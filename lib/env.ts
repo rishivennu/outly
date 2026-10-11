@@ -1,4 +1,5 @@
 import "server-only";
+import "./env-clean";
 import { z } from "zod";
 
 const schema = z.object({
