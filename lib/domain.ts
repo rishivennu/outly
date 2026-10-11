@@ -1,0 +1,114 @@
+// Shared domain vocabulary. Safe to import from client and server.
+
+export const PLATFORMS = ["instagram", "youtube", "x"] as const;
+export type Platform = (typeof PLATFORMS)[number];
+/** Planned next; the publisher registry is open to these without touching UI code. */
+export const FUTURE_PLATFORMS = ["tiktok", "facebook", "linkedin", "threads"] as const;
+export type AnyPlatform = Platform | (typeof FUTURE_PLATFORMS)[number];
+
+export type PostStatus = "draft" | "scheduled" | "publishing" | "published" | "partial" | "failed";
+export type TargetStatus = "pending" | "queued" | "uploading" | "processing" | "published" | "failed";
+export type MediaStatus = "uploaded" | "processing" | "ready" | "failed";
+export type AccountStatus = "connected" | "needs_reconnect" | "disconnected";
+
+export type ErrorCode =
+  | "AUTH_EXPIRED"
+  | "RATE_LIMITED"
+  | "MEDIA_REJECTED"
+  | "NETWORK"
+  | "PLATFORM_DOWN"
+  | "NOT_CONNECTED"
+  | "DUPLICATE"
+  | "FORBIDDEN"
+  | "NEEDS_APPROVAL"
+  | "UNKNOWN";
+
+export interface PlatformMeta {
+  id: Platform;
+  name: string;
+  format: string; // "Reel", "Short", "Post"
+  /** CSS custom property name for the brand accent */
+  colorVar: string;
+  gradient: string; // tailwind gradient classes
+  captionLimit: number;
+  titleLimit?: number;
+  maxDurationSec: number;
+  hashtagStyle: "many" | "few" | "none";
+}
+
+export const PLATFORM_META: Record<Platform, PlatformMeta> = {
+  instagram: {
+    id: "instagram",
+    name: "Instagram",
+    format: "Reel",
+    colorVar: "--instagram",
+    gradient: "from-[#f58529] via-[#dd2a7b] to-[#8134af]",
+    captionLimit: 2200,
+    maxDurationSec: 900,
+    hashtagStyle: "many",
+  },
+  youtube: {
+    id: "youtube",
+    name: "YouTube",
+    format: "Short",
+    colorVar: "--youtube",
+    gradient: "from-[#ff4d4d] to-[#c4002b]",
+    captionLimit: 5000,
+    titleLimit: 100,
+    maxDurationSec: 180,
+    hashtagStyle: "few",
+  },
+  x: {
+    id: "x",
+    name: "X",
+    format: "Post",
+    colorVar: "--x",
+    gradient: "from-[#3a3a3a] to-[#0a0a0a]",
+    captionLimit: 280,
+    maxDurationSec: 140,
+    hashtagStyle: "none",
+  },
+};
+
+/** Human copy for every error code. Technical detail stays behind a disclosure. */
+export function humanError(platform: Platform, code: ErrorCode | string | null | undefined) {
+  const name = PLATFORM_META[platform].name;
+  switch (code) {
+    case "AUTH_EXPIRED":
+    case "NOT_CONNECTED":
+      return { title: `${name} needs you to reconnect.`, action: `Reconnect ${name}`, kind: "reconnect" as const };
+    case "RATE_LIMITED":
+      return { title: `${name} asked us to slow down for a minute.`, action: "Let's try again", kind: "retry" as const };
+    case "MEDIA_REJECTED":
+      return { title: `${name} didn't like something about the video.`, action: "Let's try again", kind: "retry" as const };
+    case "NETWORK":
+    case "PLATFORM_DOWN":
+      return { title: `We couldn't reach ${name} just now.`, action: "Let's try again", kind: "retry" as const };
+    default:
+      return { title: "Something got in the way.", action: "Let's try again", kind: "retry" as const };
+  }
+}
+
+export const TARGET_COPY: Record<TargetStatus, string> = {
+  pending: "Waiting its turn",
+  queued: "Lining up…",
+  uploading: "Uploading…",
+  processing: "Making it ready…",
+  published: "Published",
+  failed: "Something got in the way",
+};
+
+export function isPlatform(v: unknown): v is Platform {
+  return typeof v === "string" && (PLATFORMS as readonly string[]).includes(v);
+}
+
+export function derivePostStatus(targets: { platformStatus: string }[], scheduled: boolean): PostStatus {
+  if (targets.length === 0) return "draft";
+  const s = targets.map((t) => t.platformStatus);
+  if (s.every((x) => x === "published")) return "published";
+  if (s.some((x) => ["queued", "uploading", "processing"].includes(x))) return "publishing";
+  if (s.every((x) => x === "failed")) return "failed";
+  if (s.some((x) => x === "failed")) return s.some((x) => x === "published") ? "partial" : "failed";
+  if (s.every((x) => x === "pending")) return scheduled ? "scheduled" : "draft";
+  return "publishing";
+}
