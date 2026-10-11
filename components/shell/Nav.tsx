@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { BarChart3, CalendarDays, ClipboardCheck, Home, LayoutGrid, MessagesSquare, Plus, Settings, Link2 } from "lucide-react";
+import { ArrowUpRight, BarChart3, CalendarDays, ClipboardCheck, Globe, Home, LayoutGrid, MessagesSquare, Plus, Settings, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -31,7 +31,7 @@ export function Sidebar() {
   return (
     <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
       <aside className="glass hairline flex h-full w-[240px] flex-col rounded-[28px] px-3 pb-4 pt-5" aria-label="Primary">
-        <Link href="/home" className="mb-6 flex items-center gap-2 rounded-2xl px-2 py-1 text-[18px]" aria-label="Outly home">
+        <Link href="/home" className="mb-6 flex items-center gap-2 rounded-2xl px-2 py-1 text-[18px] transition-opacity hover:opacity-80" aria-label="Outly dashboard" title="Dashboard">
           <OutlyLogo size={30} />
         </Link>
 
@@ -74,6 +74,11 @@ export function Sidebar() {
               {label}
             </Link>
           ))}
+          <Link href="/" className="group flex h-10 items-center gap-3 rounded-2xl px-3 text-[13.5px] text-muted-foreground transition-colors duration-200 hover:bg-foreground/[0.04] hover:text-foreground">
+            <Globe className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
+            Outly website
+            <ArrowUpRight className="ml-auto h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+          </Link>
           <ThemeToggle compact plain className="mb-1 mt-2 self-start" />
           <div className="mt-2 flex items-center gap-2 rounded-2xl p-1.5 hairline">
             <Link href="/settings" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl p-1 hover:bg-secondary/60">
@@ -116,11 +121,14 @@ export function MobileNav() {
 export function MobileTopBar() {
   return (
     <div className="sticky top-0 z-30 flex items-center justify-between gap-2 px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] lg:hidden">
-      <Link href="/home" className="flex items-center gap-2 rounded-2xl py-1 text-[16px]" aria-label="Outly home">
+      <Link href="/home" className="flex items-center gap-2 rounded-2xl py-1 text-[16px]" aria-label="Outly dashboard">
         <OutlyMark size={28} />
-        <span className="font-display text-[1.15em] font-bold tracking-[-0.045em]">outly</span>
+        <span className="hidden font-display text-[1.15em] font-bold tracking-[-0.03em] min-[420px]:inline">outly</span>
       </Link>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
+        <Link href="/" aria-label="Outly website" title="Outly website" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary">
+          <Globe className="h-[18px] w-[18px]" />
+        </Link>
         <ThemeToggle compact />
         <Link href="/approvals" data-tour="approvals" aria-label="Approvals" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary">
           <ClipboardCheck className="h-[18px] w-[18px]" />

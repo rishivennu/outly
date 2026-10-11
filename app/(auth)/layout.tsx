@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { Collectible } from "@/components/shared/Collectible";
 import { OutlyLogo } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -9,7 +11,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="animate-morph absolute -left-32 top-10 h-[560px] w-[560px] bg-lime opacity-20 blur-[120px]" />
         <div className="animate-morph absolute -bottom-40 left-1/4 h-[420px] w-[420px] bg-accent opacity-[0.18] blur-[130px] [animation-delay:-5s]" />
       </div>
-      <ThemeToggle compact className="fixed right-4 top-4 z-20" />
+      <div className="fixed right-4 top-4 z-20 flex items-center gap-2">
+        <Link href="/" className="glass hairline inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold text-foreground/85 transition-colors hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Website
+        </Link>
+        <ThemeToggle compact />
+      </div>
       <section className="relative hidden flex-col justify-between p-12 lg:flex" aria-hidden="true">
         <OutlyLogo size={34} className="text-xl" />
         <div>

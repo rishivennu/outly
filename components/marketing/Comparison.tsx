@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { Check, Minus, X, CircleHelp } from "lucide-react";
+import { Check, ChevronDown, Minus, X, CircleHelp } from "lucide-react";
 import { OutlyMark } from "@/components/brand/Logo";
 import { Shell, SectionHead } from "./bits";
 import { COMPETITORS, ROWS, ROW_GROUPS, CELL_LABEL, COMPARISON_DISCLAIMER, type Cell } from "@/lib/marketing/comparison";
@@ -29,6 +29,91 @@ function CellMark({ value, note }: { value: Cell; note?: string }) {
   );
 }
 
+/**
+ * Below lg: every tool side by side in one compact grid (icon per cell), so the whole
+ * comparison reads in one screen-height pass instead of a 4,700px sideways table.
+ * Each row opens to show the notes. The column header sticks under the nav.
+ */
+function CompactComparison() {
+  const tools = [{ id: "outly", name: "Outly" }, ...COMPETITORS.map((c) => ({ id: c.id, name: c.name }))];
+  let r = 0;
+  return (
+    <div className="mt-8 lg:hidden">
+      <div className="sticky top-[72px] z-10 -mx-2 grid grid-cols-5 gap-1 rounded-2xl bg-card/95 px-2 py-2.5 shadow-[0_0_0_1px_hsl(var(--foreground)/.08),0_10px_24px_-16px_rgba(0,0,0,.4)] backdrop-blur-md" aria-hidden="true">
+        {tools.map((t) => (
+          <span key={t.id} className={cn("flex flex-col items-center gap-1 text-center text-[11px] font-semibold leading-tight", t.id === "outly" ? "text-foreground" : "text-foreground/70")}>
+            {t.id === "outly" ? <OutlyMark size={18} /> : <span className="h-[18px]" />}
+            {t.name}
+          </span>
+        ))}
+      </div>
+      <p className="mt-3 px-1 text-[12.5px] text-foreground/60">Tap a row for the details behind each answer.</p>
+      {ROW_GROUPS.map((g) => {
+        const rows = ROWS.slice(r, r + g.rows);
+        r += g.rows;
+        return (
+          <section key={g.label} aria-label={g.label} className="mt-5">
+            <h3 className="px-1 pb-2 font-sans text-[11.5px] font-semibold uppercase tracking-[0.14em] text-foreground/60">{g.label}</h3>
+            <ul className="overflow-hidden rounded-2xl bg-card shadow-[0_0_0_1px_hsl(var(--foreground)/.08)]">
+              {rows.map((row) => {
+                const cells = [{ id: "outly", name: "Outly", cell: row.outly }, ...COMPETITORS.map((c) => ({ id: c.id, name: c.name, cell: row.cells[c.id] ?? { value: "unknown" as Cell } }))];
+                return (
+                  <li key={row.feature} className="border-t border-border first:border-t-0">
+                    <details className="group/row">
+                      <summary className="block cursor-pointer list-none px-3 py-3 [&::-webkit-details-marker]:hidden">
+                        <span className="flex items-start justify-between gap-3">
+                          <span className="font-display text-[15px] font-semibold leading-snug tracking-[-0.01em]">{row.feature}</span>
+                          <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-foreground/50 transition-transform duration-300 group-open/row:rotate-180" aria-hidden="true" />
+                        </span>
+                        <span className="mt-2.5 grid grid-cols-5 gap-1">
+                          {cells.map(({ id, name, cell }) => {
+                            const { Icon, chip } = MARK[cell.value];
+                            return (
+                              <span key={id} className={cn("grid h-8 place-items-center rounded-xl", id === "outly" && "bg-lime/[0.16] dark:bg-lime/[0.08]")}>
+                                <span className={cn("grid h-6 w-6 place-items-center rounded-full", chip)}>
+                                  <Icon className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
+                                </span>
+                                <span className="sr-only">{name}: {CELL_LABEL[cell.value]}.</span>
+                              </span>
+                            );
+                          })}
+                        </span>
+                      </summary>
+                      <dl className="grid gap-2 px-3 pb-4 text-[13.5px] leading-snug">
+                        {row.detail && <p className="text-foreground/65">{row.detail}</p>}
+                        {cells.map(({ id, name, cell }) => (
+                          <div key={id} className="flex gap-2">
+                            <dt className="w-[86px] shrink-0 font-semibold">{name}</dt>
+                            <dd className="text-foreground/75">
+                              <span className={cn("font-semibold", MARK[cell.value].tone)}>{CELL_LABEL[cell.value]}</span>
+                              {cell.note ? `. ${cell.note}` : ""}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </details>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })}
+      <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-2 px-1 text-[12.5px] text-foreground/70" aria-label="Legend">
+        {(Object.keys(MARK) as Cell[]).map((k) => {
+          const { Icon, chip } = MARK[k];
+          return (
+            <li key={k} className="inline-flex items-center gap-1.5">
+              <span className={cn("grid h-5 w-5 place-items-center rounded-full", chip)}><Icon className="h-3 w-3" strokeWidth={3} aria-hidden="true" /></span>
+              {CELL_LABEL[k]}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 const cols = COMPETITORS.length + 2;
 
 export function Comparison() {
@@ -43,17 +128,15 @@ export function Comparison() {
           body="Read this as a shape comparison, not a scoreboard. Buffer, Metricool, Later and Hootsuite each do a great deal that Outly does not, and the rows where they win are in the table too."
         />
 
-        <p className="mt-10 text-[13px] text-muted-foreground lg:hidden" aria-hidden="true">
-          Scroll the table sideways to see all four competitors.
-        </p>
+        <CompactComparison />
 
         {/* tabindex: a scroll container has to be reachable without a pointer */}
-        <Reveal y={36}>
+        <Reveal y={36} className="hidden lg:block">
         <div
           tabIndex={0}
           role="region"
           aria-label="Feature comparison table, scrollable horizontally"
-          className="-mx-5 mt-3 overflow-x-auto overscroll-x-contain px-5 pb-2 sm:mx-0 sm:px-0 lg:mt-12"
+          className="mt-12 hidden overflow-x-auto pb-2 lg:block"
         >
           <table className="w-full min-w-[980px] border-separate border-spacing-0 text-left">
             <caption className="sr-only">
@@ -123,7 +206,12 @@ export function Comparison() {
         </div>
         </Reveal>
 
-        <p className="mt-8 max-w-3xl text-[14px] leading-relaxed text-muted-foreground">{COMPARISON_DISCLAIMER}</p>
+        <details className="group/src mt-8 rounded-2xl px-4 py-3 hairline">
+          <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 text-[14px] font-semibold text-foreground/80 [&::-webkit-details-marker]:hidden">
+            How we checked, and sources
+            <ChevronDown className="h-4 w-4 transition-transform duration-300 group-open/src:rotate-180" aria-hidden="true" />
+          </summary>
+        <p className="mt-3 max-w-3xl text-[14px] leading-relaxed text-muted-foreground">{COMPARISON_DISCLAIMER}</p>
 
         <Reveal as="ul" stagger className="mt-5 grid gap-3 sm:grid-cols-2">
           {COMPETITORS.map((c) => (
@@ -141,6 +229,7 @@ export function Comparison() {
             </li>
           ))}
         </Reveal>
+        </details>
       </Shell>
     </section>
   );

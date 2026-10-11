@@ -6,7 +6,8 @@ import { cache } from "react";
 import { db } from "./db";
 import { env } from "./env";
 
-export const SESSION_COOKIE = "studio_session";
+import { SESSION_COOKIE } from "./session-cookie";
+export { SESSION_COOKIE };
 const secret = new TextEncoder().encode(env.AUTH_SECRET);
 const MAX_AGE = 60 * 60 * 24 * 14; // 14 days
 

@@ -140,10 +140,10 @@
   /* Headlines. Bricolage at display sizes: a touch condensed, tight but not crushed. */
   .display {
     font-family: var(--font-display), var(--font-body), system-ui, sans-serif;
-    font-weight: 700;
-    font-variation-settings: "wdth" 92;
-    letter-spacing: -0.022em;
-    line-height: 0.98;
+    font-weight: 650;
+    font-variation-settings: "wdth" 96, "opsz" 72;
+    letter-spacing: -0.028em;
+    line-height: 1.02;
   }
   /* The one accent word per headline: Instrument Serif italic, optically matched. */
   .accent-serif {
@@ -425,7 +425,28 @@ html:not(.dark) .o3d-floor { background: radial-gradient(closest-side, rgba(30, 
 
 /* ---------- Marketing nav ---------- */
 .mnav-bar { transition: background-color .35s var(--ease-out, ease), box-shadow .35s var(--ease-out, ease), transform .35s var(--ease-out, ease), padding .35s var(--ease-out, ease); }
-.mnav[data-scrolled="true"] .mnav-bar { background: hsl(var(--card) / .78); box-shadow: 0 0 0 1px hsl(var(--foreground) / .07), 0 18px 40px -22px rgba(0, 0, 0, .55); -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%); }
+/* Always on a near-solid surface: the hero and the dark CTA both sit behind it, and text must hold 4.5:1 over either. */
+.mnav-bar { background: hsl(var(--card) / .9); box-shadow: 0 0 0 1px hsl(var(--foreground) / .1), 0 10px 30px -18px rgba(0, 0, 0, .35); -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%); }
+.mnav[data-scrolled="true"] .mnav-bar { background: hsl(var(--card) / .96); box-shadow: 0 0 0 1px hsl(var(--foreground) / .12), 0 18px 40px -20px rgba(0, 0, 0, .5); }
+.mnav-panel { background: hsl(var(--card) / .98); box-shadow: 0 0 0 1px hsl(var(--foreground) / .1), 0 24px 60px -24px rgba(0, 0, 0, .6); transform-origin: top center; animation: mnav-drop .32s cubic-bezier(.22, 1, .36, 1); }
+@keyframes mnav-drop { from { opacity: 0; transform: translateY(-8px) scale(.98); } }
+
+/* ---------- Route change: a soft water sheet sweeps up while the page settles in ----------
+   Only transform/opacity/filter animate. Skipped on first load and under reduced motion. */
+.page-in { animation: page-in .55s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes page-in { from { opacity: 0; transform: translate3d(0, 14px, 0); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+.page-wave { position: fixed; inset: 0; z-index: 90; pointer-events: none; overflow: hidden; }
+.page-wave > i { position: absolute; left: -10%; right: -10%; height: 140vh; top: 100%; display: block; animation: wave-up .9s cubic-bezier(.65, 0, .35, 1) forwards; will-change: transform;
+  background: linear-gradient(180deg, transparent 0, hsl(var(--lime) / .16) 9%, hsl(190 95% 60% / .14) 30%, hsl(228 100% 64% / .1) 55%, transparent 100%); }
+.page-wave > i::before { content: ""; position: absolute; inset: 0 0 auto; height: 22vh; border-radius: 50% 50% 0 0 / 100% 100% 0 0; background: linear-gradient(180deg, hsl(var(--lime) / .28), hsl(190 95% 60% / .08) 70%, transparent); filter: blur(10px); }
+.page-wave > i:nth-child(2) { animation-delay: .1s; opacity: .65; left: -25%; right: -5%; }
+.page-wave > i:nth-child(2)::before { border-radius: 40% 60% 0 0 / 100% 100% 0 0; }
+@keyframes wave-up { to { transform: translate3d(0, -245vh, 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .page-in { animation: page-fade .25s linear both; }
+  .page-wave { display: none; }
+}
+@keyframes page-fade { from { opacity: 0; } }
 
 /* ---------- Scroll reveal (CSS + one IntersectionObserver, no JS animation loop) ----------
    Hidden only once JS has confirmed it runs (html.js), so content is never lost. */
@@ -547,3 +568,10 @@ html.lenis { scroll-behavior: auto !important; }
 .live-dot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: inherit; animation: live-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite; }
 @keyframes live-ping { 0% { transform: scale(1); opacity: 0.6; } 80%, 100% { transform: scale(2.6); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .live-dot::after { animation: none; } }
+
+/* ---------- Footer ---------- */
+.footer-card { background: radial-gradient(70% 90% at 100% 100%, hsl(var(--lime) / .16), transparent 60%), radial-gradient(60% 80% at 0% 100%, hsl(228 100% 64% / .12), transparent 60%), hsl(var(--card)); box-shadow: 0 0 0 1px hsl(var(--foreground) / .08), 0 30px 60px -40px rgba(0, 0, 0, .35); }
+.footer-word { font-size: clamp(5.5rem, 24vw, 17rem); letter-spacing: -0.06em; font-variation-settings: "wdth" 100, "opsz" 96; margin-bottom: -0.16em; background: linear-gradient(180deg, hsl(var(--foreground) / .16), hsl(var(--foreground) / .02) 85%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.footer-link { position: relative; transition: color .2s ease; }
+.footer-link::after { content: ""; position: absolute; left: 0; right: 0; bottom: .45rem; height: 1px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform .3s cubic-bezier(.22, 1, .36, 1); }
+.footer-link:hover::after, .footer-link:focus-visible::after { transform: scaleX(1); }
