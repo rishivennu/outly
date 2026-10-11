@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="1280" viewBox="0 0 720 1280">
+<defs>
+<radialGradient id="g" cx="70%" cy="28%" r="80%"><stop offset="0" stop-color="#6aa8ff"/><stop offset="0.55" stop-color="#2747c9"/><stop offset="1" stop-color="#0b1240"/></radialGradient>
+<filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.07 0"/></filter>
+</defs>
+<rect width="720" height="1280" fill="url(#g)"/>
+<circle cx="560" cy="330" r="230" fill="#6aa8ff" opacity="0.55"/>
+<circle cx="600" cy="300" r="120" fill="#fff" opacity="0.12"/>
+<path d="M-40 980 C 180 860, 420 1120, 760 940 L 760 1280 L -40 1280 Z" fill="#0b1240" opacity="0.65"/>
+<rect width="720" height="1280" filter="url(#n)"/>
+<text x="64" y="132" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="700" letter-spacing="6" fill="#fff" opacity="0.8">FALLEN GIANTS</text>
+<text x="64" y="856" font-family="Helvetica, Arial, sans-serif" font-size="104" font-weight="900" letter-spacing="-4" fill="#fff"><tspan x="64" dy="0">NOKIA HAD</tspan><tspan x="64" dy="112">THE IPHONE</tspan><tspan x="64" dy="112">FIRST</tspan></text>
+</svg>
