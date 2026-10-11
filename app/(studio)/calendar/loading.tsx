@@ -1,5 +1,5 @@
-import { PageSkeleton } from "@/components/shared/Skeleton";
+import { FunLoader } from "@/components/shared/FunLoader";
 
 export default function Loading() {
-  return <PageSkeleton title="Loading your calendar" cards={7} aspect="aspect-[3/4] md:min-h-[420px]" />;
+  return <FunLoader label="Laying out your week" lines={["Flipping the calendar…", "Sorting the mail bag…", "We're doing great!", "Almost there, keep going!"]} />;
 }

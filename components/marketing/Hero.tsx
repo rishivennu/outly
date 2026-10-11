@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { HeroStage } from "./HeroStage";
+import { StampChip } from "@/components/brand/Stamps";
 import { Shell } from "./bits";
 import { HERO, PLATFORM_PITCH } from "@/lib/marketing/content";
 
@@ -10,7 +11,7 @@ export function Hero() {
       <div aria-hidden="true" className="hero-glow pointer-events-none absolute inset-0" />
       <Shell className="relative flex flex-col items-center text-center">
         <p className="glass hairline inline-flex items-center gap-2 rounded-full py-1.5 pl-2 pr-4 text-[13px] font-medium text-foreground/85">
-          <span className="rounded-full bg-lime px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--lime-foreground))]">Beta</span>
+          <StampChip>Beta</StampChip>
           {HERO.eyebrow}
         </p>
         <h1 id="hero-title" className="display mt-7 max-w-[15ch] text-balance text-[clamp(2.9rem,8vw,6.25rem)]">

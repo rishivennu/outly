@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { ExternalLink, MessagesSquare, RefreshCw, Send } from "lucide-react";
+import { useRef, useState } from "react";
+import { ExternalLink, MessagesSquare, RefreshCw, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
@@ -126,6 +126,35 @@ function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: 
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [ideas, setIdeas] = useState<{ label: string; text: string }[] | null>(null);
+  const [thinking, setThinking] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+
+  const suggest = async () => {
+    setThinking(true);
+    setErr(null);
+    try {
+      const r = await api<{ suggestions: { label: string; text: string }[] }>("/api/ai/replies", {
+        method: "POST",
+        json: { comment: comment.text, author: comment.authorName, platform: comment.platform, postTitle: comment.postTitle ?? null },
+      });
+      setIdeas(r.suggestions);
+    } catch (e2) {
+      setErr(e2 instanceof ApiError ? e2.message : "Couldn't think of replies just now. Try again in a moment.");
+    } finally {
+      setThinking(false);
+    }
+  };
+
+  const pick = (t: string) => {
+    setText(t);
+    requestAnimationFrame(() => {
+      const el = input.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(t.length, t.length);
+    });
+  };
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,6 +165,7 @@ function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: 
       const r = await api<{ reply: InboxComment }>("/api/inbox/reply", { method: "POST", json: { targetId: comment.targetId, commentId: comment.id, text: text.trim() } });
       onReplied(comment.id, { ...r.reply, targetId: comment.targetId, postId: comment.postId, platform: comment.platform, postTitle: comment.postTitle, postUrl: comment.postUrl });
       setText("");
+      setIdeas(null);
     } catch (e2) {
       setErr(e2 instanceof ApiError ? e2.message : "The reply didn't go through. Let's try again.");
     } finally {
@@ -173,8 +203,37 @@ function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: 
             </ul>
           )}
 
+          {ideas && (
+            <div className="reply-ideas mt-3" role="group" aria-label="Suggested replies">
+              <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                <Sparkles className="h-3 w-3" aria-hidden="true" /> Tap one, then make it yours
+              </p>
+              <ul className="flex flex-col gap-1.5">
+                {ideas.map((s, i) => (
+                  <li key={s.text} style={{ ["--i" as string]: i }}>
+                    <button
+                      type="button"
+                      onClick={() => pick(s.text)}
+                      aria-pressed={text === s.text}
+                      className={cn(
+                        "reply-idea w-full rounded-2xl px-3.5 py-2.5 text-left text-sm transition hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                        text === s.text ? "bg-lime/15 text-foreground" : "bg-card text-foreground hover:bg-secondary",
+                      )}
+                    >
+                      <span className="mr-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-lime-ink dark:text-lime">{s.label}</span>
+                      {s.text}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <form onSubmit={send} className="mt-3 flex gap-2">
-            <Input value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="Write a reply…" aria-label={`Reply to ${comment.authorName}`} className="h-11 text-sm" />
+            <Button type="button" variant="ghost" size="icon" onClick={suggest} disabled={thinking} aria-label={ideas ? "More reply ideas" : "Suggest replies"} title="Suggest replies" className="shrink-0">
+              <Sparkles className={cn("h-4 w-4", thinking && "animate-pulse")} />
+            </Button>
+            <Input ref={input} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="Write a reply…" aria-label={`Reply to ${comment.authorName}`} className="h-11 text-sm" />
             <Button type="submit" variant="lime" size="icon" disabled={busy || !text.trim()} aria-label="Send reply">
               <Send className="h-4 w-4" />
             </Button>

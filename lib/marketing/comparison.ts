@@ -192,7 +192,7 @@ export const ROWS: Row[] = [
   },
   {
     feature: "Unified inbox and comment replies",
-    outly: { value: "partial", note: "One inbox for comments on your Reels, Shorts and X posts, with inline replies. No DMs; X comments need a paid X API tier." },
+    outly: { value: "partial", note: "One inbox for comments on your Reels, Shorts and X posts, with inline replies and AI-suggested replies. No DMs; X comments need a paid X API tier." },
     cells: {
       buffer: { value: "yes", note: "Community inbox with AI replies on every plan." },
       metricool: { value: "yes", note: "Inbox for messages and comments." },

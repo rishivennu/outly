@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Icon3D } from "@/components/brand/Icon3D";
+import { StampCluster } from "@/components/brand/Stamps";
 import { Shell } from "./bits";
 import { Reveal } from "./Reveal";
 import { FINAL_CTA } from "@/lib/marketing/content";
@@ -19,7 +20,8 @@ export function FinalCta() {
             aria-hidden="true"
             className="pointer-events-none absolute -bottom-28 -right-16 h-80 w-80 rounded-full bg-[radial-gradient(circle,hsl(var(--pink)/0.3),transparent_65%)]"
           />
-          <Reveal stagger y={20} className="relative max-w-2xl">
+          <StampCluster className="pointer-events-none absolute -right-6 top-8 hidden w-[340px] md:block lg:right-6 lg:top-1/2 lg:w-[400px] lg:-translate-y-1/2" />
+          <Reveal stagger y={20} className="relative max-w-2xl md:max-w-[52%] lg:max-w-[50%]">
             <Icon3D name="celebration" size={128} className="h-20 w-20" />
             <h2 id="cta-title" className="display mt-7 text-balance text-[clamp(2.1rem,5.6vw,3.75rem)]">
               {FINAL_CTA.title}

@@ -1,5 +1,5 @@
-import { PageSkeleton } from "@/components/shared/Skeleton";
+import { FunLoader } from "@/components/shared/FunLoader";
 
 export default function Loading() {
-  return <PageSkeleton title="Gathering your comments" cards={6} />;
+  return <FunLoader label="Collecting your comments" lines={["Reading every reply…", "Licking the stamp…", "We're doing great!", "Almost there, keep going!"]} />;
 }

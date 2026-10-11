@@ -76,3 +76,10 @@ export const platformCopyRequestSchema = z.object({
   hook: z.string().trim().min(3).max(500),
   platforms: z.array(platformSchema).min(1),
 });
+
+export const replySuggestRequestSchema = z.object({
+  comment: z.string().trim().min(1).max(2000),
+  author: z.string().trim().max(120).default(""),
+  platform: platformSchema,
+  postTitle: z.string().max(300).nullish(),
+});

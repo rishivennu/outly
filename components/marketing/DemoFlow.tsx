@@ -1,13 +1,14 @@
 "use client";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { Bookmark, Check, Heart, Info, MessageCircle, MoreHorizontal, Play, Repeat2, RotateCcw, Send, Sparkles, ThumbsUp } from "lucide-react";
+import { Check, Info, Play, RotateCcw, Sparkles } from "lucide-react";
 import { OutlyMark } from "@/components/brand/Logo";
 import { PlatformGlyph } from "@/components/shared/PlatformIcon";
 import { cn } from "@/lib/utils";
 import type { Platform } from "@/lib/domain";
 
 /*
- * v3: a mock of the real create -> publish flow, shown as the three posts it turns into.
+ * v4 "postage": a mock of the real create -> publish flow. Each destination is a stamp;
+ * the result of each job is the postmark it gets.
  * Nothing here talks to a server. Four beats loop; the last deliberately shows a failure,
  * because that is the state the product is designed around.
  *
@@ -152,9 +153,9 @@ export function DemoFlow() {
         </div>
 
         {/* the three posts it becomes */}
-        <ul className="demo-rail relative flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 py-5 sm:px-6 sm:py-6 md:grid md:grid-cols-3 md:overflow-visible" aria-label="Destinations">
+        <ul className="demo-rail relative flex snap-x snap-mandatory gap-6 overflow-x-auto px-5 pb-6 pt-8 sm:px-8 md:grid md:grid-cols-3 md:gap-8 md:overflow-visible md:pt-10" aria-label="Destinations">
           {ORDER.map((p, i) => (
-            <PostCard key={p} p={p} i={i} beat={beat} retry={retry} onRetry={() => setRetry("running")} />
+            <StampCard key={p} p={p} i={i} beat={beat} retry={retry} onRetry={() => setRetry("running")} />
           ))}
         </ul>
       </div>
@@ -172,37 +173,79 @@ export function DemoFlow() {
   );
 }
 
-function PostCard({ p, i, beat, retry, onRetry }: { p: Platform; i: number; beat: Beat; retry: Retry; onRetry: () => void }) {
+const STAMP: Record<Platform, { big: string; ratio: string; no: string; ink: string }> = {
+  instagram: { big: "REELS", ratio: "9:16", no: "No.01", ink: "#b0186a" },
+  youtube: { big: "SHORTS", ratio: "9:16", no: "No.02", ink: "#c4161c" },
+  x: { big: "POST", ratio: "16:9", no: "No.03", ink: "#16161a" },
+};
+
+/**
+ * One destination as a perforated postage stamp, printed in that platform's ink.
+ * Beat 0: blank paper. 1: the ink prints in with the AI copy. 2: the stamp lifts and the
+ * airmail meter runs. 3: a rubber postmark lands (or a red "return to sender").
+ */
+function StampCard({ p, i, beat, retry, onRetry }: { p: Platform; i: number; beat: Beat; retry: Retry; onRetry: () => void }) {
   const c = COPY[p];
+  const st = STAMP[p];
   const s = state(p, beat, retry);
-  const drafted = beat >= 1;
   const live = s.tone === "done";
+  const mark = beat === 3 ? (live ? "posted" : s.tone === "fail" ? "returned" : "transit") : null;
 
   return (
     <li
-      className={cn("demo-post relative flex w-[78%] shrink-0 snap-center flex-col overflow-hidden rounded-[22px] bg-background hairline sm:w-[46%] md:w-auto", beat === 0 && "is-wait", s.tone === "fail" && "is-fail", live && "is-done")}
-      style={{ ["--i" as string]: i, ["--pc" as string]: `hsl(var(--${p}))` }}
+      className={cn("stamp-item relative flex w-[80%] shrink-0 snap-center flex-col sm:w-[46%] md:w-auto", s.tone === "fail" && "is-fail", live && "is-done")}
+      style={{ ["--i" as string]: i, ["--ink" as string]: st.ink, ["--tilt" as string]: `${[-2.2, 1.4, -1][i]}deg` }}
     >
-      {/* platform header */}
-      <div className="flex items-center gap-2.5 px-3.5 pb-2.5 pt-3">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full" style={{ background: `hsl(var(--${p}) / 0.14)`, color: `hsl(var(--${p}))` }}>
-          <PlatformGlyph platform={p} className="h-3.5 w-3.5" />
-        </span>
-        <span className="text-sm font-semibold">{c.name}</span>
-        <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{c.format}</span>
-        <MoreHorizontal className="ml-auto h-4 w-4 text-muted-foreground/70" aria-hidden="true" />
+      <div className="stamp-wrap">
+        <div className={cn("stamp-perf", mark && "is-marked")} data-mark={mark ?? undefined}>
+          <div className="stamp-face">
+            {/* header band: big condensed name + the corner block, as on a real issue */}
+            <div className="stamp-ink flex items-stretch gap-1.5">
+              <p className="stamp-title flex-1">{st.big}</p>
+              <div className="stamp-corner">
+                <span className="flex gap-[3px]" aria-hidden="true">
+                  <i /><i /><i />
+                </span>
+                <span className="tabular">{st.ratio}</span>
+              </div>
+            </div>
+
+            {/* the vignette: the same desk video, duotoned in this platform's ink */}
+            <div className="stamp-ink stamp-vignette relative mt-1.5 flex-1">
+              <DeskScene />
+              <span className="stamp-ai">
+                <Sparkles className="h-3 w-3" aria-hidden="true" /> AI {c.field.toLowerCase()}
+              </span>
+              <span className="absolute inset-0 grid place-items-center" aria-hidden="true">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-[#f6f0e1]/90 text-[var(--ink)]">
+                  <Play className="ml-0.5 h-3.5 w-3.5 fill-current" />
+                </span>
+              </span>
+            </div>
+
+            <p className={cn("stamp-ink stamp-copy mt-2", p === "youtube" && "font-bold")}>
+              {c.text} {c.tags && <span className="opacity-70">{c.tags}</span>}
+            </p>
+
+            <div className="stamp-ink mt-2 flex items-center justify-between border-t-[1.5px] border-[var(--ink)] pt-1.5 text-[10px] font-bold uppercase tracking-[0.14em]">
+              <span className="inline-flex items-center gap-1.5">
+                <PlatformGlyph platform={p} className="h-3 w-3" /> {c.name} {c.format}
+              </span>
+              <span className="tabular">{st.no}</span>
+            </div>
+
+            {/* beat 0: un-inked paper */}
+            <div className="stamp-blank" aria-hidden="true">
+              <span /><span /><span />
+            </div>
+          </div>
+        </div>
+        {mark && <Postmark kind={mark} key={`${mark}-${retry}`} />}
       </div>
 
-      {/* native preview, fixed height so nothing jumps between beats */}
-      <div className="relative h-[268px] px-3.5 pb-1">
-        {p === "x" ? <XBody c={c} drafted={drafted} /> : <VerticalBody p={p} c={c} drafted={drafted} />}
-        {/* during upload every preview is a skeleton */}
-        <div className={cn("demo-skel absolute inset-0 mx-3.5 rounded-[14px]", beat === 0 && "is-on")} aria-hidden="true" />
-      </div>
-
-      {/* job status */}
-      <div className="mt-auto border-t border-border/70 px-3.5 py-3">
-        <div className="flex min-h-[32px] items-center gap-2">
+      {/* job status, on the page rather than on the stamp so it stays readable */}
+      <div className="mt-4 px-1">
+        <div className="flex min-h-[36px] items-center gap-2">
           {s.tone === "fail" ? (
             <>
               <span key="fail" className="demo-chip inline-flex items-center gap-1.5 text-xs font-semibold text-destructive">
@@ -217,7 +260,7 @@ function PostCard({ p, i, beat, retry, onRetry }: { p: Platform; i: number; beat
               </button>
             </>
           ) : (
-            <span key={s.status} className={cn("demo-chip inline-flex items-center gap-1.5 text-xs font-medium", TONE_TEXT[s.tone])}>
+            <span key={s.status} className={cn("demo-chip inline-flex items-center gap-1.5 text-xs font-semibold", TONE_TEXT[s.tone])}>
               {live ? (
                 <span className="demo-tick grid h-5 w-5 place-items-center rounded-full bg-success/15">
                   <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
@@ -229,84 +272,70 @@ function PostCard({ p, i, beat, retry, onRetry }: { p: Platform; i: number; beat
             </span>
           )}
         </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary" aria-hidden="true">
+        <div className={cn("stamp-meter mt-2", s.tone === "work" && "is-work", live && "is-done", s.tone === "fail" && "is-fail")} aria-hidden="true">
           <span
-            className="demo-bar block h-full origin-left rounded-full"
             style={{
-              backgroundColor: s.tone === "fail" ? "hsl(var(--destructive))" : live ? "hsl(var(--success))" : "hsl(var(--accent))",
               transform: `scaleX(${beat >= 2 ? s.fill : 0})`,
               transitionDuration: beat === 2 ? `${BEAT_MS * 0.9}ms` : retry === "running" ? "1400ms" : "900ms",
             }}
           />
         </div>
-        <p key={s.note} className="demo-chip mt-2 line-clamp-2 min-h-[32px] text-[11px] leading-4 text-muted-foreground">{s.note}</p>
+        <p key={s.note} className="demo-chip mt-2 line-clamp-2 min-h-[32px] text-[12px] leading-4 text-muted-foreground">{s.note}</p>
       </div>
     </li>
   );
 }
 
-/** Instagram Reel and YouTube Short: the same vertical video, each platform's own chrome. */
-function VerticalBody({ p, c, drafted }: { p: Platform; c: (typeof COPY)[Platform]; drafted: boolean }) {
-  const yt = p === "youtube";
+/** A tiny desk-setup illustration (monitor, lamp, plant) in paper colour, sitting on the ink. */
+function DeskScene() {
   return (
-    <div className="demo-video relative h-full overflow-hidden rounded-[14px]">
-      <span className="demo-video-sheen" aria-hidden="true" />
-      <span className={cn("demo-ai absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-lime", drafted && "is-on")}>
-        <Sparkles className="h-3 w-3" aria-hidden="true" /> AI {c.field.toLowerCase()}
-      </span>
-      <span className="absolute inset-0 grid place-items-center" aria-hidden="true">
-        <span className="grid h-11 w-11 place-items-center rounded-full bg-white/25 text-white backdrop-blur-sm">
-          <Play className="ml-0.5 h-4 w-4 fill-current" />
-        </span>
-      </span>
-      {/* side rail of actions, as each app draws it */}
-      <span className="absolute bottom-16 right-2.5 flex flex-col items-center gap-3 text-white/90" aria-hidden="true">
-        {yt ? <ThumbsUp className="h-4 w-4" /> : <Heart className="h-4 w-4" />}
-        <MessageCircle className="h-4 w-4" />
-        {yt ? <Repeat2 className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-        {!yt && <Bookmark className="h-4 w-4" />}
-      </span>
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/35 to-transparent px-3 pb-3 pt-10 text-white">
-        <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold">
-          <span className="h-4 w-4 rounded-full bg-white/80" aria-hidden="true" /> {yt ? "@yourchannel" : "yourhandle"}
-        </p>
-        <div className="relative min-h-[48px] pr-8">
-          <p className={cn("demo-type text-[12px] leading-snug", yt && "font-semibold", drafted && "is-on")}>
-            {c.text} {c.tags && <span className="text-white/75">{c.tags}</span>}
-          </p>
-        </div>
-      </div>
-      <span className="demo-playhead" aria-hidden="true" />
-    </div>
+    <svg viewBox="0 0 160 120" className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <circle cx="122" cy="30" r="16" fill="#f6f0e1" opacity=".28" />
+      <rect x="0" y="92" width="160" height="28" fill="#f6f0e1" opacity=".18" />
+      <rect x="38" y="34" width="62" height="40" rx="4" fill="none" stroke="#f6f0e1" strokeWidth="3.5" />
+      <rect x="44" y="40" width="50" height="28" rx="1.5" fill="#f6f0e1" opacity=".22" />
+      <path d="M64 74v12M54 88h30" stroke="#f6f0e1" strokeWidth="3.5" strokeLinecap="round" />
+      <path d="M20 90V58l14-12" stroke="#f6f0e1" strokeWidth="3" strokeLinecap="round" fill="none" />
+      <path d="M28 44l12 6-4 6z" fill="#f6f0e1" />
+      <path d="M118 90c-6-10-2-22 6-26 6 6 8 18 2 26z" fill="#f6f0e1" opacity=".9" />
+      <path d="M128 90c2-12 10-18 18-18-2 10-8 16-18 18z" fill="#f6f0e1" opacity=".7" />
+      <rect x="114" y="88" width="20" height="8" rx="2" fill="#f6f0e1" />
+      <path d="M0 96h160" stroke="#f6f0e1" strokeWidth="3" />
+    </svg>
   );
 }
 
-/** X: text first, the video as an attached card underneath. */
-function XBody({ c, drafted }: { c: (typeof COPY)[Platform]; drafted: boolean }) {
+/** Rubber postmarks. SVG so the ring text and the cancellation waves stay crisp at any size. */
+function Postmark({ kind }: { kind: "posted" | "transit" | "returned" }) {
+  if (kind === "returned")
+    return (
+      <span className="postmark postmark-box" aria-hidden="true">
+        <span className="block text-[9px] tracking-[0.3em]">Return to</span>
+        <span className="block text-[17px] leading-none tracking-[0.06em]">SENDER</span>
+        <span className="block text-[8px] tracking-[0.2em]">too long for tier</span>
+      </span>
+    );
+  const label = kind === "posted" ? "POSTED" : "IN TRANSIT";
   return (
-    <div className="flex h-full flex-col">
-      <div className="relative min-h-[60px]">
-        <span className={cn("demo-ai mb-1 inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-semibold text-lime-ink dark:text-lime", drafted && "is-on")}>
-          <Sparkles className="h-3 w-3" aria-hidden="true" /> AI {c.field.toLowerCase()}
-        </span>
-        <p className={cn("demo-type text-[13px] leading-snug text-foreground/90", drafted && "is-on")}>{c.text}</p>
-      </div>
-      <div className="demo-video relative mt-2 min-h-0 flex-1 overflow-hidden rounded-[14px]">
-        <span className="demo-video-sheen" aria-hidden="true" />
-        <span className="absolute inset-0 grid place-items-center" aria-hidden="true">
-          <span className="grid h-10 w-10 place-items-center rounded-full bg-white/25 text-white backdrop-blur-sm">
-            <Play className="ml-0.5 h-4 w-4 fill-current" />
-          </span>
-        </span>
-        <span className="absolute bottom-2 left-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white tabular">0:28</span>
-      </div>
-      <div className="mb-1 mt-2.5 flex items-center justify-between px-1 text-muted-foreground/70" aria-hidden="true">
-        <MessageCircle className="h-4 w-4" />
-        <Repeat2 className="h-4 w-4" />
-        <Heart className="h-4 w-4" />
-        <Bookmark className="h-4 w-4" />
-      </div>
-    </div>
+    <svg viewBox="0 0 220 110" className={cn("postmark", kind === "transit" && "postmark-transit")} aria-hidden="true">
+      <defs>
+        <path id={`pm-ring-${kind}`} d="M55 55 m-38 0 a38 38 0 1 1 76 0 a38 38 0 1 1 -76 0" />
+      </defs>
+      <circle cx="55" cy="55" r="48" fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray={kind === "transit" ? "6 5" : undefined} />
+      <circle cx="55" cy="55" r="29" fill="none" stroke="currentColor" strokeWidth="2" />
+      <text fontSize="10.5" fontWeight="800" letterSpacing="2.4" fill="currentColor">
+        <textPath href={`#pm-ring-${kind}`} startOffset="2%">OUTLY POST · ONE UPLOAD · EVERYWHERE ·</textPath>
+      </text>
+      <text x="55" y={kind === "posted" ? 59 : 53} textAnchor="middle" fontSize={kind === "posted" ? 12.5 : 10} fontWeight="900" letterSpacing="1" fill="currentColor">
+        {kind === "posted" ? label : "IN"}
+      </text>
+      {kind === "transit" && (
+        <text x="55" y="65" textAnchor="middle" fontSize="10" fontWeight="900" letterSpacing="1" fill="currentColor">TRANSIT</text>
+      )}
+      {[34, 46, 58, 70].map((y) => (
+        <path key={y} d={`M112 ${y} q12 -7 24 0 t24 0 t24 0 t24 0`} fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+      ))}
+    </svg>
   );
 }
 

@@ -154,7 +154,7 @@ export function Assistant(p: Props) {
               </div>
 
               <div className={cn("relative overflow-hidden rounded-3xl p-[1.5px]", p.chosenHook ? "bg-border" : "lime-bg")}>
-                <div className="relative rounded-[calc(1.5rem-1.5px)] bg-card p-5">
+                <div className="relative rounded-[calc(1.5rem-1.5px)] bg-card p-5 text-foreground">
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <p className="eyebrow !text-foreground">Suggested</p>
                     {current && (

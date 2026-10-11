@@ -5,8 +5,8 @@ let seen = false; // module scope: survives route changes, resets on a full relo
 
 /**
  * Wraps a route segment (used from template.tsx, which remounts on every navigation).
- * The page settles in with a short rise and blur-clear while a translucent water sheet
- * sweeps up across the screen. The very first load gets neither, so nothing delays paint.
+ * The page settles in with a short rise and blur-clear while a three-layer water wave with
+ * rolling crests sweeps up and splashes across the screen. The very first load gets neither, so nothing delays paint.
  */
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const [first] = useState(() => !seen);
@@ -14,7 +14,7 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     seen = true;
     if (!wave) return;
-    const t = setTimeout(() => setWave(false), 1100);
+    const t = setTimeout(() => setWave(false), 1700);
     return () => clearTimeout(t);
   }, [wave]);
   return (
@@ -22,8 +22,11 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
       <div className={first ? undefined : "page-in"}>{children}</div>
       {wave && (
         <div className="page-wave" aria-hidden="true">
-          <i />
-          <i />
+          <div className="pw-sheet"><span className="pw-crest" /></div>
+          <div className="pw-sheet"><span className="pw-crest" /></div>
+          <div className="pw-sheet"><span className="pw-crest" /></div>
+          <span className="pw-ripple" />
+          <span className="pw-ripple" />
         </div>
       )}
     </>
