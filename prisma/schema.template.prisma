@@ -1,0 +1,157 @@
+// Source of truth. Production DB = Supabase Postgres (DATABASE_URL pooled :6543, DIRECT_URL :5432 for migrations).
+// `bun run scripts/prisma-provider.mjs` writes schema.prisma with the provider from DATABASE_PROVIDER.
+// No enums / Json so the same schema runs on SQLite (dev) and PostgreSQL (prod). Status values are typed in lib/domain.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "__PROVIDER__"
+  url      = env("DATABASE_URL")
+  __DIRECT_URL__
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String? // only for AUTH_PROVIDER=local; Supabase Auth owns passwords otherwise
+  authId       String?  @unique // Supabase auth.users.id
+  avatar       String?
+  timezone     String   @default("Asia/Kolkata")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  socialAccounts SocialAccount[]
+  media          Media[]
+  posts          Post[]
+}
+
+model SocialAccount {
+  id             String    @id @default(cuid())
+  userId         String
+  platform       String // instagram | youtube | x | tiktok | facebook | linkedin | threads
+  platformUserId String
+  username       String
+  displayName    String?
+  avatar         String?
+  accessToken    String // AES-256-GCM encrypted, never sent to the client
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  metadata       String? // JSON string
+  status         String    @default("connected") // connected | needs_reconnect | disconnected
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targets PostTarget[]
+
+  @@unique([userId, platform, platformUserId])
+  @@index([userId])
+}
+
+model Media {
+  id               String   @id @default(cuid())
+  userId           String
+  originalFilename String
+  storageKey       String
+  thumbnailKey     String?
+  mimeType         String
+  size             Int
+  duration         Float?
+  width            Int?
+  height           Int?
+  status           String   @default("uploaded") // uploading | uploaded | processing | ready | failed
+  createdAt        DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts Post[]
+
+  @@index([userId])
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  userId      String
+  mediaId     String
+  title       String? // internal working title
+  story       String? // creator's description of the video
+  hook        String? // chosen hook
+  status      String    @default("draft") // draft | scheduled | publishing | published | partial | failed
+  requireApproval Boolean @default(false) // publishing is blocked until a reviewer approves
+  scheduledAt DateTime?
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media   Media        @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  targets PostTarget[]
+  reviews ReviewRequest[]
+
+  @@index([userId, status])
+  @@index([userId, scheduledAt])
+}
+
+model PostTarget {
+  id              String    @id @default(cuid())
+  postId          String
+  socialAccountId String?
+  platform        String
+  title           String?
+  caption         String?
+  description     String?
+  hashtags        String? // space separated
+  platformStatus  String    @default("pending") // pending | queued | uploading | processing | published | failed
+  uploadRef       String? // platform upload handle between SOCIAL_UPLOAD and SOCIAL_PUBLISH
+  platformPostId  String?
+  platformUrl     String?
+  errorCode       String?
+  errorMessage    String?
+  attempts        Int       @default(0)
+  practice        Boolean   @default(false) // true = rehearsal through MockPublisher; never shown as a real post
+  publishRequestedAt DateTime? // set just before the irreversible "go public" call; a retry reconciles first
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  post          Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount? @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+  metrics       TargetMetric[]
+
+  @@unique([postId, platform])
+  @@index([platformStatus])
+}
+
+model TargetMetric {
+  id         String   @id @default(cuid())
+  targetId   String
+  capturedAt DateTime @default(now())
+  views      Int      @default(0)
+  likes      Int      @default(0)
+  comments   Int      @default(0)
+  shares     Int      @default(0)
+
+  target PostTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@index([targetId, capturedAt])
+}
+
+/// A share-by-link review. The link is the credential, so only its SHA-256 hash is stored and
+/// exactly one decision is ever accepted per token.
+model ReviewRequest {
+  id           String    @id @default(cuid())
+  postId       String
+  tokenHash    String    @unique
+  reviewerName String?
+  status       String    @default("pending") // pending | approved | changes_requested
+  note         String?
+  createdAt    DateTime  @default(now())
+  decidedAt    DateTime?
+  expiresAt    DateTime
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+}
