@@ -11,9 +11,11 @@ const OPEN_PREFIX = ["/review/", "/r/", "/team/accept"];
 const HINT = "outlly_in";
 // Readable "waitlist is on" hint, so cached marketing pages can relabel their signup buttons.
 const WL_HINT = "outlly_wl";
-// Admin-only hint: which switches are on ("m", "w", "mw"). Admins skip the maintenance page on purpose,
-// so without this they'd see the normal site and think the switch did nothing. Read by AdminSiteBar.
-const AF_HINT = "outlly_af";
+// Waitlist on: the whole public site becomes the waitlist page (user's call, 10-12g). These still work:
+// the waitlist page itself, the legal pages its form links to, and links that are their own credential
+// (emailed invites, team invites, client review links, share links).
+const WAITLIST_OPEN = ["/waitlist", "/privacy", "/terms"];
+const WAITLIST_PREFIX = ["/review/", "/r/", "/team/accept"];
 
 function sync(req: NextRequest, res: NextResponse, name: string, on: boolean, maxAge: number) {
   const has = req.cookies.get(name)?.value === "1";
@@ -63,15 +65,8 @@ async function isAdmin(req: NextRequest) {
 
 export async function middleware(req: NextRequest) {
   const res = await route(req);
-  const { pathname } = req.nextUrl;
-  if (pathname === "/admin" || pathname.startsWith("/admin/")) return res;
-  const f = status;
-  const want = f && (f.maintenance || f.waitlist) && (await isAdmin(req)) ? `${f.maintenance ? "m" : ""}${f.waitlist ? "w" : ""}` : "";
-  const have = req.cookies.get(AF_HINT)?.value ?? "";
-  if (want !== have) {
-    if (want) res.cookies.set(AF_HINT, want, { path: "/", sameSite: "lax", secure: req.nextUrl.protocol === "https:", maxAge: 60 * 60 * 12 });
-    else res.cookies.delete(AF_HINT);
-  }
+  // The old admin-only notice bar is gone; clear its cookie from browsers that still have it.
+  if (req.cookies.get("outlly_af")) res.cookies.delete("outlly_af");
   return res;
 }
 
@@ -79,8 +74,15 @@ async function route(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const adminArea = pathname === "/admin" || pathname.startsWith("/admin/");
   const flags = adminArea ? null : await siteFlags(req);
-  if (flags && pathname !== "/maintenance" && flags.maintenance && !(await isAdmin(req))) {
+  // Maintenance on: every public page shows the maintenance page, admins included (user's call, 10-12g).
+  // Only /admin stays reachable, so the switch can be turned off again.
+  if (flags && pathname !== "/maintenance" && flags.maintenance) {
     return NextResponse.rewrite(new URL("/maintenance", req.url));
+  }
+  // Waitlist on: every public page sends you to the waitlist, admins included.
+  if (flags?.waitlist && !WAITLIST_OPEN.includes(pathname) && !WAITLIST_PREFIX.some((p) => pathname.startsWith(p))) {
+    const invited = pathname === "/signup" && (req.nextUrl.searchParams.has("invite") || (req.nextUrl.searchParams.get("next") ?? "").startsWith("/team/accept"));
+    if (!invited) return NextResponse.redirect(new URL("/waitlist", req.url));
   }
   // Admin has its own session. Middleware only checks the cookie is there; every admin page
   // and API re-verifies the signature, the role and the password fingerprint on the server.

@@ -126,8 +126,8 @@ export function MobileTopBar() {
   return (
     <div className="sticky top-0 z-30 flex items-center justify-between gap-2 px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] lg:hidden">
       <Link href="/home" className="flex min-w-0 shrink-0 items-center gap-2 rounded-2xl py-1 text-[16px]" aria-label="Outlly dashboard">
-        <OutlyMark size={28} />
-        <span className="hidden font-display text-[1.15em] font-bold tracking-[-0.03em] min-[480px]:inline">outlly</span>
+        <OutlyMark size={26} className="min-[480px]:hidden" />
+        <OutlyLogo className="hidden min-[480px]:inline-flex" />
       </Link>
       <div className="flex min-w-0 items-center gap-0.5">
         <Link href="/" aria-label="Outlly website" title="Outlly website" className="hidden h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary min-[420px]:grid">

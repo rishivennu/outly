@@ -24,18 +24,20 @@ export function OutlyMark({
 }) {
   const common = { width: size, height: size, alt: "", "aria-hidden": true as const, decoding: "async" as const, draggable: false };
   if (variant === "icon") {
-    const deep = "/brand/rocket/rocket-deep-256.png";
-    const lime = "/brand/rocket/rocket-256.png";
+    // Same lime gradient in both themes (user's call, 10-12g). Light mode gets the deepened copy:
+    // bright lime is 1.2-1.5:1 on cream (invisible); this one is >= 3.3:1 and keeps the gradient.
+    const onLight = "/brand/rocket/rocket-lime-ink-256.png";
+    const onDark = "/brand/rocket/rocket-256.png";
     const base = "shrink-0 select-none object-contain";
     if (tone !== "auto")
       // eslint-disable-next-line @next/next/no-img-element
-      return <img src={tone === "light" ? deep : lime} {...common} className={cn(base, className)} />;
+      return <img src={tone === "light" ? onLight : onDark} {...common} className={cn(base, className)} />;
     return (
       <>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={deep} {...common} className={cn(base, "dark:hidden", className)} />
+        <img src={onLight} {...common} className={cn(base, "dark:hidden", className)} />
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={lime} {...common} className={cn(base, "hidden dark:block", className)} />
+        <img src={onDark} {...common} className={cn(base, "hidden dark:block", className)} />
       </>
     );
   }
@@ -61,11 +63,21 @@ export function OutlyMark({
   );
 }
 
+/**
+ * Mark + wordmark. The rocket is sized from the wordmark's own font (em), not pixels, so it always
+ * matches the letters: MARK_EM of the wordmark size, centred on the word with a tight gap.
+ * The wordmark keeps its size (1.15em of the surrounding text); `size` only matters with label={false}.
+ */
+const MARK_EM = 1.08; // a touch taller than the letters, centred on them (user: "make it bigger", 10-12g)
+
 export function OutlyLogo({ size = 28, className, label = true, tone = "auto" }: { size?: number; className?: string; label?: boolean; tone?: "auto" | "light" | "dark" }) {
+  if (!label) return <OutlyMark size={size} tone={tone} className={className} />;
   return (
-    <span className={cn("inline-flex items-center gap-2", className)}>
-      <OutlyMark size={size} tone={tone} />
-      {label && <span className="font-display text-[1.15em] font-bold tracking-[-0.045em]">outlly</span>}
+    <span className={cn("inline-flex", className)}>
+      <span className="inline-flex items-center gap-[0.16em] font-display text-[1.15em] font-bold leading-none tracking-[-0.045em]" style={{ ["--mk" as string]: `${MARK_EM}em` }}>
+        <OutlyMark size={size} tone={tone} className="h-[var(--mk)] w-[var(--mk)]" />
+        <span>outlly</span>
+      </span>
     </span>
   );
 }

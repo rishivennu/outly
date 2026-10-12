@@ -5,7 +5,7 @@ import { useSignedIn } from "./useSignedIn";
 import { useWaitlist } from "./useWaitlist";
 import { usePathname } from "next/navigation";
 import { ArrowRight, LayoutDashboard, Menu, X } from "lucide-react";
-import { OutlyMark } from "@/components/brand/Logo";
+import { OutlyLogo } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { cn } from "@/lib/utils";
 
@@ -116,8 +116,7 @@ export function MarketingNav() {
     <header className="mnav sticky top-0 z-50 px-3 pt-3 sm:px-6" data-scrolled={scrolled || open}>
       <div ref={barRef} className="mnav-bar mx-auto flex h-14 max-w-[1180px] items-center gap-2 rounded-full pl-3 pr-1.5 sm:h-[60px] sm:pl-4">
         <Link href="/" className="flex h-11 items-center gap-2 rounded-full pr-2" aria-label="Outlly home">
-          <OutlyMark size={28} />
-          <span className="font-display text-[20px] font-bold tracking-[-0.045em]">outlly</span>
+          <OutlyLogo className="text-[17.4px]" />
         </Link>
 
         <nav aria-label="Sections" className="mx-auto hidden lg:block">

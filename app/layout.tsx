@@ -5,7 +5,6 @@ import { themeScript } from "@/lib/theme/script";
 import { CookieBanner } from "@/components/shared/CookieConsent";
 import { Connectivity, Ripples } from "@/components/shared/Connectivity";
 import { ChatWidget } from "@/components/support/ChatWidget";
-import { AdminSiteBar } from "@/components/shared/AdminSiteBar";
 import "./globals.css";
 
 /*
@@ -37,7 +36,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="font-sans antialiased">
         <MotionRoot>
-          <AdminSiteBar />
           {children}
           <ChatWidget />
           <CookieBanner />
