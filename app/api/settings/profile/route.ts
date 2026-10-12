@@ -16,10 +16,11 @@ const schema = z.object({
       }
     }, "That time zone doesn't look right")
     .optional(),
+  weeklyReport: z.boolean().optional(),
 });
 
 export const PATCH = route(async (req, { user }) => {
   const body = schema.parse(await req.json());
-  const u = await db.user.update({ where: { id: user.id }, data: body, select: { name: true, timezone: true } });
+  const u = await db.user.update({ where: { id: user.id }, data: body, select: { name: true, timezone: true, weeklyReport: true } });
   return json({ user: u });
 });
