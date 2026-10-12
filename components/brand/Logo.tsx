@@ -1,28 +1,44 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Outlly mark (2026-10 rebrand): the lime-gradient rocket on a rounded tile.
- * The tile contrasts with the theme (user's call, 10-12c): the near-black tile in light mode,
- * the white tile in dark mode, so the mark always pops off the page.
+ * Outlly mark (2026-10 rebrand). Default (10-12f, user's call): the bare rocket, no tile.
+ * Light mode gets the deep-green rocket (4.4:1 on cream), dark mode the lime rocket.
  * Both are rendered and CSS shows one, so there is no flash and no client JS.
  * Raster on purpose: the gradient + white streak are the supplied artwork, not a redraw.
- * `variant` picks tile (default), bare lime glyph, ink glyph (on lime) or white glyph.
- * `tone` pins a tile colour when it sits on a surface that does not follow the theme.
+ * `variant`: icon (default), tile (old rounded tile, for app-icon spots), glyph (lime), ink, white.
+ * `tone` pins a colour when it sits on a surface that does not follow the theme
+ * ("light" = sits on a light surface, "dark" = sits on a dark surface).
  */
 const px = (size: number) => (size <= 32 ? 64 : size <= 64 ? 128 : size <= 128 ? 256 : 512);
 
 export function OutlyMark({
   size = 28,
   className,
-  variant = "tile",
+  variant = "icon",
   tone = "auto",
 }: {
   size?: number;
   className?: string;
-  variant?: "tile" | "glyph" | "ink" | "white";
+  variant?: "icon" | "tile" | "glyph" | "ink" | "white";
   tone?: "auto" | "light" | "dark";
 }) {
   const common = { width: size, height: size, alt: "", "aria-hidden": true as const, decoding: "async" as const, draggable: false };
+  if (variant === "icon") {
+    const deep = "/brand/rocket/rocket-deep-256.png";
+    const lime = "/brand/rocket/rocket-256.png";
+    const base = "shrink-0 select-none object-contain";
+    if (tone !== "auto")
+      // eslint-disable-next-line @next/next/no-img-element
+      return <img src={tone === "light" ? deep : lime} {...common} className={cn(base, className)} />;
+    return (
+      <>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={deep} {...common} className={cn(base, "dark:hidden", className)} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={lime} {...common} className={cn(base, "hidden dark:block", className)} />
+      </>
+    );
+  }
   if (variant !== "tile") {
     const src = `/brand/rocket/${variant === "glyph" ? "rocket" : variant === "ink" ? "rocket-ink" : "rocket-white"}-256.png`;
     // eslint-disable-next-line @next/next/no-img-element

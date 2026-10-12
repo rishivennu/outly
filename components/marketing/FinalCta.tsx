@@ -66,6 +66,8 @@ function Wall({ tiles, side }: { tiles: Tile[]; side: "l" | "r" }) {
   );
 }
 
+const ROW: Brand[] = ["instagram", "tiktok", "youtube", "linkedin", "x"];
+
 const SENT: { brand: Brand; name: string; what: string }[] = [
   { brand: "instagram", name: "Instagram", what: "Reel" },
   { brand: "youtube", name: "YouTube", what: "Short" },
@@ -135,7 +137,12 @@ export function FinalCta() {
               <p className="mt-3 text-[13px] text-[hsl(var(--ap-ink2))]">Free while in beta. No card needed.</p>
             </Reveal>
 
-            <div aria-hidden="true" className="fc-stage relative mx-auto mt-12 flex h-[400px] max-w-[1000px] items-start justify-center gap-3 sm:mt-14 sm:h-[460px] sm:gap-4">
+            {/* Phones: the destinations as one row that always fits (the side walls need 768px). */}
+            <div aria-hidden="true" className="mx-auto mt-10 flex max-w-full justify-center gap-2 md:hidden">
+              {ROW.map((b) => <AppIcon key={b} brand={b} size={38} />)}
+            </div>
+
+            <div aria-hidden="true" className="fc-stage relative mx-auto mt-8 md:mt-12 flex h-[400px] max-w-[1000px] items-start justify-center gap-3 sm:mt-14 sm:h-[460px] sm:gap-4">
               <Wall tiles={LEFT} side="l" />
               <CtaPhone />
               <Wall tiles={RIGHT} side="r" />

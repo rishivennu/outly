@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { ArrowUpRight, BarChart3, CreditCard, LifeBuoy, CalendarDays, ClipboardCheck, Globe, Home, LayoutGrid, MessagesSquare, Plus, Settings, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
-import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { ThemeCycleButton, ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useUser } from "./UserContext";
 
 const MAIN = [
@@ -103,7 +103,6 @@ export function Sidebar() {
 
 export function MobileNav() {
   const path = usePathname();
-  if (path.startsWith("/create")) return null; // Create owns the bottom of the screen on mobile.
   return (
     <nav aria-label="Primary" className="glass-strong fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-40 flex h-[68px] items-center justify-around rounded-[28px] px-1 lg:hidden">
       {MAIN.filter((m) => m.href !== "/approvals").map(({ href, label, icon: Icon }) => {
@@ -126,12 +125,12 @@ export function MobileTopBar() {
   const { workspace } = useUser();
   return (
     <div className="sticky top-0 z-30 flex items-center justify-between gap-2 px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] lg:hidden">
-      <Link href="/home" className="flex items-center gap-2 rounded-2xl py-1 text-[16px]" aria-label="Outlly dashboard">
+      <Link href="/home" className="flex min-w-0 shrink-0 items-center gap-2 rounded-2xl py-1 text-[16px]" aria-label="Outlly dashboard">
         <OutlyMark size={28} />
-        <span className="hidden font-display text-[1.15em] font-bold tracking-[-0.03em] min-[420px]:inline">outlly</span>
+        <span className="hidden font-display text-[1.15em] font-bold tracking-[-0.03em] min-[480px]:inline">outlly</span>
       </Link>
-      <div className="flex items-center gap-0.5">
-        <Link href="/" aria-label="Outlly website" title="Outlly website" className="hidden h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary min-[400px]:grid">
+      <div className="flex min-w-0 items-center gap-0.5">
+        <Link href="/" aria-label="Outlly website" title="Outlly website" className="hidden h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary min-[420px]:grid">
           <Globe className="h-[18px] w-[18px]" />
         </Link>
         {!workspace && (
@@ -139,10 +138,8 @@ export function MobileTopBar() {
             <CreditCard className="h-[18px] w-[18px]" />
           </Link>
         )}
-        {/* Under 360px the three-way theme switch does not fit; it stays in Settings > Look. */}
-        <span className="contents max-[359px]:hidden">
-          <ThemeToggle compact />
-        </span>
+        {/* One cycling button: the three-way switch made the row wider than a phone (10-12f). */}
+        <ThemeCycleButton />
         <Link href="/approvals" data-tour="approvals" aria-label="Approvals" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary">
           <ClipboardCheck className="h-[18px] w-[18px]" />
         </Link>

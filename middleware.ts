@@ -3,7 +3,7 @@ import { jwtVerify } from "jose";
 
 const AUTH_PAGES = ["/login", "/signup"];
 // Marketing pages anyone can read.
-const OPEN = ["/", "/privacy", "/terms", "/contact", "/help", "/waitlist"];
+const OPEN = ["/", "/privacy", "/terms", "/contact", "/help", "/waitlist", "/maintenance"];
 // A review link is its own credential: the reviewer has no account here.
 // A share link (/r/code) and a team invite must work before the visitor has an account.
 const OPEN_PREFIX = ["/review/", "/r/", "/team/accept"];
@@ -11,6 +11,9 @@ const OPEN_PREFIX = ["/review/", "/r/", "/team/accept"];
 const HINT = "outlly_in";
 // Readable "waitlist is on" hint, so cached marketing pages can relabel their signup buttons.
 const WL_HINT = "outlly_wl";
+// Admin-only hint: which switches are on ("m", "w", "mw"). Admins skip the maintenance page on purpose,
+// so without this they'd see the normal site and think the switch did nothing. Read by AdminSiteBar.
+const AF_HINT = "outlly_af";
 
 function sync(req: NextRequest, res: NextResponse, name: string, on: boolean, maxAge: number) {
   const has = req.cookies.get(name)?.value === "1";
@@ -59,6 +62,20 @@ async function isAdmin(req: NextRequest) {
 }
 
 export async function middleware(req: NextRequest) {
+  const res = await route(req);
+  const { pathname } = req.nextUrl;
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) return res;
+  const f = status;
+  const want = f && (f.maintenance || f.waitlist) && (await isAdmin(req)) ? `${f.maintenance ? "m" : ""}${f.waitlist ? "w" : ""}` : "";
+  const have = req.cookies.get(AF_HINT)?.value ?? "";
+  if (want !== have) {
+    if (want) res.cookies.set(AF_HINT, want, { path: "/", sameSite: "lax", secure: req.nextUrl.protocol === "https:", maxAge: 60 * 60 * 12 });
+    else res.cookies.delete(AF_HINT);
+  }
+  return res;
+}
+
+async function route(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const adminArea = pathname === "/admin" || pathname.startsWith("/admin/");
   const flags = adminArea ? null : await siteFlags(req);

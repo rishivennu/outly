@@ -67,3 +67,23 @@ export function ThemeToggle({ compact = false, plain = false, className }: { com
     </div>
   );
 }
+
+const NEXT: Record<ThemeChoice, ThemeChoice> = { light: "dark", dark: "system", system: "light" };
+
+/** One 44px button that cycles Light > Dark > System. For tight bars (the phone top bar). */
+export function ThemeCycleButton({ className }: { className?: string }) {
+  const { choice, set } = useTheme();
+  const cur = OPTIONS.find((o) => o.value === choice) ?? OPTIONS[2];
+  const nxt = OPTIONS.find((o) => o.value === NEXT[choice])!;
+  return (
+    <button
+      type="button"
+      onClick={() => set(NEXT[choice])}
+      aria-label={`Theme: ${cur.label}. Switch to ${nxt.label}`}
+      title={`Theme: ${cur.label}`}
+      className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground", className)}
+    >
+      <cur.Icon className="h-[18px] w-[18px]" aria-hidden />
+    </button>
+  );
+}

@@ -142,7 +142,7 @@ export function PlatformDeck(p: Props) {
         </motion.div>
       </AnimatePresence>
 
-      <div className="sticky bottom-0 z-20 -mx-4 mt-6 flex flex-col items-center gap-3 bg-gradient-to-t from-background via-background/95 to-transparent px-4 pb-4 pt-8 sm:flex-row sm:justify-between">
+      <div className="sticky bottom-[calc(max(12px,env(safe-area-inset-bottom))+72px)] z-20 -mx-4 mt-6 lg:bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-background via-background/95 to-transparent px-4 pb-4 pt-8 sm:flex-row sm:justify-between">
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {enabled.length === 0 ? "Pick at least one place to send it." : ready ? "All set. Nothing goes out until you hit send." : `${pending.length} to look over: ${pending.map((x) => PLATFORM_META[x].name).join(", ")}`}
         </p>

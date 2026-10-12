@@ -83,9 +83,9 @@ export function CookieBanner() {
                     aria-label={`${r.title} cookies`}
                     disabled={locked}
                     onClick={() => setPrefs((p) => ({ ...p, [r.id]: !p[r.id as "analytics" | "marketing"] }))}
-                    className={cn("relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors duration-300 disabled:opacity-60", on ? "bg-lime" : "bg-secondary hairline")}
+                    className={cn("relative mt-0.5 box-border inline-flex h-7 w-12 min-w-12 shrink-0 items-center overflow-hidden rounded-full p-1 transition-colors duration-300 disabled:opacity-60", on ? "bg-lime" : "bg-secondary hairline")}
                   >
-                    <span className={cn("absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform duration-500 [transition-timing-function:var(--ease-liquid)]", on ? "translate-x-6" : "translate-x-1")} />
+                    <span aria-hidden="true" className={cn("block h-5 w-5 shrink-0 rounded-full bg-white shadow transition-transform duration-500 [transition-timing-function:var(--ease-liquid)]", on ? "translate-x-5" : "translate-x-0")} />
                   </button>
                 </li>
               );

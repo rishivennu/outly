@@ -58,7 +58,7 @@ const TILE: Record<keyof typeof BRAND_PATH, { bg: string; fg: string; s: number 
 export function AppIcon({ brand, size = 44, className }: { brand: Brand; size?: number; className?: string }) {
   const box = { width: size, height: size };
   const base = "relative inline-grid shrink-0 place-items-center overflow-hidden rounded-[23%] app-icon";
-  if (brand === "outly") return <OutlyMark size={size} className={cn("app-icon", className)} />;
+  if (brand === "outly") return <OutlyMark size={size} className={className} />; // bare rocket, no tile (10-12f)
   if (brand === "metricool" || brand === "later")
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={`/brands/${brand}.png`} alt="" aria-hidden="true" width={size} height={size} decoding="async" className={cn(base, className)} style={box} />;

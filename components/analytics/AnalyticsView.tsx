@@ -168,7 +168,7 @@ export function AnalyticsView({ initial, connected }: { initial: AnalyticsSummar
                   formatter={(v: number, n: string) => [compact(v), PLATFORM_META[n as keyof typeof PLATFORM_META]?.name ?? n]}
                 />
                 {live.map((p) => (
-                  <Area key={p} type="monotone" dataKey={p} stackId="1" stroke={PLATFORM_HALO[p]} strokeWidth={2} fill={`url(#g-${p})`} animationDuration={900} />
+                  <Area isAnimationActive={false} key={p} type="monotone" dataKey={p} stackId="1" stroke={PLATFORM_HALO[p]} strokeWidth={2} fill={`url(#g-${p})`} />
                 ))}
               </AreaChart>
             </ResponsiveContainer>

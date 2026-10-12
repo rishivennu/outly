@@ -267,7 +267,7 @@ function Trend({ data, color }: { data: PlatformDashboard; color: string }) {
                 labelFormatter={(d: string) => new Date(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                 formatter={(v: number) => [v.toLocaleString("en-US"), s.label]}
               />
-              <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2.2} fill="url(#g-live)" animationDuration={700} />
+              <Area isAnimationActive={false} type="monotone" dataKey="value" stroke={color} strokeWidth={2.2} fill="url(#g-live)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -343,7 +343,7 @@ function Hours({ hours, color }: { hours: NonNullable<PlatformDashboard["hours"]
             <XAxis dataKey="label" tickLine={false} axisLine={false} interval={3} padding={{ left: 8, right: 8 }} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
             <YAxis hide />
             <Tooltip cursor={{ fill: "hsl(var(--foreground) / 0.05)" }} contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 14, fontSize: 12, color: "hsl(var(--popover-foreground))" }} formatter={(v: number) => [`${v} followers`, "Online"]} />
-            <Bar dataKey="value" radius={[6, 6, 2, 2]} animationDuration={600}>
+            <Bar isAnimationActive={false} dataKey="value" radius={[6, 6, 2, 2]}>
               {hours.map((h) => (
                 <Cell key={h.startMinute} fill={color} fillOpacity={h === peak ? 1 : 0.28 + 0.5 * (h.value / (peak.value || 1))} />
               ))}

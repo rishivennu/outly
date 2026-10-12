@@ -23,9 +23,18 @@ export async function ensureSuperAdmin() {
 }
 
 /** True while this admin still signs in with the starter password. */
+// bcrypt is deliberately slow (~0.2 s). The answer only changes when the hash changes, so remember it
+// per hash instead of paying that on every admin page the layout renders.
+const weakByHash = new Map<string, boolean>();
 export async function usingDefaultPassword(adminId: string) {
   const a = await db.adminUser.findUnique({ where: { id: adminId }, select: { passwordHash: true } });
-  return !!a && (await bcrypt.compare(DEFAULT_PASSWORD, a.passwordHash));
+  if (!a) return false;
+  const hit = weakByHash.get(a.passwordHash);
+  if (hit !== undefined) return hit;
+  const weak = await bcrypt.compare(DEFAULT_PASSWORD, a.passwordHash);
+  if (weakByHash.size > 200) weakByHash.clear();
+  weakByHash.set(a.passwordHash, weak);
+  return weak;
 }
 
 /** Fingerprint of the password hash: changing the password invalidates every older session. */

@@ -42,7 +42,7 @@ export function OverviewCharts({ series, revenueByPlan, currency, showMoney }: {
                 <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} interval={tick} />
                 <YAxis tick={axis} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={tip} formatter={(v: number) => [v, "Active"]} />
-                <Area type="monotone" dataKey="active" stroke={LIME} strokeWidth={2.2} fill="url(#g-act)" animationDuration={800} />
+                <Area isAnimationActive={false} type="monotone" dataKey="active" stroke={LIME} strokeWidth={2.2} fill="url(#g-act)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -58,8 +58,8 @@ export function OverviewCharts({ series, revenueByPlan, currency, showMoney }: {
                 <YAxis yAxisId="a" tick={axis} tickLine={false} axisLine={false} allowDecimals={false} />
                 <YAxis yAxisId="b" orientation="right" tick={axis} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={tip} cursor={{ fill: "hsl(var(--foreground) / 0.04)" }} />
-                <Bar yAxisId="a" dataKey="signups" name="Sign-ups" fill="#a3e635" radius={[6, 6, 0, 0]} animationDuration={700} />
-                <Line yAxisId="b" type="monotone" dataKey="users" name="Total users" stroke={LIME} strokeWidth={2.2} dot={false} animationDuration={800} />
+                <Bar isAnimationActive={false} yAxisId="a" dataKey="signups" name="Sign-ups" fill="#a3e635" radius={[6, 6, 0, 0]} />
+                <Line isAnimationActive={false} yAxisId="b" type="monotone" dataKey="users" name="Total users" stroke={LIME} strokeWidth={2.2} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -77,7 +77,7 @@ export function OverviewCharts({ series, revenueByPlan, currency, showMoney }: {
                     <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} interval={tick} />
                     <YAxis tick={axis} tickLine={false} axisLine={false} tickFormatter={money} width={56} />
                     <Tooltip contentStyle={tip} formatter={(v: number) => [money(v), "Revenue"]} />
-                    <Area type="monotone" dataKey="revenue" stroke="#16a34a" strokeWidth={2.2} fill="url(#g-rev)" animationDuration={800} />
+                    <Area isAnimationActive={false} type="monotone" dataKey="revenue" stroke="#16a34a" strokeWidth={2.2} fill="url(#g-rev)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -93,9 +93,9 @@ export function OverviewCharts({ series, revenueByPlan, currency, showMoney }: {
                     <YAxis tick={axis} tickLine={false} axisLine={false} allowDecimals={false} />
                     <Tooltip contentStyle={tip} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                    <Line type="monotone" dataKey="activeSubs" name="Active" stroke={LIME} strokeWidth={2.4} dot={false} animationDuration={800} />
-                    <Line type="monotone" dataKey="newSubs" name="New" stroke="#14b8a6" strokeWidth={1.8} dot={false} />
-                    <Line type="monotone" dataKey="cancels" name="Cancelled" stroke="hsl(var(--destructive))" strokeWidth={1.8} strokeDasharray="4 3" dot={false} />
+                    <Line isAnimationActive={false} type="monotone" dataKey="activeSubs" name="Active" stroke={LIME} strokeWidth={2.4} dot={false} />
+                    <Line isAnimationActive={false} type="monotone" dataKey="newSubs" name="New" stroke="#14b8a6" strokeWidth={1.8} dot={false} />
+                    <Line isAnimationActive={false} type="monotone" dataKey="cancels" name="Cancelled" stroke="hsl(var(--destructive))" strokeWidth={1.8} strokeDasharray="4 3" dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -108,7 +108,7 @@ export function OverviewCharts({ series, revenueByPlan, currency, showMoney }: {
                   <div className="h-[200px]" aria-hidden>
                     <ResponsiveContainer>
                       <PieChart accessibilityLayer={false} tabIndex={-1}>
-                        <Pie rootTabIndex={-1} data={revenueByPlan} dataKey="value" nameKey="name" innerRadius={58} outerRadius={90} paddingAngle={3} stroke="none" animationDuration={800}>
+                        <Pie isAnimationActive={false} rootTabIndex={-1} data={revenueByPlan} dataKey="value" nameKey="name" innerRadius={58} outerRadius={90} paddingAngle={3} stroke="none">
                           {revenueByPlan.map((_, i) => <Cell key={i} fill={PIE[i % PIE.length]} />)}
                         </Pie>
                         <Tooltip contentStyle={tip} formatter={(v: number) => money(v)} />
