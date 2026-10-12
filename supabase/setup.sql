@@ -1,4 +1,4 @@
--- Outly: one-time Supabase setup. Paste ALL of this into Supabase -> SQL Editor -> New query -> Run.
+-- Outlly: one-time Supabase setup. Paste ALL of this into Supabase -> SQL Editor -> New query -> Run.
 -- Run it on a fresh project (it creates the tables; a second run will say they already exist).
 -- Generated from prisma/schema.template.prisma (PostgreSQL).
 

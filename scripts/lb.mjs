@@ -1,4 +1,4 @@
-// Outly load balancer: a dependency-free reverse proxy for N `next start` instances.
+// Outlly load balancer: a dependency-free reverse proxy for N `next start` instances.
 //
 //   UPSTREAMS=http://127.0.0.1:3041,http://127.0.0.1:3042 LB_PORT=3040 bun scripts/lb.mjs
 //
@@ -89,7 +89,7 @@ export function startLb({ port = Number(process.env.LB_PORT ?? 3040), upstreams 
     const target = pick();
     if (!target) {
       res.writeHead(503, { "content-type": "application/json", "retry-after": "5" });
-      return res.end(JSON.stringify({ error: "UNAVAILABLE", message: "Outly is restarting. Try again in a few seconds." }));
+      return res.end(JSON.stringify({ error: "UNAVAILABLE", message: "Outlly is restarting. Try again in a few seconds." }));
     }
     forward(req, res, target, false);
   });

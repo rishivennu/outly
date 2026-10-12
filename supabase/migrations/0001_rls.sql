@@ -1,4 +1,4 @@
--- Outly: lock the public Data API (PostgREST) out of every app table.
+-- Outlly: lock the public Data API (PostgREST) out of every app table.
 --
 -- Why: all reads/writes go through the Next.js server via Prisma, connected as the `postgres` role (table owner,
 -- which bypasses RLS). The browser holds the anon key, which is public by design. With RLS enabled and NO

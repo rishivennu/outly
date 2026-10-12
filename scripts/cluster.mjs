@@ -1,4 +1,4 @@
-// Run Outly as a small cluster on one machine: N `next start` instances + the load balancer.
+// Run Outlly as a small cluster on one machine: N `next start` instances + the load balancer.
 //
 //   bun run build && bun run cluster            # size from CLUSTER_SIZE, default min(4, cores/2)
 //

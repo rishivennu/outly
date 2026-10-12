@@ -123,7 +123,7 @@ describe("youtube durations", () => {
 describe("account-wide comments", () => {
   const acct = { id: "a1", platformUserId: "UCchan", username: "@me", accessToken: "tok", refreshToken: null, tokenExpiresAt: null };
 
-  test("instagram: only media with comments, skipping ones Outly tracks", async () => {
+  test("instagram: only media with comments, skipping ones Outlly tracks", async () => {
     const urls: string[] = [];
     globalThis.fetch = (async (u: string) => {
       urls.push(String(u));
