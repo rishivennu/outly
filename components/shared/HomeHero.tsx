@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Icon3D, type IconName } from "@/components/brand/Icon3D";
 import { UploadZone } from "./UploadZone";
 import { handoffFile } from "@/lib/client/handoff";
+import { Greeting } from "./Greeting";
 
 /** Decorative 3D icons parked in the hero's corners; they drift unless motion is reduced. */
 const DECOR: { name: IconName; className: string; size: number; rot: number; delay: number }[] = [
@@ -32,9 +33,9 @@ export function HomeHero({ firstName }: { firstName: string }) {
         ))}
       </div>
 
-      <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="eyebrow relative mb-5 text-center">
-        Hey {firstName}
-      </motion.p>
+      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="relative mb-5 flex justify-center">
+        <Greeting name={firstName} />
+      </motion.div>
       <motion.h1
         id="home-title"
         initial={{ opacity: 0, y: 18 }}

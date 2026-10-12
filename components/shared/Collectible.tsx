@@ -46,6 +46,34 @@ const SPEC: Record<Platform, Spec> = {
     top: "linear-gradient(90deg,#8c8c94,#5a5a60)",
     ink: "#f4f4f4", plate: "rgba(255,255,255,.07)", label: "POST", tag: "280", rim: "220 90% 70%",
   },
+  tiktok: {
+    w: 9.6, h: 9.8, d: 6.4,
+    body: "linear-gradient(150deg,#1c1c1f 0%,#0b0b0d 70%,#000 100%)",
+    side: "linear-gradient(180deg,#fe2c55,#7a0f26)",
+    top: "linear-gradient(90deg,#25f4ee,#7ff9f5)",
+    ink: "#fff", plate: "rgba(37,244,238,.14)", label: "VIDEO", tag: "FYP", rim: "178 85% 55%",
+  },
+  threads: {
+    w: 9.4, h: 9.2, d: 6.2,
+    body: "linear-gradient(155deg,#2c2c30 0%,#111113 65%,#000 100%)",
+    side: "linear-gradient(180deg,#232326,#08080a)",
+    top: "linear-gradient(90deg,#9a9aa2,#62626a)",
+    ink: "#fff", plate: "rgba(255,255,255,.08)", label: "THREAD", tag: "500", rim: "0 0% 80%",
+  },
+  facebook: {
+    w: 10.4, h: 8.8, d: 6.4,
+    body: "linear-gradient(160deg,#4f9cff 0%,#1877f2 55%,#0b4fb3 100%)",
+    side: "linear-gradient(180deg,#0d4ea8,#072f68)",
+    top: "linear-gradient(90deg,#9cc6ff,#6aa8ff)",
+    ink: "#fff", plate: "rgba(0,0,0,.16)", label: "REELS", tag: "PAGE", rim: "214 95% 64%",
+  },
+  linkedin: {
+    w: 10, h: 9, d: 6.4,
+    body: "linear-gradient(160deg,#2b8fd6 0%,#0a66c2 55%,#074785 100%)",
+    side: "linear-gradient(180deg,#074785,#042a50)",
+    top: "linear-gradient(90deg,#8cc4ef,#5aa6e3)",
+    ink: "#fff", plate: "rgba(0,0,0,.16)", label: "POST", tag: "PRO", rim: "201 85% 58%",
+  },
 };
 
 function Barcode({ className }: { className?: string }) {

@@ -7,6 +7,8 @@ export interface ClientUser {
   email: string;
   avatar: string | null;
   timezone: string;
+  /** Set while working inside someone else's workspace: whose it is, your role, and who you really are. */
+  workspace?: { ownerName: string; role: "editor" | "manager"; me: { name: string; email: string } } | null;
 }
 const Ctx = createContext<ClientUser | null>(null);
 export function UserProvider({ user, children }: { user: ClientUser; children: React.ReactNode }) {

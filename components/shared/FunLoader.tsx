@@ -1,21 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { Pip } from "@/components/brand/Pip";
 
 const CHEERS = [
   "We're doing great!",
-  "Licking the stamp…",
-  "Sorting the mail bag…",
+  "Fuelling the rocket…",
+  "Plotting the route…",
   "Polishing your posts…",
   "Almost there, keep going!",
 ];
 
 /**
- * Route loader with a mascot: a lime postage stamp that hops, squashes on landing, blinks,
+ * Route loader with Pip, the Outlly rocket mascot: hops, squashes on landing, blinks,
  * and cheers you on. Only transform and opacity animate. Under reduced motion it sits still
  * and the lines still change, so the screen never looks frozen.
  */
-export function FunLoader({ label = "Opening Outly", lines = CHEERS, className }: { label?: string; lines?: string[]; className?: string }) {
+export function FunLoader({ label = "Opening Outlly", lines = CHEERS, className }: { label?: string; lines?: string[]; className?: string }) {
   const [n, setN] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setN((v) => v + 1), 1600);
@@ -32,7 +33,7 @@ export function FunLoader({ label = "Opening Outly", lines = CHEERS, className }
           <span className="fl-spark fl-spark-3" />
           <div className="fl-hop">
             <div className="fl-squash">
-              <Stampy />
+              <Pip size={104} mood="fly" />
             </div>
           </div>
           <span className="fl-shadow" />
@@ -50,48 +51,5 @@ export function FunLoader({ label = "Opening Outly", lines = CHEERS, className }
         </div>
       </div>
     </div>
-  );
-}
-
-/** The mascot. Perforated edge is a mask of circles punched out of the paper. */
-function Stampy() {
-  const holes: [number, number][] = [];
-  for (let x = 8; x <= 92; x += 12) holes.push([x, 2], [x, 118]);
-  for (let y = 14; y <= 106; y += 12) holes.push([2, y], [98, y]);
-  return (
-    <svg viewBox="0 0 100 120" width="104" height="125" className="block overflow-visible">
-      <defs>
-        <mask id="fl-perf">
-          <rect width="100" height="120" fill="#fff" />
-          {holes.map(([x, y]) => (
-            <circle key={`${x}-${y}`} cx={x} cy={y} r="4.2" fill="#000" />
-          ))}
-        </mask>
-      </defs>
-      <g mask="url(#fl-perf)">
-        <rect width="100" height="120" rx="3" fill="hsl(var(--lime))" />
-        <rect x="9" y="11" width="82" height="98" rx="5" fill="none" stroke="#14140f" strokeOpacity=".9" strokeWidth="2.4" strokeDasharray="1 4.5" strokeLinecap="round" />
-        <text x="16" y="29" fontSize="10" fontWeight="900" letterSpacing="1.6" fill="#14140f">OUTLY</text>
-        <text x="84" y="29" fontSize="10" fontWeight="900" textAnchor="end" fill="#14140f">1¢</text>
-      </g>
-      {/* face */}
-      <g className="fl-eyes" fill="#14140f">
-        <ellipse cx="37" cy="62" rx="5.2" ry="7" />
-        <ellipse cx="63" cy="62" rx="5.2" ry="7" />
-        <circle cx="38.8" cy="59.4" r="1.9" fill="#fff" />
-        <circle cx="64.8" cy="59.4" r="1.9" fill="#fff" />
-      </g>
-      <ellipse cx="27" cy="76" rx="6" ry="3.6" fill="#ff7aa8" opacity=".75" />
-      <ellipse cx="73" cy="76" rx="6" ry="3.6" fill="#ff7aa8" opacity=".75" />
-      <path d="M41 78q9 10 18 0" fill="#14140f" />
-      <path d="M45.5 81.6q4.5 3.2 9 0" fill="#ff7aa8" />
-      {/* waving arm */}
-      <g className="fl-arm">
-        <path d="M98 70q12 -4 14 -18" fill="none" stroke="currentColor" strokeWidth="4.2" strokeLinecap="round" />
-        <circle cx="112" cy="50" r="5.4" fill="hsl(var(--lime))" stroke="currentColor" strokeWidth="3" />
-      </g>
-      <path d="M2 74q-11 5 -12 16" fill="none" stroke="currentColor" strokeWidth="4.2" strokeLinecap="round" />
-      <circle cx="-10" cy="92" r="5.4" fill="hsl(var(--lime))" stroke="currentColor" strokeWidth="3" />
-    </svg>
   );
 }

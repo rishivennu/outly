@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowUpRight, BarChart3, CalendarDays, ClipboardCheck, Globe, Home, LayoutGrid, MessagesSquare, Plus, Settings, Link2 } from "lucide-react";
+import { ArrowUpRight, BarChart3, CreditCard, LifeBuoy, CalendarDays, ClipboardCheck, Globe, Home, LayoutGrid, MessagesSquare, Plus, Settings, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -30,8 +30,8 @@ export function Sidebar() {
   const studio = MAIN.filter((m) => m.href !== "/create");
   return (
     <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
-      <aside className="glass hairline flex h-full w-[240px] flex-col rounded-[28px] px-3 pb-4 pt-5" aria-label="Primary">
-        <Link href="/home" className="mb-6 flex items-center gap-2 rounded-2xl px-2 py-1 text-[18px] transition-opacity hover:opacity-80" aria-label="Outly dashboard" title="Dashboard">
+      <aside className="glass hairline flex h-full w-[240px] flex-col overflow-y-auto rounded-[28px] px-3 pb-4 pt-5" aria-label="Primary">
+        <Link href="/home" className="mb-6 flex items-center gap-2 rounded-2xl px-2 py-1 text-[18px] transition-opacity hover:opacity-80" aria-label="Outlly dashboard" title="Dashboard">
           <OutlyLogo size={30} />
         </Link>
 
@@ -66,7 +66,11 @@ export function Sidebar() {
         <div className="mt-auto flex flex-col gap-0.5">
           <p className="eyebrow mb-2 px-3 text-[11px]">Workspace</p>
           {[
-            { href: "/accounts", label: "Connected accounts", icon: Link2 },
+            ...(user.workspace ? [] : [
+              { href: "/accounts", label: "Connected accounts", icon: Link2 },
+              { href: "/billing", label: "Billing", icon: CreditCard },
+            ]),
+            { href: "/support", label: "Help centre", icon: LifeBuoy },
             { href: "/settings", label: "Settings", icon: Settings },
           ].map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} data-tour={TOUR[href]} aria-current={isActive(path, href) ? "page" : undefined} className={cn("flex h-10 items-center gap-3 rounded-2xl px-3 text-[13.5px] transition-colors duration-200", isActive(path, href) ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground")}>
@@ -76,18 +80,18 @@ export function Sidebar() {
           ))}
           <Link href="/" className="group flex h-10 items-center gap-3 rounded-2xl px-3 text-[13.5px] text-muted-foreground transition-colors duration-200 hover:bg-foreground/[0.04] hover:text-foreground">
             <Globe className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-            Outly website
+            Outlly website
             <ArrowUpRight className="ml-auto h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
           </Link>
           <ThemeToggle compact plain className="mb-1 mt-2 self-start" />
           <div className="mt-2 flex items-center gap-2 rounded-2xl p-1.5 hairline">
             <Link href="/settings" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl p-1 hover:bg-secondary/60">
               <span className="lime-bg grid h-9 w-9 shrink-0 place-items-center rounded-full font-display text-[13px] font-bold" aria-hidden="true">
-                {user.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
+                {(user.workspace?.me.name ?? user.name).split(" ").map((p) => p[0]).slice(0, 2).join("")}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-[13px] font-semibold">{user.name}</span>
-                <span className="block truncate text-[11.5px] text-muted-foreground">{user.email}</span>
+                <span className="block truncate text-[13px] font-semibold">{user.workspace?.me.name ?? user.name}</span>
+                <span className="block truncate text-[11.5px] text-muted-foreground">{user.workspace ? `In ${user.workspace.ownerName}'s studio` : user.email}</span>
               </span>
             </Link>
           </div>
@@ -119,23 +123,34 @@ export function MobileNav() {
 }
 
 export function MobileTopBar() {
+  const { workspace } = useUser();
   return (
     <div className="sticky top-0 z-30 flex items-center justify-between gap-2 px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] lg:hidden">
-      <Link href="/home" className="flex items-center gap-2 rounded-2xl py-1 text-[16px]" aria-label="Outly dashboard">
+      <Link href="/home" className="flex items-center gap-2 rounded-2xl py-1 text-[16px]" aria-label="Outlly dashboard">
         <OutlyMark size={28} />
-        <span className="hidden font-display text-[1.15em] font-bold tracking-[-0.03em] min-[420px]:inline">outly</span>
+        <span className="hidden font-display text-[1.15em] font-bold tracking-[-0.03em] min-[420px]:inline">outlly</span>
       </Link>
       <div className="flex items-center gap-0.5">
-        <Link href="/" aria-label="Outly website" title="Outly website" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary">
+        <Link href="/" aria-label="Outlly website" title="Outlly website" className="hidden h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary min-[400px]:grid">
           <Globe className="h-[18px] w-[18px]" />
         </Link>
-        <ThemeToggle compact />
+        {!workspace && (
+          <Link href="/billing" aria-label="Billing" title="Billing" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary">
+            <CreditCard className="h-[18px] w-[18px]" />
+          </Link>
+        )}
+        {/* Under 360px the three-way theme switch does not fit; it stays in Settings > Look. */}
+        <span className="contents max-[359px]:hidden">
+          <ThemeToggle compact />
+        </span>
         <Link href="/approvals" data-tour="approvals" aria-label="Approvals" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary">
           <ClipboardCheck className="h-[18px] w-[18px]" />
         </Link>
-        <Link href="/accounts" data-tour="accounts" aria-label="Connected accounts" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary">
-          <Link2 className="h-[18px] w-[18px]" />
-        </Link>
+        {!workspace && (
+          <Link href="/accounts" data-tour="accounts" aria-label="Connected accounts" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary">
+            <Link2 className="h-[18px] w-[18px]" />
+          </Link>
+        )}
         <Link href="/settings" aria-label="Settings" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary">
           <Settings className="h-[18px] w-[18px]" />
         </Link>

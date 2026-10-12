@@ -22,7 +22,7 @@ function label(h: number, m: number) {
   return `${hh}:${String(m).padStart(2, "0")} ${ap}`;
 }
 
-export function DateTimePicker({ value, onChange, tz, peakHours = [19, 20, 21] }: Props) {
+export function DateTimePicker({ value, onChange, tz, peakHours = [] }: Props) {
   const now = new Date();
   const todayKey = dayKey(now, tz);
   const v = partsInTz(value, tz);
@@ -117,7 +117,7 @@ export function DateTimePicker({ value, onChange, tz, peakHours = [19, 20, 21] }
       <div>
         <div className="mb-2 flex items-center justify-between">
           <p className="text-[13px] font-medium text-muted-foreground" id="dtp-time">Time</p>
-          <p className="flex items-center gap-1 text-[12px] text-muted-foreground"><Flame className="h-3.5 w-3.5 text-cyan" /> your audience is most active</p>
+          {peakHours.length > 0 && <p className="flex items-center gap-1 text-[12px] text-muted-foreground"><Flame className="h-3.5 w-3.5 text-cyan" aria-hidden="true" /> best time to post</p>}
         </div>
         <div ref={slotsRef} className="scrollbar-none -mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1" role="group" aria-labelledby="dtp-time">
           {SLOTS.filter((s) => s.h >= 6).map((s) => {
@@ -128,7 +128,7 @@ export function DateTimePicker({ value, onChange, tz, peakHours = [19, 20, 21] }
               <button key={`${s.h}:${s.m}`} type="button" disabled={past} aria-pressed={on} onClick={() => set(vKey, s.h, s.m)} className={cn("relative h-11 shrink-0 snap-start rounded-full px-4 text-[13px] font-medium tabular transition", on ? "bg-foreground text-background" : "bg-secondary/70 hover:bg-secondary hairline", past && "opacity-30")}>
                 {peak && !on && <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-cyan" aria-hidden="true" />}
                 {label(s.h, s.m)}
-                {peak && <span className="sr-only"> (peak time)</span>}
+                {peak && <span className="sr-only"> (best time to post)</span>}
               </button>
             );
           })}
