@@ -1,4 +1,4 @@
-# Outly
+# Outlly
 
 One video. Every platform. Zero chaos.
 
@@ -37,7 +37,7 @@ With `REDIS_URL` empty, jobs and the scheduler run inside the Next.js process. P
 3. Lock the Data API: run `supabase/migrations/0001_rls.sql` in the SQL editor (RLS on, no policies; the server uses Prisma as the owner role).
 4. Storage: create a **private** bucket `media` (Free plan: 50 MB per object). Set `STORAGE_DRIVER=supabase`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_BUCKET=media`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
    Browsers upload straight to the bucket with one-time signed tokens (TUS resumable above 6 MB, with real progress, ETA, cancel and resume). Files are only ever read through short-lived signed URLs.
-5. Auth: `AUTH_PROVIDER=supabase`. Passwords live in Supabase Auth; existing local accounts migrate on their next sign-in. Outly still issues its own HttpOnly session cookie.
+5. Auth: `AUTH_PROVIDER=supabase`. Passwords live in Supabase Auth; existing local accounts migrate on their next sign-in. Outlly still issues its own HttpOnly session cookie.
 
 ## Workers (production)
 

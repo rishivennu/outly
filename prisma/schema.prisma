@@ -23,9 +23,22 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  lastActiveAt DateTime?
+  referralCode String?   @unique // share link /r/{code}
+  referredById String? // who invited this user (one free month each time a referral signs up)
+  weeklyReport Boolean   @default(true) // Monday summary email
+  lastReportAt DateTime?
+
   socialAccounts SocialAccount[]
   media          Media[]
   posts          Post[]
+  subscriptions  Subscription[]
+  payments       Payment[]
+  invoices       Invoice[]
+  tickets        Ticket[]
+  activity       UserActivityDay[]
+  teamMembers    TeamMember[]      @relation("TeamOwner")
+  seats          TeamMember[]      @relation("TeamSeat")
 }
 
 model SocialAccount {
@@ -154,4 +167,241 @@ model ReviewRequest {
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId, createdAt])
+}
+
+// ---------------------------------------------------------------- admin, billing, support (2026-10-12)
+
+/// One row per user per active day (YYYY-MM-DD, UTC). Cheap DAU/WAU/MAU without an events table.
+model UserActivityDay {
+  id     String @id @default(cuid())
+  userId String
+  day    String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day])
+  @@index([day])
+}
+
+/// Editable from /admin/pricing. Prices are minor units (paise / cents).
+model Plan {
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  name       String
+  priceMinor Int      @default(0)
+  currency   String   @default("INR")
+  interval   String   @default("month") // month | year
+  note       String   @default("")
+  features   String   @default("[]") // JSON string[]
+  prices     String   @default("{}") // JSON { USD: 599, EUR: 549 } per-currency overrides; missing = converted from priceMinor
+  postLimit  Int      @default(0) // posts per calendar month, 0 = unlimited
+  aiCaptions Boolean  @default(true) // AI captions, hooks, titles and transcripts
+  seats      Int      @default(0) // team members besides the owner, 0 = none
+  state      String   @default("available") // available | soon | hidden
+  highlight  Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+/// Price is snapshotted, so editing a plan never silently changes what an existing subscriber pays.
+model Subscription {
+  id               String    @id @default(cuid())
+  userId           String
+  planId           String
+  status           String    @default("active") // active | past_due | canceled
+  priceMinor       Int
+  currency         String
+  interval         String
+  provider         String
+  currentPeriodEnd DateTime
+  cancelAtPeriodEnd Boolean  @default(false)
+  canceledAt       DateTime?
+  sample           Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan     Plan      @relation(fields: [planId], references: [id])
+  payments Payment[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Payment {
+  id             String   @id @default(cuid())
+  userId         String
+  subscriptionId String?
+  planId         String?
+  amountMinor    Int
+  currency       String
+  provider       String // mock | stripe | razorpay
+  providerRef    String? // gateway payment / session id: the idempotency key
+  status         String   @default("pending") // pending | succeeded | failed | refunded
+  failureReason  String?
+  sample         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  invoice      Invoice?
+
+  @@unique([provider, providerRef])
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+model Invoice {
+  id            String    @id @default(cuid())
+  number        String    @unique // OUT-2026-000123
+  paymentId     String    @unique
+  userId        String
+  customerName  String
+  customerEmail String
+  description   String
+  amountMinor   Int
+  currency      String
+  issuedAt      DateTime  @default(now())
+  emailedAt     DateTime?
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, issuedAt])
+}
+
+model Ticket {
+  id        String   @id @default(cuid())
+  ref       String   @unique // T-7K2M9Q, safe to show the customer
+  userId    String?
+  email     String
+  name      String?
+  subject   String
+  status    String   @default("open") // open | pending | resolved
+  priority  String   @default("normal") // normal | high | urgent
+  source    String   @default("chatbot") // chatbot | form | admin
+  sample    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages TicketMessage[]
+
+  @@index([status, priority, createdAt])
+}
+
+model TicketMessage {
+  id         String   @id @default(cuid())
+  ticketId   String
+  author     String // customer | bot | admin
+  authorName String?
+  body       String
+  createdAt  DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+}
+
+model FaqItem {
+  id        String   @id @default(cuid())
+  category  String // Payments | Account | Technical | Publishing
+  question  String
+  answer    String
+  sortOrder Int      @default(0)
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category, sortOrder])
+}
+
+/// Every email we send or would send. With the mock provider this IS the outbox.
+model EmailLog {
+  id        String   @id @default(cuid())
+  to        String
+  subject   String
+  html      String
+  kind      String // invoice | ticket_opened | ticket_reply | test
+  provider  String // mock | resend
+  status    String // mocked | sent | failed
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+/// Key/value config. Secret fields inside `value` are AES-256-GCM encrypted by lib/settings.ts.
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  login        String    @unique
+  name         String
+  role         String    @default("support") // super | finance | support
+  passwordHash String
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+/// Notification feed for the admin bell (failed payments, new subscriptions, new tickets).
+model AdminEvent {
+  id        String   @id @default(cuid())
+  kind      String // payment_failed | subscription_new | ticket_new | ticket_urgent | plan_changed
+  title     String
+  body      String?
+  href      String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+/// Someone the owner invited into their workspace. Members act on the owner's posts, media and accounts.
+/// The invite link is the credential, so only its SHA-256 hash is stored.
+model TeamMember {
+  id         String    @id @default(cuid())
+  ownerId    String
+  userId     String?
+  email      String
+  role       String    @default("editor") // editor (drafts, needs approval) | manager (publish, schedule)
+  status     String    @default("invited") // invited | active
+  tokenHash  String    @unique
+  createdAt  DateTime  @default(now())
+  acceptedAt DateTime?
+
+  owner User  @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  user  User? @relation("TeamSeat", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, email])
+  @@index([userId])
+}
+
+/// Visitors who asked to be told when maintenance ends. Emailed once, then marked notified.
+model MaintenanceSubscriber {
+  id         String    @id @default(cuid())
+  email      String    @unique
+  createdAt  DateTime  @default(now())
+  notifiedAt DateTime?
+}
+
+/// People waiting for an invite while signups are paused (admin Waitlist switch). Emailed once when invited.
+model WaitlistEntry {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  source    String?
+  createdAt DateTime  @default(now())
+  invitedAt DateTime?
+
+  @@index([invitedAt, createdAt])
 }
