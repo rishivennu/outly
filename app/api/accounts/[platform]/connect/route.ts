@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { isPlatform } from "@/lib/domain";
-import { getPublisher, hasCredentials, practiceAllowed } from "@/lib/social/registry";
+import { getPublisher, hasCredentials, loadKeys, practiceAllowed } from "@/lib/social/registry";
 import { safeReturnTo, saveOAuthState } from "@/lib/oauth-state";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: { platform: st
   const user = await getCurrentUser();
   if (!user) return NextResponse.redirect(new URL("/login", env.APP_URL));
   if (!isPlatform(params.platform)) return NextResponse.json({ error: "Unknown platform" }, { status: 404 });
+  await loadKeys();
   // No keys and not in rehearsal mode: say so plainly instead of handing out a pretend account.
   if (!hasCredentials(params.platform) && !practiceAllowed()) {
     const back = new URL(safeReturnTo(req.nextUrl.searchParams.get("returnTo")), env.APP_URL);

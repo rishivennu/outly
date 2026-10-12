@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, DM_Sans, Instrument_Serif } from "next/font/google";
 import { MotionRoot } from "@/components/shared/MotionRoot";
 import { themeScript } from "@/lib/theme/script";
+import { CookieBanner } from "@/components/shared/CookieConsent";
+import { Connectivity, Ripples } from "@/components/shared/Connectivity";
+import { ChatWidget } from "@/components/support/ChatWidget";
 import "./globals.css";
 
 /*
@@ -16,9 +19,9 @@ const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["nor
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3040"),
-  title: { default: "Outly · Create once. Publish everywhere.", template: "%s · Outly" },
+  title: { default: "Outlly · Create once. Publish everywhere.", template: "%s · Outlly" },
   description: "Upload one video, let AI tailor it for Instagram Reels, YouTube Shorts and X, then publish and track every destination from one creative workspace.",
-  openGraph: { title: "Outly", description: "Your content deserves to be everywhere.", type: "website" },
+  openGraph: { title: "Outlly", description: "Your content deserves to be everywhere.", type: "website" },
   // Google Search Console ownership tag. Set GOOGLE_SITE_VERIFICATION in Vercel to the content="..." value only.
   verification: { google: process.env.GOOGLE_SITE_VERIFICATION?.trim() || undefined },
 };
@@ -32,7 +35,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="font-sans antialiased">
-        <MotionRoot>{children}</MotionRoot>
+        <MotionRoot>
+          {children}
+          <ChatWidget />
+          <CookieBanner />
+          <Connectivity />
+          <Ripples />
+        </MotionRoot>
       </body>
     </html>
   );

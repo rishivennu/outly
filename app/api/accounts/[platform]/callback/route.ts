@@ -3,11 +3,13 @@ import { getCurrentUser } from "@/lib/auth";
 import { saveConnectedAccount } from "@/lib/accounts";
 import { env } from "@/lib/env";
 import { isPlatform } from "@/lib/domain";
-import { getPublisher } from "@/lib/social/registry";
+import { getPublisher, loadKeys } from "@/lib/social/registry";
 import { takeOAuthState } from "@/lib/oauth-state";
 import { invalidateDashboards } from "@/lib/live";
 import { createSession } from "@/lib/auth";
 import { signInWithGoogle } from "@/lib/auth-provider";
+import { HttpError } from "@/lib/http";
+import { attachReferral } from "@/lib/referral";
 import { YouTubePublisher, googleIdentity } from "@/lib/social/youtube";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +18,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest, { params }: { params: { platform: string } }) {
   if (!isPlatform(params.platform)) return NextResponse.json({ error: "Unknown platform" }, { status: 404 });
   const p = params.platform;
+  await loadKeys();
   const pending = takeOAuthState(p, req.nextUrl.searchParams.get("state"));
   if (pending?.mode === "login" && p === "youtube") return googleSignIn(req, pending.returnTo);
   const user = await getCurrentUser();
@@ -46,6 +49,7 @@ async function googleSignIn(req: NextRequest, returnTo: string) {
     const who = await googleIdentity(tok.access_token);
     if (!who.email || who.email_verified === false) return fail("unverified");
     const user = await signInWithGoogle({ email: who.email, name: who.name, picture: who.picture });
+    if (user.created) await attachReferral(user.id).catch((e) => console.error("[referral] attach", e));
     await createSession(user.id);
     const channel = await yt.channelProfile(tok).catch((e) => {
       console.error("[google sign-in] channel", e);
@@ -60,6 +64,8 @@ async function googleSignIn(req: NextRequest, returnTo: string) {
     dest.searchParams.set(channel ? "connected" : "notice", channel ? "youtube" : channel === null ? "no_channel" : "channel_later");
     return NextResponse.redirect(dest);
   } catch (e) {
+    // Waitlist on and this Google account has no invite yet: send them to join the line.
+    if (e instanceof HttpError && e.code === "waitlist") return NextResponse.redirect(new URL("/waitlist?from=google", env.APP_URL));
     console.error("[google sign-in]", e);
     return fail("exchange");
   }
