@@ -1,0 +1,12 @@
+import type { Platform } from "../domain";
+
+/** What the admin needs per platform: where to make the app, what to call the fields, which scopes to request. */
+export const PLATFORM_SETUP: Record<Platform, { idLabel: string; secretLabel: string; console: string; consoleName: string; scopes: string; note: string }> = {
+  instagram: { idLabel: "App ID", secretLabel: "App secret", console: "https://developers.facebook.com/apps", consoleName: "Meta for Developers", scopes: "instagram_business_basic, instagram_business_content_publish", note: "Instagram API with Instagram Login. Creators can also paste a long-lived token without these keys." },
+  youtube: { idLabel: "OAuth client ID", secretLabel: "Client secret", console: "https://console.cloud.google.com/apis/credentials", consoleName: "Google Cloud console", scopes: "youtube.upload, youtube.readonly", note: "Enable the YouTube Data API v3 and add the callback below as an authorised redirect URI." },
+  x: { idLabel: "OAuth 2.0 client ID", secretLabel: "Client secret", console: "https://developer.x.com/en/portal/dashboard", consoleName: "X developer portal", scopes: "tweet.read, tweet.write, users.read, media.write, offline.access", note: "Media upload needs a tier that allows it." },
+  tiktok: { idLabel: "Client key", secretLabel: "Client secret", console: "https://developers.tiktok.com/apps", consoleName: "TikTok for Developers", scopes: "user.info.basic, video.upload, video.publish", note: "Add the Content Posting API product. Unaudited apps can only post privately." },
+  threads: { idLabel: "Threads app ID", secretLabel: "Threads app secret", console: "https://developers.facebook.com/apps", consoleName: "Meta for Developers", scopes: "threads_basic, threads_content_publish, threads_read_replies, threads_manage_replies", note: "Use the Threads use case on your Meta app; it has its own app ID and secret." },
+  facebook: { idLabel: "App ID", secretLabel: "App secret", console: "https://developers.facebook.com/apps", consoleName: "Meta for Developers", scopes: "pages_show_list, pages_read_engagement, pages_manage_posts", note: "Publishes Reels to the first Page the creator manages." },
+  linkedin: { idLabel: "Client ID", secretLabel: "Client secret", console: "https://www.linkedin.com/developers/apps", consoleName: "LinkedIn Developers", scopes: "openid, profile, w_member_social", note: "Add the Share on LinkedIn and Sign In with LinkedIn using OpenID Connect products." },
+};

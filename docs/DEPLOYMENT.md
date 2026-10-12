@@ -1,4 +1,4 @@
-# Deploying Outly, and where the load balancer fits
+# Deploying Outlly, and where the load balancer fits
 
 ## What actually made the app feel slow
 A load balancer spreads traffic across machines. It does not make one page load faster for one user. The lag came from:

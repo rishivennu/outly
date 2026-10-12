@@ -4,6 +4,10 @@ import { ZodError } from "zod";
 import { getCurrentUser, type SessionUser } from "./auth";
 import { rateLimit } from "./rate-limit";
 import { env } from "./env";
+import { getConfig } from "./settings";
+import { getAdmin } from "./admin/auth";
+import { loadKeys } from "./social/keys";
+import { memberBlock } from "./team/roles";
 
 export class HttpError extends Error {
   constructor(public status: number, message: string, public code?: string) {
@@ -56,10 +60,16 @@ export function route<C = { params: Record<string, string> }>(
           { error: "You're moving fast. Give it a moment.", code: "RATE_LIMITED" },
           { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
         );
+      // Maintenance: customer APIs pause (admins keep working). The status endpoint stays open for the page itself.
+      if (!req.nextUrl.pathname.startsWith("/api/maintenance") && (await getConfig("site")).maintenance && !(await getAdmin()))
+        return json({ error: "Outlly is down for a short maintenance. Nothing was changed; try again soon.", code: "MAINTENANCE" }, { status: 503, headers: { "Retry-After": "300" } });
+      await loadKeys(); // platform app keys saved in the admin console (cached)
       let user = null as SessionUser | null;
       if (opts.auth !== false) {
         user = await getCurrentUser();
         if (!user) return json({ error: "Please sign in again.", code: "UNAUTHENTICATED" }, { status: 401 });
+        const blocked = memberBlock(user.role, req.method, req.nextUrl.pathname);
+        if (blocked) return json({ error: blocked, code: "ROLE" }, { status: 403 });
       }
       return await handler(req, { ...ctx, user: user as SessionUser });
     } catch (e) {

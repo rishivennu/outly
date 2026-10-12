@@ -1,4 +1,4 @@
-import { env } from "../env";
+import { creds } from "./keys";
 import { commonMediaChecks, httpFailure, PublisherError, type AccountContext, type CommentTarget, type PlatformComment, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { formPost, newState } from "./oauth";
 
@@ -13,7 +13,7 @@ export class InstagramPublisher implements SocialPublisher {
     const state = newState();
     const u = new URL("https://www.instagram.com/oauth/authorize");
     u.search = new URLSearchParams({
-      client_id: env.INSTAGRAM_CLIENT_ID,
+      client_id: creds("instagram").clientId,
       redirect_uri: redirectUri,
       response_type: "code",
       // instagram_manage_comments is what the inbox needs; without it comment reads return 403.
@@ -25,8 +25,8 @@ export class InstagramPublisher implements SocialPublisher {
 
   async completeConnect(code: string, redirectUri: string) {
     const short = await formPost("https://api.instagram.com/oauth/access_token", {
-      client_id: env.INSTAGRAM_CLIENT_ID,
-      client_secret: env.INSTAGRAM_CLIENT_SECRET,
+      client_id: creds("instagram").clientId,
+      client_secret: creds("instagram").clientSecret,
       grant_type: "authorization_code",
       redirect_uri: redirectUri,
       code,
@@ -34,7 +34,7 @@ export class InstagramPublisher implements SocialPublisher {
     if (!short.ok) throw await httpFailure(short, "instagram token exchange");
     const s = (await short.json()) as { access_token: string; user_id: string | number };
     const long = await fetch(
-      `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${env.INSTAGRAM_CLIENT_SECRET}&access_token=${s.access_token}`,
+      `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${creds("instagram").clientSecret}&access_token=${s.access_token}`,
     );
     if (!long.ok) throw await httpFailure(long, "instagram long-lived exchange");
     const l = (await long.json()) as { access_token: string; expires_in: number };

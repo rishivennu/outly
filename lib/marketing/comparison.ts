@@ -5,9 +5,9 @@
  *  - Every cell is drawn from the competitor's OWN public pricing or feature page
  *    (listed in `COMPETITORS[].sources`) on the `lastVerified` date below.
  *  - "unknown" means we could not confirm it on their public pages. It does NOT
- *    mean "no". Nothing is marked exclusive to Outly on the strength of a gap we
+ *    mean "no". Nothing is marked exclusive to Outlly on the strength of a gap we
  *    did not verify.
- *  - Outly's own column describes what the product does today, including "no".
+ *  - Outlly's own column describes what the product does today, including "no".
  *  - Competitors ship constantly. Re-verify before quoting this anywhere.
  *
  * Research notes and quotes: docs/COMPETITORS.md

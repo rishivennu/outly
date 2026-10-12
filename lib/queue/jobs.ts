@@ -28,4 +28,4 @@ export function queueFor(name: JobName, data: JobPayloads[JobName]): string {
   if (name === "VIDEO_PROCESS" || name === "VIDEO_THUMBNAIL") return "media";
   return "system";
 }
-export const QUEUE_NAMES = ["media", "system", "social-instagram", "social-youtube", "social-x"] as const;
+export const QUEUE_NAMES = ["media", "system", "social-instagram", "social-youtube", "social-x", "social-tiktok", "social-threads", "social-facebook", "social-linkedin"] as const;

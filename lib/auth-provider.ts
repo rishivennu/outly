@@ -3,6 +3,7 @@ import { db } from "./db";
 import { env } from "./env";
 import { hashPassword, verifyPassword } from "./auth";
 import { HttpError } from "./http";
+import { assertMayCreateAccount } from "./site";
 import { sbAuth, SupabaseError, supabaseConfigured } from "./supabase/server";
 
 /**
@@ -47,6 +48,8 @@ export async function signIn(email: string, password: string) {
       return { id: local.id };
     }
     // Account exists in Supabase but not here yet (e.g. created in the dashboard): create the profile.
+    // That is a new account, so the waitlist applies (Supabase may allow public sign-ups).
+    await assertMayCreateAccount(email);
     const u = await db.user.create({ data: { email, name: s.user.user_metadata?.name ?? email.split("@")[0], authId: s.user.id } });
     return { id: u.id };
   } catch (e) {
@@ -70,6 +73,7 @@ export async function signInWithGoogle(who: { email: string; name?: string; pict
   const email = who.email.toLowerCase();
   const existing = await db.user.findUnique({ where: { email } });
   if (existing) return { id: existing.id, created: false };
+  await assertMayCreateAccount(email);
   const u = await db.user.create({ data: { email, name: who.name?.trim() || email.split("@")[0], avatar: who.picture ?? null }, select: { id: true } });
   return { id: u.id, created: true };
 }

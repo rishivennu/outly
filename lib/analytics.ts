@@ -7,7 +7,7 @@ export interface AnalyticsSummary {
   rangeDays: number;
   totals: { views: number; likes: number; comments: number; shares: number; engagement: number };
   previous: { views: number; engagement: number };
-  series: { date: string; instagram: number; youtube: number; x: number }[];
+  series: ({ date: string } & Record<Platform, number>)[];
   byPlatform: { platform: Platform; views: number; engagement: number }[];
   top: { postId: string; title: string; thumbnailUrl: string | null; views: number; platform: Platform } | null;
   bestDay: string | null;
@@ -31,8 +31,8 @@ export async function getAnalytics(userId: string, rangeDays = 30): Promise<Anal
     return v ? ((sum(rs, "likes") + sum(rs, "comments") + sum(rs, "shares")) / v) * 100 : 0;
   };
 
-  const days = new Map<string, { instagram: number; youtube: number; x: number }>();
-  for (let i = rangeDays - 1; i >= 0; i--) days.set(new Date(now - i * 864e5).toISOString().slice(0, 10), { instagram: 0, youtube: 0, x: 0 });
+  const days = new Map<string, Record<Platform, number>>();
+  for (let i = rangeDays - 1; i >= 0; i--) days.set(new Date(now - i * 864e5).toISOString().slice(0, 10), Object.fromEntries(PLATFORMS.map((p) => [p, 0])) as Record<Platform, number>);
   for (const r of cur) {
     const d = days.get(r.capturedAt.toISOString().slice(0, 10));
     if (d && (PLATFORMS as readonly string[]).includes(r.target.platform)) d[r.target.platform as Platform] += r.views;

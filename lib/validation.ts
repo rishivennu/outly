@@ -59,7 +59,7 @@ export const reviewDecisionSchema = z
   .refine((v) => v.decision !== "changes_requested" || !!v.note, { message: "Tell them what to change.", path: ["note"] });
 
 export const inboxReplySchema = z.object({
-  // A published Outly target (cuid) or a post on the creator's own account (a:<accountId>:<mediaId>).
+  // A published Outlly target (cuid) or a post on the creator's own account (a:<accountId>:<mediaId>).
   targetId: z.string().refine((v) => /^c[a-z0-9]{20,}$/.test(v) || /^a:c[a-z0-9]{20,}:[\w.-]{1,120}$/.test(v), "Unknown post"),
   commentId: z.string().min(1).max(200),
   text: z.string().trim().min(1, "Write something first.").max(1000),

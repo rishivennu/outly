@@ -1,4 +1,4 @@
-import { env } from "../env";
+import { creds } from "./keys";
 import { commonMediaChecks, httpFailure, type AccountContext, type CommentTarget, type PlatformComment, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { formPost, newState, pkce } from "./oauth";
 
@@ -7,7 +7,7 @@ const API = "https://api.x.com/2";
 const CHUNK = 4 * 1024 * 1024;
 
 function basic() {
-  return "Basic " + Buffer.from(`${env.X_CLIENT_ID}:${env.X_CLIENT_SECRET}`).toString("base64");
+  return "Basic " + Buffer.from(`${creds("x").clientId}:${creds("x").clientSecret}`).toString("base64");
 }
 
 export class XPublisher implements SocialPublisher {
@@ -19,7 +19,7 @@ export class XPublisher implements SocialPublisher {
     const u = new URL("https://x.com/i/oauth2/authorize");
     u.search = new URLSearchParams({
       response_type: "code",
-      client_id: env.X_CLIENT_ID,
+      client_id: creds("x").clientId,
       redirect_uri: redirectUri,
       scope: "tweet.read tweet.write users.read media.write offline.access",
       state,

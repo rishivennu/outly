@@ -1,10 +1,13 @@
 // Shared domain vocabulary. Safe to import from client and server.
 
-export const PLATFORMS = ["instagram", "youtube", "x"] as const;
+export const PLATFORMS = ["instagram", "youtube", "x", "tiktok", "threads", "facebook", "linkedin"] as const;
 export type Platform = (typeof PLATFORMS)[number];
-/** Planned next; the publisher registry is open to these without touching UI code. */
-export const FUTURE_PLATFORMS = ["tiktok", "facebook", "linkedin", "threads"] as const;
-export type AnyPlatform = Platform | (typeof FUTURE_PLATFORMS)[number];
+/** Always offered in the studio (they were first). */
+export const CORE_PLATFORMS = ["instagram", "youtube", "x"] as const;
+/** Real publishers exist; each switches on the moment an admin saves its app keys (Admin > Social platforms). */
+export const EXTRA_PLATFORMS = ["tiktok", "threads", "facebook", "linkedin"] as const;
+export type AnyPlatform = Platform;
+export const isCorePlatform = (p: string) => (CORE_PLATFORMS as readonly string[]).includes(p);
 
 export type PostStatus = "draft" | "scheduled" | "publishing" | "published" | "partial" | "failed";
 export type TargetStatus = "pending" | "queued" | "uploading" | "processing" | "published" | "failed";
@@ -67,6 +70,47 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     captionLimit: 280,
     maxDurationSec: 140,
     hashtagStyle: "none",
+  },
+  tiktok: {
+    id: "tiktok",
+    name: "TikTok",
+    format: "Video",
+    colorVar: "--tiktok",
+    gradient: "from-[#25f4ee] via-[#111111] to-[#fe2c55]",
+    captionLimit: 2200,
+    maxDurationSec: 600,
+    hashtagStyle: "many",
+  },
+  threads: {
+    id: "threads",
+    name: "Threads",
+    format: "Post",
+    colorVar: "--threads",
+    gradient: "from-[#2b2b2b] to-[#000000]",
+    captionLimit: 500,
+    maxDurationSec: 300,
+    hashtagStyle: "few",
+  },
+  facebook: {
+    id: "facebook",
+    name: "Facebook",
+    format: "Reel",
+    colorVar: "--facebook",
+    gradient: "from-[#4f9cff] to-[#0b5bd3]",
+    captionLimit: 5000,
+    maxDurationSec: 90,
+    hashtagStyle: "few",
+  },
+  linkedin: {
+    id: "linkedin",
+    name: "LinkedIn",
+    format: "Video",
+    colorVar: "--linkedin",
+    gradient: "from-[#2d8fd5] to-[#004182]",
+    captionLimit: 3000,
+    titleLimit: 200,
+    maxDurationSec: 600,
+    hashtagStyle: "few",
   },
 };
 

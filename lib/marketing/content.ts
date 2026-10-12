@@ -94,7 +94,7 @@ export const FEATURES: Feature[] = [
 export const DIFFERENTIATION = {
   eyebrow: "Why it feels different",
   title: "Built around one video, not around a dashboard.",
-  body: "Social media suites are built for teams managing many brands across a dozen networks. Outly is built for the creator with one video and three places to put it. That is a different shape of problem, so it gets a different shape of tool — not a better one for everybody.",
+  body: "Social media suites are built for teams managing many brands across a dozen networks. Outlly is built for the creator with one video and three places to put it. That is a different shape of problem, so it gets a different shape of tool — not a better one for everybody.",
   points: [
     { title: "Less repetitive work", body: "The same video, caption and schedule are entered once, not three times.", icon: "auto-format" as IconName },
     { title: "AI that assists, not decides", body: "Drafts arrive filled in and editable. Nothing publishes with words you have not read.", icon: "generate-ideas" as IconName },
@@ -111,6 +111,8 @@ export interface PlatformPitch {
   format: string;
   blurb: string;
   needs: string;
+  /** Short, checkable facts shown as chips. */
+  specs: string[];
 }
 
 export const PLATFORM_PITCH: PlatformPitch[] = [
@@ -120,6 +122,7 @@ export const PLATFORM_PITCH: PlatformPitch[] = [
     format: "Reels",
     blurb: "Vertical video with a caption and hashtag set tuned for discovery.",
     needs: "Needs a professional (Business or Creator) Instagram account linked to a Facebook Page.",
+    specs: ["9:16 vertical", "2,200-char caption", "Up to 30 hashtags"],
   },
   {
     id: "youtube",
@@ -127,6 +130,7 @@ export const PLATFORM_PITCH: PlatformPitch[] = [
     format: "Shorts",
     blurb: "Title, description and tags drafted separately from the social caption.",
     needs: "Needs a YouTube channel and Google OAuth consent for uploads.",
+    specs: ["9:16 vertical", "Up to 3 minutes", "100-char title"],
   },
   {
     id: "x",
@@ -134,10 +138,44 @@ export const PLATFORM_PITCH: PlatformPitch[] = [
     format: "Posts",
     blurb: "A short hook that reads well on its own, with the video attached.",
     needs: "Needs an X developer app on a tier that permits media upload and posting.",
+    specs: ["Video attached", "280-char post", "Up to 2:20"],
+  },
+  {
+    id: "tiktok",
+    name: "TikTok",
+    format: "Videos",
+    blurb: "Uploaded straight to your profile with the caption and privacy setting you pick.",
+    needs: "Needs a TikTok developer app approved for the Content Posting API.",
+    specs: ["9:16 vertical", "Up to 10 minutes", "2,200-char caption"],
+  },
+  {
+    id: "threads",
+    name: "Threads",
+    format: "Posts",
+    blurb: "A conversational post with the video attached, written to start replies.",
+    needs: "Needs a Threads profile and a Meta app with Threads publishing access.",
+    specs: ["Video attached", "500-char post", "Up to 5 minutes"],
+  },
+  {
+    id: "facebook",
+    name: "Facebook",
+    format: "Reels",
+    blurb: "Published as a Reel on the Facebook Page you manage, with its own description.",
+    needs: "Needs a Facebook Page you manage and a Meta app approved for Page publishing.",
+    specs: ["9:16 vertical", "Up to 90 seconds", "Pages only"],
+  },
+  {
+    id: "linkedin",
+    name: "LinkedIn",
+    format: "Video posts",
+    blurb: "A native video post that leads with the lesson, for your professional network.",
+    needs: "Needs a LinkedIn app with the Share on LinkedIn product enabled.",
+    specs: ["Video attached", "3,000-char post", "Up to 10 minutes"],
   },
 ];
 
-export const COMING_LATER = "TikTok, Threads, Facebook and LinkedIn are on the roadmap. They are not connected yet, and we would rather say so here than in a footnote.";
+/** Shown under the live list for any platform whose developer app is not switched on yet. */
+export const COMING_LATER = "The publishers are built. Each one switches on as soon as its developer app is approved, and we would rather say so here than in a footnote.";
 
 export interface Faq {
   q: string;
@@ -146,7 +184,7 @@ export interface Faq {
 
 export const FAQS: Faq[] = [
   {
-    q: "Can Outly really publish for me, or does it just remind me to post?",
+    q: "Can Outlly really publish for me, or does it just remind me to post?",
     a: "It publishes through each platform's official API. For that to work, a developer app has to exist for each platform and be approved for the permissions that posting needs — which is a review process run by Meta, Google and X, not by us. Until an app is approved and your account is connected, a destination cannot be published to.",
   },
   {
@@ -155,7 +193,7 @@ export const FAQS: Faq[] = [
   },
   {
     q: "What about X?",
-    a: "X's API is tiered, and video upload plus posting sits on the paid tiers. Whether X works for you depends on the access level of the developer app you connect. Rate limits on your tier apply to Outly the same way they apply to any other client.",
+    a: "X's API is tiered, and video upload plus posting sits on the paid tiers. Whether X works for you depends on the access level of the developer app you connect. Rate limits on your tier apply to Outlly the same way they apply to any other client.",
   },
   {
     q: "Where do my uploads live?",
@@ -175,7 +213,7 @@ export const FAQS: Faq[] = [
   },
   {
     q: "Is there an export or a way out?",
-    a: "Your source files stay downloadable from the library, and posts keep the captions you shipped. Nothing you upload is locked to Outly.",
+    a: "Your source files stay downloadable from the library, and posts keep the captions you shipped. Nothing you upload is locked to Outlly.",
   },
 ];
 
@@ -211,7 +249,7 @@ export const PLANS: Plan[] = [
   },
 ];
 
-export const PRICING_NOTE = "Outly is in beta and free to use. Paid plans are not on sale yet and we have not set their prices — when we do, you will see them here before anything changes for you.";
+export const PRICING_NOTE = "Outlly is in beta and free to use. Paid plans are not on sale yet and we have not set their prices — when we do, you will see them here before anything changes for you.";
 
 export const FINAL_CTA = {
   title: "One video. Three destinations. One afternoon back.",
@@ -219,7 +257,7 @@ export const FINAL_CTA = {
 } as const;
 
 export const SOCIALS = [
-  { label: "Outly on X", href: "#", handle: "X" },
-  { label: "Outly on Instagram", href: "#", handle: "Instagram" },
-  { label: "Outly on YouTube", href: "#", handle: "YouTube" },
+  { label: "Outlly on X", href: "#", handle: "X" },
+  { label: "Outlly on Instagram", href: "#", handle: "Instagram" },
+  { label: "Outlly on YouTube", href: "#", handle: "YouTube" },
 ] as const;

@@ -8,7 +8,7 @@ import { isPlatform, type ErrorCode, type Platform } from "./domain";
 import { isPracticeAccount, publisherForAccount } from "./social/registry";
 import { asPublisherError, type AccountContext, type PlatformComment, type SocialPublisher } from "./social/types";
 
-/** Inbox ids for comments on the creator's own account (not published through Outly): a:<accountId>:<mediaId>. */
+/** Inbox ids for comments on the creator's own account (not published through Outlly): a:<accountId>:<mediaId>. */
 export const accountTargetId = (accountId: string, mediaId: string) => `a:${accountId}:${mediaId}`;
 export function parseAccountTarget(id: string) {
   const m = /^a:([^:]+):(.+)$/.exec(id);
@@ -146,7 +146,7 @@ export async function inbox(userId: string, platform?: Platform) {
       errors.push({ targetId: l.target.id, platform: l.target.platform, postTitle: l.target.postTitle, code: pe.code, detail: pe.technical ?? pe.message });
     }
   });
-  // Then everything else on the creator's own accounts: comments on posts made outside Outly.
+  // Then everything else on the creator's own accounts: comments on posts made outside Outlly.
   const skip = new Set(targets.map((l) => l.target.platformPostId));
   const own = await accountComments(userId, skip, platform);
   comments.push(...own.comments);

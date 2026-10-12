@@ -35,6 +35,8 @@ const schema = z.object({
   X_CLIENT_ID: z.string().optional().default(""),
   X_CLIENT_SECRET: z.string().optional().default(""),
   GEMINI_API_KEY: z.string().optional().default(""),
+  /** Bearer secret for /api/cron/* (Vercel Cron sends it automatically when set). */
+  CRON_SECRET: z.string().optional().default(""),
 });
 
 export const env = schema.parse(process.env);

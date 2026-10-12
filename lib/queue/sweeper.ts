@@ -8,6 +8,8 @@ export function startSweeper(intervalMs = 15_000) {
     try {
       const { sweepDuePosts } = await import("./handlers");
       await sweepDuePosts();
+      const { maybeSendWeeklyReports } = await import("../reports/weekly");
+      await maybeSendWeeklyReports();
     } catch (e) {
       console.error("[sweeper]", e);
     }

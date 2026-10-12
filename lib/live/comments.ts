@@ -1,7 +1,7 @@
 import "server-only";
 import { httpFailure, type AccountContext, type PlatformComment } from "../social/types";
 
-/** A post on the creator's own account that has comments, whether or not it went out through Outly. */
+/** A post on the creator's own account that has comments, whether or not it went out through Outlly. */
 export interface AccountThread {
   mediaId: string;
   title: string | null;
@@ -24,7 +24,7 @@ const igC = (c: IgC, parentId: string | null = null): PlatformComment => ({
   parentId,
 });
 
-/** Newest media that actually has comments; skips ids Outly already tracks so nothing shows twice. */
+/** Newest media that actually has comments; skips ids Outlly already tracks so nothing shows twice. */
 export async function instagramThreads(acct: AccountContext, skip: Set<string>, maxPosts = 8): Promise<AccountThread[]> {
   const t = encodeURIComponent(acct.accessToken);
   const r = await fetch(`${IG}/me/media?fields=id,caption,permalink,comments_count,timestamp&limit=25&access_token=${t}`, { signal: AbortSignal.timeout(12_000), cache: "no-store" });

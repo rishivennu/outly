@@ -15,8 +15,8 @@ export interface SuggestInput {
 }
 
 const DAY = 864e5;
-const NAME: Record<Platform, string> = { instagram: "Instagram", youtube: "YouTube", x: "X" };
-const UNIT: Record<Platform, string> = { instagram: "Reel", youtube: "video", x: "post" };
+const NAME: Record<Platform, string> = { instagram: "Instagram", youtube: "YouTube", x: "X", tiktok: "TikTok", threads: "Threads", facebook: "Facebook", linkedin: "LinkedIn" };
+const UNIT: Record<Platform, string> = { instagram: "Reel", youtube: "video", x: "post", tiktok: "video", threads: "post", facebook: "Reel", linkedin: "post" };
 
 export function median(xs: number[]) {
   if (!xs.length) return 0;

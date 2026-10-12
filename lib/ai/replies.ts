@@ -13,7 +13,7 @@ export interface ReplyResult {
   source: "gemini" | "studio";
 }
 
-const LIMIT: Record<Platform, number> = { instagram: 2200, youtube: 10000, x: 280 };
+const LIMIT: Record<Platform, number> = { instagram: 2200, youtube: 10000, x: 280, tiktok: 150, threads: 500, facebook: 8000, linkedin: 1250 };
 
 /** Rough read of what the commenter wants, so the offline drafts are not generic. */
 export function classify(comment: string): ReplyResult["intent"] {

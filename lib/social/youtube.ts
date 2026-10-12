@@ -1,4 +1,4 @@
-import { env } from "../env";
+import { creds } from "./keys";
 import { commonMediaChecks, httpFailure, type AccountContext, type CommentTarget, type PlatformComment, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { formPost, newState } from "./oauth";
 
@@ -12,7 +12,7 @@ const YT_SCOPES = [
   "https://www.googleapis.com/auth/yt-analytics.readonly",
 ].join(" ");
 
-/** Who signed in with Google. Only verified addresses are trusted to sign in to Outly. */
+/** Who signed in with Google. Only verified addresses are trusted to sign in to Outlly. */
 export async function googleIdentity(accessToken: string) {
   const r = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { authorization: `Bearer ${accessToken}` }, cache: "no-store" });
   if (!r.ok) throw await httpFailure(r, "google userinfo");
@@ -23,12 +23,12 @@ export async function googleIdentity(accessToken: string) {
 export class YouTubePublisher implements SocialPublisher {
   readonly platform = "youtube" as const;
 
-  /** `identity` adds openid/email so the same consent can also sign the creator in to Outly. */
+  /** `identity` adds openid/email so the same consent can also sign the creator in to Outlly. */
   async connect(redirectUri: string, opts: { identity?: boolean } = {}) {
     const state = newState();
     const u = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     u.search = new URLSearchParams({
-      client_id: env.YOUTUBE_CLIENT_ID,
+      client_id: creds("youtube").clientId,
       redirect_uri: redirectUri,
       response_type: "code",
       scope: `${opts.identity ? "openid email profile " : ""}${YT_SCOPES}`,
@@ -51,8 +51,8 @@ export class YouTubePublisher implements SocialPublisher {
   async exchange(code: string, redirectUri: string): Promise<GoogleTokens> {
     const t = await formPost("https://oauth2.googleapis.com/token", {
       code,
-      client_id: env.YOUTUBE_CLIENT_ID,
-      client_secret: env.YOUTUBE_CLIENT_SECRET,
+      client_id: creds("youtube").clientId,
+      client_secret: creds("youtube").clientSecret,
       redirect_uri: redirectUri,
       grant_type: "authorization_code",
     });
@@ -82,8 +82,8 @@ export class YouTubePublisher implements SocialPublisher {
 
   async refreshToken(account: { refreshToken?: string | null }) {
     const r = await formPost("https://oauth2.googleapis.com/token", {
-      client_id: env.YOUTUBE_CLIENT_ID,
-      client_secret: env.YOUTUBE_CLIENT_SECRET,
+      client_id: creds("youtube").clientId,
+      client_secret: creds("youtube").clientSecret,
       refresh_token: account.refreshToken ?? "",
       grant_type: "refresh_token",
     });

@@ -1,4 +1,4 @@
-# Outly: integration status and risk audit
+# Outlly: integration status and risk audit
 
 Last updated: 2026-10-11. This page is deliberately blunt. "Built" means the code exists and passes automated tests
 against fakes. "Verified live" means it was exercised against the real service in this environment.
@@ -73,7 +73,7 @@ Guarantees, each with a test:
   poll `processingDetails`.
 - Scopes: `youtube.upload`, `youtube.readonly`.
 - Requirements and risks:
-  - **Unaudited API projects can only upload as Private.** Outly detects "processed but private" and reports it as
+  - **Unaudited API projects can only upload as Private.** Outlly detects "processed but private" and reports it as
     FORBIDDEN with an explanation, instead of claiming a public Short. Fix: complete Google's API audit.
   - Quota: 10,000 units/day by default and an upload costs about 1,600, so roughly 6 uploads/day per project.
   - Shorts classification is decided by YouTube (vertical, up to 3 minutes). We can't force it.
@@ -91,7 +91,7 @@ Guarantees, each with a test:
 ## Supabase
 
 - **Auth**: identities live in Supabase Auth (`lib/auth-provider.ts`). Our `User` row links by `authId` and stores no
-  password. Pre-Supabase local accounts migrate on their first successful sign-in. Sessions are still Outly's own
+  password. Pre-Supabase local accounts migrate on their first successful sign-in. Sessions are still Outlly's own
   HttpOnly JWT cookie (`studio_session`), so the Supabase access token never reaches browser JS.
   - Signup uses the admin API with `email_confirm: true`, so no email verification is sent. Before public launch,
     either enable SMTP and switch to the normal signup flow, or accept that risk knowingly.

@@ -3,7 +3,7 @@ import { db } from "../db";
 import { env } from "../env";
 import { PLATFORM_META, type Platform } from "../domain";
 import { gemini } from "../ai/creative";
-import { canConnectWithToken, hasCredentials, isPracticeAccount } from "../social/registry";
+import { canConnectWithToken, hasCredentials, isPracticeAccount, loadKeys } from "../social/registry";
 import { asPublisherError } from "../social/types";
 import { liveAccount } from "./account";
 import { instagramDashboard } from "./instagram";
@@ -33,6 +33,7 @@ export async function platformDashboard(userId: string, platform: Platform, opts
   if (!opts.fresh && hit && Date.now() - hit.at < LIVE_CACHE_MS) return hit.data;
 
   const name = PLATFORM_META[platform].name;
+  await loadKeys();
   const connect = { oauth: hasCredentials(platform), token: canConnectWithToken(platform) };
   const [user, acct] = await Promise.all([
     db.user.findUnique({ where: { id: userId }, select: { timezone: true } }),

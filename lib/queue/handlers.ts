@@ -1,3 +1,5 @@
+import { getConfig } from "../settings";
+import { loadKeys } from "../social/keys";
 import "server-only";
 import { db } from "../db";
 import { decrypt, encrypt } from "../crypto";
@@ -15,6 +17,7 @@ const MAX_AUTO_RETRIES = 3;
 const MAX_STATUS_POLLS = 60;
 
 export async function runJob<N extends JobName>(name: N, data: JobPayloads[N]) {
+  await loadKeys();
   switch (name) {
     case "VIDEO_PROCESS":
       return videoProcess(data as JobPayloads["VIDEO_PROCESS"]);
@@ -272,6 +275,8 @@ async function scheduledPost({ postId }: { postId: string }) {
   // (the sweeper re-checks on every pass) instead of failing in the creator's face at midnight.
   const pending = await db.post.findUnique({ where: { id: postId }, select: { id: true, requireApproval: true, status: true } });
   if (!pending) return;
+  // Maintenance: hold it. The sweeper picks it up again on the first pass after the switch goes off.
+  if ((await getConfig("site")).maintenance) return;
   if (pending.status === "scheduled" && !(await isApproved(pending))) {
     console.warn(`[SCHEDULED_POST] ${postId} skipped: waiting for approval.`);
     return;
@@ -293,6 +298,7 @@ async function scheduledPost({ postId }: { postId: string }) {
 
 /** Safety net for scheduled posts (survives restarts, lost timers, and missed delayed jobs). */
 export async function sweepDuePosts() {
+  if ((await getConfig("site")).maintenance) return;
   const due = await db.post.findMany({ where: { status: "scheduled", scheduledAt: { lte: new Date() } }, select: { id: true }, take: 50 });
   for (const p of due) await enqueue("SCHEDULED_POST", { postId: p.id }, { jobId: `sched-${p.id}` });
   const expiring = await db.socialAccount.findMany({

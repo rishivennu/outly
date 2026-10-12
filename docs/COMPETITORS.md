@@ -16,11 +16,11 @@ Third-party reviews and roundups were read for orientation and are **not** cited
 | `no` | The competitor's own page shows it is not offered (e.g. a platform absent from their supported list). |
 | `unknown` | Not confirmable from their public pages. **Not** evidence of absence. |
 
-No row is marked exclusive to Outly. Where we could not verify a competitor's behaviour —
+No row is marked exclusive to Outlly. Where we could not verify a competitor's behaviour —
 notably per-destination publish status and single-destination retry — the cell is `unknown`
 for all four, not `no`.
 
-Rows where Outly is honestly behind are included on purpose: unified inbox (`no`), team
+Rows where Outlly is honestly behind are included on purpose: unified inbox (`no`), team
 approval workflows (`no`), networks beyond Reels / Shorts / X (`no`), analytics (`partial`).
 
 ---

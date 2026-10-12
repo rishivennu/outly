@@ -11,6 +11,10 @@ const HANDLES: Record<Platform, { username: string; displayName: string }> = {
   instagram: { username: "@maya.makes", displayName: "Maya Makes" },
   youtube: { username: "Maya Makes Things", displayName: "Maya Makes Things" },
   x: { username: "@mayamakes", displayName: "Maya" },
+  tiktok: { username: "@maya.makes", displayName: "Maya Makes" },
+  threads: { username: "@maya.makes", displayName: "Maya Makes" },
+  facebook: { username: "Maya Makes", displayName: "Maya Makes" },
+  linkedin: { username: "Maya Rao", displayName: "Maya Rao" },
 };
 
 // Per-platform pacing so the three destinations visibly update independently.
@@ -18,6 +22,10 @@ const PACE: Record<Platform, { upload: [number, number]; process: [number, numbe
   instagram: { upload: [1800, 3200], process: [1400, 2600] },
   youtube: { upload: [2600, 4200], process: [2200, 3600] },
   x: { upload: [1000, 1800], process: [700, 1400] },
+  tiktok: { upload: [2000, 3400], process: [1600, 2800] },
+  threads: { upload: [1400, 2400], process: [1000, 2000] },
+  facebook: { upload: [2200, 3600], process: [1800, 3000] },
+  linkedin: { upload: [2400, 3800], process: [2000, 3200] },
 };
 
 /**
