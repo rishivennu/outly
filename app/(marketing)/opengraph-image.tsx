@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Outly — your content deserves to be everywhere.";
+export const alt = "Outlly — your content deserves to be everywhere.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -26,7 +26,7 @@ export default async function OpengraphImage() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <div style={{ width: 52, height: 52, borderRadius: 16, background: "#c6f432", display: "flex" }} />
-          <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em" }}>outly</div>
+          <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em" }}>outlly</div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>

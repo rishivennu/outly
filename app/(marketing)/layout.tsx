@@ -1,13 +1,11 @@
-import { cookies } from "next/headers";
 import { MarketingNav } from "@/components/marketing/Nav";
 import { MarketingFooter } from "@/components/marketing/Footer";
 import { SmoothScroll } from "@/components/marketing/SmoothScroll";
-import { SESSION_COOKIE } from "@/lib/session-cookie";
 
 /** Shell for every public page: one nav, one footer, one skip link. */
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
-  // Cookie presence only (no DB hit): a stale cookie just lands on /home, which re-checks and redirects to login.
-  const signedIn = Boolean(cookies().get(SESSION_COOKIE)?.value);
+  // No cookies() here: reading a cookie on the server would make every public page render per
+  // request. The nav and footer read the signed-in hint in the browser instead (useSignedIn).
   return (
     <div className="min-h-dvh">
       <a
@@ -17,9 +15,9 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
         Skip to content
       </a>
       <SmoothScroll />
-      <MarketingNav signedIn={signedIn} />
+      <MarketingNav />
       <main id="main">{children}</main>
-      <MarketingFooter signedIn={signedIn} />
+      <MarketingFooter />
     </div>
   );
 }

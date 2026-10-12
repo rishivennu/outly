@@ -8,7 +8,7 @@ import { Thumb } from "@/components/shared/Thumb";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import type { Platform } from "@/lib/domain";
 import { connectedPlatforms } from "@/lib/live/connected";
-import { canConnectWithToken, hasCredentials } from "@/lib/social/registry";
+import { canConnectWithToken, hasCredentials, loadKeys } from "@/lib/social/registry";
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +16,7 @@ export const metadata = { title: "Home" };
 
 export default async function HomePage() {
   const user = (await getCurrentUser())!;
+  await loadKeys();
   const [drafts, next, live] = await Promise.all([
     db.post.findMany({ where: { userId: user.id, status: "draft" }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() } }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),

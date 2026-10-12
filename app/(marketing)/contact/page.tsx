@@ -6,9 +6,9 @@ import { SOCIALS } from "@/lib/marketing/content";
 
 export const metadata: Metadata = {
   title: "Contact",
-  description: "How to reach Outly during beta: in-app support, bug reports with the detail that helps, and where the social accounts will be.",
+  description: "How to reach Outlly during beta: in-app support, bug reports with the detail that helps, and where the social accounts will be.",
   alternates: { canonical: "/contact" },
-  openGraph: { title: "Contact · Outly", description: "How to reach Outly during beta.", url: "/contact" },
+  openGraph: { title: "Contact · Outlly", description: "How to reach Outlly during beta.", url: "/contact" },
 };
 
 const ROUTES = [
@@ -38,7 +38,7 @@ export default function ContactPage() {
       <Shell>
         <PageHead
           title="Contact"
-          lead="Outly is a beta run by a small team, so support goes through the app rather than a shared inbox we cannot answer. Here is the quickest route for each kind of message."
+          lead="Outlly is a beta run by a small team, so support goes through the app rather than a shared inbox we cannot answer. Here is the quickest route for each kind of message."
         />
 
         <ul className="mt-14 grid gap-4 md:grid-cols-3">

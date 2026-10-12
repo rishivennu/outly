@@ -12,11 +12,14 @@ import { FinalCta } from "@/components/marketing/FinalCta";
 import { RouteRule, Shell } from "@/components/marketing/bits";
 import { FAQS, HERO } from "@/lib/marketing/content";
 
+// Rendered per request: prices follow the visitor's country, and the platform list follows the admin's keys.
+export const dynamic = "force-dynamic";
+
 const DESCRIPTION =
-  "Upload one video. Outly's AI tailors the caption, hook, hashtags and title for Instagram Reels, YouTube Shorts and X, then publishes or schedules it and tracks every destination separately. Free during beta.";
+  "Upload one video. Outlly's AI tailors the caption, hook, hashtags and title for Instagram Reels, YouTube Shorts and X, then publishes or schedules it and tracks every destination separately. Free during beta.";
 
 export const metadata: Metadata = {
-  title: "Outly · Your content deserves to be everywhere",
+  title: "Outlly · Your content deserves to be everywhere",
   description: DESCRIPTION,
   alternates: { canonical: "/" },
   keywords: [
@@ -29,7 +32,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: "/",
-    siteName: "Outly",
+    siteName: "Outlly",
     title: "Your content deserves to be everywhere.",
     description: HERO.sub,
   },

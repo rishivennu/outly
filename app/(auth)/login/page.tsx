@@ -1,4 +1,4 @@
-import { hasCredentials } from "@/lib/social/registry";
+import { hasCredentials, loadKeys } from "@/lib/social/registry";
 import { Suspense } from "react";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { OutlyLogo } from "@/components/brand/Logo";
@@ -6,7 +6,8 @@ import { OutlyLogo } from "@/components/brand/Logo";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Sign in" };
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  await loadKeys();
   return (
     <>
       <OutlyLogo size={32} className="mb-8 text-xl lg:hidden" />

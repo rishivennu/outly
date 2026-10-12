@@ -3,9 +3,9 @@ import { PageHead, Prose, Shell } from "@/components/marketing/bits";
 
 export const metadata: Metadata = {
   title: "Privacy",
-  description: "What Outly stores, where your uploaded video lives, which third parties see it, and how to get it deleted.",
+  description: "What Outlly stores, where your uploaded video lives, which third parties see it, and how to get it deleted.",
   alternates: { canonical: "/privacy" },
-  openGraph: { title: "Privacy · Outly", description: "What Outly stores and why.", url: "/privacy" },
+  openGraph: { title: "Privacy · Outlly", description: "What Outlly stores and why.", url: "/privacy" },
 };
 
 export default function PrivacyPage() {
@@ -15,7 +15,7 @@ export default function PrivacyPage() {
         <PageHead
           title="Privacy"
           updated="10 October 2026"
-          lead="Outly is in beta. This page describes what the product actually does with your data today, in plain language. If something here changes, the date above changes with it."
+          lead="Outlly is in beta. This page describes what the product actually does with your data today, in plain language. If something here changes, the date above changes with it."
         />
 
         <Prose>
@@ -30,7 +30,7 @@ export default function PrivacyPage() {
 
           <h2>Where uploads live</h2>
           <p>
-            Uploaded files go to private object storage attached to your account. Buckets are not publicly listable, and playback inside Outly
+            Uploaded files go to private object storage attached to your account. Buckets are not publicly listable, and playback inside Outlly
             uses short-lived signed links that expire. When you delete a media item, the stored file is deleted with it.
           </p>
           <p>We do not use your footage, captions or analytics to train models, and we do not sell any of it.</p>
@@ -50,7 +50,7 @@ export default function PrivacyPage() {
           </ul>
           <p>
             Each of those platforms applies its own privacy policy to whatever you publish there. Once a post is live on a platform, that
-            platform&apos;s terms govern it, and deleting it in Outly does not delete it there.
+            platform&apos;s terms govern it, and deleting it in Outlly does not delete it there.
           </p>
 
           <h2>Cookies</h2>
