@@ -1,32 +1,55 @@
-import { useId } from "react";
 import { cn } from "@/lib/utils";
 
-/** Outly mark: a lime "O" with a play notch, sending a spark out to the top-right. */
-export function OutlyMark({ size = 28, className }: { size?: number; className?: string }) {
-  // per-instance gradient id: a shared id breaks when the owning instance is display:none
-  const id = `outly-g-${useId().replace(/:/g, "")}`;
+/**
+ * Outlly mark (2026-10 rebrand): the lime-gradient rocket on a rounded tile.
+ * The tile contrasts with the theme (user's call, 10-12c): the near-black tile in light mode,
+ * the white tile in dark mode, so the mark always pops off the page.
+ * Both are rendered and CSS shows one, so there is no flash and no client JS.
+ * Raster on purpose: the gradient + white streak are the supplied artwork, not a redraw.
+ * `variant` picks tile (default), bare lime glyph, ink glyph (on lime) or white glyph.
+ * `tone` pins a tile colour when it sits on a surface that does not follow the theme.
+ */
+const px = (size: number) => (size <= 32 ? 64 : size <= 64 ? 128 : size <= 128 ? 256 : 512);
+
+export function OutlyMark({
+  size = 28,
+  className,
+  variant = "tile",
+  tone = "auto",
+}: {
+  size?: number;
+  className?: string;
+  variant?: "tile" | "glyph" | "ink" | "white";
+  tone?: "auto" | "light" | "dark";
+}) {
+  const common = { width: size, height: size, alt: "", "aria-hidden": true as const, decoding: "async" as const, draggable: false };
+  if (variant !== "tile") {
+    const src = `/brand/rocket/${variant === "glyph" ? "rocket" : variant === "ink" ? "rocket-ink" : "rocket-white"}-256.png`;
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} {...common} className={cn("shrink-0 select-none", className)} />;
+  }
+  const n = px(size);
+  const dark = `/brand/rocket/mark-${Math.min(n, 256)}.png`;
+  const light = `/brand/rocket/mark-light-${n}.png`;
+  const base = "shrink-0 select-none rounded-[22%]";
+  if (tone !== "auto")
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={tone === "light" ? light : dark} {...common} className={cn(base, tone === "light" && "brand-tile-light", className)} />;
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden className={cn("shrink-0", className)}>
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="hsl(78 100% 62%)" />
-          <stop offset="1" stopColor="hsl(84 100% 44%)" />
-        </linearGradient>
-      </defs>
-      <rect x="1" y="1" width="30" height="30" rx="9" fill="#0d0d10" />
-      <circle cx="15" cy="17" r="8.2" fill="none" stroke={`url(#${id})`} strokeWidth="4.2" />
-      <path d="M13.2 13.6v6.8l5.6-3.4z" fill={`url(#${id})`} />
-      <path d="M22.5 5.5h4v4" fill="none" stroke="hsl(330 90% 66%)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M26.5 5.5 21 11" stroke="hsl(330 90% 66%)" strokeWidth="2.2" strokeLinecap="round" />
-    </svg>
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={dark} {...common} className={cn(base, "dark:hidden", className)} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={light} {...common} className={cn(base, "brand-tile-light hidden dark:block", className)} />
+    </>
   );
 }
 
-export function OutlyLogo({ size = 28, className, label = true }: { size?: number; className?: string; label?: boolean }) {
+export function OutlyLogo({ size = 28, className, label = true, tone = "auto" }: { size?: number; className?: string; label?: boolean; tone?: "auto" | "light" | "dark" }) {
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
-      <OutlyMark size={size} />
-      {label && <span className="font-display text-[1.15em] font-bold tracking-[-0.045em]">outly</span>}
+      <OutlyMark size={size} tone={tone} />
+      {label && <span className="font-display text-[1.15em] font-bold tracking-[-0.045em]">outlly</span>}
     </span>
   );
 }

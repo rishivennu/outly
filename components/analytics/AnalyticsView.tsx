@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
 import { api } from "@/lib/client/api";
-import { PLATFORM_META, PLATFORMS } from "@/lib/domain";
+import { PLATFORM_META } from "@/lib/domain";
+import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn, compact } from "@/lib/utils";
 import type { AnalyticsSummary } from "@/lib/analytics";
 import type { Platform } from "@/lib/domain";
@@ -41,6 +42,7 @@ function CountUp({ value, format = compact, className }: { value: number; format
 
 export function AnalyticsView({ initial, connected }: { initial: AnalyticsSummary; connected: Partial<Record<Platform, boolean>> }) {
   const [data, setData] = useState(initial);
+  const live = useLivePlatforms();
   const [loading, setLoading] = useState(false);
   const range = RANGES.find((r) => r.d === data.rangeDays) ?? RANGES[1];
 
@@ -61,7 +63,7 @@ export function AnalyticsView({ initial, connected }: { initial: AnalyticsSummar
         <LiveStrip connected={connected} />
         <div className="flex min-h-[46dvh] flex-col items-center justify-center px-6 text-center">
           <Icon3D name="analytics" size={104} className="animate-bob mb-7" />
-          <h1 className="display text-[clamp(2.2rem,5vw,3.2rem)]">Nothing published through Outly yet.</h1>
+          <h1 className="display text-[clamp(2.2rem,5vw,3.2rem)]">Nothing published through Outlly yet.</h1>
           <p className="mt-3 max-w-md text-muted-foreground">
             {Object.values(connected).some(Boolean)
               ? "Your accounts' own numbers are live above. Once you publish from here, this page compares how each post did everywhere it went."
@@ -86,7 +88,7 @@ export function AnalyticsView({ initial, connected }: { initial: AnalyticsSummar
       <PlatformTabs connected={connected} />
       <LiveStrip connected={connected} />
       <div className="mt-10 flex flex-wrap items-center justify-between gap-4">
-        <p className="eyebrow">Published through Outly</p>
+        <p className="eyebrow">Published through Outlly</p>
         <div role="radiogroup" aria-label="Time range" className="flex gap-1 rounded-full bg-secondary/60 p-1 hairline">
           {RANGES.map((r) => (
             <button key={r.d} role="radio" aria-checked={data.rangeDays === r.d} onClick={() => pick(r.d)} className={cn("relative h-10 rounded-full px-4 text-sm font-medium", data.rangeDays === r.d ? "text-[hsl(var(--lime-foreground))]" : "text-muted-foreground hover:text-foreground")}>
@@ -136,7 +138,7 @@ export function AnalyticsView({ initial, connected }: { initial: AnalyticsSummar
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 id="trend" className="text-lg font-semibold">Views over time</h2>
             <ul className="flex gap-4 text-xs text-muted-foreground">
-              {PLATFORMS.map((p) => (
+              {live.map((p) => (
                 <li key={p} className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full" style={{ background: PLATFORM_HALO[p] }} aria-hidden="true" /> {PLATFORM_META[p].name}
                 </li>
@@ -147,7 +149,7 @@ export function AnalyticsView({ initial, connected }: { initial: AnalyticsSummar
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.series} margin={{ top: 6, right: 6, left: -16, bottom: 0 }}>
                 <defs>
-                  {PLATFORMS.map((p) => (
+                  {live.map((p) => (
                     <linearGradient key={p} id={`g-${p}`} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={PLATFORM_HALO[p]} stopOpacity={0.38} />
                       <stop offset="100%" stopColor={PLATFORM_HALO[p]} stopOpacity={0} />
@@ -165,7 +167,7 @@ export function AnalyticsView({ initial, connected }: { initial: AnalyticsSummar
                   labelFormatter={(d: string) => new Date(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                   formatter={(v: number, n: string) => [compact(v), PLATFORM_META[n as keyof typeof PLATFORM_META]?.name ?? n]}
                 />
-                {PLATFORMS.map((p) => (
+                {live.map((p) => (
                   <Area key={p} type="monotone" dataKey={p} stackId="1" stroke={PLATFORM_HALO[p]} strokeWidth={2} fill={`url(#g-${p})`} animationDuration={900} />
                 ))}
               </AreaChart>

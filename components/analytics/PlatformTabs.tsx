@@ -4,13 +4,15 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { LayoutDashboard } from "lucide-react";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
-import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
+import { PLATFORM_META, type Platform } from "@/lib/domain";
+import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn } from "@/lib/utils";
 
 /** Overview plus one tab per platform. The dot says whether that platform is connected for real. */
 export function PlatformTabs({ connected }: { connected: Partial<Record<Platform, boolean>> }) {
   const path = usePathname();
-  const tabs = [{ href: "/analytics", label: "Overview", platform: null as Platform | null }, ...PLATFORMS.map((p) => ({ href: `/analytics/${p}`, label: PLATFORM_META[p].name, platform: p }))];
+  const live = useLivePlatforms();
+  const tabs = [{ href: "/analytics", label: "Overview", platform: null as Platform | null }, ...live.map((p) => ({ href: `/analytics/${p}`, label: PLATFORM_META[p].name, platform: p }))];
   return (
     <nav aria-label="Analytics views" className="-mx-1 overflow-x-auto px-1 pb-1">
       <ul className="flex w-max gap-1 rounded-full bg-secondary/60 p-1 hairline">

@@ -13,12 +13,13 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Icon3D, type IconName } from "@/components/brand/Icon3D";
 import { api, ApiError } from "@/lib/client/api";
-import { FUTURE_PLATFORMS, PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
+import { EXTRA_PLATFORMS, PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
+import { useLivePlatforms } from "@/components/shell/LivePlatforms";
+import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { cn } from "@/lib/utils";
 import type { AccountView } from "@/lib/services";
-import { PracticePill } from "@/components/shared/PracticePill";
 
-const RIM: Record<Platform, string> = { instagram: "330 90% 66%", youtube: "2 95% 64%", x: "222 95% 66%" };
+const RIM: Record<Platform, string> = { instagram: "330 90% 66%", youtube: "2 95% 64%", x: "222 95% 66%", tiktok: "178 85% 55%", threads: "0 0% 80%", facebook: "214 95% 64%", linkedin: "201 85% 58%" };
 
 /** The 3D marker shows the connection at a glance; the badge next to it states the exact status. */
 const STATE_ICON: Record<"connected" | "needs_reconnect" | "disconnected", IconName> = { connected: "connected", needs_reconnect: "reconnect", disconnected: "disconnected" };
@@ -27,6 +28,10 @@ const BLURB: Record<Platform, string> = {
   instagram: "Reels, with captions and hashtags that travel.",
   youtube: "Shorts, with titles people actually search for.",
   x: "Video posts, short and sharp.",
+  tiktok: "Vertical videos, straight to your profile.",
+  threads: "Video posts with room to talk.",
+  facebook: "Reels on your Facebook Page.",
+  linkedin: "Native video posts for your network.",
 };
 
 export type ConnectSetup = Record<Platform, { oauth: boolean; token: boolean }>;
@@ -39,7 +44,7 @@ const ERRORS: Record<string, (name: string) => string> = {
   no_channel: () => "That Google account doesn't have a YouTube channel yet. Create one on youtube.com (it takes a minute), then connect again.",
 };
 
-export function AccountsView({ initial, mock, setup }: { initial: AccountView[]; mock: boolean; setup: ConnectSetup }) {
+export function AccountsView({ initial, setup }: { initial: AccountView[]; setup: ConnectSetup }) {
   const [accounts, setAccounts] = useState(initial);
   const [confirm, setConfirm] = useState<Platform | null>(null);
   const toast = useToast();
@@ -47,6 +52,8 @@ export function AccountsView({ initial, mock, setup }: { initial: AccountView[];
   const params = useSearchParams();
   const errorReason = params.get("connect_error") === "youtube" ? params.get("reason") : null;
   const tilt = useTilt(12);
+  const live = useLivePlatforms();
+  const soon = EXTRA_PLATFORMS.filter((p) => !live.includes(p));
 
   useEffect(() => {
     const c = params.get("connected");
@@ -83,11 +90,11 @@ export function AccountsView({ initial, mock, setup }: { initial: AccountView[];
       <h1 className="display max-w-3xl text-[clamp(2.6rem,6vw,4.6rem)]">Where should we send your content?</h1>
       <p className="mt-4 max-w-xl text-muted-foreground">
         You sign in on each platform&apos;s own page. We never see your password, and every key we keep is encrypted.
-        {mock ? practiceNote(accounts) : " Every account you connect here is your real one: posts go live and the numbers are real."}
+        {" Every account you connect here is your real one: posts go live and the numbers are real."}
       </p>
 
       <ul className="mt-10 grid gap-4 md:grid-cols-3">
-        {PLATFORMS.map((p, i) => {
+        {live.map((p, i) => {
           const a = accounts.find((x) => x.platform === p);
           const ok = a?.status === "connected";
           return (
@@ -116,18 +123,17 @@ export function AccountsView({ initial, mock, setup }: { initial: AccountView[];
                       <p className={cn("flex items-center gap-1 text-xs", ok ? "text-success" : "text-warning")}>
                         {ok ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <CircleAlert className="h-3.5 w-3.5" aria-hidden="true" />}
                         {ok ? "Ready to publish" : `${PLATFORM_META[p].name} needs you to reconnect.`}
-                        {a.mock && <PracticePill className="ml-2 align-middle" />}
                       </p>
                     </div>
                   </div>
                 )}
               </div>
 
-              {!ok && !setup[p].oauth && !setup[p].token && !mock && (
+              {!ok && !setup[p].oauth && !setup[p].token && (
                 <p className="relative mt-4 flex gap-2 rounded-2xl bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
                   <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   <span>
-                    Needs {PLATFORM_META[p].name} developer keys first. Add <code className="text-xs">{p.toUpperCase()}_CLIENT_ID</code> and <code className="text-xs">{p.toUpperCase()}_CLIENT_SECRET</code> to the server&apos;s .env, then restart.
+                    {PLATFORM_META[p].name} isn&apos;t switched on yet. An admin adds its app keys in Admin &gt; Social platforms, and it goes live right away.
                   </span>
                 </p>
               )}
@@ -135,23 +141,31 @@ export function AccountsView({ initial, mock, setup }: { initial: AccountView[];
                 <p className="relative mt-4 flex gap-2 text-xs leading-relaxed text-muted-foreground">
                   <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   {p === "youtube"
-                    ? "You sign in on Google's own page and pick the channel. Outly never sees your password."
-                    : `You log in on ${PLATFORM_META[p].name}'s own page. Outly never sees your password.`}
+                    ? "You sign in on Google's own page and pick the channel. Outlly never sees your password."
+                    : `You log in on ${PLATFORM_META[p].name}'s own page. Outlly never sees your password.`}
                 </p>
               )}
-              {!ok && p === "youtube" && setup.youtube.oauth && <GoogleHelp className="relative mt-3" defaultOpen={errorReason === "access_denied"} />}
+              {!ok && p === "youtube" && setup.youtube.oauth && errorReason === "access_denied" && <GoogleHelp className="relative mt-3" defaultOpen />}
+              {!ok && p === "instagram" && !setup.instagram.oauth && setup.instagram.token && (
+                <p className="relative mt-4 flex gap-2 rounded-2xl bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
+                  <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>
+                    &ldquo;Log in with Instagram&rdquo; switches on once an admin adds the Instagram app ID and secret in Admin &gt; Social platforms. Until then, connect with a token below.
+                  </span>
+                </p>
+              )}
 
-              {setup[p].token && (!ok || a?.mock) && <TokenConnect defaultOpen={!setup[p].oauth} onConnected={(acc) => setAccounts((all) => [...all.filter((x) => x.platform !== p), acc])} />}
+              {setup[p].token && !ok && <TokenConnect defaultOpen={!setup[p].oauth} onConnected={(acc) => setAccounts((all) => [...all.filter((x) => x.platform !== p), acc])} />}
 
               <div className="mt-6 flex flex-wrap gap-2">
-                {!ok && (setup[p].oauth || mock) && (
+                {!ok && setup[p].oauth && (
                   <Button asChild variant={a ? "primary" : "lime"} className="flex-1">
                     <a href={`/api/accounts/${p}/connect?returnTo=/accounts`}>
-                      {a ? "Reconnect" : mock ? "Connect account" : p === "youtube" ? "Sign in with Google" : `Log in with ${PLATFORM_META[p].name}`} <ArrowRight className="h-4 w-4" />
+                      {a ? "Reconnect" : p === "youtube" ? "Sign in with Google" : `Log in with ${PLATFORM_META[p].name}`} <ArrowRight className="h-4 w-4" />
                     </a>
                   </Button>
                 )}
-                {ok && !a?.mock && (
+                {ok && (
                   <Button asChild variant="primary" className="flex-1">
                     <Link href={`/analytics/${p}`}>
                       <BarChart3 className="h-4 w-4" /> Open dashboard
@@ -179,18 +193,20 @@ export function AccountsView({ initial, mock, setup }: { initial: AccountView[];
         onConfirm={() => confirm && disconnect(confirm)}
       />
 
-      <section className="mt-12" aria-labelledby="soon">
-        <h2 id="soon" className="eyebrow mb-4">
-          Coming next
-        </h2>
-        <ul className="flex flex-wrap gap-2">
-          {FUTURE_PLATFORMS.map((p) => (
-            <li key={p} className="rounded-full px-4 py-2 text-sm capitalize text-muted-foreground hairline">
-              {p === "linkedin" ? "LinkedIn" : p === "tiktok" ? "TikTok" : p}
-            </li>
-          ))}
-        </ul>
-      </section>
+      {soon.length > 0 && (
+        <section className="mt-12" aria-labelledby="soon">
+          <h2 id="soon" className="eyebrow mb-4">
+            Coming next
+          </h2>
+          <ul className="flex flex-wrap gap-2">
+            {soon.map((p) => (
+              <li key={p} className="inline-flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-4 text-sm text-muted-foreground hairline">
+                <PlatformOrb platform={p} size={26} /> {PLATFORM_META[p].name}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
@@ -246,11 +262,3 @@ function TokenConnect({ onConnected, defaultOpen }: { onConnected: (a: AccountVi
 
 const names = (ps: Platform[]) => ps.map((p) => PLATFORM_META[p].name).join(ps.length === 2 ? " and " : ", ");
 
-/** Say exactly which destinations rehearse and which go live, so nobody posts for real by surprise. */
-function practiceNote(accounts: AccountView[]) {
-  const real = PLATFORMS.filter((p) => accounts.some((a) => a.platform === p && !a.mock && a.status === "connected"));
-  const practice = PLATFORMS.filter((p) => !real.includes(p));
-  if (real.length === 0) return " You're in practice mode, so connecting makes a pretend account and nothing actually gets posted.";
-  if (practice.length === 0) return " Every account here is real: publishing goes live.";
-  return ` ${names(real)} ${real.length === 1 ? "is" : "are"} real, so posts there go live. ${names(practice)} ${practice.length === 1 ? "is" : "are"} still in practice mode, where nothing actually gets posted.`;
-}

@@ -55,11 +55,11 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="ghost" size="icon" onClick={() => go(-1)} aria-label="Previous week">
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          <span className="tabular min-w-[140px] text-center text-sm font-medium" aria-live="polite">
+          <span className="tabular min-w-0 text-center sm:min-w-[140px] text-sm font-medium" aria-live="polite">
             {range}
           </span>
           <Button variant="ghost" size="icon" onClick={() => go(1)} aria-label="Next week">

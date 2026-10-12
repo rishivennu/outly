@@ -14,14 +14,14 @@ import { useUser } from "@/components/shell/UserContext";
 type Stop = { target?: string; title: string; body: string };
 
 const STOPS: Stop[] = [
-  { title: "Welcome to Outly", body: "A quick look around: about a minute. Use the arrow keys or the buttons, and press Esc to leave any time." },
-  { target: "new-post", title: "Start with one video", body: "Drop a video here. Outly drafts a caption, a title and a post for each platform, and you edit anything before it goes out." },
+  { title: "Welcome to Outlly", body: "A quick look around: about a minute. Use the arrow keys or the buttons, and press Esc to leave any time." },
+  { target: "new-post", title: "Start with one video", body: "Drop a video here. Outlly drafts a caption, a title and a post for each platform, and you edit anything before it goes out." },
   { target: "content", title: "Everything you've made", body: "Every video and post in one place, with where each one went and how it's doing." },
   { target: "calendar", title: "Plan the week", body: "Schedule posts and see what's going out when. Drag to move a post to another day." },
   { target: "analytics", title: "Live numbers, per platform", body: "Each connected account gets its own dashboard: followers, views, reach, your best posts, and suggestions worked out from those numbers." },
   { target: "inbox", title: "Every comment, one list", body: "Comments from all your accounts land here, and you can reply without opening each app." },
   { target: "approvals", title: "Get a yes before it posts", body: "Send a review link to a teammate or client. They approve or ask for changes; nothing goes out until it's cleared." },
-  { target: "accounts", title: "Connect your accounts", body: "Instagram and YouTube connect here. You sign in on their own pages, so Outly never sees your password." },
+  { target: "accounts", title: "Connect your accounts", body: "Instagram and YouTube connect here. You sign in on their own pages, so Outlly never sees your password." },
   { title: "You're set", body: "Connect an account to see your live numbers, or start your first post. You can replay this tour from Settings or the Home checklist." },
 ];
 
@@ -150,7 +150,7 @@ export function Tour() {
         style={{ width: W, ...pos }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-xs font-medium text-muted-foreground tabular">
+          <span className="text-xs font-semibold text-foreground/80 tabular">
             {step + 1} of {STOPS.length}
           </span>
           <span className="flex flex-1 gap-1" aria-hidden="true">

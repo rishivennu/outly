@@ -94,7 +94,7 @@ export function Assistant(p: Props) {
           <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-success" aria-hidden="true" />
         </span>
         <div>
-          <h2 className="text-sm font-semibold">Outly assistant</h2>
+          <h2 className="text-sm font-semibold">Outlly assistant</h2>
           <p className="text-xs text-muted-foreground">{p.hooks.loading || p.copyLoading ? "Thinking…" : "Here with you"}</p>
         </div>
       </header>

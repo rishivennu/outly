@@ -1,4 +1,8 @@
+"use client";
 import Link from "next/link";
+import { useSignedIn } from "./useSignedIn";
+import { useWaitlist } from "./useWaitlist";
+import { CookieSettingsButton } from "@/components/shared/CookieConsent";
 import { ArrowRight, ArrowUp, LayoutDashboard } from "lucide-react";
 import { OutlyLogo } from "@/components/brand/Logo";
 import { PlatformGlyph } from "@/components/shared/PlatformIcon";
@@ -18,6 +22,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   {
     title: "Company",
     links: [
+      { href: "/help", label: "Help centre" },
       { href: "/contact", label: "Contact" },
       { href: "/privacy", label: "Privacy" },
       { href: "/terms", label: "Terms" },
@@ -36,7 +41,9 @@ const PLATFORMS = [
  * in), two link columns, the three destinations, and the wordmark set huge as a sign-off.
  * Every item is a real link; nothing points at "#".
  */
-export function MarketingFooter({ signedIn = false }: { signedIn?: boolean }) {
+export function MarketingFooter() {
+  const signedIn = useSignedIn();
+  const waitlist = useWaitlist();
   return (
     <footer className="px-3 pb-3 pt-6 sm:px-6 sm:pb-6">
       <div className="footer-card relative mx-auto max-w-[1240px] overflow-hidden rounded-[32px] sm:rounded-[40px]">
@@ -47,7 +54,7 @@ export function MarketingFooter({ signedIn = false }: { signedIn?: boolean }) {
               Upload once. Publish to Reels, Shorts and X. See exactly what happened to each one.
             </p>
             <Link
-              href={signedIn ? "/home" : "/signup"}
+              href={signedIn ? "/home" : waitlist ? "/waitlist" : "/signup"}
               className="lime-glow group mt-6 inline-flex h-12 items-center gap-2 rounded-full bg-lime px-5 text-[15px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-px active:scale-95"
             >
               {signedIn ? (
@@ -56,7 +63,7 @@ export function MarketingFooter({ signedIn = false }: { signedIn?: boolean }) {
                 </>
               ) : (
                 <>
-                  Start creating, it&apos;s free
+                  {waitlist ? "Join the waitlist" : "Start creating, it\u2019s free"}
                   <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
                 </>
               )}
@@ -83,6 +90,11 @@ export function MarketingFooter({ signedIn = false }: { signedIn?: boolean }) {
                       </Link>
                     </li>
                   ))}
+                  {col.title === "Company" && (
+                    <li>
+                      <CookieSettingsButton className="footer-link inline-flex min-h-9 items-center text-[15px] font-medium text-foreground/80 hover:text-foreground" />
+                    </li>
+                  )}
                 </ul>
               </nav>
             ))}
@@ -104,12 +116,12 @@ export function MarketingFooter({ signedIn = false }: { signedIn?: boolean }) {
         </div>
 
         <p aria-hidden="true" className="footer-word pointer-events-none select-none px-4 text-center font-display font-bold leading-[0.8]">
-          outly
+          outlly
         </p>
 
         <div className="relative flex flex-col gap-1.5 px-6 pb-6 pt-2 text-[12.5px] text-foreground/60 sm:flex-row sm:items-center sm:justify-between sm:px-10">
-          <p>&copy; {new Date().getFullYear()} Outly. In beta.</p>
-          <p>Instagram, YouTube and X are trademarks of their owners. Outly is not affiliated with them.</p>
+          <p>&copy; {new Date().getFullYear()} Outlly. In beta.</p>
+          <p>Instagram, YouTube and X are trademarks of their owners. Outlly is not affiliated with them.</p>
         </div>
       </div>
     </footer>

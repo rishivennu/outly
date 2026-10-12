@@ -12,7 +12,6 @@ import { fmt, tzShort, useUser } from "@/components/shell/UserContext";
 import { api, ApiError } from "@/lib/client/api";
 import { PLATFORM_META, TARGET_COPY, type TargetStatus } from "@/lib/domain";
 import { targetErrorCopy } from "@/components/shared/errorCopy";
-import { PracticePill } from "@/components/shared/PracticePill";
 import type { PostView } from "@/lib/services";
 
 interface Props {
@@ -112,9 +111,8 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
                       <span className="truncate">
                         {PLATFORM_META[t.platform].name} <span className="text-muted-foreground">{PLATFORM_META[t.platform].format}</span>
                       </span>
-                      {t.practice && <PracticePill />}
                     </p>
-                    <p className={h ? "text-xs text-destructive" : "truncate text-xs text-muted-foreground"}>{h ? h.title : t.status === "published" ? (t.url ? "Published" : "Practice run — nothing was posted") : t.status === "pending" ? (post.status === "scheduled" ? "Waiting for its moment" : "Not sent yet") : TARGET_COPY[t.status as TargetStatus]}</p>
+                    <p className={h ? "text-xs text-destructive" : "truncate text-xs text-muted-foreground"}>{h ? h.title : t.status === "published" ? "Published" : t.status === "pending" ? (post.status === "scheduled" ? "Waiting for its moment" : "Not sent yet") : TARGET_COPY[t.status as TargetStatus]}</p>
                   </div>
                   {t.url && (
                     <a href={t.url} target="_blank" rel="noopener noreferrer" aria-label={`Open on ${PLATFORM_META[t.platform].name} (new tab)`} className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground">

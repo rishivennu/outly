@@ -4,7 +4,7 @@ import { Shell, SectionHead } from "./bits";
 
 export function Demo() {
   return (
-    <section id="demo" className="scroll-mt-24 overflow-hidden bg-secondary/50 py-20 sm:py-28" aria-labelledby="demo-title">
+    <section id="demo" className="ap-canvas scroll-mt-24 overflow-hidden py-20 sm:py-28" aria-labelledby="demo-title">
       <Shell>
         <SectionHead
           id="demo-title"
@@ -13,7 +13,7 @@ export function Demo() {
           title="Watch one upload become three posts."
           body="Including the part where a platform says no. Step through it yourself with the buttons underneath."
         />
-        <Reveal className="mt-14">
+        <Reveal className="mt-12 sm:mt-16">
           <DemoFlow />
         </Reveal>
       </Shell>

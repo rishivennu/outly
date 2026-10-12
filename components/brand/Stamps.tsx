@@ -15,7 +15,7 @@ const MINI = [
   { big: "POST", no: "03", ink: "#16161a", tilt: -3, x: "62%", y: "26%" },
 ];
 
-/** Three platform stamps fanned out under a slowly turning Outly postmark. Pure decoration. */
+/** Three platform stamps fanned out under a slowly turning Outlly postmark. Pure decoration. */
 export function StampCluster({ className }: { className?: string }) {
   return (
     <div className={cn("stamp-cluster", className)} aria-hidden="true">

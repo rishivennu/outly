@@ -5,7 +5,6 @@ import { ArrowRight, Check, Compass, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/components/shell/UserContext";
 import { useToast } from "@/components/shared/Toast";
-import { GoogleHelp } from "./GoogleHelp";
 import { startTour, tourKey } from "./Tour";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +21,7 @@ const NOTICES: Record<string, { text: string; tone: "ok" | "info" | "error" }> =
   channel_later: { text: "You're signed in. YouTube didn't link this time; try Sign in with Google again from the checklist.", tone: "info" },
 };
 
-/** First-run checklist on Home: the five steps from sign-up to a connected, toured studio. */
+/** First-run checklist on Home: the four steps from sign-up to a connected, toured studio. */
 export function SetupChecklist({ state }: { state: SetupState }) {
   const user = useUser();
   const toast = useToast();
@@ -39,8 +38,8 @@ export function SetupChecklist({ state }: { state: SetupState }) {
     const q = new URLSearchParams(location.search);
     const welcome = q.get("welcome") === "1";
     const notice = q.get("notice");
-    if (q.get("connected") === "youtube") toast(welcome ? "Welcome to Outly. Your YouTube channel is linked." : "YouTube channel linked.", "ok");
-    else if (welcome) toast("Welcome to Outly. Your account is ready.", "ok");
+    if (q.get("connected") === "youtube") toast(welcome ? "Welcome to Outlly. Your YouTube channel is linked." : "YouTube channel linked.", "ok");
+    else if (welcome) toast("Welcome to Outlly. Your account is ready.", "ok");
     if (notice && NOTICES[notice]) toast(NOTICES[notice].text, NOTICES[notice].tone);
     if (welcome || notice || q.has("connected")) {
       ["welcome", "notice", "connected"].forEach((k) => q.delete(k));
@@ -60,10 +59,9 @@ export function SetupChecklist({ state }: { state: SetupState }) {
 
   const { connected } = state;
   const steps = [
-    { id: "account", title: "Create your Outly account", done: true, body: "Done. You're in." },
+    { id: "account", title: "Create your Outlly account", done: true, body: "Done. You're in." },
     { id: "instagram", title: "Connect Instagram", done: connected.instagram },
     { id: "youtube", title: "Sign in with Google to link YouTube", done: connected.youtube },
-    { id: "403", title: "If Google shows Error 403, get tester access", done: connected.youtube },
     { id: "tour", title: "Take the guided tour", done: toured },
   ];
   const doneCount = steps.filter((s) => s.done).length;
@@ -100,7 +98,6 @@ export function SetupChecklist({ state }: { state: SetupState }) {
         );
       return <p className="text-sm text-muted-foreground">Google sign-in isn&apos;t set up on this server yet.</p>;
     }
-    if (id === "403") return <GoogleHelp compact className="w-full" />;
     if (id === "tour")
       return (
         <Button size="sm" variant="outline" onClick={() => startTour()}>
@@ -111,9 +108,8 @@ export function SetupChecklist({ state }: { state: SetupState }) {
   };
 
   const notes: Record<string, string> = {
-    instagram: "You log in on Instagram's own page and pick the account. Outly never sees your password. Needs a professional (Business or Creator) account.",
+    instagram: "You log in on Instagram's own page and pick the account. Outlly never sees your password. Needs a professional (Business or Creator) account.",
     youtube: "Pick your Gmail on Google's page; the channel on that account links automatically.",
-    "403": "Google limits unverified apps to approved testers. This is a one-time fix.",
     tour: "One minute: posting, the calendar, live analytics, the inbox and approvals.",
   };
 
@@ -123,7 +119,7 @@ export function SetupChecklist({ state }: { state: SetupState }) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="eyebrow mb-1.5">Getting started</p>
-            <h2 id="setup-h" className="text-xl font-semibold tracking-tight">Set up Outly in five steps</h2>
+            <h2 id="setup-h" className="text-xl font-semibold tracking-tight">Set up Outlly in four steps</h2>
           </div>
           <Button size="icon-sm" variant="ghost" onClick={dismiss} aria-label="Hide the setup checklist" className="h-11 w-11">
             <X className="h-4 w-4" aria-hidden="true" />

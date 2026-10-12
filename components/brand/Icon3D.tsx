@@ -7,7 +7,7 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * The Outly object set: every concept is a small, glossy, sticker-bombed 3D
+ * The Outlly object set: every concept is a small, glossy, sticker-bombed 3D
  * collectible (a box, a can, a jar, a pouch, a tag or a retro computer) built in
  * CSS. Same family as the platform Collectibles on Connect accounts.
  *

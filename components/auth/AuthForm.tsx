@@ -10,7 +10,7 @@ import { GoogleButton } from "./GoogleButton";
 import { GoogleHelp } from "@/components/onboarding/GoogleHelp";
 
 const GOOGLE_ERRORS: Record<string, string> = {
-  access_denied: "Google didn't let you in. While Outly is in testing, only approved testers can use Google sign-in. See the help below.",
+  access_denied: "Google didn't let you in. While Outlly is in testing, only approved testers can use Google sign-in. See the help below.",
   denied: "Google sign-in was cancelled. Nothing was connected.",
   unverified: "That Google account doesn't have a verified email, so we can't sign you in with it.",
   state: "That sign-in took too long or came from another tab. Let's start it again.",
@@ -27,7 +27,7 @@ export function AuthForm({ mode, google = false }: { mode: "login" | "signup"; g
   const [error, setError] = useState<string | null>(googleError ? (GOOGLE_ERRORS[googleError] ?? GOOGLE_ERRORS.exchange) : null);
   // Demo credentials are prefilled only when explicitly enabled (local/dev seeds).
   const demo = mode === "login" && process.env.NEXT_PUBLIC_DEMO_LOGIN === "true";
-  const [form, setForm] = useState({ name: "", email: demo ? "creator@studio.dev" : "", password: demo ? "studio123" : "" });
+  const [form, setForm] = useState({ name: "", email: demo ? "creator@studio.dev" : mode === "signup" ? (params.get("email") ?? "").slice(0, 200) : "", password: demo ? "studio123" : "" });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,21 +82,21 @@ export function AuthForm({ mode, google = false }: { mode: "login" | "signup"; g
         </p>
       )}
       <Button type="submit" variant="lime" size="lg" className="w-full" disabled={busy}>
-        {busy ? (mode === "login" ? "Opening Outly…" : "Setting up your account…") : mode === "login" ? "Let's go" : "Create my account"}
+        {busy ? (mode === "login" ? "Opening Outlly…" : "Setting up your account…") : mode === "login" ? "Let's go" : "Create my account"}
         {!busy && <ArrowRight className="h-5 w-5" />}
       </Button>
       <p className="text-center text-sm text-muted-foreground">
         {mode === "login" ? (
           <>
             New here?{" "}
-            <Link href="/signup" className="font-medium text-foreground underline underline-offset-4">
+            <Link href={next ? `/signup?next=${encodeURIComponent(next)}` : "/signup"} className="font-medium text-foreground underline underline-offset-4">
               Create an account
             </Link>
           </>
         ) : (
           <>
             Already have one?{" "}
-            <Link href="/login" className="font-medium text-foreground underline underline-offset-4">
+            <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="font-medium text-foreground underline underline-offset-4">
               Sign in
             </Link>
           </>

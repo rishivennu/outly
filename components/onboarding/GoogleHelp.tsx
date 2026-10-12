@@ -4,7 +4,7 @@ import { ChevronDown, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * Google shows "Error 403: access_denied" on its own page while an app is in Testing, so Outly never
+ * Google shows "Error 403: access_denied" on its own page while an app is in Testing, so Outlly never
  * hears about it. The only fix we can offer is telling people before they go, and after they come back.
  */
 export function GoogleHelp({ className, defaultOpen = false, compact = false }: { className?: string; defaultOpen?: boolean; compact?: boolean }) {
@@ -25,10 +25,10 @@ export function GoogleHelp({ className, defaultOpen = false, compact = false }: 
       </button>
       <div id={id} hidden={!open} className="px-3.5 pb-3.5 text-muted-foreground">
         <p>
-          Outly hasn&apos;t finished Google&apos;s app verification yet, so Google only lets approved testers sign in. Nothing is wrong with your
+          Outlly hasn&apos;t finished Google&apos;s app verification yet, so Google only lets approved testers sign in. Nothing is wrong with your
           account.
         </p>
-        <p className="mt-3 font-medium text-foreground">If you run this copy of Outly</p>
+        <p className="mt-3 font-medium text-foreground">If you run this copy of Outlly</p>
         <ol className="mt-1 list-decimal space-y-1 pl-5">
           <li>
             Open <span className="text-foreground">Google Cloud Console</span>, then <span className="text-foreground">Google Auth Platform</span>,
@@ -41,7 +41,7 @@ export function GoogleHelp({ className, defaultOpen = false, compact = false }: 
           <li>Save, wait a minute, and try again. Up to 100 testers are allowed.</li>
         </ol>
         <p className="mt-3 font-medium text-foreground">If someone else runs it</p>
-        <p className="mt-1">Send them the Gmail address you use and ask to be added as a tester. Once Outly is verified, this step goes away.</p>
+        <p className="mt-1">Send them the Gmail address you use and ask to be added as a tester. Once Outlly is verified, this step goes away.</p>
       </div>
     </div>
   );

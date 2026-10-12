@@ -4,11 +4,11 @@ import { ExternalLink, MessagesSquare, RefreshCw, Send, Sparkles } from "lucide-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
-import { PracticePill } from "@/components/shared/PracticePill";
 import { useToast } from "@/components/shared/Toast";
 import { targetErrorCopy } from "@/components/shared/errorCopy";
 import { api, ApiError } from "@/lib/client/api";
-import { PLATFORMS, PLATFORM_META, type Platform } from "@/lib/domain";
+import { PLATFORM_META, type Platform } from "@/lib/domain";
+import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn } from "@/lib/utils";
 import type { InboxComment, InboxProblem } from "@/lib/inbox";
 
@@ -19,6 +19,7 @@ export function InboxView({ initial }: { initial: Data }) {
   const toast = useToast();
   const [data, setData] = useState<Data>(initial);
   const [platform, setPlatform] = useState<Platform | "all">("all");
+  const live = useLivePlatforms();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,10 +45,10 @@ export function InboxView({ initial }: { initial: Data }) {
     <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-14">
       <p className="eyebrow mb-3">Inbox</p>
       <h1 className="display max-w-3xl text-[clamp(2.6rem,6vw,4.6rem)]">Everyone who replied.</h1>
-      <p className="mt-3 max-w-2xl text-muted-foreground">Comments from your connected Instagram and YouTube accounts, plus every post you published here, newest first. Reply without leaving Outly.</p>
+      <p className="mt-3 max-w-2xl text-muted-foreground">Comments from your connected Instagram and YouTube accounts, plus every post you published here, newest first. Reply without leaving Outlly.</p>
 
       <div className="mt-8 flex flex-wrap items-center gap-2">
-        {(["all", ...PLATFORMS] as const).map((p) => (
+        {(["all", ...live] as const).map((p) => (
           <button
             key={p}
             onClick={() => load(p)}
@@ -180,7 +181,6 @@ function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: 
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
             {comment.authorName}
-            {comment.practice && <PracticePill />}
             <span className="text-xs font-normal text-muted-foreground">{new Date(comment.createdAt).toLocaleString()}</span>
           </p>
           <p className="mt-1 whitespace-pre-wrap text-[15px]">{comment.text}</p>

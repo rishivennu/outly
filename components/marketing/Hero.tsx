@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { HeroStage } from "./HeroStage";
+import { SignupCta } from "./SignupCta";
 import { StampChip } from "@/components/brand/Stamps";
 import { Shell } from "./bits";
 import { HERO, PLATFORM_PITCH } from "@/lib/marketing/content";
@@ -20,13 +21,12 @@ export function Hero() {
         <p className="mt-6 max-w-xl text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-[19px]">{HERO.sub}</p>
 
         <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href={HERO.primary.href}
+          <SignupCta
+            label={HERO.primary.label}
             className="lime-glow group inline-flex h-14 items-center gap-2 rounded-full bg-lime px-7 text-base font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.97]"
           >
-            {HERO.primary.label}
             <ArrowRight className="h-[18px] w-[18px] transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
-          </Link>
+          </SignupCta>
           <Link
             href={HERO.secondary.href}
             className="glass hairline inline-flex h-14 items-center rounded-full px-6 text-base font-medium transition-colors hover:bg-secondary"

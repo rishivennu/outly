@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Check, Compass, LogOut } from "lucide-react";
+import { Compass, LogOut, Mail } from "lucide-react";
 import { startTour } from "@/components/onboarding/Tour";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
@@ -11,17 +11,8 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { useUser, tzShort } from "@/components/shell/UserContext";
 import { api, ApiError } from "@/lib/client/api";
-import { cn } from "@/lib/utils";
-
-export type SimMode = "realistic" | "smooth" | "instagram-reconnect" | "youtube-flaky" | "x-rejects";
-
-const MODES: { id: SimMode; title: string; body: string }[] = [
-  { id: "realistic", title: "Like real life", body: "Mostly smooth. Now and then a platform asks us to slow down, and we retry on our own." },
-  { id: "smooth", title: "Everything works", body: "Every platform says yes the first time. Good for a quick demo." },
-  { id: "instagram-reconnect", title: "Instagram needs you", body: "Instagram's sign-in has expired, so you'll see the reconnect flow." },
-  { id: "youtube-flaky", title: "YouTube is wobbly", body: "YouTube fails a couple of times, then gets there with retries." },
-  { id: "x-rejects", title: "X says no", body: "X turns the video down, so you'll see a failure that needs a fix." },
-];
+import { TeamCard } from "./TeamCard";
+import { ReferralCard } from "./ReferralCard";
 
 function zones(): string[] {
   const anyIntl = Intl as unknown as { supportedValuesOf?: (k: string) => string[] };
@@ -31,7 +22,43 @@ function zones(): string[] {
   return ["UTC", "Asia/Kolkata", "Europe/London", "America/New_York", "America/Los_Angeles", "Asia/Tokyo", "Australia/Sydney"];
 }
 
-export function SettingsView({ sim, mock }: { sim: SimMode; mock: boolean }) {
+/** Monday summary email on/off. Saves the moment it's flipped. */
+function WeeklyReportCard({ initial }: { initial: boolean }) {
+  const toast = useToast();
+  const [on, setOn] = useState(initial);
+  const [saving, setSaving] = useState(false);
+  const flip = async (next: boolean) => {
+    setOn(next);
+    setSaving(true);
+    try {
+      await api("/api/settings/profile", { method: "PATCH", json: { weeklyReport: next } });
+      toast(next ? "You'll get your weekly report on Monday morning." : "Weekly report turned off.", "ok");
+    } catch (err) {
+      setOn(!next);
+      toast(err instanceof ApiError ? err.message : "Something got in the way.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <section className="glass flex items-center justify-between gap-4 rounded-[32px] p-6" aria-labelledby="wr-h">
+      <div className="flex items-start gap-3">
+        <Mail className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <div>
+          <h2 id="wr-h" className="text-lg font-semibold">Weekly report</h2>
+          <p id="wr-d" className="text-sm text-muted-foreground">Every Monday at 9 am your time: views, top post and what's scheduled next.</p>
+        </div>
+      </div>
+      <label className="flex shrink-0 cursor-pointer items-center">
+        <span className="sr-only">Email me a weekly report</span>
+        <input type="checkbox" role="switch" checked={on} disabled={saving} aria-describedby="wr-d" onChange={(e) => flip(e.target.checked)} className="peer sr-only" />
+        <span aria-hidden className="relative h-7 w-12 shrink-0 rounded-full bg-muted transition-colors peer-checked:bg-lime peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-background after:shadow after:transition-transform after:duration-300 peer-checked:after:translate-x-5" />
+      </label>
+    </section>
+  );
+}
+
+export function SettingsView({ weeklyReport = true }: { weeklyReport?: boolean }) {
   const user = useUser();
   const router = useRouter();
   const toast = useToast();
@@ -39,7 +66,6 @@ export function SettingsView({ sim, mock }: { sim: SimMode; mock: boolean }) {
   const [timezone, setTimezone] = useState(user.timezone);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<SimMode>(sim);
   const [leaving, setLeaving] = useState(false);
   // Server and browser Intl data differ, so zone lists and short names render after mount (no hydration mismatch).
   const [mounted, setMounted] = useState(false);
@@ -66,18 +92,6 @@ export function SettingsView({ sim, mock }: { sim: SimMode; mock: boolean }) {
     }
   };
 
-  const pick = async (m: SimMode) => {
-    const prev = mode;
-    setMode(m);
-    try {
-      await api("/api/settings/simulation", { method: "POST", json: { mode: m } });
-      toast(`Practice mode: ${MODES.find((x) => x.id === m)!.title.toLowerCase()}.`, "info");
-    } catch {
-      setMode(prev);
-      toast("Couldn't switch that. Let's try again.", "info");
-    }
-  };
-
   const logout = async () => {
     setLeaving(true);
     try {
@@ -93,6 +107,15 @@ export function SettingsView({ sim, mock }: { sim: SimMode; mock: boolean }) {
       <h1 className="display max-w-3xl text-[clamp(2.6rem,6vw,4.6rem)]">Make it yours.</h1>
 
       <div className="mt-10 grid max-w-5xl gap-4 lg:grid-cols-[1.1fr_1fr]">
+        {user.workspace ? (
+          <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-[32px] p-6 sm:p-8" aria-labelledby="you">
+            <h2 id="you" className="text-2xl font-semibold tracking-tight">You</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{user.workspace.me.name} · {user.workspace.me.email}</p>
+            <p className="mt-5 text-sm">
+              You're in <b>{user.workspace.ownerName}</b>'s studio. Your own name, time zone and emails are changed from your own studio.
+            </p>
+          </motion.section>
+        ) : (
         <motion.form onSubmit={save} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-[32px] p-6 sm:p-8" aria-labelledby="you">
           <h2 id="you" className="text-2xl font-semibold tracking-tight">You</h2>
           <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
@@ -124,50 +147,38 @@ export function SettingsView({ sim, mock }: { sim: SimMode; mock: boolean }) {
             {saving ? "Saving…" : "Save changes"}
           </Button>
         </motion.form>
+        )}
 
-        <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="glass rounded-[32px] p-6 sm:p-8" aria-labelledby="practice">
-          <h2 id="practice" className="text-2xl font-semibold tracking-tight">Practice mode</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {mock ? "Nothing really gets posted. Pick how the pretend platforms behave, so you can see every state." : "Real platforms are connected, so these only affect platforms still in practice mode."}
-          </p>
-          <div role="radiogroup" aria-labelledby="practice" className="mt-5 space-y-2">
-            {MODES.map((m) => {
-              const on = mode === m.id;
-              return (
-                <button key={m.id} type="button" role="radio" aria-checked={on} onClick={() => !on && pick(m.id)} className={cn("flex min-h-[44px] w-full items-start gap-3 rounded-2xl p-3 text-left transition-colors", on ? "bg-secondary hairline" : "hover:bg-secondary/50")}>
-                  <span className={cn("mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border", on ? "lime-bg border-transparent" : "border-muted-foreground/40")} aria-hidden="true">
-                    {on && <Check className="h-3 w-3" strokeWidth={3} />}
-                  </span>
-                  <span>
-                    <span className="block text-[15px] font-medium">{m.title}</span>
-                    <span className="block text-sm text-muted-foreground">{m.body}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </motion.section>
-
-        <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="glass flex flex-wrap items-center justify-between gap-6 rounded-[32px] p-6 sm:p-8 lg:col-span-2" aria-labelledby="look">
-          <div className="flex items-center gap-4">
-            <Icon3D name="settings" size={64} className="shrink-0" />
-            <div>
-              <h2 id="look" className="text-2xl font-semibold tracking-tight">Look</h2>
-              <p className="mt-1 max-w-sm text-sm text-muted-foreground">Outly comes in light and dark. System follows your device.</p>
+        <div className="grid content-start gap-4">
+          <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="glass rounded-[32px] p-6 sm:p-8" aria-labelledby="look">
+            <div className="flex items-center gap-4">
+              <Icon3D name="settings" size={64} className="shrink-0" />
+              <div>
+                <h2 id="look" className="text-2xl font-semibold tracking-tight">Look</h2>
+                <p className="mt-1 max-w-sm text-sm text-muted-foreground">Outlly comes in light and dark. System follows your device.</p>
+              </div>
             </div>
-          </div>
-          <ThemeToggle plain className="shrink-0" />
-        </motion.section>
+            <ThemeToggle plain className="mt-5" />
+          </motion.section>
 
-        <section className="glass flex flex-wrap items-center justify-between gap-4 rounded-[32px] p-6 lg:col-span-2" aria-labelledby="tour-h">
-          <div>
-            <h2 id="tour-h" className="text-lg font-semibold">Guided tour</h2>
-            <p className="text-sm text-muted-foreground">A one-minute walk through posting, analytics, the inbox and connecting accounts.</p>
-          </div>
-          <Button variant="outline" onClick={() => startTour()}>
-            <Compass className="h-4 w-4" aria-hidden="true" /> Replay the tour
-          </Button>
-        </section>
+          <section className="glass flex flex-wrap items-center justify-between gap-4 rounded-[32px] p-6" aria-labelledby="tour-h">
+            <div>
+              <h2 id="tour-h" className="text-lg font-semibold">Guided tour</h2>
+              <p className="text-sm text-muted-foreground">A one-minute walk through posting, analytics, the inbox and connecting accounts.</p>
+            </div>
+            <Button variant="outline" onClick={() => startTour()}>
+              <Compass className="h-4 w-4" aria-hidden="true" /> Replay the tour
+            </Button>
+          </section>
+        </div>
+
+        {!user.workspace && <WeeklyReportCard initial={weeklyReport} />}
+        <div className={user.workspace ? "lg:col-span-2" : undefined}>
+          <ReferralCard />
+        </div>
+        <div className="lg:col-span-2">
+          <TeamCard />
+        </div>
 
         <section className="glass flex flex-wrap items-center justify-between gap-4 rounded-[32px] p-6 lg:col-span-2" aria-label="Session">
           <div>

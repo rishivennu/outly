@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSignedIn } from "./useSignedIn";
+import { useWaitlist } from "./useWaitlist";
 import { usePathname } from "next/navigation";
 import { ArrowRight, LayoutDashboard, Menu, X } from "lucide-react";
 import { OutlyMark } from "@/components/brand/Logo";
@@ -16,23 +18,45 @@ const LINKS = [
 ];
 
 /**
- * Marketing nav. Always sits on a solid, high-contrast surface so it reads over the
- * colourful hero and the dark CTA alike. Scrollspy: the active link is the last section
- * whose top has crossed 40% of the viewport, so it never goes blank between sections and
- * clears above the first one. Clicking a link marks it at once instead of waiting for the
- * scroll to land. Below lg the links live in a panel that closes on outside tap, Esc,
- * link tap or route change.
+ * Marketing nav: a floating pill on a near-solid card surface, so text holds 4.5:1 over
+ * the hero and the dark sections alike. Scrollspy: the active link is the last section
+ * whose top has crossed 40% of the viewport; clicking a link marks it at once. Below lg the
+ * links live in a card that drops under the pill and closes on outside tap, Esc, link tap
+ * or route change.
  */
-export function MarketingNav({ signedIn = false }: { signedIn?: boolean }) {
+export function MarketingNav() {
+  const signedIn = useSignedIn();
+  const waitlist = useWaitlist();
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [pill, setPill] = useState<{ x: number; w: number } | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const lockUntil = useRef(0);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [pill, setPill] = useState<{ l: number; r: number; dir: "left" | "right" | "none" } | null>(null);
+
+  // Liquid indicator: one pill under the active link. The edge in the direction of travel
+  // leads and the trailing edge catches up, so it stretches across and settles.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measure = (fromResize = false) => {
+      const a = active ? list.querySelector<HTMLElement>(`[data-id="${active}"]`) : null;
+      if (!a) return setPill(null);
+      const l = a.offsetLeft;
+      const r = list.clientWidth - (a.offsetLeft + a.offsetWidth);
+      setPill((prev) => {
+        if (prev && prev.l === l && prev.r === r) return prev; // ResizeObserver fires on observe; keep the running slide
+        return { l, r, dir: !prev || fromResize ? "none" : l > prev.l ? "right" : l < prev.l ? "left" : prev.dir };
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(() => measure(true));
+    ro.observe(list);
+    return () => ro.disconnect();
+  }, [active]);
 
   useEffect(() => {
     let raf = 0;
@@ -61,13 +85,6 @@ export function MarketingNav({ signedIn = false }: { signedIn?: boolean }) {
     };
   }, [pathname]);
 
-  useEffect(() => {
-    const list = listRef.current;
-    const a = active && list?.querySelector<HTMLElement>(`[data-id="${active}"]`);
-    if (!list || !a) return setPill(null);
-    setPill({ x: a.offsetLeft, w: a.offsetWidth });
-  }, [active]);
-
   useEffect(() => setOpen(false), [pathname]);
 
   useEffect(() => {
@@ -92,41 +109,40 @@ export function MarketingNav({ signedIn = false }: { signedIn?: boolean }) {
     setOpen(false);
   };
 
+  const ctaHref = waitlist ? "/waitlist" : "/signup";
+  const ctaLabel = waitlist ? "Join the waitlist" : "Start creating";
+
   return (
     <header className="mnav sticky top-0 z-50 px-3 pt-3 sm:px-6" data-scrolled={scrolled || open}>
-      {/* Tap-outside scrim for the mobile panel. Pointer-events only while open. */}
-      <div
-        aria-hidden="true"
-        className={cn("fixed inset-0 -z-10 bg-black/25 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden", open ? "opacity-100" : "pointer-events-none opacity-0")}
-      />
       <div ref={barRef} className="mnav-bar mx-auto flex h-14 max-w-[1180px] items-center gap-2 rounded-full pl-3 pr-1.5 sm:h-[60px] sm:pl-4">
-        <Link href="/" className="flex h-11 items-center gap-2 rounded-full pr-2 text-[17px]" aria-label="Outly home">
+        <Link href="/" className="flex h-11 items-center gap-2 rounded-full pr-2" aria-label="Outlly home">
           <OutlyMark size={24} />
-          <span className="font-display text-[1.2em] font-bold tracking-[-0.03em]">outly</span>
+          <span className="font-display text-[20px] font-bold tracking-[-0.045em]">outlly</span>
         </Link>
 
-        <nav aria-label="Sections" className="relative mx-auto hidden lg:block">
-          <div ref={listRef} className="relative flex items-center">
-            <span
-              aria-hidden="true"
-              className="absolute top-1/2 h-9 -translate-y-1/2 rounded-full bg-foreground shadow-[0_6px_16px_-8px_rgba(0,0,0,.5)] transition-[transform,width,opacity] duration-500 ease-[cubic-bezier(.22,1,.36,1)]"
-              style={{ width: pill?.w ?? 0, transform: `translate3d(${pill?.x ?? 0}px,-50%,0)`, opacity: pill ? 1 : 0 }}
-            />
+        <nav aria-label="Sections" className="mx-auto hidden lg:block">
+          <div ref={listRef} className="relative">
+          <span
+            aria-hidden="true"
+            className="mnav-pill"
+            data-dir={pill?.dir ?? "none"}
+            style={{ left: pill?.l ?? 0, right: pill?.r ?? 0, opacity: pill ? 1 : 0 }}
+          />
+          <ul className="flex items-center">
             {LINKS.map((l) => (
-              <Link
-                key={l.id}
-                data-id={l.id}
-                href={`/#${l.id}`}
-                onClick={() => pick(l.id)}
-                aria-current={active === l.id ? "true" : undefined}
-                className={cn(
-                  "relative rounded-full px-4 py-2.5 text-[14.5px] font-semibold transition-colors duration-300",
-                  active === l.id ? "text-background" : "text-foreground/80 hover:text-foreground",
-                )}
-              >
-                {l.label}
-              </Link>
+              <li key={l.id}>
+                <Link
+                  data-id={l.id}
+                  href={`/#${l.id}`}
+                  onClick={() => pick(l.id)}
+                  aria-current={active === l.id ? "true" : undefined}
+                  className={cn("mnav-link", active === l.id && "is-active")}
+                >
+                  {l.label}
+                </Link>
+              </li>
             ))}
+          </ul>
           </div>
         </nav>
 
@@ -135,28 +151,28 @@ export function MarketingNav({ signedIn = false }: { signedIn?: boolean }) {
           {signedIn ? (
             <Link
               href="/home"
-              className="lime-glow group inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-lime px-4 text-[14px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 active:scale-95 sm:px-5"
+              className="lime-glow inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-lime px-4 text-[14px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 active:scale-95 sm:px-5"
             >
               <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
               Dashboard
             </Link>
           ) : (
             <>
-              <Link href="/login" className="hidden h-11 items-center rounded-full px-4 text-[14.5px] font-semibold text-foreground/85 transition-colors hover:text-foreground sm:inline-flex">
+              <Link href="/login" className="hidden h-11 items-center rounded-full px-4 text-[14.5px] font-semibold text-foreground/80 transition-colors hover:text-foreground sm:inline-flex">
                 Log in
               </Link>
               <Link
-                href="/signup"
+                href={ctaHref}
                 className="lime-glow group inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-lime px-4 text-[14px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 active:scale-95 sm:px-5"
               >
-                Start creating
+                {ctaLabel}
                 <ArrowRight className="hidden h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 sm:block" aria-hidden="true" />
               </Link>
             </>
           )}
           <button
             type="button"
-            className="grid h-11 w-11 place-items-center rounded-full text-foreground transition-colors hover:bg-foreground/[0.06] lg:hidden"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-foreground transition-colors hover:bg-foreground/[0.06] lg:hidden"
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
             aria-controls="mnav-panel"
@@ -167,12 +183,7 @@ export function MarketingNav({ signedIn = false }: { signedIn?: boolean }) {
         </div>
       </div>
 
-      <div
-        ref={panelRef}
-        id="mnav-panel"
-        hidden={!open}
-        className="mnav-panel mx-auto mt-2 max-w-[1180px] overflow-hidden rounded-[28px] p-2 lg:hidden"
-      >
+      <div ref={panelRef} id="mnav-panel" hidden={!open} className="mnav-panel mx-auto mt-2 max-w-[1180px] overflow-hidden rounded-[28px] p-2 lg:hidden">
         <nav aria-label="Sections" className="flex flex-col">
           {LINKS.map((l) => (
             <Link
@@ -181,21 +192,21 @@ export function MarketingNav({ signedIn = false }: { signedIn?: boolean }) {
               onClick={() => pick(l.id)}
               aria-current={active === l.id ? "true" : undefined}
               className={cn(
-                "flex h-12 items-center justify-between rounded-2xl px-4 font-display text-[19px] font-semibold tracking-tight transition-colors",
-                active === l.id ? "bg-foreground text-background" : "hover:bg-foreground/[0.06]",
+                "flex h-12 items-center justify-between rounded-2xl px-4 font-display text-[19px] font-semibold tracking-tight hover:bg-foreground/[0.05]",
+                active === l.id && "bg-foreground/[0.06]",
               )}
             >
               {l.label}
-              <ArrowRight className={cn("h-4 w-4", active === l.id ? "text-background/70" : "text-muted-foreground")} aria-hidden="true" />
+              <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </Link>
           ))}
           {!signedIn && (
-            <Link href="/login" onClick={() => setOpen(false)} className="mt-1 flex h-12 items-center rounded-2xl px-4 text-[16px] font-semibold text-foreground/80 hover:bg-foreground/[0.06] sm:hidden">
+            <Link href="/login" onClick={() => setOpen(false)} className="mt-1 flex h-12 items-center rounded-2xl px-4 text-[16px] font-semibold text-foreground/80 hover:bg-foreground/[0.05] sm:hidden">
               Log in
             </Link>
           )}
           <div className="mt-1 flex items-center justify-between rounded-2xl px-4 py-2 sm:hidden">
-            <span className="text-[15px] text-foreground/75">Theme</span>
+            <span className="text-[15px] text-muted-foreground">Theme</span>
             <ThemeToggle compact />
           </div>
         </nav>

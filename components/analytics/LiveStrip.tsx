@@ -4,20 +4,22 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
 import { api } from "@/lib/client/api";
-import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
+import { PLATFORM_META, type Platform } from "@/lib/domain";
+import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn, compact } from "@/lib/utils";
 import type { PlatformDashboard } from "@/lib/live/types";
 
 /** One card per platform with its live headline numbers; each opens that platform's dashboard. */
 export function LiveStrip({ connected }: { connected: Partial<Record<Platform, boolean>> }) {
   const [data, setData] = useState<Partial<Record<Platform, PlatformDashboard | "error">>>({});
+  const live = useLivePlatforms();
   useEffect(() => {
-    for (const p of PLATFORMS)
+    for (const p of live)
       if (connected[p])
         api<PlatformDashboard>(`/api/platforms/${p}`)
           .then((d) => setData((x) => ({ ...x, [p]: d })))
           .catch(() => setData((x) => ({ ...x, [p]: "error" })));
-  }, [connected]);
+  }, [connected, live]);
 
   return (
     <section aria-labelledby="live-strip" className="mt-8">
@@ -25,7 +27,7 @@ export function LiveStrip({ connected }: { connected: Partial<Record<Platform, b
         <span className="live-dot" aria-hidden="true" /> Live from your accounts
       </h2>
       <ul className="grid gap-3 md:grid-cols-3">
-        {PLATFORMS.map((p) => {
+        {live.map((p) => {
           const d = data[p];
           const on = connected[p];
           const first = d && d !== "error" ? d.headline[0] : null;

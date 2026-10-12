@@ -8,10 +8,10 @@ import { Counter, Input, Label, Textarea } from "@/components/ui/field";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
 import { blocking, checksFor } from "@/lib/client/checks";
 import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
+import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn } from "@/lib/utils";
 import { InstagramReel, XPost, YouTubeShort } from "./Previews";
 import type { AccountView, Draft } from "./types";
-import { PracticePill } from "@/components/shared/PracticePill";
 
 interface Props {
   drafts: Record<Platform, Draft>;
@@ -27,18 +27,23 @@ interface Props {
   onHook: (h: string) => void;
 }
 
-const READY_LABEL: Record<Platform, string> = { instagram: "Ready ✨", youtube: "Wants a stronger title 👀", x: "Make it impossible to ignore" };
+const READY_LABEL: Record<Platform, string> = { instagram: "Ready ✨", youtube: "Wants a stronger title 👀", x: "Make it impossible to ignore", tiktok: "Hook in the first second", threads: "Keep it conversational", facebook: "Ready for the feed", linkedin: "Lead with the lesson" };
 
 const SURFACE: Record<Platform, string> = {
   instagram: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(330_85%_62%/0.16),transparent_60%),radial-gradient(100%_80%_at_100%_100%,hsl(30_95%_60%/0.10),transparent_60%)]",
   youtube: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(0_88%_60%/0.16),transparent_60%)]",
   x: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(var(--foreground)/0.07),transparent_60%)]",
+  tiktok: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(178_85%_45%/0.14),transparent_60%),radial-gradient(100%_80%_at_100%_100%,hsl(348_95%_58%/0.10),transparent_60%)]",
+  threads: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(var(--foreground)/0.07),transparent_60%)]",
+  facebook: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(214_89%_55%/0.15),transparent_60%)]",
+  linkedin: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(201_100%_40%/0.15),transparent_60%)]",
 };
 
 export function PlatformDeck(p: Props) {
   const enabled = PLATFORMS.filter((pl) => p.drafts[pl].enabled);
   const [active, setActive] = useState<Platform>(enabled[0] ?? "instagram");
   const hookId = useId();
+  const live = useLivePlatforms();
 
   const status = useMemo(() => {
     const out = {} as Record<Platform, { checks: ReturnType<typeof checksFor>; blocked: boolean; label: string; tone: "ok" | "warn" | "off" | "done" }>;
@@ -86,7 +91,7 @@ export function PlatformDeck(p: Props) {
 
       {/* Destination picker */}
       <div role="tablist" aria-label="Destinations" className="scrollbar-none -mx-1 mb-6 flex snap-x gap-3 overflow-x-auto px-1 pb-1">
-        {PLATFORMS.map((pl) => {
+        {live.map((pl) => {
           const s = status[pl];
           const on = active === pl;
           return (
@@ -192,7 +197,6 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
             </h3>
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="truncate">{acct ? `as ${acct.username}` : "No account connected"}</span>
-              {acct?.mock && <PracticePill />}
             </p>
           </div>
           <label className="flex min-h-[44px] items-center gap-3 text-sm text-muted-foreground">

@@ -10,7 +10,6 @@ import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
 import { api, ApiError } from "@/lib/client/api";
 import { PLATFORM_META, TARGET_COPY, type TargetStatus } from "@/lib/domain";
 import { targetErrorCopy } from "@/components/shared/errorCopy";
-import { PracticePill } from "@/components/shared/PracticePill";
 import { cn } from "@/lib/utils";
 import type { PostView, TargetView } from "./types";
 
@@ -203,7 +202,6 @@ function TargetCard({ t, postId, busy, onRetry }: { t: TargetView; postId: strin
             <span className="truncate">
               {meta.name} <span className="font-normal text-muted-foreground">{meta.format}</span>
             </span>
-            {t.practice && <PracticePill />}
           </p>
           <p className={cn("text-xs", t.status === "published" ? "text-success" : t.status === "failed" ? "text-destructive" : "text-muted-foreground")}>
             {t.status === "published" ? "It's live." : TARGET_COPY[t.status as TargetStatus] ?? t.status}
@@ -226,7 +224,7 @@ function TargetCard({ t, postId, busy, onRetry }: { t: TargetView; postId: strin
           <span className="sr-only">(opens in a new tab)</span>
         </a>
       ) : (
-        <p className="mt-3 text-sm text-muted-foreground">Practice run — nothing was posted.</p>
+        <p className="mt-3 text-sm text-muted-foreground">Posted.</p>
       ))}
 
       {h && (

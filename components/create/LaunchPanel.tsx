@@ -1,8 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { CalendarClock, CalendarDays, Pencil, Plus, Rocket, Send } from "lucide-react";
+import { CalendarClock, CalendarDays, Flame, Pencil, Plus, Rocket, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { Sheet } from "@/components/shared/Sheet";
@@ -12,6 +12,8 @@ import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { fmt, tzShort } from "@/components/shell/UserContext";
 import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/client/api";
+import type { BestTimes } from "@/lib/schedule/best-time";
 import type { AccountView, Draft } from "./types";
 
 interface Props {
@@ -35,6 +37,17 @@ export function LaunchPanel(p: Props) {
   const targets = PLATFORMS.filter((pl) => p.drafts[pl].enabled);
   const names = targets.map((t) => PLATFORM_META[t].name);
   const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
+  const [best, setBest] = useState<BestTimes | null>(null);
+  const key = targets.join(",");
+  useEffect(() => {
+    let live = true;
+    api<BestTimes>(`/api/best-time?platforms=${key}`)
+      .then((b) => live && setBest(b))
+      .catch(() => live && setBest(null));
+    return () => {
+      live = false;
+    };
+  }, [key]);
 
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -103,6 +116,26 @@ export function LaunchPanel(p: Props) {
         </motion.button>
       )}
 
+      {p.mode === "schedule" && best && best.slots.length > 0 && (
+        <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} aria-labelledby="best-times" className="mt-3 rounded-[24px] p-4 hairline">
+          <h3 id="best-times" className="flex items-center gap-2 text-sm font-semibold">
+            <Flame className="h-4 w-4 text-cyan" aria-hidden="true" /> Best times to post
+            <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{best.source === "yours" ? "From your posts" : "Typical"}</span>
+          </h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {best.slots.map((s) => {
+              const on = Math.abs(new Date(s.at).getTime() - p.when.getTime()) < 60_000;
+              return (
+                <button key={s.at} type="button" aria-pressed={on} onClick={() => p.onWhen(new Date(s.at))} className={cn("h-11 rounded-full px-4 text-sm font-semibold transition hairline", on ? "bg-foreground text-background" : "hover:bg-secondary/70")}>
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{best.reason}</p>
+        </motion.section>
+      )}
+
       <div className="mt-8 flex flex-col items-center gap-3">
         <Button variant="lime" size="xl" className="w-full sm:w-auto sm:min-w-[320px]" disabled={p.busy || targets.length === 0} onClick={p.onLaunch}>
           {p.mode === "now" ? (
@@ -125,8 +158,8 @@ export function LaunchPanel(p: Props) {
         )}
       </div>
 
-      <Sheet open={picking} onOpenChange={setPicking} title="When should this go live?" description={`Times are in ${tzShort(p.tz)}. Dots mark when your audience is usually around.`} side="center">
-        <DateTimePicker value={p.when} onChange={p.onWhen} tz={p.tz} />
+      <Sheet open={picking} onOpenChange={setPicking} title="When should this go live?" description={`Times are in ${tzShort(p.tz)}.${best?.peakHours.length ? " Dots mark the best times to post." : ""}`} side="center">
+        <DateTimePicker value={p.when} onChange={p.onWhen} tz={p.tz} peakHours={best?.peakHours ?? []} />
         <Button variant="primary" size="lg" className="mt-6 w-full" onClick={() => setPicking(false)}>
           That works
         </Button>

@@ -45,4 +45,8 @@ export const NOTES: Record<Platform, string> = {
   instagram: "Instagram is ready ✨",
   youtube: "YouTube wants a stronger title 👀",
   x: "Let's make this impossible to ignore.",
+  tiktok: "TikTok wants a hook in the first second.",
+  threads: "Threads likes it conversational.",
+  facebook: "Facebook is ready for the feed.",
+  linkedin: "LinkedIn wants the lesson up front.",
 };

@@ -9,12 +9,15 @@ import { uploadVideo } from "@/lib/client/upload";
 import { takeHandoff } from "@/lib/client/handoff";
 import { blocking, checksFor } from "@/lib/client/checks";
 import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
+import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { Assistant } from "./Assistant";
 import { JourneyBar, JourneyRail } from "./JourneyRail";
+import { createFont } from "./font";
 import { LaunchPanel, ScheduledView } from "./LaunchPanel";
 import { PlatformDeck } from "./PlatformDeck";
 import { PublishingView } from "./PublishingView";
 import { VideoStage } from "./VideoStage";
+import { CaptionBurner } from "./CaptionBurner";
 import { readVideo } from "./frame";
 import { emptyDraft, NOTES, type AccountView, type Draft, type HookResult, type MediaView, type PlatformCopy, type PostView, type Step, type Tone, type UploadState } from "./types";
 
@@ -43,6 +46,8 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const posterBlob = useRef<Blob | null>(null);
   const synced = useRef<string | null>(null);
   const uploadAbort = useRef<AbortController | null>(null);
+  /** The clean video, kept while a captioned copy is in use so "without captions" is one click (no re-upload). */
+  const [preCaption, setPreCaption] = useState<{ media: MediaView; file: File | null } | null>(null);
 
   /* ---------------- story + hooks ---------------- */
   const [step, setStep] = useState<Step>(() => {
@@ -58,13 +63,14 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const [hook, setHook] = useState<string | null>(initialPost?.hook ?? null);
 
   /* ---------------- platforms ---------------- */
+  const live = useLivePlatforms();
   const [drafts, setDrafts] = useState<Record<Platform, Draft>>(() => {
     const out = {} as Record<Platform, Draft>;
     for (const p of PLATFORMS) {
       const t = initialPost?.targets.find((x) => x.platform === p);
       out[p] = t
         ? { enabled: true, title: t.title ?? "", caption: t.caption ?? "", description: t.description ?? "", hashtags: t.hashtags ?? "", note: NOTES[p], reviewed: false }
-        : emptyDraft(initialPost ? false : !!accounts[p]);
+        : emptyDraft(initialPost ? false : !!accounts[p] && live.includes(p));
     }
     if (initialPost && connected && (PLATFORMS as readonly string[]).includes(connected)) out[connected as Platform].enabled = true;
     return out;
@@ -376,7 +382,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
       chosenHook={hook && (hooks.result || step !== "story") ? hook : null}
       copyLoading={copyLoading}
       drafts={drafts}
-      platforms={[...PLATFORMS]}
+      platforms={[...live]}
     />
   );
 
@@ -392,14 +398,29 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
         <div className="mx-auto flex w-full max-w-3xl flex-col px-4 pb-16 pt-6 sm:px-8 lg:max-w-4xl lg:pt-8">
           {/* Steps animate in on mount. No exit choreography: a nested exit that never settles must not strand the next step. */}
             {showVideo && !hasMedia && (
-              <motion.section key="drop" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} aria-labelledby="drop-title" className="flex flex-col items-center pt-4 lg:pt-10">
-                <p className="eyebrow mb-4">01 · Your video</p>
-                <h1 id="drop-title" className="display text-center text-[clamp(2.6rem,7vw,5.2rem)] uppercase">
-                  Let&apos;s start with
-                  <br />
-                  <span className="energy-text">your video.</span>
+              <motion.section key="drop" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} aria-labelledby="drop-title" className={`${createFont.variable} font-create flex flex-col items-center pt-2 sm:pt-4 lg:pt-10`}>
+                <p className="step-pill mb-5">
+                  <span className="step-pill-dot" aria-hidden="true" />
+                  Step 1 of 4 <span className="text-muted-foreground/60" aria-hidden="true">·</span> <span className="text-muted-foreground">Your video</span>
+                </p>
+                <h1 id="drop-title" className="create-title text-balance text-center">
+                  Let&apos;s start with{" "}
+                  <span className="create-title-accent">
+                    <span className="accent-serif energy-text">your video</span>
+                    <svg className="create-swoosh" viewBox="0 0 300 24" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                      <path d="M4 17 C 70 5, 150 4, 296 13" pathLength="1" />
+                    </svg>
+                  </span>
                 </h1>
-                <div className="mt-10 w-full">
+                <p className="mt-5 max-w-md text-balance text-center text-[clamp(.98rem,.9rem+.35vw,1.12rem)] leading-relaxed text-muted-foreground">
+                  Drop one clip. We&apos;ll shape it for Reels, Shorts and X, and you approve every word.
+                </p>
+                <ul className="mt-5 flex flex-wrap justify-center gap-2" aria-label="What works best">
+                  {["MP4 or MOV", "Vertical 9:16 looks best", "Saves as you go"].map((t) => (
+                    <li key={t} className="pf-chip">{t}</li>
+                  ))}
+                </ul>
+                <div className="mt-8 w-full sm:mt-10">
                   <UploadZone compact onFile={(f) => startUpload(f)} />
                 </div>
               </motion.section>
@@ -419,6 +440,37 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                   onCancel={cancelUpload}
                   onError={(m) => toast(m, "info")}
                 />
+                {(preCaption || (src && media && upload.kind === "done")) && (
+                  <CaptionBurner
+                    key={preCaption?.media.id ?? media?.id}
+                    /* always the clean video, so the preview overlay and a re-burn never double the captions */
+                    src={(preCaption ? preCaption.media.url : src) ?? src ?? ""}
+                    filename={(preCaption?.media ?? media)?.filename ?? fileRef.current?.name ?? "video.mp4"}
+                    duration={meta?.duration ?? 0}
+                    onBurned={(f) => {
+                      setPreCaption((p) => p ?? (media ? { media, file: fileRef.current } : null));
+                      startUpload(f);
+                      toast("Captions added. Uploading the captioned video…", "info");
+                    }}
+                    onUndo={
+                      preCaption
+                        ? () => {
+                            const p = preCaption;
+                            uploadAbort.current?.abort(); // a captioned upload still in flight must not land afterwards
+                            setPreCaption(null);
+                            fileRef.current = p.file;
+                            synced.current = p.media.id;
+                            setMedia(p.media);
+                            setLocalMeta(null);
+                            setLocalPoster(null);
+                            setLocalUrl(null);
+                            setUpload({ kind: "done" });
+                          }
+                        : undefined
+                    }
+                    onError={(m) => toast(m, "error")}
+                  />
+                )}
                 <div className="glass mt-8 rounded-[28px] lg:hidden">{assistant}</div>
               </motion.section>
             )}
