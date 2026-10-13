@@ -4,10 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const STUDIO = ["/home", "/create", "/calendar", "/content", "/analytics", "/inbox", "/approvals", "/accounts", "/billing", "/settings", "/support"];
-import { ArrowUp, Loader2, X } from "lucide-react";
+import { ArrowUp, ChevronDown, Loader2, X } from "lucide-react";
 import { Pip, type PipMood } from "@/components/brand/Pip";
 import { Answer } from "./Answer";
-import { LANGS, T, readLang, writeLang, type Lang } from "@/lib/i18n/support";
+import { LANGS, T, langDir, readLang, writeLang, type Lang } from "@/lib/i18n/support";
+import { HUMAN_RE } from "@/lib/support/smalltalk";
 import { cn } from "@/lib/utils";
 
 type Msg = { id: number; role: "user" | "bot"; text: string; sources?: { id: string; question: string }[]; ask?: boolean; kind?: "escalate" | "ticket" };
@@ -20,7 +21,7 @@ const FAILS_TO_ESCALATE = 2;
  * "Not really"), or when someone asks for a person, it collects an email, opens a prioritised
  * ticket and the customer gets the confirmation by email. The chat survives page changes.
  */
-export function ChatWidget() {
+export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}) {
   const path = usePathname();
   // Inside the dashboard, answers open the dashboard help page so you never leave the studio.
   const helpBase = STUDIO.some((r) => path === r || path?.startsWith(r + "/")) ? "/support" : "/help";
@@ -79,7 +80,9 @@ export function ChatWidget() {
       const r = await fetch("/api/support/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, history, lang }) });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error);
-      push({ role: "bot", text: j.answer, sources: j.sources?.slice(0, 3), ask: j.confident });
+      // Small talk ("hi", "thanks") gets a friendly reply: no "Did that help?" and it never counts as a miss.
+      push({ role: "bot", text: j.answer, sources: j.sources?.slice(0, 3), ask: j.confident && !j.smalltalk });
+      if (j.smalltalk) return;
       if (j.wantsHuman) escalate();
       else if (!j.confident) {
         const n = fails + 1;
@@ -104,6 +107,14 @@ export function ChatWidget() {
     return () => window.removeEventListener("outly:chat-open", on);
   }, [send]);
 
+  // Someone asked for the chat before it finished loading (LazyChat): open it now.
+  useEffect(() => {
+    if (!pending) return;
+    setOpen(true);
+    if (pending.q?.trim()) setTimeout(() => send(pending.q!), 400);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     const id = setTimeout(() => inputRef.current?.focus(), 120);
@@ -118,13 +129,13 @@ export function ChatWidget() {
     const n = fails + 1;
     setFails(n);
     if (n >= FAILS_TO_ESCALATE) escalate();
-    else push({ role: "bot", text: lang === "hi" ? "माफ़ कीजिए। क्या आप थोड़ा और बता सकते हैं?" : "Sorry about that. Can you tell me a bit more?" });
+    else push({ role: "bot", text: t.more });
   }
 
   async function raise(e: React.FormEvent) {
     e.preventDefault();
     setTicket((x) => ({ ...x, busy: true, error: "" }));
-    const asked = msgs.some((m) => m.role === "user" && /human|person|agent|इंसान|व्यक्ति/i.test(m.text));
+    const asked = msgs.some((m) => m.role === "user" && HUMAN_RE.test(m.text));
     try {
       const r = await fetch("/api/support/ticket", {
         method: "POST",
@@ -150,24 +161,29 @@ export function ChatWidget() {
   return (
     <div className={cn("fixed right-4 z-[55] sm:right-6", path.startsWith("/create") && "max-lg:hidden", lift ? "bottom-[96px] lg:bottom-6" : "bottom-[max(16px,env(safe-area-inset-bottom))] sm:bottom-6")}>
       {open && (
-        <section role="dialog" aria-label={t.title} className="chat-pop glass-strong absolute bottom-[76px] right-0 flex h-[min(620px,calc(100dvh-140px))] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-[28px] shadow-2xl">
-          <header className="flex items-center gap-3 border-b border-border px-4 py-3">
+        <section role="dialog" aria-label={t.title} dir={langDir(lang)} lang={lang} className="chat-pop glass-strong absolute bottom-[76px] right-0 flex h-[min(620px,calc(100dvh-140px))] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-[28px] shadow-2xl">
+          <div className="flex items-center gap-3 border-b border-border px-4 py-3">
             <Pip size={42} mood={mood} />
             <div className="min-w-0 flex-1">
               <p className="font-semibold leading-tight">{t.title}</p>
               <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground"><span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />{t.status}</p>
             </div>
-            <div role="group" aria-label={t.lang} className="flex rounded-full bg-secondary p-0.5">
-              {LANGS.map((l) => (
-                <button key={l.id} type="button" aria-pressed={lang === l.id} title={l.label} onClick={() => { setLang(l.id); writeLang(l.id); }} className={cn("h-8 min-w-8 rounded-full px-2 text-[12px] font-semibold transition-colors", lang === l.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}>
-                  {l.short}
-                </button>
-              ))}
-            </div>
+            <label className="relative shrink-0">
+              <span className="sr-only">{t.lang}</span>
+              <select
+                value={lang}
+                onChange={(e) => { const l = e.target.value as Lang; setLang(l); writeLang(l); }}
+                title={t.lang}
+                className="h-9 max-w-[9.5rem] cursor-pointer appearance-none truncate rounded-full bg-secondary py-0 pe-7 ps-3 text-[12.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-lime"
+              >
+                {LANGS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+              </select>
+              <ChevronDown className="pointer-events-none absolute end-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            </label>
             <button type="button" onClick={() => { setOpen(false); bubbleRef.current?.focus(); }} aria-label={t.close} className="grid h-10 w-10 place-items-center rounded-full hover:bg-secondary"><X className="h-4 w-4" /></button>
-          </header>
+          </div>
 
-          <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite">
+          <div ref={listRef} data-lenis-prevent className="flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4" aria-live="polite">
             <Bubble role="bot"><p>{t.hello}</p></Bubble>
             {msgs.length === 0 && (
               <div className="flex flex-wrap gap-2 pt-1">
@@ -233,7 +249,7 @@ export function ChatWidget() {
 
       {nudge && !open && (
         <button type="button" onClick={() => { setOpen(true); setNudge(false); }} className="chat-pop absolute bottom-[74px] right-0 w-max max-w-[240px] rounded-2xl rounded-br-md bg-card px-4 py-2.5 text-left text-[13px] shadow-lg hairline">
-          {lang === "hi" ? "कोई सवाल? मैं मदद कर सकता हूँ।" : "Questions? I can help."}
+          {t.nudge}
         </button>
       )}
       <button
@@ -252,7 +268,8 @@ export function ChatWidget() {
 
 function Bubble({ role, children }: { role: "user" | "bot"; children: React.ReactNode }) {
   return (
-    <div className={cn("max-w-[86%] rounded-[20px] px-4 py-2.5 text-[14.5px] leading-relaxed", role === "user" ? "ml-auto rounded-br-md bg-foreground text-background" : "rounded-bl-md bg-card hairline")}>
+    // dir="auto": each message follows its own script, so Spanish punctuation stays right inside an Arabic chat.
+    <div dir="auto" className={cn("max-w-[86%] break-words rounded-[20px] px-4 py-2.5 text-[14.5px] leading-relaxed", role === "user" ? "ms-auto rounded-ee-md bg-foreground text-background" : "rounded-es-md bg-card hairline")}>
       {children}
     </div>
   );

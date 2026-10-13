@@ -1,56 +1,69 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { HeroStage } from "./HeroStage";
+import { HeroFan, CursorTag, Sparkles } from "./HeroFan";
 import { SignupCta } from "./SignupCta";
 import { StampChip } from "@/components/brand/Stamps";
 import { Shell } from "./bits";
 import { HERO, PLATFORM_PITCH } from "@/lib/marketing/content";
 
-export function Hero() {
+/**
+ * Hero: centred pill eyebrow, a two-line headline in a soft silver gradient with the serif
+ * accent, collaborator name tags floating beside it, then the arched card fan rising from
+ * the bottom edge. Works in both themes; the fan cards keep their own saturated colours.
+ */
+export function Hero({ showHow = true }: { showHow?: boolean }) {
   return (
     <section className="relative overflow-hidden pb-4 pt-10 sm:pt-16" aria-labelledby="hero-title">
-      <div aria-hidden="true" className="hero-glow pointer-events-none absolute inset-0" />
+      <div aria-hidden="true" className="hf-glow pointer-events-none absolute inset-0" />
+      <Sparkles />
       <Shell className="relative flex flex-col items-center text-center">
         <p className="glass hairline inline-flex items-center gap-2 rounded-full py-1.5 pl-2 pr-4 text-[13px] font-medium text-foreground/85">
           <StampChip>Beta</StampChip>
-          {HERO.eyebrow}
+          <span className="text-lime-ink dark:text-lime">Free during beta</span>
+          {/* the long half only where it fits on one line */}
+          <span aria-hidden="true" className="hidden text-foreground/40 sm:inline">&mdash;</span>
+          <span className="hidden sm:inline">{HERO.eyebrow}</span>
         </p>
-        <h1 id="hero-title" className="display mt-7 max-w-[15ch] text-balance text-[clamp(2.9rem,8vw,6.25rem)]">
-          Your content deserves to be <span className="accent-serif text-lime-ink dark:text-lime">everywhere.</span>
-        </h1>
+
+        <div className="relative mt-7 w-full">
+          <CursorTag name="Meera" tone="teal" side="l" className="left-[2%] top-[4%] hidden md:inline-flex lg:left-[8%]" />
+          <CursorTag name="Arjun" tone="pink" side="r" className="right-[2%] top-[58%] hidden md:inline-flex lg:right-[8%]" />
+          <h1 id="hero-title" className="display hf-h1 mx-auto max-w-[17ch] text-balance text-[clamp(2.6rem,7.2vw,5.6rem)]">
+            <span className="hf-line">Your content deserves</span>{" "}
+            <span className="hf-line">
+              to be <span className="accent-serif hf-accent">everywhere.</span>
+            </span>
+          </h1>
+        </div>
         <p className="mt-6 max-w-xl text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-[19px]">{HERO.sub}</p>
 
-        <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+        <div className="mt-8 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
           <SignupCta
             label={HERO.primary.label}
-            className="lime-glow group inline-flex h-14 items-center gap-2 rounded-full bg-lime px-7 text-base font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.97]"
+            className="lime-glow group inline-flex h-14 items-center justify-center gap-2 rounded-full bg-lime px-7 text-base font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.97]"
           >
             <ArrowRight className="h-[18px] w-[18px] transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
           </SignupCta>
-          <Link
+          {showHow && <Link
             href={HERO.secondary.href}
-            className="glass hairline inline-flex h-14 items-center rounded-full px-6 text-base font-medium transition-colors hover:bg-secondary"
+            className="glass hairline inline-flex h-14 items-center justify-center rounded-full px-6 text-base font-medium transition-colors hover:bg-secondary"
           >
             {HERO.secondary.label}
-          </Link>
+          </Link>}
         </div>
 
-        <dl className="mt-8 flex flex-wrap justify-center gap-x-7 gap-y-3">
+        <dl className="mt-7 flex flex-wrap justify-center gap-x-7 gap-y-2">
           {PLATFORM_PITCH.map((p) => (
             <div key={p.id} className="flex items-baseline gap-1.5">
               <dt className="text-sm font-semibold">{p.name}</dt>
               <dd className="text-sm text-muted-foreground">{p.format}</dd>
             </div>
           ))}
-          <div className="flex items-baseline gap-1.5">
-            <dt className="text-sm font-semibold text-lime-ink dark:text-lime">Free</dt>
-            <dd className="text-sm text-muted-foreground">during beta</dd>
-          </div>
         </dl>
       </Shell>
 
-      <div className="relative mt-6 sm:mt-10">
-        <HeroStage />
+      <div className="relative mt-4 sm:mt-6">
+        <HeroFan />
       </div>
     </section>
   );

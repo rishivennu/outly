@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
-import { CalendarClock, ShieldCheck, Wrench } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, CalendarClock, ShieldCheck, Wrench } from "lucide-react";
 import { Pip } from "@/components/brand/Pip";
 import { OutlyLogo } from "@/components/brand/Logo";
 import { siteStatus } from "@/lib/site";
 import { NotifyForm } from "@/components/maintenance/NotifyForm";
+import { Countdown } from "@/components/maintenance/Countdown";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Back soon", robots: { index: false } };
@@ -21,7 +23,7 @@ function ago(iso: string) {
   return `Started ${h} hour${h === 1 ? "" : "s"} ago`;
 }
 
-/** Shown to everyone except signed-in admins while the admin switch is on. Same bento language as the waitlist. */
+/** Shown to new visitors while the admin switch is on (members and admins carry on). Same bento language as the waitlist. */
 export default async function Maintenance() {
   const s = await siteStatus();
   if (!s.maintenance) redirect("/");
@@ -46,6 +48,12 @@ export default async function Maintenance() {
               <p className="mt-4 max-w-[30rem] text-pretty text-[16px] leading-relaxed text-[hsl(var(--ap-ink2))]">
                 {s.message || "Outlly is down for a short upgrade. We'll be back before long."}
               </p>
+              <p className="mt-6 text-[14px] text-[hsl(var(--ap-ink2))]">
+                Already have an account? You can keep working.{" "}
+                <Link href="/login" className="inline-flex min-h-[44px] items-center gap-1 font-semibold text-foreground underline underline-offset-4">
+                  Sign in <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </Link>
+              </p>
             </div>
           </li>
 
@@ -53,16 +61,22 @@ export default async function Maintenance() {
             <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-[hsl(var(--ap-ink2))]">
               <span className="live-dot" style={{ background: "hsl(var(--lime))" }} aria-hidden="true" /> Upgrade in progress
             </span>
-            <p className="mt-auto pt-6 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.03em]">
-              {s.eta ? (
-                <>
-                  <span className="block text-[15px] font-semibold tracking-normal text-[hsl(var(--ap-ink2))]">Expected back</span>
-                  {s.eta}
-                </>
-              ) : (
-                "Back shortly."
-              )}
-            </p>
+            {s.endsAt ? (
+              <div className="mt-auto pt-6">
+                <Countdown endsAt={s.endsAt} since={s.since} />
+              </div>
+            ) : (
+              <p className="mt-auto pt-6 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.03em]">
+                {s.eta ? (
+                  <>
+                    <span className="block text-[15px] font-semibold tracking-normal text-[hsl(var(--ap-ink2))]">Expected back</span>
+                    {s.eta}
+                  </>
+                ) : (
+                  "Back shortly."
+                )}
+              </p>
+            )}
             {started && <p className="mt-2 text-[14px] text-[hsl(var(--ap-ink2))]">{started}</p>}
           </li>
 

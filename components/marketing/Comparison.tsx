@@ -45,8 +45,11 @@ function CmpIcon({ value, small }: { value: Cell; small?: boolean }) {
 }
 
 /** Feature column + one column per tool. Header, rows and the open panel all share it, so they line up. */
-const GRID = "grid grid-cols-5 gap-1 lg:grid-cols-[minmax(0,1.6fr)_repeat(5,minmax(0,1fr))] lg:gap-2";
-const TOOLS = [{ id: "outly", name: "Outlly", sub: "Beta, free" }, ...COMPETITORS.map((c) => ({ id: c.id, name: c.name, sub: `Checked ${c.lastVerified}` }))];
+// The column count follows the admin's landing switches (--cmp-n = Outlly + the competitors left on).
+const GRID = "grid grid-cols-[repeat(var(--cmp-n),minmax(0,1fr))] gap-1 lg:grid-cols-[minmax(0,1.6fr)_repeat(var(--cmp-n),minmax(0,1fr))] lg:gap-2";
+type Tool = { id: string; name: string; sub: string };
+const ALL_TOOLS: Tool[] = [{ id: "outly", name: "Outlly", sub: "Beta, free" }, ...COMPETITORS.map((c) => ({ id: c.id, name: c.name, sub: `Checked ${c.lastVerified}` }))];
+type Flags = Record<string, boolean> | undefined;
 
 /**
  * Apple-style compare, built to stay short: groups fold (the first starts open), and every row
@@ -54,16 +57,16 @@ const TOOLS = [{ id: "outly", name: "Outlly", sub: "Beta, free" }, ...COMPETITOR
  * so the words get room instead of being squeezed into a 150px column.
  * Native <details> throughout: works before hydration and with the keyboard.
  */
-function CompareGrid() {
+function CompareGrid({ tools, groups }: { tools: Tool[]; groups: Flags }) {
   let r = 0;
   return (
-    <div data-cmp className="mt-10 sm:mt-14">
+    <div data-cmp className="mt-10 sm:mt-14" style={{ ["--cmp-n" as string]: tools.length }}>
       <div className="sticky top-[76px] z-10 sm:top-[84px]">
         <div className={cn(GRID, "items-end rounded-[22px] bg-card/95 px-3 py-3 shadow-[0_0_0_1px_hsl(var(--foreground)/.08),0_12px_28px_-18px_rgba(0,0,0,.45)] backdrop-blur-md sm:px-5 lg:py-4")}>
           <div className="hidden items-center lg:flex">
             <CmpExpandAll />
           </div>
-          {TOOLS.map((t) => (
+          {tools.map((t) => (
             <span key={t.id} className="flex min-w-0 flex-col items-center gap-1.5 text-center" aria-hidden="true">
               <span className="lg:hidden"><AppIcon brand={t.id as Brand} size={26} /></span>
               <span className="hidden lg:block"><AppIcon brand={t.id as Brand} size={40} /></span>
@@ -82,9 +85,10 @@ function CompareGrid() {
       {ROW_GROUPS.map((g, gi) => {
         const rows = ROWS.slice(r, r + g.rows);
         r += g.rows;
+        if (groups?.[g.label] === false) return null;
         const ours = rows.filter((x) => x.outly.value === "yes").length;
         return (
-          <details key={g.label} data-cmp-group open={gi === 0} className="group/g ap-tile mt-4 !rounded-[26px] shadow-[0_0_0_1px_hsl(var(--foreground)/.06)]">
+          <details key={g.label} data-cmp-group open={gi === ROW_GROUPS.findIndex((x) => groups?.[x.label] !== false)} className="group/g ap-tile mt-4 !rounded-[26px] shadow-[0_0_0_1px_hsl(var(--foreground)/.06)]">
             <summary className="flex min-h-[64px] cursor-pointer list-none items-center gap-3 px-4 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
               <span className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-3">
                 <h3 className="font-display text-[20px] font-bold leading-tight tracking-[-0.02em] sm:text-[24px]">{g.label}</h3>
@@ -98,13 +102,13 @@ function CompareGrid() {
             </summary>
             <ul className="px-2 pb-2 sm:px-3">
               {rows.map((row) => {
-                const cells = TOOLS.map((t) => ({ ...t, cell: t.id === "outly" ? row.outly : row.cells[t.id] ?? { value: "unknown" as Cell } }));
+                const cells = tools.map((t) => ({ ...t, cell: t.id === "outly" ? row.outly : row.cells[t.id] ?? { value: "unknown" as Cell } }));
                 return (
                   <li key={row.feature} className="border-t border-border">
                     <details className="group/row">
                       <summary className="block cursor-pointer list-none rounded-2xl px-2 py-3 transition-colors hover:bg-foreground/[0.03] sm:px-3 lg:py-3.5 [&::-webkit-details-marker]:hidden">
                         <span className={cn(GRID, "items-center")}>
-                          <span className="col-span-5 flex items-start justify-between gap-3 pb-2.5 lg:col-span-1 lg:pb-0">
+                          <span className="col-span-full flex items-start justify-between gap-3 pb-2.5 lg:col-span-1 lg:pb-0">
                             <span className="font-display text-[15px] font-semibold leading-snug tracking-[-0.01em] lg:text-[16px]">{row.feature}</span>
                             <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-foreground/50 transition-transform duration-300 group-open/row:rotate-180" aria-hidden="true" />
                           </span>
@@ -122,7 +126,7 @@ function CompareGrid() {
                       </summary>
                       <div className="px-2 pb-4 pt-1 sm:px-3">
                         {row.detail && <p className="mb-3 max-w-2xl text-[14px] leading-relaxed text-foreground/70">{row.detail}</p>}
-                        <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
+                        <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-[repeat(var(--cmp-n),minmax(0,1fr))]">
                           {cells.map(({ id, name, cell }) => (
                             <li key={id} className={cn("cmp-note rounded-[18px] p-4", id === "outly" && "cmp-note-us sm:col-span-2 lg:col-span-1")}>
                               <span className="flex items-center gap-2">
@@ -163,7 +167,11 @@ function CompareGrid() {
   );
 }
 
-export function Comparison() {
+export function Comparison({ competitors, groups }: { competitors?: Flags; groups?: Flags } = {}) {
+  const tools = ALL_TOOLS.filter((t) => t.id === "outly" || competitors?.[t.id] !== false);
+  const shownCompetitors = COMPETITORS.filter((c) => competitors?.[c.id] !== false);
+  const names = shownCompetitors.map((c) => c.name);
+  const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] ?? "the big suites";
   return (
     <section id="compare" className="scroll-mt-24 py-20 sm:py-28" aria-labelledby="compare-title">
       <CmpSprite />
@@ -173,11 +181,11 @@ export function Comparison() {
           align="center"
           eyebrow="Honest comparison"
           title={<>Outlly, next to the <span className="accent-serif">big suites.</span></>}
-          body="Read this as a shape comparison, not a scoreboard. Buffer, Metricool, Later and Hootsuite each do a great deal that Outlly does not, and the rows where they win are here too."
+          body={`Read this as a shape comparison, not a scoreboard. ${list} ${names.length === 1 ? "does" : "each do"} a great deal that Outlly does not, and the rows where they win are here too.`}
         />
 
         <Reveal y={36}>
-          <CompareGrid />
+          <CompareGrid tools={tools} groups={groups} />
         </Reveal>
 
         <details className="group/src ap-canvas mx-auto mt-10 max-w-[980px] rounded-[24px] px-5 py-3 sm:px-7">
@@ -188,7 +196,7 @@ export function Comparison() {
         <p className="mt-3 max-w-3xl text-[14px] leading-relaxed text-muted-foreground">{COMPARISON_DISCLAIMER}</p>
 
         <Reveal as="ul" stagger className="mb-4 mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {COMPETITORS.map((c) => (
+          {shownCompetitors.map((c) => (
             <li key={c.id} className="ap-tile flex gap-3 !rounded-[18px] p-4 text-[14px] leading-relaxed text-muted-foreground">
               <AppIcon brand={c.id as Brand} size={32} className="shrink-0" />
               <span className="min-w-0 [overflow-wrap:anywhere]">

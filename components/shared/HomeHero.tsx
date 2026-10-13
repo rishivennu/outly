@@ -2,63 +2,77 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Icon3D, type IconName } from "@/components/brand/Icon3D";
+import { ArrowRight, CalendarClock } from "lucide-react";
+import { HeroFan, CursorTag, Sparkles, type FanCard } from "@/components/marketing/HeroFan";
 import { UploadZone } from "./UploadZone";
 import { handoffFile } from "@/lib/client/handoff";
 import { Greeting } from "./Greeting";
 
-/** Decorative 3D icons parked in the hero's corners; they drift unless motion is reduced. */
-const DECOR: { name: IconName; className: string; size: number; rot: number; delay: number }[] = [
-  { name: "upload", className: "left-[3%] top-[10%]", size: 104, rot: -8, delay: 0 },
-  { name: "ai-assistant", className: "right-[4%] top-[6%]", size: 112, rot: 7, delay: 1.4 },
-  { name: "write-captions", className: "left-[7%] top-[46%]", size: 88, rot: 5, delay: 2.6 },
-  { name: "publish", className: "right-[7%] top-[44%]", size: 96, rot: -6, delay: 3.8 },
+/*
+ * Studio home hero, built from the landing hero's parts: the glow, sparkles, a pill eyebrow
+ * (here the live greeting), the silver two-line headline with the gradient serif accent,
+ * collaborator name tags (the creator and Pip), and the arched card fan. The fan's centre
+ * pill goes to /create instead of sign-up. The upload drop zone stays right below it.
+ */
+const STUDIO_CARDS: FanCard[] = [
+  { key: "ideas", title: "Ideas", sub: "Hooks that land", icon: "generate-ideas", tone: "hf-purple", rot: -15, y: 96, hideSm: true },
+  { key: "ig", title: "Reels", sub: "Caption, tailored", icon: "hashtags", tone: "hf-pink", platform: "instagram", rot: -8, y: 34 },
+  { key: "you", title: "Next video", sub: "Upload once", icon: "create", tone: "hf-lime", rot: 0, y: 0 },
+  { key: "yt", title: "Shorts", sub: "Title, tailored", icon: "hook-generator", tone: "hf-red", platform: "youtube", rot: 8, y: 34 },
+  { key: "plan", title: "Schedule", sub: "Best time, picked", icon: "schedule", tone: "hf-blue", rot: 15, y: 96, hideSm: true },
 ];
 
 export function HomeHero({ firstName }: { firstName: string }) {
   const router = useRouter();
   const [accepted, setAccepted] = useState(false);
+  const tag = (firstName || "You").slice(0, 14);
   return (
-    <section className="relative px-5 pb-16 pt-6 sm:px-10 lg:pt-14" aria-labelledby="home-title">
-      <div className="pointer-events-none absolute inset-0 hidden lg:block" aria-hidden="true">
-        {DECOR.map((d) => (
-          <span key={d.name} className={`absolute ${d.className}`}>
-            <span className="animate-bob block" style={{ ["--rot" as string]: `${d.rot}deg`, animationDelay: `${d.delay}s` }}>
-              <Icon3D name={d.name} size={d.size} />
-            </span>
-          </span>
-        ))}
+    <section className="relative overflow-hidden pb-14" aria-labelledby="home-title">
+      {/* the glow stops where the fan fades out, so the fade lands on plain background (no seam) */}
+      <div className="relative pt-8 sm:pt-12">
+        <div aria-hidden="true" className="hf-glow pointer-events-none absolute inset-0 [mask-image:linear-gradient(to_bottom,#000_70%,transparent)]" />
+        <Sparkles />
+        <div className="relative mx-auto flex max-w-6xl flex-col items-center px-5 text-center sm:px-10">
+          <Greeting name={firstName} className="hf-rise-in" />
+
+          <div className="relative mt-7 w-full">
+            <CursorTag name={tag} tone="teal" side="l" className="left-[2%] top-[6%] hidden md:inline-flex lg:left-[6%]" />
+            <CursorTag name="Pip" tone="pink" side="r" className="right-[2%] top-[60%] hidden md:inline-flex lg:right-[8%]" />
+            <h1 id="home-title" className="display hf-h1 mx-auto max-w-[15ch] text-balance text-[clamp(2.5rem,7vw,5.4rem)]">
+              <span className="hf-line">What are we</span>{" "}
+              <span className="hf-line">
+                <span className="accent-serif hf-accent">creating</span> today?
+              </span>
+            </h1>
+          </div>
+          <p className="mt-6 max-w-lg text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-[19px]">
+            One video. Every platform. Zero chaos.
+          </p>
+
+          <div className="mt-8 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <Link
+              href="/create"
+              className="lime-glow group inline-flex h-14 items-center justify-center gap-2 rounded-full bg-lime px-7 text-base font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.97]"
+            >
+              Create something
+              <ArrowRight className="h-[18px] w-[18px] transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
+            </Link>
+            <Link
+              href="/calendar"
+              className="glass hairline inline-flex h-14 items-center justify-center gap-2 rounded-full px-6 text-base font-medium transition-colors hover:bg-secondary"
+            >
+              <CalendarClock className="h-[18px] w-[18px]" aria-hidden="true" /> Open calendar
+            </Link>
+          </div>
+        </div>
+
+        <div className="relative mt-4 sm:mt-6">
+          <HeroFan cards={STUDIO_CARDS} cta={{ href: "/create", label: "Create something" }} />
+        </div>
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="relative mb-5 flex justify-center">
-        <Greeting name={firstName} />
-      </motion.div>
-      <motion.h1
-        id="home-title"
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="display relative mx-auto max-w-[12ch] text-balance text-center text-[clamp(2.8rem,8.5vw,6.75rem)]"
-      >
-        What are we <span className="accent-serif energy-text">creating</span> today?
-      </motion.h1>
-      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="relative mx-auto mt-6 max-w-md text-center text-lg text-muted-foreground">
-        One video. Every platform. Zero chaos.
-      </motion.p>
-
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="relative mt-8 flex justify-center">
-        <Button asChild variant="lime" size="lg">
-          <Link href="/create">
-            Create something <Sparkles className="h-5 w-5" aria-hidden="true" />
-          </Link>
-        </Button>
-      </motion.div>
-
-      <motion.div initial={{ opacity: 0, y: 24, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ delay: 0.12, type: "spring", stiffness: 180, damping: 24 }} className="relative mt-10">
-        <p className="mb-4 text-center text-sm text-muted-foreground">…or start from a video you already have.</p>
+      <div className="relative mx-auto mt-6 max-w-6xl px-5 sm:px-10">
+        <p className="mb-4 text-center text-sm text-muted-foreground">…or drop a video you already have.</p>
         <UploadZone
           accepted={accepted}
           onFile={(f) => {
@@ -68,7 +82,7 @@ export function HomeHero({ firstName }: { firstName: string }) {
             setTimeout(() => router.push("/create"), 650);
           }}
         />
-      </motion.div>
+      </div>
     </section>
   );
 }

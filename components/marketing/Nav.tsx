@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSignedIn } from "./useSignedIn";
 import { useWaitlist } from "./useWaitlist";
+import { useHiddenSections } from "./useHiddenSections";
 import { usePathname } from "next/navigation";
 import { ArrowRight, LayoutDashboard, Menu, X } from "lucide-react";
 import { OutlyLogo } from "@/components/brand/Logo";
@@ -28,6 +29,8 @@ export function MarketingNav() {
   const signedIn = useSignedIn();
   const waitlist = useWaitlist();
   const pathname = usePathname();
+  const hidden = useHiddenSections(pathname);
+  const links = LINKS.filter((l) => !hidden.has(l.id));
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -128,7 +131,7 @@ export function MarketingNav() {
             style={{ left: pill?.l ?? 0, right: pill?.r ?? 0, opacity: pill ? 1 : 0 }}
           />
           <ul className="flex items-center">
-            {LINKS.map((l) => (
+            {links.map((l) => (
               <li key={l.id}>
                 <Link
                   data-id={l.id}
@@ -184,7 +187,7 @@ export function MarketingNav() {
 
       <div ref={panelRef} id="mnav-panel" hidden={!open} className="mnav-panel mx-auto mt-2 max-w-[1180px] overflow-hidden rounded-[28px] p-2 lg:hidden">
         <nav aria-label="Sections" className="flex flex-col">
-          {LINKS.map((l) => (
+          {links.map((l) => (
             <Link
               key={l.id}
               href={`/#${l.id}`}

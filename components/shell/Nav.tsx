@@ -30,7 +30,7 @@ export function Sidebar() {
   const studio = MAIN.filter((m) => m.href !== "/create");
   return (
     <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
-      <aside className="glass hairline flex h-full w-[240px] flex-col overflow-y-auto rounded-[28px] px-3 pb-4 pt-5" aria-label="Primary">
+      <aside data-lenis-prevent className="glass hairline flex h-full w-[240px] flex-col overflow-y-auto rounded-[28px] px-3 pb-4 pt-5" aria-label="Primary">
         <Link href="/home" className="mb-6 flex items-center gap-2 rounded-2xl px-2 py-1 text-[18px] transition-opacity hover:opacity-80" aria-label="Outlly dashboard" title="Dashboard">
           <OutlyLogo size={30} />
         </Link>

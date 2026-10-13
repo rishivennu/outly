@@ -10,18 +10,38 @@
 //   reached the app)
 // - streams bodies both ways, so large uploads and range requests are not buffered
 // - keep-alive to upstreams, X-Forwarded-* headers, graceful shutdown
+// - overload guard: each instance takes at most LB_MAX_ACTIVE requests at once (default 256);
+//   when every instance is full the balancer answers 503 + Retry-After instead of queueing forever
+// - timeouts: an instance that accepts a request but sends no headers within LB_TIMEOUT_MS
+//   (default 60 s) gets a 504, so one stuck process cannot hold connections open
+// - hop-by-hop headers are stripped both ways; X-Forwarded-Proto from a TLS terminator is kept
+// - /__lb status is answered only to localhost
 // In production prefer nginx or your platform's balancer (deploy/nginx.conf); this is
 // the same policy for running a cluster on one machine.
 import http from "node:http";
 
-export function startLb({ port = Number(process.env.LB_PORT ?? 3040), upstreams = (process.env.UPSTREAMS ?? "").split(",").filter(Boolean) } = {}) {
+const HOP = ["connection", "keep-alive", "proxy-connection", "proxy-authenticate", "proxy-authorization", "te", "trailer", "upgrade"];
+const strip = (h) => {
+  const out = { ...h };
+  for (const k of String(h.connection ?? "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean)) delete out[k];
+  for (const k of HOP) delete out[k];
+  return out;
+};
+const LOCAL = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+
+export function startLb({
+  port = Number(process.env.LB_PORT ?? 3040),
+  upstreams = (process.env.UPSTREAMS ?? "").split(",").filter(Boolean),
+  maxActive = Number(process.env.LB_MAX_ACTIVE ?? 256),
+  timeoutMs = Number(process.env.LB_TIMEOUT_MS ?? 60_000),
+} = {}) {
   if (!upstreams.length) throw new Error("UPSTREAMS is empty");
-  const agent = new http.Agent({ keepAlive: true, maxSockets: 256 });
+  const agent = new http.Agent({ keepAlive: true, maxSockets: maxActive, keepAliveMsecs: 30_000 });
   const pool = upstreams.map((u) => ({ url: new URL(u), active: 0, up: true, misses: 0, served: 0 }));
   let rr = 0;
 
   const pick = (exclude) => {
-    const live = pool.filter((p) => p.up && p !== exclude);
+    const live = pool.filter((p) => p.up && p !== exclude && p.active < maxActive);
     if (!live.length) return null;
     const min = Math.min(...live.map((p) => p.active));
     const best = live.filter((p) => p.active === min);
@@ -52,12 +72,28 @@ export function startLb({ port = Number(process.env.LB_PORT ?? 3040), upstreams 
   const forward = (req, res, target, retried) => {
     target.active++;
     target.served++;
-    const headers = { ...req.headers, "x-forwarded-for": [req.headers["x-forwarded-for"], req.socket.remoteAddress].filter(Boolean).join(", "), "x-forwarded-host": req.headers.host ?? "", "x-forwarded-proto": "http" };
+    const headers = {
+      ...strip(req.headers),
+      "x-forwarded-for": [req.headers["x-forwarded-for"], req.socket.remoteAddress].filter(Boolean).join(", "),
+      "x-forwarded-host": req.headers["x-forwarded-host"] ?? req.headers.host ?? "",
+      "x-forwarded-proto": req.headers["x-forwarded-proto"] ?? "http",
+    };
     const up = http.request({ host: target.url.hostname, port: target.url.port, method: req.method, path: req.url, headers, agent }, (ur) => {
-      res.writeHead(ur.statusCode ?? 502, { ...ur.headers, "x-outly-upstream": target.url.port });
+      clearTimeout(slow);
+      res.writeHead(ur.statusCode ?? 502, { ...strip(ur.headers), "x-outly-upstream": target.url.port });
       ur.pipe(res);
       ur.on("end", done);
     });
+    // No response headers in time: give up on this instance for this request.
+    let timedOut = false;
+    const slow = setTimeout(() => {
+      timedOut = true;
+      done();
+      up.destroy();
+      if (res.headersSent) return res.destroy();
+      res.writeHead(504, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "GATEWAY_TIMEOUT", message: "That took too long. Try again in a moment." }));
+    }, timeoutMs);
     let finished = false;
     function done() {
       if (!finished) {
@@ -65,9 +101,15 @@ export function startLb({ port = Number(process.env.LB_PORT ?? 3040), upstreams 
         target.active--;
       }
     }
-    res.on("close", done);
+    res.on("close", () => {
+      done();
+      clearTimeout(slow);
+      if (!res.writableFinished) up.destroy(); // client went away: stop the work upstream too
+    });
     up.on("error", (e) => {
       done();
+      clearTimeout(slow);
+      if (timedOut) return;
       if (res.headersSent) return res.destroy(e);
       if (e.code === "ECONNREFUSED" || e.code === "ECONNRESET") {
         target.up = false;
@@ -82,24 +124,28 @@ export function startLb({ port = Number(process.env.LB_PORT ?? 3040), upstreams 
   };
 
   const server = http.createServer((req, res) => {
-    if (req.url === "/__lb") {
+    if (req.url === "/__lb" && LOCAL.has(req.socket.remoteAddress ?? "")) {
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       return res.end(JSON.stringify(pool.map((p) => ({ upstream: p.url.host, up: p.up, active: p.active, served: p.served }))));
     }
     const target = pick();
     if (!target) {
-      res.writeHead(503, { "content-type": "application/json", "retry-after": "5" });
-      return res.end(JSON.stringify({ error: "UNAVAILABLE", message: "Outlly is restarting. Try again in a few seconds." }));
+      const busy = pool.some((p) => p.up);
+      res.writeHead(503, { "content-type": "application/json", "retry-after": busy ? "2" : "5" });
+      return res.end(JSON.stringify(busy ? { error: "BUSY", message: "Outlly is very busy right now. Try again in a moment." } : { error: "UNAVAILABLE", message: "Outlly is restarting. Try again in a few seconds." }));
     }
     forward(req, res, target, false);
   });
   server.keepAliveTimeout = 65_000;
   server.headersTimeout = 66_000;
+  server.requestTimeout = 0; // long uploads stream through; the upstream timeout above covers stuck instances
   server.listen(port, () => console.log(`[lb] :${port} -> ${upstreams.join(", ")} (least-connections)`));
+  // Graceful: stop accepting, let in-flight requests finish (max 10 s), then drop idle sockets.
   const close = () => {
     clearInterval(timer);
     server.close();
-    agent.destroy();
+    server.closeIdleConnections?.();
+    setTimeout(() => (server.closeAllConnections?.(), agent.destroy()), 10_000).unref();
   };
   return { server, pool, close };
 }

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpen, Construction, Hourglass, CreditCard, Globe, Share2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Mail, Menu, Plug, ShieldCheck, Tag, Users, X } from "lucide-react";
+import { BookOpen, Construction, Hourglass, PanelsTopLeft, CreditCard, Globe, Share2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Mail, Menu, Plug, ShieldCheck, Tag, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -21,6 +21,7 @@ const NAV: { href: string; label: string; icon: typeof Users; area: AdminArea; g
   { href: "/admin/outbox", label: "Email outbox", icon: Mail, area: "outbox", group: "Support" },
   { href: "/admin/integrations", label: "Integrations", icon: Plug, area: "integrations", group: "Setup" },
   { href: "/admin/platforms", label: "Social platforms", icon: Share2, area: "platforms", group: "Setup" },
+  { href: "/admin/landing", label: "Landing page", icon: PanelsTopLeft, area: "site", group: "Setup" },
   { href: "/admin/maintenance", label: "Maintenance", icon: Construction, area: "site", group: "Setup" },
   { href: "/admin/waitlist", label: "Waitlist", icon: Hourglass, area: "site", group: "Setup" },
   { href: "/admin/team", label: "Team & roles", icon: ShieldCheck, area: "team", group: "Setup" },
@@ -113,7 +114,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
   return (
     <div className="flex min-h-dvh">
       <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
-        <aside className="glass hairline flex h-full w-[248px] flex-col overflow-y-auto rounded-[28px] px-3 pb-3 pt-5" aria-label="Admin sidebar">
+        <aside data-lenis-prevent className="glass hairline flex h-full w-[248px] flex-col overflow-y-auto rounded-[28px] px-3 pb-3 pt-5" aria-label="Admin sidebar">
           <div className="mb-6 flex items-center justify-between gap-2 px-2">
             <Link href="/admin" className="text-[17px]" aria-label="Admin overview">
               <OutlyLogo size={28} />
@@ -152,6 +153,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
               role="dialog"
               aria-modal="true"
               aria-label="Admin menu"
+              data-lenis-prevent
               className="glass-strong fixed inset-y-2 left-2 z-50 flex w-[min(300px,calc(100vw-1rem))] flex-col overflow-y-auto rounded-[28px] px-3 pb-3 pt-4 lg:hidden"
               initial={{ x: "-110%" }}
               animate={{ x: 0 }}

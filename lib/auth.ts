@@ -66,9 +66,9 @@ export const getCurrentUser = cache(async () => {
   if (ws && ws !== id) {
     const seat = await db.teamMember.findFirst({ where: { ownerId: ws, userId: id, status: "active" }, select: { role: true, owner: { select: USER_SELECT } } });
     if (seat && (TEAM_ROLES as readonly string[]).includes(seat.role))
-      return { ...seat.owner, actor: { id: me.id, name: me.name, email: me.email } as Actor | null, role: seat.role as WorkspaceRole };
+      return { ...seat.owner, joinedAt: me.createdAt, actor: { id: me.id, name: me.name, email: me.email } as Actor | null, role: seat.role as WorkspaceRole };
   }
-  return { ...me, actor: null as Actor | null, role: "owner" as WorkspaceRole };
+  return { ...me, joinedAt: me.createdAt, actor: null as Actor | null, role: "owner" as WorkspaceRole };
 });
 
 export type Actor = { id: string; name: string; email: string };

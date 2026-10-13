@@ -18,7 +18,7 @@ const VERTICAL: Platform[] = ["instagram", "youtube", "tiktok", "facebook"];
  * real limits on it. Platforms still waiting on developer approval sit underneath as app icons.
  * The list follows the admin's platform keys, so a platform moves up the moment it goes live.
  */
-export async function Platforms() {
+export async function Platforms({ showCompare = true }: { showCompare?: boolean } = {}) {
   const live = await liveNow();
   const on = PLATFORM_PITCH.filter((p) => live.includes(p.id));
   const soon = PLATFORM_PITCH.filter((p) => !live.includes(p.id));
@@ -43,9 +43,11 @@ export async function Platforms() {
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2">
               <SignupCta className="ap-btn" />
-              <a href="#compare" className="ap-link">
-                Compare tools <ChevronRight className="h-4 w-4" aria-hidden="true" />
-              </a>
+              {showCompare && (
+                <a href="#compare" className="ap-link">
+                  Compare tools <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </a>
+              )}
             </div>
           </Reveal>
 

@@ -37,5 +37,6 @@ export function takeOAuthState(p: Platform, state: string | null): Pending | nul
 }
 
 export function safeReturnTo(v: string | null) {
-  return v && v.startsWith("/") && !v.startsWith("//") ? v : "/accounts";
+  // "/\\evil.com" also counts as protocol-relative: new URL() turns the backslash into a slash.
+  return v && /^\/(?![/\\])/.test(v) && !/[\u0000-\u001f]/.test(v) ? v : "/accounts";
 }

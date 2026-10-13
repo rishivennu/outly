@@ -8,7 +8,10 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ["@prisma/client", "bcryptjs", "bullmq", "ioredis"],
     instrumentationHook: true,
+    // tree-shake the big icon/animation/chart libraries so pages only ship what they import
+    optimizePackageImports: ["lucide-react", "framer-motion", "recharts", "date-fns"],
   },
+  images: { formats: ["image/avif", "image/webp"] },
   headers: async () => [
     // Brand art and sample posters: cached by browsers for a day and by a CDN for a week,
     // so repeat visits and many users at once don't touch the app server for images.

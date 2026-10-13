@@ -11,10 +11,14 @@ const OPEN_PREFIX = ["/review/", "/r/", "/team/accept"];
 const HINT = "outlly_in";
 // Readable "waitlist is on" hint, so cached marketing pages can relabel their signup buttons.
 const WL_HINT = "outlly_wl";
+// Readable list of landing sections the admin hid ("how.pricing"), so the nav and footer can drop those links.
+const LH_HINT = "outlly_lh";
 // Waitlist on: the whole public site becomes the waitlist page (user's call, 10-12g). These still work:
 // the waitlist page itself, the legal pages its form links to, and links that are their own credential
 // (emailed invites, team invites, client review links, share links).
 const WAITLIST_OPEN = ["/waitlist", "/privacy", "/terms"];
+// Maintenance on: strangers only reach these. /login lets members back in; nobody can sign up.
+const MAINTENANCE_OPEN = ["/maintenance", "/login", "/privacy", "/terms"];
 const WAITLIST_PREFIX = ["/review/", "/r/", "/team/accept"];
 
 function sync(req: NextRequest, res: NextResponse, name: string, on: boolean, maxAge: number) {
@@ -27,17 +31,22 @@ function sync(req: NextRequest, res: NextResponse, name: string, on: boolean, ma
 function hint(req: NextRequest, res: NextResponse, authed: boolean) {
   sync(req, res, HINT, authed, 60 * 60 * 24 * 30);
   sync(req, res, WL_HINT, !!status?.waitlist, 60 * 60 * 24);
+  const want = status?.hide ?? "";
+  const has = req.cookies.get(LH_HINT)?.value ?? "";
+  if (want && want !== has) res.cookies.set(LH_HINT, want, { path: "/", sameSite: "lax", secure: req.nextUrl.protocol === "https:", maxAge: 60 * 60 * 24 });
+  if (!want && has) res.cookies.delete(LH_HINT);
   return res;
 }
 
 // Maintenance and waitlist flags, read through the public status API (edge middleware can't open the
 // database). Cached per instance for a few seconds so a busy site doesn't call it on every page view.
-let status: { at: number; maintenance: boolean; waitlist: boolean } | null = null;
+let status: { at: number; maintenance: boolean; waitlist: boolean; hide: string } | null = null;
 let warned = false;
 async function siteFlags(req: NextRequest) {
   if (status && Date.now() - status.at < 5_000) return status;
   let maintenance = status?.maintenance ?? false;
   let waitlist = status?.waitlist ?? false;
+  let hide = status?.hide ?? "";
   try {
     // Never build this URL from the request: the Host header is the visitor's to choose, and the answer
     // is cached for everyone on this instance. APP_URL is ours; fall back to the request only in dev.
@@ -56,11 +65,13 @@ async function siteFlags(req: NextRequest) {
       const j = await r.json();
       maintenance = !!j.maintenance;
       waitlist = !!j.waitlist;
+      // Only plain anchor names get into the cookie.
+      hide = Array.isArray(j.hide) ? j.hide.filter((x: unknown) => typeof x === "string" && /^[a-z]{1,20}$/.test(x)).slice(0, 20).join(".") : "";
     }
   } catch {
     /* status API unreachable: keep the last known state rather than flapping */
   }
-  status = { at: Date.now(), maintenance, waitlist };
+  status = { at: Date.now(), maintenance, waitlist, hide };
   return status;
 }
 
@@ -87,11 +98,6 @@ async function route(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const adminArea = pathname === "/admin" || pathname.startsWith("/admin/");
   const flags = adminArea ? null : await siteFlags(req);
-  // Maintenance on: every public page shows the maintenance page, admins included (user's call, 10-12g).
-  // Only /admin stays reachable, so the switch can be turned off again.
-  if (flags && pathname !== "/maintenance" && flags.maintenance) {
-    return NextResponse.rewrite(new URL("/maintenance", req.url));
-  }
   const token = req.cookies.get("studio_session")?.value;
   let authed = false;
   if (token) {
@@ -102,6 +108,15 @@ async function route(req: NextRequest) {
       authed = false;
     }
   }
+  // Maintenance on (10-13): members keep using the whole site and keep posting. Everyone else sees the
+  // maintenance page, except sign-in (so a member can get back in) and the legal pages it links to.
+  // No account can be created while it is on, and the APIs re-check the member's join date.
+  if (flags?.maintenance && !authed && !MAINTENANCE_OPEN.includes(pathname) && !(await isAdmin(req))) {
+    const res = NextResponse.rewrite(new URL("/maintenance", req.url));
+    res.headers.set("cache-control", "no-store");
+    return res;
+  }
+  if (flags?.maintenance && authed && pathname === "/maintenance" && !req.nextUrl.searchParams.has("preview")) return hint(req, NextResponse.redirect(new URL("/home", req.url)), authed);
   // Waitlist on: every public page sends signed-out visitors to the waitlist. People who already
   // have an account keep working: /login stays open, and a signed-in creator is never bounced out
   // of the studio (the signup API still refuses strangers on its own).

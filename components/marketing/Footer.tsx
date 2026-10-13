@@ -2,6 +2,8 @@
 import Link from "next/link";
 import { useSignedIn } from "./useSignedIn";
 import { useWaitlist } from "./useWaitlist";
+import { useHiddenSections } from "./useHiddenSections";
+import { usePathname } from "next/navigation";
 import { CookieSettingsButton } from "@/components/shared/CookieConsent";
 import { ArrowRight, ArrowUp, LayoutDashboard } from "lucide-react";
 import { OutlyLogo } from "@/components/brand/Logo";
@@ -43,6 +45,7 @@ const PLATFORMS = [
  */
 export function MarketingFooter() {
   const signedIn = useSignedIn();
+  const hidden = useHiddenSections(usePathname());
   const waitlist = useWaitlist();
   return (
     <footer className="px-3 pb-3 pt-6 sm:px-6 sm:pb-6">
@@ -50,7 +53,7 @@ export function MarketingFooter() {
         <div className="relative grid gap-10 px-6 pb-8 pt-10 sm:px-10 sm:pt-14 md:grid-cols-[1.5fr_1fr_1fr] md:gap-8">
           <div>
             <OutlyLogo size={28} className="text-[20px]" />
-            <p className="mt-4 max-w-sm text-[15.5px] leading-relaxed text-foreground/75">
+            <p className="ft-body mt-4 max-w-sm text-[15.5px] leading-relaxed text-foreground/75">
               Upload once. Publish to Reels, Shorts and X. See exactly what happened to each one.
             </p>
             <Link
@@ -69,7 +72,7 @@ export function MarketingFooter() {
               )}
             </Link>
             {!signedIn && (
-              <p className="mt-3 text-[13.5px] text-foreground/65">
+              <p className="ft-fine mt-3 text-[13.5px] text-foreground/65">
                 Already have an account?{" "}
                 <Link href="/login" className="font-semibold text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground">
                   Log in
@@ -81,9 +84,9 @@ export function MarketingFooter() {
           <div className="grid grid-cols-2 gap-8 md:contents">
             {COLUMNS.map((col) => (
               <nav key={col.title} aria-label={col.title}>
-                <h2 className="mb-4 font-sans text-[12px] font-semibold uppercase tracking-[0.16em] text-foreground/55">{col.title}</h2>
+                <h2 className="ft-head mb-4 font-sans text-[12px] font-semibold uppercase tracking-[0.16em] text-foreground/55">{col.title}</h2>
                 <ul className="flex flex-col gap-1">
-                  {col.links.map((l) => (
+                  {col.links.filter((l) => !(l.href.startsWith("/#") && hidden.has(l.href.slice(2)))).map((l) => (
                     <li key={l.href}>
                       <Link href={l.href} className="footer-link inline-flex min-h-9 items-center text-[15px] font-medium text-foreground/80 hover:text-foreground">
                         {l.label}
@@ -101,16 +104,16 @@ export function MarketingFooter() {
           </div>
         </div>
 
-        <div className="relative mx-6 flex flex-col gap-4 border-t border-foreground/10 py-6 sm:mx-10 sm:flex-row sm:items-center sm:justify-between">
+        <div className="ft-rule relative mx-6 flex flex-col gap-4 border-t border-foreground/10 py-6 sm:mx-10 sm:flex-row sm:items-center sm:justify-between">
           <ul className="flex flex-wrap gap-2" aria-label="Publishes to">
             {PLATFORMS.map((p) => (
-              <li key={p.id} className="inline-flex h-9 items-center gap-2 rounded-full bg-foreground/[0.05] px-3.5 text-[13px] font-medium text-foreground/80">
+              <li key={p.id} className="ft-chip inline-flex h-9 items-center gap-2 rounded-full bg-foreground/[0.05] px-3.5 text-[13px] font-medium text-foreground/80">
                 <PlatformGlyph platform={p.id} className="h-3.5 w-3.5" />
                 {p.label}
               </li>
             ))}
           </ul>
-          <a href="#main" className="inline-flex h-10 items-center gap-2 self-start rounded-full px-4 text-[13.5px] font-semibold text-foreground/80 ring-1 ring-foreground/15 transition-colors hover:bg-foreground hover:text-background sm:self-auto">
+          <a href="#main" className="ft-top inline-flex h-10 items-center gap-2 self-start rounded-full px-4 text-[13.5px] font-semibold text-foreground/80 ring-1 ring-foreground/15 transition-colors hover:bg-foreground hover:text-background sm:self-auto">
             Back to top <ArrowUp className="h-4 w-4" aria-hidden="true" />
           </a>
         </div>
@@ -119,7 +122,7 @@ export function MarketingFooter() {
           outlly
         </p>
 
-        <div className="relative flex flex-col gap-1.5 px-6 pb-6 pt-2 text-[12.5px] text-foreground/60 sm:flex-row sm:items-center sm:justify-between sm:px-10">
+        <div className="ft-rule ft-fine relative flex flex-col gap-1.5 border-t border-foreground/10 px-6 pb-6 pt-4 text-[12.5px] text-foreground/70 sm:flex-row sm:items-center sm:justify-between sm:px-10">
           <p>&copy; {new Date().getFullYear()} Outlly. In beta.</p>
           <p>Instagram, YouTube and X are trademarks of their owners. Outlly is not affiliated with them.</p>
         </div>

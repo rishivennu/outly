@@ -35,7 +35,7 @@ export default async function WaitlistPage({ searchParams }: { searchParams: { f
       <section className="px-5 pb-10 pt-14 sm:px-8 sm:pb-12 sm:pt-20" aria-labelledby="wl-title">
         <div className="mx-auto flex max-w-[680px] flex-col items-center text-center">
           <p className="wl-rise inline-flex items-center gap-2 rounded-full bg-[hsl(var(--ap-tile))] py-1.5 pl-1.5 pr-4 text-[14px] font-semibold shadow-[0_0_0_1px_hsl(var(--foreground)/.08)]">
-            <AppIcon brand="outly" size={26} /> Outlly beta
+            <span className="wl-mini inline-flex"><AppIcon brand="outly" size={26} /></span> Outlly beta
           </p>
           <h1 id="wl-title" className="wl-rise display mt-5 text-balance text-[clamp(2.4rem,7vw,4.4rem)]" style={{ animationDelay: ".05s" }}>
             One upload.
@@ -56,8 +56,19 @@ export default async function WaitlistPage({ searchParams }: { searchParams: { f
           <ul className="wl-bento wl-rise" style={{ animationDelay: ".2s" }}>
             <Tile className="wl-hub" label="Outlly">
               <span className="flex h-full flex-col items-center justify-center text-center">
-                <AppIcon brand="outly" size={96} />
-                <span className="mt-5 font-display text-[44px] font-bold leading-none tracking-[-0.04em] sm:text-[56px]">Outlly</span>
+                {/* Animated rocket: hovers, rumbles, leaves an exhaust trail and puffs. CSS only; reduced motion keeps it still. */}
+                <span className="wl-rocket" aria-hidden="true">
+                  <span className="wl-trail" />
+                  <span className="wl-trail" />
+                  <span className="wl-trail" />
+                  <span className="wl-puff" />
+                  <span className="wl-puff" />
+                  <span className="wl-puff" />
+                  <span className="wl-ship">
+                    <AppIcon brand="outly" size={96} />
+                  </span>
+                </span>
+                <span className="wl-word mt-5 font-display text-[44px] font-bold leading-none tracking-[-0.04em] sm:text-[56px]">Outlly</span>
                 <span className="mt-2 text-[15px] text-[hsl(var(--ap-ink2))]">Upload once, publish everywhere.</span>
               </span>
             </Tile>

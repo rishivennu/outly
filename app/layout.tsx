@@ -4,7 +4,8 @@ import { MotionRoot } from "@/components/shared/MotionRoot";
 import { themeScript } from "@/lib/theme/script";
 import { CookieBanner } from "@/components/shared/CookieConsent";
 import { Connectivity, Ripples } from "@/components/shared/Connectivity";
-import { ChatWidget } from "@/components/support/ChatWidget";
+import { LazyChat } from "@/components/support/LazyChat";
+import { SmoothScroll } from "@/components/marketing/SmoothScroll";
 import "./globals.css";
 
 /*
@@ -36,8 +37,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="font-sans antialiased">
         <MotionRoot>
+          <SmoothScroll />
           {children}
-          <ChatWidget />
+          <LazyChat />
           <CookieBanner />
           <Connectivity />
           <Ripples />

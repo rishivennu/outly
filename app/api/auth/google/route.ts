@@ -11,6 +11,13 @@ export const dynamic = "force-dynamic";
  * It reuses the YouTube callback URL, so no extra redirect URI has to be registered in Google Cloud.
  */
 export async function GET(req: NextRequest) {
+  // Google always comes back to APP_URL. Started on any other host (a preview URL, www vs bare, a second
+  // domain) the state cookie would be left behind there and the sign-in would bounce. Hop over first.
+  const home = new URL(env.APP_URL);
+  const here = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? req.nextUrl.host;
+  if (process.env.NODE_ENV === "production" && here && here !== home.host) {
+    return NextResponse.redirect(new URL(`${req.nextUrl.pathname}${req.nextUrl.search}`, home));
+  }
   const from = req.nextUrl.searchParams.get("from") === "signup" ? "/signup" : "/login";
   await loadKeys();
   if (!hasCredentials("youtube")) return NextResponse.redirect(new URL(`${from}?google_error=not_configured`, env.APP_URL));

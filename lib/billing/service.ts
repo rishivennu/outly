@@ -23,6 +23,15 @@ export async function activeGateway() {
   return { cfg, provider: ready ? cfg.provider : ("mock" as const), misconfigured: !ready };
 }
 
+/**
+ * The mock gateway hands out real subscriptions, invoices and referral rewards for a test card.
+ * On a live site that is only allowed when the owner opts in on purpose (ALLOW_MOCK_PAYMENTS=true,
+ * e.g. a staging deploy); otherwise checkout says payments are being set up instead.
+ */
+export function mockAllowed() {
+  return env.NODE_ENV !== "production" || process.env.ALLOW_MOCK_PAYMENTS === "true";
+}
+
 /** `wanted` is the visitor's currency (cookie / IP country). The gateway decides what it can actually charge. */
 export async function startCheckout(userId: string, planSlug: string, wanted?: Currency): Promise<CheckoutStart & { paymentId: string }> {
   const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
@@ -33,6 +42,7 @@ export async function startCheckout(userId: string, planSlug: string, wanted?: C
   if (current) throw new HttpError(409, `You're already on ${plan.name}.`, "ALREADY_SUBSCRIBED");
 
   const { cfg, provider } = await activeGateway();
+  if (provider === "mock" && !mockAllowed()) throw new HttpError(503, "Payments are being set up. Paid plans open shortly.", "GATEWAY");
   const charge = localPrice({ ...plan, prices: parsePrices(plan.prices) }, chargeCurrency(provider, wanted ?? (isCurrency(plan.currency) ? plan.currency : "INR"), plan.currency));
   // Reuse a recent pending attempt for the same plan, so double-clicks don't create duplicate payments.
   const recent = await db.payment.findFirst({
@@ -172,8 +182,32 @@ export async function refundPayment(paymentId: string, by: string, reason: strin
     db.payment.update({ where: { id: p.id }, data: { status: "refunded", failureReason: `Refunded by ${by}${reason ? `: ${reason}` : ""} (${ref})`.slice(0, 300) } }),
     ...(p.subscriptionId ? [db.subscription.updateMany({ where: { id: p.subscriptionId, status: "active" }, data: { status: "canceled", canceledAt: new Date() } })] : []),
   ]);
+  if (!p.sample) await revokeReferralReward(p.userId, p.createdAt).catch((e) => console.error("[refund] referral revoke", e));
   if (!p.sample) {
     await sendEmail({ to: p.user.email, kind: "subscription", subject: `Refund issued: ${formatMoney(p.amountMinor, p.currency)}`, html: templates.refund({ name: p.user.name, amount: formatMoney(p.amountMinor, p.currency), number: p.invoice?.number ?? "-" }) });
     await adminEvent("refund", `Refunded ${p.user.name}`, `${formatMoney(p.amountMinor, p.currency)} by ${by}`, "/admin/payments?status=refunded");
   }
+}
+
+/**
+ * A refunded FIRST payment must not leave the referrer's free month behind (otherwise: refer yourself,
+ * pay, get refunded, keep the month, repeat). Undo exactly what rewardReferrer granted: the gift
+ * subscription, or the extra month on the referrer's paid plan.
+ */
+async function revokeReferralReward(userId: string, paidAt: Date) {
+  const me = await db.user.findUnique({ where: { id: userId }, select: { referredById: true } });
+  if (!me?.referredById) return;
+  const real = await db.payment.count({ where: { userId, status: { in: ["succeeded", "refunded"] }, sample: false } });
+  if (real !== 1) return; // the reward is only ever granted for the first real payment
+  const now = new Date();
+  const gift = await db.subscription.updateMany({
+    where: { userId: me.referredById, provider: "referral", status: "active", createdAt: { gte: new Date(paidAt.getTime() - 60_000) } },
+    // paidAt is the payment row's createdAt: the gift is always created after it, however slow the reward path.
+    data: { status: "canceled", canceledAt: now },
+  });
+  if (gift.count > 0) return;
+  const paid = await db.subscription.findFirst({ where: { userId: me.referredById, status: "active", priceMinor: { gt: 0 } }, orderBy: { currentPeriodEnd: "desc" } });
+  if (!paid) return;
+  const back = addMonths(paid.currentPeriodEnd, -1);
+  await db.subscription.update({ where: { id: paid.id }, data: { currentPeriodEnd: back > now ? back : now } });
 }

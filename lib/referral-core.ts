@@ -4,7 +4,16 @@ export const REF_DAYS = 30;
 // No 0/O/1/I/L: codes get read aloud and typed by hand.
 const ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
 
-export function makeCode(rand: (n: number) => number = (n) => Math.floor(Math.random() * n), len = 8) {
+// crypto.getRandomValues (not Math.random): codes must not be predictable, or attribution can be stolen.
+const secureRand = (n: number) => {
+  const max = Math.floor(0x100000000 / n) * n; // rejection sampling keeps every letter equally likely
+  const buf = new Uint32Array(1);
+  do globalThis.crypto.getRandomValues(buf);
+  while (buf[0] >= max);
+  return buf[0] % n;
+};
+
+export function makeCode(rand: (n: number) => number = secureRand, len = 8) {
   let s = "";
   for (let i = 0; i < len; i++) s += ALPHABET[rand(ALPHABET.length)];
   return s;

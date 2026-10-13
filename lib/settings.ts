@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "./db";
+import { LANDING_DEFAULT } from "./landing";
 import { encrypt, decrypt } from "./crypto";
 
 /**
@@ -29,6 +30,8 @@ export interface SiteConfig {
   /** Free text shown on the page, e.g. "about 30 minutes". */
   eta: string;
   since: string;
+  /** When maintenance should be over (ISO), set from the admin's duration picker. Drives the live countdown. "" = no countdown. */
+  endsAt: string;
   /** Waitlist mode: new signups are paused, visitors join a queue, the admin invites them in. */
   waitlist: boolean;
   waitlistSince: string;
@@ -57,7 +60,8 @@ export const DEFAULTS = {
     business: { name: "Outlly", address: "Bengaluru, India", gstin: "", taxPercent: 0 },
   } as PaymentConfig,
   email: { provider: "mock", from: "Outlly <hello@outlly.app>", replyTo: "", resend: { apiKey: "" } } as EmailConfig,
-  site: { maintenance: false, message: "", eta: "", since: "", waitlist: false, waitlistSince: "" } as SiteConfig,
+  site: { maintenance: false, message: "", eta: "", since: "", endsAt: "", waitlist: false, waitlistSince: "" } as SiteConfig,
+  landing: LANDING_DEFAULT,
   platforms: Object.fromEntries(["instagram", "youtube", "x", "tiktok", "facebook", "threads", "linkedin"].map((p) => [p, { clientId: "", clientSecret: "" }])) as PlatformKeys,
 };
 type Key = keyof typeof DEFAULTS;

@@ -1,6 +1,5 @@
 import { MarketingNav } from "@/components/marketing/Nav";
 import { MarketingFooter } from "@/components/marketing/Footer";
-import { SmoothScroll } from "@/components/marketing/SmoothScroll";
 
 /** Shell for every public page: one nav, one footer, one skip link. */
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
@@ -14,7 +13,6 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       >
         Skip to content
       </a>
-      <SmoothScroll />
       <MarketingNav />
       <main id="main">{children}</main>
       <MarketingFooter />

@@ -1,7 +1,7 @@
 /** Continue with Google: a plain link, so it works before any JavaScript has loaded. */
 export function GoogleButton({ from, next, label = "Continue with Google" }: { from: "login" | "signup"; next?: string | null; label?: string }) {
   const q = new URLSearchParams({ from });
-  if (next && next.startsWith("/") && !next.startsWith("//")) q.set("next", next);
+  if (next && /^\/(?![/\\])/.test(next)) q.set("next", next); // not "//" or "/\\" (both leave the site)
   return (
     <a
       href={`/api/auth/google?${q}`}

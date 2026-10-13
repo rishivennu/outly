@@ -16,10 +16,37 @@ export const DEFAULT_LOGIN = "admin";
 const DEFAULT_PASSWORD = "1214";
 let DUMMY: string | undefined;
 
-/** First run: create the super admin the owner asked for (admin / 1214). The console nags until it is changed. */
+const PROD = process.env.NODE_ENV === "production";
+/** Strong bootstrap password from the environment (production must set one; 12+ characters). */
+const bootstrapPassword = () => {
+  const pw = process.env.ADMIN_BOOTSTRAP_PASSWORD?.trim() ?? "";
+  return pw.length >= 12 ? pw : "";
+};
+
+/**
+ * First run: create the super admin.
+ * - Dev: admin / 1214 (the console nags until it is changed).
+ * - Production: only with ADMIN_BOOTSTRAP_PASSWORD (12+ chars). If an admin is still on the
+ *   4-digit starter password, it is rotated to the bootstrap password, so a live deploy that was
+ *   created with 1214 is closed the moment the env var is set.
+ */
+let rotateChecked = false;
 export async function ensureSuperAdmin() {
-  if ((await db.adminUser.count()) > 0) return;
-  await db.adminUser.create({ data: { login: DEFAULT_LOGIN, name: "Super admin", role: "super", passwordHash: await bcrypt.hash(DEFAULT_PASSWORD, 11) } }).catch(() => {});
+  const boot = bootstrapPassword();
+  if ((await db.adminUser.count()) > 0) {
+    if (PROD && boot && !rotateChecked) {
+      rotateChecked = true;
+      const def = await db.adminUser.findUnique({ where: { login: DEFAULT_LOGIN } });
+      if (def && (await bcrypt.compare(DEFAULT_PASSWORD, def.passwordHash)))
+        await db.adminUser.update({ where: { id: def.id }, data: { passwordHash: await bcrypt.hash(boot, 11) } }).catch(() => {});
+    }
+    return;
+  }
+  if (PROD && !boot) {
+    console.error("[admin] No admin exists. Set ADMIN_BOOTSTRAP_PASSWORD (12+ characters) to create the first super admin.");
+    return;
+  }
+  await db.adminUser.create({ data: { login: DEFAULT_LOGIN, name: "Super admin", role: "super", passwordHash: await bcrypt.hash(boot || DEFAULT_PASSWORD, 11) } }).catch(() => {});
 }
 
 /** True while this admin still signs in with the starter password. */
@@ -69,12 +96,27 @@ export const getAdmin = cache(async (): Promise<AdminSession | null> => {
   }
 });
 
+/** True when the request carries a validly signed admin cookie. No database read, so it still works
+ * while the database is down (used by /api/health to decide who sees diagnostics). */
+export async function hasAdminCookie() {
+  const token = cookies().get(ADMIN_COOKIE)?.value;
+  if (!token) return false;
+  try {
+    await jwtVerify(token, secret, { algorithms: ["HS256"] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function verifyAdminLogin(login: string, password: string) {
   await ensureSuperAdmin();
   const a = await db.adminUser.findUnique({ where: { login: login.trim().toLowerCase() } });
   // compare against a dummy hash when the login is unknown, so timing does not reveal valid logins
   const ok = await bcrypt.compare(password, a?.passwordHash ?? (DUMMY ??= await bcrypt.hash("not-a-password", 11)));
   if (!a || !ok || !a.active) return null;
+  // Never accept the 4-digit starter password on a live site: it falls to a few thousand guesses.
+  if (PROD && password === DEFAULT_PASSWORD) return null;
   await db.adminUser.update({ where: { id: a.id }, data: { lastLoginAt: new Date() } });
   return a;
 }
