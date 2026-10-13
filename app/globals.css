@@ -1098,8 +1098,10 @@ html:not(.dark) .wl-trail { background: linear-gradient(270deg, hsl(var(--lime-i
 
 
 /* ---------- Hero v5: card fan (reference: centred pill, silver headline, cursor tags, arched cards) ---------- */
-.hf-glow { background: radial-gradient(55% 45% at 50% 100%, hsl(var(--lime) / .22), transparent 70%), radial-gradient(40% 40% at 18% 80%, hsl(262 90% 62% / .16), transparent 70%), radial-gradient(40% 40% at 84% 78%, hsl(330 90% 60% / .14), transparent 70%); }
-html:not(.dark) .hf-glow { background: radial-gradient(55% 45% at 50% 100%, hsl(78 100% 50% / .22), transparent 70%), radial-gradient(40% 40% at 18% 80%, hsl(262 90% 70% / .14), transparent 70%), radial-gradient(40% 40% at 84% 78%, hsl(330 90% 70% / .12), transparent 70%); }
+.hf-glow { background: radial-gradient(50% 40% at 50% 80%, hsl(var(--lime) / .22), transparent 70%), radial-gradient(40% 38% at 18% 72%, hsl(262 90% 62% / .16), transparent 70%), radial-gradient(40% 38% at 84% 70%, hsl(330 90% 60% / .14), transparent 70%);
+  /* the glow sits behind the cards and melts away before the section ends: no lime band, no cut line */
+  -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 97%); mask-image: linear-gradient(to bottom, #000 58%, transparent 97%); }
+html:not(.dark) .hf-glow { background: radial-gradient(50% 40% at 50% 80%, hsl(78 100% 50% / .22), transparent 70%), radial-gradient(40% 38% at 18% 72%, hsl(262 90% 70% / .14), transparent 70%), radial-gradient(40% 38% at 84% 70%, hsl(330 90% 70% / .12), transparent 70%); }
 .hf-h1 { line-height: 1.02; }
 .hf-line { display: inline-block; background: linear-gradient(180deg, hsl(var(--foreground)) 30%, hsl(var(--foreground) / .62) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; padding-bottom: .06em; }
 .hf-accent { background: linear-gradient(100deg, hsl(var(--energy-a)), hsl(var(--energy-b)) 50%, hsl(var(--energy-c))); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: .08em; }
@@ -1117,22 +1119,53 @@ html:not(.dark) .hf-glow { background: radial-gradient(55% 45% at 50% 100%, hsl(
 .hf-cursor-l { left: -14px; top: -14px; }
 @keyframes hf-drift { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(6px, -8px, 0); } }
 
+/* the fan dissolves into the page: cards fade out toward the bottom and at the far left/right, so there is no box edge */
+/* the stage starts 64px higher than the cards (pulled up with -mt) so the centre card's glow has room to spread,
+   and that headroom fades in from nothing: no flat top edge either */
+.hf-stage { --fade: linear-gradient(to bottom, transparent 0, #000 60px, #000 58%, rgba(0,0,0,.55) 80%, transparent 100%);
+  --sides: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+  -webkit-mask-image: var(--fade), var(--sides); -webkit-mask-composite: source-in;
+  mask-image: var(--fade), var(--sides); mask-composite: intersect; }
 .hf-fan { height: 100%; }
+.hf-slot { pointer-events: auto; }
 .hf-slot { position: relative; margin: 0 -26px; transform: translateY(calc(var(--y) + 40px)) rotate(var(--r)); transform-origin: 50% 120%; opacity: 0;
   animation: hf-rise .9s var(--ease-out) var(--d) forwards; }
 @keyframes hf-rise { to { opacity: 1; transform: translateY(var(--y)) rotate(var(--r)); } }
 .hf-card { position: relative; width: 220px; height: 330px; border-radius: 28px; padding: 20px; overflow: hidden; color: #fff; isolation: isolate;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.22), 0 30px 60px -28px rgba(0,0,0,.7); transition: transform .5s var(--ease-out), box-shadow .4s var(--ease-out); }
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.22), 0 30px 60px -28px rgba(0,0,0,.7); }
 .hf-hero { width: 250px; height: 380px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.5), 0 0 60px -10px hsl(var(--lime) / .6), 0 40px 70px -30px rgba(0,0,0,.75); }
-/* the card under the pointer slides up out of the hand and comes in front of its neighbours (still under the bottom fade, z 40) */
-.hf-obj { transition: translate .45s var(--ease-out); }
+/* hand-of-cards hover, tuned to feel liquid: one long ease-out-expo curve (no bounce) both ways, so a card can
+   reverse half way without a jolt. Only transform and opacity animate (GPU), the shadow and the dimming are
+   layers that fade, never repainted. Lift/push/straighten live on .hf-lift, the pointer lean on .hf-tilt, so
+   the two never fight. Stays under the stage's fade mask; the centre card lifts less because the stage clips. */
+.hf-stage { --liquid: cubic-bezier(.16, 1, .3, 1); }
+.hf-lift { --lift: 0px; --push: 0px; --tilt: 0deg; --sc: 1; position: relative; will-change: transform;
+  transform: translate3d(var(--push), var(--lift), 0) rotate(var(--tilt)) scale(var(--sc)); transition: transform .9s var(--liquid); }
+.hf-tilt { position: relative; transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform .7s var(--liquid); }
+.hf-cast { position: absolute; inset: 0; border-radius: 28px; opacity: 0; transition: opacity .8s var(--liquid);
+  box-shadow: 0 70px 90px -34px rgba(0,0,0,.85), 0 24px 40px -24px rgba(0,0,0,.6); }
+.hf-cast-hero { box-shadow: 0 0 110px -6px hsl(var(--lime) / .75), 0 70px 90px -34px rgba(0,0,0,.85); }
+.hf-spot { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .7s var(--liquid);
+  background: radial-gradient(280px circle at var(--mx, 50%) var(--my, 25%), rgba(255,255,255,.3), rgba(255,255,255,.06) 45%, transparent 70%); }
+.hf-dim { position: absolute; inset: 0; z-index: 20; pointer-events: none; background: #07080c; opacity: 0; transition: opacity .8s var(--liquid); }
+.hf-obj { transition: translate .9s var(--liquid), rotate .9s var(--liquid); }
+/* resting fan breathes: the 3D objects float a few pixels, out of step with each other */
+.hf-bob { animation: hf-bob 5.5s ease-in-out infinite; }
+@keyframes hf-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
 @media (hover: hover) and (pointer: fine) {
   .hf-slot:hover { z-index: 35; }
-  .hf-slot:hover .hf-card { transform: translateY(-34px); transition-duration: .38s; transition-timing-function: cubic-bezier(.34, 1.4, .64, 1);
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.3), 0 44px 70px -26px rgba(0,0,0,.75); }
-  .hf-slot:hover .hf-hero { transform: translateY(-24px);
-    box-shadow: inset 0 0 0 2px rgba(255,255,255,.6), 0 0 80px -6px hsl(var(--lime) / .7), 0 50px 80px -30px rgba(0,0,0,.8); }
-  .hf-slot:hover .hf-obj { translate: 0 -10px; }
+  .hf-slot:hover .hf-lift { --lift: -46px; --sc: 1.05; --tilt: calc(var(--r) * -0.75); }
+  .hf-slot:hover .hf-lift-hero { --lift: -18px; --sc: 1.03; --tilt: 0deg; }
+  .hf-slot:hover .hf-cast, .hf-slot:hover .hf-spot { opacity: 1; }
+  .hf-slot:hover .hf-obj { translate: 0 -14px; rotate: -5deg; }
+  /* the hand parts around the picked card, closest cards most */
+  .hf-slot:hover + .hf-slot .hf-lift { --push: 26px; --tilt: 2deg; }
+  .hf-slot:hover + .hf-slot + .hf-slot .hf-lift { --push: 12px; }
+  .hf-slot:has(+ .hf-slot:hover) .hf-lift { --push: -26px; --tilt: -2deg; }
+  .hf-slot:has(+ .hf-slot + .hf-slot:hover) .hf-lift { --push: -12px; }
+  /* the rest settle back and dim so the picked card reads at a glance */
+  .hf-fan:has(.hf-slot:hover) .hf-slot:not(:hover) .hf-lift { --lift: 8px; }
+  .hf-fan:has(.hf-slot:hover) .hf-slot:not(:hover) .hf-dim { opacity: .34; }
 }
 .hf-title { font-family: var(--font-display), system-ui, sans-serif; font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
 .hf-sub { margin-top: 6px; font-size: 13px; font-weight: 500; opacity: .82; }
@@ -1150,6 +1183,7 @@ html:not(.dark) .hf-glow { background: radial-gradient(55% 45% at 50% 100%, hsl(
   .hf-slot { margin: 0 -34px; }
   .hf-card { width: 168px; height: 260px; border-radius: 22px; padding: 14px; }
   .hf-hero { width: 190px; height: 300px; }
+  .hf-cast { border-radius: 22px; }
   .hf-title { font-size: 23px; }
   .hf-sub { font-size: 11.5px; }
   .hf-obj { transform: translateX(-50%) scale(.72); transform-origin: 50% 100%; bottom: 14px; }
@@ -1158,7 +1192,9 @@ html:not(.dark) .hf-glow { background: radial-gradient(55% 45% at 50% 100%, hsl(
 @media (prefers-reduced-motion: reduce) {
   .hf-slot { animation: none; opacity: 1; transform: translateY(var(--y)) rotate(var(--r)); }
   .hf-tag, .hf-spark, .hf-prop { animation: none; }
-  .hf-card, .hf-obj { transition: none; }
+  .hf-lift, .hf-tilt, .hf-obj, .hf-cast, .hf-spot, .hf-dim { transition: none; }
+  .hf-tilt { transform: none; }
+  .hf-bob { animation: none; }
 }
 /* studio home hero: the greeting pill rises in like the landing eyebrow */
 .hf-rise-in { animation: hf-rise-in .6s var(--ease-out) both; }
