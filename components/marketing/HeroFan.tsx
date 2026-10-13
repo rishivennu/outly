@@ -23,18 +23,42 @@ const CARDS: FanCard[] = [
 ];
 
 /** The signed-in studio home uses the same fan with its own cards and pill (see HomeHero). */
+/** Mouse only: the hovered card leans toward the pointer and a soft light follows it. CSS eases every value. */
+function tiltTo(e: React.PointerEvent<HTMLDivElement>) {
+  if (e.pointerType !== "mouse") return;
+  const el = e.currentTarget.querySelector<HTMLElement>(".hf-tilt");
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+  el.style.setProperty("--ry", `${((x - 0.5) * 12).toFixed(2)}deg`);
+  el.style.setProperty("--rx", `${((0.5 - y) * 9).toFixed(2)}deg`);
+  el.style.setProperty("--mx", `${(x * 100).toFixed(1)}%`);
+  el.style.setProperty("--my", `${(y * 100).toFixed(1)}%`);
+}
+function tiltReset(e: React.PointerEvent<HTMLDivElement>) {
+  const el = e.currentTarget.querySelector<HTMLElement>(".hf-tilt");
+  el?.style.setProperty("--ry", "0deg");
+  el?.style.setProperty("--rx", "0deg");
+}
+
 export function HeroFan({ cards = CARDS, cta }: { cards?: FanCard[]; cta?: { href: string; label: string } }) {
   const waitlist = useWaitlist();
   const pill = cta ?? (waitlist ? { href: "/waitlist", label: "Join waitlist" } : { href: "/signup", label: "Get started" });
   return (
-    <div aria-hidden="true" className="hf-stage relative mx-auto h-[340px] w-full max-w-[1180px] select-none overflow-hidden sm:h-[410px]">
+    <div aria-hidden="true" className="hf-stage pointer-events-none relative mx-auto -mt-[64px] h-[404px] w-full max-w-[1180px] select-none overflow-hidden sm:h-[474px]">
       <div className="hf-fan absolute inset-x-0 bottom-0 flex items-end justify-center">
         {cards.map((c, i) => (
           <div
             key={c.key}
             className={`hf-slot ${c.hideSm ? "hidden md:block" : ""} ${c.key === "you" ? "z-30" : i === 1 || i === 3 ? "z-20" : "z-10"}`}
             style={{ ["--r" as string]: `${c.rot}deg`, ["--y" as string]: `${c.y}px`, ["--d" as string]: `${120 + Math.abs(i - 2) * 90}ms` }}
+            onPointerMove={tiltTo}
+            onPointerLeave={tiltReset}
           >
+            <div className={`hf-lift ${c.key === "you" ? "hf-lift-hero" : ""}`}>
+            <div className="hf-tilt">
+            <span className={`hf-cast ${c.key === "you" ? "hf-cast-hero" : ""}`} />
             <div className={`hf-card ${c.tone} ${c.key === "you" ? "hf-hero" : ""}`}>
               <div className="relative z-10 flex items-start justify-between gap-2">
                 <div>
@@ -51,15 +75,18 @@ export function HeroFan({ cards = CARDS, cta }: { cards?: FanCard[]; cta?: { hre
                   <span className="grid h-7 w-7 place-items-center rounded-full bg-lime text-[hsl(var(--lime-foreground))]"><ArrowUpRight className="h-4 w-4" /></span>
                 </Link>
               ) : null}
-              <div className="hf-obj"><Icon3D name={c.icon} size={c.key === "you" ? 150 : 128} /></div>
+              <div className="hf-obj"><div className="hf-bob" style={{ animationDelay: `${-i * 1.1}s` }}><Icon3D name={c.icon} size={c.key === "you" ? 150 : 128} /></div></div>
               <span className="hf-shine" />
+              <span className="hf-spot" />
+              <span className="hf-dim" />
+            </div>
+            </div>
             </div>
           </div>
         ))}
       </div>
       <div className="hf-prop left-[6%] bottom-[46%] hidden lg:block" style={{ ["--rot" as string]: "-10deg", animationDelay: "-2s" }}><Icon3D name="publish" size={92} /></div>
       <div className="hf-prop right-[7%] bottom-[50%] hidden lg:block" style={{ ["--rot" as string]: "8deg", animationDelay: "-4s" }}><Icon3D name="analytics" size={86} /></div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 h-16 bg-gradient-to-t from-background to-transparent" />
     </div>
   );
 }

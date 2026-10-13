@@ -30,7 +30,7 @@ export function HomeHero({ firstName }: { firstName: string }) {
     <section className="relative overflow-hidden pb-14" aria-labelledby="home-title">
       {/* the glow stops where the fan fades out, so the fade lands on plain background (no seam) */}
       <div className="relative pt-8 sm:pt-12">
-        <div aria-hidden="true" className="hf-glow pointer-events-none absolute inset-0 [mask-image:linear-gradient(to_bottom,#000_70%,transparent)]" />
+        <div aria-hidden="true" className="hf-glow pointer-events-none absolute inset-0" />
         <Sparkles />
         <div className="relative mx-auto flex max-w-6xl flex-col items-center px-5 text-center sm:px-10">
           <Greeting name={firstName} className="hf-rise-in" />
