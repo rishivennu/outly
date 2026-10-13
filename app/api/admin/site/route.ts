@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { json } from "@/lib/http";
 import { adminRoute } from "@/lib/admin/route";
+
+// Bulk email (back-online notice, waitlist invites) can run for up to ~40 s; give the function room.
+export const maxDuration = 60;
 import { setMaintenance, siteStatus, subscriberCounts } from "@/lib/site";
 
 export const GET = adminRoute("site", async () => json({ site: await siteStatus(), subscribers: await subscriberCounts() }));

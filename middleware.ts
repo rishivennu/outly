@@ -33,12 +33,25 @@ function hint(req: NextRequest, res: NextResponse, authed: boolean) {
 // Maintenance and waitlist flags, read through the public status API (edge middleware can't open the
 // database). Cached per instance for a few seconds so a busy site doesn't call it on every page view.
 let status: { at: number; maintenance: boolean; waitlist: boolean } | null = null;
+let warned = false;
 async function siteFlags(req: NextRequest) {
   if (status && Date.now() - status.at < 5_000) return status;
   let maintenance = status?.maintenance ?? false;
   let waitlist = status?.waitlist ?? false;
   try {
-    const r = await fetch(new URL("/api/maintenance", req.url), { cache: "no-store", signal: AbortSignal.timeout(1_500) });
+    // Never build this URL from the request: the Host header is the visitor's to choose, and the answer
+    // is cached for everyone on this instance. APP_URL is ours; fall back to the request only in dev.
+    const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+    const base =
+      process.env.APP_URL ||
+      (vercel ? `https://${vercel}` : "") ||
+      (process.env.NODE_ENV === "production" ? "" : req.nextUrl.origin);
+    if (!base) {
+      if (!warned) console.error("[middleware] APP_URL is not set: maintenance and waitlist flags cannot be read");
+      warned = true;
+      throw new Error("APP_URL not set");
+    }
+    const r = await fetch(new URL("/api/maintenance", base), { cache: "no-store", signal: AbortSignal.timeout(1_500) });
     if (r.ok) {
       const j = await r.json();
       maintenance = !!j.maintenance;
@@ -79,20 +92,6 @@ async function route(req: NextRequest) {
   if (flags && pathname !== "/maintenance" && flags.maintenance) {
     return NextResponse.rewrite(new URL("/maintenance", req.url));
   }
-  // Waitlist on: every public page sends you to the waitlist, admins included.
-  if (flags?.waitlist && !WAITLIST_OPEN.includes(pathname) && !WAITLIST_PREFIX.some((p) => pathname.startsWith(p))) {
-    const invited = pathname === "/signup" && (req.nextUrl.searchParams.has("invite") || (req.nextUrl.searchParams.get("next") ?? "").startsWith("/team/accept"));
-    if (!invited) return NextResponse.redirect(new URL("/waitlist", req.url));
-  }
-  // Admin has its own session. Middleware only checks the cookie is there; every admin page
-  // and API re-verifies the signature, the role and the password fingerprint on the server.
-  if (pathname === "/admin/login") return NextResponse.next();
-  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
-    if (req.cookies.get("outly_admin")?.value) return NextResponse.next();
-    const u = new URL("/admin/login", req.url);
-    if (pathname !== "/admin") u.searchParams.set("next", pathname);
-    return NextResponse.redirect(u);
-  }
   const token = req.cookies.get("studio_session")?.value;
   let authed = false;
   if (token) {
@@ -102,6 +101,22 @@ async function route(req: NextRequest) {
     } catch {
       authed = false;
     }
+  }
+  // Waitlist on: every public page sends signed-out visitors to the waitlist. People who already
+  // have an account keep working: /login stays open, and a signed-in creator is never bounced out
+  // of the studio (the signup API still refuses strangers on its own).
+  if (flags?.waitlist && !authed && pathname !== "/login" && !WAITLIST_OPEN.includes(pathname) && !WAITLIST_PREFIX.some((p) => pathname.startsWith(p))) {
+    const invited = pathname === "/signup" && (req.nextUrl.searchParams.has("invite") || (req.nextUrl.searchParams.get("next") ?? "").startsWith("/team/accept"));
+    if (!invited) return hint(req, NextResponse.redirect(new URL("/waitlist", req.url)), authed);
+  }
+  // Admin has its own session. Middleware only checks the cookie is there; every admin page
+  // and API re-verifies the signature, the role and the password fingerprint on the server.
+  if (pathname === "/admin/login") return NextResponse.next();
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    if (req.cookies.get("outly_admin")?.value) return NextResponse.next();
+    const u = new URL("/admin/login", req.url);
+    if (pathname !== "/admin") u.searchParams.set("next", pathname);
+    return NextResponse.redirect(u);
   }
   if (OPEN.includes(pathname) || OPEN_PREFIX.some((p) => pathname.startsWith(p))) return hint(req, NextResponse.next(), authed);
   // Waitlist on: the signup page becomes the waitlist. Emailed invitees (?invite), teammates

@@ -25,6 +25,7 @@ export async function GET(req: NextRequest, { params }: { params: { platform: st
   if (!user) return NextResponse.redirect(new URL("/login", env.APP_URL));
   const back = (q: string) => NextResponse.redirect(new URL(`${pending?.returnTo ?? "/accounts"}${(pending?.returnTo ?? "").includes("?") ? "&" : "?"}${q}`, env.APP_URL));
   if (!pending) return back(`connect_error=${p}&reason=state`);
+  if (user.role !== "owner") return back(`connect_error=${p}&reason=owner_only`);
   const code = req.nextUrl.searchParams.get("code");
   if (!code) return back(`connect_error=${p}&reason=${encodeURIComponent(req.nextUrl.searchParams.get("error") ?? "denied")}`);
   try {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { json, route, HttpError } from "@/lib/http";
-import { completePayment, failPayment } from "@/lib/billing/service";
+import { completePayment, failPayment, mockAllowed } from "@/lib/billing/service";
 
 const Body = z.object({
   paymentId: z.string().min(1),
@@ -16,6 +16,7 @@ const Body = z.object({
  *   4000 0000 0000 9995 -> insufficient funds     UPI "fail@upi" -> declined, any other UPI id -> success
  */
 export const POST = route(async (req, { user }) => {
+  if (!mockAllowed()) throw new HttpError(404, "Not found", "NOT_FOUND");
   const b = Body.parse(await req.json());
   const p = await db.payment.findUnique({ where: { id: b.paymentId } });
   if (!p || p.userId !== user.id) throw new HttpError(404, "This checkout has expired. Start again from Billing.", "NOT_FOUND");

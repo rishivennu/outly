@@ -12,6 +12,14 @@ export async function GET(req: NextRequest, { params }: { params: { platform: st
   const user = await getCurrentUser();
   if (!user) return NextResponse.redirect(new URL("/login", env.APP_URL));
   if (!isPlatform(params.platform)) return NextResponse.json({ error: "Unknown platform" }, { status: 404 });
+  // Inside a teammate's workspace `user` is the OWNER, so connecting here would replace the owner's
+  // channel with the teammate's. Only the owner manages connected accounts.
+  if (user.role !== "owner") {
+    const back = new URL(safeReturnTo(req.nextUrl.searchParams.get("returnTo")), env.APP_URL);
+    back.searchParams.set("connect_error", params.platform);
+    back.searchParams.set("reason", "owner_only");
+    return NextResponse.redirect(back);
+  }
   await loadKeys();
   // No keys and not in rehearsal mode: say so plainly instead of handing out a pretend account.
   if (!hasCredentials(params.platform) && !practiceAllowed()) {
