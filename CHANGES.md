@@ -23,3 +23,10 @@ No database change and no new environment variable. tsc 0, 222 tests pass.
 11. lib/analytics.ts: the overview query fetches only the numbers (not the title and thumbnail on every row) and is cached for 60 s.
 12. PlatformDashboardView.tsx: shows "Gemini is reading your numbers..." only when it takes longer than 0.6 s.
 13. NEW tests/live-youtube-speed.test.ts (3 tests).
+
+## Custom page scrollbar on the public site (added 10-14)
+- NEW components/marketing/PageScrollbar.tsx, mounted in app/(marketing)/layout.tsx: home, contact, help, privacy, terms, waitlist.
+- Same 4px pill as the admin sidebar: soft at rest, lime + glow while scrolling, 6px on hover, draggable, click the rail to jump. Identical in Chrome, Edge, Firefox, Safari. Touch screens keep their native overlay bar.
+- Native page bar hidden in CSS via html:has(.pb-rail) on fine pointers only, so no layout jump on load. Hidden while a dialog locks the page and when printing.
+- Drags and jumps go through Lenis (new getLenis() export in SmoothScroll.tsx) so smooth scroll and the bar never fight.
+- Tested Edge + Firefox: no native gutter, wheel/drag/rail-click top and bottom, light + dark. tsc 0, 222 tests pass.

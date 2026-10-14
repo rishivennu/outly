@@ -6,6 +6,9 @@ import type Lenis from "lenis";
 let lenis: Lenis | null = null;
 let popped = false; // back/forward: let the browser restore the old position
 
+/** The running Lenis instance, or null (reduced motion, touch, not loaded yet). PageScrollbar drags through it. */
+export const getLenis = () => lenis;
+
 /**
  * Inertial "liquid" scroll for every page: landing, studio and admin (mounted once in the root layout).
  * Loaded after hydration so it never delays first paint, skipped for reduced motion and touch devices

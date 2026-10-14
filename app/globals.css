@@ -1308,6 +1308,28 @@ html:has(.admin-root),
 @media (hover: none) { .sa-root[data-over="1"]:hover .sa-rail { opacity: 0; } .sa-root[data-over="1"][data-live="1"] .sa-rail { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .sa-view, .sa-rail, .sa-thumb { transition: none; } }
 
+/* Public site page scrollbar (components/marketing/PageScrollbar.tsx): the admin sidebar's pill, fixed to the window's
+   right edge, so every browser shows the same bar. Only on mouse/trackpad screens: touch keeps its native overlay bar.
+   The native page bar is hidden only while the rail is in the page (marketing layout), and only for fine pointers. */
+@media (pointer: fine) {
+  html:has(.pb-rail) { scrollbar-width: none; }
+  html:has(.pb-rail)::-webkit-scrollbar { display: none; width: 0; height: 0; }
+}
+.pb-rail { position: fixed; top: 6px; bottom: 6px; right: 0; width: 14px; z-index: 52; display: none; /* above the sticky nav (50), under chat (55), sheets and dialogs (60+) */
+  --pb-ink: hsl(var(--lime-ink)); --pb-rest: hsl(var(--foreground) / .22); }
+.dark .pb-rail { --pb-ink: hsl(var(--lime)); --pb-rest: hsl(var(--foreground) / .26); }
+@media (pointer: fine) { .pb-rail[data-over="1"] { display: block; } }
+body[data-scroll-locked] .pb-rail { display: none; }
+.pb-thumb { position: absolute; top: 0; right: 4px; width: 4px; border-radius: 999px; background: var(--pb-rest);
+  touch-action: none; cursor: grab; will-change: transform;
+  transition: width .18s ease, right .18s ease, background-color .2s ease, box-shadow .2s ease; }
+.pb-thumb::before { content: ""; position: absolute; inset: -6px -5px; }
+.pb-rail[data-live="1"] .pb-thumb { background: var(--pb-ink); box-shadow: 0 0 10px -1px color-mix(in srgb, var(--pb-ink) 60%, transparent); }
+.pb-rail:hover .pb-thumb, .pb-rail[data-drag="1"] .pb-thumb { width: 6px; right: 3px; background: var(--pb-ink); }
+.pb-rail[data-drag="1"] .pb-thumb { cursor: grabbing; }
+@media (prefers-reduced-motion: reduce) { .pb-thumb { transition: none; } }
+@media print { .pb-rail { display: none !important; } }
+
 /* ---------- Play pass (10-14): springy, sticker-like motion in the spirit of aardvarkbookclub.com ----------
    Elastic curves are GSAP's elastic.out sampled into CSS linear(): --ease-elastic = elastic.out(1, .72),
    --ease-spring = elastic.out(1, .4). Entrances animate the individual scale/rotate/translate properties,
