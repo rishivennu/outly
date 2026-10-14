@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { ContrastToggle } from "@/components/shared/ContrastToggle";
 import { can, ROLE_LABEL, type AdminArea, type AdminRole } from "@/lib/admin/perms";
 import { Bell } from "./Bell";
+import { ScrollArea } from "./ScrollArea";
 
 const NAV: { href: string; label: string; icon: typeof Users; area: AdminArea; group: "Run" | "Support" | "Setup" }[] = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, area: "overview", group: "Run" },
@@ -112,17 +113,19 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
   }, [open]);
 
   return (
-    <div className="flex min-h-dvh">
+    <div className="admin-root flex min-h-dvh">
       <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
-        <aside data-lenis-prevent className="glass hairline flex h-full w-[248px] flex-col overflow-y-auto rounded-[28px] px-3 pb-3 pt-5" aria-label="Admin sidebar">
-          <div className="mb-6 flex items-center justify-between gap-2 px-2">
-            <Link href="/admin" className="text-[17px]" aria-label="Admin overview">
-              <OutlyLogo size={28} />
-            </Link>
-            <span className="rounded-full bg-lime/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-lime-ink">Admin</span>
-          </div>
-          <NavList role={admin.role} path={path} badges={badges} layoutId="admin-pill" />
-          <Footer admin={admin} path={path} />
+        <aside className="glass hairline flex h-full w-[248px] flex-col overflow-hidden rounded-[28px]" aria-label="Admin sidebar">
+          <ScrollArea className="px-3 pb-3 pt-5">
+            <div className="mb-6 flex items-center justify-between gap-2 px-2">
+              <Link href="/admin" className="text-[17px]" aria-label="Admin overview">
+                <OutlyLogo size={28} />
+              </Link>
+              <span className="rounded-full bg-lime/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-lime-ink">Admin</span>
+            </div>
+            <NavList role={admin.role} path={path} badges={badges} layoutId="admin-pill" />
+            <Footer admin={admin} path={path} />
+          </ScrollArea>
         </aside>
       </div>
 
@@ -153,21 +156,22 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
               role="dialog"
               aria-modal="true"
               aria-label="Admin menu"
-              data-lenis-prevent
-              className="glass-strong fixed inset-y-2 left-2 z-50 flex w-[min(300px,calc(100vw-1rem))] flex-col overflow-y-auto rounded-[28px] px-3 pb-3 pt-4 lg:hidden"
+              className="glass-strong fixed inset-y-2 left-2 z-50 flex w-[min(300px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[28px] lg:hidden"
               initial={{ x: "-110%" }}
               animate={{ x: 0 }}
               exit={{ x: "-110%" }}
               transition={{ type: "spring", stiffness: 380, damping: 38 }}
             >
-              <div className="mb-5 flex items-center justify-between px-2">
-                <OutlyLogo size={26} />
-                <button type="button" onClick={() => setOpen(false)} aria-label="Close menu" className="grid h-10 w-10 place-items-center rounded-full hover:bg-secondary" autoFocus>
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              <NavList role={admin.role} path={path} badges={badges} onNavigate={() => setOpen(false)} layoutId="admin-pill-m" />
-              <Footer admin={admin} path={path} onNavigate={() => setOpen(false)} />
+              <ScrollArea className="px-3 pb-3 pt-4">
+                <div className="mb-5 flex items-center justify-between px-2">
+                  <OutlyLogo size={26} />
+                  <button type="button" onClick={() => setOpen(false)} aria-label="Close menu" className="grid h-10 w-10 place-items-center rounded-full hover:bg-secondary" autoFocus>
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <NavList role={admin.role} path={path} badges={badges} onNavigate={() => setOpen(false)} layoutId="admin-pill-m" />
+                <Footer admin={admin} path={path} onNavigate={() => setOpen(false)} />
+              </ScrollArea>
             </motion.aside>
           </>
         )}
