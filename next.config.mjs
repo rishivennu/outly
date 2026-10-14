@@ -2,7 +2,8 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  compress: true,
+  // Production only: in dev, gzipping ~10 MB of unminified JS per page load on one thread made localhost take 10 s+.
+  compress: process.env.NODE_ENV === "production",
   // Lets parallel dev servers run from one checkout without clobbering each other's build output.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   experimental: {
