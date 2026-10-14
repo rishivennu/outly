@@ -6,6 +6,7 @@ import { CookieBanner } from "@/components/shared/CookieConsent";
 import { Connectivity, Ripples } from "@/components/shared/Connectivity";
 import { LazyChat } from "@/components/support/LazyChat";
 import { SmoothScroll } from "@/components/marketing/SmoothScroll";
+import { ScrollProgress } from "@/components/shared/ScrollProgress";
 import "./globals.css";
 
 /*
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="font-sans antialiased">
         <MotionRoot>
           <SmoothScroll />
+          <ScrollProgress />
           {children}
           <LazyChat />
           <CookieBanner />
