@@ -42,11 +42,12 @@ function tiltReset(e: React.PointerEvent<HTMLDivElement>) {
   el?.style.setProperty("--rx", "0deg");
 }
 
-export function HeroFan({ cards = CARDS, cta }: { cards?: FanCard[]; cta?: { href: string; label: string } }) {
+/** `framed`: the landing's original boxed stage (hard sides, 64px fade into the page), which the dotted rule below lines up with. */
+export function HeroFan({ cards = CARDS, cta, framed = false }: { cards?: FanCard[]; cta?: { href: string; label: string }; framed?: boolean }) {
   const waitlist = useWaitlist();
   const pill = cta ?? (waitlist ? { href: "/waitlist", label: "Join waitlist" } : { href: "/signup", label: "Get started" });
   return (
-    <div aria-hidden="true" className="hf-stage pointer-events-none relative mx-auto -mt-[64px] h-[404px] w-full max-w-[1180px] select-none overflow-hidden sm:h-[474px]">
+    <div aria-hidden="true" className={`hf-stage ${framed ? "hf-framed" : ""} pointer-events-none relative mx-auto -mt-[64px] h-[404px] w-full max-w-[1180px] select-none overflow-hidden sm:h-[474px]`}>
       <div className="hf-fan absolute inset-x-0 bottom-0 flex items-end justify-center">
         {cards.map((c, i) => (
           <div
@@ -87,6 +88,7 @@ export function HeroFan({ cards = CARDS, cta }: { cards?: FanCard[]; cta?: { hre
       </div>
       <div className="hf-prop left-[6%] bottom-[46%] hidden lg:block" style={{ ["--rot" as string]: "-10deg", animationDelay: "-2s" }}><Icon3D name="publish" size={92} /></div>
       <div className="hf-prop right-[7%] bottom-[50%] hidden lg:block" style={{ ["--rot" as string]: "8deg", animationDelay: "-4s" }}><Icon3D name="analytics" size={86} /></div>
+      {framed && <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 h-16 bg-gradient-to-t from-background to-transparent" />}
     </div>
   );
 }
@@ -94,7 +96,7 @@ export function HeroFan({ cards = CARDS, cta }: { cards?: FanCard[]; cta?: { hre
 /** Name tags with a cursor arrow, floating beside the headline like collaborators on a canvas. */
 export function CursorTag({ name, tone, side, className }: { name: string; tone: "teal" | "pink"; side: "l" | "r"; className?: string }) {
   return (
-    <span aria-hidden="true" className={`hf-tag hf-tag-${tone} ${className ?? ""}`} style={{ animationDelay: side === "l" ? "-1s" : "-3.5s" }}>
+    <span aria-hidden="true" className={`hf-tag hf-tag-${tone} ${className ?? ""}`} style={{ ["--dd" as string]: side === "l" ? "-1s" : "-3.5s" }}>
       <svg viewBox="0 0 16 16" className={`hf-cursor ${side === "l" ? "hf-cursor-r" : "hf-cursor-l"}`}><path d="M2 1.5 14 7l-5.2 1.6L6.6 14z" /></svg>
       {name}
     </span>

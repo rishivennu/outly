@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useSignedIn } from "./useSignedIn";
 import { useWaitlist } from "./useWaitlist";
@@ -8,6 +9,8 @@ import { CookieSettingsButton } from "@/components/shared/CookieConsent";
 import { ArrowRight, ArrowUp, LayoutDashboard } from "lucide-react";
 import { OutlyLogo } from "@/components/brand/Logo";
 import { PlatformGlyph } from "@/components/shared/PlatformIcon";
+import { BounceText } from "./Split";
+import { FooterWordmark } from "./FooterWordmark";
 
 const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   {
@@ -44,12 +47,21 @@ const PLATFORMS = [
  * Every item is a real link; nothing points at "#".
  */
 export function MarketingFooter() {
+  // The wordmark's signature loop only runs while it is on screen (no repaint work when scrolled away).
+  const wordRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = wordRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => (el.dataset.play = e.isIntersecting ? "1" : "0"), { rootMargin: "80px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   const signedIn = useSignedIn();
   const hidden = useHiddenSections(usePathname());
   const waitlist = useWaitlist();
   return (
     <footer className="px-3 pb-3 pt-6 sm:px-6 sm:pb-6">
-      <div className="footer-card relative mx-auto max-w-[1240px] overflow-hidden rounded-[32px] sm:rounded-[40px]">
+      <div className="footer-card relative mx-auto max-w-[1240px] overflow-clip rounded-[32px] sm:rounded-[40px]">
         <div className="relative grid gap-10 px-6 pb-8 pt-10 sm:px-10 sm:pt-14 md:grid-cols-[1.5fr_1fr_1fr] md:gap-8">
           <div>
             <OutlyLogo size={28} className="text-[20px]" />
@@ -58,15 +70,16 @@ export function MarketingFooter() {
             </p>
             <Link
               href={signedIn ? "/home" : waitlist ? "/waitlist" : "/signup"}
+              data-bounce=""
               className="lime-glow group mt-6 inline-flex h-12 items-center gap-2 rounded-full bg-lime px-5 text-[15px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-px active:scale-95"
             >
               {signedIn ? (
                 <>
-                  <LayoutDashboard className="h-4 w-4" aria-hidden="true" /> Open your dashboard
+                  <LayoutDashboard className="h-4 w-4" aria-hidden="true" /> <BounceText text="Open your dashboard" />
                 </>
               ) : (
                 <>
-                  {waitlist ? "Join the waitlist" : "Start creating, it\u2019s free"}
+                  <BounceText text={waitlist ? "Join the waitlist" : "Start creating, it\u2019s free"} />
                   <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
                 </>
               )}
@@ -118,9 +131,10 @@ export function MarketingFooter() {
           </a>
         </div>
 
-        <p aria-hidden="true" className="footer-word pointer-events-none select-none px-4 text-center font-display font-bold leading-[0.8]">
-          outlly
-        </p>
+        {/* Signed like a signature: a pen draws each letter's outline in turn, the ink floods in, holds, and the word is written again (globals.css fw-pen / fw-ink). */}
+        <div ref={wordRef} className="footer-word pointer-events-none select-none">
+          <FooterWordmark className="fw-svg" />
+        </div>
 
         <div className="ft-rule ft-fine relative flex flex-col gap-1.5 border-t border-foreground/10 px-6 pb-6 pt-4 text-[12.5px] text-foreground/70 sm:flex-row sm:items-center sm:justify-between sm:px-10">
           <p>&copy; {new Date().getFullYear()} Outlly. In beta.</p>

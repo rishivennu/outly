@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SignupCta } from "./SignupCta";
+import { BounceText } from "./Split";
 import { Check } from "lucide-react";
 import { Shell, SectionHead } from "./bits";
 import { PRICING_NOTE } from "@/lib/marketing/content";
@@ -75,9 +76,10 @@ export async function Pricing() {
                   ) : live ? (
                     <Link
                       href={`/billing?plan=${p.slug}`}
+                      data-bounce=""
                       className="lime-glow mt-8 inline-flex h-12 items-center justify-center rounded-full bg-lime px-6 text-sm font-semibold text-[hsl(var(--lime-foreground))] transition-transform active:scale-[0.97]"
                     >
-                      {`Choose ${p.name}`}
+                      <BounceText text={`Choose ${p.name}`} />
                     </Link>
                   ) : (
                     <p className="mt-8 text-[13px] leading-relaxed text-muted-foreground">

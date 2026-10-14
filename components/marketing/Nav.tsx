@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSignedIn } from "./useSignedIn";
 import { useWaitlist } from "./useWaitlist";
 import { useHiddenSections } from "./useHiddenSections";
+import { BounceText } from "./Split";
 import { usePathname } from "next/navigation";
 import { ArrowRight, LayoutDashboard, Menu, X } from "lucide-react";
 import { OutlyLogo } from "@/components/brand/Logo";
@@ -165,9 +166,10 @@ export function MarketingNav() {
               </Link>
               <Link
                 href={ctaHref}
+                data-bounce=""
                 className="lime-glow group inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-lime px-4 text-[14px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 active:scale-95 sm:px-5"
               >
-                {ctaLabel}
+                <BounceText text={ctaLabel} />
                 <ArrowRight className="hidden h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 sm:block" aria-hidden="true" />
               </Link>
             </>
