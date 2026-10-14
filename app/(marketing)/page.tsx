@@ -9,7 +9,7 @@ import { Comparison } from "@/components/marketing/Comparison";
 import { Pricing } from "@/components/marketing/Pricing";
 import { Faq } from "@/components/marketing/Faq";
 import { FinalCta } from "@/components/marketing/FinalCta";
-import { RouteRule, Shell } from "@/components/marketing/bits";
+import { RouteRule } from "@/components/marketing/bits";
 import { FAQS, HERO } from "@/lib/marketing/content";
 import { getConfig } from "@/lib/settings";
 import { siteStatus } from "@/lib/site";
@@ -73,9 +73,10 @@ export default async function LandingPage() {
       )}
       {on("hero") && <Hero showHow={on("how")} />}
       {on("hero") && on("how") && (
-        <Shell>
+        // Same box as the framed fan stage (HeroFan: w-full max-w-[1180px]) so the dotted line runs edge to edge with it.
+        <div className="mx-auto w-full max-w-[1180px]">
           <RouteRule />
-        </Shell>
+        </div>
       )}
       {!on("hero") && <div className="h-6" aria-hidden="true" />}
       {on("how") && <HowItWorks />}

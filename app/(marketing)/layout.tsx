@@ -1,5 +1,6 @@
 import { MarketingNav } from "@/components/marketing/Nav";
 import { MarketingFooter } from "@/components/marketing/Footer";
+import { MotionFx } from "@/components/marketing/MotionFx";
 
 /** Shell for every public page: one nav, one footer, one skip link. */
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
@@ -16,6 +17,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <MarketingNav />
       <main id="main">{children}</main>
       <MarketingFooter />
+      <MotionFx />
     </div>
   );
 }
