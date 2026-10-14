@@ -1,25 +1,25 @@
-# fix-1014-speed (cumulative: includes everything in fix-1014-play)
+# fix-1014-perf: admin and analytics speed (2026-10-14)
 
-Copy each file over the same path in the repo. 19 files, listed in FILES.txt (FooterWordmark.tsx is NEW).
+Upload every file at the SAME path from the REPO ROOT (no extra app/app or components/components folder).
+No database change and no new environment variable. tsc 0, 222 tests pass.
 
-1. Localhost speed (next.config.mjs): `compress` is now production only. The dev server was gzipping
-   ~10 MB of unminified JS on one thread every page load (main-app.js alone took 6.6 s). Warm page:
-   DOMContentLoaded 11.5 s -> 2.9 s. Vercel / `next start` still compress as before.
-2. Hero fan (HeroFan.tsx `framed`, Hero.tsx, globals.css `.hf-stage.hf-framed`): the landing is back to the
-   original boxed stage (hard sides, 64px fade into the page). Dashboard home keeps the soft mask.
-   Fan bottom fade restored to the pre-Play values.
-3. Dotted rule under the hero (app/(marketing)/page.tsx): same 1180px box as the fan stage, so both edges line up.
-4. Footer wordmark (Footer.tsx, NEW FooterWordmark.tsx, globals.css `.footer-card` / `.footer-word` / `.fw-svg`):
-   - The word is now an inline SVG built from the site's own Bricolage Grotesque (bold, same shapes as before), so it
-     can be drawn like a pen. Tighter tracking: -0.05em.
-   - Fills the card: ink exactly 40px from each edge, centred, the "y" tail sits on the bottom line (measured at
-     1440/1024/390px).
-   - Signature loop (not scroll): a pen draws each letter's outline one after another, the ink fades in behind it
-     (the "o" keeps its hole), the word holds, then the ink lifts and the line runs off in the writing direction.
-     11s cycle, sine ease in-out, 60fps with no long frames. Paused while the footer is off screen
-     (IntersectionObserver). Reduced motion = static filled word.
-   - Card is `overflow-clip` (was overflow-hidden, which made it a scroll container).
-5. Nav (globals.css `.mnav-bar`): liquid glass (tinted pane, blur + saturation, specular top, white refracted rim),
-   no coloured glow. Reduced-transparency users get a solid bar.
-6. Scroll progress (components/shared/ScrollProgress.tsx, app/layout.tsx): glowing lime line down the RIGHT edge of
-   every page. CSS scroll-driven where supported, rAF fallback elsewhere; hidden on pages that don't scroll.
+## Admin: the 1 second wait on every click
+1. NEW app/admin/(panel)/loading.tsx: a skeleton appears the moment you click a sidebar link (Next prefetches it),
+   instead of the old screen sitting still until the server in Sydney answered.
+2. globals.css: the page fade is shorter (.18s, 4px) and the skeleton waits 120 ms before showing, so fast pages don't flash.
+3. lib/admin/auth.ts: one admin database read per click, not two (the session check and the starter-password banner share it).
+4. layout.tsx + lib/support/tickets.ts + api/admin/tickets/[id]: the open-tickets badge count is cached for 15 s and cleared when a ticket changes.
+5. lib/cache.ts: an update made while a read is still loading can no longer be overwritten by the old value.
+6. SearchBox.tsx: a spinner shows while results load, typing stays smooth, and Back/Forward no longer re-applies the old search.
+
+## Analytics / YouTube loading slowly
+7. lib/live/index.ts: the dashboard no longer waits for Gemini (that wait could run up to 2 x 15 s). Numbers and rule-based tips come back first.
+   NEW api/platforms/[platform]/ideas: the Gemini ideas load afterwards, cached for 6 h until your posts' numbers move.
+8. lib/live/index.ts: the live numbers are also kept in Vercel's shared data cache (90 s, served stale while it refreshes,
+   refetched once older than 10 min), so a cold server or a different page doesn't call YouTube again.
+9. lib/live/youtube.ts: all YouTube calls go out at once (the uploads list comes from the channel id), so it's 2 rounds of calls instead of 3,
+   and the result is checked against the real channel.
+10. lib/live/instagram.ts: same parallel loading. A note now says when some posts' numbers didn't load.
+11. lib/analytics.ts: the overview query fetches only the numbers (not the title and thumbnail on every row) and is cached for 60 s.
+12. PlatformDashboardView.tsx: shows "Gemini is reading your numbers..." only when it takes longer than 0.6 s.
+13. NEW tests/live-youtube-speed.test.ts (3 tests).

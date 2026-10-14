@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "./db";
+import { cached } from "./cache";
 import { storage } from "./storage";
 import { PLATFORMS, type Platform } from "./domain";
 
@@ -14,13 +15,20 @@ export interface AnalyticsSummary {
   hasData: boolean;
 }
 
-export async function getAnalytics(userId: string, rangeDays = 30): Promise<AnalyticsSummary> {
+/** Metrics only change when the sync job writes them, so a 60 s per-creator copy makes range switches and revisits instant. */
+export function getAnalytics(userId: string, rangeDays = 30): Promise<AnalyticsSummary> {
+  return cached(`analytics:${userId}:${rangeDays}`, 60_000, () => computeAnalytics(userId, rangeDays));
+}
+
+async function computeAnalytics(userId: string, rangeDays: number): Promise<AnalyticsSummary> {
   const now = Date.now();
   const since = new Date(now - rangeDays * 864e5);
   const prevSince = new Date(now - 2 * rangeDays * 864e5);
+  // Numbers only (10-14 perf): the post title and thumbnail used to ride along on every metric row,
+  // which multiplied the payload by the number of snapshots. Only the top post needs them, fetched below.
   const rows = await db.targetMetric.findMany({
     where: { capturedAt: { gte: prevSince }, target: { post: { userId } } },
-    include: { target: { select: { platform: true, postId: true, post: { select: { title: true, hook: true, media: { select: { thumbnailKey: true } } } } } } },
+    select: { capturedAt: true, views: true, likes: true, comments: true, shares: true, target: { select: { platform: true, postId: true } } },
   });
 
   const cur = rows.filter((r) => r.capturedAt >= since);
@@ -55,7 +63,8 @@ export async function getAnalytics(userId: string, rangeDays = 30): Promise<Anal
   }
   const bestWd = [...weekday].sort((a, b) => b[1] - a[1])[0];
 
-  const tk = topE?.row.target.post.media.thumbnailKey;
+  const topPost = topE ? await db.post.findUnique({ where: { id: topE.row.target.postId }, select: { title: true, hook: true, media: { select: { thumbnailKey: true } } } }) : null;
+  const tk = topPost?.media.thumbnailKey;
   const topThumb = !tk ? null : tk.startsWith("/") ? tk : await storage.signedUrl(tk, 6 * 3600).catch(() => null);
 
   return {
@@ -68,7 +77,7 @@ export async function getAnalytics(userId: string, rangeDays = 30): Promise<Anal
       return { platform: p, views: sum(rs, "views"), engagement: eng(rs) };
     }),
     top: topE
-      ? { postId: topE.row.target.postId, title: topE.row.target.post.title ?? topE.row.target.post.hook ?? "Untitled", thumbnailUrl: topThumb, views: topE.views, platform: topE.row.target.platform as Platform }
+      ? { postId: topE.row.target.postId, title: topPost?.title ?? topPost?.hook ?? "Untitled", thumbnailUrl: topThumb, views: topE.views, platform: topE.row.target.platform as Platform }
       : null,
     bestDay: bestWd && bestWd[1] > 0 ? ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][bestWd[0]] : null,
     hasData: cur.length > 0,

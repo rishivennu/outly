@@ -183,6 +183,28 @@ function NotLive({ platform, data }: { platform: Platform; data: PlatformDashboa
 }
 
 function Live({ platform, data }: { platform: Platform; data: PlatformDashboard }) {
+  // Gemini ideas load after the numbers are on screen, so a slow model never holds the dashboard back.
+  const [ideas, setIdeas] = useState<Suggestion[]>([]);
+  const [thinking, setThinking] = useState(false);
+  const enoughPosts = data.status === "ok" && data.posts.length >= 3;
+  useEffect(() => {
+    if (!enoughPosts) return;
+    let gone = false;
+    // Only say "thinking" if it takes a moment (no Gemini key answers instantly with nothing).
+    const t = setTimeout(() => !gone && setThinking(true), 600);
+    api<{ suggestions: Suggestion[] }>(`/api/platforms/${platform}/ideas`)
+      .then((r) => !gone && setIdeas(r.suggestions ?? []))
+      .catch(() => {})
+      .finally(() => {
+        clearTimeout(t);
+        if (!gone) setThinking(false);
+      });
+    return () => {
+      gone = true;
+      clearTimeout(t);
+    };
+  }, [platform, enoughPosts]);
+  const coach = useMemo(() => [...data.suggestions.filter((s) => s.source !== "ai"), ...ideas], [data.suggestions, ideas]);
   const color = PLATFORM_HALO[platform];
   return (
     <>
@@ -200,7 +222,7 @@ function Live({ platform, data }: { platform: Platform; data: PlatformDashboard 
 
       <div className="mt-6 grid gap-3 lg:grid-cols-[1.55fr_1fr]">
         <Trend data={data} color={color} />
-        <Coach suggestions={data.suggestions} platform={platform} />
+        <Coach suggestions={coach} platform={platform} thinking={thinking} />
       </div>
 
       {(data.hours?.length || data.breakdown) && (
@@ -278,7 +300,7 @@ function Trend({ data, color }: { data: PlatformDashboard; color: string }) {
   );
 }
 
-function Coach({ suggestions, platform }: { suggestions: Suggestion[]; platform: Platform }) {
+function Coach({ suggestions, platform, thinking = false }: { suggestions: Suggestion[]; platform: Platform; thinking?: boolean }) {
   const [open, setOpen] = useState<string | null>(suggestions[0]?.id ?? null);
   const ai = suggestions.some((s) => s.source === "ai");
   return (
@@ -321,6 +343,11 @@ function Coach({ suggestions, platform }: { suggestions: Suggestion[]; platform:
             );
           })}
         </ol>
+      )}
+      {thinking && (
+        <p role="status" className="relative mt-3 flex items-center gap-2 px-3 text-xs text-muted-foreground">
+          <Sparkles className="h-3.5 w-3.5 animate-pulse" aria-hidden="true" /> Gemini is reading your numbers for more ideas…
+        </p>
       )}
       <p className="relative mt-4 text-[11px] leading-snug text-muted-foreground">
         {ai ? "Worked out from your live numbers. Items tagged AI were written by Gemini from the same numbers." : "Worked out from your live numbers. Nothing here is a guess: each one shows the figures behind it."}

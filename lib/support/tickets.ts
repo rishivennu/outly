@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { db } from "../db";
+import { invalidate } from "../cache";
 import { env } from "../env";
 import { sendEmail, templates } from "../email";
 import { adminEvent } from "../admin/route";
@@ -43,6 +44,7 @@ export async function raiseTicket(o: { email: string; name?: string | null; user
           messages: { create: o.transcript.slice(-20).map((t) => ({ author: t.role === "user" ? "customer" : "bot", body: t.text.slice(0, 2000) })) },
         },
       });
+      invalidate("admin:open-tickets");
     } catch (e: any) {
       if (e?.code !== "P2002") throw e;
     }

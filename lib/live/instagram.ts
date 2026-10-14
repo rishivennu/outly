@@ -26,13 +26,26 @@ export async function instagramDashboard(acct: AccountContext, timezone: string,
   const totalsQ = (since: number, until: number, metrics: string) => `/me/insights?metric=${metrics}&period=day&metric_type=total_value&since=${since}&until=${until}`;
   const notes: PlatformDashboard["notes"] = [];
 
-  // Profile first: if this fails the token is the problem and nothing else will work either.
-  const me = await ig<{ username: string; name?: string; profile_picture_url?: string; biography?: string; followers_count?: number; follows_count?: number; media_count?: number }>(
+  // All at once (10-14 perf). The profile still decides: if it fails the token is the problem, so its
+  // error is the one reported, but the other calls no longer wait a round trip behind it.
+  const meP = ig<{ username: string; name?: string; profile_picture_url?: string; biography?: string; followers_count?: number; follows_count?: number; media_count?: number }>(
     "/me?fields=user_id,username,name,profile_picture_url,biography,followers_count,follows_count,media_count",
     t,
   );
 
-  const [cur, prev, reach, followers, online, countries, media] = await Promise.allSettled([
+  type IgInsight = { data: { name: string; values: { value: number }[] }[] };
+  const mediaP = ig<{ data: IgMedia[] }>("/me/media?fields=id,caption,media_type,media_product_type,timestamp,permalink,thumbnail_url,media_url,like_count,comments_count&limit=24", t);
+  // Per-post insights for the newest 16 start the moment the post list lands; older posts keep the media endpoint's counts.
+  const insightsP = mediaP.then((m) =>
+    Promise.allSettled(
+      (m.data ?? [])
+        .filter((x) => x.media_product_type !== "STORY")
+        .slice(0, 16)
+        .map((x) => ig<IgInsight>(`/${x.id}/insights?metric=${x.media_product_type === "REELS" ? "views,reach,likes,comments,shares,saved,ig_reels_avg_watch_time" : "views,reach,likes,comments,shares,saved"}`, t)),
+    ),
+  );
+  const [meR, cur, prev, reach, followers, online, countries, media, insightsR] = await Promise.allSettled([
+    meP,
     ig<Totals>(totalsQ(now - rangeDays * DAY, now, "views,reach,profile_views,accounts_engaged,total_interactions,likes,comments,shares,saves"), t),
     ig<Totals>(totalsQ(now - 2 * rangeDays * DAY, now - rangeDays * DAY, "views,reach,profile_views,accounts_engaged,total_interactions"), t),
     ig<Daily>(`/me/insights?metric=reach&period=day&since=${now - rangeDays * DAY}&until=${now}`, t),
@@ -42,8 +55,11 @@ export async function instagramDashboard(acct: AccountContext, timezone: string,
       "/me/insights?metric=follower_demographics&period=lifetime&metric_type=total_value&breakdown=country",
       t,
     ),
-    ig<{ data: IgMedia[] }>("/me/media?fields=id,caption,media_type,media_product_type,timestamp,permalink,thumbnail_url,media_url,like_count,comments_count&limit=24", t),
+    mediaP,
+    insightsP,
   ]);
+  if (meR.status === "rejected") throw meR.reason;
+  const me = meR.value;
   const ok = <T,>(r: PromiseSettledResult<T>, what: string) => {
     if (r.status === "fulfilled") return r.value;
     notes.push({ level: "warning", text: `Instagram didn't return ${what} this time.`, detail: (r.reason as { technical?: string })?.technical ?? String(r.reason) });
@@ -81,15 +97,10 @@ export async function instagramDashboard(acct: AccountContext, timezone: string,
     : undefined;
 
   const items = (ok(media, "your recent posts")?.data ?? []).filter((m) => m.media_product_type !== "STORY");
-  // Per-post insights for the newest 16; older ones keep the counts the media endpoint already gave us.
-  const insights = await Promise.allSettled(
-    items.slice(0, 16).map((m) =>
-      ig<{ data: { name: string; values: { value: number }[] }[] }>(
-        `/${m.id}/insights?metric=${m.media_product_type === "REELS" ? "views,reach,likes,comments,shares,saved,ig_reels_avg_watch_time" : "views,reach,likes,comments,shares,saved"}`,
-        t,
-      ),
-    ),
-  );
+  const insights = insightsR.status === "fulfilled" ? insightsR.value : [];
+  const missed = insights.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+  if (missed.length)
+    notes.push({ level: "warning", text: `Instagram didn't return the full numbers for ${missed.length} of your newest ${insights.length} posts this time, so some show a dash.`, detail: (missed[0].reason as { technical?: string })?.technical ?? String(missed[0].reason) });
   const posts: LivePost[] = items.map((m, i) => {
     const ins = insights[i]?.status === "fulfilled" ? (insights[i] as PromiseFulfilledResult<{ data: { name: string; values: { value: number }[] }[] }>).value : null;
     const v = (k: string) => ins?.data.find((d) => d.name === k)?.values[0]?.value ?? null;

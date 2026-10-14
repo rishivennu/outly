@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { db } from "@/lib/db";
+import { cached } from "@/lib/cache";
 import { requireAdmin } from "@/lib/admin/guard";
 import { usingDefaultPassword } from "@/lib/admin/auth";
 import { can } from "@/lib/admin/perms";
@@ -15,7 +16,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const admin = await requireAdmin();
   const [weak, openTickets] = await Promise.all([
     usingDefaultPassword(admin.id),
-    can(admin.role, "tickets") ? db.ticket.count({ where: { status: { not: "resolved" } } }) : Promise.resolve(0),
+    // The sidebar badge can lag a few seconds; it should not cost a database trip on every click.
+    can(admin.role, "tickets") ? cached("admin:open-tickets", 15_000, () => db.ticket.count({ where: { status: { not: "resolved" } } })) : Promise.resolve(0),
   ]);
   return (
     <ToastProvider>

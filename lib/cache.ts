@@ -13,6 +13,8 @@ type Entry = { at: number; v?: unknown; p?: Promise<unknown> };
 const g = globalThis as unknown as { __outllyCache?: Map<string, Entry> };
 const store = (g.__outllyCache ??= new Map());
 const MAX = 500;
+/** Bumped by invalidate(), so a read that started before a write can't put the old value back. */
+let gen = 0;
 
 export async function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
   const now = Date.now();
@@ -21,13 +23,15 @@ export async function cached<T>(key: string, ttlMs: number, load: () => Promise<
     if (e.p) return e.p as Promise<T>;
     if (now - e.at < ttlMs) return e.v as T;
   }
+  const born = gen;
   const p = load().then(
     (v) => {
-      store.set(key, { at: Date.now(), v });
+      if (born === gen) store.set(key, { at: Date.now(), v });
+      else if (store.get(key)?.p === p) store.delete(key);
       return v;
     },
     (err) => {
-      store.delete(key);
+      if (store.get(key)?.p === p) store.delete(key);
       throw err;
     },
   );
@@ -37,6 +41,7 @@ export async function cached<T>(key: string, ttlMs: number, load: () => Promise<
 }
 
 export function invalidate(prefix: string) {
+  gen++;
   for (const k of [...store.keys()]) if (k.startsWith(prefix)) store.delete(k);
 }
 

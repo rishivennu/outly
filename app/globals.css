@@ -870,8 +870,12 @@ html:not(.dark) .footer-word { --fw-s0: hsl(82 85% 16%); --fw-s1: hsl(82 85% 26%
 }
 
 /* ---------------------------------------------------------------- admin console + a11y (2026-10-12) */
-.admin-page-in { animation: admin-page-in .3s var(--ease-liquid) both; }
-@keyframes admin-page-in { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
+/* 10-14 perf: short and light, so a page that is already loaded never looks like it is still arriving. */
+.admin-page-in { animation: admin-page-in .18s var(--ease-out) both; }
+@keyframes admin-page-in { from { opacity: 0; transform: translate3d(0, 4px, 0); } to { opacity: 1; transform: none; } }
+/* The loading skeleton waits a beat before showing, so fast pages swap straight in without a flash. */
+.admin-skel { animation: admin-skel-in .2s ease-out .12s both; }
+@keyframes admin-skel-in { from { opacity: 0; } to { opacity: 1; } }
 .admin-blob { animation: admin-blob 22s ease-in-out infinite alternate; }
 @keyframes admin-blob { 0% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(6%,-4%,0) scale(1.12); } 100% { transform: translate3d(-5%,5%,0) scale(.94); } }
 .bell-ring { animation: bell-ring .9s var(--ease-out); transform-origin: 50% 10%; }
@@ -891,7 +895,7 @@ html[data-contrast="more"] :focus-visible { outline: 3px solid hsl(var(--ring)) 
 html[data-contrast="more"] a:not([class*="btn"]) { text-decoration-thickness: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .admin-page-in, .admin-blob, .bell-ring, .offline-bar, .chat-pop, .consent-in { animation: none; }
+  .admin-page-in, .admin-skel, .admin-blob, .bell-ring, .offline-bar, .chat-pop, .consent-in { animation: none; }
   .admin-card, .kpi-card:hover { transition: none; transform: none; }
 }
 
@@ -1270,6 +1274,39 @@ html:has(.admin-root),
   html:has(.admin-root)::-webkit-scrollbar-thumb:hover,
   .admin-root ::-webkit-scrollbar-thumb:hover { background-color: hsl(var(--lime)); }
 }
+
+/* Admin sidebar / drawer scrollbar (components/admin/ScrollArea.tsx). The native bar is hidden: on Windows it is a grey
+   box with arrows that ignores scrollbar-color. Instead a 4px pill rides inside the panel's right edge: invisible at rest,
+   soft while the pointer is over the panel, lime (with a faint glow) while scrolling or dragging, 6px under the pointer.
+   The list fades at the top/bottom edge only when there is more that way. */
+@property --sa-ft { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --sa-fb { syntax: "<length>"; inherits: false; initial-value: 0px; }
+.sa-root { position: relative; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0;
+  --sa-ink: hsl(var(--lime-ink)); --sa-rest: hsl(var(--foreground) / .22); }
+.dark .sa-root { --sa-ink: hsl(var(--lime)); --sa-rest: hsl(var(--foreground) / .26); }
+.sa-view { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--sa-ft), #000 calc(100% - var(--sa-fb)), transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 var(--sa-ft), #000 calc(100% - var(--sa-fb)), transparent 100%);
+  transition: --sa-ft .25s ease, --sa-fb .25s ease; }
+.admin-root .sa-view { scrollbar-width: none; }
+.admin-root .sa-view::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.sa-root[data-over="1"][data-top="0"] .sa-view { --sa-ft: 26px; }
+.sa-root[data-over="1"][data-end="0"] .sa-view { --sa-fb: 34px; }
+.sa-rail { position: absolute; top: 16px; bottom: 16px; right: 2px; width: 14px; opacity: 0; pointer-events: none;
+  transition: opacity .3s ease; }
+.sa-root[data-over="1"] .sa-rail { pointer-events: auto; }
+.sa-root[data-over="1"]:hover .sa-rail { opacity: 1; }
+.sa-root[data-over="1"][data-live="1"] .sa-rail,
+.sa-root[data-over="1"][data-drag="1"] .sa-rail { opacity: 1; transition-duration: .12s; }
+.sa-thumb { position: absolute; top: 0; right: 4px; width: 4px; border-radius: 999px; background: var(--sa-rest);
+  touch-action: none; cursor: grab; will-change: transform;
+  transition: width .18s ease, right .18s ease, background-color .2s ease, box-shadow .2s ease; }
+.sa-thumb::before { content: ""; position: absolute; inset: -6px -5px; } /* bigger grab target than the 4px pill */
+.sa-root[data-live="1"] .sa-thumb { background: var(--sa-ink); box-shadow: 0 0 10px -1px color-mix(in srgb, var(--sa-ink) 60%, transparent); }
+.sa-rail:hover .sa-thumb, .sa-root[data-drag="1"] .sa-thumb { width: 6px; right: 3px; background: var(--sa-ink); }
+.sa-root[data-drag="1"] .sa-thumb { cursor: grabbing; }
+@media (hover: none) { .sa-root[data-over="1"]:hover .sa-rail { opacity: 0; } .sa-root[data-over="1"][data-live="1"] .sa-rail { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sa-view, .sa-rail, .sa-thumb { transition: none; } }
 
 /* ---------- Play pass (10-14): springy, sticker-like motion in the spirit of aardvarkbookclub.com ----------
    Elastic curves are GSAP's elastic.out sampled into CSS linear(): --ease-elastic = elastic.out(1, .72),

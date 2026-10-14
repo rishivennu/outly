@@ -54,7 +54,8 @@ export async function ensureSuperAdmin() {
 // per hash instead of paying that on every admin page the layout renders.
 const weakByHash = new Map<string, boolean>();
 export async function usingDefaultPassword(adminId: string) {
-  const a = await db.adminUser.findUnique({ where: { id: adminId }, select: { passwordHash: true } });
+  // Same request as the layout's session check, so this reuses that row instead of a second round trip.
+  const a = await adminRow(adminId);
   if (!a) return false;
   const hit = weakByHash.get(a.passwordHash);
   if (hit !== undefined) return hit;
@@ -83,12 +84,15 @@ export function destroyAdminSession() {
 
 export type AdminSession = { id: string; name: string; login: string; role: AdminRole };
 
+/** One admin row per request: the session check, the starter-password banner and the page all share it. */
+const adminRow = cache((id: string) => db.adminUser.findUnique({ where: { id } }));
+
 export const getAdmin = cache(async (): Promise<AdminSession | null> => {
   const token = cookies().get(ADMIN_COOKIE)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
-    const a = await db.adminUser.findUnique({ where: { id: String(payload.sub) } });
+    const a = await adminRow(String(payload.sub));
     if (!a || !a.active || payload.fp !== fp(a.passwordHash)) return null;
     return { id: a.id, name: a.name, login: a.login, role: a.role as AdminRole };
   } catch {
