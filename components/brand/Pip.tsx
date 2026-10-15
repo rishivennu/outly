@@ -1,6 +1,7 @@
 "use client";
 import { useId } from "react";
 import { cn } from "@/lib/utils";
+import { moodSituation, paletteById, paletteVars, type PipSituation } from "@/lib/mascot/palettes";
 
 export type PipMood = "idle" | "wave" | "think" | "happy" | "sad" | "fly" | "sleepy" | "dizzy" | "wait";
 
@@ -8,7 +9,11 @@ export type PipMood = "idle" | "wave" | "think" | "happy" | "sad" | "fly" | "sle
  * Pip, Outlly's mascot (2026-10-15 glow redesign): a soft indigo cloud with a blurred, colourful
  * "heart light" inside that changes shape with the mood, and simple white line eyes.
  * Pure SVG + CSS (transform/opacity only); every loop stops under reduced motion.
+ *
+ * Colours are CSS variables (Indigo is the fallback). The admin picks a colourway per situation and
+ * /api/pip-theme sets them on `.pip-sit-<situation>`; `palette` forces one (admin previews).
  */
+const v = (name: string, fallback: string) => ({ stopColor: `var(${name}, ${fallback})` });
 const CLOUD =
   "M30 94C15 94 7 82 11 70C4 60 10 45 25 45C25 29 41 19 56 25C64 13 87 15 91 31C105 31 115 44 109 58C117 69 112 87 97 90C90 101 72 101 66 95C58 101 40 101 34 95C32.6 94.4 31.3 94 30 94Z";
 
@@ -37,7 +42,7 @@ const EYES: Record<PipMood, React.ReactNode> = {
   dizzy: (<><path className="pip-swirl" d="M49 54a3 3 0 1 1 3 3 5.5 5.5 0 1 1 5.5-5.5" /><path className="pip-swirl pip-swirl-r" d="M69 54a3 3 0 1 1 3 3 5.5 5.5 0 1 1 5.5-5.5" /></>),
 };
 
-export function Pip({ size = 96, mood = "idle", className, title }: { size?: number; mood?: PipMood; className?: string; title?: string }) {
+export function Pip({ size = 96, mood = "idle", className, title, situation, palette, style }: { size?: number; mood?: PipMood; className?: string; title?: string; situation?: PipSituation; palette?: string; style?: React.CSSProperties }) {
   const id = useId().replace(/:/g, "");
   const body = `pip-b-${id}`;
   const rim = `pip-r-${id}`;
@@ -50,26 +55,27 @@ export function Pip({ size = 96, mood = "idle", className, title }: { size?: num
       viewBox="0 0 120 120"
       width={size}
       height={size}
-      className={cn("pip", `pip-${mood}`, className)}
+      className={cn("pip", `pip-${mood}`, `pip-sit-${situation ?? moodSituation(mood)}`, className)}
+      style={palette ? { ...(paletteVars(paletteById(palette)) as React.CSSProperties), ...style } : style}
       role={title ? "img" : undefined}
       aria-hidden={title ? undefined : true}
       aria-label={title}
     >
       <defs>
         <radialGradient id={body} cx="0.42" cy="0.38" r="0.7">
-          <stop offset="0" stopColor="#5b4cf5" />
-          <stop offset="0.6" stopColor="#3a2bd6" />
-          <stop offset="1" stopColor="#2a1c9e" />
+          <stop offset="0" style={v("--pip-b0", "#5b4cf5")} />
+          <stop offset="0.6" style={v("--pip-b1", "#3a2bd6")} />
+          <stop offset="1" style={v("--pip-b2", "#2a1c9e")} />
         </radialGradient>
         <radialGradient id={rim} cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0.72" stopColor="#8d80ff" stopOpacity="0" />
-          <stop offset="1" stopColor="#b4abff" stopOpacity="0.85" />
+          <stop offset="0.72" stopOpacity="0" style={v("--pip-r0", "#8d80ff")} />
+          <stop offset="1" stopOpacity="0.85" style={v("--pip-r1", "#b4abff")} />
         </radialGradient>
         <linearGradient id={core} x1="0.1" y1="0.1" x2="0.9" y2="0.95">
-          <stop offset="0" stopColor="#ff5fb8" />
-          <stop offset="0.38" stopColor="#ffb13d" />
-          <stop offset="0.68" stopColor="#9ff218" />
-          <stop offset="1" stopColor="#3ee0ff" />
+          <stop offset="0" style={v("--pip-c0", "#ff5fb8")} />
+          <stop offset="0.38" style={v("--pip-c1", "#ffb13d")} />
+          <stop offset="0.68" style={v("--pip-c2", "#9ff218")} />
+          <stop offset="1" style={v("--pip-c3", "#3ee0ff")} />
         </linearGradient>
         <filter id={soft} x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4.2" /></filter>
         <filter id={glow} x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6" /></filter>
@@ -77,7 +83,7 @@ export function Pip({ size = 96, mood = "idle", className, title }: { size?: num
       </defs>
       <g className="pip-body">
         {/* outer glow */}
-        <path d={CLOUD} fill="#6c5cff" opacity="0.55" filter={`url(#${glow})`} className="pip-halo" />
+        <path d={CLOUD} style={{ fill: "var(--pip-halo, #6c5cff)" }} opacity="0.55" filter={`url(#${glow})`} className="pip-halo" />
         <path d={CLOUD} fill={`url(#${body})`} />
         <g clipPath={`url(#${clip})`}>
           <g className="pip-core">
@@ -87,20 +93,20 @@ export function Pip({ size = 96, mood = "idle", className, title }: { size?: num
           <path d={CLOUD} fill={`url(#${rim})`} />
           <ellipse cx="42" cy="38" rx="16" ry="7" fill="#ffffff" opacity="0.22" filter={`url(#${soft})`} transform="rotate(-18 42 38)" />
         </g>
-        <path d={CLOUD} fill="none" stroke="#c9c2ff" strokeOpacity="0.35" strokeWidth="1.2" />
+        <path d={CLOUD} fill="none" style={{ stroke: "var(--pip-edge, #c9c2ff)" }} strokeOpacity="0.35" strokeWidth="1.2" />
         <g className="pip-eyes" fill="none" stroke="#ffffff" strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round">
           {EYES[mood]}
         </g>
       </g>
       {mood === "think" && (
-        <g className="pip-dots" fill="#b4abff">
+        <g className="pip-dots" style={{ fill: "var(--pip-accent, #b4abff)" }}>
           <circle cx="98" cy="22" r="3" />
           <circle cx="107" cy="14" r="3" />
           <circle cx="115" cy="6" r="3" />
         </g>
       )}
       {mood === "sleepy" && (
-        <g className="pip-zz" fill="none" stroke="#b4abff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+        <g className="pip-zz" fill="none" style={{ stroke: "var(--pip-accent, #b4abff)" }} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
           <path d="M92 22h8l-8 9h8" />
           <path d="M104 8h6l-6 7h6" />
         </g>

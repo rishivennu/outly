@@ -1,4 +1,6 @@
 import { Pip, type PipMood } from "@/components/brand/Pip";
+import { StreakFlame } from "@/components/home/StreakFlame";
+import { TIER_NAME, streakTier } from "@/components/home/streak-tier";
 
 export const metadata = { title: "Pip" };
 
@@ -33,6 +35,20 @@ export default function MascotPage() {
               <Pip size={104} mood={m.mood} title={`Pip, ${m.label.toLowerCase()}`} />
               <span className="mt-2 font-semibold">{m.label}</span>
               <span className="text-[13px] text-[#a9a6b8]">{m.use}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section aria-labelledby="sf-h" className="mt-14 max-w-5xl border-t border-white/10 pt-10">
+        <h2 id="sf-h" className="text-xl font-semibold">Streak flame</h2>
+        <p className="mt-1 text-[13px] text-[#a9a6b8]">Grows hotter with the streak. Leave the page alone for 9 seconds and Pip starts babbling.</p>
+        <ul className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-5">
+          {[0, 1, 4, 7, 12].map((n) => (
+            <li key={n} className="flex flex-col items-center gap-2 text-center">
+              <StreakFlame streak={n} met={false} className="w-[132px]" />
+              <span className="mt-2 font-semibold">{TIER_NAME[streakTier(n)]}</span>
+              <span className="text-[13px] text-[#a9a6b8]">{n} week{n === 1 ? "" : "s"}</span>
             </li>
           ))}
         </ul>

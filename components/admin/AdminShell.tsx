@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, BookOpen, Construction, HeartPulse, Hourglass, Rocket, PanelsTopLeft, CreditCard, Globe, Share2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Mail, Menu, Plug, ShieldCheck, Tag, Users, X } from "lucide-react";
+import { Activity, BookOpen, Construction, HeartPulse, Hourglass, Rocket, PanelsTopLeft, CreditCard, Globe, Share2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Mail, Menu, Palette, Plug, ShieldCheck, Tag, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
@@ -27,6 +27,7 @@ const NAV: { href: string; label: string; icon: typeof Users; area: AdminArea; g
   { href: "/admin/integrations", label: "Integrations", icon: Plug, area: "integrations", group: "Setup" },
   { href: "/admin/platforms", label: "Social platforms", icon: Share2, area: "platforms", group: "Setup" },
   { href: "/admin/landing", label: "Landing page", icon: PanelsTopLeft, area: "site", group: "Setup" },
+  { href: "/admin/mascot", label: "Mascot colours", icon: Palette, area: "site", group: "Setup" },
   { href: "/admin/maintenance", label: "Maintenance", icon: Construction, area: "site", group: "Setup" },
   { href: "/admin/waitlist", label: "Waitlist", icon: Hourglass, area: "site", group: "Setup" },
   { href: "/admin/team", label: "Team & roles", icon: ShieldCheck, area: "team", group: "Setup" },
@@ -94,7 +95,7 @@ function Footer({ admin, path, onNavigate }: { admin: { name: string; role: Admi
           <span className="block truncate text-[11.5px] text-muted-foreground">{ROLE_LABEL[admin.role]}</span>
         </span>
         <form action="/api/admin/logout" method="post">
-          <button type="submit" className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="Sign out" title="Sign out">
+          <button type="submit" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="Sign out" title="Sign out">
             <LogOut className="h-4 w-4" />
           </button>
         </form>
@@ -167,7 +168,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
               <ScrollArea className="px-3 pb-3 pt-4">
                 <div className="mb-5 flex items-center justify-between px-2">
                   <OutlyLogo size={26} />
-                  <button type="button" onClick={() => setOpen(false)} aria-label="Close menu" className="grid h-10 w-10 place-items-center rounded-full hover:bg-secondary" autoFocus>
+                  <button type="button" onClick={() => setOpen(false)} aria-label="Close menu" className="grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" autoFocus>
                     <X className="h-5 w-5" />
                   </button>
                 </div>

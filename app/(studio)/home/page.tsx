@@ -9,7 +9,6 @@ import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import type { Platform } from "@/lib/domain";
 import { connectedPlatforms } from "@/lib/live/connected";
 import { canConnectWithToken, hasCredentials, loadKeys } from "@/lib/social/registry";
-import { ProfileReview } from "@/components/analytics/ProfileReview";
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
 import { WelcomeSubscribe, type WelcomeOffer } from "@/components/onboarding/WelcomeSubscribe";
 import { entitlements } from "@/lib/billing/entitlements";
@@ -22,6 +21,7 @@ import { NextSteps } from "@/components/home/NextSteps";
 import { GoalRing } from "@/components/home/GoalRing";
 import { IdeaBank } from "@/components/home/IdeaBank";
 import { RecycleCard } from "@/components/home/RecycleCard";
+import { cn } from "@/lib/utils";
 
 const NEW_FOR_DAYS = 14;
 
@@ -63,6 +63,10 @@ export default async function HomePage() {
     }),
   ]);
   const started = Object.values(live).some(Boolean) || published > 0;
+  const steps = ret?.steps ?? [];
+  const recycle = ret?.recycle ?? [];
+  // Ideas fill a whole row when nothing sits beside them; with no steps they pair with the streak card.
+  const ideasWide = ret ? steps.length > 0 && recycle.length === 0 : true;
   const setup = {
     connected: { instagram: !!live.instagram, youtube: !!live.youtube },
     instagram: { oauth: hasCredentials("instagram"), token: canConnectWithToken("instagram") },
@@ -79,21 +83,13 @@ export default async function HomePage() {
       <HomeHero firstName={user.name.split(" ")[0]} />
       <SetupChecklist state={setup} />
       {welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} />}
-      {started && ret && (
-        <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-4 sm:px-10 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-          {ret.steps.length > 0 ? <NextSteps steps={ret.steps} /> : <div className="hidden md:block" />}
-          <GoalRing goal={ret.goal} scheduled={ret.scheduledThisWeek} canEdit={!user.actor} />
-        </div>
-      )}
       {started && (
-        <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-10 sm:px-10 md:grid-cols-2">
-          <IdeaBank />
-          {ret && ret.recycle.length > 0 && <RecycleCard posts={ret.recycle} />}
-        </div>
-      )}
-      {started && (
-        <div className="mx-auto max-w-5xl px-5 pb-10 sm:px-10">
-          <ProfileReview compactMode />
+        // One 12-column bento: next steps beside the streak, ideas beside recycling. Spans adapt to what's there.
+        <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-10 sm:px-10 md:grid-cols-12">
+          {steps.length > 0 && <div className="grid min-w-0 md:col-span-7"><NextSteps steps={steps} /></div>}
+          {ret && <div className="grid min-w-0 md:col-span-5"><GoalRing goal={ret.goal} scheduled={ret.scheduledThisWeek} canEdit={!user.actor} /></div>}
+          <div className={cn("grid min-w-0", ideasWide ? "md:col-span-12" : "md:col-span-7")}><IdeaBank wide={ideasWide} /></div>
+          {recycle.length > 0 && <div className={cn("grid min-w-0", ret && steps.length === 0 ? "md:col-span-12" : "md:col-span-5")}><RecycleCard posts={recycle} /></div>}
         </div>
       )}
       {(dv.length > 0 || nv) && (
@@ -110,7 +106,7 @@ export default async function HomePage() {
                         <span className="block truncate font-medium">{p.title ?? "Untitled idea"}</span>
                         <span className="block truncate text-sm text-muted-foreground">{p.story ?? "No story yet"}</span>
                       </span>
-                      <ArrowUpRight className="h-4 w-4 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" />
+                      <ArrowUpRight className="h-4 w-4 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" aria-hidden="true" />
                     </Link>
                   </li>
                 ))}

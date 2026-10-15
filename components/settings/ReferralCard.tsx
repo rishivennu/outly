@@ -27,7 +27,7 @@ export function ReferralCard() {
     }
   };
   return (
-    <section id="referral" className="glass scroll-mt-24 rounded-[32px] p-6 sm:p-8" aria-labelledby="ref-h">
+    <section id="referral" className="glass flex h-full scroll-mt-24 flex-col rounded-[32px] p-6 sm:p-8" aria-labelledby="ref-h">
       <div className="flex items-start gap-3">
         <span className="lime-bg grid h-11 w-11 shrink-0 place-items-center rounded-2xl" aria-hidden="true">
           <Gift className="h-5 w-5" />
@@ -38,10 +38,10 @@ export function ReferralCard() {
         </div>
       </div>
       {failed ? (
-        <p role="alert" className="mt-5 text-sm text-destructive">Your link didn't load. Refresh to try again.</p>
+        <p role="alert" className="mt-auto pt-5 text-sm text-destructive">Your link didn't load. Refresh to try again.</p>
       ) : (
         <>
-          <div className="mt-5 flex flex-wrap items-center gap-2">
+          <div className="mt-auto flex flex-wrap items-center gap-2 pt-5">
             <label htmlFor="ref-url" className="sr-only">Your invite link</label>
             <input id="ref-url" readOnly value={s?.url ?? "Loading…"} onFocus={(e) => e.currentTarget.select()} className="h-12 min-w-0 flex-1 rounded-2xl bg-secondary/60 px-4 text-sm text-foreground hairline focus-visible:outline-2" />
             <Button variant="lime" onClick={copy} disabled={!s} aria-live="polite">

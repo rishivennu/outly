@@ -1570,3 +1570,41 @@ html[data-contrast="more"] .pc-sheet { background: var(--pc-solid); backdrop-fil
 .av-opt:hover .av-swatch { transform: scale(1.06); }
 @media (prefers-reduced-motion: reduce) { .av-opt:hover .av-swatch { transform: none; } }
 @media (forced-colors: active) { .av-swatch.av-on, .av-face.av-on { outline: 3px solid Highlight; } }
+
+/* 10-15: Profile review + "Live from your accounts" read like the "Analyse with Gemini" button:
+   DM Sans, semibold, sentence case. Scoped to these sections; the global fonts are untouched. */
+.ai-type :is(h2, h3, h4) { font-family: var(--font-body), system-ui, sans-serif; letter-spacing: -0.01em; }
+.ai-type .eyebrow { font-family: var(--font-body), system-ui, sans-serif; font-size: 14px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.ai-type .ai-kicker { color: #4f46e5; }
+.dark .ai-type .ai-kicker { color: #aea6ff; }
+
+/* 10-15: Streak flame. Pip in a chunky layered flame; the tier sets size, colours, flicker speed and sparks. */
+.sf-stage { position: relative; overflow: hidden; border-radius: 28px; isolation: isolate; }
+.sf-flame { transform-origin: 50% 100%; transform: scale(var(--sf-scale, 1)); transition: transform .6s var(--ease-out); }
+.sf-flame .sf-l { transform-box: view-box; transform-origin: 100px 214px; animation: sf-lick var(--sf-flick, 1.2s) ease-in-out infinite; }
+.sf-flame .sf-l2 { animation-delay: calc(var(--sf-flick, 1.2s) * -.33); animation-direction: reverse; }
+.sf-flame .sf-l3 { animation-delay: calc(var(--sf-flick, 1.2s) * -.66); }
+.sf-still .sf-flame .sf-l { animation: none; }
+.sf-aura { transform-box: view-box; transform-origin: 100px 214px; transform: scale(1.1); animation: sf-aura calc(var(--sf-flick, 1s) * 2.4) ease-in-out infinite; }
+@keyframes sf-lick { 0%,100% { transform: scale(1,1) skewX(0) } 25% { transform: scale(.97,1.05) skewX(-2.5deg) } 50% { transform: scale(1.03,.97) skewX(1.5deg) } 75% { transform: scale(.98,1.03) skewX(2.5deg) } }
+@keyframes sf-aura { 0%,100% { opacity: .35; transform: scale(1.08) } 50% { opacity: .65; transform: scale(1.14) } }
+.sf-spark { position: absolute; bottom: 18%; border-radius: 999px; background: #fff6c4; box-shadow: 0 0 8px 2px rgba(255, 210, 61, .85); opacity: 0; animation: sf-rise 2.2s ease-out infinite; pointer-events: none; }
+@keyframes sf-rise { 0% { opacity: 0; transform: translate(0,0) scale(1) } 15% { opacity: 1 } 100% { opacity: 0; transform: translate(var(--dx, 0px), -120px) scale(.4) } }
+.sf-cheer .sf-flame { animation: sf-pop .9s var(--ease-out) 2; }
+@keyframes sf-pop { 0%,100% { transform: scale(var(--sf-scale, 1)) } 40% { transform: scale(calc(var(--sf-scale, 1) * 1.12)) } }
+.sf-pip { position: absolute; left: 50%; bottom: 5%; width: 52%; height: auto; transform: translateX(-50%); filter: drop-shadow(0 6px 10px rgba(120, 40, 0, .35)); }
+
+/* Pip's speech bubble (idle gibberish, streak cheers). Decorative: the text beside it says the real thing. */
+.pip-bubble { position: absolute; left: 50%; top: -12px; z-index: 2; transform: translateX(-50%); white-space: nowrap; border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 600; line-height: 1.25;
+  background: hsl(var(--card)); color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); box-shadow: 0 8px 20px -10px rgba(0,0,0,.35); animation: pip-bubble-in .35s var(--ease-out); }
+.pip-bubble::after { content: ""; position: absolute; left: 50%; bottom: -6px; width: 10px; height: 10px; transform: translateX(-50%) rotate(45deg); background: inherit; border-right: 1px solid hsl(var(--border)); border-bottom: 1px solid hsl(var(--border)); }
+@keyframes pip-bubble-in { from { opacity: 0; transform: translate(-50%, 6px) scale(.8) } to { opacity: 1; transform: translate(-50%, 0) scale(1) } }
+@media (prefers-reduced-motion: reduce) {
+  .sf-flame .sf-l, .sf-aura, .sf-cheer .sf-flame, .pip-bubble { animation: none !important; }
+  .sf-spark { display: none; }
+}
+@media (forced-colors: active) { .pip-bubble { border-color: CanvasText; } }
+
+/* 10-15 Home cards: tinted idea notes. Text stays foreground on a light tint, so contrast holds in both themes. */
+.idea-note { background: color-mix(in srgb, var(--note) 14%, hsl(var(--card))); border: 1px solid color-mix(in srgb, var(--note) 30%, transparent); }
+.dark .idea-note { background: color-mix(in srgb, var(--note) 16%, hsl(var(--card))); }

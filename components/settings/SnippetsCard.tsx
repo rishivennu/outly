@@ -14,6 +14,13 @@ const KINDS = [
   { id: "brand", label: "Brand notes", hint: "How you sound and words you avoid. Kept for your team." },
 ] as const;
 
+/** Starters for an empty list: one tap fills the form, the user edits and saves. */
+const EXAMPLES = [
+  { kind: "caption", name: "Sign-off", body: "Thanks for watching. Follow for a new one every week." },
+  { kind: "hashtags", name: "Core tags", body: "#behindthescenes #smallbusiness #creatorlife" },
+  { kind: "brand", name: "Our voice", body: "Warm and short. Say you, not users. No slang we would not say out loud." },
+] as const;
+
 /** Manage the snippets the composer offers: add, read, delete. */
 export function SnippetsCard() {
   const toast = useToast();
@@ -87,12 +94,36 @@ export function SnippetsCard() {
           </div>
           <Button type="submit" variant="lime" disabled={busy || !name.trim() || !body.trim()}>Save snippet</Button>
         </form>
-        <div className="min-w-0">
+        <div className="flex min-w-0 flex-col">
           <h3 className="mb-2 text-sm font-medium">Saved</h3>
           {list === null ? (
             <div className="skeleton h-24 rounded-2xl" aria-hidden="true" />
           ) : list.length === 0 ? (
-            <p className="text-sm text-muted-foreground">None yet.</p>
+            <div className="flex min-h-[240px] flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border p-5 text-center">
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-secondary/70 hairline" aria-hidden="true">
+                <BookmarkPlus className="h-5 w-5 text-muted-foreground" />
+              </span>
+              <p className="text-[15px] font-medium">Nothing saved yet</p>
+              <p className="max-w-xs text-[13px] text-muted-foreground">Start from an example. Tap one to fill the form, change it, then save.</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {EXAMPLES.map((ex) => (
+                  <button
+                    key={ex.name}
+                    type="button"
+                    onClick={() => {
+                      setKind(ex.kind);
+                      setName(ex.name);
+                      setBody(ex.body);
+                      document.getElementById(`${id}-body`)?.focus();
+                    }}
+                    className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-secondary/60 px-4 text-sm hairline transition-colors hover:bg-secondary focus-visible:outline-2"
+                  >
+                    {ex.kind === "hashtags" ? <Hash className="h-4 w-4 text-muted-foreground" aria-hidden="true" /> : <Quote className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}
+                    <span><span className="sr-only">Use example </span>{ex.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           ) : (
             <ul className="flex max-h-[340px] flex-col overflow-y-auto" data-lenis-prevent>
               {list.map((s) => (

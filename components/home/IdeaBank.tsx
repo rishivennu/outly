@@ -3,14 +3,18 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Lightbulb, MessageCircle, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Pip } from "@/components/brand/Pip";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/components/shared/Toast";
 import { api, ApiError } from "@/lib/client/api";
 
 type Idea = { id: string; text: string; source: string; done: boolean; createdAt: string };
-const SHOW = 5;
+/** Note tints, cycled. Text on them stays foreground (see .idea-note). */
+const NOTE = ["#9be22a", "#6c5cff", "#ffb13d", "#ff5fb8", "#3ee0ff"];
+const STARTERS = ["A question a follower asked", "Behind the scenes of my week", "A mistake I learned from"];
 
-/** Idea bank: jot an idea, keep comments worth answering, turn one into a post in a click. */
-export function IdeaBank() {
+/** Ideas (10-15 redesign): a pill to jot one, saved ideas as tinted notes, one click turns a note into a post. */
+export function IdeaBank({ wide = false }: { wide?: boolean }) {
   const router = useRouter();
   const toast = useToast();
   const id = useId();
@@ -64,14 +68,15 @@ export function IdeaBank() {
   }
 
   const list = ideas ?? [];
-  const shown = all ? list : list.slice(0, SHOW);
+  const limit = wide ? 6 : 4; // full rows of notes
+  const shown = all ? list : list.slice(0, limit);
   return (
-    <section id="ideas" aria-labelledby={`${id}-h`} className="glass min-w-0 scroll-mt-24 rounded-[32px] p-5 sm:p-6">
+    <section id="ideas" aria-labelledby={`${id}-h`} className="glass flex h-full min-w-0 scroll-mt-24 flex-col rounded-[32px] p-5 sm:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 id={`${id}-h`} className="eyebrow flex items-center gap-2"><Lightbulb className="h-3.5 w-3.5" aria-hidden="true" /> Idea bank</h2>
-        {list.length > 0 && <span className="text-sm text-muted-foreground">{list.length} saved</span>}
+        <h2 id={`${id}-h`} className="eyebrow flex items-center gap-2"><Lightbulb className="h-3.5 w-3.5" aria-hidden="true" /> Ideas</h2>
+        {list.length > 0 && <span className="text-[13px] text-muted-foreground tabular">{list.length} saved</span>}
       </div>
-      <form onSubmit={add} className="flex gap-2">
+      <form onSubmit={add} className="flex items-center gap-2 rounded-full bg-secondary/60 p-1.5 pl-4 hairline focus-within:ring-2 focus-within:ring-ring">
         <label htmlFor={`${id}-in`} className="sr-only">New idea</label>
         <input
           ref={input}
@@ -79,38 +84,52 @@ export function IdeaBank() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={500}
-          placeholder="A video idea, a question a follower asked..."
-          className="h-11 min-w-0 flex-1 rounded-2xl bg-secondary/60 px-4 text-[15px] hairline placeholder:text-muted-foreground"
+          placeholder="Jot a video idea or a question a follower asked"
+          className="h-11 min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted-foreground"
         />
-        <Button type="submit" size="icon" variant="lime" aria-label="Save idea" disabled={busy === "add"}>
-          <Plus className="h-5 w-5" aria-hidden="true" />
+        <Button type="submit" variant="lime" disabled={busy === "add"} className="shrink-0 rounded-full">
+          <Plus className="h-4 w-4" aria-hidden="true" /> <span className="hidden sm:inline">Save</span><span className="sr-only sm:hidden">Save idea</span>
         </Button>
       </form>
       {ideas === null ? (
-        <div className="mt-4 space-y-2" aria-hidden="true">
-          <div className="skeleton h-11 rounded-2xl" />
-          <div className="skeleton h-11 rounded-2xl" />
+        <div className={cn("mt-4 grid gap-2", wide ? "sm:grid-cols-3" : "sm:grid-cols-2")} aria-hidden="true">
+          <div className="skeleton h-28 rounded-2xl" />
+          <div className="skeleton h-28 rounded-2xl" />
         </div>
       ) : list.length === 0 ? (
-        <p className="mt-4 text-sm text-muted-foreground">Nothing saved yet. Ideas you jot here, and comments you save from the Inbox, wait for you.</p>
+        <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border p-5 text-center">
+          <Pip size={56} mood="think" />
+          <p className="max-w-xs text-sm text-muted-foreground">Ideas you jot here, and comments you save from the Inbox, wait for you. Need a nudge?</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {STARTERS.map((t) => (
+              <button key={t} type="button" onClick={() => { setText(t); input.current?.focus(); }} className="inline-flex min-h-[44px] items-center rounded-full bg-secondary/60 px-4 text-sm hairline transition-colors hover:bg-secondary focus-visible:outline-2">
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
       ) : (
-        <ul className="mt-3 flex flex-col" aria-label="Saved ideas">
-          {shown.map((i) => (
-            <li key={i.id} className="group flex min-h-[48px] items-center gap-2 border-b border-border/60 py-1 last:border-0">
-              {i.source === "comment" && <MessageCircle className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="From a comment" />}
-              <span className="min-w-0 flex-1 text-[15px] leading-snug">{i.text}</span>
-              <Button variant="ghost" size="icon" aria-label={`Remove idea: ${i.text.slice(0, 40)}`} onClick={() => remove(i)} className="opacity-70 hover:opacity-100">
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-              </Button>
-              <Button variant="subtle" onClick={() => make(i)} disabled={busy === i.id} aria-label={`Make a post from: ${i.text.slice(0, 40)}`}>
-                Make it <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Button>
+        <ul className={cn("mt-4 grid gap-2", wide ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2")} aria-label="Saved ideas">
+          {shown.map((i, n) => (
+            <li key={i.id} className="idea-note flex min-h-[124px] flex-col rounded-2xl p-3.5" style={{ ["--note" as string]: NOTE[n % NOTE.length] }}>
+              <p className="line-clamp-3 flex-1 text-[15px] leading-snug">{i.text}</p>
+              <div className="mt-3 flex items-center gap-1">
+                <span className="mr-auto inline-flex min-w-0 items-center gap-1 truncate text-[12px] text-muted-foreground">
+                  {i.source === "comment" ? <><MessageCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> From a comment</> : "Your note"}
+                </span>
+                <Button variant="ghost" size="icon" aria-label={`Remove idea: ${i.text.slice(0, 40)}`} onClick={() => remove(i)} className="shrink-0 opacity-70 hover:opacity-100">
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </Button>
+                <Button variant="subtle" onClick={() => make(i)} disabled={busy === i.id} aria-label={`Make a post from: ${i.text.slice(0, 40)}`} className="shrink-0">
+                  Make it <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </div>
             </li>
           ))}
         </ul>
       )}
-      {list.length > SHOW && (
-        <Button variant="ghost" onClick={() => setAll((v) => !v)} aria-expanded={all} className="-ml-3 mt-2">
+      {list.length > limit && (
+        <Button variant="ghost" onClick={() => setAll((v) => !v)} aria-expanded={all} className="-ml-3 mt-2 self-start">
           {all ? "Show fewer" : `Show all ${list.length}`}
         </Button>
       )}

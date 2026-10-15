@@ -39,7 +39,7 @@ export function RecycleCard({ posts }: { posts: Recyclable[] }) {
   }
 
   return (
-    <section id="recycle" aria-labelledby={`${id}-h`} className="glass min-w-0 scroll-mt-24 rounded-[32px] p-5 sm:p-6">
+    <section id="recycle" aria-labelledby={`${id}-h`} className="glass h-full min-w-0 scroll-mt-24 rounded-[32px] p-5 sm:p-6">
       <h2 id={`${id}-h`} className="eyebrow mb-1 flex items-center gap-2"><Repeat2 className="h-3.5 w-3.5" aria-hidden="true" /> Worth posting again</h2>
       <p className="mb-4 text-sm text-muted-foreground">Your best performers from a while back. Most followers never saw them.</p>
       <ul className="flex flex-col gap-2">

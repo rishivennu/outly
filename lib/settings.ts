@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import { LANDING_DEFAULT } from "./landing";
+import { MASCOT_DEFAULT, type MascotConfig } from "./mascot/palettes";
 import { encrypt, decrypt } from "./crypto";
 
 /**
@@ -62,6 +63,7 @@ export const DEFAULTS = {
   email: { provider: "mock", from: "Outlly <hello@outlly.app>", replyTo: "", resend: { apiKey: "" } } as EmailConfig,
   site: { maintenance: false, message: "", eta: "", since: "", endsAt: "", waitlist: false, waitlistSince: "" } as SiteConfig,
   landing: LANDING_DEFAULT,
+  mascot: MASCOT_DEFAULT as MascotConfig,
   platforms: Object.fromEntries(["instagram", "youtube", "x", "tiktok", "facebook", "threads", "linkedin"].map((p) => [p, { clientId: "", clientSecret: "" }])) as PlatformKeys,
 };
 type Key = keyof typeof DEFAULTS;

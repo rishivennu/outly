@@ -307,10 +307,10 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
   );
 
   return (
-    <section aria-labelledby="pr-title" className={cn(compactMode ? "" : "mt-10")} aria-busy={thinking}>
+    <section aria-labelledby="pr-title" className={cn("ai-type", compactMode ? "" : "mt-10")} aria-busy={thinking}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="eyebrow">Profile review</p>
+          <p className="eyebrow ai-kicker">Profile review</p>
           <h2 id="pr-title" className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">How your profile is really doing</h2>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -471,9 +471,6 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
           </Tile>
         )}
       </div>
-      {r?.empty && !compactMode && (
-        <p className="mt-4 text-sm text-muted-foreground">{r.summary}</p>
-      )}
     </section>
   );
 }

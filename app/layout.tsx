@@ -7,6 +7,7 @@ import { Connectivity, Ripples } from "@/components/shared/Connectivity";
 import { LazyChat } from "@/components/support/LazyChat";
 import { SmoothScroll } from "@/components/marketing/SmoothScroll";
 import { ScrollProgress } from "@/components/shared/ScrollProgress";
+import { PageScrollbar } from "@/components/marketing/PageScrollbar";
 import "./globals.css";
 
 /*
@@ -35,11 +36,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${display.variable} ${body.variable} ${serif.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* Pip colourways picked in Admin > Mascot colours (tiny, cached; Pip falls back to Indigo without it) */}
+        {/* eslint-disable-next-line @next/next/no-css-tags */}
+        <link rel="stylesheet" href="/api/pip-theme" />
       </head>
       <body className="font-sans antialiased">
         <MotionRoot>
           <SmoothScroll />
           <ScrollProgress />
+          <PageScrollbar />
           {children}
           <LazyChat />
           <CookieBanner />

@@ -22,8 +22,8 @@ export function LiveStrip({ connected }: { connected: Partial<Record<Platform, b
   }, [connected, live]);
 
   return (
-    <section aria-labelledby="live-strip" className="mt-8">
-      <h2 id="live-strip" className="eyebrow mb-3 flex items-center gap-2">
+    <section aria-labelledby="live-strip" className="ai-type mt-8">
+      <h2 id="live-strip" className="eyebrow ai-kicker mb-3 flex items-center gap-2">
         <span className="live-dot" aria-hidden="true" /> Live from your accounts
       </h2>
       <ul className="grid gap-3 md:grid-cols-3">

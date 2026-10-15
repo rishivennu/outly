@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Compass, LogOut, Mail } from "lucide-react";
+import { CalendarClock, Compass, Eye, LogOut, Mail, Trophy } from "lucide-react";
 import { startTour } from "@/components/onboarding/Tour";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
@@ -25,6 +25,12 @@ function zones(): string[] {
   return ["UTC", "Asia/Kolkata", "Europe/London", "America/New_York", "America/Los_Angeles", "Asia/Tokyo", "Australia/Sydney"];
 }
 
+const WR_PARTS = [
+  { label: "Views for the week", Ico: Eye },
+  { label: "Your top post", Ico: Trophy },
+  { label: "What's up next", Ico: CalendarClock },
+];
+
 /** Monday summary email on/off. Saves the moment it's flipped. */
 function WeeklyReportCard({ initial }: { initial: boolean }) {
   const toast = useToast();
@@ -44,19 +50,32 @@ function WeeklyReportCard({ initial }: { initial: boolean }) {
     }
   };
   return (
-    <section className="glass flex items-center justify-between gap-4 rounded-[32px] p-6" aria-labelledby="wr-h">
-      <div className="flex items-start gap-3">
-        <Mail className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <div>
-          <h2 id="wr-h" className="text-lg font-semibold">Weekly report</h2>
-          <p id="wr-d" className="text-sm text-muted-foreground">Every Monday at 9 am your time: views, top post and what's scheduled next.</p>
+    <section className="glass flex h-full flex-col rounded-[32px] p-6 sm:p-8" aria-labelledby="wr-h">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-secondary/70 hairline" aria-hidden="true">
+            <Mail className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 id="wr-h" className="text-2xl font-semibold tracking-tight">Weekly report</h2>
+            <p id="wr-d" className="mt-1 text-sm text-muted-foreground">An email every Monday at 9 am your time.</p>
+          </div>
         </div>
+        <label className="flex min-h-[44px] shrink-0 cursor-pointer items-center">
+          <span className="sr-only">Email me a weekly report</span>
+          <input type="checkbox" role="switch" checked={on} disabled={saving} aria-describedby="wr-d" onChange={(e) => flip(e.target.checked)} className="peer sr-only" />
+          <span aria-hidden className="relative h-7 w-12 shrink-0 rounded-full bg-muted transition-colors peer-checked:bg-lime peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-background after:shadow after:transition-transform after:duration-300 peer-checked:after:translate-x-5" />
+        </label>
       </div>
-      <label className="flex shrink-0 cursor-pointer items-center">
-        <span className="sr-only">Email me a weekly report</span>
-        <input type="checkbox" role="switch" checked={on} disabled={saving} aria-describedby="wr-d" onChange={(e) => flip(e.target.checked)} className="peer sr-only" />
-        <span aria-hidden className="relative h-7 w-12 shrink-0 rounded-full bg-muted transition-colors peer-checked:bg-lime peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-background after:shadow after:transition-transform after:duration-300 peer-checked:after:translate-x-5" />
-      </label>
+      <ul className="mt-5 grid flex-1 grid-cols-3 gap-2" aria-label="What's in it">
+        {WR_PARTS.map(({ label, Ico }) => (
+          <li key={label} className={"flex min-h-[84px] flex-col justify-between gap-3 rounded-2xl p-3 hairline transition-opacity " + (on ? "bg-secondary/60" : "bg-secondary/30 opacity-60")}>
+            <Ico className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <span className="text-[13px] font-medium leading-tight">{label}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-[13px] text-muted-foreground" aria-live="polite">{on ? "On. The next one lands Monday morning." : "Off. Flip the switch to get it again."}</p>
     </section>
   );
 }
@@ -176,12 +195,13 @@ export function SettingsView({ weeklyReport = true }: { weeklyReport?: boolean }
         </div>
 
         {!user.workspace && <AvatarPicker />}
-        {!user.workspace && <WeeklyReportCard initial={weeklyReport} />}
         {!user.workspace && <TwoStepCard email={user.email} />}
         <SnippetsCard />
-        <div className={user.workspace ? "lg:col-span-2" : undefined}>
+        {/* Referral and the weekly report share one row so neither leaves a gap beside it. */}
+        <div className={user.workspace ? "grid lg:col-span-2" : "grid"}>
           <ReferralCard />
         </div>
+        {!user.workspace && <WeeklyReportCard initial={weeklyReport} />}
         <div className="lg:col-span-2">
           <TeamCard />
         </div>
