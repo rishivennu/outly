@@ -3,10 +3,12 @@ import { PageHead, Prose, Shell } from "@/components/marketing/bits";
 
 export const metadata: Metadata = {
   title: "Terms",
-  description: "The terms of using Outlly during beta: what you keep, what we are responsible for, and what depends on Instagram, YouTube and X.",
+  description: "The terms of using Outlly: what you keep, plans and billing, and the rules of Instagram, YouTube, X, TikTok, Threads, Facebook and LinkedIn that apply when you publish through us.",
   alternates: { canonical: "/terms" },
-  openGraph: { title: "Terms · Outlly", description: "The terms of using Outlly during beta.", url: "/terms" },
+  openGraph: { title: "Terms · Outlly", description: "The terms of using Outlly.", url: "/terms" },
 };
+
+const ext = { target: "_blank", rel: "noopener noreferrer" } as const;
 
 export default function TermsPage() {
   return (
@@ -14,68 +16,111 @@ export default function TermsPage() {
       <Shell>
         <PageHead
           title="Terms"
-          updated="10 October 2026"
-          lead="Short, specific, and written for a beta product. Using Outlly means these apply to you."
+          updated="15 October 2026"
+          lead="Short and specific. By creating an account or using Outlly, you agree to these terms and to our Privacy page."
         />
 
         <Prose>
-          <h2>Beta software</h2>
+          <h2>Who can use Outlly</h2>
           <p>
-            Outlly is in beta and provided as it is. Features move, limits change, and downtime happens. Do not make Outlly the only copy of
-            anything you care about — keep your source files on your own machine or drive as well.
+            You must be at least 18 and allowed to use every platform you connect. If you use Outlly for a business or a client, you confirm
+            you are allowed to accept these terms for them.
           </p>
+
+          <h2>Your account and your team</h2>
+          <ul>
+            <li>Keep your sign-in details safe. You are responsible for what happens in your studio.</li>
+            <li>If you invite teammates, they act on your behalf within the role you give them. Only you, the owner, can connect or disconnect platform accounts, change billing, or delete the studio.</li>
+            <li>People you ask to review a post through an approval link can see that post until they respond or the link expires.</li>
+          </ul>
 
           <h2>Your content stays yours</h2>
           <p>
-            You keep ownership of everything you upload and everything you publish. You grant us only the permission needed to run the
-            product: to store your file, transcode or inspect it where that is required, generate drafts you asked for, and transmit the post
-            to the platforms you chose.
+            You keep ownership of everything you upload and publish. You give us only the permission needed to run Outlly for you: to store
+            your files, inspect or convert them where that is needed, create the drafts you ask for, and send your posts to the platforms you
+            choose, at the time you choose.
+          </p>
+
+          <h2>Connecting social accounts</h2>
+          <p>
+            When you connect Instagram, YouTube, X, TikTok, Threads, Facebook or LinkedIn, you authorise Outlly to act for you through that
+            platform’s official API, and only to do what you ask: publish or schedule your posts, check their status, show your numbers, and
+            read or reply to comments where Outlly supports it. We never post anything you did not create or schedule. You can disconnect any
+            platform at any time from Accounts, or from the platform’s own settings.
+          </p>
+          <p>Each platform’s own rules apply to everything you publish there, and by publishing through Outlly you agree to them:</p>
+          <ul>
+            <li><strong>YouTube:</strong> by using Outlly’s YouTube features you agree to be bound by the <a href="https://www.youtube.com/t/terms" {...ext}>YouTube Terms of Service</a>, and Google’s handling of your data is covered by the <a href="https://policies.google.com/privacy" {...ext}>Google Privacy Policy</a>.</li>
+            <li><strong>Instagram:</strong> the <a href="https://help.instagram.com/581066165581870" {...ext}>Instagram Terms of Use</a>. Publishing needs an Instagram professional (business or creator) account.</li>
+            <li><strong>Facebook and Threads:</strong> the <a href="https://www.facebook.com/terms.php" {...ext}>Meta Terms</a> and the Threads terms. Facebook publishing needs a Page you manage.</li>
+            <li><strong>TikTok:</strong> the <a href="https://www.tiktok.com/legal/page/global/terms-of-service/en" {...ext}>TikTok Terms of Service</a>. By posting to TikTok through Outlly you agree to TikTok’s <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" {...ext}>Music Usage Confirmation</a>.</li>
+            <li><strong>X:</strong> the <a href="https://x.com/tos" {...ext}>X Terms of Service</a>.</li>
+            <li><strong>LinkedIn:</strong> the <a href="https://www.linkedin.com/legal/user-agreement" {...ext}>LinkedIn User Agreement</a>. Outlly posts to your own profile.</li>
+          </ul>
+          <p>
+            Platforms can reject, limit, label or remove a post, change or withdraw their API, or suspend an account, for reasons we cannot see
+            or control. Access tiers, rate limits and app review decisions belong to them. If a platform withdraws access, that destination
+            stops working until it is restored, and we will tell you in the app.
           </p>
 
           <h2>What you are responsible for</h2>
           <ul>
-            <li>Having the rights to the video, audio, music and likenesses in what you upload.</li>
-            <li>Following each platform&apos;s own rules. Instagram, YouTube and X can reject, limit or remove a post for reasons we have no visibility into.</li>
-            <li>Keeping your account secure, and the content published through any platform account you connect.</li>
-            <li>Not using Outlly for spam, bulk impersonation, or automated posting that breaches a platform&apos;s developer terms.</li>
+            <li>Having the rights to the video, audio, music, brands and people in what you upload.</li>
+            <li>Following the law and each platform’s rules, including their rules on ads, branded content and disclosures.</li>
+            <li>Not using Outlly for spam, impersonation, misleading or harmful content, mass automated posting, or anything that breaks a platform’s developer terms.</li>
+            <li>Not trying to break, overload, reverse engineer or get around the limits of Outlly.</li>
+          </ul>
+
+          <h2>AI features</h2>
+          <p>
+            AI captions, hooks, titles, hashtags, transcripts, reply suggestions and insights are drafts. They can be wrong. Read them before you
+            publish. You are responsible for what you post, whoever or whatever wrote the first draft.
+          </p>
+
+          <h2>Plans and billing</h2>
+          <ul>
+            <li>Outlly has a Free plan and paid plans. Each plan’s price, posts per month, AI features and team seats are shown in Billing before you pay, with taxes where they apply.</li>
+            <li>Paid plans renew automatically at the end of each period until you cancel. Payments are taken by Stripe, Razorpay or PayPal, under their terms.</li>
+            <li>Cancel any time in Billing. You keep your plan until the end of the period you paid for, then your account moves to Free. You can resume before that date.</li>
+            <li>If we change a plan’s price, the price you pay now stays the same until your current period ends, and we tell you before the new price applies.</li>
+            <li>If you were charged by mistake or something did not work, ask from the Pip chat. A person reviews every refund request, and refunds go back to the original payment method.</li>
+            <li>Referral rewards, such as a free month, have no cash value and can be withdrawn if they are abused.</li>
           </ul>
 
           <h2>What we are responsible for</h2>
           <p>
-            Running the service with reasonable care, keeping your uploads private, telling you honestly when a publish fails, and not using
-            your content for anything you did not ask for. We are not responsible for a platform rejecting your post, changing its API,
-            suspending your account there, or for reach and performance of anything you publish.
+            Running Outlly with reasonable care, keeping your uploads private, telling you honestly when a publish fails and why, and not using
+            your content for anything you did not ask for. Outlly is provided as it is. We are not responsible for a platform’s decisions, for
+            the reach or performance of what you publish, or for losses we could not reasonably foresee. As far as the law allows, our total
+            responsibility to you is limited to what you paid us in the 12 months before the problem. Nothing here limits rights you have
+            under consumer law.
           </p>
 
-          <h2>Platform dependencies</h2>
+          <h2>Keep your own copies</h2>
           <p>
-            Publishing works through official platform APIs, and every one of them has conditions outside our control: a professional
-            Instagram account, Google OAuth consent for YouTube uploads, and an X developer app on a tier that allows media posting. Access
-            tiers, rate limits and review decisions belong to those platforms. If one of them withdraws access, that destination stops
-            working until it is restored.
-          </p>
-
-          <h2>Price</h2>
-          <p>
-            Outlly is free during beta. There are no paid plans on sale. If that changes, you will see the price and the terms before anything
-            is charged, and a beta account will never be billed without an explicit opt-in.
+            Features change, limits change, and downtime happens. Do not make Outlly the only copy of anything you care about. Keep your source
+            files on your own device or drive as well.
           </p>
 
           <h2>Ending it</h2>
           <p>
-            You can delete your account whenever you like, and your media and posts go with it. We may suspend an account that is breaking
-            these terms or a platform&apos;s developer terms, and we will say why where we are allowed to.
+            You can stop using Outlly and ask us to delete your account at any time, as described on the <a href="/privacy#data-deletion">Privacy page</a>.
+            We may suspend or close an account that breaks these terms or a platform’s rules, and we will tell you why where we are allowed to.
+            If we ever close Outlly, we will give you notice and time to download your files.
           </p>
 
           <h2>Changes</h2>
           <p>
-            These terms will change as the product leaves beta. The date at the top tells you when they last did, and material changes are
-            announced in the app.
+            When these terms change, the date at the top moves, and material changes are announced in the app before they apply. Using
+            Outlly after that means you accept the new terms.
           </p>
+
+          <h2>Law</h2>
+          <p>These terms are governed by the laws of India, and the courts of India have jurisdiction, without taking away protections your local law gives you.</p>
 
           <h2>Questions</h2>
           <p>
-            Anything unclear here is worth asking about — use the <a href="/contact">contact page</a>.
+            Anything unclear here is worth asking about. Use the <a href="/contact">contact page</a> or Pip, the chat in the corner.
           </p>
         </Prose>
       </Shell>

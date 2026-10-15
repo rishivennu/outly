@@ -26,3 +26,10 @@ export function rateLimit(key: string, limit: number, windowMs: number) {
   store.set(key, b);
   return { ok: true as const, remaining: limit - b.hits.length };
 }
+
+/** Is the key over its limit right now? Reads only, records nothing (pair with rateLimit() on failures). */
+export function isLimited(key: string, limit: number, windowMs: number) {
+  const now = Date.now();
+  const b = store.get(key);
+  return !!b && b.hits.filter((t) => now - t < windowMs).length >= limit;
+}

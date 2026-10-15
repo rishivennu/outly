@@ -11,7 +11,7 @@ export const metadata = { title: "Ticket" };
 
 export default async function TicketPage({ params }: { params: { id: string } }) {
   await requireAdmin("tickets");
-  const t = await db.ticket.findUnique({ where: { id: params.id }, include: { messages: { orderBy: { createdAt: "asc" } }, user: { select: { name: true, email: true, createdAt: true, subscriptions: { where: { status: "active" }, take: 1, include: { plan: true } }, payments: { orderBy: { createdAt: "desc" }, take: 3 } } } } });
+  const t = await db.ticket.findUnique({ where: { id: params.id }, include: { messages: { orderBy: { createdAt: "asc" } }, user: { select: { name: true, email: true, avatar: true, createdAt: true, subscriptions: { where: { status: "active" }, take: 1, include: { plan: true } }, payments: { orderBy: { createdAt: "desc" }, take: 3 } } } } });
   if (!t) notFound();
   const sub = t.user?.subscriptions[0];
   return (
@@ -19,7 +19,7 @@ export default async function TicketPage({ params }: { params: { id: string } })
       <Link href="/admin/tickets" className="mb-4 inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[13px] text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden />All tickets</Link>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <TicketThread
-          ticket={{ id: t.id, ref: t.ref, subject: t.subject, status: t.status, priority: t.priority, email: t.email, name: t.name, source: t.source, createdAt: t.createdAt.toISOString() }}
+          ticket={{ avatar: t.user?.avatar ?? null, id: t.id, ref: t.ref, subject: t.subject, status: t.status, priority: t.priority, email: t.email, name: t.name, source: t.source, createdAt: t.createdAt.toISOString() }}
           messages={t.messages.map((m) => ({ id: m.id, author: m.author, authorName: m.authorName, body: m.body, createdAt: m.createdAt.toISOString() }))}
         />
         <Card className="self-start">

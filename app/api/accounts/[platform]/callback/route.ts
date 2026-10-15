@@ -6,10 +6,11 @@ import { isPlatform } from "@/lib/domain";
 import { getPublisher, loadKeys } from "@/lib/social/registry";
 import { takeOAuthState } from "@/lib/oauth-state";
 import { invalidateDashboards } from "@/lib/live";
-import { createSession } from "@/lib/auth";
+import { beginSignIn } from "@/lib/otp/two-factor";
 import { signInWithGoogle } from "@/lib/auth-provider";
 import { HttpError } from "@/lib/http";
 import { attachReferral } from "@/lib/referral";
+import { attachSource } from "@/lib/growth/source";
 import { YouTubePublisher, googleIdentity } from "@/lib/social/youtube";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,9 @@ export async function GET(req: NextRequest, { params }: { params: { platform: st
   const pending = takeOAuthState(p, req.nextUrl.searchParams.get("state"));
   if (pending?.mode === "login" && p === "youtube") return googleSignIn(req, pending.returnTo);
   const user = await getCurrentUser();
+  // A Google sign-in whose state cookie is gone (other tab, expired after 10 min, or started on another
+  // domain than APP_URL) used to drop the visitor on /login with no word of what happened. Say it.
+  if (!user && !pending && p === "youtube") return NextResponse.redirect(new URL(`/login?google_error=${req.nextUrl.searchParams.get("error") === "access_denied" ? "access_denied" : "state"}`, env.APP_URL));
   if (!user) return NextResponse.redirect(new URL("/login", env.APP_URL));
   const back = (q: string) => NextResponse.redirect(new URL(`${pending?.returnTo ?? "/accounts"}${(pending?.returnTo ?? "").includes("?") ? "&" : "?"}${q}`, env.APP_URL));
   if (!pending) return back(`connect_error=${p}&reason=state`);
@@ -51,7 +55,14 @@ async function googleSignIn(req: NextRequest, returnTo: string) {
     if (!who.email || who.email_verified === false) return fail("unverified");
     const user = await signInWithGoogle({ email: who.email, name: who.name, picture: who.picture });
     if (user.created) await attachReferral(user.id).catch((e) => console.error("[referral] attach", e));
-    await createSession(user.id);
+    if (user.created) await attachSource(user.id).catch((e) => console.error("[growth] source", e));
+    // Authenticator on: Google was the first step only. No session (and no channel link) until the app code.
+    if ((await beginSignIn(user.id)).twoFactor) {
+      const half = new URL("/login", env.APP_URL);
+      half.searchParams.set("step", "2fa");
+      if (returnTo && returnTo !== "/home") half.searchParams.set("next", returnTo);
+      return NextResponse.redirect(half);
+    }
     const channel = await yt.channelProfile(tok).catch((e) => {
       console.error("[google sign-in] channel", e);
       return undefined;
@@ -67,7 +78,22 @@ async function googleSignIn(req: NextRequest, returnTo: string) {
   } catch (e) {
     // Waitlist on and this Google account has no invite yet: send them to join the line.
     if (e instanceof HttpError && e.code === "waitlist") return NextResponse.redirect(new URL("/waitlist?from=google", env.APP_URL));
-    console.error("[google sign-in]", e);
-    return fail("exchange");
+    // Maintenance: members still get in (they already have an account), but no new account is made.
+    if (e instanceof HttpError && e.code === "maintenance") return fail("maintenance");
+    console.error("[google sign-in]", e, (e as { technical?: string }).technical ?? "");
+    return fail(googleReason(e));
   }
+}
+
+/**
+ * Turn Google's token-endpoint answer into a reason the login page can explain, so the screen says
+ * which setting is wrong instead of a generic "couldn't finish the handshake".
+ */
+function googleReason(e: unknown) {
+  const t = `${(e as { technical?: string })?.technical ?? ""} ${(e as Error)?.message ?? ""}`;
+  if (/invalid_client|unauthorized_client/i.test(t)) return "config"; // client ID / secret pair wrong or for another project
+  if (/redirect_uri_mismatch/i.test(t)) return "redirect";
+  if (/invalid_grant/i.test(t)) return "state"; // code already used or expired: start again
+  if (/prisma|database|ECONNREFUSED|P10\d\d|P20\d\d/i.test(t)) return "server";
+  return "exchange";
 }

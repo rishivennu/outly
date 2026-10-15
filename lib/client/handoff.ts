@@ -20,3 +20,19 @@ export function validateVideoFile(f: File): string | null {
   if (f.size > MAX_MB * 1024 * 1024) return `That's a big one. Keep it under ${MAX_MB} MB.`;
   return null;
 }
+
+/** A video shared to Outlly from the phone's share sheet, kept by the service worker (public/sw.js). Read once. */
+export async function takeSharedFile(): Promise<File | null> {
+  if (typeof caches === "undefined") return null;
+  try {
+    const c = await caches.open("outly-share");
+    const res = await c.match("/__shared-media");
+    if (!res) return null;
+    await c.delete("/__shared-media");
+    const blob = await res.blob();
+    const name = decodeURIComponent(res.headers.get("x-name") ?? "shared-video.mp4");
+    return new File([blob], name, { type: res.headers.get("content-type") || blob.type || "video/mp4" });
+  } catch {
+    return null;
+  }
+}

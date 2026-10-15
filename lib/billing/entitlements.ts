@@ -13,7 +13,9 @@ export interface Entitlements {
 
 /** What this account's plan allows: its active subscription's plan, else the Free plan, else no limits. */
 export async function entitlements(userId: string): Promise<Entitlements> {
-  const sub = await db.subscription.findFirst({ where: { userId, status: "active", currentPeriodEnd: { gt: new Date() } }, include: { plan: true }, orderBy: { createdAt: "desc" } });
+  const now = new Date();
+  // A paused plan rests: Free limits until pausedUntil, then the frozen paid days run again.
+  const sub = await db.subscription.findFirst({ where: { userId, status: "active", currentPeriodEnd: { gt: now }, OR: [{ pausedUntil: null }, { pausedUntil: { lte: now } }] }, include: { plan: true }, orderBy: { createdAt: "desc" } });
   let plan = sub?.plan ?? null;
   if (!plan) {
     await ensurePlans();

@@ -3,6 +3,7 @@ import { signUp } from "@/lib/auth-provider";
 import { json, route } from "@/lib/http";
 import { signupSchema } from "@/lib/validation";
 import { attachReferral } from "@/lib/referral";
+import { attachSource } from "@/lib/growth/source";
 import { assertMayCreateAccount } from "@/lib/site";
 
 export const POST = route(
@@ -13,6 +14,7 @@ export const POST = route(
     await assertMayCreateAccount(body.email);
     const user = await signUp(body.name, body.email, body.password);
     await attachReferral(user.id).catch((e) => console.error("[referral] attach", e));
+    await attachSource(user.id).catch((e) => console.error("[growth] source", e));
     await createSession(user.id);
     return json({ ok: true });
   },

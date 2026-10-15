@@ -9,6 +9,7 @@ import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import type { Platform } from "@/lib/domain";
 import { connectedPlatforms } from "@/lib/live/connected";
 import { canConnectWithToken, hasCredentials, loadKeys } from "@/lib/social/registry";
+import { ProfileReview } from "@/components/analytics/ProfileReview";
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
 import { WelcomeSubscribe, type WelcomeOffer } from "@/components/onboarding/WelcomeSubscribe";
 import { entitlements } from "@/lib/billing/entitlements";
@@ -16,6 +17,11 @@ import { listPlans } from "@/lib/billing/plans";
 import { visitorCurrency } from "@/lib/billing/visitor";
 import { localPrice } from "@/lib/billing/currency";
 import { formatMoney } from "@/lib/billing/money";
+import { homeRetention } from "@/lib/retention/home";
+import { NextSteps } from "@/components/home/NextSteps";
+import { GoalRing } from "@/components/home/GoalRing";
+import { IdeaBank } from "@/components/home/IdeaBank";
+import { RecycleCard } from "@/components/home/RecycleCard";
 
 const NEW_FOR_DAYS = 14;
 
@@ -44,12 +50,19 @@ export const metadata = { title: "Home" };
 export default async function HomePage() {
   const user = (await getCurrentUser())!;
   await loadKeys();
-  const [drafts, next, live, welcome] = await Promise.all([
+  const me = await db.user.findUnique({ where: { id: user.id }, select: { postingGoal: true } });
+  const [drafts, next, live, welcome, published, ret] = await Promise.all([
     db.post.findMany({ where: { userId: user.id, status: "draft" }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() } }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),
     connectedPlatforms(user.id),
     welcomeOffer(user).catch(() => null),
+    db.post.count({ where: { userId: user.id, status: { in: ["published", "partial"] } } }),
+    homeRetention({ id: user.id, postingGoal: me?.postingGoal ?? 3, timezone: user.timezone }).catch((e) => {
+      console.error("[home] retention", e);
+      return null;
+    }),
   ]);
+  const started = Object.values(live).some(Boolean) || published > 0;
   const setup = {
     connected: { instagram: !!live.instagram, youtube: !!live.youtube },
     instagram: { oauth: hasCredentials("instagram"), token: canConnectWithToken("instagram") },
@@ -66,6 +79,23 @@ export default async function HomePage() {
       <HomeHero firstName={user.name.split(" ")[0]} />
       <SetupChecklist state={setup} />
       {welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} />}
+      {started && ret && (
+        <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-4 sm:px-10 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          {ret.steps.length > 0 ? <NextSteps steps={ret.steps} /> : <div className="hidden md:block" />}
+          <GoalRing goal={ret.goal} scheduled={ret.scheduledThisWeek} canEdit={!user.actor} />
+        </div>
+      )}
+      {started && (
+        <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-10 sm:px-10 md:grid-cols-2">
+          <IdeaBank />
+          {ret && ret.recycle.length > 0 && <RecycleCard posts={ret.recycle} />}
+        </div>
+      )}
+      {started && (
+        <div className="mx-auto max-w-5xl px-5 pb-10 sm:px-10">
+          <ProfileReview compactMode />
+        </div>
+      )}
       {(dv.length > 0 || nv) && (
         <section aria-label="Pick up where you left off" className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-20 sm:px-10 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
           {dv.length > 0 && (

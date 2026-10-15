@@ -167,6 +167,9 @@ async function failTarget(targetId: string, postId: string, err: unknown) {
     const t = await db.postTarget.findUnique({ where: { id: targetId }, select: { socialAccountId: true } });
     if (t?.socialAccountId) await db.socialAccount.update({ where: { id: t.socialAccountId }, data: { status: "needs_reconnect" } });
   }
+  // Tell the creator in the app (and by email once per post). A notice failure never hides the real one.
+  const { noticeFailedTarget } = await import("../retention/notices");
+  await noticeFailedTarget(targetId, pe.code).catch((e) => console.error("[notice]", e));
 }
 
 /** Retry transient failures with exponential backoff, otherwise surface to the creator. */

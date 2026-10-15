@@ -17,14 +17,22 @@ export default async function CreatePage({ searchParams }: { searchParams: Recor
       post = null;
     }
   }
+  // A story to start from: text shared from another app, or an idea picked from the idea bank on Home.
+  let initialStory: string | null = null;
+  if (!post && searchParams.idea) {
+    const idea = await db.idea.findFirst({ where: { id: searchParams.idea, userId: user.id }, select: { text: true } });
+    initialStory = idea?.text ?? null;
+  } else if (!post && searchParams.text) initialStory = searchParams.text.slice(0, 600);
   return (
     <CreateWorkspace
-      key={post?.id ?? "new"}
+      key={post?.id ?? searchParams.idea ?? "new"}
       accounts={accounts.map(accountView)}
       initialPost={post}
       tz={user.timezone}
       connected={searchParams.connected ?? null}
       connectError={searchParams.connect_error ?? null}
+      initialStory={initialStory}
+      shared={searchParams.shared ?? null}
     />
   );
 }

@@ -1,9 +1,10 @@
+import { ADMIN_ROLES } from "@/lib/admin/perms";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { json, HttpError } from "@/lib/http";
 import { adminRoute } from "@/lib/admin/route";
 
-const Patch = z.object({ role: z.enum(["super", "finance", "support"]).optional(), active: z.boolean().optional() });
+const Patch = z.object({ role: z.enum(ADMIN_ROLES).optional(), active: z.boolean().optional() });
 
 /** Guard: there must always be at least one active super admin, or nobody can manage the team. */
 async function keepsASuper(id: string, next: { role?: string; active?: boolean } | "delete") {

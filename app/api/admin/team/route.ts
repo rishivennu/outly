@@ -1,3 +1,4 @@
+import { ADMIN_ROLES } from "@/lib/admin/perms";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { json, HttpError } from "@/lib/http";
@@ -7,7 +8,7 @@ import { hashAdminPassword } from "@/lib/admin/auth";
 const Create = z.object({
   name: z.string().trim().min(1).max(60),
   login: z.string().trim().toLowerCase().regex(/^[a-z0-9._@-]{3,60}$/, "Login: 3-60 letters, numbers, dots or dashes"),
-  role: z.enum(["super", "finance", "support"]),
+  role: z.enum(ADMIN_ROLES),
   password: z.string().min(8, "Use at least 8 characters for new admins").max(200),
 });
 

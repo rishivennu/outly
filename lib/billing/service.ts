@@ -11,6 +11,7 @@ import { issueInvoice } from "./invoice";
 import { sendEmail, templates } from "../email";
 import { mock, paypal, razorpay, stripe, type CheckoutStart } from "./providers";
 import { rewardReferrer } from "../referral";
+import { isPaused, pausePlan, resumePlan } from "./pause";
 
 /** Which gateway serves checkout right now. Falls back to mock if the chosen one is missing keys, and says so. */
 export async function activeGateway() {
@@ -147,6 +148,21 @@ export async function resumeSubscription(userId: string) {
   const s = await db.subscription.findFirst({ where: { userId, status: "active", cancelAtPeriodEnd: true } });
   if (!s) throw new HttpError(404, "Nothing to resume.", "NO_SUBSCRIPTION");
   await db.subscription.update({ where: { id: s.id }, data: { cancelAtPeriodEnd: false } });
+}
+
+/** Pause instead of cancel: the plan rests (Free limits apply) and the unused paid days come back after. */
+export async function pauseSubscription(userId: string, months: number, now = new Date()) {
+  const s = await db.subscription.findFirst({ where: { userId, status: "active", priceMinor: { gt: 0 }, currentPeriodEnd: { gt: now } }, include: { plan: true }, orderBy: { createdAt: "desc" } });
+  if (!s) throw new HttpError(404, "You don't have an active paid plan.", "NO_SUBSCRIPTION");
+  if (isPaused(s, now)) throw new HttpError(409, "Your plan is already paused.", "ALREADY_PAUSED");
+  const p = pausePlan(now, s.currentPeriodEnd, months);
+  await db.subscription.update({ where: { id: s.id }, data: { pausedUntil: p.pausedUntil, currentPeriodEnd: p.periodEnd, cancelAtPeriodEnd: false } });
+  return { ...s, ...p };
+}
+export async function unpauseSubscription(userId: string, now = new Date()) {
+  const s = await db.subscription.findFirst({ where: { userId, status: "active", pausedUntil: { gt: now } } });
+  if (!s) throw new HttpError(404, "Your plan isn't paused.", "NOT_PAUSED");
+  await db.subscription.update({ where: { id: s.id }, data: { pausedUntil: null, currentPeriodEnd: resumePlan(now, s.pausedUntil!, s.currentPeriodEnd).periodEnd } });
 }
 
 /** Lazy expiry: called when billing is read, so no cron is needed for cancel-at-period-end. */

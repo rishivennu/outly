@@ -13,7 +13,7 @@ const EXTRA: { category: string; q: string; a: string }[] = [
   { category: "Payments", q: "Can I get a refund?", a: "If you were charged by mistake or something did not work, ask our team from this chat and a person will review it. Refunds go back to the original payment method." },
   { category: "Account", q: "How do I reset my password?", a: "On the sign-in page choose Forgot password, or sign in with Google if that is how you joined. If you no longer have access to the email, contact us from this chat." },
   { category: "Account", q: "How do I change the email on my account?", a: "Email changes need a quick identity check, so ask from this chat and our team will handle it." },
-  { category: "Account", q: "How do I delete my account?", a: "Go to Settings and choose Delete account. Your uploads and posts are removed and active plans are cancelled. This can't be undone." },
+  { category: "Account", q: "How do I delete my account?", a: "Ask from this chat, or the contact page, using your account email. We confirm it is you, cancel any active plan, and delete your account, uploads, posts and connected accounts within 30 days. This can't be undone. To only stop Outlly posting somewhere, disconnect that platform in Accounts instead." },
   { category: "Technical", q: "My upload is stuck. What can I do?", a: "Check the file is MP4 or MOV and under the size limit of your plan, then retry. Big uploads resume where they left off, so a dropped connection doesn't mean starting over." },
 ];
 
@@ -30,8 +30,21 @@ async function renameBrandInFaq() {
   }
 }
 
+/** 10-15: there is no self-serve "Delete account" button; seeded rows that still promise one get the real steps. Admin-edited rows are left alone. */
+const OLD_DELETE = "Go to Settings and choose Delete account. Your uploads and posts are removed and active plans are cancelled. This can't be undone.";
+async function fixDeleteAnswer() {
+  if (await db.setting.findUnique({ where: { key: "migrate:faq-delete-1015" }, select: { key: true } })) return;
+  const won = await db.setting.create({ data: { key: "migrate:faq-delete-1015", value: new Date().toISOString() } }).then(() => true, () => false);
+  if (!won) return;
+  const answer = EXTRA.find((f) => f.q === "How do I delete my account?")?.a;
+  if (answer) await db.faqItem.updateMany({ where: { answer: OLD_DELETE }, data: { answer } });
+}
+
 export async function ensureFaq() {
-  if ((await db.faqItem.count()) > 0) return renameBrandInFaq();
+  if ((await db.faqItem.count()) > 0) {
+    await renameBrandInFaq();
+    return fixDeleteAnswer();
+  }
   // a unique-key lock row: if two processes race (parallel build workers), only one seeds
   const won = await db.setting.create({ data: { key: "seed:faq", value: new Date().toISOString() } }).then(() => true, () => false);
   if (!won) return;
