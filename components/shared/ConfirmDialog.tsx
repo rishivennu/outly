@@ -13,13 +13,17 @@ interface Props {
   busy?: boolean;
   tone?: "danger" | "primary";
   onConfirm: () => void;
+  /** optional content between the text and the buttons (e.g. a softer alternative) */
+  extra?: React.ReactNode;
+  /** "wide" fits a small form (e.g. an email composer) */
+  size?: "default" | "wide";
 }
 
 /**
  * Small glass confirmation for destructive actions. Radix gives it the focus
  * trap, Escape handling and aria-modal; the cancel button keeps initial focus.
  */
-export function ConfirmDialog({ open, onOpenChange, title, body, confirmLabel, cancelLabel = "Keep it", busy, tone = "danger", onConfirm }: Props) {
+export function ConfirmDialog({ open, onOpenChange, title, body, confirmLabel, cancelLabel = "Keep it", busy, tone = "danger", onConfirm, extra, size = "default" }: Props) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <AnimatePresence>
@@ -41,10 +45,11 @@ export function ConfirmDialog({ open, onOpenChange, title, body, confirmLabel, c
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ type: "spring", stiffness: 460, damping: 36 }}
-                  className="glass-strong w-full max-w-[420px] rounded-[28px] p-5 sm:p-6"
+                  className={`glass-strong w-full ${size === "wide" ? "max-w-[580px]" : "max-w-[420px]"} rounded-[28px] p-5 sm:p-6`}
                 >
                   <Dialog.Title className="text-lg font-semibold tracking-tight [overflow-wrap:anywhere]">{title}</Dialog.Title>
                   <Dialog.Description className="mt-2 text-sm text-muted-foreground [overflow-wrap:anywhere]">{body}</Dialog.Description>
+                  {extra}
                   <div className="mt-6 flex flex-wrap-reverse gap-2">
                     <Dialog.Close asChild>
                       <Button variant="ghost" className="min-w-[8rem] flex-1" autoFocus>

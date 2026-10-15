@@ -4,9 +4,11 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowUpRight, BarChart3, CreditCard, LifeBuoy, CalendarDays, ClipboardCheck, Globe, Home, LayoutGrid, MessagesSquare, Plus, Settings, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
 import { ThemeCycleButton, ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useUser } from "./UserContext";
+import { NoticesBell } from "./NoticesBell";
 
 const MAIN = [
   { href: "/home", label: "Home", icon: Home },
@@ -86,14 +88,14 @@ export function Sidebar() {
           <ThemeToggle compact plain className="mb-1 mt-2 self-start" />
           <div className="mt-2 flex items-center gap-2 rounded-2xl p-1.5 hairline">
             <Link href="/settings" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl p-1 hover:bg-secondary/60">
-              <span className="lime-bg grid h-9 w-9 shrink-0 place-items-center rounded-full font-display text-[13px] font-bold" aria-hidden="true">
-                {(user.workspace?.me.name ?? user.name).split(" ").map((p) => p[0]).slice(0, 2).join("")}
-              </span>
+              {/* Teammates get their own stable orb; the owner's saved avatar is theirs alone. */}
+              <OrbAvatar avatar={user.workspace ? null : user.avatar} seed={user.workspace?.me.email ?? user.email} size={36} />
               <span className="min-w-0">
                 <span className="block truncate text-[13px] font-semibold">{user.workspace?.me.name ?? user.name}</span>
                 <span className="block truncate text-[11.5px] text-muted-foreground">{user.workspace ? `In ${user.workspace.ownerName}'s studio` : user.email}</span>
               </span>
             </Link>
+            <NoticesBell placement="side" />
           </div>
         </div>
       </aside>
@@ -124,7 +126,7 @@ export function MobileNav() {
 export function MobileTopBar() {
   const { workspace } = useUser();
   return (
-    <div className="sticky top-0 z-30 flex items-center justify-between gap-2 px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] lg:hidden">
+    <header className="sticky top-0 z-30 flex items-center justify-between gap-2 px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] lg:hidden">
       <Link href="/home" className="flex min-w-0 shrink-0 items-center gap-2 rounded-2xl py-1 text-[16px]" aria-label="Outlly dashboard">
         <OutlyMark size={26} className="min-[480px]:hidden" />
         <OutlyLogo className="hidden min-[480px]:inline-flex" />
@@ -140,6 +142,7 @@ export function MobileTopBar() {
         )}
         {/* One cycling button: the three-way switch made the row wider than a phone (10-12f). */}
         <ThemeCycleButton />
+        <NoticesBell placement="below" />
         <Link href="/approvals" data-tour="approvals" aria-label="Approvals" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary">
           <ClipboardCheck className="h-[18px] w-[18px]" />
         </Link>
@@ -152,6 +155,6 @@ export function MobileTopBar() {
           <Settings className="h-[18px] w-[18px]" />
         </Link>
       </div>
-    </div>
+    </header>
   );
 }

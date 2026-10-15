@@ -28,6 +28,14 @@ model User {
   referredById String? // who invited this user (one free month each time a referral signs up)
   weeklyReport Boolean   @default(true) // Monday summary email
   lastReportAt DateTime?
+  postingGoal  Int       @default(3) // posts per week the creator aims for (0 = no goal)
+  nudgeAt      DateTime? // last "you're behind this week" nudge
+  winbackAt    DateTime? // last win-back email after going quiet
+  signupSource String? // first campaign link they arrived on: "source/medium/campaign", "referral" or "direct"
+  totpSecret    String? // authenticator key (base32), AES-256-GCM encrypted. Saved at setup; live once totpEnabledAt is set
+  totpEnabledAt DateTime?
+  totpLastStep  Int? // last accepted 30-second step, so one code can't be used twice
+  recoveryCodes String? // JSON array of hashed one-time recovery codes
 
   socialAccounts SocialAccount[]
   media          Media[]
@@ -39,6 +47,25 @@ model User {
   activity       UserActivityDay[]
   teamMembers    TeamMember[]      @relation("TeamOwner")
   seats          TeamMember[]      @relation("TeamSeat")
+  notices        Notice[]
+  snippets       Snippet[]
+  ideas          Idea[]
+}
+
+/// One-time sign-in codes sent by email. Only a keyed hash of the code is stored; no link to User, so a
+/// request for an unknown address looks exactly like one for a real account.
+model OtpCode {
+  id        String    @id @default(cuid())
+  email     String
+  purpose   String // login
+  codeHash  String
+  attempts  Int       @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email, purpose])
+  @@index([expiresAt])
 }
 
 model SocialAccount {
@@ -219,6 +246,7 @@ model Subscription {
   currentPeriodEnd DateTime
   cancelAtPeriodEnd Boolean  @default(false)
   canceledAt       DateTime?
+  pausedUntil      DateTime? // "pause for a month" instead of cancelling: no renewal charge until then
   sample           Boolean   @default(false)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -421,4 +449,54 @@ model WaitlistEntry {
   invitedAt DateTime?
 
   @@index([invitedAt, createdAt])
+}
+
+/// In-app alerts (reconnect, failed post, goal nudge). `key` dedupes, so a sweep can run every minute safely.
+model Notice {
+  id        String    @id @default(cuid())
+  userId    String
+  kind      String // token_expiring | post_failed | reconnect | goal_nudge | recycle
+  tone      String    @default("info") // info | warn | danger
+  title     String
+  body      String
+  href      String?
+  action    String? // button label
+  key       String    @unique
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+/// Reusable bits a creator builds up over time: caption presets, hashtag sets, templates, brand kit.
+model Snippet {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String // caption | hashtags | template | brand
+  name      String
+  body      String
+  uses      Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind])
+}
+
+/// Idea bank. Ideas come from the creator or from a comment in the inbox.
+model Idea {
+  id        String    @id @default(cuid())
+  userId    String
+  text      String
+  source    String    @default("manual") // manual | comment | suggestion
+  sourceRef String? // comment id or permalink
+  doneAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, doneAt])
 }

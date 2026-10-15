@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
+import { SRC_COOKIE, SRC_DAYS, sourceFromParams } from "./lib/growth/core";
 
 const AUTH_PAGES = ["/login", "/signup"];
 // Marketing pages anyone can read.
@@ -91,6 +92,10 @@ export async function middleware(req: NextRequest) {
   const res = await route(req);
   // The old admin-only notice bar is gone; clear its cookie from browsers that still have it.
   if (req.cookies.get("outlly_af")) res.cookies.delete("outlly_af");
+  // Campaign links (Growth page): remember the FIRST utm link a visitor arrived on, for 30 days,
+  // so signup can credit the channel. Never overwritten by a later link.
+  const src = req.cookies.get(SRC_COOKIE) ? null : sourceFromParams(req.nextUrl.searchParams);
+  if (src) res.cookies.set(SRC_COOKIE, src, { path: "/", httpOnly: true, sameSite: "lax", secure: req.nextUrl.protocol === "https:", maxAge: 60 * 60 * 24 * SRC_DAYS });
   return res;
 }
 

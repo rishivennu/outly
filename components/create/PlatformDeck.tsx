@@ -11,6 +11,7 @@ import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn } from "@/lib/utils";
 import { InstagramReel, XPost, YouTubeShort } from "./Previews";
+import { SnippetBar } from "./SnippetBar";
 import { enabledPlatforms, launchGate } from "./publish";
 import type { AccountView, Draft } from "./types";
 
@@ -28,7 +29,7 @@ interface Props {
   onHook: (h: string) => void;
 }
 
-const READY_LABEL: Record<Platform, string> = { instagram: "Ready ✨", youtube: "Wants a stronger title 👀", x: "Make it impossible to ignore", tiktok: "Hook in the first second", threads: "Keep it conversational", facebook: "Ready for the feed", linkedin: "Lead with the lesson" };
+const READY_LABEL: Record<Platform, string> = { instagram: "Ready to go", youtube: "Wants a stronger title", x: "Make it impossible to ignore", tiktok: "Hook in the first second", threads: "Keep it conversational", facebook: "Ready for the feed", linkedin: "Lead with the lesson" };
 
 const SURFACE: Record<Platform, string> = {
   instagram: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(330_85%_62%/0.16),transparent_60%),radial-gradient(100%_80%_at_100%_100%,hsl(30_95%_60%/0.10),transparent_60%)]",
@@ -224,7 +225,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
           <div className="flex items-start gap-2.5 rounded-2xl bg-accent/10 px-4 py-3 text-[14.5px]">
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
             <span>
-              {pl === "youtube" ? "YouTube wants a stronger title 👀 I wrote one that people actually search for." : pl === "x" ? "Let's make this impossible to ignore. Short, sharp, no hashtags." : "Instagram is ready ✨ Warm caption, a question to get comments, and tags that travel."}
+              {pl === "youtube" ? "YouTube wants a stronger title. I wrote one that people actually search for." : pl === "x" ? "Let's make this impossible to ignore. Short, sharp, no hashtags." : "Instagram is ready. Warm caption, a question to get comments, and tags that travel."}
             </span>
           </div>
         )}
@@ -272,6 +273,13 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
               <Input id={`${id}-tags`} value={d.hashtags} onChange={(e) => set({ hashtags: e.target.value })} placeholder="#oneidea #anotherone" />
             </div>
           )}
+          <SnippetBar
+            caption={pl === "youtube" ? d.description : d.caption}
+            hashtags={d.hashtags}
+            showTags={pl !== "x"}
+            onCaption={(v) => set(pl === "youtube" ? { description: v } : { caption: v })}
+            onTags={(v) => set({ hashtags: v })}
+          />
         </fieldset>
 
         <ul className="space-y-1.5" aria-label="Checks">

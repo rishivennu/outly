@@ -143,7 +143,7 @@ export function Assistant(p: Props) {
         {result && (
           <>
             <Bubble from="outly">
-              <span className="font-semibold">Oh, I like this one. 👀</span> {result.understood}
+              <span className="font-semibold">Oh, I like this one.</span> {result.understood}
               <span className="mt-2 block text-muted-foreground">{result.insight}</span>
             </Bubble>
 

@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { ExternalLink, MessagesSquare, RefreshCw, Send, Sparkles } from "lucide-react";
+import { ExternalLink, Lightbulb, MessagesSquare, RefreshCw, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
@@ -129,7 +129,20 @@ function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: 
   const [err, setErr] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<{ label: string; text: string }[] | null>(null);
   const [thinking, setThinking] = useState(false);
+  const [saved, setSaved] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const toast = useToast();
+
+  // A question in the comments is often the next video. Keep it in the idea bank on Home.
+  const saveIdea = async () => {
+    try {
+      const r = await api<{ existed?: boolean }>("/api/ideas", { method: "POST", json: { text: `Answer ${comment.authorName}: ${comment.text}`.slice(0, 500), source: "comment", sourceRef: `${comment.platform}:${comment.id}`.slice(0, 300) } });
+      setSaved(true);
+      toast(r.existed ? "Already in your idea bank" : "Saved to your idea bank on Home", "ok");
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Couldn't save it", "error");
+    }
+  };
 
   const suggest = async () => {
     setThinking(true);
@@ -184,13 +197,16 @@ function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: 
             <span className="text-xs font-normal text-muted-foreground">{new Date(comment.createdAt).toLocaleString()}</span>
           </p>
           <p className="mt-1 whitespace-pre-wrap text-[15px]">{comment.text}</p>
-          <p className="mt-1 truncate text-xs text-muted-foreground">
-            on {comment.postTitle ?? "a post"}
+          <p className="mt-1 flex min-w-0 items-center text-xs text-muted-foreground">
+            <span className="truncate">on {comment.postTitle ?? "a post"}</span>
             {comment.postUrl && (
               <a href={comment.postUrl} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex items-center gap-1 underline">
                 Open <ExternalLink className="h-3 w-3" />
               </a>
             )}
+            <button type="button" onClick={saveIdea} disabled={saved} aria-label={saved ? "Saved as an idea" : `Save ${comment.authorName}'s comment as a video idea`} className="ml-auto inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-full px-3 font-medium text-foreground hover:bg-secondary disabled:text-muted-foreground">
+              <Lightbulb className="h-3.5 w-3.5" aria-hidden="true" /> {saved ? "Saved" : "Save as idea"}
+            </button>
           </p>
 
           {(comment.replies ?? []).length > 0 && (

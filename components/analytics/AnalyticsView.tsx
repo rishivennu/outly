@@ -15,6 +15,7 @@ import type { AnalyticsSummary } from "@/lib/analytics";
 import type { Platform } from "@/lib/domain";
 import { PlatformTabs } from "./PlatformTabs";
 import { LiveStrip } from "./LiveStrip";
+import { ProfileReview } from "./ProfileReview";
 
 const RANGES = [
   { d: 7, label: "7 days", phrase: "this week" },
@@ -61,6 +62,7 @@ export function AnalyticsView({ initial, connected }: { initial: AnalyticsSummar
       <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-14">
         <PlatformTabs connected={connected} />
         <LiveStrip connected={connected} />
+        <ProfileReview />
         <div className="flex min-h-[46dvh] flex-col items-center justify-center px-6 text-center">
           <Icon3D name="analytics" size={104} className="animate-bob mb-7" />
           <h1 className="display text-[clamp(2.2rem,5vw,3.2rem)]">Nothing published through Outlly yet.</h1>
@@ -87,6 +89,7 @@ export function AnalyticsView({ initial, connected }: { initial: AnalyticsSummar
     <div className={cn("px-5 pb-16 pt-8 transition-opacity sm:px-10 lg:pt-14", loading && "opacity-60")} aria-busy={loading}>
       <PlatformTabs connected={connected} />
       <LiveStrip connected={connected} />
+        <ProfileReview />
       <div className="mt-10 flex flex-wrap items-center justify-between gap-4">
         <p className="eyebrow">Published through Outlly</p>
         <div role="radiogroup" aria-label="Time range" className="flex gap-1 rounded-full bg-secondary/60 p-1 hairline">

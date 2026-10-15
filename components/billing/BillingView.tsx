@@ -14,7 +14,7 @@ import { CurrencyPicker } from "./CurrencyPicker";
 import { cn } from "@/lib/utils";
 
 export type ReturnNotice = { tone: "ok" | "info" | "error"; text: string };
-type Current = { planSlug: string; planName: string; priceMinor: number; currency: string; interval: string; periodEnd: string; cancelAtPeriodEnd: boolean } | null;
+type Current = { planSlug: string; planName: string; priceMinor: number; currency: string; interval: string; periodEnd: string; cancelAtPeriodEnd: boolean; pausedUntil?: string | null } | null;
 type Inv = { number: string; description: string; amountMinor: number; currency: string; issuedAt: string; refunded: boolean };
 
 const CACHE = "outly-invoices-v1";
@@ -125,11 +125,17 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
     }
   }
 
-  async function cancelOrResume(action: "cancel" | "resume") {
-    setBusy(action);
+  async function cancelOrResume(action: "cancel" | "resume" | "pause" | "unpause", months?: number) {
+    setBusy(action === "pause" ? `pause-${months}` : action);
     try {
-      await api("/api/billing/cancel", { method: "POST", json: { action } });
-      toast(action === "cancel" ? `Done. ${current?.planName} stays active until ${day(current!.periodEnd)}.` : "Welcome back. Your plan will renew as usual.", "ok");
+      const r = await api<{ pausedUntil?: string; daysKept?: number }>("/api/billing/cancel", { method: "POST", json: { action, months } });
+      toast(
+        action === "cancel" ? `Done. ${current?.planName} stays active until ${day(current!.periodEnd)}.`
+        : action === "pause" ? `Paused until ${day(r.pausedUntil!)}. Your ${r.daysKept} paid day${r.daysKept === 1 ? "" : "s"} wait for you.`
+        : action === "unpause" ? "Welcome back. Your plan is running again."
+        : "Welcome back. Your plan will renew as usual.",
+        "ok",
+      );
       setConfirm(false);
       router.refresh();
     } catch (e) {
@@ -167,11 +173,13 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
             {current && <span className="ml-2 text-base font-medium text-muted-foreground tabular">{current.priceMinor > 0 ? <>{formatMoney(current.priceMinor, current.currency)}{intervalLabel(current.interval)}</> : "free month"}</span>}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {!current ? "No card on file. Upgrade any time; you'll get an invoice by email straight away." : current.cancelAtPeriodEnd ? <>Ends on <b className="text-foreground">{day(current.periodEnd)}</b>, then you move to Free. Nothing else will be charged.</> : <>Renews on <b className="text-foreground">{day(current.periodEnd)}</b>.</>}
+            {!current ? "No card on file. Upgrade any time; you'll get an invoice by email straight away." : current.pausedUntil ? <>Paused until <b className="text-foreground">{day(current.pausedUntil)}</b>. Free limits apply until then, and your paid days run again after, to <b className="text-foreground">{day(current.periodEnd)}</b>.</> : current.cancelAtPeriodEnd ? <>Ends on <b className="text-foreground">{day(current.periodEnd)}</b>, then you move to Free. Nothing else will be charged.</> : <>Renews on <b className="text-foreground">{day(current.periodEnd)}</b>.</>}
           </p>
           <UsageMeter u={props.usage} />
         </div>
-        {current && current.priceMinor > 0 && (current.cancelAtPeriodEnd ? (
+        {current && current.priceMinor > 0 && (current.pausedUntil ? (
+          <Button variant="lime" onClick={() => cancelOrResume("unpause")} disabled={busy === "unpause"}>{busy === "unpause" && <Loader2 className="h-4 w-4 animate-spin" />}Resume now</Button>
+        ) : current.cancelAtPeriodEnd ? (
           <Button variant="lime" onClick={() => cancelOrResume("resume")} disabled={busy === "resume"}>{busy === "resume" && <Loader2 className="h-4 w-4 animate-spin" />}Keep my plan</Button>
         ) : (
           <Button variant="ghost" onClick={() => setConfirm(true)}>Cancel plan</Button>
@@ -259,6 +267,21 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
         cancelLabel="Keep plan"
         busy={busy === "cancel"}
         onConfirm={() => cancelOrResume("cancel")}
+        extra={
+          current && current.priceMinor > 0 && !current.pausedUntil ? (
+            <div className="mt-5 rounded-2xl bg-lime/15 p-4" role="group" aria-labelledby="pause-h">
+              <p id="pause-h" className="text-sm font-semibold">Need a break instead?</p>
+              <p className="mt-1 text-[13px] text-muted-foreground">Pause and keep your unused paid days. They start again when the pause ends.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[1, 2, 3].map((m) => (
+                  <Button key={m} variant="subtle" className="flex-1" onClick={() => cancelOrResume("pause", m)} disabled={!!busy}>
+                    {busy === `pause-${m}` && <Loader2 className="h-4 w-4 animate-spin" />}Pause {m} month{m === 1 ? "" : "s"}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : null
+        }
       />
     </div>
   );

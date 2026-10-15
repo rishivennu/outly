@@ -1,31 +1,19 @@
-# fix-1015-features (33 files + this note)
+# fix-1015-retention (upload AFTER fix-1014-perf and fix-1015-features)
 
-Upload AFTER fix-1014-perf. Drop the contents at the REPO ROOT (paths are relative to it).
+Copy every file into the REPO ROOT, keeping the folders. 106 files, cumulative since fix-1015-features.
+
+## Before or right after deploying
+1. `prisma db push` against production (new: User.postingGoal/nudgeAt/winbackAt/signupSource/totpSecret/totpEnabledAt/totpLastStep/recoveryCodes, Subscription.pausedUntil, models Notice, Snippet, Idea, OtpCode).
+2. Vercel env: `CRON_SECRET` (daily retention cron in vercel.json), `GEMINI_API_KEY` (already needed).
+3. Email provider must be Resend in Admin > Email for sign-in codes to reach real inboxes. In production, while the provider is still Mock, "Email me a code" answers "not switched on yet" instead of parking live codes in the Outbox.
+4. Rate limits are in memory (per server instance). Fine for one instance; move them to Redis before scaling out.
 
 ## What's in it
-1. Admin > User behavior (/admin/behavior). Breakdown tab: actives, stickiness, activation funnel, retention, weekly cohorts, segments, frequency, weekday rhythm, platforms, posting habits, paid vs free, most engaged. Gemini analyses tab: run an analysis (optional focus question), every version is saved and numbered, older versions load on demand, each version lists what changed since the previous one, "Copy as text". Gemini only sees anonymised totals.
-2. Save draft on every create step, with an autosave line and a "View drafts" link (/content?filter=draft).
-3. Publish only to chosen platforms: each destination has a Sending / Skipping checkbox; the server only creates targets for the kept platforms.
-4. First-time greeting on /home for new free users, inviting them to subscribe (waits for the tour, shows once).
-5. Email template redesign: Bricolage Grotesque + DM Sans, dark header, lime button, full footer.
-6. GSAP motion (gsap + @gsap/react): breakdown cards stagger in, numbers count up, bars grow, cohort grid fills; analysis versions reveal section by section; the greeting choreographs its copy, offer and check marks. Reduced-motion users get the final state with no tweening.
-
-## Deploy notes
-- New dependencies: gsap, @gsap/react (package.json + bun.lock included).
-- New table BehaviorAnalysis: the build's db sync creates it on Vercel; otherwise run `prisma db push` once.
-- Set GEMINI_API_KEY for the analyses tab (without it the tab explains what to set).
-
-## Auth redesign (sign in / sign up)
-- New split card: brand light panel on the left (lime, deep green, cream, ink; GSAP drift, pointer lean, glides between the two routes), form on the right.
-- Form: mark, title, labelled fields, lime action, then "or continue with" Google (always shown; needs YouTube OAuth keys or it returns ?google_error=not_configured).
-- Signup fits the screen with no scroll down to 1280x720 and on 390px phones. Skeleton fallback so the form area is never blank while code loads.
-- Files: app/(auth)/{layout,template}.tsx, app/(auth)/{login,signup}/page.tsx, components/auth/{AuthForm,AuthShowcase,AuthFormSkeleton,GoogleButton}.tsx, app/globals.css.
-
-## Verifier fixes
-- lib/admin/behavior.ts: stored health value is whitelisted (a bad value used to crash /admin/behavior).
-- components/admin/BehaviorAnalyses.tsx: safe health lookup, no hydration warning on "x min ago".
-
-## Bento emails (lib/email/index.ts)
-- Every email is now a bento board: dark page, top bar (mark, name, tagline), lime or cream hero tile with a chip and the title, detail tiles (ink, white, deep green) with big numbers, a cream message tile with an ink pill button (lime label), footer on the board.
-- Weekly report: posts out / views / likes tiles, a By platform tile, a Best performer tile. Invoice, refund, canceled, ticket, waitlist, team invite and referral get their own detail tiles.
-- Platform names use the brand spelling (YouTube, TikTok, LinkedIn). Tiles stack on phones. tests/email-template.test.ts updated (9 tests).
+- Retention: posting goal ring, idea bank, recycle card, next steps, notices bell, snippets, PWA share target, daily cron (nudges, win-backs, notices).
+- Billing: pause 1 to 3 months instead of cancelling, resume any time.
+- Admin: "At risk" page (one-click win-back), "Growth" page (funnel, lead lists with email + CSV, campaign link builder, channel table, referral board), marketing role.
+- Signup source: first-touch utm cookie stored as User.signupSource.
+- Sign-in codes by email: "Email me a sign-in code instead" on /login. 6 digits, hashed, 10 min, 5 tries, single use, 1 per minute and 5 per hour per address, same answer for unknown addresses. The code is masked in the Outbox copy whenever a real provider sent it, and always in production. A failed delivery is logged and gives the same answer, so it can't reveal which addresses have accounts.
+- Two-step sign-in (authenticator app, TOTP RFC 6238): Settings > Two-step sign-in. QR drawn in the page (no QR service), 10 one-time recovery codes, replay protection, 6 wrong codes per 15 minutes. Applies after password, email code and Google sign-in. The halfway step is a 5-minute signed cookie that dies once any code is spent or 2FA is reset; "Start over" clears it (DELETE /api/auth/2fa). Turning it on or off, and new recovery codes, each send a security email.
+- SMS: `lib/otp/channel.ts` has an `smsChannel` stub. Needs a DLT-registered SMS provider (India) before it can send.
+- Tests: tests/round-1015-*.test.ts.

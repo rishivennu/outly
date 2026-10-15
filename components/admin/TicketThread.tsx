@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Send } from "lucide-react";
 import { Pip } from "@/components/brand/Pip";
+import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
@@ -11,7 +12,7 @@ import { adminApi } from "@/lib/client/admin-api";
 import { cn } from "@/lib/utils";
 import { Card } from "./ui";
 
-type T = { id: string; ref: string; subject: string; status: string; priority: string; email: string; name: string | null; source: string; createdAt: string };
+type T = { avatar?: string | null; id: string; ref: string; subject: string; status: string; priority: string; email: string; name: string | null; source: string; createdAt: string };
 type M = { id: string; author: string; authorName: string | null; body: string; createdAt: string };
 
 const sel = "h-9 rounded-full bg-secondary/60 px-3 text-[13px] font-semibold hairline";
@@ -80,7 +81,7 @@ export function TicketThread({ ticket, messages: initial }: { ticket: T; message
             const bot = m.author === "bot";
             return (
               <motion.li key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn("flex gap-2.5", mine && "flex-row-reverse")}>
-                {bot ? <Pip size={30} mood="idle" /> : <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-full text-[12px] font-bold", mine ? "lime-bg" : "bg-secondary")} aria-hidden>{(m.authorName ?? (mine ? "A" : t.name ?? t.email)).slice(0, 1).toUpperCase()}</span>}
+                {bot ? <Pip size={30} mood="idle" /> : <OrbAvatar avatar={mine ? null : t.avatar} seed={mine ? m.authorName ?? "team" : t.email} size={32} />}
                 <div className={cn("max-w-[80%] rounded-[20px] px-4 py-2.5 text-[14px] leading-relaxed", mine ? "rounded-tr-md bg-lime/15" : bot ? "rounded-tl-md bg-secondary/60" : "rounded-tl-md bg-card hairline")}>
                   <p className="mb-0.5 text-[11.5px] font-semibold text-muted-foreground">{bot ? "Pip" : m.authorName ?? (mine ? "Team" : t.name ?? "Customer")} · {new Date(m.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</p>
                   <p className="whitespace-pre-wrap break-words">{m.body}</p>

@@ -42,8 +42,8 @@ export type UploadState =
 export const emptyDraft = (enabled: boolean): Draft => ({ enabled, title: "", caption: "", description: "", hashtags: "", note: "", reviewed: false });
 
 export const NOTES: Record<Platform, string> = {
-  instagram: "Instagram is ready ✨",
-  youtube: "YouTube wants a stronger title 👀",
+  instagram: "Instagram is ready",
+  youtube: "YouTube wants a stronger title",
   x: "Let's make this impossible to ignore.",
   tiktok: "TikTok wants a hook in the first second.",
   threads: "Threads likes it conversational.",

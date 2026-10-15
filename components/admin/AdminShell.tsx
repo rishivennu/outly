@@ -3,8 +3,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, BookOpen, Construction, Hourglass, PanelsTopLeft, CreditCard, Globe, Share2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Mail, Menu, Plug, ShieldCheck, Tag, Users, X } from "lucide-react";
+import { Activity, BookOpen, Construction, HeartPulse, Hourglass, Rocket, PanelsTopLeft, CreditCard, Globe, Share2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Mail, Menu, Plug, ShieldCheck, Tag, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { ContrastToggle } from "@/components/shared/ContrastToggle";
@@ -16,6 +17,8 @@ const NAV: { href: string; label: string; icon: typeof Users; area: AdminArea; g
   { href: "/admin", label: "Overview", icon: LayoutDashboard, area: "overview", group: "Run" },
   { href: "/admin/users", label: "Users", icon: Users, area: "users", group: "Run" },
   { href: "/admin/behavior", label: "User behavior", icon: Activity, area: "insights", group: "Run" },
+  { href: "/admin/retention", label: "At risk", icon: HeartPulse, area: "retention", group: "Run" },
+  { href: "/admin/growth", label: "Growth", icon: Rocket, area: "growth", group: "Run" },
   { href: "/admin/payments", label: "Payments", icon: CreditCard, area: "payments", group: "Run" },
   { href: "/admin/pricing", label: "Pricing", icon: Tag, area: "pricing", group: "Run" },
   { href: "/admin/tickets", label: "Tickets", icon: LifeBuoy, area: "tickets", group: "Support" },
@@ -85,9 +88,7 @@ function Footer({ admin, path, onNavigate }: { admin: { name: string; role: Admi
         <ContrastToggle label={false} />
       </div>
       <div className="mt-2 flex items-center gap-2.5 rounded-2xl p-2 hairline">
-        <span className="lime-bg grid h-9 w-9 shrink-0 place-items-center rounded-full font-display text-[13px] font-bold" aria-hidden>
-          {admin.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
-        </span>
+        <OrbAvatar seed={admin.name} size={36} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13px] font-semibold">{admin.name}</span>
           <span className="block truncate text-[11.5px] text-muted-foreground">{ROLE_LABEL[admin.role]}</span>
@@ -131,7 +132,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border/50 bg-background/75 px-4 py-2.5 backdrop-blur-xl lg:border-0 lg:bg-transparent lg:px-8 lg:pt-5 lg:backdrop-blur-0">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border/50 bg-background/75 px-4 py-2.5 backdrop-blur-xl lg:border-0 lg:bg-transparent lg:px-8 lg:pt-5 lg:backdrop-blur-0">
           <div className="flex items-center gap-2 lg:hidden">
             <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" aria-expanded={open} className="grid h-11 w-11 place-items-center rounded-full hover:bg-secondary">
               <Menu className="h-5 w-5" />
@@ -142,7 +143,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
           <div className="ml-auto flex items-center gap-1">
             <Bell role={admin.role} />
           </div>
-        </div>
+        </header>
         <main id="main" className="mx-auto w-full max-w-[1240px] px-4 pb-24 pt-2 sm:px-6 lg:px-8">
           {children}
         </main>

@@ -2,74 +2,107 @@
 import { useId } from "react";
 import { cn } from "@/lib/utils";
 
-export type PipMood = "idle" | "wave" | "think" | "happy" | "sad" | "fly";
+export type PipMood = "idle" | "wave" | "think" | "happy" | "sad" | "fly" | "sleepy" | "dizzy" | "wait";
 
 /**
- * Pip, Outlly's mascot: a small, round lime rocket with a porthole face, fin "arms" and a
- * flickering flame. Built from the brand gradient (#22f04a -> #dcfa18) so it belongs next to
- * the logo. Pure SVG + CSS (transform/opacity only); every loop stops under reduced motion.
+ * Pip, Outlly's mascot (2026-10-15 glow redesign): a soft indigo cloud with a blurred, colourful
+ * "heart light" inside that changes shape with the mood, and simple white line eyes.
+ * Pure SVG + CSS (transform/opacity only); every loop stops under reduced motion.
  */
+const CLOUD =
+  "M30 94C15 94 7 82 11 70C4 60 10 45 25 45C25 29 41 19 56 25C64 13 87 15 91 31C105 31 115 44 109 58C117 69 112 87 97 90C90 101 72 101 66 95C58 101 40 101 34 95C32.6 94.4 31.3 94 30 94Z";
+
+/** The blurred shape inside the cloud: its silhouette carries the mood. */
+const CORE: Record<PipMood, string> = {
+  idle: "M60 44c13 0 22 8 22 19s-10 19-23 19-22-8-22-19 10-19 23-19z",
+  wait: "M60 44c13 0 22 8 22 19s-10 19-23 19-22-8-22-19 10-19 23-19z",
+  wave: "M58 42c14-2 25 8 24 20-1 13-13 20-25 19-12-1-20-10-19-21 1-9 8-17 20-18z",
+  think: "M60 36l6 16 17 2-13 10 4 17-14-9-14 9 4-17-13-10 17-2z",
+  happy: "M60 82C46 72 37 64 37 54c0-7 5-12 11-12 5 0 9 3 12 7 3-4 7-7 12-7 6 0 11 5 11 12 0 10-9 18-23 28z",
+  sad: "M60 46c8 9 14 17 14 24 0 8-6 13-14 13s-14-5-14-13c0-7 6-15 14-24z",
+  fly: "M60 32l5 19 14-12-6 17 19 1-17 8 13 13-18-5 1 19-11-15-11 15 1-19-18 5 13-13-17-8 19-1-6-17 14 12z",
+  sleepy: "M70 40c-14 0-24 10-24 23s10 22 23 22c6 0 11-2 15-5-12 0-21-9-21-20 0-9 4-16 7-20z",
+  dizzy: "M44 50c6-10 26-12 32 0 5 10-4 22-16 22-9 0-14-6-12-12 2-5 9-6 12-2",
+};
+
+const EYES: Record<PipMood, React.ReactNode> = {
+  idle: (<><path d="M50 49l-1.6 10" /><path d="M66 49l-1.6 10" /></>),
+  wait: (<><path d="M50 49l-1.6 10" /><path d="M66 49l-1.6 10" /></>),
+  wave: (<><path d="M50 49l-1.6 10" /><path d="M62 56l4.5-5 4.5 5" /></>),
+  think: (<><circle cx="55" cy="51" r="2.6" className="pip-dot-eye" /><circle cx="70" cy="51" r="2.6" className="pip-dot-eye" /></>),
+  happy: (<><path d="M44 57l5-5.5 5 5.5" /><path d="M64 57l5-5.5 5 5.5" /></>),
+  sad: (<><path d="M44 52c3 3.5 7 3.5 10 0" /><path d="M64 52c3 3.5 7 3.5 10 0" /><path d="M47 60c0 2.5-1 4-2 4s-2-1.5-2-4c0-1.6 2-4 2-4s2 2.4 2 4z" className="pip-tear" /></>),
+  fly: (<><path d="M45 49l7 5-7 5" /><path d="M73 49l-7 5 7 5" /></>),
+  sleepy: (<><path d="M44 56h9" /><path d="M65 56h9" /></>),
+  dizzy: (<><path className="pip-swirl" d="M49 54a3 3 0 1 1 3 3 5.5 5.5 0 1 1 5.5-5.5" /><path className="pip-swirl pip-swirl-r" d="M69 54a3 3 0 1 1 3 3 5.5 5.5 0 1 1 5.5-5.5" /></>),
+};
+
 export function Pip({ size = 96, mood = "idle", className, title }: { size?: number; mood?: PipMood; className?: string; title?: string }) {
   const id = useId().replace(/:/g, "");
-  const g = `pip-g-${id}`;
-  const f = `pip-f-${id}`;
+  const body = `pip-b-${id}`;
+  const rim = `pip-r-${id}`;
+  const core = `pip-c-${id}`;
+  const soft = `pip-s-${id}`;
+  const glow = `pip-g-${id}`;
+  const clip = `pip-k-${id}`;
   return (
     <svg
-      viewBox="0 0 120 140"
+      viewBox="0 0 120 120"
       width={size}
-      height={(size * 140) / 120}
+      height={size}
       className={cn("pip", `pip-${mood}`, className)}
       role={title ? "img" : undefined}
       aria-hidden={title ? undefined : true}
       aria-label={title}
     >
       <defs>
-        <linearGradient id={g} x1="0.1" y1="1" x2="0.9" y2="0">
-          <stop offset="0" stopColor="#22f04a" />
-          <stop offset="0.55" stopColor="#7cf52a" />
-          <stop offset="1" stopColor="#dcfa18" />
+        <radialGradient id={body} cx="0.42" cy="0.38" r="0.7">
+          <stop offset="0" stopColor="#5b4cf5" />
+          <stop offset="0.6" stopColor="#3a2bd6" />
+          <stop offset="1" stopColor="#2a1c9e" />
+        </radialGradient>
+        <radialGradient id={rim} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0.72" stopColor="#8d80ff" stopOpacity="0" />
+          <stop offset="1" stopColor="#b4abff" stopOpacity="0.85" />
+        </radialGradient>
+        <linearGradient id={core} x1="0.1" y1="0.1" x2="0.9" y2="0.95">
+          <stop offset="0" stopColor="#ff5fb8" />
+          <stop offset="0.38" stopColor="#ffb13d" />
+          <stop offset="0.68" stopColor="#9ff218" />
+          <stop offset="1" stopColor="#3ee0ff" />
         </linearGradient>
-        <linearGradient id={f} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#fff7c2" />
-          <stop offset="0.45" stopColor="#ffd23d" />
-          <stop offset="1" stopColor="#ff7a1a" stopOpacity="0" />
-        </linearGradient>
+        <filter id={soft} x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4.2" /></filter>
+        <filter id={glow} x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6" /></filter>
+        <clipPath id={clip}><path d={CLOUD} /></clipPath>
       </defs>
       <g className="pip-body">
-        {/* flame */}
-        <g className="pip-flame">
-          <path d="M60 104c-9 0-14 9-12 18 2 7 7 12 12 16 5-4 10-9 12-16 2-9-3-18-12-18z" fill={`url(#${f})`} />
-          <path d="M60 108c-4 0-7 5-6 10 1 4 3 6 6 8 3-2 5-4 6-8 1-5-2-10-6-10z" fill="#fffbe0" />
+        {/* outer glow */}
+        <path d={CLOUD} fill="#6c5cff" opacity="0.55" filter={`url(#${glow})`} className="pip-halo" />
+        <path d={CLOUD} fill={`url(#${body})`} />
+        <g clipPath={`url(#${clip})`}>
+          <g className="pip-core">
+            <path d={CORE[mood]} fill={mood === "dizzy" ? "none" : `url(#${core})`} stroke={mood === "dizzy" ? `url(#${core})` : "none"} strokeWidth="9" strokeLinecap="round" filter={`url(#${soft})`} opacity={mood === "sad" || mood === "sleepy" ? 0.7 : 0.95} />
+          </g>
+          {/* glassy rim and top highlight */}
+          <path d={CLOUD} fill={`url(#${rim})`} />
+          <ellipse cx="42" cy="38" rx="16" ry="7" fill="#ffffff" opacity="0.22" filter={`url(#${soft})`} transform="rotate(-18 42 38)" />
         </g>
-        {/* left fin = arm (waves) */}
-        <g className="pip-arm-l">
-          <path d="M31 70c-9 4-16 13-17 24-.3 3 2.6 5 5 3.4L34 88z" fill={`url(#${g})`} stroke="#0d0f0a" strokeWidth="3" strokeLinejoin="round" />
+        <path d={CLOUD} fill="none" stroke="#c9c2ff" strokeOpacity="0.35" strokeWidth="1.2" />
+        <g className="pip-eyes" fill="none" stroke="#ffffff" strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round">
+          {EYES[mood]}
         </g>
-        <g className="pip-arm-r">
-          <path d="M89 70c9 4 16 13 17 24 .3 3-2.6 5-5 3.4L86 88z" fill={`url(#${g})`} stroke="#0d0f0a" strokeWidth="3" strokeLinejoin="round" />
-        </g>
-        {/* hull */}
-        <path d="M60 6C40 20 28 44 28 70c0 14 4 26 10 34h44c6-8 10-20 10-34C92 44 80 20 60 6z" fill={`url(#${g})`} stroke="#0d0f0a" strokeWidth="3.5" strokeLinejoin="round" />
-        <path d="M45 26c-6 9-9 20-9 31" stroke="#ffffff" strokeOpacity=".75" strokeWidth="4" strokeLinecap="round" fill="none" />
-        <rect x="40" y="100" width="40" height="9" rx="4.5" fill="#0d0f0a" />
-        {/* porthole face */}
-        <circle cx="60" cy="62" r="21" fill="#0d0f0a" />
-        <circle cx="60" cy="62" r="21" fill="none" stroke="#ffffff" strokeOpacity=".9" strokeWidth="3" />
-        <g className="pip-eyes">
-          <ellipse className="pip-eye" cx="52.5" cy="60" rx="3.6" ry="5" fill="#ffffff" />
-          <ellipse className="pip-eye" cx="67.5" cy="60" rx="3.6" ry="5" fill="#ffffff" />
-          <circle cx="53.6" cy="58.4" r="1.2" fill="#0d0f0a" />
-          <circle cx="68.6" cy="58.4" r="1.2" fill="#0d0f0a" />
-        </g>
-        <path className="pip-mouth" d={mood === "sad" ? "M54 73c3-3 9-3 12 0" : "M53.5 70c3.5 4 9.5 4 13 0"} stroke="#9ff218" strokeWidth="2.8" strokeLinecap="round" fill="none" />
-        <circle cx="46" cy="69" r="2.6" fill="#ff7aa8" opacity=".55" />
-        <circle cx="74" cy="69" r="2.6" fill="#ff7aa8" opacity=".55" />
       </g>
       {mood === "think" && (
-        <g className="pip-dots" fill="#9ff218">
-          <circle cx="96" cy="22" r="3.5" />
-          <circle cx="106" cy="14" r="3.5" />
-          <circle cx="115" cy="6" r="3.5" />
+        <g className="pip-dots" fill="#b4abff">
+          <circle cx="98" cy="22" r="3" />
+          <circle cx="107" cy="14" r="3" />
+          <circle cx="115" cy="6" r="3" />
+        </g>
+      )}
+      {mood === "sleepy" && (
+        <g className="pip-zz" fill="none" stroke="#b4abff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M92 22h8l-8 9h8" />
+          <path d="M104 8h6l-6 7h6" />
         </g>
       )}
     </svg>

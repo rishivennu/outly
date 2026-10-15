@@ -6,11 +6,11 @@ import { Input, Label } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { adminApi } from "@/lib/client/admin-api";
-import type { AdminRole } from "@/lib/admin/perms";
+import { ADMIN_ROLES, type AdminRole } from "@/lib/admin/perms";
 import { Card, CardTitle, Pill, Table, ago } from "./ui";
 
 type A = { id: string; name: string; login: string; role: string; active: boolean; lastLoginAt: string | null };
-const ROLES: AdminRole[] = ["super", "finance", "support"];
+const ROLES: AdminRole[] = [...ADMIN_ROLES];
 
 export function TeamView({ initial, me, roles }: { initial: A[]; me: string; roles: { label: Record<AdminRole, string>; blurb: Record<AdminRole, string> } }) {
   const [team, setTeam] = useState(initial);

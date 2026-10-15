@@ -13,6 +13,9 @@ import { useUser, tzShort } from "@/components/shell/UserContext";
 import { api, ApiError } from "@/lib/client/api";
 import { TeamCard } from "./TeamCard";
 import { ReferralCard } from "./ReferralCard";
+import { AvatarPicker } from "./AvatarPicker";
+import { SnippetsCard } from "./SnippetsCard";
+import { TwoStepCard } from "./TwoStepCard";
 
 function zones(): string[] {
   const anyIntl = Intl as unknown as { supportedValuesOf?: (k: string) => string[] };
@@ -172,7 +175,10 @@ export function SettingsView({ weeklyReport = true }: { weeklyReport?: boolean }
           </section>
         </div>
 
+        {!user.workspace && <AvatarPicker />}
         {!user.workspace && <WeeklyReportCard initial={weeklyReport} />}
+        {!user.workspace && <TwoStepCard email={user.email} />}
+        <SnippetsCard />
         <div className={user.workspace ? "lg:col-span-2" : undefined}>
           <ReferralCard />
         </div>

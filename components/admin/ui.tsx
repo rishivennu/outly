@@ -66,9 +66,10 @@ export function Empty({ title, body, children }: { title: string; body?: string;
 }
 
 /** A table that becomes a scroller on narrow screens instead of breaking the layout. */
-export function Table({ head, children, className }: { head: React.ReactNode[]; children: React.ReactNode; className?: string }) {
+export function Table({ head, children, className, label = "Table" }: { head: React.ReactNode[]; children: React.ReactNode; className?: string; label?: string }) {
+  // Focusable so keyboard users can scroll it sideways on a phone (axe: scrollable-region-focusable).
   return (
-    <div className={cn("relative -mx-5 overflow-x-auto px-5 sm:-mx-6 sm:px-6", className)}>
+    <div role="region" aria-label={label} tabIndex={0} className={cn("relative -mx-5 overflow-x-auto px-5 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring sm:-mx-6 sm:px-6", className)}>
       <table className="w-full min-w-[640px] border-separate border-spacing-0 text-[13.5px]">
         <thead>
           <tr>

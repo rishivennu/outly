@@ -6,7 +6,7 @@ import { useToast } from "@/components/shared/Toast";
 import { defaultSchedule } from "@/components/shared/DateTimePicker";
 import { api, ApiError } from "@/lib/client/api";
 import { uploadVideo } from "@/lib/client/upload";
-import { takeHandoff } from "@/lib/client/handoff";
+import { takeHandoff, takeSharedFile, validateVideoFile } from "@/lib/client/handoff";
 import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { Assistant } from "./Assistant";
@@ -29,12 +29,16 @@ interface Props {
   tz: string;
   connected: string | null;
   connectError: string | null;
+  /** Story to start from: shared text, or an idea from the idea bank */
+  initialStory?: string | null;
+  /** "1" = a video arrived from the share sheet; "missed" = it was shared but couldn't be kept */
+  shared?: string | null;
 }
 
 type Meta = { duration: number; width: number; height: number };
 const LIVE = ["publishing", "published", "partial", "failed"];
 
-export function CreateWorkspace({ accounts: accountList, initialPost, tz, connected, connectError }: Props) {
+export function CreateWorkspace({ accounts: accountList, initialPost, tz, connected, connectError, initialStory, shared }: Props) {
   const toast = useToast();
   const accounts = useMemo(() => Object.fromEntries(accountList.map((a) => [a.platform, a])) as Partial<Record<Platform, AccountView>>, [accountList]);
 
@@ -58,7 +62,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
     if (initialPost.hook) return "everywhere";
     return "story";
   });
-  const [story, setStory] = useState(initialPost?.story ?? "");
+  const [story, setStory] = useState(initialPost?.story ?? initialStory ?? "");
   const [submittedStory, setSubmittedStory] = useState<string | null>(initialPost?.story ?? null);
   const [hooks, setHooks] = useState<{ loading: boolean; result: HookResult | null; index: number; tone: Tone; error: string | null }>({ loading: false, result: null, index: 0, tone: "default", error: null });
   const seen = useRef<string[]>([]);
@@ -180,6 +184,14 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   useEffect(() => {
     const h = takeHandoff();
     if (h) startUpload(h.file, h.objectUrl);
+    else if (shared === "1" && !initialPost)
+      void takeSharedFile().then((f) => {
+        if (!f) return toast("The shared video didn't come through. Pick it again below.", "info");
+        const bad = validateVideoFile(f);
+        if (bad) return toast(bad, "error");
+        startUpload(f, URL.createObjectURL(f));
+      });
+    else if (shared === "missed") toast("The shared video didn't come through. Pick it again below.", "info");
     if (connected && (PLATFORMS as readonly string[]).includes(connected)) toast(`${PLATFORM_META[connected as Platform].name} is connected.`);
     if (connectError) toast("That connection didn't go through. Let's try again.", "info");
     // eslint-disable-next-line react-hooks/exhaustive-deps
