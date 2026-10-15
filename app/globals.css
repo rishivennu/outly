@@ -995,20 +995,58 @@ html[data-contrast="more"] a:not([class*="btn"]) { text-decoration-thickness: 2p
 
 /* Demo: phone + rings + widgets */
 .dm-copy { container-type: inline-size; }
-/* Demo bento: words, phone, posts, a live counter and the step control each get their own tile. */
-.dm-bento { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "words" "phone" "posts" "count" "steps"; }
-.dm-t-words { grid-area: words; } .dm-t-phone { grid-area: phone; } .dm-t-posts { grid-area: posts; } .dm-t-count { grid-area: count; } .dm-t-steps { grid-area: steps; }
-@media (min-width: 640px) { .dm-bento { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); grid-template-areas: "words count" "phone phone" "posts posts" "steps steps"; } }
-@media (min-width: 1024px) { .dm-bento { grid-template-columns: minmax(0, 1fr) 420px; grid-template-areas: "words phone" "count phone" "posts posts" "steps steps"; } }
-@media (min-width: 1280px) { .dm-bento { grid-template-columns: minmax(0, 1fr) 420px minmax(0, 1fr); grid-template-areas: "words phone posts" "count phone posts" "steps steps steps"; } }
-.dm-t-phone { position: relative; display: grid; place-items: center; overflow: hidden; padding: 40px 16px; }
-@media (min-width: 1024px) { .dm-t-phone { min-height: 740px; } }
-.dm-bento .dm-widget { border-radius: 28px; box-shadow: none; }
-.dark .dm-bento .dm-widget { box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .06); }
-.dm-bento .dm-widget.is-done { box-shadow: inset 0 0 0 2px hsl(var(--success) / .5); }
-.dm-bento .dm-widget.is-fail { box-shadow: inset 0 0 0 2px hsl(var(--destructive) / .55); }
-/* Sized to its own column (cqi), so the longest word, "upload.", always fits beside the phone. */
-.dm-word { font-size: clamp(2.6rem, 24cqi, 5.6rem); animation: dm-word .7s var(--ease-liquid) both; }
+/* Demo bento v6 (10-15): reference layout (tall stage, floating headline, one accent tile, a tray of soft cards), Apple restraint. */
+.dm-grid { --dm-violet: 262 80% 56%; --dm-stage: 8 66% 89%; display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "beat" "stage" "tray"; }
+.dark .dm-grid { --dm-stage: 8 40% 78%; }
+.dm-a-head { grid-area: head; min-width: 0; } .dm-a-beat { grid-area: beat; display: flex; min-width: 0; } .dm-a-stage { grid-area: stage; } .dm-a-tray { grid-area: tray; min-width: 0; }
+@media (min-width: 640px) { .dm-grid { gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "head head" "stage beat" "tray tray"; } }
+@media (min-width: 1024px) {
+  .dm-grid { grid-template-columns: 330px minmax(0, 1fr); grid-template-areas: "head head" "stage beat" "stage tray"; }
+  .dm-grid .dm-a-head { flex-direction: row; align-items: flex-end; justify-content: space-between; padding: 0 4px 8px; }
+  .dm-grid .dm-a-head .dm-head-ctl { align-items: flex-end; }
+}
+@media (min-width: 1280px) {
+  .dm-grid { grid-template-columns: 330px minmax(0, 1fr) 300px; grid-template-areas: "stage head beat" "stage tray tray"; }
+  .dm-grid .dm-a-head { flex-direction: column; align-items: stretch; justify-content: center; padding: 8px 12px; }
+  .dm-grid .dm-a-head .dm-head-ctl { align-items: flex-start; }
+}
+.dm-head h2 { font-size: clamp(2.1rem, 4.6vw, 3.5rem); }
+.dm-head .rv-body { margin-top: 14px; }
+/* one highlighted phrase, set as a pill (the reference's "experiences.") */
+.dm-hl { display: inline-block; padding: .02em .3em .1em; margin-left: -.04em; border-radius: 9999px; background: hsl(var(--dm-violet)); color: #fff; line-height: 1.04; }
+
+.dm-beat { flex: 1; display: flex; flex-direction: column; min-height: 300px; padding: 24px; border-radius: 32px; background: hsl(var(--dm-violet)); color: #fff; box-shadow: 0 30px 60px -42px hsl(262 80% 35% / .8); }
+@media (min-width: 640px) { .dm-beat { padding: 28px; } }
+
+.dm-stage { position: relative; display: grid; place-items: center; overflow: hidden; padding: 22px 16px; border-radius: 32px; background: radial-gradient(120% 70% at 50% 0%, hsl(0 0% 100% / .45), transparent 60%), hsl(var(--dm-stage)); }
+.dm-stage .dm-ring { border-color: hsl(240 10% 8% / .08); }
+.dm-phone-fit { zoom: .8; }
+@media (min-width: 640px) { .dm-phone-fit { zoom: .9; } }
+@media (min-width: 1024px) { .dm-phone-fit { zoom: 1; } }
+
+.dm-tray { padding: 10px; border-radius: 32px; background: hsl(var(--ap-tile)); }
+.dark .dm-tray { box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .06); }
+.dm-rail { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dm-rail:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 4px; border-radius: 26px; }
+@media (max-width: 639px) {
+  .dm-tray { margin-inline: -20px; padding: 0; border-radius: 0; background: transparent; box-shadow: none !important; }
+  .dm-rail { display: flex; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding-inline: 20px; padding: 2px 20px 6px; scrollbar-width: none; }
+  .dm-rail::-webkit-scrollbar { display: none; }
+  .dm-rail > li { flex: 0 0 84%; scroll-snap-align: start; }
+}
+.dm-card { display: flex; flex-direction: column; border-radius: 24px; background: hsl(var(--dm-tint)); box-shadow: none; }
+.dm-card-instagram { --dm-tint: 330 78% 95%; } .dm-card-youtube { --dm-tint: 44 86% 88%; } .dm-card-x { --dm-tint: 212 86% 93%; }
+.dark .dm-card-instagram { --dm-tint: 330 28% 16%; } .dark .dm-card-youtube { --dm-tint: 42 30% 14%; } .dark .dm-card-x { --dm-tint: 214 32% 16%; }
+/* darker inks inside the light tints keep every label at 4.5:1 or better */
+html:not(.dark) .dm-card { --muted-foreground: 240 8% 27%; --accent: 262 72% 44%; --success: 146 72% 24%; --destructive: 0 76% 38%; }
+.dm-card.is-done { box-shadow: inset 0 0 0 2px hsl(var(--success) / .55); }
+.dm-card.is-fail { box-shadow: inset 0 0 0 2px hsl(var(--destructive) / .6); }
+.dm-card .stamp-meter { background: hsl(var(--foreground) / .1); }
+.dm-badge { min-height: 26px; padding: 0 10px; border-radius: 9999px; background: hsl(var(--background) / .72); }
+.dark .dm-badge { background: hsl(0 0% 0% / .28); }
+@media (forced-colors: active) { .dm-beat, .dm-stage, .dm-tray, .dm-card, .dm-hl { border: 1px solid CanvasText; } }
+/* Sized to the accent tile (cqi), so the longest word, "upload.", always fits. */
+.dm-word { font-size: clamp(2.8rem, 21cqi, 5.4rem); animation: dm-word .7s var(--ease-liquid) both; }
 @keyframes dm-word { from { opacity: 0; transform: translate3d(0, 14px, 0); filter: blur(6px); } }
 .dm-phone { position: relative; width: 286px; aspect-ratio: 286 / 590; padding: 9px; border-radius: 50px; background: linear-gradient(145deg, #2b2b2e, #0d0d0f 40%, #1d1d20); box-shadow: inset 0 0 0 1.5px #4a4a4f, 0 40px 80px -36px rgb(10 10 30 / .55), 0 12px 24px -12px rgb(0 0 0 / .35); }
 .dark .dm-phone { box-shadow: inset 0 0 0 1.5px #55555b, 0 0 0 1px hsl(0 0% 100% / .06), 0 40px 90px -30px rgb(0 0 0 / .9); }
@@ -1048,9 +1086,9 @@ html[data-contrast="more"] a:not([class*="btn"]) { text-decoration-thickness: 2p
 }
 
 /* Platforms: Apple One-style service bars in each platform's own colours (white text holds >= 4.5:1 over the text side). */
-/* 10-15: Supported destinations bento. Brand-coloured tiles; on mobile they become a sticky card stack. */
-.pf-tile { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 19rem; overflow: hidden; border-radius: 28px; padding: 1.5rem; color: #fff; isolation: isolate; }
-.pf-tile::after { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(120% 90% at 100% 100%, rgb(255 255 255 / .16), transparent 55%); pointer-events: none; }
+.pf-bar { position: relative; display: flex; gap: 1.25rem; overflow: hidden; border-radius: 28px; padding: 1.5rem; color: #fff; isolation: isolate; }
+@media (min-width: 640px) { .pf-bar { padding: 1.75rem 1.75rem 1.75rem 1.75rem; } }
+.pf-bar::after { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(120% 90% at 100% 100%, rgb(255 255 255 / .16), transparent 55%); pointer-events: none; }
 .pf-bar-instagram { background: linear-gradient(100deg, #5b2a9e 0%, #8e2a91 38%, #b8256f 68%, #e0533a 100%); }
 .pf-bar-youtube { background: linear-gradient(100deg, #9e0010 0%, #c80000 60%, #f2221a 100%); }
 .pf-bar-x { background: linear-gradient(100deg, #000 0%, #16161a 100%); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .1); }
@@ -1060,17 +1098,35 @@ html[data-contrast="more"] a:not([class*="btn"]) { text-decoration-thickness: 2p
 .pf-bar-linkedin { background: linear-gradient(100deg, #004182 0%, #0a66c2 100%); }
 .pf-bar-icon { box-shadow: 0 0 0 1px rgb(255 255 255 / .25), 0 8px 18px -8px rgb(0 0 0 / .5); }
 .pf-bar-chip { border-radius: 9999px; padding: .28rem .7rem; font-size: 12px; font-weight: 600; background: rgb(0 0 0 / .26); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18); }
+.pf-art-phone, .pf-art-post { display: none; }
+@media (min-width: 640px) {
+  .pf-art-phone { display: block; position: relative; flex-shrink: 0; align-self: flex-end; width: 92px; height: 176px; margin: 0 -.25rem -2.6rem 0; padding: 4px; border-radius: 20px; background: #0c0c0e; box-shadow: 0 0 0 1px rgb(255 255 255 / .2), 0 20px 30px -12px rgb(0 0 0 / .55); transform: rotate(6deg); transition: transform .6s var(--ease-liquid); }
+  .pf-art-post { display: flex; flex-direction: column; flex-shrink: 0; align-self: flex-end; width: 150px; margin: 0 -.5rem -2.2rem 0; padding: 10px; border-radius: 16px; background: #fff; box-shadow: 0 20px 30px -12px rgb(0 0 0 / .55); transform: rotate(-4deg); transition: transform .6s var(--ease-liquid); }
+  .pf-bar:hover .pf-art-phone { transform: rotate(2deg) translateY(-6px); }
+  .pf-bar:hover .pf-art-post { transform: rotate(-1deg) translateY(-6px); }
+}
+.pf-art-screen { position: relative; display: block; height: 100%; border-radius: 16px; overflow: hidden; background: radial-gradient(circle at 70% 25%, rgb(255 255 255 / .55) 0 9%, transparent 10%), linear-gradient(160deg, hsl(262 80% 62%), hsl(190 85% 52%) 55%, hsl(330 85% 62%)); }
+.pf-art-rail { position: absolute; right: 6px; bottom: 26px; display: flex; flex-direction: column; gap: 6px; }
+.pf-art-rail i { display: block; width: 10px; height: 10px; border-radius: 9999px; background: rgb(255 255 255 / .85); }
+.pf-art-lines { position: absolute; left: 7px; bottom: 10px; right: 22px; display: flex; flex-direction: column; gap: 4px; }
+.pf-art-lines i { display: block; height: 4px; border-radius: 3px; background: rgb(255 255 255 / .85); }
+.pf-art-lines i:last-child { width: 60%; }
+.pf-art-av { display: block; width: 16px; height: 16px; border-radius: 9999px; background: #d4d4d8; }
+.pf-art-l { display: block; height: 5px; border-radius: 3px; background: #d4d4d8; }
+.pf-art-media { display: block; margin-top: 8px; height: 64px; border-radius: 10px; background: linear-gradient(150deg, hsl(262 80% 62%), hsl(190 85% 52%) 50%, hsl(330 85% 62%)); }
+@media (prefers-reduced-motion: reduce) { .pf-art-phone, .pf-art-post { transition: none; } }
 .pf-chip-api { display: inline-flex; align-items: center; gap: .3rem; background: rgb(255 255 255 / .2); }
-.pf-live { display: inline-flex; align-items: center; gap: .3rem; border-radius: 9999px; padding: .3rem .65rem; font-size: 12.5px; font-weight: 600; background: rgb(255 255 255 / .16); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .22); }
 .pf-count { font-size: 12.5px; font-weight: 600; opacity: .8; }
+/* 10-15c: phones only, the bars become a sticky card stack (StackFx feeds --cover). Tablet and desktop keep the plain bars. */
 @media (max-width: 767px) {
   .pf-stack { gap: 1rem; }
   .pf-stack > li { position: sticky; top: calc(84px + env(safe-area-inset-top, 0px)); }
-  .pf-stack .pf-tile { min-height: 23rem; transform-origin: 50% 0; transform: scale(calc(1 - var(--cover, 0) * .07)); box-shadow: 0 -14px 32px -18px rgb(0 0 0 / .45); will-change: transform; }
-  .pf-stack .pf-tile::before { content: ""; position: absolute; inset: 0; z-index: 3; border-radius: inherit; background: #000; opacity: calc(var(--cover, 0) * .5); pointer-events: none; }
+  .pf-stack .pf-bar { min-height: 23rem; transform-origin: 50% 0; transform: scale(calc(1 - var(--cover, 0) * .07)); box-shadow: 0 -14px 32px -18px rgb(0 0 0 / .45); will-change: transform; }
+  .pf-stack .pf-bar::before { content: ""; position: absolute; inset: 0; z-index: 3; border-radius: inherit; background: #000; opacity: calc(var(--cover, 0) * .5); pointer-events: none; }
+  .pf-stack .pf-bar-body { display: flex; flex-direction: column; }
+  .pf-stack .pf-bar-specs { margin-top: auto; padding-top: 1.25rem; }
 }
-@media (min-width: 1024px) { .pf-tile { min-height: 18rem; } }
-@media (forced-colors: active) { .pf-tile { border: 1px solid CanvasText; } .pf-stack .pf-tile::before { display: none; } }
+@media (forced-colors: active) { .pf-stack .pf-bar { border: 1px solid CanvasText; } .pf-stack .pf-bar::before { display: none; } }
 
 /* Comparison, Apple compare-models look: our column sits on the soft canvas grey. */
 .cmp-us { background: hsl(var(--ap-canvas)); }
