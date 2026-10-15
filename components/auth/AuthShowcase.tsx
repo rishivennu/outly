@@ -20,6 +20,11 @@ const POSE = {
     { x: 22, y: -18, s: 0.94 },
     { x: -70, y: 12, s: 1.15 },
   ],
+  admin: [
+    { x: 18, y: 30, s: 0.9 },
+    { x: 30, y: -24, s: 1.05 },
+    { x: -40, y: 50, s: 0.85 },
+  ],
 } as const;
 
 /**
@@ -28,9 +33,10 @@ const POSE = {
  * assistive tech; the form carries the meaning. GSAP: an entrance, a slow ambient drift, a light that leans
  * toward the pointer, and a glide to a new composition when the route changes. Reduced motion gets a still frame.
  */
-export function AuthShowcase() {
+export function AuthShowcase({ eyebrow = "With Outlly you can", lines = ["Make it once and", "post it everywhere"] }: { eyebrow?: string; lines?: [string, string] } = {}) {
   const ref = useRef<HTMLElement>(null);
-  const signup = usePathname().startsWith("/signup");
+  const path = usePathname();
+  const pose = path.startsWith("/signup") ? "signup" : path.startsWith("/admin") ? "admin" : "login";
   const first = useRef(true);
 
   // Entrance + ambient life (once per mount).
@@ -73,16 +79,16 @@ export function AuthShowcase() {
   useGSAP(() => {
     const blobs = ref.current?.querySelectorAll<HTMLElement>(".as-pose");
     if (!blobs?.length) return;
-    const pose = POSE[signup ? "signup" : "login"];
+    const at = POSE[pose];
     const still = first.current || !window.matchMedia(MOTION_OK).matches;
     blobs.forEach((el, i) => {
-      const p = pose[i] ?? pose[0];
+      const p = at[i] ?? at[0];
       const v = { xPercent: p.x, yPercent: p.y, scale: p.s };
       if (still) gsap.set(el, v);
       else gsap.to(el, { ...v, duration: 1.6, ease: "power3.inOut", overwrite: "auto" });
     });
     first.current = false;
-  }, { dependencies: [signup], scope: ref });
+  }, { dependencies: [pose], scope: ref });
 
   return (
     <section
@@ -111,10 +117,10 @@ export function AuthShowcase() {
       <OutlyMark variant="white" size={44} className="as-mark gs-in" />
 
       <div className="relative max-w-[440px]">
-        <p className="as-eyebrow gs-in text-[15px] font-medium text-white/80">With Outlly you can</p>
+        <p className="as-eyebrow gs-in text-[15px] font-medium text-white/80">{eyebrow}</p>
         <h2 className="mt-3 font-display text-[clamp(2.1rem,3.2vw,2.9rem)] font-bold leading-[1.04] tracking-[-0.03em]">
-          <span className="as-line block overflow-hidden pb-[0.06em]"><span className="block">Make it once and</span></span>
-          <span className="as-line block overflow-hidden pb-[0.06em]"><span className="block">post it everywhere</span></span>
+          <span className="as-line block overflow-hidden pb-[0.06em]"><span className="block">{lines[0]}</span></span>
+          <span className="as-line block overflow-hidden pb-[0.06em]"><span className="block">{lines[1]}</span></span>
         </h2>
       </div>
     </section>

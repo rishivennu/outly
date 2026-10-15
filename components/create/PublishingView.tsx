@@ -11,6 +11,7 @@ import { api, ApiError } from "@/lib/client/api";
 import { PLATFORM_META, TARGET_COPY, type TargetStatus } from "@/lib/domain";
 import { targetErrorCopy } from "@/components/shared/errorCopy";
 import { cn } from "@/lib/utils";
+import { PostingAnimation } from "./PostingAnimation";
 import type { PostView, TargetView } from "./types";
 
 const ACTIVE: TargetStatus[] = ["pending", "queued", "uploading", "processing"];
@@ -86,6 +87,9 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
   return (
     <div className="mx-auto w-full max-w-3xl">
       <div className="text-center" aria-live="polite">
+        {active ? (
+          <PostingAnimation platforms={post.targets.filter((t) => ACTIVE.includes(t.status as TargetStatus)).map((t) => t.platform)} />
+        ) : (
         <div className="mb-5 flex justify-center">
           <AnimatePresence mode="wait">
             <motion.span key={hero} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", stiffness: 320, damping: 24 }} className="inline-block">
@@ -95,6 +99,7 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
             </motion.span>
           </AnimatePresence>
         </div>
+        )}
         <AnimatePresence mode="wait">
           <motion.h2 key={headline} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className={cn("display text-[clamp(2.4rem,7vw,4.6rem)]", allLive && "energy-text")}>
             {headline}

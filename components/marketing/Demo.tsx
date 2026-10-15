@@ -1,21 +1,12 @@
 import { DemoFlow } from "./DemoFlow";
-import { Shell, SectionHead } from "./bits";
+import { Shell } from "./bits";
 
+/** "Watch one upload become three posts": the phone flow as a brand bento. Its heading lives inside DemoFlow's stage. */
 export function Demo() {
   return (
-    <section id="demo" className="ap-canvas scroll-mt-24 overflow-hidden py-16 sm:py-24" aria-labelledby="demo-title">
+    <section id="demo" className="scroll-mt-24 overflow-hidden py-16 sm:py-24" aria-labelledby="demo-title">
       <Shell>
-        <DemoFlow
-          head={
-            <SectionHead
-              id="demo-title"
-              eyebrow="The flow, end to end"
-              title={<>Watch one upload become <span className="dm-hl">three posts.</span></>}
-              body="Including the part where a platform says no."
-              className="dm-head"
-            />
-          }
-        />
+        <DemoFlow />
       </Shell>
     </section>
   );
