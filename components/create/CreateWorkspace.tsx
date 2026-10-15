@@ -7,7 +7,6 @@ import { defaultSchedule } from "@/components/shared/DateTimePicker";
 import { api, ApiError } from "@/lib/client/api";
 import { uploadVideo } from "@/lib/client/upload";
 import { takeHandoff } from "@/lib/client/handoff";
-import { blocking, checksFor } from "@/lib/client/checks";
 import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { Assistant } from "./Assistant";
@@ -17,6 +16,9 @@ import { LaunchPanel, ScheduledView } from "./LaunchPanel";
 import { PlatformDeck } from "./PlatformDeck";
 import { PublishingView } from "./PublishingView";
 import { VideoStage } from "./VideoStage";
+import { PublishTo } from "./PublishTo";
+import { SaveDraft } from "./SaveDraft";
+import { draftTitle, enabledPlatforms, launchGate, targetPayload } from "./publish";
 import { CaptionBurner } from "./CaptionBurner";
 import { readVideo } from "./frame";
 import { emptyDraft, NOTES, type AccountView, type Draft, type HookResult, type MediaView, type PlatformCopy, type PostView, type Step, type Tone, type UploadState } from "./types";
@@ -82,7 +84,10 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const [postId, setPostId] = useState<string | null>(initialPost?.id ?? null);
   const postIdRef = useRef<string | null>(initialPost?.id ?? null);
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [savedAt, setSavedAt] = useState<string | null>(null);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
+  /** An explicit "Save draft" pressed while the upload is still in flight runs the moment the media lands. */
+  const pendingSave = useRef(false);
 
   /* ---------------- launch ---------------- */
   const [mode, setMode] = useState<"now" | "schedule">(initialPost?.status === "scheduled" ? "schedule" : "now");
@@ -129,7 +134,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
         .catch(() => {});
 
       try {
-        const r = await uploadVideo<MediaView>(file, (p, eta) => setUpload({ kind: "uploading", progress: p, eta }), ctrl.signal);
+        const r = await uploadVideo<MediaView>(file, (p, eta) => { setUpload({ kind: "uploading", progress: p, eta }); }, ctrl.signal);
         if (ctrl.signal.aborted) return;
         setMedia(r.media);
         setUpload({ kind: "done" });
@@ -241,7 +246,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
     setHook(text);
     setStep("everywhere");
     setCopyLoading(true);
-    await fetchCopy(PLATFORMS.filter((p) => drafts[p].enabled), text);
+    await fetchCopy(enabledPlatforms(drafts), text);
     setCopyLoading(false);
   };
 
@@ -269,43 +274,70 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   };
 
   /* ================= saving ================= */
-  const save = useCallback(() => {
-    const run = async () => {
-      if (!media || !hook) return postIdRef.current;
-      setSaved("saving");
-      try {
-        const title = (drafts.youtube.enabled && drafts.youtube.title ? drafts.youtube.title.replace(/\s*#Shorts\s*$/i, "") : hook.split("\n")[0]).slice(0, 200);
-        const r = await api<{ post: PostView }>("/api/posts", {
-          method: "POST",
-          json: {
-            postId: postIdRef.current ?? undefined,
-            mediaId: media.id,
-            title,
-            story: submittedStory ?? story,
-            hook,
-            targets: PLATFORMS.filter((p) => drafts[p].enabled).map((p) => ({ platform: p, title: drafts[p].title || null, caption: drafts[p].caption || null, description: drafts[p].description || null, hashtags: drafts[p].hashtags || null })),
-          },
-        });
-        if (!postIdRef.current) {
-          postIdRef.current = r.post.id;
-          setPostId(r.post.id);
-          window.history.replaceState(null, "", `/create?post=${r.post.id}`);
+  const save = useCallback(
+    (opts?: { force?: boolean }) => {
+      const run = async () => {
+        // Autosave still waits for a hook; an explicit save only needs the video, and names the draft itself.
+        if (!media || (!hook && !opts?.force)) return postIdRef.current;
+        setSaved("saving");
+        try {
+          const title = draftTitle({ drafts, hook, filename: media.filename ?? fileRef.current?.name });
+          const r = await api<{ post: PostView }>("/api/posts", {
+            method: "POST",
+            json: {
+              postId: postIdRef.current ?? undefined,
+              mediaId: media.id,
+              title,
+              story: submittedStory ?? story,
+              hook,
+              targets: targetPayload(drafts),
+            },
+          });
+          if (!postIdRef.current) {
+            postIdRef.current = r.post.id;
+            setPostId(r.post.id);
+            window.history.replaceState(null, "", `/create?post=${r.post.id}`);
+          }
+          setSaved("saved");
+          setSavedAt(new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }));
+          return r.post.id;
+        } catch {
+          setSaved("error");
+          return postIdRef.current;
         }
-        setSaved("saved");
-        return r.post.id;
-      } catch {
-        setSaved("error");
-        return postIdRef.current;
-      }
-    };
-    const next = chain.current.then(run, run);
-    chain.current = next;
-    return next as Promise<string | null>;
-  }, [media, hook, drafts, story, submittedStory]);
+      };
+      const next = chain.current.then(run, run);
+      chain.current = next;
+      return next as Promise<string | null>;
+    },
+    [media, hook, drafts, story, submittedStory],
+  );
+
+  /** The Save draft button: immediate, works without a hook, and says where the draft went. */
+  const saveDraftNow = useCallback(async () => {
+    if (!media) {
+      // Upload still running: remember the intent, the effect below finishes the job.
+      pendingSave.current = true;
+      setSaved("saving");
+      return;
+    }
+    const id = await save({ force: true });
+    if (id) toast("Saved to Drafts. Find it under Content.");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [media, save]);
+
+  useEffect(() => {
+    if (!media || !pendingSave.current) return;
+    pendingSave.current = false;
+    save({ force: true }).then((id) => {
+      if (id) toast("Saved to Drafts. Find it under Content.");
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [media]);
 
   useEffect(() => {
     if (!media || !hook || phase !== "edit" || copyLoading) return;
-    const t = setTimeout(save, 900);
+    const t = setTimeout(() => save(), 900);
     return () => clearTimeout(t);
   }, [save, media, hook, phase, copyLoading]);
 
@@ -315,8 +347,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   };
 
   /* ================= launch ================= */
-  const enabled = PLATFORMS.filter((p) => drafts[p].enabled);
-  const allReviewed = enabled.length > 0 && enabled.every((p) => drafts[p].reviewed && accounts[p]?.status === "connected" && !blocking(checksFor(p, drafts[p], meta)));
+  const { enabled, ready: allReviewed } = launchGate(drafts, accounts, meta);
 
   const launch = async () => {
     setLaunching(true);
@@ -471,6 +502,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                     onError={(m) => toast(m, "error")}
                   />
                 )}
+                <PublishTo platforms={live} drafts={drafts} accounts={accounts} onToggle={(pl, on) => onDraft(pl, { enabled: on })} />
                 <div className="glass mt-8 rounded-[28px] lg:hidden">{assistant}</div>
               </motion.section>
             )}
@@ -512,7 +544,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                 )}
               </motion.section>
             )}
-          {postId && <span className="sr-only" aria-live="polite">{saved === "saved" ? "Draft saved" : ""}</span>}
+          {hasMedia && <SaveDraft state={saved} at={savedAt} onSave={saveDraftNow} busy={saved === "saving"} />}
         </div>
       </div>
 

@@ -10,6 +10,33 @@ import type { Platform } from "@/lib/domain";
 import { connectedPlatforms } from "@/lib/live/connected";
 import { canConnectWithToken, hasCredentials, loadKeys } from "@/lib/social/registry";
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
+import { WelcomeSubscribe, type WelcomeOffer } from "@/components/onboarding/WelcomeSubscribe";
+import { entitlements } from "@/lib/billing/entitlements";
+import { listPlans } from "@/lib/billing/plans";
+import { visitorCurrency } from "@/lib/billing/visitor";
+import { localPrice } from "@/lib/billing/currency";
+import { formatMoney } from "@/lib/billing/money";
+
+const NEW_FOR_DAYS = 14;
+
+/** Free, owner-level accounts that are new or haven't published yet get the subscribe greeting once. */
+async function welcomeOffer(user: { id: string; createdAt: Date; actor: unknown }) {
+  if (user.actor) return null; // billing belongs to the workspace owner
+  const [ent, published, plans] = await Promise.all([
+    entitlements(user.id),
+    db.post.count({ where: { userId: user.id, status: { in: ["published", "partial"] } } }),
+    listPlans(),
+  ]);
+  const isNew = Date.now() - user.createdAt.getTime() < NEW_FOR_DAYS * 86_400_000;
+  if (ent.planSlug !== "free" || (!isNew && published > 0)) return null;
+  const paid = plans.filter((p) => p.priceMinor > 0 && p.state === "available");
+  const pick = paid.find((p) => p.highlight) ?? paid[0];
+  if (!pick) return { freeLimit: ent.postLimit, offer: null };
+  const visitor = visitorCurrency((pick.currency as never) ?? "INR");
+  const lp = localPrice(pick, visitor.currency);
+  const offer: WelcomeOffer = { slug: pick.slug, name: pick.name, price: formatMoney(lp.priceMinor, lp.currency), interval: pick.interval === "year" ? "year" : "month", features: pick.features.slice(0, 3), postLimit: pick.postLimit, aiCaptions: pick.aiCaptions };
+  return { freeLimit: ent.postLimit, offer };
+}
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Home" };
@@ -17,10 +44,11 @@ export const metadata = { title: "Home" };
 export default async function HomePage() {
   const user = (await getCurrentUser())!;
   await loadKeys();
-  const [drafts, next, live] = await Promise.all([
+  const [drafts, next, live, welcome] = await Promise.all([
     db.post.findMany({ where: { userId: user.id, status: "draft" }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() } }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),
     connectedPlatforms(user.id),
+    welcomeOffer(user).catch(() => null),
   ]);
   const setup = {
     connected: { instagram: !!live.instagram, youtube: !!live.youtube },
@@ -37,6 +65,7 @@ export default async function HomePage() {
     <div className="relative overflow-hidden">
       <HomeHero firstName={user.name.split(" ")[0]} />
       <SetupChecklist state={setup} />
+      {welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} />}
       {(dv.length > 0 || nv) && (
         <section aria-label="Pick up where you left off" className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-20 sm:px-10 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
           {dv.length > 0 && (

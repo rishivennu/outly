@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpen, Construction, Hourglass, PanelsTopLeft, CreditCard, Globe, Share2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Mail, Menu, Plug, ShieldCheck, Tag, Users, X } from "lucide-react";
+import { Activity, BookOpen, Construction, Hourglass, PanelsTopLeft, CreditCard, Globe, Share2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Mail, Menu, Plug, ShieldCheck, Tag, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -15,6 +15,7 @@ import { ScrollArea } from "./ScrollArea";
 const NAV: { href: string; label: string; icon: typeof Users; area: AdminArea; group: "Run" | "Support" | "Setup" }[] = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, area: "overview", group: "Run" },
   { href: "/admin/users", label: "Users", icon: Users, area: "users", group: "Run" },
+  { href: "/admin/behavior", label: "User behavior", icon: Activity, area: "insights", group: "Run" },
   { href: "/admin/payments", label: "Payments", icon: CreditCard, area: "payments", group: "Run" },
   { href: "/admin/pricing", label: "Pricing", icon: Tag, area: "pricing", group: "Run" },
   { href: "/admin/tickets", label: "Tickets", icon: LifeBuoy, area: "tickets", group: "Support" },

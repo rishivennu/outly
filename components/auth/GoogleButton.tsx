@@ -5,7 +5,7 @@ export function GoogleButton({ from, next, label = "Continue with Google" }: { f
   return (
     <a
       href={`/api/auth/google?${q}`}
-      className="flex min-h-[52px] w-full items-center justify-center gap-3 rounded-full bg-background px-5 text-[15px] font-semibold text-foreground hairline transition hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.99]"
+      className="google-btn flex min-h-12 w-full items-center justify-center gap-3 rounded-full bg-secondary px-5 text-[15px] font-semibold text-foreground transition-[transform,background-color,box-shadow] duration-200 hover:-translate-y-px hover:bg-secondary/70 hover:shadow-[0_10px_24px_-16px_hsl(var(--foreground)/0.5)] hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:translate-y-0 active:scale-[0.985] motion-reduce:transform-none motion-reduce:transition-colors"
     >
       <svg viewBox="0 0 48 48" className="h-5 w-5" aria-hidden="true">
         <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />

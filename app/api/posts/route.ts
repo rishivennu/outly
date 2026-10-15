@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { HttpError, json, route } from "@/lib/http";
 import { savePostSchema } from "@/lib/validation";
 import { ownedMedia, ownedPost, postView } from "@/lib/services";
+import { keepPlatforms } from "./targets";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export const POST = route(async (req, { user }) => {
   } else {
     postId = (await db.post.create({ data: { userId: user.id, mediaId: body.mediaId, title: body.title, story: body.story, hook: body.hook } })).id;
   }
-  const keep = body.targets.map((t) => t.platform);
+  const keep = keepPlatforms(body.targets);
   await db.postTarget.deleteMany({ where: { postId, platform: { notIn: keep } } });
   for (const t of body.targets) {
     const data = { title: t.title ?? null, caption: t.caption ?? null, description: t.description ?? null, hashtags: t.hashtags ?? null };

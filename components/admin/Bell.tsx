@@ -2,14 +2,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, BellRing, Bell as BellIcon, CreditCard, LifeBuoy, Plug, Tag } from "lucide-react";
+import { AlertTriangle, BellRing, Bell as BellIcon, CreditCard, LifeBuoy, Plug, Tag, Sparkles } from "lucide-react";
 import { useToast } from "@/components/shared/Toast";
 import type { AdminRole } from "@/lib/admin/perms";
 import { cn } from "@/lib/utils";
 
 type Ev = { id: string; kind: string; title: string; body?: string | null; href?: string | null; createdAt: string };
 const SEEN = "outly-admin-seen";
-const ICON: Record<string, typeof Tag> = { payment_failed: AlertTriangle, subscription_new: CreditCard, ticket_new: LifeBuoy, ticket_urgent: LifeBuoy, plan_changed: Tag, integration: Plug };
+const ICON: Record<string, typeof Tag> = { payment_failed: AlertTriangle, subscription_new: CreditCard, ticket_new: LifeBuoy, ticket_urgent: LifeBuoy, plan_changed: Tag, integration: Plug, behavior_analysis: Sparkles };
 const LOUD = new Set(["payment_failed", "ticket_urgent", "ticket_new", "subscription_new"]);
 
 function ago(iso: string) {

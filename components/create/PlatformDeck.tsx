@@ -2,7 +2,7 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import * as Switch from "@radix-ui/react-switch";
-import { AlertCircle, ArrowRight, Check, CircleAlert, Link2, RefreshCw, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowRight, Check, CircleAlert, Link2, MinusCircle, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Counter, Input, Label, Textarea } from "@/components/ui/field";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
@@ -11,6 +11,7 @@ import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn } from "@/lib/utils";
 import { InstagramReel, XPost, YouTubeShort } from "./Previews";
+import { enabledPlatforms, launchGate } from "./publish";
 import type { AccountView, Draft } from "./types";
 
 interface Props {
@@ -40,7 +41,7 @@ const SURFACE: Record<Platform, string> = {
 };
 
 export function PlatformDeck(p: Props) {
-  const enabled = PLATFORMS.filter((pl) => p.drafts[pl].enabled);
+  const enabled = enabledPlatforms(p.drafts);
   const [active, setActive] = useState<Platform>(enabled[0] ?? "instagram");
   const hookId = useId();
   const live = useLivePlatforms();
@@ -63,8 +64,8 @@ export function PlatformDeck(p: Props) {
     return out;
   }, [p.drafts, p.accounts, p.media]);
 
-  const pending = enabled.filter((pl) => !p.drafts[pl].reviewed || status[pl].blocked);
-  const ready = enabled.length > 0 && pending.length === 0;
+  // Skipped platforms are not in the gate at all, so switching one off can never hold up the launch.
+  const { pending, ready } = launchGate(p.drafts, p.accounts, p.media);
 
   const markReviewed = (pl: Platform) => {
     p.onDraft(pl, { reviewed: true });
@@ -89,37 +90,49 @@ export function PlatformDeck(p: Props) {
         </div>
       </header>
 
-      {/* Destination picker */}
-      <div role="tablist" aria-label="Destinations" className="scrollbar-none -mx-1 mb-6 flex snap-x gap-3 overflow-x-auto px-1 pb-1">
-        {live.map((pl) => {
-          const s = status[pl];
-          const on = active === pl;
-          return (
-            <button
-              key={pl}
-              role="tab"
-              id={`tab-${pl}`}
-              aria-selected={on}
-              aria-controls={`panel-${pl}`}
-              onClick={() => setActive(pl)}
-              className={cn(
-                "relative flex min-w-[200px] flex-1 snap-start items-center gap-3 rounded-3xl p-3.5 pr-4 text-left transition",
-                on ? "glass shadow-[0_20px_60px_-30px_var(--halo)]" : "bg-secondary/40 hover:bg-secondary/70",
-                !p.drafts[pl].enabled && "opacity-60",
-              )}
-              style={{ ["--halo" as string]: PLATFORM_HALO[pl] }}
-            >
-              {on && <motion.span layoutId="deck-tab" className="absolute inset-0 rounded-3xl ring-1 ring-foreground/25" transition={{ type: "spring", stiffness: 400, damping: 34 }} />}
-              <PlatformOrb platform={pl} size={40} />
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold">
-                  {PLATFORM_META[pl].name} <span className="font-normal text-muted-foreground">{PLATFORM_META[pl].format}</span>
-                </span>
-                <span className={cn("block truncate text-xs", s.tone === "done" ? "text-success" : s.tone === "warn" ? "text-warning" : "text-muted-foreground")}>{p.loading && p.drafts[pl].enabled ? "Writing…" : s.label}</span>
-              </span>
-            </button>
-          );
-        })}
+      {/* Destination picker. The on/off control is a sibling of the tab, never nested inside it. */}
+      <div className="scrollbar-none -mx-1 mb-6 flex snap-x gap-3 overflow-x-auto px-1 pb-1">
+        <div role="tablist" aria-label="Destinations" className="contents">
+          {live.map((pl) => {
+            const s = status[pl];
+            const on = active === pl;
+            const d = p.drafts[pl];
+            return (
+              <div key={pl} role="presentation" className={cn("relative flex min-w-[200px] flex-1 snap-start flex-col rounded-3xl transition", on ? "glass shadow-[0_20px_60px_-30px_var(--halo)]" : "bg-secondary/40", !d.enabled && "opacity-80")} style={{ ["--halo" as string]: PLATFORM_HALO[pl] }}>
+                {on && <motion.span layoutId="deck-tab" className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-foreground/25" transition={{ type: "spring", stiffness: 400, damping: 34 }} />}
+                <button
+                  role="tab"
+                  id={`tab-${pl}`}
+                  aria-selected={on}
+                  aria-controls={`panel-${pl}`}
+                  onClick={() => setActive(pl)}
+                  className={cn("relative flex items-center gap-3 rounded-3xl p-3.5 pr-4 text-left transition", !on && "hover:bg-secondary/60")}
+                >
+                  <PlatformOrb platform={pl} size={40} />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">
+                      {PLATFORM_META[pl].name} <span className="font-normal text-muted-foreground">{PLATFORM_META[pl].format}</span>
+                    </span>
+                    <span className={cn("block truncate text-xs", s.tone === "done" ? "text-success" : s.tone === "warn" ? "text-warning" : "text-muted-foreground")}>{p.loading && d.enabled ? "Writing…" : s.label}</span>
+                  </span>
+                </button>
+                <label htmlFor={`send-${pl}`} className="relative flex min-h-[44px] cursor-pointer items-center gap-2 rounded-b-3xl border-t border-border/60 px-3.5 text-xs font-semibold">
+                  <input
+                    id={`send-${pl}`}
+                    type="checkbox"
+                    checked={d.enabled}
+                    onChange={(e) => p.onDraft(pl, { enabled: e.target.checked })}
+                    className="h-5 w-5 shrink-0 cursor-pointer accent-lime focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+                  />
+                  {d.enabled ? <Check className="h-4 w-4 text-success" aria-hidden="true" /> : <MinusCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}
+                  <span className={d.enabled ? "text-foreground" : "text-muted-foreground"}>
+                    {d.enabled ? "Sending" : "Skipping"} <span className="sr-only">{PLATFORM_META[pl].name}</span>
+                  </span>
+                </label>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <AnimatePresence mode="wait">

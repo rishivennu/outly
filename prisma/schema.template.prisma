@@ -366,6 +366,23 @@ model AdminEvent {
   @@index([createdAt])
 }
 
+/// One saved Gemini read of user behaviour. Every run is kept so admins can compare versions over time.
+/// stats = the anonymised aggregate snapshot that was sent (JSON), result = the model's answer (JSON).
+model BehaviorAnalysis {
+  id         String   @id @default(cuid())
+  version    Int      @unique
+  rangeDays  Int      @default(30)
+  focus      String?
+  model      String?
+  stats      String
+  result     String
+  createdBy  String
+  durationMs Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 /// Someone the owner invited into their workspace. Members act on the owner's posts, media and accounts.
 /// The invite link is the credential, so only its SHA-256 hash is stored.
 model TeamMember {

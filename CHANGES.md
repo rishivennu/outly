@@ -1,32 +1,26 @@
-# fix-1014-perf: admin and analytics speed (2026-10-14)
+# fix-1015-features (33 files + this note)
 
-Upload every file at the SAME path from the REPO ROOT (no extra app/app or components/components folder).
-No database change and no new environment variable. tsc 0, 222 tests pass.
+Upload AFTER fix-1014-perf. Drop the contents at the REPO ROOT (paths are relative to it).
 
-## Admin: the 1 second wait on every click
-1. NEW app/admin/(panel)/loading.tsx: a skeleton appears the moment you click a sidebar link (Next prefetches it),
-   instead of the old screen sitting still until the server in Sydney answered.
-2. globals.css: the page fade is shorter (.18s, 4px) and the skeleton waits 120 ms before showing, so fast pages don't flash.
-3. lib/admin/auth.ts: one admin database read per click, not two (the session check and the starter-password banner share it).
-4. layout.tsx + lib/support/tickets.ts + api/admin/tickets/[id]: the open-tickets badge count is cached for 15 s and cleared when a ticket changes.
-5. lib/cache.ts: an update made while a read is still loading can no longer be overwritten by the old value.
-6. SearchBox.tsx: a spinner shows while results load, typing stays smooth, and Back/Forward no longer re-applies the old search.
+## What's in it
+1. Admin > User behavior (/admin/behavior). Breakdown tab: actives, stickiness, activation funnel, retention, weekly cohorts, segments, frequency, weekday rhythm, platforms, posting habits, paid vs free, most engaged. Gemini analyses tab: run an analysis (optional focus question), every version is saved and numbered, older versions load on demand, each version lists what changed since the previous one, "Copy as text". Gemini only sees anonymised totals.
+2. Save draft on every create step, with an autosave line and a "View drafts" link (/content?filter=draft).
+3. Publish only to chosen platforms: each destination has a Sending / Skipping checkbox; the server only creates targets for the kept platforms.
+4. First-time greeting on /home for new free users, inviting them to subscribe (waits for the tour, shows once).
+5. Email template redesign: Bricolage Grotesque + DM Sans, dark header, lime button, full footer.
+6. GSAP motion (gsap + @gsap/react): breakdown cards stagger in, numbers count up, bars grow, cohort grid fills; analysis versions reveal section by section; the greeting choreographs its copy, offer and check marks. Reduced-motion users get the final state with no tweening.
 
-## Analytics / YouTube loading slowly
-7. lib/live/index.ts: the dashboard no longer waits for Gemini (that wait could run up to 2 x 15 s). Numbers and rule-based tips come back first.
-   NEW api/platforms/[platform]/ideas: the Gemini ideas load afterwards, cached for 6 h until your posts' numbers move.
-8. lib/live/index.ts: the live numbers are also kept in Vercel's shared data cache (90 s, served stale while it refreshes,
-   refetched once older than 10 min), so a cold server or a different page doesn't call YouTube again.
-9. lib/live/youtube.ts: all YouTube calls go out at once (the uploads list comes from the channel id), so it's 2 rounds of calls instead of 3,
-   and the result is checked against the real channel.
-10. lib/live/instagram.ts: same parallel loading. A note now says when some posts' numbers didn't load.
-11. lib/analytics.ts: the overview query fetches only the numbers (not the title and thumbnail on every row) and is cached for 60 s.
-12. PlatformDashboardView.tsx: shows "Gemini is reading your numbers..." only when it takes longer than 0.6 s.
-13. NEW tests/live-youtube-speed.test.ts (3 tests).
+## Deploy notes
+- New dependencies: gsap, @gsap/react (package.json + bun.lock included).
+- New table BehaviorAnalysis: the build's db sync creates it on Vercel; otherwise run `prisma db push` once.
+- Set GEMINI_API_KEY for the analyses tab (without it the tab explains what to set).
 
-## Custom page scrollbar on the public site (added 10-14)
-- NEW components/marketing/PageScrollbar.tsx, mounted in app/(marketing)/layout.tsx: home, contact, help, privacy, terms, waitlist.
-- Same 4px pill as the admin sidebar: soft at rest, lime + glow while scrolling, 6px on hover, draggable, click the rail to jump. Identical in Chrome, Edge, Firefox, Safari. Touch screens keep their native overlay bar.
-- Native page bar hidden in CSS via html:has(.pb-rail) on fine pointers only, so no layout jump on load. Hidden while a dialog locks the page and when printing.
-- Drags and jumps go through Lenis (new getLenis() export in SmoothScroll.tsx) so smooth scroll and the bar never fight.
-- Tested Edge + Firefox: no native gutter, wheel/drag/rail-click top and bottom, light + dark. tsc 0, 222 tests pass.
+## Auth redesign (sign in / sign up)
+- New split card: brand light panel on the left (lime, deep green, cream, ink; GSAP drift, pointer lean, glides between the two routes), form on the right.
+- Form: mark, title, labelled fields, lime action, then "or continue with" Google (always shown; needs YouTube OAuth keys or it returns ?google_error=not_configured).
+- Signup fits the screen with no scroll down to 1280x720 and on 390px phones. Skeleton fallback so the form area is never blank while code loads.
+- Files: app/(auth)/{layout,template}.tsx, app/(auth)/{login,signup}/page.tsx, components/auth/{AuthForm,AuthShowcase,AuthFormSkeleton,GoogleButton}.tsx, app/globals.css.
+
+## Verifier fixes
+- lib/admin/behavior.ts: stored health value is whitelisted (a bad value used to crash /admin/behavior).
+- components/admin/BehaviorAnalyses.tsx: safe health lookup, no hydration warning on "x min ago".

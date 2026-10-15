@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
@@ -8,6 +8,8 @@ import { Input, Label } from "@/components/ui/field";
 import { api, ApiError } from "@/lib/client/api";
 import { GoogleButton } from "./GoogleButton";
 import { GoogleHelp } from "@/components/onboarding/GoogleHelp";
+import { OutlyMark } from "@/components/brand/Logo";
+import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
 
 const GOOGLE_ERRORS: Record<string, string> = {
   access_denied: "Google didn't let you in. While Outlly is in testing, only approved testers can use Google sign-in. See the help below.",
@@ -22,7 +24,12 @@ const GOOGLE_ERRORS: Record<string, string> = {
   maintenance: "Outlly is in a short maintenance window, so new accounts are paused. If you already have an account, sign in with the email it uses.",
 };
 
-export function AuthForm({ mode, google = false }: { mode: "login" | "signup"; google?: boolean }) {
+/**
+ * The form half of the auth card. Apple-style utility surface: mark, one clear title, labelled fields,
+ * one lime action, then Google as the alternative. Motion stays short (under half a second) and only clarifies: fields settle in on arrival,
+ * and the card gives a small shake when sign-in fails.
+ */
+export function AuthForm({ mode, google = false, title, subtitle }: { mode: "login" | "signup"; google?: boolean; title: string; subtitle: string }) {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next");
@@ -35,6 +42,25 @@ export function AuthForm({ mode, google = false }: { mode: "login" | "signup"; g
   const demo = mode === "login" && process.env.NEXT_PUBLIC_DEMO_LOGIN === "true";
   const [form, setForm] = useState({ name: "", email: demo ? "creator@studio.dev" : mode === "signup" ? (params.get("email") ?? "").slice(0, 200) : "", password: demo ? "studio123" : "" });
 
+  const ref = useRef<HTMLDivElement>(null);
+  const { contextSafe } = useGSAP(() => {
+    const root = ref.current;
+    if (!root) return;
+    const mm = gsap.matchMedia();
+    mm.add(MOTION_OK, () => {
+      gsap.fromTo(gsap.utils.selector(root)(".gs-in"), { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out", stagger: 0.045, delay: 0.05 });
+    }, root);
+    root.dataset.gsReady = "1";
+  }, { scope: ref });
+  const shake = contextSafe(() => {
+    if (!ref.current || !window.matchMedia(MOTION_OK).matches) return;
+    gsap.fromTo(ref.current, { x: 0 }, { keyframes: { x: [-9, 8, -6, 4, -2, 0] }, duration: 0.45, ease: "power1.out", clearProps: "x" });
+  });
+  const [tries, setTries] = useState(0);
+  useEffect(() => {
+    if (tries) shake();
+  }, [tries, shake]);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -46,97 +72,106 @@ export function AuthForm({ mode, google = false }: { mode: "login" | "signup"; g
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Something got in the way. Let's try again.");
       setBusy(false);
+      setTries((n) => n + 1);
     }
   };
 
+  const other = mode === "login" ? "/signup" : "/login";
+  const otherHref = next ? `${other}?next=${encodeURIComponent(next)}` : other;
+  const label = "mb-1.5 text-[14px] font-semibold text-foreground";
+  const field = "h-12 rounded-xl border border-border bg-card shadow-[0_1px_2px_hsl(var(--foreground)/0.05)] hover:border-foreground/25 focus:border-foreground/40 focus:bg-card";
+
   return (
-    <form onSubmit={submit} className="w-full space-y-5" noValidate>
-      {google && (
-        <div className="space-y-3">
-          <GoogleButton from={mode} next={next} />
-          <p className="text-center text-xs text-muted-foreground">Signs you in and links your YouTube channel in one step.</p>
-          <GoogleHelp compact defaultOpen={googleError === "access_denied"} />
-          <div className="flex items-center gap-3 pt-1 text-xs text-muted-foreground" aria-hidden="true">
-            <span className="h-px flex-1 bg-border" />
-            or use email
-            <span className="h-px flex-1 bg-border" />
-          </div>
-        </div>
-      )}
-      {mode === "signup" && (
-        <div>
-          <Label htmlFor="name">What should we call you?</Label>
-          <Input id="name" autoComplete="name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        </div>
-      )}
-      <div>
-        <Label htmlFor="email">Email</Label>
-        <Input id="email" type="email" inputMode="email" autoComplete="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-      </div>
-      <div>
-        <Label htmlFor="password">Password</Label>
-        <div className="relative">
-          <Input
-            id="password"
-            type={showPw ? "text" : "password"}
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            required
-            minLength={mode === "signup" ? 8 : 1}
-            maxLength={200}
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            onKeyUp={(e) => setCaps(e.getModifierState?.("CapsLock") ?? false)}
-            onBlur={() => setCaps(false)}
-            aria-describedby={[mode === "signup" ? "pw-hint" : "", caps ? "pw-caps" : ""].filter(Boolean).join(" ") || undefined}
-            className="pr-12"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPw((v) => !v)}
-            aria-label={showPw ? "Hide password" : "Show password"}
-            aria-pressed={showPw}
-            className="absolute right-1.5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-          >
-            {showPw ? <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" /> : <Eye className="h-[18px] w-[18px]" aria-hidden="true" />}
-          </button>
-        </div>
-        {caps && (
-          <p id="pw-caps" className="mt-2 text-xs font-medium text-warning">
-            Caps Lock is on.
-          </p>
-        )}
+    <div ref={ref} className="gs-stage">
+      <div className="gs-in mb-4 flex [@media(max-height:800px)]:hidden"><OutlyMark size={34} /></div>
+      <h1 className="gs-in font-display text-[clamp(2rem,3.4vw,2.5rem)] font-bold leading-[1.05] tracking-[-0.035em]">{title}</h1>
+      <p className="gs-in mb-6 mt-2.5 max-w-[40ch] text-[15px] leading-relaxed text-muted-foreground">{subtitle}</p>
+      <form onSubmit={submit} className="w-full space-y-4 [@media(max-height:800px)]:space-y-3" noValidate>
         {mode === "signup" && (
-          <p id="pw-hint" className="mt-2 text-xs text-muted-foreground">
-            At least 8 characters.{form.password.length > 0 && form.password.length < 8 ? ` ${8 - form.password.length} to go.` : ""}
+          <div className="gs-in">
+            <Label htmlFor="name" className={label}>Your name</Label>
+            <Input id="name" autoComplete="name" required placeholder="Alex Rivera" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={field} />
+          </div>
+        )}
+        <div className="gs-in">
+          <Label htmlFor="email" className={label}>Your email</Label>
+          <Input id="email" type="email" inputMode="email" autoComplete="email" required placeholder="you@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={field} />
+        </div>
+        <div className="gs-in">
+          <Label htmlFor="password" className={label}>
+            Password
+            {mode === "signup" && (
+              <span id="pw-hint" className="text-xs font-normal text-muted-foreground" aria-live="polite">
+                {form.password.length > 0 && form.password.length < 8 ? `${8 - form.password.length} more to go` : "At least 8 characters"}
+              </span>
+            )}
+          </Label>
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPw ? "text" : "password"}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              required
+              minLength={mode === "signup" ? 8 : 1}
+              maxLength={200}
+              placeholder={mode === "signup" ? "Create a password" : "Your password"}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              onKeyUp={(e) => setCaps(e.getModifierState?.("CapsLock") ?? false)}
+              onBlur={() => setCaps(false)}
+              aria-describedby={[mode === "signup" ? "pw-hint" : "", caps ? "pw-caps" : ""].filter(Boolean).join(" ") || undefined}
+              className={`${field} pr-12`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw((v) => !v)}
+              aria-label={showPw ? "Hide password" : "Show password"}
+              aria-pressed={showPw}
+              className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              {showPw ? <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" /> : <Eye className="h-[18px] w-[18px]" aria-hidden="true" />}
+            </button>
+          </div>
+          {caps && (
+            <p id="pw-caps" className="mt-2 text-xs font-medium text-warning">
+              Caps Lock is on.
+            </p>
+          )}
+        </div>
+        {error && (
+          <p role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
           </p>
         )}
-      </div>
-      {error && (
-        <p role="alert" className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
+        <div className="gs-in">
+          <Button type="submit" variant="lime" className="auth-cta h-12 w-full text-[15px]" disabled={busy} aria-busy={busy}>
+            {busy ? (mode === "login" ? "Opening Outlly…" : "Setting up your account…") : mode === "login" ? "Sign in" : "Get started"}
+            {!busy && <ArrowRight className="auth-cta-arrow h-[18px] w-[18px]" aria-hidden="true" />}
+          </Button>
+        </div>
+        <div className="gs-in flex items-center gap-3 text-xs text-muted-foreground" aria-hidden="true">
+          <span className="h-px flex-1 bg-border" />
+          or continue with
+          <span className="h-px flex-1 bg-border" />
+        </div>
+        <div className="gs-in space-y-3">
+          <GoogleButton from={mode} next={next} label={mode === "login" ? "Sign in with Google" : "Sign up with Google"} />
+          {google && <GoogleHelp compact defaultOpen={googleError === "access_denied"} />}
+        </div>
+        <p className="gs-in text-center text-sm text-muted-foreground">
+          {mode === "login" ? "Don't have an account? " : "Already have an account? "}
+          <Link href={otherHref} className="rounded font-semibold text-lime-ink underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+            {mode === "login" ? "Sign up" : "Sign in"}
+          </Link>
         </p>
-      )}
-      <Button type="submit" variant="lime" size="lg" className="w-full" disabled={busy}>
-        {busy ? (mode === "login" ? "Opening Outlly…" : "Setting up your account…") : mode === "login" ? "Let's go" : "Create my account"}
-        {!busy && <ArrowRight className="h-5 w-5" />}
-      </Button>
-      <p className="text-center text-sm text-muted-foreground">
-        {mode === "login" ? (
-          <>
-            New here?{" "}
-            <Link href={next ? `/signup?next=${encodeURIComponent(next)}` : "/signup"} className="font-medium text-foreground underline underline-offset-4">
-              Create an account
-            </Link>
-          </>
-        ) : (
-          <>
-            Already have one?{" "}
-            <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="font-medium text-foreground underline underline-offset-4">
-              Sign in
-            </Link>
-          </>
+        {mode === "signup" && (
+          <p className="gs-in text-center text-xs leading-relaxed text-muted-foreground">
+            By creating an account you agree to the{" "}
+            <Link href="/terms" className="font-medium text-foreground underline underline-offset-4">Terms</Link> and{" "}
+            <Link href="/privacy" className="font-medium text-foreground underline underline-offset-4">Privacy Policy</Link>.
+          </p>
         )}
-      </p>
-    </form>
+      </form>
+    </div>
   );
 }

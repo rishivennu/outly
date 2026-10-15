@@ -10,11 +10,12 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DateTimePicker } from "@/components/shared/DateTimePicker";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { fmt, tzShort } from "@/components/shell/UserContext";
-import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
+import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/client/api";
 import type { BestTimes } from "@/lib/schedule/best-time";
 import type { AccountView, Draft } from "./types";
+import { enabledPlatforms } from "./publish";
 
 interface Props {
   drafts: Record<Platform, Draft>;
@@ -34,7 +35,8 @@ interface Props {
 
 export function LaunchPanel(p: Props) {
   const [picking, setPicking] = useState(false);
-  const targets = PLATFORMS.filter((pl) => p.drafts[pl].enabled);
+  // Only the destinations the user left switched on. Nothing else is ever listed or sent.
+  const targets = enabledPlatforms(p.drafts);
   const names = targets.map((t) => PLATFORM_META[t].name);
   const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
   const [best, setBest] = useState<BestTimes | null>(null);
@@ -149,7 +151,7 @@ export function LaunchPanel(p: Props) {
           )}
         </Button>
         <p className="text-center text-sm text-muted-foreground">
-          {p.mode === "now" ? `Goes to ${list} right away.` : `Goes to ${list} at that time. You can change it until then.`}
+          {targets.length === 0 ? "Pick at least one place to send it." : p.mode === "now" ? `Goes to ${list} right away.` : `Goes to ${list} at that time. You can change it until then.`}
         </p>
         {p.error && (
           <p role="alert" className="text-center text-sm text-destructive">

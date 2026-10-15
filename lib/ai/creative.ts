@@ -255,9 +255,11 @@ function offlineCopy(story: string, hook: string, platforms: Platform[]): Platfo
 
 const MODELS = ["gemini-flash-lite-latest", "gemini-flash-latest"];
 
-export async function gemini<T>(system: string, prompt: string): Promise<T | null> {
+export type GeminiOpts = { temperature?: number; timeoutMs?: number; models?: string[]; onModel?: (model: string) => void };
+
+export async function gemini<T>(system: string, prompt: string, opts: GeminiOpts = {}): Promise<T | null> {
   if (!env.GEMINI_API_KEY) return null;
-  for (const model of MODELS) {
+  for (const model of opts.models ?? MODELS) {
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
@@ -265,14 +267,18 @@ export async function gemini<T>(system: string, prompt: string): Promise<T | nul
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json", temperature: 0.9 },
+          generationConfig: { responseMimeType: "application/json", temperature: opts.temperature ?? 0.9 },
         }),
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 15_000),
       });
       if (!r.ok) continue;
       const j = await r.json();
       const txt = j.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (txt) return JSON.parse(txt) as T;
+      if (txt) {
+        const out = JSON.parse(txt) as T;
+        opts.onModel?.(model);
+        return out;
+      }
     } catch {
       /* try next model */
     }

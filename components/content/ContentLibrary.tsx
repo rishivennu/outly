@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,12 +24,16 @@ const FILTERS = [
 ] as const;
 type F = (typeof FILTERS)[number]["id"];
 
+/** `/content?filter=draft` opens straight on that tab, so a "Saved to Drafts" link can land here. */
+export const filterFromParam = (v: string | null | undefined): F => (FILTERS.some((f) => f.id === v) ? (v as F) : "all");
+
 const match = (p: PostView, f: F) => f === "all" || (f === "failed" ? ["failed", "partial"].includes(p.status) : f === "published" ? p.status === "published" : p.status === f);
 
 export function ContentLibrary({ initial, views }: { initial: PostView[]; views: Record<string, number> }) {
   const { timezone: tz } = useUser();
   const [posts, setPosts] = useState(initial);
-  const [filter, setFilter] = useState<F>("all");
+  const params = useSearchParams();
+  const [filter, setFilter] = useState<F>(() => filterFromParam(params?.get("filter")));
   const [open, setOpen] = useState<PostView | null>(null);
   const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.id, posts.filter((p) => match(p, f.id)).length])) as Record<F, number>, [posts]);
   const shown = posts.filter((p) => match(p, filter));
@@ -54,7 +59,10 @@ export function ContentLibrary({ initial, views }: { initial: PostView[]; views:
 
       <div role="tablist" aria-label="Filter by status" className="scrollbar-none -mx-1 mt-8 flex gap-2 overflow-x-auto px-1 pb-1">
         {FILTERS.map((f) => (
-          <button key={f.id} role="tab" aria-selected={filter === f.id} onClick={() => setFilter(f.id)} className={cn("relative h-11 shrink-0 rounded-full px-4 text-sm font-medium transition", filter === f.id ? "text-[hsl(var(--lime-foreground))]" : "text-muted-foreground hairline hover:text-foreground")}>
+          <button key={f.id} role="tab" aria-selected={filter === f.id} onClick={() => {
+              setFilter(f.id);
+              window.history.replaceState(null, "", f.id === "all" ? "/content" : `/content?filter=${f.id}`);
+            }} className={cn("relative h-11 shrink-0 rounded-full px-4 text-sm font-medium transition", filter === f.id ? "text-[hsl(var(--lime-foreground))]" : "text-muted-foreground hairline hover:text-foreground")}>
             {filter === f.id && <motion.span layoutId="content-filter" className="lime-bg absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
             <span className="relative">
               {f.label} <span className="tabular opacity-60">{counts[f.id]}</span>
