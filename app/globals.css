@@ -1048,9 +1048,9 @@ html[data-contrast="more"] a:not([class*="btn"]) { text-decoration-thickness: 2p
 }
 
 /* Platforms: Apple One-style service bars in each platform's own colours (white text holds >= 4.5:1 over the text side). */
-.pf-bar { position: relative; display: flex; gap: 1.25rem; overflow: hidden; border-radius: 28px; padding: 1.5rem; color: #fff; isolation: isolate; }
-@media (min-width: 640px) { .pf-bar { padding: 1.75rem 1.75rem 1.75rem 1.75rem; } }
-.pf-bar::after { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(120% 90% at 100% 100%, rgb(255 255 255 / .16), transparent 55%); pointer-events: none; }
+/* 10-15: Supported destinations bento. Brand-coloured tiles; on mobile they become a sticky card stack. */
+.pf-tile { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 19rem; overflow: hidden; border-radius: 28px; padding: 1.5rem; color: #fff; isolation: isolate; }
+.pf-tile::after { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(120% 90% at 100% 100%, rgb(255 255 255 / .16), transparent 55%); pointer-events: none; }
 .pf-bar-instagram { background: linear-gradient(100deg, #5b2a9e 0%, #8e2a91 38%, #b8256f 68%, #e0533a 100%); }
 .pf-bar-youtube { background: linear-gradient(100deg, #9e0010 0%, #c80000 60%, #f2221a 100%); }
 .pf-bar-x { background: linear-gradient(100deg, #000 0%, #16161a 100%); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .1); }
@@ -1060,23 +1060,17 @@ html[data-contrast="more"] a:not([class*="btn"]) { text-decoration-thickness: 2p
 .pf-bar-linkedin { background: linear-gradient(100deg, #004182 0%, #0a66c2 100%); }
 .pf-bar-icon { box-shadow: 0 0 0 1px rgb(255 255 255 / .25), 0 8px 18px -8px rgb(0 0 0 / .5); }
 .pf-bar-chip { border-radius: 9999px; padding: .28rem .7rem; font-size: 12px; font-weight: 600; background: rgb(0 0 0 / .26); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18); }
-.pf-art-phone, .pf-art-post { display: none; }
-@media (min-width: 640px) {
-  .pf-art-phone { display: block; position: relative; flex-shrink: 0; align-self: flex-end; width: 92px; height: 176px; margin: 0 -.25rem -2.6rem 0; padding: 4px; border-radius: 20px; background: #0c0c0e; box-shadow: 0 0 0 1px rgb(255 255 255 / .2), 0 20px 30px -12px rgb(0 0 0 / .55); transform: rotate(6deg); transition: transform .6s var(--ease-liquid); }
-  .pf-art-post { display: flex; flex-direction: column; flex-shrink: 0; align-self: flex-end; width: 150px; margin: 0 -.5rem -2.2rem 0; padding: 10px; border-radius: 16px; background: #fff; box-shadow: 0 20px 30px -12px rgb(0 0 0 / .55); transform: rotate(-4deg); transition: transform .6s var(--ease-liquid); }
-  .pf-bar:hover .pf-art-phone { transform: rotate(2deg) translateY(-6px); }
-  .pf-bar:hover .pf-art-post { transform: rotate(-1deg) translateY(-6px); }
+.pf-chip-api { display: inline-flex; align-items: center; gap: .3rem; background: rgb(255 255 255 / .2); }
+.pf-live { display: inline-flex; align-items: center; gap: .3rem; border-radius: 9999px; padding: .3rem .65rem; font-size: 12.5px; font-weight: 600; background: rgb(255 255 255 / .16); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .22); }
+.pf-count { font-size: 12.5px; font-weight: 600; opacity: .8; }
+@media (max-width: 767px) {
+  .pf-stack { gap: 1rem; }
+  .pf-stack > li { position: sticky; top: calc(84px + env(safe-area-inset-top, 0px)); }
+  .pf-stack .pf-tile { min-height: 23rem; transform-origin: 50% 0; transform: scale(calc(1 - var(--cover, 0) * .07)); box-shadow: 0 -14px 32px -18px rgb(0 0 0 / .45); will-change: transform; }
+  .pf-stack .pf-tile::before { content: ""; position: absolute; inset: 0; z-index: 3; border-radius: inherit; background: #000; opacity: calc(var(--cover, 0) * .5); pointer-events: none; }
 }
-.pf-art-screen { position: relative; display: block; height: 100%; border-radius: 16px; overflow: hidden; background: radial-gradient(circle at 70% 25%, rgb(255 255 255 / .55) 0 9%, transparent 10%), linear-gradient(160deg, hsl(262 80% 62%), hsl(190 85% 52%) 55%, hsl(330 85% 62%)); }
-.pf-art-rail { position: absolute; right: 6px; bottom: 26px; display: flex; flex-direction: column; gap: 6px; }
-.pf-art-rail i { display: block; width: 10px; height: 10px; border-radius: 9999px; background: rgb(255 255 255 / .85); }
-.pf-art-lines { position: absolute; left: 7px; bottom: 10px; right: 22px; display: flex; flex-direction: column; gap: 4px; }
-.pf-art-lines i { display: block; height: 4px; border-radius: 3px; background: rgb(255 255 255 / .85); }
-.pf-art-lines i:last-child { width: 60%; }
-.pf-art-av { display: block; width: 16px; height: 16px; border-radius: 9999px; background: #d4d4d8; }
-.pf-art-l { display: block; height: 5px; border-radius: 3px; background: #d4d4d8; }
-.pf-art-media { display: block; margin-top: 8px; height: 64px; border-radius: 10px; background: linear-gradient(150deg, hsl(262 80% 62%), hsl(190 85% 52%) 50%, hsl(330 85% 62%)); }
-@media (prefers-reduced-motion: reduce) { .pf-art-phone, .pf-art-post { transition: none; } }
+@media (min-width: 1024px) { .pf-tile { min-height: 18rem; } }
+@media (forced-colors: active) { .pf-tile { border: 1px solid CanvasText; } .pf-stack .pf-tile::before { display: none; } }
 
 /* Comparison, Apple compare-models look: our column sits on the soft canvas grey. */
 .cmp-us { background: hsl(var(--ap-canvas)); }
@@ -1608,3 +1602,19 @@ html[data-contrast="more"] .pc-sheet { background: var(--pc-solid); backdrop-fil
 /* 10-15 Home cards: tinted idea notes. Text stays foreground on a light tint, so contrast holds in both themes. */
 .idea-note { background: color-mix(in srgb, var(--note) 14%, hsl(var(--card))); border: 1px solid color-mix(in srgb, var(--note) 30%, transparent); }
 .dark .idea-note { background: color-mix(in srgb, var(--note) 16%, hsl(var(--card))); }
+
+/* 10-15: Invisible watermark (components/shared/Watermark.tsx). ~1% so it never shows, but survives a levels pass on a screenshot. */
+.wm { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; background-image: var(--wm-l); background-repeat: repeat; opacity: .008; }
+.dark .wm { background-image: var(--wm-d); opacity: .008; }
+.wm-user { background-position: 220px 125px; }
+@media print { .wm { opacity: .05; } }
+
+/* 10-15: Avatar cursor (components/shell/AvatarCursor.tsx). Mouse/trackpad only; text fields keep the text cursor. */
+@media (hover: hover) and (pointer: fine) {
+  html[data-avatar-cursor], html[data-avatar-cursor] body, html[data-avatar-cursor] body * { cursor: var(--avatar-cursor) !important; }
+  html[data-avatar-cursor] :is(a[href], button:not(:disabled), [role="button"], [role="tab"], [role="switch"], [role="menuitem"], [role="option"], [role="radio"], [role="checkbox"], label, summary, select),
+  html[data-avatar-cursor] :is(a[href], button:not(:disabled), [role="button"], [role="tab"], [role="switch"], [role="menuitem"], [role="option"], [role="radio"], [role="checkbox"], label, summary, select) * { cursor: var(--avatar-cursor-hover) !important; }
+  html[data-avatar-cursor] :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="button"], [type="submit"], [type="color"], [type="file"]), textarea, [contenteditable="true"], [contenteditable=""]) { cursor: text !important; }
+  html[data-avatar-cursor] :is(:disabled, [aria-disabled="true"]) { cursor: not-allowed !important; }
+}
+@media (forced-colors: active) { html[data-avatar-cursor] * { cursor: auto !important; } }

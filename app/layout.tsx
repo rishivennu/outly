@@ -20,12 +20,16 @@ const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-disp
 const body = DM_Sans({ subsets: ["latin"], variable: "--font-body", display: "swap", axes: ["opsz"] });
 const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-serif", display: "swap" });
 
+import { Watermark } from "@/components/shared/Watermark";
+
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3040"),
   title: { default: "Outlly · Create once. Publish everywhere.", template: "%s · Outlly" },
   description: "Upload one video, let AI tailor it for Instagram Reels, YouTube Shorts and X, then publish and track every destination from one creative workspace.",
   openGraph: { title: "Outlly", description: "Your content deserves to be everywhere.", type: "website" },
   // Google Search Console ownership tag. Set GOOGLE_SITE_VERIFICATION in Vercel to the content="..." value only.
+  // Copyright notice in the page head; the visible one sits in the footer.
+  other: { copyright: `\u00A9 ${new Date().getFullYear()} Outlly. All rights reserved.` },
   verification: { google: process.env.GOOGLE_SITE_VERIFICATION?.trim() || undefined },
 };
 
@@ -50,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <CookieBanner />
           <Connectivity />
           <Ripples />
+          <Watermark />
         </MotionRoot>
       </body>
     </html>

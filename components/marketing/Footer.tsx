@@ -137,7 +137,7 @@ export function MarketingFooter() {
         </div>
 
         <div className="ft-rule ft-fine relative flex flex-col gap-1.5 border-t border-foreground/10 px-6 pb-6 pt-4 text-[12.5px] text-foreground/70 sm:flex-row sm:items-center sm:justify-between sm:px-10">
-          <p>&copy; {new Date().getFullYear()} Outlly. In beta.</p>
+          <p>&copy; {new Date().getFullYear()} Outlly. All rights reserved. In beta.</p>
           <p>Instagram, YouTube and X are trademarks of their owners. Outlly is not affiliated with them.</p>
         </div>
       </div>

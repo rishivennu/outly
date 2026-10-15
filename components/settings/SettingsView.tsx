@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { CursorToggle } from "@/components/shell/AvatarCursor";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { useUser, tzShort } from "@/components/shell/UserContext";
 import { api, ApiError } from "@/lib/client/api";
@@ -181,6 +182,7 @@ export function SettingsView({ weeklyReport = true }: { weeklyReport?: boolean }
               </div>
             </div>
             <ThemeToggle plain className="mt-5" />
+            <CursorToggle />
           </motion.section>
 
           <section className="glass flex flex-wrap items-center justify-between gap-4 rounded-[32px] p-6" aria-labelledby="tour-h">
