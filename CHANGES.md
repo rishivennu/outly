@@ -24,3 +24,8 @@ Upload AFTER fix-1014-perf. Drop the contents at the REPO ROOT (paths are relati
 ## Verifier fixes
 - lib/admin/behavior.ts: stored health value is whitelisted (a bad value used to crash /admin/behavior).
 - components/admin/BehaviorAnalyses.tsx: safe health lookup, no hydration warning on "x min ago".
+
+## Bento emails (lib/email/index.ts)
+- Every email is now a bento board: dark page, top bar (mark, name, tagline), lime or cream hero tile with a chip and the title, detail tiles (ink, white, deep green) with big numbers, a cream message tile with an ink pill button (lime label), footer on the board.
+- Weekly report: posts out / views / likes tiles, a By platform tile, a Best performer tile. Invoice, refund, canceled, ticket, waitlist, team invite and referral get their own detail tiles.
+- Platform names use the brand spelling (YouTube, TikTok, LinkedIn). Tiles stack on phones. tests/email-template.test.ts updated (9 tests).
