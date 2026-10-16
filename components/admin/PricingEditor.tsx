@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ExternalLink, Plus, Sparkles, Trash2, Users } from "lucide-react";
+import { Check, Plus, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
@@ -11,7 +11,7 @@ import { adminApi } from "@/lib/client/admin-api";
 import { CURRENCIES, priceLabel, type PublicPlan } from "@/lib/billing/money";
 import { localPrice } from "@/lib/billing/currency";
 import { cn } from "@/lib/utils";
-import { Pill } from "./ui";
+import { DotText } from "@/components/brand/DotText";
 
 type Plan = PublicPlan & { subscribers: number; locked: boolean };
 type Draft = { name: string; slug: string; price: string; currency: string; interval: string; note: string; features: string; state: PublicPlan["state"]; highlight: boolean; sortOrder: number; prices: Record<string, string>; postLimit: number; aiCaptions: boolean; seats: number };
@@ -55,9 +55,11 @@ function LocalPrices({ d, parsed, onChange }: { d: Draft; parsed: ReturnType<typ
   const others = CURRENCIES.filter((c) => c !== d.currency);
   const free = !Number.isFinite(parsed.priceMinor) || parsed.priceMinor <= 0;
   return (
-    <fieldset className="sm:col-span-2 rounded-2xl bg-secondary/30 p-4 hairline">
-      <legend className="px-1 text-[14px] font-medium">Local prices</legend>
-      <p className="mb-3 text-[12px] text-muted-foreground">Visitors see the price in their own currency, picked from where they are. Leave a box blank to convert from {d.currency} automatically (the grey number); type a price to set it exactly.</p>
+    <fieldset className="sm:col-span-2">
+      <legend className="text-[14px] font-medium">Local prices</legend>
+      <p className="mb-3 mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+        {free ? "A free plan is free everywhere." : `Visitors see their own currency. Leave a box blank to convert from ${d.currency} (the grey number), or type a price to set it exactly.`}
+      </p>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         {others.map((c) => {
           const auto = free ? "0" : String(localPrice({ priceMinor: parsed.priceMinor, currency: d.currency }, c).priceMinor / 100);
@@ -75,13 +77,87 @@ function LocalPrices({ d, parsed, onChange }: { d: Draft; parsed: ReturnType<typ
 
 function Seg<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; label: string }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex w-full rounded-2xl bg-secondary/60 p-1 hairline">
+    <div role="radiogroup" aria-label={label} className="inline-flex w-full rounded-full bg-secondary/60 p-1 hairline">
       {options.map((o) => (
-        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)} className={cn("h-10 flex-1 rounded-xl px-3 text-[13px] font-semibold transition-all duration-300", value === o.value ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}>
+        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)} className={cn("h-10 flex-1 rounded-full px-3 text-[13px] font-semibold transition-all duration-300", value === o.value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
           {o.label}
         </button>
       ))}
     </div>
+  );
+}
+
+function Toggle({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex min-h-[3.25rem] cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4 py-2.5 hairline">
+      <span className="min-w-0">
+        <span className="block text-[14px] font-medium">{label}</span>
+        {hint && <span className="block text-[12px] text-muted-foreground">{hint}</span>}
+      </span>
+      <input type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
+      <span aria-hidden className="relative h-7 w-12 shrink-0 rounded-full bg-muted transition-colors peer-checked:bg-lime peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-background after:shadow after:transition-transform after:duration-300 peer-checked:after:translate-x-5" />
+    </label>
+  );
+}
+
+/** One numbered group of the form, drawn as a Live Activity inner box. */
+function Section({ n, title, hint, children }: { n: string; title: string; hint?: string; children: React.ReactNode }) {
+  const id = `pl-sec-${n}`;
+  return (
+    <section aria-labelledby={id} className="la-box relative rounded-[1.5rem] p-4 sm:p-5">
+      <div className="mb-4 flex items-baseline gap-3">
+        <span className="tabular text-[11px] font-bold uppercase tracking-[0.12em] la-accent" aria-hidden="true">{n}</span>
+        <h2 id={id} className="text-[15px] font-semibold leading-tight">{title}</h2>
+        {hint && <span className="ml-auto text-[12px] la-mute">{hint}</span>}
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+    </section>
+  );
+}
+
+const STATE: Record<PublicPlan["state"], { label: string; note: string }> = {
+  available: { label: "On sale", note: "Live on the site" },
+  soon: { label: "Coming soon", note: "Shown, not on sale" },
+  hidden: { label: "Hidden", note: "Not on the site" },
+};
+
+/** A plan in the rail: the same Live Activity card as the posting screen, with the plan name in dot letters. */
+function PlanCard({ p, on, onPick }: { p: Plan; on: boolean; onPick: () => void }) {
+  const live = p.state === "available";
+  return (
+    <li className="min-w-0">
+      <button
+        type="button"
+        onClick={onPick}
+        aria-pressed={on}
+        aria-label={`${p.name}, ${priceLabel(p)}, ${STATE[p.state].label}${p.subscribers ? `, ${p.subscribers} active` : ""}`}
+        className={cn(
+          "la-card la-themed relative flex h-full w-full flex-col overflow-hidden rounded-[1.75rem] p-4 text-left transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-[hsl(var(--ring))] motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+          live && "la-live",
+          on && "ring-2 ring-lime ring-offset-2 ring-offset-background",
+        )}
+      >
+        <span className="la-grid rounded-[inherit]" aria-hidden="true" />
+        <span className="relative flex items-start justify-between gap-2" aria-hidden="true">
+          <DotText text={p.name || "PLAN"} className="h-7 max-w-full" />
+          {p.highlight && <Sparkles className="mt-1 h-4 w-4 shrink-0 la-accent" />}
+        </span>
+        <span className="relative mt-3 grid grid-cols-2 gap-3" aria-hidden="true">
+          <span className="min-w-0">
+            <span className="block truncate font-semibold leading-tight tabular">{priceLabel(p)}</span>
+            <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.08em] la-mute">{p.priceMinor === 0 ? "Free" : p.interval === "year" ? "Yearly" : "Monthly"}</span>
+          </span>
+          <span className="min-w-0">
+            <span className="block font-semibold leading-tight tabular">{p.subscribers}</span>
+            <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.08em] la-mute">Active</span>
+          </span>
+        </span>
+        <span className="la-box relative mt-3 flex items-center justify-between gap-2 rounded-[1.1rem] px-3.5 py-2.5" aria-hidden="true">
+          <span className="text-[14px] font-semibold">{STATE[p.state].label}</span>
+          <span className={cn("text-[10.5px] font-bold uppercase tracking-[0.1em]", live ? "la-accent" : "la-mute")}>{STATE[p.state].note}</span>
+        </span>
+      </button>
+    </li>
   );
 }
 
@@ -101,7 +177,7 @@ function Preview({ d }: { d: ReturnType<typeof parse> }) {
           {price}
         </motion.p>
       </AnimatePresence>
-      <p className="mt-1 text-sm text-muted-foreground">{d.note || "\u00a0"}</p>
+      <p className="mt-1 text-sm text-foreground/75">{d.note || "\u00a0"}</p>
       <ul className="mt-6 flex flex-1 flex-col gap-2.5">
         {d.features.map((b, i) => (
           <li key={i} className="flex items-start gap-2.5 text-[14.5px] leading-snug">
@@ -114,6 +190,41 @@ function Preview({ d }: { d: ReturnType<typeof parse> }) {
         {live ? (d.priceMinor > 0 ? `Get ${d.name || "plan"}` : "Start creating") : d.state === "soon" ? "Not on sale yet" : "Hidden from the site"}
       </span>
     </article>
+  );
+}
+
+/** What saving does, in plain words, from facts on screen only. */
+function Impact({ current, parsed }: { current?: Plan; parsed: ReturnType<typeof parse> }) {
+  const ok = Number.isFinite(parsed.priceMinor);
+  const price = ok ? priceLabel(parsed as any) : "-";
+  const exact = Object.keys(parsed.prices).length;
+  const auto = CURRENCIES.length - 1 - exact;
+  const rows: { k: string; v: React.ReactNode; warn?: boolean }[] = [
+    { k: "On the site", v: parsed.state === "available" ? `On sale at ${price}` : parsed.state === "soon" ? "Shown as coming soon" : "Not shown" },
+    { k: "Other currencies", v: parsed.priceMinor > 0 ? `${exact} set by hand, ${auto} converted from ${parsed.currency}` : "Free everywhere" },
+  ];
+  if (current && current.subscribers > 0) {
+    const changed = parsed.priceMinor !== current.priceMinor || parsed.currency !== current.currency || parsed.interval !== current.interval;
+    rows.push({
+      k: current.subscribers === 1 ? "1 subscriber" : `${current.subscribers} subscribers`,
+      v: changed ? `Keep ${priceLabel(current)} until they change plan. New customers pay ${price}.` : "Nothing changes for them.",
+      warn: changed,
+    });
+  }
+  return (
+    <div className="la-card la-themed relative mt-4 overflow-hidden rounded-[1.75rem] p-4" aria-live="polite">
+      <span className="la-grid rounded-[inherit]" aria-hidden="true" />
+      <p className="relative text-[11px] font-bold uppercase tracking-[0.12em] la-mute">When you save</p>
+      <dl className="relative mt-3 grid gap-2">
+        {rows.map((r) => (
+          <div key={r.k} className="la-box rounded-[1.1rem] px-3.5 py-2.5">
+            <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] la-mute">{r.k}</dt>
+            <dd className={cn("mt-0.5 text-[13.5px] font-medium leading-snug", r.warn && "la-warn")}>{r.v}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="relative mt-3 text-[12px] leading-relaxed la-mute">The website, checkout and billing page use it on the very next request.</p>
+    </div>
   );
 }
 
@@ -185,119 +296,136 @@ export function PricingEditor({ initial }: { initial: Plan[] }) {
   }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)_340px]">
-      {/* plan list */}
-      <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-5">
+      {/* plan rail */}
+      <ul aria-label="Plans" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {plans.map((p) => (
-          <button key={p.id} type="button" onClick={() => pick(p.id)} aria-pressed={sel === p.id} className={cn("group flex items-center gap-3 rounded-[20px] p-3.5 text-left transition-all duration-300 hairline", sel === p.id ? "bg-card shadow-[0_10px_30px_-18px_hsl(var(--foreground)/0.4)] ring-2 ring-lime" : "hover:bg-card/70")}>
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-2 font-semibold">{p.name}{p.highlight && <Sparkles className="h-3.5 w-3.5 text-lime-ink" aria-label="highlighted" />}</span>
-              <span className="block text-[12.5px] text-muted-foreground">{priceLabel(p)}</span>
-            </span>
-            <span className="flex flex-col items-end gap-1">
-              <Pill tone={p.state === "available" ? "ok" : p.state === "soon" ? "warn" : "muted"}>{p.state === "available" ? "Live" : p.state === "soon" ? "Soon" : "Hidden"}</Pill>
-              {p.subscribers > 0 && <span className="flex items-center gap-1 text-[11.5px] text-muted-foreground"><Users className="h-3 w-3" aria-hidden />{p.subscribers}</span>}
-            </span>
-          </button>
+          <PlanCard key={p.id} p={p} on={sel === p.id} onPick={() => pick(p.id)} />
         ))}
-        <button type="button" onClick={() => pick("new")} aria-pressed={sel === "new"} className={cn("flex h-12 items-center justify-center gap-2 rounded-[20px] border border-dashed border-border text-[13.5px] font-medium text-muted-foreground transition-colors hover:border-lime hover:text-foreground", sel === "new" && "border-lime text-foreground")}>
-          <Plus className="h-4 w-4" aria-hidden /> Add a plan
-        </button>
-        <a href="/#pricing" target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1.5 self-start rounded-full px-3 py-2 text-[13px] text-muted-foreground hover:bg-secondary hover:text-foreground">
-          <ExternalLink className="h-3.5 w-3.5" aria-hidden /> Open live pricing
-        </a>
-      </div>
+        <li className="min-w-0">
+          <button
+            type="button"
+            onClick={() => pick("new")}
+            aria-pressed={sel === "new"}
+            className={cn(
+              "flex h-full min-h-[9.5rem] w-full flex-col items-center justify-center gap-2 rounded-[1.75rem] border-2 border-dashed border-border text-[14px] font-semibold text-muted-foreground transition-colors hover:border-lime hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-[hsl(var(--ring))]",
+              sel === "new" && "border-lime text-foreground",
+            )}
+          >
+            <span className="grid h-11 w-11 place-items-center rounded-full bg-secondary hairline" aria-hidden="true"><Plus className="h-5 w-5" /></span>
+            Add a plan
+          </button>
+        </li>
+      </ul>
 
-      {/* form */}
-      <form onSubmit={(e) => { e.preventDefault(); save(); }} className="rounded-[24px] bg-card p-5 hairline sm:p-6" aria-label={current ? `Edit ${current.name}` : "New plan"}>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="pl-name">Name</Label>
-            <Input id="pl-name" value={draft.name} onChange={(e) => set("name", e.target.value)} maxLength={40} />
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        {/* form */}
+        <form onSubmit={(e) => { e.preventDefault(); save(); }} className="la-card la-themed relative rounded-[2rem] p-3 sm:p-4 [&_label]:text-foreground/80" aria-label={current ? `Edit ${current.name}` : "New plan"}>
+          <span className="la-grid rounded-[inherit]" aria-hidden="true" />
+          <div className="relative flex flex-wrap items-center gap-3 px-2 pb-4 pt-2 sm:px-3">
+            <DotText text={draft.name || (current ? current.name : "NEW")} className="h-8 max-w-[70%]" />
+            <span className="ml-auto text-[11px] font-bold uppercase tracking-[0.12em] la-mute">{current ? (current.locked ? "Has payments" : "Editing") : "New plan"}</span>
           </div>
-          <div>
-            <Label htmlFor="pl-slug">Slug <span className="text-[11.5px]">{current?.locked ? "locked: has payments" : "used in links"}</span></Label>
-            <Input id="pl-slug" value={draft.slug} onChange={(e) => set("slug", e.target.value.toLowerCase())} disabled={current?.locked} placeholder="auto from name" className="font-mono text-[14px]" />
+
+          <div className="relative flex flex-col gap-3">
+            <Section n="01" title="Basics">
+              <div>
+                <Label htmlFor="pl-name">Name</Label>
+                <Input id="pl-name" value={draft.name} onChange={(e) => set("name", e.target.value)} maxLength={40} />
+              </div>
+              <div>
+                <Label htmlFor="pl-slug">Slug <span className="text-[11.5px]">{current?.locked ? "locked: has payments" : "used in links"}</span></Label>
+                <Input id="pl-slug" value={draft.slug} onChange={(e) => set("slug", e.target.value.toLowerCase())} disabled={current?.locked} placeholder="auto from name" className="font-mono text-[14px]" />
+              </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor="pl-note">Tagline</Label>
+                <Input id="pl-note" value={draft.note} onChange={(e) => set("note", e.target.value)} maxLength={80} placeholder="For one creator going faster" />
+              </div>
+            </Section>
+
+            <Section n="02" title="Price">
+              <div>
+                <Label htmlFor="pl-price">Price</Label>
+                <div className="flex gap-2">
+                  <select aria-label="Currency" value={draft.currency} onChange={(e) => set("currency", e.target.value)} className="h-12 rounded-2xl bg-secondary/60 px-3 text-[14px] font-semibold hairline">
+                    {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
+                  </select>
+                  <Input id="pl-price" inputMode="decimal" value={draft.price} onChange={(e) => set("price", e.target.value.replace(/[^\d.,]/g, ""))} className="tabular text-[17px] font-semibold" aria-describedby="pl-price-hint" />
+                </div>
+                <p id="pl-price-hint" className="mt-1.5 text-[12px] text-muted-foreground">0 makes it free. Tax is added on the invoice from Integrations.</p>
+              </div>
+              <div>
+                <Label>Billing</Label>
+                <Seg label="Billing interval" value={draft.interval as "month" | "year"} onChange={(v) => set("interval", v)} options={[{ value: "month", label: "Monthly" }, { value: "year", label: "Yearly" }]} />
+              </div>
+              <LocalPrices d={draft} parsed={parsed} onChange={(c, v) => setDraft((x) => ({ ...x, prices: { ...x.prices, [c]: v } }))} />
+            </Section>
+
+            <Section n="03" title="What's included" hint={`${parsed.features.length}/12`}>
+              <div className="sm:col-span-2">
+                <Label htmlFor="pl-feat">Features <span className="text-[11.5px]">one per line</span></Label>
+                <Textarea id="pl-feat" rows={6} value={draft.features} onChange={(e) => set("features", e.target.value)} />
+              </div>
+            </Section>
+
+            <Section n="04" title="On the site">
+              <div className="sm:col-span-2">
+                <Label>Visibility</Label>
+                <Seg label="Visibility" value={draft.state} onChange={(v) => set("state", v)} options={[{ value: "available", label: "On sale" }, { value: "soon", label: "Coming soon" }, { value: "hidden", label: "Hidden" }]} />
+              </div>
+              <div className="sm:col-span-2 grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
+                <Toggle label="Highlight as most popular" hint="Only one plan can be highlighted." checked={draft.highlight} onChange={(v) => set("highlight", v)} />
+                <div>
+                  <Label htmlFor="pl-order">Order on the page</Label>
+                  <Input id="pl-order" type="number" min={0} max={99} value={draft.sortOrder} onChange={(e) => set("sortOrder", Math.max(0, Math.min(99, Number(e.target.value) || 0)))} />
+                </div>
+              </div>
+            </Section>
+
+            <Section n="05" title="Plan limits">
+              <div>
+                <Label htmlFor="pl-posts">Posts per month</Label>
+                <Input id="pl-posts" type="number" min={0} max={100000} value={draft.postLimit} onChange={(e) => set("postLimit", Math.max(0, Math.min(100000, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-posts-hint" />
+                <p id="pl-posts-hint" className="mt-1 text-[12px] text-muted-foreground">0 = unlimited</p>
+              </div>
+              <div>
+                <Label htmlFor="pl-seats">Team seats</Label>
+                <Input id="pl-seats" type="number" min={0} max={50} value={draft.seats} onChange={(e) => set("seats", Math.max(0, Math.min(50, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-seats-hint" />
+                <p id="pl-seats-hint" className="mt-1 text-[12px] text-muted-foreground">People besides the owner</p>
+              </div>
+              <div className="sm:col-span-2">
+                <Toggle label="AI captions" hint="Included on this plan" checked={draft.aiCaptions} onChange={(v) => set("aiCaptions", v)} />
+              </div>
+            </Section>
           </div>
-          <div>
-            <Label htmlFor="pl-price">Price</Label>
-            <div className="flex gap-2">
-              <select aria-label="Currency" value={draft.currency} onChange={(e) => set("currency", e.target.value)} className="h-12 rounded-2xl bg-secondary/60 px-3 text-[14px] font-semibold hairline">
-                {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
-              </select>
-              <Input id="pl-price" inputMode="decimal" value={draft.price} onChange={(e) => set("price", e.target.value.replace(/[^\d.,]/g, ""))} className="tabular text-[17px] font-semibold" aria-describedby="pl-price-hint" />
-            </div>
-            <p id="pl-price-hint" className="mt-1.5 text-[12px] text-muted-foreground">0 makes it free. Tax is added on the invoice from Integrations.</p>
+
+          <div className="liquid-panel relative" data-open={!!error}>
+            <div><p role="alert" className="liquid-inner mt-3 rounded-2xl bg-destructive/10 px-4 py-3 text-[13.5px] text-destructive">{error}</p></div>
           </div>
-          <div>
-            <Label>Billing</Label>
-            <Seg label="Billing interval" value={draft.interval as "month" | "year"} onChange={(v) => set("interval", v)} options={[{ value: "month", label: "Monthly" }, { value: "year", label: "Yearly" }]} />
-          </div>
-          <div className="sm:col-span-2">
-            <Label htmlFor="pl-note">Tagline</Label>
-            <Input id="pl-note" value={draft.note} onChange={(e) => set("note", e.target.value)} maxLength={80} placeholder="For one creator going faster" />
-          </div>
-          <div className="sm:col-span-2">
-            <Label htmlFor="pl-feat">Features <span className="text-[11.5px]">one per line · {parsed.features.length}/12</span></Label>
-            <Textarea id="pl-feat" rows={6} value={draft.features} onChange={(e) => set("features", e.target.value)} />
-          </div>
-          <div className="sm:col-span-2">
-            <Label>Visibility</Label>
-            <Seg label="Visibility" value={draft.state} onChange={(v) => set("state", v)} options={[{ value: "available", label: "On sale" }, { value: "soon", label: "Coming soon" }, { value: "hidden", label: "Hidden" }]} />
-          </div>
-          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4 py-3 hairline sm:col-span-2">
-            <span>
-              <span className="block text-[14px] font-medium">Highlight as most popular</span>
-              <span className="block text-[12px] text-muted-foreground">Only one plan can be highlighted.</span>
+
+          {/* save bar: stays in reach while the form scrolls */}
+          <div className="sticky bottom-3 z-10 mt-3 flex flex-wrap items-center gap-2 rounded-full bg-background/85 p-1.5 pl-4 shadow-[0_18px_40px_-20px_rgb(0_0_0/.5)] backdrop-blur-xl hairline">
+            <span className="mr-auto flex items-center gap-2 text-[13px] font-medium">
+              <span aria-hidden="true" className={cn("h-2 w-2 rounded-full", current && !dirty ? "bg-lime" : "bg-amber-500")} />
+              {current ? (dirty ? "Unsaved changes" : "Saved and live") : "Not created yet"}
             </span>
-            <input type="checkbox" role="switch" checked={draft.highlight} onChange={(e) => set("highlight", e.target.checked)} className="peer sr-only" />
-            <span aria-hidden className="relative h-7 w-12 rounded-full bg-muted transition-colors peer-checked:bg-lime peer-focus-visible:outline peer-focus-visible:outline-2 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-background after:shadow after:transition-transform after:duration-300 peer-checked:after:translate-x-5" />
-          </label>
-          <LocalPrices d={draft} parsed={parsed} onChange={(c, v) => setDraft((x) => ({ ...x, prices: { ...x.prices, [c]: v } }))} />
-          <fieldset className="sm:col-span-2 grid gap-3 rounded-2xl bg-secondary/30 p-4 hairline sm:grid-cols-3">
-            <legend className="px-1 text-[14px] font-medium">Plan limits</legend>
-            <div>
-              <Label htmlFor="pl-posts" className="text-[12px]">Posts per month</Label>
-              <Input id="pl-posts" type="number" min={0} max={100000} value={draft.postLimit} onChange={(e) => set("postLimit", Math.max(0, Math.min(100000, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-posts-hint" className="h-11" />
-              <p id="pl-posts-hint" className="mt-1 text-[11.5px] text-muted-foreground">0 = unlimited</p>
-            </div>
-            <div>
-              <Label htmlFor="pl-seats" className="text-[12px]">Team seats</Label>
-              <Input id="pl-seats" type="number" min={0} max={50} value={draft.seats} onChange={(e) => set("seats", Math.max(0, Math.min(50, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-seats-hint" className="h-11" />
-              <p id="pl-seats-hint" className="mt-1 text-[11.5px] text-muted-foreground">People besides the owner</p>
-            </div>
-            <label className="flex cursor-pointer items-center justify-between gap-3 self-start rounded-2xl bg-background/60 px-3 py-2.5 hairline sm:mt-6">
-              <span className="text-[13px] font-medium">AI captions</span>
-              <input type="checkbox" role="switch" checked={draft.aiCaptions} onChange={(e) => set("aiCaptions", e.target.checked)} className="peer sr-only" />
-              <span aria-hidden className="relative h-7 w-12 shrink-0 rounded-full bg-muted transition-colors peer-checked:bg-lime peer-focus-visible:outline peer-focus-visible:outline-2 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-background after:shadow after:transition-transform after:duration-300 peer-checked:after:translate-x-5" />
-            </label>
-          </fieldset>
-          <div>
-            <Label htmlFor="pl-order">Order on the page</Label>
-            <Input id="pl-order" type="number" min={0} max={99} value={draft.sortOrder} onChange={(e) => set("sortOrder", Math.max(0, Math.min(99, Number(e.target.value) || 0)))} />
+            {current && <Button type="button" variant="ghost" size="icon" onClick={() => setDel(true)} disabled={busy} aria-label={`Delete ${current.name}`} className="rounded-full text-[hsl(0_72%_38%)] hover:bg-destructive/15 dark:text-destructive"><Trash2 className="h-4 w-4" aria-hidden /></Button>}
+            {current && dirty && <Button type="button" variant="ghost" className="rounded-full" onClick={() => setDraft(toDraft(current))}>Undo</Button>}
+            <Button type="submit" variant={current && !dirty ? "subtle" : "lime"} className={cn("rounded-full", current && !dirty && "disabled:opacity-100")} disabled={busy || (!dirty && !!current)}>
+              {busy ? "Saving…" : current ? (dirty ? "Save & publish" : "Saved") : "Create plan"}
+            </Button>
           </div>
-        </div>
+        </form>
 
-        {current && current.subscribers > 0 && parsed.priceMinor !== current.priceMinor && (
-          <p className="mt-4 rounded-2xl bg-accent/10 px-4 py-3 text-[13px]">{current.subscribers} active subscriber{current.subscribers === 1 ? "" : "s"} keep{current.subscribers === 1 ? "s" : ""} {priceLabel(current)} until they change plan. New customers pay {priceLabel(parsed as any)}.</p>
-        )}
-        <div className="liquid-panel" data-open={!!error}>
-          <div><p role="alert" className="liquid-inner mt-4 rounded-2xl bg-destructive/10 px-4 py-3 text-[13.5px] text-destructive">{error}</p></div>
+        {/* preview */}
+        <div className="xl:sticky xl:top-20 xl:self-start">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="eyebrow text-[11px]">Live preview</p>
+            <a href="/#pricing" target="_blank" rel="noreferrer" className="inline-flex min-h-[44px] items-center rounded-full px-3 text-[13px] font-medium text-muted-foreground hover:bg-secondary hover:text-foreground">Open live pricing</a>
+          </div>
+          <Preview d={parsed} />
+          <Impact current={current} parsed={parsed} />
         </div>
-
-        <div className="mt-6 flex flex-wrap items-center gap-2">
-          <Button type="submit" variant="lime" disabled={busy || (!dirty && !!current)}>
-            {busy ? "Saving…" : current ? (dirty ? "Save & publish" : "Saved") : "Create plan"}
-          </Button>
-          {current && dirty && <Button type="button" variant="ghost" onClick={() => setDraft(toDraft(current))}>Undo changes</Button>}
-          {current && <Button type="button" variant="danger" className="ml-auto" onClick={() => setDel(true)} disabled={busy}><Trash2 className="h-4 w-4" aria-hidden />Delete</Button>}
-        </div>
-      </form>
-
-      {/* preview */}
-      <div className="xl:sticky xl:top-20 xl:self-start">
-        <p className="eyebrow mb-2 text-[11px]">Live preview</p>
-        <Preview d={parsed} />
       </div>
 
       <ConfirmDialog open={del} onOpenChange={setDel} title={`Delete ${current?.name}?`} body="Only possible for plans nobody has paid for. If people have, set it to Hidden instead." confirmLabel="Delete plan" busy={busy} onConfirm={remove} />
