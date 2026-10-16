@@ -20,12 +20,16 @@ export const mediaMetaSchema = z.object({
   height: z.number().int().positive().max(16384).optional(),
 });
 
+/** A text field that also accepts a list of strings (joined with spaces), so a stray array from AI copy never blocks a save. */
+const textish = (max: number) =>
+  z.preprocess((v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" || typeof x === "number").join(" ") : v), z.string().max(max).optional().nullable());
+
 export const targetDraftSchema = z.object({
   platform: platformSchema,
-  title: z.string().max(200).optional().nullable(),
-  caption: z.string().max(5000).optional().nullable(),
-  description: z.string().max(5000).optional().nullable(),
-  hashtags: z.string().max(1000).optional().nullable(),
+  title: textish(200),
+  caption: textish(5000),
+  description: textish(5000),
+  hashtags: textish(1000),
 });
 
 export const savePostSchema = z.object({

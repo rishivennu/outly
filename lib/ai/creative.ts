@@ -295,8 +295,11 @@ export async function generateHooks(story: string, tone: Tone, exclude: string[]
     VOICE,
     `Creator says the video is about: """${story}"""\nTone: ${toneLine}.\nAvoid these hooks: ${JSON.stringify(exclude)}\nReturn JSON {"understood": one-sentence paraphrase showing you get it, "original": the plain un-optimised title, "hooks": [{"angle": 2-word label like "The twist", "text": hook, may use one \\n line break}] x3}`,
   );
-  if (!g?.hooks?.length) return fallback;
-  return { ...fallback, understood: g.understood || fallback.understood, original: g.original || fallback.original, hooks: g.hooks.slice(0, 3), source: "gemini" };
+  const hooks = (Array.isArray(g?.hooks) ? g.hooks : [])
+    .map((h) => ({ ...h, angle: asText(h?.angle).slice(0, 40) || "Fresh angle", text: asText(h?.text).slice(0, 500) }))
+    .filter((h) => h.text);
+  if (!g || !hooks.length) return fallback;
+  return { ...fallback, understood: asText(g.understood) || fallback.understood, original: asText(g.original) || fallback.original, hooks: hooks.slice(0, 3), source: "gemini" };
 }
 
 export async function generatePlatformCopy(story: string, hook: string, platforms: Platform[]): Promise<PlatformCopy[]> {
@@ -305,9 +308,39 @@ export async function generatePlatformCopy(story: string, hook: string, platform
     VOICE,
     `Video story: """${story}"""\nChosen hook: """${hook}"""\nWrite DIFFERENT copy per platform, never the same caption twice:\n- instagram: emotional, engaging caption (3 short paragraphs + a question CTA), 5-8 hashtags.\n- youtube: search-friendly title <= 90 chars ending with #Shorts, a 2-3 sentence keyword-rich description, 2-4 hashtags.\n- x: one punchy post <= 240 chars, no hashtags.\nOnly for: ${platforms.join(", ")}.\nReturn JSON {"items":[{"platform","title"?,"caption","description"?,"hashtags"}]}`,
   );
-  if (!g?.items?.length) return fallback;
+  if (!Array.isArray(g?.items) || !g.items.length) return fallback;
   return fallback.map((f) => {
-    const m = g.items.find((i) => i.platform === f.platform);
-    return m ? { ...f, ...m, note: f.note, caption: (m.caption ?? f.caption).slice(0, f.platform === "x" ? 280 : 2200) } : f;
+    const m = g.items.find((i) => i && i.platform === f.platform);
+    if (!m) return f;
+    // Models drift on shape (hashtags as an array, a number for a title...). Coerce every field to text.
+    const caption = asText(m.caption) || f.caption;
+    return {
+      ...f,
+      title: f.title === undefined && m.title === undefined ? undefined : (asText(m.title) || f.title || "").slice(0, 200),
+      description: f.description === undefined && m.description === undefined ? undefined : (asText(m.description) || f.description || "").slice(0, 5000),
+      hashtags: f.platform === "x" ? "" : asTags(m.hashtags) || f.hashtags,
+      caption: caption.slice(0, f.platform === "x" ? 280 : 2200),
+      note: f.note,
+    };
   });
+}
+
+/** Any model value as plain text: arrays joined, objects dropped. */
+export function asText(v: unknown): string {
+  if (typeof v === "string") return v.trim();
+  if (typeof v === "number") return String(v);
+  if (Array.isArray(v)) return v.map(asText).filter(Boolean).join(" ");
+  return "";
+}
+
+/** Hashtags as one "#a #b" string, whether the model sent a string, an array, or bare words. */
+export function asTags(v: unknown): string {
+  return asText(v)
+    .split(/[\s,]+/)
+    .map((t) => t.replace(/^#+/, "").replace(/[^\p{L}\p{N}_]/gu, ""))
+    .filter(Boolean)
+    .map((t) => `#${t}`)
+    .slice(0, 30)
+    .join(" ")
+    .slice(0, 1000);
 }

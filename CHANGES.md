@@ -53,3 +53,9 @@ Verified locally: tsc 0 errors, bun test 329/0, axe 0 (light+dark, 1440+390).
 Root cause: when an upload failed or stalled, Save draft waited forever ("Saving...") and Post always said "still coming in", hiding the real reason. A failed POST /api/posts showed the same message.
 - components/create/CreateWorkspace.tsx: save, Post and Connect now wait for an in-flight upload and then continue. A failed upload toasts the real reason, Save draft says "Couldn't save" with how to fix it, Post shows the actual error. Removed the pendingSave path.
 - lib/client/upload.ts: 60 s stall watchdog on every upload request (no bytes moving = dropped connection, so retry/resume kicks in instead of hanging). R2 single-PUT resume window capped at 50 min (URL lives 60 min).
+
+## Fix: "Couldn't save the draft. Expected string, received array"
+Root cause: Gemini sometimes returns platform hashtags as a JSON array; it was passed straight into the draft, and POST /api/posts rejected it (so no draft, no post).
+- lib/ai/creative.ts: generatePlatformCopy coerces every field to text (asText / asTags: "#a #b"), X never gets hashtags; generateHooks coerces hook text/angle the same way.
+- lib/validation.ts: target title/caption/description/hashtags accept an array of strings and join it, so an open tab with old state saves too.
+- tests/round-1016-copyshape.test.ts: 4 tests. Suite 344 pass / 0 fail.
