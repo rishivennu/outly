@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ErrorScreen, pill } from "@/components/shared/ErrorScreen";
+import { ErrorScreen, ghostPill, pill } from "@/components/shared/ErrorScreen";
 
 export const metadata = { title: "Page not found" };
 
@@ -13,7 +13,7 @@ export default function NotFound() {
       actions={
         <>
           <Link href="/home" className={`${pill} lime-bg lime-glow`}>Go to my dashboard</Link>
-          <Link href="/" className={`${pill} hairline hover:bg-secondary`}>Outlly home</Link>
+          <Link href="/" className={ghostPill}>Outlly home</Link>
         </>
       }
     />

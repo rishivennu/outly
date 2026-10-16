@@ -13,11 +13,13 @@ import { LivePlatformsProvider } from "@/components/shell/LivePlatforms";
 import { WorkspaceBar } from "@/components/shell/WorkspaceBar";
 import { siteStatus, joinedBeforeMaintenance } from "@/lib/site";
 import { Countdown } from "@/components/maintenance/Countdown";
+import { getConfig } from "@/lib/settings";
+import { WhatsNew } from "@/components/shell/WhatsNew";
 
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  const [live, site] = await Promise.all([liveNow(), siteStatus()]);
+  const [live, site, notice] = await Promise.all([liveNow(), siteStatus(), getConfig("updates")]);
   // Maintenance: members who joined before it started carry on; anyone newer waits on the maintenance page.
   if (site.maintenance && !joinedBeforeMaintenance({ createdAt: user.joinedAt }, site.since)) redirect("/maintenance?preview");
   void touchActivity(user.id); // daily-active tracking for the admin console; never blocks or throws
@@ -45,6 +47,7 @@ export default async function StudioLayout({ children }: { children: React.React
       </div>
       <MobileNav />
       <Tour />
+      <WhatsNew notice={notice} userId={user.actor?.id ?? user.id} joinedAt={new Date(user.joinedAt).toISOString()} />
       <AvatarCursor />
       <Watermark tag={createHash("sha256").update(user.id).digest("hex").slice(0, 10).toUpperCase()} />
       </ToastProvider>

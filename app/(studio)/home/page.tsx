@@ -21,6 +21,10 @@ import { NextSteps } from "@/components/home/NextSteps";
 import { GoalRing } from "@/components/home/GoalRing";
 import { IdeaBank } from "@/components/home/IdeaBank";
 import { RecycleCard } from "@/components/home/RecycleCard";
+import { SendingNow } from "@/components/home/SendingNow";
+import { WeekPulse } from "@/components/home/WeekPulse";
+import { homePulse } from "@/lib/retention/pulse";
+import { isPlatform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
 const NEW_FOR_DAYS = 14;
@@ -63,6 +67,12 @@ export default async function HomePage() {
     }),
   ]);
   const started = Object.values(live).some(Boolean) || published > 0;
+  const pulse = started
+    ? await homePulse({ id: user.id, timezone: user.timezone }, Object.keys(live).filter((k) => live[k as Platform] && isPlatform(k)) as Platform[]).catch((e) => {
+        console.error("[home] pulse", e);
+        return null;
+      })
+    : null;
   const steps = ret?.steps ?? [];
   const recycle = ret?.recycle ?? [];
   // Ideas fill a whole row when nothing sits beside them; with no steps they pair with the streak card.
@@ -83,6 +93,12 @@ export default async function HomePage() {
       <HomeHero firstName={user.name.split(" ")[0]} />
       <SetupChecklist state={setup} />
       {welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} />}
+      {pulse && (
+        <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-4 sm:px-10">
+          <SendingNow items={pulse.sending} />
+          <WeekPulse p={pulse} />
+        </div>
+      )}
       {started && (
         // One 12-column bento: next steps beside the streak, ideas beside recycling. Spans adapt to what's there.
         <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-10 sm:px-10 md:grid-cols-12">

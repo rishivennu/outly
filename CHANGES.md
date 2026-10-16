@@ -59,3 +59,28 @@ Root cause: Gemini sometimes returns platform hashtags as a JSON array; it was p
 - lib/ai/creative.ts: generatePlatformCopy coerces every field to text (asText / asTags: "#a #b"), X never gets hashtags; generateHooks coerces hook text/angle the same way.
 - lib/validation.ts: target title/caption/description/hashtags accept an array of strings and join it, so an open tab with old state saves too.
 - tests/round-1016-copyshape.test.ts: 4 tests. Suite 344 pass / 0 fail.
+
+## New: posting as Live Activity cards (Apple-style), music, galaxy auth/admin/404
+- components/create/PublishingView.tsx: one dark card per platform, dot-matrix "YOU -> IG", status box, glowing lime progress bar with the Outlly rocket at the tip, eased progress per stage, Landed / Stopped states, reconnect pills, Pip dancing while it posts, music toggle.
+- components/create/VideoStage.tsx: the upload pill is now a mini Live Activity card (Pip, ETA, music, cancel, rocket progress).
+- components/create/Groove.tsx + public/audio/pip-groove.mp3: optional background groove while posting/uploading (off by default; toggle). Check the track licence (Pixabay content licence) before launch.
+- components/marketing/CometShower.tsx (new) + StarField.tsx: random comets from the top/left edges to the bottom-right across the whole canvas; "space" variant with tinted stars and an emerald nebula. Pauses on hidden tab and reduced motion.
+- components/auth/AuthCard.tsx: /login, /signup, /admin/login sit in the galaxy; card edge glow matches the emerald sky.
+- components/admin/AdminShell.tsx: admin console gets the star field + nebula.
+- components/shared/ErrorScreen.tsx, app/not-found.tsx, app/error.tsx: 404 and error pages in the galaxy, light text on dark in both themes.
+- app/globals.css: .la-* (Live Activity), .groove*, galaxy (.sky-space, nebula, tinted stars), .wn-* (update notice), .err-galaxy, cookie banner solid over the sky.
+
+## New: This week on the dashboard
+- lib/retention/pulse-core.ts, lib/retention/pulse.ts: views last 7 days with week-on-week change, posts out this week, top post, next good time to post, Mon-Sun strip.
+- components/home/SendingNow.tsx: live card for posts that are going out right now (refreshes every 5 s).
+- components/home/WeekPulse.tsx; app/(studio)/home/page.tsx wires both in.
+- tests/round-1016-pulse.test.ts.
+
+## New: "We made some changes" notice (trust popup)
+- lib/updates.ts: notice shape, default copy for this release, shouldShowUpdate (once per published id, skipped for people who joined after it), cleanItems.
+- components/shell/WhatsNew.tsx: modal shown once per member on the dashboard, after the cookie banner, never on the same visit as the guided tour or welcome offer. "Tell us what's off" opens Help with the message form ready; "Got it" closes. Radix focus trap, Esc, 44 px buttons, reduced motion.
+- app/(studio)/layout.tsx mounts it; lib/settings.ts adds the "updates" config (stored in the Setting table, no schema change).
+- Admin > Setup > Update notice (app/admin/(panel)/updates/page.tsx, components/admin/UpdatesEditor.tsx, app/api/admin/updates/route.ts, nav entry in AdminShell): edit title, note and changes with live preview; "Publish to members" shows it again to everyone; "Save quietly" fixes typos; on/off switch.
+- components/support/HelpCenter.tsx: /support?write=changes opens the form with "About the recent changes: " and focuses it. Messages land in Tickets.
+- tests/round-1016-updates.test.ts.
+- After deploying, press Publish once in Admin > Update notice so the date matches the deploy.

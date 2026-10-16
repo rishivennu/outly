@@ -1,11 +1,13 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ErrorScreen, pill } from "@/components/shared/ErrorScreen";
+import { ErrorScreen, ghostPill, pill } from "@/components/shared/ErrorScreen";
 
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => console.error(error), [error]);
-  const offline = typeof navigator !== "undefined" && !navigator.onLine;
+  // Read after mount: the server has no navigator, and a render-time read would mismatch on hydration.
+  const [offline, setOffline] = useState(false);
+  useEffect(() => setOffline(!navigator.onLine), []);
   return (
     <ErrorScreen
       code={error.digest ? `Ref ${error.digest}` : undefined}
@@ -14,7 +16,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
       actions={
         <>
           <button onClick={reset} className={`${pill} lime-bg lime-glow`}>Try again</button>
-          <Link href="/home" className={`${pill} hairline hover:bg-secondary`}>Back to dashboard</Link>
+          <Link href="/home" className={ghostPill}>Back to dashboard</Link>
         </>
       }
     />
