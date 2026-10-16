@@ -1151,6 +1151,59 @@ html.js .bx:not([data-shown]) .bx-tile { opacity: 0; }
 /* bento head bits (10-15e): same head for Platforms and Demo; the accent word is lime-ink on cream, lime on ink */
 .bx-eyebrow { font-size: 13px; font-weight: 600; color: hsl(var(--muted-foreground)); }
 .bx-accent { color: hsl(var(--lime-ink)); } .dark .bx-accent { color: hsl(var(--lime)); }
+/* Demo (10-16f): the gradient glow cards from the posting screen. Ink glass in both themes, one status
+   colour glowing from the bottom edge. --gc is the tone; .is-on turns the glow up. Text stays white on ink. */
+.bx-gc { --gc: 78 100% 55%; --bx-a: 240 3% 14.5%; --bx-b: 240 3% 11%; --bx-edge: 0 0% 100%; --bx-text: 240 5% 96%; --bx-mute: 240 5% 70%; --bx-line: 0 0% 100%; --bx-orb: 240 3% 17%; --bx-hi: 0 0% 100% / .1; --bx-glow: .7;
+  isolation: isolate; color: #fff; background: linear-gradient(180deg, hsl(var(--gc) / .1) 0%, transparent 26%), linear-gradient(180deg, #15161a 0%, #0c0d10 55%, #0a0b0d 100%);
+  box-shadow: inset 0 0 0 1px hsl(var(--gc) / .28), inset 0 1px 0 rgb(255 255 255 / .1), 0 30px 60px -40px hsl(var(--gc) / .55), 0 14px 30px -18px rgb(0 0 0 / .45); }
+.gc-wait { --gc: 262 90% 72%; } .gc-send { --gc: 78 100% 55%; } .gc-live { --gc: 145 90% 52%; } .gc-bad { --gc: 6 95% 62%; }
+.gc-glow { position: absolute; inset: auto 0 0 0; z-index: -1; height: 18%; pointer-events: none; opacity: .5; background: radial-gradient(95% 100% at 50% 100%, hsl(var(--gc) / .8) 0%, hsl(var(--gc) / .4) 30%, hsl(var(--gc) / .12) 62%, transparent 82%); transition: opacity .6s var(--ease-liquid), background .5s; }
+.gc-glow::after { content: ""; position: absolute; left: 8%; right: 8%; bottom: 0; height: 22%; background: radial-gradient(60% 100% at 50% 100%, rgb(255 255 255 / .35), transparent 72%); }
+.bx-demo > .bx-gc { padding-bottom: 30px; }
+.gc-rim { position: absolute; left: 10%; right: 10%; bottom: -1px; z-index: -1; height: 3px; border-radius: 999px; opacity: .55; background: hsl(var(--gc)); box-shadow: 0 0 18px 4px hsl(var(--gc) / .8), 0 -10px 40px 8px hsl(var(--gc) / .35); transition: opacity .6s var(--ease-liquid), background .5s; }
+.bx-demo .bx-gc.is-on { box-shadow: inset 0 0 0 1px hsl(var(--gc) / .6), inset 0 1px 0 rgb(255 255 255 / .12), 0 0 0 3px hsl(var(--gc) / .14), 0 34px 70px -34px hsl(var(--gc) / .75); }
+.bx-gc.is-on .gc-glow, .bx-gc.is-on .gc-rim { opacity: 1; }
+[data-running] .bx-gc.is-on .gc-glow { animation: gc-breathe 2.6s ease-in-out infinite; }
+@keyframes gc-breathe { 0%, 100% { opacity: .82; } 50% { opacity: 1; } }
+.bx-gc .bx-title { color: #fff; } .bx-gc .bx-sub { color: rgb(255 255 255 / .72); }
+.bx-gc .bx-svg .ln { stroke: hsl(var(--bx-line) / .1); }
+.bx-gc .bx-svg .hotln { stroke: hsl(var(--lime)); stroke-width: 1.6; }
+.bx-gc .bx-orbs::before { border-color: hsl(var(--bx-line) / .08); }
+.bx-gc .bx-orb { box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .07), 0 6px 14px -6px rgb(0 0 0 / .6); }
+.bx-gc .bx-msg { color: #fff; background: linear-gradient(180deg, hsl(240 3% 20%), hsl(240 3% 15%)); box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .08), 0 14px 30px -12px rgb(0 0 0 / .7); }
+.bx-gc .bx-msg p { color: rgb(255 255 255 / .7); }
+.bx-gc .bx-btn { background: #fff; color: #0c0d10; }
+.bx-gc .bx-btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .gc-glow, .gc-rim { transition: none; } .bx-demo .bx-gc .gc-glow { animation: none; } }
+@media (forced-colors: active) { .gc-glow, .gc-rim { display: none; } }
+/* Demo row (10-16f): three tiles, not a tall bento. */
+@media (min-width: 1024px) { .bx.bx-demo { min-height: 0; } .bx-demo > .bx-tile { min-height: 300px; } }
+/* Light variation of the glow tiles: white glass, tone glow from the bottom, ink text. Dark keeps the ink glass. */
+html:not(.dark) .bx-gc { --bx-a: 40 46% 92%; --bx-b: 38 40% 88.5%; --bx-edge: 36 32% 80%; --bx-text: 240 10% 8%; --bx-mute: 30 8% 30%; --bx-line: 34 22% 72%; --bx-orb: 40 45% 96%; --bx-hi: 0 0% 100% / .55; --bx-glow: .55;
+  color: hsl(240 10% 8%); background: linear-gradient(180deg, hsl(var(--gc) / .08) 0%, transparent 28%), linear-gradient(180deg, #ffffff 0%, #fbfaf6 60%, #f5f3ec 100%);
+  box-shadow: inset 0 0 0 1px hsl(var(--gc) / .35), inset 0 1px 0 #fff, 0 26px 50px -36px hsl(var(--gc) / .6), 0 10px 22px -16px rgb(40 30 10 / .18); }
+html:not(.dark) .bx-demo .bx-gc.is-on { box-shadow: inset 0 0 0 1px hsl(var(--gc) / .7), inset 0 1px 0 #fff, 0 0 0 3px hsl(var(--gc) / .16), 0 30px 60px -32px hsl(var(--gc) / .7); }
+html:not(.dark) .bx-gc .gc-glow { background: radial-gradient(95% 100% at 50% 100%, hsl(var(--gc) / .55) 0%, hsl(var(--gc) / .25) 34%, hsl(var(--gc) / .08) 64%, transparent 84%); }
+html:not(.dark) .bx-gc .gc-glow::after { display: none; }
+html:not(.dark) .bx-gc .bx-title { color: hsl(240 10% 8%); } html:not(.dark) .bx-gc .bx-sub { color: hsl(30 8% 30%); }
+
+/* Live Activity, two variations. .la-themed cards follow the theme; text colours go through these classes. */
+.la-themed { color: #fff; } .la-themed .la-mute { color: rgb(255 255 255 / .64); } .la-themed .la-accent { color: hsl(var(--lime)); } .la-themed .la-warn { color: #ff8a80; }
+html:not(.dark) .la-themed { color: hsl(240 10% 8%); background: radial-gradient(110% 95% at 0% 0%, hsl(78 100% 50% / .14), transparent 48%), linear-gradient(180deg, #ffffff, #f6f4ee); border-color: hsl(36 32% 80% / .8); box-shadow: inset 0 1px 0 #fff, 0 30px 60px -38px rgb(40 30 10 / .3), 0 10px 22px -14px rgb(40 30 10 / .14); }
+html:not(.dark) .la-themed .la-mute { color: rgb(20 20 24 / .64); }
+html:not(.dark) .la-themed .la-accent { color: hsl(var(--lime-ink)); }
+html:not(.dark) .la-themed .la-warn { color: #b3261e; }
+html:not(.dark) .la-themed .la-grid { background-image: radial-gradient(rgb(20 20 24 / .14) 1px, transparent 1.5px); }
+html:not(.dark) .la-themed .la-dots { color: #15161a; filter: none; }
+html:not(.dark) .la-themed .la-arrow { color: hsl(var(--lime-ink)); }
+html:not(.dark) .la-themed .la-box { background: linear-gradient(180deg, #ffffff, #faf9f5); border-color: rgb(20 20 24 / .09); box-shadow: inset 0 1px 0 #fff, 0 8px 20px -14px rgb(40 30 10 / .25); }
+html:not(.dark) .la-themed.la-live .la-box { box-shadow: inset 0 1px 0 #fff, 0 0 40px -14px hsl(var(--lime) / .7); }
+html:not(.dark) .la-themed.la-bad .la-box { box-shadow: inset 0 1px 0 #fff, 0 0 40px -14px rgb(255 90 77 / .55); }
+html:not(.dark) .la-themed .la-round { background: rgb(20 20 24 / .07); color: hsl(240 10% 8%); }
+html:not(.dark) .la-themed .la-round:hover { background: rgb(20 20 24 / .13); }
+html:not(.dark) .la-themed .la-round:focus-visible { outline-color: hsl(var(--ring)); }
+html:not(.dark) .la-themed .la-track { background: linear-gradient(180deg, #e7e4dc, #f2f0ea); box-shadow: inset 0 3px 8px rgb(40 30 10 / .16), inset 0 -1px 0 #fff; }
+html:not(.dark) .la-themed .la-fill { box-shadow: 0 0 22px 0 hsl(var(--lime) / .45), inset 0 2px 1px rgb(255 255 255 / .55), inset 0 -8px 14px rgb(30 70 0 / .25); }
 .bx-lead { margin-top: 14px; max-width: 36rem; font-size: 16.5px; line-height: 1.6; color: hsl(var(--muted-foreground)); text-wrap: pretty; }
 .bx-note { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: hsl(var(--muted-foreground)); }
 .bx-cta { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 22px; border-radius: 9999px; background: hsl(var(--lime)); color: hsl(var(--lime-foreground)); font-size: 15px; font-weight: 600; box-shadow: inset 0 1px 0 hsl(0 0% 100% / .5), 0 12px 26px -14px hsl(var(--lime) / .9); transition: transform .2s var(--ease-out); }
@@ -1964,34 +2017,10 @@ html[data-contrast="more"] .wn-card { background: hsl(var(--card)); backdrop-fil
 /* Cookie banner over the night sky (auth, 404) in light theme: translucent glass turned grey and dimmed its text. */
 html:has(.sky-space) [aria-labelledby="cc-title"] { background: hsl(var(--card)); -webkit-backdrop-filter: none; backdrop-filter: none; }
 
-/* ---------- Publishing cards (10-16e): side-by-side glass cards with a status glow at the foot ---------- */
-/* Always dark in both themes. --lv is the state colour from the Outlly palette; --p (0-100) lifts the glow as the upload moves. */
-.lv-card{--lv:78 100% 55%;position:relative;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;min-height:25rem;max-width:24rem;padding:1.5rem;border-radius:2rem;color:#fff;background:linear-gradient(180deg,hsl(var(--lv)/.10) 0%,transparent 24%),linear-gradient(180deg,#15161a 0%,#0c0d10 55%,#0a0b0d 100%);border:1px solid hsl(var(--lv)/.3);box-shadow:inset 0 1px 0 rgb(255 255 255/.10),0 40px 80px -42px hsl(var(--lv)/.6),0 18px 36px -18px rgb(0 0 0/.45);transition:border-color .5s,box-shadow .5s}
-.lv-wait{--lv:262 90% 72%}
-.lv-send{--lv:78 100% 55%}
-.lv-live{--lv:145 90% 52%}
-.lv-bad{--lv:6 95% 62%}
-.lv-off{--lv:220 12% 62%}
-.lv-glow{position:absolute;inset:auto 0 0 0;z-index:-1;height:calc(22% + var(--p,0) * .14%);background:radial-gradient(95% 100% at 50% 100%,hsl(var(--lv)/.95) 0%,hsl(var(--lv)/.55) 30%,hsl(var(--lv)/.16) 62%,transparent 82%);transition:height 1s linear,background .5s}
-.lv-glow::after{content:"";position:absolute;left:6%;right:6%;bottom:0;height:34%;background:radial-gradient(60% 100% at 50% 100%,rgb(255 255 255/.6),transparent 72%)}
-.lv-rim{position:absolute;left:9%;right:9%;bottom:-1px;z-index:-1;height:3px;border-radius:999px;background:hsl(var(--lv));box-shadow:0 0 18px 4px hsl(var(--lv)/.8),0 -10px 40px 8px hsl(var(--lv)/.4)}
-.lv-moving .lv-glow{animation:lv-breathe 2.6s ease-in-out infinite}
-@keyframes lv-breathe{0%,100%{opacity:.82}50%{opacity:1}}
-.lv-tile{display:grid;place-items:center;width:60px;height:60px;border-radius:18px;background:linear-gradient(180deg,rgb(255 255 255/.12),rgb(255 255 255/.03));border:1px solid rgb(255 255 255/.14);box-shadow:inset 0 1px 0 rgb(255 255 255/.2),0 10px 26px -10px hsl(var(--lv)/.7)}
-.lv-chip{display:inline-flex;align-items:center;min-height:28px;padding:0 .75rem;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:rgb(255 255 255/.08);border:1px solid hsl(var(--lv)/.5)}
-.lv-track{position:relative;height:6px;border-radius:999px;background:rgb(255 255 255/.12);overflow:hidden}
-.lv-fill{position:absolute;inset:0 auto 0 0;border-radius:inherit;background:hsl(var(--lv));box-shadow:0 0 14px hsl(var(--lv)/.8);transition:width 1s linear}
-.lv-cta{display:inline-flex;align-items:center;gap:.4rem;min-height:44px;border-radius:12px;font-size:.92rem;font-weight:600;color:#fff;transition:gap .2s,background .2s,opacity .2s}
-.lv-cta:hover{gap:.6rem}
-.lv-cta:disabled{opacity:.6;cursor:default}
-.lv-cta:focus-visible{outline:2px solid hsl(var(--lime));outline-offset:3px}
-.lv-cta-quiet{font-weight:500;color:rgb(255 255 255/.75)}
-.lv-cta-quiet:hover{gap:.4rem}
-.lv-cta-stop{padding:0 1rem;border-radius:999px;background:rgb(255 255 255/.1);border:1px solid rgb(255 255 255/.18)}
-.lv-cta-stop:hover{gap:.4rem;background:rgb(255 255 255/.18)}
+/* ---------- Publishing (10-16f): Live Activity cards (.la-*) as side-by-side columns ---------- */
+.la-off .la-fill{background:linear-gradient(90deg,#e4e6ea,#a3a7ae 60%,#6f747c);box-shadow:inset 0 2px 1px rgb(255 255 255/.5)}
 .lv-stop-yes{background:hsl(var(--foreground));color:hsl(var(--background))}
 .lv-stop-yes:disabled{opacity:.6}
-@media (prefers-reduced-motion:reduce){.lv-card,.lv-glow,.lv-fill{transition:none}.lv-moving .lv-glow{animation:none}.lv-cta,.lv-cta:hover{transition:none;gap:.4rem}}
 
 /* Destination rail on the Everywhere step: visible thin scrollbar, edge fades and arrows when there is more. */
 .deck-rail{scrollbar-width:thin;scrollbar-color:hsl(var(--foreground)/.25) transparent;scroll-padding-inline:4px}
