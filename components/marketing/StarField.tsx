@@ -1,9 +1,14 @@
+import { CometShower } from "./CometShower";
+
 /**
- * Brand sky behind every public page (10-16): a scatter of twinkling stars and a few lime comets
- * that fall on a loop, echoing the rocket mark. Pure CSS on a fixed layer, so it is there in every
- * section as you scroll, costs no JS, and only animates transform + opacity (compositor only).
- * Positions come from a seeded generator, so server and browser render the same markup.
- * Decorative: aria-hidden, pointer-events none. Reduced motion: comets off, stars still.
+ * Brand sky (10-16). Twinkling stars plus comets fired at random from the top-left, crossing the
+ * whole view to the bottom right (CometShower.tsx).
+ * - "page": follows the theme, sits behind public pages and the admin panel.
+ * - "space": always deep space (auth pages): denser, tinted stars, nebula clouds and a faint
+ *   milky-way band, so sign in / sign up feel like floating in a galaxy in both themes.
+ * Stars are CSS on a fixed layer (transform + opacity only). Positions come from a seeded generator,
+ * so server and browser render the same markup. Decorative: aria-hidden, pointer-events none.
+ * Reduced motion: comets and drift off, stars still.
  */
 function rng(seed: number) {
   let s = seed;
@@ -13,41 +18,47 @@ function rng(seed: number) {
   };
 }
 
-const r = rng(1016);
-const STARS = Array.from({ length: 56 }, () => ({
-  x: +(r() * 100).toFixed(2),
-  y: +(r() * 100).toFixed(2),
-  s: r() < 0.18 ? 2.5 : r() < 0.55 ? 1.5 : 1,
-  d: +(3 + r() * 5).toFixed(2),
-  w: +(-r() * 8).toFixed(2),
-}));
+type Star = { x: number; y: number; s: number; d: number; w: number; tint: number; glow: boolean };
+function stars(seed: number, n: number, rich: boolean): Star[] {
+  const r = rng(seed);
+  return Array.from({ length: n }, () => {
+    const big = r();
+    return {
+      x: +(r() * 100).toFixed(2),
+      y: +(r() * 100).toFixed(2),
+      s: big < 0.12 ? 2.5 : big < 0.5 ? 1.5 : 1,
+      d: +(3 + r() * 5).toFixed(2),
+      w: +(-r() * 8).toFixed(2),
+      tint: rich ? Math.floor(r() * 10) : 0, // 0-6 white, 7 lime, 8 cyan, 9 rose
+      glow: rich && big < 0.05,
+    };
+  });
+}
+const PAGE = stars(1016, 56, false);
+const SPACE = stars(2026, 150, true);
+const TINT = ["", "", "", "", "", "", "", "sky-star-lime", "sky-star-cyan", "sky-star-rose"];
 
-// Comets start above or left of the view and fall toward the bottom right. Spread start times so
-// at most one or two are in flight at once.
-const COMETS = Array.from({ length: 7 }, (_, i) => ({
-  x: +(-10 + r() * 85).toFixed(1),
-  y: +(-12 + r() * 45).toFixed(1),
-  a: +(26 + r() * 16).toFixed(1),
-  len: Math.round(110 + r() * 120),
-  d: +(10 + r() * 8).toFixed(1),
-  w: +(-(i * 2.6 + r() * 1.5)).toFixed(1),
-}));
-
-export function StarField() {
+export function StarField({ variant = "page", nebula = variant === "space", className }: { variant?: "page" | "space"; nebula?: boolean; className?: string }) {
+  const list = variant === "space" ? SPACE : PAGE;
   return (
-    <div className="sky" aria-hidden="true">
-      {STARS.map((s, i) => (
+    <div className={["sky", variant === "space" ? "sky-space" : "", className ?? ""].join(" ").trim()} aria-hidden="true">
+      {nebula && (
+        <div className="sky-nebula">
+          <span />
+          <span />
+          <span />
+          <span />
+          {variant === "space" && <i className="sky-band" />}
+        </div>
+      )}
+      {list.map((s, i) => (
         <span
           key={i}
-          className="sky-star"
+          className={["sky-star", TINT[s.tint], s.glow ? "sky-star-glow" : ""].join(" ").trim()}
           style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.s, height: s.s, animationDuration: `${s.d}s`, animationDelay: `${s.w}s` }}
         />
       ))}
-      {COMETS.map((c, i) => (
-        <span key={i} className="sky-comet" style={{ left: `${c.x}%`, top: `${c.y}%`, transform: `rotate(${c.a}deg)` }}>
-          <span style={{ width: c.len, animationDuration: `${c.d}s`, animationDelay: `${c.w}s` }} />
-        </span>
-      ))}
+      <CometShower dense={variant === "space"} />
     </div>
   );
 }

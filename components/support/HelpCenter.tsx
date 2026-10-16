@@ -193,6 +193,19 @@ function StillStuck({ me, t }: { me: { name: string; email: string } | null; t: 
   const [state, setState] = useState<"idle" | "busy" | "done">("idle");
   const [err, setErr] = useState("");
   const [ref, setRef] = useState("");
+  // Arriving from the "What changed" notice (?write=changes): open the form, start the message, put the cursor in it.
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("write") !== "changes") return;
+    setForm(true);
+    setMsg((m) => m || "About the recent changes: ");
+    const t = window.setTimeout(() => {
+      const el = document.getElementById("st-msg") as HTMLTextAreaElement | null;
+      el?.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      el?.focus({ preventScroll: true });
+      el?.setSelectionRange(el.value.length, el.value.length);
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, []);
   async function send(e: React.FormEvent) {
     e.preventDefault();
     if (msg.trim().length < 10) return setErr("Tell us a little more (at least a sentence) so we can help first time.");

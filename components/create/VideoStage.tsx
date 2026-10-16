@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { aspectLabel, cn, formatBytes, formatDuration, resolutionLabel } from "@/lib/utils";
 import { validateVideoFile } from "@/lib/client/handoff";
 import type { UploadState } from "./types";
+import { OutlyMark } from "@/components/brand/Logo";
+import { DancingPip, MusicToggle, useGroove } from "./Groove";
 
 interface Props {
   src: string | null;
@@ -30,6 +32,7 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
   const [d, setD] = useState(meta?.duration ?? 0);
   const [full, setFull] = useState(false);
   const [justIn, setJustIn] = useState(false);
+  const groove = useGroove(upload.kind === "uploading");
 
   useEffect(() => {
     if (upload.kind !== "done") return;
@@ -163,27 +166,34 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
         <div className="absolute inset-x-0 top-4 flex justify-center px-4" aria-live="polite">
           <AnimatePresence mode="wait">
             {upload.kind === "uploading" && (
-              <motion.div key="up" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="w-full max-w-[280px] rounded-2xl bg-[hsl(240_10%_8%/0.62)] px-3 py-2 backdrop-blur-xl text-[13px] font-medium text-white hairline">
-                <div className="flex items-baseline gap-2">
-                  <span className="min-w-0 flex-1 truncate">{upload.progress < 1 ? "Bringing it over…" : "Making it ready…"}</span>
-                  <span className="tabular shrink-0">{Math.round(upload.progress * 100)}%</span>
-                </div>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <span className="relative h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-white/20">
-                    <motion.span className="absolute inset-y-0 left-0 bg-lime" animate={{ width: `${Math.round(upload.progress * 100)}%` }} transition={{ ease: "easeOut" }} />
-                  </span>
-                  {etaLabel && <span className="shrink-0 text-[11px] font-normal text-white/70">{etaLabel}</span>}
+              <motion.div key="up" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="la-card relative w-full max-w-[340px] overflow-hidden rounded-[1.6rem] p-3 text-[13px] font-medium text-white">
+                <span className="la-grid" aria-hidden="true" />
+                <div className="relative flex items-center gap-2.5">
+                  <DancingPip size={40} className="groove-glass shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{upload.progress < 1 ? "Bringing it over" : "Making it ready"}</p>
+                    <p className="truncate text-[11px] font-bold uppercase tracking-[0.1em] text-[hsl(var(--lime))]">{etaLabel ?? (upload.progress < 1 ? "On its way" : "Almost there")}</p>
+                  </div>
+                  <MusicToggle g={groove} tone="glass" iconOnly className="-my-1 shrink-0" />
                   {onCancel && (
                     <button
                       type="button"
                       onClick={onCancel}
                       aria-label="Cancel upload"
                       title="Cancel upload"
-                      className="-my-2.5 -mr-2 grid h-11 w-11 shrink-0 place-items-center rounded-full text-white/80 transition hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                      className="-my-1 -mr-1 grid h-11 w-11 shrink-0 place-items-center rounded-full text-white/80 transition hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                     >
                       <X className="h-4 w-4" aria-hidden="true" />
                     </button>
                   )}
+                </div>
+                <div className="la-track relative mt-2.5 h-9 rounded-full" role="progressbar" aria-label="Upload progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(upload.progress * 100)}>
+                  <motion.div className="la-fill la-fill-anim absolute inset-y-0 left-0 rounded-full" style={{ minWidth: "2.25rem" }} animate={{ width: `${Math.round(upload.progress * 100)}%` }} transition={{ ease: "easeOut" }}>
+                    <span className="absolute right-1 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center">
+                      <OutlyMark variant="ink" size={18} className="la-rocket la-rocket-anim" />
+                    </span>
+                  </motion.div>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold tabular-nums text-white/60">{Math.round(upload.progress * 100)}%</span>
                 </div>
               </motion.div>
             )}
