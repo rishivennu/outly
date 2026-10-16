@@ -1,9 +1,11 @@
 "use client";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Info, Pause, Play, RotateCcw } from "lucide-react";
+import { ArrowRight, Check, Info, Pause, Play, RefreshCw } from "lucide-react";
 import { AppIcon } from "@/components/brand/brands";
+import { DotText } from "@/components/brand/DotText";
+import { OutlyMark } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
-import { Av, Bars, Bolt, Graph, Rings } from "./bento/Art";
+import { Bars, Bolt } from "./bento/Art";
 import { Reveal } from "./Reveal";
 
 /*
@@ -103,9 +105,7 @@ export function DemoFlow() {
   const go = useCallback((b: Beat) => setBeat(b), []);
   const states = ORDER.map((p) => state(p, beat, retry));
   const done = states.filter((s) => s.tone === "done").length;
-  const x = states[2];
   const [w1, w2] = headline(beat, done);
-  const track = beat < 2 ? "Waiting to send." : ORDER.map((p, i) => `${NAME[p]} ${states[i].status}`).join(", ") + ".";
 
   return (
     <div
@@ -129,110 +129,139 @@ export function DemoFlow() {
         </p>
       </div>
 
+      {/* 10-16f: three tiles for the story (upload, drafts, the step), then one Live Activity card per place.
+          The per-place tiles (sends, status, fix, live count) live in those cards now. */}
       <Reveal y={0} className="bx bx-demo">
-        <div className="bx-col">
-          <Tile on={beat === 0} live={beat === 0 && running} title="One upload" sub="desk-setup.mp4 lands in your library." art={<Bars />} />
-          <Tile on={beat === 1} title="Three drafts" sub="A caption, a title and a post, each in its own shape." art={<Bolt id={`${uid}-bolt`} />} />
-        </div>
-
-        <div className="bx-col">
-          <Tile
-            on={beat === 2}
-            title="Three sends"
-            sub="Each place becomes its own job."
-            art={
-              <Rings>
-                {ORDER.map((p) => (
-                  <Av key={p}>
-                    <AppIcon brand={p} size={26} />
-                  </Av>
-                ))}
-              </Rings>
-            }
-          />
-          <Tile
-            on={beat === 3}
-            title="Its own status"
-            sub={track}
-            art={
-              <span className="bx-orbs is-3" aria-hidden="true">
-                {ORDER.map((p, i) => (
-                  <span key={p} className="bx-orb">
-                    <AppIcon brand={p} size={26} />
-                    <span className={cn("bx-st", states[i].tone !== "idle" && states[i].tone)} />
-                  </span>
-                ))}
-              </span>
-            }
-          />
-          <div className={cn("bx-tile bx-wide", beat === 3 && "is-on")}>
-            <div className="bx-art">
-              <div className="flex flex-col items-center">
-                <div className="bx-msg">
-                  <span className="bx-msg-av" aria-hidden="true">
-                    <AppIcon brand="x" size={22} />
-                  </span>
-                  <div className="min-w-0">
-                    <b>X Post</b>
-                    <p key={x.note} className="bx-word">{x.note}</p>
-                  </div>
-                </div>
-                {x.tone === "fail" ? (
-                  <button type="button" className="bx-btn" onClick={() => setRetry("running")}>
-                    <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Retry X
-                  </button>
-                ) : (
-                  <span className="bx-btn invisible" aria-hidden="true">
-                    Retry X
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="bx-copy">
-              <h3 className="bx-title">Fix just the one</h3>
-              <p className="bx-sub">Retry one place. Nothing else is sent twice.</p>
-            </div>
+        <Tile tone="send" on={beat === 0} live={beat === 0 && running} title="One upload" sub="desk-setup.mp4 lands in your library." art={<Bars />} />
+        <Tile tone="wait" on={beat === 1} title="Three drafts" sub="A caption, a title and a post, each in its own shape." art={<Bolt id={`${uid}-bolt`} />} />
+        <div className="bx-tile bx-lime">
+          <div className="flex items-center justify-between">
+            <Steps beat={beat} go={go} uid={uid} />
+            <button type="button" className="bx-play" onClick={() => setPaused((v) => !v)} aria-label={paused ? "Play demo" : "Pause demo"}>
+              {paused ? <Play className="ml-0.5 h-4 w-4 fill-current" aria-hidden="true" /> : <Pause className="h-4 w-4 fill-current" aria-hidden="true" />}
+            </button>
           </div>
-        </div>
-
-        <div className="bx-col">
-          <div className="bx-tile bx-lime">
-            <div className="flex items-center justify-between">
-              <Steps beat={beat} go={go} uid={uid} />
-              <button type="button" className="bx-play" onClick={() => setPaused((v) => !v)} aria-label={paused ? "Play demo" : "Pause demo"}>
-                {paused ? <Play className="ml-0.5 h-4 w-4 fill-current" aria-hidden="true" /> : <Pause className="h-4 w-4 fill-current" aria-hidden="true" />}
-              </button>
-            </div>
-            <div id={`${uid}-panel`} role="tabpanel" aria-labelledby={`${uid}-tab-${beat}`} aria-live="polite" className="bx-copy mt-auto pt-8">
-              <p className="text-[13px] font-semibold">
-                Step <span className="tabular">{beat + 1}</span> of 4 · {BEATS[beat].label}
-              </p>
-              <p key={`w-${beat}-${done}`} className="bx-word bx-big mt-2">
-                {w1} <span className="accent-serif font-normal">{w2}</span>
-              </p>
-              <p key={`c-${beat}`} className="bx-word bx-sub">{BEATS[beat].caption}</p>
-            </div>
-          </div>
-          <div className={cn("bx-tile bx-wide bx-row-sm", beat === 3 && "is-on")}>
-            <div className="bx-art">
-              <Graph id={`${uid}-graph`} at={beat < 3 ? beat : 2 + done} lit={(beat < 3 ? beat : 2 + done) / 5} />
-            </div>
-            <div className="bx-copy">
-              <h3 className="bx-title">
-                Live right now <span className="tabular">{done}/3</span>
-              </h3>
-              <p className="bx-sub">Each place counts the moment it is live.</p>
-            </div>
+          <div id={`${uid}-panel`} role="tabpanel" aria-labelledby={`${uid}-tab-${beat}`} aria-live="polite" className="bx-copy mt-auto pt-8">
+            <p className="text-[13px] font-semibold">
+              Step <span className="tabular">{beat + 1}</span> of 4 · {BEATS[beat].label}
+            </p>
+            <p key={`w-${beat}-${done}`} className="bx-word bx-big mt-2">
+              {w1} <span className="accent-serif font-normal">{w2}</span>
+            </p>
+            <p key={`c-${beat}`} className="bx-word bx-sub">{BEATS[beat].caption}</p>
           </div>
         </div>
       </Reveal>
+
+      {/* The same Live Activity cards the posting screen uses, playing the demo's beats (10-16f). */}
+      <ul aria-label="Each place, live" className="la-demo mt-3 flex flex-wrap gap-3">
+        {ORDER.map((p, i) => (
+          <DemoActivity key={p} p={p} s={states[i]} beat={beat} retry={retry} moving={running} onRetry={() => setRetry("running")} />
+        ))}
+      </ul>
     </div>
   );
 }
 
-function Tile({ on, live, title, sub, art }: { on: boolean; live?: boolean; title: string; sub: string; art: React.ReactNode }) {
+const CODE: Record<Core, string> = { instagram: "IG", youtube: "YT", x: "X" };
+const FORMAT: Record<Core, string> = { instagram: "Reel", youtube: "Short", x: "Post" };
+const TITLE: Record<string, string> = { waiting: "Waiting", "draft ready": "Draft ready", queued: "Queued", uploading: "Sending", processing: "Going public", retrying: "Trying again", live: "Live", "needs a hand": "Needs a hand" };
+const STEP: Record<string, number> = { waiting: 1, "draft ready": 1, queued: 1, uploading: 2, retrying: 2, processing: 3, live: 4 };
+
+function pctFor(p: Core, status: string, beat: Beat) {
+  if (status === "live") return 100;
+  if (status === "processing") return 78;
+  if (status === "retrying") return 60;
+  if (status === "needs a hand") return 46;
+  if (beat === 2) return p === "youtube" ? 12 : p === "instagram" ? 44 : 36;
+  return 0;
+}
+
+/** One Live Activity card, demo flavour: no server, the beat clock drives it. */
+function DemoActivity({ p, s, beat, retry, moving, onRetry }: { p: Core; s: { status: string; tone: Tone; note: string }; beat: Beat; retry: Retry; moving: boolean; onRetry: () => void }) {
+  const live = s.tone === "done";
+  const bad = s.tone === "fail";
+  const work = s.tone === "work";
+  const pct = pctFor(p, s.status, beat);
+  const step = STEP[s.status] ?? 1;
+  const accent = live ? "Live now" : bad ? "Tap retry to finish" : s.status === "retrying" ? "Try 2" : `Step ${step} of 4`;
   return (
-    <div className={cn("bx-tile", on && "is-on", live && "bx-live")}>
+    <li className={cn("la-card la-themed relative flex min-w-0 flex-[1_1_17rem] flex-col overflow-hidden rounded-[2rem] p-4 sm:p-5", live && "la-live", bad && "la-bad")}>
+      <span className="la-grid" aria-hidden="true" />
+      <div className="relative flex items-center gap-3" aria-hidden="true">
+        <DotText text="YOU" />
+        <ArrowRight className="la-arrow h-6 w-6 shrink-0" strokeWidth={3} />
+        <DotText text={CODE[p]} />
+      </div>
+      <div className="relative mt-3 grid grid-cols-2 gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold leading-tight">Your video</p>
+          <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.08em] la-mute">desk-setup.mp4</p>
+        </div>
+        <div className="min-w-0">
+          <h3 className="truncate font-semibold leading-tight">{NAME[p]}</h3>
+          <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.08em] la-mute">{FORMAT[p]}</p>
+        </div>
+      </div>
+
+      <div className="la-box relative mt-4 flex min-h-[7.75rem] flex-col justify-center rounded-[1.25rem] p-4 pr-16">
+        <p key={s.status} className="bx-word text-lg font-semibold leading-tight">{TITLE[s.status] ?? s.status}</p>
+        <p className="mt-1 text-sm leading-snug la-mute">{s.note}</p>
+        <p className={cn("mt-2 text-[11px] font-bold uppercase tracking-[0.1em]", bad ? "la-warn" : "la-accent")}>{accent}</p>
+        <span className="absolute right-3 top-3">
+          {bad ? (
+            <button type="button" onClick={onRetry} disabled={retry === "running"} className="la-round" aria-label={`Try again on ${NAME[p]}`}>
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            </button>
+          ) : live ? (
+            <span className="la-round" aria-hidden="true">
+              <Check className="h-4 w-4" strokeWidth={3} />
+            </span>
+          ) : (
+            <span className="grid h-11 w-11 place-items-center" aria-hidden="true">
+              <AppIcon brand={p} size={30} />
+            </span>
+          )}
+        </span>
+      </div>
+
+      <div
+        className="la-track relative mt-4 h-14 rounded-full"
+        role="progressbar"
+        aria-label={`${NAME[p]} progress`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pct}
+        aria-valuetext={`${NAME[p]}: ${TITLE[s.status] ?? s.status}`}
+      >
+        <div className={cn("la-fill absolute inset-y-0 left-0 rounded-full", work && moving && "la-fill-anim")} style={{ width: `max(3.5rem, ${pct}%)` }}>
+          <span className="absolute right-1.5 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center">
+            <OutlyMark variant="ink" size={26} className={cn("la-rocket", work && moving && "la-rocket-anim")} />
+          </span>
+          {live && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.12em] text-[hsl(var(--lime-foreground))]">Landed</span>}
+        </div>
+        {!live && <span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold tabular-nums la-mute">{bad ? "STOPPED" : `${pct}%`}</span>}
+      </div>
+    </li>
+  );
+}
+
+type GTone = "wait" | "send" | "live" | "bad";
+
+/** The bottom glow and rim of the gradient cards. Decorative only. */
+function Glow() {
+  return (
+    <>
+      <span className="gc-glow" aria-hidden="true" />
+      <span className="gc-rim" aria-hidden="true" />
+    </>
+  );
+}
+
+function Tile({ tone, on, live, title, sub, art }: { tone: GTone; on: boolean; live?: boolean; title: string; sub: string; art: React.ReactNode }) {
+  return (
+    <div className={cn("bx-tile bx-gc", `gc-${tone}`, on && "is-on", live && "bx-live")}>
+      <Glow />
       <div className="bx-art">{art}</div>
       <div className="bx-copy">
         <h3 className="bx-title">{title}</h3>
