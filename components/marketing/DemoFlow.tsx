@@ -110,7 +110,7 @@ export function DemoFlow() {
   return (
     <div
       ref={root}
-      className="mx-auto w-full max-w-[1180px]"
+      className="dark demo-stage mx-auto w-full max-w-[1180px]"
       data-beat={beat}
       data-running={running ? "" : undefined}
       style={{ ["--beat" as string]: `${BEAT_MS}ms` }}
