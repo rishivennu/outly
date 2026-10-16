@@ -206,3 +206,35 @@ describe("retention prune", () => {
     expect(await db.otpCode.count({ where: { id: newCode.id } })).toBe(1);
   });
 });
+
+describe("draft expiry", () => {
+  test("untouched drafts go after 3 days with their video; fresh, booked and reviewed ones stay", async () => {
+    const u = await mk("drafts");
+    const day = 864e5;
+    const media = (k: string) => db.media.create({ data: { userId: u.id, originalFilename: `${k}.mp4`, storageKey: `drafts/${k}-${n}.mp4`, mimeType: "video/mp4", size: 10, status: "ready" } });
+    const draft = async (k: string, ageDays: number, extra: Record<string, unknown> = {}, mediaId?: string) => {
+      const m = mediaId ?? (await media(k)).id;
+      const p = await db.post.create({ data: { userId: u.id, mediaId: m, status: "draft", ...extra } });
+      await db.post.update({ where: { id: p.id }, data: { updatedAt: new Date(Date.now() - ageDays * day) } });
+      return { post: p, mediaId: m };
+    };
+    const old = await draft("old", 4);
+    const fresh = await draft("fresh", 1);
+    const booked = await draft("booked", 5, { scheduledAt: new Date(Date.now() + 2 * day) });
+    const reviewed = await draft("reviewed", 5);
+    await db.reviewRequest.create({ data: { postId: reviewed.post.id, tokenHash: `h-${Date.now()}`, expiresAt: new Date(Date.now() + day) } });
+    const shared = await draft("shared", 6);
+    await db.post.create({ data: { userId: u.id, mediaId: shared.mediaId, status: "published" } });
+    const sent = await draft("sent", 9, { status: "published" });
+
+    const out = await prune.pruneStaleDrafts();
+    expect(out.drafts).toBeGreaterThanOrEqual(2);
+    const has = (id: string) => db.post.count({ where: { id } });
+    expect(await has(old.post.id)).toBe(0);
+    expect(await db.media.count({ where: { id: old.mediaId } })).toBe(0);
+    expect(await has(shared.post.id)).toBe(0);
+    expect(await db.media.count({ where: { id: shared.mediaId } })).toBe(1);
+    for (const keep of [fresh, booked, reviewed, sent]) expect(await has(keep.post.id)).toBe(1);
+  });
+});
+

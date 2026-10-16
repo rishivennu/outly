@@ -25,6 +25,17 @@ const when = (iso: string) => {
  * The list resolves itself on the server once a problem is fixed. Non-modal panel: Escape or a click
  * outside closes it and focus goes back to the bell.
  */
+/* The sidebar and the mobile top bar each mount a bell (one is hidden by CSS). Share one request between them. */
+type NoticeList = { notices: Notice[]; unread: number };
+let inflight: { at: number; p: Promise<NoticeList> } | null = null;
+function fetchNotices(): Promise<NoticeList> {
+  if (inflight && Date.now() - inflight.at < 2000) return inflight.p;
+  const p = api<NoticeList>("/api/notices");
+  inflight = { at: Date.now(), p };
+  p.catch(() => (inflight = null));
+  return p;
+}
+
 export function NoticesBell({ placement = "side", className }: { placement?: "side" | "below"; className?: string }) {
   const path = usePathname();
   const id = useId();
@@ -36,7 +47,7 @@ export function NoticesBell({ placement = "side", className }: { placement?: "si
   const [pos, setPos] = useState<React.CSSProperties>({});
 
   const load = useCallback(() => {
-    api<{ notices: Notice[]; unread: number }>("/api/notices")
+    fetchNotices()
       .then((r) => {
         setItems(r.notices);
         setUnread(r.unread);

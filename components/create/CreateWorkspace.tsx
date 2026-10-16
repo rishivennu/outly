@@ -21,6 +21,9 @@ import { SaveDraft } from "./SaveDraft";
 import { draftTitle, enabledPlatforms, launchGate, targetPayload } from "./publish";
 import { CaptionBurner } from "./CaptionBurner";
 import { readVideo } from "./frame";
+import { primeGroove } from "./Groove";
+import { DeviceDrafts } from "./DeviceDrafts";
+import { findDeviceDraftByPost, getDeviceDraft, newDeviceId, removeDeviceDraft, saveDeviceDraft, type DeviceTarget } from "@/lib/client/device-drafts";
 import { emptyDraft, NOTES, type AccountView, type Draft, type HookResult, type MediaView, type PlatformCopy, type PostView, type Step, type Tone, type UploadState } from "./types";
 
 interface Props {
@@ -33,12 +36,16 @@ interface Props {
   initialStory?: string | null;
   /** "1" = a video arrived from the share sheet; "missed" = it was shared but couldn't be kept */
   shared?: string | null;
+  /** `?local=` : a draft kept in this browser to pick up (lib/client/device-drafts). */
+  restoreLocal?: string | null;
+  /** `?post=` that no longer exists on the server (an expired draft): look for a copy in this browser. */
+  missingPostId?: string | null;
 }
 
 type Meta = { duration: number; width: number; height: number };
 const LIVE = ["publishing", "published", "partial", "failed"];
 
-export function CreateWorkspace({ accounts: accountList, initialPost, tz, connected, connectError, initialStory, shared }: Props) {
+export function CreateWorkspace({ accounts: accountList, initialPost, tz, connected, connectError, initialStory, shared, restoreLocal, missingPostId }: Props) {
   const toast = useToast();
   const accounts = useMemo(() => Object.fromEntries(accountList.map((a) => [a.platform, a])) as Partial<Record<Platform, AccountView>>, [accountList]);
 
@@ -93,6 +100,9 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
+  /** This draft's copy in the browser. Resolved on mount (an existing copy is adopted), then saved as you go. */
+  const deviceId = useRef<string | null>(initialPost || restoreLocal || missingPostId ? null : newDeviceId());
+  const [deviceReady, setDeviceReady] = useState(!initialPost && !restoreLocal && !missingPostId);
 
   /* ---------------- launch ---------------- */
   const [mode, setMode] = useState<"now" | "schedule">(initialPost?.status === "scheduled" ? "schedule" : "now");
@@ -182,6 +192,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
     setLocalUrl((old) => (old && URL.revokeObjectURL(old), null));
     setUpload({ kind: "idle" });
     setStep("video");
+    if (!postIdRef.current && deviceId.current) void removeDeviceDraft(deviceId.current);
   }, []);
 
   // Browser-measured metadata + poster frame go up once both the upload and the read have finished.
@@ -216,6 +227,76 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
     if (connectError) toast("That connection didn't go through. Let's try again.", "info");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The copy in this browser: adopt it for a server draft, or bring a draft back from it.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (initialPost) {
+        const found = await findDeviceDraftByPost(initialPost.id);
+        deviceId.current = found?.id ?? `p_${initialPost.id}`;
+      } else if (restoreLocal || missingPostId) {
+        const found = restoreLocal ? await getDeviceDraft(restoreLocal) : await findDeviceDraftByPost(missingPostId!).then((d) => (d ? getDeviceDraft(d.id) : null));
+        if (!alive) return;
+        if (found?.draft.postId && restoreLocal) {
+          // The server still has it: open that one, it is the fuller copy.
+          const onServer = await api<{ post: PostView }>(`/api/posts/${found.draft.postId}`).catch(() => null);
+          if (onServer) return window.location.replace(`/create?post=${onServer.post.id}`);
+        }
+        if (found) {
+          const d = found.draft;
+          deviceId.current = d.id;
+          postIdRef.current = null;
+          setPostId(null);
+          window.history.replaceState(null, "", "/create");
+          setStory(d.story);
+          setSubmittedStory(d.story || null);
+          setHook(d.hook);
+          setDrafts((cur) => {
+            const out = { ...cur };
+            for (const p of PLATFORMS) {
+              const t = d.targets[p];
+              if (t) out[p] = { ...cur[p], ...t, note: NOTES[p], reviewed: false };
+            }
+            return out;
+          });
+          if (found.video) {
+            void startUpload(found.video);
+            setStep(d.hook ? "everywhere" : "story");
+            toast(missingPostId ? "That draft had expired on Outlly, so we brought it back from this device. Uploading the video again." : "Picked up where you left off. Uploading the video again.", "info");
+          } else {
+            setStep("video");
+            toast("Your words are back. Add the video again to carry on.", "info");
+          }
+        } else {
+          if (restoreLocal) window.history.replaceState(null, "", "/create");
+          toast(missingPostId ? "That draft is gone. Drafts left untouched for 3 days are removed." : "That draft isn't on this device any more.", "info");
+        }
+      }
+      deviceId.current ??= newDeviceId();
+      if (alive) setDeviceReady(true);
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Save as you go, to this browser: words every change, the video once.
+  useEffect(() => {
+    if (!deviceReady || phase !== "edit" || !hasMedia || !deviceId.current) return;
+    const id = deviceId.current;
+    const t = setTimeout(() => {
+      const filename = media?.filename ?? fileRef.current?.name ?? null;
+      const targets: Record<string, DeviceTarget> = {};
+      for (const p of PLATFORMS) {
+        const x = drafts[p];
+        targets[p] = { enabled: x.enabled, title: x.title, caption: x.caption, description: x.description, hashtags: x.hashtags };
+      }
+      void saveDeviceDraft({ id, postId, title: draftTitle({ drafts, hook, filename }), story: submittedStory ?? story, hook, targets, filename, poster: posterBlob.current }, fileRef.current);
+    }, 700);
+    return () => clearTimeout(t);
+  }, [deviceReady, phase, hasMedia, postId, drafts, hook, story, submittedStory, media, localPoster]);
 
   useEffect(() => {
     if (upload.kind !== "uploading") return;
@@ -388,12 +469,15 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const { enabled, ready: allReviewed } = launchGate(drafts, accounts, meta);
 
   const launch = async () => {
+    // Still inside the click: unlock the publishing screen's music before the save + launch round trips.
+    if (mode === "now") primeGroove();
     setLaunching(true);
     setLaunchError(null);
     try {
       const id = await save({ force: true, strict: true });
       if (!id) throw new ApiError(400, "Add a video first.");
       const r = await api<{ post: PostView }>(`/api/posts/${id}/launch`, { method: "POST", json: { mode, scheduledAt: mode === "schedule" ? when.toISOString() : undefined, confirmed: true } });
+      if (deviceId.current) void removeDeviceDraft(deviceId.current); // it's out (or booked): no copy to keep
       if (mode === "now") {
         setLivePost(r.post);
         setPhase("publishing");
@@ -492,6 +576,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                 <div className="mt-8 w-full sm:mt-10">
                   <UploadZone compact onFile={(f) => startUpload(f)} />
                 </div>
+                {!initialPost && !restoreLocal && deviceReady && <DeviceDrafts className="mx-auto mt-10 max-w-md text-left" />}
               </motion.section>
             )}
 

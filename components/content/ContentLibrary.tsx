@@ -12,6 +12,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { fmt, useUser } from "@/components/shell/UserContext";
 import { PostSheet } from "@/components/posts/PostSheet";
+import { DeviceDrafts } from "@/components/create/DeviceDrafts";
 import { cn, compact, formatDuration } from "@/lib/utils";
 import type { PostView } from "@/lib/services";
 
@@ -71,6 +72,8 @@ export function ContentLibrary({ initial, views }: { initial: PostView[]; views:
         ))}
       </div>
 
+      {filter === "draft" && <DeviceDrafts className="mt-8" limit={8} heading="Also saved on this device" grid="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" />}
+
       {shown.length === 0 ? (
         <Empty filter={filter} />
       ) : (
@@ -125,7 +128,7 @@ export function ContentLibrary({ initial, views }: { initial: PostView[]; views:
 function Empty({ filter }: { filter: F }) {
   const copy: Record<F, [string, string, IconName]> = {
     all: ["Nothing here yet.", "Your first video is one drop away.", "gallery"],
-    draft: ["No drafts.", "Everything you started, you finished. Look at you.", "drafts"],
+    draft: ["No drafts.", "Everything you started, you finished. Drafts you leave for 3 days are removed.", "drafts"],
     scheduled: ["Nothing on the calendar.", "Schedule something and it'll wait here.", "schedule"],
     published: ["Nothing live yet.", "Send your first one out. It's a good feeling.", "publish"],
     failed: ["Nothing went wrong.", "Every post made it where it was going.", "success"],

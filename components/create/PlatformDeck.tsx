@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useId, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import * as Switch from "@radix-ui/react-switch";
-import { AlertCircle, ArrowRight, Check, CircleAlert, Link2, MinusCircle, RefreshCw, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowRight, Check, ChevronLeft, ChevronRight, CircleAlert, Link2, MinusCircle, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Counter, Input, Label, Textarea } from "@/components/ui/field";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
@@ -46,6 +46,46 @@ export function PlatformDeck(p: Props) {
   const [active, setActive] = useState<Platform>(enabled[0] ?? "instagram");
   const hookId = useId();
   const live = useLivePlatforms();
+  const reduce = useReducedMotion();
+
+  // The destination rail scrolls sideways once there are more places than fit. Arrows and edge fades show
+  // there is more, a vertical wheel scrolls it on desktop, and the active tab is kept in view.
+  const rail = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState({ l: false, r: false });
+  const measure = useCallback(() => {
+    const el = rail.current;
+    if (!el) return;
+    setEdge({ l: el.scrollLeft > 4, r: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+  }, []);
+  useEffect(() => {
+    const el = rail.current;
+    if (!el) return;
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const room = e.deltaY > 0 ? el.scrollLeft + el.clientWidth < el.scrollWidth - 1 : el.scrollLeft > 0;
+      if (!room) return; // at the end: let the page scroll on
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener("scroll", measure, { passive: true });
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", measure);
+      el.removeEventListener("wheel", onWheel);
+    };
+  }, [measure, live.length]);
+  const nudge = (dir: 1 | -1) => {
+    const el = rail.current;
+    if (el) el.scrollBy({ left: dir * Math.max(220, el.clientWidth * 0.7), behavior: reduce ? "auto" : "smooth" });
+  };
+  useEffect(() => {
+    const tab = document.getElementById(`tab-${active}`)?.parentElement;
+    tab?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: reduce ? "auto" : "smooth" });
+  }, [active, reduce]);
 
   const status = useMemo(() => {
     const out = {} as Record<Platform, { checks: ReturnType<typeof checksFor>; blocked: boolean; label: string; tone: "ok" | "warn" | "off" | "done" }>;
@@ -58,7 +98,7 @@ export function PlatformDeck(p: Props) {
       out[pl] = {
         checks,
         blocked: blocked || !connected,
-        label: !d.enabled ? "Skipping this one" : !connected ? (acct ? "Needs a reconnect" : "Not connected yet") : d.reviewed && !blocked ? "Looks good ✓" : blocked ? "Needs a hand" : READY_LABEL[pl],
+        label: !d.enabled ? "Skipping this one" : !connected ? (acct ? "Needs a reconnect" : "Not connected yet") : d.reviewed && !blocked ? "Looks good" : blocked ? "Needs a hand" : READY_LABEL[pl],
         tone: !d.enabled ? "off" : !connected || blocked ? "warn" : d.reviewed ? "done" : "ok",
       };
     }
@@ -92,7 +132,8 @@ export function PlatformDeck(p: Props) {
       </header>
 
       {/* Destination picker. The on/off control is a sibling of the tab, never nested inside it. */}
-      <div className="scrollbar-none -mx-1 mb-6 flex snap-x gap-3 overflow-x-auto px-1 pb-1">
+      <div className="relative mb-6">
+      <div ref={rail} className={cn("deck-rail -mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-3", edge.l && "deck-fade-l", edge.r && "deck-fade-r")}>
         <div role="tablist" aria-label="Destinations" className="contents">
           {live.map((pl) => {
             const s = status[pl];
@@ -134,6 +175,17 @@ export function PlatformDeck(p: Props) {
             );
           })}
         </div>
+      </div>
+        {edge.l && (
+          <button type="button" onClick={() => nudge(-1)} aria-label="Show earlier destinations" className="deck-arrow left-0 -translate-x-1/3">
+            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+          </button>
+        )}
+        {edge.r && (
+          <button type="button" onClick={() => nudge(1)} aria-label="Show more destinations" className="deck-arrow right-0 translate-x-1/3">
+            <ChevronRight className="h-5 w-5" aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       <AnimatePresence mode="wait">

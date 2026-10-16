@@ -5,7 +5,7 @@ import { Pip } from "@/components/brand/Pip";
 import { cn } from "@/lib/utils";
 
 /**
- * Pip's groove: one shared lofi track that plays while a video uploads or sends, and a Pip that
+ * Pip's groove: one shared lofi track that plays while a post is sending (the publishing screen only), and a Pip that
  * dances to its actual beat (Web Audio analyser on the bass band). One <audio> for the whole app,
  * so moving from "uploading" to "sending" doesn't restart the song.
  *
@@ -157,6 +157,30 @@ function loop() {
     if (dancers.size || snap.playing) raf = requestAnimationFrame(tick);
   };
   raf = requestAnimationFrame(tick);
+}
+
+/**
+ * Call synchronously inside the Launch click. Saving and launching take a few seconds, long enough for the
+ * browser to forget the click, so the publishing screen's music would come up blocked. Playing the element once
+ * here (silently) unlocks it; if the publishing screen has mounted by the time it starts, it simply keeps going.
+ */
+export function primeGroove() {
+  init();
+  if (!snap.on || typeof window === "undefined") return;
+  wire();
+  void ctx?.resume().catch(() => {});
+  const a = audio;
+  if (!a || !a.paused) return;
+  a.volume = 0;
+  a.play()
+    .then(() => {
+      if (users > 0 && snap.on && !held) {
+        set({ playing: true, blocked: false });
+        ramp(VOL);
+        loop();
+      } else a.pause();
+    })
+    .catch(() => {});
 }
 
 export function useGroove(active: boolean) {

@@ -1,6 +1,6 @@
 # fix-1016-all (system review "fix all")
 
-Upload every file in this folder to the repo root, keeping the paths. 75 files.
+Split in two for GitHub's 100-file upload limit. Upload fix-1016-part1 (app/, lib/: 65 files) and then fix-1016-part2 (everything else: 66 files incl. this note) to the repo root, keeping the paths. The build after part 1 alone may fail; it goes green once part 2 lands.
 Do NOT upload vercel.json (unchanged) or prisma/schema.prisma (generated at build from schema.template.prisma).
 
 ## What changed
@@ -84,3 +84,17 @@ Root cause: Gemini sometimes returns platform hashtags as a JSON array; it was p
 - components/support/HelpCenter.tsx: /support?write=changes opens the form with "About the recent changes: " and focuses it. Messages land in Tickets.
 - tests/round-1016-updates.test.ts.
 - After deploying, press Publish once in Admin > Update notice so the date matches the deploy.
+
+## New (10-16e): stop uploads, live cards, drafts on device, speed
+- Stop uploads: "Stop this upload" on each card and "Stop all uploads" (with a confirm) on the publishing screen. Works while a target is pending, queued or uploading; once the platform has it ("Going public now") it can't be stopped. A stopped target shows "Stopped by you" and can be sent again.
+  - lib/domain.ts (CANCELED error code, STOPPABLE), lib/services.ts cancelTargets, new app/api/targets/[id]/cancel/route.ts and app/api/posts/[id]/cancel/route.ts, lib/queue/handlers.ts (every step re-checks for a stop; a stop during the upload means it is never published).
+- Publishing screen redesign (components/create/PublishingView.tsx, .lv-* in globals.css): glass cards side by side (1 per row on phones, up to 4 on wide screens), a single card sits in the middle, original platform logos, a glow in the state colour (violet waiting, lime sending, green live, red needs a hand, grey stopped). components/shared/PlatformIcon.tsx: square logo tiles.
+- Music: off the creation screens (VideoStage), kept on the publishing screen. Groove.tsx primeGroove() unlocks audio inside the Launch click.
+- Destination rail on step 3 (components/create/PlatformDeck.tsx, .deck-* CSS): arrows, faded edges, mouse-wheel scroll, active tab scrolled into view.
+- Drafts on this device: lib/client/device-drafts.ts keeps each draft in the browser (IndexedDB, video included, newest 8). components/create/DeviceDrafts.tsx lists them on an empty Create page and on Content > Drafts with "Pick it up" (re-uploads the video) and Remove. /create?post= for an expired draft brings it back from the device. Removed from the device once launched or scheduled.
+- Drafts left untouched for 3 days are deleted from Outlly (lib/retention/prune.ts pruneStaleDrafts, run by the daily /api/cron/retention), with their video when no other post uses it. Drafts booked for a future time or waiting on a reviewer are kept. Copy in SaveDraft and the Drafts tab says so.
+- Speed: home page queries run in one parallel batch; sidebar links prefetch on hover instead of all at once (components/shell/HoverLink.tsx, Nav.tsx); the notices bell no longer fetches twice (NoticesBell.tsx). app/(studio)/create/page.tsx passes ?local= and missing ?post=.
+- Tests: tests/publishing.test.ts "stopping uploads" (5), tests/round-1016-backend.test.ts "draft expiry". Full suite 359 pass.
+- Biggest remaining speed win is a setting, not code: put Vercel Functions in bom1 (Mumbai) in Project Settings > Functions, and keep the database in or near the same region. Today functions run in syd1 while visitors arrive at bom1, so every request crosses regions.
+
+- Review fixes (10-16e): a stale publish job can no longer re-post something already live; stopping works only while a post is sending (a booked post is called off with Unschedule, so one Stop can't strand the rest); quieter screen-reader updates on the publishing screen; polling slows after 2 minutes and stops if signed out; a restored draft's video is not rewritten to the browser again; old drafts are deleted in batches. Tests 361 pass.

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { RotateCcw, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { autosaveLine, type SaveState } from "./publish";
+import { DRAFT_TTL_DAYS } from "@/lib/client/device-drafts";
 
 interface Props {
   state: SaveState;
@@ -32,6 +33,7 @@ export function SaveDraft({ state, at, onSave, busy }: Props) {
           View drafts
         </Link>
       )}
+      <p className="w-full text-xs text-muted-foreground">A copy stays in this browser too. Drafts you don&apos;t touch for {DRAFT_TTL_DAYS} days are removed from Outlly.</p>
     </div>
   );
 }

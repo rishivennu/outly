@@ -7,7 +7,7 @@ import { aspectLabel, cn, formatBytes, formatDuration, resolutionLabel } from "@
 import { validateVideoFile } from "@/lib/client/handoff";
 import type { UploadState } from "./types";
 import { OutlyMark } from "@/components/brand/Logo";
-import { DancingPip, MusicToggle, useGroove } from "./Groove";
+import { DancingPip } from "./Groove";
 
 interface Props {
   src: string | null;
@@ -32,7 +32,6 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
   const [d, setD] = useState(meta?.duration ?? 0);
   const [full, setFull] = useState(false);
   const [justIn, setJustIn] = useState(false);
-  const groove = useGroove(upload.kind === "uploading");
 
   useEffect(() => {
     if (upload.kind !== "done") return;
@@ -174,7 +173,6 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
                     <p className="truncate text-sm font-semibold">{upload.progress < 1 ? "Bringing it over" : "Making it ready"}</p>
                     <p className="truncate text-[11px] font-bold uppercase tracking-[0.1em] text-[hsl(var(--lime))]">{etaLabel ?? (upload.progress < 1 ? "On its way" : "Almost there")}</p>
                   </div>
-                  <MusicToggle g={groove} tone="glass" iconOnly className="-my-1 shrink-0" />
                   {onCancel && (
                     <button
                       type="button"

@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import { HoverLink as Link } from "./HoverLink";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";

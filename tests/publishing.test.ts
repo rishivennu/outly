@@ -343,3 +343,88 @@ describe("publishing pipeline", () => {
     expect(view).not.toMatch(/accessToken|refreshToken/);
   });
 });
+
+describe("stopping uploads", () => {
+  test("stop all while queued: nothing reaches the platform", async () => {
+    const f = await fixture({ platforms: ["x", "youtube"] });
+    await services.launchPost(f.user.id, f.post.id, "now", null, "smooth");
+    expect(await services.cancelTargets(f.user.id, f.post.id)).toBe(2);
+    await drain();
+    expect(fake.calls).not.toContain("upload");
+    for (const t of f.targets) {
+      const row = await target(t.id);
+      expect(row.platformStatus).toBe("failed");
+      expect(row.errorCode).toBe("CANCELED");
+    }
+    expect((await post(f.post.id)).status).toBe("failed");
+  });
+
+  test("stop one: the other keeps going", async () => {
+    const f = await fixture({ platforms: ["x", "youtube"] });
+    fake.uploads.push("media-1");
+    fake.publishes.push({ state: "published", platformPostId: "9", url: "https://x.com/u/status/9" });
+    await services.launchPost(f.user.id, f.post.id, "now", null, "smooth");
+    expect(await services.cancelTargets(f.user.id, f.post.id, [f.targets[1].id])).toBe(1);
+    await drain();
+    expect((await target(f.targets[0].id)).platformStatus).toBe("published");
+    expect((await target(f.targets[1].id)).errorCode).toBe("CANCELED");
+    expect((await post(f.post.id)).status).toBe("partial");
+  });
+
+  test("stopped mid-upload: the upload finishes but is never published", async () => {
+    const f = await fixture();
+    fake.uploads.push(async () => {
+      await services.cancelTargets(f.user.id, f.post.id, [f.target.id]);
+      return "media-1";
+    });
+    await services.launchPost(f.user.id, f.post.id, "now", null, "smooth");
+    await drain();
+    expect(fake.calls).not.toContain("publish");
+    expect(jobs.some((j) => j.name === "SOCIAL_PUBLISH")).toBe(false);
+    const row = await target(f.target.id);
+    expect(row.platformStatus).toBe("failed");
+    expect(row.errorCode).toBe("CANCELED");
+  });
+
+  test("too late once the platform has it, and a stopped one can be sent again", async () => {
+    const f = await fixture();
+    await services.launchPost(f.user.id, f.post.id, "now", null, "smooth");
+    await db.postTarget.update({ where: { id: f.target.id }, data: { platformStatus: "processing" } });
+    expect(await services.cancelTargets(f.user.id, f.post.id)).toBe(0);
+    await db.postTarget.update({ where: { id: f.target.id }, data: { platformStatus: "queued" } });
+    expect(await services.cancelTargets(f.user.id, f.post.id)).toBe(1);
+    jobs = [];
+    await services.retryTarget(f.user.id, f.target.id);
+    expect((await target(f.target.id)).platformStatus).toBe("queued");
+    expect(jobs.some((j) => j.name === "SOCIAL_UPLOAD")).toBe(true);
+  });
+
+  test("someone else's post can't be stopped", async () => {
+    const f = await fixture();
+    const other = await db.user.create({ data: { name: "O", email: `o${Date.now()}@test.dev`, passwordHash: "x" } });
+    await expect(services.cancelTargets(other.id, f.post.id)).rejects.toThrow();
+  });
+});
+
+describe("stop and stale-job guards", () => {
+  test("a stale publish job never re-posts a target that is already live", async () => {
+    const f = await fixture();
+    fake.uploads.push("media-1");
+    fake.publishes.push({ state: "published", platformPostId: "1", url: "https://x.com/u/status/1" });
+    await services.launchPost(f.user.id, f.post.id, "now", null, "smooth");
+    await drain();
+    expect((await target(f.target.id)).platformStatus).toBe("published");
+    const calls = fake.calls.length;
+    await runJob("SOCIAL_PUBLISH", { targetId: f.target.id, simulate: "smooth" } as any);
+    expect(fake.calls.length).toBe(calls);
+    expect((await target(f.target.id)).platformStatus).toBe("published");
+    expect((await post(f.post.id)).status).toBe("published");
+  });
+
+  test("a booked post can't be stopped one destination at a time", async () => {
+    const f = await fixture({ platforms: ["x", "youtube"] });
+    await services.launchPost(f.user.id, f.post.id, "schedule", new Date(Date.now() + 3600_000), "smooth");
+    await expect(services.cancelTargets(f.user.id, f.post.id, [f.targets[0].id])).rejects.toThrow(/Unschedule/);
+    expect((await post(f.post.id)).status).toBe("scheduled");
+  });
+});

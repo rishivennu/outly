@@ -25,10 +25,10 @@ const ORB: Record<Platform, string> = {
 };
 
 /** Circular platform mark, the main way platforms show up across the product. */
-export function PlatformOrb({ platform, size = 40, className, ring }: { platform: Platform; size?: number; className?: string; ring?: boolean }) {
+export function PlatformOrb({ platform, size = 40, className, ring, square }: { platform: Platform; size?: number; className?: string; ring?: boolean; square?: boolean }) {
   return (
     <span
-      className={cn("inline-grid shrink-0 place-items-center rounded-full", ORB[platform], ring && "ring-[3px] ring-background", className)}
+      className={cn("inline-grid shrink-0 place-items-center", square ? "rounded-[28%]" : "rounded-full", ORB[platform], ring && "ring-[3px] ring-background", className)}
       style={{ width: size, height: size }}
     >
       <PlatformGlyph platform={platform} className="h-[46%] w-[46%]" />
