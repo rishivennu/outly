@@ -5,6 +5,8 @@ import { getConfig } from "@/lib/settings";
 import { listPlans } from "@/lib/billing/plans";
 import { visitorCurrency } from "@/lib/billing/visitor";
 import { chargeCurrency, localPrice } from "@/lib/billing/currency";
+import { hasYearly, priceFor, yearlySaving } from "@/lib/billing/cycle";
+import { normalizeDisplay } from "@/lib/billing/display";
 import { formatMoney } from "@/lib/billing/money";
 import { stripe } from "@/lib/billing/providers";
 import { activeGateway, capturePaypal, completePayment, expireSubscriptions, failPayment } from "@/lib/billing/service";
@@ -44,7 +46,7 @@ async function handlePaypalReturn(userId: string, orderId: string): Promise<Retu
   }
 }
 
-export default async function BillingPage({ searchParams }: { searchParams: { checkout?: string; session_id?: string; token?: string; plan?: string; paid?: string } }) {
+export default async function BillingPage({ searchParams }: { searchParams: { checkout?: string; session_id?: string; token?: string; plan?: string; paid?: string; cycle?: string } }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/billing");
   if (user.actor) redirect("/home"); // billing belongs to the workspace owner
@@ -63,12 +65,13 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
     notice = { tone: "info", text: "Checkout cancelled. You weren't charged." };
   } else if (searchParams.paid) notice = { tone: "ok", text: `Payment received. Invoice ${searchParams.paid} is below and on its way to ${user.email}.` };
 
-  const [plans, sub, invoices, gw, usage] = await Promise.all([
+  const [plans, sub, invoices, gw, usage, display] = await Promise.all([
     listPlans(),
     db.subscription.findFirst({ where: { userId: user.id, status: "active" }, include: { plan: true }, orderBy: { createdAt: "desc" } }),
     db.invoice.findMany({ where: { userId: user.id }, orderBy: { issuedAt: "desc" }, take: 50, include: { payment: { select: { status: true } } } }),
     activeGateway(),
     postUsage(user.id),
+    getConfig("pricing").then(normalizeDisplay),
   ]);
 
   const visitor = visitorCurrency((plans.find((p) => p.priceMinor > 0)?.currency as any) ?? "INR");
@@ -76,7 +79,14 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
   const priced = plans.map((p) => {
     const lp = localPrice(p, chargeCurrency(gw.provider, visitor.currency, p.currency));
     const approx = lp.currency !== visitor.currency && p.priceMinor > 0 ? localPrice(p, visitor.currency) : null;
-    return { ...p, priceMinor: lp.priceMinor, currency: lp.currency, approx: approx ? `about ${formatMoney(approx.priceMinor, approx.currency)}` : null };
+    // Yearly: same rules, so the number on the card is exactly what checkout charges.
+    let year: { priceMinor: number; currency: string; approx: string | null; save: number } | null = null;
+    if (hasYearly(p, display.yearly)) {
+      const ly = priceFor(p, lp.currency, "year", display.freeMonths);
+      const ay = approx ? priceFor(p, visitor.currency, "year", display.freeMonths) : null;
+      year = { priceMinor: ly.priceMinor, currency: ly.currency, approx: ay ? `about ${formatMoney(ay.priceMinor, ay.currency)}` : null, save: yearlySaving(lp.priceMinor, ly.priceMinor) };
+    }
+    return { ...p, priceMinor: lp.priceMinor, currency: lp.currency, approx: approx ? `about ${formatMoney(approx.priceMinor, approx.currency)}` : null, year };
   });
 
   return (
@@ -84,6 +94,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
       email={user.email}
       notice={notice}
       focusPlan={searchParams.plan ?? null}
+      cycle={searchParams.cycle === "year" ? "year" : "month"}
       gateway={gw.provider}
       testMode={gw.provider === "mock" || gw.cfg.mode === "test"}
       plans={priced}

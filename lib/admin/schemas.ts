@@ -14,6 +14,8 @@ export const PlanInput = z.object({
   sortOrder: z.number().int().min(0).max(99),
   /** Exact prices in other currencies, minor units. Missing currencies are converted from priceMinor. */
   prices: z.record(z.enum(CURRENCIES), z.number().int().min(1, "Local prices must be above zero").max(100_000_000)).default({}),
+  /** Yearly price in the plan currency, minor units. 0 = monthly x (12 - free months). */
+  yearlyMinor: z.number().int().min(0, "Yearly price can't be negative").max(1_000_000_000).default(0),
   postLimit: z.number().int().min(0).max(100_000).default(0),
   aiCaptions: z.boolean().default(true),
   seats: z.number().int().min(0).max(50).default(0),

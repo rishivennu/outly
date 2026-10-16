@@ -220,6 +220,7 @@ model Plan {
   priceMinor Int      @default(0)
   currency   String   @default("INR")
   interval   String   @default("month") // month | year
+  yearlyMinor Int     @default(0) // yearly price in `currency` when interval is month; 0 = monthly x (12 - free months)
   note       String   @default("")
   features   String   @default("[]") // JSON string[]
   prices     String   @default("{}") // JSON { USD: 599, EUR: 549 } per-currency overrides; missing = converted from priceMinor
@@ -269,6 +270,7 @@ model Payment {
   amountMinor    Int
   currency       String
   provider       String // mock | stripe | razorpay
+  interval       String   @default("month") // the billing cycle bought: month | year
   providerRef    String? // gateway payment / session id: the idempotency key
   status         String   @default("pending") // pending | succeeded | failed | refunded
   failureReason  String?

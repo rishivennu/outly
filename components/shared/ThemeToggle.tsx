@@ -16,11 +16,11 @@ function apply(choice: ThemeChoice) {
 }
 
 export function useTheme() {
-  const [choice, setChoice] = useState<ThemeChoice>("system");
+  const [choice, setChoice] = useState<ThemeChoice>("dark");
   useEffect(() => {
-    setChoice(((localStorage.getItem(THEME_KEY) as ThemeChoice) || "system"));
+    setChoice(((localStorage.getItem(THEME_KEY) as ThemeChoice) || "dark"));
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => (localStorage.getItem(THEME_KEY) || "system") === "system" && apply("system");
+    const onChange = () => (localStorage.getItem(THEME_KEY) || "dark") === "system" && apply("system");
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
@@ -73,7 +73,7 @@ const NEXT: Record<ThemeChoice, ThemeChoice> = { light: "dark", dark: "system", 
 /** One 44px button that cycles Light > Dark > System. For tight bars (the phone top bar). */
 export function ThemeCycleButton({ className }: { className?: string }) {
   const { choice, set } = useTheme();
-  const cur = OPTIONS.find((o) => o.value === choice) ?? OPTIONS[2];
+  const cur = OPTIONS.find((o) => o.value === choice) ?? OPTIONS[1];
   const nxt = OPTIONS.find((o) => o.value === NEXT[choice])!;
   return (
     <button

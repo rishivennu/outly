@@ -11,6 +11,8 @@ import { api } from "@/lib/client/api";
 import { formatMoney, intervalLabel, priceLabel, type PublicPlan } from "@/lib/billing/money";
 import type { CurrencySource } from "@/lib/billing/currency";
 import { CurrencyPicker } from "./CurrencyPicker";
+import { CycleSwitch } from "./CycleSwitch";
+import type { Cycle } from "@/lib/billing/cycle";
 import { cn } from "@/lib/utils";
 
 export type ReturnNotice = { tone: "ok" | "info" | "error"; text: string };
@@ -34,7 +36,7 @@ function loadRazorpay() {
   });
 }
 
-type PricedPlan = PublicPlan & { approx: string | null };
+type PricedPlan = PublicPlan & { approx: string | null; year: { priceMinor: number; currency: string; approx: string | null; save: number } | null };
 /** limit 0 = unlimited */
 type Usage = { used: number; limit: number; seats: number; aiCaptions: boolean };
 
@@ -58,11 +60,14 @@ function UsageMeter({ u }: { u: Usage }) {
   );
 }
 
-export function BillingView(props: { email: string; notice: ReturnNotice | null; focusPlan: string | null; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; canPickCurrency: boolean; current: Current; usage: Usage; invoices: Inv[] }) {
+export function BillingView(props: { email: string; notice: ReturnNotice | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; canPickCurrency: boolean; current: Current; usage: Usage; invoices: Inv[] }) {
   const { plans, current } = props;
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
+  const [cycle, setCycle] = useState<Cycle>(props.cycle);
+  const anyYear = plans.some((p) => p.year && p.state === "available");
+  const save = Math.max(0, ...plans.map((p) => p.year?.save ?? 0));
   const [confirm, setConfirm] = useState(false);
   const [notice, setNotice] = useState(props.notice);
   const [online, setOnline] = useState(true);
@@ -91,11 +96,12 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
     if (props.notice) window.history.replaceState(null, "", "/billing"); // a refresh shouldn't replay the notice
   }, [props.focusPlan, props.notice]);
 
-  async function choose(p: PublicPlan) {
+  async function choose(p: PricedPlan) {
+    const y = cycle === "year" && p.year ? p.year : null;
     if (!online) return toast("You're offline. Reconnect to change plans.", "error");
     setBusy(p.slug);
     try {
-      const r = await api<any>("/api/billing/checkout", { method: "POST", json: { plan: p.slug, currency: p.currency } });
+      const r = await api<any>("/api/billing/checkout", { method: "POST", json: { plan: p.slug, currency: y ? y.currency : p.currency, cycle: y ? "year" : "month" } });
       if (r.kind === "redirect") {
         window.location.href = r.url;
         return;
@@ -190,11 +196,15 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 id="plans" className="text-xl font-semibold tracking-tight">Plans</h2>
           {props.canPickCurrency && <CurrencyPicker currency={props.currency} source={props.currencySource} className="mr-auto ml-3" />}
+          {anyYear && <CycleSwitch value={cycle} onChange={setCycle} save={save} />}
           {props.testMode && <p className="inline-flex items-center gap-1.5 rounded-full bg-warning/15 px-3 py-1 text-[12px] font-medium"><ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Test mode: no real money moves</p>}
         </div>
         <ul className="mt-4 grid gap-4 md:grid-cols-3">
           {plans.map((p) => {
-            const mine = p.slug === currentSlug;
+            const y = cycle === "year" && p.year ? p.year : null;
+            // Same plan on the other cycle is a switch you can make (monthly -> yearly), not "your plan".
+            const mine = p.slug === currentSlug && (!current || p.priceMinor === 0 || !p.year || current.interval === (y ? "year" : "month"));
+            const otherCycle = !mine && !!current && p.slug === currentSlug;
             const focus = props.focusPlan === p.slug && !mine;
             return (
               <li key={p.id} ref={focus ? focusRef : undefined}>
@@ -203,8 +213,9 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
                     <h3 className="text-lg font-semibold">{p.name}</h3>
                     {mine ? <span className="rounded-full bg-lime/20 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-lime-ink">Your plan</span> : p.highlight && <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider">Popular</span>}
                   </div>
-                  <p className="mt-4 text-[1.7rem] font-semibold tracking-tight tabular">{priceLabel(p)}</p>
-                  {p.approx && <p className="text-[12.5px] text-muted-foreground">{p.approx} · billed in {p.currency}</p>}
+                  <p className="mt-4 text-[1.7rem] font-semibold tracking-tight tabular">{y ? `${formatMoney(y.priceMinor, y.currency)}/yr` : priceLabel(p)}</p>
+                  {y && y.save > 0 && <p className="text-[12.5px] font-medium text-lime-ink">Billed yearly, save {y.save}%</p>}
+                  {(y ? y.approx : p.approx) && <p className="text-[12.5px] text-muted-foreground">{y ? y.approx : p.approx} · billed in {y ? y.currency : p.currency}</p>}
                   <p className="mt-1 text-sm text-muted-foreground">{p.note}</p>
                   <ul className="mt-5 flex-1 space-y-2 text-sm">
                     {p.features.map((f) => <li key={f} className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-lime-ink" aria-hidden />{f}</li>)}
@@ -219,7 +230,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
                     ) : (
                       <Button variant={p.highlight || focus ? "lime" : "primary"} className="w-full" onClick={() => choose(p)} disabled={!!busy}>
                         {busy === p.slug && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-                        {busy === p.slug ? "Opening checkout" : current ? `Switch to ${p.name}` : `Upgrade to ${p.name}`}
+                        {busy === p.slug ? "Opening checkout" : otherCycle ? `Switch to ${y ? "yearly" : "monthly"}` : current ? `Switch to ${p.name}${y ? " yearly" : ""}` : `Upgrade to ${p.name}${y ? " yearly" : ""}`}
                       </Button>
                     )}
                   </div>

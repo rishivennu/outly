@@ -2,26 +2,31 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Plus, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { adminApi } from "@/lib/client/admin-api";
-import { CURRENCIES, priceLabel, type PublicPlan } from "@/lib/billing/money";
+import { CURRENCIES, formatMoney, priceLabel, type PublicPlan } from "@/lib/billing/money";
 import { localPrice } from "@/lib/billing/currency";
 import { cn } from "@/lib/utils";
 import { DotText } from "@/components/brand/DotText";
+import { PlanCardView } from "@/components/billing/PlanCardView";
+import { CycleSwitch } from "@/components/billing/CycleSwitch";
+import { CARD_STYLES, CARD_STYLE_META, type CardStyle, type PricingDisplay } from "@/lib/billing/display";
+import { hasYearly, yearlyBase, yearlySaving, type Cycle } from "@/lib/billing/cycle";
 
 type Plan = PublicPlan & { subscribers: number; locked: boolean };
-type Draft = { name: string; slug: string; price: string; currency: string; interval: string; note: string; features: string; state: PublicPlan["state"]; highlight: boolean; sortOrder: number; prices: Record<string, string>; postLimit: number; aiCaptions: boolean; seats: number };
+type Draft = { name: string; slug: string; price: string; currency: string; interval: string; note: string; features: string; state: PublicPlan["state"]; highlight: boolean; sortOrder: number; prices: Record<string, string>; yearly: string; postLimit: number; aiCaptions: boolean; seats: number };
 
 const toDraft = (p: Plan): Draft => ({
   name: p.name, slug: p.slug, price: String(p.priceMinor / 100), currency: p.currency, interval: p.interval, note: p.note, features: p.features.join("\n"), state: p.state, highlight: p.highlight, sortOrder: p.sortOrder,
   prices: Object.fromEntries(Object.entries(p.prices ?? {}).map(([k, v]) => [k, String((v as number) / 100)])),
+  yearly: p.yearlyMinor ? String(p.yearlyMinor / 100) : "",
   postLimit: p.postLimit ?? 0, aiCaptions: p.aiCaptions ?? true, seats: p.seats ?? 0,
 });
-const BLANK: Draft = { name: "", slug: "", price: "0", currency: "INR", interval: "month", note: "", features: "", state: "soon", highlight: false, sortOrder: 9, prices: {}, postLimit: 0, aiCaptions: true, seats: 0 };
+const BLANK: Draft = { name: "", slug: "", price: "0", currency: "INR", interval: "month", note: "", features: "", state: "soon", highlight: false, sortOrder: 9, prices: {}, yearly: "", postLimit: 0, aiCaptions: true, seats: 0 };
 
 const toMinor = (s: string) => {
   const n = Number(s.replace(/,/g, ""));
@@ -44,6 +49,7 @@ function parse(d: Draft) {
     highlight: d.highlight,
     sortOrder: d.sortOrder,
     prices,
+    yearlyMinor: d.yearly.trim() ? toMinor(d.yearly) : 0,
     postLimit: d.postLimit,
     aiCaptions: d.aiCaptions,
     seats: d.seats,
@@ -162,34 +168,132 @@ function PlanCard({ p, on, onPick }: { p: Plan; on: boolean; onPick: () => void 
 }
 
 /** Same visual as the marketing pricing card, so what you see is what goes live. */
-function Preview({ d }: { d: ReturnType<typeof parse> }) {
+function Preview({ d, variant, cycle, freeMonths }: { d: ReturnType<typeof parse>; variant: CardStyle; cycle: Cycle; freeMonths: number }) {
   const live = d.state === "available";
-  const price = Number.isFinite(d.priceMinor) ? priceLabel({ priceMinor: d.priceMinor, currency: d.currency, interval: d.interval, state: d.state }) : "-";
+  const ok = Number.isFinite(d.priceMinor) && Number.isFinite(d.yearlyMinor);
+  const yearly = cycle === "year" && ok && hasYearly(d, true) ? yearlyBase(d, freeMonths) : 0;
+  const price = !ok ? "-" : yearly ? `${formatMoney(yearly, d.currency)}/yr` : priceLabel({ priceMinor: d.priceMinor, currency: d.currency, interval: d.interval, state: d.state });
   return (
-    <article className={cn("flex h-full flex-col rounded-[1.75rem] p-7 transition-all duration-500", d.highlight ? "border-2 border-lime bg-lime/[0.07]" : "border border-border bg-card", d.state === "hidden" && "opacity-50")}>
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-xl font-semibold tracking-tight">{d.name || "Plan name"}</h3>
-        {d.highlight && live && <span className="rounded-full bg-lime px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-[hsl(var(--lime-foreground))]">Popular</span>}
-        {d.state === "soon" && <span className="rounded-full border border-border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Soon</span>}
+    <PlanCardView
+      variant={variant}
+      save={yearly ? yearlySaving(d.priceMinor, yearly) : 0}
+      name={d.name}
+      note={d.note}
+      priceMinor={yearly || d.priceMinor}
+      interval={yearly ? "year" : d.interval}
+      state={d.state}
+      features={d.features}
+      featured={d.highlight}
+      className={d.state === "hidden" ? "opacity-50" : undefined}
+      price={
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span key={price} className="block" initial={{ opacity: 0, y: 10, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -10, filter: "blur(4px)" }} transition={{ duration: 0.35 }}>
+            {price}
+          </motion.span>
+        </AnimatePresence>
+      }
+      cta={
+        <span className={cn("inline-flex h-12 items-center justify-center rounded-full px-6 text-sm font-semibold", live ? (variant === "bold" && d.highlight ? "bg-[#0b0b0d] text-white" : "lime-glow bg-lime text-[hsl(var(--lime-foreground))]") : variant === "live" ? "la-box la-mute" : "border border-border text-muted-foreground")}>
+          {live ? (d.priceMinor > 0 ? `Choose ${d.name || "plan"}${yearly ? " yearly" : ""}` : "Start creating") : d.state === "soon" ? "Not on sale yet" : "Hidden from the site"}
+        </span>
+      }
+    />
+  );
+}
+
+const MINI: Record<CardStyle, string> = {
+  live: "la-card la-themed pc-live pc-hot la-live",
+  classic: "border-2 border-lime bg-lime/[0.07]",
+  glass: "pc-glass pc-hot",
+  bold: "pc-bold pc-hot",
+};
+
+/** A thumbnail of each card style, drawn with the real style classes so it matches the site. */
+function MiniCard({ v }: { v: CardStyle }) {
+  return (
+    <span className={cn("relative flex h-[5.5rem] flex-col overflow-hidden rounded-2xl p-3", MINI[v])} aria-hidden="true">
+      {v === "live" && <span className="la-grid rounded-[inherit]" />}
+      <span className="relative block h-2 w-10 rounded-full bg-current opacity-70" />
+      <span className={cn("relative mt-2 block h-3.5 w-16 rounded-md", v === "bold" ? "bg-[#0b0b0d]" : v === "live" ? "la-box" : "bg-current opacity-25")} />
+      <span className={cn("relative mt-auto block h-3 w-full rounded-full", v === "bold" ? "bg-[#0b0b0d]" : "bg-lime")} />
+    </span>
+  );
+}
+
+/** Card style + yearly billing. Applies to the landing page, billing page and this preview; saved on each change. */
+function DisplayPanel({ value, onChange }: { value: PricingDisplay; onChange: (d: PricingDisplay) => void }) {
+  const toast = useToast();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function save(patch: Partial<PricingDisplay>) {
+    const before = value;
+    onChange({ ...value, ...patch });
+    setBusy(true);
+    try {
+      const r = await adminApi<{ display: PricingDisplay }>("/api/admin/pricing-display", { method: "PUT", json: patch });
+      onChange(r.display);
+      toast(patch.cardStyle ? `${CARD_STYLE_META[r.display.cardStyle].label} cards are live on the site` : "Pricing updated on the site");
+      router.refresh();
+    } catch (e: any) {
+      onChange(before);
+      toast(e.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section aria-labelledby="pc-style-h" className="la-card la-themed relative overflow-hidden rounded-[2rem] p-4 sm:p-5" aria-busy={busy || undefined}>
+      <span className="la-grid rounded-[inherit]" aria-hidden="true" />
+      <div className="relative mb-4 flex flex-wrap items-baseline gap-3">
+        <h2 id="pc-style-h" className="text-[15px] font-semibold">Card style and billing</h2>
+        <span className="text-[12px] la-mute">Changes the landing page, billing page and the preview below, the moment you click.</span>
       </div>
-      <AnimatePresence mode="popLayout" initial={false}>
-        <motion.p key={price} initial={{ opacity: 0, y: 10, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -10, filter: "blur(4px)" }} transition={{ duration: 0.35 }} className={cn("mt-5 text-[1.6rem] font-semibold tracking-tightest", live ? "text-lime-ink" : "text-muted-foreground")}>
-          {price}
-        </motion.p>
-      </AnimatePresence>
-      <p className="mt-1 text-sm text-foreground/75">{d.note || "\u00a0"}</p>
-      <ul className="mt-6 flex flex-1 flex-col gap-2.5">
-        {d.features.map((b, i) => (
-          <li key={i} className="flex items-start gap-2.5 text-[14.5px] leading-snug">
-            <Check className={cn("mt-0.5 h-4 w-4 shrink-0", live ? "text-lime-ink" : "text-muted-foreground")} aria-hidden />
-            <span>{b}</span>
-          </li>
-        ))}
-      </ul>
-      <span className={cn("mt-7 inline-flex h-11 items-center justify-center rounded-full px-6 text-sm font-semibold", live ? "bg-lime text-[hsl(var(--lime-foreground))]" : "hairline text-muted-foreground")}>
-        {live ? (d.priceMinor > 0 ? `Get ${d.name || "plan"}` : "Start creating") : d.state === "soon" ? "Not on sale yet" : "Hidden from the site"}
-      </span>
-    </article>
+      <div role="radiogroup" aria-label="Pricing card style" className="relative grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {CARD_STYLES.map((v) => {
+          const on = value.cardStyle === v;
+          return (
+            <button
+              key={v}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              disabled={busy}
+              onClick={() => !on && save({ cardStyle: v })}
+              className={cn(
+                "la-box relative flex flex-col gap-3 rounded-[1.4rem] p-3 text-left transition-[box-shadow,transform] duration-300 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-[hsl(var(--ring))] disabled:cursor-progress motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+              )}
+            >
+              {on && <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-[1.4rem] ring-2 ring-inset ring-[hsl(var(--lime-ink))] dark:ring-lime" />}
+              <MiniCard v={v} />
+              <span className="px-1 pb-1">
+                <span className="flex items-center gap-2 text-[14px] font-semibold">
+                  {CARD_STYLE_META[v].label}
+                  {on && <span className="rounded-full bg-lime px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[hsl(var(--lime-foreground))]">Live</span>}
+                </span>
+                <span className="mt-0.5 block text-[12px] leading-snug la-mute">{CARD_STYLE_META[v].hint}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="relative mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_14rem]">
+        <Toggle label="Offer yearly billing" hint="Adds a Monthly / Yearly switch above the cards and at checkout." checked={value.yearly} onChange={(v) => save({ yearly: v })} />
+        <div>
+          <Label htmlFor="pc-free-months">Months free on yearly</Label>
+          <select
+            id="pc-free-months"
+            value={value.freeMonths}
+            disabled={busy || !value.yearly}
+            onChange={(e) => save({ freeMonths: Number(e.target.value) })}
+            className="h-12 w-full rounded-2xl bg-secondary/60 px-3 text-[14px] font-semibold hairline disabled:opacity-60"
+          >
+            {[0, 1, 2, 3, 4, 5, 6].map((n) => (
+              <option key={n} value={n}>{n === 0 ? "None (12 x monthly)" : `${n} month${n === 1 ? "" : "s"} (pay ${12 - n})`}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -228,8 +332,10 @@ function Impact({ current, parsed }: { current?: Plan; parsed: ReturnType<typeof
   );
 }
 
-export function PricingEditor({ initial }: { initial: Plan[] }) {
+export function PricingEditor({ initial, display: initialDisplay }: { initial: Plan[]; display: PricingDisplay }) {
   const [plans, setPlans] = useState(initial);
+  const [display, setDisplay] = useState(initialDisplay);
+  const [cycle, setCycle] = useState<Cycle>("month");
   const [sel, setSel] = useState<string>(initial.find((p) => p.highlight)?.id ?? initial[0]?.id ?? "new");
   const [draft, setDraft] = useState<Draft>(() => (initial[0] ? toDraft(initial.find((p) => p.id === sel) ?? initial[0]) : BLANK));
   const [busy, setBusy] = useState(false);
@@ -255,6 +361,7 @@ export function PricingEditor({ initial }: { initial: Plan[] }) {
     if (!Number.isFinite(parsed.priceMinor) || parsed.priceMinor < 0) return setError("Price must be a number, like 499 or 4.99.");
     const badLocal = Object.entries(parsed.prices).find(([, v]) => !Number.isFinite(v) || v <= 0);
     if (badLocal) return setError(`The ${badLocal[0]} price must be a number above zero, or blank to convert automatically.`);
+    if (!Number.isFinite(parsed.yearlyMinor) || parsed.yearlyMinor < 0) return setError("Yearly price must be a number, or blank for the automatic one.");
     setBusy(true);
     setError(null);
     try {
@@ -297,6 +404,7 @@ export function PricingEditor({ initial }: { initial: Plan[] }) {
 
   return (
     <div className="flex flex-col gap-5">
+      <DisplayPanel value={display} onChange={setDisplay} />
       {/* plan rail */}
       <ul aria-label="Plans" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {plans.map((p) => (
@@ -358,6 +466,24 @@ export function PricingEditor({ initial }: { initial: Plan[] }) {
                 <Label>Billing</Label>
                 <Seg label="Billing interval" value={draft.interval as "month" | "year"} onChange={(v) => set("interval", v)} options={[{ value: "month", label: "Monthly" }, { value: "year", label: "Yearly" }]} />
               </div>
+              {draft.interval === "month" && (
+                <div className="sm:col-span-2">
+                  <Label htmlFor="pl-year">Yearly price <span className="text-[11.5px]">{draft.currency}, blank = automatic</span></Label>
+                  <Input
+                    id="pl-year"
+                    inputMode="decimal"
+                    disabled={!display.yearly || !(parsed.priceMinor > 0)}
+                    value={draft.yearly}
+                    placeholder={parsed.priceMinor > 0 ? String(yearlyBase({ ...parsed, yearlyMinor: 0 }, display.freeMonths) / 100) : "0"}
+                    onChange={(e) => set("yearly", e.target.value.replace(/[^\d.,]/g, ""))}
+                    className="tabular h-11 text-[15px]"
+                    aria-describedby="pl-year-hint"
+                  />
+                  <p id="pl-year-hint" className="mt-1.5 text-[12px] text-muted-foreground">
+                    {!display.yearly ? "Yearly billing is off for every plan (Card style and billing, above)." : !(parsed.priceMinor > 0) ? "A free plan has no yearly price." : `Blank = monthly x ${12 - display.freeMonths} (${display.freeMonths} months free). Other currencies follow the same ratio.`}
+                  </p>
+                </div>
+              )}
               <LocalPrices d={draft} parsed={parsed} onChange={(c, v) => setDraft((x) => ({ ...x, prices: { ...x.prices, [c]: v } }))} />
             </Section>
 
@@ -423,7 +549,12 @@ export function PricingEditor({ initial }: { initial: Plan[] }) {
             <p className="eyebrow text-[11px]">Live preview</p>
             <a href="/#pricing" target="_blank" rel="noreferrer" className="inline-flex min-h-[44px] items-center rounded-full px-3 text-[13px] font-medium text-muted-foreground hover:bg-secondary hover:text-foreground">Open live pricing</a>
           </div>
-          <Preview d={parsed} />
+          {display.yearly && hasYearly(parsed, true) && (
+            <div className="mb-3 flex justify-center">
+              <CycleSwitch value={cycle} onChange={setCycle} save={Number.isFinite(parsed.yearlyMinor) ? yearlySaving(parsed.priceMinor, yearlyBase(parsed, display.freeMonths)) : 0} />
+            </div>
+          )}
+          <Preview d={parsed} variant={display.cardStyle} cycle={display.yearly ? cycle : "month"} freeMonths={display.freeMonths} />
           <Impact current={current} parsed={parsed} />
         </div>
       </div>

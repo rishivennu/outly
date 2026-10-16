@@ -1,14 +1,12 @@
-# fix-1016i: admin Pricing page redesign
+# fix-1016k-pricing
 
-Upload these 2 files over the repo (same paths). No database or env changes.
+Upload every file in this folder to the repo root, keeping the paths. 25 files (plus this note).
 
-- components/admin/PricingEditor.tsx
-  - Plan rail is now Live Activity cards (la-card la-themed): dot-letter plan name, price, interval, active subscriber count, and an on-site state row. Dashed "Add a plan" tile at the end.
-  - Editor is one Live Activity card with numbered sections: 01 Basics, 02 Price (with local prices), 03 What's included, 04 On the site, 05 Plan limits.
-  - Sticky rounded save bar (status, delete, Undo, Save & publish). The settled "Saved" state uses the subtle button so it stays readable.
-  - Right column: live preview plus a new "When you save" card that explains, from what is on screen, what saving changes (site state, currencies, existing subscribers).
-  - Save, validate, delete and plan-pick logic is unchanged.
-- components/brand/DotText.tsx
-  - Now supports A-Z, 0-9, + and - (unknown characters are dropped), and takes an optional className for size (default h-9). Existing callers are unchanged.
-
-Checks: tsc 0, axe 0 (light and dark, desktop and mobile), no horizontal scroll, text contrast 4.5:1 or better in both themes.
+## fix-1016k (dark default, yearly pricing, rocket CTA, card style toggle)
+- Dark is the default theme on every page (lib/theme/script.ts, ThemeToggle, app/layout.tsx, public/offline.html). A saved Light choice still wins.
+- Yearly billing: Plan.yearlyMinor and Payment.interval (schema.template.prisma). lib/billing/cycle.ts works out the yearly price: the admin's yearly price if set, else monthly x (12 - months free). Monthly/Yearly switch (components/billing/CycleSwitch.tsx) on the landing page, billing page and admin preview. Checkout takes `cycle`; the subscription period follows the payment interval.
+- Rocket CTA (components/billing/RocketCta.tsx): pricing buttons are a Live Activity bar; on click the fill slides across, the rocket lifts off, and a veil (LaunchHost in app/layout.tsx) slides in and out across the move to /billing (or /login when signed out). Reduced motion and Ctrl/Cmd clicks just navigate.
+- Card style toggle: Admin > Pricing > "Card style and billing" picks Live Activity (current), Classic (previous), Glass or Bold. It applies to the landing page, billing page and admin preview straight away. Same panel: "Offer yearly billing" on/off and "Months free on yearly" (0 to 6). New app/api/admin/pricing-display/route.ts, lib/billing/display.ts, components/marketing/PricingCards.tsx.
+- Light mode pricing cards: richer lime tints instead of pale ones.
+- Verified: tsc 0, bun test 383/0, axe 0 (all 4 styles, light + dark, admin pricing, billing yearly), yearly checkout on the test gateway charged USD 59.99 with interval "year".
+- PROD: run `npx prisma db push` (adds Plan.yearlyMinor and Payment.interval) before or with this deploy. Do not upload prisma/schema.prisma (generated at build).

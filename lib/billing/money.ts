@@ -34,6 +34,8 @@ export interface PublicPlan {
   sortOrder: number;
   /** Admin-set prices in other currencies (minor units). Missing ones are converted. */
   prices: Partial<Record<Currency, number>>;
+  /** Yearly price in `currency` for a monthly plan. 0 = monthly x (12 - free months). */
+  yearlyMinor: number;
   /** Posts per calendar month; 0 = unlimited. */
   postLimit: number;
   aiCaptions: boolean;

@@ -20,7 +20,7 @@ export async function ensurePlans() {
   for (const p of SEED) await db.plan.upsert({ where: { slug: p.slug }, update: {}, create: { ...p, currency: "INR", interval: "month", features: JSON.stringify(p.features) } }).catch(() => {});
 }
 
-type PlanRow = { id: string; slug: string; name: string; priceMinor: number; currency: string; interval: string; note: string; features: string; state: string; highlight: boolean; sortOrder: number; prices: string; postLimit: number; aiCaptions: boolean; seats: number };
+type PlanRow = { id: string; slug: string; name: string; priceMinor: number; currency: string; interval: string; note: string; features: string; state: string; highlight: boolean; sortOrder: number; prices: string; yearlyMinor: number; postLimit: number; aiCaptions: boolean; seats: number };
 
 export function toPublic(p: PlanRow): PublicPlan {
   let features: string[] = [];
@@ -32,6 +32,7 @@ export function toPublic(p: PlanRow): PublicPlan {
     highlight: p.highlight, sortOrder: p.sortOrder, postLimit: p.postLimit, aiCaptions: p.aiCaptions, seats: p.seats,
     features,
     prices: parsePrices(p.prices),
+    yearlyMinor: p.yearlyMinor ?? 0,
     state: (["available", "soon", "hidden"].includes(p.state) ? p.state : "available") as PublicPlan["state"],
   };
 }

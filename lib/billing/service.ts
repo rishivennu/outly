@@ -6,7 +6,9 @@ import { HttpError } from "../http";
 import { getConfig } from "../settings";
 import { adminEvent } from "../admin/route";
 import { formatMoney, type Currency } from "./money";
-import { chargeCurrency, isCurrency, localPrice, parsePrices } from "./currency";
+import { chargeCurrency, isCurrency, parsePrices } from "./currency";
+import { hasYearly, priceFor, type Cycle } from "./cycle";
+import { normalizeDisplay } from "./display";
 import { issueInvoice } from "./invoice";
 import { sendEmail, templates } from "../email";
 import { mock, paypal, razorpay, stripe, type CheckoutStart } from "./providers";
@@ -49,28 +51,32 @@ export function mockAllowed() {
 }
 
 /** `wanted` is the visitor's currency (cookie / IP country). The gateway decides what it can actually charge. */
-export async function startCheckout(userId: string, planSlug: string, wanted?: Currency): Promise<CheckoutStart & { paymentId: string }> {
+/** `cycle` is the Monthly / Yearly switch the buyer picked; yearly falls back to monthly if it is switched off. */
+export async function startCheckout(userId: string, planSlug: string, wanted?: Currency, cycle: Cycle = "month"): Promise<CheckoutStart & { paymentId: string }> {
   const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
   const plan = await db.plan.findUnique({ where: { slug: planSlug } });
   if (!plan || plan.state !== "available") throw new HttpError(404, "That plan isn't available right now.", "PLAN_UNAVAILABLE");
   if (plan.priceMinor <= 0) throw new HttpError(400, "That plan is free, there's nothing to pay.", "FREE_PLAN");
-  const current = await db.subscription.findFirst({ where: { userId, status: "active", planId: plan.id } });
-  if (current) throw new HttpError(409, `You're already on ${plan.name}.`, "ALREADY_SUBSCRIBED");
+  const display = normalizeDisplay(await getConfig("pricing"));
+  const want: Cycle = cycle === "year" && (plan.interval === "year" || hasYearly(plan, display.yearly)) ? "year" : plan.interval === "year" ? "year" : "month";
+  // Same plan on the other cycle (monthly -> yearly) is a real change, so only the exact same plan + cycle is refused.
+  const current = await db.subscription.findFirst({ where: { userId, status: "active", planId: plan.id, interval: want } });
+  if (current) throw new HttpError(409, `You're already on ${plan.name}${want === "year" ? " yearly" : ""}.`, "ALREADY_SUBSCRIBED");
 
   const { cfg, provider } = await activeGateway();
   if (provider === "mock" && !mockAllowed()) throw new HttpError(503, "Payments are being set up. Paid plans open shortly.", "GATEWAY");
-  const charge = localPrice({ ...plan, prices: parsePrices(plan.prices) }, chargeCurrency(provider, wanted ?? (isCurrency(plan.currency) ? plan.currency : "INR"), plan.currency));
+  const charge = priceFor({ ...plan, prices: parsePrices(plan.prices) }, chargeCurrency(provider, wanted ?? (isCurrency(plan.currency) ? plan.currency : "INR"), plan.currency), want, display.freeMonths);
   // Reuse a recent pending attempt for the same plan, so double-clicks don't create duplicate payments.
   const recent = await db.payment.findFirst({
-    where: { userId, planId: plan.id, status: "pending", provider, createdAt: { gt: new Date(Date.now() - 20 * 60_000) } },
+    where: { userId, planId: plan.id, status: "pending", provider, interval: charge.interval, createdAt: { gt: new Date(Date.now() - 20 * 60_000) } },
     orderBy: { createdAt: "desc" },
   });
   const payment =
     recent && recent.amountMinor === charge.priceMinor && recent.currency === charge.currency
       ? recent
-      : await db.payment.create({ data: { userId, planId: plan.id, amountMinor: charge.priceMinor, currency: charge.currency, provider, status: "pending" } });
+      : await db.payment.create({ data: { userId, planId: plan.id, amountMinor: charge.priceMinor, currency: charge.currency, interval: charge.interval, provider, status: "pending" } });
 
-  const args = { paymentId: payment.id, amountMinor: payment.amountMinor, currency: payment.currency, planName: plan.name, user: { name: user.name, email: user.email }, appUrl: env.APP_URL };
+  const args = { paymentId: payment.id, amountMinor: payment.amountMinor, currency: payment.currency, planName: charge.interval === "year" && plan.interval !== "year" ? `${plan.name} (yearly)` : plan.name, user: { name: user.name, email: user.email }, appUrl: env.APP_URL };
   let start: CheckoutStart;
   try {
     start =
@@ -107,9 +113,9 @@ export async function completePayment(paymentId: string, providerRef?: string) {
         status: "active",
         priceMinor: p.amountMinor,
         currency: p.currency,
-        interval: plan.interval,
+        interval: p.interval === "year" || plan.interval === "year" ? "year" : "month",
         provider: p.provider,
-        currentPeriodEnd: plan.interval === "year" ? addYears(now, 1) : addMonths(now, 1),
+        currentPeriodEnd: p.interval === "year" || plan.interval === "year" ? addYears(now, 1) : addMonths(now, 1),
         sample: p.sample,
       },
     });

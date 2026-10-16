@@ -22,6 +22,7 @@ const body = DM_Sans({ subsets: ["latin"], variable: "--font-body", display: "sw
 const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["italic"], variable: "--font-serif", display: "swap" });
 
 import { Watermark } from "@/components/shared/Watermark";
+import { LaunchHost } from "@/components/billing/RocketCta";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3040"),
@@ -34,11 +35,11 @@ export const metadata: Metadata = {
   verification: { google: process.env.GOOGLE_SITE_VERIFICATION?.trim() || undefined },
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: [{ media: "(prefers-color-scheme: dark)", color: "#0c0c0e" }, { media: "(prefers-color-scheme: light)", color: "#faf8f3" }], viewportFit: "cover" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0c0c0e", viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} ${serif.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`dark ${display.variable} ${body.variable} ${serif.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         {/* Landing sections the admin hid (readable hint cookie set by middleware): mark <html> before the
@@ -59,6 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Connectivity />
           <Ripples />
           <Watermark />
+          <LaunchHost />
         </MotionRoot>
       </body>
     </html>

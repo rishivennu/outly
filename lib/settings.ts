@@ -4,6 +4,7 @@ import { LANDING_DEFAULT } from "./landing";
 import { MASCOT_DEFAULT, type MascotConfig } from "./mascot/palettes";
 import { encrypt, decrypt } from "./crypto";
 import { UPDATE_DEFAULT, type UpdateNotice } from "./updates";
+import { PRICING_DISPLAY_DEFAULT, type PricingDisplay } from "./billing/display";
 
 /**
  * Integration config lives in the DB so the admin can switch providers without a deploy.
@@ -64,6 +65,7 @@ export const DEFAULTS = {
   email: { provider: "mock", from: "Outlly <hello@outlly.app>", replyTo: "", resend: { apiKey: "" } } as EmailConfig,
   site: { maintenance: false, message: "", eta: "", since: "", endsAt: "", waitlist: false, waitlistSince: "" } as SiteConfig,
   landing: LANDING_DEFAULT,
+  pricing: PRICING_DISPLAY_DEFAULT as PricingDisplay,
   mascot: MASCOT_DEFAULT as MascotConfig,
   updates: UPDATE_DEFAULT as UpdateNotice,
   platforms: Object.fromEntries(["instagram", "youtube", "x", "tiktok", "facebook", "threads", "linkedin"].map((p) => [p, { clientId: "", clientSecret: "" }])) as PlatformKeys,
