@@ -1786,3 +1786,30 @@ html[data-lh~="faq"] [data-sec="faq"] { display: none !important; }
   .lt-half { flex: 1 1 100%; flex-wrap: wrap; justify-content: center; gap: 1rem 2rem; padding: 0; }
   .lt-half:nth-child(2), .lt-half > :nth-child(n + 8) { display: none; }
 }
+
+/* ---------- Brand sky: stars + falling comets behind every public page (StarField.tsx) ---------- */
+.sky-host { isolation: isolate; position: relative; }
+.sky { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; contain: strict;
+  --sky-star: hsl(var(--foreground) / .28); --sky-head: hsl(150 60% 26%); --sky-tail: hsl(150 60% 26% / .55); --sky-glow: hsl(150 60% 26% / .25); }
+.dark .sky { --sky-star: hsl(0 0% 100% / .7); --sky-head: hsl(0 0% 100%); --sky-tail: hsl(var(--lime) / .8); --sky-glow: hsl(var(--lime) / .55); }
+.sky-star { position: absolute; border-radius: 9999px; background: var(--sky-star); opacity: .35;
+  animation: sky-twinkle 5s ease-in-out infinite; }
+@keyframes sky-twinkle { 0%, 100% { opacity: .2; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+.sky-comet { position: absolute; width: 0; height: 0; transform-origin: 0 0; }
+.sky-comet > span { position: absolute; top: -1px; right: 0; height: 2px; border-radius: 9999px; opacity: 0;
+  background: linear-gradient(90deg, transparent, var(--sky-tail) 70%, var(--sky-head));
+  filter: drop-shadow(0 0 6px var(--sky-glow));
+  animation: sky-fall 14s cubic-bezier(.3, .1, .6, 1) infinite; will-change: transform, opacity; }
+.sky-comet > span::after { content: ""; position: absolute; right: -2px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px;
+  border-radius: 9999px; background: var(--sky-head); box-shadow: 0 0 10px 2px var(--sky-glow); }
+@keyframes sky-fall {
+  0% { transform: translateX(0); opacity: 0; }
+  2% { opacity: 1; }
+  11% { opacity: .9; }
+  16% { transform: translateX(78vmax); opacity: 0; }
+  100% { transform: translateX(78vmax); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sky-comet { display: none; }
+  .sky-star { animation: none; opacity: .45; }
+}

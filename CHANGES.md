@@ -25,3 +25,8 @@ Do NOT upload vercel.json (unchanged) or prisma/schema.prisma (generated at buil
 5. CSP is report-only. Watch the console for a week, then switch to enforcing.
 
 Verified locally: tsc 0 errors, bun test 329/0, axe 0 (light+dark, 1440+390).
+
+## Brand sky (stars + falling comets)
+- components/marketing/StarField.tsx (new): fixed, aria-hidden layer behind every public page. 56 twinkling stars, 7 comets falling on a loop (1-2 in flight at once). CSS only, transform/opacity, seeded positions (no hydration mismatch).
+- app/(marketing)/layout.tsx: renders <StarField /> inside a .sky-host (isolation) wrapper so the sky sits behind all sections.
+- app/globals.css: .sky-* styles. Dark = lime comets with white heads; light = deep green (no lime on white). Reduced motion: comets off, stars static.
