@@ -1,12 +1,47 @@
 import "server-only";
 import { db } from "../db";
+import { storage } from "../storage";
+import { DRAFT_TTL_DAYS } from "../domain";
 
 /**
  * Housekeeping: rows nobody reads any more. Logs and admin noise go after 90 days, per-post metric
  * samples after 180 (the charts only look back 12 weeks), expired sign-in codes after a day.
+ * Drafts nobody has touched for DRAFT_TTL_DAYS go too, with their video when no other post uses it
+ * (the browser keeps its own copy, see lib/client/device-drafts.ts).
  * Run from the retention cron; every delete is a plain window on a timestamp, so it is safe to repeat.
  */
 const DAY = 864e5;
+export { DRAFT_TTL_DAYS };
+
+/**
+ * Untouched drafts: status draft, not saved for DRAFT_TTL_DAYS, not booked for a future time and not
+ * waiting on a reviewer. The delete repeats the conditions, so a draft saved meanwhile survives.
+ */
+export async function pruneStaleDrafts(now: Date = new Date(), batch = 500) {
+  const cutoff = new Date(now.getTime() - DRAFT_TTL_DAYS * DAY);
+  const where = {
+    status: "draft",
+    updatedAt: { lt: cutoff },
+    OR: [{ scheduledAt: null }, { scheduledAt: { lt: now } }],
+    reviews: { none: { status: "pending", expiresAt: { gt: now } } },
+  };
+  const stale = await db.post.findMany({ where, select: { id: true, mediaId: true }, take: batch });
+  if (!stale.length) return { drafts: 0, media: 0 };
+  const { count } = await db.post.deleteMany({ where: { ...where, id: { in: stale.map((p) => p.id) } } });
+  const orphans = await db.media.findMany({
+    where: { id: { in: Array.from(new Set(stale.map((p) => p.mediaId))) }, posts: { none: {} } },
+    select: { id: true, storageKey: true, thumbnailKey: true },
+  });
+  if (!orphans.length) return { drafts: count, media: 0 };
+  await db.media.deleteMany({ where: { id: { in: orphans.map((m) => m.id) }, posts: { none: {} } } });
+  // Only files whose row is really gone: one picked up by a new post in the meantime stays.
+  const kept = new Set((await db.media.findMany({ where: { id: { in: orphans.map((m) => m.id) } }, select: { id: true } })).map((m) => m.id));
+  const removed = orphans.filter((m) => !kept.has(m.id));
+  for (const m of removed)
+    for (const key of [m.storageKey, m.thumbnailKey])
+      if (key) await storage.remove(key).catch((e) => console.error("[prune:drafts] storage", key, e));
+  return { drafts: count, media: removed.length };
+}
 
 export async function pruneOldData(now: Date = new Date()) {
   const before = (days: number) => new Date(now.getTime() - days * DAY);
@@ -17,7 +52,17 @@ export async function pruneOldData(now: Date = new Date()) {
     db.targetMetric.deleteMany({ where: { capturedAt: { lt: before(180) } } }),
     db.otpCode.deleteMany({ where: { createdAt: { lt: before(1) } } }),
   ]);
+  // Batches of 500, a few per run, so a backlog drains without one huge delete.
+  const drafts = { drafts: 0, media: 0 };
+  for (let i = 0; i < 10; i++) {
+    const r = await pruneStaleDrafts(now);
+    drafts.drafts += r.drafts;
+    drafts.media += r.media;
+    if (r.drafts < 500) break;
+  }
   return {
+    drafts: drafts.drafts,
+    draftMedia: drafts.media,
     emailLogs: emailLogs.count,
     adminEvents: adminEvents.count,
     behaviorAnalyses: behaviorAnalyses.count,

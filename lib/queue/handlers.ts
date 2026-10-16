@@ -157,7 +157,22 @@ export async function syncPost(postId: string) {
   });
 }
 
+/** The creator pressed Stop. Any job still holding this target lets it go. */
+async function canceled(targetId: string) {
+  const t = await db.postTarget.findUnique({ where: { id: targetId }, select: { errorCode: true, platformStatus: true } });
+  return t?.platformStatus === "failed" && t.errorCode === "CANCELED";
+}
+
+/** Move a target forward only if nobody stopped it in the meantime. Returns false when it was stopped. */
+async function advance(targetId: string, postId: string, status: TargetStatus, extra: Record<string, unknown> = {}) {
+  // Never from failed (a Stop) and never backwards from published (a stale or duplicate job).
+  const r = await db.postTarget.updateMany({ where: { id: targetId, platformStatus: { notIn: ["failed", "published"] } }, data: { platformStatus: status, ...extra } });
+  if (r.count) await syncPost(postId);
+  return r.count > 0;
+}
+
 async function failTarget(targetId: string, postId: string, err: unknown) {
+  if (await canceled(targetId)) return; // a stop is the creator's call; a late error must not overwrite it
   const pe = asPublisherError(err);
   await setTarget(targetId, postId, "failed", {
     errorCode: pe.code,
@@ -175,6 +190,7 @@ async function failTarget(targetId: string, postId: string, err: unknown) {
 /** Retry transient failures with exponential backoff, otherwise surface to the creator. */
 async function handleFailure(name: "SOCIAL_UPLOAD" | "SOCIAL_PUBLISH", data: JobPayloads["SOCIAL_UPLOAD"], targetId: string, postId: string, attempts: number, raw: unknown) {
   const err = asPublisherError(raw);
+  if (await canceled(targetId)) return;
   if (err.retryable && attempts < MAX_AUTO_RETRIES) {
     await db.postTarget.update({ where: { id: targetId }, data: { attempts: { increment: 1 }, errorCode: err.code, errorMessage: err.technical ?? err.message } });
     await enqueue(name, data, { delayMs: 1500 * 2 ** attempts });
@@ -191,16 +207,18 @@ async function socialUpload(data: JobPayloads["SOCIAL_UPLOAD"]) {
   });
   if (!loaded) return;
   const { t, ctx, publisher } = loaded;
-  if (t.platformStatus === "published") return;
+  if (t.platformStatus === "published" || (t.platformStatus === "failed" && t.errorCode === "CANCELED")) return;
   // Already handed to the platform on a previous run (and not a resumable session): don't upload twice.
   if (t.uploadRef && !t.uploadRef.startsWith("session:")) return void (await enqueue("SOCIAL_PUBLISH", data));
   const issues = publisher.validateMedia(ctx.media).filter((i) => i.level === "error");
   if (issues.length) return failTarget(t.id, t.postId, new PublisherError("MEDIA_REJECTED", issues[0].message, issues.map((i) => i.message).join("\n"), false));
 
-  await setTarget(t.id, t.postId, "uploading", { errorCode: null, errorMessage: null });
+  if (!(await advance(t.id, t.postId, "uploading", { errorCode: null, errorMessage: null }))) return;
   try {
     const ref = await publisher.upload(ctx);
     await db.postTarget.update({ where: { id: t.id }, data: { uploadRef: ref } });
+    // Stopped while the bytes were moving: keep the upload ref (a later "Send it again" reuses it), but never publish.
+    if (await canceled(t.id)) return;
     await enqueue("SOCIAL_PUBLISH", data);
   } catch (e) {
     await handleFailure("SOCIAL_UPLOAD", data, t.id, t.postId, t.attempts, e);
@@ -222,8 +240,11 @@ async function socialPublish(data: JobPayloads["SOCIAL_PUBLISH"]) {
   const loaded = await loadContext(data.targetId, data.simulate);
   if (!loaded) return;
   const { t, ctx, publisher } = loaded;
+  if (t.platformStatus === "failed" && t.errorCode === "CANCELED") return;
+  if (t.platformStatus === "published") return; // a stale or duplicate job: it's already out, never post it twice
   if (!t.uploadRef) return failTarget(t.id, t.postId, new PublisherError("UNKNOWN", "Missing upload", "SOCIAL_PUBLISH ran without an upload reference.", false));
-  await setTarget(t.id, t.postId, "processing");
+  // Last point a Stop can win. After this the platform is asked to go public, which can't be taken back.
+  if (!(await advance(t.id, t.postId, "processing"))) return;
   try {
     if (await reconciled(t, ctx, publisher)) return;
     if (!t.publishRequestedAt) await db.postTarget.update({ where: { id: t.id }, data: { publishRequestedAt: new Date() } });

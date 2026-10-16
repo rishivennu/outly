@@ -24,6 +24,7 @@ export type ErrorCode =
   | "DUPLICATE"
   | "FORBIDDEN"
   | "NEEDS_APPROVAL"
+  | "CANCELED"
   | "UNKNOWN";
 
 export interface PlatformMeta {
@@ -128,6 +129,8 @@ export function humanError(platform: Platform, code: ErrorCode | string | null |
     case "NETWORK":
     case "PLATFORM_DOWN":
       return { title: `We couldn't reach ${name} just now.`, action: "Let's try again", kind: "retry" as const };
+    case "CANCELED":
+      return { title: `You stopped this one before it reached ${name}.`, action: "Send it again", kind: "retry" as const };
     default:
       return { title: "Something got in the way.", action: "Let's try again", kind: "retry" as const };
   }
@@ -141,6 +144,12 @@ export const TARGET_COPY: Record<TargetStatus, string> = {
   published: "Published",
   failed: "Something got in the way",
 };
+
+/** Statuses a creator can still stop: nothing has asked the platform to go public yet. */
+export const STOPPABLE: readonly TargetStatus[] = ["pending", "queued", "uploading"];
+
+/** Drafts nobody saves for this many days are removed from Outlly (lib/retention/prune.ts); the browser keeps its own copy. */
+export const DRAFT_TTL_DAYS = 3;
 
 export function isPlatform(v: unknown): v is Platform {
   return typeof v === "string" && (PLATFORMS as readonly string[]).includes(v);

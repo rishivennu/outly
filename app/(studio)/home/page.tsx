@@ -53,26 +53,34 @@ export const metadata = { title: "Home" };
 
 export default async function HomePage() {
   const user = (await getCurrentUser())!;
-  await loadKeys();
-  const me = await db.user.findUnique({ where: { id: user.id }, select: { postingGoal: true } });
-  const [drafts, next, live, welcome, published, ret] = await Promise.all([
+  // One parallel wave: every query below is independent, so the page pays one database round trip, not four.
+  // Pulse only needs the connections and the published count, so it chains on those two instead of waiting for all.
+  const liveP = connectedPlatforms(user.id);
+  const publishedP = db.post.count({ where: { userId: user.id, status: { in: ["published", "partial"] } } });
+  const [, drafts, next, live, welcome, published, ret, pulse] = await Promise.all([
+    loadKeys(),
     db.post.findMany({ where: { userId: user.id, status: "draft" }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() } }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),
-    connectedPlatforms(user.id),
+    liveP,
     welcomeOffer(user).catch(() => null),
-    db.post.count({ where: { userId: user.id, status: { in: ["published", "partial"] } } }),
-    homeRetention({ id: user.id, postingGoal: me?.postingGoal ?? 3, timezone: user.timezone }).catch((e) => {
-      console.error("[home] retention", e);
-      return null;
-    }),
-  ]);
-  const started = Object.values(live).some(Boolean) || published > 0;
-  const pulse = started
-    ? await homePulse({ id: user.id, timezone: user.timezone }, Object.keys(live).filter((k) => live[k as Platform] && isPlatform(k)) as Platform[]).catch((e) => {
+    publishedP,
+    db.user
+      .findUnique({ where: { id: user.id }, select: { postingGoal: true } })
+      .then((me) => homeRetention({ id: user.id, postingGoal: me?.postingGoal ?? 3, timezone: user.timezone }))
+      .catch((e) => {
+        console.error("[home] retention", e);
+        return null;
+      }),
+    Promise.all([liveP, publishedP])
+      .then(([lv, pub]) =>
+        Object.values(lv).some(Boolean) || pub > 0 ? homePulse({ id: user.id, timezone: user.timezone }, Object.keys(lv).filter((k) => lv[k as Platform] && isPlatform(k)) as Platform[]) : null,
+      )
+      .catch((e) => {
         console.error("[home] pulse", e);
         return null;
-      })
-    : null;
+      }),
+  ]);
+  const started = Object.values(live).some(Boolean) || published > 0;
   const steps = ret?.steps ?? [];
   const recycle = ret?.recycle ?? [];
   // Ideas fill a whole row when nothing sits beside them; with no steps they pair with the streak card.

@@ -25,7 +25,7 @@ export default async function CreatePage({ searchParams }: { searchParams: Recor
   } else if (!post && searchParams.text) initialStory = searchParams.text.slice(0, 600);
   return (
     <CreateWorkspace
-      key={post?.id ?? searchParams.idea ?? "new"}
+      key={post?.id ?? searchParams.local ?? searchParams.idea ?? "new"}
       accounts={accounts.map(accountView)}
       initialPost={post}
       tz={user.timezone}
@@ -33,6 +33,8 @@ export default async function CreatePage({ searchParams }: { searchParams: Recor
       connectError={searchParams.connect_error ?? null}
       initialStory={initialStory}
       shared={searchParams.shared ?? null}
+      restoreLocal={post ? null : (searchParams.local ?? null)}
+      missingPostId={!post && searchParams.post ? searchParams.post : null}
     />
   );
 }

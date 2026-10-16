@@ -3,7 +3,7 @@ import type { Media, Post, PostTarget, ReviewRequest, SocialAccount } from "@pri
 import { db } from "./db";
 import { HttpError } from "./http";
 import { storage } from "./storage";
-import { isPlatform, PLATFORMS, type Platform } from "./domain";
+import { isPlatform, PLATFORMS, STOPPABLE, type Platform } from "./domain";
 import { enqueue } from "./queue";
 import { syncPost } from "./queue/handlers";
 import type { SimulationMode } from "./social/types";
@@ -183,6 +183,24 @@ async function claim(postId: string, from: string[], data: { status: string; sch
   if (claimed.count !== 1) return null;
   const row = await db.post.findUnique({ where: { id: postId }, select: { updatedAt: true } });
   return String(row?.updatedAt.getTime() ?? Date.now());
+}
+
+/**
+ * Stop sending: one destination, or every one still moving. Only targets that haven't asked the platform to
+ * go public can stop (pending, queued, uploading); the update is conditional, so a worker that got there first
+ * wins and the creator sees the real state. Jobs already in the queue check for CANCELED and bow out.
+ */
+export async function cancelTargets(userId: string, postId: string, targetIds?: string[]) {
+  const post = await db.post.findFirst({ where: { id: postId, userId }, select: { id: true, status: true } });
+  if (!post) throw new HttpError(404, "We couldn't find that post.");
+  // Only a send in progress. A booked post is called off with Unschedule, so one Stop can't strand the rest of it.
+  if (post.status !== "publishing") throw new HttpError(409, post.status === "scheduled" ? "This one is booked for later. Unschedule it instead." : "Nothing is on its way right now.");
+  const r = await db.postTarget.updateMany({
+    where: { postId, platformStatus: { in: [...STOPPABLE] }, ...(targetIds ? { id: { in: targetIds } } : {}) },
+    data: { platformStatus: "failed", errorCode: "CANCELED", errorMessage: "Stopped by the creator before it was sent." },
+  });
+  await syncPost(postId);
+  return r.count;
 }
 
 export async function retryTarget(userId: string, targetId: string) {
