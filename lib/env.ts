@@ -37,6 +37,12 @@ const schema = z.object({
   GEMINI_API_KEY: z.string().optional().default(""),
   /** Bearer secret for /api/cron/* (Vercel Cron sends it automatically when set). */
   CRON_SECRET: z.string().optional().default(""),
+  /** Upstash Redis REST, so rate limits are shared across serverless instances instead of per-process. */
+  UPSTASH_REDIS_REST_URL: z.string().optional().default(""),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional().default(""),
+  /** AI calls one creator may make per UTC day (app/api/ai/*), and separately in support chat. */
+  AI_DAILY_LIMIT: z.coerce.number().int().min(0).default(60),
+  AI_SUPPORT_DAILY_LIMIT: z.coerce.number().int().min(0).default(40),
 });
 
 export const env = schema.parse(process.env);

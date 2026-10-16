@@ -25,7 +25,7 @@ export const STEPS: Step[] = [
   {
     n: "01",
     title: "Drop your video",
-    body: "Drag in a file — up to 50 MB on the free beta — and it lands in your library straight away. We read duration, aspect ratio and resolution so nothing surprises you later.",
+    body: "Drag in a file (up to 50 MB on the free beta) and it lands in your library straight away. We read duration, aspect ratio and resolution so nothing surprises you later.",
     icon: "upload",
   },
   {
@@ -71,7 +71,7 @@ export const FEATURES: Feature[] = [
   },
   {
     title: "Live per-destination status",
-    body: "Queued, uploading, processing, published or failed — shown per platform with the platform's own error, not a generic one.",
+    body: "Queued, uploading, processing, published or failed, shown per platform with the platform's own error, not a generic one.",
     icon: "sync",
   },
   {
@@ -94,7 +94,7 @@ export const FEATURES: Feature[] = [
 export const DIFFERENTIATION = {
   eyebrow: "Why it feels different",
   title: "Built around one video, not around a dashboard.",
-  body: "Social media suites are built for teams managing many brands across a dozen networks. Outlly is built for the creator with one video and three places to put it. That is a different shape of problem, so it gets a different shape of tool — not a better one for everybody.",
+  body: "Social media suites are built for teams managing many brands across a dozen networks. Outlly is built for the creator with one video and three places to put it. That is a different shape of problem, so it gets a different shape of tool. Not a better one for everybody.",
   points: [
     { title: "Less repetitive work", body: "The same video, caption and schedule are entered once, not three times.", icon: "auto-format" as IconName },
     { title: "AI that assists, not decides", body: "Drafts arrive filled in and editable. Nothing publishes with words you have not read.", icon: "generate-ideas" as IconName },
@@ -185,11 +185,11 @@ export interface Faq {
 export const FAQS: Faq[] = [
   {
     q: "Can Outlly really publish for me, or does it just remind me to post?",
-    a: "It publishes through each platform's official API. For that to work, a developer app has to exist for each platform and be approved for the permissions that posting needs — which is a review process run by Meta, Google and X, not by us. Until an app is approved and your account is connected, a destination cannot be published to.",
+    a: "It publishes through each platform's official API. For that to work, a developer app has to exist for each platform and be approved for the permissions that posting needs, which is a review process run by Meta, Google and X, not by us. Until an app is approved and your account is connected, a destination cannot be published to.",
   },
   {
     q: "What do I need on the Instagram side?",
-    a: "A professional Instagram account — Business or Creator — linked to a Facebook Page. Meta's Content Publishing API does not publish to personal profiles, so a personal account cannot be a destination.",
+    a: "A professional Instagram account (Business or Creator) linked to a Facebook Page. Meta's Content Publishing API does not publish to personal profiles, so a personal account cannot be a destination.",
   },
   {
     q: "What about X?",
@@ -201,11 +201,11 @@ export const FAQS: Faq[] = [
   },
   {
     q: "Is there a limit on how big my video can be?",
-    a: "Yes — 50 MB per file on the free beta, which is the cap on our current storage plan. A trimmed vertical clip of a minute or two usually fits; a long 4K export will not. Larger uploads need a paid storage plan, and raising that cap is part of what the future Creator and Studio plans are for.",
+    a: "Yes, 50 MB per file on the free beta, which is the cap on our current storage plan. A trimmed vertical clip of a minute or two usually fits; a long 4K export will not. Larger uploads need a paid storage plan, and raising that cap is part of what the future Creator and Studio plans are for.",
   },
   {
     q: "What happens when one platform fails?",
-    a: "Each destination is its own job. The ones that succeeded stay published, the failed one keeps its real error — expired token, rejected media, rate limit — and you can retry only that destination once the cause is fixed.",
+    a: "Each destination is its own job. The ones that succeeded stay published, the failed one keeps its real error (expired token, rejected media, rate limit) and you can retry only that destination once the cause is fixed.",
   },
   {
     q: "Which analytics can I actually see?",
@@ -249,11 +249,11 @@ export const PLANS: Plan[] = [
   },
 ];
 
-export const PRICING_NOTE = "Outlly is in beta and free to use. Paid plans are not on sale yet and we have not set their prices — when we do, you will see them here before anything changes for you.";
+export const PRICING_NOTE = "Outlly is in beta and free to use. Paid plans are not on sale yet and we have not set their prices. When we do, you will see them here before anything changes for you.";
 
 export const FINAL_CTA = {
   title: "One video. Three destinations. One afternoon back.",
-  body: "Start with a single upload and see the whole flow — library, AI drafts, schedule, statuses — before you connect a thing.",
+  body: "Start with a single upload and see the whole flow (library, AI drafts, schedule, statuses) before you connect a thing.",
 } as const;
 
 export const SOCIALS = [

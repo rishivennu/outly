@@ -58,6 +58,17 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
   // same code twice and the second answer ("already used") would hide the first. Refs see it at once.
   const inFlight = useRef(false);
   const lastSent = useRef<string | null>(null);
+  // The browser's own time zone, so the first schedule and the weekly report are in local time. Google's
+  // callback carries no body, so it also goes in a short-lived cookie the server reads on first sign-in.
+  const tz = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    try {
+      tz.current = Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+      if (tz.current) document.cookie = `outlly_tz=${tz.current}; path=/; max-age=1800; samesite=lax`;
+    } catch {
+      /* very old browser: the server default stays */
+    }
+  }, []);
   useEffect(() => {
     if (wait <= 0) return;
     const t = setTimeout(() => setWait((w) => w - 1), 1000);
@@ -149,7 +160,7 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
     if (step !== "password" && mode === "login") setNote("Checking your code…");
     try {
       if (mode === "signup") {
-        await api("/api/auth/signup", { method: "POST", json: form });
+        await api("/api/auth/signup", { method: "POST", json: { ...form, timezone: tz.current } });
         return go();
       }
       if (step === "password") return after(await api<{ twoFactor?: boolean }>("/api/auth/login", { method: "POST", json: { email: form.email, password: form.password } }));

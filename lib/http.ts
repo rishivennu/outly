@@ -2,7 +2,7 @@ import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import { ZodError } from "zod";
 import { getCurrentUser, type SessionUser } from "./auth";
-import { rateLimit } from "./rate-limit";
+import { limitShared } from "./rate-limit";
 import { env } from "./env";
 import { getConfig } from "./settings";
 import { getAdmin } from "./admin/auth";
@@ -67,7 +67,7 @@ export function route<C = { params: Record<string, string> }>(
     try {
       assertSameOrigin(req);
       const [limit, windowMs] = opts.limit ?? [120, 60_000];
-      const rl = rateLimit(`${clientKey(req)}:${req.nextUrl.pathname}:${req.method}`, limit, windowMs);
+      const rl = await limitShared(`${clientKey(req)}:${req.nextUrl.pathname}:${req.method}`, limit, windowMs);
       if (!rl.ok)
         return json(
           { error: "You're moving fast. Give it a moment.", code: "RATE_LIMITED" },

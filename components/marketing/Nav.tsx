@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { AnimatedLink } from "@/components/ui/animated-link";
 import { useSignedIn } from "./useSignedIn";
 import { useWaitlist } from "./useWaitlist";
 import { useHiddenSections } from "./useHiddenSections";
@@ -133,7 +134,7 @@ export function MarketingNav() {
           />
           <ul className="flex items-center">
             {links.map((l) => (
-              <li key={l.id}>
+              <li key={l.id} data-sec={l.id}>
                 <Link
                   data-id={l.id}
                   href={`/#${l.id}`}
@@ -161,9 +162,9 @@ export function MarketingNav() {
             </Link>
           ) : (
             <>
-              <Link href="/login" className="hidden h-11 items-center rounded-full px-4 text-[14.5px] font-semibold text-foreground/80 transition-colors hover:text-foreground sm:inline-flex">
+              <AnimatedLink href="/login" className="hidden h-11 rounded-full px-4 text-[14.5px] font-semibold text-foreground/80 transition-colors hover:text-foreground sm:inline-flex">
                 Log in
-              </Link>
+              </AnimatedLink>
               <Link
                 href={ctaHref}
                 data-bounce=""
@@ -192,6 +193,7 @@ export function MarketingNav() {
           {links.map((l) => (
             <Link
               key={l.id}
+              data-sec={l.id}
               href={`/#${l.id}`}
               onClick={() => pick(l.id)}
               aria-current={active === l.id ? "true" : undefined}

@@ -228,7 +228,7 @@ function ReviewBlock({ post, onChange }: { post: PostView; onChange: (p: PostVie
       await navigator.clipboard.writeText(url);
       toast("Review link copied. Paste it wherever your team talks.");
     } catch {
-      toast("Couldn't reach the clipboard — the link is on screen, copy it by hand.", "info");
+      toast("Couldn't reach the clipboard. The link is on screen, so copy it by hand.", "info");
     }
   };
 

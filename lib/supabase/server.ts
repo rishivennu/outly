@@ -154,6 +154,12 @@ export const sbAuth = {
     }
     return null;
   },
+  /** Permanently remove the auth user. Used when a creator deletes their studio. */
+  async deleteUser(id: string) {
+    const r = await sbFetch(`/auth/v1/admin/users/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (r.status === 404) return; // already gone
+    await ok(r, "auth delete");
+  },
   async updatePassword(id: string, password: string) {
     const r = await sbFetch(`/auth/v1/admin/users/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ password }) });
     return ok<SbUser>(r, "auth update");

@@ -1,27 +1,27 @@
-# fix-1015-brand (2026-10-15)
+# fix-1016-all (system review "fix all")
 
-Upload AFTER fix-1015-home (order: fix-1014-perf, fix-1015-features, fix-1015-retention, fix-1015-home, fix-1015-brand).
-Copy every file to the SAME path at the REPO ROOT (for example `app/globals.css` goes to `<repo>/app/globals.css`).
-No database, env or package changes.
+Upload every file in this folder to the repo root, keeping the paths. 75 files.
+Do NOT upload vercel.json (unchanged) or prisma/schema.prisma (generated at build from schema.template.prisma).
 
-## Home bento (Platforms + Demo)
-- `components/marketing/bento/Art.tsx` (new): small animated art pieces for tiles (bars, rings, avatars, bolt, graph, arrow).
-- `components/marketing/bento/LimeCta.tsx` (new): the whole lime tile is one link to /signup (or /waitlist when the waitlist is on).
-- `Platforms.tsx`: rebuilt as a 3-column bento with a small animation in every tile.
-- `DemoFlow.tsx` + `Demo.tsx`: demo steps live in the bento; steps auto-play every 2.5s with a Pause/Play button, keyboard tabs (arrows, Home, End).
-- All motion stops under reduced motion.
+## What changed
+- Security/auth: session version claim, "Sign out everywhere" (/api/auth/logout-all), Upstash rate limit, AI daily quota (429 AI_QUOTA), CSP Report-Only header, next 14.2.15 -> 14.2.35.
+- Data: Download my data (/api/settings/export), Delete account (/api/settings/account), retention pruning, stuck-post requeue in sweep.
+- Time zone: signup stores device time zone, date picker warns when studio and device zones differ.
+- UI: mobile nav Home/Create/Calendar/Inbox/More, tour 9 -> 4 stops (after cookie consent), compact cookie bar, chat widget waits for consent, empty analytics state, danger button contrast fix, 96px logo webp, faster hero, no em-dashes in copy, /pricing /faq /features redirect to home sections, unknown guest URLs 404.
 
-## Whole-page glow
-- `app/globals.css`: soft corner glows behind every page (lime bottom-right, indigo bottom-left, faint top), lighter in light mode. Turned off for high contrast, forced colours and print.
+- Animated links (Skiper UI skiper40, adapted): new components/ui/animated-link.tsx. Underline draws in on hover and keyboard focus in the footer, nav "Log in", cookie settings and contact cards (with arrow). Inline links in sentences keep their static underline. Attribution comment kept in the file (required by the free license).
 
-## Posting animation
-- `components/create/PostingAnimation.tsx` (new): soft grainy ribbons flowing into a glass pill "Posting to {place}" that cycles through each place still sending, with Pip flying above. Decorative (aria-hidden); still under reduced motion.
-- `components/create/PublishingView.tsx`: shows it while a post is going out.
+- Pip answers every help question inside the chat: "Related" chips and the new "All help questions" list (grouped by topic, from GET /api/support/faq) ask Pip instead of opening /help or /support. A tapped question is answered from that exact FAQ entry (chat API `faqId`), translated for non-English. Related no longer repeats the question just answered. The "delete my account" answer now points to Settings > Your data (one-time migration, admin-edited rows untouched).
 
-## Admin login restyle
-- `components/auth/AuthCard.tsx` (new): the floating sign-in card, shared.
-- `app/(auth)/layout.tsx`: now uses AuthCard.
-- `components/auth/AuthShowcase.tsx`: takes eyebrow/lines, adds an admin pose.
-- `app/admin/login/page.tsx` + `components/admin/LoginForm.tsx`: admin login now matches sign-up (same card, fields, lime button, shake on wrong password). Login logic unchanged.
+- Logo ticker under the hero (components/marketing/LogoTicker.tsx + .lt-* in globals.css): every platform mark and name in one grey, drifting left, faded edges, pauses on hover. Live places first; places without approved keys carry a "soon" tag (follows liveNow(), so a platform loses the tag when its keys go live). Reduced motion: static wrapped row. Shown whenever the hero is on.
 
-Checks: tsc 0 errors; axe 0 violations and no sideways scroll on home, signup, admin login and the posting view, light + dark, 1440 / 800 / 390.
+- Pip is AI-first: Gemini reads the whole help centre plus a product brief (lib/support/knowledge.ts, built from the site copy and the live platform list), the chat so far, and whether the person is signed in. It answers everyday wording, typos, follow-ups, any language and general creator questions, never invents Outlly facts, and hands money/access problems to a person. Typical reply 1.3 to 1.7 s. Without GEMINI_API_KEY (or if Gemini is down) it falls back to the keyword matcher. Tests force the key off (tests/preload.ts) so they never call the network.
+
+## Prod steps (in order)
+1. `bun install` picks up package.json + bun.lock (next 14.2.35).
+2. `npx prisma db push` against prod DB (adds User.tokenVersion and AiUsage table).
+3. Vercel env (GEMINI_API_KEY is what makes Pip answer properly, set it first): UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN, AI_DAILY_LIMIT=60, AI_SUPPORT_DAILY_LIMIT=40, CRON_SECRET, GEMINI_API_KEY, Resend keys.
+4. Hobby plan cannot run per-minute crons: set up cron-job.org to call GET /api/cron/sweep every minute with header `Authorization: Bearer <CRON_SECRET>` (see docs/DEPLOYMENT.md).
+5. CSP is report-only. Watch the console for a week, then switch to enforcing.
+
+Verified locally: tsc 0 errors, bun test 329/0, axe 0 (light+dark, 1440+390).

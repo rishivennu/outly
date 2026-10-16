@@ -40,7 +40,7 @@ export const T: Record<Lang, ChatT> = {
     offline: "You're offline. I'll be here when you reconnect.",
     error: "Something got in the way. Try again in a moment.",
     suggestions: ["How do I cancel my plan?", "Where are my invoices?", "My payment failed", "Why did my post fail?"],
-    related: "Related", faqLink: "Browse the help centre", lang: "Language",
+    related: "Related", faqLink: "All help questions", lang: "Language",
     more: "Sorry about that. Can you tell me a bit more?", nudge: "Questions? I can help.",
   },
   hi: {
@@ -56,7 +56,7 @@ export const T: Record<Lang, ChatT> = {
     offline: "आप ऑफ़लाइन हैं। दोबारा कनेक्ट होने पर मैं यहीं मिलूँगा।",
     error: "कुछ गड़बड़ हो गई। थोड़ी देर में फिर कोशिश करें।",
     suggestions: ["मैं अपना प्लान कैसे रद्द करूँ?", "मेरे इनवॉइस कहाँ हैं?", "मेरा पेमेंट फेल हो गया", "मेरी पोस्ट फेल क्यों हुई?"],
-    related: "संबंधित", faqLink: "हेल्प सेंटर देखें", lang: "भाषा",
+    related: "संबंधित", faqLink: "सभी सवाल", lang: "भाषा",
     more: "माफ़ कीजिए। क्या आप थोड़ा और बता सकते हैं?", nudge: "कोई सवाल? मैं मदद कर सकता हूँ।",
   },
   es: {
@@ -72,7 +72,7 @@ export const T: Record<Lang, ChatT> = {
     offline: "Estás sin conexión. Aquí estaré cuando vuelvas.",
     error: "Algo salió mal. Inténtalo de nuevo en un momento.",
     suggestions: ["¿Cómo cancelo mi plan?", "¿Dónde están mis facturas?", "Mi pago falló", "¿Por qué falló mi publicación?"],
-    related: "Relacionado", faqLink: "Ver el centro de ayuda", lang: "Idioma",
+    related: "Relacionado", faqLink: "Todas las preguntas", lang: "Idioma",
     more: "Lo siento. ¿Me cuentas un poco más?", nudge: "¿Dudas? Te ayudo.",
   },
   fr: {
@@ -88,7 +88,7 @@ export const T: Record<Lang, ChatT> = {
     offline: "Tu es hors ligne. Je serai là à ton retour.",
     error: "Un souci est survenu. Réessaie dans un instant.",
     suggestions: ["Comment annuler mon abonnement ?", "Où sont mes factures ?", "Mon paiement a échoué", "Pourquoi ma publication a échoué ?"],
-    related: "Voir aussi", faqLink: "Parcourir le centre d'aide", lang: "Langue",
+    related: "Voir aussi", faqLink: "Toutes les questions", lang: "Langue",
     more: "Désolé. Tu peux m'en dire un peu plus ?", nudge: "Une question ? Je peux aider.",
   },
   de: {
@@ -104,7 +104,7 @@ export const T: Record<Lang, ChatT> = {
     offline: "Du bist offline. Ich bin da, sobald du wieder verbunden bist.",
     error: "Da ist etwas schiefgelaufen. Versuch es gleich noch einmal.",
     suggestions: ["Wie kündige ich mein Abo?", "Wo finde ich meine Rechnungen?", "Meine Zahlung ist fehlgeschlagen", "Warum ist mein Post fehlgeschlagen?"],
-    related: "Passend dazu", faqLink: "Zum Hilfe-Center", lang: "Sprache",
+    related: "Passend dazu", faqLink: "Alle Hilfefragen", lang: "Sprache",
     more: "Das tut mir leid. Kannst du mir etwas mehr erzählen?", nudge: "Fragen? Ich helfe gern.",
   },
   pt: {
@@ -120,7 +120,7 @@ export const T: Record<Lang, ChatT> = {
     offline: "Você está offline. Estarei aqui quando voltar.",
     error: "Algo deu errado. Tente de novo em instantes.",
     suggestions: ["Como cancelo meu plano?", "Onde estão minhas faturas?", "Meu pagamento falhou", "Por que minha publicação falhou?"],
-    related: "Relacionado", faqLink: "Ver a central de ajuda", lang: "Idioma",
+    related: "Relacionado", faqLink: "Todas as perguntas", lang: "Idioma",
     more: "Desculpe. Pode me contar um pouco mais?", nudge: "Dúvidas? Eu ajudo.",
   },
   ar: {
@@ -136,7 +136,7 @@ export const T: Record<Lang, ChatT> = {
     offline: "أنت غير متصل. سأكون هنا عند عودتك.",
     error: "حدث خطأ ما. حاول مرة أخرى بعد قليل.",
     suggestions: ["كيف ألغي اشتراكي؟", "أين فواتيري؟", "فشل الدفع", "لماذا فشل منشوري؟"],
-    related: "ذو صلة", faqLink: "تصفح مركز المساعدة", lang: "اللغة",
+    related: "ذو صلة", faqLink: "كل أسئلة المساعدة", lang: "اللغة",
     more: "آسف لذلك. هل يمكنك إخباري بالمزيد؟", nudge: "لديك سؤال؟ يمكنني المساعدة.",
   },
   zh: {
@@ -152,7 +152,7 @@ export const T: Record<Lang, ChatT> = {
     offline: "你已离线。重新连接后我还在这里。",
     error: "出了点问题，请稍后再试。",
     suggestions: ["如何取消我的套餐？", "我的发票在哪里？", "我的付款失败了", "为什么我的帖子发布失败？"],
-    related: "相关", faqLink: "浏览帮助中心", lang: "语言",
+    related: "相关", faqLink: "全部帮助问题", lang: "语言",
     more: "抱歉。能再多说一点吗？", nudge: "有问题？我可以帮忙。",
   },
   ja: {
@@ -168,7 +168,7 @@ export const T: Record<Lang, ChatT> = {
     offline: "オフラインです。再接続したらまたお手伝いします。",
     error: "問題が発生しました。少し待ってからもう一度お試しください。",
     suggestions: ["プランを解約するには？", "請求書はどこ？", "支払いに失敗しました", "投稿が失敗したのはなぜ？"],
-    related: "関連", faqLink: "ヘルプセンターを見る", lang: "言語",
+    related: "関連", faqLink: "ヘルプの質問一覧", lang: "言語",
     more: "すみません。もう少し詳しく教えてもらえますか？", nudge: "質問はありますか？お手伝いします。",
   },
   ru: {
@@ -184,7 +184,7 @@ export const T: Record<Lang, ChatT> = {
     offline: "Вы офлайн. Я буду здесь, когда связь вернётся.",
     error: "Что-то пошло не так. Попробуйте чуть позже.",
     suggestions: ["Как отменить подписку?", "Где мои счета?", "Оплата не прошла", "Почему публикация не удалась?"],
-    related: "Похожее", faqLink: "Открыть центр помощи", lang: "Язык",
+    related: "Похожее", faqLink: "Все вопросы", lang: "Язык",
     more: "Извините. Расскажете чуть подробнее?", nudge: "Есть вопросы? Я помогу.",
   },
   id: {
@@ -200,7 +200,7 @@ export const T: Record<Lang, ChatT> = {
     offline: "Kamu sedang offline. Aku akan tetap di sini saat kamu terhubung lagi.",
     error: "Ada kendala. Coba lagi sebentar lagi.",
     suggestions: ["Bagaimana cara membatalkan paket?", "Di mana invoice saya?", "Pembayaran saya gagal", "Kenapa postingan saya gagal?"],
-    related: "Terkait", faqLink: "Lihat pusat bantuan", lang: "Bahasa",
+    related: "Terkait", faqLink: "Semua pertanyaan", lang: "Bahasa",
     more: "Maaf soal itu. Bisa ceritakan sedikit lagi?", nudge: "Ada pertanyaan? Aku bisa bantu.",
   },
   bn: {
@@ -216,7 +216,7 @@ export const T: Record<Lang, ChatT> = {
     offline: "আপনি অফলাইনে আছেন। আবার যুক্ত হলে আমি এখানেই থাকব।",
     error: "কিছু একটা সমস্যা হয়েছে। একটু পরে আবার চেষ্টা করুন।",
     suggestions: ["আমার প্ল্যান কীভাবে বাতিল করব?", "আমার ইনভয়েস কোথায়?", "আমার পেমেন্ট ব্যর্থ হয়েছে", "আমার পোস্ট কেন ব্যর্থ হল?"],
-    related: "সম্পর্কিত", faqLink: "হেল্প সেন্টার দেখুন", lang: "ভাষা",
+    related: "সম্পর্কিত", faqLink: "সব প্রশ্ন", lang: "ভাষা",
     more: "দুঃখিত। আরেকটু বিস্তারিত বলবেন?", nudge: "প্রশ্ন আছে? আমি সাহায্য করতে পারি।",
   },
 };

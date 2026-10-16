@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import Link from "next/link";
+import { AnimatedLink } from "@/components/ui/animated-link";
 import { useSignedIn } from "./useSignedIn";
 import { useWaitlist } from "./useWaitlist";
 import { useHiddenSections } from "./useHiddenSections";
@@ -100,15 +101,15 @@ export function MarketingFooter() {
                 <h2 className="ft-head mb-4 font-sans text-[12px] font-semibold uppercase tracking-[0.16em] text-foreground/55">{col.title}</h2>
                 <ul className="flex flex-col gap-1">
                   {col.links.filter((l) => !(l.href.startsWith("/#") && hidden.has(l.href.slice(2)))).map((l) => (
-                    <li key={l.href}>
-                      <Link href={l.href} className="footer-link inline-flex min-h-9 items-center text-[15px] font-medium text-foreground/80 hover:text-foreground">
+                    <li key={l.href} data-sec={l.href.startsWith("/#") ? l.href.slice(2) : undefined}>
+                      <AnimatedLink href={l.href} className="footer-link min-h-9 text-[15px] font-medium text-foreground/80 hover:text-foreground">
                         {l.label}
-                      </Link>
+                      </AnimatedLink>
                     </li>
                   ))}
                   {col.title === "Company" && (
                     <li>
-                      <CookieSettingsButton className="footer-link inline-flex min-h-9 items-center text-[15px] font-medium text-foreground/80 hover:text-foreground" />
+                      <CookieSettingsButton animated className="footer-link group/al inline-flex min-h-9 items-center text-[15px] font-medium text-foreground/80 hover:text-foreground" />
                     </li>
                   )}
                 </ul>

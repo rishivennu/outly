@@ -14,15 +14,11 @@ import { useUser } from "@/components/shell/UserContext";
 type Stop = { target?: string; title: string; body: string };
 
 const STOPS: Stop[] = [
-  { title: "Welcome to Outlly", body: "A quick look around: about a minute. Use the arrow keys or the buttons, and press Esc to leave any time." },
-  { target: "new-post", title: "Start with one video", body: "Drop a video here. Outlly drafts a caption, a title and a post for each platform, and you edit anything before it goes out." },
-  { target: "content", title: "Everything you've made", body: "Every video and post in one place, with where each one went and how it's doing." },
-  { target: "calendar", title: "Plan the week", body: "Schedule posts and see what's going out when. Drag to move a post to another day." },
-  { target: "analytics", title: "Live numbers, per platform", body: "Each connected account gets its own dashboard: followers, views, reach, your best posts, and suggestions worked out from those numbers." },
-  { target: "inbox", title: "Every comment, one list", body: "Comments from all your accounts land here, and you can reply without opening each app." },
-  { target: "approvals", title: "Get a yes before it posts", body: "Send a review link to a teammate or client. They approve or ask for changes; nothing goes out until it's cleared." },
-  { target: "accounts", title: "Connect your accounts", body: "Instagram and YouTube connect here. You sign in on their own pages, so Outlly never sees your password." },
-  { title: "You're set", body: "Connect an account to see your live numbers, or start your first post. You can replay this tour from Settings or the Home checklist." },
+  // Four stops, about twenty seconds (was nine). The rest of the studio explains itself where you find it.
+  { target: "new-post", title: "Start with one video", body: "Drop a video here. Outlly drafts a caption and a post for each platform, and you edit anything before it goes out. Arrow keys move, Esc leaves." },
+  { target: "calendar", title: "Plan the week", body: "See what's going out when, and drag a post to another day." },
+  { target: "analytics", title: "Live numbers, per platform", body: "Each connected account gets its own dashboard: views, reach and your best posts." },
+  { target: "accounts", title: "Connect your accounts", body: "You sign in on Instagram's and Google's own pages, so Outlly never sees your password. Replay this tour any time from Settings." },
 ];
 
 const EVENT = "outly:tour";

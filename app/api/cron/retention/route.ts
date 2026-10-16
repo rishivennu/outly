@@ -3,6 +3,7 @@ import { env } from "@/lib/env";
 import { getConfig } from "@/lib/settings";
 import { sweepAccountHealth } from "@/lib/retention/notices";
 import { sendGoalNudges } from "@/lib/retention/sweep";
+import { pruneOldData } from "@/lib/retention/prune";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -16,5 +17,6 @@ export async function GET(req: NextRequest) {
   if (req.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if ((await getConfig("site")).maintenance) return NextResponse.json({ skipped: "maintenance" });
   const [accounts, nudges] = [await sweepAccountHealth(), await sendGoalNudges()];
-  return NextResponse.json({ accounts, nudges });
+  const pruned = await pruneOldData();
+  return NextResponse.json({ accounts, nudges, pruned });
 }

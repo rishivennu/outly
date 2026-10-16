@@ -16,7 +16,8 @@ const buttonVariants = cva(
         subtle: "bg-secondary text-secondary-foreground hover:bg-secondary/70 hairline",
         ghost: "text-muted-foreground hover:bg-secondary hover:text-foreground",
         outline: "hairline text-foreground hover:bg-secondary",
-        danger: "bg-destructive/15 text-destructive hover:bg-destructive/25",
+        // Light mode ink is a shade deeper than --destructive: on its own 15% tint the base red is 4.27:1.
+        danger: "bg-destructive/15 text-[hsl(0_72%_38%)] hover:bg-destructive/25 dark:text-destructive",
       },
       size: {
         sm: "h-9 px-3.5 text-[13px]",

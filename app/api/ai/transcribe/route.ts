@@ -1,6 +1,8 @@
 import { json, route, HttpError } from "@/lib/http";
 import { transcribeWav } from "@/lib/ai/transcribe";
 import { assertAiCaptions } from "@/lib/billing/entitlements";
+import { chargeAi } from "@/lib/ai-quota";
+import { realUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -11,6 +13,7 @@ const MAX = 4 * 1024 * 1024; // one ~60 s chunk of 16 kHz mono WAV is ~1.9 MB; s
 export const POST = route(
   async (req, { user }) => {
     await assertAiCaptions(user.id);
+    await chargeAi(realUserId(user));
     const type = req.headers.get("content-type") ?? "";
     if (!type.startsWith("audio/wav")) throw new HttpError(415, "Send the audio as WAV.", "BAD_TYPE");
     const len = Number(req.headers.get("content-length") ?? 0);

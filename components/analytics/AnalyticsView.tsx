@@ -57,19 +57,44 @@ export function AnalyticsView({ initial, connected }: { initial: AnalyticsSummar
     }
   };
 
+  const anyConnected = Object.values(connected).some(Boolean);
+  // Brand-new studio: nothing connected and nothing published. A review and live counter would only
+  // shimmer at zero, so show the one thing that unlocks this page instead.
+  if (!data.hasData && !anyConnected) {
+    return (
+      <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-14">
+        <div className="flex min-h-[60dvh] flex-col items-center justify-center px-6 text-center">
+          <Icon3D name="analytics" size={104} className="animate-bob mb-7" />
+          <h1 className="display text-[clamp(2.2rem,5vw,3.2rem)]">Connect a place to see your numbers.</h1>
+          <p className="mt-3 max-w-md text-muted-foreground">
+            Link an account like Instagram or YouTube and its views show up here live. Once you publish through Outlly, this page compares how each post did everywhere it went.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Button asChild variant="lime" size="lg">
+              <Link href="/accounts">Connect an account</Link>
+            </Button>
+            <Button asChild variant="outline" size="lg">
+              <Link href="/create">
+                <Plus className="h-5 w-5" aria-hidden="true" /> Make your first one
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!data.hasData) {
     return (
       <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-14">
         <PlatformTabs connected={connected} />
         <LiveStrip connected={connected} />
-        <ProfileReview />
+      <ProfileReview />
         <div className="flex min-h-[46dvh] flex-col items-center justify-center px-6 text-center">
           <Icon3D name="analytics" size={104} className="animate-bob mb-7" />
           <h1 className="display text-[clamp(2.2rem,5vw,3.2rem)]">Nothing published through Outlly yet.</h1>
           <p className="mt-3 max-w-md text-muted-foreground">
-            {Object.values(connected).some(Boolean)
-              ? "Your accounts' own numbers are live above. Once you publish from here, this page compares how each post did everywhere it went."
-              : "Connect an account to see its live numbers above. Once you publish from here, this page compares how each post did everywhere it went."}
+            Your accounts&apos; own numbers are live above. Once you publish from here, this page compares how each post did everywhere it went.
           </p>
           <Button asChild variant="lime" size="lg" className="mt-8">
             <Link href="/create">
@@ -89,7 +114,7 @@ export function AnalyticsView({ initial, connected }: { initial: AnalyticsSummar
     <div className={cn("px-5 pb-16 pt-8 transition-opacity sm:px-10 lg:pt-14", loading && "opacity-60")} aria-busy={loading}>
       <PlatformTabs connected={connected} />
       <LiveStrip connected={connected} />
-        <ProfileReview />
+      <ProfileReview />
       <div className="mt-10 flex flex-wrap items-center justify-between gap-4">
         <p className="eyebrow">Published through Outlly</p>
         <div role="radiogroup" aria-label="Time range" className="flex gap-1 rounded-full bg-secondary/60 p-1 hairline">

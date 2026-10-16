@@ -1,5 +1,6 @@
 "use client";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,18 @@ export function DateTimePicker({ value, onChange, tz, peakHours = [] }: Props) {
     const [y, mo, d] = key.split("-").map(Number);
     return fromTzParts(y, mo, d, h, m, tz).getTime() < Date.now() + 60_000;
   };
+
+  // Studio time is what the scheduler uses. If this device is somewhere else, say so once, quietly,
+  // so 7 PM never means the wrong 7 PM.
+  const [here, setHere] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      setHere(Intl.DateTimeFormat().resolvedOptions().timeZone || null);
+    } catch {
+      /* keep quiet */
+    }
+  }, []);
+  const elsewhere = here !== null && here !== tz;
 
   const headline = new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "long", day: "numeric" }).format(value);
 
@@ -137,6 +150,12 @@ export function DateTimePicker({ value, onChange, tz, peakHours = [] }: Props) {
           Exact time
           <input type="time" value={`${String(v.h).padStart(2, "0")}:${String(v.min).padStart(2, "0")}`} onChange={(e) => { const [h, m] = e.target.value.split(":").map(Number); if (!isNaN(h)) set(vKey, h, m); }} className="h-10 rounded-xl bg-secondary px-3 text-foreground hairline" />
         </label>
+        {elsewhere && (
+          <p className="mt-2 text-[12px] text-muted-foreground">
+            Times are in your studio time zone ({tz.replace(/_/g, " ")}), not this device&apos;s ({here!.replace(/_/g, " ")}).{" "}
+            <Link href="/settings" className="font-medium text-foreground underline underline-offset-2">Change it</Link>
+          </p>
+        )}
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useUser } from "@/components/shell/UserContext";
 import { useToast } from "@/components/shared/Toast";
 import { startTour, tourKey } from "./Tour";
+import { readConsent } from "@/components/shared/CookieConsent";
 import { cn } from "@/lib/utils";
 
 export type SetupState = {
@@ -47,12 +48,18 @@ export function SetupChecklist({ state }: { state: SetupState }) {
     }
 
     // First visit ever on this device: open the tour once. Closing it counts as done.
+    // One thing at a time: the cookie question comes first, the tour after it is answered.
     let t: ReturnType<typeof setTimeout> | undefined;
-    if ((welcome || !localStorage.getItem(key)) && q.get("tour") !== "1") t = setTimeout(startTour, 600);
+    const begin = () => { t = setTimeout(startTour, 600); };
+    const wantsTour = (welcome || !localStorage.getItem(key)) && q.get("tour") !== "1";
+    const consented = !!readConsent();
+    if (wantsTour && consented) begin();
+    else if (wantsTour) window.addEventListener("outly:consent", begin, { once: true });
     const onClosed = () => setToured(!!localStorage.getItem(key));
     window.addEventListener("outly:tour-closed", onClosed);
     return () => {
       if (t) clearTimeout(t);
+      window.removeEventListener("outly:consent", begin);
       window.removeEventListener("outly:tour-closed", onClosed);
     };
   }, [user.id, toast]);

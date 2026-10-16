@@ -35,8 +35,10 @@ const FOCUSABLE = 'a[href],button:not([disabled]),textarea:not([disabled]),input
 export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}) {
   const path = usePathname() ?? "/";
   const inStudio = STUDIO.some((r) => path === r || path.startsWith(r + "/"));
-  // Inside the dashboard, answers open the dashboard help page so you never leave the studio.
-  const helpBase = inStudio ? "/support" : "/help";
+  // Every help question is answered inside Pip (10-16): no chip or link sends you off to the help page.
+  const [browse, setBrowse] = useState(false);
+  const [faqList, setFaqList] = useState<{ category: string; items: { id: string; question: string }[] }[] | null>(null);
+  const browseRef = useRef<HTMLElement>(null);
   const [open, setOpen] = useState(false);
   const [big, setBig] = useState(false);
   const [lang, setLang] = useState<Lang>("en");
@@ -55,6 +57,30 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const [copied, setCopied] = useState<number | null>(null);
   const [atBottom, setAtBottom] = useState(true);
   const [sleepy, setSleepy] = useState(false);
+  // First run is one thing at a time: cookie choice, then the tour, then Pip.
+  const [waitTurn, setWaitTurn] = useState(false);
+  useEffect(() => {
+    let consent = false;
+    try {
+      consent = !!JSON.parse(localStorage.getItem("outly-consent") ?? "null");
+    } catch {}
+    setWaitTurn(!consent);
+    // A first-time tour starts shortly after the cookie choice: give it a beat so Pip doesn't pop in and out.
+    let inTour = false;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const touring = () => { inTour = true; setWaitTurn(true); };
+    const free = () => { inTour = false; setWaitTurn(false); };
+    const afterConsent = () => { t = setTimeout(() => { if (!inTour) setWaitTurn(false); }, 1500); };
+    window.addEventListener("outly:tour", touring);
+    window.addEventListener("outly:tour-closed", free);
+    window.addEventListener("outly:consent", afterConsent);
+    return () => {
+      if (t) clearTimeout(t);
+      window.removeEventListener("outly:tour", touring);
+      window.removeEventListener("outly:tour-closed", free);
+      window.removeEventListener("outly:consent", afterConsent);
+    };
+  }, []);
   const [announce, setAnnounce] = useState("");
   const sheetRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -121,7 +147,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     if (!me) fetch("/api/support/me").then((r) => r.json()).then((u) => { if (u) { setMe(u); setEmail((e) => e || u.email); } }).catch(() => {});
   }, [lang, me]);
 
-  const send = useCallback(async (text: string) => {
+  const send = useCallback(async (text: string, faqId?: string) => {
     const q = text.trim().slice(0, MAX);
     if (!q || busy) return;
     setInput("");
@@ -131,11 +157,12 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     if (!navigator.onLine) return push({ role: "bot", text: T[lang].offline, kind: "error" });
     setBusy(true);
     try {
-      const r = await fetch("/api/support/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, history, lang }) });
+      const r = await fetch("/api/support/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, history, lang, page: path.slice(0, 120), ...(faqId ? { faqId } : {}) }) });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error);
       // Small talk ("hi", "thanks") gets a friendly reply: no "Did that help?" and it never counts as a miss.
-      push({ role: "bot", text: j.answer, sources: j.sources?.slice(0, 3), ask: j.confident && !j.smalltalk });
+      // sources[0] is the question just answered, so a confident reply shows only the others as Related.
+      push({ role: "bot", text: j.answer, sources: (j.confident ? j.sources?.slice(1, 4) : j.sources?.slice(0, 3))?.filter((x: { id: string }) => x.id), ask: j.confident && !j.smalltalk });
       if (j.smalltalk) return;
       if (j.wantsHuman) escalate();
       else if (!j.confident) {
@@ -148,7 +175,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     } finally {
       setBusy(false);
     }
-  }, [busy, msgs, lang, fails, escalate]);
+  }, [busy, msgs, lang, fails, escalate, path]);
 
   // open from anywhere: window.dispatchEvent(new CustomEvent("outly:chat-open", { detail: "optional question" }))
   useEffect(() => {
@@ -204,6 +231,15 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
   }, [input, open]);
+
+  // The full help centre, listed inside the chat. Fetched once, then cached for the session.
+  function openBrowse() {
+    if (browse) return setBrowse(false);
+    setBrowse(true);
+    setTimeout(() => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" }); browseRef.current?.focus({ preventScroll: true }); }, 60);
+    if (faqList) return;
+    fetch("/api/support/faq").then((r) => (r.ok ? r.json() : { groups: [] })).then((j) => setFaqList(j.groups ?? [])).catch(() => setFaqList([]));
+  }
 
   function feedback(m: Msg, good: boolean) {
     setMsgs((x) => x.map((y) => (y.id === m.id ? { ...y, ask: false } : y)));
@@ -279,8 +315,10 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const left = MAX - input.length;
   const returnTo = encodeURIComponent(path);
 
+  // Create has its own writing assistant on the right, so a second bubble there only competes with it.
+  // Pip still opens on request (help links fire outly:chat-open) and goes away again when closed.
   return (
-    <div className={cn("pc fixed right-4 z-[55] sm:right-6", path.startsWith("/create") && "max-lg:hidden", lift ? "bottom-[96px] lg:bottom-6" : "bottom-[max(16px,env(safe-area-inset-bottom))] sm:bottom-6")}>
+    <div className={cn("pc fixed right-4 z-[55] sm:right-6", (path.startsWith("/create") || waitTurn) && !open && "hidden", lift ? "bottom-[96px] lg:bottom-6" : "bottom-[max(16px,env(safe-area-inset-bottom))] sm:bottom-6")}>
       {open && <div className="pc-scrim fixed inset-0" aria-hidden onClick={close} />}
       {open && (
         <section
@@ -374,7 +412,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                         {!!m.sources?.length && !m.ask && (
                           <>
                             <span className="pc-muted px-1 text-[12px]">{t.related}:</span>
-                            {m.sources.map((s) => <Link key={s.id} href={`${helpBase}?q=${encodeURIComponent(s.question)}`} className="pc-chip pc-chip-sm">{s.question}</Link>)}
+                            {m.sources.map((s) => <button key={s.id} type="button" disabled={busy} onClick={() => send(s.question, s.id)} className="pc-chip pc-chip-sm text-start">{s.question}</button>)}
                           </>
                         )}
                       </div>
@@ -389,6 +427,29 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                   </div>
                 ))}
               </div>
+
+              {browse && (
+                <section ref={browseRef} aria-labelledby="pc-all" tabIndex={-1} className="pc-card pc-in mt-3 p-3 outline-none">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 id="pc-all" className="pc-eyebrow">{t.faqLink}</h3>
+                    <button type="button" onClick={() => setBrowse(false)} aria-label={`${cx.dismiss}: ${t.faqLink}`} className="pc-icon pc-icon-sm -me-1"><X className="h-4 w-4" aria-hidden /></button>
+                  </div>
+                  {!faqList ? (
+                    <p className="pc-muted mt-2 inline-flex items-center gap-2 text-[13.5px]"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />{t.thinking}</p>
+                  ) : (
+                    faqList.map((g) => (
+                      <div key={g.category} className="mt-3">
+                        <h4 className="pc-muted mb-1.5 text-[12.5px] font-semibold">{g.category}</h4>
+                        <ul className="flex flex-col gap-1.5">
+                          {g.items.map((q) => (
+                            <li key={q.id}><button type="button" disabled={busy} onClick={() => { setBrowse(false); send(q.question, q.id); }} className="pc-chip w-full text-start">{q.question}</button></li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))
+                  )}
+                </section>
+              )}
 
               <div role="status" aria-live="polite" className="mt-3">
                 {busy && (
@@ -441,7 +502,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
               {left <= 100 ? <span aria-live="polite" className={cn(left <= 20 && "pc-error font-medium")}>{cx.charsLeft(left)}</span> : cx.hint}
             </p>
             <div className="mt-0.5 flex items-center justify-between gap-2 ps-1">
-              <Link href={helpBase} onClick={close} className="pc-link inline-flex min-h-11 items-center text-[12.5px]">{t.faqLink}</Link>
+              <button type="button" onClick={openBrowse} aria-expanded={browse} className="pc-link inline-flex min-h-11 items-center text-[12.5px]">{t.faqLink}</button>
               <label className="relative shrink-0">
                 <span className="sr-only">{t.lang}</span>
                 <select value={lang} onChange={(e) => { const l = e.target.value as Lang; setLang(l); writeLang(l); }} title={t.lang} className="pc-select h-11 max-w-[9.5rem] cursor-pointer appearance-none truncate rounded-full py-0 pe-8 ps-4 text-[12.5px] font-medium">

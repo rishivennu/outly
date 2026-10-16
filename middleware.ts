@@ -8,6 +8,12 @@ const OPEN = ["/", "/privacy", "/terms", "/contact", "/help", "/waitlist", "/mai
 // A review link is its own credential: the reviewer has no account here.
 // A share link (/r/code) and a team invite must work before the visitor has an account.
 const OPEN_PREFIX = ["/review/", "/r/", "/team/accept"];
+// Pages that need a session. Anything not listed here and not public is either a real public file
+// (og image, icons) or a typo, and a typo deserves the 404 page, not a sign-in wall.
+const STUDIO = ["/home", "/create", "/content", "/calendar", "/analytics", "/inbox", "/approvals", "/accounts", "/billing", "/settings", "/support", "/mascot", "/share-target"];
+const needsSession = (p: string) => STUDIO.some((s) => p === s || p.startsWith(s + "/"));
+// Old or guessed marketing URLs that point at a section of the home page.
+const SECTION_ALIASES: Record<string, string> = { "/pricing": "/#pricing", "/faq": "/#faq", "/features": "/#features" };
 
 const HINT = "outlly_in";
 // Readable "waitlist is on" hint, so cached marketing pages can relabel their signup buttons.
@@ -101,6 +107,8 @@ export async function middleware(req: NextRequest) {
 
 async function route(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const alias = SECTION_ALIASES[pathname];
+  if (alias) return NextResponse.redirect(new URL(alias, req.url), 308);
   const adminArea = pathname === "/admin" || pathname.startsWith("/admin/");
   const flags = adminArea ? null : await siteFlags(req);
   const token = req.cookies.get("studio_session")?.value;
@@ -146,7 +154,7 @@ async function route(req: NextRequest) {
     const through = sp.has("invite") || (sp.get("next") ?? "").startsWith("/team/accept") || (await isAdmin(req));
     if (!through) return hint(req, NextResponse.redirect(new URL("/waitlist", req.url)), authed);
   }
-  if (!authed && !AUTH_PAGES.includes(pathname)) {
+  if (!authed && !AUTH_PAGES.includes(pathname) && needsSession(pathname)) {
     const u = new URL("/login", req.url);
     u.searchParams.set("next", pathname + req.nextUrl.search);
     return hint(req, NextResponse.redirect(u), authed);

@@ -695,8 +695,7 @@ html:not(.dark) .footer-card .ft-top:hover { background: hsl(82 85% 20%); color:
 html:not(.dark) .footer-word { --fw-s0: hsl(82 85% 16%); --fw-s1: hsl(82 85% 26%);
   --fw-mask: linear-gradient(180deg, rgba(0,0,0,.95) 0%, rgba(0,0,0,.85) 55%, rgba(0,0,0,.32) 100%); filter: drop-shadow(0 10px 30px hsl(78 100% 45% / .25)); }
 
-.footer-link::after { content: ""; position: absolute; left: 0; right: 0; bottom: .45rem; height: 1px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform .3s cubic-bezier(.22, 1, .36, 1); }
-.footer-link:hover::after, .footer-link:focus-visible::after { transform: scaleX(1); }
+/* Footer link underline now comes from components/ui/animated-link.tsx (Skiper 40). */
 
 /* ---------- Demo v4: postage stamps (risograph ink on cream paper) ---------- */
 .stamp-item { --paper: #f6f0e1; transform: rotate(var(--tilt, 0deg)); transition: transform .9s var(--ease-liquid); }
@@ -1471,8 +1470,11 @@ body[data-scroll-locked] .pb-rail { display: none; }
 /* Hero: the gradient moves from the line onto each word, so the words can move on their own. */
 .hf-line.is-split { background: none; color: inherit; padding-bottom: 0; }
 .hf-line.is-split > .sw:not(.hf-accent) { background: linear-gradient(180deg, hsl(var(--foreground)) 30%, hsl(var(--foreground) / .62) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; padding-bottom: .06em; }
-.hf-h1 .sw { --wd: calc(.15s + var(--wi, 0) * 88ms); animation: sw-unfold .875s var(--ease-elastic) var(--wd) both, sw-fade .22s linear var(--wd) both; }
-.hf-h1 .sw.accent-serif { animation: sw-fade .2s linear var(--wd) both, sw-write .8s cubic-bezier(.6, .05, .3, 1) var(--wd) both, sw-hop .9s var(--ease-elastic) var(--wd) both; }
+/* Hero words: start almost at once and never from opacity 0. The browser does not count an invisible
+   word as painted, so a full fade-in pushed Largest Contentful Paint back by the whole stagger. */
+@keyframes sw-fade-lcp { from { opacity: .01; } to { opacity: 1; } }
+.hf-h1 .sw { --wd: calc(.04s + var(--wi, 0) * 60ms); animation: sw-unfold .8s var(--ease-elastic) var(--wd) both, sw-fade-lcp .2s linear var(--wd) both; }
+.hf-h1 .sw.accent-serif { animation: sw-fade-lcp .2s linear var(--wd) both, sw-write .7s cubic-bezier(.6, .05, .3, 1) var(--wd) both, sw-hop .8s var(--ease-elastic) var(--wd) both; }
 /* The rest of the hero drops in from just above, after the headline. */
 @keyframes hf-drop { from { opacity: 0; translate: 0 -.75em; } to { opacity: 1; translate: 0 0; } }
 .hf-in { animation: hf-drop .5s var(--ease-out) var(--d, .05s) both; }
@@ -1760,3 +1762,27 @@ html:not(.dark) .pa-ribbon { opacity: .55; }
 @media (prefers-reduced-motion: reduce) { .pa-ribbon, .pa-pip, .pa-swap, .pa-dots i { animation: none; } }
 @media (prefers-reduced-transparency: reduce) { .pa-pill { background: hsl(var(--card)); backdrop-filter: none; -webkit-backdrop-filter: none; } }
 
+/* Hidden landing sections (see the data-lh script in app/layout.tsx). */
+html[data-lh~="how"] [data-sec="how"],
+html[data-lh~="features"] [data-sec="features"],
+html[data-lh~="demo"] [data-sec="demo"],
+html[data-lh~="why"] [data-sec="why"],
+html[data-lh~="platforms"] [data-sec="platforms"],
+html[data-lh~="compare"] [data-sec="compare"],
+html[data-lh~="pricing"] [data-sec="pricing"],
+html[data-lh~="faq"] [data-sec="faq"] { display: none !important; }
+
+/* Logo ticker under the hero (components/marketing/LogoTicker.tsx). One grey for marks and names, faded edges. */
+.lt-viewport { overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+.lt-track { display: flex; width: max-content; animation: lt-move 38s linear infinite; }
+.lt-viewport:hover .lt-track { animation-play-state: paused; }
+.lt-half { display: flex; flex-shrink: 0; align-items: center; gap: 3.25rem; padding-right: 3.25rem; }
+.lt-item { display: inline-flex; align-items: center; gap: .6rem; white-space: nowrap; color: hsl(var(--muted-foreground)); }
+.lt-soon { border-radius: 999px; padding: .1rem .5rem; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; box-shadow: inset 0 0 0 1px hsl(var(--muted-foreground) / .35); }
+@keyframes lt-move { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .lt-viewport { -webkit-mask-image: none; mask-image: none; }
+  .lt-track { animation: none; width: auto; justify-content: center; }
+  .lt-half { flex: 1 1 100%; flex-wrap: wrap; justify-content: center; gap: 1rem 2rem; padding: 0; }
+  .lt-half:nth-child(2), .lt-half > :nth-child(n + 8) { display: none; }
+}

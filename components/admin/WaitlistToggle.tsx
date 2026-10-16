@@ -121,7 +121,7 @@ export function WaitlistToggle({ initial }: { initial: WaitlistState }) {
             {st.recent.map((r) => (
               <tr key={r.id}>
                 <td className="max-w-[260px] truncate font-medium">{r.email}</td>
-                <td className="text-muted-foreground">{r.name || "—"}</td>
+                <td className="text-muted-foreground">{r.name || "-"}</td>
                 <td className="whitespace-nowrap text-muted-foreground">{ago(r.createdAt)}</td>
                 <td>{r.invitedAt ? <Pill tone="ok">Invited {ago(r.invitedAt)}</Pill> : <Pill tone="muted">Waiting</Pill>}</td>
                 <td className="text-right">

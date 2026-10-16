@@ -8,7 +8,7 @@ export function targetErrorCopy(platform: Platform, code: string | null | undefi
   const name = PLATFORM_META[platform].name;
   switch (code) {
     case "FORBIDDEN":
-      return { title: `${name} wouldn't allow this one — the account doesn't have permission for it yet.`, action: "Let's try again", kind: "retry" as const };
+      return { title: `${name} wouldn't allow this one: the account doesn't have permission for it yet.`, action: "Let's try again", kind: "retry" as const };
     case "NEEDS_APPROVAL":
       return { title: "Waiting on a teammate's approval before this goes out.", action: "Open the review", kind: "retry" as const };
     case "DUPLICATE":

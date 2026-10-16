@@ -17,8 +17,9 @@ import "./globals.css";
  * swap + size-adjusted fallbacks, so there is no layout shift and no third-party request.
  */
 const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-display", display: "swap", axes: ["opsz", "wdth"] });
-const body = DM_Sans({ subsets: ["latin"], variable: "--font-body", display: "swap", axes: ["opsz"] });
-const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-serif", display: "swap" });
+// No opsz axis (10-16): it tripled the file (132 KB) for a change you can't see at 15-17px.
+const body = DM_Sans({ subsets: ["latin"], variable: "--font-body", display: "swap" });
+const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["italic"], variable: "--font-serif", display: "swap" });
 
 import { Watermark } from "@/components/shared/Watermark";
 
@@ -40,6 +41,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${display.variable} ${body.variable} ${serif.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* Landing sections the admin hid (readable hint cookie set by middleware): mark <html> before the
+            first paint so CSS drops their nav and footer links at once, instead of a link flashing in and out. */}
+        <script dangerouslySetInnerHTML={{ __html: `try{var m=document.cookie.match(/(?:^|; )outlly_lh=([^;]*)/);if(m)document.documentElement.setAttribute("data-lh",decodeURIComponent(m[1]).split(".").join(" "))}catch(e){}` }} />
         {/* Pip colourways picked in Admin > Mascot colours (tiny, cached; Pip falls back to Indigo without it) */}
         {/* eslint-disable-next-line @next/next/no-css-tags */}
         <link rel="stylesheet" href="/api/pip-theme" />

@@ -1,5 +1,5 @@
 import { createSession } from "@/lib/auth";
-import { signUp } from "@/lib/auth-provider";
+import { signUp, validTimezone } from "@/lib/auth-provider";
 import { json, route } from "@/lib/http";
 import { signupSchema } from "@/lib/validation";
 import { attachReferral } from "@/lib/referral";
@@ -8,11 +8,14 @@ import { assertMayCreateAccount } from "@/lib/site";
 
 export const POST = route(
   async (req) => {
-    const body = signupSchema.parse(await req.json());
+    const raw = (await req.json()) as Record<string, unknown>;
+    const body = signupSchema.parse(raw);
+    // Optional: the browser's own time zone, so schedules and weekly reports are right from the first post.
+    const timezone = validTimezone(typeof raw.timezone === "string" ? raw.timezone : null);
     // Waitlist on: only invitees (and pending teammates) may create an account. Checked here, not just
     // by the /signup redirect, so a direct API call can't skip the line.
     await assertMayCreateAccount(body.email);
-    const user = await signUp(body.name, body.email, body.password);
+    const user = await signUp(body.name, body.email, body.password, timezone);
     await attachReferral(user.id).catch((e) => console.error("[referral] attach", e));
     await attachSource(user.id).catch((e) => console.error("[growth] source", e));
     await createSession(user.id);

@@ -145,8 +145,11 @@ export async function launchPost(userId: string, postId: string, mode: "now" | "
 
   if (mode === "schedule") {
     if (!scheduledAt || scheduledAt.getTime() < Date.now() + 60_000) throw new HttpError(400, "Pick a time at least a minute from now.");
+    // Atomic claim (same pattern as scheduledPost()): whoever flips the status wins, so two
+    // simultaneous requests can never both schedule — and never both enqueue — the same post.
+    if (!(await claim(post.id, ["draft", "failed", "partial", "scheduled"], { status: "scheduled", scheduledAt })))
+      throw new HttpError(409, "This one is already on its way.");
     await db.$transaction([
-      db.post.update({ where: { id: post.id }, data: { status: "scheduled", scheduledAt } }),
       ...post.targets.map((t) =>
         db.postTarget.update({ where: { id: t.id }, data: { platformStatus: "pending", socialAccountId: accounts.get(t.platform as Platform)!.id, errorCode: null, errorMessage: null, attempts: 0 } }),
       ),
@@ -155,14 +158,31 @@ export async function launchPost(userId: string, postId: string, mode: "now" | "
     return;
   }
 
-  // Send now: create records first, return immediately, workers do the rest.
-  await db.$transaction([
-    db.post.update({ where: { id: post.id }, data: { status: "publishing", scheduledAt: null } }),
-    ...post.targets.map((t) =>
+  // Send now: claim first, create records, return immediately, workers do the rest.
+  // The claim is what stops a double-click (or a retried fetch) from publishing twice: the status check
+  // above is a read, and two requests can both pass it before either write lands.
+  const stamp = await claim(post.id, ["draft", "failed", "partial", "scheduled"], { status: "publishing", scheduledAt: null });
+  if (!stamp) throw new HttpError(409, "This one is already on its way.");
+  await db.$transaction(
+    post.targets.map((t) =>
       db.postTarget.update({ where: { id: t.id }, data: { platformStatus: "queued", socialAccountId: accounts.get(t.platform as Platform)!.id, errorCode: null, errorMessage: null, attempts: 0, uploadRef: null, publishRequestedAt: null } }),
     ),
-  ]);
-  for (const t of post.targets) await enqueue("SOCIAL_UPLOAD", { targetId: t.id, platform: t.platform as Platform, simulate });
+  );
+  // jobId comes from the claim, not the clock: a duplicate request never gets this far, and a later
+  // relaunch of the same post gets a fresh claim (so a new id) instead of being swallowed as a dupe.
+  for (const t of post.targets)
+    await enqueue("SOCIAL_UPLOAD", { targetId: t.id, platform: t.platform as Platform, simulate }, { jobId: `up-${t.id}-${stamp}` });
+}
+
+/**
+ * Flip a post's status only if it is still in one of `from`, and return a token identifying this claim
+ * (the row's new updatedAt). Null means somebody else got there first.
+ */
+async function claim(postId: string, from: string[], data: { status: string; scheduledAt?: Date | null }) {
+  const claimed = await db.post.updateMany({ where: { id: postId, status: { in: from } }, data });
+  if (claimed.count !== 1) return null;
+  const row = await db.post.findUnique({ where: { id: postId }, select: { updatedAt: true } });
+  return String(row?.updatedAt.getTime() ?? Date.now());
 }
 
 export async function retryTarget(userId: string, targetId: string) {

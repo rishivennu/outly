@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { AnimatedLink } from "@/components/ui/animated-link";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { PageHead, Prose, Shell } from "@/components/marketing/bits";
 import { SOCIALS } from "@/lib/marketing/content";
@@ -48,12 +48,9 @@ export default function ContactPage() {
                 <Icon3D name={r.icon} size={80} className="h-14 w-14" />
                 <h2 className="mt-6 text-[17px] font-semibold tracking-tight">{r.title}</h2>
                 <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">{r.body}</p>
-                <Link
-                  href={r.cta.href}
-                  className="mt-auto pt-6 text-sm font-semibold underline decoration-border underline-offset-4 hover:decoration-foreground"
-                >
+                <AnimatedLink variant="arrow" href={r.cta.href} className="mt-auto min-h-11 self-start pt-6 text-sm font-semibold">
                   {r.cta.label}
-                </Link>
+                </AnimatedLink>
               </article>
             </li>
           ))}
@@ -63,7 +60,7 @@ export default function ContactPage() {
           <Prose>
             <h2>Social accounts</h2>
             <p>
-              Our public accounts go live with the public launch. The links below are placeholders until then — they are listed so you know
+              Our public accounts go live with the public launch. The links below are placeholders until then. They are listed so you know
               where to look, not because they work yet.
             </p>
           </Prose>

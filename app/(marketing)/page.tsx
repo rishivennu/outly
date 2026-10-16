@@ -4,6 +4,7 @@ import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { Features } from "@/components/marketing/Features";
 import { Difference } from "@/components/marketing/Difference";
 import { Platforms } from "@/components/marketing/Platforms";
+import { LogoTicker } from "@/components/marketing/LogoTicker";
 import { Demo } from "@/components/marketing/Demo";
 import { Comparison } from "@/components/marketing/Comparison";
 import { Pricing } from "@/components/marketing/Pricing";
@@ -72,6 +73,7 @@ export default async function LandingPage() {
         </div>
       )}
       {on("hero") && <Hero showHow={on("how")} />}
+      {on("hero") && <LogoTicker />}
       {on("hero") && on("how") && (
         // Same box as the framed fan stage (HeroFan: w-full max-w-[1180px]) so the dotted line runs edge to edge with it.
         <div className="mx-auto w-full max-w-[1180px]">

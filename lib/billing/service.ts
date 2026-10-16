@@ -24,6 +24,21 @@ export async function activeGateway() {
   return { cfg, provider: ready ? cfg.provider : ("mock" as const), misconfigured: !ready };
 }
 
+let warnedMock = false;
+/**
+ * Is checkout being served by the simulated gateway? Shown by /api/health, and on a production deploy
+ * it is almost always a mistake, so say so loudly in the logs the first time anything asks.
+ */
+export async function paymentsMock() {
+  const { provider, misconfigured } = await activeGateway();
+  const mock = provider === "mock";
+  if (mock && env.NODE_ENV === "production" && !warnedMock) {
+    warnedMock = true;
+    console.warn("[payments] WARNING: the simulated payment gateway is live in production. No real money is being taken. Pick a provider and add its keys in the admin console.");
+  }
+  return { mock, misconfigured };
+}
+
 /**
  * The mock gateway hands out real subscriptions, invoices and referral rewards for a test card.
  * On a live site that is only allowed when the owner opts in on purpose (ALLOW_MOCK_PAYMENTS=true,

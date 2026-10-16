@@ -9,6 +9,11 @@ import { cn } from "@/lib/utils";
  * `tone` pins a colour when it sits on a surface that does not follow the theme
  * ("light" = sits on a light surface, "dark" = sits on a dark surface).
  */
+/**
+ * Rocket file for a drawn size (10-16 perf): up to 48px draws from a 96px WebP (~5 KB, sharp at 2x)
+ * instead of the 256px PNG (35-53 KB). Both theme copies are in the page, so this matters twice.
+ */
+const rocket = (name: string, size: number) => (size <= 48 ? `/brand/rocket/${name}-96.webp` : `/brand/rocket/${name}-256.png`);
 const px = (size: number) => (size <= 32 ? 64 : size <= 64 ? 128 : size <= 128 ? 256 : 512);
 
 export function OutlyMark({
@@ -22,12 +27,12 @@ export function OutlyMark({
   variant?: "icon" | "tile" | "glyph" | "ink" | "white";
   tone?: "auto" | "light" | "dark";
 }) {
-  const common = { width: size, height: size, alt: "", "aria-hidden": true as const, decoding: "async" as const, draggable: false };
+  const common = { width: size, height: size, alt: "", "aria-hidden": true as const, decoding: "async" as const, draggable: false, loading: "lazy" as const }; // lazy: the CSS-hidden theme copy is never fetched
   if (variant === "icon") {
     // Same lime gradient in both themes (user's call, 10-12g). Light mode gets the deepened copy:
     // bright lime is 1.2-1.5:1 on cream (invisible); this one is >= 3.3:1 and keeps the gradient.
-    const onLight = "/brand/rocket/rocket-lime-ink-256.png";
-    const onDark = "/brand/rocket/rocket-256.png";
+    const onLight = rocket("rocket-lime-ink", size);
+    const onDark = rocket("rocket", size);
     const base = "shrink-0 select-none object-contain";
     if (tone !== "auto")
       // eslint-disable-next-line @next/next/no-img-element
@@ -42,7 +47,7 @@ export function OutlyMark({
     );
   }
   if (variant !== "tile") {
-    const src = `/brand/rocket/${variant === "glyph" ? "rocket" : variant === "ink" ? "rocket-ink" : "rocket-white"}-256.png`;
+    const src = rocket(variant === "glyph" ? "rocket" : variant === "ink" ? "rocket-ink" : "rocket-white", size);
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={src} {...common} className={cn("shrink-0 select-none", className)} />;
   }

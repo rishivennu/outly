@@ -81,8 +81,8 @@ export function InboxView({ initial }: { initial: Data }) {
                 <p className="mt-0.5 text-muted-foreground">
                   {g.items.length === 1
                     ? `${PLATFORM_META[g.platform].name}${titles[0] ? ` · ${titles[0]}` : ""}`
-                    : `${g.items.length} ${PLATFORM_META[g.platform].name} posts`}{" "}
-                  — we didn&apos;t show anything rather than guess.
+                    : `${g.items.length} ${PLATFORM_META[g.platform].name} posts`}.{" "}
+                  We didn&apos;t show anything rather than guess.
                 </p>
                 {g.items[0].hint && <p className="mt-2 text-foreground/85">{g.items[0].hint}</p>}
                 {(g.items.length > 1 || details.length > 0) && (

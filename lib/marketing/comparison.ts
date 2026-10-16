@@ -42,7 +42,7 @@ export const COMPETITORS: Competitor[] = [
     lastVerified: "2026-10-10",
     sources: [
       { label: "metricool.com/pricing", url: "https://metricool.com/pricing/" },
-      { label: "metricool.com — YouTube", url: "https://metricool.com/analyze-youtube-with-metricool/" },
+      { label: "metricool.com: YouTube", url: "https://metricool.com/analyze-youtube-with-metricool/" },
     ],
   },
   {
@@ -102,7 +102,7 @@ export const ROWS: Row[] = [
     cells: {
       buffer: { value: "yes", note: "X / Twitter free and premium profiles both listed for automatic publishing." },
       metricool: { value: "partial", note: "X is a paid add-on; the free plan covers \"all networks except LinkedIn and Twitter\"." },
-      later: { value: "no", note: "Their pricing page lists Instagram, Facebook, TikTok, Threads, YouTube, Pinterest, LinkedIn and Snapchat — X is not among them." },
+      later: { value: "no", note: "Their pricing page lists Instagram, Facebook, TikTok, Threads, YouTube, Pinterest, LinkedIn and Snapchat. X is not among them." },
       hootsuite: { value: "yes", note: "X is listed among supported networks for posting and scheduling." },
     },
   },
@@ -224,7 +224,7 @@ export const ROWS: Row[] = [
 ];
 
 export const COMPARISON_DISCLAIMER =
-  "Compiled on 10 October 2026 from each company's own pricing and feature pages, linked below. \u201CUnverified\u201D means we could not confirm it publicly — not that it is missing. These products ship weekly; check the source before relying on a row.";
+  "Compiled on 10 October 2026 from each company's own pricing and feature pages, linked below. \u201CUnverified\u201D means we could not confirm it publicly, not that it is missing. These products ship weekly; check the source before relying on a row.";
 
 export const CELL_LABEL: Record<Cell, string> = {
   yes: "Yes",

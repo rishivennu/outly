@@ -28,6 +28,8 @@ Object.assign(process.env, {
   AUTH_PROVIDER: "local",
   STORAGE_DRIVER: "local",
   REDIS_URL: "",
+  // A real key in .env would make tests call Gemini over the network; tests that need AI set a fake key themselves.
+  GEMINI_API_KEY: process.env.PIP_LIVE ? process.env.GEMINI_API_KEY ?? "" : "",
   MOCK_SOCIAL_PUBLISHING: "false",
   INSTAGRAM_CLIENT_ID: "",
   INSTAGRAM_CLIENT_SECRET: "",

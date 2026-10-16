@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowUpRight, BarChart3, CreditCard, LifeBuoy, CalendarDays, ClipboardCheck, Globe, Home, LayoutGrid, MessagesSquare, Plus, Settings, Link2 } from "lucide-react";
+import { ArrowUpRight, BarChart3, CreditCard, LifeBuoy, CalendarDays, ClipboardCheck, Globe, Home, LayoutGrid, MessagesSquare, MoreHorizontal, Plus, Settings, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
@@ -33,7 +34,7 @@ export function Sidebar() {
   return (
     <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
       <aside data-lenis-prevent className="glass hairline flex h-full w-[240px] flex-col overflow-y-auto rounded-[28px] px-3 pb-4 pt-5" aria-label="Primary">
-        <Link href="/home" className="mb-6 flex items-center gap-2 rounded-2xl px-2 py-1 text-[18px] transition-opacity hover:opacity-80" aria-label="Outlly dashboard" title="Dashboard">
+        <Link href="/home" className="mb-6 flex min-h-11 items-center gap-2 rounded-2xl px-2 text-[18px] transition-opacity hover:opacity-80" aria-label="Outlly dashboard" title="Dashboard">
           <OutlyLogo size={30} />
         </Link>
 
@@ -103,57 +104,106 @@ export function Sidebar() {
   );
 }
 
+// Phone tab bar: four destinations and More (Apple's tab-bar guidance: five at most, labels always on).
+const TABS = ["/home", "/create", "/calendar", "/inbox"];
+
 export function MobileNav() {
   const path = usePathname();
+  const { workspace } = useUser();
+  const [more, setMore] = useState(false);
+  const panel = useRef<HTMLDivElement>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  const extra = [
+    { href: "/content", label: "Content", icon: LayoutGrid },
+    { href: "/analytics", label: "Analytics", icon: BarChart3 },
+    { href: "/approvals", label: "Approvals", icon: ClipboardCheck },
+    ...(workspace ? [] : [{ href: "/accounts", label: "Connected accounts", icon: Link2 }, { href: "/billing", label: "Billing", icon: CreditCard }]),
+    { href: "/support", label: "Help centre", icon: LifeBuoy },
+    { href: "/settings", label: "Settings", icon: Settings },
+    { href: "/", label: "Outlly website", icon: Globe },
+  ];
+  const moreActive = !more && extra.some((x) => x.href !== "/" && isActive(path, x.href));
+
+  useEffect(() => setMore(false), [path]);
+  useEffect(() => {
+    if (!more) return;
+    panel.current?.querySelector<HTMLElement>("a")?.focus();
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMore(false);
+        btn.current?.focus();
+      }
+    };
+    const away = (e: PointerEvent) => {
+      if (!panel.current?.contains(e.target as Node) && !btn.current?.contains(e.target as Node)) setMore(false);
+    };
+    document.addEventListener("keydown", key);
+    document.addEventListener("pointerdown", away);
+    return () => {
+      document.removeEventListener("keydown", key);
+      document.removeEventListener("pointerdown", away);
+    };
+  }, [more]);
+
+  const tab = "flex h-14 min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 transition-colors duration-200";
   return (
-    <nav aria-label="Primary" className="glass-strong fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-40 flex h-[68px] items-center justify-around rounded-[28px] px-1 lg:hidden">
-      {MAIN.filter((m) => m.href !== "/approvals").map(({ href, label, icon: Icon }) => {
-        const active = isActive(path, href);
-        const create = href === "/create";
-        return (
-          <Link key={href} href={href} data-tour={TOUR[href]} aria-current={active ? "page" : undefined} className={cn("flex h-14 min-w-[48px] flex-col items-center justify-center gap-0.5 rounded-2xl px-1 transition-colors duration-200", create ? "" : active ? "text-foreground" : "text-muted-foreground")}>
-            <span className={cn("grid h-8 w-11 place-items-center rounded-full transition-colors duration-200", create ? "lime-bg lime-glow" : active && "bg-secondary text-lime-ink")}>
-              <Icon className="h-[19px] w-[19px]" strokeWidth={create ? 2.4 : active ? 2.2 : 1.9} aria-hidden="true" />
-            </span>
-            <span className="text-[10.5px] font-medium leading-none">{label}</span>
-          </Link>
-        );
-      })}
-    </nav>
+    <>
+      <div
+        ref={panel}
+        id="more-panel"
+        hidden={!more}
+        className="fixed inset-x-3 bottom-[calc(max(12px,env(safe-area-inset-bottom))+76px)] z-[56] max-h-[60dvh] bg-background/95 shadow-2xl backdrop-blur-xl hairline overflow-y-auto rounded-[28px] p-2 lg:hidden"
+      >
+        <ul className="grid grid-cols-1 gap-0.5 min-[400px]:grid-cols-2">
+          {extra.map(({ href, label, icon: Icon }) => {
+            const active = href !== "/" && isActive(path, href);
+            return (
+              <li key={href}>
+                <Link href={href} data-tour={TOUR[href]} aria-current={active ? "page" : undefined} className={cn("flex h-12 items-center gap-3 rounded-2xl px-3 text-[15px] font-medium", active ? "bg-secondary text-foreground" : "text-foreground/85 hover:bg-foreground/[0.05]")}>
+                  <Icon className="h-[18px] w-[18px] text-muted-foreground" aria-hidden="true" />
+                  {label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <nav aria-label="Primary" className="glass-strong fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-40 flex h-[68px] items-center justify-around rounded-[28px] px-1 lg:hidden">
+        {MAIN.filter((m) => TABS.includes(m.href)).map(({ href, label, icon: Icon }) => {
+          const active = isActive(path, href);
+          const create = href === "/create";
+          return (
+            <Link key={href} href={href} data-tour={TOUR[href]} aria-current={active ? "page" : undefined} className={cn(tab, create ? "" : active ? "text-foreground" : "text-muted-foreground")}>
+              <span className={cn("grid h-8 w-11 place-items-center rounded-full transition-colors duration-200", create ? "lime-bg lime-glow" : active && "bg-secondary text-lime-ink")}>
+                <Icon className="h-[19px] w-[19px]" strokeWidth={create ? 2.4 : active ? 2.2 : 1.9} aria-hidden="true" />
+              </span>
+              <span className="text-[10.5px] font-medium leading-none">{label}</span>
+            </Link>
+          );
+        })}
+        <button ref={btn} type="button" aria-expanded={more} aria-controls="more-panel" onClick={() => setMore((m) => !m)} className={cn(tab, more || moreActive ? "text-foreground" : "text-muted-foreground")}>
+          <span className={cn("grid h-8 w-11 place-items-center rounded-full transition-colors duration-200", (more || moreActive) && "bg-secondary text-lime-ink")}>
+            <MoreHorizontal className="h-[19px] w-[19px]" strokeWidth={more || moreActive ? 2.2 : 1.9} aria-hidden="true" />
+          </span>
+          <span className="text-[10.5px] font-medium leading-none">More</span>
+        </button>
+      </nav>
+    </>
   );
 }
 
+/** Phone top bar: brand, theme and notifications. Everything else moved to More in the tab bar. */
 export function MobileTopBar() {
-  const { workspace } = useUser();
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between gap-2 px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] lg:hidden">
-      <Link href="/home" className="flex min-w-0 shrink-0 items-center gap-2 rounded-2xl py-1 text-[16px]" aria-label="Outlly dashboard">
+      <Link href="/home" className="flex min-h-11 min-w-0 shrink-0 items-center gap-2 rounded-2xl text-[16px]" aria-label="Outlly dashboard">
         <OutlyMark size={26} className="min-[480px]:hidden" />
         <OutlyLogo className="hidden min-[480px]:inline-flex" />
       </Link>
       <div className="flex min-w-0 items-center gap-0.5">
-        <Link href="/" aria-label="Outlly website" title="Outlly website" className="hidden h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary min-[420px]:grid">
-          <Globe className="h-[18px] w-[18px]" />
-        </Link>
-        {!workspace && (
-          <Link href="/billing" aria-label="Billing" title="Billing" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary">
-            <CreditCard className="h-[18px] w-[18px]" />
-          </Link>
-        )}
         {/* One cycling button: the three-way switch made the row wider than a phone (10-12f). */}
         <ThemeCycleButton />
         <NoticesBell placement="below" />
-        <Link href="/approvals" data-tour="approvals" aria-label="Approvals" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary">
-          <ClipboardCheck className="h-[18px] w-[18px]" />
-        </Link>
-        {!workspace && (
-          <Link href="/accounts" data-tour="accounts" aria-label="Connected accounts" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary">
-            <Link2 className="h-[18px] w-[18px]" />
-          </Link>
-        )}
-        <Link href="/settings" aria-label="Settings" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary">
-          <Settings className="h-[18px] w-[18px]" />
-        </Link>
       </div>
     </header>
   );

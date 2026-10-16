@@ -1,6 +1,8 @@
 import "server-only";
 import { listFaq } from "./faq";
 import { gemini } from "../ai/creative";
+import { env } from "../env";
+import { productBrief } from "./knowledge";
 import type { Lang } from "../i18n/support";
 import { HUMAN_RE, detectScript, norm, smallTalk } from "./smalltalk";
 
@@ -87,8 +89,73 @@ async function toEnglish(q: string) {
   return r && typeof r.en === "string" ? r.en.slice(0, 800) : null;
 }
 
+/**
+ * A help question picked from the chat (a Related chip or the in-chat question list): answer that exact
+ * FAQ entry inside the chat, no guessing. Other languages get it translated, with the English text as fallback.
+ */
+export async function answerFaq(id: string, lang: Lang = "en"): Promise<BotReply | null> {
+  const faq = await listFaq();
+  const f = faq.find((x) => x.id === id);
+  if (!f) return null;
+  // Same contract as answer(): sources[0] is the entry answered, the rest are related questions.
+  const others = [f, ...faq.filter((x) => x.id !== f.id && x.category === f.category).slice(0, 3)].map((x) => ({ id: x.id, question: x.question }));
+  const use: Lang = COPY[lang] ? lang : "en";
+  if (use !== "en") {
+    const ai = await gemini<{ answer: string }>(
+      `Translate this support answer from Outlly's help centre into ${COPY[use].name}. Keep product names, **bold** and [link](url) markup exactly. Return JSON {"answer": string}.`,
+      f.answer,
+    ).catch(() => null);
+    if (ai && typeof ai.answer === "string" && ai.answer.trim()) return { answer: ai.answer, confident: true, sources: others, wantsHuman: false, lang: use };
+  }
+  return { answer: f.answer, confident: true, sources: others, wantsHuman: false, lang: "en" };
+}
+
+const PIP = `You are Pip, the support assistant inside Outlly, a tool that lets creators upload one short video and publish it to Instagram Reels, YouTube Shorts and X with AI captions, hooks and titles.
+Your job: give the person a complete, correct answer right here in the chat so they never have to go anywhere else.
+Rules:
+- Outlly facts (features, steps, limits, prices, policies, which platforms are live) come ONLY from the HELP CENTRE and PRODUCT BRIEF below. Never invent a feature, button, price, limit or date. If something is not covered, say so plainly.
+- General creator questions (best time to post, hook ideas, hashtags, video length, growth) you may answer from general knowledge, briefly and practically, and connect it to how Outlly helps when it fits.
+- Give real steps: name the exact place in the studio (for example "Settings, then Your data"). Never just say "see the help centre"; the person is already talking to help.
+- Use the chat so far to understand follow-ups like "and on YouTube?" or "it still fails".
+- Problems only a person can fix (charged twice, refund, account access lost, a bug that persists after the steps, email change, legal) : answer what you can, then set needsHuman=true.
+- If the question is unclear, ask ONE short clarifying question (answered=false).
+- Tone: warm, calm, plain words, short paragraphs, under 120 words. No headings, no emoji, no em dashes. **bold** for button names is fine.
+- Reply in {LANG}.
+Return JSON {"answer": string, "answered": boolean, "needsHuman": boolean, "faqIds": string[] (ids of help entries you used, most relevant first, may be empty)}.`;
+
+async function aiAnswer(q: string, history: { role: "user" | "bot"; text: string }[], langName: string, use: Lang, ctx: ChatCtx): Promise<BotReply | null> {
+  const [faq, brief] = await Promise.all([listFaq(), productBrief()]);
+  const ai = await gemini<{ answer: string; answered: boolean; needsHuman?: boolean; faqIds?: string[] }>(
+    PIP.replace("{LANG}", langName),
+    [
+      `HELP CENTRE:\n${faq.map((f) => `[${f.id}] (${f.category}) Q: ${f.question}\nA: ${f.answer}`).join("\n\n")}`,
+      `PRODUCT BRIEF:\n${brief}`,
+      `PERSON: ${ctx.signedIn ? "signed in to the studio" : "a visitor, not signed in"}${ctx.page ? `, currently on ${ctx.page}` : ""}.`,
+      `CHAT SO FAR:\n${history.slice(-8).map((h) => `${h.role === "user" ? "Person" : "Pip"}: ${h.text.slice(0, 600)}`).join("\n") || "(new chat)"}`,
+      `QUESTION: ${q}`,
+    ].join("\n\n"),
+    { temperature: 0.3, timeoutMs: 12_000 },
+  ).catch(() => null);
+  if (!ai || typeof ai.answer !== "string" || !ai.answer.trim()) return null;
+  const byId = new Map(faq.map((f) => [f.id, f]));
+  const used = (Array.isArray(ai.faqIds) ? ai.faqIds : []).filter((id) => byId.has(id));
+  // sources[0] = the entry the answer rests on (the widget hides it and shows the rest as Related).
+  // Only entries Gemini actually used: padding with keyword guesses put unrelated questions under answers.
+  const sources = used.slice(0, 4).map((id) => ({ id, question: byId.get(id)!.question }));
+  const answered = !!ai.answered;
+  return {
+    answer: ai.answer.trim().replace(/\s*\u2014\s*/g, ", "),
+    confident: answered,
+    sources,
+    wantsHuman: !!ai.needsHuman,
+    lang: use,
+  };
+}
+
 /** FAQ retrieval (keyword + synonyms, BM25-ish), phrased by Gemini when a key is set. */
-export async function answer(question: string, history: { role: "user" | "bot"; text: string }[] = [], lang: Lang = "en"): Promise<BotReply> {
+export type ChatCtx = { signedIn?: boolean; page?: string };
+
+export async function answer(question: string, history: { role: "user" | "bot"; text: string }[] = [], lang: Lang = "en", ctx: ChatCtx = {}): Promise<BotReply> {
   const q = question.trim().slice(0, 800);
   const chat = small(q, lang);
   if (chat) return chat;
@@ -96,6 +163,13 @@ export async function answer(question: string, history: { role: "user" | "bot"; 
   const use: Lang = detectScript(q) ?? (COPY[lang] ? lang : "en");
   const L = COPY[use];
   if (HUMAN_RE.test(q) || HUMAN_RE.test(norm(q))) return { answer: L.human, confident: false, sources: [], wantsHuman: true, lang: use };
+  // AI first (10-16): Gemini reads the WHOLE help centre plus the product brief and the chat so far, so
+  // everyday wording, typos, follow-ups ("and on YouTube?") and any language get a real answer.
+  // The keyword matcher below is the fallback when no key is set or Gemini is down.
+  if (env.GEMINI_API_KEY) {
+    const ai = await aiAnswer(q, history, L.name, use, ctx);
+    if (ai) return ai;
+  }
   let r = await rank(q);
   if ((!r.best || !r.confident) && (use !== "en" || /[^\x00-\x7f]/.test(q))) {
     const en = await toEnglish(q);

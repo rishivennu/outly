@@ -310,6 +310,26 @@ export async function sweepDuePosts() {
   for (const a of expiring) await enqueue("TOKEN_REFRESH", { accountId: a.id }, { jobId: `refresh-${a.id}` });
 }
 
+/**
+ * A target left in "queued" means its SOCIAL_UPLOAD job never ran: a lost timer, a recycled serverless
+ * instance, or Redis dropping the job. Hand it to the queue again. The job id is bucketed by minute, so
+ * several instances sweeping at once produce one retry, and socialUpload() already refuses to upload twice.
+ */
+export async function requeueStuckTargets(olderThanMs = 120_000, now = Date.now()) {
+  const stuck = await db.postTarget.findMany({
+    where: { platformStatus: "queued", updatedAt: { lte: new Date(now - olderThanMs) } },
+    select: { id: true, platform: true },
+    take: 50,
+  });
+  let requeued = 0;
+  for (const t of stuck) {
+    if (!isPlatform(t.platform)) continue;
+    await enqueue("SOCIAL_UPLOAD", { targetId: t.id, platform: t.platform, simulate: "realistic" }, { jobId: `requeue-${t.id}-${Math.floor(now / 60_000)}` });
+    requeued++;
+  }
+  return requeued;
+}
+
 async function tokenRefresh({ accountId }: { accountId: string }) {
   const a = await db.socialAccount.findUnique({ where: { id: accountId } });
   if (!a || !isPlatform(a.platform)) return;

@@ -83,7 +83,7 @@ export function ReviewPage({ token, data }: { token: string; data: ReviewPackage
             {asking && (
               <div>
                 <Label htmlFor="rnote">What should change?</Label>
-                <Textarea id="rnote" value={note} onChange={(e) => setNote(e.target.value)} rows={4} maxLength={2000} placeholder="Be specific — they only get this one note." />
+                <Textarea id="rnote" value={note} onChange={(e) => setNote(e.target.value)} rows={4} maxLength={2000} placeholder="Be specific, they only get this one note." />
               </div>
             )}
             <div className="flex flex-wrap gap-2">

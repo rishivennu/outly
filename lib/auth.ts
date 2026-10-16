@@ -19,8 +19,13 @@ export async function verifyPassword(pw: string, hash: string) {
   return bcrypt.compare(pw, hash);
 }
 
+/**
+ * Sign in. The JWT carries the user's `tokenVersion` as `v`, so "sign out everywhere" (or a password
+ * change) can invalidate every existing cookie by bumping one integer — no session table needed.
+ */
 export async function createSession(userId: string) {
-  const token = await new SignJWT({ sub: userId })
+  const v = (await db.user.findUnique({ where: { id: userId }, select: { tokenVersion: true } }))?.tokenVersion ?? 0;
+  const token = await new SignJWT({ sub: userId, v })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
@@ -39,15 +44,30 @@ export function destroySession() {
   cookies().delete("outlly_in"); // readable signed-in hint kept by middleware
 }
 
-export async function readSessionUserId(): Promise<string | null> {
+/** Cookie contents, signature-checked only. Tokens issued before `v` existed read as v=0. */
+async function readSessionClaims(): Promise<{ id: string; v: number } | null> {
   const token = cookies().get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
-    return typeof payload.sub === "string" ? payload.sub : null;
+    if (typeof payload.sub !== "string") return null;
+    return { id: payload.sub, v: typeof payload.v === "number" ? payload.v : 0 };
   } catch {
     return null;
   }
+}
+
+/** Signed-in user id, revocation included (one cheap query). Null once the token version is stale. */
+export async function readSessionUserId(): Promise<string | null> {
+  const claims = await readSessionClaims();
+  if (!claims) return null;
+  const u = await db.user.findUnique({ where: { id: claims.id }, select: { tokenVersion: true } });
+  return u && u.tokenVersion === claims.v ? claims.id : null;
+}
+
+/** Invalidate every session this person has anywhere. Call after logout-everywhere or a password change. */
+export async function revokeAllSessions(userId: string) {
+  await db.user.update({ where: { id: userId }, data: { tokenVersion: { increment: 1 } } });
 }
 
 const USER_SELECT = { id: true, name: true, email: true, avatar: true, timezone: true, createdAt: true } as const;
@@ -58,10 +78,13 @@ const USER_SELECT = { id: true, name: true, email: true, avatar: true, timezone:
  * scoped by user.id just works; `actor` is the real person signed in and `role` what they may do.
  */
 export const getCurrentUser = cache(async () => {
-  const id = await readSessionUserId();
-  if (!id) return null;
-  const me = await db.user.findUnique({ where: { id }, select: USER_SELECT });
-  if (!me) return null;
+  const claims = await readSessionClaims();
+  if (!claims) return null;
+  const id = claims.id;
+  const found = await db.user.findUnique({ where: { id }, select: { ...USER_SELECT, tokenVersion: true } });
+  // Revoked elsewhere ("sign out everywhere", password change): the cookie verifies but is one version behind.
+  if (!found || found.tokenVersion !== claims.v) return null;
+  const { tokenVersion: _v, ...me } = found;
   const ws = cookies().get(WS_COOKIE)?.value;
   if (ws && ws !== id) {
     const seat = await db.teamMember.findFirst({ where: { ownerId: ws, userId: id, status: "active" }, select: { role: true, owner: { select: USER_SELECT } } });

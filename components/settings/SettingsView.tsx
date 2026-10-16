@@ -17,6 +17,7 @@ import { ReferralCard } from "./ReferralCard";
 import { AvatarPicker } from "./AvatarPicker";
 import { SnippetsCard } from "./SnippetsCard";
 import { TwoStepCard } from "./TwoStepCard";
+import { YourDataCard } from "./YourDataCard";
 
 function zones(): string[] {
   const anyIntl = Intl as unknown as { supportedValuesOf?: (k: string) => string[] };
@@ -207,6 +208,8 @@ export function SettingsView({ weeklyReport = true }: { weeklyReport?: boolean }
         <div className="lg:col-span-2">
           <TeamCard />
         </div>
+
+        {!user.workspace && <YourDataCard email={user.email} />}
 
         <section className="glass flex flex-wrap items-center justify-between gap-4 rounded-[32px] p-6 lg:col-span-2" aria-label="Session">
           <div>

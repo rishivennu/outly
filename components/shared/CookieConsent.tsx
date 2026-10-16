@@ -1,4 +1,5 @@
 "use client";
+import { AnimatedUnderline } from "@/components/ui/animated-link";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -53,12 +54,12 @@ export function CookieBanner() {
   const done = (c: { analytics: boolean; marketing: boolean }) => { save(c); setShow(false); setCustom(false); };
 
   return (
-    <section role="dialog" aria-modal="false" aria-labelledby="cc-title" aria-describedby="cc-body" className={cn("consent-in glass-strong fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-[60] mx-auto max-w-[560px] rounded-[28px] p-5 shadow-2xl sm:left-5 sm:right-auto sm:mx-0 sm:p-6", lift && "max-lg:bottom-[96px]")}>
+    <section role="dialog" aria-modal="false" aria-labelledby="cc-title" aria-describedby="cc-body" className={cn("consent-in glass-strong fixed inset-x-2 bottom-[max(8px,env(safe-area-inset-bottom))] z-[60] max-h-[calc(100dvh-24px)] overflow-y-auto rounded-[24px] p-4 shadow-2xl sm:inset-x-auto sm:left-5 sm:w-[min(520px,calc(100vw-40px))] sm:p-5", lift && "max-lg:bottom-[92px]")}>
       <div className="flex items-start gap-3">
-        <span className="lime-bg grid h-10 w-10 shrink-0 place-items-center rounded-2xl" aria-hidden><Cookie className="h-5 w-5" /></span>
+        <span className="lime-bg hidden h-10 w-10 shrink-0 place-items-center rounded-2xl sm:grid" aria-hidden><Cookie className="h-5 w-5" /></span>
         <div className="min-w-0">
           <h2 id="cc-title" className="font-semibold tracking-tight">Cookies, your call</h2>
-          <p id="cc-body" className="mt-1 text-[13.5px] leading-relaxed text-muted-foreground">
+          <p id="cc-body" className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
             We use necessary cookies to run Outlly. With your OK we'd also use analytics to improve it. <Link href="/privacy" className="font-medium text-foreground underline underline-offset-4">Privacy policy</Link>
           </p>
         </div>
@@ -76,6 +77,7 @@ export function CookieBanner() {
                     <p className="text-sm font-medium">{r.title}</p>
                     <p className="text-[12.5px] text-muted-foreground">{r.body}</p>
                   </div>
+                  {/* 44px hit area around a 48x28 track, so the switch is easy to hit on a phone. */}
                   <button
                     type="button"
                     role="switch"
@@ -83,9 +85,11 @@ export function CookieBanner() {
                     aria-label={`${r.title} cookies`}
                     disabled={locked}
                     onClick={() => setPrefs((p) => ({ ...p, [r.id]: !p[r.id as "analytics" | "marketing"] }))}
-                    className={cn("relative mt-0.5 box-border inline-flex h-7 w-12 min-w-12 shrink-0 items-center overflow-hidden rounded-full p-1 transition-colors duration-300 disabled:opacity-60", on ? "bg-lime" : "bg-secondary hairline")}
+                    className="group -my-2 -mr-1 grid h-11 w-14 shrink-0 place-items-center rounded-full disabled:opacity-60"
                   >
-                    <span aria-hidden="true" className={cn("block h-5 w-5 shrink-0 rounded-full bg-white shadow transition-transform duration-500 [transition-timing-function:var(--ease-liquid)]", on ? "translate-x-5" : "translate-x-0")} />
+                    <span aria-hidden="true" className={cn("box-border inline-flex h-7 w-12 items-center overflow-hidden rounded-full p-1 transition-colors duration-300", on ? "bg-lime" : "bg-secondary hairline")}>
+                      <span className={cn("block h-5 w-5 shrink-0 rounded-full bg-white shadow transition-transform duration-500 [transition-timing-function:var(--ease-liquid)]", on ? "translate-x-5" : "translate-x-0")} />
+                    </span>
                   </button>
                 </li>
               );
@@ -94,7 +98,7 @@ export function CookieBanner() {
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         {custom ? (
           <Button size="sm" variant="lime" onClick={() => done(prefs)}>Save choices</Button>
         ) : (
@@ -109,10 +113,10 @@ export function CookieBanner() {
   );
 }
 
-export function CookieSettingsButton({ className }: { className?: string }) {
+export function CookieSettingsButton({ className, animated }: { className?: string; animated?: boolean }) {
   return (
     <button type="button" className={className} onClick={() => window.dispatchEvent(new CustomEvent("outly:consent-open"))}>
-      Cookie settings
+      {animated ? <AnimatedUnderline>Cookie settings</AnimatedUnderline> : "Cookie settings"}
     </button>
   );
 }

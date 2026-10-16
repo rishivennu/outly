@@ -1,5 +1,7 @@
 import { HttpError, json, route } from "@/lib/http";
 import { currentReview, deepReview, ReviewError } from "@/lib/live/review";
+import { chargeAi } from "@/lib/ai-quota";
+import { realUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -10,6 +12,7 @@ export const GET = route(async (_req, { user }) => json(await currentReview(user
 /** Runs the Gemini deep review now. */
 export const POST = route(
   async (_req, { user }) => {
+    await chargeAi(realUserId(user));
     try {
       return json({ review: await deepReview(user.id), ai: true, stale: false });
     } catch (e) {
