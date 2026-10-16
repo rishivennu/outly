@@ -37,6 +37,7 @@ With `REDIS_URL` empty, jobs and the scheduler run inside the Next.js process. P
 3. Lock the Data API: run `supabase/migrations/0001_rls.sql` in the SQL editor (RLS on, no policies; the server uses Prisma as the owner role).
 4. Storage: create a **private** bucket `media` (Free plan: 50 MB per object). Set `STORAGE_DRIVER=supabase`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_BUCKET=media`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
    Browsers upload straight to the bucket with one-time signed tokens (TUS resumable above 6 MB, with real progress, ETA, cancel and resume). Files are only ever read through short-lived signed URLs.
+   For files above 50 MB use Cloudflare R2 instead (`STORAGE_DRIVER=r2`, free egress, 10 GB free). Setup and migration: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#storage-cloudflare-r2-large-uploads).
 5. Auth: `AUTH_PROVIDER=supabase`. Passwords live in Supabase Auth; existing local accounts migrate on their next sign-in. Outlly still issues its own HttpOnly session cookie.
 
 ## Workers (production)
@@ -64,7 +65,7 @@ app/(studio)      home, create, content, calendar, analytics, accounts, settings
 app/api           route handlers, all wrapped by lib/http route(): session, Origin (CSRF) check, rate limit, Zod errors
 lib/social        SocialPublisher interface + instagram / youtube / x / mock publishers, registry
 lib/queue         job contracts, BullMQ or in-process backend, handlers, scheduled sweeper
-lib/storage       local or S3 driver, signed URLs
+lib/storage       local, Supabase, S3 or R2 driver, signed + multipart uploads
 lib/crypto        AES-256-GCM for OAuth tokens at rest
 lib/ai            creative assistant: hooks, tone rewrites, platform copy (Gemini if keyed, offline otherwise)
 components/create the creation workspace: journey rail, video stage, assistant, platform deck, launch, live publishing

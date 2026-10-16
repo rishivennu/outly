@@ -30,3 +30,26 @@ Verified locally: tsc 0 errors, bun test 329/0, axe 0 (light+dark, 1440+390).
 - components/marketing/StarField.tsx (new): fixed, aria-hidden layer behind every public page. 56 twinkling stars, 7 comets falling on a loop (1-2 in flight at once). CSS only, transform/opacity, seeded positions (no hydration mismatch).
 - app/(marketing)/layout.tsx: renders <StarField /> inside a .sky-host (isolation) wrapper so the sky sits behind all sections.
 - app/globals.css: .sky-* styles. Dark = lime comets with white heads; light = deep green (no lime on white). Reduced motion: comets off, stars static.
+
+## Nav: Product mega menu (inspired by navbar.gallery SaaS menus)
+- components/marketing/NavProduct.tsx (new): Product panel with 6 icon tiles (AI captions and hooks, Schedule and publish, Track every destination, Platforms, Compare, Ask Pip) and a lime "See it in 60 seconds" featured card with mini comets. Compact tiles for mobile.
+- components/marketing/Nav.tsx: "Features" becomes a "Product" trigger. Opens on hover (180 ms grace) or click, ArrowDown/Tab moves into the panel, Esc closes and returns focus, outside click/focus closes. Compare moved into the panel (still scroll-spied). Mobile menu shows the Product tiles first.
+- app/globals.css: .np-* styles, solid card surface, focus-visible rings, reduced motion. Light and dark tested.
+
+## Storage: Cloudflare R2 driver with multipart uploads (lifts the 50 MB cap)
+- lib/storage/s3x.ts (new): dependency-light S3/R2 client (SigV4 via aws4fetch): put, head, get, delete, presigned GET/PUT with pinned Content-Length, multipart create/sign part/list/complete/abort.
+- lib/storage/index.ts: STORAGE_DRIVER=r2, createDirectUpload() returns tus (Supabase), put (single presigned PUT) or multipart.
+- lib/env.ts: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET (default outlly-media), R2_ENDPOINT, UPLOAD_PART_MB (10), UPLOAD_PIN_LENGTH (true).
+- app/api/media/direct/route.ts: returns the mode-specific upload plan.
+- app/api/media/direct/parts/route.ts (new): signs up to 24 part URLs at a time for the owner only, each pinned to its exact size; lists uploaded parts for resume.
+- app/api/media/direct/complete/route.ts: verifies every part exists and sizes add up (409 PARTS_MISSING otherwise) before completing, then the existing size + magic-byte checks.
+- lib/client/upload.ts: presigned PUT and 4-way parallel multipart with per-part retry, URL re-sign on expiry, resume after reload. TUS path unchanged.
+- app/api/cron/storage-copy/route.ts (new): copies existing Supabase files to R2 (Bearer CRON_SECRET, cursor paging).
+- tests/helpers/fake-s3.ts + tests/round-1016-r2.test.ts: fake S3 server with an independent SigV4 verifier; 11 new tests. Suite 340 pass / 0 fail.
+- docs/DEPLOYMENT.md + README.md: R2 setup, CORS, env table, migration steps.
+- After R2 is live: change "50 MB" copy in lib/marketing/content.ts (lines 28, 204, 234) and lib/billing/plans.ts (line 10).
+
+## Fix: drafts not saving / "Your video is still coming in" stuck forever
+Root cause: when an upload failed or stalled, Save draft waited forever ("Saving...") and Post always said "still coming in", hiding the real reason. A failed POST /api/posts showed the same message.
+- components/create/CreateWorkspace.tsx: save, Post and Connect now wait for an in-flight upload and then continue. A failed upload toasts the real reason, Save draft says "Couldn't save" with how to fix it, Post shows the actual error. Removed the pendingSave path.
+- lib/client/upload.ts: 60 s stall watchdog on every upload request (no bytes moving = dropped connection, so retry/resume kicks in instead of hanging). R2 single-PUT resume window capped at 50 min (URL lives 60 min).

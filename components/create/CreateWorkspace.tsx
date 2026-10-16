@@ -52,6 +52,9 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const posterBlob = useRef<Blob | null>(null);
   const synced = useRef<string | null>(null);
   const uploadAbort = useRef<AbortController | null>(null);
+  /** Resolves with the stored media when the current upload lands, or null if it fails or is cancelled. Save, launch and connect wait on it. */
+  const mediaReady = useRef<Promise<MediaView | null> | null>(null);
+  const uploadFail = useRef<string | null>(null);
   /** The clean video, kept while a captioned copy is in use so "without captions" is one click (no re-upload). */
   const [preCaption, setPreCaption] = useState<{ media: MediaView; file: File | null } | null>(null);
 
@@ -90,8 +93,6 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
-  /** An explicit "Save draft" pressed while the upload is still in flight runs the moment the media lands. */
-  const pendingSave = useRef(false);
 
   /* ---------------- launch ---------------- */
   const [mode, setMode] = useState<"now" | "schedule">(initialPost?.status === "scheduled" ? "schedule" : "now");
@@ -137,23 +138,42 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
         })
         .catch(() => {});
 
-      try {
-        const r = await uploadVideo<MediaView>(file, (p, eta) => { setUpload({ kind: "uploading", progress: p, eta }); }, ctrl.signal);
-        if (ctrl.signal.aborted) return;
-        setMedia(r.media);
-        setUpload({ kind: "done" });
-      } catch (e) {
-        if (ctrl.signal.aborted) return;
-        setUpload({ kind: "failed", message: e instanceof ApiError ? e.message : "Something got in the way." });
-      }
+      uploadFail.current = null;
+      const run = (async () => {
+        try {
+          const r = await uploadVideo<MediaView>(file, (p, eta) => { setUpload({ kind: "uploading", progress: p, eta }); }, ctrl.signal);
+          if (ctrl.signal.aborted) return null;
+          setMedia(r.media);
+          setUpload({ kind: "done" });
+          return r.media;
+        } catch (e) {
+          if (ctrl.signal.aborted) return null;
+          const message = e instanceof ApiError ? e.message : "Something got in the way.";
+          uploadFail.current = message;
+          setUpload({ kind: "failed", message });
+          // The stage may be off screen by now (we move on to the story while it uploads), so say it out loud too.
+          toast(`Your video didn't upload. ${message}`, "error");
+          return null;
+        }
+      })();
+      mediaReady.current = run;
+      await run;
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  /** Same file again; TUS and multipart pick up from what already landed. */
+  const retryUpload = useCallback(() => {
+    if (fileRef.current) void startUpload(fileRef.current, localUrl ?? undefined);
+  }, [startUpload, localUrl]);
 
   /** Cancel in flight: abort the transfer, drop the local preview, back to an empty stage. */
   const cancelUpload = useCallback(() => {
     uploadAbort.current?.abort();
     uploadAbort.current = null;
+    mediaReady.current = null;
+    uploadFail.current = null;
     fileRef.current = null;
     posterBlob.current = null;
     setMedia(null);
@@ -287,18 +307,33 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
 
   /* ================= saving ================= */
   const save = useCallback(
-    (opts?: { force?: boolean }) => {
+    (opts?: { force?: boolean; strict?: boolean }) => {
       const run = async () => {
         // Autosave still waits for a hook; an explicit save only needs the video, and names the draft itself.
-        if (!media || (!hook && !opts?.force)) return postIdRef.current;
+        if (!hook && !opts?.force) return postIdRef.current;
+        let m = media;
+        if (!m && mediaReady.current) {
+          if (opts?.force) setSaved("saving");
+          m = await mediaReady.current; // still uploading: wait for it instead of giving up
+        }
+        if (!m) {
+          if (!opts?.force) return postIdRef.current;
+          setSaved("error");
+          const why = uploadFail.current
+            ? `Your video didn't upload (${uploadFail.current.replace(/\.$/, "")}). Tap "Let's try again" on the video, then save.`
+            : "Add a video first, then save.";
+          if (opts?.strict) throw new ApiError(400, why);
+          toast(why, "error");
+          return postIdRef.current;
+        }
         setSaved("saving");
         try {
-          const title = draftTitle({ drafts, hook, filename: media.filename ?? fileRef.current?.name });
+          const title = draftTitle({ drafts, hook, filename: m.filename ?? fileRef.current?.name });
           const r = await api<{ post: PostView }>("/api/posts", {
             method: "POST",
             json: {
               postId: postIdRef.current ?? undefined,
-              mediaId: media.id,
+              mediaId: m.id,
               title,
               story: submittedStory ?? story,
               hook,
@@ -313,8 +348,10 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
           setSaved("saved");
           setSavedAt(new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }));
           return r.post.id;
-        } catch {
+        } catch (e) {
           setSaved("error");
+          if (opts?.strict) throw e;
+          if (opts?.force) toast(e instanceof ApiError ? `Couldn't save the draft. ${e.message}` : "Couldn't save the draft. Check your connection and try again.", "error");
           return postIdRef.current;
         }
       };
@@ -327,25 +364,12 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
 
   /** The Save draft button: immediate, works without a hook, and says where the draft went. */
   const saveDraftNow = useCallback(async () => {
-    if (!media) {
-      // Upload still running: remember the intent, the effect below finishes the job.
-      pendingSave.current = true;
-      setSaved("saving");
-      return;
-    }
+    // Mid-upload this waits for the video to land, then saves.
+    if (!media && upload.kind === "uploading") toast("Saving as soon as your video finishes uploading.", "info");
     const id = await save({ force: true });
     if (id) toast("Saved to Drafts. Find it under Content.");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [media, save]);
-
-  useEffect(() => {
-    if (!media || !pendingSave.current) return;
-    pendingSave.current = false;
-    save({ force: true }).then((id) => {
-      if (id) toast("Saved to Drafts. Find it under Content.");
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [media]);
+  }, [media, save, upload.kind]);
 
   useEffect(() => {
     if (!media || !hook || phase !== "edit" || copyLoading) return;
@@ -354,7 +378,9 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   }, [save, media, hook, phase, copyLoading]);
 
   const connect = async (p: Platform) => {
-    const id = await save();
+    // Leaving the page kills an upload in flight, so let it land and save first.
+    if (!media && upload.kind === "uploading") toast("Finishing your upload first, then we'll connect.", "info");
+    const id = await save({ force: !!(media || mediaReady.current) });
     window.location.href = `/api/accounts/${p}/connect?returnTo=${encodeURIComponent(id ? `/create?post=${id}&connected=${p}` : "/create")}`;
   };
 
@@ -365,8 +391,8 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
     setLaunching(true);
     setLaunchError(null);
     try {
-      const id = await save();
-      if (!id) throw new ApiError(400, "Your video is still coming in. Give it a second.");
+      const id = await save({ force: true, strict: true });
+      if (!id) throw new ApiError(400, "Add a video first.");
       const r = await api<{ post: PostView }>(`/api/posts/${id}/launch`, { method: "POST", json: { mode, scheduledAt: mode === "schedule" ? when.toISOString() : undefined, confirmed: true } });
       if (mode === "now") {
         setLivePost(r.post);
@@ -479,7 +505,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                   meta={meta}
                   upload={upload}
                   onReplace={(f) => startUpload(f)}
-                  onRetry={fileRef.current ? () => startUpload(fileRef.current!, localUrl ?? undefined) : undefined}
+                  onRetry={fileRef.current ? retryUpload : undefined}
                   onCancel={cancelUpload}
                   onError={(m) => toast(m, "info")}
                 />

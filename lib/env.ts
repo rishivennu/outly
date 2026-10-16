@@ -9,7 +9,7 @@ const schema = z.object({
   TOKEN_ENCRYPTION_KEY: z.string().min(40, "TOKEN_ENCRYPTION_KEY must be a base64 32-byte key"),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().optional().default(""),
-  STORAGE_DRIVER: z.enum(["local", "s3", "supabase"]).default("local"),
+  STORAGE_DRIVER: z.enum(["local", "s3", "r2", "supabase"]).default("local"),
   SUPABASE_URL: z.string().optional().default(""),
   SUPABASE_SECRET_KEY: z.string().optional().default(""),
   SUPABASE_BUCKET: z.string().optional().default("media"),
@@ -20,6 +20,19 @@ const schema = z.object({
   S3_BUCKET: z.string().optional().default(""),
   S3_ACCESS_KEY_ID: z.string().optional().default(""),
   S3_SECRET_ACCESS_KEY: z.string().optional().default(""),
+  /** Cloudflare R2 (STORAGE_DRIVER=r2). Endpoint is derived from the account id; R2_ENDPOINT overrides it (e.g. EU jurisdiction). */
+  R2_ACCOUNT_ID: z.string().optional().default(""),
+  R2_ACCESS_KEY_ID: z.string().optional().default(""),
+  R2_SECRET_ACCESS_KEY: z.string().optional().default(""),
+  R2_BUCKET: z.string().optional().default("outlly-media"),
+  R2_ENDPOINT: z.string().optional().default(""),
+  /** Part size for browser multipart uploads to R2/S3 (min 5 MB; R2 needs equal parts). */
+  /** Pin each presigned upload URL to its exact Content-Length (default on). Turn off only if the bucket rejects signed lengths. */
+  UPLOAD_PIN_LENGTH: z
+    .string()
+    .optional()
+    .transform((v) => v !== "false"),
+  UPLOAD_PART_MB: z.coerce.number().int().min(5).max(100).default(10),
   MAX_UPLOAD_MB: z.coerce.number().int().positive().max(4096).default(500),
   FFMPEG_PATH: z.string().optional().default(""),
   FFPROBE_PATH: z.string().optional().default(""),

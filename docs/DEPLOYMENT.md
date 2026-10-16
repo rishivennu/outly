@@ -48,6 +48,46 @@ Caveats when scaling out: the rate limiter (`lib/rate-limit.ts`) and the signed-
 
 3. **Payments.** Pick a provider and add its keys in the admin console. With `mock` (or a provider missing keys) checkout is simulated, which in production logs `[payments] WARNING: the simulated payment gateway is live in production` once and shows `paymentsMock: true` in `/api/health`. Mock checkout itself is refused in production unless `ALLOW_MOCK_PAYMENTS=true` (staging only).
 
+## Storage: Cloudflare R2 (large uploads)
+
+Supabase Free caps each object at 50 MB. R2 has no practical cap, 10 GB free storage and free egress. Browsers upload straight to R2 (Vercel never sees the bytes):
+
+- up to 10 MB: one presigned PUT, its Content-Length pinned in the signature so the size cannot be swapped
+- above that: S3 multipart, 10 MB parts, 4 in parallel, each part URL pinned to its exact size; retries per part and resumes after a reload
+- `/api/media/direct/complete` lists the parts on R2 and refuses (409 `PARTS_MISSING`) unless every part is there and the sizes add up, then checks the file's magic bytes
+
+### Setup
+
+1. Cloudflare dashboard, **R2 Object Storage**, **Create bucket** `outlly-media` (private, location Automatic).
+2. Bucket **Settings, CORS policy**:
+   ```json
+   [{"AllowedOrigins":["https://outly-ecru.vercel.app","http://localhost:3040"],"AllowedMethods":["PUT","GET","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":3600}]
+   ```
+3. R2 overview, **Manage R2 API Tokens, Create API token**: permission **Object Read & Write**, scoped to `outlly-media`. Copy the Access Key ID and Secret Access Key (shown once) and the Account ID.
+4. Environment:
+
+| Variable | Value |
+|---|---|
+| `STORAGE_DRIVER` | `r2` |
+| `R2_ACCOUNT_ID` | account id |
+| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | token keys |
+| `R2_BUCKET` | `outlly-media` (default) |
+| `R2_ENDPOINT` | optional, e.g. `https://<id>.eu.r2.cloudflarestorage.com` for an EU bucket |
+| `UPLOAD_PART_MB` | optional, part size 5 to 100 (default 10) |
+| `UPLOAD_PIN_LENGTH` | optional, `false` only if R2 ever rejects signed Content-Length |
+| `MAX_UPLOAD_MB` / `NEXT_PUBLIC_MAX_UPLOAD_MB` | e.g. `500` (X caps video at 512 MB) |
+
+### Moving existing files from Supabase
+
+Keep the Supabase env vars set (plus `CRON_SECRET`), then call the copy job until `next` is null:
+
+```bash
+curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://outly-ecru.vercel.app/api/cron/storage-copy
+curl -X POST -H "Authorization: Bearer $CRON_SECRET" "https://outly-ecru.vercel.app/api/cron/storage-copy?cursor=<next>"
+```
+
+It copies each media file and thumbnail, skips ones already on R2 with the same size, and returns `{copied, skipped, missing, failed, next}`. It works whatever `STORAGE_DRIVER` is, so: add the R2 keys, run it once, switch `STORAGE_DRIVER=r2`, redeploy, run it once more to catch files uploaded in between. Local tests use a fake S3 server (`tests/helpers/fake-s3.ts`) that verifies SigV4 independently.
+
 ## Cron: what actually sends a scheduled post
 
 Self-hosted (`bun run start` / `bun run worker`) has an in-process sweeper every 15 s, so there is nothing to set up. Serverless has no always-on process, so a scheduled post only goes out when something calls the sweeper:

@@ -16,9 +16,17 @@ const body = z.object({
   size: z.number().int().positive(),
 });
 
-/** Tells the client how to upload: straight to Supabase Storage when available, else stream through /api/media. */
+/**
+ * Tells the client how to upload: straight to the bucket when the driver allows it (Supabase TUS,
+ * or R2/S3 presigned PUT / multipart), else stream through /api/media.
+ */
 export const GET = route(async () => {
-  return json({ direct: Boolean(storage.createDirectUpload), driver: storage.name, maxBytes: env.MAX_UPLOAD_MB * 1024 * 1024, chunkSize: 6 * 1024 * 1024 });
+  return json({
+    direct: Boolean(storage.createDirectUpload),
+    driver: storage.name,
+    maxBytes: env.MAX_UPLOAD_MB * 1024 * 1024,
+    chunkSize: storage.multipart?.partSize ?? 6 * 1024 * 1024,
+  });
 });
 
 /**
@@ -38,11 +46,15 @@ export const POST = route(
 
     const id = randomUUID();
     const key = `videos/${user.id}/${id}${ext}`;
-    const up = await storage.createDirectUpload(key);
+    const up = await storage.createDirectUpload(key, { size: b.size, contentType: mime });
     const media = await db.media.create({
       data: { userId: user.id, originalFilename: b.name, storageKey: key, mimeType: mime, size: b.size, status: "uploading" },
     });
-    return json({ mediaId: media.id, key, bucket: env.SUPABASE_BUCKET, token: up.token, uploadUrl: up.url, resumableUrl: up.resumableUrl, chunkSize: 6 * 1024 * 1024 }, { status: 201 });
+    const base = { mediaId: media.id, key, mode: up.mode, contentType: mime };
+    if (up.mode === "tus")
+      return json({ ...base, bucket: env.SUPABASE_BUCKET, token: up.token, uploadUrl: up.url, resumableUrl: up.resumableUrl, chunkSize: 6 * 1024 * 1024 }, { status: 201 });
+    if (up.mode === "put") return json({ ...base, uploadUrl: up.url, chunkSize: b.size }, { status: 201 });
+    return json({ ...base, uploadId: up.uploadId, partSize: up.partSize, chunkSize: up.partSize, parts: Math.ceil(b.size / up.partSize) }, { status: 201 });
   },
   { limit: [20, 60_000] },
 );

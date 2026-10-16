@@ -7,15 +7,16 @@ import { useWaitlist } from "./useWaitlist";
 import { useHiddenSections } from "./useHiddenSections";
 import { BounceText } from "./Split";
 import { usePathname } from "next/navigation";
-import { ArrowRight, LayoutDashboard, Menu, X } from "lucide-react";
+import { ArrowRight, ChevronDown, LayoutDashboard, Menu, X } from "lucide-react";
+import { PRODUCT_ITEMS, ProductPanel, ProductTilesCompact } from "./NavProduct";
 import { OutlyLogo } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
   { id: "how", label: "How it works" },
-  { id: "features", label: "Features" },
-  { id: "compare", label: "Compare" },
+  { id: "features", label: "Product" }, // opens the Product mega menu on lg+
+  { id: "compare", label: "Compare" }, // lives inside Product; kept here for the scrollspy
   { id: "pricing", label: "Pricing" },
   { id: "faq", label: "FAQ" },
 ];
@@ -32,7 +33,7 @@ export function MarketingNav() {
   const waitlist = useWaitlist();
   const pathname = usePathname();
   const hidden = useHiddenSections(pathname);
-  const links = LINKS.filter((l) => !hidden.has(l.id));
+  const links = LINKS.filter((l) => !hidden.has(l.id) && l.id !== "compare");
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -40,6 +41,12 @@ export function MarketingNav() {
   const panelRef = useRef<HTMLDivElement>(null);
   const lockUntil = useRef(0);
   const listRef = useRef<HTMLDivElement>(null);
+  const [menu, setMenu] = useState(false);
+  const menuWrap = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const hoverT = useRef<number>(0);
+  const hoverAt = useRef(0); // a click right after hover opened the menu should not close it again
+  const products = PRODUCT_ITEMS.filter((p) => !p.sec || !hidden.has(p.sec));
   const [pill, setPill] = useState<{ l: number; r: number; dir: "left" | "right" | "none" } | null>(null);
 
   // Liquid indicator: one pill under the active link. The edge in the direction of travel
@@ -48,7 +55,8 @@ export function MarketingNav() {
     const list = listRef.current;
     if (!list) return;
     const measure = (fromResize = false) => {
-      const a = active ? list.querySelector<HTMLElement>(`[data-id="${active}"]`) : null;
+      const id = active === "compare" ? "features" : active; // Compare sits inside the Product menu
+      const a = id ? list.querySelector<HTMLElement>(`[data-id="${id}"]`) : null;
       if (!a) return setPill(null);
       const l = a.offsetLeft;
       const r = list.clientWidth - (a.offsetLeft + a.offsetWidth);
@@ -90,7 +98,50 @@ export function MarketingNav() {
     };
   }, [pathname]);
 
-  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    setOpen(false);
+    setMenu(false);
+  }, [pathname]);
+
+  // Product menu: hover opens it for a mouse (with a short grace period so the pointer can travel
+  // from the trigger down into the panel), click / Enter / Space toggles it for everyone else.
+  // Esc closes and returns focus to the trigger; focus or a tap leaving the menu closes it.
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setMenu(false);
+      triggerRef.current?.focus();
+    };
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!menuWrap.current?.contains(t) && !triggerRef.current?.contains(t)) setMenu(false);
+    };
+    const onFocus = (e: FocusEvent) => {
+      const t = e.target;
+      if (t instanceof Node && !menuWrap.current?.contains(t) && !triggerRef.current?.contains(t)) setMenu(false);
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("focusin", onFocus);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("focusin", onFocus);
+    };
+  }, [menu]);
+  const hoverOpen = (e: React.PointerEvent) => {
+    if (e.pointerType !== "mouse") return;
+    clearTimeout(hoverT.current);
+    if (!menu) hoverAt.current = Date.now();
+    setMenu(true);
+  };
+  const hoverClose = (e: React.PointerEvent) => {
+    if (e.pointerType !== "mouse") return;
+    clearTimeout(hoverT.current);
+    hoverT.current = window.setTimeout(() => setMenu(false), 180);
+  };
+  useEffect(() => () => clearTimeout(hoverT.current), []);
 
   useEffect(() => {
     if (!open) return;
@@ -112,6 +163,14 @@ export function MarketingNav() {
     setActive(id);
     lockUntil.current = Date.now() + 1200; // let the smooth scroll land before the spy takes over again
     setOpen(false);
+    setMenu(false);
+  };
+  const pickProduct = (sec: string | null) => {
+    if (sec) pick(sec === "how" || sec === "compare" ? sec : "features");
+    else {
+      setOpen(false);
+      setMenu(false);
+    }
   };
 
   const ctaHref = waitlist ? "/waitlist" : "/signup";
@@ -133,7 +192,35 @@ export function MarketingNav() {
             style={{ left: pill?.l ?? 0, right: pill?.r ?? 0, opacity: pill ? 1 : 0 }}
           />
           <ul className="flex items-center">
-            {links.map((l) => (
+            {links.map((l) =>
+              l.id === "features" ? (
+                <li key={l.id} data-sec={l.id} onPointerEnter={hoverOpen} onPointerLeave={hoverClose}>
+                  <button
+                    ref={triggerRef}
+                    type="button"
+                    data-id={l.id}
+                    aria-expanded={menu}
+                    aria-controls="mnav-product"
+                    onClick={() => setMenu((v) => (Date.now() - hoverAt.current < 600 ? true : !v))}
+                    onKeyDown={(e) => {
+                      // Tab from the open trigger goes into the panel (it sits later in the DOM).
+                      if (e.key === "Tab" && !e.shiftKey && menu) {
+                        e.preventDefault();
+                        document.querySelector<HTMLElement>("#mnav-product .np-tile")?.focus();
+                        return;
+                      }
+                      if (e.key !== "ArrowDown") return;
+                      e.preventDefault();
+                      setMenu(true);
+                      requestAnimationFrame(() => document.querySelector<HTMLElement>("#mnav-product .np-tile")?.focus());
+                    }}
+                    className={cn("mnav-link gap-1", (active === l.id || active === "compare") && "is-active", menu && "is-open")}
+                  >
+                    {l.label}
+                    <ChevronDown className="np-chev h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                </li>
+              ) : (
               <li key={l.id} data-sec={l.id}>
                 <Link
                   data-id={l.id}
@@ -145,10 +232,23 @@ export function MarketingNav() {
                   {l.label}
                 </Link>
               </li>
-            ))}
+              ),
+            )}
           </ul>
           </div>
         </nav>
+
+        <div
+          ref={menuWrap}
+          id="mnav-product"
+          hidden={!menu}
+          onPointerEnter={hoverOpen}
+          onPointerLeave={hoverClose}
+          className="np-panel hidden lg:block"
+        >
+          <p className="sr-only">Product</p>
+          <ProductPanel items={products} onPick={pickProduct} showDemo={!hidden.has("demo")} />
+        </div>
 
         <div className="ml-auto flex items-center gap-1.5 lg:ml-0">
           <ThemeToggle compact className="hidden sm:inline-flex" />
@@ -190,7 +290,10 @@ export function MarketingNav() {
 
       <div ref={panelRef} id="mnav-panel" hidden={!open} className="mnav-panel mx-auto mt-2 max-w-[1180px] overflow-hidden rounded-[28px] p-2 lg:hidden">
         <nav aria-label="Sections" className="flex flex-col">
-          {links.map((l) => (
+          <p className="px-4 pb-1 pt-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Product</p>
+          <ProductTilesCompact items={products} onPick={pickProduct} />
+          <div className="mx-4 my-2 h-px bg-border" aria-hidden="true" />
+          {links.filter((l) => l.id !== "features").map((l) => (
             <Link
               key={l.id}
               data-sec={l.id}
