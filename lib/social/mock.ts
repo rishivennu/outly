@@ -132,6 +132,11 @@ export class MockPublisher implements SocialPublisher {
     return reply;
   }
 
+  async postComment(_account: AccountContext, platformPostId: string) {
+    await sleep(150);
+    return { id: `practice-first-${platformPostId}` };
+  }
+
   async delete() {
     await sleep(300);
   }

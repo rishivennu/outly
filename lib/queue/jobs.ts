@@ -9,6 +9,7 @@ export const JOBS = {
   SOCIAL_STATUS_CHECK: "SOCIAL_STATUS_CHECK",
   SCHEDULED_POST: "SCHEDULED_POST",
   TOKEN_REFRESH: "TOKEN_REFRESH",
+  FIRST_COMMENT: "FIRST_COMMENT",
 } as const;
 export type JobName = keyof typeof JOBS;
 
@@ -20,6 +21,7 @@ export interface JobPayloads {
   SOCIAL_STATUS_CHECK: { targetId: string; platform: Platform; simulate?: SimulationMode; poll: number };
   SCHEDULED_POST: { postId: string };
   TOKEN_REFRESH: { accountId: string };
+  FIRST_COMMENT: { targetId: string; platform: Platform; attempt?: number };
 }
 
 /** Queue topology: one queue per platform so a slow YouTube upload never blocks an X post. */

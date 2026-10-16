@@ -52,6 +52,10 @@ export function targetView(t: PostTarget) {
     caption: t.caption,
     description: t.description,
     hashtags: t.hashtags,
+    firstComment: t.firstComment,
+    /** posted | failed | waiting (set, not yet live) | null (none). */
+    firstCommentState: !t.firstComment?.trim() ? null : t.firstCommentId ? ("posted" as const) : t.firstCommentError ? ("failed" as const) : ("waiting" as const),
+    firstCommentError: t.firstCommentError,
     status: t.platformStatus,
     platformPostId: t.platformPostId,
     url: t.platformUrl,

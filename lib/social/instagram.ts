@@ -164,6 +164,12 @@ export class InstagramPublisher implements SocialPublisher {
     return { id, text, authorName: account.username, createdAt: new Date().toISOString(), parentId: commentId };
   }
 
+  async postComment(account: AccountContext, mediaId: string, text: string) {
+    const r = await formPost(`${GRAPH}/${mediaId}/comments`, { message: text, access_token: account.accessToken });
+    if (!r.ok) throw await httpFailure(r, "instagram first comment");
+    return { id: ((await r.json()) as { id: string }).id };
+  }
+
   async delete() {
     throw new PublisherError("UNKNOWN", "Instagram does not allow deleting Reels through the API. Remove it in the app.", undefined, false);
   }

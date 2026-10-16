@@ -30,6 +30,8 @@ export const targetDraftSchema = z.object({
   caption: textish(5000),
   description: textish(5000),
   hashtags: textish(1000),
+  /** Per-platform limits (FIRST_COMMENT_LIMIT) are checked in the editor; this is only the outer bound so autosave never fails mid-typing. */
+  firstComment: textish(10000),
 });
 
 export const savePostSchema = z.object({
@@ -52,6 +54,24 @@ export const updatePostSchema = z.object({
   targets: z.array(targetDraftSchema).optional(),
   title: z.string().max(200).optional(),
   requireApproval: z.boolean().optional(),
+});
+
+/** Bulk scheduling: up to 10 videos, the same destinations, each with its own time. */
+export const bulkScheduleSchema = z.object({
+  platforms: z.array(platformSchema).min(1, "Pick at least one place to send them.").max(PLATFORMS.length),
+  items: z
+    .array(
+      z.object({
+        mediaId: z.string().cuid(),
+        title: z.string().trim().max(200).optional().nullable(),
+        caption: z.string().max(5000).optional().nullable(),
+        hashtags: z.string().max(1000).optional().nullable(),
+        scheduledAt: z.string().datetime(),
+      }),
+    )
+    .min(1, "Add at least one video.")
+    .max(10, "Ten videos at a time, please.")
+    .refine((xs) => new Set(xs.map((x) => x.mediaId)).size === xs.length, "The same video is in the batch twice."),
 });
 
 export const reviewDecisionSchema = z

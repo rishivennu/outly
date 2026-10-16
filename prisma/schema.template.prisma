@@ -145,6 +145,9 @@ model PostTarget {
   caption         String?
   description     String?
   hashtags        String? // space separated
+  firstComment    String? // posted as the first comment once the post is live (Instagram, YouTube; a reply on X)
+  firstCommentId  String? // the platform's id for that comment, once posted
+  firstCommentError String? // why the first comment didn't go up (the post itself is unaffected)
   platformStatus  String    @default("pending") // pending | queued | uploading | processing | published | failed
   uploadRef       String? // platform upload handle between SOCIAL_UPLOAD and SOCIAL_PUBLISH
   platformPostId  String?

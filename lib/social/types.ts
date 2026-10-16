@@ -126,6 +126,8 @@ export interface SocialPublisher {
   /** Comments on a published post, newest first. Optional: a platform without the permission simply omits it. */
   listComments?(target: CommentTarget, account: AccountContext): Promise<PlatformComment[]>;
   replyToComment?(account: AccountContext, commentId: string, text: string): Promise<PlatformComment>;
+  /** The creator's own first comment on their just-published post (a reply to it on X). */
+  postComment?(account: AccountContext, platformPostId: string, text: string): Promise<{ id: string }>;
 }
 
 /** fetch() itself failing (DNS, reset, timeout) means we don't know what the platform did. */

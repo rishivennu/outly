@@ -2,14 +2,16 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Layers, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { fmt, tzShort, useUser } from "@/components/shell/UserContext";
 import { PostSheet } from "@/components/posts/PostSheet";
-import { addDaysKey, dayKey } from "@/lib/client/tz";
+import { addDaysKey, dayKey, fromTzParts, partsInTz } from "@/lib/client/tz";
+import { useToast } from "@/components/shared/Toast";
+import { api, ApiError } from "@/lib/client/api";
 import { cn } from "@/lib/utils";
 import type { PostView } from "@/lib/services";
 
@@ -24,6 +26,30 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
   const [start, setStart] = useState(() => addDaysKey(today, -weekdayOf(today)));
   const [dir, setDir] = useState(0);
   const [open, setOpen] = useState<PostView | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropKey, setDropKey] = useState<string | null>(null);
+  const toast = useToast();
+
+  /** Move a booked post to another day at the same time of day. Optimistic; puts it back if the server says no. */
+  const moveTo = async (id: string, key: string) => {
+    const p = posts.find((x) => x.id === id);
+    if (!p?.scheduledAt || p.status !== "scheduled") return;
+    const was = partsInTz(new Date(p.scheduledAt), tz);
+    const [y, m, d] = key.split("-").map(Number);
+    const next = fromTzParts(y, m, d, was.h, was.min, tz);
+    if (dayKey(new Date(p.scheduledAt), tz) === key) return;
+    if (next.getTime() < Date.now() + 60_000) return toast("That time has already passed. Pick a later day.", "info");
+    const before = p.scheduledAt;
+    setPosts((ps) => ps.map((x) => (x.id === id ? { ...x, scheduledAt: next.toISOString() } : x)));
+    try {
+      const r = await api<{ post: PostView }>(`/api/posts/${id}`, { method: "PATCH", json: { scheduledAt: next.toISOString() } });
+      setPosts((ps) => ps.map((x) => (x.id === id ? r.post : x)));
+      toast(`Moved to ${fmt(next, tz, { weekday: "long", hour: "numeric", minute: "2-digit" })}.`);
+    } catch (e) {
+      setPosts((ps) => ps.map((x) => (x.id === id ? { ...x, scheduledAt: before } : x)));
+      toast(e instanceof ApiError ? e.message : "Couldn't move it. Check your connection and try again.", "error");
+    }
+  };
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDaysKey(start, i)), [start]);
   const byDay = useMemo(() => {
@@ -68,6 +94,11 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
           <Button variant="subtle" size="sm" onClick={() => setStart(addDaysKey(today, -weekdayOf(today)))} disabled={days.includes(today)}>
             Today
           </Button>
+          <Button asChild variant="lime" size="sm">
+            <Link href="/create/bulk">
+              <Layers className="h-4 w-4" aria-hidden /> Plan a batch
+            </Link>
+          </Button>
         </div>
       </header>
 
@@ -78,15 +109,47 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
             const isToday = d === today;
             const past = d < today;
             return (
-              <li key={d} className={cn("flex min-h-[120px] flex-col rounded-[24px] p-2.5 md:min-h-[420px]", isToday ? "glass lime-ring" : "bg-card/50 hairline")} aria-label={fmt(keyDate(d), "UTC", { weekday: "long", month: "long", day: "numeric" })}>
+              <li
+                key={d}
+                onDragOver={(e) => {
+                  if (!dragId || past) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  if (dropKey !== d) setDropKey(d);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropKey((k) => (k === d ? null : k));
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const id = e.dataTransfer.getData("text/x-outlly-post") || dragId;
+                  setDragId(null);
+                  setDropKey(null);
+                  if (id) void moveTo(id, d);
+                }}
+                className={cn("flex min-h-[120px] flex-col rounded-[24px] p-2.5 transition-shadow md:min-h-[420px]", isToday ? "glass lime-ring" : "bg-card/50 hairline", dropKey === d && "ring-2 ring-[hsl(var(--lime))]")}
+                aria-label={fmt(keyDate(d), "UTC", { weekday: "long", month: "long", day: "numeric" })}>
                 <div className="mb-3 flex items-baseline justify-between px-1.5 pt-1">
                   <span className={cn("text-xs font-semibold uppercase tracking-[0.14em]", isToday ? "text-foreground" : "text-muted-foreground")}>{fmt(keyDate(d), "UTC", { weekday: "short" })}</span>
                   <span className={cn("tabular grid h-8 w-8 place-items-center rounded-full text-sm font-semibold", isToday && "lime-bg")}>{fmt(keyDate(d), "UTC", { day: "numeric" })}</span>
                 </div>
                 <div className="flex flex-1 flex-col gap-2">
                   {items.map((p) => (
-                    <motion.button
+                    <div
                       key={p.id}
+                      draggable={p.status === "scheduled"}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/x-outlly-post", p.id);
+                        e.dataTransfer.effectAllowed = "move";
+                        setDragId(p.id);
+                      }}
+                      onDragEnd={() => {
+                        setDragId(null);
+                        setDropKey(null);
+                      }}
+                      className={cn(p.status === "scheduled" && "cursor-grab active:cursor-grabbing", dragId === p.id && "opacity-50")}
+                    >
+                    <motion.button
                       layout
                       type="button"
                       onClick={() => setOpen(p)}
@@ -108,6 +171,7 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
                       </div>
                       {p.status !== "scheduled" && <StatusBadge status={p.status} className="absolute right-2 top-2 hidden scale-90 md:inline-flex" />}
                     </motion.button>
+                    </div>
                   ))}
                   {!past && items.length === 0 && (
                     <Link href="/create" className="group mt-auto flex min-h-[44px] items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border text-xs text-muted-foreground transition hover:border-foreground/30 hover:text-foreground md:flex-1">
@@ -120,6 +184,8 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
           })}
         </motion.ol>
       </AnimatePresence>
+
+      {weekCount > 0 && <p className="mt-4 hidden text-xs text-muted-foreground md:block">Drag a booked post to another day to move it. It keeps its time. Tap a post to pick an exact time.</p>}
 
       <PostSheet
         post={open}

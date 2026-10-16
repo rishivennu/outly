@@ -18,6 +18,7 @@ export function targetPayload(drafts: Drafts) {
     caption: drafts[p].caption || null,
     description: drafts[p].description || null,
     hashtags: drafts[p].hashtags || null,
+    firstComment: drafts[p].firstComment?.trim() || null,
   }));
 }
 

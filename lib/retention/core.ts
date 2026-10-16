@@ -74,6 +74,7 @@ export function nudgeDue(u: { postingGoal: number; nudgeAt: Date | null; timezon
 /** Notice keys carry the id they are about, so a notice can resolve itself once the problem is gone. */
 export const noticeKey = {
   failed: (postId: string, targetId: string) => `fail:${postId}:${targetId}`,
+  live: (postId: string) => `live:${postId}`,
   reconnect: (accountId: string, week: string) => `reconnect:${accountId}:${week}`,
   expiring: (accountId: string, week: string) => `expiring:${accountId}:${week}`,
   nudge: (userId: string, week: string) => `nudge:${userId}:${week}`,

@@ -41,7 +41,7 @@ export function SectionHead({
 /** The dashed route from the hero, reused as a section divider. */
 export function RouteRule({ className }: { className?: string }) {
   return (
-    <div className={cn("relative h-10", className)} aria-hidden="true">
+    <div className={cn("relative h-10", className)} aria-hidden="true" data-route="">
       <svg viewBox="0 0 1200 40" preserveAspectRatio="none" className="h-full w-full">
         <path d="M0 20 H1200" fill="none" stroke="hsl(var(--border))" strokeWidth="2" strokeDasharray="2 12" strokeLinecap="round" />
       </svg>

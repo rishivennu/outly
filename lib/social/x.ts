@@ -171,6 +171,16 @@ export class XPublisher implements SocialPublisher {
     return { id, text, authorName: account.username, createdAt: new Date().toISOString(), parentId: commentId };
   }
 
+  async postComment(account: AccountContext, tweetId: string, text: string) {
+    const r = await fetch(`${API}/tweets`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${account.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ text, reply: { in_reply_to_tweet_id: tweetId } }),
+    });
+    if (!r.ok) throw await httpFailure(r, "x first reply");
+    return { id: ((await r.json()) as { data: { id: string } }).data.id };
+  }
+
   async delete(account: { accessToken: string }, id: string) {
     const r = await fetch(`${API}/tweets/${id}`, { method: "DELETE", headers: { authorization: `Bearer ${account.accessToken}` } });
     if (!r.ok && r.status !== 404) throw await httpFailure(r, "x delete");

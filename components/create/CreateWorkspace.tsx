@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { UploadZone } from "@/components/shared/UploadZone";
 import { useToast } from "@/components/shared/Toast";
 import { defaultSchedule } from "@/components/shared/DateTimePicker";
@@ -85,7 +86,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
     for (const p of PLATFORMS) {
       const t = initialPost?.targets.find((x) => x.platform === p);
       out[p] = t
-        ? { enabled: true, title: t.title ?? "", caption: t.caption ?? "", description: t.description ?? "", hashtags: t.hashtags ?? "", note: NOTES[p], reviewed: false }
+        ? { enabled: true, title: t.title ?? "", caption: t.caption ?? "", description: t.description ?? "", hashtags: t.hashtags ?? "", firstComment: t.firstComment ?? "", note: NOTES[p], reviewed: false }
         : emptyDraft(initialPost ? false : !!accounts[p] && live.includes(p));
     }
     if (initialPost && connected && (PLATFORMS as readonly string[]).includes(connected)) out[connected as Platform].enabled = true;
@@ -291,7 +292,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
       const targets: Record<string, DeviceTarget> = {};
       for (const p of PLATFORMS) {
         const x = drafts[p];
-        targets[p] = { enabled: x.enabled, title: x.title, caption: x.caption, description: x.description, hashtags: x.hashtags };
+        targets[p] = { enabled: x.enabled, title: x.title, caption: x.caption, description: x.description, hashtags: x.hashtags, firstComment: x.firstComment };
       }
       void saveDeviceDraft({ id, postId, title: draftTitle({ drafts, hook, filename }), story: submittedStory ?? story, hook, targets, filename, poster: posterBlob.current }, fileRef.current);
     }, 700);
@@ -576,6 +577,9 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                 <div className="mt-8 w-full sm:mt-10">
                   <UploadZone compact onFile={(f) => startUpload(f)} />
                 </div>
+                <Link href="/create/bulk" className="mt-4 inline-flex min-h-[44px] items-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+                  Several videos? Plan a batch of up to 10
+                </Link>
                 {!initialPost && !restoreLocal && deviceReady && <DeviceDrafts className="mx-auto mt-10 max-w-md text-left" />}
               </motion.section>
             )}

@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { ToastProvider } from "@/components/shared/Toast";
 import { MobileNav, MobileTopBar, Sidebar } from "@/components/shell/Nav";
 import { Tour } from "@/components/onboarding/Tour";
+import { CommandPalette } from "@/components/shell/CommandPalette";
 import { touchActivity } from "@/lib/activity";
 import { liveNow } from "@/lib/social/registry";
 import { LivePlatformsProvider } from "@/components/shell/LivePlatforms";
@@ -15,6 +16,7 @@ import { siteStatus, joinedBeforeMaintenance } from "@/lib/site";
 import { Countdown } from "@/components/maintenance/Countdown";
 import { getConfig } from "@/lib/settings";
 import { WhatsNew } from "@/components/shell/WhatsNew";
+import { SendingPill } from "@/components/shell/SendingPill";
 
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -46,7 +48,9 @@ export default async function StudioLayout({ children }: { children: React.React
         </div>
       </div>
       <MobileNav />
+      <SendingPill />
       <Tour />
+      <CommandPalette />
       <WhatsNew notice={notice} userId={user.actor?.id ?? user.id} joinedAt={new Date(user.joinedAt).toISOString()} />
       <AvatarCursor />
       <Watermark tag={createHash("sha256").update(user.id).digest("hex").slice(0, 10).toUpperCase()} />

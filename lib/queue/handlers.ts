@@ -32,6 +32,8 @@ export async function runJob<N extends JobName>(name: N, data: JobPayloads[N]) {
       return scheduledPost(data as JobPayloads["SCHEDULED_POST"]);
     case "TOKEN_REFRESH":
       return tokenRefresh(data as JobPayloads["TOKEN_REFRESH"]);
+    case "FIRST_COMMENT":
+      return firstComment(data as JobPayloads["FIRST_COMMENT"]);
   }
 }
 
@@ -142,8 +144,45 @@ async function loadContext(targetId: string, simulate: SimulationMode | undefine
 }
 
 async function setTarget(id: string, postId: string, status: TargetStatus, extra: Record<string, unknown> = {}) {
-  await db.postTarget.update({ where: { id }, data: { platformStatus: status, ...extra } });
+  const t = await db.postTarget.update({ where: { id }, data: { platformStatus: status, ...extra } });
   await syncPost(postId);
+  // Live with a first comment waiting: post it a few seconds later (a brand-new video can refuse comments for a moment).
+  if (status === "published" && t.firstComment?.trim() && !t.firstCommentId && isPlatform(t.platform))
+    await enqueue("FIRST_COMMENT", { targetId: id, platform: t.platform }, { delayMs: 5000, jobId: `fc-${id}` });
+}
+
+const FIRST_COMMENT_TRIES = 4;
+
+/**
+ * Post the creator's first comment on their own, already-live post. Best effort by design: the post itself is
+ * never touched, a failure is kept on the target (firstCommentError) so the app can say so plainly.
+ */
+export async function firstComment({ targetId, platform, attempt = 0 }: JobPayloads["FIRST_COMMENT"]) {
+  const t = await db.postTarget.findUnique({ where: { id: targetId }, include: { socialAccount: true } });
+  if (!t || t.firstCommentId || !t.firstComment?.trim() || t.platformStatus !== "published" || !t.platformPostId) return;
+  const fail = (msg: string) => db.postTarget.update({ where: { id: t.id }, data: { firstCommentError: msg } });
+  const acct = t.socialAccount;
+  if (!acct || acct.status !== "connected") return void (await fail("The account was disconnected before we could add the comment."));
+  try {
+    const publisher = publisherForAccount(platform, acct);
+    if (!publisher.postComment) return void (await fail("This platform doesn't let apps add comments."));
+    let accessToken = decrypt(acct.accessToken);
+    if (acct.tokenExpiresAt && acct.tokenExpiresAt.getTime() - Date.now() < 5 * 60_000) {
+      const fresh = await publisher.refreshToken({ id: acct.id, platformUserId: acct.platformUserId, username: acct.username, accessToken, refreshToken: acct.refreshToken ? decrypt(acct.refreshToken) : null });
+      accessToken = fresh.accessToken;
+      await db.socialAccount.update({ where: { id: acct.id }, data: { accessToken: encrypt(fresh.accessToken), ...(fresh.refreshToken ? { refreshToken: encrypt(fresh.refreshToken) } : {}), tokenExpiresAt: fresh.expiresAt ?? null } });
+    }
+    const account = { id: acct.id, platformUserId: acct.platformUserId, username: acct.username, accessToken };
+    const { id } = await publisher.postComment(account, t.platformPostId, t.firstComment.trim());
+    // Conditional, so a duplicate job that raced this one can't post twice and overwrite the id.
+    await db.postTarget.updateMany({ where: { id: t.id, firstCommentId: null }, data: { firstCommentId: id, firstCommentError: null } });
+  } catch (e) {
+    const pe = asPublisherError(e);
+    // MEDIA_REJECTED here is usually "still processing": worth a few more tries, spaced out.
+    const again = (pe.retryable || pe.code === "MEDIA_REJECTED") && attempt + 1 < FIRST_COMMENT_TRIES;
+    if (again) return void (await enqueue("FIRST_COMMENT", { targetId, platform, attempt: attempt + 1 }, { delayMs: 15_000 * 2 ** attempt, jobId: `fc-${targetId}-${attempt + 1}` }));
+    await fail(pe.code === "AUTH_EXPIRED" ? "The account needs reconnecting, so the comment didn't go up." : pe.code === "FORBIDDEN" ? "The platform didn't allow the comment (comments may be off for this post)." : "The comment didn't go up. You can add it on the platform.");
+  }
 }
 
 export async function syncPost(postId: string) {
@@ -155,6 +194,12 @@ export async function syncPost(postId: string) {
     where: { id: postId },
     data: { status, ...(allDone && !post.publishedAt ? { publishedAt: new Date() } : {}) },
   });
+  // The send just settled with something live: one in-app notice (10-16g). Keyed per post, so a retry
+  // that finishes later never adds a second one.
+  if (post.status === "publishing" && (status === "published" || status === "partial")) {
+    const { noticePostLive } = await import("../retention/notices");
+    await noticePostLive(postId).catch((e) => console.error("[notice]", e));
+  }
 }
 
 /** The creator pressed Stop. Any job still holding this target lets it go. */

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { firstCommentLine } from "@/lib/client/first-comment";
 import Link from "next/link";
 import { CalendarClock, Check, Copy, ExternalLink, Link as LinkIcon, MessageSquareWarning, PenLine, ShieldCheck, Trash2, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -103,6 +104,7 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
           <ul className="space-y-2">
             {post.targets.map((t) => {
               const h = t.status === "failed" ? targetErrorCopy(t.platform, t.errorCode) : null;
+              const fc = t.status === "failed" ? null : firstCommentLine(t);
               return (
                 <li key={t.id} className="flex items-center gap-3 rounded-2xl bg-secondary/50 p-3">
                   <PlatformOrb platform={t.platform} size={32} />
@@ -113,6 +115,7 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
                       </span>
                     </p>
                     <p className={h ? "text-xs text-destructive" : "truncate text-xs text-muted-foreground"}>{h ? h.title : t.status === "published" ? "Published" : t.status === "pending" ? (post.status === "scheduled" ? "Waiting for its moment" : "Not sent yet") : TARGET_COPY[t.status as TargetStatus]}</p>
+                    {fc && <p className={fc.tone === "bad" ? "mt-0.5 text-xs text-destructive" : "mt-0.5 text-xs text-muted-foreground"}>{fc.text}</p>}
                   </div>
                   {t.url && (
                     <a href={t.url} target="_blank" rel="noopener noreferrer" aria-label={`Open on ${PLATFORM_META[t.platform].name} (new tab)`} className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground">

@@ -1,3 +1,4 @@
+import { weekDay, weekStart } from "../retention/core";
 /** Pure parts of the Monday report, unit-tested without a database. */
 export interface ReportTarget {
   platform: string;
@@ -62,3 +63,51 @@ export function reportDue(u: { weeklyReport: boolean; lastReportAt: Date | null;
 }
 
 export const compact = (n: number) => new Intl.NumberFormat("en-US", { notation: n >= 10_000 ? "compact" : "standard", maximumFractionDigits: 1 }).format(n);
+
+/* ---------------- Home "Last week" recap (10-16 UX round) ---------------- */
+
+
+/** Holds last week's key once the creator hides the card. Lives here, not in the client component, so the server can read the real string. */
+export const RECAP_COOKIE = "outlly_recap_hide";
+
+/** Monday and Tuesday only: by Wednesday last week is old news and "This week" says enough. */
+export const recapVisible = (now: Date, tz: string) => weekDay(now, tz) <= 2;
+
+/** Last week's local Monday 00:00 and this week's, plus a stable key ("2026-10-05") for "hide until next week". */
+export function recapWindow(now: Date, tz: string) {
+  const thisMonday = weekStart(now, tz);
+  const lastMonday = new Date(thisMonday.getTime() - 7 * 864e5);
+  // noon, so a DST shift can never push the label into the neighbouring day
+  const day = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date(d.getTime() + 12 * 36e5));
+  const short = (d: Date) => new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "short", day: "numeric" }).format(new Date(d.getTime() + 12 * 36e5));
+  const lastSunday = new Date(thisMonday.getTime() - 864e5);
+  return { since: lastMonday, until: thisMonday, key: day(lastMonday), label: `${short(lastMonday)} to ${short(lastSunday)}` };
+}
+
+export interface RecapCopy {
+  headline: string;
+  versus: string | null;
+  goal: string | null;
+  cta: { label: string; href: string };
+}
+
+/**
+ * The words on the card. Posts are compared with the week before (a fair count); views are not,
+ * because older posts have had longer to collect them.
+ */
+export function recapCopy(s: Pick<WeeklyStats, "published" | "views" | "upcoming">, prevPublished: number, goal: number): RecapCopy {
+  const posts = `${s.published} post${s.published === 1 ? "" : "s"}`;
+  const headline = !s.published ? "Nothing went out last week." : s.views > 0 ? `${posts} out, ${compact(s.views)} view${s.views === 1 ? "" : "s"} so far.` : `${posts} out last week.`;
+  const versus =
+    s.published === prevPublished
+      ? prevPublished
+        ? "Same as the week before."
+        : null
+      : s.published > prevPublished
+        ? `Up from ${prevPublished} the week before.`
+        : `Down from ${prevPublished} the week before.`;
+  const goalLine = goal > 0 ? (s.published >= goal ? `You hit your goal of ${goal} a week.` : `${s.published} of your ${goal} a week.`) : null;
+  const short = Math.max(0, goal - s.upcoming);
+  const cta = short > 0 ? { label: short === 1 ? "Plan one more for this week" : `Plan ${short} more for this week`, href: "/create/bulk" } : { label: "See this week", href: "/calendar" };
+  return { headline, versus, goal: goalLine, cta };
+}

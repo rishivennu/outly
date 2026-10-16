@@ -10,6 +10,7 @@ import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
 import { ThemeCycleButton, ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useUser } from "./UserContext";
 import { NoticesBell } from "./NoticesBell";
+import { PaletteButton } from "./PaletteButton";
 
 const MAIN = [
   { href: "/home", label: "Home", icon: Home },
@@ -42,11 +43,12 @@ export function Sidebar() {
           href="/create"
           data-tour="new-post"
           aria-current={isActive(path, "/create") ? "page" : undefined}
-          className="lime-glow group mb-6 flex h-12 items-center gap-2.5 rounded-2xl bg-lime px-4 text-[15px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-px active:scale-[0.98]"
+          className="lime-glow group mb-3 flex h-12 items-center gap-2.5 rounded-2xl bg-lime px-4 text-[15px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-px active:scale-[0.98]"
         >
           <Plus className="h-[18px] w-[18px] transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.6} aria-hidden="true" />
           New post
         </Link>
+        <PaletteButton />
 
         <p className="eyebrow mb-2 px-3 text-[11px]">Studio</p>
         <nav className="flex flex-col gap-0.5">
@@ -202,6 +204,7 @@ export function MobileTopBar() {
       </Link>
       <div className="flex min-w-0 items-center gap-0.5">
         {/* One cycling button: the three-way switch made the row wider than a phone (10-12f). */}
+        <PaletteButton compact />
         <ThemeCycleButton />
         <NoticesBell placement="below" />
       </div>

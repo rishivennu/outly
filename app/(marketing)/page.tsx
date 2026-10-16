@@ -16,6 +16,7 @@ import { getConfig } from "@/lib/settings";
 import { siteStatus } from "@/lib/site";
 import { shown } from "@/lib/landing";
 import { Countdown } from "@/components/maintenance/Countdown";
+import { ScrollScenes } from "@/components/marketing/ScrollScenes";
 
 // Rendered per request: prices follow the visitor's country, and the platform list follows the admin's keys.
 export const dynamic = "force-dynamic";
@@ -92,6 +93,7 @@ export default async function LandingPage() {
       {on("cta") && <FinalCta />}
       {/* A page with every section off still needs a heading for screen readers and a way in. */}
       {!on("hero") && <h1 className="sr-only">Outlly</h1>}
+      <ScrollScenes />
     </>
   );
 }

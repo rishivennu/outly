@@ -19,6 +19,8 @@ export interface DeviceTarget {
   caption: string;
   description: string;
   hashtags: string;
+  /** Missing on drafts saved before first comments existed. */
+  firstComment?: string;
 }
 
 export interface DeviceDraft {

@@ -1,8 +1,13 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { firstCommentLine } from "@/lib/client/first-comment";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { useToast } from "@/components/shared/Toast";
+import { deleteCopy, isFailedPost } from "@/lib/client/failed-posts";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, Check, ChevronDown, ExternalLink, LayoutGrid, Link2, Plus, RefreshCw, Square } from "lucide-react";
+import { ArrowRight, BarChart3, Bell, BellOff, Check, ChevronDown, ExternalLink, LayoutGrid, Link2, Plus, RefreshCw, Square, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OutlyMark } from "@/components/brand/Logo";
 import { Pip } from "@/components/brand/Pip";
@@ -12,6 +17,7 @@ import { api, ApiError } from "@/lib/client/api";
 import { PLATFORM_META, STOPPABLE, TARGET_COPY, type Platform, type TargetStatus } from "@/lib/domain";
 import { targetErrorCopy } from "@/components/shared/errorCopy";
 import { cn } from "@/lib/utils";
+import { askNotify, muteNotify, notifyOnce, notifyState, pingSending, readTimes, recordSendTime, sendSummary, typicalLabel, type NotifyState } from "@/lib/client/sending";
 import { DancingPip, MusicToggle, useGroove } from "./Groove";
 import type { PostView, TargetView } from "./types";
 
@@ -43,10 +49,21 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const router = useRouter();
+  const toast = useToast();
   const reduce = useReducedMotion();
   const active = post.targets.some((t) => ACTIVE.includes(t.status as TargetStatus));
   const stoppable = post.targets.filter((t) => STOPPABLE.includes(t.status as TargetStatus));
   const g = useGroove(active);
+  /** A live post whose first comment is still on its way keeps a slow poll going, for five minutes at most. */
+  const commentWait = post.targets.some((t) => t.status === "published" && t.firstCommentState === "waiting");
+  const [commentGaveUp, setCommentGaveUp] = useState(false);
+  useEffect(() => {
+    if (!commentWait) return;
+    const id = setTimeout(() => setCommentGaveUp(true), 300_000);
+    return () => clearTimeout(id);
+  }, [commentWait]);
 
   /** Signed out or the post is gone: no point asking again. */
   const [pollDead, setPollDead] = useState(false);
@@ -66,16 +83,17 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
   // Fast while it's fresh, then easy on the server for a platform that takes its time.
   const slow = now - t0 > 120_000;
 
+  const polling = active || (commentWait && !commentGaveUp);
   useEffect(() => {
-    if (!active || pollDead) return;
-    const id = setInterval(refresh, slow ? 6000 : POLL_MS);
+    if (!polling || pollDead) return;
+    const id = setInterval(refresh, active ? (slow ? 6000 : POLL_MS) : 5000);
     const onShow = () => !document.hidden && refresh();
     document.addEventListener("visibilitychange", onShow);
     return () => {
       clearInterval(id);
       document.removeEventListener("visibilitychange", onShow);
     };
-  }, [active, refresh, slow, pollDead]);
+  }, [polling, active, refresh, slow, pollDead]);
 
   useEffect(() => {
     if (!stoppable.length) setConfirmAll(false);
@@ -104,6 +122,46 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
     }
     if (t.status !== "failed") rec.pct = p;
     return Math.round(p);
+  };
+
+  // Real send times (10-16g): only targets we watched from the start (pending/queued) count, timed
+  // from when this screen first saw them to when they went live. Feeds "usually about N min".
+  const firstSeen = useRef<Record<string, { s: string; at: number; done?: boolean }>>({});
+  const [times, setTimes] = useState<Record<string, number[]>>({});
+  useEffect(() => setTimes(readTimes()), []);
+  useEffect(() => {
+    let changed = false;
+    for (const t of post.targets) {
+      const f = firstSeen.current[t.id];
+      if (!f) firstSeen.current[t.id] = { s: t.status, at: Date.now() };
+      else if (!f.done && t.status === "published" && (f.s === "pending" || f.s === "queued") && !t.practice) {
+        f.done = true;
+        recordSendTime(t.platform, (Date.now() - f.at) / 1000);
+        changed = true;
+      }
+    }
+    if (changed) setTimes(readTimes());
+  }, [post.targets]);
+
+  // Wake the studio's sending pill, and the opt-in browser notification for when this settles.
+  useEffect(() => {
+    if (active) pingSending();
+  }, [active]);
+  const [notify, setNotify] = useState<NotifyState>("unsupported");
+  useEffect(() => setNotify(notifyState()), []);
+  const wasActive = useRef(active);
+  useEffect(() => {
+    if (wasActive.current && !active && document.hidden) {
+      const s = sendSummary(post.targets);
+      notifyOnce(post.id, s.tone === "live" ? "You're live" : "Needs a hand", `"${post.title || post.media.filename || "Your post"}": ${s.text}.`, `/create?post=${post.id}`);
+    }
+    wasActive.current = active;
+  }, [active, post]);
+  const toggleNotify = async () => {
+    if (notify === "on") {
+      muteNotify();
+      setNotify("off");
+    } else setNotify(await askNotify());
   };
 
   const published = post.targets.filter((t) => t.status === "published");
@@ -138,6 +196,21 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
   };
   const retry = (t: TargetView) => act(t.id, `/api/targets/${t.id}/retry`);
   const stop = (t: TargetView) => act(t.id, `/api/targets/${t.id}/cancel`);
+  // A post that failed (fully or in places) can be cleared out of Outlly from right here.
+  const removePost = async () => {
+    setBusy("delete");
+    try {
+      await api(`/api/posts/${post.id}`, { method: "DELETE" });
+      setConfirmDel(false);
+      toast("Deleted from Outlly.", "info");
+      router.push("/content");
+    } catch (e) {
+      setConfirmDel(false);
+      setErr(e instanceof ApiError ? e.message : "Couldn't delete it. Try again in a moment.");
+      setBusy(null);
+    }
+  };
+  const delCopy = deleteCopy([post]);
   const stopAll = async () => {
     setConfirmAll(false);
     await act("all", `/api/posts/${post.id}/cancel`);
@@ -157,6 +230,12 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
             {active && <span className="font-mono tabular-nums normal-case tracking-normal text-muted-foreground" aria-hidden="true">{clock}</span>}
           </p>
           {active && <MusicToggle g={g} />}
+          {active && (notify === "off" || notify === "on") && (
+            <button type="button" onClick={toggleNotify} aria-pressed={notify === "on"} className="inline-flex h-11 items-center gap-1.5 rounded-full bg-card px-4 text-xs font-semibold hairline hover:bg-secondary">
+              {notify === "on" ? <Bell className="h-3.5 w-3.5 fill-current" aria-hidden="true" /> : <BellOff className="h-3.5 w-3.5" aria-hidden="true" />}
+              {notify === "on" ? "We'll tell you when it's done" : "Tell me when it's done"}
+            </button>
+          )}
           {stoppable.length > 1 &&
             (confirmAll ? (
               <span className="inline-flex flex-wrap items-center gap-1.5 rounded-full bg-card p-1 pl-3 text-xs font-semibold hairline" role="group" aria-label="Stop every upload?">
@@ -186,7 +265,7 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
 
       <ul aria-label="Where your video is going" className="mx-auto mt-10 flex max-w-[56rem] flex-wrap justify-center gap-5">
         {post.targets.map((t, i) => (
-          <LiveActivity key={t.id} t={t} i={i} pct={pctOf(t)} post={post} busy={busy === t.id || busy === "all"} onRetry={() => retry(t)} onStop={() => stop(t)} reduce={!!reduce} />
+          <LiveActivity key={t.id} t={t} i={i} pct={pctOf(t)} usually={typicalLabel(times[t.platform])} post={post} busy={busy === t.id || busy === "all"} onRetry={() => retry(t)} onStop={() => stop(t)} reduce={!!reduce} />
         ))}
       </ul>
 
@@ -195,6 +274,8 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
           {err}
         </p>
       )}
+
+      {!active && <WhatHappened post={post} />}
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-10 flex flex-wrap justify-center gap-3">
         {!active ? (
@@ -207,6 +288,11 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
             <Button variant="subtle" size="lg" onClick={onAnother}>
               <Plus className="h-5 w-5" /> Create another
             </Button>
+            {isFailedPost(post) && (
+              <Button variant="danger" size="lg" onClick={() => setConfirmDel(true)} disabled={busy === "delete"}>
+                <Trash2 className="h-5 w-5" aria-hidden="true" /> Delete this post
+              </Button>
+            )}
           </>
         ) : (
           <Button variant="ghost" size="lg" onClick={onAnother}>
@@ -214,11 +300,20 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
           </Button>
         )}
       </motion.div>
+      <ConfirmDialog
+        open={confirmDel}
+        onOpenChange={(o) => busy !== "delete" && setConfirmDel(o)}
+        title={delCopy.title}
+        body={delCopy.body}
+        confirmLabel={busy === "delete" ? "Deleting..." : delCopy.confirm}
+        busy={busy === "delete"}
+        onConfirm={removePost}
+      />
     </div>
   );
 }
 
-function LiveActivity({ t, i, pct, post, busy, onRetry, onStop, reduce }: { t: TargetView; i: number; pct: number; post: PostView; busy: boolean; onRetry: () => void; onStop: () => void; reduce: boolean }) {
+function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, reduce }: { t: TargetView; i: number; pct: number; usually: string | null; post: PostView; busy: boolean; onRetry: () => void; onStop: () => void; reduce: boolean }) {
   const meta = PLATFORM_META[t.platform];
   const canceled = t.status === "failed" && t.errorCode === "CANCELED";
   const h = t.status === "failed" && !canceled ? targetErrorCopy(t.platform, t.errorCode) : null;
@@ -227,6 +322,7 @@ function LiveActivity({ t, i, pct, post, busy, onRetry, onStop, reduce }: { t: T
   const canStop = STOPPABLE.includes(t.status as TargetStatus);
   const live = t.status === "published";
   const bad = t.status === "failed";
+  const fc = firstCommentLine(t);
   const returnTo = encodeURIComponent(`/create?post=${post.id}`);
   const name = post.title || post.media.filename || "Untitled";
   const title = live ? "Live" : canceled ? "Stopped" : bad ? "Needs a hand" : (TITLE[t.status] ?? t.status);
@@ -240,7 +336,7 @@ function LiveActivity({ t, i, pct, post, busy, onRetry, onStop, reduce }: { t: T
           ? "Reconnect to finish"
           : "Tap retry to finish"
         : canStop
-          ? `Step ${step + 1} of 4${t.attempts > 1 ? `, try ${t.attempts}` : ""}`
+          ? `Step ${step + 1} of 4${t.attempts > 1 ? `, try ${t.attempts}` : usually ? `, usually ${usually}` : ""}`
           : "Going public, can't stop now";
 
   return (
@@ -278,6 +374,11 @@ function LiveActivity({ t, i, pct, post, busy, onRetry, onStop, reduce }: { t: T
         <p className="text-lg font-semibold leading-tight">{title}</p>
         <p className="mt-1 text-sm leading-snug text-white/65">{statusLine}</p>
         <p className={cn("mt-2 text-[11px] font-bold uppercase tracking-[0.1em]", bad && !canceled ? "text-[#ff8a80]" : "text-[hsl(var(--lime))]")}>{accent}</p>
+        {fc && !canceled && (
+          <p className={cn("mt-2 text-[13px] leading-snug", fc.tone === "bad" ? "text-[#ff8a80]" : fc.tone === "ok" ? "text-white/85" : "text-white/65")} aria-live="polite">
+            {fc.text}
+          </p>
+        )}
         <span className="absolute right-3 top-3">
           {live && t.url ? (
             <a href={t.url} target="_blank" rel="noopener noreferrer" className="la-round" aria-label={`See it on ${meta.name} (opens in a new tab)`}>
@@ -361,13 +462,74 @@ function LiveActivity({ t, i, pct, post, busy, onRetry, onStop, reduce }: { t: T
   );
 }
 
+/**
+ * What happened (10-16g): once a send settles, one card that sums it up. Where it's live with a link
+ * to each post, what didn't go and why in a few words. Numbers live in Analytics, which reads them
+ * from each platform; we don't keep per-post numbers here, so we link there rather than guess.
+ */
+function WhatHappened({ post }: { post: PostView }) {
+  const rows = post.targets.map((t) => {
+    const meta = PLATFORM_META[t.platform];
+    const canceled = t.status === "failed" && t.errorCode === "CANCELED";
+    const result = t.status === "published" ? "Live" : canceled ? "Stopped by you" : t.status === "failed" ? "Needs a hand" : "Not sent";
+    const why = t.status === "failed" && !canceled ? targetErrorCopy(t.platform, t.errorCode).title : null;
+    return { t, meta, result, why };
+  });
+  const live = rows.filter((r) => r.t.status === "published");
+  return (
+    <section aria-labelledby="what-happened" className="la-card la-themed relative mx-auto mt-8 max-w-[56rem] overflow-hidden rounded-[2rem] p-5 sm:p-6">
+      <span className="la-grid" aria-hidden="true" />
+      <div className="relative flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="la-mute text-[11px] font-bold uppercase tracking-[0.12em]">What happened</p>
+          <h2 id="what-happened" className="mt-1 text-xl font-semibold leading-tight">
+            {live.length === rows.length ? `Live in all ${rows.length} places` : `Live in ${live.length} of ${rows.length}`}
+          </h2>
+        </div>
+        {live.length > 0 && (
+          <Link href="/analytics" className="la-pill la-pill-ghost">
+            <BarChart3 className="h-4 w-4" aria-hidden="true" /> See how it's doing
+          </Link>
+        )}
+      </div>
+      <ul className="relative mt-4 divide-y divide-current/10">
+        {rows.map(({ t, meta, result, why }) => (
+          <li key={t.id} className="flex min-h-[56px] items-center gap-3 py-2.5">
+            <PlatformOrb platform={t.platform} size={28} />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold leading-tight">
+                {meta.name} <span className="la-mute text-xs font-medium">{meta.format}</span>
+              </p>
+              <p className={cn("mt-0.5 text-sm leading-snug", t.status === "published" ? "la-accent" : t.status === "failed" && t.errorCode !== "CANCELED" ? "la-warn" : "la-mute")}>
+                {result}
+                {why && <span className="la-mute">. {why}</span>}
+              </p>
+              {t.status === "published" && firstCommentLine(t) && <p className="la-mute mt-0.5 text-[13px] leading-snug">{firstCommentLine(t)!.text}</p>}
+            </div>
+            {t.status === "published" && t.url && (
+              <a href={t.url} target="_blank" rel="noopener noreferrer" className="la-round" aria-label={`Open the post on ${meta.name} (opens in a new tab)`}>
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function Burst() {
   const bits = useMemo(
     () =>
       Array.from({ length: 30 }, (_, i) => {
-        const a = (i / 30) * Math.PI * 2 + Math.random() * 0.4;
-        const r = 120 + Math.random() * 160;
-        return { x: Math.cos(a) * r, y: Math.sin(a) * r * 0.7, c: ["--lime", "--energy-a", "--energy-b", "--energy-c", "--success"][i % 5], s: 6 + Math.random() * 6, rot: Math.random() * 360, round: i % 3 === 0 };
+        // Seeded by index, not Math.random: the server render and the first client render must match.
+        const rnd = (k: number) => {
+          const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+          return x - Math.floor(x);
+        };
+        const a = (i / 30) * Math.PI * 2 + rnd(1) * 0.4;
+        const r = 120 + rnd(2) * 160;
+        return { x: Math.cos(a) * r, y: Math.sin(a) * r * 0.7, c: ["--lime", "--energy-a", "--energy-b", "--energy-c", "--success"][i % 5], s: 6 + rnd(3) * 6, rot: rnd(4) * 360, round: i % 3 === 0 };
       }),
     [],
   );

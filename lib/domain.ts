@@ -115,6 +115,10 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
   },
 };
 
+/** Where Outlly can post the creator's first comment (on X it is a reply to the post). Limit = the platform's comment length. */
+export const FIRST_COMMENT_LIMIT: Partial<Record<Platform, number>> = { instagram: 2200, youtube: 10000, x: 280 };
+export const supportsFirstComment = (p: string): p is Platform => p in FIRST_COMMENT_LIMIT;
+
 /** Human copy for every error code. Technical detail stays behind a disclosure. */
 export function humanError(platform: Platform, code: ErrorCode | string | null | undefined) {
   const name = PLATFORM_META[platform].name;

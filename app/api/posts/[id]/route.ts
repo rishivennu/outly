@@ -3,6 +3,7 @@ import { HttpError, json, route } from "@/lib/http";
 import { updatePostSchema } from "@/lib/validation";
 import { ownedPost, postView } from "@/lib/services";
 import { enqueue } from "@/lib/queue";
+import { supportsFirstComment } from "@/lib/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,13 @@ export const PATCH = route(async (req, { user, params }) => {
   for (const t of body.targets ?? []) {
     await db.postTarget.updateMany({
       where: { postId: post.id, platform: t.platform },
-      data: { title: t.title ?? undefined, caption: t.caption ?? undefined, description: t.description ?? undefined, hashtags: t.hashtags ?? undefined },
+      data: {
+        title: t.title ?? undefined,
+        caption: t.caption ?? undefined,
+        description: t.description ?? undefined,
+        hashtags: t.hashtags ?? undefined,
+        ...(t.firstComment !== undefined && supportsFirstComment(t.platform) ? { firstComment: t.firstComment?.trim() || null } : {}),
+      },
     });
   }
   return json({ post: await postView(await ownedPost(user.id, post.id)) });

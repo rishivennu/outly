@@ -39,7 +39,7 @@ export type UploadState =
   | { kind: "done" }
   | { kind: "failed"; message: string };
 
-export const emptyDraft = (enabled: boolean): Draft => ({ enabled, title: "", caption: "", description: "", hashtags: "", note: "", reviewed: false });
+export const emptyDraft = (enabled: boolean): Draft => ({ enabled, title: "", caption: "", description: "", hashtags: "", firstComment: "", note: "", reviewed: false });
 
 export const NOTES: Record<Platform, string> = {
   instagram: "Instagram is ready",

@@ -8,7 +8,7 @@ import { isPracticeAccount } from "../social/registry";
 import { noticeKey, parseKey, weekStamp } from "./core";
 
 export interface NoticeInput {
-  kind: "post_failed" | "reconnect" | "token_expiring" | "goal_nudge";
+  kind: "post_failed" | "post_live" | "reconnect" | "token_expiring" | "goal_nudge";
   tone: "danger" | "warn" | "info";
   title: string;
   body: string;
@@ -145,4 +145,35 @@ export async function listNotices(userId: string) {
   await resolveStale(userId).catch(() => 0);
   const rows = await db.notice.findMany({ where: { userId }, orderBy: [{ readAt: { sort: "asc", nulls: "first" } }, { createdAt: "desc" }], take: 20 });
   return rows.map((n) => ({ id: n.id, kind: n.kind, tone: n.tone, title: n.title, body: n.body, href: n.href, action: n.action, read: !!n.readAt, createdAt: n.createdAt.toISOString() }));
+}
+
+/**
+ * Called once when a send settles with at least one place live (10-16g). In-app only, no email: a
+ * failure already has its own notice and email. Practice runs stay quiet. Links to the posting screen,
+ * which shows the summary.
+ */
+export async function noticePostLive(postId: string) {
+  const p = await db.post.findUnique({
+    where: { id: postId },
+    select: { userId: true, title: true, hook: true, targets: { select: { platform: true, platformStatus: true, practice: true, socialAccount: { select: { id: true, platformUserId: true } } } } },
+  });
+  if (!p) return;
+  const real = p.targets.filter((t) => !t.practice && !(t.socialAccount && isPracticeAccount(t.socialAccount)));
+  const live = real.filter((t) => t.platformStatus === "published");
+  if (!live.length) return;
+  const rest = real.filter((t) => t.platformStatus === "failed");
+  const names = (ts: { platform: string }[]) => {
+    const n = ts.map((t) => platformName(t.platform));
+    return n.length <= 1 ? (n[0] ?? "") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`;
+  };
+  const title = (p.title || p.hook || "Your post").split("\n")[0].slice(0, 60);
+  await notify(p.userId, {
+    kind: "post_live",
+    tone: "info",
+    title: `"${title}" is live on ${names(live)}`,
+    body: rest.length ? `${names(rest)} still ${rest.length === 1 ? "needs" : "need"} a hand. Open it to see what happened.` : "Everything went out. Open it for the links to each post.",
+    href: `/create?post=${postId}`,
+    action: "See what happened",
+    key: noticeKey.live(postId),
+  });
 }

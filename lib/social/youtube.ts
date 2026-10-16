@@ -194,6 +194,16 @@ export class YouTubePublisher implements SocialPublisher {
     return ytComment((await r.json()) as YtComment);
   }
 
+  async postComment(account: AccountContext, videoId: string, text: string) {
+    const r = await fetch("https://www.googleapis.com/youtube/v3/commentThreads?part=snippet", {
+      method: "POST",
+      headers: { authorization: `Bearer ${account.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ snippet: { videoId, topLevelComment: { snippet: { textOriginal: text } } } }),
+    });
+    if (!r.ok) throw await httpFailure(r, "youtube first comment");
+    return { id: ((await r.json()) as { id: string }).id };
+  }
+
   async delete(account: { accessToken: string }, id: string) {
     const r = await fetch(`https://www.googleapis.com/youtube/v3/videos?id=${id}`, {
       method: "DELETE",

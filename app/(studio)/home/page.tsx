@@ -23,6 +23,10 @@ import { IdeaBank } from "@/components/home/IdeaBank";
 import { RecycleCard } from "@/components/home/RecycleCard";
 import { SendingNow } from "@/components/home/SendingNow";
 import { WeekPulse } from "@/components/home/WeekPulse";
+import { WeekRecap } from "@/components/home/WeekRecap";
+import { RECAP_COOKIE } from "@/lib/reports/weekly-core";
+import { lastWeekRecap } from "@/lib/reports/weekly";
+import { cookies } from "next/headers";
 import { homePulse } from "@/lib/retention/pulse";
 import { isPlatform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
@@ -51,22 +55,24 @@ async function welcomeOffer(user: { id: string; createdAt: Date; actor: unknown 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Home" };
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams?: { recapAt?: string } }) {
   const user = (await getCurrentUser())!;
   // One parallel wave: every query below is independent, so the page pays one database round trip, not four.
   // Pulse only needs the connections and the published count, so it chains on those two instead of waiting for all.
   const liveP = connectedPlatforms(user.id);
   const publishedP = db.post.count({ where: { userId: user.id, status: { in: ["published", "partial"] } } });
-  const [, drafts, next, live, welcome, published, ret, pulse] = await Promise.all([
+  const meP = db.user.findUnique({ where: { id: user.id }, select: { postingGoal: true, weeklyReport: true } });
+  const recapHidden = cookies().get(RECAP_COOKIE)?.value;
+  // Dev only: preview the Monday card on any day (?recapAt=2026-10-19T05:00:00Z).
+  const recapAt = process.env.NODE_ENV !== "production" && searchParams?.recapAt ? new Date(searchParams.recapAt) : new Date();
+  const [, drafts, next, live, welcome, published, ret, pulse, recap] = await Promise.all([
     loadKeys(),
     db.post.findMany({ where: { userId: user.id, status: "draft" }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() } }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),
     liveP,
     welcomeOffer(user).catch(() => null),
     publishedP,
-    db.user
-      .findUnique({ where: { id: user.id }, select: { postingGoal: true } })
-      .then((me) => homeRetention({ id: user.id, postingGoal: me?.postingGoal ?? 3, timezone: user.timezone }))
+    meP.then((me) => homeRetention({ id: user.id, postingGoal: me?.postingGoal ?? 3, timezone: user.timezone }))
       .catch((e) => {
         console.error("[home] retention", e);
         return null;
@@ -77,6 +83,13 @@ export default async function HomePage() {
       )
       .catch((e) => {
         console.error("[home] pulse", e);
+        return null;
+      }),
+    meP
+      .then((me) => lastWeekRecap({ id: user.id, timezone: user.timezone, postingGoal: me?.postingGoal ?? 3, weeklyReport: me?.weeklyReport ?? true }, Number.isNaN(+recapAt) ? new Date() : recapAt))
+      .then((r) => (r && r.key === recapHidden ? null : r))
+      .catch((e) => {
+        console.error("[home] recap", e);
         return null;
       }),
   ]);
@@ -101,10 +114,11 @@ export default async function HomePage() {
       <HomeHero firstName={user.name.split(" ")[0]} />
       <SetupChecklist state={setup} />
       {welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} />}
-      {pulse && (
+      {(pulse || recap) && (
         <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-4 sm:px-10">
-          <SendingNow items={pulse.sending} />
-          <WeekPulse p={pulse} />
+          {recap && <WeekRecap r={recap} canEmail={!user.actor} />}
+          {pulse && <SendingNow items={pulse.sending} />}
+          {pulse && <WeekPulse p={pulse} />}
         </div>
       )}
       {started && (

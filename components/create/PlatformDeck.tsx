@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Counter, Input, Label, Textarea } from "@/components/ui/field";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
 import { blocking, checksFor } from "@/lib/client/checks";
-import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
+import { FIRST_COMMENT_LIMIT, PLATFORM_META, PLATFORMS, supportsFirstComment, type Platform } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn } from "@/lib/utils";
 import { InstagramReel, XPost, YouTubeShort } from "./Previews";
@@ -134,7 +134,7 @@ export function PlatformDeck(p: Props) {
       {/* Destination picker. The on/off control is a sibling of the tab, never nested inside it. */}
       <div className="relative mb-6">
       <div ref={rail} className={cn("deck-rail -mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-3", edge.l && "deck-fade-l", edge.r && "deck-fade-r")}>
-        <div role="tablist" aria-label="Destinations" className="contents">
+        <div role="group" aria-label="Destinations" className="contents">
           {live.map((pl) => {
             const s = status[pl];
             const on = active === pl;
@@ -143,10 +143,10 @@ export function PlatformDeck(p: Props) {
               <div key={pl} role="presentation" className={cn("relative flex min-w-[200px] flex-1 snap-start flex-col rounded-3xl transition", on ? "glass shadow-[0_20px_60px_-30px_var(--halo)]" : "bg-secondary/40", !d.enabled && "opacity-80")} style={{ ["--halo" as string]: PLATFORM_HALO[pl] }}>
                 {on && <motion.span layoutId="deck-tab" className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-foreground/25" transition={{ type: "spring", stiffness: 400, damping: 34 }} />}
                 <button
-                  role="tab"
+                  type="button"
                   id={`tab-${pl}`}
-                  aria-selected={on}
-                  aria-controls={`panel-${pl}`}
+                  aria-pressed={on}
+                  aria-controls={on ? `panel-${pl}` : undefined}
                   onClick={() => setActive(pl)}
                   className={cn("relative flex items-center gap-3 rounded-3xl p-3.5 pr-4 text-left transition", !on && "hover:bg-secondary/60")}
                 >
@@ -191,7 +191,7 @@ export function PlatformDeck(p: Props) {
       <AnimatePresence mode="wait">
         <motion.div
           key={active}
-          role="tabpanel"
+          role="region"
           id={`panel-${active}`}
           aria-labelledby={`tab-${active}`}
           initial={{ opacity: 0, y: 14 }}
@@ -323,6 +323,37 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
             <div>
               <Label htmlFor={`${id}-tags`}>Hashtags</Label>
               <Input id={`${id}-tags`} value={d.hashtags} onChange={(e) => set({ hashtags: e.target.value })} placeholder="#oneidea #anotherone" />
+            </div>
+          )}
+          {supportsFirstComment(pl) && (
+            <div>
+              <Label htmlFor={`${id}-fc`}>
+                {pl === "x" ? "First reply" : "First comment"} <Counter value={d.firstComment.length} max={FIRST_COMMENT_LIMIT[pl] ?? 2200} />
+              </Label>
+              <Textarea
+                id={`${id}-fc`}
+                rows={2}
+                value={d.firstComment}
+                onChange={(e) => set({ firstComment: e.target.value })}
+                aria-describedby={`${id}-fc-hint`}
+                placeholder={pl === "x" ? "A link, a source, or the next thought. Optional." : "Hashtags, a link, or a question. Optional."}
+              />
+              <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                <p id={`${id}-fc-hint`} className="text-[12.5px] text-muted-foreground">
+                  {pl === "x" ? "Posted as a reply to your post a few seconds after it goes live." : "Posted as your first comment a few seconds after it goes live."}
+                </p>
+                {pl !== "x" && d.hashtags.trim() && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="subtle"
+                    className="min-h-[44px]"
+                    onClick={() => set({ firstComment: [d.firstComment.trim(), d.hashtags.trim()].filter(Boolean).join("\n\n"), hashtags: "" })}
+                  >
+                    Move hashtags here
+                  </Button>
+                )}
+              </div>
             </div>
           )}
           <SnippetBar
