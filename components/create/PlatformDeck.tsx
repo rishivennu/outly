@@ -277,7 +277,8 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
           <div className="flex items-start gap-2.5 rounded-2xl bg-accent/10 px-4 py-3 text-[14.5px]">
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
             <span>
-              {pl === "youtube" ? "YouTube wants a stronger title. I wrote one that people actually search for." : pl === "x" ? "Let's make this impossible to ignore. Short, sharp, no hashtags." : "Instagram is ready. Warm caption, a question to get comments, and tags that travel."}
+              {pl === "youtube" ? "YouTube wants a stronger title. I wrote one that people actually search for." : pl === "x" ? "Let's make this impossible to ignore. Short, sharp, no hashtags." : pl === "instagram" ? "Instagram is ready. A hook up front, one ask, and tags that travel." : `${d.note.replace(/\.$/, "")}. Written to its rules.`}
+              {d.why && <span className="mt-1 block text-[13px] text-muted-foreground">{d.why}</span>}
             </span>
           </div>
         )}

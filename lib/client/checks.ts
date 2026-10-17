@@ -9,6 +9,8 @@ export interface Draft {
   /** Posted as the first comment (a reply on X) a few seconds after the post goes live. */
   firstComment: string;
   note: string;
+  /** Caption engine line for the card, e.g. "Myth Buster · Curiosity hook · optimised for saves". */
+  why?: string;
   reviewed: boolean;
 }
 

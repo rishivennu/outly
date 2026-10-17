@@ -2115,3 +2115,24 @@ html:not(.dark) .pc-live:not(.dark *) .pc-price{background:linear-gradient(180de
 @keyframes rk-veil-out{from{transform:none}to{transform:translateX(-100%)}}
 @keyframes rk-hover{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 @media (prefers-reduced-motion:reduce){.rk-cta *,.rk-veil,.rk-veil *{animation:none!important;transition:none!important}}
+
+/* Command palette (10-17): the search row shows focus, so the input never draws a ring that the rounded
+   panel would clip (More contrast forces rings with !important). Thin scrollbar on the results. */
+html[data-contrast="more"] .cp-input:focus-visible { outline: none !important; }
+html[data-contrast="more"] .cp-search:focus-within { border-bottom-color: hsl(var(--ring)); box-shadow: inset 0 -2px 0 hsl(var(--ring)); }
+.cp-list { scrollbar-width: thin; scrollbar-color: hsl(var(--foreground) / 0.18) transparent; }
+.cp-list::-webkit-scrollbar { width: 8px; }
+.cp-list::-webkit-scrollbar-thumb { background: hsl(var(--foreground) / 0.18); border-radius: 9999px; border: 2px solid transparent; background-clip: padding-box; }
+.cp-list::-webkit-scrollbar-track { background: transparent; }
+
+/* Analytics redesign 10-17: score ring and pillar bars in one solid brand colour (no lime-to-yellow ramp).
+   Lime on dark; on light, the deep lime ink so the bar keeps 3:1 against its track. */
+.pr-meter { background: hsl(var(--lime-ink)); }
+.dark .pr-meter { background: hsl(var(--lime)); }
+.pr-ring { stroke: hsl(var(--lime-ink)); }
+.dark .pr-ring { stroke: hsl(var(--lime)); }
+.ai-type .ai-kicker, .ai-kicker { color: #4f46e5; }
+.dark .ai-kicker { color: #aea6ff; }
+/* Green badge text: --success is 3.7:1 on its own tint in light mode, so darken it there (dark mode keeps it). */
+.pr-good { color: hsl(146 64% 24%); }
+.dark .pr-good { color: hsl(var(--success)); }

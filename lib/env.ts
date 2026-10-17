@@ -48,6 +48,9 @@ const schema = z.object({
   X_CLIENT_ID: z.string().optional().default(""),
   X_CLIENT_SECRET: z.string().optional().default(""),
   GEMINI_API_KEY: z.string().optional().default(""),
+  /* Optional FunASR (Paraformer) subtitle worker, the speech engine FunClip uses. POST audio/wav, returns FunASR JSON. */
+  FUNASR_URL: z.string().optional().default(""),
+  FUNASR_TOKEN: z.string().optional().default(""),
   /** Bearer secret for /api/cron/* (Vercel Cron sends it automatically when set). */
   CRON_SECRET: z.string().optional().default(""),
   /** Upstash Redis REST, so rate limits are shared across serverless instances instead of per-process. */

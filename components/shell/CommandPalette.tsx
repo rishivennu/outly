@@ -75,6 +75,11 @@ export function CommandPalette() {
     };
   }, [letters, router]);
 
+  // The palette wins over the onboarding tour: the tour steps aside (not marked done) so they never stack.
+  useEffect(() => {
+    if (open) window.dispatchEvent(new Event("outly:tour-pause"));
+  }, [open]);
+
   // Posts load once, the first time the palette opens.
   useEffect(() => {
     if (!open) return;
@@ -181,7 +186,7 @@ export function CommandPalette() {
                   className="glass-strong flex max-h-[min(560px,80dvh)] w-full max-w-[600px] flex-col overflow-hidden rounded-[28px]"
                 >
                   <Dialog.Title className="sr-only">Search Outlly</Dialog.Title>
-                  <div className="flex items-center gap-3 border-b-2 border-border/60 px-5 transition-colors focus-within:border-primary/70">
+                  <div className="cp-search flex items-center gap-3 border-b-2 border-border/60 px-5 transition-colors focus-within:border-primary/70">
                     <Search className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                     <input
                       autoFocus
@@ -195,11 +200,11 @@ export function CommandPalette() {
                       onChange={(e) => setQ(e.target.value)}
                       onKeyDown={onKeyDown}
                       placeholder="Search pages, actions and posts"
-                      className="h-14 min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted-foreground"
+                      className="cp-input h-14 min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted-foreground"
                     />
                     <kbd className="hidden rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hairline sm:inline">Esc</kbd>
                   </div>
-                  <div ref={listRef} id={`${id}-list`} role="listbox" aria-label="Results" className="min-h-0 flex-1 overflow-y-auto p-2">
+                  <div ref={listRef} id={`${id}-list`} role="listbox" aria-label="Results" className="cp-list min-h-0 flex-1 overflow-y-auto p-2">
                     {groups.map(([g, list]) => (
                       <div key={g} role="group" aria-labelledby={`${id}-g-${g}`} className="mb-1">
                         <div id={`${id}-g-${g}`} role="presentation" className="eyebrow px-3 pb-1 pt-2 text-[11px]">{g}</div>

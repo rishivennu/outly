@@ -118,10 +118,10 @@ export function AuthShowcase({ eyebrow = "With Outlly you can", lines = ["Make i
 
       <div className="relative max-w-[440px]">
         <p className="as-eyebrow gs-in text-[15px] font-medium text-white/80">{eyebrow}</p>
-        <h2 className="mt-3 font-display text-[clamp(2.1rem,3.2vw,2.9rem)] font-bold leading-[1.04] tracking-[-0.03em]">
+        <p className="mt-3 font-display text-[clamp(1.85rem,2.6vw,2.35rem)] font-bold leading-[1.04] tracking-[-0.03em]">
           <span className="as-line block overflow-hidden pb-[0.06em]"><span className="block">{lines[0]}</span></span>
           <span className="as-line block overflow-hidden pb-[0.06em]"><span className="block">{lines[1]}</span></span>
-        </h2>
+        </p>
       </div>
     </section>
   );

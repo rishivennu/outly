@@ -189,3 +189,101 @@ export async function burnCaptions(
   const base = opts.name.replace(/\.[^.]+$/, "") || "video";
   return new File(parts, `${base}-captions.${type.ext}`, { type: type.mime.split(";")[0] });
 }
+
+/**
+ * Cut by ranges (FunClip's "clip by text" output): plays only the kept ranges in order and records them into
+ * one MP4, captions burned in when `cues` is given. The recorder pauses during each seek so no frozen frames
+ * are kept. Real time: a 20 s cut takes about 20 s.
+ */
+export async function cutClips(
+  src: string,
+  ranges: { start: number; end: number }[],
+  opts: { cues?: Cue[]; style: CaptionStyle; pos: CaptionPos; name: string; onProgress?: (p: number) => void; signal?: AbortSignal },
+): Promise<File> {
+  const type = recorderType();
+  if (!type) throw new Error("This browser can't record MP4 video. Use the latest Chrome, Edge or Safari.");
+  const keep = [...ranges].filter((r) => r.end - r.start > 0.1).sort((a, b) => a.start - b.start);
+  if (!keep.length) throw new Error("Pick at least one part of the video to keep.");
+  const total = keep.reduce((t, r) => t + r.end - r.start, 0);
+
+  const video = document.createElement("video");
+  video.src = src;
+  video.crossOrigin = "anonymous";
+  video.playsInline = true;
+  video.preload = "auto";
+  await new Promise<void>((res, rej) => {
+    video.onloadedmetadata = () => res();
+    video.onerror = () => rej(new Error("Couldn't open the video to cut it."));
+  });
+  const w = video.videoWidth || 1080;
+  const h = video.videoHeight || 1920;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  const stream = canvas.captureStream(30);
+  const ac = new AudioContext();
+  const dest = ac.createMediaStreamDestination();
+  try {
+    ac.createMediaElementSource(video).connect(dest);
+    dest.stream.getAudioTracks().forEach((t) => stream.addTrack(t));
+  } catch {
+    /* silent clip */
+  }
+  const rec = new MediaRecorder(stream, { mimeType: type.mime, videoBitsPerSecond: Math.min(12_000_000, Math.round(w * h * 30 * 0.12)) });
+  const parts: Blob[] = [];
+  rec.ondataavailable = (e) => e.data.size && parts.push(e.data);
+  const stopped = new Promise<void>((res) => (rec.onstop = () => res()));
+  const cleanup = () => {
+    video.pause();
+    stream.getTracks().forEach((t) => t.stop());
+    ac.close().catch(() => {});
+  };
+  const aborted = () => !!opts.signal?.aborted;
+  const paint = () => {
+    ctx.drawImage(video, 0, 0, w, h);
+    const c = opts.cues ? cueAt(opts.cues, video.currentTime) : null;
+    if (c) drawCue(ctx, c.text, w, h, opts.style, opts.pos);
+  };
+  const seek = (t: number) =>
+    new Promise<void>((res) => {
+      video.onseeked = () => res();
+      video.currentTime = t;
+    });
+
+  await ac.resume().catch(() => {});
+  let done = 0;
+  let started = false;
+  try {
+    for (let i = 0; i < keep.length && !aborted(); i++) {
+      const r = keep[i];
+      await seek(r.start);
+      paint();
+      if (!started) {
+        rec.start(1000);
+        started = true;
+      } else rec.resume();
+      await video.play();
+      await new Promise<void>((res) => {
+        const step = () => {
+          paint();
+          opts.onProgress?.(Math.min(0.99, (done + Math.max(0, video.currentTime - r.start)) / total));
+          if (aborted() || video.ended || video.currentTime >= r.end) return res();
+          "requestVideoFrameCallback" in video ? (video as any).requestVideoFrameCallback(step) : requestAnimationFrame(step);
+        };
+        step();
+      });
+      video.pause();
+      if (rec.state === "recording") rec.pause();
+      done += r.end - r.start;
+    }
+  } finally {
+    if (started && rec.state !== "inactive") rec.stop();
+    if (started) await stopped;
+    cleanup();
+  }
+  if (aborted()) throw new DOMException("Cancelled", "AbortError");
+  opts.onProgress?.(1);
+  const base = opts.name.replace(/\.[^.]+$/, "") || "video";
+  return new File(parts, `${base}-cut.${type.ext}`, { type: type.mime.split(";")[0] });
+}

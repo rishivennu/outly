@@ -30,6 +30,7 @@ export interface PlatformCopy {
   description?: string;
   hashtags: string;
   note: string;
+  why?: { formula: string; hook: string; cta: string; signal: string };
 }
 export type Tone = "default" | "punchier" | "professional" | "genz";
 

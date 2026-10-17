@@ -173,7 +173,7 @@ export function HelpCenter({
         ) : (
           sections.filter((s) => s.list.length).map((s) => (
             <section key={s.c || "r"} className="mb-10" aria-label={s.c || undefined}>
-              {s.c && <h2 className="eyebrow mb-2">{s.c}</h2>}
+              {s.c && <h2 className="mb-3 font-display text-[19px] font-semibold tracking-[-0.01em]">{s.c}</h2>}
               <LiquidAccordion key={`${cat}|${openId}`} defaultOpen={openId ? [openId] : []} items={s.list.map((it) => ({ id: it.id, q: it.q, a: <Answer text={it.a} /> }))} />
             </section>
           ))

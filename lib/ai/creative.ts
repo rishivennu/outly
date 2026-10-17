@@ -1,6 +1,8 @@
 import "server-only";
 import { env } from "../env";
 import type { Platform } from "../domain";
+import { DEFAULT_RULES, enginePrompt, polish, type EngineWhy } from "./caption-engine";
+import { captionRules } from "./engine-store";
 
 export type Tone = "default" | "punchier" | "professional" | "genz";
 
@@ -24,6 +26,8 @@ export interface PlatformCopy {
   description?: string;
   hashtags: string;
   note: string; // assistant's line on the platform card
+  /** Caption engine breakdown: which formula, hook and signal this copy was written for. */
+  why?: EngineWhy;
 }
 
 /* ------------------------------------------------------------------ */
@@ -223,7 +227,7 @@ function offlineCopy(story: string, hook: string, platforms: Platform[]): Platfo
       return {
         platform: p,
         caption: `${hookOne}\n\n${body}\n\nWould you try it? Tell me below 👇\n\nSave this for the next time you're stuck.`,
-        hashtags: [...tagify([nounTag, ...kw.slice(0, 3)]), ...niche, "#reelsdaily"].slice(0, 8).join(" "),
+        hashtags: [...tagify([nounTag, ...kw.slice(0, 3)]), ...niche].slice(0, 5).join(" "),
         note: "Instagram is ready ✨",
       };
     }
@@ -293,7 +297,7 @@ export async function generateHooks(story: string, tone: Tone, exclude: string[]
   const toneLine = { default: "confident and curious", punchier: "shorter and sharper, under 10 words", professional: "polished and credible, no emoji, no slang", genz: "Gen Z voice, lowercase, playful, still clear" }[tone];
   const g = await gemini<{ understood: string; original: string; hooks: Hook[] }>(
     VOICE,
-    `Creator says the video is about: """${story}"""\nTone: ${toneLine}.\nAvoid these hooks: ${JSON.stringify(exclude)}\nReturn JSON {"understood": one-sentence paraphrase showing you get it, "original": the plain un-optimised title, "hooks": [{"angle": 2-word label like "The twist", "text": hook, may use one \\n line break}] x3}`,
+    `Creator says the video is about: """${story}"""\nTone: ${toneLine}.\nEach hook stops the scroll in 5-10 words and uses a DIFFERENT hook type from: ${DEFAULT_RULES.hooks.join("; ")}. No engagement bait, no em dashes, no facts that are not in the story.\nAvoid these hooks: ${JSON.stringify(exclude)}\nReturn JSON {"understood": one-sentence paraphrase showing you get it, "original": the plain un-optimised title, "hooks": [{"angle": 2-word label like "The twist", "text": hook, may use one \\n line break}] x3}`,
   );
   const hooks = (Array.isArray(g?.hooks) ? g.hooks : [])
     .map((h) => ({ ...h, angle: asText(h?.angle).slice(0, 40) || "Fresh angle", text: asText(h?.text).slice(0, 500) }))
@@ -303,10 +307,15 @@ export async function generateHooks(story: string, tone: Tone, exclude: string[]
 }
 
 export async function generatePlatformCopy(story: string, hook: string, platforms: Platform[]): Promise<PlatformCopy[]> {
-  const fallback = offlineCopy(story, hook, platforms);
-  const g = await gemini<{ items: PlatformCopy[] }>(
-    VOICE,
-    `Video story: """${story}"""\nChosen hook: """${hook}"""\nWrite DIFFERENT copy per platform, never the same caption twice:\n- instagram: emotional, engaging caption (3 short paragraphs + a question CTA), 5-8 hashtags.\n- youtube: search-friendly title <= 90 chars ending with #Shorts, a 2-3 sentence keyword-rich description, 2-4 hashtags.\n- x: one punchy post <= 240 chars, no hashtags.\nOnly for: ${platforms.join(", ")}.\nReturn JSON {"items":[{"platform","title"?,"caption","description"?,"hashtags"}]}`,
+  const rules = await captionRules();
+  const tidy = (c: PlatformCopy): PlatformCopy => {
+    const { copy } = polish(c.platform, { title: c.title, caption: c.caption, description: c.description, hashtags: c.hashtags }, rules);
+    return { ...c, ...copy, title: c.title === undefined ? undefined : copy.title, description: c.description === undefined ? undefined : copy.description };
+  };
+  const fallback = offlineCopy(story, hook, platforms).map(tidy);
+  const g = await gemini<{ items: (PlatformCopy & { formula?: unknown; hookType?: unknown; cta?: unknown; signal?: unknown })[] }>(
+    `${VOICE}\n\n${enginePrompt(rules, platforms)}`,
+    `Video story: """${story}"""\nChosen hook: """${hook}"""\nWrite captions for: ${platforms.join(", ")}. Build each one on the chosen hook, adapted to that platform's rules, with a DIFFERENT formula each time. youtube needs "title" and "description" (caption may be empty); the others need "caption".\nReturn JSON {"items":[{"platform","title"?,"caption","description"?,"hashtags": "#a #b","formula": formula name,"hookType": hook type,"cta": the CTA type,"signal": the signal it optimises for}]}`,
   );
   if (!Array.isArray(g?.items) || !g.items.length) return fallback;
   return fallback.map((f) => {
@@ -314,14 +323,16 @@ export async function generatePlatformCopy(story: string, hook: string, platform
     if (!m) return f;
     // Models drift on shape (hashtags as an array, a number for a title...). Coerce every field to text.
     const caption = asText(m.caption) || f.caption;
-    return {
+    const formula = asText(m.formula).slice(0, 60);
+    return tidy({
       ...f,
       title: f.title === undefined && m.title === undefined ? undefined : (asText(m.title) || f.title || "").slice(0, 200),
       description: f.description === undefined && m.description === undefined ? undefined : (asText(m.description) || f.description || "").slice(0, 5000),
-      hashtags: f.platform === "x" ? "" : asTags(m.hashtags) || f.hashtags,
-      caption: caption.slice(0, f.platform === "x" ? 280 : 2200),
+      hashtags: asTags(m.hashtags) || f.hashtags,
+      caption,
       note: f.note,
-    };
+      why: formula ? { formula, hook: asText(m.hookType).slice(0, 40), cta: asText(m.cta).slice(0, 40), signal: asText(m.signal).slice(0, 60) } : undefined,
+    });
   });
 }
 

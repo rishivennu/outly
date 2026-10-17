@@ -60,9 +60,14 @@ export function Tour() {
       opener.current = document.activeElement;
       setStep(0);
     };
+    const pause = () => setStep((s) => (s === null ? s : null));
     window.addEventListener(EVENT, open);
+    window.addEventListener("outly:tour-pause", pause);
     if (new URLSearchParams(location.search).get("tour") === "1") open();
-    return () => window.removeEventListener(EVENT, open);
+    return () => {
+      window.removeEventListener(EVENT, open);
+      window.removeEventListener("outly:tour-pause", pause);
+    };
   }, []);
 
   // Follow the target through scrolls and resizes, one measurement per frame at most.

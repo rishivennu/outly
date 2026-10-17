@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, DM_Sans, Instrument_Serif } from "next/font/google
 import { MotionRoot } from "@/components/shared/MotionRoot";
 import { themeScript } from "@/lib/theme/script";
 import { CookieBanner } from "@/components/shared/CookieConsent";
+import { DeviceHint } from "@/components/shared/DeviceHint";
 import { Connectivity, Ripples } from "@/components/shared/Connectivity";
 import { LazyChat } from "@/components/support/LazyChat";
 import { SmoothScroll } from "@/components/marketing/SmoothScroll";
@@ -57,6 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <LazyChat />
           <CookieBanner />
+          <DeviceHint />
           <Connectivity />
           <Ripples />
           <Watermark />

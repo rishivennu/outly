@@ -7,13 +7,15 @@ import { ApiError } from "@/lib/client/api";
 import { audioChunks, burnCaptions, drawCue, recorderType } from "@/lib/client/captions";
 import { CAPTION_STYLES, cueAt, cuesFromScript, normalizeCues, toSrt, type CaptionPos, type CaptionStyle, type Cue } from "@/lib/captions/cues";
 import { cn } from "@/lib/utils";
+import { wordsFromCues, type Word } from "@/lib/captions/subtitle-engine";
+import { ClipCutter } from "./ClipCutter";
 
 interface Props {
   src: string;
   filename: string;
   duration: number;
   /** A captioned copy is ready: parent uploads it and swaps it in. */
-  onBurned: (file: File) => void;
+  onBurned: (file: File, kind?: "captions" | "cut") => void;
   /** Shown after a burn so the creator can go back to the clean video. */
   onUndo?: () => void;
   onError: (msg: string) => void;
@@ -36,6 +38,8 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart
 export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onError }: Props) {
   const [on, setOn] = useState(false);
   const [cues, setCues] = useState<Cue[]>([]);
+  /* Word timings from the engine: what "cut by text" searches. Typed captions fall back to rough ones. */
+  const [words, setWords] = useState<Word[]>([]);
   const [style, setStyle] = useState<CaptionStyle>("pop");
   const [pos, setPos] = useState<CaptionPos>("bottom");
   const [busy, setBusy] = useState<Busy>(null);
@@ -78,6 +82,7 @@ export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onErr
       const chunks = await audioChunks(src, ctrl.signal);
       setBusy({ kind: "transcribe", done: 0, total: chunks.length });
       const all: Cue[] = [];
+      const ws: Word[] = [];
       let lang = "";
       for (let i = 0; i < chunks.length; i++) {
         const c = chunks[i];
@@ -85,11 +90,13 @@ export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onErr
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new ApiError(r.status, j.error ?? "Transcription didn't come back.", j.code);
         all.push(...(j.cues as Cue[]));
+        if (Array.isArray(j.words)) ws.push(...(j.words as Word[]));
         lang ||= j.language;
         setBusy({ kind: "transcribe", done: i + 1, total: chunks.length });
       }
       const clean = normalizeCues(all, duration || Infinity);
       setCues(clean);
+      setWords(ws.length ? ws : wordsFromCues(clean));
       setNote(clean.length ? `${clean.length} captions${lang ? ` in ${lang}` : ""}. Fix any word by clicking it.` : "We didn't hear any speech. Type your captions instead.");
       if (!clean.length) setTyping(true);
     } catch (e) {
@@ -106,6 +113,7 @@ export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onErr
     const c = cuesFromScript(script, duration);
     if (!c.length) return setNote("Type a line or two first.");
     setCues(c);
+    setWords([]);
     setTyping(false);
     setNote(`Spread ${c.length} captions across the clip. Nudge the times if a line lands early or late.`);
   }
@@ -119,7 +127,7 @@ export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onErr
     try {
       const file = await burnCaptions(src, cues, { style, pos, name: filename, signal: ctrl.signal, onProgress: (p) => setBusy({ kind: "burn", p }) });
       setBurned(true);
-      onBurned(file);
+      onBurned(file, "captions");
     } catch (e) {
       if ((e as Error).name !== "AbortError") onError((e as Error).message);
     } finally {
@@ -196,7 +204,7 @@ export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onErr
                 <ol className="mt-4 max-h-64 space-y-1.5 overflow-y-auto pr-1" aria-label="Captions">
                   {cues.map((c, i) => (
                     <li key={i} className="flex items-center gap-2">
-                      <button type="button" onClick={() => { if (video.current) { video.current.currentTime = c.start; } }} className="min-h-[44px] w-16 shrink-0 rounded-xl text-[12px] tabular text-muted-foreground hover:bg-secondary" aria-label={`Jump to ${fmt(c.start)}`}>
+                      <button type="button" onClick={() => { if (video.current) { video.current.currentTime = c.start; } }} className="min-h-[44px] w-16 shrink-0 rounded-xl text-[13px] tabular text-muted-foreground hover:bg-secondary" aria-label={`Jump to ${fmt(c.start)}`}>
                         {fmt(c.start)}
                       </button>
                       <input value={c.text} onChange={(e) => edit(i, { text: e.target.value })} aria-label={`Caption ${i + 1} text`} className="h-11 min-w-0 flex-1 rounded-xl bg-secondary/50 px-3 text-[14px] hairline" />
@@ -233,7 +241,23 @@ export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onErr
                     <div className="h-full rounded-full bg-lime transition-[width] duration-300" style={{ width: `${busy.p * 100}%` }} />
                   </div>
                 )}
-                <p className="mt-2 text-[12px] text-muted-foreground">Burning plays the clip once in the background, so it takes about as long as the video. Keep this tab open.</p>
+                <p className="mt-2 text-[13px] text-muted-foreground">Burning plays the clip once in the background, so it takes about as long as the video. Keep this tab open.</p>
+
+                {canRecord && (
+                  <ClipCutter
+                    src={src}
+                    filename={filename}
+                    duration={duration}
+                    cues={cues}
+                    words={words.length ? words : wordsFromCues(cues)}
+                    style={style}
+                    pos={pos}
+                    preview={video}
+                    disabled={working}
+                    onCut={(f) => { setBurned(true); onBurned(f, "cut"); }}
+                    onError={onError}
+                  />
+                )}
               </>
             )}
           </div>

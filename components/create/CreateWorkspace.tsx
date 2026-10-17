@@ -1,4 +1,5 @@
 "use client";
+import { whyLine } from "@/lib/ai/caption-engine";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -338,7 +339,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const applyCopy = (items: PlatformCopy[]) =>
     setDrafts((d) => {
       const next = { ...d };
-      for (const c of items) next[c.platform] = { ...next[c.platform], title: c.title ?? "", caption: c.caption ?? "", description: c.description ?? "", hashtags: c.hashtags ?? "", note: c.note, reviewed: false };
+      for (const c of items) next[c.platform] = { ...next[c.platform], title: c.title ?? "", caption: c.caption ?? "", description: c.description ?? "", hashtags: c.hashtags ?? "", note: c.note, why: whyLine(c.why), reviewed: false };
       return next;
     });
 
@@ -605,10 +606,10 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                     src={(preCaption ? preCaption.media.url : src) ?? src ?? ""}
                     filename={(preCaption?.media ?? media)?.filename ?? fileRef.current?.name ?? "video.mp4"}
                     duration={meta?.duration ?? 0}
-                    onBurned={(f) => {
+                    onBurned={(f, kind) => {
                       setPreCaption((p) => p ?? (media ? { media, file: fileRef.current } : null));
                       startUpload(f);
-                      toast("Captions added. Uploading the captioned video…", "info");
+                      toast(kind === "cut" ? "Clip cut. Uploading it as your video…" : "Captions added. Uploading the captioned video…", "info");
                     }}
                     onUndo={
                       preCaption

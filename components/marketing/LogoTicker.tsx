@@ -22,9 +22,9 @@ export async function LogoTicker({ live: forced }: { live?: Platform[] } = {}) {
   const half = [...list, ...list];
   return (
     <section aria-labelledby="lt-h" className="lt mx-auto w-full max-w-[1180px] px-5 pb-2 pt-10 sm:pt-12">
-      <h2 id="lt-h" className="text-center text-[12.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+      <p id="lt-h" className="text-center text-[12.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         Publishes to
-      </h2>
+      </p>
       <ul className="sr-only">
         {list.map((p) => (
           <li key={p}>{PLATFORM_META[p].name}{live.includes(p) ? "" : " (coming soon)"}</li>

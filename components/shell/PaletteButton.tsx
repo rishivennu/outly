@@ -19,11 +19,12 @@ export function PaletteButton({ compact = false }: { compact?: boolean }) {
       type="button"
       onClick={openPalette}
       aria-keyshortcuts={mac ? "Meta+K" : "Control+K"}
-      className="mb-6 flex h-11 items-center gap-2.5 rounded-2xl px-3 text-[13.5px] text-muted-foreground transition-colors hairline hover:bg-foreground/[0.04] hover:text-foreground"
+      aria-label="Search or jump"
+      className="mb-6 flex h-11 min-w-0 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-2xl px-3 text-[13.5px] text-muted-foreground transition-colors hairline hover:bg-foreground/[0.04] hover:text-foreground"
     >
-      <Search className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-      <span className="flex-1 text-left">Search or jump</span>
-      <kbd className="rounded-md px-1.5 py-0.5 text-[11px] font-medium hairline" aria-hidden="true">{key}</kbd>
+      <Search className="h-4 w-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+      <span className="min-w-0 flex-1 truncate text-left">Search</span>
+      <kbd className="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium hairline" aria-hidden="true">{key}</kbd>
     </button>
   );
 }
