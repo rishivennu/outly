@@ -7,6 +7,7 @@ import { ArrowRight, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/components/shell/UserContext";
 import { tourKey } from "./Tour";
+import { afterPrivacy } from "@/components/shared/PrivacyNotice";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
 
 export type WelcomeOffer = { slug: string; name: string; price: string; interval: string; features: string[]; postLimit: number; aiCaptions: boolean };
@@ -53,11 +54,14 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit }: { firstName: s
     const show = () => {
       t = setTimeout(() => setOpen(true), 450);
     };
-    if (localStorage.getItem(tourKey(user.id))) show();
-    const onClosed = () => show();
+    // Never on top of the privacy notice: wait for it to be closed first.
+    let unPrivacy = () => {};
+    if (localStorage.getItem(tourKey(user.id))) unPrivacy = afterPrivacy(user.id, show);
+    const onClosed = () => { unPrivacy(); unPrivacy = afterPrivacy(user.id, show); };
     window.addEventListener("outly:tour-closed", onClosed, { once: true });
     return () => {
       if (t) clearTimeout(t);
+      unPrivacy();
       window.removeEventListener("outly:tour-closed", onClosed);
     };
   }, [user.id]);

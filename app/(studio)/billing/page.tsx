@@ -9,7 +9,7 @@ import { hasYearly, priceFor, yearlySaving } from "@/lib/billing/cycle";
 import { normalizeDisplay } from "@/lib/billing/display";
 import { formatMoney } from "@/lib/billing/money";
 import { stripe } from "@/lib/billing/providers";
-import { activeGateway, capturePaypal, completePayment, expireSubscriptions, failPayment } from "@/lib/billing/service";
+import { activeGateway, capturePaypal, completePayment, confirmYoupi, expireSubscriptions, failPayment } from "@/lib/billing/service";
 import { BillingView, type ReturnNotice } from "@/components/billing/BillingView";
 import { postUsage } from "@/lib/billing/entitlements";
 
@@ -46,7 +46,21 @@ async function handlePaypalReturn(userId: string, orderId: string): Promise<Retu
   }
 }
 
-export default async function BillingPage({ searchParams }: { searchParams: { checkout?: string; session_id?: string; token?: string; plan?: string; paid?: string; cycle?: string } }) {
+/** YOUPI sends the buyer back with ?p={our payment id}. We ask the gateway ourselves; the URL proves nothing. */
+async function handleYoupiReturn(userId: string, paymentId: string): Promise<ReturnNotice> {
+  try {
+    const r = await confirmYoupi(paymentId, userId);
+    if (r.state === "paid") return { tone: "ok", text: `Payment received. Invoice ${r.invoice?.number ?? ""} is below and in your inbox.` };
+    if (r.state === "pending") return { tone: "info", text: "We're matching your UPI payment with the bank alert. This usually takes under a minute. Refresh to check." };
+    if (r.state === "failed") return { tone: "error", text: "That UPI payment didn't go through or timed out. If money left your account, contact support with the UTR from your UPI app." };
+    if (r.state === "mismatch") return { tone: "error", text: "We received a payment we couldn't match to this plan. Our team will check it by hand and get back to you. You don't need to pay again." };
+    return { tone: "error", text: "We couldn't match that checkout to your account. If you were charged, contact support." };
+  } catch {
+    return { tone: "info", text: "We're confirming your UPI payment with the gateway. Refresh in a minute." };
+  }
+}
+
+export default async function BillingPage({ searchParams }: { searchParams: { checkout?: string; session_id?: string; token?: string; p?: string; plan?: string; paid?: string; cycle?: string } }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/billing");
   if (user.actor) redirect("/home"); // billing belongs to the workspace owner
@@ -55,6 +69,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
   let notice: ReturnNotice | null = null;
   if (searchParams.checkout === "return" && searchParams.session_id) notice = await handleStripeReturn(user.id, searchParams.session_id);
   else if (searchParams.checkout === "paypal" && searchParams.token) notice = await handlePaypalReturn(user.id, searchParams.token);
+  else if (searchParams.checkout === "youpi" && searchParams.p) notice = await handleYoupiReturn(user.id, searchParams.p.slice(0, 64));
   else if (searchParams.checkout === "cancelled") {
     // PayPal's cancel URL carries the order id; Stripe's doesn't, so take the latest pending redirect checkout.
     const pending = await db.payment.findFirst({

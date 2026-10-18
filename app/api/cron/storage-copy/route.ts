@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { safeEqual } from "@/lib/crypto";
 import { makeS3 } from "@/lib/storage/s3x";
 import { r2Config, r2Configured } from "@/lib/storage";
 import { sbStorage, supabaseConfigured } from "@/lib/supabase/server";
@@ -20,7 +21,7 @@ export const maxDuration = 60;
  */
 export async function POST(req: NextRequest) {
   if (!env.CRON_SECRET) return NextResponse.json({ error: "Set CRON_SECRET first." }, { status: 503 });
-  if (req.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!safeEqual(req.headers.get("authorization") ?? "", `Bearer ${env.CRON_SECRET}`)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!r2Configured()) return NextResponse.json({ error: "Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET first." }, { status: 503 });
   if (!supabaseConfigured()) return NextResponse.json({ error: "Supabase storage is not configured, nothing to copy from." }, { status: 503 });
 

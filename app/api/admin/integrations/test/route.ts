@@ -2,7 +2,7 @@ import { z } from "zod";
 import { json } from "@/lib/http";
 import { adminRoute } from "@/lib/admin/route";
 import { getConfig } from "@/lib/settings";
-import { paypal, razorpay, stripe } from "@/lib/billing/providers";
+import { paypal, razorpay, stripe, youpi } from "@/lib/billing/providers";
 import { sendEmail, templates } from "@/lib/email";
 
 const Body = z.object({ key: z.enum(["payments", "email"]), to: z.string().email().optional() });
@@ -12,7 +12,7 @@ export const POST = adminRoute("integrations", async (req) => {
   if (b.key === "payments") {
     const cfg = await getConfig("payments");
     if (cfg.provider === "mock") return json({ ok: true, message: "Mock gateway is always ready. Test cards: 4242 4242 4242 4242 succeeds, 4000 0000 0000 0002 is declined." });
-    return json(cfg.provider === "stripe" ? await stripe.test(cfg) : cfg.provider === "paypal" ? await paypal.test(cfg) : await razorpay.test(cfg));
+    return json(cfg.provider === "stripe" ? await stripe.test(cfg) : cfg.provider === "paypal" ? await paypal.test(cfg) : cfg.provider === "youpi" ? await youpi.test(cfg) : await razorpay.test(cfg));
   }
   if (!b.to) return json({ ok: false, message: "Enter an address to send the test to." });
   const cfg = await getConfig("email");

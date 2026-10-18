@@ -10,11 +10,12 @@ import { Card, CardTitle, Pill } from "./ui";
 
 export type Secret = { set: boolean; last4: string };
 type Pay = {
-  provider: "mock" | "stripe" | "razorpay" | "paypal";
+  provider: "mock" | "stripe" | "razorpay" | "paypal" | "youpi";
   mode: "test" | "live";
   stripe: { publishableKey: string; secretKey: Secret; webhookSecret: Secret };
   razorpay: { keyId: string; keySecret: Secret; webhookSecret: Secret };
   paypal: { clientId: string; clientSecret: Secret; webhookId: string };
+  youpi: { gatewayUrl: string; merchantId: string; webhookSecret: Secret; minVerification: 1 | 2 };
   business: { name: string; address: string; gstin: string; taxPercent: number };
 };
 type Mailer = { provider: "mock" | "resend"; from: string; replyTo: string; resend: { apiKey: Secret } };
@@ -89,11 +90,11 @@ export function CopyRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay; email: Mailer; webhooks: { stripe: string; razorpay: string; paypal: string } }) {
+export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay; email: Mailer; webhooks: { stripe: string; razorpay: string; paypal: string; youpi: string } }) {
   const toast = useToast();
   // ---- payments
   const [pay, setPay] = useState(payments);
-  const [p, setP] = useState({ provider: payments.provider, mode: payments.mode, stripePk: payments.stripe.publishableKey, rzpId: payments.razorpay.keyId, ppId: payments.paypal.clientId, ppHook: payments.paypal.webhookId, business: payments.business });
+  const [p, setP] = useState({ provider: payments.provider, mode: payments.mode, stripePk: payments.stripe.publishableKey, rzpId: payments.razorpay.keyId, ppId: payments.paypal.clientId, ppHook: payments.paypal.webhookId, ypUrl: payments.youpi?.gatewayUrl ?? "", ypId: payments.youpi?.merchantId ?? "", ypLevel: (payments.youpi?.minVerification ?? 1) as 1 | 2, business: payments.business });
   const [ps, setPs] = useState<Record<string, SecretEdit>>({});
   const [pBusy, setPBusy] = useState<"save" | "test" | null>(null);
   const [pRes, setPRes] = useState<{ ok: boolean; message: string } | null>(null);
@@ -106,13 +107,14 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
   const [mRes, setMRes] = useState<{ ok: boolean; message: string } | null>(null);
 
   const sec = (k: string) => (ps[k] === undefined || ps[k] === "" ? undefined : ps[k]);
-  const pDirty = JSON.stringify({ provider: pay.provider, mode: pay.mode, stripePk: pay.stripe.publishableKey, rzpId: pay.razorpay.keyId, ppId: pay.paypal.clientId, ppHook: pay.paypal.webhookId, business: pay.business }) !== JSON.stringify(p) || Object.values(ps).some((v) => v !== undefined && v !== "");
+  const pDirty = JSON.stringify({ provider: pay.provider, mode: pay.mode, stripePk: pay.stripe.publishableKey, rzpId: pay.razorpay.keyId, ppId: pay.paypal.clientId, ppHook: pay.paypal.webhookId, ypUrl: pay.youpi?.gatewayUrl ?? "", ypId: pay.youpi?.merchantId ?? "", ypLevel: pay.youpi?.minVerification ?? 1, business: pay.business }) !== JSON.stringify(p) || Object.values(ps).some((v) => v !== undefined && v !== "");
   const mDirty = JSON.stringify({ provider: mail.provider, from: mail.from, replyTo: mail.replyTo }) !== JSON.stringify(m) || (ms !== undefined && ms !== "");
 
   const missing =
     p.provider === "stripe" ? !(pay.stripe.secretKey.set || sec("stripe.secretKey")) || ps["stripe.secretKey"] === null
     : p.provider === "razorpay" ? !p.rzpId || !(pay.razorpay.keySecret.set || sec("razorpay.keySecret")) || ps["razorpay.keySecret"] === null
     : p.provider === "paypal" ? !p.ppId || !(pay.paypal.clientSecret.set || sec("paypal.clientSecret")) || ps["paypal.clientSecret"] === null
+    : p.provider === "youpi" ? !p.ypUrl || !p.ypId || !(pay.youpi?.webhookSecret.set || sec("youpi.webhookSecret")) || ps["youpi.webhookSecret"] === null || (p.mode === "live" && !/^https:\/\//i.test(p.ypUrl))
     : false;
 
   async function savePay() {
@@ -129,6 +131,7 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
             stripe: { publishableKey: p.stripePk, secretKey: sec("stripe.secretKey"), webhookSecret: sec("stripe.webhookSecret") },
             razorpay: { keyId: p.rzpId, keySecret: sec("razorpay.keySecret"), webhookSecret: sec("razorpay.webhookSecret") },
             paypal: { clientId: p.ppId, clientSecret: sec("paypal.clientSecret"), webhookId: p.ppHook },
+            youpi: { gatewayUrl: p.ypUrl, merchantId: p.ypId, webhookSecret: sec("youpi.webhookSecret"), minVerification: p.ypLevel },
             business: { ...p.business, taxPercent: Number(p.business.taxPercent) || 0 },
           },
         },
@@ -195,6 +198,7 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
             { value: "stripe", title: "Stripe", body: "Cards, wallets, global currencies. Hosted Checkout.", badge: "global" },
             { value: "razorpay", title: "Razorpay", body: "UPI, cards, netbanking in India. Popup checkout.", badge: "India" },
             { value: "paypal", title: "PayPal", body: "PayPal balance and cards in 200+ countries. Redirect checkout.", badge: "global" },
+            { value: "youpi", title: "YOUPI (UPI)", body: "Your own UPI gateway on your server. No fees, INR only, no refund API.", badge: "self-hosted" },
           ]}
         />
 
@@ -254,6 +258,33 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
                   <div className="sm:col-span-2">
                     <p className="mb-2 text-[12.5px] text-muted-foreground">In PayPal Developer → Apps → your app → Webhooks, add this URL with <code>CHECKOUT.ORDER.APPROVED</code>, <code>PAYMENT.CAPTURE.COMPLETED</code> and <code>PAYMENT.CAPTURE.DENIED</code>, then paste its webhook id above. Sandbox and live are separate apps; match the mode. Cards are charged in USD, EUR, GBP, CAD, AUD or SGD (others fall back to USD).</p>
                     <CopyRow label="PayPal" value={webhooks.paypal} />
+                  </div>
+                </div>
+              )}
+              {p.provider === "youpi" && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="yp-url">Gateway URL</Label>
+                    <Input id="yp-url" type="url" value={p.ypUrl} onChange={(e) => setP((x) => ({ ...x, ypUrl: e.target.value.trim() }))} placeholder={p.mode === "live" ? "https://pay.yourdomain.com" : "http://localhost:7000"} className="font-mono text-[14px]" />
+                  </div>
+                  <div>
+                    <Label htmlFor="yp-id">Merchant id</Label>
+                    <Input id="yp-id" value={p.ypId} onChange={(e) => setP((x) => ({ ...x, ypId: e.target.value.trim() }))} placeholder="from YOUPI Merchant Admin" className="font-mono text-[14px]" />
+                  </div>
+                  <SecretField id="yp-wh" label="Webhook secret" saved={pay.youpi?.webhookSecret ?? { set: false, last4: "" }} value={ps["youpi.webhookSecret"]} onChange={(v) => setPs((x) => ({ ...x, "youpi.webhookSecret": v }))} placeholder="the merchant webhook secret" />
+                  <div className="sm:col-span-2">
+                    <div role="radiogroup" aria-label="Confirm a payment after" className="inline-flex rounded-full bg-secondary/60 p-1 hairline">
+                      {([1, 2] as const).map((v) => (
+                        <button key={v} type="button" role="radio" aria-checked={p.ypLevel === v} onClick={() => setP((x) => ({ ...x, ypLevel: v }))} className={cn("min-h-[40px] rounded-full px-4 text-[13px] font-semibold transition-all", p.ypLevel === v ? "lime-bg" : "text-muted-foreground")}>
+                          {v === 1 ? "1 bank alert" : "SMS and email both"}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[13px] text-muted-foreground">A plan is granted only after we ask the gateway ourselves and it reports this exact order, the exact amount in paise and this many matching bank alerts. "SMS and email both" is safer: a fake credit email alone can't unlock a plan.</p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <p className="mb-2 text-[13px] text-muted-foreground">In YOUPI Merchant Admin, set the webhook URL to this address. Prices are charged in INR. Refunds are not automatic: send them back by UPI from your bank app.</p>
+                    <CopyRow label="YOUPI" value={webhooks.youpi} />
                   </div>
                 </div>
               )}

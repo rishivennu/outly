@@ -5,13 +5,14 @@ import { MASCOT_DEFAULT, type MascotConfig } from "./mascot/palettes";
 import { encrypt, decrypt } from "./crypto";
 import { UPDATE_DEFAULT, type UpdateNotice } from "./updates";
 import { PRICING_DISPLAY_DEFAULT, type PricingDisplay } from "./billing/display";
+import { YOUPI_DEFAULT, type YoupiConfig } from "./billing/youpi";
 
 /**
  * Integration config lives in the DB so the admin can switch providers without a deploy.
  * Secret fields are encrypted at rest (AES-256-GCM, same key as social tokens) and are
  * never returned to the browser: the admin UI only ever sees "•••• last4".
  */
-export type PaymentProvider = "mock" | "stripe" | "razorpay" | "paypal";
+export type PaymentProvider = "mock" | "stripe" | "razorpay" | "paypal" | "youpi";
 export type EmailProvider = "mock" | "resend";
 
 export interface PaymentConfig {
@@ -20,6 +21,8 @@ export interface PaymentConfig {
   stripe: { publishableKey: string; secretKey: string; webhookSecret: string };
   razorpay: { keyId: string; keySecret: string; webhookSecret: string };
   paypal: { clientId: string; clientSecret: string; webhookId: string };
+  /** Self-hosted UPI gateway (YOUPI PG). */
+  youpi: YoupiConfig;
   business: { name: string; address: string; gstin: string; taxPercent: number };
 }
 /** Every platform, keyed the same way so the admin form and the registry stay generic. */
@@ -48,7 +51,7 @@ export interface EmailConfig {
 }
 
 const SECRET_PATHS: Record<string, string[]> = {
-  payments: ["stripe.secretKey", "stripe.webhookSecret", "razorpay.keySecret", "razorpay.webhookSecret", "paypal.clientSecret"],
+  payments: ["stripe.secretKey", "stripe.webhookSecret", "razorpay.keySecret", "razorpay.webhookSecret", "paypal.clientSecret", "youpi.webhookSecret"],
   platforms: ["instagram", "youtube", "x", "tiktok", "facebook", "threads", "linkedin"].map((p) => `${p}.clientSecret`),
   email: ["resend.apiKey"],
 };
@@ -60,6 +63,7 @@ export const DEFAULTS = {
     stripe: { publishableKey: "", secretKey: "", webhookSecret: "" },
     razorpay: { keyId: "", keySecret: "", webhookSecret: "" },
     paypal: { clientId: "", clientSecret: "", webhookId: "" },
+    youpi: { ...YOUPI_DEFAULT },
     business: { name: "Outlly", address: "Bengaluru, India", gstin: "", taxPercent: 0 },
   } as PaymentConfig,
   email: { provider: "mock", from: "Outlly <hello@outlly.app>", replyTo: "", resend: { apiKey: "" } } as EmailConfig,

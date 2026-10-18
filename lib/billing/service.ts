@@ -11,7 +11,8 @@ import { hasYearly, priceFor, type Cycle } from "./cycle";
 import { normalizeDisplay } from "./display";
 import { issueInvoice } from "./invoice";
 import { sendEmail, templates } from "../email";
-import { mock, paypal, razorpay, stripe, type CheckoutStart } from "./providers";
+import { mock, paypal, razorpay, stripe, youpi, type CheckoutStart } from "./providers";
+import { youpiReady, youpiVerdict } from "./youpi";
 import { rewardReferrer } from "../referral";
 import { isPaused, pausePlan, resumePlan } from "./pause";
 
@@ -22,7 +23,8 @@ export async function activeGateway() {
     cfg.provider === "mock" ||
     (cfg.provider === "stripe" && !!cfg.stripe.secretKey) ||
     (cfg.provider === "razorpay" && !!cfg.razorpay.keyId && !!cfg.razorpay.keySecret) ||
-    (cfg.provider === "paypal" && !!cfg.paypal.clientId && !!cfg.paypal.clientSecret);
+    (cfg.provider === "paypal" && !!cfg.paypal.clientId && !!cfg.paypal.clientSecret) ||
+    (cfg.provider === "youpi" && youpiReady(cfg.youpi, cfg.mode));
   return { cfg, provider: ready ? cfg.provider : ("mock" as const), misconfigured: !ready };
 }
 
@@ -83,6 +85,7 @@ export async function startCheckout(userId: string, planSlug: string, wanted?: C
       provider === "stripe" ? await stripe.start(cfg, args)
       : provider === "razorpay" ? await razorpay.start(cfg, args)
       : provider === "paypal" ? await paypal.start(cfg, args)
+      : provider === "youpi" ? await youpi.start(cfg, args)
       : await mock.start(args);
   } catch (e) {
     await failPayment(payment.id, `Gateway error: ${(e as Error).message}`);
@@ -151,6 +154,27 @@ export async function capturePaypal(orderId: string, userId: string | null) {
   return { state: "failed" as const, reason: r.reason };
 }
 
+/**
+ * YOUPI return URL and webhook both land here. Neither is trusted on its own: we ask the gateway
+ * for the payment ourselves and only grant the plan when it is SUCCESS for this order, at exactly
+ * our stored amount, in INR, at the admin's verification level. `userId` scopes the return URL.
+ */
+export async function confirmYoupi(paymentId: string, userId: string | null) {
+  const p = await db.payment.findFirst({ where: { id: paymentId, provider: "youpi", ...(userId ? { userId } : {}) } });
+  if (!p) return { state: "unknown" as const };
+  if (p.status === "succeeded") return { state: "paid" as const, invoice: await db.invoice.findUnique({ where: { paymentId: p.id } }) };
+  if (!p.providerRef) return { state: "unknown" as const };
+  const cfg = await getConfig("payments");
+  const v = youpiVerdict(await youpi.status(cfg, p.providerRef), { id: p.id, amountMinor: p.amountMinor, currency: p.currency }, cfg.youpi.minVerification === 2 ? 2 : 1);
+  if (v.state === "paid") {
+    const { invoice } = await completePayment(p.id);
+    return { state: "paid" as const, invoice };
+  }
+  if (v.state === "pending") return { state: "pending" as const };
+  if (p.status === "pending") await failPayment(p.id, v.state === "mismatch" ? `YOUPI mismatch, check by hand before granting: ${v.reason}` : `YOUPI: ${v.reason}`);
+  return { state: v.state, reason: v.reason };
+}
+
 export async function failPayment(paymentId: string, reason: string) {
   const p = await db.payment.findUnique({ where: { id: paymentId }, include: { user: { select: { name: true } } } });
   if (!p || p.status === "succeeded") return;
@@ -205,6 +229,7 @@ export async function refundPayment(paymentId: string, by: string, reason: strin
   let ref = `mock_refund_${Date.now().toString(36)}`;
   if (p.provider !== "mock" && !p.sample) {
     const cfg = await getConfig("payments");
+    if (p.provider === "youpi") throw new HttpError(409, "UPI payments through YOUPI have no refund API. Send the money back by UPI from your bank app, then cancel the plan from the user's page.", "NO_REFUND_API");
     if (!p.providerRef) throw new HttpError(409, "This payment has no gateway reference. Refund it from the gateway dashboard.", "NO_REF");
     try {
       ref =

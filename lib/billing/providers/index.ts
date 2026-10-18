@@ -2,6 +2,8 @@ import "server-only";
 import { createHmac } from "node:crypto";
 import { safeEqual } from "../../crypto";
 import type { PaymentConfig } from "../../settings";
+import { safeCheckoutUrl, youpiBase, youpiSigHex, type YoupiStatus } from "../youpi";
+import { assertPublicUrl } from "../../net/assert-public";
 
 export type CheckoutStart =
   | { kind: "redirect"; url: string; providerRef?: string }
@@ -253,5 +255,75 @@ export const razorpay = {
     if (!r) return { ok: false, message: "Could not reach Razorpay." };
     if (r.status === 401) return { ok: false, message: "Razorpay rejected the key id / secret pair." };
     return r.ok ? { ok: true, message: `Connected to Razorpay (${keyId.startsWith("rzp_live_") ? "live" : "test"} keys).` } : { ok: false, message: `Razorpay answered ${r.status}.` };
+  },
+};
+
+// ---------------------------------------------------------------- youpi (self-hosted UPI gateway, REST)
+/**
+ * We send only the order id, the amount and a return URL. No name, email or phone: the gateway
+ * verifies the buyer itself, so Outlly shares nothing it doesn't have to.
+ */
+export const youpi = {
+  base: (cfg: PaymentConfig) => youpiBase(cfg.youpi.gatewayUrl, cfg.mode),
+  async start(cfg: PaymentConfig, a: StartArgs): Promise<CheckoutStart> {
+    const base = youpi.base(cfg);
+    if (!base) throw new Error("YOUPI gateway URL is not set (https only in live mode).");
+    if (a.currency !== "INR") throw new Error("YOUPI takes INR only.");
+    if (cfg.mode === "live") await assertPublicUrl(base);
+    const r = await fetch(`${base}/api/v1/payments`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-merchant-id": cfg.youpi.merchantId, "idempotency-key": a.paymentId },
+      body: JSON.stringify({
+        orderId: a.paymentId,
+        amount: (a.amountMinor / 100).toFixed(2),
+        currency: "INR",
+        description: `Outlly ${a.planName}`.slice(0, 120),
+        returnUrl: `${a.appUrl}/billing?checkout=youpi&p=${encodeURIComponent(a.paymentId)}`,
+        metadata: { paymentId: a.paymentId },
+      }),
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    });
+    const j: any = await r.json().catch(() => ({}));
+    if (r.status === 409) throw new Error("A payment for this account is already open on another device.");
+    if (!r.ok) throw new Error(String(j?.error ?? `YOUPI ${r.status}`).slice(0, 160));
+    if (String(j.orderId ?? "") !== a.paymentId) throw new Error("YOUPI answered for a different order.");
+    const url = safeCheckoutUrl(j.checkoutUrl, cfg.mode);
+    if (!url || !j.paymentId) throw new Error("YOUPI didn't return a safe checkout link.");
+    return { kind: "redirect", url, providerRef: String(j.paymentId).slice(0, 100) };
+  },
+  /** Server-to-server status read. This, not the webhook body, is what we trust. */
+  async status(cfg: PaymentConfig, id: string): Promise<YoupiStatus> {
+    const base = youpi.base(cfg);
+    if (!base) throw new Error("YOUPI gateway URL is not set.");
+    if (cfg.mode === "live") await assertPublicUrl(base);
+    const r = await fetch(`${base}/api/v1/payments/${encodeURIComponent(id)}`, {
+      headers: { "x-merchant-id": cfg.youpi.merchantId },
+      redirect: "error",
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!r.ok) throw new Error(`YOUPI ${r.status}`);
+    return (await r.json()) as YoupiStatus;
+  },
+  /** X-Gateway-Signature: sha256=HMAC-SHA256(webhookSecret, raw body), constant-time compare. */
+  verifyWebhook(secret: string, raw: string, header: string | null) {
+    const got = youpiSigHex(header);
+    if (!got || !secret) return false;
+    return safeEqual(createHmac("sha256", secret).update(raw).digest("hex"), got);
+  },
+  async test(cfg: PaymentConfig) {
+    const base = youpi.base(cfg);
+    if (!base) return { ok: false, message: cfg.mode === "live" ? "Add an https:// gateway URL. Live mode never talks to a gateway over plain http." : "Add the gateway URL (https, or http://localhost for a local test gateway)." };
+    if (!cfg.youpi.merchantId) return { ok: false, message: "Add the merchant id from the YOUPI admin panel." };
+    if (!cfg.youpi.webhookSecret) return { ok: false, message: "Add the webhook secret, so payments are confirmed even if the buyer closes the tab." };
+    if (cfg.mode === "live") {
+      const bad = await assertPublicUrl(base).then(() => "", (e: Error) => e.message);
+      if (bad) return { ok: false, message: bad };
+    }
+    const r = await fetch(`${base}/api/v1/payments/outlly-connection-test`, { headers: { "x-merchant-id": cfg.youpi.merchantId }, redirect: "error", signal: AbortSignal.timeout(10_000) }).catch(() => null);
+    if (!r) return { ok: false, message: `Could not reach the gateway at ${base}.` };
+    // An unknown id must come back 404: that proves the payment API is answering.
+    return r.status === 404 || r.ok ? { ok: true, message: `Gateway is answering at ${base}. Do one real Rs 1 test payment before going live.` } : { ok: false, message: `The gateway answered ${r.status}.` };
   },
 };

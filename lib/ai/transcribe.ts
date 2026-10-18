@@ -4,6 +4,7 @@ import { HttpError } from "../http";
 import { normalizeCues, type Cue } from "../captions/cues";
 import { cleanWords, cuesFromWords, wordsFromCues, wordsFromFunasr, type SubtitleRules, type Word } from "../captions/subtitle-engine";
 import { subtitleRules } from "./engine-store";
+import { assertPublicUrl } from "../net/assert-public";
 
 const MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest"];
 
@@ -19,6 +20,7 @@ async function viaFunasr(url: string, wav: ArrayBuffer, offset: number, duration
     method: "POST",
     headers: { "content-type": "audio/wav", ...(env.FUNASR_TOKEN ? { authorization: `Bearer ${env.FUNASR_TOKEN}` } : {}), ...(rules.hotwords.length ? { "x-hotwords": rules.hotwords.join(" ").slice(0, 400) } : {}) },
     body: wav,
+    redirect: "error",
     signal: AbortSignal.timeout(50_000),
   });
   if (!r.ok) return null;
@@ -69,6 +71,8 @@ export async function transcribeWav(wav: ArrayBuffer, offset: number, duration: 
   const url = rules.workerUrl || env.FUNASR_URL;
   if (rules.provider === "funasr" && url) {
     try {
+      // FUNASR_URL is the operator's own (may be private); an admin-typed URL is re-checked before every call.
+      if (rules.workerUrl && process.env.NODE_ENV === "production") await assertPublicUrl(rules.workerUrl);
       const t = await viaFunasr(url, wav, offset, duration, rules);
       if (t && (t.words.length || !env.GEMINI_API_KEY)) return t;
     } catch (e) {

@@ -7,6 +7,7 @@ import { useUser } from "@/components/shell/UserContext";
 import { useToast } from "@/components/shared/Toast";
 import { startTour, tourKey } from "./Tour";
 import { readConsent } from "@/components/shared/CookieConsent";
+import { afterPrivacy } from "@/components/shared/PrivacyNotice";
 import { cn } from "@/lib/utils";
 
 export type SetupState = {
@@ -49,8 +50,10 @@ export function SetupChecklist({ state }: { state: SetupState }) {
 
     // First visit ever on this device: open the tour once. Closing it counts as done.
     // One thing at a time: the cookie question comes first, the tour after it is answered.
+    // Then the privacy notice, then the tour.
     let t: ReturnType<typeof setTimeout> | undefined;
-    const begin = () => { t = setTimeout(startTour, 600); };
+    let unPrivacy = () => {};
+    const begin = () => { unPrivacy = afterPrivacy(user.id, () => { t = setTimeout(startTour, 600); }); };
     const wantsTour = (welcome || !localStorage.getItem(key)) && q.get("tour") !== "1";
     const consented = !!readConsent();
     if (wantsTour && consented) begin();
@@ -59,6 +62,7 @@ export function SetupChecklist({ state }: { state: SetupState }) {
     window.addEventListener("outly:tour-closed", onClosed);
     return () => {
       if (t) clearTimeout(t);
+      unPrivacy();
       window.removeEventListener("outly:consent", begin);
       window.removeEventListener("outly:tour-closed", onClosed);
     };

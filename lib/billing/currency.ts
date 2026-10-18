@@ -117,6 +117,7 @@ export const PAYPAL_CURRENCIES: readonly Currency[] = ["USD", "EUR", "GBP", "CAD
 
 /** Which currency a gateway can actually charge. Razorpay accounts are INR unless international is enabled, so it bills in the plan's own currency. */
 export function chargeCurrency(gateway: string, wanted: Currency, planCurrency: string): Currency {
+  if (gateway === "youpi") return "INR"; // UPI is rupees only
   if (gateway === "razorpay") return isCurrency(planCurrency) ? planCurrency : "INR";
   if (gateway === "paypal") return PAYPAL_CURRENCIES.includes(wanted) ? wanted : "USD";
   return wanted;

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
+import { safeEqual } from "@/lib/crypto";
 import { getConfig } from "@/lib/settings";
 import { sweepAccountHealth } from "@/lib/retention/notices";
 import { sendGoalNudges } from "@/lib/retention/sweep";
@@ -14,7 +15,7 @@ export const maxDuration = 60;
  */
 export async function GET(req: NextRequest) {
   if (!env.CRON_SECRET) return NextResponse.json({ error: "Set CRON_SECRET to enable scheduled reminders." }, { status: 503 });
-  if (req.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!safeEqual(req.headers.get("authorization") ?? "", `Bearer ${env.CRON_SECRET}`)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if ((await getConfig("site")).maintenance) return NextResponse.json({ skipped: "maintenance" });
   const [accounts, nudges] = [await sweepAccountHealth(), await sendGoalNudges()];
   const pruned = await pruneOldData();

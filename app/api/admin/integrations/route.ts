@@ -5,11 +5,19 @@ import { getConfig, redact, saveConfig } from "@/lib/settings";
 
 const secret = z.union([z.string().trim().max(400), z.null()]).optional();
 const Payments = z.object({
-  provider: z.enum(["mock", "stripe", "razorpay", "paypal"]).optional(),
+  provider: z.enum(["mock", "stripe", "razorpay", "paypal", "youpi"]).optional(),
   mode: z.enum(["test", "live"]).optional(),
   stripe: z.object({ publishableKey: z.string().trim().max(400).optional(), secretKey: secret, webhookSecret: secret }).optional(),
   razorpay: z.object({ keyId: z.string().trim().max(100).optional(), keySecret: secret, webhookSecret: secret }).optional(),
   paypal: z.object({ clientId: z.string().trim().max(200).optional(), clientSecret: secret, webhookId: z.string().trim().max(100).optional() }).optional(),
+  youpi: z
+    .object({
+      gatewayUrl: z.union([z.literal(""), z.string().trim().max(300).url().refine((u) => /^https?:\/\//i.test(u), "Use an https:// address")]).optional(),
+      merchantId: z.string().trim().max(100).regex(/^[A-Za-z0-9._-]*$/, "Letters, numbers, dots and dashes only").optional(),
+      webhookSecret: secret,
+      minVerification: z.union([z.literal(1), z.literal(2)]).optional(),
+    })
+    .optional(),
   business: z.object({ name: z.string().trim().max(80).optional(), address: z.string().trim().max(160).optional(), gstin: z.string().trim().max(20).optional(), taxPercent: z.number().min(0).max(40).optional() }).optional(),
 });
 const Email = z.object({

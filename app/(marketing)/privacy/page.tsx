@@ -69,7 +69,7 @@ export default function PrivacyPage() {
       <Shell>
         <PageHead
           title="Privacy"
-          updated="15 October 2026"
+          updated="18 October 2026"
           lead="This page describes what Outlly actually does with your data today, in plain language, including exactly what each social platform lets us do once you connect it. If anything here changes, the date above changes with it."
         />
 
@@ -79,7 +79,7 @@ export default function PrivacyPage() {
             <li>We only post when you tell us to: publishing now, or a schedule you set.</li>
             <li>Platform access tokens are encrypted, never shown to your browser, and deleted when you disconnect.</li>
             <li>We do not sell your data, show ads, or use your videos, captions, comments or numbers to train AI models.</li>
-            <li>You can disconnect any platform at any time, and ask us to delete your whole account.</li>
+            <li>You can disconnect any platform at any time, and delete your whole account yourself from Settings.</li>
           </ul>
 
           <h2>What we store</h2>
@@ -89,7 +89,7 @@ export default function PrivacyPage() {
             <li><strong>The posts you create:</strong> captions, hooks, titles, hashtags, schedules, approval requests, and the status each platform reported back.</li>
             <li><strong>Connected accounts:</strong> the access and refresh tokens each platform issues (encrypted with AES-256-GCM), when they expire, and the account ID, username, display name and avatar the platform returns.</li>
             <li><strong>Numbers and comments from your accounts:</strong> views, likes, comments, followers and similar figures for your posts, and the comments in your Inbox. Live figures are cached for about a minute and a half; per-post history is kept so your analytics can show trends.</li>
-            <li><strong>Billing:</strong> your plan, payment amounts, status and the gateway reference, and invoices with your name and email. Card and bank details go straight to the payment provider. We never see or store them.</li>
+            <li><strong>Billing:</strong> your plan, payment amounts, status and the gateway reference, and invoices with your name and email. Card and bank details go straight to the payment provider. We never see or store them. If you pay by UPI through YOUPI, we send it only the amount and an order number, never your name, email or phone.</li>
             <li><strong>Teams:</strong> if you invite people to your studio, their email address, name and role.</li>
             <li><strong>Support:</strong> what you write to Pip, our support assistant, and any ticket you open, including the conversation that led to it, so a person can pick it up.</li>
             <li><strong>Operational logs:</strong> publish attempts, errors, timings and the emails we sent you, so a failed post or a missing email can be explained.</li>
@@ -145,7 +145,8 @@ export default function PrivacyPage() {
           <p>Outlly uses Google Gemini for its AI features. Here is exactly what is sent, and only when you use that feature:</p>
           <ul>
             <li><strong>Captions, hooks, titles and hashtags:</strong> the text you write describing your video.</li>
-            <li><strong>Captions from speech:</strong> the audio track of your video, converted to a small sound file. The video picture is not sent.</li>
+            <li><strong>Captions from speech:</strong> the audio track of your video, converted to a small sound file. The video picture is not sent. If we switch on our own speech-recognition server (FunASR), the sound file goes there instead of Google.</li>
+            <li><strong>Clip highlights:</strong> the subtitle text of your video, so it can suggest the moments worth their own clip.</li>
             <li><strong>Reply suggestions:</strong> the comment you are replying to.</li>
             <li><strong>Insights on your analytics:</strong> your account and post numbers.</li>
             <li><strong>Pip, the support assistant:</strong> your question and the last few messages of the chat.</li>
@@ -161,6 +162,7 @@ export default function PrivacyPage() {
             <li><strong>Supabase:</strong> our database, sign-in and file storage.</li>
             <li><strong>Resend:</strong> sends account, publishing, invoice and support emails.</li>
             <li><strong>Stripe, Razorpay or PayPal:</strong> takes payments, depending on which you choose at checkout.</li>
+            <li><strong>YOUPI (UPI payments):</strong> a payment gateway we run on our own server. It confirms a UPI payment by matching it with our bank&rsquo;s payment alert, so it sees the amount, time, UPI reference and any payer name or UPI ID the alert shows.</li>
             <li><strong>Google (Gemini API):</strong> the AI features above.</li>
             <li><strong>The social platforms you connect:</strong> as described above.</li>
           </ul>
@@ -184,11 +186,12 @@ export default function PrivacyPage() {
           <ul>
             <li><strong>Disconnect a platform:</strong> open Accounts and choose Disconnect. The stored tokens for that platform are deleted straight away. You can also remove Outlly from the platform’s own settings (connected apps or business integrations), which stops access from their side too.</li>
             <li><strong>Delete media or posts:</strong> from the content library, at any time.</li>
-            <li><strong>Delete your account:</strong> ask from the Pip chat or the <a href="/contact">contact page</a> using your account email. We confirm it is you, cancel any active plan, and delete your account, media, posts, connected accounts, comments and analytics within 30 days.</li>
+            <li><strong>Delete your account:</strong> open Settings, then Your data, and choose Delete account. Your account, media, posts, connected accounts, comments and analytics are deleted straight away. You can also ask from the Pip chat or the <a href="/contact">contact page</a> using your account email.</li>
+            <li><strong>Take a copy:</strong> Settings, Your data, Download my data gives you one file with your profile, posts, schedule, library details and invoices. Access tokens are never included.</li>
           </ul>
           <p>
-            Invoices and payment records are kept as long as tax law requires. Logs that no longer identify you may be kept for a short time
-            for debugging. Your source files stay downloadable from the library for as long as your account exists.
+            Invoices and payment records are kept as long as tax law requires. Drafts nobody has touched for 3 days are removed
+            automatically. Email logs are deleted after 90 days, post metric history after 180 days and sign-in codes after one day. Your source files stay downloadable from the library for as long as your account exists.
           </p>
 
           <h2>Your rights</h2>

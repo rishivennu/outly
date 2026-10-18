@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
+import { safeEqual } from "@/lib/crypto";
 import { requeueStuckTargets, sweepDuePosts } from "@/lib/queue/handlers";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ export const maxDuration = 60;
  */
 async function sweep(req: NextRequest) {
   if (!env.CRON_SECRET) return NextResponse.json({ error: "Set CRON_SECRET to enable the sweeper." }, { status: 503 });
-  if (req.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!safeEqual(req.headers.get("authorization") ?? "", `Bearer ${env.CRON_SECRET}`)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   // No maintenance skip: members keep posting while maintenance is on, so their schedule must still run.
   await sweepDuePosts();
   const requeued = await requeueStuckTargets();

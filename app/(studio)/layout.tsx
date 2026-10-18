@@ -17,6 +17,7 @@ import { Countdown } from "@/components/maintenance/Countdown";
 import { getConfig } from "@/lib/settings";
 import { WhatsNew } from "@/components/shell/WhatsNew";
 import { SendingPill } from "@/components/shell/SendingPill";
+import { PrivacyNotice } from "@/components/shared/PrivacyNotice";
 
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -49,6 +50,7 @@ export default async function StudioLayout({ children }: { children: React.React
       </div>
       <MobileNav />
       <SendingPill />
+      <PrivacyNotice />
       <Tour />
       <CommandPalette />
       <WhatsNew notice={notice} userId={user.actor?.id ?? user.id} joinedAt={new Date(user.joinedAt).toISOString()} />
