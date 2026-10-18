@@ -56,6 +56,8 @@ export function ThemeToggle({ compact = false, plain = false, className }: { com
             onClick={() => set(value)}
             className={cn(
               "inline-flex h-9 min-w-9 items-center justify-center gap-1.5 rounded-full px-2.5 text-sm transition-colors",
+              // icon-only: 44px wide, and the hit area reaches 4px above and below into the group's padding, so 44 x 44
+              compact && "relative min-w-11 before:absolute before:-inset-y-1 before:inset-x-0 before:content-['']",
               on ? "lime-bg lime-ring font-medium" : "text-muted-foreground hover:text-foreground",
             )}
           >

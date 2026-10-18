@@ -16,7 +16,7 @@ export function HowItWorks() {
 
         <ol className="mt-14 grid gap-px overflow-hidden rounded-[1.75rem] border border-border bg-border sm:grid-cols-3">
           {STEPS.map((s, i) => (
-            <li key={s.n} data-flick="" className="bg-background p-7 sm:p-8">
+            <li key={s.n} data-flick="" data-spot="" className="bg-background p-7 sm:p-8">
               <Reveal delay={i * 0.08}>
                 <div className="flex items-start justify-between gap-4">
                   <span className="display text-[2.6rem] text-lime-ink">{s.n}</span>

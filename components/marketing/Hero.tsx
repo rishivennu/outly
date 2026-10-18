@@ -19,6 +19,8 @@ export function Hero({ showHow = true }: { showHow?: boolean }) {
   return (
     <section className="relative overflow-hidden pb-4 pt-10 sm:pt-16" aria-labelledby="hero-title">
       <div aria-hidden="true" className="hf-glow pointer-events-none absolute inset-0" />
+      {/* a soft light that trails the mouse behind the headline (LandingFx) */}
+      <div aria-hidden="true" className="hf-aura" />
       <Sparkles />
       <Shell className="relative flex flex-col items-center text-center">
         <p className="hf-in glass hairline inline-flex items-center gap-2 rounded-full py-1.5 pl-2 pr-4 text-[13px] font-medium text-foreground/85">
@@ -45,12 +47,14 @@ export function Hero({ showHow = true }: { showHow?: boolean }) {
 
         <div className="hf-in mt-8 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center" style={{ ["--d" as string]: ".8s" }}>
           <SignupCta
+            magnet
             label={HERO.primary.label}
             className="lime-glow group inline-flex h-14 items-center justify-center gap-2 rounded-full bg-lime px-7 text-base font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.97]"
           >
             <ArrowRight className="h-[18px] w-[18px] transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
           </SignupCta>
           {showHow && <Link
+            data-magnet=""
             href={HERO.secondary.href}
             className="glass hairline inline-flex h-14 items-center justify-center rounded-full px-6 text-base font-medium transition-colors hover:bg-secondary"
           >

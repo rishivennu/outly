@@ -517,7 +517,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
       )}
 
       {nudge && !open && (
-        <button type="button" onClick={() => { setOpen(true); setNudge(false); }} className="pc-nudge pc-in absolute bottom-[72px] right-0 w-max max-w-[240px] px-4 py-2.5 text-start text-[14px]">
+        <button type="button" onClick={() => { setOpen(true); setNudge(false); }} className="pc-nudge pc-in absolute bottom-[72px] right-0 min-h-11 w-max max-w-[240px] px-4 py-2.5 text-start text-[14px]">
           {t.nudge}
         </button>
       )}

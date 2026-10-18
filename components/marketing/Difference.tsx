@@ -14,7 +14,7 @@ const STICKERS: { label: string; tone: string; r: number }[] = [
 
 export function Difference() {
   return (
-    <section id="why" className="scroll-mt-24 py-20 sm:py-28" aria-labelledby="why-title">
+    <section id="why" className="scroll-mt-24 overflow-x-clip py-20 sm:py-28" aria-labelledby="why-title">
       <Shell>
         <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16">
           <div>

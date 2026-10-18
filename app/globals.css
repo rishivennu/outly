@@ -2136,3 +2136,45 @@ html[data-contrast="more"] .cp-search:focus-within { border-bottom-color: hsl(va
 /* Green badge text: --success is 3.7:1 on its own tint in light mode, so darken it there (dark mode keeps it). */
 .pr-good { color: hsl(146 64% 24%); }
 .dark .pr-good { color: hsl(var(--success)); }
+
+/* ===== 10-18b landing motion layer (components/marketing/LandingFx.tsx + ScrollScenes) ===== */
+/* Off-screen sections: every loop inside stops until it comes back within half a screen of view. */
+[data-off], [data-off] *, [data-off] *::before, [data-off] *::after { animation-play-state: paused !important; }
+
+/* Hero fan deals itself out on scroll. GSAP writes the variables; the slot's own translate/rotate properties apply them on
+   top of its CSS entrance (which animates transform), around the same low pivot, so the hand opens like real cards. */
+.hf-slot { translate: var(--fx, 0px) var(--fy, 0px); rotate: var(--fr, 0deg); }
+
+/* Hero aura: a soft light that trails the mouse behind the headline. One blurred disc moved by transform (no repaint). */
+.hf-aura { position: absolute; left: 0; top: 0; width: 620px; height: 620px; margin: -310px 0 0 -310px; border-radius: 9999px; pointer-events: none;
+  opacity: 0; transition: opacity .9s var(--ease-out); will-change: transform;
+  background: radial-gradient(circle, hsl(var(--lime) / .13), hsl(262 90% 62% / .07) 42%, transparent 68%); }
+.hf-aura[data-on] { opacity: 1; }
+html:not(.dark) .hf-aura { background: radial-gradient(circle, hsl(78 100% 45% / .18), hsl(262 90% 70% / .07) 42%, transparent 68%); }
+
+/* Spotlight cards: a light and a lit rim follow the pointer (LandingFx sets --sx / --sy in px). */
+[data-spot] { --spot: hsl(var(--lime) / .10); --spot-rim: hsl(var(--lime) / .6); position: relative; isolation: isolate; }
+[data-spot="ink"] { --spot: hsl(var(--lime) / .24); --spot-rim: hsl(var(--lime)); }
+[data-spot]::before, [data-spot]::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+  transition: opacity .5s var(--ease-out); }
+[data-spot]::before { z-index: -1; background: radial-gradient(420px circle at var(--sx, 50%) var(--sy, 0%), var(--spot), transparent 62%); }
+[data-spot]::after { z-index: 1; padding: 1px; background: radial-gradient(260px circle at var(--sx, 50%) var(--sy, 0%), var(--spot-rim), transparent 70%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+@media (hover: hover) and (pointer: fine) { [data-spot]:hover::before, [data-spot]:hover::after { opacity: 1; } }
+
+/* Ticker leans with scroll speed (LandingFx sets --lt-sk on the track). */
+.lt-half { transform: skewX(var(--lt-sk, 0deg)); }
+
+/* Pointer toys are mouse only and never run with reduced motion. */
+@media (prefers-reduced-motion: reduce), (hover: none) {
+  .hf-aura, [data-spot]::before, [data-spot]::after { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hf-slot { translate: none; rotate: none; }
+  .lt-half { transform: none; }
+}
+
+/* 44px tap targets: the demo step tabs, and the decorative "Get started" pill on the hero card (mouse can still click it). */
+.bx-dot { width: 44px; }
+.hf-pill { padding: 8px 8px 8px 18px; }

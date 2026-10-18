@@ -10,7 +10,7 @@ export function FinalCtaButtons() {
   if (signedIn)
     return (
       <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-        <Link href="/home" className="ap-btn">
+        <Link href="/home" className="ap-btn" data-magnet="">
           <LayoutDashboard className="h-[18px] w-[18px]" aria-hidden="true" />
           Open your dashboard
         </Link>
@@ -18,7 +18,7 @@ export function FinalCtaButtons() {
     );
   return (
     <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-      <SignupCta className="ap-btn" />
+      <SignupCta className="ap-btn" magnet />
       <Link href="/login" className="ap-link">
         Log in
         <ChevronRight className="h-4 w-4" aria-hidden="true" />

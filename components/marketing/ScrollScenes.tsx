@@ -36,8 +36,10 @@ export function ScrollScenes() {
     if (!main) return;
     const mm = gsap.matchMedia();
 
-    mm.add({ motion: MOTION_OK, wide: "(min-width: 768px)" }, (ctx) => {
-      const { motion, wide } = ctx.conditions as { motion: boolean; wide: boolean };
+    // Built when the main thread is free (or within 700ms), so it does not lengthen the hydration task.
+    // The hero scene starts at rest and every other scene only sets its start offset below the fold, so nothing on screen jumps.
+    const build = () => mm.add({ motion: MOTION_OK, wide: "(min-width: 768px)", lg: "(min-width: 1024px)" }, (ctx) => {
+      const { motion, wide, lg } = ctx.conditions as { motion: boolean; wide: boolean; lg: boolean };
       if (!motion) return;
       const k = wide ? 1 : 0.55; // travel scale on phones
       const scrub = wide ? 0.6 : true;
@@ -67,6 +69,19 @@ export function ScrollScenes() {
         if (copy.length) tl.to(copy, { y: -110 * k, opacity: 0.35 }, 0);
         if (fan.length) tl.to(fan, { y: -40 * k, scale: 0.97 }, 0);
         if (glow.length) tl.to(glow, { y: 140 * k }, 0);
+        // The hand of cards deals itself out as you leave: the outer cards swing wider and drop, the centre one rises.
+        // CSS variables feed the slots' own translate/rotate properties (globals.css), so the CSS entrance on transform is untouched.
+        const slots = Array.from(hero.querySelectorAll<HTMLElement>(".hf-slot"));
+        const mid = (slots.length - 1) / 2;
+        slots.forEach((s, i) => {
+          const o = i - mid;
+          tl.fromTo(
+            s,
+            { "--fx": "0px", "--fy": "0px", "--fr": "0deg" },
+            { "--fx": `${o * 46 * k}px`, "--fy": `${o ? Math.abs(o) * 18 * k : -22 * k}px`, "--fr": `${o * 5}deg` },
+            0,
+          );
+        });
       }
 
       // 3. "Publishes to" ticker eases up to full size.
@@ -104,9 +119,10 @@ export function ScrollScenes() {
       const demo = main.querySelector("#demo");
       if (demo) enter(one(demo, ":scope > div"), demo, { y: 80 * k, scale: 0.92 }, ["top 95%", "top 25%"]);
 
-      // 8. Why Outlly: each point slides in from the right, one after another.
+      // 8. Why Outlly: each point slides in from the right, one after another. Only beside the copy (lg): when the list
+      //    is full width (tablet) a sideways start would push past the screen edge and make the page scroll sideways.
       const why = main.querySelector("#why");
-      if (why) enter(all(why, "ul.divide-y > li"), why, wide ? { x: 70 } : { y: 30 }, ["top 85%", "top 25%"], 0.08);
+      if (why) enter(all(why, "ul.divide-y > li"), why, lg ? { x: 70 } : { y: 30 }, ["top 85%", "top 25%"], 0.08);
 
       // 9. Platforms: the bento columns move at different speeds, the middle one furthest.
       //    Phones stack them, so each column then follows its own position instead of the section's.
@@ -162,7 +178,13 @@ export function ScrollScenes() {
       };
     });
 
-    return () => mm.revert();
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    const id = w.requestIdleCallback ? w.requestIdleCallback(build, { timeout: 700 }) : window.setTimeout(build, 1);
+    return () => {
+      if (w.cancelIdleCallback) w.cancelIdleCallback(id);
+      else window.clearTimeout(id);
+      mm.revert();
+    };
   }, []);
   return null;
 }

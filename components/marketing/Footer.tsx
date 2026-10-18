@@ -99,17 +99,17 @@ export function MarketingFooter() {
             {COLUMNS.map((col) => (
               <nav key={col.title} aria-label={col.title}>
                 <h2 className="ft-head mb-4 font-sans text-[12px] font-semibold uppercase tracking-[0.16em] text-foreground/55">{col.title}</h2>
-                <ul className="flex flex-col gap-1">
+                <ul className="flex flex-col">
                   {col.links.filter((l) => !(l.href.startsWith("/#") && hidden.has(l.href.slice(2)))).map((l) => (
                     <li key={l.href} data-sec={l.href.startsWith("/#") ? l.href.slice(2) : undefined}>
-                      <AnimatedLink href={l.href} className="footer-link min-h-9 text-[15px] font-medium text-foreground/80 hover:text-foreground">
+                      <AnimatedLink href={l.href} className="footer-link min-h-11 min-w-11 text-[15px] font-medium text-foreground/80 hover:text-foreground">
                         {l.label}
                       </AnimatedLink>
                     </li>
                   ))}
                   {col.title === "Company" && (
                     <li>
-                      <CookieSettingsButton animated className="footer-link group/al inline-flex min-h-9 items-center text-[15px] font-medium text-foreground/80 hover:text-foreground" />
+                      <CookieSettingsButton animated className="footer-link group/al inline-flex min-h-11 items-center text-[15px] font-medium text-foreground/80 hover:text-foreground" />
                     </li>
                   )}
                 </ul>
@@ -127,7 +127,7 @@ export function MarketingFooter() {
               </li>
             ))}
           </ul>
-          <a href="#main" className="ft-top inline-flex h-10 items-center gap-2 self-start rounded-full px-4 text-[13.5px] font-semibold text-foreground/80 ring-1 ring-foreground/15 transition-colors hover:bg-foreground hover:text-background sm:self-auto">
+          <a href="#main" className="ft-top inline-flex h-11 items-center gap-2 self-start rounded-full px-4 text-[13.5px] font-semibold text-foreground/80 ring-1 ring-foreground/15 transition-colors hover:bg-foreground hover:text-background sm:self-auto">
             Back to top <ArrowUp className="h-4 w-4" aria-hidden="true" />
           </a>
         </div>

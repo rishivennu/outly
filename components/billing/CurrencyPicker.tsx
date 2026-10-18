@@ -18,7 +18,7 @@ export function CurrencyPicker({ currency, source, className }: { currency: stri
   }
 
   return (
-    <div className={cn("inline-flex items-center gap-2 rounded-full bg-secondary/60 py-1 pl-3 pr-1 text-[13px] hairline", className)}>
+    <div className={cn("inline-flex items-center gap-2 rounded-full bg-secondary/60 py-0.5 pl-3 pr-0.5 text-[13px] hairline", className)}>
       {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-hidden /> : <Globe2 className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />}
       <label htmlFor="ccy-pick" className="text-muted-foreground">
         Prices in <span className="sr-only">(currently {currency}, {why})</span>
@@ -27,7 +27,7 @@ export function CurrencyPicker({ currency, source, className }: { currency: stri
         id="ccy-pick"
         value={currency}
         onChange={(e) => change(e.target.value)}
-        className="h-8 cursor-pointer rounded-full bg-background px-2.5 text-[13px] font-semibold hairline"
+        className="h-11 cursor-pointer rounded-full bg-background px-3 text-[13px] font-semibold hairline"
       >
         {CURRENCIES.map((c) => (
           <option key={c} value={c}>{c} · {CURRENCY_NAME[c]}</option>
