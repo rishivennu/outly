@@ -25,7 +25,7 @@ function v4Reason([a, b]: number[]): string | null {
 }
 
 export function blockedHostReason(hostname: string): string | null {
-  const h = hostname.trim().toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  const h = hostname.trim().toLowerCase().replace(/^\[|\]$/g, "").replace(/\.+$/, "");
   if (!h) return "an empty host";
   const four = v4(h);
   if (four) return v4Reason(four);
@@ -38,6 +38,7 @@ export function blockedHostReason(hostname: string): string | null {
     if (/^::[0-9a-f]{1,4}(:[0-9a-f]{1,4})?$/.test(h)) return "an IPv4-compatible address";
     if (/^64:ff9b:/.test(h)) return "a NAT64 address that can reach IPv4 inside the network";
     if (/^2002:/.test(h)) return "a 6to4 address that can wrap a private IPv4";
+    if (/^(::ffff:0{1,4}:|2001:(0{1,4})?:)/.test(h)) return "an IPv6 address with an IPv4 address inside it";
     if (/^f[cd][0-9a-f]{2}:/.test(h)) return "a private IPv6 address";
     if (/^fe[89ab][0-9a-f]:/.test(h)) return "a link-local IPv6 address";
     if (/^ff[0-9a-f]{2}:/.test(h)) return "a multicast IPv6 address";

@@ -13,13 +13,16 @@ import { useUser } from "@/components/shell/UserContext";
  * that would open after it calls afterPrivacy(). Bump PRIVACY_VERSION when what we collect, who receives
  * it or how long we keep it changes, and everyone sees the new version once. Keep it in step with /privacy.
  */
-export const PRIVACY_VERSION = "2026-10-18";
+export const PRIVACY_VERSION = "2026-10-18b";
 const UPDATED = "18 Oct 2026";
 export const privacyKey = (userId: string) => `outlly:privacy-seen:${userId}`;
 const OPEN = "outlly:privacy-open";
 const CLOSED = "outlly:privacy-closed";
+// Also remembered in memory, so a browser that refuses localStorage writes never wedges the popups waiting on it.
+let seenThisSession = false;
 
 export function privacyPending(userId: string) {
+  if (seenThisSession) return false;
   try {
     return localStorage.getItem(privacyKey(userId)) !== PRIVACY_VERSION;
   } catch {
@@ -47,10 +50,10 @@ const ROWS = [
   {
     icon: Share2,
     title: "Who else gets it",
-    body: "Only services doing a job for you: the platforms you publish to, Google Gemini when you use an AI feature (your notes, or your video's audio for captions from speech), the payment gateway you pick, Resend for email, and Supabase and Vercel, which host Outlly.",
+    body: "Only services doing a job for you: the platforms you post to, Google Gemini for AI features (including your video's audio for captions from speech), your payment gateway, Resend for email, and Supabase, Vercel and Cloudflare, which host Outlly and your files.",
   },
   { icon: Lock, title: "How it's protected", body: "HTTPS everywhere. Platform tokens are encrypted and never reach your browser. We never see your card, bank or platform passwords." },
-  { icon: Clock, title: "How long we keep it", body: "Drafts nobody touches for 3 days are removed. Email logs go after 90 days, post metric history after 180, sign-in codes after a day." },
+  { icon: Clock, title: "How long we keep it", body: "Drafts nobody touches for 3 days are removed. Email logs go after 90 days, post metric history after 180, sign-in codes after a day. Invoices are kept for 8 years after their date, as tax law requires." },
   { icon: Ban, title: "What we never do", body: "Sell your data, show ads, run trackers, or train AI models on your videos, captions or numbers." },
   { icon: SlidersHorizontal, title: "You're in control", body: "Download a copy or delete your account in Settings, any time. Disconnect any platform in Accounts and its tokens are deleted at once." },
 ] as const;
@@ -60,10 +63,14 @@ export function PrivacyNotice() {
   const [open, setOpen] = useState(false);
   const reduce = useReducedMotion();
   const shown = useRef(false);
+  const opener = useRef<HTMLElement | null>(null);
 
   // Reopen on request, whether or not it was seen.
   useEffect(() => {
-    const reopen = () => setOpen(true);
+    const reopen = () => {
+      opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setOpen(true);
+    };
     window.addEventListener(OPEN, reopen);
     return () => window.removeEventListener(OPEN, reopen);
   }, []);
@@ -74,7 +81,13 @@ export function PrivacyNotice() {
     let tries = 0;
     let t = 0;
     const tick = () => {
-      if (++tries > 120) return window.clearInterval(t); // about 1.5 minutes, then next visit
+      if (!privacyPending(userId)) return window.clearInterval(t); // already seen, e.g. opened from Settings
+      if (++tries > 120) {
+        // About 1.5 minutes: try again next visit, but let the tour and welcome offer go ahead now.
+        window.clearInterval(t);
+        window.dispatchEvent(new Event(CLOSED));
+        return;
+      }
       if (document.hidden || !readConsent()) return;
       if (document.querySelector('[role="dialog"], [aria-labelledby="cc-title"]')) return;
       shown.current = true;
@@ -86,6 +99,7 @@ export function PrivacyNotice() {
   }, [userId]);
 
   const close = () => {
+    seenThisSession = true;
     try {
       localStorage.setItem(privacyKey(userId), PRIVACY_VERSION);
     } catch {
@@ -103,9 +117,20 @@ export function PrivacyNotice() {
             <Dialog.Overlay asChild forceMount>
               <motion.div className="fixed inset-0 z-[80] bg-black/45 backdrop-blur-[4px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
             </Dialog.Overlay>
-            <Dialog.Content asChild forceMount>
+            <Dialog.Content
+              asChild
+              forceMount
+              onCloseAutoFocus={(e) => {
+                // Reopened from a button: hand focus back to it.
+                if (opener.current?.isConnected) {
+                  e.preventDefault();
+                  opener.current.focus();
+                }
+                opener.current = null;
+              }}
+            >
               <div
-                className="fixed inset-0 z-[81] grid place-items-center overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+                className="fixed inset-0 z-[81] flex flex-col items-center overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
                 data-lenis-prevent
                 data-privacy-notice
                 onPointerDown={(e) => {
@@ -113,7 +138,7 @@ export function PrivacyNotice() {
                 }}
               >
                 <motion.div
-                  className="wn-card relative w-full max-w-[520px] overflow-hidden rounded-[30px] p-5 sm:p-6"
+                  className="wn-card relative my-auto w-full max-w-[680px] shrink-0 overflow-hidden rounded-[30px] p-5 sm:p-6"
                   initial={reduce ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.96 }}
                   animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
                   exit={reduce ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }}
@@ -137,7 +162,7 @@ export function PrivacyNotice() {
                   <Dialog.Description className="relative mt-2 text-[14.5px] leading-relaxed text-muted-foreground">
                     The short version, in about 30 seconds. Nothing here changes anything you have already set up.
                   </Dialog.Description>
-                  <ul className="relative mt-4 grid gap-2">
+                  <ul className="relative mt-4 grid gap-2 sm:grid-cols-2">
                     {ROWS.map(({ icon: Icon, title, body }) => (
                       <li key={title} className="wn-item flex items-start gap-3 rounded-[16px] px-3 py-2.5">
                         <span aria-hidden className="wn-tick mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full">

@@ -290,21 +290,30 @@ model Payment {
   @@index([userId])
 }
 
+/// Tax law needs invoices kept after the customer leaves, so deleting an account (or its payment row)
+/// only detaches the invoice: userId and paymentId go null, detachedAt is set, and the retention cron
+/// deletes it INVOICE_KEEP_YEARS after it was issued (lib/retention/prune.ts). Everything the PDF prints
+/// is copied onto the row at issue time, so it renders the same without the payment or the user.
 model Invoice {
   id            String    @id @default(cuid())
   number        String    @unique // OUT-2026-000123
-  paymentId     String    @unique
-  userId        String
+  paymentId     String?   @unique
+  userId        String?
   customerName  String
   customerEmail String
   description   String
   amountMinor   Int
   currency      String
+  provider      String? // gateway at issue time (null on invoices issued before 2026-10-18)
+  providerRef   String?
+  taxPercent    Float? // tax rate at issue time
+  issuer        String? // JSON {name,address,gstin} of the seller at issue time
   issuedAt      DateTime  @default(now())
   emailedAt     DateTime?
+  detachedAt    DateTime? // the customer deleted their account; kept for tax law until the retention window ends
 
-  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId, issuedAt])
 }

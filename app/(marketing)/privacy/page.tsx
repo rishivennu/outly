@@ -152,7 +152,7 @@ export default function PrivacyPage() {
             <li><strong>Pip, the support assistant:</strong> your question and the last few messages of the chat.</li>
           </ul>
           <p>
-            AI suggestions are drafts. Nothing generated is published until you choose to publish it. Our team also uses Gemini on anonymised,
+            AI suggestions are drafts. Nothing generated is published until you choose to publish it. Our team also uses Gemini, without training any model on it, on anonymised,
             aggregated product numbers (no names or email addresses) to understand how Outlly is used.
           </p>
 
@@ -160,6 +160,8 @@ export default function PrivacyPage() {
           <ul>
             <li><strong>Vercel:</strong> hosts the website and app.</li>
             <li><strong>Supabase:</strong> our database, sign-in and file storage.</li>
+            <li><strong>Cloudflare (R2):</strong> may store your uploaded videos and thumbnails instead of, or as a copy of, Supabase storage.</li>
+            <li><strong>Upstash:</strong> shared rate-limit counters that stop abuse. They are keyed by a scrambled form of your IP address, never the address itself, and expire within minutes.</li>
             <li><strong>Resend:</strong> sends account, publishing, invoice and support emails.</li>
             <li><strong>Stripe, Razorpay or PayPal:</strong> takes payments, depending on which you choose at checkout.</li>
             <li><strong>YOUPI (UPI payments):</strong> a payment gateway we run on our own server. It confirms a UPI payment by matching it with our bank&rsquo;s payment alert, so it sees the amount, time, UPI reference and any payer name or UPI ID the alert shows.</li>
@@ -186,11 +188,11 @@ export default function PrivacyPage() {
           <ul>
             <li><strong>Disconnect a platform:</strong> open Accounts and choose Disconnect. The stored tokens for that platform are deleted straight away. You can also remove Outlly from the platform’s own settings (connected apps or business integrations), which stops access from their side too.</li>
             <li><strong>Delete media or posts:</strong> from the content library, at any time.</li>
-            <li><strong>Delete your account:</strong> open Settings, then Your data, and choose Delete account. Your account, media, posts, connected accounts, comments and analytics are deleted straight away. You can also ask from the Pip chat or the <a href="/contact">contact page</a> using your account email.</li>
+            <li><strong>Delete your account:</strong> open Settings, then Your data, and choose Delete account. Your account, media, posts, connected accounts, comments, analytics and payment records are deleted straight away. Invoices are the one exception (see below). You can also ask from the Pip chat or the <a href="/contact">contact page</a> using your account email.</li>
             <li><strong>Take a copy:</strong> Settings, Your data, Download my data gives you one file with your profile, posts, schedule, library details and invoices. Access tokens are never included.</li>
           </ul>
           <p>
-            Invoices and payment records are kept as long as tax law requires. Drafts nobody has touched for 3 days are removed
+            Invoices stay on your Billing page for as long as you have an account. If you delete it, each invoice is kept until 8 years after the date it was issued, because Indian tax law requires it, and is then deleted automatically. A kept invoice holds only what was printed on it: the invoice number, date, plan, amount, tax and the name and email it was made out to. It is no longer linked to any account. Drafts nobody has touched for 3 days are removed
             automatically. Email logs are deleted after 90 days, post metric history after 180 days and sign-in codes after one day. Your source files stay downloadable from the library for as long as your account exists.
           </p>
 

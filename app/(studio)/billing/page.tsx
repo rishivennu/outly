@@ -118,7 +118,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
       canPickCurrency={gw.provider !== "razorpay"}
       current={sub ? { planSlug: sub.plan.slug, planName: sub.plan.name, priceMinor: sub.priceMinor, currency: sub.currency, interval: sub.interval, periodEnd: sub.currentPeriodEnd.toISOString(), cancelAtPeriodEnd: sub.cancelAtPeriodEnd, pausedUntil: sub.pausedUntil && sub.pausedUntil > new Date() ? sub.pausedUntil.toISOString() : null } : null}
       usage={{ used: usage.used, limit: usage.postLimit, seats: usage.seats, aiCaptions: usage.aiCaptions }}
-      invoices={invoices.map((i) => ({ number: i.number, description: i.description, amountMinor: i.amountMinor, currency: i.currency, issuedAt: i.issuedAt.toISOString(), refunded: i.payment.status === "refunded" }))}
+      invoices={invoices.map((i) => ({ number: i.number, description: i.description, amountMinor: i.amountMinor, currency: i.currency, issuedAt: i.issuedAt.toISOString(), refunded: i.payment?.status === "refunded" }))}
     />
   );
 }

@@ -23,7 +23,8 @@ export const YOUPI_DEFAULT: YoupiConfig = { gatewayUrl: "", merchantId: "", webh
 
 const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/;
 
-/** A usable gateway URL: https always, plain http only for a local test gateway. Returns "" when unusable. */
+/** A usable gateway URL: https always, plain http only for a local test gateway. Returns "" when unusable.
+ * Literal host check only. Any caller that fetches the result in live mode must also `await assertPublicUrl(base)`. */
 export function youpiBase(url: string, mode: "test" | "live"): string {
   let u: URL;
   try {

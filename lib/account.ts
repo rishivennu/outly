@@ -1,4 +1,5 @@
 import "server-only";
+import { getConfig } from "./settings";
 import { db } from "./db";
 import { env } from "./env";
 import { HttpError } from "./http";
@@ -59,7 +60,9 @@ export async function exportUser(id: string) {
 
 /**
  * Delete the studio. Everything that hangs off the User row goes with it (the schema cascades) and the
- * uploaded files are removed afterwards. The Supabase auth user is deleted FIRST, so the password stops
+ * uploaded files are removed afterwards. Invoices are the one exception: tax law needs them, so they are
+ * detached (no user, no payment row, detachedAt set) and the retention cron deletes them once
+ * INVOICE_KEEP_YEARS have passed (lib/retention/prune.ts). The Supabase auth user is deleted FIRST, so the password stops
  * working even if the row delete were to fail. A teammate inside someone else's workspace is refused.
  */
 export async function deleteAccount(user: Pick<SessionUser, "id" | "actor">, confirm: string) {
@@ -76,7 +79,29 @@ export async function deleteAccount(user: Pick<SessionUser, "id" | "actor">, con
     }
   }
   const media = await db.media.findMany({ where: { userId: me.id }, select: { storageKey: true, thumbnailKey: true } });
-  await db.user.delete({ where: { id: me.id } });
+  const now = new Date();
+  // Older invoices predate the snapshot columns: fill them in now (gateway from the payment row, which is
+  // about to go; tax rate and seller from today's settings), so the kept copy stops changing with settings.
+  const legacy = await db.invoice.findMany({
+    where: { userId: me.id, OR: [{ provider: null }, { taxPercent: null }, { issuer: null }] },
+    select: { id: true, provider: true, providerRef: true, taxPercent: true, issuer: true, payment: { select: { provider: true, providerRef: true } } },
+  });
+  const biz = legacy.length ? (await getConfig("payments")).business : null;
+  await db.$transaction([
+    ...legacy.map((i) =>
+      db.invoice.update({
+        where: { id: i.id },
+        data: {
+          provider: i.provider ?? i.payment?.provider ?? null,
+          providerRef: i.providerRef ?? i.payment?.providerRef ?? null,
+          taxPercent: i.taxPercent ?? biz?.taxPercent ?? 0,
+          issuer: i.issuer ?? JSON.stringify({ name: biz?.name || "Outlly", address: biz?.address || "", gstin: biz?.gstin || "" }),
+        },
+      }),
+    ),
+    db.invoice.updateMany({ where: { userId: me.id }, data: { detachedAt: now } }),
+    db.user.delete({ where: { id: me.id } }), // the schema sets the invoices' userId and paymentId to null
+  ]);
   // Files last: an orphaned object is harmless, and a storage hiccup must not leave the row behind.
   for (const m of media)
     for (const key of [m.storageKey, m.thumbnailKey])

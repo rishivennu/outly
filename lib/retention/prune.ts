@@ -14,6 +14,21 @@ const DAY = 864e5;
 export { DRAFT_TTL_DAYS };
 
 /**
+ * Invoices of deleted accounts are kept this long after they were issued, then deleted. Indian GST law
+ * (CGST Act s.36) needs records for 72 months after the annual return's due date, which falls up to
+ * about 21 months after an invoice, so 8 years from issue covers every case. Invoices of live
+ * accounts are not touched: the owner can still see them in Billing.
+ */
+export const INVOICE_KEEP_YEARS = 8;
+
+export async function pruneDetachedInvoices(now: Date = new Date()) {
+  const cutoff = new Date(now);
+  cutoff.setFullYear(cutoff.getFullYear() - INVOICE_KEEP_YEARS);
+  const { count } = await db.invoice.deleteMany({ where: { userId: null, issuedAt: { lt: cutoff } } });
+  return count;
+}
+
+/**
  * Untouched drafts: status draft, not saved for DRAFT_TTL_DAYS, not booked for a future time and not
  * waiting on a reviewer. The delete repeats the conditions, so a draft saved meanwhile survives.
  */
@@ -45,12 +60,13 @@ export async function pruneStaleDrafts(now: Date = new Date(), batch = 500) {
 
 export async function pruneOldData(now: Date = new Date()) {
   const before = (days: number) => new Date(now.getTime() - days * DAY);
-  const [emailLogs, adminEvents, behaviorAnalyses, targetMetrics, otpCodes] = await Promise.all([
+  const [emailLogs, adminEvents, behaviorAnalyses, targetMetrics, otpCodes, invoices] = await Promise.all([
     db.emailLog.deleteMany({ where: { createdAt: { lt: before(90) } } }),
     db.adminEvent.deleteMany({ where: { createdAt: { lt: before(90) } } }),
     db.behaviorAnalysis.deleteMany({ where: { createdAt: { lt: before(90) } } }),
     db.targetMetric.deleteMany({ where: { capturedAt: { lt: before(180) } } }),
     db.otpCode.deleteMany({ where: { createdAt: { lt: before(1) } } }),
+    pruneDetachedInvoices(now),
   ]);
   // Batches of 500, a few per run, so a backlog drains without one huge delete.
   const drafts = { drafts: 0, media: 0 };
@@ -68,5 +84,6 @@ export async function pruneOldData(now: Date = new Date()) {
     behaviorAnalyses: behaviorAnalyses.count,
     targetMetrics: targetMetrics.count,
     otpCodes: otpCodes.count,
+    detachedInvoices: invoices,
   };
 }

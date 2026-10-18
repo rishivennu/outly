@@ -12,6 +12,7 @@ import { CursorToggle } from "@/components/shell/AvatarCursor";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { useUser, tzShort } from "@/components/shell/UserContext";
 import { api, ApiError } from "@/lib/client/api";
+import { forgetBillingCopies } from "@/lib/client/forget-billing";
 import { TeamCard } from "./TeamCard";
 import { ReferralCard } from "./ReferralCard";
 import { AvatarPicker } from "./AvatarPicker";
@@ -121,6 +122,7 @@ export function SettingsView({ weeklyReport = true }: { weeklyReport?: boolean }
     try {
       await api("/api/auth/logout", { method: "POST" });
     } finally {
+      await forgetBillingCopies();
       window.location.href = "/login";
     }
   };

@@ -7,6 +7,15 @@ import { formatMoney } from "./money";
 import { getConfig } from "../settings";
 import { sendEmail, templates } from "../email";
 
+function issuerOf(json: string | null): { name?: string; address?: string; gstin?: string } | null {
+  if (!json) return null;
+  try {
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 /** OUT-2026-000042. Sequential per year; retried on the rare unique collision between two parallel payments. */
 async function nextNumber() {
   const y = new Date().getFullYear();
@@ -23,11 +32,20 @@ export async function issueInvoice(paymentId: string, opts: { email?: boolean } 
   const p = await db.payment.findUniqueOrThrow({ where: { id: paymentId }, include: { user: true, subscription: { include: { plan: true } } } });
   if (p.status !== "succeeded") throw new Error("Invoices are only issued for successful payments");
   const description = p.subscription ? `${p.subscription.plan.name} plan, 1 ${p.subscription.interval}` : "Outlly subscription";
+  // Copy what the PDF prints onto the invoice itself: it must read the same years later, after a
+  // change of business details or tax rate, and after the customer deletes their account.
+  const biz = (await getConfig("payments")).business;
+  const snapshot = {
+    provider: p.provider,
+    providerRef: p.providerRef,
+    taxPercent: biz.taxPercent || 0,
+    issuer: JSON.stringify({ name: biz.name || "Outlly", address: biz.address || "", gstin: biz.gstin || "" }),
+  };
   let inv = null;
   for (let i = 0; i < 4 && !inv; i++) {
     try {
       inv = await db.invoice.create({
-        data: { number: await nextNumber(), paymentId, userId: p.userId, customerName: p.user.name, customerEmail: p.user.email, description, amountMinor: p.amountMinor, currency: p.currency },
+        data: { number: await nextNumber(), paymentId, userId: p.userId, customerName: p.user.name, customerEmail: p.user.email, description, amountMinor: p.amountMinor, currency: p.currency, ...snapshot },
       });
     } catch (e: any) {
       if (e?.code !== "P2002") throw e;
@@ -52,7 +70,12 @@ export async function issueInvoice(paymentId: string, opts: { email?: boolean } 
 
 export async function invoicePdf(invoiceId: string): Promise<Buffer> {
   const inv = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { payment: true } });
-  const biz = (await getConfig("payments")).business;
+  // Invoices issued before the snapshot columns existed fall back to today's settings and the payment row.
+  const live = (await getConfig("payments")).business;
+  const kept = issuerOf(inv.issuer);
+  const biz = { name: kept?.name ?? live.name, address: kept?.address ?? live.address, gstin: kept?.gstin ?? live.gstin, taxPercent: inv.taxPercent ?? live.taxPercent };
+  const provider = inv.provider ?? inv.payment?.provider ?? "";
+  const providerRef = inv.providerRef ?? inv.payment?.providerRef ?? "";
   const d = new Pdf();
   const ink: [number, number, number] = [0.07, 0.09, 0.03];
   const mute: [number, number, number] = [0.42, 0.44, 0.39];
@@ -77,7 +100,7 @@ export async function invoicePdf(invoiceId: string): Promise<Buffer> {
 
   const issued = inv.issuedAt.toISOString().slice(0, 10);
   d.text(40, 640, `Issued ${issued}`, 10, false, ink);
-  d.text(200, 640, `Payment ${inv.payment.provider.toUpperCase()} ${inv.payment.providerRef?.slice(0, 22) ?? ""}`, 10, false, mute);
+  d.text(200, 640, `Payment ${provider.toUpperCase()} ${providerRef.slice(0, 22)}`.trim(), 10, false, mute);
   d.textR(555, 640, "PAID", 11, true, [0.07, 0.53, 0.24]);
 
   d.rect(40, 596, 515, 26, [0.95, 0.96, 0.93]);

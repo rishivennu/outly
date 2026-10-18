@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { api, ApiError } from "@/lib/client/api";
+import { forgetBillingCopies } from "@/lib/client/forget-billing";
 
 /**
  * Your data: sign out on every device, take a copy of everything, or close the studio for good.
@@ -24,6 +25,7 @@ export function YourDataCard({ email }: { email: string }) {
     setBusy("all");
     try {
       await api("/api/auth/logout-all", { method: "POST" });
+      await forgetBillingCopies();
       window.location.href = "/login";
     } catch (e) {
       toast(e instanceof ApiError ? e.message : "Couldn't sign out everywhere. Try again in a moment.", "info");
@@ -38,6 +40,7 @@ export function YourDataCard({ email }: { email: string }) {
     setError(null);
     try {
       await api("/api/settings/account", { method: "DELETE", json: { confirm: confirm.trim() } });
+      await forgetBillingCopies();
       window.location.href = "/";
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something got in the way. Nothing was deleted.");
@@ -80,7 +83,7 @@ export function YourDataCard({ email }: { email: string }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="font-semibold">Delete account</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Removes your studio, posts, library and connections. This can&apos;t be undone.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Removes your studio, posts, library and connections. This can&apos;t be undone. Invoices are kept until 8 years after their date, as tax law requires, then deleted.</p>
           </div>
           {!open && (
             <Button variant="danger" onClick={() => setOpen(true)} aria-expanded={false} aria-controls={`${id}-del`}>

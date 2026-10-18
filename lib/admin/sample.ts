@@ -45,6 +45,8 @@ export async function seedSample() {
 }
 
 export async function clearSample() {
+  // Invoices outlive their payment and user rows (kept for tax law), so sample ones are removed by hand.
+  await db.invoice.deleteMany({ where: { OR: [{ payment: { sample: true } }, { customerEmail: { endsWith: `@${SAMPLE_DOMAIN}` } }] } });
   await db.payment.deleteMany({ where: { sample: true } });
   await db.ticket.deleteMany({ where: { sample: true } });
   await db.subscription.deleteMany({ where: { sample: true } });

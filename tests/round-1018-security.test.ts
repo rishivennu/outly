@@ -23,8 +23,13 @@ describe("blockedHostReason", () => {
       expect(blockedHostReason(h)).not.toBeNull();
     }
   });
+  test("review fixes: repeated trailing dots, IPv4-translated (::ffff:0:) and Teredo (2001:0:) are refused", () => {
+    for (const h of ["localhost..", "127.0.0.1..", "metadata.google.internal...", "::ffff:0:a9fe:a9fe", "::ffff:0:7f00:1", "2001:0:4136:e378:8000:63bf:3fff:fdd2", "2001::1"]) {
+      expect(blockedHostReason(h)).not.toBeNull();
+    }
+  });
   test("allows public hosts and addresses", () => {
-    for (const h of ["8.8.8.8", "172.32.0.1", "192.169.0.1", "pay.example.com", "asr.outlly.app", "2606:4700::1111"]) {
+    for (const h of ["8.8.8.8", "172.32.0.1", "192.169.0.1", "pay.example.com", "asr.outlly.app", "2606:4700::1111", "2001:4860:4860::8888"]) {
       expect(blockedHostReason(h)).toBeNull();
     }
   });
@@ -64,5 +69,32 @@ describe("YOUPI gateway URL in live mode", () => {
     expect(youpiBase("https://localhost:9000", "live")).toBe("");
     expect(youpiBase("https://pay.example.com/", "live")).toBe("https://pay.example.com");
     expect(youpiBase("http://localhost:9000", "test")).toBe("http://localhost:9000");
+  });
+});
+
+describe("shared rate limiter (Upstash)", () => {
+  test("sends an HMAC of the key, never the raw IP or email", async () => {
+    const { env } = await import("../lib/env");
+    const { limitShared } = await import("../lib/rate-limit");
+    const saved = { url: env.UPSTASH_REDIS_REST_URL, token: env.UPSTASH_REDIS_REST_TOKEN, fetch: globalThis.fetch };
+    const bodies: string[] = [];
+    env.UPSTASH_REDIS_REST_URL = "https://upstash.test.dev";
+    env.UPSTASH_REDIS_REST_TOKEN = "t";
+    globalThis.fetch = (async (_u: unknown, init?: { body?: string }) => {
+      bodies.push(String(init?.body ?? ""));
+      return new Response(JSON.stringify([{ result: 1 }, { result: 1 }]), { status: 200 });
+    }) as typeof fetch;
+    try {
+      const r = await limitShared("login:203.0.113.77:someone@example.com", 5, 60_000);
+      expect(r.ok).toBe(true);
+      expect(bodies.length).toBe(1);
+      expect(bodies[0]).not.toContain("203.0.113.77");
+      expect(bodies[0]).not.toContain("someone@example.com");
+      expect(bodies[0]).toMatch(/"rl:[A-Za-z0-9_-]{32}:\d+"/);
+    } finally {
+      env.UPSTASH_REDIS_REST_URL = saved.url;
+      env.UPSTASH_REDIS_REST_TOKEN = saved.token;
+      globalThis.fetch = saved.fetch;
+    }
   });
 });

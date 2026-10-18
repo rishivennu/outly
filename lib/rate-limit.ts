@@ -1,4 +1,5 @@
 import "server-only";
+import { createHmac } from "node:crypto";
 import { env } from "./env";
 
 /**
@@ -39,9 +40,15 @@ function bucket(key: string) {
   return b;
 }
 
-/** Fixed window key: one counter per key per window, so INCR + PEXPIRE is all the state we need. */
+/**
+ * Fixed window key: one counter per key per window, so INCR + PEXPIRE is all the state we need.
+ * Keys often hold an IP address or an email, so what goes to Upstash is an HMAC of the key, never
+ * the key itself (the privacy page promises this). The in-memory map keeps raw keys; it never leaves
+ * the process.
+ */
 function windowKey(key: string, windowMs: number) {
-  return `rl:${key}:${Math.floor(Date.now() / windowMs)}`;
+  const digest = createHmac("sha256", `rl:${env.AUTH_SECRET}`).update(key).digest("base64url").slice(0, 32);
+  return `rl:${digest}:${Math.floor(Date.now() / windowMs)}`;
 }
 
 /** Upstash pipeline: INCR then PEXPIRE. Returns the new count, or null when Redis isn't usable. */
