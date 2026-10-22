@@ -92,10 +92,13 @@ export function ScrollScenes() {
         };
         const rail = fill.parentElement;
         rail?.setAttribute("data-live", "");
-        // Dim a waiting step's contents, not the li: the li is opaque over the grid's hairline background.
-        const parts = (li: HTMLElement) => Array.from(li.querySelectorAll<HTMLElement>(":scope > div > *"));
-        const [p2, p3] = [parts(steps[1]), parts(steps[2])];
-        gsap.set([...p2, ...p3], { opacity: 0.3 });
+        // A waiting step dims only its decorative row (number + icon); its title and text stay at full contrast,
+        // since a deep link or anchor can land here at progress 0 with all three steps on screen. The text gets
+        // a small lift instead. Never the li itself: it is opaque over the grid's hairline background.
+        const deco = (li: HTMLElement) => Array.from(li.querySelectorAll<HTMLElement>(":scope > div > :first-child"));
+        const text = (li: HTMLElement) => Array.from(li.querySelectorAll<HTMLElement>(":scope > div > :not(:first-child)"));
+        const [d2, d3, t2, t3] = [deco(steps[1]), deco(steps[2]), text(steps[1]), text(steps[2])];
+        gsap.set([...d2, ...d3], { opacity: 0.3 });
         gsap.set(fill, { scaleX: 1 / 3, transformOrigin: "0% 50%" });
         light(0);
         let at = 0;
@@ -116,9 +119,11 @@ export function ScrollScenes() {
           },
         });
         tl.to(fill, { scaleX: 2 / 3, duration: 1 }, 0)
-          .fromTo(p2, { opacity: 0.3, y: 14 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.04 }, 0.5)
+          .fromTo(d2, { opacity: 0.3, y: 14 }, { opacity: 1, y: 0, duration: 0.5 }, 0.5)
+          .fromTo(t2, { y: 10 }, { y: 0, duration: 0.5, stagger: 0.04 }, 0.5)
           .to(fill, { scaleX: 1, duration: 1 }, 1)
-          .fromTo(p3, { opacity: 0.3, y: 14 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.04 }, 1.5)
+          .fromTo(d3, { opacity: 0.3, y: 14 }, { opacity: 1, y: 0, duration: 0.5 }, 1.5)
+          .fromTo(t3, { y: 10 }, { y: 0, duration: 0.5, stagger: 0.04 }, 1.5)
           .to({}, { duration: 0.4 }); // a short hold on the finished row before the page moves on
         undo.push(() => {
           rail?.removeAttribute("data-live");

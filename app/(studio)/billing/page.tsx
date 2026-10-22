@@ -111,7 +111,8 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
       focusPlan={searchParams.plan ?? null}
       cycle={searchParams.cycle === "year" ? "year" : "month"}
       gateway={gw.provider}
-      testMode={gw.provider === "mock" || gw.cfg.mode === "test"}
+      // Customers never see a test badge on the live site; it only shows on the local dev server.
+      testMode={process.env.NODE_ENV !== "production" && (gw.provider === "mock" || gw.cfg.mode === "test")}
       plans={priced}
       currency={visitor.currency}
       currencySource={visitor.source}

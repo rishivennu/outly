@@ -9,6 +9,17 @@ let popped = false; // back/forward: let the browser restore the old position
 /** The running Lenis instance, or null (reduced motion, touch, not loaded yet). PageScrollbar drags through it. */
 export const getLenis = () => lenis;
 
+const waiting = new Set<(l: Lenis) => void>();
+/** Run `cb` with the Lenis instance as soon as it exists (now, or once the lazy import lands). Returns a cancel. */
+export function whenLenis(cb: (l: Lenis) => void): () => void {
+  if (lenis) {
+    cb(lenis);
+    return () => {};
+  }
+  waiting.add(cb);
+  return () => waiting.delete(cb);
+}
+
 /**
  * Inertial "liquid" scroll for every page: landing, studio and admin (mounted once in the root layout).
  * Loaded after hydration so it never delays first paint, skipped for reduced motion and touch devices
@@ -29,6 +40,8 @@ export function SmoothScroll() {
       if (cancelled) return;
       const l = new L({ lerp: 0.1, wheelMultiplier: 1, anchors: true, autoRaf: true, allowNestedScroll: true });
       lenis = l;
+      waiting.forEach((cb) => cb(l));
+      waiting.clear();
       document.documentElement.classList.add("lenis");
       const body = document.body;
       const sync = () => (body.hasAttribute("data-scroll-locked") ? l.stop() : l.start());

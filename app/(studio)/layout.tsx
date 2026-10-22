@@ -2,8 +2,6 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { UserProvider } from "@/components/shell/UserContext";
 import { AvatarCursor } from "@/components/shell/AvatarCursor";
-import { Watermark } from "@/components/shared/Watermark";
-import { createHash } from "node:crypto";
 import { ToastProvider } from "@/components/shared/Toast";
 import { MobileNav, MobileTopBar, Sidebar } from "@/components/shell/Nav";
 import { Tour } from "@/components/onboarding/Tour";
@@ -55,7 +53,6 @@ export default async function StudioLayout({ children }: { children: React.React
       <CommandPalette />
       <WhatsNew notice={notice} userId={user.actor?.id ?? user.id} joinedAt={new Date(user.joinedAt).toISOString()} />
       <AvatarCursor />
-      <Watermark tag={createHash("sha256").update(user.id).digest("hex").slice(0, 10).toUpperCase()} />
       </ToastProvider>
       </LivePlatformsProvider>
     </UserProvider>

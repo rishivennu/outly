@@ -12,7 +12,8 @@ API or env changes.
 - Hero: a soft light sweep (CSS mask) crosses the headline as the words unfold. The headline never
   goes to opacity 0, so LCP is not delayed. The dashboard home hero gets it too.
 - How it works (desktop, when it fits the screen): the section pins; a lime rail fills step by step,
-  nodes light, steps 2 and 3 brighten as they arrive.
+  nodes light, steps 2 and 3 light up as they arrive (only the number and icon dim while
+  waiting; titles and text always stay at full contrast, so a /#how deep link is readable).
 - Demo (desktop): scroll walks the four beats (the beat clock pauses while you scroll through).
 - Comparison: opening a group brings its rows in by threes.
 - FAQ: answers open/close with a real-height GSAP tween; reversing mid-motion is smooth.
@@ -31,4 +32,5 @@ API or env changes.
   0 infinite animations under reduced motion, frame p50 10-13 ms.
 - Motion checks: hero mask present then removed, how pin + rail + nodes, demo beats via scroll,
   rows-in on group open, FAQ height tween, failsafe, no pins on phone / short screens / reduced motion,
-  studio and admin page stagger settle fully, 0 console errors.
+  studio and admin page stagger settle fully, /#how deep link keeps full text contrast, 0 console errors.
+- Independent verification teammate: all reveal/pin/FAQ/resize/reduced-motion/mobile checks PASS.

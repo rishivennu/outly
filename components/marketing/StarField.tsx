@@ -37,6 +37,12 @@ function stars(seed: number, n: number, rich: boolean): Star[] {
 const PAGE = stars(1016, 56, false);
 const SPACE = stars(2026, 150, true);
 const TINT = ["", "", "", "", "", "", "", "sky-star-lime", "sky-star-cyan", "sky-star-rose"];
+/**
+ * Stars twinkle in a few groups, not one by one: each group is one layer whose opacity breathes on its
+ * own clock. 5 to 7 animations instead of 56 to 150 keeps scrolling cheap, because every running
+ * animation is restyled on each main-thread frame and smooth scroll makes every frame one.
+ */
+const GROUPS = { page: 5, space: 7 } as const;
 
 export function StarField({ variant = "page", nebula = variant === "space", className }: { variant?: "page" | "space"; nebula?: boolean; className?: string }) {
   const list = variant === "space" ? SPACE : PAGE;
@@ -51,12 +57,18 @@ export function StarField({ variant = "page", nebula = variant === "space", clas
           {variant === "space" && <i className="sky-band" />}
         </div>
       )}
-      {list.map((s, i) => (
-        <span
-          key={i}
-          className={["sky-star", TINT[s.tint], s.glow ? "sky-star-glow" : ""].join(" ").trim()}
-          style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.s, height: s.s, animationDuration: `${s.d}s`, animationDelay: `${s.w}s` }}
-        />
+      {Array.from({ length: GROUPS[variant] }, (_, g) => (
+        <div key={g} className="sky-g" style={{ animationDuration: `${(4.6 + g * 1.35).toFixed(2)}s`, animationDelay: `${(-g * 1.9).toFixed(2)}s` }}>
+          {list
+            .filter((_, i) => i % GROUPS[variant] === g)
+            .map((s, i) => (
+              <span
+                key={i}
+                className={["sky-star", TINT[s.tint], s.glow ? "sky-star-glow" : ""].join(" ").trim()}
+                style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.s, height: s.s }}
+              />
+            ))}
+        </div>
       ))}
       <CometShower dense={variant === "space"} />
     </div>

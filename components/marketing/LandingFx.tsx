@@ -158,10 +158,23 @@ export function LandingFx() {
       const t0 = Number(anim.currentTime ?? 0);
       anim.currentTime = t0 + 38000 * 60;
       const st = { r: 1, sk: 0 };
+      const halves = Array.from(track.querySelectorAll<HTMLElement>(".lt-half"));
+      // Write only real changes: a new playbackRate re-sends the animation to the compositor, and the skew goes
+      // straight onto the two halves (a CSS variable on the track would restyle every logo inside it).
+      let lastR = 1;
+      let lastS = 0;
       const apply = () => {
-        anim.playbackRate = st.r;
-        track.style.setProperty("--lt-sk", `${st.sk.toFixed(2)}deg`);
+        if (Math.abs(st.r - lastR) > 0.04 || (st.r === 1 && lastR !== 1)) {
+          anim.playbackRate = st.r;
+          lastR = st.r;
+        }
+        const s = Math.round(st.sk * 4) / 4;
+        if (s !== lastS) {
+          lastS = s;
+          for (const h of halves) h.style.transform = s ? `skewX(${s}deg)` : "";
+        }
       };
+      let goal = 1;
       const trig = ScrollTrigger.create({
         trigger: main,
         start: 0,
@@ -169,14 +182,19 @@ export function LandingFx() {
         onUpdate: (self) => {
           const v = self.getVelocity(); // px per second, negative going up
           if (Math.abs(v) < 40) return;
+          const r = Math.max(-5, Math.min(7, 1 + v / 280));
+          // Same target as the tween already running: let it run instead of starting a new one every frame.
+          if (Math.abs(r - goal) < 0.25 && gsap.isTweening(st)) return;
+          goal = r;
           gsap.to(st, {
-            r: Math.max(-5, Math.min(7, 1 + v / 280)),
+            r,
             sk: clamp(-v / 260, 7),
             duration: 0.25,
             ease: "power2.out",
             overwrite: true,
             onUpdate: apply,
             onComplete: () => {
+              goal = 1;
               gsap.to(st, { r: 1, sk: 0, duration: 1.1, ease: "power3.out", onUpdate: apply });
             },
           });
@@ -186,7 +204,7 @@ export function LandingFx() {
         trig.kill();
         gsap.killTweensOf(st);
         anim.playbackRate = 1;
-        track.style.removeProperty("--lt-sk");
+        for (const h of halves) h.style.removeProperty("transform");
       });
     }
 

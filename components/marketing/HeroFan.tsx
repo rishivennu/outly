@@ -109,9 +109,12 @@ export function Sparkles() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0">
       {SPARKS.map(([l, t, s], i) => (
-        <svg key={i} viewBox="0 0 20 20" width={s} height={s} className="hf-spark absolute" style={{ left: l, top: t, animationDelay: `${-i * 0.7}s` }}>
-          <path d="M10 0c.6 5.4 4 8.8 10 10-6 1.2-9.4 4.6-10 10-.6-5.4-4-8.8-10-10C6 8.8 9.4 5.4 10 0z" />
-        </svg>
+        // The twinkle runs on a wrapper span: animating the <svg> itself forces an SVG layout every frame.
+        <span key={i} className="hf-spark absolute block" style={{ left: l, top: t, width: s, height: s, animationDelay: `${-i * 0.7}s` }}>
+          <svg viewBox="0 0 20 20" width={s} height={s} className="block">
+            <path d="M10 0c.6 5.4 4 8.8 10 10-6 1.2-9.4 4.6-10 10-.6-5.4-4-8.8-10-10C6 8.8 9.4 5.4 10 0z" />
+          </svg>
+        </span>
       ))}
     </div>
   );

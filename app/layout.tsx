@@ -22,7 +22,6 @@ const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-disp
 const body = DM_Sans({ subsets: ["latin"], variable: "--font-body", display: "swap" });
 const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["italic"], variable: "--font-serif", display: "swap" });
 
-import { Watermark } from "@/components/shared/Watermark";
 import { LaunchHost } from "@/components/billing/RocketCta";
 
 export const metadata: Metadata = {
@@ -61,7 +60,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <DeviceHint />
           <Connectivity />
           <Ripples />
-          <Watermark />
           <LaunchHost />
         </MotionRoot>
       </body>

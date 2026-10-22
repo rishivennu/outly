@@ -25,6 +25,7 @@ export type RevealFx = "rise" | "stagger" | "cards" | "tiles" | "rows" | "footer
 const EASE = "expo.out"; // fast start, long soft landing, no overshoot
 const CLEAR = "opacity,transform,visibility,transition";
 const triggers = new Map<HTMLElement, ScrollTrigger>();
+const pending = new Map<HTMLElement, gsap.core.Tween>(); // section heads waiting on their delay
 const queue = new Set<HTMLElement>();
 let raf = 0;
 
@@ -74,7 +75,7 @@ function play(el: HTMLElement, order: number) {
 
   // Section heads move nothing themselves: the eyebrow, word masks and body are CSS keyed off data-shown.
   if (el.classList.contains("rv-head")) {
-    if (delay) gsap.delayedCall(delay, () => shown(el));
+    if (delay) pending.set(el, gsap.delayedCall(delay, () => { pending.delete(el); shown(el); }));
     else shown(el);
     return;
   }
@@ -158,7 +159,10 @@ export function registerReveal(el: HTMLElement) {
     queue.delete(el);
     triggers.get(el)?.kill();
     triggers.delete(el);
-    gsap.killTweensOf(el);
+    pending.get(el)?.kill();
+    pending.delete(el);
+    // The engine tweens the wrapper, its children (stagger, cards) or its tiles/rows: stop all of them.
+    gsap.killTweensOf([el, ...Array.from(el.querySelectorAll<HTMLElement>(":scope > *, .bx-tile, details, li"))]);
   };
 }
 
