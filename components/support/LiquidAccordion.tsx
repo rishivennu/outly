@@ -1,7 +1,42 @@
 "use client";
-import { useId, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import gsap from "gsap";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+/**
+ * One answer panel. Before hydration the CSS grid-rows transition opens it; once mounted, GSAP takes over
+ * (data-gs) and tweens the real height, so an answer opened or closed mid-motion turns around smoothly
+ * from wherever it is. Reduced motion: instant.
+ */
+function Panel({ id, label, on, children }: { id: string; label: string; on: boolean; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const first = useRef(true);
+  useIso(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.dataset.gs = "";
+    if (first.current) {
+      first.current = false;
+      gsap.set(el, { height: on ? "auto" : 0 });
+      return;
+    }
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    gsap.killTweensOf(el);
+    if (on) gsap.fromTo(el, { height: el.offsetHeight }, { height: "auto", duration: still ? 0 : 0.62, ease: "expo.out" });
+    else gsap.fromTo(el, { height: el.offsetHeight }, { height: 0, duration: still ? 0 : 0.42, ease: "power3.inOut" });
+  }, [on]);
+  useEffect(() => () => { if (ref.current) gsap.killTweensOf(ref.current); }, []);
+  return (
+    <div ref={ref} id={id} role="region" aria-label={label} className="liquid-panel" data-open={on}>
+      <div>
+        <div className="liquid-inner max-w-prose pb-6 pr-11 text-[15px] leading-relaxed text-muted-foreground">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 export type AccItem = { id: string; q: string; a: React.ReactNode };
 
@@ -32,11 +67,9 @@ export function LiquidAccordion({ items, defaultOpen, multi, className, onOpen }
                 </span>
               </button>
             </h3>
-            <div id={pid} role="region" aria-label={it.q} className="liquid-panel" data-open={on}>
-              <div>
-                <div className="liquid-inner max-w-prose pb-6 pr-11 text-[15px] leading-relaxed text-muted-foreground">{it.a}</div>
-              </div>
-            </div>
+            <Panel id={pid} label={it.q} on={on}>
+              {it.a}
+            </Panel>
           </div>
         );
       })}

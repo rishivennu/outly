@@ -55,7 +55,7 @@ export async function Platforms({ showCompare = true, live: forced }: { showComp
           ))}
         </ul>
 
-        <Reveal y={0} className="bx">
+        <Reveal y={0} fx="tiles" className="bx">
           <div className="bx-col">
             <div className="bx-tile bx-live">
               <div className="bx-art">

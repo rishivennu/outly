@@ -184,7 +184,7 @@ export function Comparison({ competitors, groups }: { competitors?: Flags; group
           body={`Read this as a shape comparison, not a scoreboard. ${list} ${names.length === 1 ? "does" : "each do"} a great deal that Outlly does not, and the rows where they win are here too.`}
         />
 
-        <Reveal y={36}>
+        <Reveal y={36} fx="rows">
           <CompareGrid tools={tools} groups={groups} />
         </Reveal>
 

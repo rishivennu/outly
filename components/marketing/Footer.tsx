@@ -12,6 +12,7 @@ import { OutlyLogo } from "@/components/brand/Logo";
 import { PlatformGlyph } from "@/components/shared/PlatformIcon";
 import { BounceText } from "./Split";
 import { FooterWordmark } from "./FooterWordmark";
+import { Reveal } from "./Reveal";
 
 const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   {
@@ -62,7 +63,7 @@ export function MarketingFooter() {
   const waitlist = useWaitlist();
   return (
     <footer className="px-3 pb-3 pt-6 sm:px-6 sm:pb-6">
-      <div className="footer-card relative mx-auto max-w-[1240px] overflow-clip rounded-[32px] sm:rounded-[40px]">
+      <Reveal fx="footer" y={48} className="footer-card relative mx-auto max-w-[1240px] overflow-clip rounded-[32px] sm:rounded-[40px]">
         <div className="relative grid gap-10 px-6 pb-8 pt-10 sm:px-10 sm:pt-14 md:grid-cols-[1.5fr_1fr_1fr] md:gap-8">
           <div>
             <OutlyLogo size={28} className="text-[20px]" />
@@ -141,7 +142,7 @@ export function MarketingFooter() {
           <p>&copy; {new Date().getFullYear()} Outlly. All rights reserved. In beta.</p>
           <p>Instagram, YouTube and X are trademarks of their owners. Outlly is not affiliated with them.</p>
         </div>
-      </div>
+      </Reveal>
     </footer>
   );
 }

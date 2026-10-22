@@ -14,12 +14,19 @@ export function HowItWorks() {
           body="The flow is the product. Everything else on this page is a detail of one of these three steps."
         />
 
-        <ol className="mt-14 grid gap-px overflow-hidden rounded-[1.75rem] border border-border bg-border sm:grid-cols-3">
+        {/* On wide screens the section pins and the rail fills as each step lights up in turn (ScrollScenes.tsx). Decorative. */}
+        <div aria-hidden="true" className="how-rail mt-14 hidden lg:block">
+          <span className="how-fill" />
           {STEPS.map((s, i) => (
-            <li key={s.n} data-flick="" data-spot="" className="bg-background p-7 sm:p-8">
+            <span key={s.n} className="how-node" style={{ left: `${(i + 0.5) * (100 / STEPS.length)}%` }} />
+          ))}
+        </div>
+        <ol className="mt-14 grid gap-px overflow-hidden rounded-[1.75rem] border border-border bg-border sm:grid-cols-3 lg:mt-5">
+          {STEPS.map((s, i) => (
+            <li key={s.n} data-flick="" data-spot="" className="how-step bg-background p-7 sm:p-8">
               <Reveal delay={i * 0.08}>
                 <div className="flex items-start justify-between gap-4">
-                  <span className="display text-[2.6rem] text-lime-ink">{s.n}</span>
+                  <span className="how-n display text-[2.6rem] text-lime-ink">{s.n}</span>
                   <Icon3D name={s.icon} size={88} className="pop-in flick -mt-1 h-16 w-16 sm:h-20 sm:w-20" />
                 </div>
                 <h3 className="mt-6 text-xl font-semibold tracking-tight">{s.title}</h3>

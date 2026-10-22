@@ -78,6 +78,22 @@ export function DemoFlow() {
 
   const running = mounted && visible && !hidden && !paused && retry !== "running";
 
+  // Scroll-driven beats (ScrollScenes.tsx, wide screens): while the demo is pinned, the scroll position picks the step
+  // and the beat clock waits. Scrolling past hands control back to the clock. The tabs still work throughout.
+  const [scrubbing, setScrubbing] = useState(false);
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ beat: number; active: boolean }>).detail;
+      setScrubbing(d.active);
+      if (d.active) setBeat(Math.max(0, Math.min(3, d.beat)) as Beat);
+    };
+    el.addEventListener("demo:scrub", on);
+    return () => el.removeEventListener("demo:scrub", on);
+  }, []);
+  const clock = running && !scrubbing;
+
   // Pausable beat clock: pausing keeps the time already spent.
   const remaining = useRef(BEAT_MS);
   const shownBeat = useRef<Beat>(0);
@@ -86,14 +102,14 @@ export function DemoFlow() {
       shownBeat.current = beat;
       remaining.current = BEAT_MS;
     }
-    if (!running) return;
+    if (!clock) return;
     const start = performance.now();
     const t = window.setTimeout(() => setBeat((b) => ((b + 1) % 4) as Beat), Math.max(0, remaining.current));
     return () => {
       window.clearTimeout(t);
       remaining.current -= performance.now() - start;
     };
-  }, [beat, running]);
+  }, [beat, clock]);
 
   useEffect(() => setRetry("idle"), [beat]);
   useEffect(() => {
@@ -113,6 +129,7 @@ export function DemoFlow() {
       className="dark demo-stage mx-auto w-full max-w-[1180px]"
       data-beat={beat}
       data-running={running ? "" : undefined}
+      data-scrub={scrubbing ? "" : undefined}
       style={{ ["--beat" as string]: `${BEAT_MS}ms` }}
     >
       <div className="bx-head">
@@ -131,7 +148,7 @@ export function DemoFlow() {
 
       {/* 10-16f: three tiles for the story (upload, drafts, the step), then one Live Activity card per place.
           The per-place tiles (sends, status, fix, live count) live in those cards now. */}
-      <Reveal y={0} className="bx bx-demo">
+      <Reveal y={0} fx="tiles" className="bx bx-demo">
         <Tile tone="send" on={beat === 0} live={beat === 0 && running} title="One upload" sub="desk-setup.mp4 lands in your library." art={<Bars />} />
         <Tile tone="wait" on={beat === 1} title="Three drafts" sub="A caption, a title and a post, each in its own shape." art={<Bolt id={`${uid}-bolt`} />} />
         <div className="bx-tile bx-lime">
