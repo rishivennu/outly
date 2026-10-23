@@ -38,7 +38,7 @@ export function SmoothScroll() {
     let cancelled = false;
     import("lenis").then(({ default: L }) => {
       if (cancelled) return;
-      const l = new L({ lerp: 0.1, wheelMultiplier: 1, anchors: true, autoRaf: true, allowNestedScroll: true });
+      const l = new L({ lerp: 0.075, wheelMultiplier: 0.8, anchors: true, autoRaf: true, allowNestedScroll: true });
       lenis = l;
       waiting.forEach((cb) => cb(l));
       waiting.clear();
