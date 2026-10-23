@@ -1,36 +1,36 @@
-# fix-1022d-gsap: GSAP cinematic pass (UI only)
+# fix-1022e-scroll: section scroll motion back on the landing page (UI only)
 
-Upload AFTER fix-1022c-no-watermark. Cumulative on it: app/globals.css here already contains the
-watermark removal. Copy each file to the same path in the repo, replacing the old one. No schema,
-API or env changes.
+Upload AFTER fix-1022d-gsap (and fix-1022-billing-badge; the two do not touch the same file).
+One file: copy components/marketing/ScrollScenes.tsx to the same path in the repo, replacing the
+1022d version. No schema, API, env or CSS changes.
 
 ## What changes
-- One reveal engine (NEW lib/motion/reveal.ts) replaces the old CSS-transition reveals and the
-  per-section scroll parallax. ScrollTrigger.batch groups what enters view together into one
-  staggered wave. Choreographies via <Reveal fx>: rise, stagger, cards (pricing, centre plan first),
-  tiles (bento tiles in reading order), rows (comparison groups, rows in threes), footer.
-- Hero: a soft light sweep (CSS mask) crosses the headline as the words unfold. The headline never
-  goes to opacity 0, so LCP is not delayed. The dashboard home hero gets it too.
-- How it works (desktop, when it fits the screen): the section pins; a lime rail fills step by step,
-  nodes light, steps 2 and 3 light up as they arrive (only the number and icon dim while
-  waiting; titles and text always stay at full contrast, so a /#how deep link is readable).
-- Demo (desktop): scroll walks the four beats (the beat clock pauses while you scroll through).
-- Comparison: opening a group brings its rows in by threes.
-- FAQ: answers open/close with a real-height GSAP tween; reversing mid-motion is smooth.
-- Final CTA: walls slide in, phone rises, tiles stagger from the edges.
-- Dashboard (studio) and admin: on navigation, the page's top-level blocks settle in one after
-  another (admin shorter and lower).
+The 1022d pass kept only entrance reveals, so the sections stopped moving with the scroll. This adds
+scrubbed section motion back (scene 7 in ScrollScenes.tsx). Every section below the hero moves as it
+comes up and is exactly at rest by the time it reaches reading position, so anchor links always land
+on a still page.
+- Section headings (How it works, Features, Compare, Pricing) drift in behind their content.
+- "Publishes to" ticker eases up to full size.
+- How it works: the board and rail rise into place (finished before the desktop pin starts).
+- Features: the grid rises; on desktop each column settles at its own speed.
+- Demo: the player comes forward like a screen (finished before the desktop pin).
+- Why Outlly: copy column rises; points slide in from the right on desktop, rise on phones.
+- Platforms: head lifts; on desktop the three bento columns move at different speeds.
+- Comparison: the table rises (no scale, so the sticky header stays crisp).
+- Pricing: middle plan leads, outer two follow; on phones each card rises on its own.
+- FAQ: question side rises, answers a beat behind.
+- Final CTA: the card swells to full size as it comes up.
 
 ## Safety
-- Reduced motion: no pins, no movement, short fades only. Phones: no pins, short lift + fade.
-- Content is hidden only under html.js; if the engine never runs, a CSS failsafe shows everything after 3s.
-- CSS transitions are suspended during each tween so hover transitions never fight the entrance.
+- Never moves an element the reveal engine, MotionFx or LandingFx already animates (BUSY filter);
+  it moves a parent or inner child instead, so transforms compose instead of fighting.
+- Created after the pins, so all trigger positions include pin spacing. Ends use clamp() so the
+  last sections always reach rest even at the bottom of the page.
+- Reduced motion: none of it runs. Phones: about half the travel, no sideways movement.
+- Transforms only; no layout properties.
 
 ## Verified locally (production build)
-- tsc 0, bun test 482 pass / 0 fail.
-- audit: 4 viewports, axe 0, no overflow, no stuck-hidden content, 0 small tap targets,
-  0 infinite animations under reduced motion, frame p50 10-13 ms.
-- Motion checks: hero mask present then removed, how pin + rail + nodes, demo beats via scroll,
-  rows-in on group open, FAQ height tween, failsafe, no pins on phone / short screens / reduced motion,
-  studio and admin page stagger settle fully, /#how deep link keeps full text contrast, 0 console errors.
-- Independent verification teammate: all reveal/pin/FAQ/resize/reduced-motion/mobile checks PASS.
+- tsc 0; bun test 482 pass (one inbox test timed out under build load, passes on re-run).
+- Motion probe, 1440 and 390: all 17 targets moving at section-enter, identity at reading position.
+- Audit, 4 viewports: axe 0, overflow 0, small targets 0, ghosts in view 0, console errors 0.
+- How pin, demo beats, comparison rows, FAQ tween, /#how deep link: same as 1022d.

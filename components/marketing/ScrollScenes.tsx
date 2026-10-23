@@ -19,12 +19,25 @@ gsap.registerPlugin(ScrollTrigger);
  *   4. Demo (lg): the section pins and scrolling walks through the four beats; past it, the clock takes over.
  *   5. Comparison: opening a group (or Expand all) brings its rows in, in threes; opening a row deals its cards.
  *   6. Final call to action: the side walls close in on the phone and the tiles settle, once.
+ *   7. Section motion (10-23): every section below the hero moves with the scroll as it comes up, each in its
+ *      own way (headings drift in behind their content, grids rise, columns settle at different speeds), and
+ *      is exactly at rest by the time it is in reading position, so an anchor link always lands on a still page.
+ *
+ * Scrubbed scenes never touch an element the reveal engine tweens (its wrappers, their staggered children,
+ * bento tiles, comparison groups) or one LandingFx/MotionFx writes to; they move a parent or an inner child
+ * instead, so the two transforms compose instead of fighting.
  *
  * Pins only happen when the section fits the window, so nothing is ever cut off. Reduced motion: none of it
  * runs (gsap.matchMedia on MOTION_OK); every section is then just its plain, readable layout.
  * Transforms and opacity only; no layout properties are animated.
  */
 const EASE = "expo.out";
+
+// Elements another engine already moves: the reveal engine (wrappers other than section heads, which it never
+// moves), bento tiles and comparison groups, and the cursor/hero effects in MotionFx and LandingFx.
+const BUSY = "[data-reveal]:not(.rv-head),.bx-tile,details,.flick,.pop-in,.hf-in,.hf-aura,.hf-slot,.lt-half,.lt-track";
+const free = (list: Array<Element | null | undefined>) =>
+  list.filter((el): el is HTMLElement => el instanceof HTMLElement && !el.matches(BUSY) && !el.parentElement?.matches("[data-stagger]"));
 
 export function ScrollScenes() {
   useEffect(() => {
@@ -164,6 +177,95 @@ export function ScrollScenes() {
           send();
         });
       }
+
+      // 7. Section motion. Created after the pins above, so every start and end already counts their pin spacing.
+      // Each scene is a scrubbed fromTo that ends at rest; transforms only. Phones get shorter travel, no sideways.
+      const enter = (targets: Array<Element | null | undefined>, trigger: Element, from: gsap.TweenVars, range: [string, string] = ["top 95%", "top 45%"], stagger = 0) => {
+        const list = free(targets);
+        if (!list.length) return;
+        gsap.fromTo(list, from, {
+          x: 0, y: 0, scale: 1, ease: "none", stagger,
+          scrollTrigger: { trigger, start: range[0], end: `clamp(${range[1]})`, scrub },
+        });
+      };
+      const sec = (sel: string) => main.querySelector<HTMLElement>(sel);
+      const q = (root: ParentNode | null, sel: string) => (root ? Array.from(root.querySelectorAll(sel)) : []);
+
+      // a. Section heads drift in a little behind their section, for a layer of depth. The head wrapper moves as a
+      //    block (the reveal engine only sets data-shown on it), so the title never slides over its own body text.
+      //    In two-column sections the whole copy column moves instead (scene d, f).
+      for (const id of ["#how", "#features", "#compare", "#pricing"]) {
+        const s = sec(id);
+        if (s) enter(q(s, ".rv-head").slice(0, 1), s, { y: 48 * k }, ["top 100%", "top 40%"]);
+      }
+
+      // b. "Publishes to": the ticker eases up to full size.
+      const lt = main.querySelector<HTMLElement>("section.lt");
+      if (lt) enter(q(lt, ".lt-viewport"), lt, { y: 28 * k, scale: 0.96 }, ["top 100%", "top 60%"]);
+
+      // c. How it works: the board rises into place (done well before the pin above takes it).
+      const howS = sec("#how");
+      if (howS) enter(q(howS, ".how-rail, ol"), howS, { y: 64 * k, scale: 0.97 }, ["top 95%", "top 40%"], 0.04);
+
+      // d. Features: the grid rises, then on wide screens each column settles at its own speed (left first).
+      const feat = sec("#features");
+      if (feat) {
+        const grid = feat.querySelector(".grid");
+        enter([grid], feat, { y: 60 * k }, ["top 90%", "top 35%"]);
+        if (lg && grid) {
+          const arts = q(grid, "article") as HTMLElement[];
+          const x0 = grid.getBoundingClientRect().left;
+          const colW = grid.getBoundingClientRect().width / 3;
+          for (const a of arts) {
+            const col = Math.round((a.getBoundingClientRect().left - x0) / colW);
+            if (col > 0) enter([a], a, { y: 40 * col }, ["top 100%", "top 55%"]);
+          }
+        }
+      }
+
+      // e. Demo: the whole player comes forward like a screen. On lg it is done before the section pins.
+      const demoS = sec("#demo");
+      if (demoS) enter([demoS.firstElementChild], demoS, { y: 80 * k, scale: 0.93 }, lg ? ["top 95%", "top 45%"] : ["top 100%", "top 35%"]);
+
+      // f. Why Outlly: the copy column rises; each point slides in from the right, one after another (beside the
+      //    copy on lg; stacked on smaller screens they rise instead). The section clips sideways overflow.
+      const why = sec("#why");
+      if (why) {
+        enter(q(why, ".rv-head").map((h) => h.parentElement), why, { y: 44 * k }, ["top 100%", "top 40%"]);
+        enter(q(why, "ul.divide-y > li"), why, lg ? { x: 70 } : { y: 28 * k }, ["top 85%", "top 25%"], 0.08);
+      }
+
+      // g. Platforms: the head lifts; on lg the bento columns move at different speeds, the middle one furthest.
+      //    (Below lg the columns are display: contents and cannot move; the tiles' own reveal carries it.)
+      const plat = sec("#platforms");
+      if (plat) {
+        enter(q(plat, ".bx-head > div"), plat, { y: 40 * k }, ["top 100%", "top 40%"], 0.06);
+        if (lg) q(plat, ".bx > .bx-col").forEach((c, i) => enter([c], plat, { y: i % 2 ? 110 : 44 }, ["top 90%", "top 25%"]));
+      }
+
+      // h. Comparison: the table rises (no scale: its header row is sticky and should stay crisp).
+      const cmpS = sec("#compare");
+      if (cmpS) enter(q(cmpS, "[data-cmp]"), cmpS, { y: 70 * k }, ["top 90%", "top 25%"]);
+
+      // i. Pricing: the middle plan leads and the outer two follow it up; on phones each card rises on its own.
+      const pri = sec("#pricing");
+      if (pri) {
+        const cards = q(pri, "ul > li > article");
+        if (wide && cards.length === 3) cards.forEach((c, i) => enter([c], pri, { y: i === 1 ? 30 : 80 }, ["top 85%", "top 25%"]));
+        else cards.forEach((c) => enter([c], c, { y: 30 * k }, ["top 100%", "top 65%"]));
+      }
+
+      // j. FAQ: the question side rises, the answers a beat behind it.
+      const faq = sec("#faq");
+      if (faq) {
+        const grid = faq.firstElementChild;
+        enter([grid?.firstElementChild], faq, { y: 40 * k }, ["top 100%", "top 40%"]);
+        enter(q(faq, "[data-reveal]:not(.rv-head) > *").slice(0, 1), faq, { y: 80 * k }, ["top 90%", "top 30%"]);
+      }
+
+      // k. Final call to action: the card swells to full size as it comes up (its walls and phone are scene 6).
+      const cta = sec("section[aria-labelledby=cta-title]");
+      if (cta) enter(q(cta, ".ap-canvas").slice(0, 1), cta, { y: 60 * k, scale: 0.94 }, ["top 100%", "top 35%"]);
 
       // 5. Comparison: groups and rows opened by the visitor.
       const cmp = main.querySelector<HTMLElement>("[data-cmp]");
