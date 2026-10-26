@@ -19,6 +19,16 @@ export const PlanInput = z.object({
   postLimit: z.number().int().min(0).max(100_000).default(0),
   aiCaptions: z.boolean().default(true),
   seats: z.number().int().min(0).max(50).default(0),
+  /** Window the post limit counts over. */
+  postPeriod: z.enum(["week", "month"]).default("month"),
+  /** Largest upload per file in MB; 0 = the server maximum. */
+  maxUploadMb: z.number().int().min(0).max(5000).default(0),
+  /** Inbox replies per week; 0 = unlimited. */
+  replyLimit: z.number().int().min(0).max(100_000).default(0),
+  /** Videos per month that can get AI captions; 0 = unlimited. */
+  captionVideos: z.number().int().min(0).max(10_000).default(0),
+  /** Burn captions into the video file. */
+  burnCaptions: z.boolean().default(true),
 });
 
 export const FaqInput = z.object({

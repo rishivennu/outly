@@ -24,7 +24,7 @@ const GOOGLE_ERRORS: Record<string, string> = {
   maintenance: "Outlly is in a short maintenance window, so new accounts are paused. If you already have an account, sign in with the email it uses.",
 };
 
-type Step = "password" | "code" | "2fa";
+type Step = "password" | "code" | "reset" | "2fa";
 
 /**
  * The form half of the auth card. Apple-style utility surface: mark, one clear title, labelled fields,
@@ -33,6 +33,7 @@ type Step = "password" | "code" | "2fa";
  *
  * Sign in has three steps sharing one slot, so the card never grows: password, or an emailed 6-digit
  * code instead; then, for studios with an authenticator app, the app code (or a recovery code).
+ * "Forgot password?" swaps in a fourth: an emailed reset code plus a new password, which signs you in.
  */
 export function AuthForm({ mode, google = false, title, subtitle }: { mode: "login" | "signup"; google?: boolean; title: string; subtitle: string }) {
   const router = useRouter();
@@ -119,9 +120,11 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
   const switchTo = (s: Step) => {
     // Leaving the authenticator step: drop the halfway sign-in on the server too.
     if (step === "2fa" && s !== "2fa") void api("/api/auth/2fa", { method: "DELETE" }).catch(() => {});
+    // Sign-in codes and reset codes are different codes: a code sent for one never fills the other.
+    if (s === "reset" || step === "reset") setSentTo(null);
     setStep(s);
     setError(null);
-    setNote(s === "code" ? "Signing in with an email code." : s === "password" && step !== "password" ? "Signing in with your password." : null);
+    setNote(s === "code" ? "Signing in with an email code." : s === "reset" ? "Resetting your password." : s === "password" && step !== "password" ? "Signing in with your password." : null);
     lastSent.current = null;
     setCode("");
     setRecovery(false);
@@ -132,9 +135,11 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
     setBusy(true);
     setError(null);
     try {
-      await api("/api/auth/code", { method: "POST", json: { email: form.email } });
+      if (step === "reset") await api("/api/auth/reset", { method: "POST", json: { step: "send", email: form.email } });
+      else await api("/api/auth/code", { method: "POST", json: { email: form.email } });
       setSentTo(form.email.trim().toLowerCase());
       setCode("");
+      if (step === "reset") setForm((f) => ({ ...f, password: "" }));
       setWait(60);
       setNote(`If ${form.email.trim()} has an Outlly account, a 6-digit code is on its way. It works for 10 minutes.`);
       setBusy(false);
@@ -150,7 +155,11 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
     e?.preventDefault();
     if (busy || inFlight.current) return;
     const c = typed ?? code;
-    if (mode === "login" && step === "code" && (!sentTo || sentTo !== form.email.trim().toLowerCase())) return sendCode();
+    if (mode === "login" && (step === "code" || step === "reset") && (!sentTo || sentTo !== form.email.trim().toLowerCase())) return sendCode();
+    if (step === "reset" && form.password.length < 8) {
+      setError("Choose a new password of at least 8 characters.");
+      return setTries((n) => n + 1);
+    }
     const sig = `${step}:${c}`;
     if (step !== "password" && mode === "login" && lastSent.current === sig) return; // this exact code is already being checked
     inFlight.current = true;
@@ -165,6 +174,7 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
       }
       if (step === "password") return after(await api<{ twoFactor?: boolean }>("/api/auth/login", { method: "POST", json: { email: form.email, password: form.password } }));
       if (step === "code") return after(await api<{ twoFactor?: boolean }>("/api/auth/code/verify", { method: "POST", json: { email: form.email, code: c } }));
+      if (step === "reset") return after(await api<{ twoFactor?: boolean }>("/api/auth/reset", { method: "POST", json: { step: "confirm", email: form.email, code: c, password: form.password } }));
       await api("/api/auth/2fa", { method: "POST", json: { code: c } });
       go();
     } catch (e) {
@@ -178,11 +188,12 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
   const onCode = (v: string) => {
     const digits = recovery ? v.slice(0, 20) : v.replace(/\D/g, "").slice(0, 6);
     setCode(digits);
-    if (!recovery && digits.length === 6 && !busy && !inFlight.current) void submit(undefined, digits);
+    // A reset also needs the new password, so it waits for the button.
+    if (!recovery && step !== "reset" && digits.length === 6 && !busy && !inFlight.current) void submit(undefined, digits);
   };
 
-  const sent = step === "code" && !!sentTo && sentTo === form.email.trim().toLowerCase();
-  const heading = step === "2fa" ? "One more step" : title;
+  const sent = (step === "code" || step === "reset") && !!sentTo && sentTo === form.email.trim().toLowerCase();
+  const heading = step === "2fa" ? "One more step" : step === "reset" ? "Reset your password" : title;
   const sub =
     step === "2fa"
       ? recovery
@@ -190,10 +201,12 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
         : "Open your authenticator app and enter the 6-digit code it shows for Outlly."
       : step === "code"
         ? "We'll email you a 6-digit code, so there's no password to remember."
-        : subtitle;
+        : step === "reset"
+          ? "We'll email you a 6-digit code. Enter it with a new password and you're signed straight in."
+          : subtitle;
   const cta = busy
-    ? step === "code" && !sent ? "Sending your code…" : mode === "login" ? "Opening Outlly…" : "Setting up your account…"
-    : mode === "signup" ? "Get started" : step === "code" && !sent ? "Email me a code" : step === "2fa" ? "Verify and sign in" : "Sign in";
+    ? (step === "code" || step === "reset") && !sent ? "Sending your code…" : step === "reset" ? "Saving your password…" : mode === "login" ? "Opening Outlly…" : "Setting up your account…"
+    : mode === "signup" ? "Get started" : step === "code" && !sent ? "Email me a code" : step === "reset" ? (sent ? "Save password and sign in" : "Email me a reset code") : step === "2fa" ? "Verify and sign in" : "Sign in";
   const textBtn = "inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-60";
 
   const other = mode === "login" ? "/signup" : "/login";
@@ -221,6 +234,15 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
         )}
         {(mode === "signup" || step === "password") && (
         <div className="gs-in">
+          {mode === "login" && (
+            <div className="mb-1.5 flex items-center justify-between gap-3">
+              <Label htmlFor="password" className={`${label} mb-0`}>Password</Label>
+              <button type="button" onClick={() => switchTo("reset")} className="-my-2 -mr-1 inline-flex min-h-11 items-center rounded-lg px-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+                Forgot password?
+              </button>
+            </div>
+          )}
+          {mode === "signup" && (
           <Label htmlFor="password" className={label}>
             Password
             {mode === "signup" && (
@@ -229,6 +251,7 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
               </span>
             )}
           </Label>
+          )}
           <div className="relative">
             <Input
               id="password"
@@ -266,7 +289,7 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
           <div>
             <div className="mb-1.5 flex items-center justify-between gap-3">
               <Label htmlFor="otp" className={`${label} mb-0`}>{step === "2fa" ? (recovery ? "Recovery code" : "Authenticator code") : "6-digit code"}</Label>
-              {step === "code" && (
+              {(step === "code" || step === "reset") && (
                 <button type="button" onClick={sendCode} disabled={busy || wait > 0} className={`${textBtn} -my-2 -mr-3 text-xs`}>
                   {wait > 0 ? `Send again in ${wait}s` : "Send a new code"}
                 </button>
@@ -290,6 +313,40 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
               aria-describedby={[note ? "otp-note" : "", error ? "auth-error" : ""].filter(Boolean).join(" ") || undefined}
               className={`${field} tabular text-center text-[22px] font-semibold ${recovery ? "tracking-[0.12em]" : "tracking-[0.42em]"}`}
             />
+          </div>
+        )}
+        {step === "reset" && sent && (
+          <div>
+            <Label htmlFor="new-password" className={label}>
+              New password
+              <span id="npw-hint" className="text-xs font-normal text-muted-foreground" aria-live="polite">
+                {form.password.length > 0 && form.password.length < 8 ? `${8 - form.password.length} more to go` : "At least 8 characters"}
+              </span>
+            </Label>
+            <div className="relative">
+              <Input
+                id="new-password"
+                type={showPw ? "text" : "password"}
+                autoComplete="new-password"
+                required
+                minLength={8}
+                maxLength={200}
+                placeholder="Choose a new password"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                aria-describedby="npw-hint"
+                className={`${field} pr-12`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw((v) => !v)}
+                aria-label={showPw ? "Hide password" : "Show password"}
+                aria-pressed={showPw}
+                className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                {showPw ? <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" /> : <Eye className="h-[18px] w-[18px]" aria-hidden="true" />}
+              </button>
+            </div>
           </div>
         )}
         {mode === "login" && (
@@ -316,9 +373,9 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
                 {recovery ? "Use the app code instead" : "Use a recovery code instead"}
               </button>
             ) : (
-              <button type="button" className={textBtn} onClick={() => switchTo(step === "code" ? "password" : "code")}>
-                {step === "code" ? <KeyRound className="h-4 w-4" aria-hidden="true" /> : <Mail className="h-4 w-4" aria-hidden="true" />}
-                {step === "code" ? "Use my password instead" : "Email me a sign-in code instead"}
+              <button type="button" className={textBtn} onClick={() => switchTo(step === "password" ? "code" : "password")}>
+                {step !== "password" ? <KeyRound className="h-4 w-4" aria-hidden="true" /> : <Mail className="h-4 w-4" aria-hidden="true" />}
+                {step === "reset" ? "Back to sign in" : step === "code" ? "Use my password instead" : "Email me a sign-in code instead"}
               </button>
             )}
           </div>

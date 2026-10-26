@@ -45,11 +45,11 @@ async function welcomeOffer(user: { id: string; createdAt: Date; actor: unknown 
   if (ent.planSlug !== "free" || (!isNew && published > 0)) return null;
   const paid = plans.filter((p) => p.priceMinor > 0 && p.state === "available");
   const pick = paid.find((p) => p.highlight) ?? paid[0];
-  if (!pick) return { freeLimit: ent.postLimit, offer: null };
+  if (!pick) return { freeLimit: ent.postLimit, freePeriod: ent.postPeriod, offer: null };
   const visitor = visitorCurrency((pick.currency as never) ?? "INR");
   const lp = localPrice(pick, visitor.currency);
-  const offer: WelcomeOffer = { slug: pick.slug, name: pick.name, price: formatMoney(lp.priceMinor, lp.currency), interval: pick.interval === "year" ? "year" : "month", features: pick.features.slice(0, 3), postLimit: pick.postLimit, aiCaptions: pick.aiCaptions };
-  return { freeLimit: ent.postLimit, offer };
+  const offer: WelcomeOffer = { slug: pick.slug, name: pick.name, price: formatMoney(lp.priceMinor, lp.currency), interval: pick.interval === "year" ? "year" : "month", features: pick.features.slice(0, 3), postLimit: pick.postLimit, aiCaptions: pick.aiCaptions, postPeriod: pick.postPeriod };
+  return { freeLimit: ent.postLimit, freePeriod: ent.postPeriod, offer };
 }
 
 export const dynamic = "force-dynamic";
@@ -113,7 +113,7 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
     <div className="relative overflow-hidden">
       <HomeHero firstName={user.name.split(" ")[0]} />
       <SetupChecklist state={setup} />
-      {welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} />}
+      {welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} freePeriod={welcome.freePeriod} />}
       {(pulse || recap) && (
         <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-4 sm:px-10">
           {recap && <WeekRecap r={recap} canEmail={!user.actor} />}

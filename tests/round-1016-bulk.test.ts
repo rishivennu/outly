@@ -173,14 +173,14 @@ describe("bookBatch", () => {
     const { u, media } = await creator();
     await bulk.planBatch(u.id, ["instagram"], 1, TZ); // makes sure the plans exist
     const free = await db.plan.findUniqueOrThrow({ where: { slug: "free" } });
-    await db.plan.update({ where: { slug: "free" }, data: { postLimit: 2 } });
+    await db.plan.update({ where: { slug: "free" }, data: { postLimit: 2, postPeriod: "month" } }); // 10-26: Free is weekly now; this pins the monthly wording
     try {
       await expect(bulk.bookBatch(u.id, { platforms: ["instagram"], items: media.map((m, i) => ({ mediaId: m.id, scheduledAt: inHours(3 + i) })) })).rejects.toThrow(/2 posts left this month/);
       expect(await db.post.count({ where: { userId: u.id } })).toBe(0);
       const plan = await bulk.planBatch(u.id, ["instagram"], 3, TZ);
       expect(plan.left).toBe(2);
     } finally {
-      await db.plan.update({ where: { slug: "free" }, data: { postLimit: free.postLimit } });
+      await db.plan.update({ where: { slug: "free" }, data: { postLimit: free.postLimit, postPeriod: free.postPeriod } });
     }
   });
 

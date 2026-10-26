@@ -32,7 +32,7 @@ export async function issueCode(emailIn: string, purpose: OtpPurpose = "login", 
   }
   const code = newCode();
   const row = await db.otpCode.create({ data: { email, purpose, codeHash: codeDigest(env.AUTH_SECRET, purpose, email, code), expiresAt: new Date(Date.now() + OTP_TTL_MS) } });
-  const sent = await channel.send(email, code, { name: user.name?.split(/\s+/)[0] || null });
+  const sent = await channel.send(email, code, { name: user.name?.split(/\s+/)[0] || null, purpose });
   if (!sent.ok) {
     // Logged, not shown: an error here (and only here) would tell a stranger the address has an account.
     await db.otpCode.delete({ where: { id: row.id } }).catch(() => {});

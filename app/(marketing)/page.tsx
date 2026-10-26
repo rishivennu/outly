@@ -13,6 +13,7 @@ import { FinalCta } from "@/components/marketing/FinalCta";
 import { RouteRule } from "@/components/marketing/bits";
 import { FAQS, HERO } from "@/lib/marketing/content";
 import { getConfig } from "@/lib/settings";
+import { isBeta } from "@/lib/beta";
 import { siteStatus } from "@/lib/site";
 import { shown } from "@/lib/landing";
 import { Countdown } from "@/components/maintenance/Countdown";
@@ -23,9 +24,14 @@ import { LandingFx } from "@/components/marketing/LandingFx";
 export const dynamic = "force-dynamic";
 
 const DESCRIPTION =
-  "Upload one video. Outlly's AI tailors the caption, hook, hashtags and title for Instagram Reels, YouTube Shorts and X, then publishes or schedules it and tracks every destination separately. Free during beta.";
+  "Upload one video. Outlly's AI tailors the caption, hook, hashtags and title for Instagram Reels, YouTube Shorts and X, then publishes or schedules it and tracks every destination separately.";
 
-export const metadata: Metadata = {
+export async function generateMetadata(): Promise<Metadata> {
+  const beta = await isBeta();
+  return { ...metadata, description: `${DESCRIPTION} ${beta ? "Free during beta." : "Start free."}` };
+}
+
+const metadata: Metadata = {
   title: "Outlly · Your content deserves to be everywhere",
   description: DESCRIPTION,
   alternates: { canonical: "/" },
@@ -63,7 +69,7 @@ const faqJsonLd = {
 
 export default async function LandingPage() {
   // Both reads are cached in-process for 15 s, so this costs nothing on a busy page.
-  const [cfg, site] = await Promise.all([getConfig("landing"), siteStatus()]);
+  const [cfg, site, beta] = await Promise.all([getConfig("landing"), siteStatus(), isBeta()]);
   const on = (id: Parameters<typeof shown>[1]) => shown(cfg, id);
   return (
     <>
@@ -74,7 +80,7 @@ export default async function LandingPage() {
           <Countdown endsAt={site.endsAt} since={site.since} variant="bar" />
         </div>
       )}
-      {on("hero") && <Hero showHow={on("how")} />}
+      {on("hero") && <Hero showHow={on("how")} beta={beta} />}
       {on("hero") && <LogoTicker />}
       {on("hero") && on("how") && (
         // Same box as the framed fan stage (HeroFan: w-full max-w-[1180px]) so the dotted line runs edge to edge with it.
@@ -86,12 +92,12 @@ export default async function LandingPage() {
       {on("how") && <HowItWorks />}
       {on("features") && <Features />}
       {on("demo") && <Demo />}
-      {on("why") && <Difference />}
+      {on("why") && <Difference beta={beta} />}
       {on("platforms") && <Platforms showCompare={on("compare")} />}
-      {on("compare") && <Comparison competitors={cfg.competitors} groups={cfg.groups} />}
+      {on("compare") && <Comparison competitors={cfg.competitors} groups={cfg.groups} beta={beta} />}
       {on("pricing") && <Pricing />}
       {on("faq") && <Faq />}
-      {on("cta") && <FinalCta />}
+      {on("cta") && <FinalCta beta={beta} />}
       {/* A page with every section off still needs a heading for screen readers and a way in. */}
       {!on("hero") && <h1 className="sr-only">Outlly</h1>}
       <ScrollScenes />

@@ -38,7 +38,7 @@ export function StampCluster({ className }: { className?: string }) {
   );
 }
 
-export function SpinPostmark({ className, text = "ONE UPLOAD · THREE PLATFORMS · FREE IN BETA · " }: { className?: string; text?: string }) {
+export function SpinPostmark({ className, text = "ONE UPLOAD · THREE PLATFORMS · EVERYWHERE · " }: { className?: string; text?: string }) {
   return (
     <svg viewBox="0 0 120 120" className={cn("spin-mark", className)} aria-hidden="true">
       <defs>

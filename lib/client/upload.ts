@@ -1,6 +1,6 @@
 "use client";
 
-import { api, ApiError, uploadWithProgress } from "./api";
+import { api, ApiError, offerUpgrade, uploadWithProgress } from "./api";
 
 /**
  * Uploads a video the best way the server supports:
@@ -83,8 +83,16 @@ const STALL_MS = 60_000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function uploadVideo<M>(file: File, onProgress: UploadProgress, signal?: AbortSignal): Promise<UploadedMedia<M>> {
-  const cfg = await api<{ direct: boolean; maxBytes: number }>("/api/media/direct");
-  if (file.size > cfg.maxBytes) throw new ApiError(413, `That's a big one. Keep it under ${Math.round(cfg.maxBytes / 1048576)} MB for now.`, "TOO_LARGE");
+  const cfg = await api<{ direct: boolean; maxBytes: number; maxMb?: number; planLimited?: boolean; planName?: string }>("/api/media/direct");
+  if (file.size > cfg.maxBytes) {
+    const mb = cfg.maxMb ?? Math.round(cfg.maxBytes / 1048576);
+    if (cfg.planLimited) {
+      const msg = `${cfg.planName ?? "Your plan"} uploads are limited to ${mb} MB per file. Upgrade to upload bigger videos, or compress this one.`;
+      offerUpgrade(msg, "upload");
+      throw new ApiError(402, msg, "PLAN_LIMIT");
+    }
+    throw new ApiError(413, `That's a big one. Keep it under ${mb} MB for now.`, "TOO_LARGE");
+  }
   if (!cfg.direct) return uploadWithProgress<UploadedMedia<M>>(`/api/media?name=${encodeURIComponent(file.name)}`, file, (p) => onProgress(p, null), signal);
 
   const est = eta();

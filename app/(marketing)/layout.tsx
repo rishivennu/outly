@@ -2,12 +2,17 @@ import { MarketingNav } from "@/components/marketing/Nav";
 import { MarketingFooter } from "@/components/marketing/Footer";
 import { MotionFx } from "@/components/marketing/MotionFx";
 import { StarField } from "@/components/marketing/StarField";
+import { BetaProvider } from "@/components/marketing/BetaContext";
+import { isBeta } from "@/lib/beta";
 
 /** Shell for every public page: one nav, one footer, one skip link. */
-export default function MarketingLayout({ children }: { children: React.ReactNode }) {
+export default async function MarketingLayout({ children }: { children: React.ReactNode }) {
   // No cookies() here: reading a cookie on the server would make every public page render per
   // request. The nav and footer read the signed-in hint in the browser instead (useSignedIn).
+  // The beta switch is a DB setting, not a cookie, so pages stay cacheable; the admin toggle revalidates them.
+  const beta = await isBeta();
   return (
+    <BetaProvider value={beta}>
     <div className="sky-host min-h-dvh">
       <StarField />
       <a
@@ -21,5 +26,6 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <MarketingFooter />
       <MotionFx />
     </div>
+    </BetaProvider>
   );
 }

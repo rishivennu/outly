@@ -40,6 +40,15 @@ export interface PublicPlan {
   postLimit: number;
   aiCaptions: boolean;
   seats: number;
+  /** Window postLimit counts over. */
+  postPeriod: "week" | "month";
+  /** Max upload per file in MB; 0 = server maximum. */
+  maxUploadMb: number;
+  /** Inbox replies per week; 0 = unlimited. */
+  replyLimit: number;
+  /** Videos per month with AI captions; 0 = unlimited. */
+  captionVideos: number;
+  burnCaptions: boolean;
 }
 
 export function priceLabel(p: Pick<PublicPlan, "priceMinor" | "currency" | "interval" | "state">) {

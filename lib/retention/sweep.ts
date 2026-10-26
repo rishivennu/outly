@@ -21,6 +21,25 @@ export async function publishedDates(userId: string, since: Date) {
   return [...first.values()].map((t) => new Date(t));
 }
 
+/** publishedDates for many people in ONE query (the Friday sweep used to run one per person). */
+export async function publishedDatesMany(userIds: string[], since: Date) {
+  const out = new Map<string, Date[]>(userIds.map((id) => [id, []]));
+  if (!userIds.length) return out;
+  const rows = await db.postTarget.findMany({
+    where: { post: { userId: { in: userIds } }, practice: false, platformStatus: "published", publishedAt: { gte: since } },
+    select: { postId: true, publishedAt: true, post: { select: { userId: true } } },
+    take: 2000 * userIds.length,
+  });
+  const first = new Map<string, { u: string; t: number }>();
+  for (const r of rows) {
+    const t = r.publishedAt!.getTime();
+    const cur = first.get(r.postId);
+    if (!cur || t < cur.t) first.set(r.postId, { u: r.post.userId, t });
+  }
+  for (const { u, t } of first.values()) out.get(u)?.push(new Date(t));
+  return out;
+}
+
 export async function goalFor(u: { id: string; postingGoal: number; timezone: string }, now = new Date()) {
   return goalState(await publishedDates(u.id, new Date(now.getTime() - 13 * 7 * 864e5)), u.postingGoal, now, u.timezone);
 }
@@ -33,8 +52,9 @@ export async function sendGoalNudges(now = new Date()) {
     take: 100,
   });
   let sent = 0;
+  const dates = await publishedDatesMany(users.map((u) => u.id), new Date(now.getTime() - 13 * 7 * 864e5));
   for (const u of users) {
-    const g = await goalFor(u, now);
+    const g = goalState(dates.get(u.id) ?? [], u.postingGoal, now, u.timezone);
     if (!nudgeDue(u, g.done, now)) continue;
     const claimed = await db.user.updateMany({ where: { id: u.id, OR: [{ nudgeAt: null }, { nudgeAt: u.nudgeAt }] }, data: { nudgeAt: now } });
     if (!claimed.count) continue;

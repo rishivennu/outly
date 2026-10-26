@@ -5,9 +5,12 @@ import { cached, invalidate } from "../cache";
 import { priceLabel, type Currency, type PublicPlan } from "./money";
 import { localPrice, parsePrices } from "./currency";
 
+const FREE_FEATURES = ["One workspace", "3 posts a week", "Uploads up to 50 MB per file", "Instagram Reels, YouTube Shorts and X", "AI captions on 2 videos a month", "10 inbox replies a week", "Scheduling, statuses and retries"];
+
 const SEED = [
   { slug: "free", name: "Free", priceMinor: 0, note: "What you get today", highlight: false, sortOrder: 0,
-    features: ["One workspace", "Uploads up to 50 MB per file", "Instagram Reels, YouTube Shorts and X", "AI captions, hooks, hashtags and titles", "Scheduling, statuses and retries"] },
+    postLimit: 3, postPeriod: "week", maxUploadMb: 50, replyLimit: 10, captionVideos: 2, burnCaptions: false,
+    features: FREE_FEATURES },
   { slug: "creator", name: "Creator", priceMinor: 49900, note: "For one creator going faster", highlight: true, sortOrder: 1,
     features: ["Everything in Free", "Uploads up to 500 MB", "Higher AI generation limits", "Longer analytics history", "Priority support"] },
   { slug: "studio", name: "Studio", priceMinor: 149900, note: "For a creator plus the people who help", highlight: false, sortOrder: 2,
@@ -15,12 +18,25 @@ const SEED = [
 ];
 
 export async function ensurePlans() {
-  if ((await db.plan.count()) > 0) return;
+  if ((await db.plan.count()) > 0) return migrateFreeLimits();
   // upsert so two processes seeding at once can't collide on the unique slug
   for (const p of SEED) await db.plan.upsert({ where: { slug: p.slug }, update: {}, create: { ...p, currency: "INR", interval: "month", features: JSON.stringify(p.features) } }).catch(() => {});
 }
 
-type PlanRow = { id: string; slug: string; name: string; priceMinor: number; currency: string; interval: string; note: string; features: string; state: string; highlight: boolean; sortOrder: number; prices: string; yearlyMinor: number; postLimit: number; aiCaptions: boolean; seats: number };
+/** One-time: existing databases get the 2026-10 Free limits. Admin can change them afterwards in Pricing. */
+async function migrateFreeLimits() {
+  const key = "migrate:free-limits-1026";
+  if (await db.setting.findUnique({ where: { key }, select: { key: true } })) return;
+  const won = await db.setting.create({ data: { key, value: new Date().toISOString() } }).then(() => true, () => false);
+  if (!won) return;
+  await db.plan.updateMany({
+    where: { slug: "free" },
+    data: { postLimit: 3, postPeriod: "week", maxUploadMb: 50, replyLimit: 10, captionVideos: 2, burnCaptions: false, features: JSON.stringify(FREE_FEATURES) },
+  });
+  invalidate("plans:");
+}
+
+type PlanRow = { id: string; slug: string; name: string; priceMinor: number; currency: string; interval: string; note: string; features: string; state: string; highlight: boolean; sortOrder: number; prices: string; yearlyMinor: number; postLimit: number; aiCaptions: boolean; seats: number; postPeriod: string; maxUploadMb: number; replyLimit: number; captionVideos: number; burnCaptions: boolean };
 
 export function toPublic(p: PlanRow): PublicPlan {
   let features: string[] = [];
@@ -30,6 +46,7 @@ export function toPublic(p: PlanRow): PublicPlan {
   return {
     id: p.id, slug: p.slug, name: p.name, priceMinor: p.priceMinor, currency: p.currency, interval: p.interval, note: p.note,
     highlight: p.highlight, sortOrder: p.sortOrder, postLimit: p.postLimit, aiCaptions: p.aiCaptions, seats: p.seats,
+    postPeriod: p.postPeriod === "week" ? "week" : "month", maxUploadMb: p.maxUploadMb ?? 0, replyLimit: p.replyLimit ?? 0, captionVideos: p.captionVideos ?? 0, burnCaptions: p.burnCaptions ?? true,
     features,
     prices: parsePrices(p.prices),
     yearlyMinor: p.yearlyMinor ?? 0,

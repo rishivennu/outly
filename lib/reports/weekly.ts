@@ -75,15 +75,17 @@ export async function sendWeeklyReports(now = new Date(), opts: { force?: boolea
     take: opts.limit ?? 50,
   });
   let sent = 0;
-  for (const u of users) {
-    if (!reportDue(u, now, opts.force)) continue;
+  const one = async (u: (typeof users)[number]) => {
+    if (!reportDue(u, now, opts.force)) return;
     // claim first, so two instances never send the same report twice
     const claimed = await db.user.updateMany({ where: { id: u.id, OR: [{ lastReportAt: null }, { lastReportAt: u.lastReportAt }] }, data: { lastReportAt: now } });
-    if (!claimed.count) continue;
+    if (!claimed.count) return;
     const stats = await weeklyStats(u.id, now);
     await sendEmail({ to: u.email, kind: "weekly_report", subject: stats.published ? `Your week: ${stats.published} post${stats.published === 1 ? "" : "s"} out` : "Your week on Outlly", html: templates.weeklyReport({ name: u.name, stats, url: `${env.APP_URL}/analytics`, settingsUrl: `${env.APP_URL}/settings` }) }).catch(() => {});
     sent++;
-  }
+  };
+  // Five at a time: the run takes about a fifth of the time it did one-by-one, without flooding the DB pool or the mail API.
+  for (let i = 0; i < users.length; i += 5) await Promise.all(users.slice(i, i + 5).map(one));
   return { checked: users.length, sent };
 }
 

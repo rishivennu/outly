@@ -68,7 +68,7 @@ export function WaitlistToggle({ initial }: { initial: WaitlistState }) {
             aria-label="Waitlist mode"
             disabled={!!busy}
             onClick={() => setAsk(on ? "off" : "on")}
-            className={cn("relative inline-flex h-9 w-16 shrink-0 items-center rounded-full transition-colors duration-300 disabled:opacity-60", on ? "bg-foreground" : "bg-foreground/20")}
+            className={cn("relative inline-flex h-9 w-16 shrink-0 items-center rounded-full transition-colors duration-300 disabled:opacity-60", on ? "bg-success" : "bg-foreground/20")}
           >
             <span className={cn("inline-block h-7 w-7 rounded-full bg-white shadow transition-transform duration-300", on ? "translate-x-8" : "translate-x-1")} />
           </button>

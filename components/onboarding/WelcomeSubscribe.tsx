@@ -10,13 +10,13 @@ import { tourKey } from "./Tour";
 import { afterPrivacy } from "@/components/shared/PrivacyNotice";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
 
-export type WelcomeOffer = { slug: string; name: string; price: string; interval: string; features: string[]; postLimit: number; aiCaptions: boolean };
+export type WelcomeOffer = { slug: string; name: string; price: string; interval: string; features: string[]; postLimit: number; aiCaptions: boolean; postPeriod?: "week" | "month" };
 
 /** One honest sentence built from the real plan limits. */
-export function welcomePitch(freeLimit: number, offer: WelcomeOffer | null) {
-  const free = freeLimit > 0 ? `You're on the Free plan with ${freeLimit} posts a month, so you can start right away.` : "You're on the Free plan, so you can start posting right away.";
+export function welcomePitch(freeLimit: number, offer: WelcomeOffer | null, freePeriod: "week" | "month" = "month") {
+  const free = freeLimit > 0 ? `You're on the Free plan with ${freeLimit} posts a ${freePeriod}, so you can start right away.` : "You're on the Free plan, so you can start posting right away.";
   if (!offer) return `${free} When you want more, subscribe from Billing.`;
-  const more = offer.postLimit > 0 ? `${offer.postLimit} posts a month` : "unlimited posts";
+  const more = offer.postLimit > 0 ? `${offer.postLimit} posts a ${offer.postPeriod ?? "month"}` : "unlimited posts";
   return `${free} Subscribe to ${offer.name} for ${more}${offer.aiCaptions ? " and AI-written captions" : ""}, and keep every video going everywhere.`;
 }
 
@@ -26,7 +26,7 @@ export const welcomeKey = (id: string) => `outly:welcome-subscribe:${id}`;
  * First-time greeting that invites a free user to subscribe. Shown once per account per device.
  * It never stacks on the guided tour: if the tour hasn't been done yet it waits for it to close.
  */
-export function WelcomeSubscribe({ firstName, offer, freeLimit }: { firstName: string; offer: WelcomeOffer | null; freeLimit: number }) {
+export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "month" }: { firstName: string; offer: WelcomeOffer | null; freeLimit: number; freePeriod?: "week" | "month" }) {
   const user = useUser();
   const [open, setOpen] = useState(false);
   const [card, setCard] = useState<HTMLDivElement | null>(null);
@@ -101,7 +101,7 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit }: { firstName: s
                     Hi {firstName}, glad you're here.
                   </Dialog.Title>
                   <p id="welcome-sub-body" data-w="line" className="mt-2.5 text-[14.5px] leading-relaxed text-muted-foreground">
-                    {welcomePitch(freeLimit, offer)}
+                    {welcomePitch(freeLimit, offer, freePeriod)}
                   </p>
                   {offer && (
                     <div data-w="offer" className="mt-5 rounded-2xl bg-lime/[0.08] p-4 hairline">

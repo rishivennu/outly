@@ -1,4 +1,5 @@
 "use client";
+import { useBeta } from "./BetaContext";
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { PlanCardView } from "@/components/billing/PlanCardView";
@@ -25,6 +26,7 @@ export type CardPlan = {
 
 /** The landing pricing grid: Monthly / Yearly switch, the admin's card style, and rocket CTAs. */
 export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; variant: CardStyle; top: string }) {
+  const beta = useBeta();
   const [cycle, setCycle] = useState<Cycle>("month");
   const reduce = useReducedMotion();
   const save = Math.max(0, ...plans.map((p) => p.year?.save ?? 0));
@@ -74,7 +76,7 @@ export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; varia
                   ) : live ? (
                     <RocketCta href={`/billing?plan=${p.slug}${y ? "&cycle=year" : ""}`} label={`Choose ${p.name}${y ? " yearly" : ""}`} tone={tone} />
                   ) : (
-                    <p className={cn("text-[13px] leading-relaxed", variant === "live" ? "la-mute" : "text-muted-foreground")}>Not on sale yet. Nothing changes for beta accounts without notice.</p>
+                    <p className={cn("text-[13px] leading-relaxed", variant === "live" ? "la-mute" : "text-muted-foreground")}>{beta ? "Not on sale yet. Nothing changes for beta accounts without notice." : "Not on sale yet. You'll see the price here before anything changes."}</p>
                   )
                 }
               />

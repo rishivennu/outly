@@ -5,6 +5,7 @@ import { HttpError } from "./http";
 import { storage } from "./storage";
 import { isPlatform, PLATFORMS, STOPPABLE, type Platform } from "./domain";
 import { enqueue } from "./queue";
+import { spendPost } from "./billing/entitlements";
 import { syncPost } from "./queue/handlers";
 import type { SimulationMode } from "./social/types";
 import { isPracticeAccount } from "./social/registry";
@@ -151,8 +152,8 @@ export async function launchPost(userId: string, postId: string, mode: "now" | "
     if (!scheduledAt || scheduledAt.getTime() < Date.now() + 60_000) throw new HttpError(400, "Pick a time at least a minute from now.");
     // Atomic claim (same pattern as scheduledPost()): whoever flips the status wins, so two
     // simultaneous requests can never both schedule — and never both enqueue — the same post.
-    if (!(await claim(post.id, ["draft", "failed", "partial", "scheduled"], { status: "scheduled", scheduledAt })))
-      throw new HttpError(409, "This one is already on its way.");
+    if (!(await claimWithSlot(userId, post, { status: "scheduled", scheduledAt }))) throw new HttpError(409, "This one is already on its way.");
+    await markLaunched(post.id);
     await db.$transaction([
       ...post.targets.map((t) =>
         db.postTarget.update({ where: { id: t.id }, data: { platformStatus: "pending", socialAccountId: accounts.get(t.platform as Platform)!.id, errorCode: null, errorMessage: null, attempts: 0 } }),
@@ -165,8 +166,9 @@ export async function launchPost(userId: string, postId: string, mode: "now" | "
   // Send now: claim first, create records, return immediately, workers do the rest.
   // The claim is what stops a double-click (or a retried fetch) from publishing twice: the status check
   // above is a read, and two requests can both pass it before either write lands.
-  const stamp = await claim(post.id, ["draft", "failed", "partial", "scheduled"], { status: "publishing", scheduledAt: null });
+  const stamp = await claimWithSlot(userId, post, { status: "publishing", scheduledAt: null });
   if (!stamp) throw new HttpError(409, "This one is already on its way.");
+  await markLaunched(post.id);
   await db.$transaction(
     post.targets.map((t) =>
       db.postTarget.update({ where: { id: t.id }, data: { platformStatus: "queued", socialAccountId: accounts.get(t.platform as Platform)!.id, errorCode: null, errorMessage: null, attempts: 0, uploadRef: null, publishRequestedAt: null } }),
@@ -177,6 +179,31 @@ export async function launchPost(userId: string, postId: string, mode: "now" | "
   for (const t of post.targets)
     await enqueue("SOCIAL_UPLOAD", { targetId: t.id, platform: t.platform as Platform, simulate }, { jobId: `up-${t.id}-${stamp}` });
 }
+
+/**
+ * Takes the plan's post slot before the claim (insert-then-count, so parallel launches can't overshoot).
+ * Moving an already-booked post to a new time is free; a draft, or a failed post sent again, costs a slot
+ * in the period it goes out (once per post per period).
+ */
+const holdPostSlot = (userId: string, post: Post) =>
+  post.status === "scheduled" && post.launchedAt ? Promise.resolve({ fresh: false, release: async () => {} }) : spendPost(userId, post.id);
+
+/** Slot first, then the claim. If the claim is lost or throws (DB hiccup), the slot goes back. */
+async function claimWithSlot(userId: string, post: Post, data: { status: string; scheduledAt: Date | null }) {
+  const slot = await holdPostSlot(userId, post);
+  let stamp: Awaited<ReturnType<typeof claim>>;
+  try {
+    stamp = await claim(post.id, ["draft", "failed", "partial", "scheduled"], data);
+  } catch (err) {
+    if (slot.fresh) await slot.release();
+    throw err;
+  }
+  if (!stamp && slot.fresh) await slot.release();
+  return stamp;
+}
+
+/** Stamps the first launch only, so a retry or reschedule never counts against the plan twice. */
+const markLaunched = (postId: string) => db.post.updateMany({ where: { id: postId, launchedAt: null }, data: { launchedAt: new Date() } });
 
 /**
  * Flip a post's status only if it is still in one of `from`, and return a token identifying this claim

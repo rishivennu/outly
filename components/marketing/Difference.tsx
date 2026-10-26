@@ -12,7 +12,7 @@ const STICKERS: { label: string; tone: string; r: number }[] = [
   { label: "Free in beta", tone: "stk-blue", r: -4 },
 ];
 
-export function Difference() {
+export function Difference({ beta = false }: { beta?: boolean }) {
   return (
     <section id="why" className="scroll-mt-24 overflow-x-clip py-20 sm:py-28" aria-labelledby="why-title">
       <Shell>
@@ -24,7 +24,7 @@ export function Difference() {
             </p>
             <Reveal y={0} className="stk-wrap mt-10">
               <ul aria-label="Outlly in short" className="flex max-w-md flex-wrap items-center gap-x-1 gap-y-2">
-                {STICKERS.map((s, i) => (
+                {STICKERS.map((s) => (!beta && s.label === "Free in beta" ? { ...s, label: "Free plan" } : s)).map((s, i) => (
                   <li
                     key={s.label}
                     data-flick=""

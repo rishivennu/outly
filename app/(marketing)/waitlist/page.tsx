@@ -5,6 +5,7 @@ import { ArrowDown, CalendarClock, Check, ChevronRight, RotateCcw, Sparkles } fr
 import { AppIcon, type Brand } from "@/components/brand/brands";
 import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
 import { siteStatus, waitlistCounts } from "@/lib/site";
+import { isBeta } from "@/lib/beta";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Join the waitlist", description: "Outlly is letting creators in a few at a time. Leave your email and we'll send your invite." };
@@ -30,12 +31,13 @@ export default async function WaitlistPage({ searchParams }: { searchParams: { f
   const s = await siteStatus();
   if (!s.waitlist) redirect("/signup");
   const counts = await waitlistCounts();
+  const beta = await isBeta();
   return (
     <div className="ap-canvas">
       <section className="px-5 pb-10 pt-14 sm:px-8 sm:pb-12 sm:pt-20" aria-labelledby="wl-title">
         <div className="mx-auto flex max-w-[680px] flex-col items-center text-center">
           <p className="wl-rise inline-flex items-center gap-2 rounded-full bg-[hsl(var(--ap-tile))] py-1.5 pl-1.5 pr-4 text-[14px] font-semibold shadow-[0_0_0_1px_hsl(var(--foreground)/.08)]">
-            <span className="wl-mini inline-flex"><AppIcon brand="outly" size={26} /></span> Outlly beta
+            <span className="wl-mini inline-flex"><AppIcon brand="outly" size={26} /></span> {beta ? "Outlly beta" : "Outlly early access"}
           </p>
           <h1 id="wl-title" className="wl-rise display mt-5 text-balance text-[clamp(2.4rem,7vw,4.4rem)]" style={{ animationDelay: ".05s" }}>
             One upload.
@@ -120,7 +122,7 @@ export default async function WaitlistPage({ searchParams }: { searchParams: { f
             </Tile>
 
             <Tile className="wl-free" label="Price">
-              <Kicker>During beta</Kicker>
+              <Kicker>{beta ? "During beta" : "To start"}</Kicker>
               <p className="mt-1 font-display text-[56px] font-bold leading-none tracking-[-0.04em]">Free</p>
               <p className="mt-2 text-[14px] text-[hsl(var(--ap-ink2))]">No card needed.</p>
             </Tile>

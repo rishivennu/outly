@@ -45,7 +45,7 @@ export default async function OpengraphImage() {
             </div>
           ))}
           <div style={{ display: "flex", background: "#c6f432", color: "#0c0c0e", borderRadius: 999, padding: "10px 24px", fontWeight: 600 }}>
-            Free during beta
+            Start free
           </div>
         </div>
       </div>

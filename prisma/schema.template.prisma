@@ -52,6 +52,9 @@ model User {
   notices        Notice[]
   snippets       Snippet[]
   ideas          Idea[]
+  featureUses FeatureUse[]
+  betaIssued  BetaCode?  @relation("BetaIssued")
+  betaRedeemed BetaCode? @relation("BetaRedeemed")
 }
 
 /// One-time sign-in codes sent by email. Only a keyed hash of the code is stored; no link to User, so a
@@ -124,6 +127,7 @@ model Post {
   requireApproval Boolean @default(false) // publishing is blocked until a reviewer approves
   scheduledAt DateTime?
   publishedAt DateTime?
+  launchedAt  DateTime? // first time it left draft (published or scheduled): what plan post limits count
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -230,6 +234,11 @@ model Plan {
   postLimit  Int      @default(0) // posts per calendar month, 0 = unlimited
   aiCaptions Boolean  @default(true) // AI captions, hooks, titles and transcripts
   seats      Int      @default(0) // team members besides the owner, 0 = none
+  postPeriod String   @default("month") // week | month: the window postLimit counts over
+  maxUploadMb Int     @default(0) // per-file upload cap on this plan, 0 = the server maximum
+  replyLimit Int      @default(0) // inbox replies per week (Monday 00:00 UTC), 0 = unlimited
+  captionVideos Int   @default(0) // videos per month that can get AI captions, 0 = unlimited
+  burnCaptions Boolean @default(true) // burn subtitles into the video file
   state      String   @default("available") // available | soon | hidden
   highlight  Boolean  @default(false)
   sortOrder  Int      @default(0)
@@ -528,4 +537,37 @@ model AiUsage {
 
   @@id([userId, day, kind])
   @@index([day])
+}
+
+/// Metered plan features (inbox replies, caption videos). One row per use; `ref` dedupes, e.g. the
+/// same video transcribed in several chunks counts once per period.
+model FeatureUse {
+  id        String   @id @default(cuid())
+  userId    String
+  feature   String // "reply" | "captions"
+  period    String // "2026-W43" (weekly) or "2026-10" (monthly)
+  ref       String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, feature, period, ref])
+  @@index([userId, feature, period])
+}
+
+/// One-time beta codes: the first N people to join get one, redeeming it unlocks a paid plan for a few months.
+model BetaCode {
+  id         String    @id @default(cuid())
+  code       String    @unique
+  planSlug   String    @default("creator")
+  months     Int       @default(3)
+  issuedToId String?   @unique // the early member it was issued to (null = made by hand in admin)
+  note       String    @default("")
+  redeemedById String? @unique // one redemption per code, and one beta grant per account
+  redeemedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  issuedTo   User?     @relation("BetaIssued", fields: [issuedToId], references: [id], onDelete: SetNull)
+  redeemedBy User?     @relation("BetaRedeemed", fields: [redeemedById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
 }

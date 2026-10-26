@@ -11,7 +11,8 @@ import { memberBlock } from "./team/roles";
 import { joinedBeforeMaintenance } from "./maintenance";
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string, public code?: string) {
+  /** `extra` is merged into the JSON body, e.g. { feature: "posts" } so the client knows which upgrade to offer. */
+  constructor(public status: number, message: string, public code?: string, public extra?: Record<string, unknown>) {
     super(message);
   }
 }
@@ -91,7 +92,7 @@ export function route<C = { params: Record<string, string> }>(
       }
       return await handler(req, { ...ctx, user: user as SessionUser });
     } catch (e) {
-      if (e instanceof HttpError) return json({ error: e.message, code: e.code }, { status: e.status });
+      if (e instanceof HttpError) return json({ ...e.extra, error: e.message, code: e.code }, { status: e.status });
       if (e instanceof ZodError)
         return json({ error: e.issues[0]?.message ?? "Invalid input", issues: e.issues, code: "VALIDATION" }, { status: 400 });
       // req.json() on a broken body: the caller's mistake, not ours (and not worth an error log).

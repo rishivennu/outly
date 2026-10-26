@@ -12,11 +12,12 @@ import { formatMoney, intervalLabel, priceLabel, type PublicPlan } from "@/lib/b
 import type { CurrencySource } from "@/lib/billing/currency";
 import { CurrencyPicker } from "./CurrencyPicker";
 import { CycleSwitch } from "./CycleSwitch";
+import { BetaRedeem, type BetaOffer } from "./BetaRedeem";
 import type { Cycle } from "@/lib/billing/cycle";
 import { cn } from "@/lib/utils";
 
 export type ReturnNotice = { tone: "ok" | "info" | "error"; text: string };
-type Current = { planSlug: string; planName: string; priceMinor: number; currency: string; interval: string; periodEnd: string; cancelAtPeriodEnd: boolean; pausedUntil?: string | null } | null;
+type Current = { planSlug: string; planName: string; priceMinor: number; currency: string; interval: string; periodEnd: string; cancelAtPeriodEnd: boolean; pausedUntil?: string | null; provider?: string } | null;
 type Inv = { number: string; description: string; amountMinor: number; currency: string; issuedAt: string; refunded: boolean };
 
 const CACHE = "outly-invoices-v1";
@@ -38,14 +39,14 @@ function loadRazorpay() {
 
 type PricedPlan = PublicPlan & { approx: string | null; year: { priceMinor: number; currency: string; approx: string | null; save: number } | null };
 /** limit 0 = unlimited */
-type Usage = { used: number; limit: number; seats: number; aiCaptions: boolean };
+type Usage = { used: number; limit: number; seats: number; aiCaptions: boolean; period?: "week" | "month"; maxUploadMb?: number; replies?: { limit: number; used: number }; captions?: { limit: number; used: number; burn: boolean } };
 
 function UsageMeter({ u }: { u: Usage }) {
   const pct = u.limit > 0 ? Math.min(100, Math.round((u.used / u.limit) * 100)) : 0;
   return (
     <div className="mt-4 max-w-md">
       <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span id="usage-l">Posts this month</span>
+        <span id="usage-l">Posts {u.period === "week" ? "this week" : "this month"}</span>
         <span className="tabular text-muted-foreground">{u.limit > 0 ? `${u.used} of ${u.limit}` : `${u.used} · unlimited`}</span>
       </div>
       {u.limit > 0 && (
@@ -54,13 +55,17 @@ function UsageMeter({ u }: { u: Usage }) {
         </div>
       )}
       <p className="mt-2 text-xs text-muted-foreground">
-        {u.seats > 0 ? `${u.seats} team seat${u.seats === 1 ? "" : "s"}` : "No team seats"} · AI captions {u.aiCaptions ? "included" : "not included"}
+        {u.seats > 0 ? `${u.seats} team seat${u.seats === 1 ? "" : "s"}` : "No team seats"} · AI captions{" "}
+        {!u.aiCaptions ? "not included" : u.captions && u.captions.limit > 0 ? `on ${Math.max(0, u.captions.limit - u.captions.used)} of ${u.captions.limit} videos left this month` : "included"}
+        {u.captions && !u.captions.burn ? " · Burned-in captions on paid plans" : ""}
+        {u.replies && u.replies.limit > 0 ? ` · Replies ${u.replies.used} of ${u.replies.limit} this week` : ""}
+        {u.maxUploadMb ? ` · Uploads up to ${u.maxUploadMb} MB` : ""}
       </p>
     </div>
   );
 }
 
-export function BillingView(props: { email: string; notice: ReturnNotice | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; canPickCurrency: boolean; current: Current; usage: Usage; invoices: Inv[] }) {
+export function BillingView(props: { email: string; notice: ReturnNotice | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; canPickCurrency: boolean; current: Current; usage: Usage; invoices: Inv[]; beta?: BetaOffer | null }) {
   const { plans, current } = props;
   const router = useRouter();
   const toast = useToast();
@@ -176,7 +181,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
           <p className="text-sm text-muted-foreground">Current plan</p>
           <h2 id="cur" className="mt-1 text-2xl font-semibold tracking-tight">
             {current ? current.planName : "Free"}
-            {current && <span className="ml-2 text-base font-medium text-muted-foreground tabular">{current.priceMinor > 0 ? <>{formatMoney(current.priceMinor, current.currency)}{intervalLabel(current.interval)}</> : "free month"}</span>}
+            {current && <span className="ml-2 text-base font-medium text-muted-foreground tabular">{current.priceMinor > 0 ? <>{formatMoney(current.priceMinor, current.currency)}{intervalLabel(current.interval)}</> : current.provider === "beta" ? "free, early member" : "free month"}</span>}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {!current ? "No card on file. Upgrade any time; you'll get an invoice by email straight away." : current.pausedUntil ? <>Paused until <b className="text-foreground">{day(current.pausedUntil)}</b>. Free limits apply until then, and your paid days run again after, to <b className="text-foreground">{day(current.periodEnd)}</b>.</> : current.cancelAtPeriodEnd ? <>Ends on <b className="text-foreground">{day(current.periodEnd)}</b>, then you move to Free. Nothing else will be charged.</> : <>Renews on <b className="text-foreground">{day(current.periodEnd)}</b>.</>}
@@ -191,6 +196,8 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
           <Button variant="ghost" onClick={() => setConfirm(true)}>Cancel plan</Button>
         ))}
       </section>
+
+      {props.beta && <BetaRedeem offer={props.beta} />}
 
       <section aria-labelledby="plans" className="mt-10 max-w-5xl">
         <div className="flex flex-wrap items-end justify-between gap-3">

@@ -25,7 +25,7 @@ export const STEPS: Step[] = [
   {
     n: "01",
     title: "Drop your video",
-    body: "Drag in a file (up to 50 MB on the free beta) and it lands in your library straight away. We read duration, aspect ratio and resolution so nothing surprises you later.",
+    body: "Drag in a file (up to 50 MB per file on the Free plan) and it lands in your library straight away. We read duration, aspect ratio and resolution so nothing surprises you later.",
     icon: "upload",
   },
   {
@@ -201,7 +201,7 @@ export const FAQS: Faq[] = [
   },
   {
     q: "Is there a limit on how big my video can be?",
-    a: "Yes, 50 MB per file on the free beta, which is the cap on our current storage plan. A trimmed vertical clip of a minute or two usually fits; a long 4K export will not. Larger uploads need a paid storage plan, and raising that cap is part of what the future Creator and Studio plans are for.",
+    a: "Yes, 50 MB per file on the Free plan. A trimmed vertical clip of a minute or two usually fits; a long 4K export will not. Paid plans raise the cap, so larger files are what Creator and Studio are for.",
   },
   {
     q: "What happens when one platform fails?",
@@ -227,29 +227,29 @@ export interface Plan {
 
 export const PLANS: Plan[] = [
   {
-    name: "Free beta",
-    price: "Free during beta",
-    note: "What you get today",
+    name: "Free",
+    price: "Free",
+    note: "Try the whole flow",
     state: "available",
-    bullets: ["One workspace", "Uploads up to 50 MB per file", "Instagram Reels, YouTube Shorts and X", "AI captions, hooks, hashtags and titles", "Scheduling, statuses and retries"],
+    bullets: ["One workspace", "3 posts a week (resets every Monday)", "Uploads up to 50 MB per file", "10 inbox replies a week", "AI captions on 2 videos a month; burning captions into the video is on paid plans", "Instagram Reels, YouTube Shorts and X", "Scheduling, statuses and retries"],
   },
   {
     name: "Creator",
-    price: "Coming soon",
+    price: "See the pricing page",
     note: "For one creator going faster",
     state: "soon",
-    bullets: ["Larger uploads on paid storage", "Higher AI generation limits", "Longer analytics history"],
+    bullets: ["More posts and larger uploads", "Burned-in captions and higher AI limits", "More inbox replies", "Longer analytics history"],
   },
   {
     name: "Studio",
-    price: "Coming soon",
+    price: "See the pricing page",
     note: "For a creator plus the people who help",
     state: "soon",
     bullets: ["Multiple workspaces", "Shared media library", "Review before publish"],
   },
 ];
 
-export const PRICING_NOTE = "Outlly is in beta and free to use. Paid plans are not on sale yet and we have not set their prices. When we do, you will see them here before anything changes for you.";
+export const PRICING_NOTE = "Outlly is free to use right now. Paid plans are not on sale yet and we have not set their prices. When we do, you will see them here before anything changes for you.";
 
 export const FINAL_CTA = {
   title: "One video. Three destinations. One afternoon back.",

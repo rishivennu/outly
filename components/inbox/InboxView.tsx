@@ -127,6 +127,7 @@ function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: 
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [left, setLeft] = useState<number | null>(null);
   const [ideas, setIdeas] = useState<{ label: string; text: string }[] | null>(null);
   const [thinking, setThinking] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -176,10 +177,11 @@ function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: 
     setBusy(true);
     setErr(null);
     try {
-      const r = await api<{ reply: InboxComment }>("/api/inbox/reply", { method: "POST", json: { targetId: comment.targetId, commentId: comment.id, text: text.trim() } });
+      const r = await api<{ reply: InboxComment; repliesLeft?: number | null }>("/api/inbox/reply", { method: "POST", json: { targetId: comment.targetId, commentId: comment.id, text: text.trim() } });
       onReplied(comment.id, { ...r.reply, targetId: comment.targetId, postId: comment.postId, platform: comment.platform, postTitle: comment.postTitle, postUrl: comment.postUrl });
       setText("");
       setIdeas(null);
+      setLeft(typeof r.repliesLeft === "number" ? r.repliesLeft : null);
     } catch (e2) {
       setErr(e2 instanceof ApiError ? e2.message : "The reply didn't go through. Let's try again.");
     } finally {
@@ -257,6 +259,11 @@ function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: 
           {err && (
             <p role="alert" className="mt-2 text-sm text-destructive">
               {err}
+            </p>
+          )}
+          {!err && left !== null && left <= 3 && (
+            <p role="status" className="mt-2 text-sm text-muted-foreground">
+              {left === 0 ? "That was your last reply this week on your plan." : `${left} ${left === 1 ? "reply" : "replies"} left this week on your plan.`}
             </p>
           )}
         </div>

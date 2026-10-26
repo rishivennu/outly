@@ -18,15 +18,16 @@ import { CARD_STYLES, CARD_STYLE_META, type CardStyle, type PricingDisplay } fro
 import { hasYearly, yearlyBase, yearlySaving, type Cycle } from "@/lib/billing/cycle";
 
 type Plan = PublicPlan & { subscribers: number; locked: boolean };
-type Draft = { name: string; slug: string; price: string; currency: string; interval: string; note: string; features: string; state: PublicPlan["state"]; highlight: boolean; sortOrder: number; prices: Record<string, string>; yearly: string; postLimit: number; aiCaptions: boolean; seats: number };
+type Draft = { name: string; slug: string; price: string; currency: string; interval: string; note: string; features: string; state: PublicPlan["state"]; highlight: boolean; sortOrder: number; prices: Record<string, string>; yearly: string; postLimit: number; aiCaptions: boolean; seats: number; postPeriod: "week" | "month"; maxUploadMb: number; replyLimit: number; captionVideos: number; burnCaptions: boolean };
 
 const toDraft = (p: Plan): Draft => ({
   name: p.name, slug: p.slug, price: String(p.priceMinor / 100), currency: p.currency, interval: p.interval, note: p.note, features: p.features.join("\n"), state: p.state, highlight: p.highlight, sortOrder: p.sortOrder,
   prices: Object.fromEntries(Object.entries(p.prices ?? {}).map(([k, v]) => [k, String((v as number) / 100)])),
   yearly: p.yearlyMinor ? String(p.yearlyMinor / 100) : "",
   postLimit: p.postLimit ?? 0, aiCaptions: p.aiCaptions ?? true, seats: p.seats ?? 0,
+  postPeriod: p.postPeriod === "week" ? "week" : "month", maxUploadMb: p.maxUploadMb ?? 0, replyLimit: p.replyLimit ?? 0, captionVideos: p.captionVideos ?? 0, burnCaptions: p.burnCaptions ?? true,
 });
-const BLANK: Draft = { name: "", slug: "", price: "0", currency: "INR", interval: "month", note: "", features: "", state: "soon", highlight: false, sortOrder: 9, prices: {}, yearly: "", postLimit: 0, aiCaptions: true, seats: 0 };
+const BLANK: Draft = { name: "", slug: "", price: "0", currency: "INR", interval: "month", note: "", features: "", state: "soon", highlight: false, sortOrder: 9, prices: {}, yearly: "", postLimit: 0, aiCaptions: true, seats: 0, postPeriod: "month", maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true };
 
 const toMinor = (s: string) => {
   const n = Number(s.replace(/,/g, ""));
@@ -53,6 +54,11 @@ function parse(d: Draft) {
     postLimit: d.postLimit,
     aiCaptions: d.aiCaptions,
     seats: d.seats,
+    postPeriod: d.postPeriod,
+    maxUploadMb: d.maxUploadMb,
+    replyLimit: d.replyLimit,
+    captionVideos: d.captionVideos,
+    burnCaptions: d.burnCaptions,
   };
 }
 
@@ -510,9 +516,28 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
 
             <Section n="05" title="Plan limits">
               <div>
-                <Label htmlFor="pl-posts">Posts per month</Label>
+                <Label htmlFor="pl-posts">Posts per {draft.postPeriod}</Label>
                 <Input id="pl-posts" type="number" min={0} max={100000} value={draft.postLimit} onChange={(e) => set("postLimit", Math.max(0, Math.min(100000, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-posts-hint" />
                 <p id="pl-posts-hint" className="mt-1 text-[12px] text-muted-foreground">0 = unlimited</p>
+              </div>
+              <div>
+                <Label>Post limit resets</Label>
+                <Seg label="Post limit resets" value={draft.postPeriod} onChange={(v) => set("postPeriod", v)} options={[{ value: "week", label: "Every Monday" }, { value: "month", label: "On the 1st" }]} />
+              </div>
+              <div>
+                <Label htmlFor="pl-upload">Max upload per file (MB)</Label>
+                <Input id="pl-upload" type="number" min={0} max={5000} value={draft.maxUploadMb} onChange={(e) => set("maxUploadMb", Math.max(0, Math.min(5000, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-upload-hint" />
+                <p id="pl-upload-hint" className="mt-1 text-[12px] text-muted-foreground">0 = the server maximum</p>
+              </div>
+              <div>
+                <Label htmlFor="pl-replies">Inbox replies per week</Label>
+                <Input id="pl-replies" type="number" min={0} max={100000} value={draft.replyLimit} onChange={(e) => set("replyLimit", Math.max(0, Math.min(100000, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-replies-hint" />
+                <p id="pl-replies-hint" className="mt-1 text-[12px] text-muted-foreground">0 = unlimited</p>
+              </div>
+              <div>
+                <Label htmlFor="pl-capvids">AI-captioned videos per month</Label>
+                <Input id="pl-capvids" type="number" min={0} max={10000} value={draft.captionVideos} onChange={(e) => set("captionVideos", Math.max(0, Math.min(10000, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-capvids-hint" />
+                <p id="pl-capvids-hint" className="mt-1 text-[12px] text-muted-foreground">0 = unlimited (when AI captions are on)</p>
               </div>
               <div>
                 <Label htmlFor="pl-seats">Team seats</Label>
@@ -521,6 +546,9 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
               </div>
               <div className="sm:col-span-2">
                 <Toggle label="AI captions" hint="Included on this plan" checked={draft.aiCaptions} onChange={(v) => set("aiCaptions", v)} />
+              </div>
+              <div className="sm:col-span-2">
+                <Toggle label="Burn captions into the video" hint="Free plan: off, so burning is paid-only" checked={draft.burnCaptions} onChange={(v) => set("burnCaptions", v)} />
               </div>
             </Section>
           </div>

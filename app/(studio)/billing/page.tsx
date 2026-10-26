@@ -11,7 +11,8 @@ import { formatMoney } from "@/lib/billing/money";
 import { stripe } from "@/lib/billing/providers";
 import { activeGateway, capturePaypal, completePayment, confirmYoupi, expireSubscriptions, failPayment } from "@/lib/billing/service";
 import { BillingView, type ReturnNotice } from "@/components/billing/BillingView";
-import { postUsage } from "@/lib/billing/entitlements";
+import { captionUsage, postUsage, replyUsage, uploadLimitBytes } from "@/lib/billing/entitlements";
+import { betaConfig, myBetaCode } from "@/lib/beta";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Billing" };
@@ -80,14 +81,28 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
     notice = { tone: "info", text: "Checkout cancelled. You weren't charged." };
   } else if (searchParams.paid) notice = { tone: "ok", text: `Payment received. Invoice ${searchParams.paid} is below and on its way to ${user.email}.` };
 
-  const [plans, sub, invoices, gw, usage, display] = await Promise.all([
+  const [plans, sub, invoices, gw, usage, display, replies, captions, upload, beta, betaCfg] = await Promise.all([
     listPlans(),
     db.subscription.findFirst({ where: { userId: user.id, status: "active" }, include: { plan: true }, orderBy: { createdAt: "desc" } }),
     db.invoice.findMany({ where: { userId: user.id }, orderBy: { issuedAt: "desc" }, take: 50, include: { payment: { select: { status: true } } } }),
     activeGateway(),
     postUsage(user.id),
     getConfig("pricing").then(normalizeDisplay),
+    replyUsage(user.id),
+    captionUsage(user.id),
+    uploadLimitBytes(user.id),
+    myBetaCode(user.id),
+    betaConfig(),
   ]);
+  // The redeem box shows to members holding a code, and to everyone while the beta is on (codes made by hand).
+  const betaPlanName = (slug: string) => plans.find((p) => p.slug === slug)?.name ?? "Creator";
+  const betaOffer = beta.redeemed
+    ? null
+    : beta.code
+      ? { code: { code: beta.code.code, months: beta.code.months, planName: betaPlanName(beta.code.planSlug) }, redeemed: false }
+      : betaCfg.enabled
+        ? { code: null, redeemed: false }
+        : null;
 
   const visitor = visitorCurrency((plans.find((p) => p.priceMinor > 0)?.currency as any) ?? "INR");
   // Price each card in what the gateway will actually charge; if that isn't the visitor's currency, show their amount as a hint.
@@ -117,8 +132,14 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
       currency={visitor.currency}
       currencySource={visitor.source}
       canPickCurrency={gw.provider !== "razorpay"}
-      current={sub ? { planSlug: sub.plan.slug, planName: sub.plan.name, priceMinor: sub.priceMinor, currency: sub.currency, interval: sub.interval, periodEnd: sub.currentPeriodEnd.toISOString(), cancelAtPeriodEnd: sub.cancelAtPeriodEnd, pausedUntil: sub.pausedUntil && sub.pausedUntil > new Date() ? sub.pausedUntil.toISOString() : null } : null}
-      usage={{ used: usage.used, limit: usage.postLimit, seats: usage.seats, aiCaptions: usage.aiCaptions }}
+      current={sub ? { planSlug: sub.plan.slug, planName: sub.plan.name, priceMinor: sub.priceMinor, currency: sub.currency, interval: sub.interval, periodEnd: sub.currentPeriodEnd.toISOString(), cancelAtPeriodEnd: sub.cancelAtPeriodEnd, pausedUntil: sub.pausedUntil && sub.pausedUntil > new Date() ? sub.pausedUntil.toISOString() : null, provider: sub.provider } : null}
+      beta={betaOffer}
+      usage={{
+        used: usage.used, limit: usage.postLimit, seats: usage.seats, aiCaptions: usage.aiCaptions, period: usage.postPeriod,
+        maxUploadMb: upload.planLimited ? upload.mb : 0,
+        replies: { limit: replies.replyLimit, used: replies.used },
+        captions: { limit: captions.captionVideos, used: captions.used, burn: captions.burnCaptions },
+      }}
       invoices={invoices.map((i) => ({ number: i.number, description: i.description, amountMinor: i.amountMinor, currency: i.currency, issuedAt: i.issuedAt.toISOString(), refunded: i.payment?.status === "refunded" }))}
     />
   );

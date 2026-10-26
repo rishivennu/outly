@@ -182,7 +182,7 @@ export const ROWS: Row[] = [
   },
   {
     feature: "Free plan",
-    outly: { value: "yes", note: "Free during beta. Paid plans are not on sale yet." },
+    outly: { value: "yes", note: "Free plan with weekly post, upload and AI caption limits; paid plans lift them." },
     cells: {
       buffer: { value: "yes", note: "Free forever: up to 3 channels, 10 scheduled posts per channel." },
       metricool: { value: "yes", note: "Free plan: one brand, all networks except LinkedIn and X, limited scheduled posts." },

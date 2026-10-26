@@ -9,7 +9,7 @@ export interface Mail {
   to: string;
   subject: string;
   html: string;
-  kind: "invoice" | "ticket_opened" | "ticket_reply" | "test" | "subscription" | "maintenance" | "weekly_report" | "team_invite" | "referral" | "waitlist" | "notice" | "nudge" | "winback" | "growth" | "otp" | "security";
+  kind: "invoice" | "ticket_opened" | "ticket_reply" | "test" | "subscription" | "maintenance" | "weekly_report" | "team_invite" | "referral" | "waitlist" | "notice" | "nudge" | "winback" | "growth" | "otp" | "security" | "beta";
   attachments?: { filename: string; content: Buffer }[];
   /** Secrets (a sign-in code) masked in the Outbox copy once a real provider has delivered the email. */
   redact?: string[];
@@ -335,6 +335,17 @@ export const templates = {
         tiles: pair({ tone: "ink", html: stat(esc(o.role), "your role", "ink", 34) }, { tone: "white", html: stat("14 days", "to accept the invite", "white", 34) }),
       },
     ),
+  /** An early member's one-time code for a free stretch of a paid plan. */
+  betaCode: (o: { name: string; code: string; plan: string; months: number; url: string }) =>
+    wrap(
+      "You're one of our first members",
+      `${p(`Hi ${esc(o.name)}, thank you for joining Outlly early. As one of the first members you get ${o.months} months of ${esc(o.plan)}, free. Enter this code in Billing to switch it on:`)}${p(`<strong style="font-size:22px;letter-spacing:2px">${esc(o.code)}</strong>`)}${btn(o.url, "Redeem in Billing")}${small("The code works once, on this account. There's nothing to pay and nothing renews when it ends.")}`,
+      {
+        kicker: "Early member",
+        preheader: `${o.months} months of ${esc(o.plan)} on us`,
+        tiles: pair({ tone: "ink", html: stat(`${o.months} months`, `of ${esc(o.plan)}, free`, "ink", 38) }, { tone: "forest", html: stat("1 use", "this code, this account", "forest", 28) }),
+      },
+    ),
   referralReward: (o: { name: string; friend: string; plan: string; until: string; url: string }) =>
     wrap(
       "You earned a free month",
@@ -371,14 +382,16 @@ export const templates = {
   growth: (o: { subject: string; body: string; url: string; cta: string }) =>
     wrap(esc(o.subject), `${o.body.split(/\n{2,}/).map((para) => p(esc(para).replace(/\n/g, "<br>"))).join("")}${btn(o.url, esc(o.cta))}`, { kicker: "From the Outlly team", tone: "cream" }),
   /** Sign-in code. The digits sit in their own tile, spaced for reading aloud, and lead the subject line. */
-  otp: (o: { name: string | null; code: string; minutes: number }) =>
+  otp: (o: { name: string | null; code: string; minutes: number; reset?: boolean }) =>
     wrap(
-      "Your sign-in code",
-      `${p(`${o.name ? `Hi ${esc(o.name)}, here` : "Here"} is the code to sign in to Outlly. It works once, for the next ${o.minutes} minutes.`)}${p("If you didn't ask for it, you can ignore this email. Nobody can sign in without the code, and it never leaves this message.")}${small("Outlly will never ask you to read this code out on a call or type it anywhere except the Outlly sign-in page.")}`,
+      o.reset ? "Reset your password" : "Your sign-in code",
+      o.reset
+        ? `${p(`${o.name ? `Hi ${esc(o.name)}, here` : "Here"} is the code to choose a new Outlly password. It works once, for the next ${o.minutes} minutes.`)}${p("If you didn't ask for it, you can ignore this email: your password stays as it is.")}${small("Outlly will never ask you to read this code out on a call or type it anywhere except the Outlly reset page.")}`
+        : `${p(`${o.name ? `Hi ${esc(o.name)}, here` : "Here"} is the code to sign in to Outlly. It works once, for the next ${o.minutes} minutes.`)}${p("If you didn't ask for it, you can ignore this email. Nobody can sign in without the code, and it never leaves this message.")}${small("Outlly will never ask you to read this code out on a call or type it anywhere except the Outlly sign-in page.")}`,
       {
-        kicker: "Sign in",
+        kicker: o.reset ? "Password" : "Sign in",
         tone: "cream",
-        preheader: `${o.code} is your Outlly sign-in code`,
+        preheader: o.reset ? `${o.code} is your Outlly password reset code` : `${o.code} is your Outlly sign-in code`,
         tiles: tile("ink", `<div style="font-family:${BODY};font-size:13px;color:${TONE.ink.sub}">Your code</div><div style="padding-top:6px;font-family:${DISPLAY};font-size:46px;line-height:1.05;font-weight:bold;letter-spacing:10px;color:${C.lime}">${esc(o.code)}</div>`),
       },
     ),

@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Captions, Download, Loader2, Plus, Sparkles, Trash2, Type, Undo2, X } from "lucide-react";
+import { Captions, Download, Loader2, Lock, Plus, Sparkles, Trash2, Type, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
-import { ApiError } from "@/lib/client/api";
+import { api, ApiError, offerUpgrade } from "@/lib/client/api";
 import { audioChunks, burnCaptions, drawCue, recorderType } from "@/lib/client/captions";
 import { CAPTION_STYLES, cueAt, cuesFromScript, normalizeCues, toSrt, type CaptionPos, type CaptionStyle, type Cue } from "@/lib/captions/cues";
 import { cn } from "@/lib/utils";
@@ -51,6 +51,16 @@ export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onErr
   const video = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const canRecord = typeof window !== "undefined" && !!recorderType();
+  /* Plan gates: burning is paid-only; Free gets AI captions on a few videos a month. null = not loaded yet. */
+  const [plan, setPlan] = useState<null | { burn: boolean; left: number | null; limit: number | null; name: string }>(null);
+  useEffect(() => {
+    if (!on || plan) return;
+    api<{ plan: { name: string }; captions: { burn: boolean; left: number | null; limit: number | null } }>("/api/plan/limits")
+      .then((l) => setPlan({ burn: l.captions.burn, left: l.captions.left, limit: l.captions.limit, name: l.plan.name }))
+      .catch(() => {});
+  }, [on, plan]);
+  // One video = one caption allowance, however many chunks or re-runs. Same file + length = same ref.
+  const ref = `${filename}:${Math.round(duration * 10)}`;
 
   // Live preview: the same drawCue the recorder uses, on a transparent canvas over the player.
   useEffect(() => {
@@ -86,9 +96,12 @@ export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onErr
       let lang = "";
       for (let i = 0; i < chunks.length; i++) {
         const c = chunks[i];
-        const r = await fetch(`/api/ai/transcribe?offset=${c.offset}&duration=${c.duration}`, { method: "POST", body: c.blob, headers: { "content-type": "audio/wav" }, credentials: "same-origin", signal: ctrl.signal });
+        const r = await fetch(`/api/ai/transcribe?offset=${c.offset}&duration=${c.duration}&ref=${encodeURIComponent(ref)}`, { method: "POST", body: c.blob, headers: { "content-type": "audio/wav" }, credentials: "same-origin", signal: ctrl.signal });
         const j = await r.json().catch(() => ({}));
-        if (!r.ok) throw new ApiError(r.status, j.error ?? "Transcription didn't come back.", j.code);
+        if (!r.ok) {
+          if (r.status === 402 && j.code === "PLAN_LIMIT") offerUpgrade(j.error, j.feature);
+          throw new ApiError(r.status, j.error ?? "Transcription didn't come back.", j.code);
+        }
         all.push(...(j.cues as Cue[]));
         if (Array.isArray(j.words)) ws.push(...(j.words as Word[]));
         lang ||= j.language;
@@ -97,6 +110,7 @@ export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onErr
       const clean = normalizeCues(all, duration || Infinity);
       setCues(clean);
       setWords(ws.length ? ws : wordsFromCues(clean));
+      setPlan(null); // re-read what's left this month
       setNote(clean.length ? `${clean.length} captions${lang ? ` in ${lang}` : ""}. Fix any word by clicking it.` : "We didn't hear any speech. Type your captions instead.");
       if (!clean.length) setTyping(true);
     } catch (e) {
@@ -120,6 +134,13 @@ export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onErr
 
   async function burn() {
     if (!cues.length) return;
+    try {
+      await api("/api/plan/limits", { method: "POST", json: { feature: "burn" } });
+    } catch (e) {
+      // 402 already opened the upgrade popup
+      setNote((e as Error).message);
+      return;
+    }
     const ctrl = new AbortController();
     abort.current = ctrl;
     setBusy({ kind: "burn", p: 0 });
@@ -188,6 +209,11 @@ export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onErr
               </Button>
               {busy?.kind === "transcribe" && <Button type="button" variant="ghost" onClick={() => abort.current?.abort()}><X className="h-4 w-4" aria-hidden />Stop</Button>}
             </div>
+            {plan?.limit != null && (
+              <p className="mt-2 text-[13px] text-muted-foreground">
+                {plan.left ? `AI captions: ${plan.left} of ${plan.limit} videos left this month on ${plan.name}.` : `You've used this month's ${plan.limit} AI-captioned videos on ${plan.name}. You can still type captions.`}
+              </p>
+            )}
 
             {typing && (
               <div className="mt-3">
@@ -226,8 +252,8 @@ export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onErr
                 <div className="mt-5 flex flex-wrap items-center gap-2">
                   {canRecord ? (
                     <Button type="button" variant="primary" onClick={burn} disabled={working}>
-                      {busy?.kind === "burn" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Captions className="h-4 w-4" aria-hidden />}
-                      {busy?.kind === "burn" ? `Adding captions ${Math.round(busy.p * 100)}%` : "Burn into video"}
+                      {busy?.kind === "burn" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : plan && !plan.burn ? <Lock className="h-4 w-4" aria-hidden /> : <Captions className="h-4 w-4" aria-hidden />}
+                      {busy?.kind === "burn" ? `Adding captions ${Math.round(busy.p * 100)}%` : plan && !plan.burn ? "Burn into video (paid plans)" : "Burn into video"}
                     </Button>
                   ) : (
                     <p className="text-[13px] text-muted-foreground">This browser can&apos;t make MP4 video. Use the latest Chrome, Edge or Safari to burn captions in.</p>

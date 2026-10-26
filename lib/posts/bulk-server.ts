@@ -19,7 +19,7 @@ export async function planBatch(userId: string, platforms: Platform[], count: nu
     postUsage(userId),
   ]);
   const slots = spreadSlots({ count: n, peakHours: best.peakHours, tz, taken: booked.map((b) => b.scheduledAt!) });
-  return { slots, peakHours: best.peakHours, source: best.source, reason: best.reason, left: Number.isFinite(usage.left) ? usage.left : null, planName: usage.planName };
+  return { slots, peakHours: best.peakHours, source: best.source, reason: best.reason, left: Number.isFinite(usage.left) ? usage.left : null, planName: usage.planName, period: usage.postPeriod };
 }
 
 /**
@@ -35,13 +35,15 @@ export async function bookBatch(userId: string, body: z.infer<typeof bulkSchedul
   if (missing) throw new HttpError(409, `${PLATFORM_META[missing].name} needs you to connect it first.`, "NOT_CONNECTED");
 
   const usage = await postUsage(userId);
+  const per = usage.postPeriod === "week" ? "this week" : "this month";
   if (Number.isFinite(usage.left) && usage.left < body.items.length)
     throw new HttpError(
       402,
       usage.left === 0
-        ? `You've used all ${usage.postLimit} posts on ${usage.planName} this month. Upgrade in Billing for more, or wait until the 1st.`
-        : `${usage.planName} has ${usage.left} post${usage.left === 1 ? "" : "s"} left this month. Pick ${usage.left} or fewer, or upgrade in Billing.`,
+        ? `You've used all ${usage.postLimit} posts on ${usage.planName} ${per}. Upgrade to post more, or ${usage.postPeriod === "week" ? "wait until Monday" : "wait until the 1st"}.`
+        : `${usage.planName} has ${usage.left} post${usage.left === 1 ? "" : "s"} left ${per}. Pick ${usage.left} or fewer, or upgrade to post more.`,
       "PLAN_LIMIT",
+      { feature: "posts", upgrade: "/billing" },
     );
 
   const soon = Date.now() + 60_000;

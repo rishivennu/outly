@@ -113,7 +113,7 @@ function CtaPhone() {
   );
 }
 
-export function FinalCta() {
+export function FinalCta({ beta = false }: { beta?: boolean }) {
   const m = FINAL_CTA.title.match(/^(.*?\.\s.*?\.)\s(.*)$/);
   const [first, second] = m ? [m[1], m[2]] : [FINAL_CTA.title, ""];
   return (
@@ -134,7 +134,7 @@ export function FinalCta() {
               </h2>
               <p className="mt-5 max-w-xl text-pretty text-[17px] leading-relaxed text-[hsl(var(--ap-ink2))] sm:text-lg">{FINAL_CTA.body}</p>
               <FinalCtaButtons />
-              <p className="mt-3 text-[13px] text-[hsl(var(--ap-ink2))]">Free while in beta. No card needed.</p>
+              <p className="mt-3 text-[13px] text-[hsl(var(--ap-ink2))]">{beta ? "Free while in beta. No card needed." : "Start free. No card needed."}</p>
             </Reveal>
 
             {/* Phones: the destinations as one row that always fits (the side walls need 768px). */}

@@ -178,7 +178,7 @@ export function MarketingNav() {
 
   return (
     <header className="mnav sticky top-0 z-50 px-3 pt-3 sm:px-6" data-scrolled={scrolled || open}>
-      <div ref={barRef} className="mnav-bar mx-auto flex h-14 max-w-[1180px] items-center gap-2 rounded-full pl-3 pr-1.5 sm:h-[60px] sm:pl-4">
+      <div ref={barRef} className="mnav-bar mx-auto flex h-14 max-w-[1180px] items-center gap-2 rounded-full pl-3 pr-1.5 sm:h-[60px] sm:pl-4 sm:pr-2">
         <Link href="/" className="flex h-11 items-center gap-2 rounded-full pr-2" aria-label="Outlly home">
           <OutlyLogo className="text-[17.4px]" />
         </Link>

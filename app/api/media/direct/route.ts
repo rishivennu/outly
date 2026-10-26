@@ -6,6 +6,7 @@ import { env } from "@/lib/env";
 import { HttpError, json, route } from "@/lib/http";
 import { storage } from "@/lib/storage";
 import { ALLOWED_EXT, ALLOWED_VIDEO_MIME } from "@/lib/media/probe";
+import { assertUploadSize, uploadLimitBytes } from "@/lib/billing/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,11 +21,15 @@ const body = z.object({
  * Tells the client how to upload: straight to the bucket when the driver allows it (Supabase TUS,
  * or R2/S3 presigned PUT / multipart), else stream through /api/media.
  */
-export const GET = route(async () => {
+export const GET = route(async (_req, { user }) => {
+  const lim = await uploadLimitBytes(user.id);
   return json({
     direct: Boolean(storage.createDirectUpload),
     driver: storage.name,
-    maxBytes: env.MAX_UPLOAD_MB * 1024 * 1024,
+    maxBytes: lim.bytes,
+    maxMb: lim.mb,
+    planLimited: lim.planLimited,
+    planName: lim.planName,
     chunkSize: storage.multipart?.partSize ?? 6 * 1024 * 1024,
   });
 });
@@ -38,11 +43,10 @@ export const POST = route(
     if (!storage.createDirectUpload) throw new HttpError(409, "Direct upload isn't available on this storage driver.", "NO_DIRECT");
     const b = body.parse(await req.json());
     const ext = extname(b.name).toLowerCase();
-    const max = env.MAX_UPLOAD_MB * 1024 * 1024;
     const mime = b.type || (ext === ".mov" ? "video/quicktime" : "video/mp4");
     if (!(ALLOWED_VIDEO_MIME as readonly string[]).includes(mime) || !(ALLOWED_EXT as readonly string[]).includes(ext))
       throw new HttpError(415, "That one isn't a video we can use yet. Try an MP4 or MOV.");
-    if (b.size > max) throw new HttpError(413, `That's a big one. Keep it under ${env.MAX_UPLOAD_MB} MB for now.`, "TOO_LARGE");
+    await assertUploadSize(user.id, b.size);
 
     const id = randomUUID();
     const key = `videos/${user.id}/${id}${ext}`;

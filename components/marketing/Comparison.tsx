@@ -167,8 +167,8 @@ function CompareGrid({ tools, groups }: { tools: Tool[]; groups: Flags }) {
   );
 }
 
-export function Comparison({ competitors, groups }: { competitors?: Flags; groups?: Flags } = {}) {
-  const tools = ALL_TOOLS.filter((t) => t.id === "outly" || competitors?.[t.id] !== false);
+export function Comparison({ competitors, groups, beta = false }: { competitors?: Flags; groups?: Flags; beta?: boolean } = {}) {
+  const tools = ALL_TOOLS.filter((t) => t.id === "outly" || competitors?.[t.id] !== false).map((t) => (t.id === "outly" && !beta ? { ...t, sub: "Free plan" } : t));
   const shownCompetitors = COMPETITORS.filter((c) => competitors?.[c.id] !== false);
   const names = shownCompetitors.map((c) => c.name);
   const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] ?? "the big suites";

@@ -3,12 +3,13 @@ import { AnimatedLink } from "@/components/ui/animated-link";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { PageHead, Prose, Shell } from "@/components/marketing/bits";
 import { SOCIALS } from "@/lib/marketing/content";
+import { ContactForm } from "@/components/marketing/ContactForm";
 
 export const metadata: Metadata = {
   title: "Contact",
-  description: "How to reach Outlly during beta: in-app support, bug reports with the detail that helps, and where the social accounts will be.",
+  description: "How to reach Outlly: in-app support, bug reports with the detail that helps, and where the social accounts will be.",
   alternates: { canonical: "/contact" },
-  openGraph: { title: "Contact · Outlly", description: "How to reach Outlly during beta.", url: "/contact" },
+  openGraph: { title: "Contact · Outlly", description: "How to reach the Outlly team.", url: "/contact" },
 };
 
 const ROUTES = [
@@ -21,8 +22,8 @@ const ROUTES = [
   {
     icon: "inspiration" as const,
     title: "You want something that does not exist yet",
-    body: "Feature requests from beta accounts shape the order we build in, particularly around which platform gets connected next.",
-    cta: { href: "/signup", label: "Join the beta" },
+    body: "Feature requests from creators using Outlly shape the order we build in, particularly around which platform gets connected next.",
+    cta: { href: "/signup", label: "Create an account" },
   },
   {
     icon: "error" as const,
@@ -38,7 +39,7 @@ export default function ContactPage() {
       <Shell>
         <PageHead
           title="Contact"
-          lead="Outlly is a beta run by a small team, so support goes through the app rather than a shared inbox we cannot answer. Here is the quickest route for each kind of message."
+          lead="Outlly is run by a small team, so every message lands in one support queue that we answer by email. Here is the quickest route for each kind of message, or use the form below."
         />
 
         <ul className="mt-14 grid gap-4 md:grid-cols-3">
@@ -55,6 +56,10 @@ export default function ContactPage() {
             </li>
           ))}
         </ul>
+
+        <div className="relative mt-14">
+          <ContactForm />
+        </div>
 
         <div className="mt-16">
           <Prose>

@@ -17,7 +17,7 @@ export function CycleSwitch({ value, onChange, save, className }: { value: Cycle
     >
       {label}
       {c === "year" && save > 0 && (
-        <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", value === c ? "bg-lime text-[hsl(var(--lime-foreground))]" : "bg-lime/20 text-lime-ink")}>Save {save}%</span>
+        <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", value === c ? "bg-lime text-[hsl(var(--lime-foreground))]" : "bg-lime/25 text-foreground")}>Save {save}%</span>
       )}
     </button>
   );

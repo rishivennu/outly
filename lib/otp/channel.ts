@@ -8,14 +8,15 @@ import { OTP_TTL_MS } from "./core";
  */
 export interface OtpChannel {
   id: "email" | "sms";
-  send(to: string, code: string, ctx: { name: string | null }): Promise<{ ok: boolean; error?: string }>;
+  send(to: string, code: string, ctx: { name: string | null; purpose?: "login" | "reset" }): Promise<{ ok: boolean; error?: string }>;
 }
 
 /** Email through whichever provider the admin picked (Resend, or the mock Outbox in dev). */
 export const emailChannel: OtpChannel = {
   id: "email",
   async send(to, code, ctx) {
-    const r = await sendEmail({ to, subject: "Your Outlly sign-in code", html: templates.otp({ name: ctx.name, code, minutes: OTP_TTL_MS / 60_000 }), kind: "otp", redact: [code] });
+    const reset = ctx.purpose === "reset";
+    const r = await sendEmail({ to, subject: reset ? "Your Outlly password reset code" : "Your Outlly sign-in code", html: templates.otp({ name: ctx.name, code, minutes: OTP_TTL_MS / 60_000, reset }), kind: "otp", redact: [code] });
     return { ok: r.ok, error: r.error };
   },
 };

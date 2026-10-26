@@ -40,6 +40,7 @@ interface Plan {
   reason: string;
   left: number | null;
   planName: string;
+  period?: "week" | "month";
 }
 type Done = { posts: PostView[]; failed: { index: number; message: string }[] };
 
@@ -172,7 +173,7 @@ export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: str
         : failedUploads
           ? "Retry or remove the videos that didn't upload."
           : overPlan
-            ? `${plan!.planName} has ${plan!.left} post${plan!.left === 1 ? "" : "s"} left this month. Remove ${rows.length - plan!.left!} or upgrade in Billing.`
+            ? `${plan!.planName} has ${plan!.left} post${plan!.left === 1 ? "" : "s"} left ${plan!.period === "week" ? "this week" : "this month"}. Remove ${rows.length - plan!.left!} or upgrade in Billing.`
             : missingTime
               ? "Finding times..."
               : null;

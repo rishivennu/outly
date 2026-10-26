@@ -457,8 +457,12 @@ html:not(.dark) .o3d-floor { background: radial-gradient(closest-side, rgba(30, 
 .mnav-bar::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; padding: 1px; pointer-events: none;
   background: linear-gradient(115deg, hsl(0 0% 100% / .75), hsl(0 0% 100% / .22) 30%, hsl(0 0% 100% / .06) 55%, hsl(0 0% 100% / .3) 85%, hsl(0 0% 100% / .6));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
-.mnav-bar::after { content: ""; position: absolute; inset: 1px 12% auto; height: 45%; z-index: -1; border-radius: 9999px 9999px 40% 40%; pointer-events: none;
-  background: linear-gradient(180deg, hsl(0 0% 100% / .32), transparent); }
+/* Specular sheen: full width, feathered at both ends, so it reads as light on glass and never as a box inside the pill. */
+.mnav-bar::after { content: ""; position: absolute; inset: 1px 1px auto; height: 50%; z-index: -1; border-radius: 9999px 9999px 0 0; pointer-events: none;
+  background: linear-gradient(180deg, hsl(0 0% 100% / .32), transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent); mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent); }
+/* The CTA sits inside the pill: concentric 8px inset, and its glow stays inside the rim instead of spilling past it. */
+.mnav-bar .lime-glow { box-shadow: inset 0 1px 0 hsl(0 0% 100% / .4), 0 0 0 1px hsl(var(--lime) / .35); }
 .dark .mnav-bar { background: linear-gradient(180deg, hsl(var(--card) / .66), hsl(var(--card) / .5));
   box-shadow: inset 0 1px 0 hsl(0 0% 100% / .18), inset 0 -1px 0 hsl(0 0% 100% / .05), 0 0 0 1px hsl(0 0% 100% / .08),
     0 14px 34px -18px rgba(0, 0, 0, .7); }

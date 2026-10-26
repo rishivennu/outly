@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { HttpError, json, route } from "@/lib/http";
 import { updatePostSchema } from "@/lib/validation";
-import { ownedPost, postView } from "@/lib/services";
+import { launchPost, ownedPost, postView } from "@/lib/services";
 import { enqueue } from "@/lib/queue";
 import { supportsFirstComment } from "@/lib/domain";
 
@@ -16,8 +16,14 @@ export const PATCH = route(async (req, { user, params }) => {
   if (body.scheduledAt) {
     const at = new Date(body.scheduledAt);
     if (at.getTime() < Date.now() + 60_000) throw new HttpError(400, "Pick a time at least a minute from now.");
-    await db.post.update({ where: { id: post.id }, data: { scheduledAt: at, status: post.status === "draft" ? "draft" : "scheduled" } });
-    if (post.status === "scheduled") await enqueue("SCHEDULED_POST", { postId: post.id }, { delayMs: at.getTime() - Date.now(), jobId: `sched-${post.id}-${at.getTime()}` });
+    if (post.status === "draft" || post.status === "scheduled") {
+      await db.post.update({ where: { id: post.id }, data: { scheduledAt: at } });
+      if (post.status === "scheduled") await enqueue("SCHEDULED_POST", { postId: post.id }, { delayMs: at.getTime() - Date.now(), jobId: `sched-${post.id}-${at.getTime()}` });
+    } else {
+      // A failed or partly-sent post is being booked again: that is a launch, so it goes through launchPost
+      // (connections, approval and the plan's post slot), never a bare status write.
+      await launchPost(user.id, post.id, "schedule", at, "realistic");
+    }
   }
   if (body.title !== undefined) await db.post.update({ where: { id: post.id }, data: { title: body.title } });
   if (body.requireApproval !== undefined) await db.post.update({ where: { id: post.id }, data: { requireApproval: body.requireApproval } });

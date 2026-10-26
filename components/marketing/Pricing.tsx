@@ -1,6 +1,7 @@
 import { PricingCards, type CardPlan } from "./PricingCards";
 import { Shell, SectionHead } from "./bits";
 import { PRICING_NOTE } from "@/lib/marketing/content";
+import { isBeta } from "@/lib/beta";
 import { inCurrency, listPlans } from "@/lib/billing/plans";
 import { getConfig } from "@/lib/settings";
 import { normalizeDisplay } from "@/lib/billing/display";
@@ -14,7 +15,7 @@ import { formatMoney, priceLabel } from "@/lib/billing/money";
  * Priced in the visitor's currency (IP country on Vercel/Cloudflare, else browser language, else their pick).
  */
 export async function Pricing() {
-  const [all, display] = await Promise.all([listPlans(), getConfig("pricing").then(normalizeDisplay)]);
+  const [all, display, beta] = await Promise.all([listPlans(), getConfig("pricing").then(normalizeDisplay), isBeta()]);
   const visitor = visitorCurrency((all.find((p) => p.priceMinor > 0)?.currency as any) ?? "INR");
   const plans = inCurrency(all, visitor.currency);
   const paid = plans.some((p) => p.state === "available" && p.priceMinor > 0);
@@ -36,7 +37,7 @@ export async function Pricing() {
           id="pricing-title"
           align="center"
           eyebrow="Pricing"
-          title={paid ? "Simple pricing. Start free." : "Free while we are in beta."}
+          title={paid ? "Simple pricing. Start free." : beta ? "Free while we are in beta." : "Start free."}
           body={paid ? "Start on Free and upgrade when you need more. Cancel any time; you keep access until the period ends. Invoices land in your inbox the moment you pay." : PRICING_NOTE}
         />
 

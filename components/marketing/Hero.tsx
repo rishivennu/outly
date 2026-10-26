@@ -12,7 +12,7 @@ import { HERO, PLATFORM_PITCH } from "@/lib/marketing/content";
  * accent, collaborator name tags floating beside it, then the arched card fan rising from
  * the bottom edge. Works in both themes; the fan cards keep their own saturated colours.
  */
-export function Hero({ showHow = true }: { showHow?: boolean }) {
+export function Hero({ showHow = true, beta = false }: { showHow?: boolean; beta?: boolean }) {
   // Words unfold one after another on load (Play pass in globals.css); the accent word is written in last.
   const l1 = splitWords("Your content deserves");
   const l2 = splitWords("to be", l1.next);
@@ -24,11 +24,20 @@ export function Hero({ showHow = true }: { showHow?: boolean }) {
       <Sparkles />
       <Shell className="relative flex flex-col items-center text-center">
         <p className="hf-in glass hairline inline-flex items-center gap-2 rounded-full py-1.5 pl-2 pr-4 text-[13px] font-medium text-foreground/85">
-          <StampChip>Beta</StampChip>
-          <span className="text-lime-ink dark:text-lime">Free during beta</span>
-          {/* the long half only where it fits on one line */}
-          <span aria-hidden="true" className="hidden text-foreground/40 sm:inline">&mdash;</span>
-          <span className="hidden sm:inline">{HERO.eyebrow}</span>
+          {beta ? (
+            <>
+              <StampChip>Beta</StampChip>
+              <span className="text-lime-ink dark:text-lime">Free during beta</span>
+              {/* the long half only where it fits on one line */}
+              <span aria-hidden="true" className="hidden text-foreground/40 sm:inline">&mdash;</span>
+              <span className="hidden sm:inline">{HERO.eyebrow}</span>
+            </>
+          ) : (
+            <>
+              <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-lime" />
+              <span>{HERO.eyebrow}</span>
+            </>
+          )}
         </p>
 
         <div className="relative mt-7 w-full">

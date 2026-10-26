@@ -16,6 +16,7 @@ import { getConfig } from "@/lib/settings";
 import { WhatsNew } from "@/components/shell/WhatsNew";
 import { SendingPill } from "@/components/shell/SendingPill";
 import { PrivacyNotice } from "@/components/shared/PrivacyNotice";
+import { UpgradeDialog } from "@/components/shared/UpgradeDialog";
 
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -49,6 +50,7 @@ export default async function StudioLayout({ children }: { children: React.React
       <MobileNav />
       <SendingPill />
       <PrivacyNotice />
+      <UpgradeDialog />
       <Tour />
       <CommandPalette />
       <WhatsNew notice={notice} userId={user.actor?.id ?? user.id} joinedAt={new Date(user.joinedAt).toISOString()} />
