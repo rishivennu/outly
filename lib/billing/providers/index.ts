@@ -2,7 +2,7 @@ import "server-only";
 import { createHmac } from "node:crypto";
 import { safeEqual } from "../../crypto";
 import type { PaymentConfig } from "../../settings";
-import { safeCheckoutUrl, youpiBase, youpiSigHex, type YoupiStatus } from "../youpi";
+import { safeCheckoutUrl, youpiBase, youpiOrderMatches, youpiSigHex, type YoupiStatus } from "../youpi";
 import { assertPublicUrl } from "../../net/assert-public";
 
 export type CheckoutStart =
@@ -287,7 +287,7 @@ export const youpi = {
     const j: any = await r.json().catch(() => ({}));
     if (r.status === 409) throw new Error("A payment for this account is already open on another device.");
     if (!r.ok) throw new Error(String(j?.error ?? `YOUPI ${r.status}`).slice(0, 160));
-    if (String(j.orderId ?? "") !== a.paymentId) throw new Error("YOUPI answered for a different order.");
+    if (!youpiOrderMatches(j.orderId, a.paymentId)) throw new Error("YOUPI answered for a different order.");
     const url = safeCheckoutUrl(j.checkoutUrl, cfg.mode);
     if (!url || !j.paymentId) throw new Error("YOUPI didn't return a safe checkout link.");
     return { kind: "redirect", url, providerRef: String(j.paymentId).slice(0, 100) };

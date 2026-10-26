@@ -3,6 +3,7 @@ import { clientIp, json } from "@/lib/http";
 import { getConfig } from "@/lib/settings";
 import { youpi } from "@/lib/billing/providers";
 import { confirmYoupi } from "@/lib/billing/service";
+import { youpiOurId } from "@/lib/billing/youpi";
 import { rateLimit } from "@/lib/rate-limit";
 
 /**
@@ -22,10 +23,12 @@ export async function POST(req: NextRequest) {
   } catch {
     return json({ error: "bad json" }, { status: 400 });
   }
-  const id = typeof ev?.orderId === "string" ? ev.orderId.slice(0, 64) : "";
+  // A restarted payment arrives as `<our id>-R1234` on a new YOUPI session: map it back, and name that session.
+  const id = youpiOurId(ev?.orderId, ev?.metadata);
   if (!id) return json({ received: true });
+  const session = typeof ev?.paymentId === "string" && /^[A-Za-z0-9-]{1,100}$/.test(ev.paymentId) ? ev.paymentId : undefined;
   try {
-    await confirmYoupi(id, null);
+    await confirmYoupi(id, null, session);
   } catch (e) {
     console.error("[youpi webhook]", (e as Error).message);
     return json({ error: "retry" }, { status: 500 });

@@ -12,7 +12,7 @@ import { normalizeDisplay } from "./display";
 import { issueInvoice } from "./invoice";
 import { sendEmail, templates } from "../email";
 import { mock, paypal, razorpay, stripe, youpi, type CheckoutStart } from "./providers";
-import { youpiReady, youpiVerdict } from "./youpi";
+import { youpiReady, youpiVerdict, type YoupiVerdict } from "./youpi";
 import { rewardReferrer } from "../referral";
 import { isPaused, pausePlan, resumePlan } from "./pause";
 
@@ -158,19 +158,30 @@ export async function capturePaypal(orderId: string, userId: string | null) {
  * YOUPI return URL and webhook both land here. Neither is trusted on its own: we ask the gateway
  * for the payment ourselves and only grant the plan when it is SUCCESS for this order, at exactly
  * our stored amount, in INR, at the admin's verification level. `userId` scopes the return URL.
+ * `session` is the YOUPI session a webhook named. It differs from providerRef when the buyer restarted
+ * the payment on YOUPI; we read that session from the gateway too (never trusting the webhook body).
  */
-export async function confirmYoupi(paymentId: string, userId: string | null) {
+export async function confirmYoupi(paymentId: string, userId: string | null, session?: string) {
   const p = await db.payment.findFirst({ where: { id: paymentId, provider: "youpi", ...(userId ? { userId } : {}) } });
   if (!p) return { state: "unknown" as const };
   if (p.status === "succeeded") return { state: "paid" as const, invoice: await db.invoice.findUnique({ where: { paymentId: p.id } }) };
   if (!p.providerRef) return { state: "unknown" as const };
   const cfg = await getConfig("payments");
-  const v = youpiVerdict(await youpi.status(cfg, p.providerRef), { id: p.id, amountMinor: p.amountMinor, currency: p.currency }, cfg.youpi.minVerification === 2 ? 2 : 1);
-  if (v.state === "paid") {
-    const { invoice } = await completePayment(p.id);
-    return { state: "paid" as const, invoice };
+  const want = { id: p.id, amountMinor: p.amountMinor, currency: p.currency };
+  const min = cfg.youpi.minVerification === 2 ? 2 : 1;
+  const refs = [p.providerRef, ...(session && session !== p.providerRef ? [session] : [])];
+  let v: Exclude<YoupiVerdict, { state: "paid" | "pending" }> | null = null;
+  let pending = false;
+  for (const ref of refs) {
+    const r = youpiVerdict(await youpi.status(cfg, ref), want, min);
+    if (r.state === "paid") {
+      const { invoice } = await completePayment(p.id, ref);
+      return { state: "paid" as const, invoice };
+    }
+    if (r.state === "pending") pending = true;
+    else v ??= r;
   }
-  if (v.state === "pending") return { state: "pending" as const };
+  if (pending || !v) return { state: "pending" as const };
   if (p.status === "pending") await failPayment(p.id, v.state === "mismatch" ? `YOUPI mismatch, check by hand before granting: ${v.reason}` : `YOUPI: ${v.reason}`);
   return { state: v.state, reason: v.reason };
 }

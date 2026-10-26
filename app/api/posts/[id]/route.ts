@@ -3,7 +3,8 @@ import { HttpError, json, route } from "@/lib/http";
 import { updatePostSchema } from "@/lib/validation";
 import { launchPost, ownedPost, postView } from "@/lib/services";
 import { enqueue } from "@/lib/queue";
-import { supportsFirstComment } from "@/lib/domain";
+import { isPlatform, PLATFORM_META, REMOVAL, supportsFirstComment, type Platform } from "@/lib/domain";
+import { removeEverywhere } from "@/lib/social/remove";
 
 export const dynamic = "force-dynamic";
 
@@ -42,9 +43,28 @@ export const PATCH = route(async (req, { user, params }) => {
   return json({ post: await postView(await ownedPost(user.id, post.id)) });
 });
 
-export const DELETE = route(async (_req, { user, params }) => {
+/**
+ * Remove from the studio. With ?platforms=1 the live copies are deleted on every platform that allows it first;
+ * if any of those fails, nothing is removed from the studio, so the creator can retry without losing the links.
+ */
+export const DELETE = route(async (req, { user, params }) => {
   const post = await ownedPost(user.id, params.id);
   if (post.status === "publishing") throw new HttpError(409, "Let it finish sending first.");
+  const q = new URL(req.url).searchParams;
+  if (q.get("platforms") === "1") {
+    // Instagram/TikTok copies can't be deleted by API; their links vanish with the studio record, so the
+    // caller must confirm the creator saw the "delete it in the app" step (the sheet sends appOnly=ack).
+    const appOnly = post.targets.filter((t) => t.platformStatus === "published" && t.platformPostId && t.removeMode !== "deleted" && isPlatform(t.platform) && !REMOVAL[t.platform].delete);
+    if (appOnly.length && q.get("appOnly") !== "ack")
+      throw new HttpError(409, `${appOnly.map((t) => PLATFORM_META[t.platform as Platform].name).join(" and ")} can't be deleted from here. Delete ${appOnly.length === 1 ? "it" : "those"} in the app first.`, "APP_ONLY_LIVE");
+    const results = await removeEverywhere(user.id, post.id);
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length)
+      throw new HttpError(409, `Couldn't take it down everywhere, so it's still in your studio. ${failed.map((f) => f.message).join(" ")}`, "REMOVE_FAILED", {
+        results,
+        post: await postView(await ownedPost(user.id, post.id)),
+      });
+  }
   await db.post.delete({ where: { id: post.id } });
   return json({ ok: true });
 });

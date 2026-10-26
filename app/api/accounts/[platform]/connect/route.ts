@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { isPlatform } from "@/lib/domain";
 import { getPublisher, hasCredentials, loadKeys, practiceAllowed } from "@/lib/social/registry";
+import { instagramIdLooksLikeMetaAppId } from "@/lib/social/keys";
 import { safeReturnTo, saveOAuthState } from "@/lib/oauth-state";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,13 @@ export async function GET(req: NextRequest, { params }: { params: { platform: st
     const back = new URL(safeReturnTo(req.nextUrl.searchParams.get("returnTo")), env.APP_URL);
     back.searchParams.set("connect_error", params.platform);
     back.searchParams.set("reason", "not_configured");
+    return NextResponse.redirect(back);
+  }
+  // Sending the creator to instagram.com with the Meta App ID only ends on "Invalid platform app". Say why instead.
+  if (params.platform === "instagram" && instagramIdLooksLikeMetaAppId()) {
+    const back = new URL(safeReturnTo(req.nextUrl.searchParams.get("returnTo")), env.APP_URL);
+    back.searchParams.set("connect_error", "instagram");
+    back.searchParams.set("reason", "wrong_app_id");
     return NextResponse.redirect(back);
   }
   const redirectUri = `${env.APP_URL}/api/accounts/${params.platform}/callback`;

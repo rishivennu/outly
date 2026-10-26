@@ -162,6 +162,9 @@ model PostTarget {
   practice        Boolean   @default(false) // true = rehearsal through MockPublisher; never shown as a real post
   publishRequestedAt DateTime? // set just before the irreversible "go public" call; a retry reconciles first
   publishedAt     DateTime?
+  // Taken down from the platform through Outlly. platformStatus stays "published" so history and stats stay true.
+  removedAt       DateTime?
+  removeMode      String? // deleted (gone from the platform) | hidden (YouTube: made private, can be made public again)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -381,11 +384,22 @@ model EmailLog {
   html      String
   kind      String // invoice | ticket_opened | ticket_reply | test
   provider  String // mock | resend
-  status    String // mocked | sent | failed
+  status    String // mocked | sent | failed | skipped (recipient unsubscribed from that list)
   error     String?
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+/// 10-26b: someone pressed Unsubscribe on a marketing email (or Gmail's one-click button did it for them).
+/// Keyed by address, not user, so it also covers people without an account. Only "news" today: nudges,
+/// win-back and growth campaigns. The weekly report has its own switch, User.weeklyReport.
+model EmailOptOut {
+  email     String // lower-case
+  list      String // "news"
+  createdAt DateTime @default(now())
+
+  @@id([email, list])
 }
 
 /// Key/value config. Secret fields inside `value` are AES-256-GCM encrypted by lib/settings.ts.

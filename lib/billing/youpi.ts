@@ -57,7 +57,25 @@ export type YoupiStatus = {
   currency?: string;
   status?: string;
   verificationLevel?: number;
+  metadata?: { paymentId?: unknown } | null;
 };
+
+/**
+ * When the buyer restarts on YOUPI (the 5 minute timer ran out, or they moved to another device),
+ * YOUPI opens a NEW session and renames the order to `<our id>-R1234`, keeping our metadata.
+ * These two helpers map that back to our payment. Only an exact `-R<digits>` suffix is accepted.
+ */
+const RETRY_SUFFIX = /^-R\d{1,6}$/;
+export function youpiOrderMatches(orderId: unknown, id: string) {
+  const o = String(orderId ?? "");
+  return !!id && (o === id || (o.startsWith(id) && RETRY_SUFFIX.test(o.slice(id.length))));
+}
+/** Our payment id from a YOUPI event: metadata.paymentId when present, else the order id minus a retry suffix. */
+export function youpiOurId(orderId: unknown, metadata?: unknown): string {
+  const m = metadata && typeof metadata === "object" ? (metadata as { paymentId?: unknown }).paymentId : undefined;
+  if (typeof m === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(m)) return m;
+  return typeof orderId === "string" ? orderId.replace(/-R\d{1,6}$/, "").slice(0, 64) : "";
+}
 
 export type YoupiVerdict =
   | { state: "paid" }
@@ -67,7 +85,9 @@ export type YoupiVerdict =
 
 /** Decide what a gateway status means for one of our pending payments. */
 export function youpiVerdict(s: YoupiStatus, want: { id: string; amountMinor: number; currency: string }, minVerification: 1 | 2): YoupiVerdict {
-  if (!s || String(s.orderId ?? "") !== want.id) return { state: "mismatch", reason: "the gateway answered for a different order" };
+  if (!s || !youpiOrderMatches(s.orderId, want.id)) return { state: "mismatch", reason: "the gateway answered for a different order" };
+  const tag = s.metadata && typeof s.metadata === "object" ? s.metadata.paymentId : undefined;
+  if (tag !== undefined && tag !== null && String(tag) !== want.id) return { state: "mismatch", reason: "the gateway answered for a different order" };
   const status = String(s.status ?? "").toUpperCase();
   if (status === "FAILED") return { state: "failed", reason: "no matching UPI credit was seen in time" };
   if (status === "EXPIRED") return { state: "failed", reason: "the 5 minute payment window ran out" };
