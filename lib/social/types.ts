@@ -118,6 +118,8 @@ export interface SocialPublisher {
   publish(ctx: PublishContext, uploadRef: string): Promise<RemoteState>;
   getStatus(ctx: PublishContext, ref: string): Promise<RemoteState>;
   delete(account: AccountContext, platformPostId: string): Promise<void>;
+  /** Hide without deleting (YouTube: private) or show again. Optional: only platforms whose API allows it. */
+  setVisibility?(account: AccountContext, platformPostId: string, visible: boolean): Promise<void>;
   /**
    * Duplicate guard. Called before retrying a step whose outcome is unknown (timeout after we asked the
    * platform to publish). Returns the post if it already went live, so we record it instead of posting twice.
@@ -149,6 +151,9 @@ export async function httpFailure(res: Response, what: string): Promise<Publishe
     if (/token|oauth|expired|revoked|unauthori[sz]ed/i.test(body)) return new PublisherError("AUTH_EXPIRED", "Authorization expired", technical, false);
     return new PublisherError("FORBIDDEN", "Not permitted", technical, false);
   }
+  // Meta's Graph API answers 400 for token and permission problems too; its error code says which.
+  if (res.status === 400 && /"code"\s*:\s*(190|102)\b/.test(body)) return new PublisherError("AUTH_EXPIRED", "Authorization expired", technical, false);
+  if (res.status === 400 && /"code"\s*:\s*(10|200|294)\b/.test(body)) return new PublisherError("FORBIDDEN", "Not permitted", technical, false);
   if (res.status === 429) return new PublisherError("RATE_LIMITED", "Rate limited", technical);
   if (res.status >= 500) return new PublisherError("PLATFORM_DOWN", "Platform unavailable", technical);
   if (res.status === 400 || res.status === 413 || res.status === 422)

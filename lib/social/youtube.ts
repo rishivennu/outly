@@ -1,5 +1,5 @@
 import { creds } from "./keys";
-import { commonMediaChecks, httpFailure, type AccountContext, type CommentTarget, type PlatformComment, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
+import { commonMediaChecks, httpFailure, PublisherError, type AccountContext, type CommentTarget, type PlatformComment, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { formPost, newState } from "./oauth";
 
 export interface GoogleTokens { access_token: string; refresh_token?: string; expires_in: number; id_token?: string }
@@ -210,6 +210,25 @@ export class YouTubePublisher implements SocialPublisher {
       headers: { authorization: `Bearer ${account.accessToken}` },
     });
     if (!r.ok && r.status !== 404) throw await httpFailure(r, "youtube delete");
+  }
+
+  /**
+   * Private = only the channel owner sees it; comments, views and the link survive, so it can come back.
+   * videos.update replaces the whole status part, so read it first and change only privacyStatus.
+   */
+  async setVisibility(account: { accessToken: string }, id: string, visible: boolean) {
+    const auth = { authorization: `Bearer ${account.accessToken}` };
+    const g = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=status&id=${encodeURIComponent(id)}`, { headers: auth });
+    if (!g.ok) throw await httpFailure(g, "youtube read status");
+    const cur = ((await g.json()) as { items?: { status?: Record<string, unknown> }[] }).items?.[0]?.status;
+    if (!cur) throw new PublisherError("UNKNOWN", "YouTube can't find this video any more. It may already be deleted.", `youtube video ${id} not found`, false);
+    const { privacyStatus: _old, publishAt: _sched, uploadStatus: _u, failureReason: _f, rejectionReason: _r, madeForKids: _k, ...keep } = cur;
+    const r = await fetch("https://www.googleapis.com/youtube/v3/videos?part=status", {
+      method: "PUT",
+      headers: { ...auth, "content-type": "application/json" },
+      body: JSON.stringify({ id, status: { ...keep, privacyStatus: visible ? "public" : "private" } }),
+    });
+    if (!r.ok) throw await httpFailure(r, "youtube visibility");
   }
 }
 

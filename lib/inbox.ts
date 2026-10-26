@@ -65,7 +65,8 @@ type LoadedTarget = {
 /** Every published destination that still has a connected account behind it. */
 async function publishedTargets(userId: string, platform?: Platform) {
   const rows = await db.postTarget.findMany({
-    where: { post: { userId }, platformStatus: "published", platformPostId: { not: null }, ...(platform ? { platform } : {}) },
+    // A post deleted from the platform has no comments left to read; a hidden (private) YouTube video still does.
+    where: { post: { userId }, platformStatus: "published", platformPostId: { not: null }, OR: [{ removeMode: null }, { removeMode: { not: "deleted" } }], ...(platform ? { platform } : {}) },
     include: { socialAccount: true, post: { select: { id: true, title: true, hook: true } } },
     orderBy: { publishedAt: "desc" },
     take: 60,

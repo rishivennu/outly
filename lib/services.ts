@@ -3,7 +3,7 @@ import type { Media, Post, PostTarget, ReviewRequest, SocialAccount } from "@pri
 import { db } from "./db";
 import { HttpError } from "./http";
 import { storage } from "./storage";
-import { isPlatform, PLATFORMS, STOPPABLE, type Platform } from "./domain";
+import { isPlatform, PLATFORMS, REMOVAL, STOPPABLE, type Platform, type RemoveMode } from "./domain";
 import { enqueue } from "./queue";
 import { spendPost } from "./billing/entitlements";
 import { syncPost } from "./queue/handlers";
@@ -65,6 +65,12 @@ export function targetView(t: PostTarget) {
     errorDetail: t.errorMessage,
     attempts: t.attempts,
     publishedAt: t.publishedAt?.toISOString() ?? null,
+    /** Taken down on the platform through Outlly: deleted, or hidden (YouTube private). */
+    removeMode: (t.removeMode as RemoveMode | null) ?? null,
+    removedAt: t.removedAt?.toISOString() ?? null,
+    /** What the creator can do to the live post from here (Instagram and TikTok: neither, open the app). */
+    canDelete: t.platformStatus === "published" && !!t.platformPostId && t.removeMode !== "deleted" && isPlatform(t.platform) && REMOVAL[t.platform].delete,
+    canHide: t.platformStatus === "published" && !!t.platformPostId && t.removeMode !== "deleted" && isPlatform(t.platform) && REMOVAL[t.platform].hide,
   };
 }
 export type TargetView = ReturnType<typeof targetView>;

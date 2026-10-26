@@ -1,4 +1,4 @@
-import { commonMediaChecks, httpFailure, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
+import { commonMediaChecks, httpFailure, PublisherError, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { formPost, newState } from "./oauth";
 import { creds } from "./keys";
 
@@ -11,7 +11,7 @@ export class ThreadsPublisher implements SocialPublisher {
   async connect(redirectUri: string) {
     const state = newState();
     const u = new URL("https://threads.net/oauth/authorize");
-    u.search = new URLSearchParams({ client_id: creds("threads").clientId, redirect_uri: redirectUri, scope: "threads_basic,threads_content_publish,threads_read_replies,threads_manage_replies", response_type: "code", state }).toString();
+    u.search = new URLSearchParams({ client_id: creds("threads").clientId, redirect_uri: redirectUri, scope: "threads_basic,threads_content_publish,threads_read_replies,threads_manage_replies,threads_delete", response_type: "code", state }).toString();
     return { url: u.toString(), state };
   }
 
@@ -71,5 +71,8 @@ export class ThreadsPublisher implements SocialPublisher {
   async delete(account: { accessToken: string }, id: string) {
     const r = await fetch(`${GRAPH}/${id}?access_token=${account.accessToken}`, { method: "DELETE" });
     if (!r.ok) throw await httpFailure(r, "threads delete");
+    // Graph can answer 200 {"success":false}: a refusal, never record it as gone.
+    if (((await r.json().catch(() => ({}))) as { success?: boolean }).success === false)
+      throw new PublisherError("UNKNOWN", "Threads didn't delete it", "threads delete: 200 success=false", false);
   }
 }

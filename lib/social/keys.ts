@@ -35,3 +35,12 @@ export function creds(p: KeyedPlatform): { clientId: string; clientSecret: strin
 export function __setKeys(k: Partial<PlatformKeys> | undefined) {
   g.__pkeys = k;
 }
+
+/**
+ * Instagram Login has its own app ID (Instagram > API setup with Instagram login). Pasting the Meta App ID
+ * instead makes instagram.com answer "Invalid platform app". When both match, that's what happened.
+ */
+export function instagramIdLooksLikeMetaAppId(): boolean {
+  const ig = creds("instagram").clientId.trim();
+  return !!ig && ig === creds("facebook").clientId.trim();
+}

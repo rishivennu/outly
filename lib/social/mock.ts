@@ -140,6 +140,10 @@ export class MockPublisher implements SocialPublisher {
   async delete() {
     await sleep(300);
   }
+
+  async setVisibility() {
+    await sleep(200);
+  }
 }
 
 /** Practice replies live in memory: a rehearsal must not leave anything behind. */

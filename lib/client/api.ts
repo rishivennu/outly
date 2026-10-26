@@ -1,7 +1,8 @@
 "use client";
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public code?: string) {
+  /** `data` = the whole error body, for routes that send more than a message (e.g. the post's new state). */
+  constructor(public status: number, message: string, public code?: string, public data?: Record<string, unknown>) {
     super(message);
   }
 }
@@ -34,7 +35,7 @@ export async function api<T>(url: string, init?: RequestInit & { json?: unknown 
   }
   if (!res.ok) {
     planLimit(res.status, data);
-    throw new ApiError(res.status, data.error ?? "Something got in the way.", data.code);
+    throw new ApiError(res.status, data.error ?? "Something got in the way.", data.code, data);
   }
   return data as T;
 }

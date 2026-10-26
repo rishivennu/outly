@@ -1,4 +1,4 @@
-import { commonMediaChecks, httpFailure, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
+import { commonMediaChecks, httpFailure, PublisherError, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { newState } from "./oauth";
 import { creds } from "./keys";
 
@@ -13,7 +13,7 @@ export class FacebookPublisher implements SocialPublisher {
   async connect(redirectUri: string) {
     const state = newState();
     const u = new URL(`https://www.facebook.com/${V}/dialog/oauth`);
-    u.search = new URLSearchParams({ client_id: creds("facebook").clientId, redirect_uri: redirectUri, state, response_type: "code", scope: "pages_show_list,pages_read_engagement,pages_manage_posts,publish_video" }).toString();
+    u.search = new URLSearchParams({ client_id: creds("facebook").clientId, redirect_uri: redirectUri, state, response_type: "code", scope: "pages_show_list,pages_read_engagement,pages_manage_posts,publish_video,read_insights" }).toString();
     return { url: u.toString(), state };
   }
 
@@ -82,6 +82,9 @@ export class FacebookPublisher implements SocialPublisher {
   async delete(account: { accessToken: string }, id: string) {
     const r = await fetch(`${GRAPH}/${id}?access_token=${account.accessToken}`, { method: "DELETE" });
     if (!r.ok) throw await httpFailure(r, "facebook delete");
+    // Graph can answer 200 {"success":false}: a refusal, never record it as gone.
+    if (((await r.json().catch(() => ({}))) as { success?: boolean }).success === false)
+      throw new PublisherError("UNKNOWN", "Facebook didn't delete it", "facebook delete: 200 success=false", false);
   }
 }
 

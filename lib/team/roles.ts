@@ -24,6 +24,7 @@ export function memberBlock(role: WorkspaceRole, method: string, path: string): 
   if (role === "editor" && write) {
     if (/^\/api\/posts\/[^/]+\/launch$/.test(path)) return "Editors can't publish. Send a review link, or ask the owner or a manager to launch it.";
     if (/^\/api\/posts\/[^/]+$/.test(path) && method.toUpperCase() === "DELETE") return "Editors can't delete posts.";
+    if (/^\/api\/targets\/[^/]+\/remove$/.test(path)) return "Editors can't take posts down from a platform. Ask the owner or a manager.";
   }
   return null;
 }

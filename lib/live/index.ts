@@ -11,6 +11,8 @@ import { liveAccount } from "./account";
 import { instagramDashboard } from "./instagram";
 import { youtubeDashboard } from "./youtube";
 import { xDashboard } from "./x";
+import { facebookDashboard } from "./facebook";
+import { outllyDashboard } from "./outlly";
 import { suggest } from "./suggest";
 import type { PlatformDashboard, Suggestion } from "./types";
 
@@ -77,8 +79,15 @@ export async function platformDashboard(userId: string, platform: Platform, opts
   if (acct.status === "needs_reconnect") return empty(platform, "needs_reconnect", `${name} asked you to sign in again before it shares more numbers.`, connect);
 
   const load = async (): Promise<PlatformDashboard> => {
+    // Each platform's token only works on its own API. Platforms without a reader get Outlly's own record,
+    // never another platform's endpoint (a Facebook token on X's API answered 401: "connection expired").
+    if (platform === "threads" || platform === "linkedin" || platform === "tiktok") {
+      const base = await outllyDashboard(userId, platform, acct);
+      return { ...base, suggestions: [] };
+    }
     const ctx = await liveAccount(acct);
-    const base = platform === "instagram" ? await instagramDashboard(ctx, tz) : platform === "youtube" ? await youtubeDashboard(ctx) : await xDashboard(ctx);
+    const base =
+      platform === "instagram" ? await instagramDashboard(ctx, tz) : platform === "youtube" ? await youtubeDashboard(ctx) : platform === "facebook" ? await facebookDashboard(ctx) : await xDashboard(ctx);
     // Rule-based coaching only: the Gemini ideas are fetched separately (platformIdeas) so a slow model
     // never holds the numbers back. Throwing here keeps a failure out of every cache.
     return { ...base, suggestions: suggest({ platform, posts: base.posts, series: base.series, hours: base.hours, timezone: tz }) };

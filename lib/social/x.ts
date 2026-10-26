@@ -1,5 +1,5 @@
 import { creds } from "./keys";
-import { commonMediaChecks, httpFailure, type AccountContext, type CommentTarget, type PlatformComment, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
+import { commonMediaChecks, httpFailure, PublisherError, type AccountContext, type CommentTarget, type PlatformComment, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { formPost, newState, pkce } from "./oauth";
 
 // X API v2: OAuth 2.0 PKCE, chunked media upload (initialize → append → finalize → status), then POST /2/tweets.
@@ -184,5 +184,8 @@ export class XPublisher implements SocialPublisher {
   async delete(account: { accessToken: string }, id: string) {
     const r = await fetch(`${API}/tweets/${id}`, { method: "DELETE", headers: { authorization: `Bearer ${account.accessToken}` } });
     if (!r.ok && r.status !== 404) throw await httpFailure(r, "x delete");
+    // X can answer 200 {"data":{"deleted":false}}: that is a refusal, never record it as gone.
+    if (r.ok && (((await r.json().catch(() => ({}))) as { data?: { deleted?: boolean } }).data?.deleted === false))
+      throw new PublisherError("UNKNOWN", "X didn't delete it", "x delete: 200 deleted=false", false);
   }
 }

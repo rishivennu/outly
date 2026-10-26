@@ -149,6 +149,22 @@ export const TARGET_COPY: Record<TargetStatus, string> = {
   failed: "Something got in the way",
 };
 
+/**
+ * Taking a live post down from inside Outlly, per platform API:
+ * delete = the API can delete it; hide = it can also be made private and public again (YouTube only);
+ * app = the API refuses (Instagram, TikTok), so the creator removes it in the platform's own app.
+ */
+export const REMOVAL: Record<Platform, { delete: boolean; hide: boolean }> = {
+  instagram: { delete: false, hide: false },
+  youtube: { delete: true, hide: true },
+  x: { delete: true, hide: false },
+  tiktok: { delete: false, hide: false },
+  threads: { delete: true, hide: false },
+  facebook: { delete: true, hide: false },
+  linkedin: { delete: true, hide: false },
+};
+export type RemoveMode = "deleted" | "hidden";
+
 /** Statuses a creator can still stop: nothing has asked the platform to go public yet. */
 export const STOPPABLE: readonly TargetStatus[] = ["pending", "queued", "uploading"];
 
