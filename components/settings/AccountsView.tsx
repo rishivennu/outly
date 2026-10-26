@@ -42,6 +42,7 @@ const ERRORS: Record<string, (name: string) => string> = {
   state: () => "That sign-in took too long or came from another tab. Let's start it again.",
   exchange: (n) => `${n} signed you in, but we couldn't finish the handshake. Try once more.`,
   no_channel: () => "That Google account doesn't have a YouTube channel yet. Create one on youtube.com (it takes a minute), then connect again.",
+  wrong_app_id: () => "Instagram login isn't set up right on this server yet (it has the Facebook app ID, not the Instagram one). Connect with a token below for now, or ask the admin to fix it in Admin > Social platforms.",
   owner_only: (n) => `Only the workspace owner can connect ${n}. Ask them to connect it, or switch to your own studio.`,
 };
 

@@ -20,13 +20,21 @@ export function PlatformKeysForm({ keys: initial, live: initialLive, base }: { k
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       {PLATFORMS.map((p) => (
-        <PlatformCard key={p} p={p} saved={keys[p]} live={live.includes(p)} base={base} onSaved={(k, l) => { setKeys(k); setLive(l); }} />
+        <PlatformCard
+          key={p}
+          p={p}
+          saved={keys[p]}
+          live={live.includes(p)}
+          base={base}
+          clash={p === "instagram" && !!keys.instagram?.clientId && keys.instagram.clientId === keys.facebook?.clientId}
+          onSaved={(k, l) => { setKeys(k); setLive(l); }}
+        />
       ))}
     </div>
   );
 }
 
-function PlatformCard({ p, saved, live, base, onSaved }: { p: Platform; saved: Keys[Platform]; live: boolean; base: string; onSaved: (k: Keys, l: Platform[]) => void }) {
+function PlatformCard({ p, saved, live, base, clash, onSaved }: { p: Platform; saved: Keys[Platform]; live: boolean; base: string; clash?: boolean; onSaved: (k: Keys, l: Platform[]) => void }) {
   const toast = useToast();
   const meta = PLATFORM_META[p];
   const s = PLATFORM_SETUP[p];
@@ -68,6 +76,11 @@ function PlatformCard({ p, saved, live, base, onSaved }: { p: Platform; saved: K
           <p className="mt-1 text-[13px] leading-snug text-muted-foreground">{s.note}</p>
         </div>
       </div>
+      {clash && (
+        <p role="alert" className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-2.5 text-[13px] leading-snug text-foreground">
+          This is the same ID as Facebook, which is the Meta App ID. Instagram login rejects it with &ldquo;Invalid platform app&rdquo;. Paste the Instagram app ID and secret from Instagram &gt; API setup with Instagram login instead.
+        </p>
+      )}
 
       <div className="mt-5 grid min-w-0 gap-4 [&>*]:min-w-0">
         <div>

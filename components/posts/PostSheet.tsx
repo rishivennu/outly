@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { firstCommentLine } from "@/lib/client/first-comment";
 import Link from "next/link";
-import { CalendarClock, Check, Copy, ExternalLink, Link as LinkIcon, MessageSquareWarning, PenLine, ShieldCheck, Trash2, Wrench } from "lucide-react";
+import { CalendarClock, Check, Copy, Eye, EyeOff, ExternalLink, Link as LinkIcon, MessageSquareWarning, PenLine, ShieldCheck, Trash2, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/shared/Sheet";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -13,7 +13,19 @@ import { fmt, tzShort, useUser } from "@/components/shell/UserContext";
 import { api, ApiError } from "@/lib/client/api";
 import { PLATFORM_META, TARGET_COPY, type TargetStatus } from "@/lib/domain";
 import { targetErrorCopy } from "@/components/shared/errorCopy";
-import type { PostView } from "@/lib/services";
+import type { PostView, TargetView } from "@/lib/services";
+
+/** Live on the platform right now (hidden YouTube videos count: they still exist there). */
+const isLive = (t: TargetView) => t.status === "published" && !!t.platformPostId && t.removeMode !== "deleted";
+
+function targetLine(t: TargetView, scheduled: boolean) {
+  const name = PLATFORM_META[t.platform].name;
+  if (t.status === "published" && t.removeMode === "deleted") return `Deleted from ${name}`;
+  if (t.status === "published" && t.removeMode === "hidden") return `Private on ${name}. Only you can see it`;
+  if (t.status === "published") return "Published";
+  if (t.status === "pending") return scheduled ? "Waiting for its moment" : "Not sent yet";
+  return TARGET_COPY[t.status as TargetStatus];
+}
 
 interface Props {
   post: PostView | null;
@@ -27,13 +39,15 @@ interface Props {
 export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Props) {
   const { timezone: tz } = useUser();
   const toast = useToast();
-  const [view, setView] = useState<"detail" | "reschedule" | "remove">("detail");
+  const [view, setView] = useState<"detail" | "reschedule" | "remove" | "takedown">("detail");
+  const [takedownId, setTakedownId] = useState<string | null>(null);
   const [when, setWhen] = useState<Date>(() => defaultSchedule(tz));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setView("detail");
+    setTakedownId(null);
     setError(null);
     setWhen(post?.scheduledAt ? new Date(post.scheduledAt) : defaultSchedule(tz));
   }, [post?.id, post?.scheduledAt, tz]);
@@ -70,18 +84,46 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
       toast("Made a copy. It's in your drafts.");
     });
 
-  const remove = () =>
+  const remove = (everywhere: boolean) =>
     run(async () => {
-      await api(`/api/posts/${post.id}`, { method: "DELETE" });
+      try {
+        await api(`/api/posts/${post.id}${everywhere ? `?platforms=1${appOnly.length ? "&appOnly=ack" : ""}` : ""}`, { method: "DELETE" });
+      } catch (e) {
+        // Some platforms said yes before one said no: show what changed, keep the post so the rest can be retried.
+        if (e instanceof ApiError && e.data?.post) onChange(e.data.post as PostView);
+        throw e;
+      }
       onRemove(post.id);
-      toast("Removed.", "info");
+      toast(everywhere ? "Deleted from the platforms and your studio." : "Removed from your studio.", "info");
       onClose();
     });
+
+  const takedownTarget = post.targets.find((t) => t.id === takedownId) ?? null;
+  const takeDown = (t: TargetView, action: "delete" | "hide" | "show") =>
+    run(async () => {
+      const r = await api<{ post: PostView }>(`/api/targets/${t.id}/remove`, { method: "POST", json: { action } });
+      onChange(r.post);
+      setView("detail");
+      const name = PLATFORM_META[t.platform].name;
+      toast(action === "delete" ? `Deleted from ${name}.` : action === "hide" ? `Now private on ${name}.` : `Public again on ${name}.`, "info");
+    });
+
+  const live = post.targets.filter(isLive);
+  const deletable = live.filter((t) => t.canDelete);
+  const appOnly = live.filter((t) => !t.canDelete);
 
   const title = post.title ?? post.hook?.split("\n")[0] ?? "Untitled idea";
 
   return (
-    <Sheet open={!!post} onOpenChange={(o) => !o && onClose()} title={view === "reschedule" ? "When should this go live?" : view === "remove" ? "Remove this?" : title} description={view === "reschedule" ? `Times are in ${tzShort(tz)}.` : undefined}>
+    <Sheet open={!!post} onOpenChange={(o) => !o && onClose()} title={
+        view === "reschedule"
+          ? "When should this go live?"
+          : view === "remove"
+            ? "Remove this?"
+            : view === "takedown" && takedownTarget
+              ? `Take it down from ${PLATFORM_META[takedownTarget.platform].name}?`
+              : title
+      } description={view === "reschedule" ? `Times are in ${tzShort(tz)}.` : undefined}>
       {view === "detail" && (
         <div className="space-y-6">
           <div className="flex gap-4">
@@ -114,13 +156,28 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
                         {PLATFORM_META[t.platform].name} <span className="text-muted-foreground">{PLATFORM_META[t.platform].format}</span>
                       </span>
                     </p>
-                    <p className={h ? "text-xs text-destructive" : "truncate text-xs text-muted-foreground"}>{h ? h.title : t.status === "published" ? "Published" : t.status === "pending" ? (post.status === "scheduled" ? "Waiting for its moment" : "Not sent yet") : TARGET_COPY[t.status as TargetStatus]}</p>
+                    <p className={h ? "text-xs text-destructive" : "truncate text-xs text-muted-foreground"}>{h ? h.title : targetLine(t, post.status === "scheduled")}</p>
                     {fc && <p className={fc.tone === "bad" ? "mt-0.5 text-xs text-destructive" : "mt-0.5 text-xs text-muted-foreground"}>{fc.text}</p>}
                   </div>
                   {t.url && (
                     <a href={t.url} target="_blank" rel="noopener noreferrer" aria-label={`Open on ${PLATFORM_META[t.platform].name} (new tab)`} className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground">
                       <ExternalLink className="h-4 w-4" />
                     </a>
+                  )}
+                  {isLive(t) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTakedownId(t.id);
+                        setError(null);
+                        setView("takedown");
+                      }}
+                      aria-label={`Take down from ${PLATFORM_META[t.platform].name}`}
+                      title={`Take down from ${PLATFORM_META[t.platform].name}`}
+                      className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </button>
                   )}
                 </li>
               );
@@ -178,16 +235,50 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
 
       {view === "remove" && (
         <div className="space-y-6">
-          <p className="text-muted-foreground">{post.status === "published" ? "This removes it from your studio. Posts already live on each platform stay up." : "This removes it and all its copy from your studio."}</p>
-          <div className="flex gap-2">
+          {live.length === 0 ? (
+            <p className="text-muted-foreground">This removes it and all its copy from your studio.</p>
+          ) : (
+            <>
+              <p className="text-muted-foreground">
+                It&rsquo;s live on {live.map((t) => PLATFORM_META[t.platform].name).join(", ")}. Choose whether it comes down there too.
+              </p>
+              {appOnly.length > 0 && (
+                <div className="rounded-2xl bg-secondary/50 p-3 text-sm">
+                  <p className="text-muted-foreground">
+                    {appOnly.map((t) => PLATFORM_META[t.platform].name).join(" and ")} {appOnly.length === 1 ? "doesn't" : "don't"} let apps delete posts. Open {appOnly.length === 1 ? "it" : "each one"} and delete it in the app first. The link goes away once it&rsquo;s out of your studio.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {appOnly.map((t) =>
+                      t.url ? (
+                        <a key={t.id} href={t.url} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center gap-1.5 rounded-full px-3 font-medium hairline hover:bg-secondary">
+                          Open on {PLATFORM_META[t.platform].name} <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span className="sr-only">(new tab)</span>
+                        </a>
+                      ) : null,
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          <div className="grid gap-2">
+            {deletable.length > 0 && (
+              <Button variant="danger" onClick={() => remove(true)} disabled={busy}>
+                <Trash2 className="h-4 w-4" /> {busy ? "Deleting…" : `Delete from ${deletable.map((t) => PLATFORM_META[t.platform].name).join(", ")} and my studio`}
+              </Button>
+            )}
+            <Button variant={deletable.length > 0 ? "subtle" : "danger"} onClick={() => remove(false)} disabled={busy}>
+              {busy ? "Removing…" : live.length > 0 ? "Remove from my studio only (stays live)" : "Yes, remove it"}
+            </Button>
             <Button variant="ghost" onClick={() => setView("detail")}>
               Keep it
             </Button>
-            <Button variant="danger" className="flex-1" onClick={remove} disabled={busy}>
-              <Trash2 className="h-4 w-4" /> {busy ? "Removing…" : "Yes, remove it"}
-            </Button>
           </div>
         </div>
+      )}
+
+      {view === "takedown" && takedownTarget && (
+        <TakedownView t={takedownTarget} busy={busy} onAction={(a) => takeDown(takedownTarget, a)} onBack={() => setView("detail")} />
       )}
 
       {error && (
@@ -196,6 +287,64 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
         </p>
       )}
     </Sheet>
+  );
+}
+
+/** One platform's live copy: delete it there, or on YouTube make it private (and public again). */
+function TakedownView({ t, busy, onAction, onBack }: { t: TargetView; busy: boolean; onAction: (a: "delete" | "hide" | "show") => void; onBack: () => void }) {
+  const m = PLATFORM_META[t.platform];
+  if (!t.canDelete && !t.canHide)
+    return (
+      <div className="space-y-6">
+        <p className="text-muted-foreground">
+          {m.name} doesn&rsquo;t let apps delete or hide posts, so this one has to come down in the {m.name} app: open the {m.format}, tap the three dots, then Delete. It stays listed here until you remove it from your studio.
+        </p>
+        <div className="grid gap-2">
+          {t.url && (
+            <Button asChild variant="primary">
+              <a href={t.url} target="_blank" rel="noopener noreferrer">
+                Open on {m.name} <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">(new tab)</span>
+              </a>
+            </Button>
+          )}
+          <Button variant="ghost" onClick={onBack}>
+            Back
+          </Button>
+        </div>
+      </div>
+    );
+  const hidden = t.removeMode === "hidden";
+  return (
+    <div className="space-y-6">
+      <p className="text-muted-foreground">
+        {hidden
+          ? `It's private on ${m.name} right now: only you can see it. Make it public again, or delete it for good.`
+          : `Deleting removes the ${m.format} from ${m.name} for good, with its views and comments. It stays in your studio, marked deleted, so you can post it again.`}
+        {!hidden && t.canHide && ` Not sure? Make it private instead: nobody else sees it, and you can bring it back any time.`}
+      </p>
+      <div className="grid gap-2">
+        {hidden ? (
+          <Button variant="primary" onClick={() => onAction("show")} disabled={busy}>
+            <Eye className="h-4 w-4" aria-hidden="true" /> {busy ? "Working…" : "Make it public again"}
+          </Button>
+        ) : (
+          t.canHide && (
+            <Button variant="subtle" onClick={() => onAction("hide")} disabled={busy}>
+              <EyeOff className="h-4 w-4" aria-hidden="true" /> {busy ? "Working…" : "Make it private"}
+            </Button>
+          )
+        )}
+        {t.canDelete && (
+          <Button variant="danger" onClick={() => onAction("delete")} disabled={busy}>
+            <Trash2 className="h-4 w-4" aria-hidden="true" /> {busy ? "Deleting…" : `Delete from ${m.name}`}
+          </Button>
+        )}
+        <Button variant="ghost" onClick={onBack}>
+          Keep it
+        </Button>
+      </div>
+    </div>
   );
 }
 
