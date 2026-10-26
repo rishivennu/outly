@@ -93,14 +93,14 @@ async function toEnglish(q: string) {
  * A help question picked from the chat (a Related chip or the in-chat question list): answer that exact
  * FAQ entry inside the chat, no guessing. Other languages get it translated, with the English text as fallback.
  */
-export async function answerFaq(id: string, lang: Lang = "en"): Promise<BotReply | null> {
+export async function answerFaq(id: string, lang: Lang = "en", allowAi = true): Promise<BotReply | null> {
   const faq = await listFaq();
   const f = faq.find((x) => x.id === id);
   if (!f) return null;
   // Same contract as answer(): sources[0] is the entry answered, the rest are related questions.
   const others = [f, ...faq.filter((x) => x.id !== f.id && x.category === f.category).slice(0, 3)].map((x) => ({ id: x.id, question: x.question }));
   const use: Lang = COPY[lang] ? lang : "en";
-  if (use !== "en") {
+  if (use !== "en" && allowAi) {
     const ai = await gemini<{ answer: string }>(
       `Translate this support answer from Outlly's help centre into ${COPY[use].name}. Keep product names, **bold** and [link](url) markup exactly. Return JSON {"answer": string}.`,
       f.answer,
@@ -153,7 +153,12 @@ async function aiAnswer(q: string, history: { role: "user" | "bot"; text: string
 }
 
 /** FAQ retrieval (keyword + synonyms, BM25-ish), phrased by Gemini when a key is set. */
-export type ChatCtx = { signedIn?: boolean; page?: string };
+export type ChatCtx = {
+  signedIn?: boolean;
+  page?: string;
+  /** false = answer from the help centre only, no model call (a signed-out visitor over the free budget). */
+  ai?: boolean;
+};
 
 export async function answer(question: string, history: { role: "user" | "bot"; text: string }[] = [], lang: Lang = "en", ctx: ChatCtx = {}): Promise<BotReply> {
   const q = question.trim().slice(0, 800);
@@ -166,12 +171,13 @@ export async function answer(question: string, history: { role: "user" | "bot"; 
   // AI first (10-16): Gemini reads the WHOLE help centre plus the product brief and the chat so far, so
   // everyday wording, typos, follow-ups ("and on YouTube?") and any language get a real answer.
   // The keyword matcher below is the fallback when no key is set or Gemini is down.
-  if (env.GEMINI_API_KEY) {
+  const useAi = ctx.ai !== false && !!env.GEMINI_API_KEY;
+  if (useAi) {
     const ai = await aiAnswer(q, history, L.name, use, ctx);
     if (ai) return ai;
   }
   let r = await rank(q);
-  if ((!r.best || !r.confident) && (use !== "en" || /[^\x00-\x7f]/.test(q))) {
+  if (useAi && (!r.best || !r.confident) && (use !== "en" || /[^\x00-\x7f]/.test(q))) {
     const en = await toEnglish(q);
     if (en) r = await rank(en);
   }
@@ -181,7 +187,7 @@ export async function answer(question: string, history: { role: "user" | "bot"; 
   }
 
   // Gemini rewrites the matched answers into a direct reply. It may ONLY use the provided FAQ text.
-  const ai = await gemini<{ answer: string; answered: boolean }>(
+  const ai = !useAi ? null : await gemini<{ answer: string; answered: boolean }>(
     `You are Pip, Outlly's friendly support assistant. Answer ONLY from the FAQ entries given. If they don't answer the question, set answered=false. Keep it under 90 words, plain and warm, no markdown headings. Reply in ${L.name}. Return JSON {"answer": string, "answered": boolean}.`,
     `Recent chat:\n${history.slice(-4).map((h) => `${h.role}: ${h.text}`).join("\n")}\n\nQuestion: ${q}\n\nFAQ:\n${top.map((t) => `Q: ${t.f.question}\nA: ${t.f.answer}`).join("\n\n")}`,
   ).catch(() => null);

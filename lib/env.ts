@@ -68,6 +68,9 @@ const schema = z.object({
   /** AI calls one creator may make per UTC day (app/api/ai/*), and separately in support chat. */
   AI_DAILY_LIMIT: z.coerce.number().int().min(0).default(60),
   AI_SUPPORT_DAILY_LIMIT: z.coerce.number().int().min(0).default(40),
+  /** Help-chat model calls for signed-out visitors: per IP per day, and for all visitors together per day. 0 = no AI for visitors. */
+  AI_SUPPORT_ANON_PER_IP: z.coerce.number().int().min(0).default(15),
+  AI_SUPPORT_ANON_DAILY: z.coerce.number().int().min(0).default(300),
 });
 
 export const env = schema.parse(process.env);

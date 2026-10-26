@@ -95,11 +95,39 @@ export async function startCheckout(userId: string, planSlug: string, wanted?: C
   return { ...start, paymentId: payment.id };
 }
 
+/**
+ * Paid time left on the plan being replaced, converted into time on the new one (1027: an upgrade used to
+ * start a fresh period and throw the rest away). Same currency only, never more than the time actually left
+ * (a downgrade keeps its days, it doesn't multiply them), nothing for free or sample periods.
+ */
+export function carryOverMs(
+  old: { priceMinor: number; currency: string; interval: string; currentPeriodEnd: Date; sample: boolean } | null,
+  next: { priceMinor: number; currency: string; interval: string; sample: boolean },
+  now: Date,
+) {
+  if (!old || old.sample !== next.sample || old.currency !== next.currency || old.priceMinor <= 0 || next.priceMinor <= 0) return 0;
+  const left = old.currentPeriodEnd.getTime() - now.getTime();
+  if (left <= 0) return 0;
+  const span = (interval: string) => (interval === "year" ? addYears(now, 1) : addMonths(now, 1)).getTime() - now.getTime();
+  const oldRate = old.priceMinor / span(old.interval);
+  const newRate = next.priceMinor / span(next.interval);
+  return Math.floor(left * Math.min(1, oldRate / newRate));
+}
+
+/** Invoice for a paid payment. A failure is logged, never thrown: the money is in, the plan must be on. */
+async function invoiceFor(p: { id: string; sample: boolean }) {
+  return issueInvoice(p.id, { email: !p.sample }).catch((e) => {
+    console.error("[billing] invoice failed for payment", p.id, e);
+    return null;
+  });
+}
+
 /** Idempotent. Safe to call from the return URL, the client callback and the webhook for the same payment. */
 export async function completePayment(paymentId: string, providerRef?: string) {
   const p = await db.payment.findUnique({ where: { id: paymentId } });
   if (!p) throw new HttpError(404, "Payment not found", "NOT_FOUND");
-  if (p.status === "succeeded") return { payment: p, invoice: await db.invoice.findUnique({ where: { paymentId } }) };
+  // Already paid. If its invoice failed last time, this repeat (webhook retry, return URL) issues it now.
+  if (p.status === "succeeded") return { payment: p, invoice: (await db.invoice.findUnique({ where: { paymentId } })) ?? (p.subscriptionId ? await invoiceFor(p) : null) };
   if (!p.planId) throw new Error("Payment has no plan");
   const plan = await db.plan.findUniqueOrThrow({ where: { id: p.planId } });
   const now = new Date();
@@ -108,6 +136,9 @@ export async function completePayment(paymentId: string, providerRef?: string) {
     // flip pending -> succeeded only once (a racing webhook sees count 0 and stops)
     const flipped = await tx.payment.updateMany({ where: { id: p.id, status: { in: ["pending", "failed"] } }, data: { status: "succeeded", failureReason: null, ...(providerRef ? { providerRef } : {}) } });
     if (flipped.count === 0) return null;
+    const interval = p.interval === "year" || plan.interval === "year" ? "year" : "month";
+    const previous = await tx.subscription.findFirst({ where: { userId: p.userId, status: "active", currentPeriodEnd: { gt: now } }, orderBy: { currentPeriodEnd: "desc" } });
+    const carry = carryOverMs(previous, { priceMinor: p.amountMinor, currency: p.currency, interval, sample: p.sample }, now);
     await tx.subscription.updateMany({ where: { userId: p.userId, status: { in: ["active", "past_due"] } }, data: { status: "canceled", canceledAt: now } });
     const s = await tx.subscription.create({
       data: {
@@ -116,9 +147,9 @@ export async function completePayment(paymentId: string, providerRef?: string) {
         status: "active",
         priceMinor: p.amountMinor,
         currency: p.currency,
-        interval: p.interval === "year" || plan.interval === "year" ? "year" : "month",
+        interval,
         provider: p.provider,
-        currentPeriodEnd: p.interval === "year" || plan.interval === "year" ? addYears(now, 1) : addMonths(now, 1),
+        currentPeriodEnd: new Date((interval === "year" ? addYears(now, 1) : addMonths(now, 1)).getTime() + carry),
         sample: p.sample,
       },
     });
@@ -127,7 +158,7 @@ export async function completePayment(paymentId: string, providerRef?: string) {
   });
   const fresh = await db.payment.findUniqueOrThrow({ where: { id: p.id } });
   if (!sub) return { payment: fresh, invoice: await db.invoice.findUnique({ where: { paymentId } }) };
-  const invoice = await issueInvoice(p.id, { email: !p.sample });
+  const invoice = await invoiceFor(p);
   if (!p.sample) {
     const u = await db.user.findUnique({ where: { id: p.userId }, select: { name: true } });
     await adminEvent("subscription_new", `${u?.name ?? "A user"} subscribed to ${plan.name}`, formatMoney(p.amountMinor, p.currency), "/admin/payments");

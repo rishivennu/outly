@@ -17,15 +17,20 @@ const SEED = [
     features: ["Everything in Creator", "Multiple workspaces", "Shared media library", "Review links before publish", "Team roles"] },
 ];
 
+const FREE_MIGRATION_KEY = "migrate:free-limits-1026";
+
 export async function ensurePlans() {
   if ((await db.plan.count()) > 0) return migrateFreeLimits();
   // upsert so two processes seeding at once can't collide on the unique slug
   for (const p of SEED) await db.plan.upsert({ where: { slug: p.slug }, update: {}, create: { ...p, currency: "INR", interval: "month", features: JSON.stringify(p.features) } }).catch(() => {});
+  // A fresh database is seeded with the current limits already, so the one-time migration is marked done here.
+  // Otherwise the first ensurePlans() after seeding ran it and overwrote any Free limits an admin had set (1027).
+  await db.setting.create({ data: { key: FREE_MIGRATION_KEY, value: new Date().toISOString() } }).catch(() => {});
 }
 
 /** One-time: existing databases get the 2026-10 Free limits. Admin can change them afterwards in Pricing. */
 async function migrateFreeLimits() {
-  const key = "migrate:free-limits-1026";
+  const key = FREE_MIGRATION_KEY;
   if (await db.setting.findUnique({ where: { key }, select: { key: true } })) return;
   const won = await db.setting.create({ data: { key, value: new Date().toISOString() } }).then(() => true, () => false);
   if (!won) return;

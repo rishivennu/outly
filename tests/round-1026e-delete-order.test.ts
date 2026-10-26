@@ -70,12 +70,27 @@ describe("delete writes its intent before calling the platform", () => {
 });
 
 describe("env fallback covers every platform", () => {
-  test("each keyed platform has CLIENT_ID / CLIENT_SECRET env vars", async () => {
+  // 1027: the old version only checked the property existed on the parsed env, which zod's .default("")
+  // guarantees, so it could never fail. This checks creds() actually reads it.
+  test("each keyed platform falls back to its env keys, and admin-saved keys win field by field", async () => {
     const { env } = await import("../lib/env");
     const { KEYED_PLATFORMS } = await import("../lib/settings");
+    const e = env as unknown as Record<string, string>;
     for (const p of KEYED_PLATFORMS) {
-      expect(`${p.toUpperCase()}_CLIENT_ID` in env).toBe(true);
-      expect(`${p.toUpperCase()}_CLIENT_SECRET` in env).toBe(true);
+      const id = `${p.toUpperCase()}_CLIENT_ID`;
+      const secret = `${p.toUpperCase()}_CLIENT_SECRET`;
+      const before = [e[id], e[secret]];
+      try {
+        e[id] = `env-id-${p}`;
+        e[secret] = `env-secret-${p}`;
+        keys.__setKeys({} as never);
+        expect(keys.creds(p)).toEqual({ clientId: `env-id-${p}`, clientSecret: `env-secret-${p}` });
+        keys.__setKeys({ [p]: { clientId: `db-id-${p}`, clientSecret: "" } } as never);
+        expect(keys.creds(p)).toEqual({ clientId: `db-id-${p}`, clientSecret: `env-secret-${p}` });
+      } finally {
+        [e[id], e[secret]] = before;
+        keys.__setKeys(undefined);
+      }
     }
   });
 });

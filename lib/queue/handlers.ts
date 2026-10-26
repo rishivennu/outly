@@ -1,7 +1,7 @@
 import { loadKeys } from "../social/keys";
 import "server-only";
 import { db } from "../db";
-import { decrypt, encrypt } from "../crypto";
+import { accountContext, freshAccount } from "../live/account";
 import { env } from "../env";
 import { derivePostStatus, isPlatform, type Platform, type TargetStatus } from "../domain";
 import { storage } from "../storage";
@@ -14,9 +14,25 @@ import type { JobName, JobPayloads } from "./jobs";
 
 const MAX_AUTO_RETRIES = 3;
 const MAX_STATUS_POLLS = 60;
+/** "uploading" with no progress this long means the job died mid-transfer (function timeout, recycled instance). */
+export const STUCK_UPLOAD_MS = 15 * 60_000;
+/** "processing" with no poll this long means the status loop was lost. Live polls touch the row every <=30 s. */
+export const STUCK_PROCESSING_MS = 10 * 60_000;
+/** Still not live this long after we asked the platform to publish: stop waiting, let the creator retry. */
+export const PROCESSING_GIVE_UP_MS = 3 * 3600_000;
+/** Upload restarts by the sweeper (on top of the automatic retries) before the target is failed. */
+const MAX_UPLOAD_RESTARTS = 3;
+/** While bytes are moving, touch updatedAt this often so the sweeper never restarts a live upload (1027 review). */
+const UPLOAD_HEARTBEAT_MS = 60_000;
+/** The sweeper refreshes tokens that expire within this window (was 24 h, so 1-hour YouTube tokens refreshed every minute). */
+export const REFRESH_WINDOW_MS = 30 * 60_000;
 
-export async function runJob<N extends JobName>(name: N, data: JobPayloads[N]) {
+export async function runJob<N extends JobName>(name: N, data: JobPayloads[N]): Promise<void> {
   await loadKeys();
+  await dispatch(name, data);
+}
+
+async function dispatch<N extends JobName>(name: N, data: JobPayloads[N]) {
   switch (name) {
     case "VIDEO_PROCESS":
       return videoProcess(data as JobPayloads["VIDEO_PROCESS"]);
@@ -95,24 +111,12 @@ async function loadContext(targetId: string, simulate: SimulationMode | undefine
   const practice = isPracticeAccount(acct);
   if (t.practice !== practice) await db.postTarget.update({ where: { id: t.id }, data: { practice } });
 
-  let accessToken = decrypt(acct.accessToken);
-  const refreshToken = acct.refreshToken ? decrypt(acct.refreshToken) : null;
-  if (acct.tokenExpiresAt && acct.tokenExpiresAt.getTime() - Date.now() < 5 * 60_000) {
-    const fresh = await publisher.refreshToken({ id: acct.id, platformUserId: acct.platformUserId, username: acct.username, accessToken, refreshToken });
-    accessToken = fresh.accessToken;
-    await db.socialAccount.update({
-      where: { id: acct.id },
-      data: {
-        accessToken: encrypt(fresh.accessToken),
-        ...(fresh.refreshToken ? { refreshToken: encrypt(fresh.refreshToken) } : {}),
-        tokenExpiresAt: fresh.expiresAt ?? null,
-      },
-    });
-  }
+  // Single-flight, race-safe refresh; a refused refresh throws AUTH_EXPIRED (and marks the account).
+  const account = accountContext(await freshAccount(acct));
 
   const media = t.post.media;
   const ctx: PublishContext = {
-    account: { id: acct.id, platformUserId: acct.platformUserId, username: acct.username, accessToken, refreshToken, tokenExpiresAt: acct.tokenExpiresAt },
+    account,
     media: {
       id: media.id,
       mimeType: media.mimeType,
@@ -143,12 +147,24 @@ async function loadContext(targetId: string, simulate: SimulationMode | undefine
   return { t, ctx, publisher, platform: t.platform as Platform };
 }
 
-async function setTarget(id: string, postId: string, status: TargetStatus, extra: Record<string, unknown> = {}) {
-  const t = await db.postTarget.update({ where: { id }, data: { platformStatus: status, ...extra } });
+/**
+ * Settle a target. Conditional (1027): a confirmed "published" is never overwritten (a late or duplicate
+ * job's failure used to turn a live post into "failed"), and a failure never lands on top of a Stop.
+ * Returns false when nothing changed.
+ */
+export async function setTarget(id: string, postId: string, status: TargetStatus, extra: Record<string, unknown> = {}) {
+  const r = await db.postTarget.updateMany({
+    where: { id, platformStatus: { not: "published" }, ...(status === "failed" ? { NOT: { platformStatus: "failed", errorCode: "CANCELED" } } : {}) },
+    data: { platformStatus: status, ...extra },
+  });
+  if (!r.count) return false;
+  const t = await db.postTarget.findUnique({ where: { id } });
   await syncPost(postId);
+  if (!t) return true;
   // Live with a first comment waiting: post it a few seconds later (a brand-new video can refuse comments for a moment).
   if (status === "published" && t.firstComment?.trim() && !t.firstCommentId && isPlatform(t.platform))
     await enqueue("FIRST_COMMENT", { targetId: id, platform: t.platform }, { delayMs: 5000, jobId: `fc-${id}` });
+  return true;
 }
 
 const FIRST_COMMENT_TRIES = 4;
@@ -166,13 +182,7 @@ export async function firstComment({ targetId, platform, attempt = 0 }: JobPaylo
   try {
     const publisher = publisherForAccount(platform, acct);
     if (!publisher.postComment) return void (await fail("This platform doesn't let apps add comments."));
-    let accessToken = decrypt(acct.accessToken);
-    if (acct.tokenExpiresAt && acct.tokenExpiresAt.getTime() - Date.now() < 5 * 60_000) {
-      const fresh = await publisher.refreshToken({ id: acct.id, platformUserId: acct.platformUserId, username: acct.username, accessToken, refreshToken: acct.refreshToken ? decrypt(acct.refreshToken) : null });
-      accessToken = fresh.accessToken;
-      await db.socialAccount.update({ where: { id: acct.id }, data: { accessToken: encrypt(fresh.accessToken), ...(fresh.refreshToken ? { refreshToken: encrypt(fresh.refreshToken) } : {}), tokenExpiresAt: fresh.expiresAt ?? null } });
-    }
-    const account = { id: acct.id, platformUserId: acct.platformUserId, username: acct.username, accessToken };
+    const account = accountContext(await freshAccount(acct));
     const { id } = await publisher.postComment(account, t.platformPostId, t.firstComment.trim());
     // Conditional, so a duplicate job that raced this one can't post twice and overwrite the id.
     await db.postTarget.updateMany({ where: { id: t.id, firstCommentId: null }, data: { firstCommentId: id, firstCommentError: null } });
@@ -219,10 +229,8 @@ async function advance(targetId: string, postId: string, status: TargetStatus, e
 async function failTarget(targetId: string, postId: string, err: unknown) {
   if (await canceled(targetId)) return; // a stop is the creator's call; a late error must not overwrite it
   const pe = asPublisherError(err);
-  await setTarget(targetId, postId, "failed", {
-    errorCode: pe.code,
-    errorMessage: pe.technical ?? pe.message,
-  });
+  // Already live (or stopped meanwhile): a late error changes nothing, and nobody gets a failure notice.
+  if (!(await setTarget(targetId, postId, "failed", { errorCode: pe.code, errorMessage: pe.technical ?? pe.message }))) return;
   if (pe.code === "AUTH_EXPIRED") {
     const t = await db.postTarget.findUnique({ where: { id: targetId }, select: { socialAccountId: true } });
     if (t?.socialAccountId) await db.socialAccount.update({ where: { id: t.socialAccountId }, data: { status: "needs_reconnect" } });
@@ -244,12 +252,30 @@ async function handleFailure(name: "SOCIAL_UPLOAD" | "SOCIAL_PUBLISH", data: Job
   await failTarget(targetId, postId, err);
 }
 
-async function socialUpload(data: JobPayloads["SOCIAL_UPLOAD"]) {
-  const loaded = await loadContext(data.targetId, data.simulate).catch(async (e) => {
-    const t = await db.postTarget.findUnique({ where: { id: data.targetId } });
-    if (t) await failTarget(t.id, t.postId, e);
+/**
+ * loadContext for every social job (1027: publish and status checks used to call it bare, so a DB hiccup or a
+ * refused token refresh threw out of the job and left the target "processing" for good). A transient problem
+ * is retried the way the job would retry itself; anything else fails the target so the creator can act.
+ */
+async function load(name: "SOCIAL_UPLOAD" | "SOCIAL_PUBLISH" | "SOCIAL_STATUS_CHECK", data: JobPayloads["SOCIAL_UPLOAD"] & { poll?: number }) {
+  try {
+    return await loadContext(data.targetId, data.simulate);
+  } catch (e) {
+    // A PublisherError says what it is (AUTH_EXPIRED, a config problem...). Anything else here is our own
+    // plumbing (Prisma pool timeout, DB unreachable): treat it as transient; handleFailure still caps retries.
+    const pe = e instanceof PublisherError ? e : new PublisherError("NETWORK", "Connection problem", asPublisherError(e).technical ?? String(e));
+    const t = await db.postTarget.findUnique({ where: { id: data.targetId } }).catch(() => null);
+    if (!t) return null;
+    const poll = data.poll ?? 0;
+    if (pe.retryable && name === "SOCIAL_STATUS_CHECK" && poll < MAX_STATUS_POLLS) await enqueue("SOCIAL_STATUS_CHECK", { ...data, poll: poll + 1 }, { delayMs: 5000 });
+    else if (pe.retryable && name !== "SOCIAL_STATUS_CHECK") await handleFailure(name, data, t.id, t.postId, t.attempts, pe);
+    else await failTarget(t.id, t.postId, pe);
     return null;
-  });
+  }
+}
+
+async function socialUpload(data: JobPayloads["SOCIAL_UPLOAD"]) {
+  const loaded = await load("SOCIAL_UPLOAD", data);
   if (!loaded) return;
   const { t, ctx, publisher } = loaded;
   if (t.platformStatus === "published" || (t.platformStatus === "failed" && t.errorCode === "CANCELED")) return;
@@ -259,6 +285,12 @@ async function socialUpload(data: JobPayloads["SOCIAL_UPLOAD"]) {
   if (issues.length) return failTarget(t.id, t.postId, new PublisherError("MEDIA_REJECTED", issues[0].message, issues.map((i) => i.message).join("\n"), false));
 
   if (!(await advance(t.id, t.postId, "uploading", { errorCode: null, errorMessage: null }))) return;
+  // A long, non-resumable upload never checkpoints, so without this it would look stuck after 15 min and the
+  // sweeper would start a second one beside it (two uploads, two publishes). A dead process stops beating.
+  const beat = setInterval(() => {
+    void db.postTarget.updateMany({ where: { id: t.id, platformStatus: "uploading" }, data: { updatedAt: new Date() } }).catch(() => {});
+  }, UPLOAD_HEARTBEAT_MS);
+  (beat as { unref?: () => void }).unref?.();
   try {
     const ref = await publisher.upload(ctx);
     await db.postTarget.update({ where: { id: t.id }, data: { uploadRef: ref } });
@@ -267,6 +299,8 @@ async function socialUpload(data: JobPayloads["SOCIAL_UPLOAD"]) {
     await enqueue("SOCIAL_PUBLISH", data);
   } catch (e) {
     await handleFailure("SOCIAL_UPLOAD", data, t.id, t.postId, t.attempts, e);
+  } finally {
+    clearInterval(beat);
   }
 }
 
@@ -282,7 +316,7 @@ async function applyRemote(targetId: string, postId: string, r: RemoteState, dat
 }
 
 async function socialPublish(data: JobPayloads["SOCIAL_PUBLISH"]) {
-  const loaded = await loadContext(data.targetId, data.simulate);
+  const loaded = await load("SOCIAL_PUBLISH", data);
   if (!loaded) return;
   const { t, ctx, publisher } = loaded;
   if (t.platformStatus === "failed" && t.errorCode === "CANCELED") return;
@@ -322,7 +356,7 @@ async function reconciled(
 }
 
 async function socialStatus(data: JobPayloads["SOCIAL_STATUS_CHECK"]) {
-  const loaded = await loadContext(data.targetId, data.simulate);
+  const loaded = await load("SOCIAL_STATUS_CHECK", data);
   if (!loaded) return;
   const { t, ctx, publisher } = loaded;
   if (!t.uploadRef || t.platformStatus === "published") return;
@@ -365,57 +399,89 @@ async function scheduledPost({ postId }: { postId: string }) {
 }
 
 /** Safety net for scheduled posts (survives restarts, lost timers, and missed delayed jobs). */
-export async function sweepDuePosts() {
-  const due = await db.post.findMany({ where: { status: "scheduled", scheduledAt: { lte: new Date() } }, select: { id: true }, take: 50 });
+export async function sweepDuePosts(now = Date.now()) {
+  const due = await db.post.findMany({ where: { status: "scheduled", scheduledAt: { lte: new Date(now) } }, select: { id: true }, take: 50 });
   for (const p of due) await enqueue("SCHEDULED_POST", { postId: p.id }, { jobId: `sched-${p.id}` });
   const expiring = await db.socialAccount.findMany({
-    where: { status: "connected", tokenExpiresAt: { lte: new Date(Date.now() + 24 * 3600_000) } },
+    where: { status: "connected", tokenExpiresAt: { lte: new Date(now + REFRESH_WINDOW_MS) } },
     select: { id: true },
     take: 50,
   });
-  for (const a of expiring) await enqueue("TOKEN_REFRESH", { accountId: a.id }, { jobId: `refresh-${a.id}` });
+  // Bucketed per 10 minutes: one refresh attempt per window however often the sweep runs, and (with Redis,
+  // which remembers finished job ids) a fixed id would have blocked every refresh after the first.
+  const bucket = Math.floor(now / (10 * 60_000));
+  for (const a of expiring) await enqueue("TOKEN_REFRESH", { accountId: a.id }, { jobId: `refresh-${a.id}-${bucket}` });
 }
 
 /**
- * A target left in "queued" means its SOCIAL_UPLOAD job never ran: a lost timer, a recycled serverless
- * instance, or Redis dropping the job. Hand it to the queue again. The job id is bucketed by minute, so
- * several instances sweeping at once produce one retry, and socialUpload() already refuses to upload twice.
+ * Hand lost work back to the queue. On a serverless host without Redis a job is a timer inside one function
+ * invocation; if that invocation ends early the target sits where it was. Three places it can sit:
+ *  - "queued": the SOCIAL_UPLOAD job never ran. Requeue it (socialUpload refuses to upload twice).
+ *  - "uploading": the job died mid-transfer. Restart it (a resumable session ref is kept and reused); after
+ *    MAX_UPLOAD_RESTARTS restarts the target fails, so it can't loop forever.
+ *  - "processing": the publish or status loop was lost. Before the publish call (no publishRequestedAt) the
+ *    publish is re-run; after it, only the status is checked (never a second publish); after
+ *    PROCESSING_GIVE_UP_MS it fails with "processing timed out" and the creator can retry.
+ * Stop only works up to "uploading" and Retry only from "failed", so before this a stuck target said
+ * "Sending..." forever. Each claim is a conditional update on updatedAt, so several sweepers running at once
+ * act once, and job ids are bucketed by minute.
  */
 export async function requeueStuckTargets(olderThanMs = 120_000, now = Date.now()) {
-  const stuck = await db.postTarget.findMany({
+  const minute = Math.floor(now / 60_000);
+  let requeued = 0;
+  const queued = await db.postTarget.findMany({
     where: { platformStatus: "queued", updatedAt: { lte: new Date(now - olderThanMs) } },
     select: { id: true, platform: true },
     take: 50,
   });
-  let requeued = 0;
-  for (const t of stuck) {
+  for (const t of queued) {
     if (!isPlatform(t.platform)) continue;
-    await enqueue("SOCIAL_UPLOAD", { targetId: t.id, platform: t.platform, simulate: "realistic" }, { jobId: `requeue-${t.id}-${Math.floor(now / 60_000)}` });
+    await enqueue("SOCIAL_UPLOAD", { targetId: t.id, platform: t.platform, simulate: "realistic" }, { jobId: `requeue-${t.id}-${minute}` });
+    requeued++;
+  }
+
+  const uploading = await db.postTarget.findMany({
+    where: { platformStatus: "uploading", updatedAt: { lte: new Date(now - STUCK_UPLOAD_MS) } },
+    select: { id: true, postId: true, platform: true, attempts: true, updatedAt: true },
+    take: 50,
+  });
+  for (const t of uploading) {
+    if (!isPlatform(t.platform)) continue;
+    const won = await db.postTarget.updateMany({ where: { id: t.id, platformStatus: "uploading", updatedAt: t.updatedAt }, data: { attempts: { increment: 1 }, updatedAt: new Date(now) } });
+    if (!won.count) continue;
+    if (t.attempts + 1 > MAX_AUTO_RETRIES + MAX_UPLOAD_RESTARTS) {
+      await failTarget(t.id, t.postId, new PublisherError("PLATFORM_DOWN", "Upload kept stopping", `The upload to ${t.platform} stopped ${t.attempts + 1} times before finishing.`, false));
+      continue;
+    }
+    await enqueue("SOCIAL_UPLOAD", { targetId: t.id, platform: t.platform, simulate: "realistic" }, { jobId: `requeue-up-${t.id}-${minute}` });
+    requeued++;
+  }
+
+  const processing = await db.postTarget.findMany({
+    where: { platformStatus: "processing", updatedAt: { lte: new Date(now - STUCK_PROCESSING_MS) } },
+    select: { id: true, postId: true, platform: true, updatedAt: true, publishRequestedAt: true },
+    take: 50,
+  });
+  for (const t of processing) {
+    if (!isPlatform(t.platform)) continue;
+    const won = await db.postTarget.updateMany({ where: { id: t.id, platformStatus: "processing", updatedAt: t.updatedAt }, data: { updatedAt: new Date(now) } });
+    if (!won.count) continue;
+    if (t.publishRequestedAt && now - t.publishRequestedAt.getTime() > PROCESSING_GIVE_UP_MS) {
+      await failTarget(t.id, t.postId, new PublisherError("PLATFORM_DOWN", "Processing timed out", `${t.platform} hadn't confirmed the post ${Math.round((now - t.publishRequestedAt.getTime()) / 60_000)} minutes after we asked it to publish.`, false));
+      continue;
+    }
+    const data = { targetId: t.id, platform: t.platform, simulate: "realistic" as const };
+    if (t.publishRequestedAt) await enqueue("SOCIAL_STATUS_CHECK", { ...data, poll: 0 }, { jobId: `requeue-st-${t.id}-${minute}` });
+    else await enqueue("SOCIAL_PUBLISH", data, { jobId: `requeue-pub-${t.id}-${minute}` });
     requeued++;
   }
   return requeued;
 }
 
+/** Sweeper-driven refresh, ahead of expiry. Shares the single-flight refresh with every other caller. */
 async function tokenRefresh({ accountId }: { accountId: string }) {
   const a = await db.socialAccount.findUnique({ where: { id: accountId } });
-  if (!a || !isPlatform(a.platform)) return;
-  try {
-    const fresh = await publisherForAccount(a.platform, a).refreshToken({
-      id: a.id,
-      platformUserId: a.platformUserId,
-      username: a.username,
-      accessToken: decrypt(a.accessToken),
-      refreshToken: a.refreshToken ? decrypt(a.refreshToken) : null,
-    });
-    await db.socialAccount.update({
-      where: { id: a.id },
-      data: {
-        accessToken: encrypt(fresh.accessToken),
-        ...(fresh.refreshToken ? { refreshToken: encrypt(fresh.refreshToken) } : {}),
-        tokenExpiresAt: fresh.expiresAt ?? null,
-      },
-    });
-  } catch (e) {
-    if (e instanceof PublisherError && e.code === "AUTH_EXPIRED") await db.socialAccount.update({ where: { id: a.id }, data: { status: "needs_reconnect" } });
-  }
+  if (!a || a.status !== "connected" || !isPlatform(a.platform)) return;
+  // A permanent refusal marks the account needs_reconnect inside freshAccount; a transient one waits for the next window.
+  await freshAccount(a, REFRESH_WINDOW_MS).catch((e) => console.warn("[TOKEN_REFRESH]", a.id, asPublisherError(e).code));
 }

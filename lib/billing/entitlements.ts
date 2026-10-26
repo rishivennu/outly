@@ -200,10 +200,14 @@ export async function captionUsage(userId: string, now = new Date()) {
   return { ...e, used, left: e.captionVideos > 0 ? Math.max(0, e.captionVideos - used) : Infinity };
 }
 
-/** Gate for AI captions on one video. Passes again for a video already counted this month. */
+/**
+ * Gate for AI captions on one video. Passes again for a video already counted this month.
+ * Returns release(): call it when the transcription then fails, so a failed run doesn't use up the
+ * chunk, nor the video slot when this chunk was the one that took it (1027).
+ */
 export async function assertCaptionVideo(userId: string, ref: string, now = new Date()) {
   const e = await assertAiCaptions(userId);
-  if (e.captionVideos <= 0) return e;
+  if (e.captionVideos <= 0) return { ...e, release: async () => {} };
   const period = periodKey("month", now);
   const key = ref.slice(0, 120) || "unknown";
   const seen = await db.featureUse.findFirst({ where: { userId, feature: "captions", period, ref: key }, select: { id: true } });
@@ -211,14 +215,15 @@ export async function assertCaptionVideo(userId: string, ref: string, now = new 
   // The video ref comes from the browser (the clip isn't uploaded yet), so the audio itself is metered too:
   // every chunk takes a slot from a monthly budget the server owns. Reusing one ref can't stretch 2 videos into 20.
   const chunk = await reserve(userId, "caption-chunk", period, randomUUID(), e.captionVideos * CHUNKS_PER_CAPTION_VIDEO, full);
-  if (seen) return e;
+  if (seen) return { ...e, release: chunk.release };
+  let video: Awaited<ReturnType<typeof reserve>>;
   try {
-    await reserve(userId, "captions", period, key, e.captionVideos, full);
+    video = await reserve(userId, "captions", period, key, e.captionVideos, full);
   } catch (err) {
     await chunk.release();
     throw err;
   }
-  return e;
+  return { ...e, release: async () => { await chunk.release(); await video.release(); } };
 }
 
 export async function assertBurnCaptions(userId: string) {
