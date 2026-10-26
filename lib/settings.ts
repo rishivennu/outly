@@ -46,7 +46,11 @@ export interface SiteConfig {
 
 export interface EmailConfig {
   provider: EmailProvider;
+  /** Sender for account email: sign-in codes, security alerts, invoices, support. Use the mail. subdomain. */
   from: string;
+  /** Sender for marketing email (nudges, win-back, growth, weekly report), on its own subdomain so a spam
+   *  complaint there can't drag sign-in codes into the junk folder. "" = use `from`. */
+  marketingFrom: string;
   replyTo: string;
   resend: { apiKey: string };
 }
@@ -67,7 +71,7 @@ export const DEFAULTS = {
     youpi: { ...YOUPI_DEFAULT },
     business: { name: "Outlly", address: "Bengaluru, India", gstin: "", taxPercent: 0 },
   } as PaymentConfig,
-  email: { provider: "mock", from: "Outlly <hello@outlly.app>", replyTo: "", resend: { apiKey: "" } } as EmailConfig,
+  email: { provider: "mock", from: "Outlly <hello@mail.outlly.com>", marketingFrom: "", replyTo: "", resend: { apiKey: "" } } as EmailConfig,
   site: { maintenance: false, message: "", eta: "", since: "", endsAt: "", waitlist: false, waitlistSince: "" } as SiteConfig,
   landing: LANDING_DEFAULT,
   pricing: PRICING_DISPLAY_DEFAULT as PricingDisplay,

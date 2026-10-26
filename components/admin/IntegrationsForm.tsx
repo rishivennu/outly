@@ -18,7 +18,7 @@ type Pay = {
   youpi: { gatewayUrl: string; merchantId: string; webhookSecret: Secret; minVerification: 1 | 2 };
   business: { name: string; address: string; gstin: string; taxPercent: number };
 };
-type Mailer = { provider: "mock" | "resend"; from: string; replyTo: string; resend: { apiKey: Secret } };
+type Mailer = { provider: "mock" | "resend"; from: string; marketingFrom?: string; replyTo: string; resend: { apiKey: Secret } };
 /** undefined = keep, "" = keep, string = replace, null = remove */
 export type SecretEdit = string | null | undefined;
 
@@ -100,7 +100,7 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
   const [pRes, setPRes] = useState<{ ok: boolean; message: string } | null>(null);
   // ---- email
   const [mail, setMail] = useState(email);
-  const [m, setM] = useState({ provider: email.provider, from: email.from, replyTo: email.replyTo });
+  const [m, setM] = useState({ provider: email.provider, from: email.from, marketingFrom: email.marketingFrom ?? "", replyTo: email.replyTo });
   const [ms, setMs] = useState<SecretEdit>(undefined);
   const [to, setTo] = useState("");
   const [mBusy, setMBusy] = useState<"save" | "test" | null>(null);
@@ -108,7 +108,7 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
 
   const sec = (k: string) => (ps[k] === undefined || ps[k] === "" ? undefined : ps[k]);
   const pDirty = JSON.stringify({ provider: pay.provider, mode: pay.mode, stripePk: pay.stripe.publishableKey, rzpId: pay.razorpay.keyId, ppId: pay.paypal.clientId, ppHook: pay.paypal.webhookId, ypUrl: pay.youpi?.gatewayUrl ?? "", ypId: pay.youpi?.merchantId ?? "", ypLevel: pay.youpi?.minVerification ?? 1, business: pay.business }) !== JSON.stringify(p) || Object.values(ps).some((v) => v !== undefined && v !== "");
-  const mDirty = JSON.stringify({ provider: mail.provider, from: mail.from, replyTo: mail.replyTo }) !== JSON.stringify(m) || (ms !== undefined && ms !== "");
+  const mDirty = JSON.stringify({ provider: mail.provider, from: mail.from, marketingFrom: mail.marketingFrom ?? "", replyTo: mail.replyTo }) !== JSON.stringify(m) || (ms !== undefined && ms !== "");
 
   const missing =
     p.provider === "stripe" ? !(pay.stripe.secretKey.set || sec("stripe.secretKey")) || ps["stripe.secretKey"] === null
@@ -330,7 +330,8 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
           ]}
         />
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <div><Label htmlFor="em-f">From</Label><Input id="em-f" value={m.from} onChange={(e) => setM((x) => ({ ...x, from: e.target.value }))} placeholder="Outlly <hello@yourdomain.com>" /></div>
+          <div><Label htmlFor="em-f">From</Label><Input id="em-f" value={m.from} onChange={(e) => setM((x) => ({ ...x, from: e.target.value }))} placeholder="Outlly <hello@mail.outlly.com>" /><p className="mt-1.5 text-[12px] text-muted-foreground">Sign-in codes, receipts, support replies.</p></div>
+          <div><Label htmlFor="em-mf">Marketing from (optional)</Label><Input id="em-mf" value={m.marketingFrom} onChange={(e) => setM((x) => ({ ...x, marketingFrom: e.target.value }))} placeholder="Outlly <hi@news.outlly.com>" /><p className="mt-1.5 text-[12px] text-muted-foreground">Nudges, win-back, weekly report. Empty = same as From.</p></div>
           <div><Label htmlFor="em-r">Reply-to (optional)</Label><Input id="em-r" type="email" value={m.replyTo} onChange={(e) => setM((x) => ({ ...x, replyTo: e.target.value }))} placeholder="support@yourdomain.com" /></div>
           <div className={cn("liquid-panel sm:col-span-2")} data-open={m.provider === "resend"}>
             <div><div className="liquid-inner"><SecretField id="em-k" label="Resend API key" saved={mail.resend.apiKey} value={ms} onChange={setMs} placeholder="re_…" /></div></div>

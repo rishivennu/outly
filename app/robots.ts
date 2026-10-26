@@ -9,7 +9,7 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "*",
         allow: "/",
         // The app itself needs a session; crawling it only produces login redirects.
-        disallow: ["/api/", "/home", "/create", "/content", "/calendar", "/analytics", "/settings", "/accounts", "/login", "/signup"],
+        disallow: ["/api/", "/admin", "/home", "/create", "/content", "/calendar", "/analytics", "/inbox", "/approvals", "/billing", "/settings", "/support", "/mascot", "/accounts", "/share-target", "/login", "/signup", "/unsubscribe", "/review/", "/team/"],
       },
     ],
     sitemap: `${BASE}/sitemap.xml`,

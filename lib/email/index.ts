@@ -4,6 +4,7 @@ import { compact } from "../reports/weekly-core";
 import { db } from "../db";
 import { env } from "../env";
 import { getConfig, type EmailConfig } from "../settings";
+import { isOptedOut, listFor, unsubPageUrl, unsubPostUrl, type List } from "./unsubscribe";
 
 export interface Mail {
   to: string;
@@ -22,6 +23,13 @@ export interface Mail {
  */
 export async function sendEmail(m: Mail, cfgOverride?: EmailConfig): Promise<{ ok: boolean; status: string; error?: string; id: string }> {
   const cfg = cfgOverride ?? (await getConfig("email"));
+  const list = listFor(m.kind);
+  // Marketing to someone who pressed Unsubscribe: don't send, but leave a row so the Outbox explains the gap.
+  if (list && (await isOptedOut(m.to, m.kind))) {
+    const row = await db.emailLog.create({ data: { to: m.to, subject: m.subject, html: "", kind: m.kind, provider: cfg.provider, status: "skipped", error: `Unsubscribed from ${list === "weekly" ? "the weekly report" : "marketing email"}` } });
+    return { ok: true, status: "skipped", id: row.id };
+  }
+  m = { ...m, html: withUnsubscribe(m.html, m.to, list) };
   let status = "mocked";
   let error: string | undefined;
   if (cfg.provider === "resend") {
@@ -34,11 +42,12 @@ export async function sendEmail(m: Mail, cfgOverride?: EmailConfig): Promise<{ o
           method: "POST",
           headers: { authorization: `Bearer ${cfg.resend.apiKey}`, "content-type": "application/json" },
           body: JSON.stringify({
-            from: cfg.from,
+            from: senderFor(m.kind, cfg),
             to: [m.to],
             subject: m.subject,
             html: m.html,
             reply_to: cfg.replyTo || undefined,
+            headers: list ? unsubscribeHeaders(m.to, list) : undefined,
             attachments: m.attachments?.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })),
           }),
           signal: AbortSignal.timeout(12_000),
@@ -63,6 +72,26 @@ export async function sendEmail(m: Mail, cfgOverride?: EmailConfig): Promise<{ o
     data: { to: m.to, subject: keep ? m.subject : (m.redact ?? []).reduce((t, x) => (x ? t.split(x).join("*".repeat(x.length)) : t), m.subject), html: logged, kind: m.kind, provider: cfg.provider, status, error },
   });
   return { ok: status !== "failed", status, error, id: row.id };
+}
+
+/** Marketing kinds go out from the news. sender when one is set; account email always from `from`. */
+export function senderFor(kind: Mail["kind"], cfg: Pick<EmailConfig, "from" | "marketingFrom">): string {
+  return listFor(kind) ? cfg.marketingFrom?.trim() || cfg.from : cfg.from;
+}
+
+/** RFC 8058 one-click unsubscribe. Gmail and Yahoo require both headers from bulk senders since 2024. */
+export function unsubscribeHeaders(to: string, list: List): Record<string, string> {
+  return { "List-Unsubscribe": `<${unsubPostUrl(to, list)}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
+}
+
+const UNSUB_MARK = "<!--outlly:unsub-->";
+/** Fills the footer's slot: an Unsubscribe link on marketing email, nothing on account email. */
+export function withUnsubscribe(html: string, to: string, list: List | null): string {
+  if (!html.includes(UNSUB_MARK)) return html;
+  const line = list
+    ? `<div style="padding-top:8px;font-family:${BODY}">${list === "weekly" ? "Don't want the weekly report?" : "Don't want emails like this?"} <a href="${unsubPageUrl(to, list)}" style="color:${C.boardText};font-family:${BODY};text-decoration:underline">Unsubscribe</a></div>`
+    : "";
+  return html.split(UNSUB_MARK).join(line);
 }
 
 // ------------------------------------------------------------- templates (inline styles + tables: email clients)
@@ -141,6 +170,7 @@ const footer = () => `${gap(22)}
 <div style="padding-top:2px;font-family:${BODY};color:${C.boardText}">Create once. Publish everywhere.</div>
 <div style="padding-top:10px;font-family:${BODY}">${footerLink("/help", "Help centre")} &nbsp;&middot;&nbsp; ${footerLink("/privacy", "Privacy")} &nbsp;&middot;&nbsp; ${footerLink("/terms", "Terms")} &nbsp;&middot;&nbsp; ${footerLink("/settings", "Settings")}</div>
 <div style="padding-top:12px;font-family:${BODY}">You are receiving this because you have an Outlly account. Questions? Just reply to this email.</div>
+${UNSUB_MARK}
 <div style="padding-top:8px;font-family:${BODY}">&copy; ${new Date().getFullYear()} Outlly</div>
 </td></tr>`;
 

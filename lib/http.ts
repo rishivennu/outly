@@ -55,7 +55,7 @@ export function clientIp(req: NextRequest) {
 const clientKey = clientIp;
 
 /** Public endpoints that stay open during maintenance so members can sign back in. */
-const MAINTENANCE_OPEN = ["/api/maintenance", "/api/auth/login", "/api/auth/code", "/api/auth/2fa", "/api/auth/logout", "/api/support/chat", "/api/health"];
+const MAINTENANCE_OPEN = ["/api/maintenance", "/api/auth/login", "/api/auth/code", "/api/auth/2fa", "/api/auth/logout", "/api/support/chat", "/api/health", "/api/email/unsubscribe"];
 
 type Handler<C> = (req: NextRequest, ctx: C & { user: SessionUser }) => Promise<Response>;
 

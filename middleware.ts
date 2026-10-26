@@ -4,7 +4,7 @@ import { SRC_COOKIE, SRC_DAYS, sourceFromParams } from "./lib/growth/core";
 
 const AUTH_PAGES = ["/login", "/signup"];
 // Marketing pages anyone can read.
-const OPEN = ["/", "/privacy", "/terms", "/contact", "/help", "/waitlist", "/maintenance"];
+const OPEN = ["/", "/privacy", "/terms", "/contact", "/help", "/waitlist", "/maintenance", "/unsubscribe"];
 // A review link is its own credential: the reviewer has no account here.
 // A share link (/r/code) and a team invite must work before the visitor has an account.
 const OPEN_PREFIX = ["/review/", "/r/", "/team/accept"];
@@ -23,9 +23,10 @@ const LH_HINT = "outlly_lh";
 // Waitlist on: the whole public site becomes the waitlist page (user's call, 10-12g). These still work:
 // the waitlist page itself, the legal pages its form links to, and links that are their own credential
 // (emailed invites, team invites, client review links, share links).
-const WAITLIST_OPEN = ["/waitlist", "/privacy", "/terms"];
+const WAITLIST_OPEN = ["/waitlist", "/privacy", "/terms", "/unsubscribe"];
 // Maintenance on: strangers only reach these. /login lets members back in; nobody can sign up.
-const MAINTENANCE_OPEN = ["/maintenance", "/login", "/privacy", "/terms"];
+// /unsubscribe: leaving a mailing list must work whatever mode the site is in.
+const MAINTENANCE_OPEN = ["/maintenance", "/login", "/privacy", "/terms", "/unsubscribe"];
 const WAITLIST_PREFIX = ["/review/", "/r/", "/team/accept"];
 
 function sync(req: NextRequest, res: NextResponse, name: string, on: boolean, maxAge: number) {

@@ -20,9 +20,11 @@ const Payments = z.object({
     .optional(),
   business: z.object({ name: z.string().trim().max(80).optional(), address: z.string().trim().max(160).optional(), gstin: z.string().trim().max(20).optional(), taxPercent: z.number().min(0).max(40).optional() }).optional(),
 });
+const SENDER = /^(.+<[^@\s]+@[^@\s]+\.[^@\s]+>|[^@\s]+@[^@\s]+\.[^@\s]+)$/;
 const Email = z.object({
   provider: z.enum(["mock", "resend"]).optional(),
-  from: z.string().trim().max(120).regex(/^(.+<[^@\s]+@[^@\s]+\.[^@\s]+>|[^@\s]+@[^@\s]+\.[^@\s]+)$/, "From must be an email, or Name <email>").optional(),
+  from: z.string().trim().max(120).regex(SENDER, "From must be an email, or Name <email>").optional(),
+  marketingFrom: z.union([z.literal(""), z.string().trim().max(120).regex(SENDER, "Marketing from must be an email, or Name <email>")]).optional(),
   replyTo: z.union([z.literal(""), z.string().trim().email()]).optional(),
   resend: z.object({ apiKey: secret }).optional(),
 });
