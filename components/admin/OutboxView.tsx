@@ -24,7 +24,7 @@ export function OutboxView({ rows }: { rows: R[] }) {
                   <span className="block truncate text-[12px] text-muted-foreground">{r.to}</span>
                   <span className="mt-1 flex gap-1.5"><Pill>{KIND[r.kind] ?? r.kind}</Pill><Pill tone={STATUS_TONE[r.status]}>{r.status}</Pill></span>
                 </span>
-                <span className="shrink-0 text-[11px] text-muted-foreground">{new Date(r.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">{new Date(r.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })}</span>
               </button>
             </li>
           ))}

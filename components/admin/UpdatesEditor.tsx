@@ -44,7 +44,7 @@ export function UpdatesEditor({ initial }: { initial: UpdateNotice }) {
     <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr]">
       <Card>
         <CardTitle
-          hint={notice.on ? `Published ${new Date(notice.publishedAt).toLocaleString()}` : "Switched off. Nobody sees it."}
+          hint={notice.on ? `Published ${new Date(notice.publishedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" })}` : "Switched off. Nobody sees it."}
           action={<Pill tone={notice.on ? "ok" : "muted"}>{notice.on ? "Showing" : "Off"}</Pill>}
         >
           What changed

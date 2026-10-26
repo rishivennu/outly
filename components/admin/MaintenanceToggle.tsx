@@ -61,7 +61,7 @@ export function MaintenanceToggle({ initial, subscribers }: { initial: Site; sub
   return (
     <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
       <Card>
-        <CardTitle hint={on ? `On since ${new Date(site.since).toLocaleString()}` : "The site is open to everyone."} action={<Pill tone={on ? "warn" : "ok"}>{on ? "Maintenance ON" : "Live"}</Pill>}>
+        <CardTitle hint={on ? `On since ${new Date(site.since).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" })}` : "The site is open to everyone."} action={<Pill tone={on ? "warn" : "ok"}>{on ? "Maintenance ON" : "Live"}</Pill>}>
           Site switch
         </CardTitle>
         <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4 hairline", on ? "bg-warning/10" : "bg-secondary/40")}>

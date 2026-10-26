@@ -25,7 +25,7 @@ export interface LeadView {
 const TEMP_TONE: Record<Temp, Tone> = { hot: "lime", warm: "warn", cold: "muted" };
 const TEMPS: (Temp | "")[] = ["", "hot", "warm", "cold"];
 const WEEK = 7 * 864e5;
-const short = (d: string) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+const short = (d: string) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
 
 export function LeadLists({ lists, total }: { lists: Record<LeadKind, LeadView[]>; total: Record<LeadKind, number> }) {
   const [kind, setKind] = useState<LeadKind>(LISTS.find((l) => lists[l.kind].length)?.kind ?? "waitlist");

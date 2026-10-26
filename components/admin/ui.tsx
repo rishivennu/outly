@@ -90,7 +90,7 @@ export function Table({ head, children, className, label = "Table" }: { head: Re
 
 export const fmtDate = (d: Date | string | null | undefined, withTime = false) =>
   d
-    ? new Date(d).toLocaleString("en-IN", withTime ? { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" } : { day: "numeric", month: "short", year: "numeric" })
+    ? new Date(d).toLocaleString("en-IN", withTime ? { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" } : { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })
     : "Never";
 
 export function ago(d: Date | string | null | undefined) {

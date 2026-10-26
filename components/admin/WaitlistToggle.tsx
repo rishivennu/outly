@@ -46,7 +46,7 @@ export function WaitlistToggle({ initial }: { initial: WaitlistState }) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
       <Card>
-        <CardTitle hint={on && st.since ? `On since ${new Date(st.since).toLocaleString()}` : "Anyone can create an account."} action={<Pill tone={on ? "info" : "ok"}>{on ? "Waitlist ON" : "Signups open"}</Pill>}>
+        <CardTitle hint={on && st.since ? `On since ${new Date(st.since).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" })}` : "Anyone can create an account."} action={<Pill tone={on ? "info" : "ok"}>{on ? "Waitlist ON" : "Signups open"}</Pill>}>
           Waitlist switch
         </CardTitle>
         <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4 hairline", on ? "bg-accent/10" : "bg-secondary/40")}>

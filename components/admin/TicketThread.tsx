@@ -83,7 +83,7 @@ export function TicketThread({ ticket, messages: initial }: { ticket: T; message
               <motion.li key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn("flex gap-2.5", mine && "flex-row-reverse")}>
                 {bot ? <Pip size={30} mood="idle" /> : <OrbAvatar avatar={mine ? null : t.avatar} seed={mine ? m.authorName ?? "team" : t.email} size={32} />}
                 <div className={cn("max-w-[80%] rounded-[20px] px-4 py-2.5 text-[14px] leading-relaxed", mine ? "rounded-tr-md bg-lime/15" : bot ? "rounded-tl-md bg-secondary/60" : "rounded-tl-md bg-card hairline")}>
-                  <p className="mb-0.5 text-[11.5px] font-semibold text-muted-foreground">{bot ? "Pip" : m.authorName ?? (mine ? "Team" : t.name ?? "Customer")} · {new Date(m.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</p>
+                  <p className="mb-0.5 text-[11.5px] font-semibold text-muted-foreground">{bot ? "Pip" : m.authorName ?? (mine ? "Team" : t.name ?? "Customer")} · {new Date(m.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })}</p>
                   <p className="whitespace-pre-wrap break-words">{m.body}</p>
                 </div>
               </motion.li>
