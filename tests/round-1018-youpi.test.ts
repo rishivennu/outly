@@ -6,7 +6,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
 import { NextRequest } from "next/server";
-import { safeCheckoutUrl, youpiBase, youpiReady, youpiSigHex, youpiVerdict } from "../lib/billing/youpi";
+import { safeCheckoutUrl, youpiBase, youpiOurId, youpiReady, youpiSigHex, youpiVerdict } from "../lib/billing/youpi";
 
 let db: typeof import("../lib/db").db;
 let svc: typeof import("../lib/billing/service");
@@ -16,7 +16,7 @@ const realFetch = globalThis.fetch;
 const SECRET = "whsec-youpi-test-0123456789";
 
 // a tiny fake gateway: payments created here, status set per test
-const gw = new Map<string, { orderId: string; amountPaise: number; status: string; verificationLevel: number; currency: string }>();
+const gw = new Map<string, { orderId: string; amountPaise: number; status: string; verificationLevel: number; currency: string; metadata?: Record<string, unknown> }>();
 const calls: { url: string; body?: any; headers: Record<string, string> }[] = [];
 
 beforeAll(async () => {
@@ -77,6 +77,18 @@ describe("youpi rules", () => {
     expect(youpiVerdict({ orderId: "pay_1", status: "SUCCESS", amountPaise: 49900, currency: "USD", verificationLevel: 2 }, want, 1).state).toBe("mismatch");
     expect(youpiVerdict({ orderId: "pay_1", status: "EXPIRED" }, want, 1).state).toBe("failed");
     expect(youpiVerdict({ orderId: "pay_1", status: "QUEUED" }, want, 1).state).toBe("pending");
+  });
+  test("a restarted YOUPI session (`<id>-R1234`) still counts, nothing looser does", () => {
+    const want = { id: "pay_1", amountMinor: 49900, currency: "INR" };
+    const ok = { status: "SUCCESS", amountPaise: 49900, verificationLevel: 1 };
+    expect(youpiVerdict({ ...ok, orderId: "pay_1-R4821", metadata: { paymentId: "pay_1" } }, want, 1).state).toBe("paid");
+    expect(youpiVerdict({ ...ok, orderId: "pay_1-R4821" }, want, 1).state).toBe("paid");
+    for (const orderId of ["pay_10", "pay_1-R", "pay_1-Rx12", "pay_1-R1234-R1", "xpay_1-R1234", "pay_1-r1234"]) expect(youpiVerdict({ ...ok, orderId }, want, 1).state).toBe("mismatch");
+    expect(youpiVerdict({ ...ok, orderId: "pay_1", metadata: { paymentId: "pay_2" } }, want, 1).state).toBe("mismatch");
+    expect(youpiOurId("pay_1-R4821")).toBe("pay_1");
+    expect(youpiOurId("pay_1-R4821", { paymentId: "pay_1" })).toBe("pay_1");
+    expect(youpiOurId("pay_1", { paymentId: "bad id!" })).toBe("pay_1");
+    expect(youpiOurId(42)).toBe("");
   });
   test("signature header parsing and constant-time verify", () => {
     expect(youpiSigHex("sha256=" + "a".repeat(64))).toBe("a".repeat(64));
@@ -139,6 +151,32 @@ describe("youpi flow", () => {
     expect(await db.subscription.count({ where: { userId: u.id, status: "active" } })).toBe(1);
     expect((await db.payment.findUniqueOrThrow({ where: { id: start.paymentId } })).status).toBe("succeeded");
     expect(await db.invoice.count({ where: { paymentId: start.paymentId } })).toBe(1);
+  });
+
+  test("webhook: buyer restarted on YOUPI and paid the new session, so the plan is granted", async () => {
+    const { POST } = await import("../app/api/billing/webhooks/youpi/route");
+    const u = await mkUser("r");
+    const start = await svc.startCheckout(u.id, "creator");
+    Object.assign(gw.get(`yp-${start.paymentId}`)!, { status: "CANCELLED" }); // first session ended by the restart
+    gw.set("yp-restart-1", { orderId: `${start.paymentId}-R4821`, amountPaise: 49900, status: "SUCCESS", verificationLevel: 1, currency: "INR", metadata: { paymentId: start.paymentId } });
+    const raw = JSON.stringify({ event: "SUCCESS", paymentId: "yp-restart-1", orderId: `${start.paymentId}-R4821`, amountPaise: 49900, metadata: { paymentId: start.paymentId } });
+    const res = await POST(new NextRequest("http://localhost/api/billing/webhooks/youpi", { method: "POST", body: raw, headers: { "x-gateway-signature": sign(raw), "content-type": "application/json" } }));
+    expect(res.status).toBe(200);
+    const p = await db.payment.findUniqueOrThrow({ where: { id: start.paymentId } });
+    expect(p.status).toBe("succeeded");
+    expect(p.providerRef).toBe("yp-restart-1");
+    expect(await db.subscription.count({ where: { userId: u.id, status: "active" } })).toBe(1);
+  });
+
+  test("webhook naming a paid session of a DIFFERENT order grants nothing", async () => {
+    const { POST } = await import("../app/api/billing/webhooks/youpi/route");
+    const u = await mkUser("x");
+    const start = await svc.startCheckout(u.id, "creator");
+    gw.set("yp-other-1", { orderId: "someone-else-R1111", amountPaise: 49900, status: "SUCCESS", verificationLevel: 2, currency: "INR", metadata: { paymentId: "someone-else" } });
+    const raw = JSON.stringify({ event: "SUCCESS", paymentId: "yp-other-1", orderId: start.paymentId });
+    await POST(new NextRequest("http://localhost/api/billing/webhooks/youpi", { method: "POST", body: raw, headers: { "x-gateway-signature": sign(raw), "content-type": "application/json" } }));
+    expect((await db.payment.findUniqueOrThrow({ where: { id: start.paymentId } })).status).toBe("pending");
+    expect(await db.subscription.count({ where: { userId: u.id, status: "active" } })).toBe(0);
   });
 
   test("refund is refused with a clear manual-UPI message", async () => {
