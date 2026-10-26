@@ -13,6 +13,10 @@ const ENV = (): Partial<Record<KeyedPlatform, { clientId: string; clientSecret: 
   instagram: { clientId: env.INSTAGRAM_CLIENT_ID, clientSecret: env.INSTAGRAM_CLIENT_SECRET },
   youtube: { clientId: env.YOUTUBE_CLIENT_ID, clientSecret: env.YOUTUBE_CLIENT_SECRET },
   x: { clientId: env.X_CLIENT_ID, clientSecret: env.X_CLIENT_SECRET },
+  facebook: { clientId: env.FACEBOOK_CLIENT_ID, clientSecret: env.FACEBOOK_CLIENT_SECRET },
+  threads: { clientId: env.THREADS_CLIENT_ID, clientSecret: env.THREADS_CLIENT_SECRET },
+  linkedin: { clientId: env.LINKEDIN_CLIENT_ID, clientSecret: env.LINKEDIN_CLIENT_SECRET },
+  tiktok: { clientId: env.TIKTOK_CLIENT_ID, clientSecret: env.TIKTOK_CLIENT_SECRET },
 });
 
 export async function loadKeys() {

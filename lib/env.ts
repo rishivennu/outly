@@ -45,6 +45,15 @@ const schema = z.object({
   INSTAGRAM_CLIENT_SECRET: z.string().optional().default(""),
   YOUTUBE_CLIENT_ID: z.string().optional().default(""),
   YOUTUBE_CLIENT_SECRET: z.string().optional().default(""),
+  // Fallbacks for the other platforms; Admin > Social platforms wins field by field.
+  FACEBOOK_CLIENT_ID: z.string().optional().default(""), // Meta App ID
+  FACEBOOK_CLIENT_SECRET: z.string().optional().default(""),
+  THREADS_CLIENT_ID: z.string().optional().default(""), // Threads app ID (Use cases > Threads API)
+  THREADS_CLIENT_SECRET: z.string().optional().default(""),
+  LINKEDIN_CLIENT_ID: z.string().optional().default(""),
+  LINKEDIN_CLIENT_SECRET: z.string().optional().default(""),
+  TIKTOK_CLIENT_ID: z.string().optional().default(""), // TikTok "Client key"
+  TIKTOK_CLIENT_SECRET: z.string().optional().default(""),
   X_CLIENT_ID: z.string().optional().default(""),
   X_CLIENT_SECRET: z.string().optional().default(""),
   GEMINI_API_KEY: z.string().optional().default(""),

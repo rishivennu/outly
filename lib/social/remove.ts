@@ -36,21 +36,32 @@ export async function removeFromPlatform(userId: string, targetId: string, actio
   if (action === "hide" && t.removeMode === "hidden") return t;
   if (action === "show" && t.removeMode !== "hidden") return t;
 
+  // A delete that reached the platform but whose save failed leaves "deleting" behind. Retrying it, the
+  // platform's "no such post" (or X/Graph's 200 deleted=false) means the first attempt worked.
+  const finishing = action === "delete" && t.removeMode === "deleting";
+  // What to restore if the delete fails. "deleting" never touches removedAt, so a set removedAt means it was hidden.
+  const before = finishing ? (t.removedAt ? "hidden" : null) : t.removeMode;
   // Practice posts never reached a real platform: there's nothing to call.
   if (!t.practice) {
     const acct = t.socialAccount;
     if (!acct || acct.status !== "connected")
       throw new HttpError(409, `Reconnect ${name} first. Outlly needs the connection to take the post down.`, "NOT_CONNECTED");
     const publisher = publisherForAccount(platform, acct);
+    // Write the intent BEFORE the irreversible call, so a crash or a failed save afterwards can't leave a
+    // post that's gone from the platform still looking live with no trace of what happened.
+    if (action === "delete" && !finishing) await db.postTarget.update({ where: { id: t.id }, data: { removeMode: "deleting" } });
     try {
       const ctx = await liveAccount(acct);
       if (action === "delete") await publisher.delete(ctx, t.platformPostId);
       else if (publisher.setVisibility) await publisher.setVisibility(ctx, t.platformPostId, action === "show");
       else throw new HttpError(409, `${name} can't hide a post from here, only delete it.`, "NOT_SUPPORTED");
     } catch (e) {
-      if (e instanceof HttpError) throw e;
-      const pe = asPublisherError(e);
-      if (action === "delete" && alreadyGone(pe.technical)) {
+      const pe = e instanceof HttpError ? null : asPublisherError(e);
+      const gone = !!pe && action === "delete" && (alreadyGone(pe.technical) || (finishing && /deleted=false|success=false/.test(pe.technical ?? "")));
+      // Anything but "it's gone": the post is still up, so put the marker back the way it was.
+      if (action === "delete" && !gone) await db.postTarget.update({ where: { id: t.id }, data: { removeMode: before } }).catch(() => {});
+      if (!pe) throw e;
+      if (gone) {
         // fall through: record it as deleted
       } else if (pe.code === "AUTH_EXPIRED") {
         await db.socialAccount.update({ where: { id: acct.id }, data: { status: "needs_reconnect" } });
@@ -72,7 +83,19 @@ export async function removeFromPlatform(userId: string, targetId: string, actio
       : action === "hide"
         ? { removedAt: new Date(), removeMode: "hidden" }
         : { removedAt: null, removeMode: null };
-  const updated = await db.postTarget.update({ where: { id: t.id }, data });
+  // The platform has already acted; try hard to record it (3 tries) so the studio matches reality.
+  let updated: Awaited<ReturnType<typeof db.postTarget.update>> | undefined;
+  for (let i = 0; !updated; i++) {
+    try {
+      updated = await db.postTarget.update({ where: { id: t.id }, data });
+    } catch (e) {
+      if (i >= 2) {
+        console.error(`[remove] ${platform} ${action} ${t.id} done on the platform but not saved`, e);
+        throw new HttpError(503, `It's ${action === "delete" ? "deleted from" : "changed on"} ${name}, but we couldn't save that here. Press it once more to finish.`, "SAVE_FAILED");
+      }
+      await new Promise((r) => setTimeout(r, 250 * (i + 1)));
+    }
+  }
   invalidateComments(t.id);
   invalidateDashboards(userId);
   return updated;

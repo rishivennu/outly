@@ -163,7 +163,9 @@ export const REMOVAL: Record<Platform, { delete: boolean; hide: boolean }> = {
   facebook: { delete: true, hide: false },
   linkedin: { delete: true, hide: false },
 };
-export type RemoveMode = "deleted" | "hidden";
+/** "deleting" = the platform call has started; it only stays if the save after a successful delete failed,
+ *  and the next Delete click then finishes the job (still counts as live until then). */
+export type RemoveMode = "deleted" | "hidden" | "deleting";
 
 /** Statuses a creator can still stop: nothing has asked the platform to go public yet. */
 export const STOPPABLE: readonly TargetStatus[] = ["pending", "queued", "uploading"];

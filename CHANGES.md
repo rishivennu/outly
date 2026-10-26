@@ -1,33 +1,22 @@
-# fix-1026b-email: unsubscribe for marketing email, separate marketing sender, sitemap/robots
+# fix-1026e-delete-env (upload after fix-1026b-email, or straight after the live code: it doesn't depend on 1026b)
 
-Upload AFTER outlly-all-1016-to-1026d (already live). Copy every file to the same path, replacing the old one.
-12 files, 2 of them new pages/routes. Nothing to delete. No database change (the EmailOptOut table went
-live with fix-1026c).
+5 files. Nothing to delete, no database change (removeMode is a text column; "deleting" is just a new value).
 
-## What changes
-- Marketing email (nudges, win-back, growth campaigns, weekly report) now has an "Unsubscribe" link in the
-  footer AND the one-click headers Gmail/Yahoo require from bulk senders (List-Unsubscribe +
-  List-Unsubscribe-Post). Gmail shows an "Unsubscribe" button next to the sender name.
-- Account email (sign-in codes, security alerts, receipts, support replies, team invites) never gets the
-  link and is never blocked.
-- New page /unsubscribe: shows the (masked) address, asks before unsubscribing (mail scanners open links,
-  so a GET never unsubscribes), and offers "I didn't mean to" to undo. Works in waitlist and maintenance mode.
-- Leaving "weekly report" turns off the same switch as Settings. Leaving "tips and product emails" is kept
-  per address, so it also covers growth leads without an account.
-- Skipped sends show in Admin > Email outbox as "skipped: Unsubscribed from ...".
-- Admin > Integrations > Email: new "Marketing from" field (e.g. Outlly <hi@news.outlly.com>). Empty = use From.
-- sitemap.xml now lists /help. robots.txt also hides /admin, /inbox, /billing, /unsubscribe, review and team links.
+## 1. Deleting a post from a platform can no longer leave it looking live
+Before: Outlly deleted the post on X/Facebook/YouTube/etc. first and saved that afterwards. If the save failed,
+the post was gone from the platform but still showed as live, and pressing Delete again could fail (X answers
+"deleted=false" for a post that is already gone).
+Now:
+- Outlly writes "deleting" on the post BEFORE calling the platform.
+- After the platform deletes it, the save is retried 3 times.
+- If it still can't save, you see "It's deleted from X, but we couldn't save that here. Press it once more to
+  finish", and the next press completes it (a "not found" / "deleted=false" answer then counts as done).
+- If the platform refuses, the marker is put back exactly as it was (a private YouTube video stays private).
 
-## Set these up
-1. Vercel env APP_URL = https://outly-ecru.vercel.app (or https://outlly.com once the domain works).
-   Without it the unsubscribe links in email have no host.
-2. Email DNS, once outlly.com resolves (it currently does not exist in DNS, so register / point the domain first):
-   - In Resend > Domains add mail.outlly.com and news.outlly.com. Resend shows the exact records for each
-     (an MX and an SPF TXT on send.<sub>, and a DKIM TXT on resend._domainkey.<sub>). Copy them exactly.
-   - DMARC, one TXT for the root: name _dmarc, value  v=DMARC1; p=none; rua=mailto:dmarc@outlly.com
-     (start with p=none; move to p=quarantine after a few weeks of clean reports).
-   - Then in Admin > Integrations: From = Outlly <hello@mail.outlly.com>, Marketing from = Outlly <hi@news.outlly.com>.
-3. Google Search Console: add outlly.com, verify with the TXT it gives you, submit /sitemap.xml.
+## 2. Every platform's keys can come from Vercel env as a fallback
+Admin > Social platforms still wins. New optional env vars (fill only if you prefer env over the admin page):
+FACEBOOK_CLIENT_ID (Meta App ID), FACEBOOK_CLIENT_SECRET, THREADS_CLIENT_ID, THREADS_CLIENT_SECRET,
+LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, TIKTOK_CLIENT_ID (TikTok "Client key"), TIKTOK_CLIENT_SECRET.
 
 ## Checks
-tests/round-1026b-unsubscribe.test.ts (14 tests). Independent review: 4 findings, all fixed (one-click never redirects, per-link rate limit so Gmail's shared IPs are not throttled, weekly opt-out sticks for changed addresses, absolute links when APP_URL is unset). Full suite 535 pass, 0 fail. tsc clean.
+tests/round-1026e-delete-order.test.ts (5 tests). Full suite 540 pass, 0 fail. tsc clean.
