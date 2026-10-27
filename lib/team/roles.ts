@@ -25,6 +25,8 @@ export function memberBlock(role: WorkspaceRole, method: string, path: string): 
     if (/^\/api\/posts\/[^/]+\/launch$/.test(path)) return "Editors can't publish. Send a review link, or ask the owner or a manager to launch it.";
     if (/^\/api\/posts\/[^/]+$/.test(path) && method.toUpperCase() === "DELETE") return "Editors can't delete posts.";
     if (/^\/api\/targets\/[^/]+\/remove$/.test(path)) return "Editors can't take posts down from a platform. Ask the owner or a manager.";
+    // Direct messages speak for the brand in private (1031): editors can read them, managers and the owner answer.
+    if (/^\/api\/messages\/[^/]+$/.test(path)) return "Editors can't send direct messages. Ask the owner or a manager to reply.";
   }
   return null;
 }

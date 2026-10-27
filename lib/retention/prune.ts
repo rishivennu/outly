@@ -58,15 +58,20 @@ export async function pruneStaleDrafts(now: Date = new Date(), batch = 500) {
   return { drafts: count, media: removed.length };
 }
 
+/** Direct messages (1031) are kept for this long after they were sent; a conversation quiet for longer goes with them. */
+export const DM_KEEP_DAYS = 180;
+
 export async function pruneOldData(now: Date = new Date()) {
   const before = (days: number) => new Date(now.getTime() - days * DAY);
-  const [emailLogs, adminEvents, behaviorAnalyses, targetMetrics, otpCodes, invoices] = await Promise.all([
+  const [emailLogs, adminEvents, behaviorAnalyses, targetMetrics, otpCodes, invoices, dmMessages, dmThreads] = await Promise.all([
     db.emailLog.deleteMany({ where: { createdAt: { lt: before(90) } } }),
     db.adminEvent.deleteMany({ where: { createdAt: { lt: before(90) } } }),
     db.behaviorAnalysis.deleteMany({ where: { createdAt: { lt: before(90) } } }),
     db.targetMetric.deleteMany({ where: { capturedAt: { lt: before(180) } } }),
     db.otpCode.deleteMany({ where: { createdAt: { lt: before(1) } } }),
     pruneDetachedInvoices(now),
+    db.dmMessage.deleteMany({ where: { sentAt: { lt: before(DM_KEEP_DAYS) } } }),
+    db.dmThread.deleteMany({ where: { lastMessageAt: { lt: before(DM_KEEP_DAYS) } } }),
   ]);
   // Batches of 500, a few per run, so a backlog drains without one huge delete.
   const drafts = { drafts: 0, media: 0 };
@@ -85,5 +90,7 @@ export async function pruneOldData(now: Date = new Date()) {
     targetMetrics: targetMetrics.count,
     otpCodes: otpCodes.count,
     detachedInvoices: invoices,
+    dmMessages: dmMessages.count,
+    dmThreads: dmThreads.count,
   };
 }

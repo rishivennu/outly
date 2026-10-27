@@ -6,6 +6,25 @@ import { formPost, newState } from "./oauth";
 //   POST /{ig-user-id}/media (media_type=REELS, video_url) → poll status_code → POST /{ig-user-id}/media_publish
 const GRAPH = "https://graph.instagram.com/v21.0";
 
+/**
+ * The code-for-token answer. Meta documents it wrapped as {"data":[{access_token,user_id,permissions}]},
+ * and older apps still get the flat {access_token,user_id}. Reading only the flat shape left the token
+ * undefined, the long-lived swap then failed, and people saw "couldn't finish the handshake" (1031).
+ */
+export function shortToken(raw: unknown): { access_token: string; user_id: string | number; permissions?: string | string[] } | null {
+  const r = raw as { access_token?: unknown; data?: unknown } | null;
+  const row = (Array.isArray(r?.data) ? r!.data[0] : r) as { access_token?: unknown; user_id?: string | number; permissions?: string | string[] } | null | undefined;
+  if (!row || typeof row.access_token !== "string" || !row.access_token) return null;
+  return { access_token: row.access_token, user_id: row.user_id ?? "", permissions: row.permissions };
+}
+
+/** Messages need this one; Instagram lets the person untick it and still connect. Empty when unknown. */
+export function missingScopes(granted: string | string[] | undefined): string[] {
+  if (!granted) return [];
+  const have = new Set((Array.isArray(granted) ? granted : granted.split(",")).map((x) => x.trim()));
+  return ["instagram_business_manage_messages"].filter((x) => !have.has(x));
+}
+
 export class InstagramPublisher implements SocialPublisher {
   readonly platform = "instagram" as const;
 
@@ -17,7 +36,7 @@ export class InstagramPublisher implements SocialPublisher {
       redirect_uri: redirectUri,
       response_type: "code",
       // instagram_manage_comments is what the inbox needs; without it comment reads return 403.
-      scope: "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments",
+      scope: "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_messages", // messages: 1031 DMs
       state,
     }).toString();
     return { url: u.toString(), state };
@@ -32,13 +51,14 @@ export class InstagramPublisher implements SocialPublisher {
       code,
     });
     if (!short.ok) throw await httpFailure(short, "instagram token exchange");
-    const s = (await short.json()) as { access_token: string; user_id: string | number };
+    const s = shortToken(await short.json().catch(() => null));
+    if (!s) throw new PublisherError("UNKNOWN", "Instagram sent no access token", "instagram token exchange: 200 without an access_token", false);
     const long = await fetch(
-      `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${creds("instagram").clientSecret}&access_token=${s.access_token}`,
+      `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${encodeURIComponent(creds("instagram").clientSecret)}&access_token=${encodeURIComponent(s.access_token)}`,
     );
     if (!long.ok) throw await httpFailure(long, "instagram long-lived exchange");
     const l = (await long.json()) as { access_token: string; expires_in: number };
-    const me = await fetch(`${GRAPH}/me?fields=user_id,username,name,profile_picture_url&access_token=${l.access_token}`);
+    const me = await fetch(`${GRAPH}/me?fields=user_id,username,name,profile_picture_url&access_token=${encodeURIComponent(l.access_token)}`);
     if (!me.ok) throw await httpFailure(me, "instagram profile");
     const p = (await me.json()) as { user_id: string; username: string; name?: string; profile_picture_url?: string };
     return {
@@ -48,6 +68,7 @@ export class InstagramPublisher implements SocialPublisher {
       avatar: p.profile_picture_url,
       accessToken: l.access_token,
       expiresAt: new Date(Date.now() + l.expires_in * 1000),
+      declined: missingScopes(s.permissions),
     };
   }
 

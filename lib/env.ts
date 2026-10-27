@@ -43,6 +43,8 @@ const schema = z.object({
   MOCK_FAILURE_RATE: z.coerce.number().min(0).max(1).default(0.15),
   INSTAGRAM_CLIENT_ID: z.string().optional().default(""),
   INSTAGRAM_CLIENT_SECRET: z.string().optional().default(""),
+  /** Webhook verify token for Meta (Instagram + Page messages). Empty = derived from AUTH_SECRET; shown in Admin > Social platforms. */
+  META_WEBHOOK_VERIFY_TOKEN: z.string().optional().default(""),
   YOUTUBE_CLIENT_ID: z.string().optional().default(""),
   YOUTUBE_CLIENT_SECRET: z.string().optional().default(""),
   // Fallbacks for the other platforms; Admin > Social platforms wins field by field.

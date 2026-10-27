@@ -89,6 +89,11 @@ export const inboxReplySchema = z.object({
   text: z.string().trim().min(1, "Write something first.").max(1000),
 });
 
+/** A direct message reply (1031). Instagram caps a message at 1000 characters. */
+export const dmReplySchema = z.object({
+  text: z.string().trim().min(1, "Write something first.").max(1000, "Keep it under 1000 characters."),
+});
+
 export const hookRequestSchema = z.object({
   story: z.string().trim().min(3, "Tell me a little more about it").max(4000),
   tone: z.enum(["default", "punchier", "professional", "genz"]).default("default"),

@@ -17,9 +17,26 @@ export async function saveConnectedAccount(userId: string, platform: Platform, p
     status: "connected",
   };
   await db.socialAccount.deleteMany({ where: { userId, platform, NOT: { platformUserId: prof.platformUserId } } });
-  return db.socialAccount.upsert({
+  const acct = await db.socialAccount.upsert({
     where: { userId_platform_platformUserId: { userId, platform, platformUserId: prof.platformUserId } },
     create: { userId, platform, platformUserId: prof.platformUserId, ...data },
     update: data,
   });
+  await subscribeDms(platform, acct);
+  return acct;
+}
+
+/**
+ * Direct messages (1031): ask Meta to send this account's messages to our webhook. Best effort: before
+ * Meta approves the messaging permissions this is refused, and connecting must still succeed.
+ */
+async function subscribeDms(platform: Platform, acct: { platformUserId: string; id: string; username: string; accessToken: string }) {
+  if ((platform !== "instagram" && platform !== "facebook") || acct.platformUserId.startsWith("mock-")) return;
+  try {
+    const { subscribeMessaging } = await import("./messages/meta");
+    const { decrypt } = await import("./crypto");
+    await subscribeMessaging(platform, { id: acct.id, platformUserId: acct.platformUserId, username: acct.username, accessToken: decrypt(acct.accessToken), refreshToken: null });
+  } catch (e) {
+    console.warn(`[dm] ${platform} webhook subscribe skipped:`, (e as Error).message?.slice(0, 300));
+  }
 }

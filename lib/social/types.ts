@@ -15,6 +15,8 @@ export interface ConnectedProfile {
   refreshToken?: string;
   expiresAt?: Date;
   metadata?: Record<string, unknown>;
+  /** Set when the person unticked a permission Outlly asked for (1031: Instagram messages). Not stored. */
+  declined?: string[];
 }
 
 /** Decrypted account handed to a publisher. Exists only inside workers, never serialised to the client. */

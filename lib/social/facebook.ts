@@ -6,6 +6,8 @@ import { creds } from "./keys";
 // We connect the creator's first Page; its token is derived from a long-lived user token, so it doesn't expire.
 const V = "v21.0";
 const GRAPH = `https://graph.facebook.com/${V}`;
+/** pages_messaging + pages_manage_metadata (1031): read and answer the Page's Messenger conversations, and subscribe the Page to our webhook. */
+export const FACEBOOK_SCOPES = "pages_show_list,pages_read_engagement,pages_manage_posts,publish_video,read_insights,pages_messaging,pages_manage_metadata";
 
 export class FacebookPublisher implements SocialPublisher {
   readonly platform = "facebook" as const;
@@ -13,7 +15,7 @@ export class FacebookPublisher implements SocialPublisher {
   async connect(redirectUri: string) {
     const state = newState();
     const u = new URL(`https://www.facebook.com/${V}/dialog/oauth`);
-    u.search = new URLSearchParams({ client_id: creds("facebook").clientId, redirect_uri: redirectUri, state, response_type: "code", scope: "pages_show_list,pages_read_engagement,pages_manage_posts,publish_video,read_insights" }).toString();
+    u.search = new URLSearchParams({ client_id: creds("facebook").clientId, redirect_uri: redirectUri, state, response_type: "code", scope: FACEBOOK_SCOPES }).toString();
     return { url: u.toString(), state };
   }
 
@@ -31,7 +33,18 @@ export class FacebookPublisher implements SocialPublisher {
     const list = ((await pages.json()) as { data?: { id: string; name: string; access_token: string; picture?: { data?: { url?: string } } }[] }).data ?? [];
     const page = list[0];
     if (!page) throw Object.assign(new Error("This Facebook account doesn't manage a Page yet. Reels publish to a Page."), { code: "NO_PAGE" });
-    return { platformUserId: page.id, username: page.name, displayName: page.name, avatar: page.picture?.data?.url, accessToken: page.access_token, metadata: { pages: list.map((p) => ({ id: p.id, name: p.name })) } };
+    // The person's app-scoped id: Meta's data deletion callback names the user, not the Page (1031).
+    const me: { id?: string } = await fetch(`${GRAPH}/me?fields=id&access_token=${userToken}`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ id?: string }>) : {}))
+      .catch(() => ({}));
+    return {
+      platformUserId: page.id,
+      username: page.name,
+      displayName: page.name,
+      avatar: page.picture?.data?.url,
+      accessToken: page.access_token,
+      metadata: { pages: list.map((p) => ({ id: p.id, name: p.name })), ...(me.id ? { metaUserId: me.id } : {}) },
+    };
   }
 
   /** Page tokens from a long-lived user token don't expire; nothing to refresh. */

@@ -1,6 +1,7 @@
 import "server-only";
 import { getConfig } from "./settings";
 import { db } from "./db";
+import { decrypt } from "./crypto";
 import { env } from "./env";
 import { HttpError } from "./http";
 import { storage } from "./storage";
@@ -16,7 +17,7 @@ import type { SessionUser } from "./auth";
 /** Everything we hold about one creator. Explicit selects only: no password hash, no authenticator
  * secret, no recovery codes, and no platform tokens, so a leaked export cannot be used to sign in or post. */
 export async function exportUser(id: string) {
-  const [profile, accounts, posts, media, ideas, snippets, subscriptions, invoices] = await Promise.all([
+  const [profile, accounts, posts, media, ideas, snippets, subscriptions, invoices, dmThreads] = await Promise.all([
     db.user.findUniqueOrThrow({
       where: { id },
       select: { id: true, name: true, email: true, avatar: true, timezone: true, postingGoal: true, weeklyReport: true, signupSource: true, referralCode: true, createdAt: true, lastActiveAt: true },
@@ -54,8 +55,34 @@ export async function exportUser(id: string) {
       select: { number: true, description: true, amountMinor: true, currency: true, issuedAt: true },
       orderBy: { issuedAt: "asc" },
     }),
+    // Direct messages (1031): the creator's own conversations, decrypted. Platform ids of the other person are left out.
+    db.dmThread.findMany({
+      where: { userId: id },
+      select: {
+        platform: true, participantName: true, participantHandle: true, lastMessageAt: true, createdAt: true,
+        account: { select: { username: true } },
+        messages: { select: { direction: true, text: true, attachments: true, sentAt: true }, orderBy: { sentAt: "asc" } },
+      },
+      orderBy: { lastMessageAt: "desc" },
+    }),
   ]);
-  return { exportedAt: new Date().toISOString(), app: "Outlly", profile, accounts, posts, media, ideas, snippets, subscriptions, invoices };
+  const plain = (v: string) => {
+    try {
+      return decrypt(v);
+    } catch {
+      return "";
+    }
+  };
+  const directMessages = dmThreads.map((t) => ({
+    platform: t.platform,
+    account: t.account.username,
+    with: t.participantName ?? t.participantHandle ?? null,
+    handle: t.participantHandle,
+    lastMessageAt: t.lastMessageAt,
+    createdAt: t.createdAt,
+    messages: t.messages.map((m) => ({ direction: m.direction, text: plain(m.text), attachments: m.attachments ? (JSON.parse(m.attachments) as unknown) : [], sentAt: m.sentAt })),
+  }));
+  return { exportedAt: new Date().toISOString(), app: "Outlly", profile, accounts, posts, media, ideas, snippets, subscriptions, invoices, directMessages };
 }
 
 /**
