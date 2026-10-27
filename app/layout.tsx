@@ -10,6 +10,8 @@ import { SmoothScroll } from "@/components/marketing/SmoothScroll";
 import { ScrollProgress } from "@/components/shared/ScrollProgress";
 import { PageScrollbar } from "@/components/marketing/PageScrollbar";
 import "./globals.css";
+import "./mobile-app.css";
+import { appScript } from "@/lib/app-mode";
 
 /*
  * Type system. Display: Bricolage Grotesque (optical sizes, a little ink-trap warmth).
@@ -42,6 +44,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`dark ${display.variable} ${body.variable} ${serif.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* Inside the Android app: mark <html> before first paint so the app layout (app/mobile-app.css) never flashes the web one. */}
+        <script dangerouslySetInnerHTML={{ __html: appScript }} />
         {/* Landing sections the admin hid (readable hint cookie set by middleware): mark <html> before the
             first paint so CSS drops their nav and footer links at once, instead of a link flashing in and out. */}
         <script dangerouslySetInnerHTML={{ __html: `try{var m=document.cookie.match(/(?:^|; )outlly_lh=([^;]*)/);if(m)document.documentElement.setAttribute("data-lh",decodeURIComponent(m[1]).split(".").join(" "))}catch(e){}` }} />

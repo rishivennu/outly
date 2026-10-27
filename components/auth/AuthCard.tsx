@@ -18,7 +18,7 @@ export function AuthCard({ children, eyebrow, lines, id }: { children: React.Rea
         <AuthShowcase eyebrow={eyebrow} lines={lines} />
         <section className="relative flex min-h-[calc(100dvh-2.5rem)] flex-col px-3 pb-6 pt-1.5 sm:min-h-0 sm:px-8 lg:px-12">
           <div className="flex items-center justify-between gap-3">
-            <Link href="/" className="inline-flex h-11 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+            <Link href="/" className="app-invisible inline-flex h-11 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               Website
             </Link>

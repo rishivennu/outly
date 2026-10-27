@@ -9,6 +9,7 @@ import { useUser } from "@/components/shell/UserContext";
 import { tourKey } from "./Tour";
 import { afterPrivacy } from "@/components/shared/PrivacyNotice";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
+import { APP_SELLS_PLANS, isApp } from "@/lib/app-mode";
 
 export type WelcomeOffer = { slug: string; name: string; price: string; interval: string; features: string[]; postLimit: number; aiCaptions: boolean; postPeriod?: "week" | "month" };
 
@@ -50,6 +51,7 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
 
   useEffect(() => {
     if (localStorage.getItem(welcomeKey(user.id))) return;
+    if (isApp() && !APP_SELLS_PLANS) return; // no plan offers inside the Android app (Google Play billing rules)
     let t: ReturnType<typeof setTimeout> | undefined;
     const show = () => {
       t = setTimeout(() => setOpen(true), 450);

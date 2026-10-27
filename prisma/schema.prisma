@@ -36,8 +36,10 @@ model User {
   totpEnabledAt DateTime?
   totpLastStep  Int? // last accepted 30-second step, so one code can't be used twice
   recoveryCodes String? // JSON array of hashed one-time recovery codes
+  tokenVersion  Int     @default(0) // bumped by "sign out everywhere" / password change; sessions carry it as `v`
 
   socialAccounts SocialAccount[]
+  aiUsage        AiUsage[]
   media          Media[]
   posts          Post[]
   subscriptions  Subscription[]
@@ -50,6 +52,10 @@ model User {
   notices        Notice[]
   snippets       Snippet[]
   ideas          Idea[]
+  featureUses FeatureUse[]
+  pushDevices PushDevice[]
+  betaIssued  BetaCode?  @relation("BetaIssued")
+  betaRedeemed BetaCode? @relation("BetaRedeemed")
 }
 
 /// One-time sign-in codes sent by email. Only a keyed hash of the code is stored; no link to User, so a
@@ -122,6 +128,7 @@ model Post {
   requireApproval Boolean @default(false) // publishing is blocked until a reviewer approves
   scheduledAt DateTime?
   publishedAt DateTime?
+  launchedAt  DateTime? // first time it left draft (published or scheduled): what plan post limits count
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -143,6 +150,9 @@ model PostTarget {
   caption         String?
   description     String?
   hashtags        String? // space separated
+  firstComment    String? // posted as the first comment once the post is live (Instagram, YouTube; a reply on X)
+  firstCommentId  String? // the platform's id for that comment, once posted
+  firstCommentError String? // why the first comment didn't go up (the post itself is unaffected)
   platformStatus  String    @default("pending") // pending | queued | uploading | processing | published | failed
   uploadRef       String? // platform upload handle between SOCIAL_UPLOAD and SOCIAL_PUBLISH
   platformPostId  String?
@@ -153,6 +163,9 @@ model PostTarget {
   practice        Boolean   @default(false) // true = rehearsal through MockPublisher; never shown as a real post
   publishRequestedAt DateTime? // set just before the irreversible "go public" call; a retry reconciles first
   publishedAt     DateTime?
+  // Taken down from the platform through Outlly. platformStatus stays "published" so history and stats stay true.
+  removedAt       DateTime?
+  removeMode      String? // deleted (gone from the platform) | hidden (YouTube: made private, can be made public again)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -218,12 +231,18 @@ model Plan {
   priceMinor Int      @default(0)
   currency   String   @default("INR")
   interval   String   @default("month") // month | year
+  yearlyMinor Int     @default(0) // yearly price in `currency` when interval is month; 0 = monthly x (12 - free months)
   note       String   @default("")
   features   String   @default("[]") // JSON string[]
   prices     String   @default("{}") // JSON { USD: 599, EUR: 549 } per-currency overrides; missing = converted from priceMinor
   postLimit  Int      @default(0) // posts per calendar month, 0 = unlimited
   aiCaptions Boolean  @default(true) // AI captions, hooks, titles and transcripts
   seats      Int      @default(0) // team members besides the owner, 0 = none
+  postPeriod String   @default("month") // week | month: the window postLimit counts over
+  maxUploadMb Int     @default(0) // per-file upload cap on this plan, 0 = the server maximum
+  replyLimit Int      @default(0) // inbox replies per week (Monday 00:00 UTC), 0 = unlimited
+  captionVideos Int   @default(0) // videos per month that can get AI captions, 0 = unlimited
+  burnCaptions Boolean @default(true) // burn subtitles into the video file
   state      String   @default("available") // available | soon | hidden
   highlight  Boolean  @default(false)
   sortOrder  Int      @default(0)
@@ -267,6 +286,7 @@ model Payment {
   amountMinor    Int
   currency       String
   provider       String // mock | stripe | razorpay
+  interval       String   @default("month") // the billing cycle bought: month | year
   providerRef    String? // gateway payment / session id: the idempotency key
   status         String   @default("pending") // pending | succeeded | failed | refunded
   failureReason  String?
@@ -283,21 +303,30 @@ model Payment {
   @@index([userId])
 }
 
+/// Tax law needs invoices kept after the customer leaves, so deleting an account (or its payment row)
+/// only detaches the invoice: userId and paymentId go null, detachedAt is set, and the retention cron
+/// deletes it INVOICE_KEEP_YEARS after it was issued (lib/retention/prune.ts). Everything the PDF prints
+/// is copied onto the row at issue time, so it renders the same without the payment or the user.
 model Invoice {
   id            String    @id @default(cuid())
   number        String    @unique // OUT-2026-000123
-  paymentId     String    @unique
-  userId        String
+  paymentId     String?   @unique
+  userId        String?
   customerName  String
   customerEmail String
   description   String
   amountMinor   Int
   currency      String
+  provider      String? // gateway at issue time (null on invoices issued before 2026-10-18)
+  providerRef   String?
+  taxPercent    Float? // tax rate at issue time
+  issuer        String? // JSON {name,address,gstin} of the seller at issue time
   issuedAt      DateTime  @default(now())
   emailedAt     DateTime?
+  detachedAt    DateTime? // the customer deleted their account; kept for tax law until the retention window ends
 
-  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId, issuedAt])
 }
@@ -356,11 +385,22 @@ model EmailLog {
   html      String
   kind      String // invoice | ticket_opened | ticket_reply | test
   provider  String // mock | resend
-  status    String // mocked | sent | failed
+  status    String // mocked | sent | failed | skipped (recipient unsubscribed from that list)
   error     String?
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+/// 10-26b: someone pressed Unsubscribe on a marketing email (or Gmail's one-click button did it for them).
+/// Keyed by address, not user, so it also covers people without an account. Only "news" today: nudges,
+/// win-back and growth campaigns. The weekly report has its own switch, User.weeklyReport.
+model EmailOptOut {
+  email     String // lower-case
+  list      String // "news"
+  createdAt DateTime @default(now())
+
+  @@id([email, list])
 }
 
 /// Key/value config. Secret fields inside `value` are AES-256-GCM encrypted by lib/settings.ts.
@@ -499,4 +539,64 @@ model Idea {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, doneAt])
+}
+
+// Per-person daily AI call counter (Gemini costs money; the cap keeps one account from running up the bill).
+model AiUsage {
+  userId    String
+  day       String // YYYY-MM-DD in UTC
+  kind      String   @default("ai") // "ai" (writing help) | "support" (help chat)
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, day, kind])
+  @@index([day])
+}
+
+/// Metered plan features (inbox replies, caption videos). One row per use; `ref` dedupes, e.g. the
+/// same video transcribed in several chunks counts once per period.
+model FeatureUse {
+  id        String   @id @default(cuid())
+  userId    String
+  feature   String // "reply" | "captions"
+  period    String // "2026-W43" (weekly) or "2026-10" (monthly)
+  ref       String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, feature, period, ref])
+  @@index([userId, feature, period])
+}
+
+/// One-time beta codes: the first N people to join get one, redeeming it unlocks a paid plan for a few months.
+model BetaCode {
+  id         String    @id @default(cuid())
+  code       String    @unique
+  planSlug   String    @default("creator")
+  months     Int       @default(3)
+  issuedToId String?   @unique // the early member it was issued to (null = made by hand in admin)
+  note       String    @default("")
+  redeemedById String? @unique // one redemption per code, and one beta grant per account
+  redeemedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  issuedTo   User?     @relation("BetaIssued", fields: [issuedToId], references: [id], onDelete: SetNull)
+  redeemedBy User?     @relation("BetaRedeemed", fields: [redeemedById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+}
+
+/// A phone running the Outlly Android app that may receive push notifications (FCM registration token).
+model PushDevice {
+  id         String   @id @default(cuid())
+  userId     String
+  token      String   @unique
+  platform   String   @default("android")
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

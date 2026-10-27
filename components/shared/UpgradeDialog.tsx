@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Pip } from "@/components/brand/Pip";
 import { useUser } from "@/components/shell/UserContext";
 import { UPGRADE_EVENT, type UpgradeDetail } from "@/lib/client/api";
+import { APP_SELLS_PLANS } from "@/lib/app-mode";
+import { useAppMode } from "@/lib/client/app-mode";
 
 const TITLE: Record<string, string> = {
   posts: "Upgrade to post more",
@@ -34,7 +36,9 @@ export function UpgradeDialog() {
   }, []);
   const open = !!d;
   const member = !!user.workspace;
-  const title = (d?.feature && TITLE[d.feature]) || TITLE.posts;
+  // The Android app can't sell plans (Google Play billing rules), so it explains the limit without a way to buy.
+  const sells = !useAppMode() || APP_SELLS_PLANS;
+  const title = sells ? (d?.feature && TITLE[d.feature]) || TITLE.posts : "You've reached your plan's limit";
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && setD(null)}>
@@ -62,13 +66,13 @@ export function UpgradeDialog() {
                   <Dialog.Title className="mt-3 text-xl font-semibold tracking-tight [overflow-wrap:anywhere]">{title}</Dialog.Title>
                   <Dialog.Description className="mt-2 text-sm text-muted-foreground [overflow-wrap:anywhere]">
                     {d?.message}
-                    {member && " Only the workspace owner can change the plan, so ask them to upgrade."}
+                    {member && sells && " Only the workspace owner can change the plan, so ask them to upgrade."}
                   </Dialog.Description>
                   <div className="mt-6 flex flex-wrap-reverse gap-2">
                     <Dialog.Close asChild>
                       <Button variant="ghost" className="min-w-[8rem] flex-1">Not now</Button>
                     </Dialog.Close>
-                    {!member && (
+                    {!member && sells && (
                       <Button asChild variant="lime" className="min-w-[8rem] flex-1">
                         <Link href="/billing#plans" onClick={() => setD(null)} autoFocus>
                           <Sparkles className="h-4 w-4" aria-hidden /> See plans

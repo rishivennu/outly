@@ -57,6 +57,8 @@ const schema = z.object({
   X_CLIENT_ID: z.string().optional().default(""),
   X_CLIENT_SECRET: z.string().optional().default(""),
   GEMINI_API_KEY: z.string().optional().default(""),
+  /** Firebase service account (JSON, or the same JSON base64-encoded) for Android app push. Empty = no push. */
+  FCM_SERVICE_ACCOUNT: z.string().optional().default(""),
   /* Optional FunASR (Paraformer) subtitle worker, the speech engine FunClip uses. POST audio/wav, returns FunASR JSON. */
   FUNASR_URL: z.string().optional().default(""),
   FUNASR_TOKEN: z.string().optional().default(""),

@@ -1,0 +1,219 @@
+/* ==========================================================================
+   Outlly for Android: Apple HIG layout + Liquid Glass materials.
+   Everything here is scoped to html[data-app] (set in <head> by lib/app-mode.ts appScript), so the website
+   is untouched. Phone widths only: tablets in the app keep the desktop layout with the sidebar.
+   ========================================================================== */
+
+html:not([data-app]) .app-only { display: none !important; }
+@media (min-width: 1024px) { .app-only { display: none !important; } }
+
+html[data-app] {
+  --ios-ease: cubic-bezier(.32, .72, 0, 1);
+  --ios-fill: 240 3% 48% / .14;
+  --ios-sep: 240 6% 50% / .2;
+  --ios-green: #34c759;
+  --ios-red: #ff3b30;
+  --app-bar-h: 52px;
+  -webkit-tap-highlight-color: transparent;
+}
+html[data-app].dark { --ios-fill: 240 3% 52% / .24; --ios-sep: 0 0% 100% / .1; --ios-green: #30d158; --ios-red: #ff453a; }
+
+@media (max-width: 1023.98px) {
+  html[data-app] .web-only,
+  html[data-app] .app-hide,
+  html[data-app] .scroll-frame,
+  html[data-app] .pb-rail,
+  html[data-app] a[href^="/billing"],
+  html[data-app] a[href^="/pricing"],
+  html[data-app] a[href="/#pricing"] { display: none !important; }
+
+  /* keeps its space so the row's other controls stay put (the marketing site lists prices, so the app never links to it) */
+  html[data-app] .app-invisible { visibility: hidden; }
+  html[data-app] body { overscroll-behavior-x: none; }
+  html[data-app] ::-webkit-scrollbar { width: 0; height: 0; }
+  html[data-app] :is(.app-bar, .app-tabbar-wrap, .app-sheet-head, .app-sheet) { -webkit-user-select: none; user-select: none; }
+
+  /* Touch feedback: everything tappable dips a little under the finger, like UIKit's highlight. `scale` is its own
+     property, so it never fights an element's existing transform. */
+  html[data-app] :is(button, a, [role="button"], [role="tab"], label):not(:disabled) { transition: scale .32s var(--ios-ease), opacity .2s; }
+  html[data-app] :is(button, a, [role="button"], [role="tab"]):not(:disabled):active { scale: .96; opacity: .82; transition-duration: .08s; }
+  html[data-app] :is(.app-tabbar, .app-sheet, #main) :is(a, button):active { scale: .97; }
+
+  /* ---------- Liquid Glass material ---------- */
+  html[data-app] .liquid {
+    position: relative; isolation: isolate;
+    background: linear-gradient(180deg, hsl(var(--card) / .66), hsl(var(--card) / .5));
+    -webkit-backdrop-filter: blur(26px) saturate(190%) brightness(1.04); backdrop-filter: blur(26px) saturate(190%) brightness(1.04);
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / .6), inset 0 -1px 0 hsl(0 0% 100% / .14), 0 0 0 .5px hsl(var(--foreground) / .08),
+      0 14px 34px -16px rgba(0, 0, 0, .35);
+  }
+  /* refracted rim: a gradient hairline, brighter where light would catch the curve */
+  html[data-app] .liquid::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; padding: 1px; pointer-events: none;
+    background: linear-gradient(120deg, hsl(0 0% 100% / .8), hsl(0 0% 100% / .2) 32%, hsl(0 0% 100% / .05) 58%, hsl(0 0% 100% / .32) 88%, hsl(0 0% 100% / .6));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  }
+  /* specular sheen across the top half */
+  html[data-app] .liquid::after {
+    content: ""; position: absolute; inset: 1px 1px auto; height: 48%; z-index: -1; border-radius: inherit; border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+    pointer-events: none; background: linear-gradient(180deg, hsl(0 0% 100% / .34), transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent); mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent);
+  }
+  html[data-app].dark .liquid {
+    background: linear-gradient(180deg, hsl(var(--card) / .62), hsl(var(--card) / .46));
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / .2), inset 0 -1px 0 hsl(0 0% 100% / .05), 0 0 0 .5px hsl(0 0% 100% / .1), 0 18px 40px -18px rgba(0, 0, 0, .8);
+  }
+  html[data-app].dark .liquid::before { background: linear-gradient(120deg, hsl(0 0% 100% / .34), hsl(0 0% 100% / .08) 32%, transparent 58%, hsl(0 0% 100% / .14) 88%, hsl(0 0% 100% / .26)); }
+  html[data-app].dark .liquid::after { background: linear-gradient(180deg, hsl(0 0% 100% / .1), transparent); }
+
+  /* ---------- Navigation bar + large title ---------- */
+  /* the wrapper must not box the sticky bar in, or the bar would scroll away with the large title */
+  html[data-app] .app-nav { display: contents; }
+  html[data-app] .app-bar {
+    position: sticky; top: 0; z-index: 35; height: calc(var(--app-bar-h) + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 12px 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
+    transition: background .3s var(--ios-ease), box-shadow .3s var(--ios-ease), -webkit-backdrop-filter .3s, backdrop-filter .3s;
+  }
+  html[data-app] .app-bar[data-scrolled="true"] {
+    background: hsl(var(--background) / .72);
+    -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
+    box-shadow: 0 .5px 0 hsl(var(--ios-sep));
+  }
+  html[data-app] .app-bar-side { display: flex; align-items: center; gap: 4px; min-width: 0; }
+  html[data-app] .app-bar-title {
+    font: 600 17px/1 var(--font-body), system-ui, sans-serif; letter-spacing: -.01em; white-space: nowrap;
+    opacity: 0; translate: 0 6px; transition: opacity .25s var(--ios-ease), translate .35s var(--ios-ease);
+  }
+  html[data-app] .app-bar[data-scrolled="true"] .app-bar-title { opacity: 1; translate: 0 0; }
+  /* a pushed screen has no large title, so its bar title shows from the start */
+  html[data-app] .app-bar:has(.app-back) .app-bar-title { opacity: 1; translate: 0 0; }
+  html[data-app] .app-back {
+    display: inline-flex; align-items: center; gap: 0; min-height: 44px; margin-left: -6px; max-width: 100%;
+    font: 500 17px/1 var(--font-body), system-ui, sans-serif; color: hsl(var(--lime-ink));
+  }
+  html[data-app] .app-round, html[data-app] .app-bar .app-round {
+    display: grid; place-items: center; width: 40px; height: 40px; border-radius: 999px; background: hsl(var(--ios-fill)); color: hsl(var(--foreground));
+  }
+  html[data-app] .app-avatar { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; }
+
+  html[data-app] .app-large { padding: 4px 20px 14px; transition: opacity .25s var(--ios-ease), scale .35s var(--ios-ease); transform-origin: left center; }
+  html[data-app] .app-large[data-scrolled="true"] { opacity: 0; scale: .96; }
+  html[data-app] .app-eyebrow { font: 600 13px/1.2 var(--font-body), system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin-bottom: 6px; }
+  html[data-app] .app-large-title { font: 700 34px/1.08 var(--font-display), system-ui, sans-serif; letter-spacing: -.035em; text-wrap: balance; }
+
+  /* ---------- Tab bar ---------- */
+  html[data-app] .app-tabbar-wrap {
+    position: fixed; z-index: 40; left: 14px; right: 14px; bottom: max(14px, env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 10px; pointer-events: none;
+  }
+  html[data-app] .app-tabbar-wrap > * { pointer-events: auto; }
+  /* content fades out under the bar instead of colliding with it */
+  html[data-app] .app-tabbar-wrap::before {
+    content: ""; position: fixed; left: 0; right: 0; bottom: 0; height: 128px; z-index: -1; pointer-events: none;
+    background: linear-gradient(to top, hsl(var(--background)) 18%, hsl(var(--background) / 0));
+  }
+  html[data-app] .app-tabbar {
+    flex: 1; height: 64px; border-radius: 32px; display: flex; align-items: center; justify-content: space-around; padding: 0 6px;
+    transition: height .45s var(--ios-ease), border-radius .45s var(--ios-ease);
+  }
+  html[data-app] .app-tab {
+    position: relative; flex: 1; max-width: 86px; height: 54px; border-radius: 27px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    color: hsl(var(--muted-foreground)); transition: color .25s, height .45s var(--ios-ease);
+  }
+  html[data-app] .app-tab.is-active { color: hsl(var(--foreground)); }
+  html[data-app] .app-tab.is-active svg { color: hsl(var(--lime-ink)); }
+  html[data-app] .app-tab-pill { position: absolute; inset: 0; border-radius: inherit; background: hsl(var(--ios-fill)); box-shadow: inset 0 .5px 0 hsl(0 0% 100% / .25); }
+  html[data-app] .app-tab-label { position: relative; font: 600 10.5px/1 var(--font-body), system-ui, sans-serif; letter-spacing: .01em; transition: opacity .25s, max-height .45s var(--ios-ease); max-height: 14px; }
+  html[data-app] .app-fab {
+    flex: none; width: 64px; height: 64px; border-radius: 32px; display: grid; place-items: center;
+    background: hsl(var(--lime)); color: hsl(var(--lime-foreground));
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / .55), inset 0 -2px 6px hsl(82 80% 30% / .25), 0 10px 26px -6px hsl(var(--lime) / .55);
+    transition: width .45s var(--ios-ease), height .45s var(--ios-ease), scale .3s var(--ios-ease);
+  }
+  /* Scrolling down shrinks the bar out of the way (iOS 26 behaviour); scrolling up brings it back. */
+  html[data-app] .app-tabbar-wrap[data-compact="true"] .app-tabbar { height: 52px; }
+  html[data-app] .app-tabbar-wrap[data-compact="true"] .app-tab { height: 44px; }
+  html[data-app] .app-tabbar-wrap[data-compact="true"] .app-tab-label { opacity: 0; max-height: 0; }
+  html[data-app] .app-tabbar-wrap[data-compact="true"] .app-fab { width: 52px; height: 52px; }
+  html[data-app] #main { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
+
+  /* ---------- Sheets ---------- */
+  html[data-app] .app-scrim { position: fixed; inset: 0; z-index: 80; background: rgba(0, 0, 0, .38); }
+  html[data-app] .app-sheet {
+    position: fixed; z-index: 81; left: 0; right: 0; bottom: 0; max-height: calc(100dvh - 48px); overflow-y: auto; overscroll-behavior: contain;
+    border-radius: 34px 34px 0 0; padding: 0 16px calc(24px + env(safe-area-inset-bottom)); touch-action: pan-y;
+    background: linear-gradient(180deg, hsl(var(--background) / .9), hsl(var(--background) / .82));
+  }
+  html[data-app] .app-grabber { display: block; width: 36px; height: 5px; border-radius: 3px; margin: 7px auto 0; background: hsl(var(--muted-foreground) / .45); }
+  html[data-app] .app-sheet-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 52px; }
+  html[data-app] .app-sheet-title { font: 600 17px/1 var(--font-body), system-ui, sans-serif; letter-spacing: -.01em; }
+  html[data-app] .app-sheet-action { min-height: 44px; display: inline-flex; align-items: center; justify-content: flex-end; font: 500 17px/1 var(--font-body), system-ui, sans-serif; color: hsl(var(--lime-ink)); }
+
+  /* Grouped inset lists (Settings style) */
+  html[data-app] .app-group { margin-top: 18px; border-radius: 16px; background: hsl(var(--card)); overflow: hidden; box-shadow: 0 0 0 .5px hsl(var(--ios-sep)); }
+  html[data-app] .app-group > li + li .app-row::after { content: ""; position: absolute; left: 58px; right: 0; top: 0; height: .5px; background: hsl(var(--ios-sep)); }
+  html[data-app] .app-group-label { margin: 22px 16px 8px; font: 500 13px/1 var(--font-body), system-ui, sans-serif; text-transform: uppercase; letter-spacing: .04em; color: hsl(var(--muted-foreground)); }
+  html[data-app] .app-row { position: relative; display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 0 14px; font: 400 17px/1.2 var(--font-body), system-ui, sans-serif; }
+  html[data-app] .app-row[aria-current="page"] { background: hsl(var(--ios-fill)); }
+  html[data-app] .app-row-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; color: #fff; flex: none; }
+  html[data-app] .app-profile { display: flex; align-items: center; gap: 14px; padding: 14px; }
+
+  /* Segmented control */
+  html[data-app] .app-seg { display: flex; padding: 2px; border-radius: 11px; background: hsl(var(--ios-fill)); height: 38px; }
+  html[data-app] .app-seg-item { position: relative; flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 9px; font: 600 14px/1 var(--font-body), system-ui, sans-serif; }
+  html[data-app] .app-seg-item:active { scale: 1; }
+  html[data-app] .app-seg-pill { position: absolute; inset: 0; border-radius: inherit; background: hsl(var(--card)); box-shadow: 0 3px 8px rgba(0, 0, 0, .12), 0 3px 1px rgba(0, 0, 0, .04), 0 0 0 .5px rgba(0, 0, 0, .04); }
+  html[data-app].dark .app-seg-pill { background: hsl(240 3% 38%); }
+
+  /* Create, presented as a sheet over a dimmed backdrop */
+  html[data-app][data-app-route="create"] body { background: #000; }
+  html[data-app][data-app-route="create"]:not(.dark) body { background: #d9d7d2; }
+  html[data-app] .app-sheet-head {
+    position: sticky; top: 0; z-index: 35; margin-top: max(10px, env(safe-area-inset-top)); padding: 0 12px;
+    border-radius: 28px 28px 0 0; background: hsl(var(--background) / .86);
+    -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); touch-action: none;
+    animation: app-sheet-in .55s var(--ios-ease) backwards;
+  }
+  html[data-app][data-app-route="create"] #main { background: hsl(var(--background)); animation: app-sheet-in .55s var(--ios-ease) backwards; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+
+  /* ---------- Screen transitions ---------- */
+  html[data-app] .app-enter-push { animation: app-push .5s var(--ios-ease) backwards; }
+  html[data-app] .app-enter-pop { animation: app-pop .45s var(--ios-ease) backwards; }
+  html[data-app] .app-enter-fade { animation: app-fade .28s var(--ios-ease) backwards; }
+
+  /* ---------- Existing screens, re-dressed ---------- */
+  /* The large title names the screen, so each page's editorial headline becomes its subtitle. */
+  html[data-app] #main h1.display { font-size: 22px !important; line-height: 1.2 !important; letter-spacing: -.02em !important; font-weight: 650; max-width: none; }
+  html[data-app] #main :is(.glass, .glass-strong) { border-radius: 22px; }
+  html[data-app] #main :is(input, textarea, select) { font-size: 16px; }
+  html[data-app] #main :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select) { border-radius: 12px; }
+  html[data-app] .app-upload { margin-top: 0; }
+
+  /* UISwitch: 51 x 31, system green when on */
+  html[data-app] button[role="switch"] { width: 51px !important; height: 31px !important; border-radius: 999px !important; background: hsl(var(--ios-fill)) !important; box-shadow: none !important; border: 0 !important; padding: 0; transition: background .25s var(--ios-ease); }
+  html[data-app] button[role="switch"][data-state="checked"], html[data-app] button[role="switch"][aria-checked="true"] { background: var(--ios-green) !important; }
+  html[data-app] button[role="switch"] > span {
+    width: 27px !important; height: 27px !important; background: #fff !important; translate: 0 0; transform: translateX(2px) !important;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, .15), 0 3px 1px rgba(0, 0, 0, .06) !important; transition: transform .32s var(--ios-ease) !important;
+  }
+  html[data-app] button[role="switch"][data-state="checked"] > span, html[data-app] button[role="switch"][aria-checked="true"] > span { transform: translateX(22px) !important; }
+  html[data-app] button[role="switch"]:active > span { width: 33px !important; }
+  html[data-app] button[role="switch"][data-state="checked"]:active > span { transform: translateX(16px) !important; }
+}
+
+@keyframes app-push { from { transform: translate3d(100%, 0, 0); box-shadow: -20px 0 40px rgba(0, 0, 0, .18); } to { transform: none; } }
+@keyframes app-pop { from { transform: translate3d(-30%, 0, 0); opacity: .5; } to { transform: none; opacity: 1; } }
+@keyframes app-fade { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes app-sheet-in { from { transform: translate3d(0, 100%, 0); } to { transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-app] :is(.app-enter-push, .app-enter-pop, .app-enter-fade, .app-sheet-head, #main) { animation: none !important; }
+  html[data-app] :is(.app-tabbar, .app-tab, .app-fab, .app-large, .app-bar-title) { transition: none !important; }
+}
+/* Solid surfaces for people who asked for less transparency or more contrast */
+@media (prefers-reduced-transparency: reduce) {
+  html[data-app] :is(.liquid, .app-bar[data-scrolled="true"], .app-sheet-head, .app-sheet) { background: hsl(var(--card)) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+}
+html[data-app][data-contrast="more"] :is(.liquid, .app-bar[data-scrolled="true"], .app-sheet-head, .app-sheet) { background: hsl(var(--card)) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }

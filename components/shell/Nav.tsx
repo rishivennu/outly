@@ -154,7 +154,7 @@ export function MobileNav() {
         ref={panel}
         id="more-panel"
         hidden={!more}
-        className="fixed inset-x-3 bottom-[calc(max(12px,env(safe-area-inset-bottom))+76px)] z-[56] max-h-[60dvh] bg-background/95 shadow-2xl backdrop-blur-xl hairline overflow-y-auto rounded-[28px] p-2 lg:hidden"
+        className="web-only fixed inset-x-3 bottom-[calc(max(12px,env(safe-area-inset-bottom))+76px)] z-[56] max-h-[60dvh] bg-background/95 shadow-2xl backdrop-blur-xl hairline overflow-y-auto rounded-[28px] p-2 lg:hidden"
       >
         <ul className="grid grid-cols-1 gap-0.5 min-[400px]:grid-cols-2">
           {extra.map(({ href, label, icon: Icon }) => {
@@ -170,7 +170,7 @@ export function MobileNav() {
           })}
         </ul>
       </div>
-      <nav aria-label="Primary" className="glass-strong fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-40 flex h-[68px] items-center justify-around rounded-[28px] px-1 lg:hidden">
+      <nav aria-label="Primary" className="web-only glass-strong fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-40 flex h-[68px] items-center justify-around rounded-[28px] px-1 lg:hidden">
         {MAIN.filter((m) => TABS.includes(m.href)).map(({ href, label, icon: Icon }) => {
           const active = isActive(path, href);
           const create = href === "/create";
@@ -197,7 +197,7 @@ export function MobileNav() {
 /** Phone top bar: brand, theme and notifications. Everything else moved to More in the tab bar. */
 export function MobileTopBar() {
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between gap-2 px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] lg:hidden">
+    <header className="web-only sticky top-0 z-30 flex items-center justify-between gap-2 px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] lg:hidden">
       <Link href="/home" className="flex min-h-11 min-w-0 shrink-0 items-center gap-2 rounded-2xl text-[16px]" aria-label="Outlly dashboard">
         <OutlyMark size={26} className="min-[480px]:hidden" />
         <OutlyLogo className="hidden min-[480px]:inline-flex" />

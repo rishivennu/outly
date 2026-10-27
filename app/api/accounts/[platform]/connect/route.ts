@@ -5,6 +5,8 @@ import { isPlatform } from "@/lib/domain";
 import { getPublisher, hasCredentials, loadKeys, practiceAllowed } from "@/lib/social/registry";
 import { instagramIdLooksLikeMetaAppId } from "@/lib/social/keys";
 import { safeReturnTo, saveOAuthState } from "@/lib/oauth-state";
+import { isNativeUA } from "@/lib/app-mode";
+import { APP_AUTH_PAGE } from "@/lib/app-handoff";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,12 @@ export async function GET(req: NextRequest, { params }: { params: { platform: st
     back.searchParams.set("connect_error", "instagram");
     back.searchParams.set("reason", "wrong_app_id");
     return NextResponse.redirect(back);
+  }
+  // In the Android app: Meta, Google and others refuse to sign in inside a WebView. Finish this in a Custom Tab.
+  if (isNativeUA(req.headers.get("user-agent"))) {
+    const to = new URL(APP_AUTH_PAGE, env.APP_URL);
+    to.searchParams.set("to", req.nextUrl.pathname + req.nextUrl.search);
+    return NextResponse.redirect(to);
   }
   const redirectUri = `${env.APP_URL}/api/accounts/${params.platform}/callback`;
   const start = await getPublisher(params.platform).connect(redirectUri);

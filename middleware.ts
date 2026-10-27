@@ -1,16 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { SRC_COOKIE, SRC_DAYS, sourceFromParams } from "./lib/growth/core";
+import { APP_SOURCE } from "./lib/app-mode";
 
 const AUTH_PAGES = ["/login", "/signup"];
 // Marketing pages anyone can read.
-const OPEN = ["/", "/privacy", "/terms", "/contact", "/help", "/waitlist", "/maintenance", "/unsubscribe"];
+const OPEN = ["/", "/privacy", "/terms", "/contact", "/help", "/waitlist", "/maintenance", "/unsubscribe", "/app-auth"];
 // A review link is its own credential: the reviewer has no account here.
 // A share link (/r/code) and a team invite must work before the visitor has an account.
 const OPEN_PREFIX = ["/review/", "/r/", "/team/accept"];
 // Pages that need a session. Anything not listed here and not public is either a real public file
 // (og image, icons) or a typo, and a typo deserves the 404 page, not a sign-in wall.
-const STUDIO = ["/home", "/create", "/content", "/calendar", "/analytics", "/inbox", "/approvals", "/accounts", "/billing", "/settings", "/support", "/mascot", "/share-target"];
+const STUDIO = ["/home", "/create", "/content", "/calendar", "/analytics", "/inbox", "/approvals", "/accounts", "/billing", "/settings", "/support", "/mascot", "/share-target", "/app-share"];
 const needsSession = (p: string) => STUDIO.some((s) => p === s || p.startsWith(s + "/"));
 // Old or guessed marketing URLs that point at a section of the home page.
 const SECTION_ALIASES: Record<string, string> = { "/pricing": "/#pricing", "/faq": "/#faq", "/features": "/#features" };
@@ -23,10 +24,10 @@ const LH_HINT = "outlly_lh";
 // Waitlist on: the whole public site becomes the waitlist page (user's call, 10-12g). These still work:
 // the waitlist page itself, the legal pages its form links to, and links that are their own credential
 // (emailed invites, team invites, client review links, share links).
-const WAITLIST_OPEN = ["/waitlist", "/privacy", "/terms", "/unsubscribe"];
+const WAITLIST_OPEN = ["/waitlist", "/privacy", "/terms", "/unsubscribe", "/app-auth"];
 // Maintenance on: strangers only reach these. /login lets members back in; nobody can sign up.
 // /unsubscribe: leaving a mailing list must work whatever mode the site is in.
-const MAINTENANCE_OPEN = ["/maintenance", "/login", "/privacy", "/terms", "/unsubscribe"];
+const MAINTENANCE_OPEN = ["/maintenance", "/login", "/privacy", "/terms", "/unsubscribe", "/app-auth"];
 const WAITLIST_PREFIX = ["/review/", "/r/", "/team/accept"];
 
 function sync(req: NextRequest, res: NextResponse, name: string, on: boolean, maxAge: number) {
@@ -95,6 +96,12 @@ async function isAdmin(req: NextRequest) {
   }
 }
 
+/** The Android app launches with ?source=twa; carry it through sign-in redirects so the first page that renders knows it's the app. */
+export function keepAppSource(req: NextRequest, to: URL) {
+  if (req.nextUrl.searchParams.get("source") === APP_SOURCE) to.searchParams.set("source", APP_SOURCE);
+  return to;
+}
+
 export async function middleware(req: NextRequest) {
   const res = await route(req);
   // The old admin-only notice bar is gone; clear its cookie from browsers that still have it.
@@ -106,8 +113,25 @@ export async function middleware(req: NextRequest) {
   return res;
 }
 
+/*
+ * A Google sign-in started in the Android app runs in a Custom Tab. When it ends on an error page
+ * (/login?google_error, or the waitlist) instead of the usual way back, send it to the app anyway, so the
+ * creator isn't left in the browser. Mirrors APP_CH_COOKIE / APP_RETURN_PATH in lib/app-handoff.ts.
+ */
+export function appBounce(req: NextRequest) {
+  if (!req.cookies.get("ol_app_ch")?.value) return null;
+  const { pathname, searchParams } = req.nextUrl;
+  const stuck = (pathname === "/login" && searchParams.has("google_error")) || (pathname === "/waitlist" && searchParams.get("from") === "google");
+  if (!stuck) return null;
+  const u = new URL("/api/app/return", req.url);
+  u.searchParams.set("next", pathname + req.nextUrl.search);
+  return NextResponse.redirect(u);
+}
+
 async function route(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const bounce = appBounce(req);
+  if (bounce) return bounce;
   const alias = SECTION_ALIASES[pathname];
   if (alias) return NextResponse.redirect(new URL(alias, req.url), 308);
   const adminArea = pathname === "/admin" || pathname.startsWith("/admin/");
@@ -158,13 +182,13 @@ async function route(req: NextRequest) {
   if (!authed && !AUTH_PAGES.includes(pathname) && needsSession(pathname)) {
     const u = new URL("/login", req.url);
     u.searchParams.set("next", pathname + req.nextUrl.search);
-    return hint(req, NextResponse.redirect(u), authed);
+    return hint(req, NextResponse.redirect(keepAppSource(req, u)), authed);
   }
-  if (authed && AUTH_PAGES.includes(pathname)) return hint(req, NextResponse.redirect(new URL("/home", req.url)), authed);
+  if (authed && AUTH_PAGES.includes(pathname)) return hint(req, NextResponse.redirect(keepAppSource(req, new URL("/home", req.url))), authed);
   return hint(req, NextResponse.next(), authed);
 }
 
 export const config = {
   // Pages only. API routes do their own auth and return JSON 401s.
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|webp|ico|txt|xml|js|html|webmanifest)$).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|\\.well-known|.*\\.(?:svg|png|jpg|webp|ico|txt|xml|js|html|webmanifest)$).*)"],
 };

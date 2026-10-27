@@ -17,6 +17,8 @@ import { WhatsNew } from "@/components/shell/WhatsNew";
 import { SendingPill } from "@/components/shell/SendingPill";
 import { PrivacyNotice } from "@/components/shared/PrivacyNotice";
 import { UpgradeDialog } from "@/components/shared/UpgradeDialog";
+import { AppEffects, AppMoreSheet, AppNavBar, AppTabBar } from "@/components/shell/AppChrome";
+import { NativeBridge } from "@/components/shell/NativeBridge";
 
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -42,12 +44,17 @@ export default async function StudioLayout({ children }: { children: React.React
             </div>
           )}
           <MobileTopBar />
+          <AppNavBar />
           <main id="main" className="relative min-h-dvh pb-28 lg:pb-0">
             {children}
           </main>
         </div>
       </div>
       <MobileNav />
+      <AppTabBar />
+      <AppMoreSheet />
+      <AppEffects />
+      <NativeBridge />
       <SendingPill />
       <PrivacyNotice />
       <UpgradeDialog />

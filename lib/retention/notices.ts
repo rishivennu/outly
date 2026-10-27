@@ -3,6 +3,7 @@ import { db } from "../db";
 import { env } from "../env";
 import { getConfig } from "../settings";
 import { sendEmail, templates } from "../email";
+import { pushToUser } from "../push/fcm";
 import { PLATFORM_META, isPlatform } from "../domain";
 import { isPracticeAccount } from "../social/registry";
 import { noticeKey, parseKey, weekStamp } from "./core";
@@ -34,6 +35,8 @@ export async function notify(userId: string, n: NoticeInput, opts: { email?: boo
     .create({ data: { userId, kind: n.kind, tone: n.tone, title: n.title, body: n.body, href: n.href ?? null, action: n.action ?? null, key: n.key } })
     .catch(() => null); // two workers racing on the same key: the other one won
   if (!created) return { created: false, id: null };
+  // Same once-per-key rule as the notice itself, so a retry never buzzes the phone twice.
+  await pushToUser(userId, { title: n.title, body: n.body, href: n.href });
   if (opts.email && !(await getConfig("site")).maintenance) {
     const u = await db.user.findUnique({ where: { id: userId }, select: { name: true, email: true } });
     if (u)

@@ -29,7 +29,7 @@ export function HomeHero({ firstName }: { firstName: string }) {
   return (
     <section className="relative overflow-hidden pb-14" aria-labelledby="home-title">
       {/* the glow stops where the fan fades out, so the fade lands on plain background (no seam) */}
-      <div className="relative pt-8 sm:pt-12">
+      <div className="app-hide relative pt-8 sm:pt-12">
         <div aria-hidden="true" className="hf-glow pointer-events-none absolute inset-0" />
         <Sparkles />
         <div className="relative mx-auto flex max-w-6xl flex-col items-center px-5 text-center sm:px-10">
@@ -71,8 +71,8 @@ export function HomeHero({ firstName }: { firstName: string }) {
         </div>
       </div>
 
-      <div className="relative mx-auto mt-6 max-w-6xl px-5 sm:px-10">
-        <p className="mb-4 text-center text-sm text-muted-foreground">…or drop a video you already have.</p>
+      <div className="app-upload relative mx-auto mt-6 max-w-6xl px-5 sm:px-10">
+        <p className="app-hide mb-4 text-center text-sm text-muted-foreground">…or drop a video you already have.</p>
         <UploadZone
           accepted={accepted}
           onFile={(f) => {

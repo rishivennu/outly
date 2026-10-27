@@ -6,6 +6,7 @@ import { Input, Label } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { api, ApiError } from "@/lib/client/api";
 import { qrSvgPath } from "@/lib/otp/qr";
+import { saveBlob } from "@/lib/client/native";
 
 type Status = { enabled: boolean; enabledAt: string | null; recoveryLeft: number };
 type View = "idle" | "setup" | "codes" | "confirm-off" | "confirm-new";
@@ -108,11 +109,7 @@ export function TwoStepCard({ email }: { email: string }) {
   };
   const download = () => {
     const body = `Outlly recovery codes for ${email}\nEach code works once. Keep them somewhere safe, away from your phone.\n\n${codes.join("\n")}\n`;
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([body], { type: "text/plain" }));
-    a.download = "outlly-recovery-codes.txt";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    saveBlob(new Blob([body], { type: "text/plain" }), "outlly-recovery-codes.txt").catch(() => toast("Couldn't save the file. Copy the codes instead.", "error"));
   };
 
   const on = !!st?.enabled;

@@ -7,6 +7,7 @@ import { cutClips } from "@/lib/client/captions";
 import { toSrt, type CaptionPos, type CaptionStyle, type Cue } from "@/lib/captions/cues";
 import { findText, rangesLength, shiftCues, type Highlight, type Range, type Word } from "@/lib/captions/subtitle-engine";
 import { cn } from "@/lib/utils";
+import { saveBlob } from "@/lib/client/native";
 
 type Pick = Range & { title?: string; why?: string; on: boolean; from: "text" | "ai" };
 
@@ -107,11 +108,7 @@ export function ClipCutter({ src, filename, duration, cues, words, style, pos, p
   };
 
   const srt = () => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([toSrt(shiftCues(cues, chosen))], { type: "application/x-subrip" }));
-    a.download = `${filename.replace(/\.[^.]+$/, "") || "clip"}-cut.srt`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    void saveBlob(new Blob([toSrt(shiftCues(cues, chosen))], { type: "application/x-subrip" }), `${filename.replace(/\.[^.]+$/, "") || "clip"}-cut.srt`).catch(() => {});
   };
 
   return (

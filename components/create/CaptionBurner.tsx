@@ -9,6 +9,7 @@ import { CAPTION_STYLES, cueAt, cuesFromScript, normalizeCues, toSrt, type Capti
 import { cn } from "@/lib/utils";
 import { wordsFromCues, type Word } from "@/lib/captions/subtitle-engine";
 import { ClipCutter } from "./ClipCutter";
+import { saveBlob } from "@/lib/client/native";
 
 interface Props {
   src: string;
@@ -157,11 +158,7 @@ export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onErr
   }
 
   function downloadSrt() {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([toSrt(cues)], { type: "application/x-subrip" }));
-    a.download = `${filename.replace(/\.[^.]+$/, "") || "captions"}.srt`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    void saveBlob(new Blob([toSrt(cues)], { type: "application/x-subrip" }), `${filename.replace(/\.[^.]+$/, "") || "captions"}.srt`).catch(() => {});
   }
 
   const edit = (i: number, patch: Partial<Cue>) => setCues((cs) => cs.map((c, j) => (j === i ? { ...c, ...patch } : c)));

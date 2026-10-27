@@ -53,6 +53,7 @@ model User {
   snippets       Snippet[]
   ideas          Idea[]
   featureUses FeatureUse[]
+  pushDevices PushDevice[]
   betaIssued  BetaCode?  @relation("BetaIssued")
   betaRedeemed BetaCode? @relation("BetaRedeemed")
 }
@@ -584,4 +585,18 @@ model BetaCode {
   redeemedBy User?     @relation("BetaRedeemed", fields: [redeemedById], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
+}
+
+/// A phone running the Outlly Android app that may receive push notifications (FCM registration token).
+model PushDevice {
+  id         String   @id @default(cuid())
+  userId     String
+  token      String   @unique
+  platform   String   @default("android")
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
