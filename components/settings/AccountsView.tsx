@@ -40,7 +40,7 @@ const ERRORS: Record<string, (name: string) => string> = {
   not_configured: (n) => `${n} isn't set up on this server yet, so there's nothing to connect to.`,
   access_denied: (n) => `${n} didn't give access. While the app is in testing, only approved testers can connect. The help on the card below shows how to get added.`,
   state: () => "That sign-in took too long or came from another tab. Let's start it again.",
-  exchange: (n) => `${n} signed you in, but we couldn't finish the handshake. Try once more.`,
+  exchange: (n) => `${n} signed you in, but the last step failed. What ${n} said is shown on this page.`,
   config: (n) => `${n} turned this server away: its app ID or secret doesn't match the ${n} app. Ask the admin to check both in Admin > Social platforms.`,
   redirect: (n) => `${n} doesn't know this site's return address yet. The admin needs to copy the callback URL from Admin > Social platforms into the ${n} app's OAuth redirect URIs, exactly as shown.`,
   server: () => "You signed in fine, but we couldn't save the connection on our side. Give it a minute and try again.",
@@ -55,6 +55,7 @@ export function AccountsView({ initial, setup }: { initial: AccountView[]; setup
   const toast = useToast();
   const router = useRouter();
   const params = useSearchParams();
+  const [fail, setFail] = useState<{ name: string; detail: string } | null>(null);
   const errorReason = params.get("connect_error") === "youtube" ? params.get("reason") : null;
   const tilt = useTilt(12);
   const live = useLivePlatforms();
@@ -71,6 +72,13 @@ export function AccountsView({ initial, setup }: { initial: AccountView[]; setup
       const name = (PLATFORMS as readonly string[]).includes(e) ? PLATFORM_META[e as Platform].name : "The platform";
       const reason = params.get("reason") ?? "";
       toast((ERRORS[reason] ?? (() => "That connection didn't go through. Let's try again."))(name), "info");
+      const m = /(?:^|;\s*)outlly-connect-detail=([^;]*)/.exec(document.cookie);
+      if (m) {
+        try {
+          setFail({ name, detail: decodeURIComponent(m[1]).slice(0, 240) });
+        } catch {}
+        document.cookie = "outlly-connect-detail=; path=/; max-age=0";
+      }
     }
     if (c || e) router.replace("/accounts");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,6 +108,17 @@ export function AccountsView({ initial, setup }: { initial: AccountView[]; setup
         You sign in on each platform&apos;s own page. We never see your password, and every key we keep is encrypted.
         {" Every account you connect here is your real one: posts go live and the numbers are real."}
       </p>
+
+      {fail && (
+        <div role="alert" className="mt-6 max-w-2xl rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm">
+          <p className="font-medium">{fail.name} didn&apos;t connect. What {fail.name} told us:</p>
+          <p className="mt-1 break-words font-mono text-[13px] text-foreground/85">{fail.detail}</p>
+          <p className="mt-2 text-foreground/75">Send this line to whoever looks after the app keys. It holds no passwords or tokens.</p>
+          <button type="button" onClick={() => setFail(null)} className="mt-2 min-h-11 underline underline-offset-2">
+            Hide this
+          </button>
+        </div>
+      )}
 
       <ul className="mt-10 grid gap-4 md:grid-cols-3">
         {live.map((p, i) => {

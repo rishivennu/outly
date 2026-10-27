@@ -5,7 +5,7 @@ import { useUser } from "@/components/shell/UserContext";
 import { defaultOrb, resolveAvatar } from "@/lib/avatar";
 
 /**
- * Avatar cursor (10-15): the mouse pointer becomes a small arrow with your avatar riding beside it.
+ * Avatar cursor (10-15): the mouse pointer becomes your avatar (photo or orb), no arrow.
  * On clickable things the avatar gets a lime ring; text fields keep the normal text cursor, so
  * typing and selecting still feel native. Mouse and trackpad only (touch has no cursor), and the
  * system cursor comes back under forced colours. On by default; Settings > Look turns it off
@@ -28,12 +28,18 @@ export function setCursorEnabled(on: boolean) {
   window.dispatchEvent(new Event(EVT));
 }
 
-const ARROW = `<path d="M3 2v17.5l4.6-4.1 3.1 7.1 3.3-1.4-3-6.9h6.3z" fill="#15131a" stroke="#fff" stroke-width="1.7" stroke-linejoin="round"/>`;
+/* Avatar only, no arrow (10-15b): a 32px round cursor, hotspot in the centre. 32px is the size every
+ * browser renders anywhere on the page (bigger cursors get swapped for the system one near the edges).
+ * A thin dark halo keeps it visible on white; on clickable things a lime ring appears around it. */
+const SIZE = 32;
+const C = SIZE / 2;
 const wrap = (inner: string, hover: boolean) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="40" height="40" viewBox="0 0 40 40">` +
-  (hover ? `<circle cx="26.5" cy="26.5" r="13" fill="none" stroke="#c6f432" stroke-width="2.6"/>` : "") +
-  inner + ARROW + `</svg>`;
-const css = (svg: string) => `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}") 3 2, auto`;
+  `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">` +
+  `<circle cx="${C}" cy="${C}" r="${hover ? 11.4 : 12.6}" fill="#fff" stroke="rgba(21,19,26,.35)" stroke-width="1"/>` +
+  inner +
+  (hover ? `<circle cx="${C}" cy="${C}" r="14.2" fill="none" stroke="#c6f432" stroke-width="2.6"/><circle cx="${C}" cy="${C}" r="15.6" fill="none" stroke="rgba(21,19,26,.4)" stroke-width=".8"/>` : "") +
+  `</svg>`;
+const css = (svg: string) => `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}") ${C} ${C}, auto`;
 
 async function photoData(src: string): Promise<string | null> {
   try {
@@ -106,10 +112,11 @@ export function AvatarCursor() {
       root.setAttribute("data-avatar-cursor", "");
     };
 
-    apply(orbInner(24, 14), orbInner(22, 15.5));
+    // the orb's own glow sits inside its 100-unit box, so it gets a little more room than the photo
+    apply(orbInner(26, C - 13), orbInner(23, C - 11.5));
     if (photo)
       void photoData(photo).then((d) => {
-        if (d) apply(photoInner(d, 22, 15), photoInner(d, 20, 16.5));
+        if (d) apply(photoInner(d, 23, C - 11.5), photoInner(d, 20.6, C - 10.3));
       });
     return () => {
       dead = true;

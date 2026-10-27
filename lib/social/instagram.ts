@@ -58,7 +58,9 @@ export class InstagramPublisher implements SocialPublisher {
     );
     if (!long.ok) throw await httpFailure(long, "instagram long-lived exchange");
     const l = (await long.json()) as { access_token: string; expires_in: number };
-    const me = await fetch(`${GRAPH}/me?fields=user_id,username,name,profile_picture_url&access_token=${encodeURIComponent(l.access_token)}`);
+    let me = await fetch(`${GRAPH}/me?fields=user_id,username,name,profile_picture_url&access_token=${encodeURIComponent(l.access_token)}`);
+    // Some accounts refuse the optional fields; the id and handle are all a connection needs (1031e).
+    if (!me.ok && me.status === 400) me = await fetch(`${GRAPH}/me?fields=user_id,username&access_token=${encodeURIComponent(l.access_token)}`);
     if (!me.ok) throw await httpFailure(me, "instagram profile");
     const p = (await me.json()) as { user_id: string; username: string; name?: string; profile_picture_url?: string };
     return {
