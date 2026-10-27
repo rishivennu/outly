@@ -81,7 +81,8 @@ export function Hero({ showHow = true, beta = false }: { showHow?: boolean; beta
         </dl>
       </Shell>
 
-      <div className="relative mt-4 sm:mt-6">
+      {/* Never catches clicks: the fan's negative top margin lifts this wrapper over the copy above. */}
+      <div className="pointer-events-none relative mt-4 sm:mt-6">
         <HeroFan framed />
       </div>
     </section>

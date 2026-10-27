@@ -52,9 +52,16 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
   useEffect(() => {
     if (localStorage.getItem(welcomeKey(user.id))) return;
     if (isApp() && !APP_SELLS_PLANS) return; // no plan offers inside the Android app (Google Play billing rules)
+    // Claim this visit so the "What's new" card waits for the next one instead of stacking on top.
+    document.documentElement.dataset.onboarding = "welcome";
     let t: ReturnType<typeof setTimeout> | undefined;
+    let tries = 0;
     const show = () => {
-      t = setTimeout(() => setOpen(true), 450);
+      // Never open over another dialog that is already up: check again shortly (about a minute at most).
+      t = setTimeout(() => {
+        if (document.querySelector('[role="dialog"]') && ++tries < 150) return show();
+        setOpen(true);
+      }, 450);
     };
     // Never on top of the privacy notice: wait for it to be closed first.
     let unPrivacy = () => {};
@@ -63,6 +70,7 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
     window.addEventListener("outly:tour-closed", onClosed, { once: true });
     return () => {
       if (t) clearTimeout(t);
+      delete document.documentElement.dataset.onboarding;
       unPrivacy();
       window.removeEventListener("outly:tour-closed", onClosed);
     };
@@ -71,6 +79,7 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
   const close = (o: boolean) => {
     if (o) return;
     localStorage.setItem(welcomeKey(user.id), new Date().toISOString());
+    delete document.documentElement.dataset.onboarding;
     setOpen(false);
   };
 
@@ -80,7 +89,7 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
         {open && (
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild forceMount>
-              <motion.div className="fixed inset-0 z-[70] bg-foreground/35 backdrop-blur-[3px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+              <motion.div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[3px] dark:bg-black/60" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount aria-describedby="welcome-sub-body">
               <div className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]" data-lenis-prevent onPointerDown={(e) => { if (e.target === e.currentTarget) close(false); }}>
@@ -90,26 +99,27 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ type: "spring", stiffness: 460, damping: 36 }}
-                  className="glass-strong relative w-full max-w-[460px] overflow-hidden rounded-[30px] p-6 sm:p-7"
+                  className="glass-strong relative w-full max-w-[460px] overflow-hidden rounded-[30px] bg-card/[0.94] p-6 shadow-2xl sm:p-7"
                 >
+                  {/* Near-opaque card (not see-through glass): the busy home page behind it made the grey text unreadable. */}
                   <span aria-hidden data-w="glow" className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-lime/25 blur-3xl" />
                   <Dialog.Close asChild>
                     <Button size="icon-sm" variant="ghost" className="absolute right-3 top-3 h-11 w-11" aria-label="Close the welcome message">
                       <X className="h-4 w-4" aria-hidden />
                     </Button>
                   </Dialog.Close>
-                  <p data-w="line" className="eyebrow mb-2">Welcome to Outlly</p>
-                  <Dialog.Title data-w="line" className="pr-8 font-display text-[1.6rem] font-bold leading-tight tracking-[-0.03em]">
+                  <p data-w="line" className="eyebrow mb-2 pr-12 text-foreground/70">Welcome to Outlly</p>
+                  <Dialog.Title data-w="line" className="pr-10 font-display text-[1.6rem] font-bold leading-tight tracking-[-0.03em]">
                     Hi {firstName}, glad you're here.
                   </Dialog.Title>
-                  <p id="welcome-sub-body" data-w="line" className="mt-2.5 text-[14.5px] leading-relaxed text-muted-foreground">
+                  <p id="welcome-sub-body" data-w="line" className="mt-2.5 text-[14.5px] leading-relaxed text-foreground/80">
                     {welcomePitch(freeLimit, offer, freePeriod)}
                   </p>
                   {offer && (
                     <div data-w="offer" className="mt-5 rounded-2xl bg-lime/[0.08] p-4 hairline">
                       <div className="flex items-baseline justify-between gap-3">
                         <p className="font-display text-[1.05rem] font-semibold">{offer.name}</p>
-                        <p className="tabular text-[14px]"><b className="font-display text-[1.25rem]">{offer.price}</b><span className="text-muted-foreground"> / {offer.interval}</span></p>
+                        <p className="tabular text-[14px]"><b className="font-display text-[1.25rem]">{offer.price}</b><span className="text-foreground/70"> / {offer.interval}</span></p>
                       </div>
                       {offer.features.length > 0 && (
                         <ul className="mt-3 flex flex-col gap-1.5 text-[13.5px]">
@@ -122,7 +132,7 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
                   )}
                   <div data-w="cta" className="mt-6 flex flex-wrap-reverse gap-2">
                     <Dialog.Close asChild>
-                      <Button variant="ghost" className="min-w-[8rem] flex-1">Keep exploring free</Button>
+                      <Button variant="ghost" className="min-w-[8rem] flex-1 text-foreground/85 hairline">Keep exploring free</Button>
                     </Dialog.Close>
                     <Button asChild variant="lime" className="min-w-[8rem] flex-1">
                       <Link href={offer ? `/billing?plan=${encodeURIComponent(offer.slug)}` : "/billing"} onClick={() => close(false)} autoFocus>
@@ -130,7 +140,7 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
                       </Link>
                     </Button>
                   </div>
-                  <p data-w="cta" className="mt-3 text-center text-[12px] text-muted-foreground">Cancel any time from Billing.</p>
+                  <p data-w="cta" className="mt-3 text-center text-[12px] text-foreground/65">Cancel any time from Billing.</p>
                 </motion.div>
               </div>
             </Dialog.Content>

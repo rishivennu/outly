@@ -15,8 +15,8 @@ const PLATFORMS: { name: string; api: string; asks: string[]; uses: string; poli
   {
     name: "Instagram",
     api: "Instagram API with Instagram Login (Meta)",
-    asks: ["Your professional account’s basic profile (username, name, profile picture)", "Publishing Reels to that account", "Reading and replying to comments on your posts"],
-    uses: "We publish the Reels you schedule, show their status and numbers, and bring comments into your Inbox. Instagram fetches the video from a private link that expires.",
+    asks: ["Your professional account’s basic profile (username, name, profile picture)", "Publishing Reels to that account", "Reading and replying to comments on your posts", "Reading and answering direct messages sent to that account"],
+    uses: "We publish the Reels you schedule, show their status and numbers, and bring comments and direct messages into your Inbox. You can answer a message for 24 hours after the person last wrote, as Meta requires. Instagram fetches the video from a private link that expires.",
     policy: [{ label: "Instagram Terms of Use", href: "https://help.instagram.com/581066165581870" }, { label: "Meta Privacy Policy", href: "https://www.facebook.com/privacy/policy" }],
   },
   {
@@ -50,8 +50,8 @@ const PLATFORMS: { name: string; api: string; asks: string[]; uses: string; poli
   {
     name: "Facebook",
     api: "Facebook Pages API (Meta)",
-    asks: ["The list of Pages you manage", "Reading engagement on those Pages", "Publishing posts and videos to a Page"],
-    uses: "We publish Reels to the first Page you manage and show their status. Facebook fetches the video from a private link that expires.",
+    asks: ["The list of Pages you manage", "Reading engagement on those Pages", "Publishing posts and videos to a Page", "Reading and answering Messenger messages sent to that Page, and subscribing the Page to message notifications"],
+    uses: "We publish Reels to the first Page you manage and show their status, and bring the Page’s Messenger conversations into your Inbox so you can answer them within Meta’s 24-hour window. Facebook fetches the video from a private link that expires.",
     policy: [{ label: "Meta Terms", href: "https://www.facebook.com/terms.php" }, { label: "Meta Privacy Policy", href: "https://www.facebook.com/privacy/policy" }],
   },
   {
@@ -147,7 +147,7 @@ export default function PrivacyPage() {
             <li><strong>Captions, hooks, titles and hashtags:</strong> the text you write describing your video.</li>
             <li><strong>Captions from speech:</strong> the audio track of your video, converted to a small sound file. The video picture is not sent. If we switch on our own speech-recognition server (FunASR), the sound file goes there instead of Google.</li>
             <li><strong>Clip highlights:</strong> the subtitle text of your video, so it can suggest the moments worth their own clip.</li>
-            <li><strong>Reply suggestions:</strong> the comment you are replying to.</li>
+            <li><strong>Reply suggestions:</strong> the comment or direct message you are replying to, and the sender’s display name.</li>
             <li><strong>Insights on your analytics:</strong> your account and post numbers.</li>
             <li><strong>Pip, the support assistant:</strong> your question and the last few messages of the chat.</li>
           </ul>
@@ -184,12 +184,20 @@ export default function PrivacyPage() {
             we do not run any, and if we add them they will only load after you allow them.
           </p>
 
+          <h2>Direct messages</h2>
+          <p>
+            When you connect Instagram or a Facebook Page, Meta sends Outlly the direct messages people write to that account, and the replies you send, so they appear in your Inbox. We store the text encrypted, together with the sender&rsquo;s display name, username, profile picture link and the time. Photos and videos stay with Meta: we keep only the link Meta gives us. Messages are used only to show your conversations and send your replies. They are never used for advertising, never sold, and never used to train AI. Only you and the teammates you invite to your workspace can read them; editors can read but not reply.
+          </p>
+          <p>
+            Messages are deleted automatically 180 days after they were sent. Disconnecting the account, removing Outlly in Instagram or Facebook settings, or deleting your Outlly account deletes them straight away. Meta&rsquo;s data deletion request does the same: it removes the connected account and its messages and gives you a confirmation code.
+          </p>
+
           <h2 id="data-deletion">Disconnecting and deleting your data</h2>
           <ul>
-            <li><strong>Disconnect a platform:</strong> open Accounts and choose Disconnect. The stored tokens for that platform are deleted straight away. You can also remove Outlly from the platform’s own settings (connected apps or business integrations), which stops access from their side too.</li>
+            <li><strong>Disconnect a platform:</strong> open Accounts and choose Disconnect. The stored tokens for that platform, and any direct messages from it, are deleted straight away. You can also remove Outlly from the platform’s own settings (connected apps or business integrations), which stops access from their side too.</li>
             <li><strong>Delete media or posts:</strong> from the content library, at any time.</li>
             <li><strong>Delete your account:</strong> open Settings, then Your data, and choose Delete account. Your account, media, posts, connected accounts, comments, analytics and payment records are deleted straight away. Invoices are the one exception (see below). You can also ask from the Pip chat or the <a href="/contact">contact page</a> using your account email.</li>
-            <li><strong>Take a copy:</strong> Settings, Your data, Download my data gives you one file with your profile, posts, schedule, library details and invoices. Access tokens are never included.</li>
+            <li><strong>Take a copy:</strong> Settings, Your data, Download my data gives you a readable PDF with your profile, posts, schedule, library details, direct messages and invoices, or the same data as a JSON file to move to another service. Passwords and access tokens are never included.</li>
           </ul>
           <p>
             Invoices stay on your Billing page for as long as you have an account. If you delete it, each invoice is kept until 8 years after the date it was issued, because Indian tax law requires it, and is then deleted automatically. A kept invoice holds only what was printed on it: the invoice number, date, plan, amount, tax and the name and email it was made out to. It is no longer linked to any account. Drafts nobody has touched for 3 days are removed

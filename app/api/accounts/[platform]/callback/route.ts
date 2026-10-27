@@ -12,6 +12,7 @@ import { HttpError } from "@/lib/http";
 import { attachReferral } from "@/lib/referral";
 import { attachSource } from "@/lib/growth/source";
 import { YouTubePublisher, googleIdentity } from "@/lib/social/youtube";
+import { connectReason } from "@/lib/social/connect-reason";
 
 export const dynamic = "force-dynamic";
 
@@ -36,10 +37,10 @@ export async function GET(req: NextRequest, { params }: { params: { platform: st
     const prof = await getPublisher(p).completeConnect(code, `${env.APP_URL}/api/accounts/${p}/callback`, pending.verifier);
     await saveConnectedAccount(user.id, p, prof);
     invalidateDashboards(user.id);
-    return back(`connected=${p}`);
+    return back(`connected=${p}${prof.declined?.length ? "&notice=dm_scope" : ""}`);
   } catch (e) {
-    console.error("[oauth callback]", e);
-    return back(`connect_error=${p}&reason=${(e as { code?: string }).code === "NO_CHANNEL" ? "no_channel" : "exchange"}`);
+    console.error("[oauth callback]", p, e, (e as { technical?: string }).technical ?? "");
+    return back(`connect_error=${p}&reason=${connectReason(e)}`);
   }
 }
 
@@ -97,3 +98,4 @@ function googleReason(e: unknown) {
   if (/prisma|database|ECONNREFUSED|P10\d\d|P20\d\d/i.test(t)) return "server";
   return "exchange";
 }
+

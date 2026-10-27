@@ -54,6 +54,7 @@ model User {
   ideas          Idea[]
   featureUses FeatureUse[]
   pushDevices PushDevice[]
+  dmThreads   DmThread[]
   betaIssued  BetaCode?  @relation("BetaIssued")
   betaRedeemed BetaCode? @relation("BetaRedeemed")
 }
@@ -91,7 +92,8 @@ model SocialAccount {
   updatedAt      DateTime  @updatedAt
 
   user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  targets PostTarget[]
+  targets   PostTarget[]
+  dmThreads DmThread[]
 
   @@unique([userId, platform, platformUserId])
   @@index([userId])
@@ -599,4 +601,57 @@ model PushDevice {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/// A direct-message conversation on a connected Instagram professional account or Facebook Page (1031).
+/// One row per (account, person). Message text is AES-256-GCM encrypted at rest, like tokens.
+model DmThread {
+  id                String    @id @default(cuid())
+  userId            String
+  accountId         String
+  platform          String // instagram | facebook
+  /// Instagram-scoped (IGSID) or Page-scoped (PSID) id of the other person. Only meaningful to this account.
+  participantId     String
+  participantName   String?
+  participantHandle String?
+  participantAvatar String?
+  /// Conversation id from the platform's conversations API, when known.
+  platformThreadId  String?
+  /// Encrypted preview of the newest message.
+  snippet           String?
+  lastMessageAt     DateTime
+  /// When the person last wrote. Replies are only allowed for 24 hours after it.
+  lastInboundAt     DateTime?
+  unread            Int       @default(0)
+  practice          Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account  SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  messages DmMessage[]
+
+  @@unique([accountId, participantId])
+  @@index([userId, lastMessageAt])
+}
+
+model DmMessage {
+  id                String   @id @default(cuid())
+  threadId          String
+  /// The platform's message id (mid). Unique per thread so a webhook retry or an echo is stored once.
+  platformMessageId String?
+  direction         String // in | out
+  /// Encrypted.
+  text              String
+  /// JSON [{ type, url }] for images, stickers, shares. URLs are the platform's, not copied.
+  attachments       String?
+  sentAt            DateTime
+  /// Outlly user who replied from the studio (owner or a manager); null for messages sent in the platform's own app.
+  sentById          String?
+  createdAt         DateTime @default(now())
+
+  thread DmThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, platformMessageId])
+  @@index([threadId, sentAt])
 }

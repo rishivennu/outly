@@ -49,7 +49,7 @@ export function HomeHero({ firstName }: { firstName: string }) {
             One video. Every platform. Zero chaos.
           </p>
 
-          <div className="mt-8 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
+          <div className="relative z-10 mt-8 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
             <Link
               href="/create"
               className="lime-glow group inline-flex h-14 items-center justify-center gap-2 rounded-full bg-lime px-7 text-base font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.97]"
@@ -66,7 +66,9 @@ export function HomeHero({ firstName }: { firstName: string }) {
           </div>
         </div>
 
-        <div className="relative mt-4 sm:mt-6">
+        {/* pointer-events-none: the fan's -64px top margin collapses through this wrapper and lifts it
+            over the buttons above, so it must never catch clicks. The fan is decorative and aria-hidden, so nothing in it needs them. */}
+        <div className="pointer-events-none relative mt-4 sm:mt-6">
           <HeroFan cards={STUDIO_CARDS} cta={{ href: "/create", label: "Create something" }} />
         </div>
       </div>

@@ -41,6 +41,9 @@ const ERRORS: Record<string, (name: string) => string> = {
   access_denied: (n) => `${n} didn't give access. While the app is in testing, only approved testers can connect. The help on the card below shows how to get added.`,
   state: () => "That sign-in took too long or came from another tab. Let's start it again.",
   exchange: (n) => `${n} signed you in, but we couldn't finish the handshake. Try once more.`,
+  config: (n) => `${n} turned this server away: its app ID or secret doesn't match the ${n} app. Ask the admin to check both in Admin > Social platforms.`,
+  redirect: (n) => `${n} doesn't know this site's return address yet. The admin needs to copy the callback URL from Admin > Social platforms into the ${n} app's OAuth redirect URIs, exactly as shown.`,
+  server: () => "You signed in fine, but we couldn't save the connection on our side. Give it a minute and try again.",
   no_channel: () => "That Google account doesn't have a YouTube channel yet. Create one on youtube.com (it takes a minute), then connect again.",
   wrong_app_id: () => "Instagram login isn't set up right on this server yet (it has the Facebook app ID, not the Instagram one). Connect with a token below for now, or ask the admin to fix it in Admin > Social platforms.",
   owner_only: (n) => `Only the workspace owner can connect ${n}. Ask them to connect it, or switch to your own studio.`,
@@ -60,7 +63,10 @@ export function AccountsView({ initial, setup }: { initial: AccountView[]; setup
   useEffect(() => {
     const c = params.get("connected");
     const e = params.get("connect_error");
-    if (c && (PLATFORMS as readonly string[]).includes(c)) toast(`${PLATFORM_META[c as Platform].name} is connected. Ready to publish.`);
+    if (c && (PLATFORMS as readonly string[]).includes(c)) {
+      if (params.get("notice") === "dm_scope") toast(`${PLATFORM_META[c as Platform].name} is connected, but messages were left unticked, so DMs won't arrive in your Inbox. To get them, reconnect and keep "Manage messages" ticked.`, "info");
+      else toast(`${PLATFORM_META[c as Platform].name} is connected. Ready to publish.`);
+    }
     if (e) {
       const name = (PLATFORMS as readonly string[]).includes(e) ? PLATFORM_META[e as Platform].name : "The platform";
       const reason = params.get("reason") ?? "";

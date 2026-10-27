@@ -886,7 +886,8 @@ html:not(.dark) .footer-word { --fw-s0: hsl(82 85% 16%); --fw-s1: hsl(82 85% 26%
 .liquid-panel[data-open="true"] > div { visibility: visible; transition-delay: 0s; } /* closed answers leave the tab order and a11y tree */
 .liquid-panel .liquid-inner { opacity: 0; transform: translateY(-10px); filter: blur(4px); transition: opacity .45s var(--ease-out) .05s, transform .55s var(--ease-out), filter .45s var(--ease-out); }
 .liquid-panel[data-open="true"] .liquid-inner { opacity: 1; transform: none; filter: none; }
-.ripple-host { position: relative; overflow: hidden; isolation: isolate; }
+/* Layered so utilities win: unlayered, its position:relative beat `absolute` on every Button (the welcome card's X fell into the text). */
+@layer components { .ripple-host { position: relative; overflow: hidden; isolation: isolate; } }
 .ripple { position: absolute; border-radius: 9999px; pointer-events: none; background: currentColor; opacity: .22; transform: scale(0); animation: ripple .6s var(--ease-out) forwards; z-index: -1; }
 @keyframes ripple { to { transform: scale(1); opacity: 0; } }
 .blob-tab { transition: transform .5s var(--ease-out), width .5s var(--ease-out); }

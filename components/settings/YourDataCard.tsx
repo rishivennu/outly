@@ -60,13 +60,18 @@ export function YourDataCard({ email }: { email: string }) {
         <div className="flex flex-col justify-between gap-3 rounded-3xl bg-secondary/50 p-5 hairline">
           <div>
             <h3 className="font-semibold">Download my data</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Profile, posts, schedule, library details and invoices as one JSON file. Access tokens are never included.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Your profile, posts, schedule, uploads, messages and invoices in one PDF that's easy to read. Passwords and access tokens are never included.</p>
           </div>
-          <Button asChild variant="outline" className="self-start">
-            <a href="/api/settings/export" download>
-              <Download className="h-4 w-4" aria-hidden="true" /> Download
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <Button asChild variant="outline">
+              <a href="/api/settings/export" download>
+                <Download className="h-4 w-4" aria-hidden="true" /> Download PDF
+              </a>
+            </Button>
+            <a href="/api/settings/export?format=json" download className="inline-flex min-h-11 items-center text-sm font-medium text-foreground/80 underline underline-offset-4 hover:text-foreground">
+              Or as JSON, for moving to another app
             </a>
-          </Button>
+          </div>
         </div>
         <div className="flex flex-col justify-between gap-3 rounded-3xl bg-secondary/50 p-5 hairline">
           <div>

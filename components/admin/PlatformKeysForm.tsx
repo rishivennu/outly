@@ -14,7 +14,10 @@ import { CopyRow, SecretField, type Secret, type SecretEdit } from "./Integratio
 type Keys = Record<Platform, { clientId: string; clientSecret: Secret }>;
 
 /** One card per platform: app ID, secret, the callback URL to paste into the platform's console, and whether it is live. */
-export function PlatformKeysForm({ keys: initial, live: initialLive, base }: { keys: Keys; live: Platform[]; base: string }) {
+/** Meta direct-message setup (1031): pasted into the Meta dashboard's Webhooks and App settings. */
+export type DmSetup = { webhook: string; verifyToken: string; deletion: string };
+
+export function PlatformKeysForm({ keys: initial, live: initialLive, base, dm }: { keys: Keys; live: Platform[]; base: string; dm?: DmSetup }) {
   const [keys, setKeys] = useState(initial);
   const [live, setLive] = useState(initialLive);
   return (
@@ -26,6 +29,7 @@ export function PlatformKeysForm({ keys: initial, live: initialLive, base }: { k
           saved={keys[p]}
           live={live.includes(p)}
           base={base}
+          dm={p === "instagram" || p === "facebook" ? dm : undefined}
           clash={p === "instagram" && !!keys.instagram?.clientId && keys.instagram.clientId === keys.facebook?.clientId}
           onSaved={(k, l) => { setKeys(k); setLive(l); }}
         />
@@ -34,7 +38,7 @@ export function PlatformKeysForm({ keys: initial, live: initialLive, base }: { k
   );
 }
 
-function PlatformCard({ p, saved, live, base, clash, onSaved }: { p: Platform; saved: Keys[Platform]; live: boolean; base: string; clash?: boolean; onSaved: (k: Keys, l: Platform[]) => void }) {
+function PlatformCard({ p, saved, live, base, dm, clash, onSaved }: { p: Platform; saved: Keys[Platform]; live: boolean; base: string; dm?: DmSetup; clash?: boolean; onSaved: (k: Keys, l: Platform[]) => void }) {
   const toast = useToast();
   const meta = PLATFORM_META[p];
   const s = PLATFORM_SETUP[p];
@@ -89,6 +93,14 @@ function PlatformCard({ p, saved, live, base, clash, onSaved }: { p: Platform; s
         </div>
         <SecretField id={`${p}-secret`} label={s.secretLabel} saved={saved.clientSecret} value={secret} onChange={setSecret} placeholder={`Paste the ${s.secretLabel.toLowerCase()}`} />
         <CopyRow label="Callback" value={`${base}/api/accounts/${p}/callback`} />
+        {dm && (
+          <div className="grid gap-2" aria-label="Direct messages setup">
+            <p className="text-[12.5px] font-semibold text-foreground">Direct messages</p>
+            <CopyRow label="Webhook URL" value={dm.webhook} />
+            <CopyRow label="Verify token" value={dm.verifyToken} />
+            <CopyRow label="Data deletion URL" value={dm.deletion} />
+          </div>
+        )}
         <p className="text-[12.5px] leading-relaxed text-muted-foreground">
           Scopes: <code className="break-all text-[12px]">{s.scopes}</code>
         </p>

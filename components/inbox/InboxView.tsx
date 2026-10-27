@@ -11,12 +11,24 @@ import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn } from "@/lib/utils";
 import type { InboxComment, InboxProblem } from "@/lib/inbox";
+import { MessagesView, type DmData } from "./MessagesView";
 
 type Data = { comments: InboxComment[]; errors: InboxProblem[]; targets: number };
 
-/** One list across every platform. Newest first, replies inline, failures stated plainly. */
-export function InboxView({ initial }: { initial: Data }) {
+type Tab = "comments" | "messages";
+
+/** One list across every platform. Newest first, replies inline, failures stated plainly. Messages (1031) sit in their own tab. */
+export function InboxView({ initial, dms, initialTab = "comments" }: { initial: Data; dms?: DmData; initialTab?: Tab }) {
   const toast = useToast();
+  const [tab, setTab] = useState<Tab>(dms ? initialTab : "comments");
+  const unread = dms?.threads.reduce((n, t) => n + (t.unread > 0 ? 1 : 0), 0) ?? 0;
+  const pickTab = (t: Tab) => {
+    setTab(t);
+    const u = new URL(window.location.href);
+    if (t === "messages") u.searchParams.set("tab", "messages");
+    else u.searchParams.delete("tab");
+    window.history.replaceState(null, "", u.toString());
+  };
   const [data, setData] = useState<Data>(initial);
   const [platform, setPlatform] = useState<Platform | "all">("all");
   const live = useLivePlatforms();
@@ -44,9 +56,50 @@ export function InboxView({ initial }: { initial: Data }) {
   return (
     <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-14">
       <p className="eyebrow mb-3">Inbox</p>
-      <h1 className="display max-w-3xl text-[clamp(2.6rem,6vw,4.6rem)]">Everyone who replied.</h1>
-      <p className="mt-3 max-w-2xl text-muted-foreground">Comments from your connected Instagram and YouTube accounts, plus every post you published here, newest first. Reply without leaving Outlly.</p>
+      <h1 className="display max-w-3xl text-[clamp(2.6rem,6vw,4.6rem)]">{tab === "messages" ? "Everyone who wrote to you." : "Everyone who replied."}</h1>
+      <p className="mt-3 max-w-2xl text-muted-foreground">
+        {tab === "messages"
+          ? "Direct messages to your Instagram account and Facebook Page, newest first. Meta lets you answer here for 24 hours after someone's last message."
+          : "Comments from your connected Instagram and YouTube accounts, plus every post you published here, newest first. Reply without leaving Outlly."}
+      </p>
 
+      {dms && (
+        <div role="tablist" aria-label="Inbox" className="mt-8 inline-flex rounded-full bg-secondary/50 p-1 hairline">
+          {(["comments", "messages"] as const).map((t) => (
+            <button
+              key={t}
+              role="tab"
+              id={`inbox-tab-${t}`}
+              aria-selected={tab === t}
+              aria-controls={`inbox-panel-${t}`}
+              tabIndex={tab === t ? 0 : -1}
+              onClick={() => pickTab(t)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                  const next = t === "comments" ? "messages" : "comments";
+                  pickTab(next);
+                  document.getElementById(`inbox-tab-${next}`)?.focus();
+                }
+              }}
+              className={cn("inline-flex h-11 items-center gap-2 rounded-full px-5 text-[13.5px] font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring", tab === t ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+            >
+              {t === "comments" ? "Comments" : "Messages"}
+              {t === "messages" && unread > 0 && (
+                <span className="rounded-full bg-lime px-1.5 text-[11px] font-semibold text-lime-ink" aria-label={`${unread} unread`}>
+                  {unread}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === "messages" && dms ? (
+        <div role="tabpanel" id="inbox-panel-messages" aria-labelledby="inbox-tab-messages">
+          <MessagesView initial={dms} />
+        </div>
+      ) : (
+      <div role={dms ? "tabpanel" : undefined} id="inbox-panel-comments" aria-labelledby={dms ? "inbox-tab-comments" : undefined}>
       <div className="mt-8 flex flex-wrap items-center gap-2">
         {(["all", ...live] as const).map((p) => (
           <button
@@ -118,6 +171,8 @@ export function InboxView({ initial }: { initial: Data }) {
             <CommentRow key={`${c.targetId}-${c.id}`} comment={c} onReplied={onReplied} />
           ))}
         </ul>
+      )}
+      </div>
       )}
     </div>
   );

@@ -85,7 +85,7 @@ export function CopyRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-center gap-2 rounded-2xl bg-secondary/40 px-3 py-2 hairline">
       <span className="shrink-0 text-[12px] font-semibold text-muted-foreground">{label}</span>
       <code className="min-w-0 flex-1 truncate text-[12.5px]">{value}</code>
-      <button type="button" aria-label={`Copy ${label} webhook URL`} onClick={() => navigator.clipboard.writeText(value).then(() => toast("Copied"))} className="grid h-8 w-8 place-items-center rounded-full hover:bg-secondary"><Copy className="h-3.5 w-3.5" /></button>
+      <button type="button" aria-label={`Copy ${label}`} onClick={() => navigator.clipboard.writeText(value).then(() => toast("Copied"))} className="grid h-8 w-8 place-items-center rounded-full hover:bg-secondary"><Copy className="h-3.5 w-3.5" /></button>
     </div>
   );
 }

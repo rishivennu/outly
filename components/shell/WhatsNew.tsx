@@ -116,7 +116,8 @@ export function WhatsNew({ notice, userId, joinedAt }: { notice: UpdateNotice; u
       if (document.hidden) return;
       // The cookie banner is a quick choice: wait for it. Any other dialog this visit: skip until next time.
       if (document.querySelector('[aria-labelledby="cc-title"]')) return;
-      if (other || document.querySelector('[role="dialog"]')) {
+      // The first-time welcome offer owns this visit (data-onboarding), even before its card is up.
+      if (other || document.documentElement.dataset.onboarding || document.querySelector('[role="dialog"]')) {
         other = true;
         window.clearInterval(t);
         return;
