@@ -1,0 +1,33 @@
+# Secrets: never commit real keys. Only the example file is shared.
+.env
+.env.*
+.env*.local
+!.env.example
+
+# Users' uploaded videos and thumbnails (local storage driver). This is personal data.
+/storage/*
+!/storage/.gitkeep
+
+# Dependencies and build output
+node_modules/
+.next/
+.next-*/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+.vercel/
+
+# Local databases and logs
+*.db
+*.db-journal
+prisma/*.db*
+*.log
+npm-debug.log*
+
+# Tests and OS noise
+coverage/
+playwright-report/
+test-results/
+.DS_Store
+Thumbs.db
