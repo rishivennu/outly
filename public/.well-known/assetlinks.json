@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.outlly.app",
+      "sha256_cert_fingerprints": ["41:CB:7F:F9:F9:6C:AB:AE:CC:91:9C:41:C1:A9:F1:D2:AB:3C:55:68:4D:BE:A6:73:87:95:26:AB:E3:F9:E0:A7"]
+    }
+  }
+]
