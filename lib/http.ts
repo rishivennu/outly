@@ -9,6 +9,7 @@ import { getAdmin } from "./admin/auth";
 import { loadKeys } from "./social/keys";
 import { memberBlock } from "./team/roles";
 import { joinedBeforeMaintenance } from "./maintenance";
+import { nativeClient } from "./native-client";
 
 export class HttpError extends Error {
   /** `extra` is merged into the JSON body, e.g. { feature: "posts" } so the client knows which upgrade to offer. */
@@ -29,6 +30,10 @@ export function json<T>(data: T, init?: ResponseInit) {
 export function assertSameOrigin(req: NextRequest) {
   if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return;
   const origin = req.headers.get("origin") ?? req.headers.get("referer");
+  // The Outlly app (Flutter) is not a browser and sends no Origin. A page on another site can't add a custom
+  // header without a CORS preflight, which this API never grants, so the header is the CSRF proof there.
+  // A request that does carry an Origin is still checked below, header or not.
+  if (!origin && nativeClient(req)) return;
   if (!origin) throw new HttpError(403, "Missing origin", "CSRF");
   let o: URL;
   try {

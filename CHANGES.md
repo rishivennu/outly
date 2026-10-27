@@ -1,6 +1,6 @@
-# outlly-all-1026b-to-1029: one upload of every pending fix
+# outlly-all-1026b-to-1030: one upload of every pending fix
 
-This contains fix-1026b, 1026e, 1027, 1028 and 1029, already merged (each file is the newest tested version).
+This contains fix-1026b, 1026e, 1027, 1028, 1029 and 1030, already merged (each file is the newest tested version).
 Copy everything over the repo at the same paths and commit once. Vercel then redeploys.
 
 ## After the deploy (in this order)
@@ -226,3 +226,29 @@ repo at the same paths. 32 files, 18 of them new.
 
 ---
 
+
+---
+
+# fix-1030-flutter-api: API support for the Flutter app (Outlly 2.0.0)
+
+Upload after fix-1029-capacitor. 5 files, 2 of them new. There are no DB changes.
+
+- **lib/native-client.ts (new).** The app sends `x-outlly-client: android/2.0.0+3` on every request.
+- **lib/http.ts (CSRF).** A request with no Origin is now accepted when it carries that header.
+  - Browsers can't add a custom header across sites without a CORS preflight, and this API never grants one.
+  - A request that does carry an Origin is still checked as before, with or without the header.
+  - Without the header, a request with no Origin is still refused. The website is unchanged.
+- **lib/auth.ts.** Adds `renewSession()`: the app's session is re-issued once it is more than 3 days old.
+  As long as the app is opened within 14 days, the person stays signed in. Web sessions are unchanged.
+- **app/api/me/route.ts (new).** Returns the signed-in user, their team workspace and role, and feature flags.
+  The app calls it on launch, and for the app it also renews the session.
+
+The app keeps the normal session cookie in Android's encrypted storage. Every existing flow (login, 2-step,
+email code, team switch, Google and connects through the PKCE handoff) works without further server changes.
+
+Verified:
+- tsc reports 0 errors.
+- bun test: 619 pass, 0 fail (10 new).
+- next build passes.
+- End to end against a local server, as the app: login, then /api/me, then /api/posts (200), then handoff, then logout (401 after).
+  A login with no Origin and no app header gets 403 CSRF.

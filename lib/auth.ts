@@ -45,13 +45,13 @@ export function destroySession() {
 }
 
 /** Cookie contents, signature-checked only. Tokens issued before `v` existed read as v=0. */
-async function readSessionClaims(): Promise<{ id: string; v: number } | null> {
+async function readSessionClaims(): Promise<{ id: string; v: number; iat: number } | null> {
   const token = cookies().get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
     if (typeof payload.sub !== "string") return null;
-    return { id: payload.sub, v: typeof payload.v === "number" ? payload.v : 0 };
+    return { id: payload.sub, v: typeof payload.v === "number" ? payload.v : 0, iat: payload.iat ?? 0 };
   } catch {
     return null;
   }
@@ -63,6 +63,21 @@ export async function readSessionUserId(): Promise<string | null> {
   if (!claims) return null;
   const u = await db.user.findUnique({ where: { id: claims.id }, select: { tokenVersion: true } });
   return u && u.tokenVersion === claims.v ? claims.id : null;
+}
+
+const RENEW_AFTER = 60 * 60 * 24 * 3;
+export const sessionNeedsRenewal = (iat: number, now = Math.floor(Date.now() / 1000)) => now - iat > RENEW_AFTER;
+
+/**
+ * The app keeps people signed in while they keep using it: past 3 days old, its session is re-issued for
+ * another 14. Only the app asks for this; on the web a session still ends after 14 days.
+ */
+export async function renewSession() {
+  const claims = await readSessionClaims();
+  if (!claims || !sessionNeedsRenewal(claims.iat)) return false;
+  if ((await readSessionUserId()) !== claims.id) return false;
+  await createSession(claims.id);
+  return true;
 }
 
 /** Invalidate every session this person has anywhere. Call after logout-everywhere or a password change. */
