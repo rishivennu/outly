@@ -89,11 +89,21 @@ describe("email wrapper", () => {
     expect(invoice).toContain("Payment received. Thank you!");
   });
 
-  test("bulletproof button keeps its lime fill and ink label", () => {
+  test("bulletproof button is an ink pill with a lime label", () => {
     const html = templates.backOnline({ url: "https://outlly.test/go" });
-    expect(html).toContain('bgcolor="#9ff218"');
+    expect(html).toContain('bgcolor="#121707"');
     expect(html).toContain("border-radius:999px");
-    expect(html).toMatch(/<a href="https:\/\/outlly\.test\/go"[^>]+color:#121707[^>]*>Open Outlly<\/a>/);
+    expect(html).toMatch(/<a href="https:\/\/outlly\.test\/go"[^>]+color:#9ff218[^>]*>Open Outlly&nbsp;&nbsp;&rarr;<\/a>/);
+  });
+
+  test("bento board: dark page, lime hero tile with a chip, rounded tiles", () => {
+    const html = templates.invoice({ name: "Tej", number: "INV-1", amount: "$19.00", plan: "Pro", url: "https://outlly.test/billing" });
+    expect(html).toContain("background:#151713");
+    expect(html).toMatch(/bgcolor="#9ff218" style="background:#9ff218;border-radius:26px/);
+    expect(html).toContain(">Billing</span>");
+    expect(html).toContain("$19.00");
+    expect(html).toContain('class="stack"');
+    expect(templates.refund({ name: "Tej", amount: "$1", number: "INV-9" })).toMatch(/bgcolor="#f1f0e9"[^>]+border-radius:26px;padding:28px/);
   });
 
   test("footer carries the wordmark, tagline, links, reply line and copyright", () => {
@@ -105,7 +115,7 @@ describe("email wrapper", () => {
       expect(html, name).toContain('href="https://outlly.test/settings"');
       expect(html, name).toContain("You are receiving this because you have an Outlly account. Questions? Just reply to this email.");
       expect(html, name).toContain(`&copy; ${new Date().getFullYear()} Outlly`);
-      expect(html, name).toContain("background:#e6e8df");
+      expect(html, name).toContain("background:#2b2e27");
     }
   });
 
@@ -135,7 +145,8 @@ describe("email wrapper", () => {
     const busy = templates.weeklyReport({ name: "Tej", stats: stats(), url: "https://outlly.test/a", settingsUrl: "https://outlly.test/settings" });
     expect(busy).toContain("Your week on Outlly");
     expect(busy).toContain("posts out");
-    expect(busy).toContain("instagram");
+    expect(busy).toContain("Instagram");
+    expect(busy).toContain("YouTube");
     expect(busy).toContain("Best performer");
     expect(busy).toContain("2 posts are scheduled for this week.");
 

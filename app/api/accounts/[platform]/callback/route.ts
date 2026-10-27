@@ -12,7 +12,7 @@ import { HttpError } from "@/lib/http";
 import { attachReferral } from "@/lib/referral";
 import { attachSource } from "@/lib/growth/source";
 import { YouTubePublisher, googleIdentity } from "@/lib/social/youtube";
-import { connectReason } from "@/lib/social/connect-reason";
+import { connectDetail, connectReason } from "@/lib/social/connect-reason";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +40,11 @@ export async function GET(req: NextRequest, { params }: { params: { platform: st
     return back(`connected=${p}${prof.declined?.length ? "&notice=dm_scope" : ""}`);
   } catch (e) {
     console.error("[oauth callback]", p, e, (e as { technical?: string }).technical ?? "");
-    return back(`connect_error=${p}&reason=${connectReason(e)}`);
+    const res = back(`connect_error=${p}&reason=${connectReason(e)}`);
+    // The exact step and the platform's own words, for the Accounts page (1031e). A cookie, not the URL,
+    // so a crafted link can't put words in our mouth; it lives two minutes and the page deletes it.
+    res.cookies.set("outlly-connect-detail", connectDetail(e), { path: "/", maxAge: 120, sameSite: "lax", secure: env.APP_URL.startsWith("https"), httpOnly: false });
+    return res;
   }
 }
 
