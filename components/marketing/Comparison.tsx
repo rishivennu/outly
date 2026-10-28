@@ -173,7 +173,7 @@ export function Comparison({ competitors, groups, beta = false }: { competitors?
   const names = shownCompetitors.map((c) => c.name);
   const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] ?? "the big suites";
   return (
-    <section id="compare" className="scroll-mt-24 py-20 sm:py-28" aria-labelledby="compare-title">
+    <section id="compare" className="scroll-mt-24 py-16 sm:py-20" aria-labelledby="compare-title">
       <CmpSprite />
       <Shell>
         <SectionHead

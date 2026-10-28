@@ -6,6 +6,7 @@ import { Features } from "@/components/marketing/Features";
 import { Difference } from "@/components/marketing/Difference";
 import { Platforms } from "@/components/marketing/Platforms";
 import { LogoTicker } from "@/components/marketing/LogoTicker";
+import { TryIt } from "@/components/marketing/TryIt";
 import { Demo } from "@/components/marketing/Demo";
 import { Comparison } from "@/components/marketing/Comparison";
 import { Pricing } from "@/components/marketing/Pricing";
@@ -20,6 +21,7 @@ import { shown } from "@/lib/landing";
 import { Countdown } from "@/components/maintenance/Countdown";
 import { ScrollScenes } from "@/components/marketing/ScrollScenes";
 import { LandingFx } from "@/components/marketing/LandingFx";
+import { liveNow } from "@/lib/social/registry";
 
 // Rendered per request: prices follow the visitor's country, and the platform list follows the admin's keys.
 export const dynamic = "force-dynamic";
@@ -70,7 +72,7 @@ const faqJsonLd = {
 
 export default async function LandingPage() {
   // Both reads are cached in-process for 15 s, so this costs nothing on a busy page.
-  const [cfg, site, beta] = await Promise.all([getConfig("landing"), siteStatus(), isBeta()]);
+  const [cfg, site, beta, live] = await Promise.all([getConfig("landing"), siteStatus(), isBeta(), liveNow()]);
   const on = (id: Parameters<typeof shown>[1]) => shown(cfg, id);
   return (
     <>
@@ -81,8 +83,10 @@ export default async function LandingPage() {
           <Countdown endsAt={site.endsAt} since={site.since} variant="bar" />
         </div>
       )}
-      {on("hero") && <Hero showHow={on("how")} beta={beta} />}
-      {on("hero") && <LogoTicker />}
+      {on("hero") && <Hero showHow={on("how")} beta={beta} live={live} />}
+      {on("hero") && <LogoTicker live={live} />}
+      {/* Try it (10-28): rides on the hero toggle until it gets its own landing switch. */}
+      {on("hero") && <TryIt />}
       {on("hero") && on("how") && (
         // Same box as the framed fan stage (HeroFan: w-full max-w-[1180px]) so the dotted line runs edge to edge with it.
         <div className="mx-auto w-full max-w-[1180px]">

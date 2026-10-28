@@ -31,7 +31,7 @@ export async function Pricing() {
     };
   });
   return (
-    <section id="pricing" className="scroll-mt-24 py-20 sm:py-28" aria-labelledby="pricing-title">
+    <section id="pricing" className="scroll-mt-24 py-16 sm:py-20" aria-labelledby="pricing-title">
       <Shell>
         <SectionHead
           id="pricing-title"

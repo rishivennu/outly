@@ -14,21 +14,22 @@ import { cn } from "@/lib/utils";
 
 type Tile = { kind: "app"; brand: Brand } | { kind: "post"; label: string; bg: string; brand: Brand };
 
+// Only the three places Outlly publishes to today (lib/marketing/content.ts rule: nothing aspirational as shipped).
 const LEFT: Tile[] = [
   { kind: "post", label: "Reel", bg: "linear-gradient(150deg,#ffb36b,#f0447a 55%,#7b3cff)", brand: "instagram" },
   { kind: "app", brand: "instagram" },
-  { kind: "post", label: "Thread", bg: "linear-gradient(160deg,#2b2b2e,#5a5a62)", brand: "threads" },
-  { kind: "app", brand: "tiktok" },
+  { kind: "post", label: "Post", bg: "linear-gradient(160deg,#2b2b2e,#5a5a62)", brand: "x" },
+  { kind: "app", brand: "youtube" },
   { kind: "post", label: "Short", bg: "linear-gradient(160deg,#ff5f4f,#b3121a)", brand: "youtube" },
-  { kind: "app", brand: "linkedin" },
+  { kind: "app", brand: "x" },
 ];
 const RIGHT: Tile[] = [
   { kind: "app", brand: "youtube" },
   { kind: "post", label: "Post", bg: "linear-gradient(150deg,#c9f25d,#4fbf73 60%,#1f7a6a)", brand: "x" },
   { kind: "app", brand: "x" },
-  { kind: "post", label: "Video", bg: "linear-gradient(160deg,#5aa8ff,#2a4bd8)", brand: "facebook" },
-  { kind: "app", brand: "threads" },
-  { kind: "post", label: "Clip", bg: "linear-gradient(150deg,#25f4ee,#1b1b1f 55%,#fe2c55)", brand: "tiktok" },
+  { kind: "post", label: "Reel", bg: "linear-gradient(160deg,#5aa8ff,#2a4bd8)", brand: "instagram" },
+  { kind: "app", brand: "instagram" },
+  { kind: "post", label: "Short", bg: "linear-gradient(150deg,#ffcf8a,#ff7a59 45%,#6c3bff)", brand: "youtube" },
 ];
 
 function TileView({ t, className }: { t: Tile; className?: string }) {
@@ -66,7 +67,7 @@ function Wall({ tiles, side }: { tiles: Tile[]; side: "l" | "r" }) {
   );
 }
 
-const ROW: Brand[] = ["instagram", "tiktok", "youtube", "linkedin", "x"];
+const ROW: Brand[] = ["instagram", "youtube", "x"];
 
 const SENT: { brand: Brand; name: string; what: string }[] = [
   { brand: "instagram", name: "Instagram", what: "Reel" },

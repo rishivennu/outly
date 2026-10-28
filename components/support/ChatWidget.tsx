@@ -98,17 +98,29 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   // restore + language
   useEffect(() => {
     setLang(readLang());
+    // A new visitor gets the "Questions?" note once, after they have had time to look around, and only for a
+    // few seconds: a note that never leaves ends up covering the page it is meant to help with.
+    let show = 0, hide = 0;
     try {
       const s = JSON.parse(sessionStorage.getItem(STORE) ?? "null");
       if (s) {
         setMsgs(s.msgs ?? []); setFails(s.fails ?? 0); setDismissed(s.dismissed ?? []);
         setTicket((x) => ({ ...x, ref: s.ref ?? "" }));
         idRef.current = Math.max(0, ...(s.msgs ?? []).map((m: Msg) => m.id)) + 1;
-      } else setNudge(true);
+      } else {
+        show = window.setTimeout(() => {
+          setNudge(true);
+          hide = window.setTimeout(() => setNudge(false), 9000);
+        }, 15000);
+      }
     } catch {}
     const onLang = (e: Event) => setLang((e as CustomEvent<Lang>).detail);
     window.addEventListener("outly:lang", onLang);
-    return () => window.removeEventListener("outly:lang", onLang);
+    return () => {
+      window.clearTimeout(show);
+      window.clearTimeout(hide);
+      window.removeEventListener("outly:lang", onLang);
+    };
   }, []);
   useEffect(() => {
     try { sessionStorage.setItem(STORE, JSON.stringify({ msgs: msgs.slice(-40), fails, ref: ticket.ref, dismissed })); } catch {}

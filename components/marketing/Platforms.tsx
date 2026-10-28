@@ -27,7 +27,7 @@ export async function Platforms({ showCompare = true, live: forced }: { showComp
   const first = on[0];
 
   return (
-    <section id="platforms" className="scroll-mt-24 py-20 sm:py-28" aria-labelledby="platforms-title">
+    <section id="platforms" className="scroll-mt-24 py-16 sm:py-20" aria-labelledby="platforms-title">
       <Shell>
         <Reveal className="bx-head">
           <div className="min-w-0">

@@ -474,11 +474,12 @@ html:not(.dark) .o3d-floor { background: radial-gradient(closest-side, rgba(30, 
   box-shadow: inset 0 1px 0 hsl(0 0% 100% / .18), 0 0 0 1px hsl(0 0% 100% / .09), 0 18px 40px -20px rgba(0, 0, 0, .75); }
 @media (prefers-reduced-transparency: reduce) { .mnav-bar, .dark .mnav-bar, .mnav[data-scrolled="true"] .mnav-bar { background: hsl(var(--card)); } .mnav-bar::after { display: none; } }
 
-/* Scroll progress (every page, components/shared/ScrollProgress.tsx): a glowing lime frame around the whole screen. It grows
+/* Scroll progress (every page, components/shared/ScrollProgress.tsx): a thin, soft lime frame (10-28: was 3px with a strong
+   glow, which read as a rendering glitch when half drawn) around the whole screen. It grows
    from the top centre along both halves at once and closes at the bottom centre when the page ends (one glow pulse).
    JS writes --pt/--ps/--pb (top half, side, bottom half, each 0..1); every bar only scales, so it never triggers layout. */
-.scroll-frame { position: fixed; inset: 0; z-index: 70; pointer-events: none; transition: opacity .3s; --sf: 3px;
-  --sf-c: hsl(var(--lime)); --sf-glow: 0 0 10px hsl(var(--lime) / .85), 0 0 22px hsl(var(--lime) / .5); }
+.scroll-frame { position: fixed; inset: 0; z-index: 70; pointer-events: none; transition: opacity .3s; --sf: 2px;
+  --sf-c: hsl(var(--lime) / .6); --sf-glow: 0 0 6px hsl(var(--lime) / .3); }
 .scroll-frame[data-on="0"] { opacity: 0; }
 .scroll-frame > i { position: absolute; display: block; background: var(--sf-c); box-shadow: var(--sf-glow); will-change: transform; }
 .sf-t, .sf-b { height: var(--sf); width: 50%; }
@@ -2276,3 +2277,57 @@ html[data-contrast="more"] .lg-glass::before, html[data-contrast="more"] .lg-gla
   .lg-glass { outline: 1px solid CanvasText; }
   .lg-glass::before, .lg-glass::after { display: none; }
 }
+
+/* ---------- Try it (10-28, MOCKUP): liquid glass on a near-black stage with lime energy waves, always dark like the home demo ---------- */
+/* Brand colours only (user, 10-28: no blue). Waves are dimmed lime/green so white/.75 on the glass holds >= 4.5:1 (axe, 1440 and 390). */
+.try-stage { position: relative; isolation: isolate; overflow: hidden; border-radius: 36px; color: #fff; color-scheme: dark;
+  background: radial-gradient(110% 90% at 8% 0%, hsl(var(--lime) / .1) 0%, transparent 55%), radial-gradient(90% 80% at 100% 100%, hsl(var(--energy-a) / .08) 0%, transparent 60%), hsl(240 6% 6%);
+  box-shadow: 0 0 0 1px hsl(0 0% 100% / .08), 0 50px 120px -60px hsl(var(--lime) / .35); }
+.try-glass { position: relative; isolation: isolate; border-radius: 28px;
+  background: linear-gradient(155deg, rgb(255 255 255 / .16), rgb(255 255 255 / .05) 55%, rgb(255 255 255 / .09));
+  -webkit-backdrop-filter: blur(26px) saturate(170%); backdrop-filter: blur(26px) saturate(170%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .38), inset 0 -1px 0 rgb(255 255 255 / .06), 0 24px 60px -30px rgb(0 0 0 / .75); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .try-glass { background: hsl(240 6% 12% / .92); } }
+/* Refracted rim, same recipe as the nav pill. */
+.try-glass::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(130deg, rgb(255 255 255 / .6), rgb(255 255 255 / .14) 32%, rgb(255 255 255 / .04) 60%, rgb(255 255 255 / .28));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+.try-card { border-radius: 24px; }
+.try-field { background: hsl(240 6% 4% / .45); box-shadow: inset 0 1px 2px rgb(0 0 0 / .35), inset 0 0 0 1px rgb(255 255 255 / .14); outline: none; transition: box-shadow .2s ease; }
+.try-field:focus-visible { box-shadow: inset 0 1px 2px rgb(0 0 0 / .35), inset 0 0 0 1px rgb(255 255 255 / .5), 0 0 0 3px rgb(255 255 255 / .35); }
+.try-chip { min-height: 44px; padding: 0 16px; border-radius: 9999px; font-size: 14px; font-weight: 500; color: rgb(255 255 255 / .92);
+  background: rgb(255 255 255 / .1); box-shadow: inset 0 1px 0 rgb(255 255 255 / .22), inset 0 0 0 1px rgb(255 255 255 / .12); transition: background .2s ease; }
+.try-chip:hover { background: rgb(255 255 255 / .17); }
+.try-chip[aria-pressed="true"] { background: rgb(255 255 255 / .24); color: #fff; }
+.try-chip:disabled { cursor: default; }
+/* Gradient glass pill with an underglow (ref 4), in the brand energy gradient. Dark ink on lime: well past 4.5:1. */
+.try-go { position: relative; isolation: isolate; display: inline-flex; align-items: center; gap: 10px; height: 56px; padding: 0 26px 0 28px; border-radius: 9999px;
+  font-size: 16px; font-weight: 600; color: hsl(var(--lime-foreground)); background: linear-gradient(100deg, hsl(var(--energy-c)), hsl(var(--lime)) 50%, hsl(var(--energy-a)));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .6), inset 0 -10px 18px -10px rgb(0 0 0 / .25), 0 0 0 1px rgb(255 255 255 / .25), 0 14px 40px -10px hsl(var(--lime) / .7), 0 4px 18px -6px hsl(var(--energy-a) / .5);
+  transition: transform .2s ease, filter .2s ease; }
+.try-go::after { content: ""; position: absolute; inset: 1px 14px auto; height: 48%; z-index: -1; border-radius: 9999px 9999px 40% 40%; pointer-events: none;
+  background: linear-gradient(180deg, rgb(255 255 255 / .38), transparent); }
+.try-go:hover { filter: brightness(1.08) saturate(1.1); transform: translateY(-1px); }
+.try-go:active { transform: scale(.97); }
+.try-go[aria-disabled="true"] { filter: saturate(.7); cursor: progress; }
+/* Frosted icon tile with the platform colour blurred behind it (ref 5). */
+.try-icon { position: relative; isolation: isolate; display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: 16px; color: #fff;
+  background: linear-gradient(150deg, rgb(255 255 255 / .34), rgb(255 255 255 / .1)); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .6), inset 0 0 0 1px rgb(255 255 255 / .2), 0 6px 14px -6px rgb(0 0 0 / .5); }
+.try-icon::before { content: ""; position: absolute; inset: 8px 4px -6px; z-index: -1; border-radius: 14px; background: var(--blob); filter: blur(10px); opacity: .9; }
+.try-icon svg { filter: drop-shadow(0 1px 1px rgb(0 0 0 / .35)); }
+/* Glass tab bar on phones (ref 3): the active tab is a darker capsule. */
+.try-tabs { display: flex; gap: 4px; padding: 5px; border-radius: 9999px; background: rgb(255 255 255 / .12);
+  -webkit-backdrop-filter: blur(22px) saturate(170%); backdrop-filter: blur(22px) saturate(170%); box-shadow: inset 0 1px 0 rgb(255 255 255 / .3), inset 0 0 0 1px rgb(255 255 255 / .12); }
+.try-tab { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; border-radius: 9999px; font-size: 14px; font-weight: 600; color: rgb(255 255 255 / .85); transition: background .25s ease; }
+.try-tab[aria-pressed="true"] { color: #fff; background: hsl(240 6% 4% / .6); box-shadow: inset 0 1px 0 rgb(255 255 255 / .18), 0 4px 12px -6px rgb(0 0 0 / .6); }
+/* White pill hand-off (ref 1). */
+.try-keep { display: inline-flex; align-items: center; gap: 8px; height: 52px; padding: 0 24px; border-radius: 9999px; font-size: 16px; font-weight: 600; color: #0b0d1a; background: #fff;
+  box-shadow: inset 0 -2px 0 rgb(0 0 0 / .08), 0 10px 30px -10px rgb(0 0 0 / .6); transition: transform .2s ease; flex: none; }
+.try-keep:hover { transform: translateY(-1px); }
+.try-meter { height: 4px; border-radius: 9999px; background: rgb(255 255 255 / .14); overflow: hidden; }
+.try-meter > span { display: block; height: 100%; border-radius: inherit; background: hsl(var(--lime)); }
+.try-caret { display: inline-block; width: 2px; height: 1.05em; margin-left: 2px; vertical-align: -0.15em; background: #fff; animation: try-blink 1s steps(1) infinite; }
+@keyframes try-blink { 50% { opacity: 0; } }
+.try-stage :is(button, a, input):focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .try-go, .try-keep, .try-chip, .try-tab { transition: none; } .try-go:hover, .try-keep:hover { transform: none; } .try-caret { animation: none; } }

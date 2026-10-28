@@ -6,7 +6,7 @@ import { FEATURES } from "@/lib/marketing/content";
 export function Features() {
   const [lead, ...rest] = FEATURES;
   return (
-    <section id="features" className="scroll-mt-24 py-20 sm:py-28" aria-labelledby="features-title">
+    <section id="features" className="scroll-mt-24 py-16 sm:py-20" aria-labelledby="features-title">
       <Shell>
         <SectionHead
           id="features-title"

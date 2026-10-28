@@ -5,7 +5,7 @@ import { STEPS } from "@/lib/marketing/content";
 
 export function HowItWorks() {
   return (
-    <section id="how" className="scroll-mt-24 pb-20 pt-14 sm:pb-28 sm:pt-20" aria-labelledby="how-title">
+    <section id="how" className="scroll-mt-24 pb-16 pt-14 sm:pb-20 sm:pt-20" aria-labelledby="how-title">
       <Shell>
         <SectionHead
           id="how-title"

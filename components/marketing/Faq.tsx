@@ -6,7 +6,7 @@ import { LiquidAccordion } from "@/components/support/LiquidAccordion";
 
 export function Faq() {
   return (
-    <section id="faq" className="scroll-mt-24 py-20 sm:py-28" aria-labelledby="faq-title">
+    <section id="faq" className="scroll-mt-24 py-16 sm:py-20" aria-labelledby="faq-title">
       <Shell className="grid gap-12 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16">
         <div>
           <SectionHead

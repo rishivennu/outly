@@ -6,13 +6,17 @@ import { StampChip } from "@/components/brand/Stamps";
 import { Shell } from "./bits";
 import { splitWords } from "./Split";
 import { HERO, PLATFORM_PITCH } from "@/lib/marketing/content";
+import type { Platform } from "@/lib/domain";
 
 /**
  * Hero: centred pill eyebrow, a two-line headline in a soft silver gradient with the serif
  * accent, collaborator name tags floating beside it, then the arched card fan rising from
  * the bottom edge. Works in both themes; the fan cards keep their own saturated colours.
  */
-export function Hero({ showHow = true, beta = false }: { showHow?: boolean; beta?: boolean }) {
+export function Hero({ showHow = true, beta = false, live }: { showHow?: boolean; beta?: boolean; live?: Platform[] }) {
+  // Only the places you can publish to today; the "Publishes to" row right below lists the ones coming soon.
+  const pitch = live ? PLATFORM_PITCH.filter((p) => live.includes(p.id as Platform)) : PLATFORM_PITCH.slice(0, 3);
+  const soon = PLATFORM_PITCH.length - pitch.length;
   // Words unfold one after another on load (Play pass in globals.css); the accent word is written in last.
   const l1 = splitWords("Your content deserves");
   const l2 = splitWords("to be", l1.next);
@@ -72,12 +76,18 @@ export function Hero({ showHow = true, beta = false }: { showHow?: boolean; beta
         </div>
 
         <dl className="hf-in mt-7 flex flex-wrap justify-center gap-x-7 gap-y-2" style={{ ["--d" as string]: ".9s" }}>
-          {PLATFORM_PITCH.map((p) => (
+          {pitch.map((p) => (
             <div key={p.id} className="flex items-baseline gap-1.5">
               <dt className="text-sm font-semibold">{p.name}</dt>
               <dd className="text-sm text-muted-foreground">{p.format}</dd>
             </div>
           ))}
+          {soon > 0 && (
+            <div className="flex items-baseline">
+              <dt className="sr-only">Coming soon</dt>
+              <dd className="text-sm text-muted-foreground">{soon} more coming soon</dd>
+            </div>
+          )}
         </dl>
       </Shell>
 
