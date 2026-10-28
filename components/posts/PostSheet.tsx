@@ -14,6 +14,7 @@ import { api, ApiError } from "@/lib/client/api";
 import { PLATFORM_META, TARGET_COPY, type TargetStatus } from "@/lib/domain";
 import { targetErrorCopy } from "@/components/shared/errorCopy";
 import type { PostView, TargetView } from "@/lib/services";
+import { TeamNotes } from "./TeamNotes";
 
 /** Live on the platform right now (hidden YouTube videos count: they still exist there). */
 const isLive = (t: TargetView) => t.status === "published" && !!t.platformPostId && t.removeMode !== "deleted";
@@ -185,6 +186,7 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
           </ul>
 
           <ReviewBlock post={post} onChange={onChange} />
+          <TeamNotes post={post} onChange={onChange} />
 
           <div className="grid grid-cols-2 gap-2">
             {editable && (

@@ -17,12 +17,30 @@ const SEED = [
     features: ["Everything in Creator", "Multiple workspaces", "Shared media library", "Review links before publish", "Team roles"] },
 ];
 
+/**
+ * Pro Multi-Account Manager (1037): for people running more than 3 accounts. Added to existing databases by a
+ * one-time migration, so an admin who later edits or hides it is never overwritten.
+ */
+export const PRO_MANAGER = {
+  slug: "pro-manager", name: "Pro Multi-Account Manager", priceMinor: 249900, note: "For managers running 5 or more accounts", highlight: false, sortOrder: 3,
+  seats: 5, accountLimit: 10, prices: { USD: 2900 },
+  features: ["Everything in Studio", "Up to 10 connected accounts", "Switch profiles in one tap", "Bulk schedule across accounts", "Per-account team access", "Combined analytics with drilldown", "PDF and CSV client reports", "Spike and failed-post alerts"],
+};
+const PRO_MIGRATION_KEY = "migrate:pro-manager-1037";
+
+const proRow = () => ({ ...PRO_MANAGER, currency: "INR", interval: "month", features: JSON.stringify(PRO_MANAGER.features), prices: JSON.stringify(PRO_MANAGER.prices) });
+
 const FREE_MIGRATION_KEY = "migrate:free-limits-1026";
 
 export async function ensurePlans() {
-  if ((await db.plan.count()) > 0) return migrateFreeLimits();
+  if ((await db.plan.count()) > 0) {
+    await migrateFreeLimits();
+    return migrateProManager();
+  }
   // upsert so two processes seeding at once can't collide on the unique slug
   for (const p of SEED) await db.plan.upsert({ where: { slug: p.slug }, update: {}, create: { ...p, currency: "INR", interval: "month", features: JSON.stringify(p.features) } }).catch(() => {});
+  await db.plan.upsert({ where: { slug: PRO_MANAGER.slug }, update: {}, create: proRow() }).catch(() => {});
+  await db.setting.create({ data: { key: PRO_MIGRATION_KEY, value: new Date().toISOString() } }).catch(() => {});
   // A fresh database is seeded with the current limits already, so the one-time migration is marked done here.
   // Otherwise the first ensurePlans() after seeding ran it and overwrote any Free limits an admin had set (1027).
   await db.setting.create({ data: { key: FREE_MIGRATION_KEY, value: new Date().toISOString() } }).catch(() => {});
@@ -41,7 +59,17 @@ async function migrateFreeLimits() {
   invalidate("plans:");
 }
 
-type PlanRow = { id: string; slug: string; name: string; priceMinor: number; currency: string; interval: string; note: string; features: string; state: string; highlight: boolean; sortOrder: number; prices: string; yearlyMinor: number; postLimit: number; aiCaptions: boolean; seats: number; postPeriod: string; maxUploadMb: number; replyLimit: number; captionVideos: number; burnCaptions: boolean };
+/** One-time (1037): existing databases get the Pro Multi-Account Manager plan. A slug already taken is left alone. */
+async function migrateProManager() {
+  const key = PRO_MIGRATION_KEY;
+  if (await db.setting.findUnique({ where: { key }, select: { key: true } })) return;
+  const won = await db.setting.create({ data: { key, value: new Date().toISOString() } }).then(() => true, () => false);
+  if (!won) return;
+  await db.plan.upsert({ where: { slug: PRO_MANAGER.slug }, update: {}, create: proRow() }).catch(() => {});
+  invalidate("plans:");
+}
+
+type PlanRow = { id: string; slug: string; name: string; priceMinor: number; currency: string; interval: string; note: string; features: string; state: string; highlight: boolean; sortOrder: number; prices: string; yearlyMinor: number; postLimit: number; aiCaptions: boolean; seats: number; postPeriod: string; maxUploadMb: number; replyLimit: number; captionVideos: number; burnCaptions: boolean; accountLimit?: number };
 
 export function toPublic(p: PlanRow): PublicPlan {
   let features: string[] = [];
@@ -51,7 +79,7 @@ export function toPublic(p: PlanRow): PublicPlan {
   return {
     id: p.id, slug: p.slug, name: p.name, priceMinor: p.priceMinor, currency: p.currency, interval: p.interval, note: p.note,
     highlight: p.highlight, sortOrder: p.sortOrder, postLimit: p.postLimit, aiCaptions: p.aiCaptions, seats: p.seats,
-    postPeriod: p.postPeriod === "week" ? "week" : "month", maxUploadMb: p.maxUploadMb ?? 0, replyLimit: p.replyLimit ?? 0, captionVideos: p.captionVideos ?? 0, burnCaptions: p.burnCaptions ?? true,
+    postPeriod: p.postPeriod === "week" ? "week" : "month", maxUploadMb: p.maxUploadMb ?? 0, replyLimit: p.replyLimit ?? 0, captionVideos: p.captionVideos ?? 0, burnCaptions: p.burnCaptions ?? true, accountLimit: p.accountLimit ?? 0,
     features,
     prices: parsePrices(p.prices),
     yearlyMinor: p.yearlyMinor ?? 0,

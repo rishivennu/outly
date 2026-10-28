@@ -5,6 +5,9 @@ import { launchPost, ownedPost, postView } from "@/lib/services";
 import { enqueue } from "@/lib/queue";
 import { isPlatform, PLATFORM_META, REMOVAL, supportsFirstComment, type Platform } from "@/lib/domain";
 import { removeEverywhere } from "@/lib/social/remove";
+import { pinTargets } from "@/lib/profiles";
+import { copyChanged } from "@/lib/collab-core";
+import { recordEdit } from "@/lib/collab";
 
 export const dynamic = "force-dynamic";
 
@@ -22,16 +25,21 @@ export const PATCH = route(async (req, { user, params }) => {
       if (post.status === "scheduled") await enqueue("SCHEDULED_POST", { postId: post.id }, { delayMs: at.getTime() - Date.now(), jobId: `sched-${post.id}-${at.getTime()}` });
     } else {
       // A failed or partly-sent post is being booked again: that is a launch, so it goes through launchPost
-      // (connections, approval and the plan's post slot), never a bare status write.
+      // (connections, approval and the plan's post slot), never a bare status write. Editors can't launch (1037).
+      if (user.role === "editor") throw new HttpError(403, "Editors can't publish. Send a review link, or ask the owner or a manager to launch it.", "ROLE");
       await launchPost(user.id, post.id, "schedule", at, "realistic");
     }
   }
+  const changed = copyChanged(post, { title: body.title, targets: body.targets });
+  const named = (body.targets ?? []).filter((t) => t.accountId);
+  const pins = named.length ? await pinTargets(user, named, {}) : {};
   if (body.title !== undefined) await db.post.update({ where: { id: post.id }, data: { title: body.title } });
   if (body.requireApproval !== undefined) await db.post.update({ where: { id: post.id }, data: { requireApproval: body.requireApproval } });
   for (const t of body.targets ?? []) {
     await db.postTarget.updateMany({
       where: { postId: post.id, platform: t.platform },
       data: {
+        ...(pins[t.platform] ? { socialAccountId: pins[t.platform] } : {}),
         title: t.title ?? undefined,
         caption: t.caption ?? undefined,
         description: t.description ?? undefined,
@@ -40,6 +48,7 @@ export const PATCH = route(async (req, { user, params }) => {
       },
     });
   }
+  if (changed) await recordEdit(user, post);
   return json({ post: await postView(await ownedPost(user.id, post.id)) });
 });
 

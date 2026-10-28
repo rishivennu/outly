@@ -22,6 +22,7 @@ export function memberBlock(role: WorkspaceRole, method: string, path: string): 
   if (OWNER_ONLY.some((p) => path === p || path.startsWith(p + "/"))) return "Only the workspace owner can change this.";
   const write = !["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase());
   if (role === "editor" && write) {
+    if (/^\/api\/posts\/[^/]+\/approve$/.test(path)) return "Editors can't approve posts. Ask the owner or a manager.";
     if (/^\/api\/posts\/[^/]+\/launch$/.test(path)) return "Editors can't publish. Send a review link, or ask the owner or a manager to launch it.";
     if (/^\/api\/posts\/[^/]+$/.test(path) && method.toUpperCase() === "DELETE") return "Editors can't delete posts.";
     if (/^\/api\/targets\/[^/]+\/remove$/.test(path)) return "Editors can't take posts down from a platform. Ask the owner or a manager.";

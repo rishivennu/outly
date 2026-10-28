@@ -42,9 +42,9 @@ export function invalidateDashboards(userId: string) {
  * cold start or on another route (the home strip vs the dashboard page) reads it instead of calling
  * the platform again. Stale entries are served at once and refreshed in the background.
  */
-function sharedRemote(userId: string, platform: Platform, tz: string, load: () => Promise<PlatformDashboard>) {
+function sharedRemote(userId: string, platform: Platform, tz: string, load: () => Promise<PlatformDashboard>, accountId: string | null = null) {
   // tz is part of the key: the hours chart and the coaching depend on it, and a settings change must not reuse the old copy.
-  return unstable_cache(load, ["live-dash-v2", userId, platform, tz], { revalidate: LIVE_CACHE_MS / 1000, tags: [`live:${userId}`, `live:${userId}:${platform}`] })().catch(noDataCache(load));
+  return unstable_cache(load, ["live-dash-v2", userId, platform, tz, accountId ?? "default"], { revalidate: LIVE_CACHE_MS / 1000, tags: [`live:${userId}`, `live:${userId}:${platform}`] })().catch(noDataCache(load));
 }
 
 /** Outside a Next request (tests, scripts) there is no data cache: just run the loader. Real failures pass through. */
@@ -57,8 +57,10 @@ function empty(platform: Platform, status: PlatformDashboard["status"], message:
   return { platform, status, message, connect, fetchedAt: new Date().toISOString(), rangeDays: 28, headline: [], series: [], posts: [], notes: [], suggestions: [] };
 }
 
-export async function platformDashboard(userId: string, platform: Platform, opts: { fresh?: boolean } = {}): Promise<PlatformDashboard> {
-  const key = `${userId}:${platform}`;
+export async function platformDashboard(userId: string, platform: Platform, opts: { fresh?: boolean; accountId?: string | null } = {}): Promise<PlatformDashboard> {
+  // 1037: a manager with several accounts on one platform sees the picked one's numbers.
+  const acctId = opts.accountId ?? null;
+  const key = `${userId}:${platform}${acctId ? `:${acctId}` : ""}`;
   const hit = cache.get(key);
   if (!opts.fresh && hit && Date.now() - hit.at < LIVE_CACHE_MS) return hit.data;
 
@@ -67,7 +69,7 @@ export async function platformDashboard(userId: string, platform: Platform, opts
   const connect = { oauth: hasCredentials(platform), token: canConnectWithToken(platform) };
   const [user, acct] = await Promise.all([
     db.user.findUnique({ where: { id: userId }, select: { timezone: true } }),
-    db.socialAccount.findFirst({ where: { userId, platform, status: { not: "disconnected" } }, orderBy: { createdAt: "desc" } }),
+    db.socialAccount.findFirst({ where: { userId, platform, status: { not: "disconnected" }, ...(acctId ? { id: acctId } : {}) }, orderBy: { createdAt: "desc" } }),
   ]);
   const tz = user?.timezone || "UTC";
 
@@ -95,7 +97,7 @@ export async function platformDashboard(userId: string, platform: Platform, opts
 
   let data: PlatformDashboard;
   try {
-    data = opts.fresh ? await load() : await sharedRemote(userId, platform, tz, load);
+    data = opts.fresh ? await load() : await sharedRemote(userId, platform, tz, load, acctId);
     if (!opts.fresh && Date.now() - new Date(data.fetchedAt).getTime() > SHARED_MAX_AGE_MS) data = await load();
   } catch (e) {
     const pe = asPublisherError(e);

@@ -1,4 +1,5 @@
 import "server-only";
+import { parseScope } from "../profiles-core";
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { db } from "../db";
@@ -12,13 +13,16 @@ const INVITE_DAYS = 14;
 export const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
 
 export async function teamFor(ownerId: string) {
-  const [members, e] = await Promise.all([
+  const [members, e, accounts] = await Promise.all([
     db.teamMember.findMany({ where: { ownerId }, orderBy: { createdAt: "asc" }, include: { user: { select: { name: true, avatar: true } } } }),
     entitlements(ownerId),
+    db.socialAccount.findMany({ where: { userId: ownerId, status: { not: "disconnected" } }, orderBy: { createdAt: "asc" }, select: { id: true, platform: true, username: true } }),
   ]);
   return {
     seats: { used: members.length, total: e.seats, plan: e.planName },
-    members: members.map((m) => ({ id: m.id, email: m.email, name: m.user?.name ?? null, role: m.role as TeamRole, status: m.status as "invited" | "active", createdAt: m.createdAt.toISOString(), expired: m.status === "invited" && Date.now() - m.createdAt.getTime() > INVITE_DAYS * 864e5 })),
+    // 1037: which accounts each member may work on (null = all), and the owner's accounts to pick from.
+    accounts,
+    members: members.map((m) => ({ id: m.id, email: m.email, name: m.user?.name ?? null, role: m.role as TeamRole, status: m.status as "invited" | "active", createdAt: m.createdAt.toISOString(), expired: m.status === "invited" && Date.now() - m.createdAt.getTime() > INVITE_DAYS * 864e5, accountIds: parseScope(m.accountIds) })),
   };
 }
 

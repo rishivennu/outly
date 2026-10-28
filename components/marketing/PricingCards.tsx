@@ -38,7 +38,7 @@ export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; varia
           <CycleSwitch value={cycle} onChange={setCycle} save={save} />
         </div>
       )}
-      <Reveal as="ul" fx="cards" className={cn("grid gap-5 md:grid-cols-3", top)}>
+      <Reveal as="ul" fx="cards" className={cn("grid gap-5 md:grid-cols-2", plans.length === 3 ? "lg:grid-cols-3" : plans.length >= 4 && "lg:grid-cols-4", top)}>
         {plans.map((p) => {
           const live = p.state === "available";
           const y = cycle === "year" && p.year ? p.year : null;

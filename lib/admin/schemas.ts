@@ -29,6 +29,8 @@ export const PlanInput = z.object({
   captionVideos: z.number().int().min(0).max(10_000).default(0),
   /** Burn captions into the video file. */
   burnCaptions: z.boolean().default(true),
+  /** Connected accounts in total, several per platform (1037). 0 = one per platform. */
+  accountLimit: z.number().int().min(0).max(50).default(0),
 });
 
 export const FaqInput = z.object({

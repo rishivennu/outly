@@ -11,6 +11,7 @@ import { ThemeCycleButton, ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useUser } from "./UserContext";
 import { NoticesBell } from "./NoticesBell";
 import { PaletteButton } from "./PaletteButton";
+import { LiveCount } from "@/components/shared/LiveCount";
 
 const MAIN = [
   { href: "/home", label: "Home", icon: Home },
@@ -89,6 +90,7 @@ export function Sidebar() {
             Outlly website
             <ArrowUpRight className="ml-auto h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
           </Link>
+          <LiveCount className="mt-3 px-3" />
           <ThemeToggle compact plain className="mb-1 mt-2 self-start" />
           <div className="mt-2 flex items-center gap-2 rounded-2xl p-1.5 hairline">
             <Link href="/settings" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl p-1 hover:bg-secondary/60">
@@ -206,6 +208,7 @@ export function MobileTopBar() {
       </Link>
       <div className="flex min-w-0 items-center gap-0.5">
         {/* One cycling button: the three-way switch made the row wider than a phone (10-12f). */}
+        <LiveCount compact className="mr-1 max-[379px]:hidden" />
         <PaletteButton compact />
         <ThemeCycleButton />
         <NoticesBell placement="below" />

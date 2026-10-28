@@ -1,6 +1,7 @@
 import "server-only";
 import type { DmThread, SocialAccount } from "@prisma/client";
 import { db } from "../db";
+import { inScope, type Scope } from "../profiles-core";
 import { decrypt, encrypt } from "../crypto";
 import { HttpError } from "../http";
 import { PLATFORM_META } from "../domain";
@@ -268,15 +269,16 @@ function view(t: ThreadRow, now = Date.now()): ThreadView {
   };
 }
 
-export async function listThreads(userId: string, platform?: DmPlatform) {
+/** scope (1037): a member limited to some accounts only sees conversations on theirs. */
+export async function listThreads(userId: string, platform?: DmPlatform, scope: Scope = null) {
   await seedPractice(userId).catch((e) => console.warn("[dm] practice seed", e));
   const rows = await db.dmThread.findMany({
-    where: { userId, account: { status: "connected" }, ...(platform ? { platform } : {}) },
+    where: { userId, account: { status: "connected" }, ...(platform ? { platform } : {}), ...(scope ? { accountId: { in: scope } } : {}) },
     include: { account: { select: { username: true, displayName: true, status: true } } },
     orderBy: { lastMessageAt: "desc" },
     take: 100,
   });
-  const connected = await db.socialAccount.count({ where: { userId, status: "connected", platform: { in: platform ? [platform] : ["instagram", "facebook"] } } });
+  const connected = await db.socialAccount.count({ where: { userId, status: "connected", platform: { in: platform ? [platform] : ["instagram", "facebook"] }, ...(scope ? { id: { in: scope } } : {}) } });
   return { threads: rows.map((t) => view(t)), accounts: connected };
 }
 
@@ -293,9 +295,9 @@ export interface MessageView {
   sentAt: string;
 }
 
-export async function getThread(userId: string, id: string) {
+export async function getThread(userId: string, id: string, scope: Scope = null) {
   const t = await db.dmThread.findFirst({ where: { id, userId }, include: { account: { select: { username: true, displayName: true, status: true } } } });
-  if (!t) throw new HttpError(404, "We couldn't find that conversation.");
+  if (!t || !inScope(scope, t.accountId)) throw new HttpError(404, "We couldn't find that conversation.");
   const rows = await db.dmMessage.findMany({ where: { threadId: t.id }, orderBy: { sentAt: "desc" }, take: 200 });
   if (t.unread) await db.dmThread.update({ where: { id: t.id }, data: { unread: 0 } });
   const messages: MessageView[] = rows.reverse().map((m) => {
@@ -316,12 +318,12 @@ function closedCopy(p: DmPlatform) {
 }
 
 /** Send a reply. The caller holds the weekly reply slot (see app/api/messages/[id]/route.ts). */
-export async function replyToThread(userId: string, actorId: string, threadId: string, rawText: string) {
+export async function replyToThread(userId: string, actorId: string, threadId: string, rawText: string, scope: Scope = null) {
   const text = rawText.trim();
   if (!text) throw new HttpError(400, "Write something first.", "VALIDATION");
   if (text.length > DM_MAX_CHARS) throw new HttpError(400, `Keep it under ${DM_MAX_CHARS} characters.`, "VALIDATION");
   const t = await db.dmThread.findFirst({ where: { id: threadId, userId }, include: { account: true } });
-  if (!t || !isDmPlatform(t.platform)) throw new HttpError(404, "We couldn't find that conversation.");
+  if (!t || !isDmPlatform(t.platform) || !inScope(scope, t.accountId)) throw new HttpError(404, "We couldn't find that conversation.");
   const platform = t.platform;
   if (t.account.status !== "connected") throw new HttpError(409, `Reconnect ${PLATFORM_META[platform].name} first.`, "NOT_CONNECTED");
   if (!windowState(t).canReply) throw new HttpError(409, closedCopy(platform), "WINDOW_CLOSED");
@@ -365,8 +367,8 @@ export async function replyToThread(userId: string, actorId: string, threadId: s
 }
 
 /** Refresh every connected Instagram / Facebook account of the workspace. Problems are reported, never thrown. */
-export async function syncAll(userId: string, platform?: DmPlatform) {
-  const accts = await db.socialAccount.findMany({ where: { userId, status: "connected", platform: { in: platform ? [platform] : ["instagram", "facebook"] } } });
+export async function syncAll(userId: string, platform?: DmPlatform, scope: Scope = null) {
+  const accts = await db.socialAccount.findMany({ where: { userId, status: "connected", platform: { in: platform ? [platform] : ["instagram", "facebook"] }, ...(scope ? { id: { in: scope } } : {}) } });
   const problems: { platform: DmPlatform; code: string; message: string; detail?: string }[] = [];
   for (const a of accts) {
     // DMs switched off (1031f): the token has no messaging permission, so asking Meta would only fail.

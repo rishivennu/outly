@@ -205,6 +205,8 @@ model ReviewRequest {
   createdAt    DateTime  @default(now())
   decidedAt    DateTime?
   expiresAt    DateTime
+  /// 1037: the team member who made the link (null = the owner). Their own change can't be cleared through it.
+  createdById  String?
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 

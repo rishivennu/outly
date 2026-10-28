@@ -13,6 +13,8 @@ import { activeGateway, capturePaypal, completePayment, confirmYoupi, expireSubs
 import { BillingView, type ReturnNotice } from "@/components/billing/BillingView";
 import { captionUsage, postUsage, replyUsage, uploadLimitBytes } from "@/lib/billing/entitlements";
 import { betaConfig, myBetaCode } from "@/lib/beta";
+import { myFounding, foundingPrice } from "@/lib/founding";
+import { trustBadges } from "@/lib/badges";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Billing" };
@@ -81,7 +83,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
     notice = { tone: "info", text: "Checkout cancelled. You weren't charged." };
   } else if (searchParams.paid) notice = { tone: "ok", text: `Payment received. Invoice ${searchParams.paid} is below and on its way to ${user.email}.` };
 
-  const [plans, sub, invoices, gw, usage, display, replies, captions, upload, beta, betaCfg] = await Promise.all([
+  const [plans, sub, invoices, gw, usage, display, replies, captions, upload, beta, betaCfg, founding, badges] = await Promise.all([
     listPlans(),
     db.subscription.findFirst({ where: { userId: user.id, status: "active" }, include: { plan: true }, orderBy: { createdAt: "desc" } }),
     db.invoice.findMany({ where: { userId: user.id }, orderBy: { issuedAt: "desc" }, take: 50, include: { payment: { select: { status: true } } } }),
@@ -93,7 +95,12 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
     uploadLimitBytes(user.id),
     myBetaCode(user.id),
     betaConfig(),
+    myFounding(user.id),
+    trustBadges(user.id),
   ]);
+  // Founding members see the price checkout will really charge, with the list price struck through.
+  const fpct = founding?.kind === "member" ? founding.pct : null;
+  const off = (minor: number) => foundingPrice(minor, fpct);
   // The redeem box shows to members holding a code, and to everyone while the beta is on (codes made by hand).
   const betaPlanName = (slug: string) => plans.find((p) => p.slug === slug)?.name ?? "Creator";
   const betaOffer = beta.redeemed
@@ -110,13 +117,13 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
     const lp = localPrice(p, chargeCurrency(gw.provider, visitor.currency, p.currency));
     const approx = lp.currency !== visitor.currency && p.priceMinor > 0 ? localPrice(p, visitor.currency) : null;
     // Yearly: same rules, so the number on the card is exactly what checkout charges.
-    let year: { priceMinor: number; currency: string; approx: string | null; save: number } | null = null;
+    let year: { priceMinor: number; currency: string; approx: string | null; save: number; was: number | null } | null = null;
     if (hasYearly(p, display.yearly)) {
       const ly = priceFor(p, lp.currency, "year", display.freeMonths);
       const ay = approx ? priceFor(p, visitor.currency, "year", display.freeMonths) : null;
-      year = { priceMinor: ly.priceMinor, currency: ly.currency, approx: ay ? `about ${formatMoney(ay.priceMinor, ay.currency)}` : null, save: yearlySaving(lp.priceMinor, ly.priceMinor) };
+      year = { priceMinor: off(ly.priceMinor), currency: ly.currency, approx: ay ? `about ${formatMoney(off(ay.priceMinor), ay.currency)}` : null, save: yearlySaving(lp.priceMinor, ly.priceMinor), was: fpct ? ly.priceMinor : null };
     }
-    return { ...p, priceMinor: lp.priceMinor, currency: lp.currency, approx: approx ? `about ${formatMoney(approx.priceMinor, approx.currency)}` : null, year };
+    return { ...p, priceMinor: off(lp.priceMinor), currency: lp.currency, approx: approx ? `about ${formatMoney(off(approx.priceMinor), approx.currency)}` : null, year, was: fpct && lp.priceMinor > 0 ? lp.priceMinor : null };
   });
 
   return (
@@ -134,6 +141,8 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
       canPickCurrency={gw.provider !== "razorpay"}
       current={sub ? { planSlug: sub.plan.slug, planName: sub.plan.name, priceMinor: sub.priceMinor, currency: sub.currency, interval: sub.interval, periodEnd: sub.currentPeriodEnd.toISOString(), cancelAtPeriodEnd: sub.cancelAtPeriodEnd, pausedUntil: sub.pausedUntil && sub.pausedUntil > new Date() ? sub.pausedUntil.toISOString() : null, provider: sub.provider } : null}
       beta={betaOffer}
+      founding={founding}
+      badges={badges}
       usage={{
         used: usage.used, limit: usage.postLimit, seats: usage.seats, aiCaptions: usage.aiCaptions, period: usage.postPeriod,
         maxUploadMb: upload.planLimited ? upload.mb : 0,

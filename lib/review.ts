@@ -5,6 +5,7 @@ import { HttpError } from "./http";
 import { randomToken, sha256 } from "./crypto";
 import { env } from "./env";
 import { mediaView, ownedPost, targetView } from "./services";
+import { approvalCurrent } from "./collab-core";
 
 export const REVIEW_TTL_MS = 7 * 24 * 3600 * 1000;
 
@@ -47,13 +48,14 @@ export async function reviewsForPost(postId: string) {
   return db.reviewRequest.findMany({ where: { postId }, orderBy: { createdAt: "desc" } });
 }
 
-export async function createReviewRequest(userId: string, postId: string) {
+/** createdById: the team member making the link, null for the owner (see isApproved). */
+export async function createReviewRequest(userId: string, postId: string, createdById: string | null = null) {
   const post = await ownedPost(userId, postId);
   if (post.status === "published" || post.status === "publishing")
     throw new HttpError(409, "This one has already gone out, so there's nothing left to review.");
   const token = randomToken(32);
   const review = await db.reviewRequest.create({
-    data: { postId: post.id, tokenHash: hashReviewToken(token), expiresAt: new Date(Date.now() + REVIEW_TTL_MS) },
+    data: { postId: post.id, tokenHash: hashReviewToken(token), expiresAt: new Date(Date.now() + REVIEW_TTL_MS), createdById },
   });
   return { review, token, url: reviewUrl(token) };
 }
@@ -113,14 +115,23 @@ export async function decideReview(token: string, input: { reviewerName: string;
 }
 
 /** True when the post is cleared to go out: approval is either not required or already given. */
-export async function isApproved(post: Pick<Post, "id" | "requireApproval">) {
+type Gate = Pick<Post, "id" | "requireApproval"> & { editedAt?: Date | null; editedById?: string | null };
+
+export async function isApproved(post: Gate) {
   if (!post.requireApproval) return true;
-  const approved = await db.reviewRequest.findFirst({ where: { postId: post.id, status: "approved" } });
-  return !!approved;
+  // 1037: an approval only clears the version it saw. A later edit (anyone's) needs approving again.
+  const known = post.editedAt !== undefined && post.editedById !== undefined;
+  const row = known ? null : await db.post.findUnique({ where: { id: post.id }, select: { editedAt: true, editedById: true } });
+  const editedAt = known ? post.editedAt ?? null : row?.editedAt ?? null;
+  const editedById = known ? post.editedById ?? null : row?.editedById ?? null;
+  // A member can't clear their own change through a review link they made and then opened themselves.
+  const notSelf = editedById ? { OR: [{ createdById: null }, { createdById: { not: editedById } }] } : {};
+  const approved = await db.reviewRequest.findMany({ where: { postId: post.id, status: "approved", ...(editedAt ? { decidedAt: { gte: editedAt } } : {}), ...notSelf }, select: { status: true, decidedAt: true }, take: 1 });
+  return approvalCurrent(approved, editedAt);
 }
 
 export const NEEDS_APPROVAL_MESSAGE = "This one needs a teammate's approval before it goes out.";
 
-export async function assertApproved(post: Pick<Post, "id" | "requireApproval">) {
+export async function assertApproved(post: Gate) {
   if (!(await isApproved(post))) throw new HttpError(409, NEEDS_APPROVAL_MESSAGE, "NEEDS_APPROVAL");
 }

@@ -13,8 +13,8 @@ export const GET = route(
     // A sync fans out to Meta for every account: far tighter than the list itself. Over it, serve what we have.
     const wantSync = req.nextUrl.searchParams.get("sync") === "1";
     const maySync = wantSync && (await limitShared(`dm-sync:${user.id}`, 6, 60_000)).ok;
-    const problems = maySync ? await syncAll(user.id, platform) : [];
-    return json({ ...(await listThreads(user.id, platform)), dmsOff: dmsOffList(), problems, ...(wantSync && !maySync ? { syncSkipped: true } : {}) });
+    const problems = maySync ? await syncAll(user.id, platform, user.scope) : [];
+    return json({ ...(await listThreads(user.id, platform, user.scope)), dmsOff: dmsOffList(), problems, ...(wantSync && !maySync ? { syncSkipped: true } : {}) });
   },
   { limit: [60, 60_000] },
 );

@@ -13,7 +13,7 @@ export const POST = route(
     const slot = await reserveReply(user.id, `${body.commentId}:${randomUUID()}`);
     let reply: Awaited<ReturnType<typeof replyToComment>>;
     try {
-      reply = await replyToComment(user.id, body.targetId, body.commentId, body.text);
+      reply = await replyToComment(user.id, body.targetId, body.commentId, body.text, user.scope);
     } catch (err) {
       await slot.release();
       throw err;

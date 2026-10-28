@@ -78,6 +78,7 @@ export const noticeKey = {
   reconnect: (accountId: string, week: string) => `reconnect:${accountId}:${week}`,
   expiring: (accountId: string, week: string) => `expiring:${accountId}:${week}`,
   nudge: (userId: string, week: string) => `nudge:${userId}:${week}`,
+  spike: (accountId: string, day: string) => `spike:${accountId}:${day}`,
 };
 
 export function parseKey(key: string) {

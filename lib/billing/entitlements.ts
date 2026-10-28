@@ -16,14 +16,15 @@ export interface Entitlements {
   replyLimit: number; // per week; 0 = unlimited
   captionVideos: number; // per month; 0 = unlimited
   burnCaptions: boolean;
+  accountLimit: number; // connected accounts in total, several per platform; 0 = one per platform (1037)
 }
 
 /** Which limit a 402 is about, so the upgrade popup can say the right thing. */
-export type LimitFeature = "posts" | "upload" | "replies" | "captions" | "burn" | "ai" | "seats";
+export type LimitFeature = "posts" | "upload" | "replies" | "captions" | "burn" | "ai" | "seats" | "accounts";
 
 const limit = (message: string, feature: LimitFeature) => new HttpError(402, message, "PLAN_LIMIT", { feature, upgrade: "/billing" });
 
-const UNLIMITED: Omit<Entitlements, "planSlug" | "planName"> = { postLimit: 0, postPeriod: "month", aiCaptions: true, seats: 0, maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true };
+const UNLIMITED: Omit<Entitlements, "planSlug" | "planName"> = { postLimit: 0, postPeriod: "month", aiCaptions: true, seats: 0, maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true, accountLimit: 0 };
 
 /** What this account's plan allows: its active subscription's plan, else the Free plan, else no limits. */
 export async function entitlements(userId: string): Promise<Entitlements> {
@@ -38,7 +39,7 @@ export async function entitlements(userId: string): Promise<Entitlements> {
   if (!plan) return { planSlug: "free", planName: "Free", ...UNLIMITED };
   return {
     planSlug: plan.slug, planName: plan.name, postLimit: plan.postLimit, postPeriod: plan.postPeriod === "week" ? "week" : "month",
-    aiCaptions: plan.aiCaptions, seats: plan.seats, maxUploadMb: plan.maxUploadMb, replyLimit: plan.replyLimit, captionVideos: plan.captionVideos, burnCaptions: plan.burnCaptions,
+    aiCaptions: plan.aiCaptions, seats: plan.seats, maxUploadMb: plan.maxUploadMb, replyLimit: plan.replyLimit, captionVideos: plan.captionVideos, burnCaptions: plan.burnCaptions, accountLimit: plan.accountLimit ?? 0,
   };
 }
 
@@ -230,6 +231,16 @@ export async function assertBurnCaptions(userId: string) {
   const e = await entitlements(userId);
   if (!e.burnCaptions) throw limit(`Burning captions into the video is a paid feature. Upgrade to burn them in; on ${e.planName} you can still post with captions in the text.`, "burn");
   return e;
+}
+
+/**
+ * Connected accounts (1037). Plans without an account limit keep one account per platform (reconnecting
+ * replaces it). A multi-account plan keeps several per platform up to `accountLimit` in total.
+ * Pure, so the rule is unit-tested: `others` = accounts already saved, not counting the one being (re)connected.
+ */
+export function checkAccounts(e: Pick<Entitlements, "accountLimit" | "planName">, others: number) {
+  if (e.accountLimit > 0 && others >= e.accountLimit)
+    throw limit(`${e.planName} includes ${e.accountLimit} connected accounts and they're all in use. Disconnect one, or upgrade to add more.`, "accounts");
 }
 
 /** Seats: invited + active members must stay within the owner's plan. */

@@ -19,6 +19,8 @@ import { AvatarPicker } from "./AvatarPicker";
 import { SnippetsCard } from "./SnippetsCard";
 import { TwoStepCard } from "./TwoStepCard";
 import { YourDataCard } from "./YourDataCard";
+import { AlertsCard } from "./AlertsCard";
+import { ALERT_DEFAULTS, type AlertPrefs } from "@/lib/alerts-core";
 
 function zones(): string[] {
   const anyIntl = Intl as unknown as { supportedValuesOf?: (k: string) => string[] };
@@ -83,7 +85,7 @@ function WeeklyReportCard({ initial }: { initial: boolean }) {
   );
 }
 
-export function SettingsView({ weeklyReport = true }: { weeklyReport?: boolean }) {
+export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS }: { weeklyReport?: boolean; alerts?: AlertPrefs }) {
   const user = useUser();
   const router = useRouter();
   const toast = useToast();
@@ -207,6 +209,7 @@ export function SettingsView({ weeklyReport = true }: { weeklyReport?: boolean }
           <ReferralCard />
         </div>
         {!user.workspace && <WeeklyReportCard initial={weeklyReport} />}
+        {!user.workspace && <div className="lg:col-span-2"><AlertsCard initial={alerts} /></div>}
         <div className="lg:col-span-2">
           <TeamCard />
         </div>

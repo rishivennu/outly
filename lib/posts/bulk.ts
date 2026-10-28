@@ -49,3 +49,23 @@ export function tooLongFor(durationSec: number | null | undefined, platforms: Pl
 }
 
 export const BULK_MAX = 10;
+/** Most accounts one batch can go to (1037). 10 videos x 10 accounts is already 100 posts. */
+export const BULK_ACCOUNTS_MAX = 10;
+
+/**
+ * Picked accounts grouped into rounds (1037). A post goes to each platform once, so two Instagram accounts
+ * need two posts per video. Each round holds at most one account per platform; the number of rounds is the
+ * most accounts picked on any one platform. Order is kept, so the first account on a platform is in round 1.
+ */
+export function accountRounds<A extends { id: string; platform: string }>(accounts: A[]): A[][] {
+  const rounds: A[][] = [];
+  const seen = new Set<string>();
+  for (const a of accounts) {
+    if (seen.has(a.id)) continue;
+    seen.add(a.id);
+    const r = rounds.find((x) => !x.some((y) => y.platform === a.platform));
+    if (r) r.push(a);
+    else rounds.push([a]);
+  }
+  return rounds;
+}

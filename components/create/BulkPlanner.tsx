@@ -13,7 +13,7 @@ import { api, ApiError } from "@/lib/client/api";
 import { uploadVideo } from "@/lib/client/upload";
 import { validateVideoFile } from "@/lib/client/handoff";
 import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
-import { BULK_MAX, titleFromFilename, tooLongFor } from "@/lib/posts/bulk";
+import { BULK_ACCOUNTS_MAX, BULK_MAX, accountRounds, titleFromFilename, tooLongFor } from "@/lib/posts/bulk";
 import { cn } from "@/lib/utils";
 import { readVideo } from "./frame";
 import type { AccountView, MediaView, PostView } from "./types";
@@ -42,7 +42,7 @@ interface Plan {
   planName: string;
   period?: "week" | "month";
 }
-type Done = { posts: PostView[]; failed: { index: number; message: string }[] };
+type Done = { posts: PostView[]; failed: { index: number; postId?: string; message: string }[] };
 
 const CONCURRENT = 2;
 let seq = 0;
@@ -50,7 +50,14 @@ let seq = 0;
 export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: string }) {
   const toast = useToast();
   const connected = useMemo(() => PLATFORMS.filter((p) => accounts.some((a) => a.platform === p && a.status === "connected")), [accounts]);
-  const [platforms, setPlatforms] = useState<Platform[]>(() => connected.filter((p) => p === "instagram" || p === "youtube").length ? connected.filter((p) => p === "instagram" || p === "youtube") : connected.slice(0, 1));
+  const [chosen, setPlatforms] = useState<Platform[]>(() => connected.filter((p) => p === "instagram" || p === "youtube").length ? connected.filter((p) => p === "instagram" || p === "youtube") : connected.slice(0, 1));
+  // 1037: with more than one account on a platform the picker lists accounts, and each extra account on a
+  // platform means one more post per video (a post goes to each platform once).
+  const live = useMemo(() => accounts.filter((a) => a.status === "connected"), [accounts]);
+  const multi = useMemo(() => connected.some((p) => live.filter((a) => a.platform === p).length > 1), [connected, live]);
+  const [acctIds, setAcctIds] = useState<string[]>(() => chosen.map((p) => live.find((a) => a.platform === p)?.id).filter((x): x is string => !!x));
+  const platforms = multi ? PLATFORMS.filter((p) => acctIds.some((id) => live.find((a) => a.id === id)?.platform === p)) : chosen;
+  const rounds = multi ? accountRounds(acctIds.map((id) => live.find((a) => a.id === id)).filter((a): a is AccountView => !!a)).length : 1;
   const [rows, setRows] = useState<Row[]>([]);
   const [hashtags, setHashtags] = useState("");
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -162,7 +169,8 @@ export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: str
   const uploading = rows.some((r) => r.state === "uploading" || r.state === "waiting");
   const failedUploads = rows.filter((r) => r.state === "failed").length;
   const missingTime = rows.some((r) => !r.at);
-  const overPlan = plan?.left != null && rows.length > plan.left;
+  const total = rows.length * Math.max(1, rounds);
+  const overPlan = plan?.left != null && total > plan.left;
   const canBook = rows.length > 0 && platforms.length > 0 && !uploading && !failedUploads && !missingTime && !overPlan && !busy;
   const why = !rows.length
     ? "Add some videos first."
@@ -173,7 +181,7 @@ export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: str
         : failedUploads
           ? "Retry or remove the videos that didn't upload."
           : overPlan
-            ? `${plan!.planName} has ${plan!.left} post${plan!.left === 1 ? "" : "s"} left ${plan!.period === "week" ? "this week" : "this month"}. Remove ${rows.length - plan!.left!} or upgrade in Billing.`
+            ? `${plan!.planName} has ${plan!.left} post${plan!.left === 1 ? "" : "s"} left ${plan!.period === "week" ? "this week" : "this month"} and this batch is ${total}. Remove some or upgrade in Billing.`
             : missingTime
               ? "Finding times..."
               : null;
@@ -183,7 +191,7 @@ export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: str
     try {
       const r = await api<Done>("/api/posts/bulk", {
         method: "POST",
-        json: { platforms, items: rows.map((x) => ({ mediaId: x.media!.id, title: x.title, caption: x.caption, hashtags, scheduledAt: x.at })) },
+        json: { platforms, ...(multi ? { accountIds: acctIds } : {}), items: rows.map((x) => ({ mediaId: x.media!.id, title: x.title, caption: x.caption, hashtags, scheduledAt: x.at })) },
       });
       setDone(r);
       if (!r.failed.length) toast(`${r.posts.length} post${r.posts.length === 1 ? "" : "s"} booked.`);
@@ -199,6 +207,7 @@ export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: str
     setRows((rs) => rs.filter((r) => r.key !== key));
     if (editing === key) setEditing(null);
   };
+  const toggleAcct = (id: string) => setAcctIds((xs) => (xs.includes(id) ? xs.filter((x) => x !== id) : xs.length >= BULK_ACCOUNTS_MAX ? xs : live.filter((a) => a.id === id || xs.includes(a.id)).map((a) => a.id)));
   const toggle = (p: Platform) => setPlatforms((ps) => (ps.includes(p) ? ps.filter((x) => x !== p) : PLATFORMS.filter((x) => x === p || ps.includes(x))));
   const when = (iso: string) => fmt(iso, tz, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
@@ -226,6 +235,30 @@ export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: str
           {/* Where */}
           <section aria-labelledby="bulk-where" className="mt-10">
             <h2 id="bulk-where" className="text-sm font-semibold">Send them to</h2>
+            {multi && (
+              <p className="mt-1 text-sm text-muted-foreground">Pick accounts. Each video becomes one post per account, all at the same time.</p>
+            )}
+            {multi ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {live.map((a) => {
+                  const on = acctIds.includes(a.id);
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => toggleAcct(a.id)}
+                      className={cn("inline-flex min-h-[44px] items-center gap-2 rounded-full py-1.5 pl-1.5 pr-4 text-sm font-medium transition hairline", on ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
+                    >
+                      <PlatformOrb platform={a.platform} size={30} />
+                      {a.username}
+                      <span className="sr-only"> on {PLATFORM_META[a.platform].name}</span>
+                      {on && <Check className="h-4 w-4" aria-hidden />}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
             <div className="mt-3 flex flex-wrap gap-2">
               {connected.map((p) => {
                 const on = platforms.includes(p);
@@ -244,6 +277,7 @@ export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: str
                 );
               })}
             </div>
+            )}
           </section>
 
           {/* Drop */}
@@ -368,7 +402,7 @@ Spaced over the days ahead, one a day where they fit. {plan.reason}
           {rows.length > 0 && (
             <div className="sticky bottom-[calc(max(12px,env(safe-area-inset-bottom))+80px)] z-10 mt-8 lg:bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-[24px] p-3 pl-5 glass hairline">
               <p className="text-sm text-muted-foreground" aria-live="polite">
-                {why ?? `${rows.length} post${rows.length === 1 ? "" : "s"} to ${platforms.map((p) => PLATFORM_META[p].name).join(", ")}.`}
+                {why ?? (multi ? `${total} post${total === 1 ? "" : "s"} across ${acctIds.length} account${acctIds.length === 1 ? "" : "s"}.` : `${rows.length} post${rows.length === 1 ? "" : "s"} to ${platforms.map((p) => PLATFORM_META[p].name).join(", ")}.`)}
               </p>
               <Button variant="lime" onClick={book} disabled={!canBook}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CalendarCheck2 className="h-4 w-4" aria-hidden />}
@@ -390,7 +424,7 @@ function Booked({ done, rows, when }: { done: Done; rows: Row[]; when: (iso: str
       <h1 className="display text-[clamp(2.4rem,5.5vw,4rem)]">{ok.length === done.posts.length ? `All ${ok.length} are booked.` : `${ok.length} of ${done.posts.length} booked.`}</h1>
       <ul className="mt-8 space-y-2">
         {done.posts.map((p, i) => {
-          const fail = done.failed.find((f) => f.index === i);
+          const fail = done.failed.find((f) => (f.postId ? f.postId === p.id : f.index === i));
           return (
             <li key={p.id} className="flex items-center gap-3 rounded-2xl p-3 hairline">
               <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-full", fail ? "bg-destructive/15" : "lime-bg")}>{fail ? <AlertTriangle className="h-4 w-4" aria-hidden /> : <Check className="h-4 w-4" aria-hidden />}</span>

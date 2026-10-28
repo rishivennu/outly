@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 type Ctx = { params: { id: string } };
 
 /** One conversation with its messages. Opening it marks it read. */
-export const GET = route<Ctx>(async (_req, { user, params }) => json(await getThread(user.id, params.id)), { limit: [120, 60_000] });
+export const GET = route<Ctx>(async (_req, { user, params }) => json(await getThread(user.id, params.id, user.scope)), { limit: [120, 60_000] });
 
 /** Reply. Counts against the same weekly reply allowance as comment replies. */
 export const POST = route<Ctx>(
@@ -19,7 +19,7 @@ export const POST = route<Ctx>(
     const slot = await reserveReply(user.id, `dm:${params.id}:${randomUUID()}`);
     let sent: Awaited<ReturnType<typeof replyToThread>>;
     try {
-      sent = await replyToThread(user.id, realUserId(user), params.id, body.text);
+      sent = await replyToThread(user.id, realUserId(user), params.id, body.text, user.scope);
     } catch (err) {
       await slot.release();
       throw err;

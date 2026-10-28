@@ -10,6 +10,8 @@ import { TryIt } from "@/components/marketing/TryIt";
 import { Demo } from "@/components/marketing/Demo";
 import { Comparison } from "@/components/marketing/Comparison";
 import { Pricing } from "@/components/marketing/Pricing";
+import { TimeSaved } from "@/components/marketing/TimeSaved";
+import { Trust } from "@/components/marketing/Trust";
 import { Faq } from "@/components/marketing/Faq";
 import { FinalCta } from "@/components/marketing/FinalCta";
 import { RouteRule } from "@/components/marketing/bits";
@@ -96,10 +98,12 @@ export default async function LandingPage() {
       {!on("hero") && <div className="h-6" aria-hidden="true" />}
       {on("how") && <HowItWorks />}
       {on("features") && <Features />}
+      {on("time") && <TimeSaved />}
       {on("demo") && <Demo />}
       {on("why") && <Difference beta={beta} />}
       {on("platforms") && <Platforms showCompare={on("compare")} />}
       {on("compare") && <Comparison competitors={cfg.competitors} groups={cfg.groups} beta={beta} />}
+      {on("trust") && <Trust />}
       {on("pricing") && <Pricing />}
       {on("faq") && <Faq />}
       {on("cta") && <FinalCta beta={beta} />}

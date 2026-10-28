@@ -8,6 +8,7 @@ import { env } from "./env";
 
 import { SESSION_COOKIE } from "./session-cookie";
 import { TEAM_ROLES, WS_COOKIE, type WorkspaceRole } from "./team/roles";
+import { parseScope, type Scope } from "./profiles-core";
 export { SESSION_COOKIE };
 const secret = new TextEncoder().encode(env.AUTH_SECRET);
 const MAX_AGE = 60 * 60 * 24 * 14; // 14 days
@@ -102,11 +103,12 @@ export const getCurrentUser = cache(async () => {
   const { tokenVersion: _v, ...me } = found;
   const ws = cookies().get(WS_COOKIE)?.value;
   if (ws && ws !== id) {
-    const seat = await db.teamMember.findFirst({ where: { ownerId: ws, userId: id, status: "active" }, select: { role: true, owner: { select: USER_SELECT } } });
+    const seat = await db.teamMember.findFirst({ where: { ownerId: ws, userId: id, status: "active" }, select: { role: true, accountIds: true, owner: { select: USER_SELECT } } });
     if (seat && (TEAM_ROLES as readonly string[]).includes(seat.role))
-      return { ...seat.owner, joinedAt: me.createdAt, actor: { id: me.id, name: me.name, email: me.email } as Actor | null, role: seat.role as WorkspaceRole };
+      return { ...seat.owner, joinedAt: me.createdAt, actor: { id: me.id, name: me.name, email: me.email } as Actor | null, role: seat.role as WorkspaceRole, scope: parseScope(seat.accountIds) };
   }
-  return { ...me, joinedAt: me.createdAt, actor: null as Actor | null, role: "owner" as WorkspaceRole };
+  // scope (1037): the accounts this person may work on in this workspace; null = all of them (always for the owner)
+  return { ...me, joinedAt: me.createdAt, actor: null as Actor | null, role: "owner" as WorkspaceRole, scope: null as Scope };
 });
 
 export type Actor = { id: string; name: string; email: string };

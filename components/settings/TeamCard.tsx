@@ -8,8 +8,51 @@ import { api, ApiError } from "@/lib/client/api";
 import { cn } from "@/lib/utils";
 
 type Role = "editor" | "manager";
-type Member = { id: string; email: string; name: string | null; role: Role; status: "invited" | "active"; expired: boolean };
-type Team = { seats: { used: number; total: number; plan: string }; members: Member[] };
+type Member = { id: string; email: string; name: string | null; role: Role; status: "invited" | "active"; expired: boolean; accountIds: string[] | null };
+type Acct = { id: string; platform: string; username: string };
+type Team = { seats: { used: number; total: number; plan: string }; members: Member[]; accounts: Acct[] };
+const PNAME: Record<string, string> = { instagram: "Instagram", youtube: "YouTube", x: "X", facebook: "Facebook", tiktok: "TikTok", threads: "Threads", linkedin: "LinkedIn" };
+
+/**
+ * Which accounts one member may work on (1037). "All accounts" is the default and also covers accounts
+ * connected later; ticking specific ones limits them to exactly those, everywhere in the studio.
+ */
+function AccountAccess({ m, accounts, busy, onSave }: { m: Member; accounts: Acct[]; busy: boolean; onSave: (ids: string[] | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const all = m.accountIds === null;
+  const picked = new Set(m.accountIds ?? []);
+  const label = all ? "All accounts" : `${m.accountIds!.filter((id) => accounts.some((a) => a.id === id)).length} of ${accounts.length} accounts`;
+  const flip = (id: string) => {
+    const next = all ? accounts.map((a) => a.id).filter((x) => x !== id) : picked.has(id) ? [...picked].filter((x) => x !== id) : [...picked, id];
+    onSave(next.length === accounts.length ? null : next);
+  };
+  return (
+    <div className="w-full sm:w-auto">
+      <button type="button" aria-expanded={open} aria-controls={`acc-${m.id}`} onClick={() => setOpen((o) => !o)} className="h-11 rounded-2xl px-3 text-sm hairline hover:bg-secondary/60 focus-visible:outline-2">
+        {label}
+      </button>
+      {open && (
+        <fieldset id={`acc-${m.id}`} className="mt-2 rounded-2xl bg-secondary/40 p-3" disabled={busy}>
+          <legend className="sr-only">Accounts {m.name ?? m.email} can work on</legend>
+          <label className="flex min-h-11 items-center gap-3 text-sm font-medium">
+            <input type="checkbox" className="h-5 w-5 accent-[hsl(var(--lime))]" checked={all} onChange={() => onSave(all ? [] : null)} /> All accounts, including ones added later
+          </label>
+          <ul className="mt-1 grid gap-1 sm:grid-cols-2">
+            {accounts.map((a) => (
+              <li key={a.id}>
+                <label className="flex min-h-11 items-center gap-3 text-sm">
+                  <input type="checkbox" className="h-5 w-5 accent-[hsl(var(--lime))]" checked={all || picked.has(a.id)} onChange={() => flip(a.id)} />
+                  <span className="truncate">{a.username} <span className="text-muted-foreground">{PNAME[a.platform] ?? a.platform}</span></span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          {!all && picked.size === 0 && <p className="mt-2 text-xs text-warning">No accounts ticked: they can open the studio but can&apos;t see or post to any account.</p>}
+        </fieldset>
+      )}
+    </div>
+  );
+}
 type Workspace = { ownerId: string; ownerName: string; ownerEmail: string; role: Role };
 type Data = { current: { ownerId: string; ownerName: string; role: string } | null; team: Team | null; workspaces: Workspace[] };
 
@@ -58,6 +101,17 @@ export function TeamCard() {
     try {
       setTeam(await api<Team>(`/api/team/members/${m.id}`, { method: "PATCH", json: { role: r } }));
       toast(`${m.name ?? m.email} is now ${r === "manager" ? "a manager" : "an editor"}.`, "ok");
+    } catch (err) {
+      toast(msg(err), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const setAccess = async (m: Member, accountIds: string[] | null) => {
+    setBusy(m.id);
+    try {
+      setTeam(await api<Team>(`/api/team/members/${m.id}`, { method: "PATCH", json: { accountIds } }));
+      toast(accountIds === null ? `${m.name ?? m.email} can work on every account.` : `${m.name ?? m.email} can work on ${accountIds.length} account${accountIds.length === 1 ? "" : "s"}.`, "ok");
     } catch (err) {
       toast(msg(err), "error");
     } finally {
@@ -198,6 +252,7 @@ export function TeamCard() {
                     <option value="editor">Editor</option>
                     <option value="manager">Manager</option>
                   </select>
+                  {team.accounts.length > 1 && <AccountAccess m={m} accounts={team.accounts} busy={busy === m.id} onSave={(ids) => setAccess(m, ids)} />}
                   <button type="button" onClick={() => remove(m)} disabled={busy === m.id} aria-label={m.status === "invited" ? `Cancel invite for ${m.email}` : `Remove ${m.name ?? m.email}`} className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-2 disabled:opacity-50">
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </button>

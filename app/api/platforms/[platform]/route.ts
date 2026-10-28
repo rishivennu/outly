@@ -1,6 +1,7 @@
 import { HttpError, json, route } from "@/lib/http";
 import { isPlatform } from "@/lib/domain";
 import { platformDashboard } from "@/lib/live";
+import { dashboardAccount } from "@/lib/profiles";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export const GET = route(
   async (req, { user, params }) => {
     const p = params.platform ?? "";
     if (!isPlatform(p)) throw new HttpError(404, "We don't support that platform yet.");
-    return json(await platformDashboard(user.id, p, { fresh: req.nextUrl.searchParams.get("fresh") === "1" }));
+    return json(await platformDashboard(user.id, p, { fresh: req.nextUrl.searchParams.get("fresh") === "1", accountId: await dashboardAccount(user, p) }));
   },
   { limit: [40, 60_000] },
 );

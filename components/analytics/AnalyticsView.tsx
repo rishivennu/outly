@@ -16,6 +16,7 @@ import type { Platform } from "@/lib/domain";
 import { PlatformTabs } from "./PlatformTabs";
 import { LiveStrip } from "./LiveStrip";
 import { ProfileReview } from "./ProfileReview";
+import { AccountDrill, ReportButtons } from "./AccountDrill";
 
 const RANGES = [
   { d: 7, label: "7 days", phrase: "this week" },
@@ -57,21 +58,35 @@ function RangePicker({ value, onPick }: { value: number; onPick: (d: number) => 
   );
 }
 
-export function AnalyticsView({ initial, connected }: { initial: AnalyticsSummary; connected: Partial<Record<Platform, boolean>> }) {
+export function AnalyticsView({ initial, connected, focusAccount = null }: { initial: AnalyticsSummary; connected: Partial<Record<Platform, boolean>>; focusAccount?: string | null }) {
   const [data, setData] = useState(initial);
   const live = useLivePlatforms();
   const [loading, setLoading] = useState(false);
   const range = RANGES.find((r) => r.d === data.rangeDays) ?? RANGES[1];
 
-  const pick = async (d: number) => {
-    if (d === data.rangeDays) return;
+  // 1037 drilldown: the combined list is remembered so picking one account never hides the others.
+  const [drill, setDrill] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState(initial.byAccount);
+  const load = async (d: number, acct: string | null) => {
     setLoading(true);
     try {
-      setData(await api<AnalyticsSummary>(`/api/analytics?days=${d}`));
+      const next = await api<AnalyticsSummary>(`/api/analytics?days=${d}${acct ? `&account=${encodeURIComponent(acct)}` : ""}`);
+      setData(next);
+      // The API ignores an id this person can't see, so only show the drill when it actually applied.
+      setDrill(acct && next.byAccount.some((a) => a.accountId === acct) ? acct : null);
+      if (!acct) setAccounts(next.byAccount);
     } finally {
       setLoading(false);
     }
   };
+  // A spike alert links here with ?account=; open on that account (the API re-checks it belongs to you).
+  useEffect(() => {
+    // Not limited to the current list: the link may be for another profile than the one picked on Home.
+    if (focusAccount) void load(initial.rangeDays, focusAccount).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const pick = (d: number) => (d === data.rangeDays ? undefined : load(d, drill));
+  const pickAccount = (id: string | null) => (id === drill ? undefined : load(data.rangeDays, id));
 
   const anyConnected = Object.values(connected).some(Boolean);
   // Brand-new studio: nothing connected and nothing published. A review and live counter would only
@@ -157,7 +172,10 @@ export function AnalyticsView({ initial, connected }: { initial: AnalyticsSummar
             {data.bestDay && <li>{data.bestDay}s are your day.</li>}
           </ul>
         </section>
-        <RangePicker value={data.rangeDays} onPick={pick} />
+        <div className="flex flex-wrap items-center gap-3">
+          <ReportButtons days={data.rangeDays} account={drill} />
+          <RangePicker value={data.rangeDays} onPick={pick} />
+        </div>
       </header>
 
       <dl className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -176,6 +194,8 @@ export function AnalyticsView({ initial, connected }: { initial: AnalyticsSummar
           </div>
         ))}
       </dl>
+
+      <AccountDrill accounts={accounts} active={drill} onPick={pickAccount} busy={loading} />
 
       <div className="mt-3 grid gap-3 lg:grid-cols-[1.6fr_1fr]">
         <section aria-labelledby="trend" className="glass flex flex-col rounded-[28px] p-5 sm:p-6">

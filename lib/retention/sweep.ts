@@ -80,6 +80,7 @@ export async function sendGoalNudges(now = new Date()) {
 }
 
 let lastRun = 0;
+let lastSpikes = 0;
 /** From the in-process sweeper: account health and goal nudges, at most every 10 minutes, never in maintenance. */
 export async function maybeRunRetention() {
   if (Date.now() - lastRun < 10 * 60_000) return;
@@ -87,4 +88,10 @@ export async function maybeRunRetention() {
   if ((await getConfig("site")).maintenance) return;
   await sweepAccountHealth().catch((e) => console.error("[retention] accounts", e));
   await sendGoalNudges().catch((e) => console.error("[retention] nudges", e));
+  // Spikes once an hour: views only move when metrics sync, and one alert per account per day is the cap anyway.
+  if (Date.now() - lastSpikes >= 60 * 60_000) {
+    lastSpikes = Date.now();
+    const { sweepSpikes } = await import("./alerts");
+    await sweepSpikes().catch((e) => console.error("[retention] spikes", e));
+  }
 }

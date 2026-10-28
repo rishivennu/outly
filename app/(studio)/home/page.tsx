@@ -30,6 +30,12 @@ import { cookies } from "next/headers";
 import { homePulse } from "@/lib/retention/pulse";
 import { isPlatform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
+import { myFounding } from "@/lib/founding";
+import { FoundingCard } from "@/components/founding/FoundingCard";
+import { listProfiles, postFilter } from "@/lib/profiles";
+import { trustBadges } from "@/lib/badges";
+import { ProfileSwitcher } from "@/components/home/ProfileSwitcher";
+import { TrustBadges } from "@/components/shared/TrustBadges";
 
 const NEW_FOR_DAYS = 14;
 
@@ -55,7 +61,7 @@ async function welcomeOffer(user: { id: string; createdAt: Date; actor: unknown 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Home" };
 
-export default async function HomePage({ searchParams }: { searchParams?: { recapAt?: string } }) {
+export default async function HomePage({ searchParams }: { searchParams?: { recapAt?: string; founding?: string } }) {
   const user = (await getCurrentUser())!;
   // One parallel wave: every query below is independent, so the page pays one database round trip, not four.
   // Pulse only needs the connections and the published count, so it chains on those two instead of waiting for all.
@@ -65,10 +71,12 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
   const recapHidden = cookies().get(RECAP_COOKIE)?.value;
   // Dev only: preview the Monday card on any day (?recapAt=2026-10-19T05:00:00Z).
   const recapAt = process.env.NODE_ENV !== "production" && searchParams?.recapAt ? new Date(searchParams.recapAt) : new Date();
-  const [, drafts, next, live, welcome, published, ret, pulse, recap] = await Promise.all([
+  // 1037: the picked profile (or a member's accounts) narrows the drafts and the next post too.
+  const [profiles, scope, badges] = await Promise.all([listProfiles(user.id, user.scope), postFilter(user), trustBadges(user.id)]);
+  const [, drafts, next, live, welcome, published, ret, pulse, recap, founding] = await Promise.all([
     loadKeys(),
-    db.post.findMany({ where: { userId: user.id, status: "draft" }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
-    db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() } }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),
+    db.post.findMany({ where: { userId: user.id, status: "draft", ...scope.where }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
+    db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() }, ...scope.where }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),
     liveP,
     welcomeOffer(user).catch(() => null),
     publishedP,
@@ -92,6 +100,7 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
         console.error("[home] recap", e);
         return null;
       }),
+    user.actor ? null : myFounding(user.id),
   ]);
   const started = Object.values(live).some(Boolean) || published > 0;
   const steps = ret?.steps ?? [];
@@ -112,6 +121,14 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
   return (
     <div className="relative overflow-hidden">
       <HomeHero firstName={user.name.split(" ")[0]} />
+      {(founding || searchParams?.founding) && <FoundingCard f={founding} where="home" status={searchParams?.founding?.slice(0, 20) ?? null} />}
+      {profiles.length >= 2 ? (
+        <ProfileSwitcher profiles={profiles} activeId={scope.active?.id ?? null}>
+          <TrustBadges b={badges} className="mt-3" />
+        </ProfileSwitcher>
+      ) : (
+        (badges.verifiedManager || (badges.foundingNo && !founding)) && <div className="mx-auto max-w-5xl px-5 pb-4 sm:px-10"><TrustBadges b={badges} /></div>
+      )}
       <SetupChecklist state={setup} />
       {welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} freePeriod={welcome.freePeriod} />}
       {(pulse || recap) && (

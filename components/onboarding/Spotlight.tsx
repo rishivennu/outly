@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, ArrowRight, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, X } from "lucide-react";
 
 /*
  * The spotlight both tours share: the studio-wide welcome tour (Tour.tsx) and the first-visit tips on
@@ -9,7 +9,8 @@ import { ArrowLeft, ArrowRight, X } from "lucide-react";
  * ('[aria-labelledby="plans"]'); the first visible match wins, and no match means a centred card.
  */
 
-export type Stop = { target?: string; title: string; body: string; owner?: boolean };
+/** points: an optional short check list under the body (the tour's benefits step, 1037). */
+export type Stop = { target?: string; title: string; body: string; owner?: boolean; points?: string[] };
 
 const sel = (t: string) => (/^[a-z-]+$/.test(t) ? `[data-tour="${t}"]` : t);
 
@@ -196,6 +197,16 @@ export function Spotlight({ stops, onClose, kicker, skipLabel = "Skip", moreFall
         <p id="tour-body" className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
           {stop.body}
         </p>
+        {stop.points?.length ? (
+          <ul className="mt-3 space-y-1.5 text-sm">
+            {stop.points.map((pt) => (
+              <li key={pt} className="flex gap-2">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-lime-ink" aria-hidden="true" />
+                <span>{pt}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {viaMore && <p className="mt-2 text-[13px] font-medium text-foreground/85">On your phone, it&apos;s under More.</p>}
         <div className="mt-5 flex items-center gap-2">
           {i > 0 && (

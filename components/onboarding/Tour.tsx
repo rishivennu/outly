@@ -17,6 +17,17 @@ import { resetGuides, tourState } from "./guides";
 // The whole studio, Home to Settings, one short line each: a first look, not a manual.
 const STOP_LIST: Stop[] = [
   { title: "Welcome to Outlly", body: "A quick look around, from Home to Settings. Arrow keys move, Esc leaves any time." },
+  // Benefits step (1037): what changes for you, before the where-is-what.
+  {
+    title: "What you get",
+    body: "One upload does the work of three. Here's what Outlly takes off your plate.",
+    points: [
+      "Captions, hooks and titles drafted for each platform",
+      "Posts go out on time, even with your laptop shut",
+      "Every result tracked per platform in one place",
+      "Run several accounts and switch in one tap on Pro Manager",
+    ],
+  },
   { target: "home", title: "Home", body: "Your day at a glance: what's going out, what needs you, and your weekly goal." },
   { target: "new-post", title: "Create a post", body: "Drop one video. Outlly drafts a caption for each platform, and you approve every word before it goes out." },
   { target: "content", title: "Content", body: "Every video and post you've made: drafts, scheduled, sent and failed, in one place." },

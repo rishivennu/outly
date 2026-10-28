@@ -10,9 +10,9 @@ export const metadata = { title: "Inbox" };
 export default async function InboxPage({ searchParams }: { searchParams?: { tab?: string } }) {
   const user = (await getCurrentUser())!;
   const [initial, dms, live] = await Promise.all([
-    inbox(user.id),
+    inbox(user.id, undefined, user.scope),
     // A broken messages store must never take the comments inbox down with it.
-    listThreads(user.id).catch((e) => {
+    listThreads(user.id, undefined, user.scope).catch((e) => {
       console.error("[inbox] messages", e);
       return { threads: [], accounts: 0 };
     }),

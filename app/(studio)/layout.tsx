@@ -8,6 +8,7 @@ import { Tour } from "@/components/onboarding/Tour";
 import { PageGuide } from "@/components/onboarding/PageGuide";
 import { CommandPalette } from "@/components/shell/CommandPalette";
 import { touchActivity } from "@/lib/activity";
+import { touchPresence } from "@/lib/presence";
 import { liveNow } from "@/lib/social/registry";
 import { LivePlatformsProvider } from "@/components/shell/LivePlatforms";
 import { WorkspaceBar } from "@/components/shell/WorkspaceBar";
@@ -28,6 +29,7 @@ export default async function StudioLayout({ children }: { children: React.React
   // Maintenance: members who joined before it started carry on; anyone newer waits on the maintenance page.
   if (site.maintenance && !joinedBeforeMaintenance({ createdAt: user.joinedAt }, site.since)) redirect("/maintenance?preview");
   void touchActivity(user.id); // daily-active tracking for the admin console; never blocks or throws
+  void touchPresence(user.actor?.id ?? user.id); // online now (1037); the LiveCount poll keeps it fresh
   return (
     <UserProvider user={{ id: user.id, name: user.name, email: user.email, avatar: user.avatar, timezone: user.timezone, workspace: user.actor ? { ownerName: user.name, role: user.role === "manager" ? "manager" : "editor", me: { name: user.actor.name, email: user.actor.email } } : null }}>
       <LivePlatformsProvider value={live}>

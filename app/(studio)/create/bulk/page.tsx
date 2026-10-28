@@ -8,6 +8,7 @@ export const metadata = { title: "Plan a batch" };
 
 export default async function BulkPage() {
   const user = (await getCurrentUser())!;
-  const accounts = await db.socialAccount.findMany({ where: { userId: user.id, status: { not: "disconnected" } } });
+  // Every account this person may post to (a member only theirs), oldest first, so a manager can pick several.
+  const accounts = await db.socialAccount.findMany({ where: { userId: user.id, status: { not: "disconnected" }, ...(user.scope ? { id: { in: user.scope } } : {}) }, orderBy: { createdAt: "asc" } });
   return <BulkPlanner accounts={accounts.map(accountView)} tz={user.timezone || "UTC"} />;
 }

@@ -7,9 +7,10 @@ import { pushToUser } from "../push/fcm";
 import { PLATFORM_META, isPlatform } from "../domain";
 import { isPracticeAccount } from "../social/registry";
 import { noticeKey, parseKey, weekStamp } from "./core";
+import { parseAlertPrefs } from "../alerts-core";
 
 export interface NoticeInput {
-  kind: "post_failed" | "post_live" | "reconnect" | "token_expiring" | "goal_nudge";
+  kind: "post_failed" | "post_live" | "reconnect" | "token_expiring" | "goal_nudge" | "engagement_spike";
   tone: "danger" | "warn" | "info";
   title: string;
   body: string;
@@ -54,9 +55,14 @@ export async function notify(userId: string, n: NoticeInput, opts: { email?: boo
 export async function noticeFailedTarget(targetId: string, code: string) {
   const t = await db.postTarget.findUnique({
     where: { id: targetId },
-    select: { id: true, practice: true, platform: true, postId: true, socialAccount: { select: { id: true, platformUserId: true } }, post: { select: { userId: true, title: true, hook: true, scheduledAt: true } } },
+    select: { id: true, practice: true, platform: true, postId: true, socialAccount: { select: { id: true, platformUserId: true } }, post: { select: { userId: true, title: true, hook: true, scheduledAt: true, user: { select: { alertPrefs: true } } } } },
   });
   if (!t || t.practice || (t.socialAccount && isPracticeAccount(t.socialAccount))) return;
+  // The owner can switch failure alerts off (1037). A sign-out still raises the reconnect notice: that one blocks every post.
+  if (!parseAlertPrefs(t.post.user.alertPrefs).failed) {
+    if (code === "AUTH_EXPIRED" && t.socialAccount) await noticeReconnect(t.post.userId, t.socialAccount.id, t.platform);
+    return;
+  }
   const name = platformName(t.platform);
   const title = (t.post.title || t.post.hook || "Your post").split("\n")[0].slice(0, 60);
   const prefix = `fail:${t.postId}:`;

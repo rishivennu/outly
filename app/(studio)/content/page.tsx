@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { postFilter } from "@/lib/profiles";
 import { postView } from "@/lib/services";
 import { ContentLibrary } from "@/components/content/ContentLibrary";
 
@@ -8,7 +9,7 @@ export const metadata = { title: "Content" };
 
 export default async function ContentPage() {
   const user = (await getCurrentUser())!;
-  const posts = await db.post.findMany({ where: { userId: user.id }, include: { targets: true, media: true, reviews: { orderBy: { createdAt: "desc" } } }, orderBy: { updatedAt: "desc" }, take: 200 });
+  const posts = await db.post.findMany({ where: { userId: user.id, ...(await postFilter(user)).where }, include: { targets: true, media: true, reviews: { orderBy: { createdAt: "desc" } } }, orderBy: { updatedAt: "desc" }, take: 200 });
   const metrics = await db.targetMetric.groupBy({ by: ["targetId"], where: { target: { post: { userId: user.id } } }, _sum: { views: true } });
   const targetPost = new Map(posts.flatMap((p) => p.targets.map((t) => [t.id, p.id] as const)));
   const views: Record<string, number> = {};

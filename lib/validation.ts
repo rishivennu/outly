@@ -32,6 +32,8 @@ export const targetDraftSchema = z.object({
   hashtags: textish(1000),
   /** Per-platform limits (FIRST_COMMENT_LIMIT) are checked in the editor; this is only the outer bound so autosave never fails mid-typing. */
   firstComment: textish(10000),
+  /** Multi-account plans (1037): send this destination from a specific connected account. */
+  accountId: z.string().cuid().optional().nullable(),
 });
 
 export const savePostSchema = z.object({
@@ -59,6 +61,8 @@ export const updatePostSchema = z.object({
 /** Bulk scheduling: up to 10 videos, the same destinations, each with its own time. */
 export const bulkScheduleSchema = z.object({
   platforms: z.array(platformSchema).min(1, "Pick at least one place to send them.").max(PLATFORMS.length),
+  // 1037: specific accounts (several per platform for a manager). When set, these decide where it goes.
+  accountIds: z.array(z.string().cuid()).max(10, "Ten accounts at a time, please.").optional(),
   items: z
     .array(
       z.object({

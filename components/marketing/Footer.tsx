@@ -14,6 +14,8 @@ import { BounceText } from "./Split";
 import { FooterWordmark } from "./FooterWordmark";
 import { Reveal } from "./Reveal";
 import { useBeta } from "./BetaContext";
+import { StoreBadges } from "./StoreBadges";
+import { LiveCount } from "@/components/shared/LiveCount";
 
 const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   {
@@ -96,6 +98,8 @@ export function MarketingFooter() {
                 </Link>
               </p>
             )}
+            <LiveCount className="mt-5" />
+            <StoreBadges className="mt-6" />
           </div>
 
           <div className="grid grid-cols-2 gap-8 md:contents">

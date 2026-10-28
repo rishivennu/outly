@@ -22,11 +22,11 @@ export type ExportData = {
 };
 
 type RGB = [number, number, number];
-const INK: RGB = [0.07, 0.08, 0.1];
-const SOFT: RGB = [0.33, 0.35, 0.4];
+export const INK: RGB = [0.07, 0.08, 0.1];
+export const SOFT: RGB = [0.33, 0.35, 0.4];
 const RULE: RGB = [0.85, 0.86, 0.88];
-const LIME: RGB = [0.776, 0.988, 0.231];
-const W = 595, H = 842, M = 50, TOP = H - 56, BOTTOM = 60;
+export const LIME: RGB = [0.776, 0.988, 0.231];
+export const W = 595, H = 842, M = 50, TOP = H - 56, BOTTOM = 60;
 
 // Helvetica advance widths (1/1000 em) for ASCII 32..126, from the standard AFM.
 const HW = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
@@ -85,7 +85,8 @@ export function wrap(text: string, size: number, max: number, bold = false): str
   return out;
 }
 
-class Doc {
+/** Exported for the client report (1037), which reuses this writer. */
+export class Doc {
   pages: string[][] = [[]];
   y = TOP;
   private get ops() { return this.pages[this.pages.length - 1]; }
@@ -129,7 +130,7 @@ class Doc {
     });
     this.y -= 2;
   }
-  build(footer: string): Buffer {
+  build(footer: string, title = "Your Outlly data"): Buffer {
     const n = this.pages.length;
     const objs: string[] = [];
     const add = (o: string) => objs.push(o) && objs.length;
@@ -151,7 +152,7 @@ class Doc {
       kids.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${c} 0 R >>`));
     });
     objs[1] = `<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(" ")}] /Count ${n} >>`;
-    const info = add(`<< /Title (Your Outlly data) /Producer (Outlly) /CreationDate (D:${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14)}Z) >>`);
+    const info = add(`<< /Title (${esc(pdfSafe(title))}) /Producer (Outlly) /CreationDate (D:${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14)}Z) >>`);
     let out = "%PDF-1.4\n%\xe2\xe3\xcf\xd3\n";
     const offs: number[] = [];
     objs.forEach((o, i) => {

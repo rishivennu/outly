@@ -8,11 +8,15 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/Toast";
 import { Pip } from "@/components/brand/Pip";
 import { api } from "@/lib/client/api";
-import { formatMoney, intervalLabel, priceLabel, type PublicPlan } from "@/lib/billing/money";
+import { formatMoney, intervalLabel, planFeatures, priceLabel, type PublicPlan } from "@/lib/billing/money";
 import type { CurrencySource } from "@/lib/billing/currency";
 import { CurrencyPicker } from "./CurrencyPicker";
 import { CycleSwitch } from "./CycleSwitch";
 import { BetaRedeem, type BetaOffer } from "./BetaRedeem";
+import { FoundingCard } from "@/components/founding/FoundingCard";
+import type { FoundingMine } from "@/lib/founding";
+import { TrustBadges } from "@/components/shared/TrustBadges";
+import { MANAGER_SLUG, type TrustBadges as Badges } from "@/lib/badges-core";
 import type { Cycle } from "@/lib/billing/cycle";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +41,7 @@ function loadRazorpay() {
   });
 }
 
-type PricedPlan = PublicPlan & { approx: string | null; year: { priceMinor: number; currency: string; approx: string | null; save: number } | null };
+type PricedPlan = PublicPlan & { approx: string | null; year: { priceMinor: number; currency: string; approx: string | null; save: number; was?: number | null } | null; was?: number | null };
 /** limit 0 = unlimited */
 type Usage = { used: number; limit: number; seats: number; aiCaptions: boolean; period?: "week" | "month"; maxUploadMb?: number; replies?: { limit: number; used: number }; captions?: { limit: number; used: number; burn: boolean } };
 
@@ -65,7 +69,7 @@ function UsageMeter({ u }: { u: Usage }) {
   );
 }
 
-export function BillingView(props: { email: string; notice: ReturnNotice | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; canPickCurrency: boolean; current: Current; usage: Usage; invoices: Inv[]; beta?: BetaOffer | null }) {
+export function BillingView(props: { email: string; notice: ReturnNotice | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; canPickCurrency: boolean; current: Current; usage: Usage; invoices: Inv[]; beta?: BetaOffer | null; founding?: FoundingMine; badges?: Badges }) {
   const { plans, current } = props;
   const router = useRouter();
   const toast = useToast();
@@ -186,6 +190,10 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
           <p className="mt-1 text-sm text-muted-foreground">
             {!current ? "No card on file. Upgrade any time; you'll get an invoice by email straight away." : current.pausedUntil ? <>Paused until <b className="text-foreground">{day(current.pausedUntil)}</b>. Free limits apply until then, and your paid days run again after, to <b className="text-foreground">{day(current.periodEnd)}</b>.</> : current.cancelAtPeriodEnd ? <>Ends on <b className="text-foreground">{day(current.periodEnd)}</b>, then you move to Free. Nothing else will be charged.</> : <>Renews on <b className="text-foreground">{day(current.periodEnd)}</b>.</>}
           </p>
+          {props.badges && <TrustBadges b={props.badges} className="mt-3" />}
+          {current?.planSlug === MANAGER_SLUG && props.badges && !props.badges.verifiedManager && (
+            <p className="mt-2 text-[12.5px] text-muted-foreground">Your Verified Manager badge appears once your email is confirmed and two or more accounts are connected.</p>
+          )}
           <UsageMeter u={props.usage} />
         </div>
         {current && current.priceMinor > 0 && (current.pausedUntil ? (
@@ -197,6 +205,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
         ))}
       </section>
 
+      {props.founding && <FoundingCard f={props.founding} where="billing" />}
       {props.beta && <BetaRedeem offer={props.beta} />}
 
       <section aria-labelledby="plans" className="mt-10 max-w-5xl">
@@ -206,7 +215,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
           {anyYear && <CycleSwitch value={cycle} onChange={setCycle} save={save} />}
           {props.testMode && <p className="inline-flex items-center gap-1.5 rounded-full bg-warning/15 px-3 py-1 text-[12px] font-medium"><ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Test mode: no real money moves</p>}
         </div>
-        <ul className="mt-4 grid gap-4 md:grid-cols-3">
+        <ul className={cn("mt-4 grid gap-4 md:grid-cols-2", plans.length === 3 ? "lg:grid-cols-3" : plans.length >= 4 && "lg:grid-cols-4")}>
           {plans.map((p) => {
             const y = cycle === "year" && p.year ? p.year : null;
             // Same plan on the other cycle is a switch you can make (monthly -> yearly), not "your plan".
@@ -220,12 +229,20 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
                     <h3 className="text-lg font-semibold">{p.name}</h3>
                     {mine ? <span className="rounded-full bg-lime/20 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-lime-ink">Your plan</span> : p.highlight && <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider">Popular</span>}
                   </div>
-                  <p className="mt-4 text-[1.7rem] font-semibold tracking-tight tabular">{y ? `${formatMoney(y.priceMinor, y.currency)}/yr` : priceLabel(p)}</p>
+                  {(y ? y.was : p.was) ? (
+                    <p className="mt-4 flex flex-wrap items-baseline gap-x-2">
+                      <span className="text-[1.7rem] font-semibold tracking-tight tabular">{y ? `${formatMoney(y.priceMinor, y.currency)}/yr` : priceLabel(p)}</span>
+                      <s className="text-sm text-muted-foreground tabular" aria-label={`was ${formatMoney((y ? y.was : p.was)!, y ? y.currency : p.currency)}`}>{formatMoney((y ? y.was : p.was)!, y ? y.currency : p.currency)}</s>
+                      <span className="text-[12.5px] font-medium text-lime-ink">Founding price</span>
+                    </p>
+                  ) : (
+                    <p className="mt-4 text-[1.7rem] font-semibold tracking-tight tabular">{y ? `${formatMoney(y.priceMinor, y.currency)}/yr` : priceLabel(p)}</p>
+                  )}
                   {y && y.save > 0 && <p className="text-[12.5px] font-medium text-lime-ink">Billed yearly, save {y.save}%</p>}
                   {(y ? y.approx : p.approx) && <p className="text-[12.5px] text-muted-foreground">{y ? y.approx : p.approx} · billed in {y ? y.currency : p.currency}</p>}
                   <p className="mt-1 text-sm text-muted-foreground">{p.note}</p>
                   <ul className="mt-5 flex-1 space-y-2 text-sm">
-                    {p.features.map((f) => <li key={f} className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-lime-ink" aria-hidden />{f}</li>)}
+                    {planFeatures(p).map((f) => <li key={f} className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-lime-ink" aria-hidden />{f}</li>)}
                   </ul>
                   <div className="mt-6">
                     {mine ? (

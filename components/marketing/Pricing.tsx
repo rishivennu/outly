@@ -8,7 +8,7 @@ import { normalizeDisplay } from "@/lib/billing/display";
 import { hasYearly, priceFor, yearlySaving } from "@/lib/billing/cycle";
 import { visitorCurrency } from "@/lib/billing/visitor";
 import { CurrencyPicker } from "@/components/billing/CurrencyPicker";
-import { formatMoney, priceLabel } from "@/lib/billing/money";
+import { formatMoney, planFeatures, priceLabel } from "@/lib/billing/money";
 
 /**
  * Reads plans from the database, so a price edited in the admin console is live on the next request.
@@ -23,7 +23,7 @@ export async function Pricing() {
     const base = all[i];
     const y = hasYearly(base, display.yearly) ? priceFor(base, visitor.currency, "year", display.freeMonths) : null;
     return {
-      id: p.id, slug: p.slug, name: p.name, note: p.note, features: p.features, state: p.state,
+      id: p.id, slug: p.slug, name: p.name, note: p.note, features: planFeatures(p), state: p.state,
       featured: p.highlight || !paid,
       free: p.priceMinor === 0,
       month: { label: priceLabel(p), minor: p.priceMinor, interval: p.interval },

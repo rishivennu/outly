@@ -10,6 +10,9 @@ import { syncPost } from "./queue/handlers";
 import type { SimulationMode } from "./social/types";
 import { isPracticeAccount } from "./social/registry";
 import { assertApproved, reviewView } from "./review";
+import { assertPostScope, requestScope } from "./profiles";
+import { pickAccount, type Scope } from "./profiles-core";
+import { approvalCurrent } from "./collab-core";
 
 /* ---------- client-safe shapes (no tokens, no storage keys) ---------- */
 
@@ -90,7 +93,10 @@ export async function postView(p: Post & { targets: PostTarget[]; media: Media; 
     updatedAt: p.updatedAt.toISOString(),
     requireApproval: p.requireApproval,
     review: reviews ? (reviews[0] ? reviewView(reviews[0]) : null) : null,
-    approved: reviews ? reviews.some((r) => r.status === "approved") : false,
+    approved: reviews ? approvalCurrent(reviews, p.editedAt) : false,
+    /** 1037: who last changed the copy, so a teammate knows whose version they're approving. */
+    editedBy: p.editedBy,
+    editedAt: p.editedAt?.toISOString() ?? null,
     media: await mediaView(p.media),
     targets: [...p.targets].sort((a, b) => PLATFORMS.indexOf(a.platform as Platform) - PLATFORMS.indexOf(b.platform as Platform)).map(targetView),
   };
@@ -123,22 +129,40 @@ export async function ownedMedia(userId: string, id: string) {
 export async function ownedPost(userId: string, id: string) {
   const p = await db.post.findFirst({ where: { id, userId }, include: { targets: true, media: true, reviews: { orderBy: { createdAt: "desc" } } } });
   if (!p) throw new HttpError(404, "We couldn't find that post.");
+  await assertPostScope(userId, p.targets); // 1037: a member limited to some accounts sees only their posts
   return p;
 }
 
 export async function ownedTarget(userId: string, id: string) {
   const t = await db.postTarget.findFirst({ where: { id, post: { userId } }, include: { post: true } });
   if (!t) throw new HttpError(404, "We couldn't find that destination.");
+  await assertPostScope(userId, [t]).catch(() => {
+    throw new HttpError(404, "We couldn't find that destination.");
+  });
   return t;
 }
 
 /* ---------- launch / retry ---------- */
 
+/**
+ * The default account per platform: the first one connected that is still connected. With one account per
+ * platform (every plan before 1037) that is simply the account. A destination tied to a specific account
+ * (multi-account plans) goes out there instead; see accountForTarget.
+ */
 export async function connectedAccounts(userId: string) {
-  const accts = await db.socialAccount.findMany({ where: { userId } });
+  const accts = await db.socialAccount.findMany({ where: { userId }, orderBy: { createdAt: "asc" } });
   const map = new Map<Platform, SocialAccount>();
-  for (const a of accts) if (isPlatform(a.platform)) map.set(a.platform, a);
-  return map;
+  for (const a of accts) {
+    if (!isPlatform(a.platform)) continue;
+    const cur = map.get(a.platform);
+    if (!cur || (cur.status !== "connected" && a.status === "connected")) map.set(a.platform, a);
+  }
+  return Object.assign(map, { all: accts });
+}
+
+/** The account one destination goes out on: its own account, else the platform default the person may use. */
+export function accountForTarget(t: Pick<PostTarget, "platform" | "socialAccountId">, all: SocialAccount[], scope: Scope) {
+  return pickAccount(t.platform, t.socialAccountId, all, scope);
 }
 
 export async function launchPost(userId: string, postId: string, mode: "now" | "schedule", scheduledAt: Date | null, simulate: SimulationMode) {
@@ -152,7 +176,11 @@ export async function launchPost(userId: string, postId: string, mode: "now" | "
   const toSend = post.targets.filter((t) => t.platformStatus !== "published");
   if (toSend.length === 0) throw new HttpError(409, "It's already live everywhere you picked.");
   const accounts = await connectedAccounts(userId);
-  const missing = toSend.filter((t) => accounts.get(t.platform as Platform)?.status !== "connected");
+  const scope = await requestScope(userId);
+  const acctOf = new Map(toSend.map((t) => [t.id, accountForTarget(t, accounts.all, scope)]));
+  if (scope && toSend.some((t) => !acctOf.get(t.id)))
+    throw new HttpError(403, "One of these destinations goes to an account you don't have access to. Ask the owner to share it with you.", "ROLE");
+  const missing = toSend.filter((t) => acctOf.get(t.id)?.status !== "connected");
   if (missing.length) {
     const p = missing[0].platform as Platform;
     throw new HttpError(409, `${p === "x" ? "X" : p[0].toUpperCase() + p.slice(1)} needs you to reconnect first.`, "NOT_CONNECTED");
@@ -166,7 +194,7 @@ export async function launchPost(userId: string, postId: string, mode: "now" | "
     await markLaunched(post.id);
     await db.$transaction([
       ...toSend.map((t) =>
-        db.postTarget.update({ where: { id: t.id }, data: { platformStatus: "pending", socialAccountId: accounts.get(t.platform as Platform)!.id, errorCode: null, errorMessage: null, attempts: 0 } }),
+        db.postTarget.update({ where: { id: t.id }, data: { platformStatus: "pending", socialAccountId: acctOf.get(t.id)!.id, errorCode: null, errorMessage: null, attempts: 0 } }),
       ),
     ]);
     await enqueue("SCHEDULED_POST", { postId: post.id }, { delayMs: scheduledAt.getTime() - Date.now(), jobId: `sched-${post.id}-${scheduledAt.getTime()}` });
@@ -181,7 +209,7 @@ export async function launchPost(userId: string, postId: string, mode: "now" | "
   await markLaunched(post.id);
   await db.$transaction(
     toSend.map((t) =>
-      db.postTarget.update({ where: { id: t.id }, data: { platformStatus: "queued", socialAccountId: accounts.get(t.platform as Platform)!.id, errorCode: null, errorMessage: null, attempts: 0, uploadRef: null, publishRequestedAt: null } }),
+      db.postTarget.update({ where: { id: t.id }, data: { platformStatus: "queued", socialAccountId: acctOf.get(t.id)!.id, errorCode: null, errorMessage: null, attempts: 0, uploadRef: null, publishRequestedAt: null } }),
     ),
   );
   // jobId comes from the claim, not the clock: a duplicate request never gets this far, and a later
@@ -247,7 +275,9 @@ export async function cancelTargets(userId: string, postId: string, targetIds?: 
 export async function retryTarget(userId: string, targetId: string) {
   const t = await ownedTarget(userId, targetId);
   if (t.platformStatus !== "failed") throw new HttpError(409, "Nothing to retry here.");
-  const acct = await db.socialAccount.findFirst({ where: { userId, platform: t.platform } });
+  // The destination's own account first (multi-account plans, 1037), else the platform default.
+  const all = await db.socialAccount.findMany({ where: { userId, platform: t.platform }, orderBy: { createdAt: "asc" } });
+  const acct = accountForTarget(t, all, await requestScope(userId));
   if (!acct || acct.status !== "connected") throw new HttpError(409, "Reconnect the account first.", "NOT_CONNECTED");
   // Keep the platform-side upload (and the publish marker) unless the media itself was the problem, so a retry
   // resumes/reconciles instead of creating a second copy.

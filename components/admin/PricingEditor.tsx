@@ -18,16 +18,16 @@ import { CARD_STYLES, CARD_STYLE_META, type CardStyle, type PricingDisplay } fro
 import { hasYearly, yearlyBase, yearlySaving, type Cycle } from "@/lib/billing/cycle";
 
 type Plan = PublicPlan & { subscribers: number; locked: boolean };
-type Draft = { name: string; slug: string; price: string; currency: string; interval: string; note: string; features: string; state: PublicPlan["state"]; highlight: boolean; sortOrder: number; prices: Record<string, string>; yearly: string; postLimit: number; aiCaptions: boolean; seats: number; postPeriod: "week" | "month"; maxUploadMb: number; replyLimit: number; captionVideos: number; burnCaptions: boolean };
+type Draft = { name: string; slug: string; price: string; currency: string; interval: string; note: string; features: string; state: PublicPlan["state"]; highlight: boolean; sortOrder: number; prices: Record<string, string>; yearly: string; postLimit: number; aiCaptions: boolean; seats: number; postPeriod: "week" | "month"; maxUploadMb: number; replyLimit: number; captionVideos: number; burnCaptions: boolean; accountLimit: number };
 
 const toDraft = (p: Plan): Draft => ({
   name: p.name, slug: p.slug, price: String(p.priceMinor / 100), currency: p.currency, interval: p.interval, note: p.note, features: p.features.join("\n"), state: p.state, highlight: p.highlight, sortOrder: p.sortOrder,
   prices: Object.fromEntries(Object.entries(p.prices ?? {}).map(([k, v]) => [k, String((v as number) / 100)])),
   yearly: p.yearlyMinor ? String(p.yearlyMinor / 100) : "",
   postLimit: p.postLimit ?? 0, aiCaptions: p.aiCaptions ?? true, seats: p.seats ?? 0,
-  postPeriod: p.postPeriod === "week" ? "week" : "month", maxUploadMb: p.maxUploadMb ?? 0, replyLimit: p.replyLimit ?? 0, captionVideos: p.captionVideos ?? 0, burnCaptions: p.burnCaptions ?? true,
+  postPeriod: p.postPeriod === "week" ? "week" : "month", maxUploadMb: p.maxUploadMb ?? 0, replyLimit: p.replyLimit ?? 0, captionVideos: p.captionVideos ?? 0, burnCaptions: p.burnCaptions ?? true, accountLimit: p.accountLimit ?? 0,
 });
-const BLANK: Draft = { name: "", slug: "", price: "0", currency: "INR", interval: "month", note: "", features: "", state: "soon", highlight: false, sortOrder: 9, prices: {}, yearly: "", postLimit: 0, aiCaptions: true, seats: 0, postPeriod: "month", maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true };
+const BLANK: Draft = { name: "", slug: "", price: "0", currency: "INR", interval: "month", note: "", features: "", state: "soon", highlight: false, sortOrder: 9, prices: {}, yearly: "", postLimit: 0, aiCaptions: true, seats: 0, postPeriod: "month", maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true, accountLimit: 0 };
 
 const toMinor = (s: string) => {
   const n = Number(s.replace(/,/g, ""));
@@ -59,6 +59,7 @@ function parse(d: Draft) {
     replyLimit: d.replyLimit,
     captionVideos: d.captionVideos,
     burnCaptions: d.burnCaptions,
+    accountLimit: d.accountLimit,
   };
 }
 
@@ -543,6 +544,11 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
                 <Label htmlFor="pl-seats">Team seats</Label>
                 <Input id="pl-seats" type="number" min={0} max={50} value={draft.seats} onChange={(e) => set("seats", Math.max(0, Math.min(50, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-seats-hint" />
                 <p id="pl-seats-hint" className="mt-1 text-[12px] text-muted-foreground">People besides the owner</p>
+              </div>
+              <div>
+                <Label htmlFor="pl-accounts">Connected accounts</Label>
+                <Input id="pl-accounts" type="number" min={0} max={50} value={draft.accountLimit} onChange={(e) => set("accountLimit", Math.max(0, Math.min(50, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-accounts-hint" />
+                <p id="pl-accounts-hint" className="mt-1 text-[12px] text-muted-foreground">Total, several per platform. 0 = one per platform</p>
               </div>
               <div className="sm:col-span-2">
                 <Toggle label="AI captions" hint="Included on this plan" checked={draft.aiCaptions} onChange={(v) => set("aiCaptions", v)} />

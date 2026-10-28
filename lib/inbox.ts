@@ -1,5 +1,6 @@
 import { PLATFORM_META } from "./domain";
 import "server-only";
+import { inScope, type Scope } from "./profiles-core";
 import { db } from "./db";
 import { HttpError } from "./http";
 import { liveAccount } from "./live/account";
@@ -63,10 +64,11 @@ type LoadedTarget = {
 };
 
 /** Every published destination that still has a connected account behind it. */
-async function publishedTargets(userId: string, platform?: Platform) {
+async function publishedTargets(userId: string, platform?: Platform, scope: Scope = null) {
   const rows = await db.postTarget.findMany({
     // A post deleted from the platform has no comments left to read; a hidden (private) YouTube video still does.
-    where: { post: { userId }, platformStatus: "published", platformPostId: { not: null }, OR: [{ removeMode: null }, { removeMode: { not: "deleted" } }], ...(platform ? { platform } : {}) },
+    // 1037: a member limited to some accounts only sees destinations tied to one of theirs.
+    where: { post: { userId }, platformStatus: "published", platformPostId: { not: null }, OR: [{ removeMode: null }, { removeMode: { not: "deleted" } }], ...(platform ? { platform } : {}), ...(scope ? { socialAccountId: { in: scope } } : {}) },
     include: { socialAccount: true, post: { select: { id: true, title: true, hook: true } } },
     orderBy: { publishedAt: "desc" },
     take: 60,
@@ -122,8 +124,8 @@ function flatten(l: LoadedTarget, comments: PlatformComment[]): InboxComment[] {
  * One inbox across every published destination. A platform that refuses is reported as a problem,
  * never as an empty thread — a real account must never be shown invented comments.
  */
-export async function inbox(userId: string, platform?: Platform) {
-  const { targets, problems } = await publishedTargets(userId, platform);
+export async function inbox(userId: string, platform?: Platform, scope: Scope = null) {
+  const { targets, problems } = await publishedTargets(userId, platform, scope);
   const comments: InboxComment[] = [];
   const errors = [...problems];
   // Fetch every destination at once; results are folded back in the original order.
@@ -149,7 +151,7 @@ export async function inbox(userId: string, platform?: Platform) {
   });
   // Then everything else on the creator's own accounts: comments on posts made outside Outlly.
   const skip = new Set(targets.map((l) => l.target.platformPostId));
-  const own = await accountComments(userId, skip, platform);
+  const own = await accountComments(userId, skip, platform, scope);
   comments.push(...own.comments);
   errors.push(...own.errors);
   comments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -164,8 +166,8 @@ const OWN_LOADERS: Partial<Record<Platform, (a: AccountContext, skip: Set<string
   youtube: youtubeThreads,
 };
 
-async function accountComments(userId: string, skip: Set<string>, platform?: Platform) {
-  const accts = await db.socialAccount.findMany({ where: { userId, status: "connected", ...(platform ? { platform } : {}) } });
+async function accountComments(userId: string, skip: Set<string>, platform?: Platform, scope: Scope = null) {
+  const accts = await db.socialAccount.findMany({ where: { userId, status: "connected", ...(platform ? { platform } : {}), ...(scope ? { id: { in: scope } } : {}) } });
   const comments: InboxComment[] = [];
   const errors: InboxProblem[] = [];
   let threads = 0;
@@ -207,11 +209,12 @@ async function accountComments(userId: string, skip: Set<string>, platform?: Pla
   return { comments, errors, threads };
 }
 
-export async function replyToComment(userId: string, targetId: string, commentId: string, text: string) {
+/** scope (1037): a member limited to some accounts gets the same 404 for any other account as for a missing one. */
+export async function replyToComment(userId: string, targetId: string, commentId: string, text: string, scope: Scope = null) {
   const own = parseAccountTarget(targetId);
   if (own) {
     const acct = await db.socialAccount.findFirst({ where: { id: own.accountId, userId } });
-    if (!acct || !isPlatform(acct.platform)) throw new HttpError(404, "We couldn't find that account.");
+    if (!acct || !isPlatform(acct.platform) || !inScope(scope, acct.id)) throw new HttpError(404, "We couldn't find that account.");
     if (acct.status !== "connected") throw new HttpError(409, "Reconnect the account first.", "NOT_CONNECTED");
     const publisher = publisherForAccount(acct.platform, acct);
     if (!publisher.replyToComment) throw new HttpError(409, "Replying isn't available for this platform yet.", "FORBIDDEN");
@@ -220,7 +223,7 @@ export async function replyToComment(userId: string, targetId: string, commentId
     return { ...reply, practice: false };
   }
   const t = await db.postTarget.findFirst({ where: { id: targetId, post: { userId } }, include: { socialAccount: true } });
-  if (!t || !isPlatform(t.platform)) throw new HttpError(404, "We couldn't find that post.");
+  if (!t || !isPlatform(t.platform) || !inScope(scope, t.socialAccountId)) throw new HttpError(404, "We couldn't find that post.");
   const acct = t.socialAccount;
   if (!acct || acct.status !== "connected") throw new HttpError(409, "Reconnect the account first.", "NOT_CONNECTED");
   const publisher = publisherForAccount(t.platform, acct);

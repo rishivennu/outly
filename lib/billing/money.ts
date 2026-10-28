@@ -49,6 +49,21 @@ export interface PublicPlan {
   /** Videos per month with AI captions; 0 = unlimited. */
   captionVideos: number;
   burnCaptions: boolean;
+  /** Connected accounts in total, several per platform allowed (1037). 0 = one per platform. */
+  accountLimit: number;
+}
+
+/**
+ * The feature list a card shows. A multi-account plan always states its account limit, even when the admin's
+ * feature text doesn't mention it (or mentions an old number), so the card can never promise the wrong count.
+ */
+export function planFeatures(p: Pick<PublicPlan, "features" | "accountLimit">): string[] {
+  const n = p.accountLimit ?? 0;
+  if (n <= 0) return p.features;
+  const line = `Up to ${n} connected accounts`;
+  const rest = p.features.filter((f) => !/\bconnected accounts?\b/i.test(f));
+  const at = rest.findIndex((f) => /^everything in\b/i.test(f));
+  return at === 0 ? [rest[0], line, ...rest.slice(1)] : [line, ...rest];
 }
 
 export function priceLabel(p: Pick<PublicPlan, "priceMinor" | "currency" | "interval" | "state">) {

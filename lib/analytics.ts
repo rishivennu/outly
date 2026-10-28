@@ -13,22 +13,27 @@ export interface AnalyticsSummary {
   top: { postId: string; title: string; thumbnailUrl: string | null; views: number; platform: Platform } | null;
   bestDay: string | null;
   hasData: boolean;
+  /** 1037: the same numbers per connected account, for the combined view's drilldown. Biggest first. */
+  byAccount: { accountId: string; platform: Platform; username: string; avatar: string | null; views: number; engagement: number; posts: number }[];
+  /** The accounts these numbers cover; null = every account. */
+  accountIds: string[] | null;
 }
 
 /** Metrics only change when the sync job writes them, so a 60 s per-creator copy makes range switches and revisits instant. */
-export function getAnalytics(userId: string, rangeDays = 30): Promise<AnalyticsSummary> {
-  return cached(`analytics:${userId}:${rangeDays}`, 60_000, () => computeAnalytics(userId, rangeDays));
+export function getAnalytics(userId: string, rangeDays = 30, accountIds: string[] | null = null): Promise<AnalyticsSummary> {
+  const ids = accountIds ? [...new Set(accountIds)].sort() : null;
+  return cached(`analytics:${userId}:${rangeDays}:${ids ? ids.join(",") : "all"}`, 60_000, () => computeAnalytics(userId, rangeDays, ids));
 }
 
-async function computeAnalytics(userId: string, rangeDays: number): Promise<AnalyticsSummary> {
+async function computeAnalytics(userId: string, rangeDays: number, accountIds: string[] | null): Promise<AnalyticsSummary> {
   const now = Date.now();
   const since = new Date(now - rangeDays * 864e5);
   const prevSince = new Date(now - 2 * rangeDays * 864e5);
   // Numbers only (10-14 perf): the post title and thumbnail used to ride along on every metric row,
   // which multiplied the payload by the number of snapshots. Only the top post needs them, fetched below.
   const rows = await db.targetMetric.findMany({
-    where: { capturedAt: { gte: prevSince }, target: { post: { userId } } },
-    select: { capturedAt: true, views: true, likes: true, comments: true, shares: true, target: { select: { platform: true, postId: true } } },
+    where: { capturedAt: { gte: prevSince }, target: { post: { userId }, ...(accountIds ? { socialAccountId: { in: accountIds } } : {}) } },
+    select: { capturedAt: true, views: true, likes: true, comments: true, shares: true, target: { select: { platform: true, postId: true, socialAccountId: true } } },
   });
 
   const cur = rows.filter((r) => r.capturedAt >= since);
@@ -67,8 +72,21 @@ async function computeAnalytics(userId: string, rangeDays: number): Promise<Anal
   const tk = topPost?.media.thumbnailKey;
   const topThumb = !tk ? null : tk.startsWith("/") ? tk : await storage.signedUrl(tk, 6 * 3600).catch(() => null);
 
+  // Per account (1037). One small query for names; numbers come from the rows already loaded.
+  const acctIds = [...new Set(cur.map((r) => r.target.socialAccountId).filter((x): x is string => !!x))];
+  const accts = acctIds.length ? await db.socialAccount.findMany({ where: { id: { in: acctIds }, userId }, select: { id: true, platform: true, username: true, avatar: true } }) : [];
+  const byAccount = accts
+    .filter((a) => (PLATFORMS as readonly string[]).includes(a.platform))
+    .map((a) => {
+      const rs = cur.filter((r) => r.target.socialAccountId === a.id);
+      return { accountId: a.id, platform: a.platform as Platform, username: a.username, avatar: a.avatar, views: sum(rs, "views"), engagement: eng(rs), posts: new Set(rs.map((r) => r.target.postId)).size };
+    })
+    .sort((a, b) => b.views - a.views);
+
   return {
     rangeDays,
+    byAccount,
+    accountIds,
     totals: { views: sum(cur, "views"), likes: sum(cur, "likes"), comments: sum(cur, "comments"), shares: sum(cur, "shares"), engagement: eng(cur) },
     previous: { views: sum(prev, "views"), engagement: eng(prev) },
     series,

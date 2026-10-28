@@ -46,12 +46,16 @@ const ERRORS: Record<string, (name: string) => string> = {
   server: () => "You signed in fine, but we couldn't save the connection on our side. Give it a minute and try again.",
   no_channel: () => "That Google account doesn't have a YouTube channel yet. Create one on youtube.com (it takes a minute), then connect again.",
   wrong_app_id: () => "Instagram login isn't set up right on this server yet (it has the Facebook app ID, not the Instagram one). Connect with a token below for now, or ask the admin to fix it in Admin > Social platforms.",
+  account_limit: () => "Your plan's connected accounts are all in use. Disconnect one, or upgrade in Billing to add more.",
   owner_only: (n) => `Only the workspace owner can connect ${n}. Ask them to connect it, or switch to your own studio.`,
 };
 
-export function AccountsView({ initial, setup }: { initial: AccountView[]; setup: ConnectSetup }) {
+export function AccountsView({ initial, setup, accountLimit = 0 }: { initial: AccountView[]; setup: ConnectSetup; accountLimit?: number }) {
   const [accounts, setAccounts] = useState(initial);
-  const [confirm, setConfirm] = useState<Platform | null>(null);
+  // 1037: a plan with an account limit (Pro Multi-Account Manager) keeps several accounts per platform.
+  const multi = accountLimit > 0;
+  const room = multi && accounts.length < accountLimit;
+  const [confirm, setConfirm] = useState<{ platform: Platform; id?: string; name: string } | null>(null);
   const toast = useToast();
   const router = useRouter();
   const params = useSearchParams();
@@ -86,13 +90,13 @@ export function AccountsView({ initial, setup }: { initial: AccountView[]; setup
 
   const [busy, setBusy] = useState(false);
 
-  const disconnect = async (p: Platform) => {
+  const disconnect = async ({ platform: p, id, name }: { platform: Platform; id?: string; name: string }) => {
     setBusy(true);
     try {
-      await api(`/api/accounts/${p}`, { method: "DELETE" });
-      setAccounts((a) => a.filter((x) => x.platform !== p));
+      await api(`/api/accounts/${p}${id ? `?id=${encodeURIComponent(id)}` : ""}`, { method: "DELETE" });
+      setAccounts((a) => a.filter((x) => (id ? x.id !== id : x.platform !== p)));
       setConfirm(null);
-      toast(`${PLATFORM_META[p].name} is disconnected. We deleted its keys.`, "info");
+      toast(`${name} is disconnected. We deleted its keys.`, "info");
     } catch (e) {
       toast(e instanceof ApiError ? e.message : "Something got in the way.", "error");
     } finally {
@@ -108,6 +112,11 @@ export function AccountsView({ initial, setup }: { initial: AccountView[]; setup
         You sign in on each platform&apos;s own page. We never see your password, and every key we keep is encrypted.
         {" Every account you connect here is your real one: posts go live and the numbers are real."}
       </p>
+      {multi && (
+        <p className="mt-3 text-sm font-medium" aria-live="polite">
+          {accounts.length} of {accountLimit} accounts connected on your plan.
+        </p>
+      )}
 
       {fail && (
         <div role="alert" className="mt-6 max-w-2xl rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm">
@@ -122,7 +131,8 @@ export function AccountsView({ initial, setup }: { initial: AccountView[]; setup
 
       <ul className="mt-10 grid gap-4 md:grid-cols-3">
         {live.map((p, i) => {
-          const a = accounts.find((x) => x.platform === p);
+          const list = accounts.filter((x) => x.platform === p);
+          const a = list.find((x) => x.status === "connected") ?? list[0];
           const ok = a?.status === "connected";
           return (
             <motion.li key={p} id={p} data-guide={i === 0 ? "acct-first" : undefined} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} {...tilt} className={cn("glass relative flex flex-col overflow-hidden rounded-[32px] p-6", ok && "neon-rim")} style={{ ["--halo" as string]: PLATFORM_HALO[p], ["--rim" as string]: RIM[p] }}>
@@ -140,19 +150,43 @@ export function AccountsView({ initial, setup }: { initial: AccountView[]; setup
               <StatusBadge status={ok ? "connected" : a ? "needs_reconnect" : "disconnected"} className="relative mt-4 self-start" />
 
               <div className="mt-6 flex-1">
-                {a && (
-                  <div className="flex items-center gap-3 rounded-2xl bg-secondary/50 p-3">
-                    <span className="lime-bg grid h-9 w-9 place-items-center rounded-full text-sm font-bold" aria-hidden="true">
-                      {a.username.replace(/^@/, "").slice(0, 1).toUpperCase()}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{a.username}</p>
-                      <p className={cn("flex items-center gap-1 text-xs", ok ? "text-success" : "text-warning")}>
-                        {ok ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <CircleAlert className="h-3.5 w-3.5" aria-hidden="true" />}
-                        {ok ? "Ready to publish" : `${PLATFORM_META[p].name} needs you to reconnect.`}
-                      </p>
-                    </div>
-                  </div>
+                {list.length > 0 && (
+                  <ul className="space-y-2">
+                    {list.map((x) => {
+                      const xok = x.status === "connected";
+                      return (
+                        <li key={x.id} className="flex items-center gap-3 rounded-2xl bg-secondary/50 p-3">
+                          <span className="lime-bg grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-bold" aria-hidden="true">
+                            {x.username.replace(/^@/, "").slice(0, 1).toUpperCase()}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{x.username}</p>
+                            <p className={cn("flex items-center gap-1 text-xs", xok ? "text-success" : "text-warning")}>
+                              {xok ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <CircleAlert className="h-3.5 w-3.5" aria-hidden="true" />}
+                              {xok ? "Ready to publish" : `${PLATFORM_META[p].name} needs you to reconnect.`}
+                            </p>
+                          </div>
+                          {list.length > 1 && (
+                            <button type="button" onClick={() => setConfirm({ platform: p, id: x.id, name: `@${x.username.replace(/^@/, "")}` })} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={`Disconnect ${x.username}`}>
+                              <Unplug className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {multi && ok && setup[p].oauth && (
+                  room ? (
+                    <p className="mt-3 text-sm">
+                      <a href={`/api/accounts/${p}/connect?returnTo=/accounts`} className="inline-flex min-h-11 items-center gap-1 font-medium underline underline-offset-4">
+                        Add another {PLATFORM_META[p].name} account <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </a>
+                      <span className="block text-xs text-muted-foreground">Sign out of {PLATFORM_META[p].name} first, or you&apos;ll be asked to pick the account you want.</span>
+                    </p>
+                  ) : (
+                    <p className="mt-3 text-xs text-muted-foreground">All {accountLimit} account slots are in use.</p>
+                  )
                 )}
               </div>
 
@@ -182,7 +216,7 @@ export function AccountsView({ initial, setup }: { initial: AccountView[]; setup
                 </p>
               )}
 
-              {setup[p].token && !ok && <TokenConnect defaultOpen={!setup[p].oauth} onConnected={(acc) => setAccounts((all) => [...all.filter((x) => x.platform !== p), acc])} />}
+              {setup[p].token && !ok && <TokenConnect defaultOpen={!setup[p].oauth} onConnected={(acc) => setAccounts((all) => (multi ? [...all.filter((x) => x.id !== acc.id), acc] : [...all.filter((x) => x.platform !== p), acc]))} />}
 
               <div className="mt-6 flex flex-wrap gap-2">
                 {!ok && setup[p].oauth && (
@@ -199,8 +233,8 @@ export function AccountsView({ initial, setup }: { initial: AccountView[]; setup
                     </Link>
                   </Button>
                 )}
-                {a && (
-                  <Button variant="ghost" onClick={() => setConfirm(p)}>
+                {a && list.length === 1 && (
+                  <Button variant="ghost" onClick={() => setConfirm({ platform: p, name: PLATFORM_META[p].name })}>
                     <Unplug className="h-4 w-4" /> Disconnect
                   </Button>
                 )}
@@ -213,7 +247,7 @@ export function AccountsView({ initial, setup }: { initial: AccountView[]; setup
       <ConfirmDialog
         open={confirm !== null}
         onOpenChange={(o) => !o && setConfirm(null)}
-        title={confirm ? `Disconnect ${PLATFORM_META[confirm].name}?` : ""}
+        title={confirm ? `Disconnect ${confirm.name}?` : ""}
         body="We delete the keys we hold for it. Anything already published stays up, and scheduled posts for this destination will stop going out until you reconnect."
         confirmLabel="Yes, disconnect"
         busy={busy}
