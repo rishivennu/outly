@@ -1,5 +1,4 @@
 import { Shell, SectionHead } from "./bits";
-import { Reveal } from "./Reveal";
 import Link from "next/link";
 import { FAQS } from "@/lib/marketing/content";
 import { LiquidAccordion } from "@/components/support/LiquidAccordion";
@@ -17,10 +16,8 @@ export function Faq() {
           />
           <Link href="/help" className="mt-6 inline-flex h-11 items-center rounded-full px-5 text-sm font-medium hairline transition-colors hover:bg-secondary">Search the help centre</Link>
         </div>
-        <Reveal>
-          {/* the first answer is open so the section reads as prose, not a wall of plus signs */}
-          <LiquidAccordion items={FAQS.map((f, i) => ({ id: `m${i}`, q: f.q, a: f.a }))} defaultOpen={["m0"]} />
-        </Reveal>
+        {/* the first answer is open so the section reads as prose, not a wall of plus signs; questions rise in turn */}
+        <LiquidAccordion reveal items={FAQS.map((f, i) => ({ id: `m${i}`, q: f.q, a: f.a }))} defaultOpen={["m0"]} />
       </Shell>
     </section>
   );

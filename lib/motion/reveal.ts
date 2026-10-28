@@ -137,6 +137,11 @@ function flush() {
   if (!els.length) return;
   const made = ScrollTrigger.batch(els, {
     start: "top 92%",
+    // Measure after the pinned scenes (How it works, Demo: ScrollScenes.tsx). Reveals register first, so at the
+    // default priority their starts ignored the pin spacing above them and every card below the first pin
+    // played about a screen early, off screen (1038 fix).
+    // batch() copies every var into each ScrollTrigger.create(), but its type leaves this one out.
+    ...({ refreshPriority: -1 } as ScrollTrigger.BatchVars),
     once: true,
     interval: 0.08,
     batchMax: 9,

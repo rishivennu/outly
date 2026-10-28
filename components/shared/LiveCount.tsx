@@ -11,7 +11,8 @@ let shared: { at: number; v: LiveView } | null = null; // two strips on one page
  * minute while the tab is visible (that poll is also the signed-in person's presence ping) and renders
  * nothing until the server says the numbers are big enough to show.
  */
-export function LiveCount({ compact = false, className }: { compact?: boolean; className?: string }) {
+/** The live counts, polled once a minute while the tab is visible; null until the first answer. Shared by every strip. */
+export function useLiveView() {
   const [v, setV] = useState<LiveView | null>(shared?.v ?? null);
   useEffect(() => {
     let alive = true;
@@ -38,6 +39,11 @@ export function LiveCount({ compact = false, className }: { compact?: boolean; c
       document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
+  return v;
+}
+
+export function LiveCount({ compact = false, className }: { compact?: boolean; className?: string }) {
+  const v = useLiveView();
   if (!v || (v.total === null && v.online === null)) return null;
   const fmt = (n: number) => n.toLocaleString("en-US");
   const label = [v.total !== null ? `${fmt(v.total)} creators on Outlly` : null, v.online !== null ? `${fmt(v.online)} online now` : null].filter(Boolean).join(", ");
@@ -59,7 +65,7 @@ export function LiveCount({ compact = false, className }: { compact?: boolean; c
   );
 }
 
-function Dot() {
+export function Dot() {
   return (
     <span className="relative inline-flex h-2 w-2 shrink-0" aria-hidden="true">
       <span className="absolute inset-0 animate-ping rounded-full bg-[hsl(var(--lime))] opacity-60 motion-reduce:hidden" />

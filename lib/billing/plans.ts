@@ -18,15 +18,21 @@ const SEED = [
 ];
 
 /**
- * Pro Multi-Account Manager (1037): for people running more than 3 accounts. Added to existing databases by a
- * one-time migration, so an admin who later edits or hides it is never overwritten.
+ * Pro (1037, named "Pro Multi-Account Manager" until 1038): for people running several accounts. Added to
+ * existing databases by a one-time migration, so an admin who later edits or hides it is never overwritten.
  */
 export const PRO_MANAGER = {
-  slug: "pro-manager", name: "Pro Multi-Account Manager", priceMinor: 249900, note: "For managers running 5 or more accounts", highlight: false, sortOrder: 3,
+  slug: "pro-manager", name: "Pro", priceMinor: 249900, note: "For agencies and managers", highlight: false, sortOrder: 3,
   seats: 5, accountLimit: 10, prices: { USD: 2900 },
-  features: ["Everything in Studio", "Up to 10 connected accounts", "Switch profiles in one tap", "Bulk schedule across accounts", "Per-account team access", "Combined analytics with drilldown", "PDF and CSV client reports", "Spike and failed-post alerts"],
+  features: ["Everything in Studio", "Up to 10 connected accounts", "5 team seats, access per account", "Bulk schedule across accounts", "Client reports and spike alerts"],
 };
 const PRO_MIGRATION_KEY = "migrate:pro-manager-1037";
+/** What 1037 shipped, so the 1038 rename only touches rows nobody has edited since. */
+const PRO_1037 = {
+  name: "Pro Multi-Account Manager", note: "For managers running 5 or more accounts",
+  features: ["Everything in Studio", "Up to 10 connected accounts", "Switch profiles in one tap", "Bulk schedule across accounts", "Per-account team access", "Combined analytics with drilldown", "PDF and CSV client reports", "Spike and failed-post alerts"],
+};
+const PRO_RENAME_KEY = "migrate:pro-rename-1038";
 
 const proRow = () => ({ ...PRO_MANAGER, currency: "INR", interval: "month", features: JSON.stringify(PRO_MANAGER.features), prices: JSON.stringify(PRO_MANAGER.prices) });
 
@@ -35,12 +41,14 @@ const FREE_MIGRATION_KEY = "migrate:free-limits-1026";
 export async function ensurePlans() {
   if ((await db.plan.count()) > 0) {
     await migrateFreeLimits();
-    return migrateProManager();
+    await migrateProManager();
+    return migrateProRename();
   }
   // upsert so two processes seeding at once can't collide on the unique slug
   for (const p of SEED) await db.plan.upsert({ where: { slug: p.slug }, update: {}, create: { ...p, currency: "INR", interval: "month", features: JSON.stringify(p.features) } }).catch(() => {});
   await db.plan.upsert({ where: { slug: PRO_MANAGER.slug }, update: {}, create: proRow() }).catch(() => {});
   await db.setting.create({ data: { key: PRO_MIGRATION_KEY, value: new Date().toISOString() } }).catch(() => {});
+  await db.setting.create({ data: { key: PRO_RENAME_KEY, value: new Date().toISOString() } }).catch(() => {});
   // A fresh database is seeded with the current limits already, so the one-time migration is marked done here.
   // Otherwise the first ensurePlans() after seeding ran it and overwrote any Free limits an admin had set (1027).
   await db.setting.create({ data: { key: FREE_MIGRATION_KEY, value: new Date().toISOString() } }).catch(() => {});
@@ -66,6 +74,22 @@ async function migrateProManager() {
   const won = await db.setting.create({ data: { key, value: new Date().toISOString() } }).then(() => true, () => false);
   if (!won) return;
   await db.plan.upsert({ where: { slug: PRO_MANAGER.slug }, update: {}, create: proRow() }).catch(() => {});
+  invalidate("plans:");
+}
+
+/**
+ * One-time (1038): "Pro Multi-Account Manager" becomes "Pro" with a shorter list. Each field changes only
+ * while it still reads exactly what 1037 shipped, so anything an admin typed in Pricing is kept.
+ */
+async function migrateProRename() {
+  const key = PRO_RENAME_KEY;
+  if (await db.setting.findUnique({ where: { key }, select: { key: true } })) return;
+  const won = await db.setting.create({ data: { key, value: new Date().toISOString() } }).then(() => true, () => false);
+  if (!won) return;
+  const where = { slug: PRO_MANAGER.slug };
+  await db.plan.updateMany({ where: { ...where, name: PRO_1037.name }, data: { name: PRO_MANAGER.name } });
+  await db.plan.updateMany({ where: { ...where, note: PRO_1037.note }, data: { note: PRO_MANAGER.note } });
+  await db.plan.updateMany({ where: { ...where, features: JSON.stringify(PRO_1037.features) }, data: { features: JSON.stringify(PRO_MANAGER.features) } });
   invalidate("plans:");
 }
 

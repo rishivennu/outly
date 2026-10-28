@@ -15,7 +15,7 @@ import { planFeatures } from "../lib/billing/money";
 import { ALERT_DEFAULTS, dayStamp, parseAlertPrefs, serializeAlertPrefs, spikeLabel, spikeRatio, SPIKE_FLOOR } from "../lib/alerts-core";
 import { compactCount, liveView, presenceDue, LIVE_MIN_TOTAL, PRESENCE_WRITE_MS } from "../lib/presence-core";
 import { floorNice, trustFigures } from "../lib/marketing/trust-core";
-import { minutesLabel, timeSaved } from "../lib/marketing/time-saved";
+import { OUTLLY_MIN_PER_VIDEO, TIME_DEFAULTS, minutesLabel, savedFromPosts, timeSaved } from "../lib/marketing/time-saved";
 import { LANDING_DEFAULT, LANDING_SECTIONS, shown } from "../lib/landing";
 
 describe("profiles and delegation scope", () => {
@@ -188,10 +188,12 @@ describe("custom alerts", () => {
 });
 
 describe("live counts and landing", () => {
-  test("small numbers are hidden, never padded", () => {
+  test("real counts from the first creator, never padded, never '0 online' (1038)", () => {
     expect(liveView(null)).toEqual({ total: null, online: null });
     expect(liveView({ total: LIVE_MIN_TOTAL - 1, online: 5 })).toEqual({ total: null, online: null });
-    expect(liveView({ total: 40, online: 1 })).toEqual({ total: 40, online: null });
+    expect(liveView({ total: 3, online: 0 })).toEqual({ total: 3, online: null });
+    expect(liveView({ total: 3, online: 1 })).toEqual({ total: 3, online: 1 });
+    expect(liveView({ total: 3, online: 9 })).toEqual({ total: 3, online: 3 }); // online never exceeds total
     expect(liveView({ total: 40, online: 7 })).toEqual({ total: 40, online: 7 });
     expect(presenceDue(undefined, 0)).toBe(true);
     expect(presenceDue(1000, 1000 + PRESENCE_WRITE_MS - 1)).toBe(false);
@@ -200,10 +202,11 @@ describe("live counts and landing", () => {
     expect(compactCount(1250)).toBe("1.2k");
     expect(compactCount(12_600)).toBe("13k");
   });
-  test("trust figures round down and stay hidden below their floor", () => {
+  test("trust figures round down and only hide at zero (1038)", () => {
     expect(floorNice(1249)).toBe(1200);
     expect(floorNice(99)).toBe(99);
-    expect(trustFigures({ creators: 10, posts: 20, platforms: 3 })).toEqual([{ value: "3", label: "platforms live today" }]);
+    expect(trustFigures({ creators: 0, posts: 0, platforms: 3 })).toEqual([{ value: "3", label: "platforms live today" }]);
+    expect(trustFigures({ creators: 10, posts: 20, platforms: 3 }).map((f) => f.value)).toEqual(["10+", "20+", "3"]);
     expect(trustFigures({ creators: 1249, posts: 130, platforms: 0 }).map((f) => f.value)).toEqual(["1,200+", "130+"]);
   });
   test("time saved is the visitor's own maths", () => {
@@ -212,6 +215,13 @@ describe("live counts and landing", () => {
     expect(minutesLabel(160)).toBe("2 h 40 min");
     expect(minutesLabel(45)).toBe("45 min");
     expect(minutesLabel(120)).toBe("2 h");
+  });
+  test("Home time saved counts each real post once per platform it reached (1038)", () => {
+    expect(savedFromPosts([])).toBe(0);
+    expect(savedFromPosts([3])).toBe(3 * TIME_DEFAULTS.byHand - OUTLLY_MIN_PER_VIDEO);
+    expect(savedFromPosts([1, 2, 3])).toBe(savedFromPosts([1]) + savedFromPosts([2]) + savedFromPosts([3]));
+    expect(savedFromPosts([0, -2])).toBe(0); // never negative
+    expect(savedFromPosts([1], 3)).toBe(0);
   });
   test("new landing sections are switchable and on by default", () => {
     for (const id of ["time", "trust"] as const) {
@@ -240,6 +250,65 @@ describe("database", () => {
     await plans.ensurePlans();
     expect((await db.plan.findUnique({ where: { slug: "pro-manager" } }))?.name).toBe("Agency");
     await db.plan.update({ where: { slug: "pro-manager" }, data: { name: plans.PRO_MANAGER.name } });
+  });
+
+  test("1038 rename: an untouched 1037 row becomes Pro, an admin's edits are kept", async () => {
+    const plans = await import("../lib/billing/plans");
+    await plans.ensurePlans();
+    const old = { name: "Pro Multi-Account Manager", note: "For managers running 5 or more accounts", features: JSON.stringify(["Everything in Studio", "Up to 10 connected accounts", "Switch profiles in one tap", "Bulk schedule across accounts", "Per-account team access", "Combined analytics with drilldown", "PDF and CSV client reports", "Spike and failed-post alerts"]) };
+    const keep = { name: "Pro", note: "My own note", features: "[]" };
+    try {
+      await db.plan.update({ where: { slug: "pro-manager" }, data: { name: old.name, note: keep.note, features: old.features } });
+      await db.setting.deleteMany({ where: { key: "migrate:pro-rename-1038" } });
+      await plans.ensurePlans();
+      const p = await db.plan.findUnique({ where: { slug: "pro-manager" } });
+      expect(p?.name).toBe("Pro");
+      expect(p?.note).toBe(keep.note); // edited by an admin: left alone
+      expect(JSON.parse(p!.features)).toEqual(plans.PRO_MANAGER.features);
+      expect(plans.PRO_MANAGER.features.length).toBeLessThanOrEqual(5);
+      await db.plan.update({ where: { slug: "pro-manager" }, data: { name: "Agency" } });
+      await plans.ensurePlans(); // runs once only
+      expect((await db.plan.findUnique({ where: { slug: "pro-manager" } }))?.name).toBe("Agency");
+    } finally {
+      await db.plan.update({ where: { slug: "pro-manager" }, data: { name: plans.PRO_MANAGER.name, note: plans.PRO_MANAGER.note, features: JSON.stringify(plans.PRO_MANAGER.features) } });
+    }
+  });
+
+  test("time saved on Home: own published posts only, week counts this week's platforms, scope narrows it", async () => {
+    const { savedTime } = await import("../lib/retention/time-saved");
+    const s = `${Date.now()}`;
+    const user = await db.user.create({ data: { name: "Saved", email: `saved-${s}@test.dev`, passwordHash: "x" } });
+    const other = await db.user.create({ data: { name: "Other", email: `saved-o-${s}@test.dev`, passwordHash: "x" } });
+    const media = await db.media.create({ data: { userId: user.id, originalFilename: "a.mp4", storageKey: `saved/${s}.mp4`, mimeType: "video/mp4", size: 10, status: "ready" } });
+    const acct = (u: string, n: number, platform: string) => db.socialAccount.create({ data: { userId: u, platform, platformUserId: `saved-${s}-${n}`, username: `@v${n}`, accessToken: encrypt("t"), status: "connected" } });
+    const [a, b, o] = [await acct(user.id, 1, "instagram"), await acct(user.id, 2, "youtube"), await acct(other.id, 3, "instagram")];
+    const now = Date.now();
+    const ago = (d: number) => new Date(now - d * 86_400_000);
+    const post = (u: string) => db.post.create({ data: { userId: u, mediaId: media.id, status: "published", title: "T" } });
+    const target = (postId: string, acc: { id: string; platform: string }, d: number, extra: { practice?: boolean; platformStatus?: string } = {}) =>
+      db.postTarget.create({ data: { postId, platform: acc.platform, socialAccountId: acc.id, platformStatus: extra.platformStatus ?? "published", practice: extra.practice ?? false, publishedAt: ago(d) } });
+    const p1 = await post(user.id); // A this week, B long ago: the week counts only A
+    await target(p1.id, a, 1);
+    await target(p1.id, b, 20);
+    const p2 = await post(user.id); // B only, this week
+    await target(p2.id, b, 3);
+    const p3 = await post(user.id); // practice and failed: never count
+    await target(p3.id, a, 1, { practice: true });
+    await target(p3.id, b, 1, { platformStatus: "failed" });
+    const p4 = await post(other.id); // someone else's
+    await target(p4.id, o, 1);
+
+    const all = await savedTime(user.id, now);
+    expect(all.posts).toBe(2);
+    expect(all.totalMin).toBe(savedFromPosts([2, 1]));
+    expect(all.weekPosts).toBe(2);
+    expect(all.weekMin).toBe(savedFromPosts([1, 1]));
+    // A team seat scoped to B never sees p1 (it also went to A).
+    const onlyB = await savedTime(user.id, now, postAccountWhere(null, [b.id]));
+    expect(onlyB.posts).toBe(1);
+    expect(onlyB.totalMin).toBe(savedFromPosts([1]));
+    const none = await savedTime(user.id, now, postAccountWhere(null, ["no-such-account"]));
+    expect(none).toEqual({ weekMin: 0, totalMin: 0, posts: 0, weekPosts: 0 });
   });
 
   test("engagement spike: one alert per account per day, nothing for a normal day", async () => {

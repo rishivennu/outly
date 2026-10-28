@@ -3,6 +3,9 @@ import { DotText } from "@/components/brand/DotText";
 import type { CardStyle } from "@/lib/billing/display";
 import { cn } from "@/lib/utils";
 
+/** Lines shown on a card before the rest fold under "+N more" (1038), so every card stays about the same height. */
+export const CARD_FEATURES = 5;
+
 /**
  * One pricing card, shared by the landing page and the admin live preview, so what the admin sees is
  * exactly what goes live. `variant` is the card style picked in Admin > Pricing:
@@ -71,7 +74,7 @@ export function PlanCardView({
 
   const priceEl =
     v === "live" ? (
-      <div className="la-box pc-price relative mt-5 rounded-[1.25rem] px-4 py-3.5">
+      <div className="la-box pc-price relative mt-4 rounded-[1.25rem] px-4 py-3">
         <p className={cn("text-[1.9rem] font-semibold leading-none tracking-tightest tabular", live ? "la-accent" : "la-mute")}>{price}</p>
         <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.1em] la-mute">{billing}</p>
       </div>
@@ -86,6 +89,19 @@ export function PlanCardView({
         <p className={cn("mt-2.5 text-[12px] font-semibold uppercase tracking-[0.1em]", mute)}>{billing}</p>
       </div>
     );
+
+  const line = (b: string, i: number) => (
+    <li key={`${i}-${b}`} className="flex items-start gap-2.5 text-[14.5px] leading-snug">
+      {v === "glass" ? (
+        <span className={cn("pcg-check mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full", !live && "opacity-60")} aria-hidden="true">
+          <Check className="h-3 w-3" strokeWidth={3} />
+        </span>
+      ) : (
+        <Check className={cn("mt-0.5 h-4 w-4 shrink-0", live ? (la ? "la-accent" : v === "classic" ? "text-lime-ink" : accent) : mute)} aria-hidden="true" />
+      )}
+      <span className={live ? undefined : mute}>{b}</span>
+    </li>
+  );
 
   return (
     <article className={cn("relative flex h-full flex-col rounded-[1.75rem]", root, className)}>
@@ -106,22 +122,20 @@ export function PlanCardView({
         </>
       )}
 
-      <ul className={cn("relative flex flex-1 flex-col gap-3", v === "classic" ? "mt-7" : "mt-6", v === "bold" && "border-t pt-6", v === "bold" && (hot ? "border-black/15" : "border-border"))}>
-        {features.map((b, i) => (
-          <li key={`${i}-${b}`} className="flex items-start gap-2.5 text-[15px] leading-snug">
-            {v === "glass" ? (
-              <span className={cn("pcg-check mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full", !live && "opacity-60")} aria-hidden="true">
-                <Check className="h-3 w-3" strokeWidth={3} />
-              </span>
-            ) : (
-              <Check className={cn("mt-0.5 h-4 w-4 shrink-0", live ? (la ? "la-accent" : v === "classic" ? "text-lime-ink" : accent) : mute)} aria-hidden="true" />
-            )}
-            <span className={live ? undefined : mute}>{b}</span>
-          </li>
-        ))}
-      </ul>
+      <div className={cn("relative flex-1", v === "classic" ? "mt-6" : "mt-5", v === "bold" && "border-t pt-5", v === "bold" && (hot ? "border-black/15" : "border-border"))}>
+        <ul className="flex flex-col gap-2.5">{features.slice(0, CARD_FEATURES).map(line)}</ul>
+        {features.length > CARD_FEATURES && (
+          <details className="group mt-2.5">
+            <summary className={cn("inline-flex min-h-[44px] cursor-pointer list-none items-center rounded-full text-[13.5px] font-semibold underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden", la ? "la-accent" : accent || undefined)}>
+              <span className="group-open:hidden">+{features.length - CARD_FEATURES} more</span>
+              <span className="hidden group-open:inline">Show less</span>
+            </summary>
+            <ul className="mt-1 flex flex-col gap-2.5">{features.slice(CARD_FEATURES).map((b, i) => line(b, i + CARD_FEATURES))}</ul>
+          </details>
+        )}
+      </div>
 
-      <div className={cn("relative flex flex-col", v === "classic" ? "mt-8" : "mt-7")}>{cta}</div>
+      <div className={cn("relative flex flex-col", v === "classic" ? "mt-7" : "mt-6")}>{cta}</div>
     </article>
   );
 }

@@ -7,28 +7,28 @@
      Light is the :root default; .dark overrides. Both are designed, not inverted.
      Brand: electric lime (--lime) on black / warm-white, purple + pink + cyan as support. */
   :root {
-    --background: 40 33% 97%;          /* warm off-white */
-    --foreground: 240 10% 8%;
+    --background: 216 28% 97%;         /* cool off-white (1038: was warm 40 33% 97%, tiring on the eyes) */
+    --foreground: 222 24% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 8%;
+    --card-foreground: 222 24% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 8%;
-    --primary: 240 10% 8%;             /* ink buttons in light */
-    --primary-foreground: 40 33% 97%;
-    --secondary: 40 18% 92%;
-    --secondary-foreground: 240 10% 12%;
-    --muted: 40 16% 93%;
-    --muted-foreground: 240 5% 36%;    /* 7.6:1 on background */
+    --popover-foreground: 222 24% 10%;
+    --primary: 222 24% 10%;            /* ink buttons in light */
+    --primary-foreground: 216 28% 97%;
+    --secondary: 216 20% 93%;
+    --secondary-foreground: 222 22% 13%;
+    --muted: 216 18% 94%;
+    --muted-foreground: 218 12% 36%;   /* 6.6:1 on background */
     --accent: 262 80% 58%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 46%;
     --destructive-foreground: 0 0% 100%;
-    --border: 40 10% 86%;
-    --input: 40 10% 82%;
+    --border: 216 16% 87%;
+    --input: 216 14% 82%;
     --ring: 262 80% 55%;
 
-    --lime: 78 100% 50%;               /* fills, glows, highlights */
-    --lime-ink: 82 85% 26%;            /* lime used AS text on light: 5.6:1 */
+    --lime: 78 92% 50%;                /* fills, glows, highlights (1038: a touch less neon on light) */
+    --lime-ink: 84 85% 24%;            /* lime used AS text on light: 5.4:1 on background */
     --lime-foreground: 240 10% 6%;
     --lavender: 262 90% 94%;
     --cyan: 190 90% 42%;
@@ -50,15 +50,15 @@
     /* glass */
     --glass-bg: 0 0% 100% / 0.62;
     --glass-solid: 0 0% 100%;
-    --glass-border: 240 10% 10% / 0.08;
+    --glass-border: 220 24% 12% / 0.08;
     --glass-highlight: 0 0% 100% / 0.9;
-    --glass-shadow: 0 1px 2px rgba(20, 16, 40, 0.06), 0 12px 32px -12px rgba(40, 30, 80, 0.18);
+    --glass-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 12px 32px -12px rgba(24, 40, 72, 0.18);
     --glass-blur: 18px;
 
     /* Apple-style canvas + tiles (marketing): cool off-white page, white tiles */
-    --ap-canvas: 240 11% 96%;
+    --ap-canvas: 216 24% 96%;
     --ap-tile: 0 0% 100%;
-    --ap-ink2: 240 4% 34%;
+    --ap-ink2: 218 10% 34%;
 
     --radius: 1.25rem;
     --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -1187,12 +1187,12 @@ a.bx-lime:hover .bx-arrow, .bx-arrow:hover { transform: rotate(45deg); backgroun
 @media (min-width: 1024px) { .bx.bx-demo { min-height: 0; } .bx-demo > .bx-tile { min-height: 300px; } }
 /* Light variation of the glow tiles: white glass, tone glow from the bottom, ink text. Dark keeps the ink glass. */
 html:not(.dark) .bx-gc:not(.dark *) { --bx-a: 40 46% 92%; --bx-b: 38 40% 88.5%; --bx-edge: 36 32% 80%; --bx-text: 240 10% 8%; --bx-mute: 30 8% 30%; --bx-line: 34 22% 72%; --bx-orb: 40 45% 96%; --bx-hi: 0 0% 100% / .55; --bx-glow: .55;
-  color: hsl(240 10% 8%); background: linear-gradient(180deg, hsl(var(--gc) / .08) 0%, transparent 28%), linear-gradient(180deg, #ffffff 0%, #fbfaf6 60%, #f5f3ec 100%);
-  box-shadow: inset 0 0 0 1px hsl(var(--gc) / .35), inset 0 1px 0 #fff, 0 26px 50px -36px hsl(var(--gc) / .6), 0 10px 22px -16px rgb(40 30 10 / .18); }
+  color: hsl(240 10% 8%); background: linear-gradient(180deg, hsl(var(--gc) / .08) 0%, transparent 28%), linear-gradient(180deg, #ffffff 0%, #f9fafc 60%, #f1f4f8 100%);
+  box-shadow: inset 0 0 0 1px hsl(var(--gc) / .35), inset 0 1px 0 #fff, 0 26px 50px -36px hsl(var(--gc) / .6), 0 10px 22px -16px rgb(15 25 45 / .14); }
 html:not(.dark) .bx-demo .bx-gc:not(.dark *).is-on { box-shadow: inset 0 0 0 1px hsl(var(--gc) / .7), inset 0 1px 0 #fff, 0 0 0 3px hsl(var(--gc) / .16), 0 30px 60px -32px hsl(var(--gc) / .7); }
 html:not(.dark) .bx-gc:not(.dark *) .gc-glow { background: radial-gradient(95% 100% at 50% 100%, hsl(var(--gc) / .55) 0%, hsl(var(--gc) / .25) 34%, hsl(var(--gc) / .08) 64%, transparent 84%); }
 html:not(.dark) .bx-gc:not(.dark *) .gc-glow::after { display: none; }
-html:not(.dark) .bx-gc:not(.dark *) .bx-title { color: hsl(240 10% 8%); } html:not(.dark) .bx-gc:not(.dark *) .bx-sub { color: hsl(30 8% 30%); }
+html:not(.dark) .bx-gc:not(.dark *) .bx-title { color: hsl(240 10% 8%); } html:not(.dark) .bx-gc:not(.dark *) .bx-sub { color: hsl(218 10% 32%); }
 
 /* Home demo stage (10-16h): the demo always wears the dark look, in both themes. Its wrapper carries .dark, so
    tokens and dark: variants flip inside it; in light mode it becomes a dark rounded stage on the light page. */
@@ -1201,20 +1201,20 @@ html:not(.dark) .demo-stage { position: relative; isolation: isolate; border-rad
 @media (forced-colors: active) { html:not(.dark) .demo-stage { border: 1px solid CanvasText; } }
 /* Live Activity, two variations. .la-themed cards follow the theme; text colours go through these classes. */
 .la-themed { color: #fff; } .la-themed .la-mute { color: rgb(255 255 255 / .64); } .la-themed .la-accent { color: hsl(var(--lime)); } .la-themed .la-warn { color: #ff8a80; }
-html:not(.dark) .la-themed:not(.dark *) { color: hsl(240 10% 8%); background: radial-gradient(110% 95% at 0% 0%, hsl(78 100% 50% / .14), transparent 48%), linear-gradient(180deg, #ffffff, #f6f4ee); border-color: hsl(36 32% 80% / .8); box-shadow: inset 0 1px 0 #fff, 0 30px 60px -38px rgb(40 30 10 / .3), 0 10px 22px -14px rgb(40 30 10 / .14); }
+html:not(.dark) .la-themed:not(.dark *) { color: hsl(240 10% 8%); background: radial-gradient(110% 95% at 0% 0%, hsl(78 92% 50% / .09), transparent 48%), linear-gradient(180deg, #ffffff, #f2f5f9); border-color: hsl(216 18% 84% / .9); box-shadow: inset 0 1px 0 #fff, 0 30px 60px -38px rgb(15 25 45 / .22), 0 10px 22px -14px rgb(15 25 45 / .1); }
 html:not(.dark) .la-themed:not(.dark *) .la-mute { color: rgb(20 20 24 / .64); }
 html:not(.dark) .la-themed:not(.dark *) .la-accent { color: hsl(var(--lime-ink)); }
 html:not(.dark) .la-themed:not(.dark *) .la-warn { color: #b3261e; }
 html:not(.dark) .la-themed:not(.dark *) .la-grid { background-image: radial-gradient(rgb(20 20 24 / .14) 1px, transparent 1.5px); }
 html:not(.dark) .la-themed:not(.dark *) .la-dots { color: #15161a; filter: none; }
 html:not(.dark) .la-themed:not(.dark *) .la-arrow { color: hsl(var(--lime-ink)); }
-html:not(.dark) .la-themed:not(.dark *) .la-box { background: linear-gradient(180deg, #ffffff, #faf9f5); border-color: rgb(20 20 24 / .09); box-shadow: inset 0 1px 0 #fff, 0 8px 20px -14px rgb(40 30 10 / .25); }
+html:not(.dark) .la-themed:not(.dark *) .la-box { background: linear-gradient(180deg, #ffffff, #f7f9fb); border-color: rgb(20 30 50 / .09); box-shadow: inset 0 1px 0 #fff, 0 8px 20px -14px rgb(15 25 45 / .2); }
 html:not(.dark) .la-themed:not(.dark *).la-live .la-box { box-shadow: inset 0 1px 0 #fff, 0 0 40px -14px hsl(var(--lime) / .7); }
 html:not(.dark) .la-themed:not(.dark *).la-bad .la-box { box-shadow: inset 0 1px 0 #fff, 0 0 40px -14px rgb(255 90 77 / .55); }
 html:not(.dark) .la-themed:not(.dark *) .la-round { background: rgb(20 20 24 / .07); color: hsl(240 10% 8%); }
 html:not(.dark) .la-themed:not(.dark *) .la-round:hover { background: rgb(20 20 24 / .13); }
 html:not(.dark) .la-themed:not(.dark *) .la-round:focus-visible { outline-color: hsl(var(--ring)); }
-html:not(.dark) .la-themed:not(.dark *) .la-track { background: linear-gradient(180deg, #e7e4dc, #f2f0ea); box-shadow: inset 0 3px 8px rgb(40 30 10 / .16), inset 0 -1px 0 #fff; }
+html:not(.dark) .la-themed:not(.dark *) .la-track { background: linear-gradient(180deg, #e3e8ef, #eff2f6); box-shadow: inset 0 3px 8px rgb(15 25 45 / .13), inset 0 -1px 0 #fff; }
 html:not(.dark) .la-themed:not(.dark *) .la-fill { box-shadow: 0 0 22px 0 hsl(var(--lime) / .45), inset 0 2px 1px rgb(255 255 255 / .55), inset 0 -8px 14px rgb(30 70 0 / .25); }
 .bx-lead { margin-top: 14px; max-width: 36rem; font-size: 16.5px; line-height: 1.6; color: hsl(var(--muted-foreground)); text-wrap: pretty; }
 .bx-note { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: hsl(var(--muted-foreground)); }
@@ -2077,8 +2077,8 @@ html:has(.sky-space) [aria-labelledby="cc-title"] { background: hsl(var(--card))
 .dark .pc-accent{color:hsl(var(--lime))}
 
 /* Live Activity, light theme. Richer than the generic la-themed card, which read pale on pricing. */
-html:not(.dark) .pc-live:not(.dark *){background:radial-gradient(120% 90% at 0% 0%,hsl(78 100% 50%/.3),transparent 55%),radial-gradient(90% 70% at 100% 100%,hsl(78 100% 50%/.12),transparent 60%),linear-gradient(180deg,#fdfdf8,#eef0e2);border:1px solid hsl(82 40% 40%/.22);box-shadow:inset 0 1px 0 #fff,0 34px 64px -36px rgb(40 50 10/.38),0 12px 24px -14px rgb(40 50 10/.2)}
-html:not(.dark) .pc-live.pc-hot:not(.dark *){background:radial-gradient(130% 100% at 0% 0%,hsl(78 100% 50%/.46),transparent 62%),radial-gradient(100% 80% at 100% 100%,hsl(78 100% 50%/.2),transparent 60%),linear-gradient(180deg,#fbfdf0,#e6edcc)}
+html:not(.dark) .pc-live:not(.dark *){background:radial-gradient(120% 90% at 0% 0%,hsl(78 92% 50%/.14),transparent 55%),radial-gradient(90% 70% at 100% 100%,hsl(78 92% 50%/.06),transparent 60%),linear-gradient(180deg,#fdfdfe,#eef2f6);border:1px solid hsl(216 20% 50%/.16);box-shadow:inset 0 1px 0 #fff,0 34px 64px -36px rgb(15 25 45/.26),0 12px 24px -14px rgb(15 25 45/.12)}
+html:not(.dark) .pc-live.pc-hot:not(.dark *){background:radial-gradient(130% 100% at 0% 0%,hsl(78 92% 50%/.26),transparent 62%),radial-gradient(100% 80% at 100% 100%,hsl(78 92% 50%/.1),transparent 60%),linear-gradient(180deg,#fcfdf9,#eaf0e4)}
 html:not(.dark) .pc-live:not(.dark *) .la-grid{background-image:radial-gradient(hsl(82 60% 22%/.2) 1px,transparent 1.5px)}
 html:not(.dark) .pc-live:not(.dark *) .la-mute{color:rgb(20 22 14/.72)}
 html:not(.dark) .pc-live:not(.dark *) .pc-price{background:linear-gradient(180deg,rgb(255 255 255/.75),rgb(255 255 255/.45));border-color:hsl(82 70% 30%/.22);box-shadow:inset 0 1px 0 #fff,0 0 0 3px hsl(78 100% 50%/.14),0 12px 28px -16px hsl(82 90% 28%/.55)}

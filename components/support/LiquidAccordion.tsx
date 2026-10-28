@@ -3,6 +3,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Reveal } from "@/components/marketing/Reveal";
 
 const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
@@ -45,15 +46,16 @@ export type AccItem = { id: string; q: string; a: React.ReactNode };
  * answer un-blurs and settles. Real buttons with aria-expanded/controls, so it is keyboard
  * and screen-reader native. One open at a time unless `multi`.
  */
-export function LiquidAccordion({ items, defaultOpen, multi, className, onOpen }: { items: AccItem[]; defaultOpen?: string[]; multi?: boolean; className?: string; onOpen?: (id: string) => void }) {
+export function LiquidAccordion({ items, defaultOpen, multi, className, onOpen, reveal }: { items: AccItem[]; defaultOpen?: string[]; multi?: boolean; className?: string; onOpen?: (id: string) => void; /** Landing: each question rises in turn on scroll (the reveal engine). */ reveal?: boolean }) {
   const [open, setOpen] = useState<string[]>(defaultOpen ?? []);
   const base = useId();
   const toggle = (id: string) => {
     setOpen((o) => (o.includes(id) ? o.filter((x) => x !== id) : multi ? [...o, id] : [id]));
     if (!open.includes(id)) onOpen?.(id);
   };
+  const Root = reveal ? RevealRoot : PlainRoot;
   return (
-    <div className={cn("border-t border-border", className)}>
+    <Root className={cn("border-t border-border", className)}>
       {items.map((it) => {
         const on = open.includes(it.id);
         const pid = `${base}-${it.id}`;
@@ -73,6 +75,13 @@ export function LiquidAccordion({ items, defaultOpen, multi, className, onOpen }
           </div>
         );
       })}
-    </div>
+    </Root>
   );
+}
+
+function PlainRoot({ className, children }: { className?: string; children: React.ReactNode }) {
+  return <div className={className}>{children}</div>;
+}
+function RevealRoot({ className, children }: { className?: string; children: React.ReactNode }) {
+  return <Reveal stagger y={18} className={className}>{children}</Reveal>;
 }

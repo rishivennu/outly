@@ -1,5 +1,6 @@
 import { PricingCards, type CardPlan } from "./PricingCards";
 import { Shell, SectionHead } from "./bits";
+import { Reveal } from "./Reveal";
 import { PRICING_NOTE } from "@/lib/marketing/content";
 import { isBeta } from "@/lib/beta";
 import { inCurrency, listPlans } from "@/lib/billing/plans";
@@ -42,9 +43,9 @@ export async function Pricing() {
         />
 
         {paid && (
-          <div className="mt-8 flex justify-center">
+          <Reveal y={16} className="mt-8 flex justify-center">
             <CurrencyPicker currency={visitor.currency} source={visitor.source} />
-          </div>
+          </Reveal>
         )}
 
         <PricingCards plans={cards} variant={display.cardStyle} top={paid ? "mt-8" : "mt-14"} />

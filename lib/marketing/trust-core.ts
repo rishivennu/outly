@@ -1,6 +1,6 @@
-/** Landing trust figures (1037), pure. A figure only shows once it is big enough to mean something; nothing is rounded up. */
+/** Landing trust figures (1037), pure. Real counts, rounded DOWN only; 1038 shows them from the first one. */
 export type TrustCounts = { creators: number; posts: number; platforms: number };
-export const TRUST_MIN = { creators: 50, posts: 100 } as const;
+export const TRUST_MIN = { creators: 1, posts: 1 } as const;
 
 /** Rounds DOWN to a friendly step, so "1,240" reads "1,200+" and never more than the truth. */
 export function floorNice(n: number) {

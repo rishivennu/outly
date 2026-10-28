@@ -27,3 +27,12 @@ export function minutesLabel(m: number) {
   const r = Math.round(m % 60);
   return h ? (r ? `${h} h ${r} min` : `${h} h`) : `${r} min`;
 }
+
+/**
+ * Home "Time saved" (1038): real posts, the calculator's own assumptions. Each published post would have
+ * taken TIME_DEFAULTS.byHand minutes per platform by hand and took OUTLLY_MIN_PER_VIDEO in Outlly.
+ * `platforms` holds, per post, how many platforms it really went live on.
+ */
+export function savedFromPosts(platforms: number[], byHand: number = TIME_DEFAULTS.byHand) {
+  return platforms.reduce((m, n) => m + Math.max(0, Math.max(0, Math.round(n)) * byHand - OUTLLY_MIN_PER_VIDEO), 0);
+}

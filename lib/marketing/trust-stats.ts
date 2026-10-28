@@ -11,7 +11,12 @@ const SAMPLE = "@sample.outly.test";
  * (practice runs and demo data excluded) and the platforms switched on right now. Cached for 10 minutes.
  */
 export async function trustStats() {
-  const counts = await cached<TrustCounts>("trust-stats", 10 * 60_000, async () => {
+  return trustFigures(await trustCounts());
+}
+
+/** The raw counts behind trustStats (1038: the live panel formats them itself). */
+export function trustCounts() {
+  return cached<TrustCounts>("trust-stats", 10 * 60_000, async () => {
     const [creators, posts, live] = await Promise.all([
       db.user.count({ where: { NOT: { email: { endsWith: SAMPLE } } } }),
       db.postTarget.count({ where: { platformStatus: "published", practice: false, post: { user: { NOT: { email: { endsWith: SAMPLE } } } } } }),
@@ -19,5 +24,4 @@ export async function trustStats() {
     ]);
     return { creators, posts, platforms: live.length };
   });
-  return trustFigures(counts);
 }

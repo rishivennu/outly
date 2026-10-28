@@ -12,6 +12,7 @@ import { formatMoney, intervalLabel, planFeatures, priceLabel, type PublicPlan }
 import type { CurrencySource } from "@/lib/billing/currency";
 import { CurrencyPicker } from "./CurrencyPicker";
 import { CycleSwitch } from "./CycleSwitch";
+import { CARD_FEATURES } from "./PlanCardView";
 import { BetaRedeem, type BetaOffer } from "./BetaRedeem";
 import { FoundingCard } from "@/components/founding/FoundingCard";
 import type { FoundingMine } from "@/lib/founding";
@@ -241,9 +242,18 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
                   {y && y.save > 0 && <p className="text-[12.5px] font-medium text-lime-ink">Billed yearly, save {y.save}%</p>}
                   {(y ? y.approx : p.approx) && <p className="text-[12.5px] text-muted-foreground">{y ? y.approx : p.approx} · billed in {y ? y.currency : p.currency}</p>}
                   <p className="mt-1 text-sm text-muted-foreground">{p.note}</p>
-                  <ul className="mt-5 flex-1 space-y-2 text-sm">
-                    {planFeatures(p).map((f) => <li key={f} className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-lime-ink" aria-hidden />{f}</li>)}
-                  </ul>
+                  <div className="mt-5 flex-1 text-sm">
+                    <ul className="space-y-2">{planFeatures(p).slice(0, CARD_FEATURES).map((f, i) => <li key={`${i}-${f}`} className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-lime-ink" aria-hidden />{f}</li>)}</ul>
+                    {planFeatures(p).length > CARD_FEATURES && (
+                      <details className="group mt-1">
+                        <summary className="inline-flex min-h-[44px] cursor-pointer list-none items-center font-semibold text-lime-ink underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden">
+                          <span className="group-open:hidden">+{planFeatures(p).length - CARD_FEATURES} more</span>
+                          <span className="hidden group-open:inline">Show less</span>
+                        </summary>
+                        <ul className="space-y-2">{planFeatures(p).slice(CARD_FEATURES).map((f, i) => <li key={`m${i}-${f}`} className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-lime-ink" aria-hidden />{f}</li>)}</ul>
+                      </details>
+                    )}
+                  </div>
                   <div className="mt-6">
                     {mine ? (
                       <Button variant="subtle" className="w-full" disabled>Current plan</Button>

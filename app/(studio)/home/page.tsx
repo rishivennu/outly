@@ -36,6 +36,8 @@ import { listProfiles, postFilter } from "@/lib/profiles";
 import { trustBadges } from "@/lib/badges";
 import { ProfileSwitcher } from "@/components/home/ProfileSwitcher";
 import { TrustBadges } from "@/components/shared/TrustBadges";
+import { savedTime } from "@/lib/retention/time-saved";
+import { TimeSavedCard } from "@/components/home/TimeSavedCard";
 
 const NEW_FOR_DAYS = 14;
 
@@ -73,7 +75,7 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
   const recapAt = process.env.NODE_ENV !== "production" && searchParams?.recapAt ? new Date(searchParams.recapAt) : new Date();
   // 1037: the picked profile (or a member's accounts) narrows the drafts and the next post too.
   const [profiles, scope, badges] = await Promise.all([listProfiles(user.id, user.scope), postFilter(user), trustBadges(user.id)]);
-  const [, drafts, next, live, welcome, published, ret, pulse, recap, founding] = await Promise.all([
+  const [, drafts, next, live, welcome, published, ret, pulse, recap, founding, saved] = await Promise.all([
     loadKeys(),
     db.post.findMany({ where: { userId: user.id, status: "draft", ...scope.where }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() }, ...scope.where }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),
@@ -101,6 +103,10 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
         return null;
       }),
     user.actor ? null : myFounding(user.id),
+    savedTime(user.id, Date.now(), scope.where).catch((e) => {
+      console.error("[home] saved", e);
+      return null;
+    }),
   ]);
   const started = Object.values(live).some(Boolean) || published > 0;
   const steps = ret?.steps ?? [];
@@ -131,11 +137,12 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
       )}
       <SetupChecklist state={setup} />
       {welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} freePeriod={welcome.freePeriod} />}
-      {(pulse || recap) && (
+      {(pulse || recap || (saved && saved.posts > 0)) && (
         <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-4 sm:px-10">
           {recap && <WeekRecap r={recap} canEmail={!user.actor} />}
           {pulse && <SendingNow items={pulse.sending} />}
           {pulse && <WeekPulse p={pulse} />}
+          {saved && <TimeSavedCard t={saved} />}
         </div>
       )}
       {started && (

@@ -1,12 +1,12 @@
 /**
  * Live counts (1037), pure. "Online" means a signed-in person whose app pinged in the last 5 minutes.
- * Small numbers are hidden rather than padded: the strip only appears once the totals mean something,
- * because showing "2 creators" is worse than showing nothing, and we never invent a number.
+ * Real numbers, never padded or invented. 1038: shown from the first creator (the owner wants the count
+ * visible from day one); "online" appears once at least one person is online, so it never reads "0 online".
  */
 export const ONLINE_WINDOW_MS = 5 * 60_000;
 export const PRESENCE_WRITE_MS = 60_000;
-export const LIVE_MIN_TOTAL = 10;
-export const LIVE_MIN_ONLINE = 2;
+export const LIVE_MIN_TOTAL = 1;
+export const LIVE_MIN_ONLINE = 1;
 
 export type LiveStats = { total: number; online: number };
 export type LiveView = { total: number | null; online: number | null };

@@ -8,7 +8,7 @@ export function TrustBadges({ b, className }: { b: T; className?: string }) {
   return (
     <ul className={cn("flex flex-wrap items-center gap-2", className)} aria-label="Badges">
       {b.verifiedManager && (
-        <li className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[hsl(var(--lime))] px-3 text-sm font-semibold text-[hsl(var(--lime-foreground))]" title="On the Pro Multi-Account Manager plan, email proven, managing two or more accounts">
+        <li className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[hsl(var(--lime))] px-3 text-sm font-semibold text-[hsl(var(--lime-foreground))]" title="On the Pro plan, email proven, managing two or more accounts">
           <BadgeCheck className="h-4 w-4" aria-hidden="true" /> Verified Manager
         </li>
       )}
