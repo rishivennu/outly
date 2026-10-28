@@ -85,8 +85,8 @@ export default async function LandingPage() {
       )}
       {on("hero") && <Hero showHow={on("how")} beta={beta} live={live} />}
       {on("hero") && <LogoTicker live={live} />}
-      {/* Try it (10-28): rides on the hero toggle until it gets its own landing switch. */}
-      {on("hero") && <TryIt />}
+      {/* Try it (10-28): its own switch in Admin > Landing page. Off also closes /api/try. */}
+      {on("try") && <TryIt />}
       {on("hero") && on("how") && (
         // Same box as the framed fan stage (HeroFan: w-full max-w-[1180px]) so the dotted line runs edge to edge with it.
         <div className="mx-auto w-full max-w-[1180px]">

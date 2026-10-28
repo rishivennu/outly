@@ -10,8 +10,11 @@ when it is set). Without a key it still answers, from the built-in offline write
 
 ## Try it section (new)
 - components/marketing/TryIt.tsx: the "One line in. Three posts out." section, placed after the logo ticker.
-- components/marketing/TryItStage.tsx: input, three sample chips, three cards (Instagram caption, Shorts title,
-  X post) with character counts. Typed lines go to /api/try. The sample chips answer instantly from drafts the
+- components/marketing/TryItStage.tsx: a staggered wall of rounded colour cards (lime, mint, cream, sage, forest, ink;
+  no blue), each with a white tag pill, a bold title and a 3D object: the input card, three sample idea cards,
+  three output cards (Instagram caption, Shorts title, X post) with character counts, and a Keep card.
+  Cards reveal one card at a time as each scrolls into view (GSAP ScrollTrigger per card, fixed 0.95 s rise,
+  0.12 s apart in reading order; never scrubbed). Reduced motion or no JS: all cards are simply shown. Typed lines go to /api/try. The sample chips answer instantly from drafts the
   real engine wrote once. If the writer is slow, down or rate-limited, a local template fills the cards and a
   note says so. "Keep these drafts" goes to /signup?next=/create?text=<topic>, so the topic is waiting in Create.
 - app/api/try/route.ts: public POST. Same-origin check, 8 a minute per IP, 30 a day per IP, topic 2 to 80
@@ -23,8 +26,12 @@ when it is set). Without a key it still answers, from the built-in offline write
 - lib/ai/creative.ts: generateHooks and generatePlatformCopy take an optional last `opts` (timeout, models).
   Every existing caller is unchanged.
 - components/marketing/SignupCta.tsx: optional `next` prop (waitlist mode still goes to /waitlist).
-- tests/try.test.ts: cleaning, clamping, engine-to-card mapping, offline answer, time budget.
-- app/globals.css: .try-* styles appended at the end.
+- tests/try.test.ts: cleaning, clamping, engine-to-card mapping, offline answer, time budget, admin switch.
+- app/globals.css: .try-* wall styles appended at the end (4 staggered columns on desktop, 2 on tablet, stacked
+  on phones; focus rings, reduced motion, forced colours).
+- lib/landing.ts: new "Try it" row in Admin > Landing page (on by default, right after Hero). Switching it off
+  hides the section and makes /api/try answer 404 TRY_OFF, so the public model endpoint closes too.
+  page.tsx now uses on("try") instead of riding on the hero switch.
 
 ## Landing audit fixes
 - page.tsx, Hero.tsx: honest platform list from liveNow() ("4 more coming soon").

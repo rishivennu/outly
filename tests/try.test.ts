@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { TRY_LIMIT, clampTo, cleanTopic, toDrafts, withBudget, writeTry } from "@/lib/try";
 import type { PlatformCopy } from "@/lib/ai/creative";
+import { LANDING_DEFAULT, LANDING_SECTIONS, shown } from "@/lib/landing";
 
 describe("try it: topic cleaning", () => {
   test("control characters, bidi marks and brackets go; spaces collapse", () => {
@@ -60,5 +61,17 @@ describe("try it: writer", () => {
   test("a writer past its budget gives null; one inside it gives its answer", async () => {
     expect(await withBudget(new Promise(() => {}), 20)).toBeNull();
     expect(await withBudget(Promise.resolve("ok"), 1000)).toBe("ok");
+  });
+});
+
+describe("try it: admin switch", () => {
+  test("Try it has its own landing switch, on by default, right after the hero", () => {
+    expect(LANDING_SECTIONS.findIndex((s) => s.id === "try")).toBe(1);
+    expect(shown(LANDING_DEFAULT, "try")).toBe(true);
+    expect(shown({ ...LANDING_DEFAULT, sections: { ...LANDING_DEFAULT.sections, try: false } }, "try")).toBe(false);
+  });
+  test("an older saved config without the key still shows it", () => {
+    const { try: _gone, ...old } = LANDING_DEFAULT.sections;
+    expect(shown({ ...LANDING_DEFAULT, sections: old as typeof LANDING_DEFAULT.sections }, "try")).toBe(true);
   });
 });

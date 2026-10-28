@@ -2278,56 +2278,110 @@ html[data-contrast="more"] .lg-glass::before, html[data-contrast="more"] .lg-gla
   .lg-glass::before, .lg-glass::after { display: none; }
 }
 
-/* ---------- Try it (10-28, MOCKUP): liquid glass on a near-black stage with lime energy waves, always dark like the home demo ---------- */
-/* Brand colours only (user, 10-28: no blue). Waves are dimmed lime/green so white/.75 on the glass holds >= 4.5:1 (axe, 1440 and 390). */
-.try-stage { position: relative; isolation: isolate; overflow: hidden; border-radius: 36px; color: #fff; color-scheme: dark;
-  background: radial-gradient(110% 90% at 8% 0%, hsl(var(--lime) / .1) 0%, transparent 55%), radial-gradient(90% 80% at 100% 100%, hsl(var(--energy-a) / .08) 0%, transparent 60%), hsl(240 6% 6%);
-  box-shadow: 0 0 0 1px hsl(0 0% 100% / .08), 0 50px 120px -60px hsl(var(--lime) / .35); }
-.try-glass { position: relative; isolation: isolate; border-radius: 28px;
-  background: linear-gradient(155deg, rgb(255 255 255 / .16), rgb(255 255 255 / .05) 55%, rgb(255 255 255 / .09));
-  -webkit-backdrop-filter: blur(26px) saturate(170%); backdrop-filter: blur(26px) saturate(170%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / .38), inset 0 -1px 0 rgb(255 255 255 / .06), 0 24px 60px -30px rgb(0 0 0 / .75); }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .try-glass { background: hsl(240 6% 12% / .92); } }
-/* Refracted rim, same recipe as the nav pill. */
-.try-glass::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; padding: 1px; pointer-events: none;
-  background: linear-gradient(130deg, rgb(255 255 255 / .6), rgb(255 255 255 / .14) 32%, rgb(255 255 255 / .04) 60%, rgb(255 255 255 / .28));
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
-.try-card { border-radius: 24px; }
-.try-field { background: hsl(240 6% 4% / .45); box-shadow: inset 0 1px 2px rgb(0 0 0 / .35), inset 0 0 0 1px rgb(255 255 255 / .14); outline: none; transition: box-shadow .2s ease; }
-.try-field:focus-visible { box-shadow: inset 0 1px 2px rgb(0 0 0 / .35), inset 0 0 0 1px rgb(255 255 255 / .5), 0 0 0 3px rgb(255 255 255 / .35); }
-.try-chip { min-height: 44px; padding: 0 16px; border-radius: 9999px; font-size: 14px; font-weight: 500; color: rgb(255 255 255 / .92);
-  background: rgb(255 255 255 / .1); box-shadow: inset 0 1px 0 rgb(255 255 255 / .22), inset 0 0 0 1px rgb(255 255 255 / .12); transition: background .2s ease; }
-.try-chip:hover { background: rgb(255 255 255 / .17); }
-.try-chip[aria-pressed="true"] { background: rgb(255 255 255 / .24); color: #fff; }
-.try-chip:disabled { cursor: default; }
-/* Gradient glass pill with an underglow (ref 4), in the brand energy gradient. Dark ink on lime: well past 4.5:1. */
-.try-go { position: relative; isolation: isolate; display: inline-flex; align-items: center; gap: 10px; height: 56px; padding: 0 26px 0 28px; border-radius: 9999px;
-  font-size: 16px; font-weight: 600; color: hsl(var(--lime-foreground)); background: linear-gradient(100deg, hsl(var(--energy-c)), hsl(var(--lime)) 50%, hsl(var(--energy-a)));
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / .6), inset 0 -10px 18px -10px rgb(0 0 0 / .25), 0 0 0 1px rgb(255 255 255 / .25), 0 14px 40px -10px hsl(var(--lime) / .7), 0 4px 18px -6px hsl(var(--energy-a) / .5);
-  transition: transform .2s ease, filter .2s ease; }
-.try-go::after { content: ""; position: absolute; inset: 1px 14px auto; height: 48%; z-index: -1; border-radius: 9999px 9999px 40% 40%; pointer-events: none;
-  background: linear-gradient(180deg, rgb(255 255 255 / .38), transparent); }
-.try-go:hover { filter: brightness(1.08) saturate(1.1); transform: translateY(-1px); }
+/* ---------- Try it (10-28): a staggered wall of colour cards (user reference) ----------
+   Tall rounded cards, a white tag pill, a bold short title, a big 3D object in the corner, columns at different
+   heights. Brand range only (user, 10-28: no blue). Ink on the light
+   tones and white on forest/ink both hold >= 4.5:1 (axe, 1440 and 390). */
+#try { overflow-x: clip; }
+.try-wall { position: relative; }
+.try-cols { position: relative; display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+.try-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.try-col-ideas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+/* Phones: an odd last idea takes the whole row, so the 2-up grid never leaves a hole. */
+@media (max-width: 767px) { .try-col-ideas > .try-idea:last-of-type:nth-of-type(odd) { grid-column: 1 / -1; min-height: 124px; } }
+@media (min-width: 768px) {
+  .try-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .try-col-ideas { display: flex; flex-direction: column; gap: 16px; padding-top: 56px; }
+  .try-col-a { margin-top: -40px; }
+  .try-col-b { padding-top: 16px; }
+}
+@media (min-width: 1024px) {
+  .try-cols { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .try-col-ideas { padding-top: 72px; }
+  .try-col-a { margin-top: 0; padding-top: 24px; }
+  .try-col-b { padding-top: 112px; }
+}
+
+.try-wall [data-tone] { --c-bg: #fff; --c-ink: hsl(240 10% 8%); --c-sub: hsl(240 10% 8% / .76); --c-chip: rgb(0 0 0 / .08); }
+.try-wall [data-tone="lime"] { --c-bg: hsl(78 100% 52%); }
+.try-wall [data-tone="mint"] { --c-bg: hsl(140 52% 80%); }
+.try-wall [data-tone="cream"] { --c-bg: hsl(40 52% 87%); }
+.try-wall [data-tone="sage"] { --c-bg: hsl(92 34% 76%); }
+.try-wall [data-tone="forest"] { --c-bg: hsl(150 62% 21%); --c-ink: #fff; --c-sub: rgb(255 255 255 / .84); --c-chip: rgb(255 255 255 / .14); }
+.try-wall [data-tone="ink"] { --c-bg: hsl(240 7% 10%); --c-ink: #fff; --c-sub: rgb(255 255 255 / .76); --c-chip: rgb(255 255 255 / .12); }
+
+.try-card { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; border-radius: 24px; padding: 20px;
+  background: var(--c-bg); color: var(--c-ink); box-shadow: inset 0 1px 0 rgb(255 255 255 / .28), 0 22px 44px -32px rgb(0 0 0 / .55); }
+.try-wall [data-tone="ink"].try-card { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .09), 0 22px 44px -32px rgb(0 0 0 / .7); }
+.dark .try-card { box-shadow: inset 0 1px 0 rgb(255 255 255 / .22), 0 22px 44px -30px rgb(0 0 0 / .9); }
+.try-pill { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px; border-radius: 9999px;
+  background: #fff; color: hsl(240 10% 8%); font-size: 12.5px; font-weight: 600; line-height: 1; box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+.try-title { font-size: 20px; font-weight: 700; line-height: 1.3; letter-spacing: -.01em; color: var(--c-ink); }
+.try-sub { font-size: 14px; line-height: 1.5; color: var(--c-sub); }
+.try-text { font-size: 15px; line-height: 1.6; color: var(--c-ink); overflow-wrap: anywhere; }
+.try-count { align-self: flex-start; margin-top: auto; padding: 4px 10px; border-radius: 9999px; background: var(--c-chip); color: var(--c-ink);
+  font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.try-text + .try-count { margin-top: 16px; }
+.try-obj { position: absolute; right: 14px; bottom: 12px; z-index: -1; transition: transform .5s var(--ease-liquid); }
+.try-obj-sm { position: relative; }
+
+/* Your idea */
+.try-input { padding-bottom: 128px; }
+.try-input .try-obj { width: 104px; height: 104px; }
+@media (min-width: 1024px) { .try-input { min-height: 600px; padding-bottom: 20px; } .try-input .try-obj { width: 140px; height: 140px; } }
+.try-checks { display: none; }
+@media (min-width: 1024px) { .try-checks { display: grid; gap: 10px; margin-top: 28px; padding-top: 20px; border-top: 1px solid rgb(255 255 255 / .12); font-size: 13.5px; line-height: 1.35; color: var(--c-sub); } }
+.try-field { background: rgb(255 255 255 / .08); color: #fff; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18); outline: none; transition: box-shadow .2s ease; }
+.try-field::placeholder { color: rgb(255 255 255 / .6); }
+.try-field:focus-visible { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .55), 0 0 0 3px hsl(var(--lime) / .55); }
+.try-go { position: relative; isolation: isolate; align-self: flex-start; display: inline-flex; align-items: center; gap: 10px; height: 56px; padding: 0 26px 0 28px; border-radius: 9999px;
+  font-size: 16px; font-weight: 700; color: hsl(240 10% 6%); background: linear-gradient(135deg, hsl(var(--lime)), hsl(96 100% 56%) 60%, hsl(145 90% 52%));
+  box-shadow: 0 10px 28px -10px hsl(var(--lime) / .7), inset 0 1px 0 rgb(255 255 255 / .55); transition: transform .2s ease, filter .2s ease; }
+.try-go:hover { filter: brightness(1.06); transform: translateY(-1px); }
 .try-go:active { transform: scale(.97); }
 .try-go[aria-disabled="true"] { filter: saturate(.7); cursor: progress; }
-/* Frosted icon tile with the platform colour blurred behind it (ref 5). */
-.try-icon { position: relative; isolation: isolate; display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: 16px; color: #fff;
-  background: linear-gradient(150deg, rgb(255 255 255 / .34), rgb(255 255 255 / .1)); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / .6), inset 0 0 0 1px rgb(255 255 255 / .2), 0 6px 14px -6px rgb(0 0 0 / .5); }
-.try-icon::before { content: ""; position: absolute; inset: 8px 4px -6px; z-index: -1; border-radius: 14px; background: var(--blob); filter: blur(10px); opacity: .9; }
-.try-icon svg { filter: drop-shadow(0 1px 1px rgb(0 0 0 / .35)); }
-/* Glass tab bar on phones (ref 3): the active tab is a darker capsule. */
-.try-tabs { display: flex; gap: 4px; padding: 5px; border-radius: 9999px; background: rgb(255 255 255 / .12);
-  -webkit-backdrop-filter: blur(22px) saturate(170%); backdrop-filter: blur(22px) saturate(170%); box-shadow: inset 0 1px 0 rgb(255 255 255 / .3), inset 0 0 0 1px rgb(255 255 255 / .12); }
-.try-tab { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; border-radius: 9999px; font-size: 14px; font-weight: 600; color: rgb(255 255 255 / .85); transition: background .25s ease; }
-.try-tab[aria-pressed="true"] { color: #fff; background: hsl(240 6% 4% / .6); box-shadow: inset 0 1px 0 rgb(255 255 255 / .18), 0 4px 12px -6px rgb(0 0 0 / .6); }
-/* White pill hand-off (ref 1). */
-.try-keep { display: inline-flex; align-items: center; gap: 8px; height: 52px; padding: 0 24px; border-radius: 9999px; font-size: 16px; font-weight: 600; color: #0b0d1a; background: #fff;
-  box-shadow: inset 0 -2px 0 rgb(0 0 0 / .08), 0 10px 30px -10px rgb(0 0 0 / .6); transition: transform .2s ease; flex: none; }
+
+/* Sample ideas */
+.try-idea { min-height: 150px; padding-bottom: 72px; text-align: left; cursor: pointer; transition: transform .4s var(--ease-liquid), box-shadow .4s var(--ease-liquid); }
+.try-idea .try-obj { width: 76px; height: 76px; }
+.try-idea-title { font-size: 17px; max-width: 100%; }
+@media (min-width: 768px) {
+  .try-idea { min-height: 184px; padding-bottom: 20px; }
+  .try-idea .try-obj { width: 104px; height: 104px; }
+  .try-idea-title { font-size: 19px; max-width: 62%; }
+}
+.try-idea:hover:not(:disabled) { transform: translateY(-4px); }
+.try-idea:hover:not(:disabled) .try-obj { transform: rotate(-8deg) scale(1.06); }
+.try-idea[aria-pressed="true"] { box-shadow: 0 0 0 3px hsl(var(--background)), 0 0 0 5px hsl(var(--foreground)); }
+.try-idea:disabled { cursor: progress; }
+
+/* What Outlly wrote */
+.try-out { min-height: 200px; }
+.try-out-instagram { min-height: 360px; }
+.try-keepcard { padding-bottom: 128px; }
+.try-keep { display: inline-flex; align-items: center; align-self: flex-start; gap: 8px; height: 52px; padding: 0 22px; border-radius: 9999px; font-size: 16px; font-weight: 700;
+  color: hsl(240 10% 8%); background: #fff; box-shadow: 0 10px 24px -12px rgb(0 0 0 / .5); transition: transform .2s ease; }
 .try-keep:hover { transform: translateY(-1px); }
-.try-meter { height: 4px; border-radius: 9999px; background: rgb(255 255 255 / .14); overflow: hidden; }
-.try-meter > span { display: block; height: 100%; border-radius: inherit; background: hsl(var(--lime)); }
-.try-caret { display: inline-block; width: 2px; height: 1.05em; margin-left: 2px; vertical-align: -0.15em; background: #fff; animation: try-blink 1s steps(1) infinite; }
+.try-caret { display: inline-block; width: 2px; height: 1.05em; margin-left: 2px; vertical-align: -0.15em; background: currentColor; animation: try-blink 1s steps(1) infinite; }
 @keyframes try-blink { 50% { opacity: 0; } }
-.try-stage :is(button, a, input):focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-@media (prefers-reduced-motion: reduce) { .try-go, .try-keep, .try-chip, .try-tab { transition: none; } .try-go:hover, .try-keep:hover { transform: none; } .try-caret { animation: none; } }
+
+/* Phones: one draft at a time */
+.try-tabs { display: flex; gap: 4px; padding: 4px; border-radius: 9999px; background: hsl(var(--muted)); }
+.try-tab { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; border-radius: 9999px; font-size: 14px; font-weight: 600;
+  color: hsl(var(--foreground)); transition: background .25s ease, color .25s ease; }
+.try-tab[aria-pressed="true"] { color: hsl(var(--background)); background: hsl(var(--foreground)); }
+
+/* Scroll reveal, one card at a time (TryItStage). Hidden only after the script arms the wall. */
+.try-wall.tc-armed [data-tc]:not([data-in]) { opacity: 0; }
+.try-wall.tc-armed [data-tc]:not([data-in]) .pop-in { scale: 0; }
+.try-wall [data-tc][data-in] .pop-in { animation: pop-in .8s var(--ease-elastic) .3s both; }
+@media (prefers-reduced-motion: reduce) { .try-wall.tc-armed [data-tc]:not([data-in]) { opacity: 1; } .try-wall [data-tc] .pop-in { animation: none; scale: 1; } }
+
+.try-wall :is(button, a, input):focus-visible { outline: 3px solid hsl(var(--foreground)); outline-offset: 3px; }
+.try-input :is(button, input):focus-visible { outline-color: #fff; }
+@media (prefers-reduced-motion: reduce) {
+  .try-go, .try-keep, .try-idea, .try-obj, .try-tab { transition: none; }
+  .try-go:hover, .try-keep:hover, .try-idea:hover:not(:disabled), .try-idea:hover:not(:disabled) .try-obj { transform: none; }
+  .try-caret { animation: none; }
+}
+@media (forced-colors: active) { .try-card, .try-pill, .try-count { border: 1px solid CanvasText; } }

@@ -3,6 +3,7 @@
 
 export const LANDING_SECTIONS = [
   { id: "hero", anchor: "", label: "Hero", shows: "Headline, sign-up button and the product preview", core: true },
+  { id: "try", anchor: "try", label: "Try it", shows: "The live AI box: one idea in, a caption, a Shorts title and a post out" },
   { id: "how", anchor: "how", label: "How it works", shows: "Three steps from one upload to every platform" },
   { id: "features", anchor: "features", label: "Features", shows: "The feature bento: AI captions, scheduling, tracking" },
   { id: "demo", anchor: "demo", label: "Live demo", shows: "The animated upload, tailor and publish flow" },
