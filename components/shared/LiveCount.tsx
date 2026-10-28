@@ -42,7 +42,8 @@ export function useLiveView() {
   return v;
 }
 
-export function LiveCount({ compact = false, className }: { compact?: boolean; className?: string }) {
+/** compact: the online number only (phone top bar). pill: a glass pill, "20 creators · 3 online" (studio Home, 1039). */
+export function LiveCount({ compact = false, pill = false, className }: { compact?: boolean; pill?: boolean; className?: string }) {
   const v = useLiveView();
   if (!v || (v.total === null && v.online === null)) return null;
   const fmt = (n: number) => n.toLocaleString("en-US");
@@ -53,6 +54,16 @@ export function LiveCount({ compact = false, className }: { compact?: boolean; c
       <span className={cn("inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-semibold tabular text-foreground/80 hairline", className)} aria-label={label} title={label}>
         <Dot /> {compactCount(v.online)}
       </span>
+    );
+  }
+  if (pill) {
+    return (
+      <p className={cn("glass hairline inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[12.5px] font-semibold tabular text-foreground/85 shadow-sm", className)} aria-label={label} title={label}>
+        <Dot />
+        {v.total !== null && <span>{fmt(v.total)} creators</span>}
+        {v.total !== null && v.online !== null && <span aria-hidden="true" className="text-foreground/40">·</span>}
+        {v.online !== null && <span>{fmt(v.online)} online</span>}
+      </p>
     );
   }
   return (

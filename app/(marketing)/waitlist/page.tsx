@@ -33,7 +33,8 @@ export default async function WaitlistPage({ searchParams }: { searchParams: { f
   const counts = await waitlistCounts();
   const beta = await isBeta();
   return (
-    <div className="ap-canvas">
+    // No solid canvas here (1039): it covered the brand sky, so the comets behind every public page never showed.
+    <div className="wl-page">
       <section className="px-5 pb-10 pt-14 sm:px-8 sm:pb-12 sm:pt-20" aria-labelledby="wl-title">
         <div className="mx-auto flex max-w-[680px] flex-col items-center text-center">
           <p className="wl-rise inline-flex items-center gap-2 rounded-full bg-[hsl(var(--ap-tile))] py-1.5 pl-1.5 pr-4 text-[14px] font-semibold shadow-[0_0_0_1px_hsl(var(--foreground)/.08)]">

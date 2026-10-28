@@ -45,8 +45,9 @@ const ALL_STOPS = (teammate: boolean) => (teammate ? STOP_LIST.filter((s) => !s.
 
 const EVENT = "outly:tour";
 export const tourKey = (userId: string) => `outly:tour-done:${userId}`;
-export function startTour() {
-  window.dispatchEvent(new Event(EVENT));
+/** on: the page the tour will run on when the caller is navigating there (its tips are covered by the tour). */
+export function startTour(on?: string) {
+  window.dispatchEvent(new CustomEvent(EVENT, { detail: on }));
 }
 
 export function Tour() {
@@ -62,11 +63,12 @@ export function Tour() {
   }, [user.id]);
 
   useEffect(() => {
-    const open = () => {
+    const open = (e: Event) => {
       // Taking the tour (again) brings every page's tips back too.
       resetGuides(user.id);
       tourState.open = true;
-      tourState.ranOn = location.pathname;
+      const on = (e as CustomEvent<string | undefined>).detail;
+      tourState.ranOn = typeof on === "string" ? on : location.pathname;
       setRun((n) => n + 1);
     };
     const pause = () => {
@@ -78,7 +80,7 @@ export function Tour() {
     // Through the event, so Pip, the update notice and page tips all hear the tour start too
     // (next tick: their listeners mount after this one).
     let deep = 0;
-    if (new URLSearchParams(location.search).get("tour") === "1") deep = window.setTimeout(startTour, 0);
+    if (new URLSearchParams(location.search).get("tour") === "1") deep = window.setTimeout(() => startTour(), 0);
     return () => {
       window.clearTimeout(deep);
       window.removeEventListener(EVENT, open);

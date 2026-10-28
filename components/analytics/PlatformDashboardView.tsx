@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
 import { PlatformTabs } from "./PlatformTabs";
-import { api, ApiError } from "@/lib/client/api";
+import { api, ApiError, cachedApi } from "@/lib/client/api";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn, compact } from "@/lib/utils";
 import type { Headline, LivePost, PlatformDashboard, Suggestion } from "@/lib/live/types";
@@ -37,7 +37,8 @@ function engagement(p: LivePost) {
   return (((p.likes ?? 0) + (p.comments ?? 0) + (p.shares ?? 0) + (p.saves ?? 0)) / p.views) * 100;
 }
 
-export function PlatformDashboardView({ platform, initial, connected }: { platform: Platform; initial: PlatformDashboard; connected: Partial<Record<Platform, boolean>> }) {
+/** renderedAt: when the server built this page; a copy prefetched on hover (1039) can be a while old. */
+export function PlatformDashboardView({ platform, initial, connected, renderedAt }: { platform: Platform; initial: PlatformDashboard; connected: Partial<Record<Platform, boolean>>; renderedAt?: number }) {
   const [data, setData] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -86,6 +87,12 @@ export function PlatformDashboardView({ platform, initial, connected }: { platfo
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 5_000);
     return () => clearInterval(t);
+  }, []);
+
+  // Opened from a page warmed earlier: show it at once, then bring the numbers up to date.
+  useEffect(() => {
+    if (live && renderedAt && Date.now() - renderedAt > 30_000) void load(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -192,7 +199,8 @@ function Live({ platform, data }: { platform: Platform; data: PlatformDashboard 
     let gone = false;
     // Only say "thinking" if it takes a moment (no Gemini key answers instantly with nothing).
     const t = setTimeout(() => !gone && setThinking(true), 600);
-    api<{ suggestions: Suggestion[] }>(`/api/platforms/${platform}/ideas`)
+    // Remembered for 5 minutes, so hopping between tabs doesn't ask the model again (1039).
+    cachedApi<{ suggestions: Suggestion[] }>(`/api/platforms/${platform}/ideas`, 5 * 60_000)
       .then((r) => !gone && setIdeas(r.suggestions ?? []))
       .catch(() => {})
       .finally(() => {

@@ -1,11 +1,11 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { HoverLink as Link } from "@/components/shell/HoverLink";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, CircleAlert, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SectionHead } from "./SectionHead";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
-import { api } from "@/lib/client/api";
+import { swrApi } from "@/lib/client/api";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn, compact } from "@/lib/utils";
@@ -53,9 +53,8 @@ export function LiveStrip({ connected }: { connected: Partial<Record<Platform, b
   useEffect(() => {
     for (const p of live)
       if (connected[p])
-        api<PlatformDashboard>(`/api/platforms/${p}`)
-          .then((d) => setData((x) => ({ ...x, [p]: d })))
-          .catch(() => setData((x) => ({ ...x, [p]: "error" })));
+        // Warmed from the nav (1039): shown at once when it was, then refreshed if it is getting old.
+        swrApi<PlatformDashboard>(`/api/platforms/${p}`, (d) => setData((x) => ({ ...x, [p]: d }))).catch(() => setData((x) => ({ ...x, [p]: "error" })));
   }, [connected, live]);
 
   /* Chosen from what is connected, never from what has loaded, so the big tile never jumps. */

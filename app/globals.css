@@ -646,8 +646,8 @@ html:not(.dark) .demo-aura span { opacity: .12; }
 
 /* Guided tour */
 .tour-spot { box-shadow: 0 0 0 9999px hsl(240 10% 4% / .62), 0 0 0 2px hsl(var(--lime)), 0 0 30px 4px hsl(var(--lime) / .35); transition: left .45s var(--ease-liquid), top .45s var(--ease-liquid), width .45s var(--ease-liquid), height .45s var(--ease-liquid); }
-.tour-dim { background: hsl(240 10% 4% / .62); animation: tour-in .3s ease both; }
-.tour-card { animation: tour-in .4s var(--ease-liquid) both; }
+.tour-dim { background: hsl(240 10% 4% / .62); animation: tour-in .2s ease both; }
+.tour-card { animation: tour-in .26s var(--ease-liquid) both; }
 @keyframes tour-in { from { opacity: 0; translate: 0 6px; } }
 @media (prefers-reduced-motion: reduce) { .tour-spot { transition: none; } .tour-card, .tour-dim { animation: none; } }
 
@@ -1251,6 +1251,7 @@ html:not(.dark) .la-themed:not(.dark *) .la-fill { box-shadow: 0 0 22px 0 hsl(va
 @media (min-width: 768px) { .fc-stage > span:first-child, .fc-stage > span:last-child { display: flex; } }
 
 /* Waitlist page, Apple style: one white card on canvas grey, then an iOS-style bento of tiles. */
+.wl-page { background: transparent; }
 .wl-card { background: hsl(var(--ap-tile)); border-radius: 28px; box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 20px 50px -30px rgb(0 0 0 / .25); }
 .dark .wl-card { box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .07); }
 .wl-fields { display: grid; gap: 12px; }

@@ -58,3 +58,42 @@ export function FilterChips({ param, options, current }: { param: string; option
     </div>
   );
 }
+
+/**
+ * One URL-driven drop-down filter (1039): picking a value replaces that search param, keeps the others
+ * and goes back to page 1. A native <select>, so keyboard, screen readers and phones all just work.
+ */
+export function FilterSelect({ param, label, options, current }: { param: string; label: string; options: { value: string; label: string }[]; current: string }) {
+  const sp = useSearchParams();
+  const router = useRouter();
+  const path = usePathname();
+  const [pending, start] = useTransition();
+  const on = current !== "" && current !== options[0]?.value;
+  return (
+    <label className="relative inline-flex min-w-0 flex-col gap-1">
+      <span className="text-[11.5px] font-medium text-muted-foreground">{label}</span>
+      <select
+        value={current}
+        aria-busy={pending}
+        onChange={(e) => {
+          const n = new URLSearchParams(sp.toString());
+          e.target.value ? n.set(param, e.target.value) : n.delete(param);
+          n.delete("page");
+          start(() => router.replace(`${path}?${n}`, { scroll: false }));
+        }}
+        className={
+          on
+            ? "h-11 min-w-[9.5rem] rounded-full bg-[hsl(var(--lime)/0.16)] pl-3.5 pr-8 text-[13px] font-semibold ring-1 ring-[hsl(var(--lime)/0.55)]"
+            : "h-11 min-w-[9.5rem] rounded-full bg-secondary/60 pl-3.5 pr-8 text-[13px] font-medium hairline"
+        }
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      {pending && <Loader2 className="pointer-events-none absolute bottom-3.5 right-3 h-4 w-4 animate-spin text-muted-foreground" aria-hidden />}
+    </label>
+  );
+}

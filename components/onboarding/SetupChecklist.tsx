@@ -7,7 +7,7 @@ import { useUser } from "@/components/shell/UserContext";
 import { useToast } from "@/components/shared/Toast";
 import { startTour, tourKey } from "./Tour";
 import { readConsent } from "@/components/shared/CookieConsent";
-import { afterPrivacy } from "@/components/shared/PrivacyNotice";
+import { afterPrivacy, privacyPending } from "@/components/shared/PrivacyNotice";
 import { cn } from "@/lib/utils";
 
 export type SetupState = {
@@ -53,7 +53,11 @@ export function SetupChecklist({ state }: { state: SetupState }) {
     // Then the privacy notice, then the tour.
     let t: ReturnType<typeof setTimeout> | undefined;
     let unPrivacy = () => {};
-    const begin = () => { unPrivacy = afterPrivacy(user.id, () => { t = setTimeout(startTour, 600); }); };
+    // Straight away when nothing is in front of it; a beat for the privacy notice's exit when it was.
+    const begin = () => {
+      const waited = privacyPending(user.id);
+      unPrivacy = afterPrivacy(user.id, () => { t = setTimeout(() => startTour(), waited ? 160 : 0); });
+    };
     const wantsTour = (welcome || !localStorage.getItem(key)) && q.get("tour") !== "1";
     const consented = !!readConsent();
     if (wantsTour && consented) begin();

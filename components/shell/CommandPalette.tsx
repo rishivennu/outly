@@ -110,7 +110,7 @@ export function CommandPalette() {
       { id: "light", group: "Do", label: "Switch to light theme", keywords: "appearance mode", run: () => applyTheme("light") },
       { id: "dark", group: "Do", label: "Switch to dark theme", keywords: "appearance mode night", run: () => applyTheme("dark") },
       { id: "system", group: "Do", label: "Match my device theme", keywords: "appearance system auto", run: () => applyTheme("system") },
-      { id: "tour", group: "Do", label: "Take the tour", keywords: "help intro guide", run: () => { router.push("/home"); setTimeout(startTour, 400); } },
+      { id: "tour", group: "Do", label: "Take the tour", keywords: "help intro guide", run: () => { router.push("/home"); startTour("/home"); } },
       { id: "tips", group: "Do", label: "Show tips for this page", keywords: "help guide how explain", run: () => setTimeout(showPageTips, 200) },
       {
         id: "letters", group: "Do", label: letters ? "Turn off single-key shortcuts" : "Turn on single-key shortcuts", keywords: "keyboard n s hotkeys",

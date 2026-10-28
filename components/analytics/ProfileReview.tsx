@@ -6,7 +6,7 @@ import { ArrowDownRight, ArrowRight, ArrowUpRight, Check, CircleAlert, Clock, La
 import { Pip } from "@/components/brand/Pip";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
 import { useToast } from "@/components/shared/Toast";
-import { api, ApiError } from "@/lib/client/api";
+import { api, ApiError, swrApi } from "@/lib/client/api";
 import { PLATFORM_META } from "@/lib/domain";
 import { cn, compact } from "@/lib/utils";
 import type { ProfileReview as Review, ReviewStat } from "@/lib/live/review-core";
@@ -163,13 +163,20 @@ function LiveViews({ delay, className }: { delay: number; className?: string }) 
   const [now, setNow] = useState(() => Date.now());
   const first = useRef<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
+  const shown = useRef(false);
 
   const load = useCallback(async () => {
-    try {
-      const d = await api<LiveTotals>("/api/analytics/live");
+    const show = (d: LiveTotals) => {
       setData(d);
       setFailed(false);
       if (first.current === null && d.views !== null) first.current = d.views;
+    };
+    try {
+      // First paint may use the copy the nav warmed (1039); every poll after that asks the server.
+      if (first.current === null && !shown.current) {
+        shown.current = true;
+        await swrApi<LiveTotals>("/api/analytics/live", show, { fresh: 20_000, keep: 2 * 60_000 });
+      } else show(await api<LiveTotals>("/api/analytics/live"));
     } catch {
       setFailed(true);
     }
@@ -283,7 +290,7 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
 
   const load = useCallback(() => {
     setError(null);
-    api<Loaded>("/api/analytics/review").then(setState, (e) => setError(e instanceof ApiError ? e.message : "The review couldn't load."));
+    swrApi<Loaded>("/api/analytics/review", setState).catch((e) => setError(e instanceof ApiError ? e.message : "The review couldn't load."));
   }, []);
   useEffect(load, [load]);
 

@@ -7,6 +7,7 @@ import { HeroFan, CursorTag, Sparkles, type FanCard } from "@/components/marketi
 import { UploadZone } from "./UploadZone";
 import { handoffFile } from "@/lib/client/handoff";
 import { Greeting } from "./Greeting";
+import { LiveCount } from "./LiveCount";
 
 /*
  * Studio home hero, built from the landing hero's parts: the glow, sparkles, a pill eyebrow
@@ -32,6 +33,8 @@ export function HomeHero({ firstName }: { firstName: string }) {
       <div className="app-hide relative pt-8 sm:pt-12">
         <div aria-hidden="true" className="hf-glow pointer-events-none absolute inset-0" />
         <Sparkles />
+        {/* Live counts (1039): top right on a computer; a phone shows them in its top bar instead. */}
+        <LiveCount pill className="absolute right-6 top-5 z-10 hidden lg:inline-flex xl:right-10" />
         <div className="relative mx-auto flex max-w-6xl flex-col items-center px-5 text-center sm:px-10">
           <Greeting name={firstName} className="hf-rise-in" />
 

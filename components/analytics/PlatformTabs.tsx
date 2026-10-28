@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import { HoverLink as Link } from "@/components/shell/HoverLink";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { LayoutDashboard } from "lucide-react";

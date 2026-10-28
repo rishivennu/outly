@@ -82,7 +82,7 @@ export function PrivacyNotice() {
     let t = 0;
     const tick = () => {
       if (!privacyPending(userId)) return window.clearInterval(t); // already seen, e.g. opened from Settings
-      if (++tries > 120) {
+      if (++tries > 340) {
         // About 1.5 minutes: try again next visit, but let the tour and welcome offer go ahead now.
         window.clearInterval(t);
         window.dispatchEvent(new Event(CLOSED));
@@ -94,8 +94,13 @@ export function PrivacyNotice() {
       setOpen(true);
       window.clearInterval(t);
     };
-    t = window.setInterval(tick, 700);
-    return () => window.clearInterval(t);
+    // Poll briefly (another dialog may be closing), and check at once when the cookie choice lands.
+    t = window.setInterval(tick, 250);
+    window.addEventListener("outly:consent", tick);
+    return () => {
+      window.clearInterval(t);
+      window.removeEventListener("outly:consent", tick);
+    };
   }, [userId]);
 
   const close = () => {

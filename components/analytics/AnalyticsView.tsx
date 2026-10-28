@@ -7,7 +7,8 @@ import { ArrowDownRight, ArrowUpRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
-import { api } from "@/lib/client/api";
+import { cachedApi } from "@/lib/client/api";
+import { warmApi, whenIdle } from "@/lib/client/warm";
 import { PLATFORM_META } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn, compact } from "@/lib/utils";
@@ -58,7 +59,8 @@ function RangePicker({ value, onPick }: { value: number; onPick: (d: number) => 
   );
 }
 
-export function AnalyticsView({ initial, connected, focusAccount = null }: { initial: AnalyticsSummary; connected: Partial<Record<Platform, boolean>>; focusAccount?: string | null }) {
+/** renderedAt: when the server built this page; a copy prefetched from the nav (1039) can be a while old. */
+export function AnalyticsView({ initial, connected, focusAccount = null, renderedAt }: { initial: AnalyticsSummary; connected: Partial<Record<Platform, boolean>>; focusAccount?: string | null; renderedAt?: number }) {
   const [data, setData] = useState(initial);
   const live = useLivePlatforms();
   const [loading, setLoading] = useState(false);
@@ -67,10 +69,12 @@ export function AnalyticsView({ initial, connected, focusAccount = null }: { ini
   // 1037 drilldown: the combined list is remembered so picking one account never hides the others.
   const [drill, setDrill] = useState<string | null>(null);
   const [accounts, setAccounts] = useState(initial.byAccount);
-  const load = async (d: number, acct: string | null) => {
-    setLoading(true);
+  const url = (d: number, acct: string | null) => `/api/analytics?days=${d}${acct ? `&account=${encodeURIComponent(acct)}` : ""}`;
+  const load = async (d: number, acct: string | null, quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
-      const next = await api<AnalyticsSummary>(`/api/analytics?days=${d}${acct ? `&account=${encodeURIComponent(acct)}` : ""}`);
+      // Ranges are warmed once the page is idle (below), so switching is usually instant.
+      const next = await cachedApi<AnalyticsSummary>(url(d, acct), quiet ? 0 : 60_000);
       setData(next);
       // The API ignores an id this person can't see, so only show the drill when it actually applied.
       setDrill(acct && next.byAccount.some((a) => a.accountId === acct) ? acct : null);
@@ -83,6 +87,10 @@ export function AnalyticsView({ initial, connected, focusAccount = null }: { ini
   useEffect(() => {
     // Not limited to the current list: the link may be for another profile than the one picked on Home.
     if (focusAccount) void load(initial.rangeDays, focusAccount).catch(() => {});
+    // A copy prefetched from the nav may be a minute or two old: update it quietly (1039).
+    else if (renderedAt && Date.now() - renderedAt > 30_000) void load(initial.rangeDays, null, true).catch(() => {});
+    // The other ranges, so a switch doesn't wait on the server.
+    return whenIdle(() => RANGES.forEach((r) => r.d !== initial.rangeDays && warmApi(url(r.d, null))), 1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const pick = (d: number) => (d === data.rangeDays ? undefined : load(d, drill));

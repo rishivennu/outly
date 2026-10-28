@@ -21,6 +21,7 @@ import { PrivacyNotice } from "@/components/shared/PrivacyNotice";
 import { UpgradeDialog } from "@/components/shared/UpgradeDialog";
 import { AppEffects, AppMoreSheet, AppNavBar, AppTabBar } from "@/components/shell/AppChrome";
 import { NativeBridge } from "@/components/shell/NativeBridge";
+import { WarmUp } from "@/components/shell/WarmUp";
 
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -66,6 +67,7 @@ export default async function StudioLayout({ children }: { children: React.React
       <CommandPalette />
       <WhatsNew notice={notice} userId={user.actor?.id ?? user.id} joinedAt={new Date(user.joinedAt).toISOString()} />
       <AvatarCursor />
+      <WarmUp />
       </ToastProvider>
       </LivePlatformsProvider>
     </UserProvider>

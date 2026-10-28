@@ -16,5 +16,5 @@ export default async function PlatformAnalyticsPage({ params }: { params: { plat
   if (!isPlatform(params.platform)) notFound();
   const user = (await getCurrentUser())!;
   const [initial, connected] = await Promise.all([dashboardAccount(user, params.platform).then((accountId) => platformDashboard(user.id, params.platform as never, { accountId })), connectedPlatforms(user.id)]);
-  return <PlatformDashboardView key={params.platform} platform={params.platform} initial={initial} connected={connected} />;
+  return <PlatformDashboardView key={params.platform} platform={params.platform} initial={initial} connected={connected} renderedAt={Date.now()} />;
 }

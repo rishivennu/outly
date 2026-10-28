@@ -13,6 +13,7 @@ import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { useTheme, type ThemeChoice } from "@/components/shared/ThemeToggle";
 import { useUser } from "./UserContext";
 import { NoticesBell } from "./NoticesBell";
+import { HoverLink } from "./HoverLink";
 
 /*
  * Android app chrome (Apple HIG + Liquid Glass): large-title navigation bar, floating glass tab bar with a
@@ -220,12 +221,14 @@ export function AppTabBar() {
       <nav aria-label="Tabs" className="app-tabbar liquid">
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = isActive(path, href);
+          // Analytics warms its whole page on touch (1039); the other tabs keep Next's own prefetch.
+          const TabLink = href === "/analytics" ? HoverLink : Link;
           return (
-            <Link key={href} href={href} aria-current={active ? "page" : undefined} className={cn("app-tab", active && "is-active")}>
+            <TabLink key={href} href={href} aria-current={active ? "page" : undefined} className={cn("app-tab", active && "is-active")}>
               {active && <motion.span layoutId="app-tab-pill" className="app-tab-pill" transition={SPRING} />}
               <Icon className="relative h-[22px] w-[22px]" strokeWidth={active ? 2.3 : 1.9} aria-hidden="true" />
               <span className="app-tab-label">{label}</span>
-            </Link>
+            </TabLink>
           );
         })}
       </nav>
