@@ -24,6 +24,8 @@ model User {
   updatedAt    DateTime @updatedAt
 
   lastActiveAt DateTime?
+  lastSeenAt   DateTime? // presence heartbeat (1037), written at most once a minute; "online" = seen in the last 5 minutes
+  alertPrefs   String? // JSON { spike, spikeX, failed, email } custom alerts (1037); null = defaults
   referralCode String?   @unique // share link /r/{code}
   referredById String? // who invited this user (one free month each time a referral signs up)
   weeklyReport Boolean   @default(true) // Monday summary email
@@ -37,6 +39,13 @@ model User {
   totpLastStep  Int? // last accepted 30-second step, so one code can't be used twice
   recoveryCodes String? // JSON array of hashed one-time recovery codes
   tokenVersion  Int     @default(0) // bumped by "sign out everywhere" / password change; sessions carry it as `v`
+  emailVerifiedAt DateTime? // the inbox was proven: Google sign-in, an emailed code, or the founding link (1036)
+  emailVerifiedFor String? // the exact address that was proven; a changed email is unproven again
+  foundingNo      Int?      @unique // founding member number, 1..limit (null = not a founding member)
+  foundingAt      DateTime?
+  foundingPct     Int? // lifetime discount locked in when the seat was claimed
+  foundingKey     String?   @unique // one seat per real inbox (Gmail dots and +tags folded away)
+  foundingRetiredNo Int? // a revoked member's number, kept so it is never handed out again
 
   socialAccounts SocialAccount[]
   aiUsage        AiUsage[]
@@ -57,6 +66,8 @@ model User {
   dmThreads   DmThread[]
   betaIssued  BetaCode?  @relation("BetaIssued")
   betaRedeemed BetaCode? @relation("BetaRedeemed")
+
+  @@index([lastSeenAt])
 }
 
 /// One-time sign-in codes sent by email. Only a keyed hash of the code is stored; no link to User, so a
@@ -131,6 +142,9 @@ model Post {
   scheduledAt DateTime?
   publishedAt DateTime?
   launchedAt  DateTime? // first time it left draft (published or scheduled): what plan post limits count
+  editedAt    DateTime? // last change to the copy (1037); an approval older than this no longer counts
+  editedBy    String? // who made that change (name), shown in the draft's activity
+  editedById  String? // their user id: nobody but the owner approves their own change
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -138,6 +152,7 @@ model Post {
   media   Media        @relation(fields: [mediaId], references: [id], onDelete: Cascade)
   targets PostTarget[]
   reviews ReviewRequest[]
+  notes   PostNote[]
 
   @@index([userId, status])
   @@index([userId, scheduledAt])
@@ -213,6 +228,21 @@ model ReviewRequest {
   @@index([postId, createdAt])
 }
 
+/// Draft collaboration (1037): comments, edits and in-team approvals on one post, oldest first.
+model PostNote {
+  id         String   @id @default(cuid())
+  postId     String
+  authorId   String // the real person signed in (not the workspace owner when a member writes it)
+  authorName String
+  kind       String   @default("comment") // comment | edit | approved | changes
+  body       String
+  createdAt  DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+}
+
 // ---------------------------------------------------------------- admin, billing, support (2026-10-12)
 
 /// One row per user per active day (YYYY-MM-DD, UTC). Cheap DAU/WAU/MAU without an events table.
@@ -247,6 +277,7 @@ model Plan {
   replyLimit Int      @default(0) // inbox replies per week (Monday 00:00 UTC), 0 = unlimited
   captionVideos Int   @default(0) // videos per month that can get AI captions, 0 = unlimited
   burnCaptions Boolean @default(true) // burn subtitles into the video file
+  accountLimit Int    @default(0) // connected accounts in total (1037), several per platform allowed; 0 = one per platform
   state      String   @default("available") // available | soon | hidden
   highlight  Boolean  @default(false)
   sortOrder  Int      @default(0)
@@ -463,6 +494,7 @@ model TeamMember {
   userId     String?
   email      String
   role       String    @default("editor") // editor (drafts, needs approval) | manager (publish, schedule)
+  accountIds String? // JSON string[] of SocialAccount ids this member may work on (1037); null = every account
   status     String    @default("invited") // invited | active
   tokenHash  String    @unique
   createdAt  DateTime  @default(now())
@@ -499,7 +531,7 @@ model WaitlistEntry {
 model Notice {
   id        String    @id @default(cuid())
   userId    String
-  kind      String // token_expiring | post_failed | reconnect | goal_nudge | recycle
+  kind      String // token_expiring | post_failed | reconnect | goal_nudge | recycle | engagement_spike | draft_note
   tone      String    @default("info") // info | warn | danger
   title     String
   body      String
