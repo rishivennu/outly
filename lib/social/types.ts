@@ -84,7 +84,35 @@ export class PublisherError extends Error {
   ) {
     super(message);
   }
+  /** How long the platform asked us to wait before trying again (Retry-After and friends), when it said. */
+  retryAfterMs?: number;
 }
+
+/**
+ * The platform's own "come back in N" hint: Retry-After (seconds or an HTTP date), X's x-rate-limit-reset
+ * (epoch seconds), or Meta's estimated_time_to_regain_access (minutes) in its usage headers.
+ */
+export function retryAfterMs(h: Headers, now = Date.now()): number | undefined {
+  const ra = h.get("retry-after")?.trim();
+  if (ra) {
+    if (/^\d+(\.\d+)?$/.test(ra)) return Math.round(Number(ra) * 1000);
+    const at = Date.parse(ra);
+    if (!Number.isNaN(at)) return Math.max(0, at - now);
+  }
+  const reset = h.get("x-rate-limit-reset")?.trim();
+  // Epoch seconds today; a 13-digit value is milliseconds, so it never turns into a wait of decades.
+  if (reset && /^\d{9,}$/.test(reset)) return Math.max(0, (reset.length >= 13 ? Number(reset) : Number(reset) * 1000) - now);
+  const usage = `${h.get("x-business-use-case-usage") ?? ""} ${h.get("x-app-usage") ?? ""} ${h.get("x-ad-account-usage") ?? ""}`;
+  const mins = [...usage.matchAll(/estimated_time_to_regain_access"?\s*:\s*(\d+)/g)].map((m) => Number(m[1]));
+  if (mins.length) return Math.max(...mins) * 60_000;
+  return undefined;
+}
+
+const withWait = (e: PublisherError, res: Response) => {
+  const ms = retryAfterMs(res.headers);
+  if (ms !== undefined) e.retryAfterMs = ms;
+  return e;
+};
 
 /** The published post a comment thread hangs off. */
 export interface CommentTarget {
@@ -147,6 +175,14 @@ export async function httpFailure(res: Response, what: string): Promise<Publishe
   const body = await res.text().catch(() => "");
   const technical = `${what}: HTTP ${res.status} ${res.statusText}\n${body.slice(0, 2000)}`;
   if (res.status === 403 && /duplicate/i.test(body)) return new PublisherError("DUPLICATE", "Already posted", technical, false);
+  // Meta throttles with HTTP 400 (or 403) and an error code, not 429: 4 app, 17 user, 32 page, 613 call-rate,
+  // 80001-80014 business use case. Without this they fell through to "Media rejected" and failed for good,
+  // and (body type "OAuthException") a 403 one even flagged the account for reconnection. So: before the 401/403 rules.
+  const meta = /fbtrace_id|"type"\s*:\s*"(OAuthException|GraphMethodException)"/.test(body); // X reuses small codes (32 = bad auth)
+  if ((res.status === 400 || res.status === 403) && meta && /"code"\s*:\s*(4|17|32|613|8000[1-9]|8001[0-4])\b/.test(body))
+    return withWait(new PublisherError("RATE_LIMITED", "Rate limited", technical), res);
+  // Meta marks a temporary fault on its side with is_transient (often code 1 or 2 on a 400/500).
+  if (meta && /"is_transient"\s*:\s*true/.test(body)) return withWait(new PublisherError("PLATFORM_DOWN", "Platform unavailable", technical), res);
   if (res.status === 401) return new PublisherError("AUTH_EXPIRED", "Authorization expired", technical, false);
   if (res.status === 403) {
     // 403 is usually a permission/tier problem, not an expired token. Only treat OAuth-ish bodies as reconnect.
@@ -156,8 +192,8 @@ export async function httpFailure(res: Response, what: string): Promise<Publishe
   // Meta's Graph API answers 400 for token and permission problems too; its error code says which.
   if (res.status === 400 && /"code"\s*:\s*(190|102)\b/.test(body)) return new PublisherError("AUTH_EXPIRED", "Authorization expired", technical, false);
   if (res.status === 400 && /"code"\s*:\s*(10|200|294)\b/.test(body)) return new PublisherError("FORBIDDEN", "Not permitted", technical, false);
-  if (res.status === 429) return new PublisherError("RATE_LIMITED", "Rate limited", technical);
-  if (res.status >= 500) return new PublisherError("PLATFORM_DOWN", "Platform unavailable", technical);
+  if (res.status === 429) return withWait(new PublisherError("RATE_LIMITED", "Rate limited", technical), res);
+  if (res.status >= 500) return withWait(new PublisherError("PLATFORM_DOWN", "Platform unavailable", technical), res);
   if (res.status === 400 || res.status === 413 || res.status === 422)
     return new PublisherError("MEDIA_REJECTED", "Media rejected", technical, false);
   return new PublisherError("UNKNOWN", "Unexpected response", technical, false);

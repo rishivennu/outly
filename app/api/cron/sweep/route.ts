@@ -3,6 +3,7 @@ import { env } from "@/lib/env";
 import { safeEqual } from "@/lib/crypto";
 import { requeueStuckTargets, sweepDirectUploads, sweepDuePosts } from "@/lib/queue/handlers";
 import { settle } from "@/lib/queue";
+import { recordSweep } from "@/lib/queue/health";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -21,6 +22,8 @@ async function sweep(req: NextRequest) {
   // No maintenance skip: members keep posting while maintenance is on, so their schedule must still run.
   await sweepDuePosts();
   const requeued = await requeueStuckTargets();
+  // Heartbeat after the work, so a sweep that throws every minute still trips the admin warning.
+  await recordSweep("cron");
   // Abandoned or oversized browser-to-bucket uploads (1031g). Never let cleanup break the post sweep.
   const cleaned = await sweepDirectUploads().catch(() => 0);
   // Without Redis the jobs above are timers in this invocation: let them run before the response ends it

@@ -34,7 +34,8 @@ export function Sidebar() {
   const studio = MAIN.filter((m) => m.href !== "/create");
   return (
     <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
-      <aside data-lenis-prevent className="glass hairline flex h-full w-[240px] flex-col overflow-y-auto rounded-[28px] px-3 pb-4 pt-5" aria-label="Primary">
+      <aside className="lg-glass flex h-full w-[240px] flex-col overflow-hidden rounded-[28px]" aria-label="Primary">
+        <div data-lenis-prevent className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-4 pt-5">
         <Link href="/home" className="mb-6 flex min-h-11 items-center gap-2 rounded-2xl px-2 text-[18px] transition-opacity hover:opacity-80" aria-label="Outlly dashboard" title="Dashboard">
           <OutlyLogo size={30} />
         </Link>
@@ -100,6 +101,7 @@ export function Sidebar() {
             </Link>
             <NoticesBell placement="side" />
           </div>
+        </div>
         </div>
       </aside>
     </div>
@@ -170,7 +172,7 @@ export function MobileNav() {
           })}
         </ul>
       </div>
-      <nav aria-label="Primary" className="web-only glass-strong fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-40 flex h-[68px] items-center justify-around rounded-[28px] px-1 lg:hidden">
+      <nav aria-label="Primary" className="web-only lg-glass fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-40 flex h-[68px] items-center justify-around rounded-[28px] px-1 lg:hidden">
         {MAIN.filter((m) => TABS.includes(m.href)).map(({ href, label, icon: Icon }) => {
           const active = isActive(path, href);
           const create = href === "/create";

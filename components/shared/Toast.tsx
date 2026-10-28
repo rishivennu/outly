@@ -19,7 +19,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       <div aria-live="polite" role="status" className="pointer-events-none fixed inset-x-0 bottom-24 z-[90] flex flex-col items-center gap-2 px-4 lg:bottom-8">
         <AnimatePresence>
           {items.map((t) => (
-            <motion.div key={t.id} layout initial={{ opacity: 0, y: 16, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.98 }} className="glass-strong pointer-events-auto flex max-w-[min(520px,calc(100vw-2rem))] items-center gap-2.5 rounded-full px-4 py-2.5 text-sm font-medium">
+            <motion.div key={t.id} layout initial={{ opacity: 0, y: 16, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.98 }} className="lg-glass pointer-events-auto flex max-w-[min(520px,calc(100vw-2rem))] items-center gap-2.5 rounded-full px-4 py-2.5 text-sm font-medium">
               {t.tone === "ok" ? <Check className="h-4 w-4 shrink-0 text-success" aria-hidden /> : t.tone === "error" ? <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" aria-hidden /> : <Info className="h-4 w-4 shrink-0 text-accent" aria-hidden />}
               {t.text}
             </motion.div>

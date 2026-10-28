@@ -147,8 +147,12 @@ export async function launchPost(userId: string, postId: string, mode: "now" | "
   if (["publishing", "published"].includes(post.status)) throw new HttpError(409, "This one is already on its way.");
   // Approval is checked for "schedule" too: a scheduled post that nobody approved would only fail later.
   await assertApproved(post);
+  // A partial post sent again (Fix it) must only send what isn't live yet: resetting a live destination to
+  // "queued" uploaded and published it a second time, a duplicate on the creator's own account (1028 review).
+  const toSend = post.targets.filter((t) => t.platformStatus !== "published");
+  if (toSend.length === 0) throw new HttpError(409, "It's already live everywhere you picked.");
   const accounts = await connectedAccounts(userId);
-  const missing = post.targets.filter((t) => accounts.get(t.platform as Platform)?.status !== "connected");
+  const missing = toSend.filter((t) => accounts.get(t.platform as Platform)?.status !== "connected");
   if (missing.length) {
     const p = missing[0].platform as Platform;
     throw new HttpError(409, `${p === "x" ? "X" : p[0].toUpperCase() + p.slice(1)} needs you to reconnect first.`, "NOT_CONNECTED");
@@ -161,7 +165,7 @@ export async function launchPost(userId: string, postId: string, mode: "now" | "
     if (!(await claimWithSlot(userId, post, { status: "scheduled", scheduledAt }))) throw new HttpError(409, "This one is already on its way.");
     await markLaunched(post.id);
     await db.$transaction([
-      ...post.targets.map((t) =>
+      ...toSend.map((t) =>
         db.postTarget.update({ where: { id: t.id }, data: { platformStatus: "pending", socialAccountId: accounts.get(t.platform as Platform)!.id, errorCode: null, errorMessage: null, attempts: 0 } }),
       ),
     ]);
@@ -176,13 +180,13 @@ export async function launchPost(userId: string, postId: string, mode: "now" | "
   if (!stamp) throw new HttpError(409, "This one is already on its way.");
   await markLaunched(post.id);
   await db.$transaction(
-    post.targets.map((t) =>
+    toSend.map((t) =>
       db.postTarget.update({ where: { id: t.id }, data: { platformStatus: "queued", socialAccountId: accounts.get(t.platform as Platform)!.id, errorCode: null, errorMessage: null, attempts: 0, uploadRef: null, publishRequestedAt: null } }),
     ),
   );
   // jobId comes from the claim, not the clock: a duplicate request never gets this far, and a later
   // relaunch of the same post gets a fresh claim (so a new id) instead of being swallowed as a dupe.
-  for (const t of post.targets)
+  for (const t of toSend)
     await enqueue("SOCIAL_UPLOAD", { targetId: t.id, platform: t.platform as Platform, simulate }, { jobId: `up-${t.id}-${stamp}` });
 }
 

@@ -9,10 +9,29 @@ import { probe, thumbnail } from "../media/probe";
 import { isPracticeAccount, publisherForAccount } from "../social/registry";
 import { asPublisherError, PublisherError, type PublishContext, type RemoteState, type SimulationMode } from "../social/types";
 import { isApproved } from "../review";
-import { enqueue } from "./index";
+import { enqueue, usingRedis } from "./index";
 import type { JobName, JobPayloads } from "./jobs";
 
-const MAX_AUTO_RETRIES = 3;
+/**
+ * Waits between automatic retries of a transient failure (1028). It used to be 1.5 / 3 / 6 s, so a platform
+ * hiccup of a minute (a Meta throttle, a YouTube 503) used up every retry and failed the post. Now about 7.5
+ * minutes in all, each wait jittered so many posts throttled together don't come back in the same second, and
+ * never shorter than the platform's own Retry-After.
+ */
+export const RETRY_DELAYS_MS = [2_000, 10_000, 30_000, 2 * 60_000, 5 * 60_000];
+const MAX_AUTO_RETRIES = RETRY_DELAYS_MS.length;
+/** A platform asking for a longer pause than this (a spent daily quota) fails now, in its words, instead of hanging. */
+export const MAX_RETRY_WAIT_MS = 20 * 60_000;
+/** Without Redis a delayed job is a timer the function keeps alive (queue HOLD_MAX_DELAY_MS); longer waits go to the sweeper. */
+const HOLD_RETRY_MS = 40_000;
+/** requeueStuckTargets re-sends a "queued" target untouched this long. */
+export const QUEUED_STALE_MS = 120_000;
+
+/** The wait before retry number `attempts + 1`: the schedule above, +-15% jitter, at least what the platform asked for. */
+export function retryDelay(attempts: number, err: { retryAfterMs?: number }, rand: () => number = Math.random) {
+  const base = RETRY_DELAYS_MS[Math.min(attempts, RETRY_DELAYS_MS.length - 1)];
+  return Math.max(Math.round(base * (0.85 + rand() * 0.3)), err.retryAfterMs ?? 0);
+}
 const MAX_STATUS_POLLS = 60;
 /** "uploading" with no progress this long means the job died mid-transfer (function timeout, recycled instance). */
 export const STUCK_UPLOAD_MS = 15 * 60_000;
@@ -245,8 +264,25 @@ async function handleFailure(name: "SOCIAL_UPLOAD" | "SOCIAL_PUBLISH", data: Job
   const err = asPublisherError(raw);
   if (await canceled(targetId)) return;
   if (err.retryable && attempts < MAX_AUTO_RETRIES) {
-    await db.postTarget.update({ where: { id: targetId }, data: { attempts: { increment: 1 }, errorCode: err.code, errorMessage: err.technical ?? err.message } });
-    await enqueue(name, data, { delayMs: 1500 * 2 ** attempts });
+    const wait = retryDelay(attempts, err);
+    if (wait > MAX_RETRY_WAIT_MS) {
+      const mins = Math.ceil(wait / 60_000);
+      return failTarget(targetId, postId, new PublisherError(err.code, err.message, `${err.technical ?? err.message}\n\nThe platform asked us to wait ${mins} minutes before trying again, so we stopped here. Try again after that.`, false));
+    }
+    const note = { attempts: { increment: 1 }, errorCode: err.code, errorMessage: err.technical ?? err.message };
+    if (wait <= HOLD_RETRY_MS || usingRedis()) {
+      await db.postTarget.update({ where: { id: targetId }, data: note });
+      await enqueue(name, data, { delayMs: wait });
+      return;
+    }
+    // Serverless, long wait: no timer survives it. Park the target as "queued", dated so the sweeper's
+    // "queued for QUEUED_STALE_MS" rule picks it up when the wait is over. socialUpload then skips straight to
+    // publish when the platform already has the media, and a publish that may have landed is reconciled first.
+    // Conditional, so a Stop (failed) or a late success (published) in the meantime always wins.
+    await db.postTarget.updateMany({
+      where: { id: targetId, platformStatus: { notIn: ["failed", "published"] } },
+      data: { ...note, platformStatus: "queued", updatedAt: new Date(Date.now() + wait - QUEUED_STALE_MS) },
+    });
     return;
   }
   await failTarget(targetId, postId, err);
@@ -355,6 +391,13 @@ async function reconciled(
   return true;
 }
 
+/** Status-check backoff: 3 s growing to 30 s, at least the platform's wait. Without Redis no timer outlives
+ *  HOLD_RETRY_MS (a longer one is dropped when the function freezes), so the wait is capped there. */
+export function statusDelay(poll: number, retryAfter?: number) {
+  const ms = Math.max(Math.min(3000 * 1.5 ** poll, 30_000), Math.min(retryAfter ?? 0, 10 * 60_000));
+  return usingRedis() ? ms : Math.min(ms, HOLD_RETRY_MS);
+}
+
 async function socialStatus(data: JobPayloads["SOCIAL_STATUS_CHECK"]) {
   const loaded = await load("SOCIAL_STATUS_CHECK", data);
   if (!loaded) return;
@@ -365,7 +408,7 @@ async function socialStatus(data: JobPayloads["SOCIAL_STATUS_CHECK"]) {
     await applyRemote(t.id, t.postId, r, data, data.poll);
   } catch (e) {
     if (e instanceof PublisherError && e.retryable && data.poll < MAX_STATUS_POLLS)
-      return void (await enqueue("SOCIAL_STATUS_CHECK", { ...data, poll: data.poll + 1 }, { delayMs: 3000 }));
+      return void (await enqueue("SOCIAL_STATUS_CHECK", { ...data, poll: data.poll + 1 }, { delayMs: statusDelay(data.poll, e.retryAfterMs) }));
     await failTarget(t.id, t.postId, e);
   }
 }
@@ -426,16 +469,19 @@ export async function sweepDuePosts(now = Date.now()) {
  * "Sending..." forever. Each claim is a conditional update on updatedAt, so several sweepers running at once
  * act once, and job ids are bucketed by minute.
  */
-export async function requeueStuckTargets(olderThanMs = 120_000, now = Date.now()) {
+export async function requeueStuckTargets(olderThanMs = QUEUED_STALE_MS, now = Date.now()) {
   const minute = Math.floor(now / 60_000);
   let requeued = 0;
   const queued = await db.postTarget.findMany({
     where: { platformStatus: "queued", updatedAt: { lte: new Date(now - olderThanMs) } },
-    select: { id: true, platform: true },
+    select: { id: true, platform: true, updatedAt: true },
     take: 50,
   });
   for (const t of queued) {
     if (!isPlatform(t.platform)) continue;
+    // Claim it (1028 review): parked retries make this branch routine, and two sweepers must not both send it.
+    const won = await db.postTarget.updateMany({ where: { id: t.id, platformStatus: "queued", updatedAt: t.updatedAt }, data: { updatedAt: new Date(now) } });
+    if (!won.count) continue;
     await enqueue("SOCIAL_UPLOAD", { targetId: t.id, platform: t.platform, simulate: "realistic" }, { jobId: `requeue-${t.id}-${minute}` });
     requeued++;
   }

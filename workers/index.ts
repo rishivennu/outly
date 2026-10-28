@@ -5,7 +5,8 @@
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
 import { QUEUE_NAMES, type JobName } from "../lib/queue/jobs";
-import { runJob, sweepDuePosts } from "../lib/queue/handlers";
+import { requeueStuckTargets, runJob, sweepDuePosts } from "../lib/queue/handlers";
+import { recordSweep } from "../lib/queue/health";
 
 const url = process.env.REDIS_URL;
 if (!url) throw new Error("REDIS_URL is required for the worker process");
@@ -19,4 +20,10 @@ for (const q of QUEUE_NAMES) {
   console.log(`[worker] listening on ${q}`);
 }
 
-setInterval(() => sweepDuePosts().catch((e) => console.error("[sweeper]", e)), 15_000);
+// Due posts plus lost-work recovery (which the worker never ran before 1028), and a heartbeat for the admin panel.
+const sweep = async () => {
+  await sweepDuePosts();
+  await requeueStuckTargets();
+  await recordSweep("worker");
+};
+setInterval(() => sweep().catch((e) => console.error("[sweeper]", e)), 15_000);

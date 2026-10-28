@@ -30,7 +30,7 @@ export function Sheet({ open, onOpenChange, title, description, children, side =
                   if (i.offset.y > 120 && window.innerWidth < 1024) onOpenChange(false);
                 }}
                 className={cn(
-                  "glass-strong fixed z-[61] flex max-h-[88dvh] flex-col overflow-hidden",
+                  "lg-glass fixed z-[61] flex max-h-[88dvh] flex-col overflow-hidden",
                   "inset-x-0 bottom-0 rounded-t-[32px] pb-[env(safe-area-inset-bottom)]",
                   side === "right" ? "lg:inset-x-auto lg:bottom-4 lg:right-4 lg:top-4 lg:max-h-none lg:w-[440px] lg:rounded-[32px]" : "lg:inset-x-0 lg:bottom-auto lg:top-[8dvh] lg:mx-auto lg:w-[560px] lg:rounded-[32px]",
                   className,

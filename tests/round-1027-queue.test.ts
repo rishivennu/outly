@@ -68,7 +68,8 @@ describe("stuck targets are handed back to the queue", () => {
 
   test("an upload that keeps dying is failed instead of looping", async () => {
     jobs = [];
-    const { t } = await target("uploading", { attempts: 6 });
+    // 5 automatic retries + 3 sweeper restarts is the budget (1028: retries went from 3 to 5).
+    const { t } = await target("uploading", { attempts: 8 });
     await h.requeueStuckTargets(120_000, LATER());
     expect(mine(t.id)).toEqual([]);
     const r = await row(t.id);

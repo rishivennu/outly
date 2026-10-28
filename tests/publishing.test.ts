@@ -47,12 +47,14 @@ g.__queueBackend = { add: async (name: string, data: unknown, opts?: Job["opts"]
 
 let db: typeof import("../lib/db").db;
 let runJob: typeof import("../lib/queue/handlers").runJob;
+let requeueStuckTargets: typeof import("../lib/queue/handlers").requeueStuckTargets;
+let QUEUED_STALE_MS: number;
 let services: typeof import("../lib/services");
 let encrypt: typeof import("../lib/crypto").encrypt;
 
 beforeAll(async () => {
   ({ db } = await import("../lib/db"));
-  ({ runJob } = await import("../lib/queue/handlers"));
+  ({ runJob, requeueStuckTargets, QUEUED_STALE_MS } = await import("../lib/queue/handlers"));
   services = await import("../lib/services");
   ({ encrypt } = await import("../lib/crypto"));
 });
@@ -97,6 +99,34 @@ const target = (id: string) => db.postTarget.findUniqueOrThrow({ where: { id } }
 const post = (id: string) => db.post.findUniqueOrThrow({ where: { id } });
 
 describe("publishing pipeline", () => {
+  test("sending a partial post again never re-publishes the destination that is already live", async () => {
+    const f = await fixture({ platforms: ["x", "youtube"] });
+    fake.uploads.push("m-x", "m-yt");
+    fake.publishes.push({ state: "published", platformPostId: "live-1", url: "https://x.com/u/status/live-1" }, new PublisherError("MEDIA_REJECTED", "Too long", "Too long", false));
+    await services.launchPost(f.user.id, f.post.id, "now", null, "smooth");
+    await drain();
+    expect((await post(f.post.id)).status).toBe("partial");
+    const [liveId, failedId] = f.targets.map((t) => t.id);
+    expect((await target(liveId)).platformStatus).toBe("published");
+
+    // "Fix it" -> send again: only the failed destination goes out
+    fake.calls = [];
+    fake.uploads.push("m-yt-2");
+    fake.publishes.push({ state: "published", platformPostId: "yt-1" });
+    await services.launchPost(f.user.id, f.post.id, "now", null, "smooth");
+    expect(jobs.map((j) => j.data.targetId)).toEqual([failedId]);
+    await drain();
+    expect(fake.calls).toEqual(["upload", "publish"]);
+    const live = await target(liveId);
+    expect(live.platformStatus).toBe("published");
+    expect(live.platformPostId).toBe("live-1");
+    expect((await post(f.post.id)).status).toBe("published");
+
+    // Nothing left to send: refused, nothing queued
+    await expect(services.launchPost(f.user.id, f.post.id, "now", null, "smooth")).rejects.toThrow();
+    expect(jobs.length).toBe(0);
+  });
+
   test("happy path: published only after the platform confirms", async () => {
     const f = await fixture();
     fake.uploads.push("media-1");
@@ -128,7 +158,54 @@ describe("publishing pipeline", () => {
 
   test("transient network failure retries with backoff, then fails honestly", async () => {
     const f = await fixture();
-    fake.uploads.push(new TypeError("fetch failed"), new TypeError("fetch failed"), new TypeError("fetch failed"), new TypeError("fetch failed"));
+    for (let i = 0; i < 6; i++) fake.uploads.push(new TypeError("fetch failed"));
+    const realRandom = Math.random;
+    Math.random = () => 0.5; // no jitter, so the schedule is exact
+    try {
+      await services.launchPost(f.user.id, f.post.id, "now", null, "smooth");
+      const delays: number[] = [];
+      const run = async () => {
+        for (let i = 0; i < 6 && jobs.length; i++) {
+          const j = jobs.shift()!;
+          if (j.opts?.delayMs) delays.push(j.opts.delayMs);
+          await runJob(j.name as any, j.data);
+        }
+      };
+      await run();
+      // Short waits are timers; without Redis the 2 and 5 minute waits are parked for the sweeper.
+      expect(delays).toEqual([2000, 10000, 30000]);
+      let t = await target(f.target.id);
+      expect(t.platformStatus).toBe("queued");
+      expect(t.attempts).toBe(4);
+      // Not yet: the sweeper leaves it alone until the 2 minutes are up...
+      expect(await requeueStuckTargets(QUEUED_STALE_MS, Date.now() + 60_000)).toBe(0);
+      expect(jobs).toEqual([]);
+      // ...then hands it back.
+      expect(await requeueStuckTargets(QUEUED_STALE_MS, Date.now() + 2 * 60_000 + 1000)).toBe(1);
+      await run();
+      t = await target(f.target.id);
+      expect(t.platformStatus).toBe("queued");
+      expect(t.attempts).toBe(5);
+      expect(await requeueStuckTargets(QUEUED_STALE_MS, Date.now() + 4 * 60_000)).toBe(0);
+      expect(await requeueStuckTargets(QUEUED_STALE_MS, Date.now() + 5 * 60_000 + 1000)).toBe(1);
+      await run();
+      expect(fake.calls.filter((c) => c === "upload").length).toBe(6);
+    } finally {
+      Math.random = realRandom;
+    }
+    const t = await target(f.target.id);
+    expect(t.platformStatus).toBe("failed");
+    expect(t.errorCode).toBe("NETWORK");
+    expect(t.platformUrl).toBeNull();
+    expect((await post(f.post.id)).status).toBe("failed");
+  });
+
+  test("a platform's Retry-After is honoured as the minimum wait", async () => {
+    const f = await fixture();
+    const throttled = new PublisherError("RATE_LIMITED", "Rate limited", "HTTP 429");
+    throttled.retryAfterMs = 25_000;
+    fake.uploads.push(throttled, "m");
+    fake.publishes.push({ state: "published", platformPostId: "p1", url: "https://x.com/u/status/p1" });
     await services.launchPost(f.user.id, f.post.id, "now", null, "smooth");
     const delays: number[] = [];
     for (let i = 0; i < 6 && jobs.length; i++) {
@@ -136,12 +213,34 @@ describe("publishing pipeline", () => {
       if (j.opts?.delayMs) delays.push(j.opts.delayMs);
       await runJob(j.name as any, j.data);
     }
-    expect(delays).toEqual([1500, 3000, 6000]);
+    expect(delays).toEqual([25_000]); // not the 2 s first step
+    expect((await target(f.target.id)).platformStatus).toBe("published");
+  });
+
+  test("a platform asking for a very long pause fails now, saying so, instead of hanging", async () => {
+    const f = await fixture();
+    const quota = new PublisherError("RATE_LIMITED", "Rate limited", "HTTP 429 daily quota");
+    quota.retryAfterMs = 6 * 3600_000;
+    fake.uploads.push(quota);
+    await services.launchPost(f.user.id, f.post.id, "now", null, "smooth");
+    await drain();
     const t = await target(f.target.id);
     expect(t.platformStatus).toBe("failed");
-    expect(t.errorCode).toBe("NETWORK");
-    expect(t.platformUrl).toBeNull();
-    expect((await post(f.post.id)).status).toBe("failed");
+    expect(t.errorCode).toBe("RATE_LIMITED");
+    expect(t.errorMessage).toContain("wait 360 minutes");
+    expect(jobs).toEqual([]);
+  });
+
+  test("Stop while a long retry wait is parked wins over the sweeper", async () => {
+    const f = await fixture();
+    const slow = new PublisherError("PLATFORM_DOWN", "Down", "HTTP 503");
+    slow.retryAfterMs = 5 * 60_000;
+    fake.uploads.push(slow);
+    await services.launchPost(f.user.id, f.post.id, "now", null, "smooth");
+    await drain();
+    expect((await target(f.target.id)).platformStatus).toBe("queued");
+    await db.postTarget.update({ where: { id: f.target.id }, data: { platformStatus: "failed", errorCode: "CANCELED" } });
+    expect(await requeueStuckTargets(QUEUED_STALE_MS, Date.now() + 6 * 60_000)).toBe(0);
   });
 
   test("expired token fails only that platform and flags the account for reconnection", async () => {

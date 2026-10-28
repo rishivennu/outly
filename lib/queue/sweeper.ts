@@ -6,8 +6,12 @@ export function startSweeper(intervalMs = 15_000) {
   if (g.__sweeper) return;
   const tick = async () => {
     try {
-      const { sweepDuePosts } = await import("./handlers");
+      const { requeueStuckTargets, sweepDuePosts } = await import("./handlers");
       await sweepDuePosts();
+      // Lost work and parked retries come back here too (claims are conditional, so parallel sweepers act once).
+      await requeueStuckTargets();
+      const { recordSweep } = await import("./health");
+      await recordSweep("inproc");
       const { maybeSendWeeklyReports } = await import("../reports/weekly");
       await maybeSendWeeklyReports();
       const { maybeRunRetention } = await import("../retention/sweep");

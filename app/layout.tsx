@@ -25,6 +25,7 @@ const body = DM_Sans({ subsets: ["latin"], variable: "--font-body", display: "sw
 const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["italic"], variable: "--font-serif", display: "swap" });
 
 import { LaunchHost } from "@/components/billing/RocketCta";
+import { LiquidGlass } from "@/components/shared/LiquidGlass";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3040"),
@@ -65,6 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Connectivity />
           <Ripples />
           <LaunchHost />
+          <LiquidGlass />
         </MotionRoot>
       </body>
     </html>

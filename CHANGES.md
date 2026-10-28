@@ -1,44 +1,37 @@
-# fix-1031fg: DM permission switch + security hardening
+# fix-1032b: smarter retries, sweeper health warning, liquid glass
 
-Upload after 1031e (repo-sync-1027 + missing5). 21 files. Paths are relative to the repo root.
-Checks on this PC: 736 tests pass (61 files), `tsc --noEmit` clean, `next build` exit 0.
+Upload order: repo-sync-1027 (1031e), then fix-1031fg-dm-switch-security, then fix-1032a-partial-resend, then this one.
+This bundle's copies of lib/queue/handlers.ts, app/api/cron/sweep/route.ts and tests/publishing.test.ts already
+contain the 1031fg and 1032a changes, so they replace those files.
 
-## 1031f: "Ask for the messaging permission" switch (Admin > Social platforms)
+## Smarter retries
+- Retries: 5 instead of 3, waiting about 2 s, 10 s, 30 s, 2 min and 5 min (was 1.5 / 3 / 6 s, so a one-minute
+  platform hiccup used up every retry and failed the post). Each wait has +-15% jitter so many posts throttled
+  together don't all come back in the same second.
+- The platform's own wait is honoured as the minimum: Retry-After (seconds or date), X's x-rate-limit-reset,
+  and Meta's estimated_time_to_regain_access in its usage headers.
+- If a platform asks for more than 20 minutes (a spent daily quota) the post fails right away and says so,
+  instead of hanging.
+- Meta throttles arrive as HTTP 400/403 with codes 4, 17, 32, 613, 80001-80014. They used to be read as
+  "Media rejected" (no retry), and a 403 one could wrongly flag the account for reconnection. Now RATE_LIMITED
+  and retried. Meta's is_transient:true is now PLATFORM_DOWN and retried. X's code 32 is unaffected.
+- On Vercel (no Redis) a wait longer than 40 s can't be a timer, so the target is parked as "queued" and the
+  minute sweep sends it again when the wait is over. Stop and late successes still win.
+- Status checks back off (3 s growing to 30 s, at least the platform's Retry-After) instead of a flat 3 s.
 
-Until Meta approves messaging, asking for the DM scopes makes Instagram/Facebook connect fail.
-The switch lets you connect without them, and turn DMs back on after App Review.
+## Sweeper health warning
+- Every sweep (cron pinger, Redis worker, in-process) records when it ran (Setting sweeper:last:<source>).
+- The Redis worker now also recovers stuck targets each tick, like the cron route already did.
+- Admin panel (super admins): a warning appears when the sweep this deployment relies on hasn't run for
+  3 minutes, with the number of overdue scheduled posts and what to check (cron-job.org pinger for
+  /api/cron/sweep with the CRON_SECRET bearer token). It also shows right after a fresh deploy until the
+  first ping arrives.
 
-- Instagram and Facebook each get a switch. ON by default (nothing changes until you turn it off). Press Save to apply.
-- OFF: connect asks only for the posting/insights scopes; no DM webhook subscribe; inbox sync skips that
-  platform; replies to old threads are paused with a friendly "switched off" message (no raw Meta error);
-  the Messages tab shows "Direct messages are switched off until Meta approves messaging". This applies to
-  creators who connected earlier too, and the admin note says so.
-- Files: lib/settings.ts, lib/social/keys.ts (dmsOn), lib/social/instagram.ts, lib/social/facebook.ts,
-  lib/accounts.ts, lib/messages/service.ts, app/api/admin/platforms/route.ts, app/api/messages/route.ts,
-  app/(studio)/inbox/page.tsx, components/inbox/MessagesView.tsx, components/admin/PlatformKeysForm.tsx,
-  tests/round-1031f-dm-switch.test.ts
+## Liquid glass
+- New components/shared/LiquidGlass.tsx (edge refraction with chromatic fringe, Chromium only; other
+  browsers keep frosted glass). Used on the sidebar, mobile tab bar, toasts and sheets.
+- Dark glass tint raised and its backdrop dimmed so muted sidebar labels stay at least 4.5:1 on a busy
+  background. Reduced transparency, increased contrast and forced colours fall back to solid surfaces.
 
-## 1031g: security
-
-1. **DOM XSS on /app-auth (high).** `/app-auth?to=...` passed the raw value into `location.replace()` in a
-   normal browser, so a link like `/app-auth?to=javascript:...` ran the attacker's script as the signed-in
-   visitor (proved in Edge), and `?to=https://evil.com` was an open redirect. Now only
-   `/api/auth/google` or `/api/accounts/<platform>/connect` on this site are allowed (appAuthTarget).
-2. **Open redirect after sign-in (medium).** `/login?next=/%09/evil.com` passed the old check; the browser
-   drops the tab and goes to evil.com after login. AuthForm, GoogleButton, NativeBridge (push taps) and
-   safeReturnTo now share one check (lib/safe-next.ts sameSitePath): single leading slash, no control
-   characters, and the path must resolve to this site.
-3. **Oversized direct uploads (low, Supabase storage only).** The Supabase signed upload can't pin a byte size,
-   so a client could reserve a small file, upload a huge one and never call complete. The minute sweeper
-   (/api/cron/sweep) now fails an "uploading" row whose object is bigger than its reservation (after 15 min) or
-   that was abandoned for a day, and only then deletes the object. The row is claimed first, so an upload that
-   finishes at the same moment keeps its file.
-- Files: lib/safe-next.ts (new), lib/oauth-state.ts, components/auth/AuthForm.tsx, components/auth/GoogleButton.tsx,
-  components/app/AppAuthBridge.tsx, components/shell/NativeBridge.tsx, lib/queue/handlers.ts,
-  app/api/cron/sweep/route.ts, tests/round-1031g-security.test.ts
-
-## Also do (dashboard, not code)
-- R2/S3: keep the bucket rule that aborts incomplete multipart uploads after 7 days (R2's default), so parts from abandoned uploads don't pile up.
-- Supabase > Storage > your bucket > set "Restrict file size" to your biggest plan's upload limit (blocks oversized uploads at the source).
-- Rotate the GEMINI key and confirm UPSTASH_REDIS_REST_URL/_TOKEN are set on Vercel (rate limits are per-instance without them).
-- Admin login has a password only; keep it long and unique.
+## Tests
+- New tests/round-1028-retries.test.ts; publishing and 1027 queue tests updated for the new schedule.
