@@ -20,11 +20,15 @@ export async function GET(req: NextRequest, { params }: { params: { key: string[
   if (!st) return new NextResponse("Not found", { status: 404 });
   const type = TYPES[key.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
   const headers: Record<string, string> = { "content-type": type, "accept-ranges": "bytes", "cache-control": "private, max-age=3600", "x-content-type-options": "nosniff" };
+  // A file opened straight from this origin must never run script (an SVG can carry <script>).
+  headers["content-security-policy"] = "default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; sandbox";
 
   const range = req.headers.get("range")?.match(/bytes=(\d*)-(\d*)/);
   if (range) {
-    const start = range[1] ? Number(range[1]) : 0;
-    const end = range[2] ? Math.min(Number(range[2]), st.size - 1) : st.size - 1;
+    // "bytes=-500" means the LAST 500 bytes (players probe the end of an mp4 for its index).
+    const suffix = !range[1] && range[2] ? Math.min(Number(range[2]), st.size) : null;
+    const start = suffix !== null ? st.size - suffix : range[1] ? Number(range[1]) : 0;
+    const end = suffix !== null ? st.size - 1 : range[2] ? Math.min(Number(range[2]), st.size - 1) : st.size - 1;
     if (start >= st.size || start > end) return new NextResponse(null, { status: 416, headers: { "content-range": `bytes */${st.size}` } });
     const { stream } = await storage.read(key, { start, end });
     return new NextResponse(Readable.toWeb(stream) as ReadableStream, {
