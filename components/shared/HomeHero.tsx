@@ -52,6 +52,7 @@ export function HomeHero({ firstName }: { firstName: string }) {
           <div className="relative z-10 mt-8 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
             <Link
               href="/create"
+              data-guide="home-create"
               className="lime-glow group inline-flex h-14 items-center justify-center gap-2 rounded-full bg-lime px-7 text-base font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.97]"
             >
               Create something

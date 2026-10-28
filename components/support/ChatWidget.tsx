@@ -73,11 +73,15 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     const afterConsent = () => { t = setTimeout(() => { if (!inTour) setWaitTurn(false); }, 1500); };
     window.addEventListener("outly:tour", touring);
     window.addEventListener("outly:tour-closed", free);
+    window.addEventListener("outly:guide", touring);
+    window.addEventListener("outly:guide-closed", free);
     window.addEventListener("outly:consent", afterConsent);
     return () => {
       if (t) clearTimeout(t);
       window.removeEventListener("outly:tour", touring);
       window.removeEventListener("outly:tour-closed", free);
+      window.removeEventListener("outly:guide", touring);
+      window.removeEventListener("outly:guide-closed", free);
       window.removeEventListener("outly:consent", afterConsent);
     };
   }, []);

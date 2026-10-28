@@ -5,6 +5,7 @@ import { AvatarCursor } from "@/components/shell/AvatarCursor";
 import { ToastProvider } from "@/components/shared/Toast";
 import { MobileNav, MobileTopBar, Sidebar } from "@/components/shell/Nav";
 import { Tour } from "@/components/onboarding/Tour";
+import { PageGuide } from "@/components/onboarding/PageGuide";
 import { CommandPalette } from "@/components/shell/CommandPalette";
 import { touchActivity } from "@/lib/activity";
 import { liveNow } from "@/lib/social/registry";
@@ -59,6 +60,7 @@ export default async function StudioLayout({ children }: { children: React.React
       <PrivacyNotice />
       <UpgradeDialog />
       <Tour />
+      <PageGuide />
       <CommandPalette />
       <WhatsNew notice={notice} userId={user.actor?.id ?? user.id} joinedAt={new Date(user.joinedAt).toISOString()} />
       <AvatarCursor />

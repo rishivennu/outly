@@ -125,7 +125,7 @@ export function AccountsView({ initial, setup }: { initial: AccountView[]; setup
           const a = accounts.find((x) => x.platform === p);
           const ok = a?.status === "connected";
           return (
-            <motion.li key={p} id={p} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} {...tilt} className={cn("glass relative flex flex-col overflow-hidden rounded-[32px] p-6", ok && "neon-rim")} style={{ ["--halo" as string]: PLATFORM_HALO[p], ["--rim" as string]: RIM[p] }}>
+            <motion.li key={p} id={p} data-guide={i === 0 ? "acct-first" : undefined} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} {...tilt} className={cn("glass relative flex flex-col overflow-hidden rounded-[32px] p-6", ok && "neon-rim")} style={{ ["--halo" as string]: PLATFORM_HALO[p], ["--rim" as string]: RIM[p] }}>
               <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full opacity-20 blur-3xl" style={{ background: PLATFORM_HALO[p] }} aria-hidden="true" />
               <div className="relative -ml-2 -mt-2 h-[150px]">
                 <Collectible platform={p} size={112} state={ok ? "ready" : a ? "reconnect" : "sealed"} />

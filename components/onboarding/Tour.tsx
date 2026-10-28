@@ -1,25 +1,36 @@
 "use client";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, X } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useUser } from "@/components/shell/UserContext";
+import { Spotlight, type Stop } from "./Spotlight";
+import { resetGuides, tourState } from "./guides";
 
 /*
- * Guided tour: a spotlight that walks the real navigation, one stop at a time.
- * Targets are plain `data-tour` attributes, so the sidebar (desktop) and the bottom bar (mobile)
- * both work; the first visible match wins, and a missing target falls back to a centred card.
+ * Welcome tour: a spotlight that walks the real navigation, Home to Settings, one short line per page.
+ * Each page then explains itself the first time it's opened (PageGuide.tsx).
+ * Targets are `data-tour` names, so the sidebar (desktop) and the bottom bar (mobile) both work;
+ * a page that lives under More on a phone points at More.
  */
 
-type Stop = { target?: string; title: string; body: string };
-
-const STOPS: Stop[] = [
-  // Four stops, about twenty seconds (was nine). The rest of the studio explains itself where you find it.
-  { target: "new-post", title: "Start with one video", body: "Drop a video here. Outlly drafts a caption and a post for each platform, and you edit anything before it goes out. Arrow keys move, Esc leaves." },
-  { target: "calendar", title: "Plan the week", body: "See what's going out when, and drag a post to another day." },
-  { target: "analytics", title: "Live numbers, per platform", body: "Each connected account gets its own dashboard: views, reach and your best posts." },
-  { target: "accounts", title: "Connect your accounts", body: "You sign in on Instagram's and Google's own pages, so Outlly never sees your password. Replay this tour any time from Settings." },
+/** owner: only the studio owner has this page (teammates don't see Accounts or Billing). */
+// The whole studio, Home to Settings, one short line each: a first look, not a manual.
+const STOP_LIST: Stop[] = [
+  { title: "Welcome to Outlly", body: "A quick look around, from Home to Settings. Arrow keys move, Esc leaves any time." },
+  { target: "home", title: "Home", body: "Your day at a glance: what's going out, what needs you, and your weekly goal." },
+  { target: "new-post", title: "Create a post", body: "Drop one video. Outlly drafts a caption for each platform, and you approve every word before it goes out." },
+  { target: "content", title: "Content", body: "Every video and post you've made: drafts, scheduled, sent and failed, in one place." },
+  { target: "calendar", title: "Calendar", body: "See what goes out when. Drag a post to another day, or plan a batch of up to 10." },
+  { target: "analytics", title: "Analytics", body: "Live numbers for each connected account: views, reach and your best posts." },
+  { target: "inbox", title: "Inbox", body: "Comments and messages from your platforms in one list, with suggested replies." },
+  { target: "approvals", title: "Approvals", body: "Want a client or teammate to check a post first? Send them a review link. Nothing goes out until it's cleared." },
+  { target: "accounts", owner: true, title: "Connected accounts", body: "Connect Instagram, YouTube and the rest here. You sign in on their own pages, so Outlly never sees your password." },
+  { target: "billing", owner: true, title: "Billing", body: "Your plan, invoices and upgrades." },
+  { target: "support", title: "Help centre", body: "Guides and answers, or write to us. Our replies show up here too." },
+  { target: "settings", title: "Settings", body: "Your profile, two-step sign-in and team. Each page also shows a few tips the first time you open it." },
 ];
+
+const ALL_STOPS = (teammate: boolean) => (teammate ? STOP_LIST.filter((s) => !s.owner) : STOP_LIST);
 
 const EVENT = "outly:tour";
 export const tourKey = (userId: string) => `outly:tour-done:${userId}`;
@@ -27,177 +38,63 @@ export function startTour() {
   window.dispatchEvent(new Event(EVENT));
 }
 
-function findTarget(name?: string): HTMLElement | null {
-  if (!name) return null;
-  for (const el of Array.from(document.querySelectorAll<HTMLElement>(`[data-tour="${name}"]`))) {
-    const r = el.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden") return el;
-  }
-  return null;
-}
-
 export function Tour() {
   const user = useUser();
-  const [step, setStep] = useState<number | null>(null);
-  const [rect, setRect] = useState<DOMRect | null>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
-  const card = useRef<HTMLDivElement>(null);
-  const next = useRef<HTMLButtonElement>(null);
-  const opener = useRef<Element | null>(null);
+  const stops = ALL_STOPS(!!user.workspace);
+  const [run, setRun] = useState(0); // 0 = closed; a new number restarts from the first stop
 
-  const close = useCallback(
-    (done = true) => {
-      if (done) localStorage.setItem(tourKey(user.id), new Date().toISOString());
-      setStep(null);
-      window.dispatchEvent(new Event("outly:tour-closed"));
-      (opener.current as HTMLElement | null)?.focus?.();
-    },
-    [user.id],
-  );
+  const close = useCallback(() => {
+    localStorage.setItem(tourKey(user.id), new Date().toISOString());
+    setRun(0);
+    tourState.open = false;
+    window.dispatchEvent(new Event("outly:tour-closed"));
+  }, [user.id]);
 
   useEffect(() => {
     const open = () => {
-      opener.current = document.activeElement;
-      setStep(0);
+      // Taking the tour (again) brings every page's tips back too.
+      resetGuides(user.id);
+      tourState.open = true;
+      tourState.ranOn = location.pathname;
+      setRun((n) => n + 1);
     };
-    const pause = () => setStep((s) => (s === null ? s : null));
+    const pause = () => {
+      tourState.open = false;
+      setRun(0);
+    };
     window.addEventListener(EVENT, open);
     window.addEventListener("outly:tour-pause", pause);
-    if (new URLSearchParams(location.search).get("tour") === "1") open();
+    // Through the event, so Pip, the update notice and page tips all hear the tour start too
+    // (next tick: their listeners mount after this one).
+    let deep = 0;
+    if (new URLSearchParams(location.search).get("tour") === "1") deep = window.setTimeout(startTour, 0);
     return () => {
+      window.clearTimeout(deep);
       window.removeEventListener(EVENT, open);
       window.removeEventListener("outly:tour-pause", pause);
     };
-  }, []);
+  }, [user.id]);
 
-  // Follow the target through scrolls and resizes, one measurement per frame at most.
-  useLayoutEffect(() => {
-    if (step === null) return;
-    let raf = 0;
-    const measure = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const el = findTarget(STOPS[step].target);
-        setRect(el ? el.getBoundingClientRect() : null);
-        setSize({ w: window.innerWidth, h: window.innerHeight });
-      });
-    };
-    findTarget(STOPS[step].target)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    measure();
-    window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, true);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure, true);
-    };
-  }, [step]);
-
-  useEffect(() => {
-    if (step !== null) next.current?.focus({ preventScroll: true });
-  }, [step]);
-
-  if (step === null || typeof document === "undefined") return null;
-  const stop = STOPS[step];
-  const last = step === STOPS.length - 1;
-  const go = (d: number) => setStep((s) => (s === null ? s : Math.min(STOPS.length - 1, Math.max(0, s + d))));
-
-  const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") return close();
-    if (e.key === "ArrowRight") return last ? close() : go(1);
-    if (e.key === "ArrowLeft") return go(-1);
-    if (e.key === "Tab" && card.current) {
-      // keep focus inside the card while the tour is open
-      const f = Array.from(card.current.querySelectorAll<HTMLElement>("button, a[href]"));
-      if (!f.length) return;
-      const [first, end] = [f[0], f[f.length - 1]];
-      if (e.shiftKey && document.activeElement === first) (e.preventDefault(), end.focus());
-      else if (!e.shiftKey && document.activeElement === end) (e.preventDefault(), first.focus());
-    }
-  };
-
-  const PAD = 6;
-  const W = Math.min(340, size.w - 24);
-  let pos: React.CSSProperties = { left: "50%", top: "50%", transform: "translate(-50%, -50%)" };
-  if (rect) {
-    const right = rect.right + 16 + W < size.w;
-    if (right) pos = { left: rect.right + 16, top: Math.max(12, Math.min(rect.top - 8, size.h - 260)) };
-    else {
-      const above = rect.top > size.h / 2;
-      const left = Math.max(12, Math.min(rect.left + rect.width / 2 - W / 2, size.w - W - 12));
-      pos = above ? { left, bottom: size.h - rect.top + 14 } : { left, top: rect.bottom + 14 };
-    }
-  }
-
-  return createPortal(
-    <div className="tour-root fixed inset-0 z-[95]" onKeyDown={onKey}>
-      {rect ? (
-        <div
-          className="tour-spot pointer-events-none fixed rounded-2xl"
-          style={{ left: rect.left - PAD, top: rect.top - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2 }}
-          aria-hidden="true"
-        />
-      ) : (
-        <div className="tour-dim fixed inset-0" aria-hidden="true" />
+  if (!run) return null;
+  return (
+    <Spotlight
+      key={run}
+      label="Guided tour"
+      stops={stops}
+      moreFallback
+      onClose={close}
+      finish={(done, ref) => (
+        <>
+          {!user.workspace && (
+            <Link href="/accounts" onClick={done} className="inline-flex min-h-[44px] items-center rounded-full px-4 text-sm font-medium hover:bg-secondary">
+              Connect
+            </Link>
+          )}
+          <Link href="/create" ref={ref} onClick={done} className="lime-bg inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-5 text-sm font-semibold">
+            New post <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </>
       )}
-      <div
-        ref={card}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="tour-title"
-        aria-describedby="tour-body"
-        key={step}
-        className="tour-card glass-strong fixed rounded-[24px] p-5 shadow-2xl hairline"
-        style={{ width: W, ...pos }}
-      >
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-foreground/80 tabular">
-            {step + 1} of {STOPS.length}
-          </span>
-          <span className="flex flex-1 gap-1" aria-hidden="true">
-            {STOPS.map((_, i) => (
-              <span key={i} className={`h-1 flex-1 rounded-full transition-colors duration-300 ${i <= step ? "bg-lime" : "bg-foreground/10"}`} />
-            ))}
-          </span>
-          <button type="button" onClick={() => close()} aria-label="Close the tour" className="-mr-2 grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <h2 id="tour-title" className="mt-1 text-lg font-semibold tracking-tight">
-          {stop.title}
-        </h2>
-        <p id="tour-body" className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-          {stop.body}
-        </p>
-        <div className="mt-5 flex items-center gap-2">
-          {step > 0 && (
-            <button type="button" onClick={() => go(-1)} className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back
-            </button>
-          )}
-          {step === 0 && (
-            <button type="button" onClick={() => close()} className="inline-flex min-h-[44px] items-center rounded-full px-3 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground">
-              Skip
-            </button>
-          )}
-          <span className="flex-1" />
-          {last ? (
-            <>
-              <Link href="/accounts" onClick={() => close()} className="inline-flex min-h-[44px] items-center rounded-full px-4 text-sm font-medium hover:bg-secondary">
-                Connect
-              </Link>
-              <Link href="/create" ref={next as unknown as React.Ref<HTMLAnchorElement>} onClick={() => close()} className="lime-bg inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-5 text-sm font-semibold">
-                New post <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-            </>
-          ) : (
-            <button ref={next} type="button" onClick={() => go(1)} className="lime-bg inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-5 text-sm font-semibold">
-              {step === 0 ? "Show me" : "Next"} <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>,
-    document.body,
+    />
   );
 }

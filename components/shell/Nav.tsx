@@ -22,7 +22,7 @@ const MAIN = [
   { href: "/approvals", label: "Approvals", icon: ClipboardCheck },
 ];
 
-const TOUR: Record<string, string> = { "/create": "new-post", "/content": "content", "/calendar": "calendar", "/analytics": "analytics", "/inbox": "inbox", "/approvals": "approvals", "/accounts": "accounts" };
+const TOUR: Record<string, string> = { "/home": "home", "/billing": "billing", "/support": "support", "/settings": "settings", "/create": "new-post", "/content": "content", "/calendar": "calendar", "/analytics": "analytics", "/inbox": "inbox", "/approvals": "approvals", "/accounts": "accounts" };
 
 function isActive(path: string, href: string) {
   return href === "/home" ? path === "/home" : path.startsWith(href);
@@ -185,7 +185,7 @@ export function MobileNav() {
             </Link>
           );
         })}
-        <button ref={btn} type="button" aria-expanded={more} aria-controls="more-panel" onClick={() => setMore((m) => !m)} className={cn(tab, more || moreActive ? "text-foreground" : "text-muted-foreground")}>
+        <button ref={btn} type="button" data-tour="more" aria-expanded={more} aria-controls="more-panel" onClick={() => setMore((m) => !m)} className={cn(tab, more || moreActive ? "text-foreground" : "text-muted-foreground")}>
           <span className={cn("grid h-8 w-11 place-items-center rounded-full transition-colors duration-200", (more || moreActive) && "bg-secondary text-lime-ink")}>
             <MoreHorizontal className="h-[19px] w-[19px]" strokeWidth={more || moreActive ? 2.2 : 1.9} aria-hidden="true" />
           </span>

@@ -109,6 +109,7 @@ export function WhatsNew({ notice, userId, joinedAt }: { notice: UpdateNotice; u
     let other = false;
     const onTour = () => (other = true);
     window.addEventListener("outly:tour", onTour);
+    window.addEventListener("outly:guide", onTour); // a page's first-visit tips own the moment too
     let tries = 0;
     const t = window.setInterval(() => {
       // Give up after about a minute and a half; it will try again next visit.
@@ -129,6 +130,7 @@ export function WhatsNew({ notice, userId, joinedAt }: { notice: UpdateNotice; u
     return () => {
       window.clearInterval(t);
       window.removeEventListener("outly:tour", onTour);
+      window.removeEventListener("outly:guide", onTour);
     };
     // Keyed on the notice fields, not the object: the layout hands a fresh object on every navigation.
   }, [notice.id, notice.on, notice.publishedAt, userId, joinedAt, owner]);

@@ -8,6 +8,7 @@ import { api } from "@/lib/client/api";
 import { LETTERS_KEY, isPaletteKey, letterShortcut, rank, type Command } from "@/lib/client/commands";
 import { THEME_KEY } from "@/lib/theme/script";
 import { startTour } from "@/components/onboarding/Tour";
+import { showPageTips } from "@/components/onboarding/PageGuide";
 import { useToast } from "@/components/shared/Toast";
 import { cn } from "@/lib/utils";
 import { fmt, useUser } from "./UserContext";
@@ -110,6 +111,7 @@ export function CommandPalette() {
       { id: "dark", group: "Do", label: "Switch to dark theme", keywords: "appearance mode night", run: () => applyTheme("dark") },
       { id: "system", group: "Do", label: "Match my device theme", keywords: "appearance system auto", run: () => applyTheme("system") },
       { id: "tour", group: "Do", label: "Take the tour", keywords: "help intro guide", run: () => { router.push("/home"); setTimeout(startTour, 400); } },
+      { id: "tips", group: "Do", label: "Show tips for this page", keywords: "help guide how explain", run: () => setTimeout(showPageTips, 200) },
       {
         id: "letters", group: "Do", label: letters ? "Turn off single-key shortcuts" : "Turn on single-key shortcuts", keywords: "keyboard n s hotkeys",
         run: () => {

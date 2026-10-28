@@ -81,7 +81,7 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
             </div>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2" data-guide="cal-weeks">
           <Button variant="ghost" size="icon" onClick={() => go(-1)} aria-label="Previous week">
             <ChevronLeft className="h-5 w-5" />
           </Button>
@@ -103,7 +103,7 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
       </header>
 
       <AnimatePresence mode="wait" initial={false}>
-        <motion.ol key={start} initial={{ opacity: 0, x: dir * 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: dir * -40 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }} className="mt-10 grid gap-3 md:grid-cols-7">
+        <motion.ol key={start} initial={{ opacity: 0, x: dir * 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: dir * -40 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }} className="mt-10 grid gap-3 md:grid-cols-7" data-guide="cal-grid">
           {days.map((d) => {
             const items = byDay.get(d) ?? [];
             const isToday = d === today;

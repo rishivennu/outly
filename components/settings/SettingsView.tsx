@@ -191,7 +191,7 @@ export function SettingsView({ weeklyReport = true }: { weeklyReport?: boolean }
           <section className="glass flex flex-wrap items-center justify-between gap-4 rounded-[32px] p-6" aria-labelledby="tour-h">
             <div>
               <h2 id="tour-h" className="text-lg font-semibold">Guided tour</h2>
-              <p className="text-sm text-muted-foreground">A one-minute walk through posting, analytics, the inbox and connecting accounts.</p>
+              <p className="text-sm text-muted-foreground">A one-minute walk from Home to Settings. Replaying it also brings back the tips each page shows the first time.</p>
             </div>
             <Button variant="outline" onClick={() => startTour()}>
               <Compass className="h-4 w-4" aria-hidden="true" /> Replay the tour

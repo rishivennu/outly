@@ -72,7 +72,7 @@ export function UploadZone({ onFile, compact, accepted }: Props) {
   }, [take]);
 
   return (
-    <div className={cn("relative mx-auto w-full", compact ? "max-w-[560px]" : "max-w-[760px]")}>
+    <div data-guide="create-upload" className={cn("relative mx-auto w-full", compact ? "max-w-[560px]" : "max-w-[760px]")}>
       {/* Energy glow behind the blob */}
       <motion.div
         aria-hidden="true"
