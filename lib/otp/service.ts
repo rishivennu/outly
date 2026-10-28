@@ -6,6 +6,7 @@ import { rateLimit } from "../rate-limit";
 import { getConfig } from "../settings";
 import { checkOtp, codeDigest, isCodeShape, newCode, normalizeCode, OTP_MAX_ATTEMPTS, OTP_MESSAGE, OTP_PER_HOUR, OTP_RESEND_MS, OTP_TTL_MS, type OtpPurpose } from "./core";
 import { emailChannel, type OtpChannel } from "./channel";
+import { markEmailVerified } from "../founding";
 
 const norm = (email: string) => email.trim().toLowerCase();
 
@@ -65,6 +66,8 @@ export async function verifyCode(emailIn: string, codeIn: string, purpose: OtpPu
   if (claimed.count !== 1) throw new HttpError(401, OTP_MESSAGE.used, "OTP_USED");
   const user = await db.user.findUnique({ where: { email }, select: { id: true } });
   if (!user) throw new HttpError(401, OTP_MESSAGE.wrong, "OTP_WRONG");
+  // The code reached this inbox, so the address is proven (and may claim a founding seat).
+  await markEmailVerified(user.id);
   // Housekeeping: old rows for this address are no use to anyone.
   await db.otpCode.deleteMany({ where: { email, createdAt: { lt: new Date(Date.now() - 24 * 60 * 60_000) } } }).catch(() => {});
   return user;

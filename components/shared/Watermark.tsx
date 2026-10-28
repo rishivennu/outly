@@ -1,7 +1,6 @@
 /**
- * Invisible watermark (10-15). A full-screen layer of repeated "OUTLLY (c) year [tag]" text at about
- * 1% opacity: nobody notices it, but a screenshot run through a levels or curves adjustment shows
- * it, so a copied page can be traced back to Outlly (and, inside the studio, to the account that
+ * Watermark (10-15). A full-screen layer of repeated "OUTLLY (c) year [tag]" text at 5% opacity
+ * (raised from ~1% on 10-22): faint on screen and clearly visible on any screenshot, so a copied page can be traced back to Outlly (and, inside the studio, to the account that
  * took it, via a short one-way hash of the user id). Purely visual: aria-hidden, no text nodes,
  * no pointer events, no JS.
  */

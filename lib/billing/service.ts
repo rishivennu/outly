@@ -8,6 +8,7 @@ import { adminEvent } from "../admin/route";
 import { formatMoney, type Currency } from "./money";
 import { chargeCurrency, isCurrency, parsePrices } from "./currency";
 import { hasYearly, priceFor, type Cycle } from "./cycle";
+import { FOUNDING_DEFAULT, foundingPrice } from "../founding-config";
 import { normalizeDisplay } from "./display";
 import { issueInvoice } from "./invoice";
 import { sendEmail, templates } from "../email";
@@ -67,7 +68,9 @@ export async function startCheckout(userId: string, planSlug: string, wanted?: C
 
   const { cfg, provider } = await activeGateway();
   if (provider === "mock" && !mockAllowed()) throw new HttpError(503, "Payments are being set up. Paid plans open shortly.", "GATEWAY");
-  const charge = priceFor({ ...plan, prices: parsePrices(plan.prices) }, chargeCurrency(provider, wanted ?? (isCurrency(plan.currency) ? plan.currency : "INR"), plan.currency), want, display.freeMonths);
+  const listed = priceFor({ ...plan, prices: parsePrices(plan.prices) }, chargeCurrency(provider, wanted ?? (isCurrency(plan.currency) ? plan.currency : "INR"), plan.currency), want, display.freeMonths);
+  // Founding members (1036): the discount they claimed with, on every paid plan and cycle, for life.
+  const charge = user.foundingNo ? { ...listed, priceMinor: foundingPrice(listed.priceMinor, user.foundingPct ?? FOUNDING_DEFAULT.discountPct) } : listed;
   // Reuse a recent pending attempt for the same plan, so double-clicks don't create duplicate payments.
   const recent = await db.payment.findFirst({
     where: { userId, planId: plan.id, status: "pending", provider, interval: charge.interval, createdAt: { gt: new Date(Date.now() - 20 * 60_000) } },

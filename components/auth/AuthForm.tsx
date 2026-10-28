@@ -36,7 +36,7 @@ type Step = "password" | "code" | "reset" | "2fa";
  * code instead; then, for studios with an authenticator app, the app code (or a recovery code).
  * "Forgot password?" swaps in a fourth: an emailed reset code plus a new password, which signs you in.
  */
-export function AuthForm({ mode, google = false, title, subtitle }: { mode: "login" | "signup"; google?: boolean; title: string; subtitle: string }) {
+export function AuthForm({ mode, google = false, title, subtitle, banner }: { mode: "login" | "signup"; google?: boolean; title: string; subtitle: string; banner?: React.ReactNode }) {
   const router = useRouter();
   const params = useSearchParams();
   // Only a path on this site: "/%09/evil.com" used to slip past and land people on another site after sign-in.
@@ -221,6 +221,7 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
       <div className="gs-in mb-4 flex [@media(max-height:800px)]:hidden"><OutlyMark size={34} /></div>
       <h1 className="gs-in font-display text-[clamp(2rem,3.4vw,2.5rem)] font-bold leading-[1.05] tracking-[-0.035em]">{heading}</h1>
       <p className="gs-in mb-6 mt-2.5 max-w-[40ch] text-[15px] leading-relaxed text-muted-foreground">{sub}</p>
+      {step !== "2fa" && banner}
       <form onSubmit={submit} className="w-full space-y-4 [@media(max-height:800px)]:space-y-3" noValidate>
         {mode === "signup" && (
           <div className="gs-in">

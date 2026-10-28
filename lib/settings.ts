@@ -7,6 +7,7 @@ import { UPDATE_DEFAULT, type UpdateNotice } from "./updates";
 import { PRICING_DISPLAY_DEFAULT, type PricingDisplay } from "./billing/display";
 import { YOUPI_DEFAULT, type YoupiConfig } from "./billing/youpi";
 import { BETA_DEFAULT, type BetaConfig } from "./beta-config";
+import { FOUNDING_DEFAULT, type FoundingConfig } from "./founding-config";
 
 /**
  * Integration config lives in the DB so the admin can switch providers without a deploy.
@@ -79,6 +80,7 @@ export const DEFAULTS = {
   mascot: MASCOT_DEFAULT as MascotConfig,
   updates: UPDATE_DEFAULT as UpdateNotice,
   beta: BETA_DEFAULT as BetaConfig,
+  founding: FOUNDING_DEFAULT as FoundingConfig,
   platforms: Object.fromEntries(["instagram", "youtube", "x", "tiktok", "facebook", "threads", "linkedin"].map((p) => [p, { clientId: "", clientSecret: "" }])) as PlatformKeys,
 };
 type Key = keyof typeof DEFAULTS;

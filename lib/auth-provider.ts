@@ -7,10 +7,15 @@ import { assertMayCreateAccount } from "./site";
 import { sbAuth, SupabaseError, supabaseConfigured } from "./supabase/server";
 import { cookies } from "next/headers";
 import { issueBetaCodeOnSignup } from "./beta";
+import { markEmailVerified, onSignupFounding } from "./founding";
 
-/** Every new account: the first members get a beta code (never blocks the signup). */
-async function joined<T extends { id: string }>(u: T): Promise<T> {
+/**
+ * Every new account: the first members get a beta code, and a founding seat once the inbox is proven
+ * (`verified` = Google already checked it). Neither ever blocks the signup.
+ */
+async function joined<T extends { id: string }>(u: T, verified = false): Promise<T> {
   await issueBetaCodeOnSignup(u.id);
+  await onSignupFounding(u.id, verified);
   return u;
 }
 
@@ -135,9 +140,13 @@ export async function setPassword(userId: string, password: string) {
 export async function signInWithGoogle(who: { email: string; name?: string; picture?: string }) {
   const email = who.email.toLowerCase();
   const existing = await db.user.findUnique({ where: { email } });
-  if (existing) return { id: existing.id, created: false };
+  if (existing) {
+    // Google vouches for the address, so an existing password studio is now verified too (and may claim a seat).
+    if (!existing.emailVerifiedAt || !existing.foundingNo) await markEmailVerified(existing.id);
+    return { id: existing.id, created: false };
+  }
   await assertMayCreateAccount(email);
   // The Google callback carries no body, so the browser leaves its time zone in a cookie before redirecting.
-  const u = await joined(await db.user.create({ data: { email, name: who.name?.trim() || email.split("@")[0], avatar: who.picture ?? null, ...tzData(cookieTimezone()) }, select: { id: true } }));
+  const u = await joined(await db.user.create({ data: { email, name: who.name?.trim() || email.split("@")[0], avatar: who.picture ?? null, emailVerifiedAt: new Date(), emailVerifiedFor: email, ...tzData(cookieTimezone()) }, select: { id: true } }), true);
   return { id: u.id, created: true };
 }

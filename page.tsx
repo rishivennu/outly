@@ -1,0 +1,18 @@
+import { hasCredentials, loadKeys } from "@/lib/social/registry";
+import { Suspense } from "react";
+import { AuthForm } from "@/components/auth/AuthForm";
+import { AuthFormSkeleton } from "@/components/auth/AuthFormSkeleton";
+import { foundingPublic } from "@/lib/founding";
+import { FoundingSeats } from "@/components/founding/FoundingSeats";
+
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Create your account" };
+
+export default async function SignupPage() {
+  const [, seats] = await Promise.all([loadKeys(), foundingPublic()]);
+  return (
+    <Suspense fallback={<AuthFormSkeleton fields={3} />}>
+      <AuthForm mode="signup" google={hasCredentials("youtube")} title="Create an account" subtitle="Upload once, post everywhere. Takes ten seconds." banner={seats ? <FoundingSeats initial={seats} /> : null} />
+    </Suspense>
+  );
+}

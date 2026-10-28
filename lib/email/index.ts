@@ -10,7 +10,7 @@ export interface Mail {
   to: string;
   subject: string;
   html: string;
-  kind: "invoice" | "ticket_opened" | "ticket_reply" | "test" | "subscription" | "maintenance" | "weekly_report" | "team_invite" | "referral" | "waitlist" | "notice" | "nudge" | "winback" | "growth" | "otp" | "security" | "beta";
+  kind: "invoice" | "ticket_opened" | "ticket_reply" | "test" | "subscription" | "maintenance" | "weekly_report" | "team_invite" | "referral" | "waitlist" | "notice" | "nudge" | "winback" | "growth" | "otp" | "security" | "beta" | "founding";
   attachments?: { filename: string; content: Buffer }[];
   /** Secrets (a sign-in code) masked in the Outbox copy once a real provider has delivered the email. */
   redact?: string[];
@@ -374,6 +374,29 @@ export const templates = {
         kicker: "Early member",
         preheader: `${o.months} months of ${esc(o.plan)} on us`,
         tiles: pair({ tone: "ink", html: stat(`${o.months} months`, `of ${esc(o.plan)}, free`, "ink", 38) }, { tone: "forest", html: stat("1 use", "this code, this account", "forest", 28) }),
+      },
+    ),
+  /** 1036: a seat was claimed. The stamp is the brand sticker, hosted on the site. */
+  foundingWelcome: (o: { name: string; no: number; pct: number; url: string; stamp: string }) =>
+    wrap(
+      `You're founding member #${o.no}`,
+      `<img src="${esc(o.stamp)}" width="120" height="119" alt="Outlly founding member stamp" style="display:block;width:120px;height:auto;margin:0 0 14px;border:0">${p(`Hi ${esc(o.name)}, thank you for backing Outlly this early. Your seat is number ${o.no}, and it's yours for good.`)}${p(`Every paid plan costs you ${o.pct}% less, for as long as you keep your account. It's already applied: the prices you see in Billing are your prices.`)}${btn(o.url, "See your founding prices")}${small("Your founding stamp shows on your Home and Billing pages.")}`,
+      {
+        kicker: "Founding member",
+        tone: "lime",
+        preheader: `Seat #${o.no} is yours, with ${o.pct}% off for life`,
+        tiles: pair({ tone: "ink", html: stat(`#${o.no}`, "your founding seat", "ink", 44) }, { tone: "forest", html: stat(`${o.pct}% off`, "every paid plan, for life", "forest", 34) }),
+      },
+    ),
+  /** 1036: one tap proves the inbox, then the seat is claimed (if one is still open). */
+  foundingVerify: (o: { name: string; url: string; left: number; pct: number; stamp: string }) =>
+    wrap(
+      "Claim your founding seat",
+      `<img src="${esc(o.stamp)}" width="96" height="95" alt="" style="display:block;width:96px;height:auto;margin:0 0 14px;border:0">${p(`Hi ${esc(o.name)}, a founding seat is waiting for you: ${o.pct}% off every paid plan, for life. We give seats only to confirmed Gmail inboxes, so one person gets one seat. Tap below to confirm this address is yours:`)}${btn(o.url, "Confirm and claim my seat")}${small(`The link works for 7 days. Seats go in the order they're claimed, and ${o.left} ${o.left === 1 ? "is" : "are"} left right now. Didn't sign up for Outlly? Ignore this and nothing happens.`)}`,
+      {
+        kicker: "Founding member",
+        preheader: `Confirm your Gmail to lock in ${o.pct}% off for life`,
+        tiles: pair({ tone: "ink", html: stat(`${o.left}`, `founding seat${o.left === 1 ? "" : "s"} left`, "ink", 44) }, { tone: "forest", html: stat(`${o.pct}% off`, "for life", "forest", 34) }),
       },
     ),
   referralReward: (o: { name: string; friend: string; plan: string; until: string; url: string }) =>
