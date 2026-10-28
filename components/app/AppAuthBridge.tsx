@@ -5,6 +5,7 @@ import { ArrowUpRight, CircleAlert, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isNative, nativeCall, nativeOn, openInBrowser } from "@/lib/client/native";
 import { BridgeScreen } from "./BridgeScreen";
+import { appAuthTarget } from "@/lib/safe-next";
 
 const VERIFIER_KEY = "outlly_app_verifier";
 const MAX_AGE_MS = 15 * 60_000;
@@ -45,7 +46,9 @@ const cameBack = () => (performance.getEntriesByType("navigation")[0] as Perform
  */
 export function AppAuthBridge() {
   const params = useSearchParams();
-  const to = params.get("to");
+  // Only Google sign-in or an account connect on this site. A raw ?to= used to go straight into
+  // location.replace(), so /app-auth?to=javascript:... ran someone else's script as the signed-in visitor.
+  const to = appAuthTarget(params.get("to"));
   const code = params.get("code");
   const [state, setState] = useState<State>(code ? "finishing" : "starting");
   const [error, setError] = useState<string | null>(null);

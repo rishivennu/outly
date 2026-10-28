@@ -3,6 +3,7 @@ import { db } from "./db";
 import { encrypt } from "./crypto";
 import type { Platform } from "./domain";
 import type { ConnectedProfile } from "./social/types";
+import { dmsOn } from "./social/keys";
 
 /** Store a freshly connected account. One account per platform per creator; reconnecting replaces it. */
 export async function saveConnectedAccount(userId: string, platform: Platform, prof: ConnectedProfile) {
@@ -32,6 +33,7 @@ export async function saveConnectedAccount(userId: string, platform: Platform, p
  */
 async function subscribeDms(platform: Platform, acct: { platformUserId: string; id: string; username: string; accessToken: string }) {
   if ((platform !== "instagram" && platform !== "facebook") || acct.platformUserId.startsWith("mock-")) return;
+  if (!dmsOn(platform)) return; // switched off by the admin (1031f): we never asked for the permission
   try {
     const { subscribeMessaging } = await import("./messages/meta");
     const { decrypt } = await import("./crypto");

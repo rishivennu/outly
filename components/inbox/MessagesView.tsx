@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 import type { MessageView, ThreadView } from "@/lib/messages/service";
 
 type Problem = { platform: "instagram" | "facebook"; code: string; message: string; detail?: string };
-export type DmData = { threads: ThreadView[]; accounts: number; problems?: Problem[]; readOnly?: boolean };
+/** dmsOff (1031f): platforms where the admin switched direct messages off, e.g. while Meta reviews the permission. */
+export type DmData = { threads: ThreadView[]; accounts: number; problems?: Problem[]; readOnly?: boolean; dmsOff?: ("instagram" | "facebook")[] };
 type Filter = "all" | "instagram" | "facebook";
 
 const MAX = 1000;
@@ -122,6 +123,16 @@ export function MessagesView({ initial }: { initial: DmData }) {
         <p role="alert" className="mt-4 text-sm text-destructive">
           {error}
         </p>
+      )}
+      {!!data.dmsOff?.length && (
+        <div role="status" className="mt-4 rounded-2xl bg-secondary/60 p-4 text-sm hairline">
+          <p className="font-medium text-foreground">
+            {data.dmsOff.length === 2 ? "Instagram and Facebook" : PLATFORM_META[data.dmsOff[0]].name} direct messages are switched off for now.
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            Outlly will bring them in once Meta approves messaging. Comments, publishing and everything else work as usual.
+          </p>
+        </div>
       )}
       {(data.problems ?? []).map((p) => (
         <div key={`${p.platform}-${p.code}`} role="status" className="mt-4 rounded-2xl bg-destructive/10 p-4 text-sm">

@@ -1,13 +1,17 @@
 import { commonMediaChecks, httpFailure, PublisherError, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { newState } from "./oauth";
-import { creds } from "./keys";
+import { creds, dmsOn } from "./keys";
 
 // Facebook Page Reels: video_reels start -> rupload with a hosted file_url -> video_reels finish (PUBLISHED) -> poll status.
 // We connect the creator's first Page; its token is derived from a long-lived user token, so it doesn't expire.
 const V = "v21.0";
 const GRAPH = `https://graph.facebook.com/${V}`;
+const FB_BASE_SCOPES = "pages_show_list,pages_read_engagement,pages_manage_posts,publish_video,read_insights";
 /** pages_messaging + pages_manage_metadata (1031): read and answer the Page's Messenger conversations, and subscribe the Page to our webhook. */
-export const FACEBOOK_SCOPES = "pages_show_list,pages_read_engagement,pages_manage_posts,publish_video,read_insights,pages_messaging,pages_manage_metadata";
+export const FB_DM_SCOPES = "pages_messaging,pages_manage_metadata";
+export const FACEBOOK_SCOPES = `${FB_BASE_SCOPES},${FB_DM_SCOPES}`;
+/** Left without the messaging pair when the admin switches DMs off (1031f). */
+export const facebookScopes = (dms: boolean) => (dms ? FACEBOOK_SCOPES : FB_BASE_SCOPES);
 
 export class FacebookPublisher implements SocialPublisher {
   readonly platform = "facebook" as const;
@@ -15,7 +19,7 @@ export class FacebookPublisher implements SocialPublisher {
   async connect(redirectUri: string) {
     const state = newState();
     const u = new URL(`https://www.facebook.com/${V}/dialog/oauth`);
-    u.search = new URLSearchParams({ client_id: creds("facebook").clientId, redirect_uri: redirectUri, state, response_type: "code", scope: FACEBOOK_SCOPES }).toString();
+    u.search = new URLSearchParams({ client_id: creds("facebook").clientId, redirect_uri: redirectUri, state, response_type: "code", scope: facebookScopes(dmsOn("facebook")) }).toString();
     return { url: u.toString(), state };
   }
 

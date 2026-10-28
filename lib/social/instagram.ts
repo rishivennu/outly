@@ -1,10 +1,16 @@
-import { creds } from "./keys";
+import { creds, dmsOn } from "./keys";
 import { commonMediaChecks, httpFailure, PublisherError, type AccountContext, type CommentTarget, type PlatformComment, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { formPost, newState } from "./oauth";
 
 // Instagram API with Instagram Login (professional accounts). Reels are published as a container:
 //   POST /{ig-user-id}/media (media_type=REELS, video_url) → poll status_code → POST /{ig-user-id}/media_publish
 const GRAPH = "https://graph.instagram.com/v21.0";
+
+// instagram_business_manage_comments is what the inbox needs; without it comment reads return 403.
+const IG_BASE_SCOPES = "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments";
+/** Direct messages (1031). Left out when the admin switches DMs off (1031f). */
+export const IG_DM_SCOPE = "instagram_business_manage_messages";
+export const instagramScopes = (dms: boolean) => (dms ? `${IG_BASE_SCOPES},${IG_DM_SCOPE}` : IG_BASE_SCOPES);
 
 /**
  * The code-for-token answer. Meta documents it wrapped as {"data":[{access_token,user_id,permissions}]},
@@ -22,7 +28,7 @@ export function shortToken(raw: unknown): { access_token: string; user_id: strin
 export function missingScopes(granted: string | string[] | undefined): string[] {
   if (!granted) return [];
   const have = new Set((Array.isArray(granted) ? granted : granted.split(",")).map((x) => x.trim()));
-  return ["instagram_business_manage_messages"].filter((x) => !have.has(x));
+  return [IG_DM_SCOPE].filter((x) => !have.has(x));
 }
 
 export class InstagramPublisher implements SocialPublisher {
@@ -35,8 +41,7 @@ export class InstagramPublisher implements SocialPublisher {
       client_id: creds("instagram").clientId,
       redirect_uri: redirectUri,
       response_type: "code",
-      // instagram_manage_comments is what the inbox needs; without it comment reads return 403.
-      scope: "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_messages", // messages: 1031 DMs
+      scope: instagramScopes(dmsOn("instagram")),
       state,
     }).toString();
     return { url: u.toString(), state };
@@ -70,7 +75,8 @@ export class InstagramPublisher implements SocialPublisher {
       avatar: p.profile_picture_url,
       accessToken: l.access_token,
       expiresAt: new Date(Date.now() + l.expires_in * 1000),
-      declined: missingScopes(s.permissions),
+      // With DMs switched off we never asked for messages, so nothing was declined.
+      declined: dmsOn("instagram") ? missingScopes(s.permissions) : [],
     };
   }
 

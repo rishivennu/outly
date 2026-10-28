@@ -485,3 +485,38 @@ async function tokenRefresh({ accountId }: { accountId: string }) {
   // A permanent refusal marks the account needs_reconnect inside freshAccount; a transient one waits for the next window.
   await freshAccount(a, REFRESH_WINDOW_MS).catch((e) => console.warn("[TOKEN_REFRESH]", a.id, asPublisherError(e).code));
 }
+
+/** A direct upload (browser straight to the bucket) still "uploading" this long was abandoned. */
+export const STALE_DIRECT_UPLOAD_MS = 24 * 3600_000;
+/** Younger than this, a direct upload is left alone entirely (bytes may still be moving). */
+const DIRECT_UPLOAD_GRACE_MS = 15 * 60_000;
+
+/**
+ * Cleans up direct uploads that never called /api/media/direct/complete (1031g audit). On the Supabase
+ * driver the signed upload can't pin a byte size, so a client could reserve a small file, push a huge
+ * one and simply never call complete, leaving it in the bucket for good. Each sweep, an "uploading" row
+ * whose object is already bigger than what was reserved, or that is older than STALE_DIRECT_UPLOAD_MS (a day,
+ * so even a slow resumed upload is finished), becomes "failed" and only then loses its object. Bounded to 25 rows per call so the sweeper stays fast.
+ */
+export async function sweepDirectUploads(now = Date.now()) {
+  const rows = await db.media.findMany({
+    where: { status: "uploading", createdAt: { lte: new Date(now - DIRECT_UPLOAD_GRACE_MS) } },
+    select: { id: true, storageKey: true, size: true, createdAt: true },
+    orderBy: { createdAt: "asc" },
+    take: 25,
+  });
+  let removed = 0;
+  for (const m of rows) {
+    const stale = m.createdAt.getTime() <= now - STALE_DIRECT_UPLOAD_MS;
+    if (!stale) {
+      const st = await storage.stat(m.storageKey).catch(() => null);
+      if (!st || st.size <= m.size) continue;
+    }
+    // Claim the row first: if /complete already moved it on, the bytes are in use and must stay.
+    const r = await db.media.updateMany({ where: { id: m.id, status: "uploading" }, data: { status: "failed" } });
+    if (r.count !== 1) continue;
+    await storage.remove(m.storageKey).catch(() => {});
+    removed++;
+  }
+  return removed;
+}

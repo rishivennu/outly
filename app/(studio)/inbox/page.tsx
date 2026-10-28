@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/auth";
 import { inbox } from "@/lib/inbox";
-import { listThreads } from "@/lib/messages/service";
+import { dmsOffList, listThreads } from "@/lib/messages/service";
 import { liveNow } from "@/lib/social/registry";
 import { InboxView } from "@/components/inbox/InboxView";
 
@@ -20,5 +20,5 @@ export default async function InboxPage({ searchParams }: { searchParams?: { tab
   ]);
   // Messages (1031) only make sense where Meta delivers them: Instagram or Facebook live, or already connected.
   const showDms = dms.accounts > 0 || dms.threads.length > 0 || live.includes("instagram") || live.includes("facebook");
-  return <InboxView initial={initial} dms={showDms ? { ...dms, readOnly: user.role === "editor" } : undefined} initialTab={searchParams?.tab === "messages" ? "messages" : "comments"} />;
+  return <InboxView initial={initial} dms={showDms ? { ...dms, dmsOff: dmsOffList(), readOnly: user.role === "editor" } : undefined} initialTab={searchParams?.tab === "messages" ? "messages" : "comments"} />;
 }

@@ -1,7 +1,10 @@
+import { sameSitePath } from "@/lib/safe-next";
+
 /** Continue with Google: a plain link, so it works before any JavaScript has loaded. */
 export function GoogleButton({ from, next, label = "Continue with Google" }: { from: "login" | "signup"; next?: string | null; label?: string }) {
   const q = new URLSearchParams({ from });
-  if (next && /^\/(?![/\\])/.test(next)) q.set("next", next); // not "//" or "/\\" (both leave the site)
+  const safe = sameSitePath(next); // not "//", "/\\" or a hidden tab/newline (all leave the site)
+  if (safe) q.set("next", safe);
   return (
     <a
       href={`/api/auth/google?${q}`}

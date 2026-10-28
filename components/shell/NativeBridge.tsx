@@ -2,12 +2,13 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { isNative, nativeCall, nativeOn, shellInfo } from "@/lib/client/native";
+import { sameSitePath } from "@/lib/safe-next";
 
 const ASKED_KEY = "outlly_push_asked";
 type Perm = { receive: "granted" | "denied" | "prompt" | "prompt-with-rationale" };
 type Tap = { notification?: { data?: { href?: string } } };
 
-const safeHref = (h: unknown) => (typeof h === "string" && /^\/(?![/\\])/.test(h) ? h : null);
+const safeHref = sameSitePath;
 
 /** Status bar icons that follow the light/dark theme, and push notifications. Only does anything inside the Android app. */
 export function NativeBridge() {

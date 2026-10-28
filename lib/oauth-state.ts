@@ -2,6 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { decrypt, encrypt, safeEqual } from "./crypto";
 import { env } from "./env";
+import { sameSitePath } from "./safe-next";
 import type { Platform } from "./domain";
 
 interface Pending {
@@ -38,5 +39,5 @@ export function takeOAuthState(p: Platform, state: string | null): Pending | nul
 
 export function safeReturnTo(v: string | null) {
   // "/\\evil.com" also counts as protocol-relative: new URL() turns the backslash into a slash.
-  return v && /^\/(?![/\\])/.test(v) && !/[\u0000-\u001f]/.test(v) ? v : "/accounts";
+  return sameSitePath(v) ?? "/accounts";
 }

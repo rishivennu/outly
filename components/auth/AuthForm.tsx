@@ -10,6 +10,7 @@ import { GoogleButton } from "./GoogleButton";
 import { GoogleHelp } from "@/components/onboarding/GoogleHelp";
 import { OutlyMark } from "@/components/brand/Logo";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
+import { sameSitePath } from "@/lib/safe-next";
 
 const GOOGLE_ERRORS: Record<string, string> = {
   access_denied: "Google didn't let you in. While Outlly is in testing, only approved testers can use Google sign-in. See the help below.",
@@ -38,7 +39,8 @@ type Step = "password" | "code" | "reset" | "2fa";
 export function AuthForm({ mode, google = false, title, subtitle }: { mode: "login" | "signup"; google?: boolean; title: string; subtitle: string }) {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next");
+  // Only a path on this site: "/%09/evil.com" used to slip past and land people on another site after sign-in.
+  const next = sameSitePath(params.get("next"));
   const [busy, setBusy] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [caps, setCaps] = useState(false);
@@ -96,7 +98,7 @@ export function AuthForm({ mode, google = false, title, subtitle }: { mode: "log
   }, [tries, shake]);
 
   const go = () => {
-    router.replace(next && /^\/(?![/\\])/.test(next) ? next : "/home");
+    router.replace(next ?? "/home");
     router.refresh();
   };
   const fail = (e: unknown) => {

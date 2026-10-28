@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { safeEqual } from "@/lib/crypto";
-import { requeueStuckTargets, sweepDuePosts } from "@/lib/queue/handlers";
+import { requeueStuckTargets, sweepDirectUploads, sweepDuePosts } from "@/lib/queue/handlers";
 import { settle } from "@/lib/queue";
 
 export const dynamic = "force-dynamic";
@@ -21,11 +21,13 @@ async function sweep(req: NextRequest) {
   // No maintenance skip: members keep posting while maintenance is on, so their schedule must still run.
   await sweepDuePosts();
   const requeued = await requeueStuckTargets();
+  // Abandoned or oversized browser-to-bucket uploads (1031g). Never let cleanup break the post sweep.
+  const cleaned = await sweepDirectUploads().catch(() => 0);
   // Without Redis the jobs above are timers in this invocation: let them run before the response ends it
   // (1027). Budget = what is left of maxDuration minus 10 s of headroom; whatever is still running then is
   // held by waitUntil or picked up by the next sweep.
   const running = await settle(Math.max(0, 50_000 - (Date.now() - startedAt)));
-  return NextResponse.json({ ok: true, requeued, running }, { headers: { "cache-control": "no-store" } });
+  return NextResponse.json({ ok: true, requeued, cleaned, running }, { headers: { "cache-control": "no-store" } });
 }
 
 export const GET = sweep;

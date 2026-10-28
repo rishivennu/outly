@@ -35,6 +35,15 @@ export function creds(p: KeyedPlatform): { clientId: string; clientSecret: strin
   return { clientId: a?.clientId || e?.clientId || "", clientSecret: a?.clientSecret || e?.clientSecret || "" };
 }
 
+/**
+ * Direct messages (1031f). On unless the admin switched them off in Admin > Social platforms, which is how
+ * an app goes live with publishing and comments while Meta is still reviewing the messaging permissions:
+ * asking for a permission the app isn't approved for blocks the whole login for the public.
+ */
+export function dmsOn(p: "instagram" | "facebook"): boolean {
+  return g.__pkeys?.[p]?.dms !== false;
+}
+
 /** Test hook: replace the snapshot without a database. */
 export function __setKeys(k: Partial<PlatformKeys> | undefined) {
   g.__pkeys = k;

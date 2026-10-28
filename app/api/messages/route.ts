@@ -1,6 +1,6 @@
 import { json, route } from "@/lib/http";
 import { isDmPlatform } from "@/lib/messages/meta";
-import { listThreads, syncAll } from "@/lib/messages/service";
+import { dmsOffList, listThreads, syncAll } from "@/lib/messages/service";
 import { limitShared } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export const GET = route(
     const wantSync = req.nextUrl.searchParams.get("sync") === "1";
     const maySync = wantSync && (await limitShared(`dm-sync:${user.id}`, 6, 60_000)).ok;
     const problems = maySync ? await syncAll(user.id, platform) : [];
-    return json({ ...(await listThreads(user.id, platform)), problems, ...(wantSync && !maySync ? { syncSkipped: true } : {}) });
+    return json({ ...(await listThreads(user.id, platform)), dmsOff: dmsOffList(), problems, ...(wantSync && !maySync ? { syncSkipped: true } : {}) });
   },
   { limit: [60, 60_000] },
 );

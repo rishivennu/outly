@@ -6,6 +6,7 @@ import { HttpError } from "../http";
 import { PLATFORM_META } from "../domain";
 import { liveAccount } from "../live/account";
 import { isPracticeAccount } from "../social/registry";
+import { dmsOn } from "../social/keys";
 import { asPublisherError, type AccountContext } from "../social/types";
 import { DM_MAX_CHARS, fetchProfile, isDmPlatform, listConversations, REPLY_WINDOW_MS, sendText, WindowClosedError, type DmPlatform, type RemoteThread } from "./meta";
 import type { DmEvent } from "./webhook";
@@ -279,6 +280,11 @@ export async function listThreads(userId: string, platform?: DmPlatform) {
   return { threads: rows.map((t) => view(t)), accounts: connected };
 }
 
+/** Platforms whose DMs the admin switched off (1031f). Needs the keys snapshot loaded (route() and liveNow() do). */
+export function dmsOffList(): DmPlatform[] {
+  return (["instagram", "facebook"] as const).filter((p) => !dmsOn(p));
+}
+
 export interface MessageView {
   id: string;
   direction: "in" | "out";
@@ -321,6 +327,8 @@ export async function replyToThread(userId: string, actorId: string, threadId: s
   if (!windowState(t).canReply) throw new HttpError(409, closedCopy(platform), "WINDOW_CLOSED");
 
   const practice = isPracticeAccount(t.account) || t.practice;
+  if (!practice && !dmsOn(platform))
+    throw new HttpError(409, `Direct messages for ${PLATFORM_META[platform].name} are switched off until Meta approves messaging.`, "DMS_OFF");
   let mid: string;
   if (practice) {
     mid = `mock-sent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -361,7 +369,8 @@ export async function syncAll(userId: string, platform?: DmPlatform) {
   const accts = await db.socialAccount.findMany({ where: { userId, status: "connected", platform: { in: platform ? [platform] : ["instagram", "facebook"] } } });
   const problems: { platform: DmPlatform; code: string; message: string; detail?: string }[] = [];
   for (const a of accts) {
-    if (!isDmPlatform(a.platform) || isPracticeAccount(a)) continue;
+    // DMs switched off (1031f): the token has no messaging permission, so asking Meta would only fail.
+    if (!isDmPlatform(a.platform) || isPracticeAccount(a) || !dmsOn(a.platform)) continue;
     try {
       await syncAccount(a);
     } catch (e) {
