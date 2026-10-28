@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Bricolage_Grotesque, DM_Sans, Instrument_Serif } from "next/font/google";
 import { MotionRoot } from "@/components/shared/MotionRoot";
 import { themeScript } from "@/lib/theme/script";
@@ -41,15 +42,17 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0c0c0e", viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // The Content Security Policy only runs scripts carrying this request's nonce (set by middleware.ts).
+  const nonce = headers().get("x-nonce") ?? undefined;
   return (
     <html lang="en" className={`dark ${display.variable} ${body.variable} ${serif.variable}`} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
         {/* Inside the Android app: mark <html> before first paint so the app layout (app/mobile-app.css) never flashes the web one. */}
-        <script dangerouslySetInnerHTML={{ __html: appScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: appScript }} />
         {/* Landing sections the admin hid (readable hint cookie set by middleware): mark <html> before the
             first paint so CSS drops their nav and footer links at once, instead of a link flashing in and out. */}
-        <script dangerouslySetInnerHTML={{ __html: `try{var m=document.cookie.match(/(?:^|; )outlly_lh=([^;]*)/);if(m)document.documentElement.setAttribute("data-lh",decodeURIComponent(m[1]).split(".").join(" "))}catch(e){}` }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `try{var m=document.cookie.match(/(?:^|; )outlly_lh=([^;]*)/);if(m)document.documentElement.setAttribute("data-lh",decodeURIComponent(m[1]).split(".").join(" "))}catch(e){}` }} />
         {/* Pip colourways picked in Admin > Mascot colours (tiny, cached; Pip falls back to Indigo without it) */}
         {/* eslint-disable-next-line @next/next/no-css-tags */}
         <link rel="stylesheet" href="/api/pip-theme" />

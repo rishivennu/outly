@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { listFaq, FAQ_CATEGORIES } from "@/lib/support/faq";
 import { getCurrentUser } from "@/lib/auth";
 import { HelpCenter } from "@/components/support/HelpCenter";
@@ -13,7 +14,7 @@ export default async function HelpPage({ searchParams }: { searchParams: { topic
   const jsonLd = { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: items.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) };
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" nonce={headers().get("x-nonce") ?? undefined} dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <HelpCenter items={items} categories={cats} initialTopic={cats.includes(searchParams.topic as never) ? searchParams.topic! : ""} initialQuery={searchParams.q ?? ""} me={user ? { name: user.name, email: user.email } : null} />
     </>
   );

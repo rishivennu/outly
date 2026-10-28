@@ -25,6 +25,13 @@ export function laneOf(p: Pick<PostView, "requireApproval" | "review" | "approve
   return null;
 }
 
+const EMPTY: Record<Lane, string> = {
+  needs: "Nothing waiting for a reviewer.",
+  waiting: "No review links out right now.",
+  changes: "No change requests. Nice.",
+  approved: "Nothing approved yet.",
+};
+
 const LANES: { k: Lane; title: string; blurb: string; icon: typeof Check; tone: string }[] = [
   { k: "needs", title: "Needs a reviewer", blurb: "Approval is on, but nobody has the link yet (or it expired).", icon: ShieldQuestion, tone: "text-muted-foreground" },
   { k: "waiting", title: "Waiting on review", blurb: "A teammate has the link. It works for 7 days.", icon: Clock, tone: "text-[hsl(var(--youtube))]" },
@@ -82,7 +89,7 @@ export function ApprovalsBoard({ initial }: { initial: PostView[] }) {
                 <p className="mt-1 text-xs leading-snug text-muted-foreground">{l.blurb}</p>
               </header>
               <ul className="flex flex-1 flex-col gap-2">
-                {lanes[l.k].length === 0 && <li className="rounded-2xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">Empty</li>}
+                {lanes[l.k].length === 0 && <li className="rounded-2xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">{EMPTY[l.k]}</li>}
                 {lanes[l.k].map((p, i) => (
                   <motion.li key={p.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
                     <button onClick={() => setOpen(p)} className="glass group flex w-full gap-3 rounded-2xl p-2.5 text-left transition-transform duration-200 hover:-translate-y-0.5">

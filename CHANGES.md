@@ -1,37 +1,55 @@
-# fix-1032b: smarter retries, sweeper health warning, liquid glass
+# fix-1033: enforce CSP + UX edge cases + UI polish
 
-Upload order: repo-sync-1027 (1031e), then fix-1031fg-dm-switch-security, then fix-1032a-partial-resend, then this one.
-This bundle's copies of lib/queue/handlers.ts, app/api/cron/sweep/route.ts and tests/publishing.test.ts already
-contain the 1031fg and 1032a changes, so they replace those files.
+Upload AFTER fix-1032b (live). app/layout.tsx here supersedes the 1032b copy.
 
-## Smarter retries
-- Retries: 5 instead of 3, waiting about 2 s, 10 s, 30 s, 2 min and 5 min (was 1.5 / 3 / 6 s, so a one-minute
-  platform hiccup used up every retry and failed the post). Each wait has +-15% jitter so many posts throttled
-  together don't all come back in the same second.
-- The platform's own wait is honoured as the minimum: Retry-After (seconds or date), X's x-rate-limit-reset,
-  and Meta's estimated_time_to_regain_access in its usage headers.
-- If a platform asks for more than 20 minutes (a spent daily quota) the post fails right away and says so,
-  instead of hanging.
-- Meta throttles arrive as HTTP 400/403 with codes 4, 17, 32, 613, 80001-80014. They used to be read as
-  "Media rejected" (no retry), and a 403 one could wrongly flag the account for reconnection. Now RATE_LIMITED
-  and retried. Meta's is_transient:true is now PLATFORM_DOWN and retried. X's code 32 is unaffected.
-- On Vercel (no Redis) a wait longer than 40 s can't be a timer, so the target is parked as "queued" and the
-  minute sweep sends it again when the wait is over. Stop and late successes still win.
-- Status checks back off (3 s growing to 30 s, at least the platform's Retry-After) instead of a flat 3 s.
+## CSP is now ENFORCED (was Report-Only)
+- lib/csp.ts (new): per-request nonce; script-src 'self' 'nonce-X' 'strict-dynamic' (plus https: and 'unsafe-inline' as fallbacks that modern browsers ignore once a nonce is set); object-src 'none'; base-uri 'self'; frame-ancestors 'none'; upgrade-insecure-requests in production.
+- middleware.ts: makes the nonce, passes it to the page as x-nonce, sets Content-Security-Policy + Reporting-Endpoints on every response.
+- app/layout.tsx: the 3 inline scripts carry the nonce.
+- next.config.mjs: Report-Only header removed; /offline.html gets a static no-script CSP.
+- app/api/csp-report/route.ts (new): receives violation reports (always 204, size-capped), logs "[csp] blocked X by directive on page" with no query strings.
+- Cost: every page now renders per request (nonces cannot be cached).
 
-## Sweeper health warning
-- Every sweep (cron pinger, Redis worker, in-process) records when it ran (Setting sweeper:last:<source>).
-- The Redis worker now also recovers stuck targets each tick, like the cron route already did.
-- Admin panel (super admins): a warning appears when the sweep this deployment relies on hasn't run for
-  3 minutes, with the number of overdue scheduled posts and what to check (cron-job.org pinger for
-  /api/cron/sweep with the CRON_SECRET bearer token). It also shows right after a fresh deploy until the
-  first ping arrives.
+After deploy: watch the Vercel logs for "[csp]" lines, and test one Razorpay checkout and one YouTube embed.
 
-## Liquid glass
-- New components/shared/LiquidGlass.tsx (edge refraction with chromatic fringe, Chromium only; other
-  browsers keep frosted glass). Used on the sidebar, mobile tab bar, toasts and sheets.
-- Dark glass tint raised and its backdrop dimmed so muted sidebar labels stay at least 4.5:1 on a busy
-  background. Reduced transparency, increased contrast and forced colours fall back to solid surfaces.
+## Hardening from the independent review
+- Offline page: "Try again" no longer uses an inline onclick (the script-free policy would kill it); it is a plain form reload.
+- /api/csp-report: only CSP report content types, 30 reports a minute per visitor, every field stripped of control characters and capped (no forged log lines).
+- Reporting-Endpoints now uses an absolute URL (browsers ignore a relative one).
+- JSON-LD scripts on the landing and Help pages carry the nonce.
+- form-action 'self' added; Razorpay's font origin allowed.
+- Publishing note tracks online/offline live instead of reading it once.
 
-## Tests
-- New tests/round-1028-retries.test.ts; publishing and 1027 queue tests updated for the new schedule.
+## UX edge cases
+- Create step 1: a note when no account is connected, linking to Connected accounts.
+- Publishing screen: after 3 failed status checks in a row (while online), an honest "we can't reach Outlly" note; clears on the next success.
+- Bulk planner: the sticky Book bar no longer hides under the mobile tab bar.
+- Long usernames truncate instead of overflowing (PlatformDeck).
+- Every text input and textarea uses dir="auto", so Arabic/Urdu/Hebrew captions type right-to-left.
+- Approvals: each empty lane says what "empty" means instead of a bare "Empty".
+
+## UI polish
+- Create step 1 chips (MP4 or MOV / Vertical 9:16 / Saves as you go) had no styles and rendered as run-on text; now real chips (.pf-chip in globals.css).
+- Sidebar: Workspace heading no longer touches Approvals; on short screens the sidebar scrolls instead of squashing the New post button.
+
+## Checks
+tsc 0 · bun test 783 pass / 0 fail · next build ok · browser CSP smoke 21/21 pages clean, injected inline script + onerror blocked and reported.
+
+## Files (17)
+- lib/csp.ts
+- middleware.ts
+- next.config.mjs
+- app/layout.tsx
+- app/api/csp-report/route.ts
+- tests/round-1033-csp.test.ts
+- public/offline.html
+- app/(marketing)/page.tsx
+- app/(marketing)/help/page.tsx
+- components/create/PlatformDeck.tsx
+- components/ui/field.tsx
+- components/create/BulkPlanner.tsx
+- components/approvals/ApprovalsBoard.tsx
+- components/create/PublishingView.tsx
+- components/create/CreateWorkspace.tsx
+- app/globals.css
+- components/shell/Nav.tsx

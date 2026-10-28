@@ -575,6 +575,12 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                     <li key={t} className="pf-chip">{t}</li>
                   ))}
                 </ul>
+                {!accountList.some((a) => a.status === "connected") && (
+                  <div className="mt-6 flex w-full max-w-md flex-col items-center gap-1 rounded-2xl px-4 pb-1.5 pt-3 text-center glass hairline">
+                    <p className="text-balance text-sm leading-snug text-muted-foreground">No accounts connected yet. You can still upload and save a draft.</p>
+                    <Link href="/accounts" className="inline-flex min-h-[44px] items-center text-sm font-medium text-foreground underline underline-offset-4">Connect an account</Link>
+                  </div>
+                )}
                 <div className="mt-8 w-full sm:mt-10">
                   <UploadZone compact onFile={(f) => startUpload(f)} />
                 </div>

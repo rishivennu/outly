@@ -67,13 +67,28 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
 
   /** Signed out or the post is gone: no point asking again. */
   const [pollDead, setPollDead] = useState(false);
+  /** Consecutive failed checks. Three in a row (while online) earns an honest note. */
+  const [pollMiss, setPollMiss] = useState(0);
+  const [online, setOnline] = useState(true);
+  useEffect(() => {
+    const sync = () => setOnline(navigator.onLine);
+    sync();
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+    };
+  }, []);
   const refresh = useCallback(async () => {
     if (document.hidden) return; // a background tab doesn't need second-by-second updates
     try {
       const r = await api<{ post: PostView }>(`/api/posts/${post.id}`);
       setPost(r.post);
+      setPollMiss(0);
     } catch (e) {
       if (e instanceof ApiError && [401, 403, 404].includes(e.status)) setPollDead(true);
+      else setPollMiss((n) => n + 1);
       /* anything else is transient; next tick tries again */
     }
   }, [post.id]);
@@ -220,6 +235,11 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
     <div className="mx-auto w-full max-w-6xl">
       <header className="relative text-center">
         <p className="sr-only" role="status" aria-live="polite">{`${headline}. ${summary}.`}</p>
+        {pollMiss >= 3 && polling && online && (
+          <p role="status" className="mx-auto mb-4 max-w-md rounded-2xl px-4 py-2.5 text-[13px] leading-snug text-muted-foreground glass hairline">
+            We can&apos;t reach Outlly right now to check on this. The send keeps going on our side, and this page catches up once we&apos;re back.
+          </p>
+        )}
         <div className="mb-3 flex h-[104px] items-end justify-center">
           {active ? <DancingPip size={92} /> : <Pip size={92} mood={allLive ? "happy" : "sad"} />}
         </div>

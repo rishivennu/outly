@@ -35,7 +35,7 @@ export function Sidebar() {
   return (
     <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
       <aside className="lg-glass flex h-full w-[240px] flex-col overflow-hidden rounded-[28px]" aria-label="Primary">
-        <div data-lenis-prevent className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-4 pt-5">
+        <div data-lenis-prevent className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-4 pt-5 [&>*]:shrink-0">
         <Link href="/home" className="mb-6 flex min-h-11 items-center gap-2 rounded-2xl px-2 text-[18px] transition-opacity hover:opacity-80" aria-label="Outlly dashboard" title="Dashboard">
           <OutlyLogo size={30} />
         </Link>
@@ -69,7 +69,7 @@ export function Sidebar() {
           })}
         </nav>
 
-        <div className="mt-auto flex flex-col gap-0.5">
+        <div className="mt-auto flex flex-col gap-0.5 pt-6">
           <p className="eyebrow mb-2 px-3 text-[11px]">Workspace</p>
           {[
             ...(user.workspace ? [] : [

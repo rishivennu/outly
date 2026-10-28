@@ -9,6 +9,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
       "h-12 w-full rounded-2xl bg-secondary/60 px-4 text-base text-foreground placeholder:text-muted-foreground/80 hairline transition focus:bg-secondary focus-visible:outline-2",
       className,
     )}
+    dir="auto"
     {...p}
   />
 ));
@@ -21,6 +22,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTML
       "w-full resize-none rounded-2xl bg-secondary/60 px-4 py-3 text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/80 hairline transition focus:bg-secondary",
       className,
     )}
+    dir="auto"
     {...p}
   />
 ));

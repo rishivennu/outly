@@ -366,7 +366,7 @@ Spaced over the days ahead, one a day where they fit. {plan.reason}
 
           {/* Book */}
           {rows.length > 0 && (
-            <div className="sticky bottom-4 z-10 mt-8 flex flex-wrap items-center justify-between gap-3 rounded-[24px] p-3 pl-5 glass hairline">
+            <div className="sticky bottom-[calc(max(12px,env(safe-area-inset-bottom))+80px)] z-10 mt-8 lg:bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-[24px] p-3 pl-5 glass hairline">
               <p className="text-sm text-muted-foreground" aria-live="polite">
                 {why ?? `${rows.length} post${rows.length === 1 ? "" : "s"} to ${platforms.map((p) => PLATFORM_META[p].name).join(", ")}.`}
               </p>

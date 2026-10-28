@@ -261,8 +261,8 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
             <h3 className="text-xl font-semibold tracking-tight">
               {meta.name} {meta.format}
             </h3>
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="truncate">{acct ? `as ${acct.username}` : "No account connected"}</span>
+            <p className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+              <span className="min-w-0 truncate" title={acct ? acct.username : undefined}>{acct ? `as ${acct.username}` : "No account connected"}</span>
             </p>
           </div>
           <label className="flex min-h-[44px] items-center gap-3 text-sm text-muted-foreground">

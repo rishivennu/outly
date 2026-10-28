@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { SRC_COOKIE, SRC_DAYS, sourceFromParams } from "./lib/growth/core";
 import { APP_SOURCE } from "./lib/app-mode";
+import { buildCsp, CSP_REPORT_PATH, newNonce } from "./lib/csp";
 
 const AUTH_PAGES = ["/login", "/signup"];
 // Marketing pages anyone can read.
@@ -103,7 +104,16 @@ export function keepAppSource(req: NextRequest, to: URL) {
 }
 
 export async function middleware(req: NextRequest) {
-  const res = await route(req);
+  // Per-request nonce (1033). Next reads it from the request's CSP header and stamps it on its own inline
+  // scripts; the root layout reads x-nonce for ours. Every page answer, rewrites included, carries the policy.
+  const nonce = newNonce();
+  const csp = buildCsp(nonce);
+  const headers = new Headers(req.headers);
+  headers.set("x-nonce", nonce);
+  headers.set("content-security-policy", csp);
+  const res = await route(req, headers);
+  res.headers.set("Content-Security-Policy", csp);
+  res.headers.set("Reporting-Endpoints", `csp="${req.nextUrl.origin}${CSP_REPORT_PATH}"`); // must be absolute
   // The old admin-only notice bar is gone; clear its cookie from browsers that still have it.
   if (req.cookies.get("outlly_af")) res.cookies.delete("outlly_af");
   // Campaign links (Growth page): remember the FIRST utm link a visitor arrived on, for 30 days,
@@ -128,8 +138,9 @@ export function appBounce(req: NextRequest) {
   return NextResponse.redirect(u);
 }
 
-async function route(req: NextRequest) {
+async function route(req: NextRequest, headers: Headers) {
   const { pathname } = req.nextUrl;
+  const pass = () => NextResponse.next({ request: { headers } });
   const bounce = appBounce(req);
   if (bounce) return bounce;
   const alias = SECTION_ALIASES[pathname];
@@ -150,7 +161,7 @@ async function route(req: NextRequest) {
   // maintenance page, except sign-in (so a member can get back in) and the legal pages it links to.
   // No account can be created while it is on, and the APIs re-check the member's join date.
   if (flags?.maintenance && !authed && !MAINTENANCE_OPEN.includes(pathname) && !(await isAdmin(req))) {
-    const res = NextResponse.rewrite(new URL("/maintenance", req.url));
+    const res = NextResponse.rewrite(new URL("/maintenance", req.url), { request: { headers } });
     res.headers.set("cache-control", "no-store");
     return res;
   }
@@ -164,14 +175,14 @@ async function route(req: NextRequest) {
   }
   // Admin has its own session. Middleware only checks the cookie is there; every admin page
   // and API re-verifies the signature, the role and the password fingerprint on the server.
-  if (pathname === "/admin/login") return NextResponse.next();
+  if (pathname === "/admin/login") return pass();
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
-    if (req.cookies.get("outly_admin")?.value) return NextResponse.next();
+    if (req.cookies.get("outly_admin")?.value) return pass();
     const u = new URL("/admin/login", req.url);
     if (pathname !== "/admin") u.searchParams.set("next", pathname);
     return NextResponse.redirect(u);
   }
-  if (OPEN.includes(pathname) || OPEN_PREFIX.some((p) => pathname.startsWith(p))) return hint(req, NextResponse.next(), authed);
+  if (OPEN.includes(pathname) || OPEN_PREFIX.some((p) => pathname.startsWith(p))) return hint(req, pass(), authed);
   // Waitlist on: the signup page becomes the waitlist. Emailed invitees (?invite), teammates
   // accepting an invite and admins still reach it; the signup API re-checks every one of them.
   if (!authed && pathname === "/signup" && flags?.waitlist) {
@@ -185,7 +196,7 @@ async function route(req: NextRequest) {
     return hint(req, NextResponse.redirect(keepAppSource(req, u)), authed);
   }
   if (authed && AUTH_PAGES.includes(pathname)) return hint(req, NextResponse.redirect(keepAppSource(req, new URL("/home", req.url))), authed);
-  return hint(req, NextResponse.next(), authed);
+  return hint(req, pass(), authed);
 }
 
 export const config = {
