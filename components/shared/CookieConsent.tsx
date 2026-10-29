@@ -54,7 +54,7 @@ export function CookieBanner() {
   const done = (c: { analytics: boolean; marketing: boolean }) => { save(c); setShow(false); setCustom(false); };
 
   return (
-    <section role="dialog" aria-modal="false" aria-labelledby="cc-title" aria-describedby="cc-body" className={cn("consent-in glass-strong fixed inset-x-2 bottom-[max(8px,env(safe-area-inset-bottom))] z-[60] max-h-[calc(100dvh-24px)] overflow-y-auto rounded-[24px] p-4 shadow-2xl sm:inset-x-auto sm:left-5 sm:w-[min(520px,calc(100vw-40px))] sm:p-5", lift && "max-lg:bottom-[92px]")}>
+    <section role="dialog" aria-modal="false" aria-labelledby="cc-title" aria-describedby="cc-body" className={cn("consent-in glass-strong !bg-[hsl(var(--background)/0.96)] fixed inset-x-2 bottom-[max(8px,env(safe-area-inset-bottom))] z-[60] max-h-[calc(100dvh-24px)] overflow-y-auto rounded-[24px] p-4 shadow-2xl sm:inset-x-auto sm:left-5 sm:w-[min(520px,calc(100vw-40px))] sm:p-5", lift && "max-lg:bottom-[92px]")}>
       <div className="flex items-start gap-3">
         <span className="lime-bg hidden h-10 w-10 shrink-0 place-items-center rounded-2xl sm:grid" aria-hidden><Cookie className="h-5 w-5" /></span>
         <div className="min-w-0">

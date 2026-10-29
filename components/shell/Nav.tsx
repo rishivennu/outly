@@ -200,7 +200,7 @@ export function MobileNav() {
 /** Phone top bar: brand, theme and notifications. Everything else moved to More in the tab bar. */
 export function MobileTopBar() {
   return (
-    <header className="web-only sticky top-0 z-30 flex border-b border-border/70 bg-background/[0.94] shadow-[0_10px_24px_-18px_rgb(0_0_0/0.6)] backdrop-blur-xl backdrop-saturate-150 items-center justify-between gap-2 px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] lg:hidden">
+    <header className="web-only sticky top-0 z-30 flex border-b border-border/70 bg-background shadow-[0_10px_24px_-18px_rgb(0_0_0/0.6)] items-center justify-between gap-2 px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] lg:hidden">
       <Link href="/home" className="flex min-h-11 min-w-0 shrink-0 items-center gap-2 rounded-2xl text-[16px]" aria-label="Outlly dashboard">
         <OutlyMark size={26} className="min-[480px]:hidden" />
         <OutlyLogo className="hidden min-[480px]:inline-flex" />
