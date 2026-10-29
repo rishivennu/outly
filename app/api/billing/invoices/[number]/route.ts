@@ -9,7 +9,10 @@ import { invoicePdf } from "@/lib/billing/invoice";
 export async function GET(_req: NextRequest, { params }: { params: { number: string } }) {
   const inv = await db.invoice.findUnique({ where: { number: params.number } });
   const [user, admin] = await Promise.all([getCurrentUser(), getAdmin()]);
-  if (!inv || !(user?.id === inv.userId || can(admin?.role, "payments"))) return new Response("Not found", { status: 404 });
+  // Billing belongs to the workspace owner (1048): inside a team workspace getCurrentUser() IS the owner, so a
+  // teammate (actor set) must not pass the owner check. Same rule as the Billing page.
+  const owner = !!user && !user.actor && user.id === inv?.userId;
+  if (!inv || !(owner || can(admin?.role, "payments"))) return new Response("Not found", { status: 404 });
   const pdf = await invoicePdf(inv.id);
   return new Response(new Uint8Array(pdf), {
     headers: { "content-type": "application/pdf", "content-disposition": `attachment; filename="${inv.number}.pdf"`, "cache-control": "private, no-store" },

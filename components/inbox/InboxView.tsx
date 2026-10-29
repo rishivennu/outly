@@ -276,7 +276,17 @@ function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: 
             </ul>
           )}
 
-          {ideas && (
+          {thinking && (
+            <div className="mt-3" role="status" aria-label="Writing reply ideas">
+              <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-lime-ink dark:text-lime">
+                <Sparkles className="ai-orb-icon is-on h-3 w-3" aria-hidden="true" /> Writing reply ideas…
+              </p>
+              <ul className="flex flex-col gap-1.5" aria-hidden="true">
+                {[88, 72, 80].map((w, i) => <li key={i} className="ai-shimmer h-10 rounded-2xl" style={{ width: `${w}%`, ["--i" as string]: i }} />)}
+              </ul>
+            </div>
+          )}
+          {ideas && !thinking && (
             <div className="reply-ideas mt-3" role="group" aria-label="Suggested replies">
               <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 <Sparkles className="h-3 w-3" aria-hidden="true" /> Tap one, then make it yours
@@ -303,8 +313,8 @@ function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: 
           )}
 
           <form onSubmit={send} className="mt-3 flex min-w-0 items-center gap-2">
-            <Button type="button" variant="ghost" size="icon" onClick={suggest} disabled={thinking} aria-label={ideas ? "More reply ideas" : "Suggest replies"} title="Suggest replies" className="shrink-0">
-              <Sparkles className={cn("h-4 w-4", thinking && "animate-pulse")} />
+            <Button type="button" variant="ghost" size="icon" onClick={suggest} disabled={thinking} aria-busy={thinking} aria-label={thinking ? "Writing reply ideas" : ideas ? "More reply ideas" : "Suggest replies"} title="Suggest replies" data-thinking={thinking ? "" : undefined} className="ai-orb shrink-0 disabled:opacity-100">
+              <Sparkles className="ai-orb-icon h-4 w-4" aria-hidden="true" />
             </Button>
             <Input ref={input} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="Write a reply…" aria-label={`Reply to ${comment.authorName}`} className="h-11 min-w-0 flex-1 text-base sm:text-sm" />
             {/* shrink-0: the field takes the squeeze on a phone, the send button stays a 44px circle (1044) */}
