@@ -86,7 +86,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
   const [plans, sub, invoices, gw, usage, display, replies, captions, upload, beta, betaCfg, founding, badges] = await Promise.all([
     listPlans(),
     db.subscription.findFirst({ where: { userId: user.id, status: "active" }, include: { plan: true }, orderBy: { createdAt: "desc" } }),
-    db.invoice.findMany({ where: { userId: user.id }, orderBy: { issuedAt: "desc" }, take: 50, include: { payment: { select: { status: true } } } }),
+    db.invoice.findMany({ where: { userId: user.id }, orderBy: { issuedAt: "desc" }, take: 50, include: { payment: { select: { status: true } }, creditNote: { select: { number: true } } } }),
     activeGateway(),
     postUsage(user.id),
     getConfig("pricing").then(normalizeDisplay),
@@ -149,7 +149,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
         replies: { limit: replies.replyLimit, used: replies.used },
         captions: { limit: captions.captionVideos, used: captions.used, burn: captions.burnCaptions },
       }}
-      invoices={invoices.map((i) => ({ number: i.number, description: i.description, amountMinor: i.amountMinor, currency: i.currency, issuedAt: i.issuedAt.toISOString(), refunded: i.payment?.status === "refunded" }))}
+      invoices={invoices.map((i) => ({ number: i.number, description: i.description, amountMinor: i.amountMinor, currency: i.currency, issuedAt: i.issuedAt.toISOString(), refunded: i.payment?.status === "refunded", creditNote: i.creditNote?.number ?? null }))}
     />
   );
 }

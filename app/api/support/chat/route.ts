@@ -7,6 +7,8 @@ import { chargeAi } from "@/lib/ai-quota";
 import { getCurrentUser, realUserId } from "@/lib/auth";
 import { limitShared } from "@/lib/rate-limit";
 import { env } from "@/lib/env";
+import { planFor, runPip } from "@/lib/pip/run";
+import { PIP_TOOLS } from "@/lib/pip/types";
 
 const Body = z.object({
   message: z.string().trim().min(1).max(800),
@@ -16,6 +18,8 @@ const Body = z.object({
   page: z.string().max(120).optional(),
   lang: z.enum(LANG_IDS).default("en"),
   history: z.array(z.object({ role: z.enum(["user", "bot"]), text: z.string().max(2000) })).max(30).default([]),
+  /** The last records card in this chat (1049), so "and in August?" means the same records. */
+  data: z.object({ tool: z.enum(PIP_TOOLS), period: z.string().max(200).nullable().optional() }).optional(),
 });
 
 const DAY = 24 * 3600_000;
@@ -48,5 +52,13 @@ export const POST = route(async (req) => {
   };
   const exact = b.faqId ? await answerFaq(b.faqId, b.lang, b.lang !== "en" && (await mayUseAi())) : null;
   if (exact) return json(exact);
+  // 1049: a signed-in person asking for their own records gets them from the database. Visitors never reach this.
+  if (me && !b.faqId) {
+    const plan = await planFor(b.message, b.data, me.timezone || "UTC", mayUseAi);
+    if (plan) {
+      const r = await runPip({ id: me.id, timezone: me.timezone, actor: me.actor, scope: me.scope }, plan, b.message, b.lang, mayUseAi);
+      return json({ answer: r.answer, confident: true, sources: [], wantsHuman: false, data: r.data });
+    }
+  }
   return json(await answer(b.message, b.history, b.lang, { signedIn: !!me, page: b.page, ai: await mayUseAi() }));
 }, { auth: false, limit: [30, 60_000] });

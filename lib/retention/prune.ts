@@ -63,7 +63,7 @@ export const DM_KEEP_DAYS = 180;
 
 export async function pruneOldData(now: Date = new Date()) {
   const before = (days: number) => new Date(now.getTime() - days * DAY);
-  const [emailLogs, adminEvents, behaviorAnalyses, targetMetrics, otpCodes, invoices, dmMessages, dmThreads] = await Promise.all([
+  const [emailLogs, adminEvents, behaviorAnalyses, targetMetrics, otpCodes, invoices, dmMessages, dmThreads, pipAccess] = await Promise.all([
     db.emailLog.deleteMany({ where: { createdAt: { lt: before(90) } } }),
     db.adminEvent.deleteMany({ where: { createdAt: { lt: before(90) } } }),
     db.behaviorAnalysis.deleteMany({ where: { createdAt: { lt: before(90) } } }),
@@ -72,6 +72,8 @@ export async function pruneOldData(now: Date = new Date()) {
     pruneDetachedInvoices(now),
     db.dmMessage.deleteMany({ where: { sentAt: { lt: before(DM_KEEP_DAYS) } } }),
     db.dmThread.deleteMany({ where: { lastMessageAt: { lt: before(DM_KEEP_DAYS) } } }),
+    // Pip's access log (1049): a year is enough to answer "who looked at my invoices?"
+    db.pipAccessLog.deleteMany({ where: { createdAt: { lt: before(365) } } }),
   ]);
   // Batches of 500, a few per run, so a backlog drains without one huge delete.
   const drafts = { drafts: 0, media: 0 };
@@ -92,5 +94,6 @@ export async function pruneOldData(now: Date = new Date()) {
     detachedInvoices: invoices,
     dmMessages: dmMessages.count,
     dmThreads: dmThreads.count,
+    pipAccess: pipAccess.count,
   };
 }

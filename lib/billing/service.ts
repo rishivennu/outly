@@ -1,4 +1,5 @@
 import "server-only";
+import { creditNotePdf, issueCreditNote } from "./credit-note";
 import { addMonths, addYears } from "date-fns";
 import { db } from "../db";
 import { env } from "../env";
@@ -290,8 +291,17 @@ export async function refundPayment(paymentId: string, by: string, reason: strin
     ...(p.subscriptionId ? [db.subscription.updateMany({ where: { id: p.subscriptionId, status: "active" }, data: { status: "canceled", canceledAt: new Date() } })] : []),
   ]);
   if (!p.sample) await revokeReferralReward(p.userId, p.createdAt).catch((e) => console.error("[refund] referral revoke", e));
+  // 1049: the refunded invoice gets its credit note straight away (the daily cron catches any that fail here).
+  const credit = p.invoice ? await issueCreditNote(p.invoice.id, reason || null).catch((e) => (console.error("[refund] credit note", e), null)) : null;
   if (!p.sample) {
-    await sendEmail({ to: p.user.email, kind: "subscription", subject: `Refund issued: ${formatMoney(p.amountMinor, p.currency)}`, html: templates.refund({ name: p.user.name, amount: formatMoney(p.amountMinor, p.currency), number: p.invoice?.number ?? "-" }) });
+    const pdf = credit ? await creditNotePdf(credit.id).catch(() => null) : null;
+    await sendEmail({
+      to: p.user.email,
+      kind: "subscription",
+      subject: `Refund issued: ${formatMoney(p.amountMinor, p.currency)}`,
+      html: templates.refund({ name: p.user.name, amount: formatMoney(p.amountMinor, p.currency), number: p.invoice?.number ?? "-", creditNote: credit?.number }),
+      ...(credit && pdf ? { attachments: [{ filename: `${credit.number}.pdf`, content: pdf }] } : {}),
+    });
     await adminEvent("refund", `Refunded ${p.user.name}`, `${formatMoney(p.amountMinor, p.currency)} by ${by}`, "/admin/payments?status=refunded");
   }
 }

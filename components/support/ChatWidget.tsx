@@ -6,13 +6,15 @@ import { ArrowDown, ArrowUp, Check, ChevronDown, Copy, Loader2, Maximize2, Minim
 import { Pip, type PipMood } from "@/components/brand/Pip";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { Answer } from "./Answer";
+import { PipDataCard } from "./PipDataCard";
+import type { PipResult } from "@/lib/pip/types";
 import { CX, LANGS, T, langDir, readLang, writeLang, type Lang } from "@/lib/i18n/support";
 import { HUMAN_RE } from "@/lib/support/smalltalk";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
 const STUDIO = ["/home", "/create", "/calendar", "/content", "/analytics", "/inbox", "/approvals", "/accounts", "/billing", "/settings", "/support"];
-type Msg = { id: number; role: "user" | "bot"; text: string; sources?: { id: string; question: string }[]; ask?: boolean; kind?: "escalate" | "ticket" | "error" };
+type Msg = { id: number; role: "user" | "bot"; text: string; sources?: { id: string; question: string }[]; ask?: boolean; kind?: "escalate" | "ticket" | "error"; data?: PipResult };
 type Card =
   | { kind: "failed"; id: string; platform: Platform; title: string; targetId: string; reconnect: boolean }
   | { kind: "reconnect"; id: string; platform: Platform }
@@ -123,7 +125,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     };
   }, []);
   useEffect(() => {
-    try { sessionStorage.setItem(STORE, JSON.stringify({ msgs: msgs.slice(-40), fails, ref: ticket.ref, dismissed })); } catch {}
+    // Records cards are never written to storage (1049): someone's invoices stay in memory only.
+    try { sessionStorage.setItem(STORE, JSON.stringify({ msgs: msgs.slice(-40).map(({ data: _d, ...m }) => m), fails, ref: ticket.ref, dismissed })); } catch {}
   }, [msgs, fails, ticket.ref, dismissed]);
   useEffect(() => setLift(!!document.querySelector('nav[aria-label="Primary"].fixed')), [path]);
 
@@ -169,16 +172,18 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     setInput("");
     setNudge(false);
     const history = msgs.filter((m) => !m.kind).map((m) => ({ role: m.role, text: m.text })).slice(-8);
+    // The last records card, so "and in August?" or "download them" means the same records (1049).
+    const lastData = [...msgs].reverse().find((m) => m.data)?.data;
     push({ role: "user", text: q });
     if (!navigator.onLine) return push({ role: "bot", text: T[lang].offline, kind: "error" });
     setBusy(true);
     try {
-      const r = await fetch("/api/support/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, history, lang, page: path.slice(0, 120), ...(faqId ? { faqId } : {}) }) });
+      const r = await fetch("/api/support/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, history, lang, page: path.slice(0, 120), ...(faqId ? { faqId } : {}), ...(lastData ? { data: { tool: lastData.ask.tool, period: lastData.ask.period } } : {}) }) });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error);
       // Small talk ("hi", "thanks") gets a friendly reply: no "Did that help?" and it never counts as a miss.
       // sources[0] is the question just answered, so a confident reply shows only the others as Related.
-      push({ role: "bot", text: j.answer, sources: (j.confident ? j.sources?.slice(1, 4) : j.sources?.slice(0, 3))?.filter((x: { id: string }) => x.id), ask: j.confident && !j.smalltalk });
+      push({ role: "bot", text: j.answer, sources: (j.confident ? j.sources?.slice(1, 4) : j.sources?.slice(0, 3))?.filter((x: { id: string }) => x.id), ask: j.confident && !j.smalltalk && !j.data, data: j.data ?? undefined });
       if (j.smalltalk) return;
       if (j.wantsHuman) escalate();
       else if (!j.confident) {
@@ -420,6 +425,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                     <Bubble role={m.role} label={m.role === "user" ? cx.saidYou : cx.saidPip} error={m.kind === "error"}>
                       {m.role === "bot" ? <Answer text={m.text} /> : <p className="whitespace-pre-wrap">{m.text}</p>}
                     </Bubble>
+                    {m.data && <PipDataCard r={m.data} />}
                     {m.role === "bot" && !m.kind && m.text !== t.glad && (
                       <div className="mt-1 flex flex-wrap items-center gap-1 ps-1">
                         <button type="button" onClick={() => copy(m)} aria-label={copied === m.id ? cx.copied : cx.copy} title={cx.copy} className="pc-icon pc-icon-sm">

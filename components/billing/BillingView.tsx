@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 
 export type ReturnNotice = { tone: "ok" | "info" | "error"; text: string };
 type Current = { planSlug: string; planName: string; priceMinor: number; currency: string; interval: string; periodEnd: string; cancelAtPeriodEnd: boolean; pausedUntil?: string | null; provider?: string } | null;
-type Inv = { number: string; description: string; amountMinor: number; currency: string; issuedAt: string; refunded: boolean };
+type Inv = { number: string; description: string; amountMinor: number; currency: string; issuedAt: string; refunded: boolean; creditNote?: string | null };
 
 const CACHE = "outly-invoices-v1";
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
@@ -296,6 +296,11 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
                 <a href={`/api/billing/invoices/${i.number}`} className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium hairline hover:bg-secondary" aria-label={`Download invoice ${i.number} (PDF)`}>
                   <Download className="h-4 w-4" aria-hidden /> PDF
                 </a>
+                {i.creditNote && (
+                  <a href={`/api/billing/credit-notes/${i.creditNote}`} className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium hairline hover:bg-secondary" aria-label={`Download credit note ${i.creditNote} for invoice ${i.number} (PDF)`}>
+                    <Download className="h-4 w-4" aria-hidden /> Credit note
+                  </a>
+                )}
               </li>
             ))}
           </ul>

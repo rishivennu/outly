@@ -68,6 +68,8 @@ model User {
   dmThreads   DmThread[]
   betaIssued  BetaCode?  @relation("BetaIssued")
   betaRedeemed BetaCode? @relation("BetaRedeemed")
+  creditNotes  CreditNote[]
+  pipAccess    PipAccessLog[]
 
   @@index([lastSeenAt])
 }
@@ -362,10 +364,52 @@ model Invoice {
   emailedAt     DateTime?
   detachedAt    DateTime? // the customer deleted their account; kept for tax law until the retention window ends
 
-  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  payment    Payment?    @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  creditNote CreditNote?
 
   @@index([userId, issuedAt])
+}
+
+/// 1049: issued when a paid invoice is refunded (GST needs one per refunded tax invoice). Full refunds only, so
+/// one per invoice. Like the invoice, everything the PDF prints is copied at issue time, and it lives exactly as
+/// long as its invoice (deleted with it by the retention cron).
+model CreditNote {
+  id            String    @id @default(cuid())
+  number        String    @unique // CN-2026-000001
+  invoiceId     String    @unique
+  userId        String?
+  customerName  String
+  customerEmail String
+  description   String
+  amountMinor   Int
+  currency      String
+  reason        String?
+  taxPercent    Float?
+  issuer        String? // JSON {name,address,gstin} of the seller at issue time
+  issuedAt      DateTime  @default(now())
+  emailedAt     DateTime?
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, issuedAt])
+}
+
+/// 1049: every time Pip reads someone's records (billing, posts, uploads, tickets). Filters only, never the data.
+model PipAccessLog {
+  id        String   @id @default(cuid())
+  userId    String // whose data was read (the workspace owner)
+  actorId   String? // the teammate who asked, when it wasn't the owner
+  tool      String
+  args      String // JSON of the filters used
+  found     Int
+  complete  Boolean
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 model Ticket {

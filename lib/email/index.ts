@@ -292,14 +292,14 @@ export const templates = {
       `${p(`Hi ${esc(o.name || "there")},`)}<div style="font-family:${BODY};font-size:16px;line-height:1.6;color:${C.ink};background:${C.white};border-radius:18px;border-left:4px solid ${C.lime};padding:16px 18px;white-space:pre-wrap">${esc(o.body)}</div>${small(`Status: ${esc(o.status)}. Reply to this email to keep the conversation going.`)}`,
       { kicker: "Support", tone: "cream" },
     ),
-  refund: (o: { name: string; amount: string; number: string }) =>
+  refund: (o: { name: string; amount: string; number: string; creditNote?: string }) =>
     wrap(
       "Your refund is on its way",
-      p(`Hi ${esc(o.name)}, we sent the money back to your original payment method. Banks usually show it within 5 to 7 working days. Your paid plan has ended; your work stays safe on the free plan.`),
+      p(`Hi ${esc(o.name)}, we sent the money back to your original payment method. Banks usually show it within 5 to 7 working days. Your paid plan has ended; your work stays safe on the free plan.${o.creditNote ? " The credit note for your records is attached." : ""}`),
       {
         kicker: "Billing",
         tone: "cream",
-        tiles: pair({ tone: "ink", html: stat(esc(o.amount), "refunded", "ink") }, { tone: "white", html: rows([["Invoice", esc(o.number)], ["Arrives", "5 to 7 days"]]) }, 46),
+        tiles: pair({ tone: "ink", html: stat(esc(o.amount), "refunded", "ink") }, { tone: "white", html: rows([["Invoice", esc(o.number)], ...(o.creditNote ? [["Credit note", esc(o.creditNote)] as [string, string]] : []), ["Arrives", "5 to 7 days"]]) }, 46),
       },
     ),
   canceled: (o: { name: string; plan: string; until: string; url: string }) =>

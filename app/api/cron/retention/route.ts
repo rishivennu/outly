@@ -6,6 +6,7 @@ import { sweepAccountHealth } from "@/lib/retention/notices";
 import { sendGoalNudges } from "@/lib/retention/sweep";
 import { pruneOldData } from "@/lib/retention/prune";
 import { sweepSpikes } from "@/lib/retention/alerts";
+import { backfillCreditNotes } from "@/lib/billing/credit-note";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -20,6 +21,7 @@ export async function GET(req: NextRequest) {
   if ((await getConfig("site")).maintenance) return NextResponse.json({ skipped: "maintenance" });
   const [accounts, nudges] = [await sweepAccountHealth(), await sendGoalNudges()];
   const spikes = await sweepSpikes().catch((e) => (console.error("[retention] spikes", e), null));
+  const creditNotes = await backfillCreditNotes().catch((e) => (console.error("[retention] credit notes", e), null));
   const pruned = await pruneOldData();
-  return NextResponse.json({ accounts, nudges, spikes, pruned });
+  return NextResponse.json({ accounts, nudges, spikes, creditNotes, pruned });
 }

@@ -1728,6 +1728,24 @@ html.js .stk-wrap:not([data-shown]) .stk { scale: 0; }
 .pc .pc-composer textarea, .pc .pc-composer textarea:focus, .pc .pc-composer textarea:focus-visible { outline: none !important; box-shadow: none !important; border: 0; border-radius: 0; }
 .pc-field, .pc-select { background: var(--pc-fill); border-radius: 999px; color: hsl(var(--foreground)); }
 .pc-link { color: var(--pc-muted); text-decoration: underline; text-underline-offset: 4px; }
+
+/* Pip records card (1049) */
+.pc { --pc-ok: hsl(152 60% 30%); --pc-warn: hsl(32 90% 32%); }
+.dark .pc { --pc-ok: hsl(152 55% 62%); --pc-warn: hsl(38 92% 64%); }
+.pd-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid currentColor; }
+.pd-ok { color: var(--pc-ok); }
+.pd-warn, .pd-note-warn { color: var(--pc-warn); }
+.pd-total { display: flex; flex-direction: column; padding: 6px 10px; border-radius: 12px; background: var(--pc-fill); }
+.pd-search { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 999px; background: var(--pc-fill); }
+.pd-search:focus-within { box-shadow: 0 0 0 2px var(--pc-accent); }
+.pd-search input:focus, .pd-search input:focus-visible { outline: none; }
+.pd-scroll { overflow-x: auto; border: 1px solid var(--pc-line); border-radius: 12px; overscroll-behavior-x: contain; }
+.pd-scroll:focus-visible { outline: 2px solid var(--pc-accent); outline-offset: 2px; }
+.pd-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pd-table th { position: sticky; top: 0; background: var(--pc-fill); text-align: start; font-weight: 600; font-size: 12px; color: var(--pc-muted); padding: 8px 10px; white-space: nowrap; }
+.pd-table td { padding: 6px 10px; border-top: 1px solid var(--pc-line); vertical-align: middle; max-width: 220px; overflow-wrap: anywhere; }
+.pd-table td.text-end, .pd-table th.text-end { white-space: nowrap; }
+.pd-link:focus-visible { outline: 2px solid var(--pc-accent); outline-offset: 2px; }
 .pc-link:hover { color: hsl(var(--foreground)); }
 .pc-jump { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; background: var(--pc-solid); border: 1px solid var(--pc-line); box-shadow: 0 6px 20px rgba(20,16,60,.16); }
 .pc-nudge { background: var(--pc-solid); border: 1px solid var(--pc-line); border-radius: 18px; border-end-end-radius: 6px; box-shadow: 0 10px 30px -8px rgba(20,16,60,.22); }
