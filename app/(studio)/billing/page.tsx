@@ -65,7 +65,7 @@ async function handleYoupiReturn(userId: string, paymentId: string): Promise<Ret
 
 export default async function BillingPage({ searchParams }: { searchParams: { checkout?: string; session_id?: string; token?: string; p?: string; plan?: string; paid?: string; cycle?: string } }) {
   const user = await getCurrentUser();
-  if (!user) redirect("/login?next=/billing");
+  if (!user) redirect("/api/auth/expired?next=/billing");
   if (user.actor) redirect("/home"); // billing belongs to the workspace owner
   await expireSubscriptions(user.id);
 

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
 import { UserProvider } from "@/components/shell/UserContext";
 import { AvatarCursor } from "@/components/shell/AvatarCursor";
@@ -25,7 +26,8 @@ import { WarmUp } from "@/components/shell/WarmUp";
 
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  // Signed cookie the database refuses: clear it on the way to sign-in, or middleware bounces /login back here (1042).
+  if (!user) redirect(`/api/auth/expired?next=${encodeURIComponent(headers().get("x-path") ?? "/home")}`);
   const [live, site, notice] = await Promise.all([liveNow(), siteStatus(), getConfig("updates")]);
   // Maintenance: members who joined before it started carry on; anyone newer waits on the maintenance page.
   if (site.maintenance && !joinedBeforeMaintenance({ createdAt: user.joinedAt }, site.since)) redirect("/maintenance?preview");

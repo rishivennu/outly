@@ -110,6 +110,7 @@ export async function middleware(req: NextRequest) {
   const csp = buildCsp(nonce);
   const headers = new Headers(req.headers);
   headers.set("x-nonce", nonce);
+  headers.set("x-path", req.nextUrl.pathname + req.nextUrl.search); // where a stale session should return to after signing in (1042)
   headers.set("content-security-policy", csp);
   const res = await route(req, headers);
   res.headers.set("Content-Security-Policy", csp);
