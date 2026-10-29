@@ -1,10 +1,13 @@
-/* Outlly offline helper. Network-first everywhere; keeps copies of Billing, Help and invoice PDFs
-   so they still open without a connection. Never caches API writes, admin pages or other users' data. */
-const CACHE = "outly-offline-v2";
+/* Outlly offline helper. Keeps copies of Billing, Help and invoice PDFs so they still open without a
+   connection, and receives the share sheet. Never caches API writes, admin pages or other users' data.
+   1041: every other page load goes straight to the browser. Proxying them turned any brief network
+   failure into "This site can't be reached / ERR_FAILED" on iPhone (no saved copy of /home, and iOS
+   drops the offline page from storage), where the browser on its own would simply have loaded it. */
+const CACHE = "outly-offline-v3";
 const KEEP = [/^\/billing\/?$/, /^\/help\/?$/, /^\/api\/billing\/invoices\/[\w-]+$/];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/offline.html"])).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/offline.html"])).catch(() => {}).then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE && k !== "outly-share").map((k) => caches.delete(k)))).then(() => self.clients.claim()));
@@ -25,6 +28,13 @@ async function takeShare(req) {
   return Response.redirect(to.href, 303);
 }
 
+function offline() {
+  return new Response(
+    '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><body style="font:16px system-ui;background:#0c0c0e;color:#f6f4ee;display:grid;place-items:center;min-height:100dvh;margin:0;text-align:center"><div><p>You are offline.</p><button onclick="location.reload()" style="font:inherit;min-height:44px;padding:0 20px;border-radius:999px;border:0;background:#c8f04a;color:#111">Try again</button></div>',
+    { status: 503, headers: { "content-type": "text/html; charset=utf-8" } },
+  );
+}
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method === "POST" && new URL(req.url).pathname === "/share-target") {
@@ -34,17 +44,17 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== location.origin || url.pathname.startsWith("/admin") || url.pathname.startsWith("/_next/webpack-hmr")) return;
-  const keep = KEEP.some((r) => r.test(url.pathname));
-  if (req.mode !== "navigate" && !keep) return;
+  if (!KEEP.some((r) => r.test(url.pathname))) return; // the browser loads it, exactly as with no worker
   e.respondWith(
     fetch(req)
       .then((res) => {
-        if (keep && res.ok) {
+        if (res.ok) {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(url.pathname, copy));
         }
         return res;
       })
-      .catch(async () => (await caches.match(url.pathname)) || (req.mode === "navigate" ? caches.match("/offline.html") : Response.error())),
+      // Always answer with a real response: an empty answer is what shows as ERR_FAILED.
+      .catch(async () => (await caches.match(url.pathname)) || (await caches.match("/offline.html")) || offline()),
   );
 });

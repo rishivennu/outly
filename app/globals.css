@@ -2386,3 +2386,10 @@ html[data-contrast="more"] .lg-glass::before, html[data-contrast="more"] .lg-gla
   .try-caret { animation: none; }
 }
 @media (forced-colors: active) { .try-card, .try-pill, .try-count { border: 1px solid CanvasText; } }
+
+/* 1041 live count: words sit back, figures in full ink; a changed figure rolls up into place. */
+.lc { color: hsl(var(--foreground) / 0.66); font-weight: 500; }
+.lc-num { display: inline-flex; overflow: hidden; vertical-align: bottom; color: hsl(var(--foreground)); font-weight: 650; font-variant-numeric: tabular-nums; }
+.lc-roll { display: inline-block; animation: lc-roll 0.42s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes lc-roll { from { transform: translateY(85%); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .lc-roll { animation: none; } }
