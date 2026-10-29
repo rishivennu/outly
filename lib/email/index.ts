@@ -259,6 +259,8 @@ const rows = (items: [string, string][], tone: Tone = "white") =>
     )
     .join("")}</table>`;
 
+export type SecurityChange = "on" | "off" | "codes" | "phone" | "phone-off";
+
 export const templates = {
   invoice: (o: { name: string; number: string; amount: string; plan: string; url: string }) =>
     wrap(
@@ -448,21 +450,25 @@ export const templates = {
         tiles: tile("ink", `<div style="font-family:${BODY};font-size:13px;color:${TONE.ink.sub}">Your code</div><div style="padding-top:6px;font-family:${DISPLAY};font-size:46px;line-height:1.05;font-weight:bold;letter-spacing:10px;color:${C.lime}">${esc(o.code)}</div>`),
       },
     ),
-  securitySubject: (change: "on" | "off" | "codes") =>
-    change === "on" ? "Two-step sign-in is on" : change === "off" ? "Two-step sign-in was turned off" : "New recovery codes were made",
+  securitySubject: (change: SecurityChange) =>
+    change === "on" ? "Two-step sign-in is on" : change === "off" ? "Two-step sign-in was turned off" : change === "phone" ? "A WhatsApp number was added" : change === "phone-off" ? "Your WhatsApp number was removed" : "New recovery codes were made",
   /** Sent after any change to two-step sign-in, so the owner hears about it even if it wasn't them. */
-  security: (o: { name: string | null; change: "on" | "off" | "codes"; url: string; at: Date }) => {
+  security: (o: { name: string | null; change: SecurityChange; url: string; at: Date }) => {
     const what =
       o.change === "on"
         ? "Two-step sign-in is now on for your Outlly account. Signing in will ask for a code from your authenticator app."
         : o.change === "off"
           ? "Two-step sign-in was turned off for your Outlly account. Signing in now needs only your password or an email code."
-          : "A new set of recovery codes was made for your Outlly account. The old ones no longer work.";
+          : o.change === "phone"
+            ? "A WhatsApp number was added to your Outlly account. It can now get sign-in codes."
+            : o.change === "phone-off"
+              ? "The WhatsApp number on your Outlly account was removed. It no longer gets sign-in codes."
+              : "A new set of recovery codes was made for your Outlly account. The old ones no longer work.";
     const when = o.at.toUTCString().replace("GMT", "UTC");
     return wrap(
       esc(templates.securitySubject(o.change)),
       `${p(`${o.name ? `Hi ${esc(o.name)}, ` : ""}${esc(what)}`)}${p(`This happened on ${esc(when)}.`)}${p("If this was you, there's nothing to do. If it wasn't, change your password now and check your security settings.")}${btn(o.url, "Review security settings")}`,
-      { kicker: "Security", tone: o.change === "off" ? "white" : "cream" },
+      { kicker: "Security", tone: o.change === "off" || o.change === "phone-off" ? "white" : "cream" },
     );
   },
   test: (provider: string) => wrap("Your email setup works", p(`This test was sent from the Outlly admin through <b>${esc(provider)}</b>.`), { kicker: "Admin", tone: "cream" }),

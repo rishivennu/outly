@@ -41,6 +41,8 @@ model User {
   tokenVersion  Int     @default(0) // bumped by "sign out everywhere" / password change; sessions carry it as `v`
   emailVerifiedAt DateTime? // the inbox was proven: Google sign-in, an emailed code, or the founding link (1036)
   emailVerifiedFor String? // the exact address that was proven; a changed email is unproven again
+  phone           String?   @unique // E.164, only ever saved once a WhatsApp code proved it
+  phoneVerifiedAt DateTime?
   foundingNo      Int?      @unique // founding member number, 1..limit (null = not a founding member)
   foundingAt      DateTime?
   foundingPct     Int? // lifetime discount locked in when the seat was claimed
@@ -75,7 +77,7 @@ model User {
 model OtpCode {
   id        String    @id @default(cuid())
   email     String
-  purpose   String // login
+  purpose   String // login | reset | phone | 2fa. `email` holds the address, or wa:/add:/2fa: keys for WhatsApp codes
   codeHash  String
   attempts  Int       @default(0)
   expiresAt DateTime

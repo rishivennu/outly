@@ -18,7 +18,7 @@ export const OTP_RESEND_MS = 60_000;
 export const OTP_PER_HOUR = 5;
 
 /** "reset" codes only set a new password; they never sign anyone in on their own. */
-export type OtpPurpose = "login" | "reset";
+export type OtpPurpose = "login" | "reset" | "phone" | "2fa";
 
 /** Uniform 6 digits from the OS random source (randomInt has no modulo bias). */
 export function newCode(): string {

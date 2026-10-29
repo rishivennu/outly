@@ -18,6 +18,7 @@ import { ReferralCard } from "./ReferralCard";
 import { AvatarPicker } from "./AvatarPicker";
 import { SnippetsCard } from "./SnippetsCard";
 import { TwoStepCard } from "./TwoStepCard";
+import { PhoneCard } from "./PhoneCard";
 import { YourDataCard } from "./YourDataCard";
 import { AlertsCard } from "./AlertsCard";
 import { ALERT_DEFAULTS, type AlertPrefs } from "@/lib/alerts-core";
@@ -203,6 +204,7 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS }: {
 
         {!user.workspace && <AvatarPicker />}
         {!user.workspace && <TwoStepCard email={user.email} />}
+        {!user.workspace && <PhoneCard />}
         <SnippetsCard />
         {/* Referral and the weekly report share one row so neither leaves a gap beside it. */}
         <div className={user.workspace ? "grid lg:col-span-2" : "grid"}>

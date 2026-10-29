@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, KeyRound, Mail } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, KeyRound, Mail, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { api, ApiError } from "@/lib/client/api";
@@ -36,7 +36,7 @@ type Step = "password" | "code" | "reset" | "2fa";
  * code instead; then, for studios with an authenticator app, the app code (or a recovery code).
  * "Forgot password?" swaps in a fourth: an emailed reset code plus a new password, which signs you in.
  */
-export function AuthForm({ mode, google = false, title, subtitle, banner }: { mode: "login" | "signup"; google?: boolean; title: string; subtitle: string; banner?: React.ReactNode }) {
+export function AuthForm({ mode, google = false, whatsapp = false, title, subtitle, banner }: { mode: "login" | "signup"; google?: boolean; whatsapp?: boolean; title: string; subtitle: string; banner?: React.ReactNode }) {
   const router = useRouter();
   const params = useSearchParams();
   // Only a path on this site: "/%09/evil.com" used to slip past and land people on another site after sign-in.
@@ -50,13 +50,31 @@ export function AuthForm({ mode, google = false, title, subtitle, banner }: { mo
   const demo = mode === "login" && process.env.NEXT_PUBLIC_DEMO_LOGIN === "true";
   const [form, setForm] = useState({ name: "", email: demo ? "creator@studio.dev" : mode === "signup" ? (params.get("email") ?? "").slice(0, 200) : "", password: demo ? "studio123" : "" });
   const [step, setStep] = useState<Step>(mode === "login" && params.get("step") === "2fa" ? "2fa" : "password");
-  const [sentTo, setSentTo] = useState<string | null>(null); // email the last code went to
+  const [sentTo, setSentTo] = useState<string | null>(null); // email (or wa:number) the last code went to
+  // Sign-in codes can go to WhatsApp instead of email when the admin has it switched on.
+  const [via, setVia] = useState<"email" | "whatsapp">("email");
+  const [phone, setPhone] = useState("");
+  // Second step: the app (or a recovery code), or a code sent to the account's WhatsApp number.
+  const [twoVia, setTwoVia] = useState<"app" | "whatsapp">("app");
+  const [waMask, setWaMask] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [recovery, setRecovery] = useState(false);
   const [wait, setWait] = useState(0); // seconds until another code may be sent
   const [note, setNote] = useState<string | null>(null);
   const codeRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const byPhone = step === "code" && via === "whatsapp";
+  const target = byPhone ? `wa:${phone.replace(/\D/g, "")}` : form.email.trim().toLowerCase();
+  /** Second step on screen: ask once whether a WhatsApp code is on offer for this sign-in. */
+  useEffect(() => {
+    if (step !== "2fa") return;
+    let live = true;
+    api<{ whatsapp: string | null }>("/api/auth/2fa").then((r) => live && setWaMask(r.whatsapp)).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [step]);
   // State updates lag a render behind, so a paste plus Enter (or a fast double auto-submit) could send the
   // same code twice and the second answer ("already used") would hide the first. Refs see it at once.
   const inFlight = useRef(false);
@@ -112,6 +130,7 @@ export function AuthForm({ mode, google = false, title, subtitle, banner }: { mo
   const after = (r: { twoFactor?: boolean }) => {
     if (!r.twoFactor) return go();
     setStep("2fa");
+    setTwoVia("app");
     setCode("");
     setNote("Step 2 of 2. Enter the 6-digit code from your authenticator app.");
     inFlight.current = false;
@@ -130,7 +149,39 @@ export function AuthForm({ mode, google = false, title, subtitle, banner }: { mo
     lastSent.current = null;
     setCode("");
     setRecovery(false);
+    setTwoVia("app");
+    if (s !== "code") setVia("email");
     requestAnimationFrame(() => (s === "2fa" || (s === "code" && sentTo) ? codeRef.current : emailRef.current)?.focus());
+  };
+  /** Email code <-> WhatsApp code, on the code step. */
+  const switchVia = (v: "email" | "whatsapp") => {
+    setVia(v);
+    setError(null);
+    setCode("");
+    lastSent.current = null;
+    setNote(v === "whatsapp" ? "Signing in with a WhatsApp code." : "Signing in with an email code.");
+    requestAnimationFrame(() => (v === "whatsapp" ? phoneRef.current : emailRef.current)?.focus());
+  };
+  /** Second step: send a code to the account's WhatsApp number instead of using the app. */
+  const sendTwoFactorWa = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api<{ phone: string | null }>("/api/auth/2fa/whatsapp", { method: "POST" });
+      setTwoVia("whatsapp");
+      setRecovery(false);
+      setCode("");
+      setWait(60);
+      lastSent.current = null;
+      setNote(`A 6-digit code is on its way to ${r.phone ?? "your number"} on WhatsApp. It works for 10 minutes.`);
+      setBusy(false);
+      requestAnimationFrame(() => codeRef.current?.focus());
+    } catch (e) {
+      const m = e instanceof ApiError && /(\d+) seconds/.exec(e.message);
+      if (m) setWait(Number(m[1]));
+      if (e instanceof ApiError && e.code === "2FA_EXPIRED") setStep("password");
+      fail(e);
+    }
   };
 
   const sendCode = async () => {
@@ -138,12 +189,17 @@ export function AuthForm({ mode, google = false, title, subtitle, banner }: { mo
     setError(null);
     try {
       if (step === "reset") await api("/api/auth/reset", { method: "POST", json: { step: "send", email: form.email } });
+      else if (byPhone) await api("/api/auth/code", { method: "POST", json: { phone } });
       else await api("/api/auth/code", { method: "POST", json: { email: form.email } });
-      setSentTo(form.email.trim().toLowerCase());
+      setSentTo(target);
       setCode("");
       if (step === "reset") setForm((f) => ({ ...f, password: "" }));
       setWait(60);
-      setNote(`If ${form.email.trim()} has an Outlly account, a 6-digit code is on its way. It works for 10 minutes.`);
+      setNote(
+        byPhone
+          ? `If ${phone.trim()} is the WhatsApp number on an Outlly account, a 6-digit code is on its way there. It works for 10 minutes.`
+          : `If ${form.email.trim()} has an Outlly account, a 6-digit code is on its way. It works for 10 minutes.`,
+      );
       setBusy(false);
       requestAnimationFrame(() => codeRef.current?.focus());
     } catch (e) {
@@ -157,12 +213,12 @@ export function AuthForm({ mode, google = false, title, subtitle, banner }: { mo
     e?.preventDefault();
     if (busy || inFlight.current) return;
     const c = typed ?? code;
-    if (mode === "login" && (step === "code" || step === "reset") && (!sentTo || sentTo !== form.email.trim().toLowerCase())) return sendCode();
+    if (mode === "login" && (step === "code" || step === "reset") && (!sentTo || sentTo !== target)) return sendCode();
     if (step === "reset" && form.password.length < 8) {
       setError("Choose a new password of at least 8 characters.");
       return setTries((n) => n + 1);
     }
-    const sig = `${step}:${c}`;
+    const sig = `${step}:${step === "2fa" ? twoVia : via}:${c}`;
     if (step !== "password" && mode === "login" && lastSent.current === sig) return; // this exact code is already being checked
     inFlight.current = true;
     lastSent.current = step !== "password" ? sig : null;
@@ -175,9 +231,9 @@ export function AuthForm({ mode, google = false, title, subtitle, banner }: { mo
         return go();
       }
       if (step === "password") return after(await api<{ twoFactor?: boolean }>("/api/auth/login", { method: "POST", json: { email: form.email, password: form.password } }));
-      if (step === "code") return after(await api<{ twoFactor?: boolean }>("/api/auth/code/verify", { method: "POST", json: { email: form.email, code: c } }));
+      if (step === "code") return after(await api<{ twoFactor?: boolean }>("/api/auth/code/verify", { method: "POST", json: byPhone ? { phone, code: c } : { email: form.email, code: c } }));
       if (step === "reset") return after(await api<{ twoFactor?: boolean }>("/api/auth/reset", { method: "POST", json: { step: "confirm", email: form.email, code: c, password: form.password } }));
-      await api("/api/auth/2fa", { method: "POST", json: { code: c } });
+      await api("/api/auth/2fa", { method: "POST", json: { code: c, via: twoVia } });
       go();
     } catch (e) {
       // The halfway sign-in ran out: back to the start rather than a dead end.
@@ -194,21 +250,25 @@ export function AuthForm({ mode, google = false, title, subtitle, banner }: { mo
     if (!recovery && step !== "reset" && digits.length === 6 && !busy && !inFlight.current) void submit(undefined, digits);
   };
 
-  const sent = (step === "code" || step === "reset") && !!sentTo && sentTo === form.email.trim().toLowerCase();
+  const sent = (step === "code" || step === "reset") && !!sentTo && sentTo === target;
   const heading = step === "2fa" ? "One more step" : step === "reset" ? "Reset your password" : title;
   const sub =
     step === "2fa"
       ? recovery
         ? "Enter one of the recovery codes you saved when you turned on two-step sign-in. Each one works once."
-        : "Open your authenticator app and enter the 6-digit code it shows for Outlly."
+        : twoVia === "whatsapp"
+          ? "Enter the 6-digit code we just sent to your WhatsApp."
+          : "Open your authenticator app and enter the 6-digit code it shows for Outlly."
       : step === "code"
-        ? "We'll email you a 6-digit code, so there's no password to remember."
+        ? byPhone
+          ? "We'll send a 6-digit code to the WhatsApp number on your account."
+          : "We'll email you a 6-digit code, so there's no password to remember."
         : step === "reset"
           ? "We'll email you a 6-digit code. Enter it with a new password and you're signed straight in."
           : subtitle;
   const cta = busy
     ? (step === "code" || step === "reset") && !sent ? "Sending your code…" : step === "reset" ? "Saving your password…" : mode === "login" ? "Opening Outlly…" : "Setting up your account…"
-    : mode === "signup" ? "Get started" : step === "code" && !sent ? "Email me a code" : step === "reset" ? (sent ? "Save password and sign in" : "Email me a reset code") : step === "2fa" ? "Verify and sign in" : "Sign in";
+    : mode === "signup" ? "Get started" : step === "code" && !sent ? (byPhone ? "Send code on WhatsApp" : "Email me a code") : step === "reset" ? (sent ? "Save password and sign in" : "Email me a reset code") : step === "2fa" ? "Verify and sign in" : "Sign in";
   const textBtn = "inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-60";
 
   const other = mode === "login" ? "/signup" : "/login";
@@ -229,7 +289,14 @@ export function AuthForm({ mode, google = false, title, subtitle, banner }: { mo
             <Input id="name" autoComplete="name" required placeholder="Alex Rivera" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={field} />
           </div>
         )}
-        {step !== "2fa" && (
+        {byPhone && (
+        <div className="gs-in">
+          <Label htmlFor="phone" className={label}>Your WhatsApp number</Label>
+          <Input ref={phoneRef} id="phone" type="tel" inputMode="tel" autoComplete="tel" required placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value.slice(0, 32))} aria-describedby="phone-hint" className={field} />
+          <p id="phone-hint" className="mt-1.5 text-xs text-muted-foreground">The number you added in Settings. Indian numbers can skip the +91.</p>
+        </div>
+        )}
+        {step !== "2fa" && !byPhone && (
         <div className="gs-in">
           <Label htmlFor="email" className={label}>Your email</Label>
           <Input ref={emailRef} id="email" type="email" inputMode="email" autoComplete="email" required placeholder="you@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={field} />
@@ -291,7 +358,12 @@ export function AuthForm({ mode, google = false, title, subtitle, banner }: { mo
         {(sent || step === "2fa") && (
           <div>
             <div className="mb-1.5 flex items-center justify-between gap-3">
-              <Label htmlFor="otp" className={`${label} mb-0`}>{step === "2fa" ? (recovery ? "Recovery code" : "Authenticator code") : "6-digit code"}</Label>
+              <Label htmlFor="otp" className={`${label} mb-0`}>{step === "2fa" ? (recovery ? "Recovery code" : twoVia === "whatsapp" ? "WhatsApp code" : "Authenticator code") : "6-digit code"}</Label>
+              {step === "2fa" && twoVia === "whatsapp" && (
+                <button type="button" onClick={sendTwoFactorWa} disabled={busy || wait > 0} className={`${textBtn} -my-2 -mr-3 text-xs`}>
+                  {wait > 0 ? `Send again in ${wait}s` : "Send a new code"}
+                </button>
+              )}
               {(step === "code" || step === "reset") && (
                 <button type="button" onClick={sendCode} disabled={busy || wait > 0} className={`${textBtn} -my-2 -mr-3 text-xs`}>
                   {wait > 0 ? `Send again in ${wait}s` : "Send a new code"}
@@ -371,10 +443,29 @@ export function AuthForm({ mode, google = false, title, subtitle, banner }: { mo
         {mode === "login" && (
           <div className="gs-in -my-1 flex justify-center">
             {step === "2fa" ? (
-              <button type="button" className={textBtn} onClick={() => { setRecovery((r) => !r); setCode(""); setError(null); requestAnimationFrame(() => codeRef.current?.focus()); }}>
-                <KeyRound className="h-4 w-4" aria-hidden="true" />
-                {recovery ? "Use the app code instead" : "Use a recovery code instead"}
-              </button>
+              <div className="flex flex-wrap justify-center gap-x-1">
+                <button type="button" className={textBtn} onClick={() => { setRecovery((r) => twoVia === "whatsapp" ? false : !r); setTwoVia("app"); setCode(""); setError(null); lastSent.current = null; requestAnimationFrame(() => codeRef.current?.focus()); }}>
+                  <KeyRound className="h-4 w-4" aria-hidden="true" />
+                  {recovery || twoVia === "whatsapp" ? "Use the app code instead" : "Use a recovery code instead"}
+                </button>
+                {waMask && twoVia !== "whatsapp" && (
+                  <button type="button" className={textBtn} onClick={sendTwoFactorWa} disabled={busy || wait > 0}>
+                    <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                    {wait > 0 ? `WhatsApp code in ${wait}s` : `Send a code to WhatsApp ${waMask}`}
+                  </button>
+                )}
+              </div>
+            ) : step === "code" && whatsapp ? (
+              <div className="flex flex-wrap justify-center gap-x-1">
+                <button type="button" className={textBtn} onClick={() => switchVia(via === "whatsapp" ? "email" : "whatsapp")}>
+                  {via === "whatsapp" ? <Mail className="h-4 w-4" aria-hidden="true" /> : <MessageCircle className="h-4 w-4" aria-hidden="true" />}
+                  {via === "whatsapp" ? "Email me the code instead" : "Get the code on WhatsApp"}
+                </button>
+                <button type="button" className={textBtn} onClick={() => switchTo("password")}>
+                  <KeyRound className="h-4 w-4" aria-hidden="true" />
+                  Use my password
+                </button>
+              </div>
             ) : (
               <button type="button" className={textBtn} onClick={() => switchTo(step === "password" ? "code" : "password")}>
                 {step !== "password" ? <KeyRound className="h-4 w-4" aria-hidden="true" /> : <Mail className="h-4 w-4" aria-hidden="true" />}

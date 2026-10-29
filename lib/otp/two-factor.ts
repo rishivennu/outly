@@ -12,6 +12,9 @@ import {
   groupKey, isCodeShape, looksLikeRecovery, newRecoveryCodes, newTotpSecret, normalizeCode, otpauthUri, parseHashes,
   recoveryDigest, spendRecovery, verifyTotp,
 } from "./core";
+import { claimCode, issueTwoFactor, WA_MESSAGE } from "./whatsapp";
+import { whatsappAvailable } from "../whatsapp";
+import { maskPhone } from "../phone";
 
 /**
  * Two-step sign-in with an authenticator app. After the first step (password, email code or Google) a
@@ -41,13 +44,17 @@ const wrong = (userId: string, msg: string) => {
 const fingerprint = (u: { totpEnabledAt: Date | null; totpLastStep: number | null; recoveryCodes: string | null }) =>
   `${u.totpEnabledAt?.getTime() ?? 0}.${u.totpLastStep ?? 0}.${parseHashes(u.recoveryCodes).length}`;
 
-export async function beginSignIn(userId: string): Promise<{ twoFactor: boolean }> {
+/**
+ * `first` says how step one was done. A WhatsApp sign-in code can't also be the second step: that would be
+ * the same phone twice, so those sign-ins only get the authenticator app or a recovery code.
+ */
+export async function beginSignIn(userId: string, first: "whatsapp" | "other" = "other"): Promise<{ twoFactor: boolean }> {
   const u = await db.user.findUnique({ where: { id: userId }, select: { totpEnabledAt: true, totpLastStep: true, recoveryCodes: true } });
   if (!u?.totpEnabledAt) {
     await createSession(userId);
     return { twoFactor: false };
   }
-  const token = await new SignJWT({ sub: userId, p: "2fa", f: fingerprint(u) }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime(`${CHALLENGE_S}s`).sign(secret);
+  const token = await new SignJWT({ sub: userId, p: "2fa", f: fingerprint(u), m: first }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime(`${CHALLENGE_S}s`).sign(secret);
   cookies().set(CHALLENGE_COOKIE, token, { httpOnly: true, secure: env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: CHALLENGE_S });
   return { twoFactor: true };
 }
@@ -57,14 +64,14 @@ export function clearChallenge() {
   cookies().delete(CHALLENGE_COOKIE);
 }
 
-async function challengeUser(): Promise<{ id: string; f: string }> {
+async function challengeUser(): Promise<{ id: string; f: string; m: string }> {
   const t = cookies().get(CHALLENGE_COOKIE)?.value;
   const gone = new HttpError(401, "That sign-in took too long. Start again with your email.", "2FA_EXPIRED");
   if (!t) throw gone;
   try {
     const { payload } = await jwtVerify(t, secret, { algorithms: ["HS256"] });
     if (payload.p !== "2fa" || typeof payload.sub !== "string" || typeof payload.f !== "string") throw gone;
-    return { id: payload.sub, f: payload.f };
+    return { id: payload.sub, f: payload.f, m: typeof payload.m === "string" ? payload.m : "other" };
   } catch {
     throw gone;
   }
@@ -102,8 +109,32 @@ async function spendFactor(userId: string, u: Factor, input: string): Promise<"t
   throw new HttpError(400, "Enter the 6-digit code from your app, or one of your recovery codes.", "2FA_SHAPE");
 }
 
-/** Second step of sign-in. */
-export async function completeSignIn(input: string) {
+/** The number a WhatsApp second step would go to, or null when that isn't on offer for this sign-in. */
+async function whatsappTarget(ch: { id: string; m: string }) {
+  if (ch.m === "whatsapp" || !(await whatsappAvailable())) return null;
+  const u = await db.user.findUnique({ where: { id: ch.id }, select: { phone: true, phoneVerifiedAt: true } });
+  return u?.phone && u.phoneVerifiedAt ? u.phone : null;
+}
+
+/** What the second step may use besides the app. Never throws: no halfway sign-in just means no options. */
+export async function challengeOptions(): Promise<{ whatsapp: string | null }> {
+  try {
+    return { whatsapp: maskPhone(await whatsappTarget(await challengeUser())) };
+  } catch {
+    return { whatsapp: null };
+  }
+}
+
+/** "Send a code to WhatsApp instead" on the second step. */
+export async function sendChallengeWhatsApp() {
+  const ch = await challengeUser();
+  const phone = await whatsappTarget(ch);
+  if (!phone) throw new HttpError(400, "WhatsApp codes aren't available for this sign-in. Use your authenticator app or a recovery code.", "WA_NOT_OFFERED");
+  return issueTwoFactor(ch.id, phone);
+}
+
+/** Second step of sign-in: app code or recovery code, or (via "whatsapp") the code just sent to the proven number. */
+export async function completeSignIn(input: string, via: "app" | "whatsapp" = "app") {
   const ch = await challengeUser();
   const userId = ch.id;
   const u = await db.user.findUnique({ where: { id: userId }, select: { totpSecret: true, totpLastStep: true, recoveryCodes: true, totpEnabledAt: true } });
@@ -112,7 +143,14 @@ export async function completeSignIn(input: string) {
     cookies().delete(CHALLENGE_COOKIE);
     throw new HttpError(401, "That sign-in took too long. Start again with your email.", "2FA_EXPIRED");
   }
-  const used = await spendFactor(userId, u, input);
+  let used: "totp" | "recovery" | "whatsapp";
+  if (via === "whatsapp") {
+    guard(userId);
+    if (!(await whatsappTarget(ch))) throw new HttpError(400, "WhatsApp codes aren't available for this sign-in. Use your authenticator app or a recovery code.", "WA_NOT_OFFERED");
+    const v = await claimCode(`2fa:${userId}`, "2fa", input);
+    if (v !== "ok") throw wrong(userId, WA_MESSAGE[v as keyof typeof WA_MESSAGE] ?? WA_MESSAGE.wrong);
+    used = "whatsapp";
+  } else used = await spendFactor(userId, u, input);
   cookies().delete(CHALLENGE_COOKIE);
   await createSession(userId);
   return { used, recoveryLeft: parseHashes((await db.user.findUnique({ where: { id: userId }, select: { recoveryCodes: true } }))?.recoveryCodes).length };

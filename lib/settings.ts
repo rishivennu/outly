@@ -58,10 +58,23 @@ export interface EmailConfig {
   resend: { apiKey: string };
 }
 
+/** WhatsApp sign-in codes through Meta's Cloud API (lib/whatsapp.ts). The token is a secret. */
+export interface WhatsAppConfig {
+  enabled: boolean;
+  phoneNumberId: string;
+  wabaId: string;
+  token: string;
+  /** Approved Authentication template with a copy-code button. */
+  template: string;
+  /** Template language code, exactly as approved ("en", "en_US"). */
+  lang: string;
+}
+
 const SECRET_PATHS: Record<string, string[]> = {
   payments: ["stripe.secretKey", "stripe.webhookSecret", "razorpay.keySecret", "razorpay.webhookSecret", "paypal.clientSecret", "youpi.webhookSecret"],
   platforms: ["instagram", "youtube", "x", "tiktok", "facebook", "threads", "linkedin"].map((p) => `${p}.clientSecret`),
   email: ["resend.apiKey"],
+  whatsapp: ["token"],
 };
 
 export const DEFAULTS = {
@@ -75,6 +88,7 @@ export const DEFAULTS = {
     business: { name: "Outlly", address: "Bengaluru, India", gstin: "", taxPercent: 0 },
   } as PaymentConfig,
   email: { provider: "mock", from: "Outlly <hello@mail.outlly.com>", marketingFrom: "", replyTo: "", resend: { apiKey: "" } } as EmailConfig,
+  whatsapp: { enabled: false, phoneNumberId: "", wabaId: "", token: "", template: "outlly_code", lang: "en" } as WhatsAppConfig,
   site: { maintenance: false, message: "", eta: "", since: "", endsAt: "", waitlist: false, waitlistSince: "" } as SiteConfig,
   landing: LANDING_DEFAULT,
   pricing: PRICING_DISPLAY_DEFAULT as PricingDisplay,

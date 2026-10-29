@@ -1,14 +1,15 @@
 import "server-only";
 import { sendEmail, templates } from "../email";
-import { OTP_TTL_MS } from "./core";
+import { sendWhatsAppCode } from "../whatsapp";
+import { OTP_TTL_MS, type OtpPurpose } from "./core";
 
 /**
  * Where a one-time code goes. The code itself is made, hashed and checked by Outlly (lib/otp); a channel only
  * delivers it, so adding SMS later is one more implementation of this interface, nothing else changes.
  */
 export interface OtpChannel {
-  id: "email" | "sms";
-  send(to: string, code: string, ctx: { name: string | null; purpose?: "login" | "reset" }): Promise<{ ok: boolean; error?: string }>;
+  id: "email" | "sms" | "whatsapp";
+  send(to: string, code: string, ctx: { name: string | null; purpose?: OtpPurpose }): Promise<{ ok: boolean; error?: string }>;
 }
 
 /** Email through whichever provider the admin picked (Resend, or the mock Outbox in dev). */
@@ -30,5 +31,14 @@ export const smsChannel: OtpChannel = {
   id: "sms",
   async send() {
     return { ok: false, error: "SMS codes need a DLT-registered SMS provider, which isn't set up yet." };
+  },
+};
+
+/** WhatsApp through Meta's Cloud API. `to` is an E.164 number. The template carries the code, nothing else. */
+export const whatsappChannel: OtpChannel = {
+  id: "whatsapp",
+  async send(to, code) {
+    const r = await sendWhatsAppCode(to, code);
+    return { ok: r.ok, error: r.error };
   },
 };
