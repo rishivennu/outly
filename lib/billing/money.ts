@@ -51,6 +51,8 @@ export interface PublicPlan {
   burnCaptions: boolean;
   /** Connected accounts in total, several per platform allowed (1037). 0 = one per platform. */
   accountLimit: number;
+  /** Total storage across all files in MB; 0 = no cap. */
+  storageMb: number;
 }
 
 /**

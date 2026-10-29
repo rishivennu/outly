@@ -31,6 +31,8 @@ export const PlanInput = z.object({
   burnCaptions: z.boolean().default(true),
   /** Connected accounts in total, several per platform (1037). 0 = one per platform. */
   accountLimit: z.number().int().min(0).max(50).default(0),
+  /** Total storage for every file, MB (1052). 0 = no cap. Optional so an older editor never wipes it. */
+  storageMb: z.number().int().min(0).max(10_000_000).optional(),
 });
 
 export const FaqInput = z.object({

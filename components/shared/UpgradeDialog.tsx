@@ -19,6 +19,8 @@ const TITLE: Record<string, string> = {
   burn: "Upgrade to burn captions in",
   ai: "Upgrade for AI captions",
   seats: "Upgrade to add your team",
+  accounts: "Upgrade to connect more accounts",
+  storage: "Upgrade for more storage",
 };
 
 /**

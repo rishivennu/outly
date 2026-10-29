@@ -91,7 +91,7 @@ export default async function GrowthPage({ searchParams }: { searchParams: { r?:
         </Card>
 
         <Card>
-          <CardTitle hint={`${refs.total} signup${refs.total === 1 ? "" : "s"} from friends' links, ${refs.paid} of them paid. Each paying friend earns the sharer a free month.`}>Referral leaderboard</CardTitle>
+          <CardTitle hint={`${refs.total} signup${refs.total === 1 ? "" : "s"} from friends' links, ${refs.paid} of them paid. Each friend who pays gets a free Creator month. Details in Refer & Earn.`}>Referral leaderboard</CardTitle>
           {refs.rows.length === 0 ? (
             <Empty title="No referrals yet" body="When a creator's share link brings someone in, they show up here." />
           ) : (

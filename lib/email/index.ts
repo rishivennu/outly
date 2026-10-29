@@ -416,6 +416,16 @@ export const templates = {
         tiles: pair({ tone: "ink", html: stat("1 month", `of ${esc(o.plan)}, free`, "ink", 38) }, { tone: "forest", html: stat(esc(o.until), "free until", "forest", 28) }),
       },
     ),
+  /** Refer & Earn (1052): the friend who joined through a link gets their free month after the first payment. */
+  referralFriendReward: (o: { name: string; plan: string; length: string; starts: string; until: string; url: string }) =>
+    wrap(
+      `Your free ${esc(o.length)} of ${esc(o.plan)}`,
+      `${p(`Hi ${esc(o.name)}, thanks for joining Outlly through a friend's link. Your first payment is in, so ${esc(o.length)} of ${esc(o.plan)} is yours, free. It starts when the period you paid for ends, so you never lose a day.`)}${btn(o.url, "See your reward")}`,
+      {
+        kicker: "Refer & Earn",
+        tiles: pair({ tone: "ink", html: stat(esc(o.starts), "starts", "ink", 28) }, { tone: "forest", html: stat(esc(o.until), "free until", "forest", 28) }),
+      },
+    ),
   /** Something broke that the creator has to fix: a failed post, an account that signed out. */
   notice: (o: { name: string; title: string; body: string; url: string; action: string; tone?: "danger" | "warn" | "info" }) =>
     wrap(

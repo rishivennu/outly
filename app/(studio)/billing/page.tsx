@@ -11,7 +11,9 @@ import { formatMoney } from "@/lib/billing/money";
 import { stripe } from "@/lib/billing/providers";
 import { activeGateway, capturePaypal, completePayment, confirmYoupi, expireSubscriptions, failPayment } from "@/lib/billing/service";
 import { BillingView, type ReturnNotice } from "@/components/billing/BillingView";
-import { captionUsage, postUsage, replyUsage, uploadLimitBytes } from "@/lib/billing/entitlements";
+import { captionUsage, postUsage, replyUsage, storageUsage, uploadLimitBytes } from "@/lib/billing/entitlements";
+import { accessFor } from "@/lib/billing/access";
+import { isPaidSub } from "@/lib/billing/access-core";
 import { betaConfig, myBetaCode } from "@/lib/beta";
 import { myFounding, foundingPrice } from "@/lib/founding";
 import { trustBadges } from "@/lib/badges";
@@ -83,9 +85,9 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
     notice = { tone: "info", text: "Checkout cancelled. You weren't charged." };
   } else if (searchParams.paid) notice = { tone: "ok", text: `Payment received. Invoice ${searchParams.paid} is below and on its way to ${user.email}.` };
 
-  const [plans, sub, invoices, gw, usage, display, replies, captions, upload, beta, betaCfg, founding, badges] = await Promise.all([
+  const [plans, subs, invoices, gw, usage, display, replies, captions, upload, beta, betaCfg, founding, badges, storage, access] = await Promise.all([
     listPlans(),
-    db.subscription.findFirst({ where: { userId: user.id, status: "active" }, include: { plan: true }, orderBy: { createdAt: "desc" } }),
+    db.subscription.findMany({ where: { userId: user.id, status: "active" }, include: { plan: true }, orderBy: { createdAt: "desc" } }),
     db.invoice.findMany({ where: { userId: user.id }, orderBy: { issuedAt: "desc" }, take: 50, include: { payment: { select: { status: true } }, creditNote: { select: { number: true } } } }),
     activeGateway(),
     postUsage(user.id),
@@ -97,7 +99,16 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
     betaConfig(),
     myFounding(user.id),
     trustBadges(user.id),
+    storageUsage(user.id),
+    accessFor(user.id),
   ]);
+  // The plan card is about money: a paid subscription wins over a gift month running alongside it.
+  const sub = subs.find((s) => isPaidSub(s)) ?? subs[0] ?? null;
+  // Access granted by our team or earned through a referral, shown so the plan in force is never a mystery.
+  const best = access.best;
+  const extra = best && (best.source === "admin" || best.source === "referral") && best.endsAt
+    ? { planName: best.plan.name, source: best.source, endsAt: best.endsAt.toISOString() }
+    : null;
   // Founding members see the price checkout will really charge, with the list price struck through.
   const fpct = founding?.kind === "member" ? founding.pct : null;
   const off = (minor: number) => foundingPrice(minor, fpct);
@@ -138,16 +149,17 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
       plans={priced}
       currency={visitor.currency}
       currencySource={visitor.source}
-      canPickCurrency={gw.provider !== "razorpay"}
       current={sub ? { planSlug: sub.plan.slug, planName: sub.plan.name, priceMinor: sub.priceMinor, currency: sub.currency, interval: sub.interval, periodEnd: sub.currentPeriodEnd.toISOString(), cancelAtPeriodEnd: sub.cancelAtPeriodEnd, pausedUntil: sub.pausedUntil && sub.pausedUntil > new Date() ? sub.pausedUntil.toISOString() : null, provider: sub.provider } : null}
       beta={betaOffer}
       founding={founding}
       badges={badges}
+      access={extra}
       usage={{
         used: usage.used, limit: usage.postLimit, seats: usage.seats, aiCaptions: usage.aiCaptions, period: usage.postPeriod,
         maxUploadMb: upload.planLimited ? upload.mb : 0,
         replies: { limit: replies.replyLimit, used: replies.used },
         captions: { limit: captions.captionVideos, used: captions.used, burn: captions.burnCaptions },
+        storage: { usedBytes: storage.usedBytes, limitBytes: storage.limitBytes, pct: storage.pct, over: storage.over, label: storage.label },
       }}
       invoices={invoices.map((i) => ({ number: i.number, description: i.description, amountMinor: i.amountMinor, currency: i.currency, issuedAt: i.issuedAt.toISOString(), refunded: i.payment?.status === "refunded", creditNote: i.creditNote?.number ?? null }))}
     />

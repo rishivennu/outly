@@ -131,7 +131,8 @@ export async function redeemBetaCode(userId: string, raw: string) {
     // The claim: only one request can flip redeemedAt from null.
     const won = await tx.betaCode.updateMany({ where: { id: c.id, redeemedAt: null, revokedAt: null }, data: { redeemedAt: now, redeemedById: userId } });
     if (won.count !== 1) throw new HttpError(409, "That code has already been used.", "USED");
-    await tx.subscription.updateMany({ where: { userId, status: "active" }, data: { status: "canceled", canceledAt: now } });
+    // 1052: a free month someone earned (legacy referral gift) keeps running; access picks the best of both.
+    await tx.subscription.updateMany({ where: { userId, status: "active", provider: { not: "referral" }, priceMinor: 0, sample: false }, data: { status: "canceled", canceledAt: now } });
     // Nothing to charge and nothing renews: it simply ends, then the account is back on Free.
     return tx.subscription.create({
       data: { userId, planId: plan.id, status: "active", priceMinor: 0, currency: plan.currency, interval: "month", provider: "beta", currentPeriodEnd: until, cancelAtPeriodEnd: true },

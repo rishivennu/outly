@@ -6,7 +6,7 @@ import { env } from "@/lib/env";
 import { HttpError, json, route } from "@/lib/http";
 import { storage } from "@/lib/storage";
 import { ALLOWED_EXT, ALLOWED_VIDEO_MIME } from "@/lib/media/probe";
-import { assertUploadSize, uploadLimitBytes } from "@/lib/billing/entitlements";
+import { assertStorage, assertUploadSize, storageUsage, uploadLimitBytes } from "@/lib/billing/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,8 +22,9 @@ const body = z.object({
  * or R2/S3 presigned PUT / multipart), else stream through /api/media.
  */
 export const GET = route(async (_req, { user }) => {
-  const lim = await uploadLimitBytes(user.id);
+  const [lim, st] = await Promise.all([uploadLimitBytes(user.id), storageUsage(user.id)]);
   return json({
+    storage: { usedBytes: st.usedBytes, limitBytes: st.limitBytes, remainingBytes: st.remainingBytes, over: st.over, label: st.label },
     direct: Boolean(storage.createDirectUpload),
     driver: storage.name,
     maxBytes: lim.bytes,
@@ -47,6 +48,8 @@ export const POST = route(
     if (!(ALLOWED_VIDEO_MIME as readonly string[]).includes(mime) || !(ALLOWED_EXT as readonly string[]).includes(ext))
       throw new HttpError(415, "That one isn't a video we can use yet. Try an MP4 or MOV.");
     await assertUploadSize(user.id, b.size);
+    // The "uploading" row below holds this size against the allowance until it lands or is swept.
+    await assertStorage(user.id, b.size);
 
     const id = randomUUID();
     const key = `videos/${user.id}/${id}${ext}`;

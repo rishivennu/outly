@@ -50,18 +50,22 @@ describe("referral codes", () => {
 });
 
 describe("refund takes the referral month back", () => {
-  test("refunding the friend's first payment cancels the gift month; the referrer keeps nothing", async () => {
+  test("refunding the friend's first payment revokes their Refer & Earn month and disqualifies the referral", async () => {
     const db = (await import("../lib/db")).db;
     const svc = await import("../lib/billing/service");
     await (await import("../lib/billing/plans")).ensurePlans();
     const mk = (tag: string, extra: Record<string, unknown> = {}) =>
       db.user.create({ data: { name: `S ${tag}`, email: `s-${tag}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@test.dev`, passwordHash: "x", ...extra } });
     const owner = await mk("ref-owner");
-    const buyer = await mk("ref-buyer", { referredById: owner.id });
+    const b0 = await mk("ref-buyer", { referredById: owner.id });
+    const buyer = await db.user.update({ where: { id: b0.id }, data: { emailVerifiedAt: new Date(), emailVerifiedFor: b0.email } });
     const s = await svc.startCheckout(buyer.id, "creator");
     await svc.completePayment(s.paymentId, `mock_${s.paymentId}`);
-    expect(await db.subscription.count({ where: { userId: owner.id, provider: "referral", status: "active" } })).toBe(1);
+    expect(await db.planGrant.count({ where: { userId: buyer.id, source: "referral", status: "active" } })).toBe(1);
     await svc.refundPayment(s.paymentId, "test", "abuse check");
-    expect(await db.subscription.count({ where: { userId: owner.id, provider: "referral", status: "active" } })).toBe(0);
+    expect(await db.planGrant.count({ where: { userId: buyer.id, source: "referral", status: "active" } })).toBe(0);
+    expect(await db.referral.findUnique({ where: { referredId: buyer.id } })).toMatchObject({ status: "disqualified" });
+    expect(await db.auditLog.count({ where: { action: "referral.revoke", email: buyer.email } })).toBe(1);
+    expect(await db.planGrant.count({ where: { userId: owner.id } })).toBe(0);
   }, 30_000);
 });

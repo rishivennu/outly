@@ -8,6 +8,9 @@ import { instagramThreads, youtubeThreads, type AccountThread } from "./live/com
 import { isPlatform, type ErrorCode, type Platform } from "./domain";
 import { isPracticeAccount, publisherForAccount } from "./social/registry";
 import { asPublisherError, type AccountContext, type PlatformComment, type SocialPublisher } from "./social/types";
+import { mediaView } from "./services";
+import { youtubeEmbed, type CommentMedia } from "./inbox-media";
+import type { Media } from "@prisma/client";
 
 /** Inbox ids for comments on the creator's own account (not published through Outlly): a:<accountId>:<mediaId>. */
 export const accountTargetId = (accountId: string, mediaId: string) => `a:${accountId}:${mediaId}`;
@@ -24,6 +27,8 @@ export interface InboxComment extends PlatformComment {
   platform: Platform;
   postTitle: string | null;
   postUrl: string | null;
+  /** The reel or short this comment is on, for the 9:16 tile and the preview (1052). Only on top-level comments. */
+  media?: CommentMedia | null;
 }
 
 export interface InboxProblem {
@@ -61,6 +66,8 @@ type LoadedTarget = {
   target: { id: string; postId: string; platform: Platform; platformPostId: string; platformUrl: string | null; postTitle: string | null; practice: boolean };
   account: AccountContext;
   publisher: SocialPublisher;
+  /** Raw pieces for the preview; only signed when the post actually has comments. */
+  source: { media: Media; caption: string | null; postedAt: Date | null; account: string | null };
 };
 
 /** Every published destination that still has a connected account behind it. */
@@ -69,7 +76,7 @@ async function publishedTargets(userId: string, platform?: Platform, scope: Scop
     // A post deleted from the platform has no comments left to read; a hidden (private) YouTube video still does.
     // 1037: a member limited to some accounts only sees destinations tied to one of theirs.
     where: { post: { userId }, platformStatus: "published", platformPostId: { not: null }, OR: [{ removeMode: null }, { removeMode: { not: "deleted" } }], ...(platform ? { platform } : {}), ...(scope ? { socialAccountId: { in: scope } } : {}) },
-    include: { socialAccount: true, post: { select: { id: true, title: true, hook: true } } },
+    include: { socialAccount: true, post: { select: { id: true, title: true, hook: true, media: true } } },
     orderBy: { publishedAt: "desc" },
     take: 60,
   });
@@ -102,12 +109,36 @@ async function publishedTargets(userId: string, platform?: Platform, scope: Scop
       target: { id: t.id, postId: t.postId, platform: t.platform, platformPostId: t.platformPostId, platformUrl: t.platformUrl, postTitle: title, practice: isPracticeAccount(acct) },
       account,
       publisher,
+      source: {
+        media: t.post.media,
+        caption: t.caption ?? t.description ?? t.title ?? t.post.hook ?? null,
+        postedAt: t.publishedAt,
+        account: acct.platform === "youtube" ? acct.displayName ?? acct.username : `@${acct.username}`,
+      },
     });
   }
   return { targets: out, problems };
 }
 
-function flatten(l: LoadedTarget, comments: PlatformComment[]): InboxComment[] {
+/** The file we uploaded is the original, so it plays first; YouTube's own player is the fallback. */
+async function targetMedia(l: LoadedTarget): Promise<CommentMedia> {
+  const { media: m, caption, postedAt, account } = l.source;
+  const v = await mediaView(m);
+  const image = m.mimeType.startsWith("image/");
+  return {
+    kind: image ? "image" : "video",
+    thumbnailUrl: v.thumbnailUrl ?? (image ? v.url : null),
+    videoUrl: image ? null : v.url,
+    embedUrl: l.target.platform === "youtube" ? youtubeEmbed(l.target.platformPostId) : null,
+    caption: caption?.trim() || null,
+    width: m.width,
+    height: m.height,
+    postedAt: postedAt?.toISOString() ?? null,
+    account,
+  };
+}
+
+function flatten(l: LoadedTarget, comments: PlatformComment[], media: CommentMedia | null = null): InboxComment[] {
   const decorate = (c: PlatformComment): InboxComment => ({
     ...c,
     practice: c.practice ?? l.target.practice,
@@ -117,7 +148,7 @@ function flatten(l: LoadedTarget, comments: PlatformComment[]): InboxComment[] {
     postTitle: l.target.postTitle,
     postUrl: l.target.platformUrl,
   });
-  return comments.map((c) => ({ ...decorate(c), replies: (c.replies ?? []).map(decorate) }));
+  return comments.map((c) => ({ ...decorate(c), media, replies: (c.replies ?? []).map(decorate) }));
 }
 
 /**
@@ -136,13 +167,15 @@ export async function inbox(userId: string, platform?: Platform, scope: Scope = 
         : Promise.resolve(null),
     ),
   );
+  // Sign media only for posts that have something to show; a missing file just means no preview.
+  const media = await Promise.all(results.map((r, i) => (r.status === "fulfilled" && r.value?.length ? targetMedia(targets[i]).catch(() => null) : null)));
   results.forEach((r, i) => {
     const l = targets[i];
     if (r.status === "fulfilled") {
       if (r.value === null) {
         errors.push({ targetId: l.target.id, platform: l.target.platform, postTitle: l.target.postTitle, code: "FORBIDDEN", detail: `${l.target.platform} comments are not wired up yet.` });
       } else {
-        comments.push(...flatten(l, r.value));
+        comments.push(...flatten(l, r.value, media[i]));
       }
     } else {
       const pe = asPublisherError(r.reason);
@@ -198,7 +231,7 @@ async function accountComments(userId: string, skip: Set<string>, platform?: Pla
           if (!th.comments.length) continue;
           threads++;
           const decorate = (c: PlatformComment): InboxComment => ({ ...c, practice: false, targetId: accountTargetId(a.id, th.mediaId), postId: "", platform: p, postTitle: th.title, postUrl: th.url });
-          comments.push(...th.comments.map((c) => ({ ...decorate(c), replies: (c.replies ?? []).map(decorate) })));
+          comments.push(...th.comments.map((c) => ({ ...decorate(c), media: th.media ?? null, replies: (c.replies ?? []).map(decorate) })));
         }
       } catch (e) {
         const pe = asPublisherError(e);

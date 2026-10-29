@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { json, route } from "@/lib/http";
-import { assertBurnCaptions, captionUsage, postUsage, replyUsage, uploadLimitBytes } from "@/lib/billing/entitlements";
+import { assertBurnCaptions, captionUsage, postUsage, replyUsage, storageUsage, uploadLimitBytes } from "@/lib/billing/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -8,13 +8,15 @@ const fin = (n: number) => (Number.isFinite(n) ? n : null);
 
 /** What the signed-in workspace's plan allows right now. `null` = unlimited. */
 export const GET = route(async (_req, { user }) => {
-  const [posts, replies, captions, upload] = await Promise.all([postUsage(user.id), replyUsage(user.id), captionUsage(user.id), uploadLimitBytes(user.id)]);
+  const [posts, replies, captions, upload, storage] = await Promise.all([postUsage(user.id), replyUsage(user.id), captionUsage(user.id), uploadLimitBytes(user.id), storageUsage(user.id)]);
   return json({
     plan: { slug: posts.planSlug, name: posts.planName },
     posts: { limit: posts.postLimit || null, period: posts.postPeriod, used: posts.used, left: fin(posts.left) },
     replies: { limit: replies.replyLimit || null, used: replies.used, left: fin(replies.left) },
     captions: { ai: captions.aiCaptions, limit: captions.captionVideos || null, used: captions.used, left: fin(captions.left), burn: captions.burnCaptions },
     upload: { maxMb: upload.mb, planLimited: upload.planLimited },
+    storage: { usedBytes: storage.usedBytes, limitBytes: storage.limitBytes || null, remainingBytes: storage.limitBytes ? storage.remainingBytes : null, over: storage.over, label: storage.label },
+    source: posts.source,
   });
 });
 

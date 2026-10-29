@@ -1,4 +1,5 @@
 import "server-only";
+import { REFERRAL_DEFAULT, type ReferralConfig } from "./referral-core";
 import { db } from "./db";
 import { LANDING_DEFAULT } from "./landing";
 import { MASCOT_DEFAULT, type MascotConfig } from "./mascot/palettes";
@@ -97,6 +98,7 @@ export const DEFAULTS = {
   updates: UPDATE_DEFAULT as UpdateNotice,
   beta: BETA_DEFAULT as BetaConfig,
   founding: FOUNDING_DEFAULT as FoundingConfig,
+  referral: REFERRAL_DEFAULT as ReferralConfig,
   platforms: Object.fromEntries(["instagram", "youtube", "x", "tiktok", "facebook", "threads", "linkedin"].map((p) => [p, { clientId: "", clientSecret: "" }])) as PlatformKeys,
 };
 type Key = keyof typeof DEFAULTS;

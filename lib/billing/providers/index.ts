@@ -40,6 +40,8 @@ export const stripe = {
         customer_email: a.user.email,
         client_reference_id: a.paymentId,
         "metadata[paymentId]": a.paymentId,
+        // So refund and dispute events (which carry the PaymentIntent, not the session) can name the payment.
+        "payment_intent_data[metadata][paymentId]": a.paymentId,
         success_url: `${a.appUrl}/billing?checkout=return&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${a.appUrl}/billing?checkout=cancelled`,
       }),
@@ -56,6 +58,17 @@ export const stripe = {
     });
     if (!r.ok) throw new Error(`Stripe ${r.status}`);
     return (await r.json()) as { id: string; payment_status: string; client_reference_id: string; payment_intent: string | null };
+  },
+  /** The Outlly payment behind a PaymentIntent, for charge.refunded / charge.dispute.created on older sessions. */
+  async paymentIdForIntent(cfg: PaymentConfig, paymentIntent: string): Promise<string | null> {
+    const r = await fetch(`https://api.stripe.com/v1/checkout/sessions?limit=1&payment_intent=${encodeURIComponent(paymentIntent)}`, {
+      headers: { authorization: `Bearer ${cfg.stripe.secretKey}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) throw new Error(`Stripe ${r.status}`);
+    const j: any = await r.json().catch(() => ({}));
+    const s = j?.data?.[0];
+    return s?.client_reference_id || s?.metadata?.paymentId || null;
   },
   /** Full refund of the payment behind a Checkout Session. */
   async refund(cfg: PaymentConfig, sessionId: string) {
@@ -172,6 +185,12 @@ export const paypal = {
     const r = await pp(cfg, `/v2/payments/captures/${cap.id}/refund`, { method: "POST", body: {}, requestId: `refund-${orderId}` });
     if (!r.ok) throw new Error(ppError(r.j, r.status));
     return r.j.id as string;
+  },
+  /** The Outlly payment (custom_id) and order behind a capture, for refund, reversal and dispute webhooks. */
+  async captureRef(cfg: PaymentConfig, captureId: string): Promise<{ paymentId: string | null; orderId: string | null }> {
+    const r = await pp(cfg, `/v2/payments/captures/${encodeURIComponent(captureId)}`);
+    if (!r.ok) throw new Error(ppError(r.j, r.status));
+    return { paymentId: r.j.custom_id ?? null, orderId: r.j.supplementary_data?.related_ids?.order_id ?? null };
   },
   /** PayPal signs webhooks with a cert; their verify endpoint checks it against the webhook id from the dashboard. */
   async verifyWebhook(cfg: PaymentConfig, raw: string, h: Headers) {

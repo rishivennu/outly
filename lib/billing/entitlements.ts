@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { db } from "../db";
 import { HttpError } from "../http";
 import { env } from "../env";
-import { ensurePlans } from "./plans";
+import { accessFor } from "./access";
+import { fitsStorage, fmtBytes, storageFigures, type AccessSource } from "./access-core";
 
 export interface Entitlements {
   planSlug: string;
@@ -17,29 +18,30 @@ export interface Entitlements {
   captionVideos: number; // per month; 0 = unlimited
   burnCaptions: boolean;
   accountLimit: number; // connected accounts in total, several per platform; 0 = one per platform (1037)
+  storageMb: number; // total storage across all files; 0 = no cap (1052)
+  source: AccessSource; // where the winning plan comes from (1052): paid, gift, admin, referral or free
+  accessEndsAt: Date | null; // when that source ends (null for Free)
 }
 
 /** Which limit a 402 is about, so the upgrade popup can say the right thing. */
-export type LimitFeature = "posts" | "upload" | "replies" | "captions" | "burn" | "ai" | "seats" | "accounts";
+export type LimitFeature = "posts" | "upload" | "replies" | "captions" | "burn" | "ai" | "seats" | "accounts" | "storage";
 
 const limit = (message: string, feature: LimitFeature) => new HttpError(402, message, "PLAN_LIMIT", { feature, upgrade: "/billing" });
 
-const UNLIMITED: Omit<Entitlements, "planSlug" | "planName"> = { postLimit: 0, postPeriod: "month", aiCaptions: true, seats: 0, maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true, accountLimit: 0 };
+const UNLIMITED: Omit<Entitlements, "planSlug" | "planName"> = { postLimit: 0, postPeriod: "month", aiCaptions: true, seats: 0, maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true, accountLimit: 0, storageMb: 0, source: "free", accessEndsAt: null };
 
-/** What this account's plan allows: its active subscription's plan, else the Free plan, else no limits. */
+/**
+ * What this account may do (1052): the best plan live right now across paid and gift subscriptions, admin
+ * grants and referral rewards (lib/billing/access.ts), else the Free plan, else no limits.
+ */
 export async function entitlements(userId: string): Promise<Entitlements> {
-  const now = new Date();
-  // A paused plan rests: Free limits until pausedUntil, then the frozen paid days run again.
-  const sub = await db.subscription.findFirst({ where: { userId, status: "active", currentPeriodEnd: { gt: now }, OR: [{ pausedUntil: null }, { pausedUntil: { lte: now } }] }, include: { plan: true }, orderBy: { createdAt: "desc" } });
-  let plan = sub?.plan ?? null;
-  if (!plan) {
-    await ensurePlans();
-    plan = await db.plan.findUnique({ where: { slug: "free" } });
-  }
-  if (!plan) return { planSlug: "free", planName: "Free", ...UNLIMITED };
+  const { best } = await accessFor(userId);
+  if (!best) return { planSlug: "free", planName: "Free", ...UNLIMITED };
+  const plan = best.plan;
   return {
     planSlug: plan.slug, planName: plan.name, postLimit: plan.postLimit, postPeriod: plan.postPeriod === "week" ? "week" : "month",
     aiCaptions: plan.aiCaptions, seats: plan.seats, maxUploadMb: plan.maxUploadMb, replyLimit: plan.replyLimit, captionVideos: plan.captionVideos, burnCaptions: plan.burnCaptions, accountLimit: plan.accountLimit ?? 0,
+    storageMb: plan.storageMb ?? 0, source: best.source, accessEndsAt: best.endsAt,
   };
 }
 
@@ -150,6 +152,32 @@ export async function assertUploadSize(userId: string, size: number) {
     throw new HttpError(413, `File is larger than ${l.mb} MB.`, "TOO_LARGE");
   }
   return l;
+}
+
+/**
+ * Bytes this account keeps in storage (1052): every file except failed or abandoned uploads. A direct upload
+ * in progress counts at its declared size, so two tabs can't both squeeze into the last few MB.
+ */
+export async function storageUsedBytes(userId: string) {
+  const r = await db.media.aggregate({ where: { userId, status: { not: "failed" } }, _sum: { size: true } });
+  return r._sum.size ?? 0;
+}
+
+/** The storage meter: "200 MB used, 300 MB remaining out of 500 MB". Same figures on every device. */
+export async function storageUsage(userId: string) {
+  const [e, used] = await Promise.all([entitlements(userId), storageUsedBytes(userId)]);
+  return { planName: e.planName, planSlug: e.planSlug, storageMb: e.storageMb, ...storageFigures(used, e.storageMb) };
+}
+
+/**
+ * Refuses a file that doesn't fit the plan's total storage. After a downgrade the files already stored stay,
+ * but nothing new goes in while usage is over the new allowance.
+ */
+export async function assertStorage(userId: string, incoming: number) {
+  const u = await storageUsage(userId);
+  if (fitsStorage(u.usedBytes, u.storageMb, incoming)) return u;
+  if (u.over) throw limit(`You're using ${fmtBytes(u.usedBytes)} of the ${fmtBytes(u.limitBytes)} on ${u.planName}, so new uploads are paused. Your files are safe. Delete some, or upgrade for more room.`, "storage");
+  throw limit(`This file is ${fmtBytes(incoming)} and ${u.planName} has ${fmtBytes(u.remainingBytes)} of storage left. Delete some files, or upgrade for more room.`, "storage");
 }
 
 export async function assertAiCaptions(userId: string) {

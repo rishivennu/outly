@@ -16,7 +16,7 @@ export default function TermsPage() {
       <Shell>
         <PageHead
           title="Terms"
-          updated="15 October 2026"
+          updated="29 October 2026"
           lead="Short and specific. By creating an account or using Outlly, you agree to these terms and to our Privacy page."
         />
 
@@ -79,12 +79,14 @@ export default function TermsPage() {
 
           <h2>Plans and billing</h2>
           <ul>
-            <li>Outlly has a Free plan and paid plans. Each plan’s price, posts per month, AI features and team seats are shown in Billing before you pay, with taxes where they apply.</li>
+            <li>Outlly has a Free plan and paid plans. Each plan’s price, posts per month, total storage, AI features and team seats are shown in Billing before you pay, with taxes where they apply. Prices are in the currency of the country you are in.</li>
+            <li>Storage is the total size of everything your account keeps, on every device. If you move to a plan with less storage, your files stay, but new uploads pause until you are under the new allowance.</li>
             <li>Paid plans renew automatically at the end of each period until you cancel. Payments are taken by Stripe, Razorpay or PayPal, under their terms.</li>
             <li>Cancel any time in Billing. You keep your plan until the end of the period you paid for, then your account moves to Free. You can resume before that date.</li>
             <li>If we change a plan’s price, the price you pay now stays the same until your current period ends, and we tell you before the new price applies.</li>
             <li>If you were charged by mistake or something did not work, ask from the Pip chat. A person reviews every refund request, and refunds go back to the original payment method.</li>
-            <li>Referral rewards, such as a free month, have no cash value and can be withdrawn if they are abused.</li>
+            <li>Refer and Earn: a friend who signs up through your link gets one month of Creator free after their first payment for a paid plan, once their email address is verified. The month starts when the period they paid for ends. One reward per person and per inbox; signing up yourself through your own link does not count.</li>
+            <li>Referral rewards and plans given by Outlly have no cash value. A referral month is withdrawn if the payment that earned it is refunded or charged back, or if the link is abused.</li>
           </ul>
 
           <h2>What we are responsible for</h2>

@@ -15,7 +15,9 @@ import { issueInvoice } from "./invoice";
 import { sendEmail, templates } from "../email";
 import { mock, paypal, razorpay, stripe, youpi, type CheckoutStart } from "./providers";
 import { youpiReady, youpiVerdict, type YoupiVerdict } from "./youpi";
-import { rewardReferrer } from "../referral";
+import { revokeReferralForPayment, rewardReferredFriend } from "../referral";
+import { expireGrants, restackReferralGrants } from "./access";
+import { GIFT_PROVIDERS, isPaidSub } from "./access-core";
 import { isPaused, pausePlan, resumePlan } from "./pause";
 
 /** Which gateway serves checkout right now. Falls back to mock if the chosen one is missing keys, and says so. */
@@ -64,7 +66,8 @@ export async function startCheckout(userId: string, planSlug: string, wanted?: C
   const display = normalizeDisplay(await getConfig("pricing"));
   const want: Cycle = cycle === "year" && (plan.interval === "year" || hasYearly(plan, display.yearly)) ? "year" : plan.interval === "year" ? "year" : "month";
   // Same plan on the other cycle (monthly -> yearly) is a real change, so only the exact same plan + cycle is refused.
-  const current = await db.subscription.findFirst({ where: { userId, status: "active", planId: plan.id, interval: want } });
+  // A gift month (beta code, referral) of the same plan doesn't stop anyone from paying for it.
+  const current = await db.subscription.findFirst({ where: { userId, status: "active", planId: plan.id, interval: want, provider: { notIn: [...GIFT_PROVIDERS] } } });
   if (current) throw new HttpError(409, `You're already on ${plan.name}${want === "year" ? " yearly" : ""}.`, "ALREADY_SUBSCRIBED");
 
   const { cfg, provider } = await activeGateway();
@@ -141,9 +144,13 @@ export async function completePayment(paymentId: string, providerRef?: string) {
     const flipped = await tx.payment.updateMany({ where: { id: p.id, status: { in: ["pending", "failed"] } }, data: { status: "succeeded", failureReason: null, ...(providerRef ? { providerRef } : {}) } });
     if (flipped.count === 0) return null;
     const interval = p.interval === "year" || plan.interval === "year" ? "year" : "month";
-    const previous = await tx.subscription.findFirst({ where: { userId: p.userId, status: "active", currentPeriodEnd: { gt: now } }, orderBy: { currentPeriodEnd: "desc" } });
+    // 1052: only the plan being paid for is replaced. Gift subscriptions, admin grants and referral months
+    // keep their own clocks (lib/billing/access.ts picks the best live one), so nothing is lost on overlap.
+    const open = await tx.subscription.findMany({ where: { userId: p.userId, status: { in: ["active", "past_due"] } } });
+    const paid = open.filter(isPaidSub);
+    const previous = paid.filter((s) => s.status === "active" && s.currentPeriodEnd > now).sort((a, b) => b.currentPeriodEnd.getTime() - a.currentPeriodEnd.getTime())[0] ?? null;
     const carry = carryOverMs(previous, { priceMinor: p.amountMinor, currency: p.currency, interval, sample: p.sample }, now);
-    await tx.subscription.updateMany({ where: { userId: p.userId, status: { in: ["active", "past_due"] } }, data: { status: "canceled", canceledAt: now } });
+    if (paid.length) await tx.subscription.updateMany({ where: { id: { in: paid.map((s) => s.id) } }, data: { status: "canceled", canceledAt: now } });
     const s = await tx.subscription.create({
       data: {
         userId: p.userId,
@@ -163,10 +170,12 @@ export async function completePayment(paymentId: string, providerRef?: string) {
   const fresh = await db.payment.findUniqueOrThrow({ where: { id: p.id } });
   if (!sub) return { payment: fresh, invoice: await db.invoice.findUnique({ where: { paymentId } }) };
   const invoice = await invoiceFor(p);
+  // A referral month that hasn't started yet moves to after the new paid period.
+  await restackReferralGrants(p.userId, sub.currentPeriodEnd, now).catch((e) => console.error("[referral] restack", e));
   if (!p.sample) {
     const u = await db.user.findUnique({ where: { id: p.userId }, select: { name: true } });
     await adminEvent("subscription_new", `${u?.name ?? "A user"} subscribed to ${plan.name}`, formatMoney(p.amountMinor, p.currency), "/admin/payments");
-    await rewardReferrer(p.userId, plan.id).catch((e) => console.error("[referral] reward", e));
+    await rewardReferredFriend(p.id); // the friend's Refer & Earn month, when this is their first qualifying payment
   }
   return { payment: fresh, invoice };
 }
@@ -230,20 +239,20 @@ export async function failPayment(paymentId: string, reason: string) {
 
 /** Cancel at period end: access continues until currentPeriodEnd, nothing is refunded automatically. */
 export async function cancelSubscription(userId: string) {
-  const s = await db.subscription.findFirst({ where: { userId, status: "active" }, include: { plan: true } });
+  const s = await db.subscription.findFirst({ where: { userId, status: "active", provider: { notIn: [...GIFT_PROVIDERS] } }, include: { plan: true }, orderBy: { currentPeriodEnd: "desc" } });
   if (!s) throw new HttpError(404, "You don't have an active paid plan.", "NO_SUBSCRIPTION");
   await db.subscription.update({ where: { id: s.id }, data: { cancelAtPeriodEnd: true } });
   return s;
 }
 export async function resumeSubscription(userId: string) {
-  const s = await db.subscription.findFirst({ where: { userId, status: "active", cancelAtPeriodEnd: true } });
+  const s = await db.subscription.findFirst({ where: { userId, status: "active", cancelAtPeriodEnd: true, provider: { notIn: [...GIFT_PROVIDERS] } } });
   if (!s) throw new HttpError(404, "Nothing to resume.", "NO_SUBSCRIPTION");
   await db.subscription.update({ where: { id: s.id }, data: { cancelAtPeriodEnd: false } });
 }
 
 /** Pause instead of cancel: the plan rests (Free limits apply) and the unused paid days come back after. */
 export async function pauseSubscription(userId: string, months: number, now = new Date()) {
-  const s = await db.subscription.findFirst({ where: { userId, status: "active", priceMinor: { gt: 0 }, currentPeriodEnd: { gt: now } }, include: { plan: true }, orderBy: { createdAt: "desc" } });
+  const s = await db.subscription.findFirst({ where: { userId, status: "active", priceMinor: { gt: 0 }, currentPeriodEnd: { gt: now }, provider: { notIn: [...GIFT_PROVIDERS] } }, include: { plan: true }, orderBy: { createdAt: "desc" } });
   if (!s) throw new HttpError(404, "You don't have an active paid plan.", "NO_SUBSCRIPTION");
   if (isPaused(s, now)) throw new HttpError(409, "Your plan is already paused.", "ALREADY_PAUSED");
   const p = pausePlan(now, s.currentPeriodEnd, months);
@@ -262,6 +271,7 @@ export async function expireSubscriptions(userId?: string) {
     where: { ...(userId ? { userId } : {}), status: "active", cancelAtPeriodEnd: true, currentPeriodEnd: { lt: new Date() } },
     data: { status: "canceled", canceledAt: new Date() },
   });
+  await expireGrants(userId ? { userId } : {});
 }
 
 /**
@@ -290,7 +300,8 @@ export async function refundPayment(paymentId: string, by: string, reason: strin
     db.payment.update({ where: { id: p.id }, data: { status: "refunded", failureReason: `Refunded by ${by}${reason ? `: ${reason}` : ""} (${ref})`.slice(0, 300) } }),
     ...(p.subscriptionId ? [db.subscription.updateMany({ where: { id: p.subscriptionId, status: "active" }, data: { status: "canceled", canceledAt: new Date() } })] : []),
   ]);
-  if (!p.sample) await revokeReferralReward(p.userId, p.createdAt).catch((e) => console.error("[refund] referral revoke", e));
+  // 1052: a refunded qualifying payment ends the friend's Refer & Earn month and disqualifies the referral.
+  if (!p.sample && !(await revokeReferralForPayment(p.id, by))) await revokeReferralReward(p.userId, p.createdAt).catch((e) => console.error("[refund] referral revoke", e));
   // 1049: the refunded invoice gets its credit note straight away (the daily cron catches any that fail here).
   const credit = p.invoice ? await issueCreditNote(p.invoice.id, reason || null).catch((e) => (console.error("[refund] credit note", e), null)) : null;
   if (!p.sample) {
@@ -307,6 +318,33 @@ export async function refundPayment(paymentId: string, by: string, reason: strin
 }
 
 /**
+ * 1052: the gateway reports money going back without us asking: a refund made in its dashboard, or a
+ * chargeback/dispute. Either way the friend's Refer & Earn month ends and the referral is disqualified.
+ * A full refund also marks the payment refunded and ends the plan it paid for, like refundPayment (the
+ * daily credit-note cron issues the note). A dispute leaves the payment alone (it can still be won).
+ * Safe to repeat: webhooks retry, and an admin refund from here triggers the same event afterwards.
+ */
+export async function markExternalRefund(paymentId: string, kind: "refund" | "chargeback", detail = "") {
+  const p = await db.payment.findUnique({ where: { id: paymentId }, include: { user: { select: { name: true } } } });
+  if (!p || p.sample) return false;
+  let refunded = false;
+  if (kind === "refund" && p.status === "succeeded") {
+    const won = await db.payment.updateMany({ where: { id: p.id, status: "succeeded" }, data: { status: "refunded", failureReason: `Refunded at ${p.provider}${detail ? `: ${detail}` : ""}`.slice(0, 300) } });
+    refunded = won.count === 1;
+    if (refunded && p.subscriptionId) await db.subscription.updateMany({ where: { id: p.subscriptionId, status: "active" }, data: { status: "canceled", canceledAt: new Date() } });
+  }
+  const revoked = await revokeReferralForPayment(p.id, "system", kind);
+  if (refunded && !revoked) await revokeReferralReward(p.userId, p.createdAt).catch((e) => console.error("[refund] referral revoke", e));
+  if (refunded || kind === "chargeback") {
+    const amount = formatMoney(p.amountMinor, p.currency);
+    await adminEvent("refund", kind === "chargeback" ? `Chargeback opened: ${p.user.name}` : `Refunded at ${p.provider}: ${p.user.name}`, `${amount}${revoked ? ", Refer & Earn month ended" : ""}`, "/admin/payments?status=refunded").catch(() => {});
+  }
+  return refunded || revoked;
+}
+
+/**
+ * Before 1052 the SHARER earned the month. A refunded first payment of a friend who joined then still takes
+ * that month back (only when there is no Refer & Earn row for them, so new referrals never reach this).
  * A refunded FIRST payment must not leave the referrer's free month behind (otherwise: refer yourself,
  * pay, get refunded, keep the month, repeat). Undo exactly what rewardReferrer granted: the gift
  * subscription, or the extra month on the referrer's paid plan.
@@ -314,6 +352,7 @@ export async function refundPayment(paymentId: string, by: string, reason: strin
 async function revokeReferralReward(userId: string, paidAt: Date) {
   const me = await db.user.findUnique({ where: { id: userId }, select: { referredById: true } });
   if (!me?.referredById) return;
+  if (await db.referral.findUnique({ where: { referredId: userId }, select: { id: true } })) return; // a 1052 referral: the sharer earned nothing
   const real = await db.payment.count({ where: { userId, status: { in: ["succeeded", "refunded"] }, sample: false } });
   if (real !== 1) return; // the reward is only ever granted for the first real payment
   const now = new Date();

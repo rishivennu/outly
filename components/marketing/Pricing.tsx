@@ -8,7 +8,7 @@ import { getConfig } from "@/lib/settings";
 import { normalizeDisplay } from "@/lib/billing/display";
 import { hasYearly, priceFor, yearlySaving } from "@/lib/billing/cycle";
 import { visitorCurrency } from "@/lib/billing/visitor";
-import { CurrencyPicker } from "@/components/billing/CurrencyPicker";
+import { CurrencyNote } from "@/components/billing/CurrencyNote";
 import { formatMoney, planFeatures, priceLabel } from "@/lib/billing/money";
 
 /**
@@ -44,7 +44,7 @@ export async function Pricing() {
 
         {paid && (
           <Reveal y={16} className="mt-8 flex justify-center">
-            <CurrencyPicker currency={visitor.currency} source={visitor.source} />
+            <CurrencyNote currency={visitor.currency} source={visitor.source} />
           </Reveal>
         )}
 

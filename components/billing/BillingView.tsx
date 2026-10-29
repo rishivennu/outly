@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, Download, FileText, Info, Loader2, ShieldCheck, WifiOff, X } from "lucide-react";
+import { Check, Download, FileText, Gift, Info, Loader2, ShieldCheck, WifiOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/Toast";
@@ -10,8 +10,9 @@ import { Pip } from "@/components/brand/Pip";
 import { api } from "@/lib/client/api";
 import { formatMoney, intervalLabel, planFeatures, priceLabel, type PublicPlan } from "@/lib/billing/money";
 import type { CurrencySource } from "@/lib/billing/currency";
-import { CurrencyPicker } from "./CurrencyPicker";
 import { CycleSwitch } from "./CycleSwitch";
+import { CurrencyNote } from "./CurrencyNote";
+import { StorageMeter, type StorageMeterData } from "./StorageMeter";
 import { CARD_FEATURES } from "./PlanCardView";
 import { BetaRedeem, type BetaOffer } from "./BetaRedeem";
 import { FoundingCard } from "@/components/founding/FoundingCard";
@@ -44,7 +45,9 @@ function loadRazorpay() {
 
 type PricedPlan = PublicPlan & { approx: string | null; year: { priceMinor: number; currency: string; approx: string | null; save: number; was?: number | null } | null; was?: number | null };
 /** limit 0 = unlimited */
-type Usage = { used: number; limit: number; seats: number; aiCaptions: boolean; period?: "week" | "month"; maxUploadMb?: number; replies?: { limit: number; used: number }; captions?: { limit: number; used: number; burn: boolean } };
+type Usage = { used: number; limit: number; seats: number; aiCaptions: boolean; period?: "week" | "month"; maxUploadMb?: number; replies?: { limit: number; used: number }; captions?: { limit: number; used: number; burn: boolean }; storage?: StorageMeterData };
+type ExtraAccess = { planName: string; source: "admin" | "referral"; endsAt: string } | null;
+
 
 function UsageMeter({ u }: { u: Usage }) {
   const pct = u.limit > 0 ? Math.min(100, Math.round((u.used / u.limit) * 100)) : 0;
@@ -66,11 +69,12 @@ function UsageMeter({ u }: { u: Usage }) {
         {u.replies && u.replies.limit > 0 ? ` · Replies ${u.replies.used} of ${u.replies.limit} this week` : ""}
         {u.maxUploadMb ? ` · Uploads up to ${u.maxUploadMb} MB` : ""}
       </p>
+      {u.storage && <StorageMeter s={u.storage} className="mt-4" />}
     </div>
   );
 }
 
-export function BillingView(props: { email: string; notice: ReturnNotice | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; canPickCurrency: boolean; current: Current; usage: Usage; invoices: Inv[]; beta?: BetaOffer | null; founding?: FoundingMine; badges?: Badges }) {
+export function BillingView(props: { email: string; notice: ReturnNotice | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; invoices: Inv[]; beta?: BetaOffer | null; founding?: FoundingMine; badges?: Badges }) {
   const { plans, current } = props;
   const router = useRouter();
   const toast = useToast();
@@ -185,12 +189,18 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
         <div className="min-w-0 flex-1">
           <p className="text-sm text-muted-foreground">Current plan</p>
           <h2 id="cur" className="mt-1 text-2xl font-semibold tracking-tight">
-            {current ? current.planName : "Free"}
+            {current ? current.planName : props.access ? props.access.planName : "Free"}
             {current && <span className="ml-2 text-base font-medium text-muted-foreground tabular">{current.priceMinor > 0 ? <>{formatMoney(current.priceMinor, current.currency)}{intervalLabel(current.interval)}</> : current.provider === "beta" ? "free, early member" : "free month"}</span>}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {!current ? "No card on file. Upgrade any time; you'll get an invoice by email straight away." : current.pausedUntil ? <>Paused until <b className="text-foreground">{day(current.pausedUntil)}</b>. Free limits apply until then, and your paid days run again after, to <b className="text-foreground">{day(current.periodEnd)}</b>.</> : current.cancelAtPeriodEnd ? <>Ends on <b className="text-foreground">{day(current.periodEnd)}</b>, then you move to Free. Nothing else will be charged.</> : <>Renews on <b className="text-foreground">{day(current.periodEnd)}</b>.</>}
           </p>
+          {props.access && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-lime/15 px-3 py-1 text-[12.5px] text-foreground" role="status">
+              <Gift className="h-3.5 w-3.5" aria-hidden />
+              {props.access.source === "referral" ? "Referral reward" : "Granted by Outlly"}: {props.access.planName} until {day(props.access.endsAt)}
+            </p>
+          )}
           {props.badges && <TrustBadges b={props.badges} className="mt-3" />}
           {current?.planSlug === MANAGER_SLUG && props.badges && !props.badges.verifiedManager && (
             <p className="mt-2 text-[12.5px] text-muted-foreground">Your Verified Manager badge appears once your email is confirmed and two or more accounts are connected.</p>
@@ -212,7 +222,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
       <section aria-labelledby="plans" className="mt-10 max-w-5xl">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 id="plans" className="text-xl font-semibold tracking-tight">Plans</h2>
-          {props.canPickCurrency && <CurrencyPicker currency={props.currency} source={props.currencySource} className="mr-auto ml-3" />}
+          <CurrencyNote currency={props.currency} source={props.currencySource} className="mr-auto ml-3" />
           {anyYear && <CycleSwitch value={cycle} onChange={setCycle} save={save} />}
           {props.testMode && <p className="inline-flex items-center gap-1.5 rounded-full bg-warning/15 px-3 py-1 text-[12px] font-medium"><ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Test mode: no real money moves</p>}
         </div>

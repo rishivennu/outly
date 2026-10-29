@@ -1,6 +1,6 @@
 import { createSession } from "@/lib/auth";
 import { signUp, validTimezone } from "@/lib/auth-provider";
-import { json, route } from "@/lib/http";
+import { clientIp, json, route } from "@/lib/http";
 import { signupSchema } from "@/lib/validation";
 import { attachReferral } from "@/lib/referral";
 import { attachSource } from "@/lib/growth/source";
@@ -16,7 +16,7 @@ export const POST = route(
     // by the /signup redirect, so a direct API call can't skip the line.
     await assertMayCreateAccount(body.email);
     const user = await signUp(body.name, body.email, body.password, timezone);
-    await attachReferral(user.id).catch((e) => console.error("[referral] attach", e));
+    await attachReferral(user.id, clientIp(req)).catch((e) => console.error("[referral] attach", e));
     await attachSource(user.id).catch((e) => console.error("[growth] source", e));
     await createSession(user.id);
     return json({ ok: true });

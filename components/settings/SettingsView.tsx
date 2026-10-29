@@ -206,17 +206,17 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS }: {
         {!user.workspace && <TwoStepCard email={user.email} />}
         {!user.workspace && <PhoneCard />}
         <SnippetsCard />
-        {/* Referral and the weekly report share one row so neither leaves a gap beside it. */}
-        <div className={user.workspace ? "grid lg:col-span-2" : "grid"}>
+        {/* Refer & Earn (1052) has its history, so it gets the full row; the weekly report pairs with Your data. */}
+        <div className="grid lg:col-span-2">
           <ReferralCard />
         </div>
         {!user.workspace && <WeeklyReportCard initial={weeklyReport} />}
+        {!user.workspace && <YourDataCard email={user.email} />}
         {!user.workspace && <div className="lg:col-span-2"><AlertsCard initial={alerts} /></div>}
         <div className="lg:col-span-2">
           <TeamCard />
         </div>
 
-        {!user.workspace && <YourDataCard email={user.email} />}
 
         <section className="glass flex flex-wrap items-center justify-between gap-4 rounded-[32px] p-6 lg:col-span-2" aria-label="Session">
           <div>

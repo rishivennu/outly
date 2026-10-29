@@ -11,7 +11,8 @@ import { connectedPlatforms } from "@/lib/live/connected";
 import { canConnectWithToken, hasCredentials, loadKeys } from "@/lib/social/registry";
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
 import { WelcomeSubscribe, type WelcomeOffer } from "@/components/onboarding/WelcomeSubscribe";
-import { entitlements } from "@/lib/billing/entitlements";
+import { entitlements, storageUsage } from "@/lib/billing/entitlements";
+import { StorageCard } from "@/components/home/StorageCard";
 import { listPlans } from "@/lib/billing/plans";
 import { visitorCurrency } from "@/lib/billing/visitor";
 import { localPrice } from "@/lib/billing/currency";
@@ -75,7 +76,7 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
   const recapAt = process.env.NODE_ENV !== "production" && searchParams?.recapAt ? new Date(searchParams.recapAt) : new Date();
   // 1037: the picked profile (or a member's accounts) narrows the drafts and the next post too.
   const [profiles, scope, badges] = await Promise.all([listProfiles(user.id, user.scope), postFilter(user), trustBadges(user.id)]);
-  const [, drafts, next, live, welcome, published, ret, pulse, recap, founding, saved] = await Promise.all([
+  const [, drafts, next, live, welcome, published, ret, pulse, recap, founding, saved, storage] = await Promise.all([
     loadKeys(),
     db.post.findMany({ where: { userId: user.id, status: "draft", ...scope.where }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() }, ...scope.where }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),
@@ -105,6 +106,10 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
     user.actor ? null : myFounding(user.id),
     savedTime(user.id, Date.now(), scope.where).catch((e) => {
       console.error("[home] saved", e);
+      return null;
+    }),
+    storageUsage(user.id).catch((e) => {
+      console.error("[home] storage", e);
       return null;
     }),
   ]);
@@ -152,6 +157,11 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
           {ret && <div className="grid min-w-0 md:col-span-5"><GoalRing goal={ret.goal} scheduled={ret.scheduledThisWeek} canEdit={!user.actor} /></div>}
           <div className={cn("grid min-w-0", ideasWide ? "md:col-span-12" : "md:col-span-7")}><IdeaBank wide={ideasWide} /></div>
           {recycle.length > 0 && <div className={cn("grid min-w-0", ret && steps.length === 0 ? "md:col-span-12" : "md:col-span-5")}><RecycleCard posts={recycle} /></div>}
+        </div>
+      )}
+      {storage && (
+        <div className="mx-auto max-w-5xl px-5 pb-4 sm:px-10">
+          <StorageCard s={storage} planName={storage.planName} canUpgrade={!user.actor && storage.planSlug !== "pro-manager"} />
         </div>
       )}
       {(dv.length > 0 || nv) && (

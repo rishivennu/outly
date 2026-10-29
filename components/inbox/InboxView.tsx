@@ -3,7 +3,6 @@ import { useRef, useState } from "react";
 import { ExternalLink, Lightbulb, MessagesSquare, RefreshCw, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
-import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { useToast } from "@/components/shared/Toast";
 import { targetErrorCopy } from "@/components/shared/errorCopy";
 import { api, ApiError } from "@/lib/client/api";
@@ -12,6 +11,7 @@ import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn } from "@/lib/utils";
 import type { InboxComment, InboxProblem } from "@/lib/inbox";
 import { MessagesView, type DmData } from "./MessagesView";
+import { PreviewTile, usePreview, VideoPreview } from "./VideoPreview";
 
 type Data = { comments: InboxComment[]; errors: InboxProblem[]; targets: number };
 
@@ -34,6 +34,7 @@ export function InboxView({ initial, dms, initialTab = "comments" }: { initial: 
   const live = useLivePlatforms();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const preview = usePreview();
 
   const load = async (p: Platform | "all") => {
     setPlatform(p);
@@ -168,17 +169,18 @@ export function InboxView({ initial, dms, initialTab = "comments" }: { initial: 
       ) : (
         <ul className="mt-8 max-w-3xl space-y-3">
           {data.comments.map((c) => (
-            <CommentRow key={`${c.targetId}-${c.id}`} comment={c} onReplied={onReplied} />
+            <CommentRow key={`${c.targetId}-${c.id}`} comment={c} onReplied={onReplied} onPreview={(from) => preview.show(c, from)} />
           ))}
         </ul>
       )}
+      <VideoPreview state={preview.open} all={data.comments} onSelect={preview.select} onClose={preview.close} onClosed={preview.restore} />
       </div>
       )}
     </div>
   );
 }
 
-function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: (id: string, reply: InboxComment) => void }) {
+function CommentRow({ comment, onReplied, onPreview }: { comment: InboxComment; onReplied: (id: string, reply: InboxComment) => void; onPreview: (from: string) => void }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -247,7 +249,8 @@ function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: 
   return (
     <li className="rounded-[24px] bg-secondary/40 p-4 hairline">
       <div className="flex items-start gap-3">
-        <PlatformOrb platform={comment.platform} size={30} />
+        {/* 1052: the reel this comment is on, 9:16. Opens the preview in place; the list stays where it was. */}
+        <PreviewTile comment={comment} id={`pv-${comment.targetId}-${comment.id}`} onOpen={() => onPreview(`pv-${comment.targetId}-${comment.id}`)} />
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
             {comment.authorName}

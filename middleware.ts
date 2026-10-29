@@ -3,6 +3,7 @@ import { jwtVerify } from "jose";
 import { SRC_COOKIE, SRC_DAYS, sourceFromParams } from "./lib/growth/core";
 import { APP_SOURCE } from "./lib/app-mode";
 import { buildCsp, CSP_REPORT_PATH, newNonce } from "./lib/csp";
+import { REF_COOKIE, REF_DAYS, REF_VISITOR, isCode } from "./lib/referral-core";
 
 const AUTH_PAGES = ["/login", "/signup"];
 // Marketing pages anyone can read.
@@ -121,6 +122,14 @@ export async function middleware(req: NextRequest) {
   // so signup can credit the channel. Never overwritten by a later link.
   const src = req.cookies.get(SRC_COOKIE) ? null : sourceFromParams(req.nextUrl.searchParams);
   if (src) res.cookies.set(SRC_COOKIE, src, { path: "/", httpOnly: true, sameSite: "lax", secure: req.nextUrl.protocol === "https:", maxAge: 60 * 60 * 24 * SRC_DAYS });
+  // Refer & Earn (1052): a share link is /signup?ref=CODE. Remember the FIRST link for 30 days (a later one
+  // never takes the credit), plus a random visitor id so the opened link becomes the friend's row at signup.
+  const ref = req.nextUrl.searchParams.get("ref")?.toLowerCase();
+  if (ref && isCode(ref) && !req.cookies.get(REF_COOKIE)) {
+    const opts = { path: "/", httpOnly: true, sameSite: "lax" as const, secure: req.nextUrl.protocol === "https:", maxAge: 60 * 60 * 24 * REF_DAYS };
+    res.cookies.set(REF_COOKIE, ref, opts);
+    res.cookies.set(REF_VISITOR, crypto.randomUUID(), opts);
+  }
   return res;
 }
 

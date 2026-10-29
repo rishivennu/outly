@@ -80,10 +80,21 @@ function xhr(method: string, url: string, body: Blob | null, headers: Record<str
 }
 
 const STALL_MS = 60_000;
+const fmtMb = (b: number) => (b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(1).replace(/\.0$/, "")} GB` : `${Math.max(1, Math.round(b / 1048576))} MB`);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function uploadVideo<M>(file: File, onProgress: UploadProgress, signal?: AbortSignal): Promise<UploadedMedia<M>> {
-  const cfg = await api<{ direct: boolean; maxBytes: number; maxMb?: number; planLimited?: boolean; planName?: string }>("/api/media/direct");
+  const cfg = await api<{ direct: boolean; maxBytes: number; maxMb?: number; planLimited?: boolean; planName?: string; storage?: { limitBytes: number; remainingBytes: number; over: boolean; label: string } }>("/api/media/direct");
+  // Total storage: checked here so nobody waits through an upload the server will refuse anyway.
+  const st = cfg.storage;
+  if (st && st.limitBytes > 0 && (st.over || file.size > st.remainingBytes)) {
+    const plan = cfg.planName ?? "Your plan";
+    const msg = st.over
+      ? `${plan} storage is full (${st.label}), so new uploads are paused. Your files are safe. Delete some, or upgrade for more room.`
+      : `This file needs ${fmtMb(file.size)} and ${plan} has ${fmtMb(st.remainingBytes)} of storage left. Delete some files, or upgrade for more room.`;
+    offerUpgrade(msg, "storage");
+    throw new ApiError(402, msg, "PLAN_LIMIT");
+  }
   if (file.size > cfg.maxBytes) {
     const mb = cfg.maxMb ?? Math.round(cfg.maxBytes / 1048576);
     if (cfg.planLimited) {

@@ -8,7 +8,7 @@ import { takeOAuthState } from "@/lib/oauth-state";
 import { invalidateDashboards } from "@/lib/live";
 import { beginSignIn } from "@/lib/otp/two-factor";
 import { signInWithGoogle } from "@/lib/auth-provider";
-import { HttpError } from "@/lib/http";
+import { HttpError, clientIp } from "@/lib/http";
 import { attachReferral } from "@/lib/referral";
 import { attachSource } from "@/lib/growth/source";
 import { YouTubePublisher, googleIdentity } from "@/lib/social/youtube";
@@ -59,7 +59,7 @@ async function googleSignIn(req: NextRequest, returnTo: string) {
     const who = await googleIdentity(tok.access_token);
     if (!who.email || who.email_verified === false) return fail("unverified");
     const user = await signInWithGoogle({ email: who.email, name: who.name, picture: who.picture });
-    if (user.created) await attachReferral(user.id).catch((e) => console.error("[referral] attach", e));
+    if (user.created) await attachReferral(user.id, clientIp(req)).catch((e) => console.error("[referral] attach", e));
     if (user.created) await attachSource(user.id).catch((e) => console.error("[growth] source", e));
     // Authenticator on: Google was the first step only. No session (and no channel link) until the app code.
     if ((await beginSignIn(user.id)).twoFactor) {

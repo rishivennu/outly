@@ -26,8 +26,8 @@ model User {
   lastActiveAt DateTime?
   lastSeenAt   DateTime? // presence heartbeat (1037), written at most once a minute; "online" = seen in the last 5 minutes
   alertPrefs   String? // JSON { spike, spikeX, failed, email } custom alerts (1037); null = defaults
-  referralCode String?   @unique // share link /r/{code}
-  referredById String? // who invited this user (one free month each time a referral signs up)
+  referralCode String?   @unique // share link /signup?ref={code} (old /r/{code} still works)
+  referredById String? // who invited this user (1052: the friend, not the sharer, earns a Creator month on their first payment)
   weeklyReport Boolean   @default(true) // Monday summary email
   lastReportAt DateTime?
   postingGoal  Int       @default(3) // posts per week the creator aims for (0 = no goal)
@@ -70,6 +70,9 @@ model User {
   betaRedeemed BetaCode? @relation("BetaRedeemed")
   creditNotes  CreditNote[]
   pipAccess    PipAccessLog[]
+  planGrants   PlanGrant[]
+  referralsMade Referral[] @relation("ReferralsMade")
+  referral      Referral?  @relation("ReferralReceived")
 
   @@index([lastSeenAt])
 }
@@ -285,10 +288,12 @@ model Plan {
   state      String   @default("available") // available | soon | hidden
   highlight  Boolean  @default(false)
   sortOrder  Int      @default(0)
+  storageMb  Int      @default(0) // total storage on this plan (1052), 0 = no cap
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   subscriptions Subscription[]
+  grants        PlanGrant[]
 }
 
 /// Price is snapshotted, so editing a plan never silently changes what an existing subscriber pays.
@@ -734,4 +739,85 @@ model DmMessage {
 
   @@unique([threadId, platformMessageId])
   @@index([threadId, sentAt])
+}
+
+/// Plan access that is not a paid subscription (1052): an admin grant or a referral reward. Never touches a
+/// Subscription row, so revoking or expiring one can't cancel or change a paid plan. The best of all live
+/// sources wins (lib/billing/access.ts). `userId` is null while an admin grant waits for that email to register.
+model PlanGrant {
+  id           String    @id @default(cuid())
+  userId       String?
+  email        String // lowercase address it was granted to
+  planId       String
+  source       String // admin | referral
+  status       String    @default("active") // pending | active | revoked | expired (time decides "scheduled" / "running")
+  startsAt     DateTime  @default(now())
+  endsAt       DateTime
+  durationDays Int? // granted by length: a pending grant's clock starts the day it activates
+  note         String    @default("") // internal: why it was granted
+  grantedBy    String? // admin login, or "system" for referral rewards
+  revokedAt    DateTime?
+  revokedBy    String?
+  revokeReason String?
+  liveKey      String?   @unique // "admin:<userId>" / "admin:@<email>" while an admin grant is live: one per person
+  referralId   String?   @unique // one reward per referral
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan     Plan      @relation(fields: [planId], references: [id])
+  referral Referral? @relation(fields: [referralId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([email, status])
+  @@index([status, endsAt])
+}
+
+/// Refer & Earn (1052). One row per friend: opened the link (invited), signed up (registered), first qualifying
+/// payment verified (paid), Creator month issued (rewarded), or disqualified. The REFERRED friend gets the reward.
+model Referral {
+  id                 String    @id @default(cuid())
+  referrerId         String
+  referredId         String?   @unique // one referral per referred account
+  code               String
+  visitorKey         String?   @unique // the invite cookie, so an opened link becomes this row at signup
+  status             String    @default("invited") // invited | registered | paid | rewarded | disqualified
+  ipHash             String? // keyed hash of the network at signup (abuse checks), never the raw IP
+  inboxKey           String? // the friend's folded inbox (Gmail dots / +tags), so one inbox is rewarded once
+  flags              String    @default("") // comma list for admins: shared-network, burst
+  paymentId          String?   @unique // the qualifying payment
+  paidAt             DateTime?
+  registeredAt       DateTime?
+  disqualifiedAt     DateTime?
+  disqualifiedReason String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  referrer User       @relation("ReferralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred User?      @relation("ReferralReceived", fields: [referredId], references: [id], onDelete: Cascade)
+  grant    PlanGrant?
+
+  @@index([referrerId, status])
+  @@index([code])
+  @@index([ipHash])
+  @@index([inboxKey])
+}
+
+/// Audit trail of every administrative change to plans, grants and referrals (1052). Append-only.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actor      String // admin login, or "system"
+  actorRole  String? // super | finance | support | marketing
+  action     String // grant.create | grant.extend | grant.change | grant.revoke | grant.activate | grant.expire | referral.reward | referral.revoke | referral.config ...
+  targetType String // grant | referral | config
+  targetId   String?
+  email      String? // whose access it was about (lowercase), so history can be searched by email
+  before     String? // JSON snapshot
+  after      String? // JSON snapshot
+  note       String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([targetType, targetId])
+  @@index([createdAt])
 }

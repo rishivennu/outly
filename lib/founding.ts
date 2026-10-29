@@ -111,6 +111,11 @@ export async function markEmailVerified(userId: string) {
     const u = await db.user.findUnique({ where: { id: userId }, select: { email: true, emailVerifiedAt: true, emailVerifiedFor: true } });
     if (!u) return { result: "off" as ClaimResult };
     if (!isProven(u)) await db.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date(), emailVerifiedFor: u.email.toLowerCase() } });
+    // 1052: plans an admin granted to this exact address start now, and a Refer & Earn month that was
+    // waiting on the verified address is issued. Both never throw.
+    const [{ activatePendingGrants }, { settleReferral }] = await Promise.all([import("./billing/access"), import("./referral")]);
+    await activatePendingGrants(userId);
+    await settleReferral(userId);
     return await claimFounding(userId);
   } catch (e) {
     console.error("[founding] verify", e);

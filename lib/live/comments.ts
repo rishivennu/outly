@@ -1,5 +1,6 @@
 import "server-only";
 import { httpFailure, type AccountContext, type PlatformComment } from "../social/types";
+import { instagramMedia, youtubeEmbed, youtubeThumb, type CommentMedia } from "../inbox-media";
 
 /** A post on the creator's own account that has comments, whether or not it went out through Outlly. */
 export interface AccountThread {
@@ -9,6 +10,8 @@ export interface AccountThread {
   comments: PlatformComment[];
   /** What the platform says the post has; lets us notice when it reports comments but returns none. */
   expected?: number;
+  /** Thumbnail, playable file or player, and caption for the inbox preview (1052). */
+  media?: CommentMedia | null;
 }
 
 const IG = "https://graph.instagram.com/v21.0";
@@ -27,9 +30,11 @@ const igC = (c: IgC, parentId: string | null = null): PlatformComment => ({
 /** Newest media that actually has comments; skips ids Outlly already tracks so nothing shows twice. */
 export async function instagramThreads(acct: AccountContext, skip: Set<string>, maxPosts = 8): Promise<AccountThread[]> {
   const t = encodeURIComponent(acct.accessToken);
-  const r = await fetch(`${IG}/me/media?fields=id,caption,permalink,comments_count,timestamp&limit=25&access_token=${t}`, { signal: AbortSignal.timeout(12_000), cache: "no-store" });
+  const r = await fetch(`${IG}/me/media?fields=id,caption,permalink,comments_count,timestamp,media_type,media_url,thumbnail_url&limit=25&access_token=${t}`, { signal: AbortSignal.timeout(12_000), cache: "no-store" });
   if (!r.ok) throw await httpFailure(r, "instagram media");
-  const media = ((await r.json()) as { data?: { id: string; caption?: string; permalink?: string; comments_count?: number }[] }).data ?? [];
+  type IgM = { id: string; caption?: string; permalink?: string; comments_count?: number; timestamp?: string; media_type?: string; media_url?: string; thumbnail_url?: string };
+  const media = ((await r.json()) as { data?: IgM[] }).data ?? [];
+  const handle = acct.username ? `@${acct.username}` : null;
   const withComments = media.filter((m) => (m.comments_count ?? 0) > 0 && !skip.has(m.id)).slice(0, maxPosts);
   const fields = encodeURIComponent("id,text,username,timestamp,like_count,replies{id,text,username,timestamp,like_count}");
   const threads = await Promise.all(
@@ -42,6 +47,7 @@ export async function instagramThreads(acct: AccountContext, skip: Set<string>, 
         title: (m.caption ?? "").split("\n")[0].trim() || "Untitled post",
         url: m.permalink ?? null,
         expected: m.comments_count ?? 0,
+        media: instagramMedia(m, handle),
         comments: data.map((x) => ({ ...igC(x), replies: (x.replies?.data ?? []).map((y) => igC(y, x.id)) })),
       };
     }),
@@ -75,7 +81,22 @@ export async function youtubeThreads(acct: AccountContext, skip: Set<string>): P
   }
   if (!byVideo.size) return [];
   const v = await fetch(`${YT}/videos?part=snippet,contentDetails&id=${[...byVideo.keys()].join(",")}`, { headers: h, signal: AbortSignal.timeout(12_000), cache: "no-store" });
-  const meta = new Map<string, string>();
-  if (v.ok) for (const x of ((await v.json()) as { items?: { id: string; snippet: { title: string } }[] }).items ?? []) meta.set(x.id, x.snippet.title);
-  return [...byVideo].map(([id, comments]) => ({ mediaId: id, title: meta.get(id) ?? "A video on your channel", url: `https://www.youtube.com/watch?v=${id}`, comments }));
+  type YtV = { id: string; snippet: { title: string; description?: string; publishedAt?: string; channelTitle?: string; thumbnails?: Parameters<typeof youtubeThumb>[0] } };
+  const meta = new Map<string, YtV["snippet"]>();
+  if (v.ok) for (const x of ((await v.json()) as { items?: YtV[] }).items ?? []) meta.set(x.id, x.snippet);
+  return [...byVideo].map(([id, comments]) => {
+    const sn = meta.get(id);
+    const media: CommentMedia = {
+      kind: "video",
+      thumbnailUrl: youtubeThumb(sn?.thumbnails),
+      videoUrl: null,
+      embedUrl: youtubeEmbed(id),
+      caption: [sn?.title, sn?.description?.trim()].filter(Boolean).join("\n\n") || null,
+      width: null,
+      height: null,
+      postedAt: sn?.publishedAt ?? null,
+      account: sn?.channelTitle ?? null,
+    };
+    return { mediaId: id, title: sn?.title ?? "A video on your channel", url: `https://www.youtube.com/watch?v=${id}`, comments, media };
+  });
 }
