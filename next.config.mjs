@@ -25,6 +25,9 @@ const nextConfig = {
       headers: [{ key: "Cache-Control", value: "public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800" }],
     },
     { source: "/offline.html", headers: [{ key: "Content-Security-Policy", value: staticCsp }] },
+    // Phone check page (1042): its own script file only, same-origin requests only.
+    { source: "/check.html", headers: [{ key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" }, { key: "Cache-Control", value: "no-store" }] },
+    { source: "/check.js", headers: [{ key: "Cache-Control", value: "no-store" }] },
     {
       source: "/(.*)",
       headers: [
