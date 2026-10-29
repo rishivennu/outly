@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Award, BookOpen, Construction, FlaskConical, HeartPulse, Hourglass, Rocket, PanelsTopLeft, CreditCard, Globe, Share2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, ShieldCheck, Tag, Users, X } from "lucide-react";
+import { Activity, Award, BookOpen, Construction, FlaskConical, HeartPulse, Hourglass, Rocket, PanelsTopLeft, CreditCard, Globe, Share2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, ShieldCheck, Tag, Type, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
@@ -29,6 +29,7 @@ const NAV: { href: string; label: string; icon: typeof Users; area: AdminArea; g
   { href: "/admin/platforms", label: "Social platforms", icon: Share2, area: "platforms", group: "Setup" },
   { href: "/admin/landing", label: "Landing page", icon: PanelsTopLeft, area: "site", group: "Setup" },
   { href: "/admin/mascot", label: "Mascot colours", icon: Palette, area: "site", group: "Setup" },
+  { href: "/admin/fonts", label: "Site fonts", icon: Type, area: "site", group: "Setup" },
   { href: "/admin/updates", label: "Update notice", icon: Megaphone, area: "site", group: "Setup" },
   { href: "/admin/maintenance", label: "Maintenance", icon: Construction, area: "site", group: "Setup" },
   { href: "/admin/waitlist", label: "Waitlist", icon: Hourglass, area: "site", group: "Setup" },

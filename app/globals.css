@@ -6,7 +6,11 @@
   /* ---------- Outlly tokens ----------
      Light is the :root default; .dark overrides. Both are designed, not inverted.
      Brand: electric lime (--lime) on black / warm-white, purple + pink + cyan as support. */
+  /* Font roles (1046). Raw faces come from next/font in app/layout.tsx; Admin > Site fonts overrides these. */
   :root {
+    --font-display: var(--font-bricolage);
+    --font-body: var(--font-dmsans);
+    --font-serif: var(--font-instrument);
     --background: 216 28% 97%;         /* cool off-white (1038: was warm 40 33% 97%, tiring on the eyes) */
     --foreground: 222 24% 10%;
     --card: 0 0% 100%;

@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "./db";
 import { LANDING_DEFAULT } from "./landing";
 import { MASCOT_DEFAULT, type MascotConfig } from "./mascot/palettes";
+import { FONTS_DEFAULT, type FontConfig } from "./fonts";
 import { encrypt, decrypt } from "./crypto";
 import { UPDATE_DEFAULT, type UpdateNotice } from "./updates";
 import { PRICING_DISPLAY_DEFAULT, type PricingDisplay } from "./billing/display";
@@ -78,6 +79,7 @@ export const DEFAULTS = {
   landing: LANDING_DEFAULT,
   pricing: PRICING_DISPLAY_DEFAULT as PricingDisplay,
   mascot: MASCOT_DEFAULT as MascotConfig,
+  fonts: FONTS_DEFAULT as FontConfig,
   updates: UPDATE_DEFAULT as UpdateNotice,
   beta: BETA_DEFAULT as BetaConfig,
   founding: FOUNDING_DEFAULT as FoundingConfig,

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Bricolage_Grotesque, DM_Sans, Instrument_Serif } from "next/font/google";
+import localFont from "next/font/local";
 import { MotionRoot } from "@/components/shared/MotionRoot";
 import { themeScript } from "@/lib/theme/script";
 import { CookieBanner } from "@/components/shared/CookieConsent";
@@ -20,10 +21,27 @@ import { appScript } from "@/lib/app-mode";
  * Serif italic, used for one word per headline at most. All self-hosted by next/font,
  * swap + size-adjusted fallbacks, so there is no layout shift and no third-party request.
  */
-const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-display", display: "swap", axes: ["opsz", "wdth"] });
+const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage", display: "swap", axes: ["opsz", "wdth"] });
 // No opsz axis (10-16): it tripled the file (132 KB) for a change you can't see at 15-17px.
-const body = DM_Sans({ subsets: ["latin"], variable: "--font-body", display: "swap" });
-const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["italic"], variable: "--font-serif", display: "swap" });
+const body = DM_Sans({ subsets: ["latin"], variable: "--font-dmsans", display: "swap" });
+const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["italic"], variable: "--font-instrument", display: "swap" });
+/*
+ * 1046: Admin > Site fonts can swap the whole set (lib/fonts.ts). These raw names feed the role variables
+ * (--font-display / --font-body / --font-serif) in globals.css; /api/pip-theme overrides the roles.
+ * The Go fonts (BSD, app/fonts/go) are declared but not preloaded, so nobody downloads them unless picked.
+ */
+const gopher = localFont({
+  src: [
+    { path: "./fonts/go/go-regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/go/go-italic.woff2", weight: "400", style: "italic" },
+    { path: "./fonts/go/go-medium.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/go/go-medium-italic.woff2", weight: "500", style: "italic" },
+    { path: "./fonts/go/go-bold.woff2", weight: "700", style: "normal" },
+  ],
+  variable: "--font-gopher",
+  display: "swap",
+  preload: false,
+});
 
 import { LaunchHost } from "@/components/billing/RocketCta";
 import { LiquidGlass } from "@/components/shared/LiquidGlass";
@@ -45,7 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // The Content Security Policy only runs scripts carrying this request's nonce (set by middleware.ts).
   const nonce = headers().get("x-nonce") ?? undefined;
   return (
-    <html lang="en" className={`dark ${display.variable} ${body.variable} ${serif.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`dark ${display.variable} ${body.variable} ${serif.variable} ${gopher.variable}`} suppressHydrationWarning>
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
         {/* Inside the Android app: mark <html> before first paint so the app layout (app/mobile-app.css) never flashes the web one. */}
@@ -53,7 +71,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Landing sections the admin hid (readable hint cookie set by middleware): mark <html> before the
             first paint so CSS drops their nav and footer links at once, instead of a link flashing in and out. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `try{var m=document.cookie.match(/(?:^|; )outlly_lh=([^;]*)/);if(m)document.documentElement.setAttribute("data-lh",decodeURIComponent(m[1]).split(".").join(" "))}catch(e){}` }} />
-        {/* Pip colourways picked in Admin > Mascot colours (tiny, cached; Pip falls back to Indigo without it) */}
+        {/* Pip colourways (Admin > Mascot colours) and the site font set (Admin > Site fonts). Tiny, cached;
+            without it Pip is Indigo and the fonts are the originals. */}
         {/* eslint-disable-next-line @next/next/no-css-tags */}
         <link rel="stylesheet" href="/api/pip-theme" />
       </head>
