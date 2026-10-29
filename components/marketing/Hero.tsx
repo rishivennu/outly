@@ -2,7 +2,6 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { HeroFan, CursorTag, Sparkles } from "./HeroFan";
 import { SignupCta } from "./SignupCta";
-import { LiveCount } from "@/components/shared/LiveCount";
 import { StampChip } from "@/components/brand/Stamps";
 import { Shell } from "./bits";
 import { splitWords } from "./Split";
@@ -90,8 +89,6 @@ export function Hero({ showHow = true, beta = false, live }: { showHow?: boolean
             </div>
           )}
         </dl>
-        {/* 1038: the real creator count and who is online, right under the pitch (renders nothing until it loads). */}
-        <LiveCount className="mt-5 justify-center rounded-full px-4 py-2 glass hairline" />
       </Shell>
 
       {/* Never catches clicks: the fan's negative top margin lifts this wrapper over the copy above. */}

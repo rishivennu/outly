@@ -19,7 +19,10 @@ if (!tagged.__outllyErrHooks) {
 }
 
 // With Redis, `bun run worker` owns the queues and the sweeper. Without it, run them in-process for dev.
-if (!process.env.REDIS_URL) {
+// Never on Vercel (1040): every instance ran its own 15 s sweep (posts, reports, retention) on boot and
+// shared its database connection with visitors, so a request landing there waited 10-20 s. There the
+// external pinger (/api/cron/sweep, every minute) and the vercel.json crons already do this work.
+if (!process.env.REDIS_URL && !process.env.VERCEL) {
   startSweeper();
   console.log("[studio] in-process queue + scheduler running (set REDIS_URL to use BullMQ workers)");
 }

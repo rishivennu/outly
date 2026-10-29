@@ -11,6 +11,7 @@ import { ArrowRight, ChevronDown, LayoutDashboard, Menu, X } from "lucide-react"
 import { PRODUCT_ITEMS, ProductPanel, ProductTilesCompact } from "./NavProduct";
 import { OutlyLogo } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { LiveCount } from "@/components/shared/LiveCount";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -251,6 +252,8 @@ export function MarketingNav() {
         </div>
 
         <div className="ml-auto flex items-center gap-1.5 lg:ml-0">
+          {/* 1040: live creator count lives in the bar (moved from the hero); full words where there is room. */}
+          <LiveCount className="mnav-live hidden flex-nowrap whitespace-nowrap px-2 md:inline-flex lg:hidden xl:inline-flex" />
           <ThemeToggle compact className="hidden sm:inline-flex" />
           {signedIn ? (
             <Link

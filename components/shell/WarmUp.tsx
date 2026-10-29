@@ -28,7 +28,7 @@ export function WarmUp() {
       try {
         sessionStorage.setItem(KEY, String(Date.now()));
       } catch {}
-      warmAnalytics(router, live);
+      warmAnalytics(router, live, false);
     }, 3000);
   }, [onAnalytics, router, live]);
   return null;
