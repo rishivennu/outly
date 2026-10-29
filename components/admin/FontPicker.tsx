@@ -19,7 +19,7 @@ function applyHere(cfg: FontConfig) {
 }
 
 /**
- * Admin > Site fonts. Three sets, each previewed in its own faces so they can be compared side by side
+ * Admin > Site fonts. Four sets, each previewed in its own faces so they can be compared side by side
  * before switching. A pick saves at once (optimistic, rolls back on error).
  */
 export function FontPicker({ initial }: { initial: FontConfig }) {
@@ -51,7 +51,7 @@ export function FontPicker({ initial }: { initial: FontConfig }) {
       <CardTitle hint={cfg.set === FONTS_DEFAULT.set ? "Using the original fonts." : `Using ${fontSetById(cfg.set).name}.`}>Typeface</CardTitle>
       <fieldset disabled={busy !== null}>
         <legend className="sr-only">Site typeface</legend>
-        <div className="grid gap-3 lg:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2">
           {FONT_SETS.map((f) => {
             const on = cfg.set === f.id;
             return (

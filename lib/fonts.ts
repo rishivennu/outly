@@ -9,8 +9,10 @@
  *            SF and New York, everything else gets its own system UI face (Segoe UI, Roboto).
  * - gopher:  the Go fonts by Bigelow & Holmes (BSD licence, self-hosted from app/fonts/go). One family
  *            for headlines and body, Go Italic as the accent.
+ * - jakarta: Plus Jakarta Sans headlines and body (geometric, open, friendly) with Fraunces italic as the
+ *            accent. Both OFL, via next/font, not preloaded.
  */
-export const FONT_SET_IDS = ["current", "apple", "gopher"] as const;
+export const FONT_SET_IDS = ["current", "apple", "gopher", "jakarta"] as const;
 export type FontSetId = (typeof FONT_SET_IDS)[number];
 
 export interface FontConfig {
@@ -53,6 +55,14 @@ export const FONT_SETS: readonly FontSet[] = [
     body: `var(--font-gopher), ${SYS}`,
     serif: `var(--font-gopher), ${SYS}`,
   },
+  {
+    id: "jakarta",
+    name: "Jakarta + Fraunces",
+    hint: "Plus Jakarta Sans, a crisp geometric sans with open, friendly shapes, and Fraunces italic for the accent word.",
+    display: `var(--font-jakarta), ${SYS}`,
+    body: `var(--font-jakarta), ${SYS}`,
+    serif: "var(--font-fraunces), Georgia, serif",
+  },
 ];
 
 export const fontSetById = (id: string): FontSet => FONT_SETS.find((f) => f.id === id) ?? FONT_SETS[0];
@@ -77,5 +87,7 @@ export function fontCss(cfg: FontConfig): string {
   ];
   // Go is wide with a tall x-height: open headline tracking a little and keep the accent upright-weighted.
   if (c.set === "gopher") lines.push(`.display{letter-spacing:-0.02em}.accent-serif{letter-spacing:-0.005em}`);
+  // Jakarta runs a little wide at display sizes; Fraunces italic is already tight.
+  if (c.set === "jakarta") lines.push(`.display{letter-spacing:-0.035em}.accent-serif{letter-spacing:-0.01em}`);
   return `/* Site fonts: ${f.name}, from Admin > Site fonts */\n${lines.join("\n")}\n`;
 }

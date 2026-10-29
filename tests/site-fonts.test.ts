@@ -3,8 +3,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { FONT_SETS, FONT_SET_IDS, FONTS_DEFAULT, fontCss, normalizeFonts } from "@/lib/fonts";
 
 describe("site fonts (1046)", () => {
-  test("three sets, original by default", () => {
-    expect(FONT_SET_IDS).toEqual(["current", "apple", "gopher"]);
+  test("four sets, original by default", () => {
+    expect(FONT_SET_IDS).toEqual(["current", "apple", "gopher", "jakarta"]);
     expect(FONT_SETS.map((f) => f.id)).toEqual([...FONT_SET_IDS]);
     expect(FONTS_DEFAULT.set).toBe("current");
   });
@@ -34,13 +34,20 @@ describe("site fonts (1046)", () => {
     for (const role of ["display", "body", "serif"]) expect(css).toContain(`--font-${role}:var(--font-gopher)`);
   });
 
+  test("jakarta uses Plus Jakarta Sans with a Fraunces accent", () => {
+    const css = fontCss({ set: "jakarta" });
+    expect(css).toContain("--font-display:var(--font-jakarta)");
+    expect(css).toContain("--font-body:var(--font-jakarta)");
+    expect(css).toContain("--font-serif:var(--font-fraunces)");
+  });
+
   test("the stylesheet can't be broken out of", () => {
     for (const f of FONT_SETS) for (const v of [f.display, f.body, f.serif]) expect(v).not.toMatch(/[{}<;]/);
   });
 
   test("layout wires the raw faces and globals maps the roles", () => {
     const layout = readFileSync("app/layout.tsx", "utf8");
-    for (const v of ["--font-bricolage", "--font-dmsans", "--font-instrument", "--font-gopher"]) expect(layout).toContain(v);
+    for (const v of ["--font-bricolage", "--font-dmsans", "--font-instrument", "--font-gopher", "--font-jakarta", "--font-fraunces"]) expect(layout).toContain(v);
     expect(layout).toContain("preload: false");
     const css = readFileSync("app/globals.css", "utf8");
     expect(css).toContain("--font-display: var(--font-bricolage);");

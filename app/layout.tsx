@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Bricolage_Grotesque, DM_Sans, Instrument_Serif } from "next/font/google";
+import { Bricolage_Grotesque, DM_Sans, Fraunces, Instrument_Serif, Plus_Jakarta_Sans } from "next/font/google";
 import localFont from "next/font/local";
 import { MotionRoot } from "@/components/shared/MotionRoot";
 import { themeScript } from "@/lib/theme/script";
@@ -42,6 +42,9 @@ const gopher = localFont({
   display: "swap",
   preload: false,
 });
+// Fourth set (Admin > Site fonts > Jakarta + Fraunces). Declared only; downloaded when that set is live.
+const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", display: "swap", preload: false });
+const fraunces = Fraunces({ subsets: ["latin"], style: ["italic"], variable: "--font-fraunces", display: "swap", preload: false });
 
 import { LaunchHost } from "@/components/billing/RocketCta";
 import { LiquidGlass } from "@/components/shared/LiquidGlass";
@@ -63,7 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // The Content Security Policy only runs scripts carrying this request's nonce (set by middleware.ts).
   const nonce = headers().get("x-nonce") ?? undefined;
   return (
-    <html lang="en" className={`dark ${display.variable} ${body.variable} ${serif.variable} ${gopher.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`dark ${display.variable} ${body.variable} ${serif.variable} ${gopher.variable} ${jakarta.variable} ${fraunces.variable}`} suppressHydrationWarning>
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
         {/* Inside the Android app: mark <html> before first paint so the app layout (app/mobile-app.css) never flashes the web one. */}
