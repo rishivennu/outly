@@ -224,14 +224,14 @@ a{color:${C.ink}}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.board}" style="background:${C.board}"><tr><td align="center" style="padding:26px 12px 30px">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px">
 <tr><td style="padding:0 8px 16px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-<td width="33%" style="width:33%"><a href="${appUrl()}/" style="text-decoration:none"><img src="${appUrl()}/brand/rocket/mark-128.png" width="30" height="30" alt="Outlly" style="display:block;border-radius:8px;border:0"></a></td>
+<td width="33%" style="width:33%"><a href="${appUrl()}/" style="text-decoration:none"><img src="${appUrl()}/brand/rocket/mark-anim.gif" width="30" height="30" alt="Outlly" style="display:block;border-radius:8px;border:0"></a></td>
 <td width="34%" align="center" style="width:34%;font-family:${DISPLAY};color:${C.white};font-size:16px;font-weight:bold;letter-spacing:-0.4px">Outlly</td>
 <td class="hide-sm" width="33%" align="right" style="width:33%;font-family:${BODY};color:${C.boardText};font-size:12px">Create once. Post everywhere.</td>
 </tr></table></td></tr>
 <tr><td class="gutter" bgcolor="${t.bg}" style="background:${t.bg};${edge(tone)}border-radius:26px;padding:28px 32px 34px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
 <td valign="top">${o.kicker ? chip(o.kicker, tone) : "&nbsp;"}</td>
-<td valign="top" align="right" width="52"><img src="${appUrl()}/brand/rocket/${tone === "ink" || tone === "forest" ? "rocket-256" : "rocket-ink-256"}.png" width="44" height="44" alt="" style="display:block;border:0"></td>
+<td valign="top" align="right" width="52"><img src="${appUrl()}/brand/rocket/${tone === "ink" || tone === "forest" ? `rocket-anim-${tone}.gif` : "rocket-ink-256.png"}" width="44" height="44" alt="" style="display:block;border:0"></td>
 </tr></table>
 <h1 class="h1" style="margin:30px 0 0;font-family:${DISPLAY};font-size:38px;line-height:1.04;font-weight:bold;letter-spacing:-1.4px;color:${t.fg}">${title}</h1>
 ${o.lead ? `<p style="margin:12px 0 0;font-family:${BODY};font-size:16px;line-height:1.5;color:${t.sub === C.muted ? C.ink : t.fg}">${o.lead}</p>` : ""}

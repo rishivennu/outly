@@ -52,7 +52,7 @@ describe("email wrapper", () => {
       expect(html, name).toContain('<meta name="color-scheme" content="light only">');
       expect(html, name).toContain('role="presentation"');
       expect(html, name).toContain("max-width:600px");
-      expect(html, name).toContain("/brand/rocket/mark-128.png");
+      expect(html, name).toContain("/brand/rocket/mark-anim.gif");
       expect(html, name).toContain(">Outlly<");
       expect(html, name).toContain("@media only screen and (max-width:600px)");
       expect(html.includes("undefined"), name).toBe(false);
