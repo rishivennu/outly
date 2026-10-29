@@ -26,7 +26,7 @@ function Badge({ path, top, name }: { path: string; top: string; name: string })
 export function StoreBadges({ className }: { className?: string }) {
   return (
     <div className={className}>
-      <p className="ft-head mb-2 font-sans text-[12px] font-semibold uppercase tracking-[0.16em] text-foreground/60">Mobile apps in development</p>
+      <p className="ft-head mb-2 font-sans text-[11.5px] font-semibold text-foreground/70">Mobile apps in development</p>
       <ul className="flex flex-wrap gap-2" aria-label="Mobile apps, coming soon">
         <Badge path={PLAY} top="Android app on" name="Google Play" />
         <Badge path={APPLE} top="iPhone app on the" name="App Store" />

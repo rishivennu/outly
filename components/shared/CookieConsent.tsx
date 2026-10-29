@@ -66,6 +66,7 @@ export function CookieBanner() {
       </div>
 
       <div className="liquid-panel" data-open={custom}>
+        {custom && (
         <div>
           <ul className="liquid-inner mt-4 space-y-2">
             {ROWS.map((r) => {
@@ -96,6 +97,7 @@ export function CookieBanner() {
             })}
           </ul>
         </div>
+        )}
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">

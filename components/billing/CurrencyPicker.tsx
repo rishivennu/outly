@@ -27,7 +27,7 @@ export function CurrencyPicker({ currency, source, className }: { currency: stri
         id="ccy-pick"
         value={currency}
         onChange={(e) => change(e.target.value)}
-        className="h-11 cursor-pointer rounded-full bg-background px-3 text-[13px] font-semibold hairline"
+        className="h-11 cursor-pointer rounded-full bg-background px-3 text-[13px] font-semibold field-edge"
       >
         {CURRENCIES.map((c) => (
           <option key={c} value={c}>{c} · {CURRENCY_NAME[c]}</option>

@@ -21,7 +21,7 @@ export function TrustLive({ creators, posts, platforms }: { creators: number; po
   ].filter(Boolean) as Cell[];
   return (
     <div className="flex h-full flex-col rounded-[2rem] bg-[hsl(var(--lime)/0.16)] p-6 hairline sm:p-8">
-      <p className="inline-flex items-center gap-2 text-[12.5px] font-semibold uppercase tracking-[0.14em] text-foreground/75">
+      <p className="inline-flex items-center gap-2 text-[12px] font-semibold text-foreground/80">
         <Dot /> Live right now
       </p>
       <Reveal as="ul" stagger y={18} delay={0.15} className="mt-6 grid flex-1 grid-cols-2 gap-3">

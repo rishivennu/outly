@@ -25,11 +25,11 @@ export function HowItWorks() {
           {STEPS.map((s, i) => (
             <li key={s.n} data-flick="" data-spot="" className="how-step bg-background p-7 sm:p-8">
               <Reveal delay={i * 0.08}>
-                <div className="flex items-start justify-between gap-4">
-                  <span className="how-n display text-[2.6rem] text-lime-ink">{s.n}</span>
-                  <Icon3D name={s.icon} size={88} className="pop-in flick -mt-1 h-16 w-16 sm:h-20 sm:w-20" />
+                <span className="how-n display block text-[2.6rem] text-lime-ink">{s.n}</span>
+                <div className="mt-4 flex items-center gap-3">
+                  <Icon3D name={s.icon} size={88} className="pop-in flick h-12 w-12 shrink-0 sm:h-14 sm:w-14" />
+                  <h3 className="text-xl font-semibold tracking-tight">{s.title}</h3>
                 </div>
-                <h3 className="mt-6 text-xl font-semibold tracking-tight">{s.title}</h3>
                 <p className="mt-2.5 text-[15px] leading-relaxed text-muted-foreground">{s.body}</p>
               </Reveal>
             </li>

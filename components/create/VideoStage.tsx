@@ -186,11 +186,12 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
                   )}
                 </div>
                 <div className="la-track relative mt-2.5 h-9 rounded-full" role="progressbar" aria-label="Upload progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(upload.progress * 100)}>
-                  <motion.div className="la-fill la-fill-anim absolute inset-y-0 left-0 rounded-full" style={{ minWidth: "2.25rem" }} animate={{ width: `${Math.round(upload.progress * 100)}%` }} transition={{ ease: "easeOut" }}>
+                  <div className="la-fill la-fill-anim absolute inset-0 rounded-full" style={{ ["--p" as string]: `max(2.25rem, ${Math.round(upload.progress * 100)}%)` }} />
+                  <span className="la-rider" style={{ ["--p" as string]: `max(2.25rem, ${Math.round(upload.progress * 100)}%)` }} aria-hidden="true">
                     <span className="absolute right-1 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center">
                       <OutlyMark variant="ink" size={18} className="la-rocket la-rocket-anim" />
                     </span>
-                  </motion.div>
+                  </span>
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold tabular-nums text-white/60">{Math.round(upload.progress * 100)}%</span>
                 </div>
               </motion.div>

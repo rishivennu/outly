@@ -31,8 +31,8 @@ export const COMPETITORS: Competitor[] = [
     positioning: "Per-channel publishing, engagement and analytics for creators, teams and agencies.",
     lastVerified: "2026-10-10",
     sources: [
-      { label: "buffer.com/pricing", url: "https://buffer.com/pricing" },
-      { label: "buffer.com/ai-assistant", url: "https://buffer.com/ai-assistant" },
+      { label: "Buffer pricing", url: "https://buffer.com/pricing" },
+      { label: "Buffer AI", url: "https://buffer.com/ai-assistant" },
     ],
   },
   {
@@ -41,8 +41,8 @@ export const COMPETITORS: Competitor[] = [
     positioning: "Multi-brand planner, analytics and reporting with an ads dashboard.",
     lastVerified: "2026-10-10",
     sources: [
-      { label: "metricool.com/pricing", url: "https://metricool.com/pricing/" },
-      { label: "metricool.com: YouTube", url: "https://metricool.com/analyze-youtube-with-metricool/" },
+      { label: "Metricool pricing", url: "https://metricool.com/pricing/" },
+      { label: "Metricool YouTube", url: "https://metricool.com/analyze-youtube-with-metricool/" },
     ],
   },
   {
@@ -50,7 +50,7 @@ export const COMPETITORS: Competitor[] = [
     name: "Later",
     positioning: "Visual planning and a media library, strongest around Instagram and link-in-bio.",
     lastVerified: "2026-10-10",
-    sources: [{ label: "later.com/pricing", url: "https://later.com/pricing/" }],
+    sources: [{ label: "Later pricing", url: "https://later.com/pricing/" }],
   },
   {
     id: "hootsuite",
@@ -58,9 +58,9 @@ export const COMPETITORS: Competitor[] = [
     positioning: "Per-seat social suite for organisations: inbox, listening, approvals, governance.",
     lastVerified: "2026-10-10",
     sources: [
-      { label: "hootsuite.com/plans", url: "https://www.hootsuite.com/plans" },
-      { label: "hootsuite.com/platform/integrations", url: "https://www.hootsuite.com/platform/integrations" },
-      { label: "hootsuite.com/platform/publish", url: "https://www.hootsuite.com/platform/publish" },
+      { label: "Hootsuite plans", url: "https://www.hootsuite.com/plans" },
+      { label: "Hootsuite integrations", url: "https://www.hootsuite.com/platform/integrations" },
+      { label: "Hootsuite publishing", url: "https://www.hootsuite.com/platform/publish" },
     ],
   },
 ];

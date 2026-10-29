@@ -21,44 +21,27 @@ export function Hero({ showHow = true, beta = false, live }: { showHow?: boolean
   const l1 = splitWords("Your content deserves");
   const l2 = splitWords("to be", l1.next);
   return (
-    <section className="relative overflow-hidden pb-4 pt-10 sm:pt-16" aria-labelledby="hero-title">
+    <section className="relative overflow-hidden pb-0 pt-8 sm:pt-10" aria-labelledby="hero-title">
       <div aria-hidden="true" className="hf-glow pointer-events-none absolute inset-0" />
       {/* a soft light that trails the mouse behind the headline (LandingFx) */}
       <div aria-hidden="true" className="hf-aura" />
       <Sparkles />
       <Shell className="relative flex flex-col items-center text-center">
-        <p className="hf-in glass hairline inline-flex items-center gap-2 rounded-full py-1.5 pl-2 pr-4 text-[13px] font-medium text-foreground/85">
-          {beta ? (
-            <>
-              <StampChip>Beta</StampChip>
-              <span className="text-lime-ink dark:text-lime">Free during beta</span>
-              {/* the long half only where it fits on one line */}
-              <span aria-hidden="true" className="hidden text-foreground/40 sm:inline">&mdash;</span>
-              <span className="hidden sm:inline">{HERO.eyebrow}</span>
-            </>
-          ) : (
-            <>
-              <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-lime" />
-              <span>{HERO.eyebrow}</span>
-            </>
-          )}
-        </p>
-
-        <div className="relative mt-7 w-full">
+        <div className="relative w-full">
           <CursorTag name="Meera" tone="teal" side="l" className="left-[2%] top-[4%] hidden md:inline-flex lg:left-[8%]" />
           <CursorTag name="Arjun" tone="pink" side="r" className="right-[2%] top-[58%] hidden md:inline-flex lg:right-[8%]" />
-          <h1 id="hero-title" className="display hf-h1 mx-auto max-w-[17ch] text-balance text-[clamp(2.6rem,7.2vw,5.6rem)]">
+          <h1 id="hero-title" className="display hf-h1 mx-auto max-w-[17ch] text-balance text-[clamp(2.5rem,6.6vw,5rem)]">
             <span className="hf-line is-split">{l1.nodes}</span>{" "}
             <span className="hf-line is-split">
               {l2.nodes} <span className="accent-serif hf-accent sw" style={{ ["--wi" as string]: l2.next }}>everywhere.</span>
             </span>
           </h1>
         </div>
-        <p className="hf-in mt-6 max-w-xl text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-[19px]" style={{ ["--d" as string]: ".7s" }}>
+        <p className="hf-in mt-4 max-w-xl text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-[19px]" style={{ ["--d" as string]: ".7s" }}>
           {HERO.sub}
         </p>
 
-        <div className="hf-in mt-8 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center" style={{ ["--d" as string]: ".8s" }}>
+        <div className="hf-in mt-5 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center" style={{ ["--d" as string]: ".8s" }}>
           <SignupCta
             magnet
             label={HERO.primary.label}
@@ -75,7 +58,25 @@ export function Hero({ showHow = true, beta = false, live }: { showHow?: boolean
           </Link>}
         </div>
 
-        <dl className="hf-in mt-7 flex flex-wrap justify-center gap-x-7 gap-y-2" style={{ ["--d" as string]: ".9s" }}>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
+        <p className="hf-in glass hairline inline-flex items-center gap-2 rounded-full py-1.5 pl-2 pr-4 text-[13px] font-medium text-foreground/85" style={{ ["--d" as string]: ".85s" }}>
+          {beta ? (
+            <>
+              <StampChip>Beta</StampChip>
+              <span className="text-lime-ink dark:text-lime">Free during beta</span>
+              {/* the long half only where it fits on one line */}
+              <span aria-hidden="true" className="hidden text-foreground/40 sm:inline">&mdash;</span>
+              <span className="hidden sm:inline">{HERO.eyebrow}</span>
+            </>
+          ) : (
+            <>
+              <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-lime" />
+              <span>{HERO.eyebrow}</span>
+            </>
+          )}
+        </p>
+
+        <dl className="hf-in flex flex-wrap justify-center gap-x-7 gap-y-2" style={{ ["--d" as string]: ".9s" }}>
           {pitch.map((p) => (
             <div key={p.id} className="flex items-baseline gap-1.5">
               <dt className="text-sm font-semibold">{p.name}</dt>
@@ -89,10 +90,11 @@ export function Hero({ showHow = true, beta = false, live }: { showHow?: boolean
             </div>
           )}
         </dl>
+        </div>
       </Shell>
 
       {/* Never catches clicks: the fan's negative top margin lifts this wrapper over the copy above. */}
-      <div className="pointer-events-none relative mt-4 sm:mt-6">
+      <div className="pointer-events-none relative mt-2 sm:mt-3">
         <HeroFan framed />
       </div>
     </section>

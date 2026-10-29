@@ -190,7 +190,7 @@ export function MarketingNav() {
             aria-hidden="true"
             className="mnav-pill"
             data-dir={pill?.dir ?? "none"}
-            style={{ left: pill?.l ?? 0, right: pill?.r ?? 0, opacity: pill ? 1 : 0 }}
+            style={{ ["--l" as string]: `${pill?.l ?? 0}px`, ["--r" as string]: `${pill?.r ?? 0}px`, opacity: pill ? 1 : 0 }}
           />
           <ul className="flex items-center">
             {links.map((l) =>
@@ -293,7 +293,7 @@ export function MarketingNav() {
 
       <div ref={panelRef} id="mnav-panel" hidden={!open} className="mnav-panel mx-auto mt-2 max-w-[1180px] overflow-hidden rounded-[28px] p-2 lg:hidden">
         <nav aria-label="Sections" className="flex flex-col">
-          <p className="px-4 pb-1 pt-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Product</p>
+          <p className="px-4 pb-1 pt-2 text-[11.5px] font-semibold text-muted-foreground">Product</p>
           <ProductTilesCompact items={products} onPick={pickProduct} />
           <div className="mx-4 my-2 h-px bg-border" aria-hidden="true" />
           {links.filter((l) => l.id !== "features").map((l) => (

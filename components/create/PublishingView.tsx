@@ -426,12 +426,14 @@ function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, reduce 
         aria-valuenow={pct}
         aria-valuetext={`${meta.name}: ${canceled ? "stopped by you" : bad ? "stopped, needs a hand" : `${STEPS[step]}, step ${step + 1} of 4`}`}
       >
-        <div className={cn("la-fill absolute inset-y-0 left-0 rounded-full", isActive && !reduce && "la-fill-anim")} style={{ width: `max(3.5rem, ${pct}%)` }}>
+        <div className={cn("la-fill absolute inset-0 rounded-full", isActive && !reduce && "la-fill-anim")} style={{ ["--p" as string]: `max(3.5rem, ${pct}%)` }}>
+          {live && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-[hsl(var(--lime-foreground))]">Landed</span>}
+        </div>
+        <span className="la-rider" style={{ ["--p" as string]: `max(3.5rem, ${pct}%)` }} aria-hidden="true">
           <span className="absolute right-1.5 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center">
             <OutlyMark variant="ink" size={26} className={cn("la-rocket", isActive && !reduce && "la-rocket-anim")} />
           </span>
-          {live && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.12em] text-[hsl(var(--lime-foreground))]">Landed</span>}
-        </div>
+        </span>
         {!live && <span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold tabular-nums text-white/60">{bad ? "STOPPED" : `${pct}%`}</span>}
       </div>
 

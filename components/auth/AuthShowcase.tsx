@@ -110,7 +110,6 @@ export function AuthShowcase({ eyebrow = "With Outlly you can", lines = ["Make i
           <span className="as-drift block h-full w-full rounded-full bg-[hsl(60_70%_92%)] opacity-80 blur-[60px] will-change-transform" />
         </span>
         <span className="absolute -bottom-[22%] -left-[18%] h-[62%] w-[96%] rounded-full bg-[hsl(240_10%_5%)] blur-[60px]" />
-        <span className="absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-[hsl(240_10%_5%/0.9)] via-[hsl(240_10%_5%/0.45)] to-transparent" />
         <span className="auth-grain absolute inset-0 opacity-[0.16] mix-blend-overlay" />
       </div>
 

@@ -42,7 +42,7 @@ function TileView({ t, className }: { t: Tile; className?: string }) {
   return (
     <span className={cn("fc-tile relative block overflow-hidden", className)} style={{ background: t.bg }}>
       <span className="absolute left-2.5 top-2.5"><AppIcon brand={t.brand} size={22} /></span>
-      <span className="absolute inset-x-2.5 bottom-2.5 flex items-center gap-1.5 text-[12px] font-semibold text-white">
+      <span className="absolute inset-x-2.5 bottom-2.5 flex w-fit items-center gap-1.5 rounded-md bg-[#0b0b0d]/95 px-1.5 py-0.5 text-[12px] font-semibold text-white">
         <Play className="h-3 w-3 fill-current" />
         {t.label}
       </span>
@@ -85,13 +85,13 @@ function CtaPhone() {
           <span className="h-2.5 w-5 rounded-[3px] bg-foreground/80" />
         </span>
         <span className="block px-4 pt-7">
-          <span className="block text-[12px] font-semibold uppercase tracking-[0.08em] text-[hsl(var(--ap-ink2))]">Today</span>
+          <span className="block text-[11.5px] font-semibold text-[hsl(var(--ap-ink2))]">Today</span>
           <span className="mt-0.5 block font-display text-[22px] font-bold tracking-[-0.02em]">All sent.</span>
           <span className="relative mt-3 block aspect-[16/10] overflow-hidden rounded-[18px]" style={{ background: "linear-gradient(140deg,#ffcf8a,#ff7a59 45%,#6c3bff)" }}>
             <span className="absolute inset-0 grid place-items-center">
               <span className="grid h-11 w-11 place-items-center rounded-full bg-white/85 text-black backdrop-blur"><Play className="ml-0.5 h-5 w-5 fill-current" /></span>
             </span>
-            <span className="absolute bottom-2 left-3 text-[12px] font-semibold text-white">desk-tour.mp4 · 0:42</span>
+            <span className="absolute bottom-2 left-3 rounded-md bg-[#0b0b0d]/95 px-1.5 py-0.5 text-[12px] font-semibold text-white">desk-tour.mp4 · 0:42</span>
           </span>
           <span className="mt-3 block overflow-hidden rounded-[18px] bg-foreground/[0.05]">
             {SENT.map((s, i) => (

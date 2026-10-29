@@ -2,6 +2,8 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   darkMode: ["class"],
+  // hover: styles only where a pointer really hovers; on phones a tapped button kept its hover fill (1043)
+  future: { hoverOnlyWhenSupported: true },
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./lib/**/*.{ts,tsx}"],
   theme: {
     extend: {

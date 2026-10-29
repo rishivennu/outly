@@ -31,7 +31,6 @@ export async function Platforms({ showCompare = true, live: forced }: { showComp
       <Shell>
         <Reveal className="bx-head">
           <div className="min-w-0">
-            <p className="bx-eyebrow">Supported destinations</p>
             <h2 id="platforms-title" className="display mt-3 text-balance">
               {count} places, <span className="accent-serif bx-accent">properly</span> supported.
             </h2>
@@ -65,7 +64,15 @@ export async function Platforms({ showCompare = true, live: forced }: { showComp
                 <h3 className="bx-title">
                   {count} {n === 1 ? "place" : "places"} live today
                 </h3>
-                <p className="bx-sub">{on.map((p) => p.name).join(", ") || "Switching on soon."}</p>
+                {on.length ? (
+                  <ul className="bx-chips">
+                    {on.map((p) => (
+                      <li key={p.id}>{p.name}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="bx-sub">Switching on soon.</p>
+                )}
               </div>
             </div>
             <div className="bx-tile">

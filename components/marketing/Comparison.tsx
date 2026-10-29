@@ -205,7 +205,7 @@ export function Comparison({ competitors, groups, beta = false }: { competitors?
               {c.sources.map((s, i) => (
                 <span key={s.url}>
                   {i > 0 && ", "}
-                  <a href={s.url} rel="nofollow noopener noreferrer" target="_blank" className="underline decoration-border underline-offset-2 hover:text-foreground">
+                  <a href={s.url} rel="nofollow noopener noreferrer" target="_blank" className="whitespace-nowrap underline decoration-border underline-offset-2 hover:text-foreground">
                     {s.label}
                   </a>
                 </span>

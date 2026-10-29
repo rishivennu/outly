@@ -105,7 +105,7 @@ export function MarketingFooter() {
           <div className="grid grid-cols-2 gap-8 md:contents">
             {COLUMNS.map((col) => (
               <nav key={col.title} aria-label={col.title}>
-                <h2 className="ft-head mb-4 font-sans text-[12px] font-semibold uppercase tracking-[0.16em] text-foreground/55">{col.title}</h2>
+                <h2 className="ft-head mb-4 font-sans text-[11.5px] font-semibold text-foreground/70">{col.title}</h2>
                 <ul className="flex flex-col">
                   {col.links.filter((l) => !(l.href.startsWith("/#") && hidden.has(l.href.slice(2)))).map((l) => (
                     <li key={l.href} data-sec={l.href.startsWith("/#") ? l.href.slice(2) : undefined}>

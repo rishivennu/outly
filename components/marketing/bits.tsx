@@ -62,8 +62,8 @@ export function Prose({ children }: { children: React.ReactNode }) {
 export function PageHead({ title, updated, lead }: { title: string; updated?: string; lead: string }) {
   return (
     <div className="max-w-2xl">
-      {updated && <p className="eyebrow mb-5">Last updated {updated}</p>}
       <h1 className="display text-balance text-[clamp(2.4rem,6.5vw,4rem)]">{title}</h1>
+      {updated && <p className="mt-3 text-[14px] text-muted-foreground">Last updated {updated}</p>}
       <p className="mt-6 text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-lg">{lead}</p>
     </div>
   );

@@ -47,7 +47,7 @@ export function HeroFan({ cards = CARDS, cta, framed = false }: { cards?: FanCar
   const waitlist = useWaitlist();
   const pill = cta ?? (waitlist ? { href: "/waitlist", label: "Join waitlist" } : { href: "/signup", label: "Get started" });
   return (
-    <div aria-hidden="true" className={`hf-stage ${framed ? "hf-framed" : ""} pointer-events-none relative mx-auto -mt-[64px] h-[404px] w-full max-w-[1180px] select-none overflow-hidden sm:h-[474px]`}>
+    <div aria-hidden="true" className={`hf-stage ${framed ? "hf-framed" : ""} pointer-events-none relative mx-auto -mt-[64px] h-[404px] w-full max-w-[1180px] select-none overflow-hidden sm:h-[448px]`}>
       <div className="hf-fan absolute inset-x-0 bottom-0 flex items-end justify-center">
         {cards.map((c, i) => (
           <div
@@ -62,7 +62,7 @@ export function HeroFan({ cards = CARDS, cta, framed = false }: { cards?: FanCar
             <span className={`hf-cast ${c.key === "you" ? "hf-cast-hero" : ""}`} />
             <div className={`hf-card ${c.tone} ${c.key === "you" ? "hf-hero" : ""}`}>
               <div className="relative z-10 flex items-start justify-between gap-2">
-                <div>
+                <div className="hf-head">
                   <p className="hf-title">{c.title}</p>
                   <p className="hf-sub">{c.sub}</p>
                 </div>

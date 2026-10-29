@@ -42,7 +42,7 @@ export function TimeSaved() {
           <Reveal y={32} delay={0.16} className="flex">
           <div className="flex flex-1 flex-col justify-between gap-6 rounded-[1.5rem] bg-[hsl(var(--lime)/0.14)] p-6 sm:p-8" aria-live="polite">
             <div>
-              <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-foreground/70">You'd save about</p>
+              <p className="text-[12.5px] font-semibold text-foreground/75">You’d save about</p>
               <p className="display mt-2 text-[clamp(2.6rem,6vw,4rem)] leading-none tabular">{minutesLabel(r.savedWeek)}</p>
               <p className="mt-1 text-[15px] font-medium">every week, roughly {r.savedMonthHours} hours a month.</p>
             </div>

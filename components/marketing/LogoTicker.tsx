@@ -21,16 +21,16 @@ export async function LogoTicker({ live: forced }: { live?: Platform[] } = {}) {
   // Enough copies that one half is always wider than a large screen; the track moves by exactly one half.
   const half = [...list, ...list];
   return (
-    <section aria-labelledby="lt-h" className="lt mx-auto w-full max-w-[1180px] px-5 pb-2 pt-10 sm:pt-12">
-      <p id="lt-h" className="text-center text-[12.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+    <section aria-labelledby="lt-h" className="lt mx-auto w-full max-w-[1180px] px-5 pb-2 pt-16 sm:pt-20">
+      <h2 id="lt-h" className="text-center text-[12px] font-semibold text-muted-foreground">
         Publishes to
-      </p>
+      </h2>
       <ul className="sr-only">
         {list.map((p) => (
           <li key={p}>{PLATFORM_META[p].name}{live.includes(p) ? "" : " (coming soon)"}</li>
         ))}
       </ul>
-      <div className="lt-viewport mt-5" aria-hidden="true">
+      <div className="lt-viewport mt-4" aria-hidden="true">
         <div className="lt-track">
           {[0, 1].map((k) => (
             <ul key={k} className="lt-half">

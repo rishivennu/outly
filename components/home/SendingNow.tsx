@@ -48,11 +48,12 @@ export function SendingNow({ items }: { items: SendingItem[] }) {
                   <ArrowUpRight className="h-4 w-4 shrink-0 text-white/60 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-white" aria-hidden="true" />
                 </div>
                 <div className="la-track relative mt-3 h-10 rounded-full" role="progressbar" aria-label={`${p.title} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
-                  <div className={cn("la-fill la-fill-anim absolute inset-y-0 left-0 rounded-full")} style={{ width: `max(2.5rem, ${pct}%)` }}>
+                  <div className={cn("la-fill la-fill-anim absolute inset-0 rounded-full")} style={{ ["--p" as string]: `max(2.5rem, ${pct}%)` }} />
+                  <span className="la-rider" style={{ ["--p" as string]: `max(2.5rem, ${pct}%)` }} aria-hidden="true">
                     <span className="absolute right-1.5 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center">
                       <OutlyMark variant="ink" size={18} className="la-rocket la-rocket-anim" />
                     </span>
-                  </div>
+                  </span>
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold tabular-nums text-white/60">{pct}%</span>
                 </div>
               </Link>

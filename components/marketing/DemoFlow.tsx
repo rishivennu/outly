@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, Check, Info, Pause, Play, RefreshCw } from "lucide-react";
 import { AppIcon } from "@/components/brand/brands";
-import { DotText } from "@/components/brand/DotText";
 import { OutlyMark } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 import { Bars, Bolt } from "./bento/Art";
@@ -134,7 +133,6 @@ export function DemoFlow() {
     >
       <div className="bx-head">
         <div className="min-w-0">
-          <p className="bx-eyebrow">The flow, end to end</p>
           <h2 id="demo-title" className="display mt-3 text-balance">
             Watch one upload become <span className="accent-serif bx-accent">three posts.</span>
           </h2>
@@ -149,7 +147,7 @@ export function DemoFlow() {
       {/* 10-16f: three tiles for the story (upload, drafts, the step), then one Live Activity card per place.
           The per-place tiles (sends, status, fix, live count) live in those cards now. */}
       <Reveal y={0} fx="tiles" className="bx bx-demo">
-        <Tile tone="send" on={beat === 0} live={beat === 0 && running} title="One upload" sub="desk-setup.mp4 lands in your library." art={<Bars />} />
+        <Tile tone="send" on={beat === 0} live={beat === 0 && running} title="One upload" sub="desk-setup.mp4 lands in your library." art={<Bars />} meta={["Format|MP4 1080p", "Length|0:42", "Size|18 MB", "Audio|Stereo"]} />
         <Tile tone="wait" on={beat === 1} title="Three drafts" sub="A caption, a title and a post, each in its own shape." art={<Bolt id={`${uid}-bolt`} />} />
         <div className="bx-tile bx-lime">
           <div className="flex items-center justify-between">
@@ -204,27 +202,27 @@ function DemoActivity({ p, s, beat, retry, moving, onRetry }: { p: Core; s: { st
   const accent = live ? "Live now" : bad ? "Tap retry to finish" : s.status === "retrying" ? "Try 2" : `Step ${step} of 4`;
   return (
     <li className={cn("la-card la-themed relative flex min-w-0 flex-[1_1_17rem] flex-col overflow-hidden rounded-[2rem] p-4 sm:p-5", live && "la-live", bad && "la-bad")}>
-      <span className="la-grid" aria-hidden="true" />
-      <div className="relative flex items-center gap-3" aria-hidden="true">
-        <DotText text="YOU" />
-        <ArrowRight className="la-arrow h-6 w-6 shrink-0" strokeWidth={3} />
-        <DotText text={CODE[p]} />
+      <div className="relative flex items-center gap-3">
+        <span className="la-code text-[13px] font-semibold tracking-tight" aria-hidden="true">YOU</span>
+        <ArrowRight className="la-arrow h-6 w-6 shrink-0" strokeWidth={3} aria-hidden="true" />
+        <span className="la-code text-[13px] font-semibold tracking-tight" aria-hidden="true">{CODE[p]}</span>
+        <h3 className="ml-auto min-w-0 truncate text-[15px] font-semibold leading-tight">{NAME[p]}</h3>
       </div>
       <div className="relative mt-3 grid grid-cols-2 gap-3">
         <div className="min-w-0">
           <p className="font-semibold leading-tight">Your video</p>
-          <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.08em] la-mute">desk-setup.mp4</p>
+          <p className="mt-1 truncate text-[11px] font-medium la-mute">desk-setup.mp4</p>
         </div>
         <div className="min-w-0">
-          <h3 className="truncate font-semibold leading-tight">{NAME[p]}</h3>
-          <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.08em] la-mute">{FORMAT[p]}</p>
+          <p className="font-semibold leading-tight">Goes out as</p>
+          <p className="mt-1 truncate text-[11px] font-medium la-mute">{FORMAT[p]}</p>
         </div>
       </div>
 
       <div className="la-box relative mt-4 flex min-h-[7.75rem] flex-col justify-center rounded-[1.25rem] p-4 pr-16">
         <p key={s.status} className="bx-word text-lg font-semibold leading-tight">{TITLE[s.status] ?? s.status}</p>
         <p className="mt-1 text-sm leading-snug la-mute">{s.note}</p>
-        <p className={cn("mt-2 text-[11px] font-bold uppercase tracking-[0.1em]", bad ? "la-warn" : "la-accent")}>{accent}</p>
+        <p className={cn("mt-2 text-[11.5px] font-semibold", bad ? "la-warn" : "la-accent")}>{accent}</p>
         <span className="absolute right-3 top-3">
           {bad ? (
             <button type="button" onClick={onRetry} disabled={retry === "running"} className="la-round" aria-label={`Try again on ${NAME[p]}`}>
@@ -251,12 +249,14 @@ function DemoActivity({ p, s, beat, retry, moving, onRetry }: { p: Core; s: { st
         aria-valuenow={pct}
         aria-valuetext={`${NAME[p]}: ${TITLE[s.status] ?? s.status}`}
       >
-        <div className={cn("la-fill absolute inset-y-0 left-0 rounded-full", work && moving && "la-fill-anim")} style={{ width: `max(3.5rem, ${pct}%)` }}>
+        <div className={cn("la-fill absolute inset-0 rounded-full", work && moving && "la-fill-anim")} style={{ ["--p" as string]: `max(3.5rem, ${pct}%)` }}>
+          {live && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-[hsl(var(--lime-foreground))]">Landed</span>}
+        </div>
+        <span className="la-rider" style={{ ["--p" as string]: `max(3.5rem, ${pct}%)` }} aria-hidden="true">
           <span className="absolute right-1.5 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center">
             <OutlyMark variant="ink" size={26} className={cn("la-rocket", work && moving && "la-rocket-anim")} />
           </span>
-          {live && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.12em] text-[hsl(var(--lime-foreground))]">Landed</span>}
-        </div>
+        </span>
         {!live && <span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold tabular-nums la-mute">{bad ? "STOPPED" : `${pct}%`}</span>}
       </div>
     </li>
@@ -275,7 +275,7 @@ function Glow() {
   );
 }
 
-function Tile({ tone, on, live, title, sub, art }: { tone: GTone; on: boolean; live?: boolean; title: string; sub: string; art: React.ReactNode }) {
+function Tile({ tone, on, live, title, sub, art, meta }: { tone: GTone; on: boolean; live?: boolean; title: string; sub: string; art: React.ReactNode; meta?: string[] }) {
   return (
     <div className={cn("bx-tile bx-gc", `gc-${tone}`, on && "is-on", live && "bx-live")}>
       <Glow />
@@ -283,6 +283,19 @@ function Tile({ tone, on, live, title, sub, art }: { tone: GTone; on: boolean; l
       <div className="bx-copy">
         <h3 className="bx-title">{title}</h3>
         <p className="bx-sub">{sub}</p>
+        {meta && (
+          <dl className="bx-meta">
+            {meta.map((m) => {
+              const [k, v] = m.split("|");
+              return (
+                <div key={k}>
+                  <dt>{k}</dt>
+                  <dd>{v}</dd>
+                </div>
+              );
+            })}
+          </dl>
+        )}
       </div>
     </div>
   );

@@ -84,7 +84,7 @@ export function AuthForm({ mode, google = false, title, subtitle, banner }: { mo
     if (!root) return;
     const mm = gsap.matchMedia();
     mm.add(MOTION_OK, () => {
-      gsap.fromTo(gsap.utils.selector(root)(".gs-in"), { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out", stagger: 0.045, delay: 0.05 });
+      if (performance.now() < 1200) gsap.fromTo(gsap.utils.selector(root)(".gs-in"), { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out", stagger: 0.045, delay: 0.05 });
     }, root);
     root.dataset.gsReady = "1";
   }, { scope: ref });
@@ -214,7 +214,7 @@ export function AuthForm({ mode, google = false, title, subtitle, banner }: { mo
   const other = mode === "login" ? "/signup" : "/login";
   const otherHref = next ? `${other}?next=${encodeURIComponent(next)}` : other;
   const label = "mb-1.5 text-[14px] font-semibold text-foreground";
-  const field = "h-12 rounded-xl border border-border bg-card shadow-[0_1px_2px_hsl(var(--foreground)/0.05)] hover:border-foreground/25 focus:border-foreground/40 focus:bg-card";
+  const field = "h-12 rounded-xl border border-foreground/45 bg-card shadow-[0_1px_2px_hsl(var(--foreground)/0.05)] hover:border-foreground/60 focus:border-foreground/75 focus:bg-card";
 
   return (
     <div ref={ref} className="gs-stage">
@@ -378,7 +378,7 @@ export function AuthForm({ mode, google = false, title, subtitle, banner }: { mo
             ) : (
               <button type="button" className={textBtn} onClick={() => switchTo(step === "password" ? "code" : "password")}>
                 {step !== "password" ? <KeyRound className="h-4 w-4" aria-hidden="true" /> : <Mail className="h-4 w-4" aria-hidden="true" />}
-                {step === "reset" ? "Back to sign in" : step === "code" ? "Use my password instead" : "Email me a sign-in code instead"}
+                {step === "reset" ? "Back to sign in" : step === "code" ? "Use my password" : "Email me a code instead"}
               </button>
             )}
           </div>

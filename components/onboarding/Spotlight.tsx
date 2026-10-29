@@ -163,7 +163,7 @@ export function Spotlight({ stops, onClose, kicker, skipLabel = "Skip", moreFall
   return createPortal(
     <div className="tour-root fixed inset-0 z-[95]">
       {spot ? (
-        <div className="tour-spot pointer-events-none fixed rounded-2xl" style={{ left: spot.left, top: spot.top, width: spot.right - spot.left, height: spot.bottom - spot.top }} aria-hidden="true" />
+        <div className="tour-spot pointer-events-none fixed rounded-2xl" style={{ ["--x" as string]: `${spot.left}px`, ["--y" as string]: `${spot.top}px`, width: spot.right - spot.left, height: spot.bottom - spot.top }} aria-hidden="true" />
       ) : (
         <div className="tour-dim fixed inset-0" aria-hidden="true" />
       )}

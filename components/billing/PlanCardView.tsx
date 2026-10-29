@@ -1,5 +1,4 @@
 import { Check } from "lucide-react";
-import { DotText } from "@/components/brand/DotText";
 import type { CardStyle } from "@/lib/billing/display";
 import { cn } from "@/lib/utils";
 
@@ -64,10 +63,7 @@ export function PlanCardView({
   ) : null;
 
   const title = la ? (
-    <h3 className="min-w-0">
-      <span className="sr-only">{name || "Plan name"}</span>
-      <DotText text={name || "PLAN"} className="h-8 max-w-full sm:h-9" />
-    </h3>
+    <h3 className="min-w-0 truncate font-display text-[1.55rem] font-semibold leading-none tracking-tightest sm:text-[1.75rem]">{name || "Plan name"}</h3>
   ) : (
     <h3 className={cn("min-w-0 tracking-tight", v === "bold" ? "text-[13px] font-bold uppercase tracking-[0.14em]" : "text-xl font-semibold")}>{name || "Plan name"}</h3>
   );
