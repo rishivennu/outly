@@ -2507,11 +2507,16 @@ html[data-contrast="more"] .lg-glass::before, html[data-contrast="more"] .lg-gla
 .ev-fill { position: absolute; inset: 0 0 auto; height: calc(var(--f) * 100%); display: flex; flex-direction: column; border-radius: 0 0 10px 10px;
   background: hsl(var(--lime)); box-shadow: 0 6px 18px -6px hsl(var(--lime) / .8);
   transition: height .95s cubic-bezier(.65, 0, .25, 1), background-color .6s, box-shadow .6s; }
-.ev-fill[data-hand] { background: repeating-linear-gradient(135deg, hsl(var(--foreground) / .9) 0 7px, hsl(var(--foreground) / .76) 7px 14px); box-shadow: 0 6px 18px -8px hsl(var(--foreground) / .6); }
+/* By hand = evening hours burning: amber at 6 pm to ember red at midnight, soft stripes on top (1050). */
+.ev-fill[data-hand] { background: repeating-linear-gradient(135deg, hsl(0 0% 100% / .2) 0 7px, transparent 7px 14px), linear-gradient(180deg, hsl(34 86% 76%), hsl(20 76% 71%) 55%, hsl(8 62% 67%)); box-shadow: 0 8px 22px -10px hsl(14 70% 55% / .35); }
+.dark .ev-fill[data-hand] { background: repeating-linear-gradient(135deg, hsl(0 0% 100% / .16) 0 7px, transparent 7px 14px), linear-gradient(180deg, hsl(34 78% 72%), hsl(18 66% 65%) 55%, hsl(6 54% 61%)); box-shadow: 0 8px 24px -10px hsl(14 60% 50% / .35); }
+.ev-fill[data-hand] i { border-bottom-color: hsl(0 0% 100% / .45); }
 .ev-fill i { flex: 1; min-height: 0; border-bottom: 1.5px solid hsl(var(--background) / .55); }
 .ev-fill i:last-child { border-bottom: 0; }
 .ev-over { position: absolute; left: 50%; bottom: 6px; translate: -50% 0; white-space: nowrap; padding: 2px 6px; border-radius: 9999px; font-size: 10px; font-weight: 700;
   background: hsl(var(--destructive)); color: #fff; }
+/* On the coral fill a red pill vanishes: flip it to white with deep red text (7:1). */
+.ev-board[data-mode="hand"] .ev-over { background: #fff; color: hsl(6 58% 36%); box-shadow: 0 2px 8px -2px hsl(0 0% 0% / .25); }
 .ev-label { margin-top: .5rem; display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 12px; text-align: center; }
 .ev-time { font-size: 11px; color: hsl(var(--muted-foreground)); }
 @media (max-width: 420px) { .ev-over { font-size: 0; width: 10px; height: 10px; padding: 0; } }

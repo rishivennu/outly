@@ -89,7 +89,7 @@ const UNSUB_MARK = "<!--outlly:unsub-->";
 export function withUnsubscribe(html: string, to: string, list: List | null): string {
   if (!html.includes(UNSUB_MARK)) return html;
   const line = list
-    ? `<div style="padding-top:8px;font-family:${BODY}">${list === "weekly" ? "Don't want the weekly report?" : "Don't want emails like this?"} <a href="${unsubPageUrl(to, list)}" style="color:${C.boardText};font-family:${BODY};text-decoration:underline">Unsubscribe</a></div>`
+    ? `<div style="padding-top:8px;font-family:${BODY}">${list === "weekly" ? "Don't want the weekly report?" : "Don't want emails like this?"} <a href="${unsubPageUrl(to, list)}" style="color:${C.muted};font-family:${BODY};text-decoration:underline">Unsubscribe</a></div>`
     : "";
   return html.split(UNSUB_MARK).join(line);
 }
@@ -102,22 +102,30 @@ const BODY = "'DM Sans',Helvetica,Arial,sans-serif";
 const FONT_CSS = "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=DM+Sans:wght@400;500;700&display=swap";
 
 /**
- * Bento palette (2026-10-15): a dark board with rounded tiles in brand colours, after the reference board.
- * Every text/fill pair here is at least 4.5:1 (small text) or 3:1 (large display numbers).
+ * Soft sunrise (2026-10-29), after the user's Headspace reference: a white card on a warm grey page, a pastel
+ * hero with the mark, a centred title and an illustration that melts into white clouds, centred copy, one pill
+ * button, then a quiet footer. No neon anywhere: muted pastels only, and every text/fill pair is at least 4.5:1.
  */
 const C = {
-  board: "#151713", // the dark page behind the tiles
-  ink: "#121707",
-  lime: "#9ff218",
-  cream: "#f1f0e9",
+  page: "#f3f1ec", // behind the card
+  card: "#ffffff",
+  edge: "#e8e5df", // card hairline
+  ink: "#2a2e27", // titles (14:1 on white)
+  text: "#474b43", // body copy (8.9:1)
+  muted: "#6f726a", // small print (4.9:1)
+  rule: "#ebe8e2",
   white: "#ffffff",
-  forest: "#1d4a2a", // deep green: the third tile colour
-  mint: "#e3f7c4", // text on forest (9.6:1)
-  muted: "#5f6357", // small text on cream/white (5.6:1)
-  rule: "#e6e8df",
-  boardText: "#c9ccc0", // links on the board (11:1)
-  boardMuted: "#8f9386", // legal lines on the board (5.9:1)
 };
+
+/** Hero moods: a pastel, its illustration (public/brand/email/hero-*.png) and one accent for kicker, links and button. */
+type Hero = "lime" | "cream" | "white";
+const HERO: Record<Hero, { bg: string; accent: string }> = {
+  lime: { bg: "#eef6dc", accent: "#3f6b2c" }, // pistachio sunrise: good news and invitations
+  cream: { bg: "#fcebdc", accent: "#9a4f2a" }, // peach: quieter account notices
+  white: { bg: "#e6eff9", accent: "#3f5f8f" }, // sky: security changes
+};
+/** Buttons and links are written before wrap() knows the hero, so they carry this token and wrap() fills it in. */
+const ACC = "%%outlly-accent%%";
 
 /** Platform ids arrive lower-case ("youtube"); emails show the brand spelling. Unknown ids pass through escaped. */
 const PLATFORM: Record<string, string> = { instagram: "Instagram", youtube: "YouTube", tiktok: "TikTok", x: "X", linkedin: "LinkedIn", facebook: "Facebook", threads: "Threads" };
@@ -125,77 +133,79 @@ const platformName = (id: string) => PLATFORM[id.toLowerCase()] ?? esc(id);
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
+/** Detail tiles sit inside the white card as soft pastel panels. `fg` colours the big figures. */
 type Tone = "lime" | "cream" | "white" | "ink" | "forest";
 const TONE: Record<Tone, { bg: string; fg: string; sub: string }> = {
-  lime: { bg: C.lime, fg: C.ink, sub: "#2c3a10" },
-  cream: { bg: C.cream, fg: C.ink, sub: C.muted },
-  white: { bg: C.white, fg: C.ink, sub: C.muted },
-  ink: { bg: "#0b0d08", fg: C.white, sub: "#a9ad9f" },
-  forest: { bg: C.forest, fg: C.mint, sub: "#b9d6a3" },
+  ink: { bg: "#eef5df", fg: "#3f6b2c", sub: "#5a6150" }, // the lead figure: pistachio
+  forest: { bg: "#fdf0e3", fg: "#9a4f2a", sub: "#6b5a4d" }, // the second figure: peach
+  white: { bg: "#f5f3ee", fg: C.ink, sub: "#62655c" }, // sand: receipts and lists
+  lime: { bg: "#eef6dc", fg: "#3f6b2c", sub: "#5a6150" },
+  cream: { bg: "#fbf1e6", fg: C.ink, sub: "#6b5a4d" },
 };
 
 /** Vertical gap between tiles. */
 const gap = (h = 10) => `<tr><td height="${h}" style="height:${h}px;line-height:${h}px;font-size:0">&nbsp;</td></tr>`;
 
-/** One rounded tile, as a full-width row of the 600px column. */
-/** Ink tiles sit on an almost-black board, so they get a hairline edge to read as a tile. */
-const edge = (tone: Tone) => (tone === "ink" ? "border:1px solid #30352a;" : "");
-const tile = (tone: Tone, inner: string, pad = "30px 32px") =>
-  `<tr><td class="gutter" bgcolor="${TONE[tone].bg}" style="background:${TONE[tone].bg};${edge(tone)}border-radius:26px;padding:${pad}">${inner}</td></tr>`;
+/** One rounded tile, as a full-width row inside the card. */
+const tile = (tone: Tone, inner: string, pad = "26px 28px") =>
+  `<tr><td align="center" bgcolor="${TONE[tone].bg}" style="background:${TONE[tone].bg};border-radius:20px;padding:${pad};text-align:center">${inner}</td></tr>`;
 
 /** Two tiles side by side (they stack on phones). `w` is the left tile's share in percent. */
 const pair = (a: { tone: Tone; html: string }, b: { tone: Tone; html: string }, w = 50) =>
   `<tr><td style="padding:0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-<td class="stack" width="${w}%" valign="top" bgcolor="${TONE[a.tone].bg}" style="width:${w}%;background:${TONE[a.tone].bg};${edge(a.tone)}border-radius:26px;padding:24px 26px">${a.html}</td>
-<td class="stack-gap" width="10" style="width:10px;font-size:0;line-height:0">&nbsp;</td>
-<td class="stack" width="${100 - w}%" valign="top" bgcolor="${TONE[b.tone].bg}" style="width:${100 - w}%;background:${TONE[b.tone].bg};${edge(b.tone)}border-radius:26px;padding:24px 26px">${b.html}</td>
+<td class="stack" width="${w - 1}%" align="center" valign="top" bgcolor="${TONE[a.tone].bg}" style="width:${w - 1}%;background:${TONE[a.tone].bg};border-radius:20px;padding:22px 20px;text-align:center">${a.html}</td>
+<td class="stack-gap" width="2%" style="width:2%;font-size:0;line-height:0">&nbsp;</td>
+<td class="stack" width="${99 - w}%" align="center" valign="top" bgcolor="${TONE[b.tone].bg}" style="width:${99 - w}%;background:${TONE[b.tone].bg};border-radius:20px;padding:22px 20px;text-align:center">${b.html}</td>
 </tr></table></td></tr>`;
 
-/** Small outlined label at the top of a tile ("Weekly report", "Billing"). */
-const chip = (label: string, tone: Tone = "lime") =>
-  `<span style="display:inline-block;border:1.5px solid ${TONE[tone].fg};border-radius:999px;padding:4px 11px;font-family:${BODY};font-size:12px;font-weight:bold;line-height:1.2;color:${TONE[tone].fg}">${label}</span>`;
+/** Small label at the top of a tile ("By platform", "Best performer"). */
+const chip = (label: string, tone: Tone = "white") =>
+  `<span style="display:inline-block;border:1px solid ${TONE[tone].sub};border-radius:999px;padding:4px 11px;font-family:${BODY};font-size:12px;font-weight:bold;line-height:1.2;color:${TONE[tone].sub}">${label}</span>`;
 
 /** A big display figure with its caption, for stat tiles. */
 const stat = (value: string, label: string, tone: Tone, size = 46) =>
-  `<div style="font-family:${DISPLAY};font-size:${size}px;line-height:1;font-weight:bold;letter-spacing:-1.5px;color:${tone === "ink" ? C.lime : TONE[tone].fg}">${value}</div>
+  `<div style="font-family:${DISPLAY};font-size:${size}px;line-height:1;font-weight:bold;letter-spacing:-1.2px;color:${TONE[tone].fg}">${value}</div>
 <div style="padding-top:8px;font-family:${BODY};font-size:13px;line-height:1.4;color:${TONE[tone].sub}">${label}</div>`;
 
 const footerLink = (path: string, label: string) =>
-  `<a href="${appUrl()}${path}" style="color:${C.boardText};font-family:${BODY};text-decoration:underline">${label}</a>`;
+  `<a href="${appUrl()}${path}" style="color:${C.text};font-family:${BODY};text-decoration:none">${label}</a>`;
+const pipe = `&nbsp;&nbsp;<span style="color:#c9c6bf">|</span>&nbsp;&nbsp;`;
 
-const footer = () => `${gap(22)}
-<tr><td style="padding:0 8px"><div style="height:1px;background:#2b2e27;line-height:1px;font-size:0">&nbsp;</div></td></tr>
-<tr><td class="gutter" align="center" style="padding:22px 24px 6px;font-family:${BODY};color:${C.boardMuted};font-size:12px;line-height:1.7">
-<div style="font-family:${DISPLAY};font-size:15px;font-weight:bold;color:${C.white};letter-spacing:-0.3px">Outlly</div>
-<div style="padding-top:2px;font-family:${BODY};color:${C.boardText}">Create once. Publish everywhere.</div>
-<div style="padding-top:10px;font-family:${BODY}">${footerLink("/help", "Help centre")} &nbsp;&middot;&nbsp; ${footerLink("/privacy", "Privacy")} &nbsp;&middot;&nbsp; ${footerLink("/terms", "Terms")} &nbsp;&middot;&nbsp; ${footerLink("/settings", "Settings")}</div>
-<div style="padding-top:12px;font-family:${BODY}">You are receiving this because you have an Outlly account. Questions? Just reply to this email.</div>
+const footer = () => `<tr><td class="gutter" align="center" style="padding:30px 48px 0;text-align:center;font-family:${BODY};font-size:14px;line-height:1.7;color:${C.text}">
+Questions? Just reply to this email or visit our <a href="${appUrl()}/help" style="color:${ACC};font-family:${BODY};font-weight:bold;text-decoration:none">Help centre</a>. A person from the team reads every reply.
+</td></tr>
+<tr><td align="center" style="padding:28px 48px 0"><table role="presentation" width="62%" cellpadding="0" cellspacing="0" border="0" style="width:62%"><tr><td height="1" style="height:1px;background:${C.rule};line-height:1px;font-size:0">&nbsp;</td></tr></table></td></tr>
+<tr><td class="gutter" align="center" style="padding:20px 32px 34px;text-align:center;font-family:${BODY};color:${C.muted};font-size:12px;line-height:1.7">
+<div style="font-family:${DISPLAY};font-size:15px;font-weight:bold;color:${C.ink};letter-spacing:-0.3px">Outlly</div>
+<div style="padding-top:2px;font-family:${BODY}">Create once. Publish everywhere.</div>
+<div style="padding-top:12px;font-family:${BODY};font-size:12px">${footerLink("/help", "Help centre")}${pipe}${footerLink("/privacy", "Privacy")}${pipe}${footerLink("/terms", "Terms")}${pipe}${footerLink("/settings", "Settings")}</div>
+<div style="padding-top:14px;font-family:${BODY}">You are receiving this because you have an Outlly account.</div>
 ${UNSUB_MARK}
-<div style="padding-top:8px;font-family:${BODY}">&copy; ${new Date().getFullYear()} Outlly</div>
+<div style="padding-top:4px;font-family:${BODY}">&copy; ${new Date().getFullYear()} Outlly</div>
 </td></tr>`;
 
 interface WrapOpts {
   /** Inbox preview line; defaults to the title. */
   preheader?: string;
-  /** Chip on the hero tile, e.g. "Billing". */
+  /** Small label above the title, e.g. "Billing". */
   kicker?: string;
-  /** Hero colour. Lime for good news and invitations, cream for quieter account notices. */
-  tone?: Tone;
-  /** One line under the title on the hero tile. */
+  /** Hero mood. Lime for good news and invitations, cream for quieter account notices, white (sky) for security. */
+  tone?: Hero;
+  /** One line under the title. */
   lead?: string;
-  /** Extra tile rows between the hero and the message tile (stats, receipts). */
+  /** Detail tile rows between the illustration and the message (stats, receipts). */
   tiles?: string;
 }
 
 /**
- * Shared chrome for every email, laid out as a bento board: a top bar (mark, name, tagline) on a dark page,
- * a coloured hero tile carrying the title, optional detail tiles, the message tile with the action, and the
- * footer on the board. Tables + inline styles only; Outlook desktop squares the corners, nothing else breaks.
+ * Shared chrome for every email: a white card on a warm page. The pastel hero carries the mark, kicker and
+ * title, then the illustration (pastel at the top, white clouds at the bottom) melts into the card, followed
+ * by optional detail tiles, the centred message with its button, and the footer. Tables + inline styles only.
  */
 const wrap = (title: string, body: string, o: WrapOpts = {}) => {
   const tone = o.tone ?? "lime";
-  const t = TONE[tone];
-  return `<!doctype html>
+  const h = HERO[tone];
+  const html = `<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -215,47 +225,43 @@ a{color:${C.ink}}
 .h1{font-size:30px!important}
 .stack{display:block!important;width:100%!important;box-sizing:border-box}
 .stack-gap{display:block!important;width:100%!important;height:10px!important}
-.hide-sm{display:none!important}
 }
 </style>
 </head>
-<body style="margin:0;padding:0;background:${C.board};font-family:${BODY};font-size:15px;line-height:1.6;color:${C.ink}">
+<body style="margin:0;padding:0;background:${C.page};font-family:${BODY};font-size:15px;line-height:1.6;color:${C.text}">
 <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;max-height:0;max-width:0;overflow:hidden;mso-hide:all">${o.preheader ?? title}</span>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.board}" style="background:${C.board}"><tr><td align="center" style="padding:26px 12px 30px">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px">
-<tr><td style="padding:0 8px 16px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-<td width="33%" style="width:33%"><a href="${appUrl()}/" style="text-decoration:none"><img src="${appUrl()}/brand/rocket/mark-anim.gif" width="30" height="30" alt="Outlly" style="display:block;border-radius:8px;border:0"></a></td>
-<td width="34%" align="center" style="width:34%;font-family:${DISPLAY};color:${C.white};font-size:16px;font-weight:bold;letter-spacing:-0.4px">Outlly</td>
-<td class="hide-sm" width="33%" align="right" style="width:33%;font-family:${BODY};color:${C.boardText};font-size:12px">Create once. Post everywhere.</td>
-</tr></table></td></tr>
-<tr><td class="gutter" bgcolor="${t.bg}" style="background:${t.bg};${edge(tone)}border-radius:26px;padding:28px 32px 34px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-<td valign="top">${o.kicker ? chip(o.kicker, tone) : "&nbsp;"}</td>
-<td valign="top" align="right" width="52"><img src="${appUrl()}/brand/rocket/${tone === "ink" || tone === "forest" ? `rocket-anim-${tone}.gif` : "rocket-ink-256.png"}" width="44" height="44" alt="" style="display:block;border:0"></td>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.page}" style="background:${C.page}"><tr><td align="center" style="padding:24px 10px 32px">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.card}" style="width:100%;max-width:600px;background:${C.card};border:1px solid ${C.edge};border-radius:24px">
+<tr><td class="gutter" align="center" bgcolor="${h.bg}" style="background:${h.bg};border-radius:24px 24px 0 0;padding:34px 40px 0;text-align:center">
+<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0"><tr>
+<td valign="middle"><a href="${appUrl()}/" style="text-decoration:none"><img src="${appUrl()}/brand/rocket/mark-anim.gif" width="34" height="34" alt="Outlly" style="display:block;border-radius:9px;border:0"></a></td>
+<td valign="middle" style="padding-left:10px;font-family:${DISPLAY};color:${C.ink};font-size:22px;font-weight:bold;letter-spacing:-0.5px">Outlly</td>
 </tr></table>
-<h1 class="h1" style="margin:30px 0 0;font-family:${DISPLAY};font-size:38px;line-height:1.04;font-weight:bold;letter-spacing:-1.4px;color:${t.fg}">${title}</h1>
-${o.lead ? `<p style="margin:12px 0 0;font-family:${BODY};font-size:16px;line-height:1.5;color:${t.sub === C.muted ? C.ink : t.fg}">${o.lead}</p>` : ""}
+${o.kicker ? `<div style="padding-top:30px;font-family:${BODY};font-size:12px;font-weight:bold;line-height:1.2;letter-spacing:1.6px;text-transform:uppercase;color:${h.accent}">${o.kicker}</div>` : ""}
+<h1 class="h1" style="margin:${o.kicker ? 10 : 30}px 0 0;font-family:${DISPLAY};font-size:38px;line-height:1.08;font-weight:bold;letter-spacing:-1.2px;color:${C.ink}">${title}</h1>
+${o.lead ? `<p style="margin:12px 0 0;font-family:${BODY};font-size:17px;line-height:1.5;color:${C.text}">${o.lead}</p>` : ""}
 </td></tr>
-${o.tiles ? `${gap()}${o.tiles}` : ""}
-${gap()}
-${tile("cream", body)}
+<tr><td bgcolor="${h.bg}" style="background:${h.bg};padding:0;font-size:0;line-height:0"><img src="${appUrl()}/brand/email/hero-${tone}.png" width="600" height="250" alt="" style="display:block;width:100%;max-width:600px;height:auto;border:0"></td></tr>
+${o.tiles ? `<tr><td class="gutter" style="padding:8px 40px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${o.tiles}</table></td></tr>` : ""}
+<tr><td class="gutter" align="center" style="padding:${o.tiles ? 30 : 8}px 56px 0;text-align:center;font-family:${BODY};color:${C.text}">${body}</td></tr>
 ${footer()}
 </table></td></tr></table></body></html>`;
+  return html.split(ACC).join(h.accent);
 };
 
-const p = (s: string) => `<p style="margin:0 0 14px;font-family:${BODY};font-size:16px;line-height:1.6;color:${C.ink}">${s}</p>`;
+const p = (s: string) => `<p style="margin:0 0 14px;font-family:${BODY};font-size:16px;line-height:1.6;color:${C.text}">${s}</p>`;
 const small = (s: string) => `<p style="margin:16px 0 0;font-family:${BODY};font-size:12px;line-height:1.6;color:${C.muted}">${s}</p>`;
-/** Bulletproof: the padding lives on the td, so clients that drop anchor padding still show a full button. Ink pill, lime label. */
+/** Bulletproof: the padding lives on the td, so clients that drop anchor padding still show a full button. A soft pill in the hero's accent. */
 const btn = (href: string, label: string) =>
-  `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 2px"><tr><td align="center" bgcolor="${C.ink}" style="background:${C.ink};border-radius:999px;padding:15px 26px">
-<a href="${href}" style="display:inline-block;font-family:${BODY};font-size:15px;font-weight:bold;line-height:1;color:${C.lime};text-decoration:none">${label}&nbsp;&nbsp;&rarr;</a></td></tr></table>`;
+  `<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="margin:26px auto 6px"><tr><td align="center" bgcolor="${ACC}" style="background:${ACC};border-radius:999px;padding:16px 34px">
+<a href="${href}" style="display:inline-block;font-family:${BODY};font-size:16px;font-weight:bold;line-height:1;color:${C.white};text-decoration:none">${label}</a></td></tr></table>`;
 
 /** "Label  value" rows inside a detail tile. */
 const rows = (items: [string, string][], tone: Tone = "white") =>
   `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${items
     .map(
       ([k, v], i) =>
-        `<tr><td style="padding:9px 0;${i ? `border-top:1px solid ${C.rule};` : ""}font-family:${BODY};font-size:14px;color:${TONE[tone].sub}">${k}</td><td align="right" style="padding:9px 0;${i ? `border-top:1px solid ${C.rule};` : ""}font-family:${BODY};font-size:14px;font-weight:bold;color:${TONE[tone].fg}">${v}</td></tr>`,
+        `<tr><td align="left" style="padding:9px 0;${i ? `border-top:1px solid ${C.rule};` : ""}text-align:left;font-family:${BODY};font-size:14px;color:${TONE[tone].sub}">${k}</td><td align="right" style="padding:9px 0;${i ? `border-top:1px solid ${C.rule};` : ""}text-align:right;font-family:${BODY};font-size:14px;font-weight:bold;color:${TONE[tone].fg}">${v}</td></tr>`,
     )
     .join("")}</table>`;
 
@@ -289,7 +295,7 @@ export const templates = {
   ticketReply: (o: { name: string; ref: string; body: string; status: string }) =>
     wrap(
       `Update on ticket ${esc(o.ref)}`,
-      `${p(`Hi ${esc(o.name || "there")},`)}<div style="font-family:${BODY};font-size:16px;line-height:1.6;color:${C.ink};background:${C.white};border-radius:18px;border-left:4px solid ${C.lime};padding:16px 18px;white-space:pre-wrap">${esc(o.body)}</div>${small(`Status: ${esc(o.status)}. Reply to this email to keep the conversation going.`)}`,
+      `${p(`Hi ${esc(o.name || "there")},`)}<div style="font-family:${BODY};font-size:16px;line-height:1.6;color:${C.text};background:#f5f3ee;border-radius:16px;border-left:4px solid ${ACC};padding:16px 18px;text-align:left;white-space:pre-wrap">${esc(o.body)}</div>${small(`Status: ${esc(o.status)}. Reply to this email to keep the conversation going.`)}`,
       { kicker: "Support", tone: "cream" },
     ),
   refund: (o: { name: string; amount: string; number: string; creditNote?: string }) =>
@@ -338,7 +344,7 @@ export const templates = {
             : ""
         }${
           s.top
-            ? `${gap()}${tile("forest", `${chip("Best performer", "forest")}<p style="margin:14px 0 0;font-family:${DISPLAY};font-size:24px;line-height:1.2;font-weight:bold;letter-spacing:-0.6px;color:${C.mint}">${esc(s.top.title)}</p><p style="margin:6px 0 0;font-family:${BODY};font-size:14px;color:#b9d6a3">${platformName(s.top.platform)} &middot; ${compact(s.top.views)} views</p>`, "24px 28px")}`
+            ? `${gap()}${tile("forest", `${chip("Best performer", "forest")}<p style="margin:14px 0 0;font-family:${DISPLAY};font-size:24px;line-height:1.2;font-weight:bold;letter-spacing:-0.6px;color:${TONE.forest.fg}">${esc(s.top.title)}</p><p style="margin:6px 0 0;font-family:${BODY};font-size:14px;color:${TONE.forest.sub}">${platformName(s.top.platform)} &middot; ${compact(s.top.views)} views</p>`, "24px 28px")}`
             : ""
         }`
       : undefined;
@@ -382,7 +388,7 @@ export const templates = {
   foundingWelcome: (o: { name: string; no: number; pct: number; url: string; stamp: string }) =>
     wrap(
       `You're founding member #${o.no}`,
-      `<img src="${esc(o.stamp)}" width="120" height="119" alt="Outlly founding member stamp" style="display:block;width:120px;height:auto;margin:0 0 14px;border:0">${p(`Hi ${esc(o.name)}, thank you for backing Outlly this early. Your seat is number ${o.no}, and it's yours for good.`)}${p(`Every paid plan costs you ${o.pct}% less, for as long as you keep your account. It's already applied: the prices you see in Billing are your prices.`)}${btn(o.url, "See your founding prices")}${small("Your founding stamp shows on your Home and Billing pages.")}`,
+      `<img src="${esc(o.stamp)}" width="120" height="119" alt="Outlly founding member stamp" style="display:block;width:120px;height:auto;margin:0 auto 14px;border:0">${p(`Hi ${esc(o.name)}, thank you for backing Outlly this early. Your seat is number ${o.no}, and it's yours for good.`)}${p(`Every paid plan costs you ${o.pct}% less, for as long as you keep your account. It's already applied: the prices you see in Billing are your prices.`)}${btn(o.url, "See your founding prices")}${small("Your founding stamp shows on your Home and Billing pages.")}`,
       {
         kicker: "Founding member",
         tone: "lime",
@@ -394,7 +400,7 @@ export const templates = {
   foundingVerify: (o: { name: string; url: string; left: number; pct: number; stamp: string }) =>
     wrap(
       "Claim your founding seat",
-      `<img src="${esc(o.stamp)}" width="96" height="95" alt="" style="display:block;width:96px;height:auto;margin:0 0 14px;border:0">${p(`Hi ${esc(o.name)}, a founding seat is waiting for you: ${o.pct}% off every paid plan, for life. We give seats only to confirmed Gmail inboxes, so one person gets one seat. Tap below to confirm this address is yours:`)}${btn(o.url, "Confirm and claim my seat")}${small(`The link works for 7 days. Seats go in the order they're claimed, and ${o.left} ${o.left === 1 ? "is" : "are"} left right now. Didn't sign up for Outlly? Ignore this and nothing happens.`)}`,
+      `<img src="${esc(o.stamp)}" width="96" height="95" alt="" style="display:block;width:96px;height:auto;margin:0 auto 14px;border:0">${p(`Hi ${esc(o.name)}, a founding seat is waiting for you: ${o.pct}% off every paid plan, for life. We give seats only to confirmed Gmail inboxes, so one person gets one seat. Tap below to confirm this address is yours:`)}${btn(o.url, "Confirm and claim my seat")}${small(`The link works for 7 days. Seats go in the order they're claimed, and ${o.left} ${o.left === 1 ? "is" : "are"} left right now. Didn't sign up for Outlly? Ignore this and nothing happens.`)}`,
       {
         kicker: "Founding member",
         preheader: `Confirm your Gmail to lock in ${o.pct}% off for life`,
@@ -447,7 +453,7 @@ export const templates = {
         kicker: o.reset ? "Password" : "Sign in",
         tone: "cream",
         preheader: o.reset ? `${o.code} is your Outlly password reset code` : `${o.code} is your Outlly sign-in code`,
-        tiles: tile("ink", `<div style="font-family:${BODY};font-size:13px;color:${TONE.ink.sub}">Your code</div><div style="padding-top:6px;font-family:${DISPLAY};font-size:46px;line-height:1.05;font-weight:bold;letter-spacing:10px;color:${C.lime}">${esc(o.code)}</div>`),
+        tiles: tile("ink", `<div style="font-family:${BODY};font-size:13px;color:${TONE.ink.sub}">Your code</div><div style="padding-top:6px;font-family:${DISPLAY};font-size:46px;line-height:1.05;font-weight:bold;letter-spacing:10px;color:${TONE.ink.fg}">${esc(o.code)}</div>`),
       },
     ),
   securitySubject: (change: SecurityChange) =>
