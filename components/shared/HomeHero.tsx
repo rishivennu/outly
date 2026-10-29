@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, CalendarClock } from "lucide-react";
-import { HeroFan, CursorTag, Sparkles, type FanCard } from "@/components/marketing/HeroFan";
+import { HeroFan, HeroProps, CursorTag, Sparkles, type FanCard } from "@/components/marketing/HeroFan";
 import { UploadZone } from "./UploadZone";
 import { handoffFile } from "@/lib/client/handoff";
 import { Greeting } from "./Greeting";
@@ -36,6 +36,7 @@ export function HomeHero({ firstName }: { firstName: string }) {
         {/* Live counts (1039): top right on a computer; a phone shows them in its top bar instead. */}
         <LiveCount pill className="absolute right-6 top-5 z-10 hidden lg:inline-flex xl:right-10" />
         <div className="relative mx-auto flex max-w-6xl flex-col items-center px-5 text-center sm:px-10">
+          <HeroProps wide />
           <Greeting name={firstName} className="hf-rise-in" />
 
           <div className="relative mt-7 w-full">

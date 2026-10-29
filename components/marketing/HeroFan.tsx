@@ -86,9 +86,24 @@ export function HeroFan({ cards = CARDS, cta, framed = false }: { cards?: FanCar
           </div>
         ))}
       </div>
-      {/* 1044: the loose "SHIP IT" / "STATS" props are gone. The fan fills the stage at every width, so they always sat on the outer cards' labels. */}
       {framed && <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 h-16 bg-gradient-to-t from-background to-transparent" />}
     </div>
+  );
+}
+
+/**
+ * The two loose 3D props ("SHIP IT", "STATS"). 1044b: they used to float inside the fan's stage, where the cards
+ * fill every pixel of width, so they always covered the outer cards' labels. They now float in the empty gutters
+ * beside the hero copy. Place inside the copy wrapper (position: relative); only from lg up, where the gutters exist.
+ */
+export function HeroProps({ wide = false }: { wide?: boolean }) {
+  // `wide`: the studio home shares its width with the sidebar, so the gutters only open up from xl.
+  const show = wide ? "hidden xl:block" : "hidden lg:block";
+  return (
+    <>
+      <div aria-hidden="true" className={`hf-prop pointer-events-none left-3 top-[30%] xl:left-[2%] ${show}`} style={{ ["--rot" as string]: "-10deg", animationDelay: "-2s" }}><Icon3D name="publish" size={92} /></div>
+      <div aria-hidden="true" className={`hf-prop pointer-events-none right-3 top-[52%] xl:right-[2%] ${show}`} style={{ ["--rot" as string]: "8deg", animationDelay: "-4s" }}><Icon3D name="analytics" size={86} /></div>
+    </>
   );
 }
 

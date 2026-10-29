@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { HeroFan, CursorTag, Sparkles } from "./HeroFan";
+import { HeroFan, HeroProps, CursorTag, Sparkles } from "./HeroFan";
 import { SignupCta } from "./SignupCta";
 import { StampChip } from "@/components/brand/Stamps";
 import { Shell } from "./bits";
@@ -27,6 +27,7 @@ export function Hero({ showHow = true, beta = false, live }: { showHow?: boolean
       <div aria-hidden="true" className="hf-aura" />
       <Sparkles />
       <Shell className="relative flex flex-col items-center text-center">
+        <HeroProps />
         <div className="relative w-full">
           <CursorTag name="Meera" tone="teal" side="l" className="left-[2%] top-[4%] hidden md:inline-flex lg:left-[8%]" />
           <CursorTag name="Arjun" tone="pink" side="r" className="right-[2%] top-[58%] hidden md:inline-flex lg:right-[8%]" />
