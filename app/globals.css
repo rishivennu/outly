@@ -1408,9 +1408,10 @@ html:not(.dark) .hf-glow { background: radial-gradient(50% 40% at 50% 80%, hsl(7
   .hf-fan:has(.hf-slot:hover) .hf-slot:not(:hover) .hf-lift { --lift: 8px; }
   .hf-fan:has(.hf-slot:hover) .hf-slot:not(:hover) .hf-dim { opacity: .34; }
 }
-.hf-head { border-radius: 14px; background: rgb(6 7 9 / .95); padding: 7px 10px 8px; }
-/* the lime card writes in dark ink, so its label ground has to be the light one */
-.hf-lime .hf-head { background: rgb(251 252 254 / .95); }
+/* 1044: no label box. The words sit straight on the card; a soft dark halo keeps white text legible on the bright
+   top of the pink/red/blue gradients, and the lime card writes in dark ink so it needs none. */
+.hf-head { min-width: 0; text-shadow: 0 1px 2px rgb(0 0 0 / .38), 0 2px 14px rgb(0 0 0 / .22); }
+.hf-lime .hf-head { text-shadow: none; }
 .hf-title { font-family: var(--font-display), system-ui, sans-serif; font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
 .hf-sub { margin-top: 4px; font-size: 13px; font-weight: 500; opacity: .92; }
 .hf-obj { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 1; filter: drop-shadow(0 20px 22px rgba(0,0,0,.35)); }

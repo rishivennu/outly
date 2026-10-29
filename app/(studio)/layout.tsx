@@ -51,7 +51,7 @@ export default async function StudioLayout({ children }: { children: React.React
           )}
           <MobileTopBar />
           <AppNavBar />
-          <main id="main" className="relative min-h-dvh pb-28 lg:pb-0">
+          <main id="main" className="relative min-h-dvh pb-[calc(env(safe-area-inset-bottom)+11rem)] lg:pb-0">
             {children}
           </main>
         </div>

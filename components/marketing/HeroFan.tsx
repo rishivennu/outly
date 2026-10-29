@@ -86,8 +86,7 @@ export function HeroFan({ cards = CARDS, cta, framed = false }: { cards?: FanCar
           </div>
         ))}
       </div>
-      <div className="hf-prop left-[6%] bottom-[46%] hidden lg:block" style={{ ["--rot" as string]: "-10deg", animationDelay: "-2s" }}><Icon3D name="publish" size={92} /></div>
-      <div className="hf-prop right-[7%] bottom-[50%] hidden lg:block" style={{ ["--rot" as string]: "8deg", animationDelay: "-4s" }}><Icon3D name="analytics" size={86} /></div>
+      {/* 1044: the loose "SHIP IT" / "STATS" props are gone. The fan fills the stage at every width, so they always sat on the outer cards' labels. */}
       {framed && <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 h-16 bg-gradient-to-t from-background to-transparent" />}
     </div>
   );

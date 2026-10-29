@@ -254,10 +254,10 @@ function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: 
             <span className="text-xs font-normal text-muted-foreground">{new Date(comment.createdAt).toLocaleString()}</span>
           </p>
           <p className="mt-1 whitespace-pre-wrap text-[15px]">{comment.text}</p>
-          <p className="mt-1 flex min-w-0 items-center text-xs text-muted-foreground">
-            <span className="truncate">on {comment.postTitle ?? "a post"}</span>
+          <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+            <span className="min-w-0 max-w-full truncate">on {comment.postTitle ?? "a post"}</span>
             {comment.postUrl && (
-              <a href={comment.postUrl} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex items-center gap-1 underline">
+              <a href={comment.postUrl} target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 items-center gap-1 underline">
                 Open <ExternalLink className="h-3 w-3" />
               </a>
             )}
@@ -302,12 +302,13 @@ function CommentRow({ comment, onReplied }: { comment: InboxComment; onReplied: 
             </div>
           )}
 
-          <form onSubmit={send} className="mt-3 flex gap-2">
+          <form onSubmit={send} className="mt-3 flex min-w-0 items-center gap-2">
             <Button type="button" variant="ghost" size="icon" onClick={suggest} disabled={thinking} aria-label={ideas ? "More reply ideas" : "Suggest replies"} title="Suggest replies" className="shrink-0">
               <Sparkles className={cn("h-4 w-4", thinking && "animate-pulse")} />
             </Button>
-            <Input ref={input} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="Write a reply…" aria-label={`Reply to ${comment.authorName}`} className="h-11 text-sm" />
-            <Button type="submit" variant="lime" size="icon" disabled={busy || !text.trim()} aria-label="Send reply">
+            <Input ref={input} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="Write a reply…" aria-label={`Reply to ${comment.authorName}`} className="h-11 min-w-0 flex-1 text-base sm:text-sm" />
+            {/* shrink-0: the field takes the squeeze on a phone, the send button stays a 44px circle (1044) */}
+            <Button type="submit" variant="lime" size="icon" disabled={busy || !text.trim()} aria-label="Send reply" className="shrink-0">
               <Send className="h-4 w-4" />
             </Button>
           </form>
