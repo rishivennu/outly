@@ -25,8 +25,10 @@ const MAIN = [
 
 const TOUR: Record<string, string> = { "/home": "home", "/billing": "billing", "/support": "support", "/settings": "settings", "/create": "new-post", "/content": "content", "/calendar": "calendar", "/analytics": "analytics", "/inbox": "inbox", "/approvals": "approvals", "/accounts": "accounts" };
 
-function isActive(path: string, href: string) {
-  return href === "/home" ? path === "/home" : path.startsWith(href);
+/** Exact route or one of its children: "/create" is active on "/create/bulk", never on "/creator". */
+export function isActive(path: string | null, href: string) {
+  if (!path) return false;
+  return path === href || path.startsWith(`${href}/`);
 }
 
 export function Sidebar() {
@@ -127,7 +129,8 @@ export function MobileNav() {
     { href: "/settings", label: "Settings", icon: Settings },
     { href: "/", label: "Outlly website", icon: Globe },
   ];
-  const moreActive = !more && extra.some((x) => x.href !== "/" && isActive(path, x.href));
+  // The page you are on lives under More: More is the selected tab (also while its panel is open).
+  const moreActive = extra.some((x) => x.href !== "/" && isActive(path, x.href));
 
   useEffect(() => setMore(false), [path]);
   useEffect(() => {
@@ -150,7 +153,10 @@ export function MobileNav() {
     };
   }, [more]);
 
-  const tab = "flex h-14 min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 transition-colors duration-200";
+  // One rule for every tab (1053): green marks where you are, nothing else. Create used to stay green on
+  // every page, so two tabs looked selected at once.
+  const tab = "group flex h-14 min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  const pill = (on: boolean) => cn("grid h-8 w-11 place-items-center rounded-full transition-[background-color,color,transform] duration-200 group-active:scale-90 motion-reduce:transition-none", on ? "lime-bg" : "group-hover:bg-foreground/[0.07]");
   return (
     <>
       <div
@@ -175,20 +181,19 @@ export function MobileNav() {
       </div>
       <nav aria-label="Primary" className="web-only lg-glass fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-40 flex h-[68px] items-center justify-around rounded-[28px] px-1 lg:hidden">
         {MAIN.filter((m) => TABS.includes(m.href)).map(({ href, label, icon: Icon }) => {
-          const active = isActive(path, href);
-          const create = href === "/create";
+          const active = isActive(path, href) && !more;
           return (
-            <Link key={href} href={href} data-tour={TOUR[href]} aria-current={active ? "page" : undefined} className={cn(tab, create ? "" : active ? "text-foreground" : "text-muted-foreground")}>
-              <span className={cn("grid h-8 w-11 place-items-center rounded-full transition-colors duration-200", create ? "lime-bg lime-glow" : active && "bg-secondary text-lime-ink")}>
-                <Icon className="h-[19px] w-[19px]" strokeWidth={create ? 2.4 : active ? 2.2 : 1.9} aria-hidden="true" />
+            <Link key={href} href={href} data-tour={TOUR[href]} aria-current={isActive(path, href) ? "page" : undefined} className={cn(tab, active ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+              <span className={pill(active)}>
+                <Icon className="h-[19px] w-[19px]" strokeWidth={active ? 2.4 : 1.9} aria-hidden="true" />
               </span>
-              <span className="text-[10.5px] font-medium leading-none">{label}</span>
+              <span className={cn("text-[10.5px] leading-none", active ? "font-semibold" : "font-medium")}>{label}</span>
             </Link>
           );
         })}
-        <button ref={btn} type="button" data-tour="more" aria-expanded={more} aria-controls="more-panel" onClick={() => setMore((m) => !m)} className={cn(tab, more || moreActive ? "text-foreground" : "text-muted-foreground")}>
-          <span className={cn("grid h-8 w-11 place-items-center rounded-full transition-colors duration-200", (more || moreActive) && "bg-secondary text-lime-ink")}>
-            <MoreHorizontal className="h-[19px] w-[19px]" strokeWidth={more || moreActive ? 2.2 : 1.9} aria-hidden="true" />
+        <button ref={btn} type="button" data-tour="more" aria-expanded={more} aria-controls="more-panel" onClick={() => setMore((m) => !m)} className={cn(tab, more || moreActive ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+          <span className={cn(pill(moreActive || more), more && !moreActive && "!bg-secondary")}>
+            <MoreHorizontal className="h-[19px] w-[19px]" strokeWidth={more || moreActive ? 2.4 : 1.9} aria-hidden="true" />
           </span>
           <span className="text-[10.5px] font-medium leading-none">More</span>
         </button>

@@ -21,6 +21,8 @@ import { TrustBadges } from "@/components/shared/TrustBadges";
 import { MANAGER_SLUG, type TrustBadges as Badges } from "@/lib/badges-core";
 import type { Cycle } from "@/lib/billing/cycle";
 import { cn } from "@/lib/utils";
+import type { Receipt } from "@/lib/billing/receipt-core";
+import { PaymentReceipt } from "./PaymentReceipt";
 
 export type ReturnNotice = { tone: "ok" | "info" | "error"; text: string };
 type Current = { planSlug: string; planName: string; priceMinor: number; currency: string; interval: string; periodEnd: string; cancelAtPeriodEnd: boolean; pausedUntil?: string | null; provider?: string } | null;
@@ -74,7 +76,7 @@ function UsageMeter({ u }: { u: Usage }) {
   );
 }
 
-export function BillingView(props: { email: string; notice: ReturnNotice | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; invoices: Inv[]; beta?: BetaOffer | null; founding?: FoundingMine; badges?: Badges }) {
+export function BillingView(props: { email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; invoices: Inv[]; beta?: BetaOffer | null; founding?: FoundingMine; badges?: Badges }) {
   const { plans, current } = props;
   const router = useRouter();
   const toast = useToast();
@@ -84,6 +86,18 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
   const save = Math.max(0, ...plans.map((p) => p.year?.save ?? 0));
   const [confirm, setConfirm] = useState(false);
   const [notice, setNotice] = useState(props.notice);
+  // 1053: a checkout that came back gets a receipt slip built from our payment row; it replaces the text notice.
+  const [receipt, setReceipt] = useState<Receipt | null>(props.receipt ?? null);
+  useEffect(() => {
+    if (props.receipt) setReceipt(props.receipt);
+  }, [props.receipt]);
+  const showReceipt = async (paymentId: string) => {
+    try {
+      const j = await api<{ receipt: Receipt }>(`/api/billing/payments/${encodeURIComponent(paymentId)}`);
+      setReceipt(j.receipt);
+      setNotice(null);
+    } catch {}
+  };
   const [online, setOnline] = useState(true);
   const [invoices, setInvoices] = useState(props.invoices);
   const [cachedAt, setCachedAt] = useState<string | null>(null);
@@ -107,8 +121,8 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
 
   useEffect(() => {
     if (props.focusPlan) focusRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    if (props.notice) window.history.replaceState(null, "", "/billing"); // a refresh shouldn't replay the notice
-  }, [props.focusPlan, props.notice]);
+    if (props.notice || props.receipt) window.history.replaceState(null, "", "/billing"); // a refresh shouldn't replay the notice
+  }, [props.focusPlan, props.notice, props.receipt]);
 
   async function choose(p: PricedPlan) {
     const y = cycle === "year" && p.year ? p.year : null;
@@ -135,8 +149,11 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
       });
       rz.on("payment.failed", (f: any) => {
         const reason = f?.error?.description ?? "The payment didn't go through.";
-        api("/api/billing/razorpay/verify", { method: "POST", json: { paymentId: r.paymentId, razorpay_order_id: r.orderId, failed: reason } }).catch(() => {});
         setNotice({ tone: "error", text: `${reason} You weren't charged. Try again or use another method.` });
+        // Once the server has recorded the failure, the slip shows it (from the database, not from the popup).
+        api("/api/billing/razorpay/verify", { method: "POST", json: { paymentId: r.paymentId, razorpay_order_id: r.orderId, failed: reason } })
+          .catch(() => {})
+          .finally(() => void showReceipt(r.paymentId));
       });
       rz.open();
     } catch (e) {
@@ -176,7 +193,17 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
           <WifiOff className="h-4 w-4" aria-hidden /> You're offline. Invoices you've opened before still work; plan changes wait until you're back.
         </p>
       )}
-      {notice && (
+      {receipt && (
+        <PaymentReceipt
+          initial={receipt}
+          onClose={() => setReceipt(null)}
+          onRetry={() => {
+            setReceipt(null);
+            document.getElementById("plans")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+          }}
+        />
+      )}
+      {notice && !receipt && (
         <div role={notice.tone === "error" ? "alert" : "status"} className={cn("admin-page-in mt-6 flex max-w-3xl items-start gap-3 rounded-2xl p-4 text-sm", notice.tone === "ok" ? "bg-success/15" : notice.tone === "error" ? "bg-destructive/10" : "bg-accent/10")}>
           {notice.tone === "ok" ? <Pip size={40} mood="happy" /> : notice.tone === "error" ? <Pip size={40} mood="sad" /> : <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />}
           <p className="flex-1 pt-1">{notice.text}</p>

@@ -4,6 +4,7 @@ import { safeEqual } from "@/lib/crypto";
 import { requeueStuckTargets, sweepDirectUploads, sweepDuePosts } from "@/lib/queue/handlers";
 import { settle } from "@/lib/queue";
 import { recordSweep } from "@/lib/queue/health";
+import { runCleanups } from "@/lib/account-cleanup";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -26,11 +27,13 @@ async function sweep(req: NextRequest) {
   await recordSweep("cron");
   // Abandoned or oversized browser-to-bucket uploads (1031g). Never let cleanup break the post sweep.
   const cleaned = await sweepDirectUploads().catch(() => 0);
+  // Files from deleted accounts (1053): retried with backoff until gone. Bounded, and never fatal.
+  const files = await runCleanups({ budgetMs: 10_000 }).catch(() => ({ removed: 0, failed: 0 }));
   // Without Redis the jobs above are timers in this invocation: let them run before the response ends it
   // (1027). Budget = what is left of maxDuration minus 10 s of headroom; whatever is still running then is
   // held by waitUntil or picked up by the next sweep.
   const running = await settle(Math.max(0, 50_000 - (Date.now() - startedAt)));
-  return NextResponse.json({ ok: true, requeued, cleaned, running }, { headers: { "cache-control": "no-store" } });
+  return NextResponse.json({ ok: true, requeued, cleaned, files, running }, { headers: { "cache-control": "no-store" } });
 }
 
 export const GET = sweep;

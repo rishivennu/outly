@@ -434,7 +434,7 @@ export async function runAnalysis(opts: { rangeDays: Range; focus?: string | nul
   const raw = await gemini<unknown>(SYSTEM, buildPrompt(snapshot, focus, previous), {
     temperature: 0.35,
     timeoutMs: 25_000,
-    models: ["gemini-flash-latest", "gemini-flash-lite-latest"],
+    models: ["gemini-3.6-flash", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"],
     onModel: (m) => (model = m),
   });
   const result = normaliseResult(raw);

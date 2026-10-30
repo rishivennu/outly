@@ -12,6 +12,7 @@ import { parseScope, type Scope } from "./profiles-core";
 export { SESSION_COOKIE };
 const secret = new TextEncoder().encode(env.AUTH_SECRET);
 const MAX_AGE = 60 * 60 * 24 * 14; // 14 days
+const SHORT_AGE = 60 * 60 * 24; // a sign-in that chose "Don't remember this device"
 
 export async function hashPassword(pw: string) {
   return bcrypt.hash(pw, 11);
@@ -24,19 +25,21 @@ export async function verifyPassword(pw: string, hash: string) {
  * Sign in. The JWT carries the user's `tokenVersion` as `v`, so "sign out everywhere" (or a password
  * change) can invalidate every existing cookie by bumping one integer — no session table needed.
  */
-export async function createSession(userId: string) {
+export async function createSession(userId: string, { persist = true }: { persist?: boolean } = {}) {
   const v = (await db.user.findUnique({ where: { id: userId }, select: { tokenVersion: true } }))?.tokenVersion ?? 0;
-  const token = await new SignJWT({ sub: userId, v })
+  // "Don't remember this device" (1053): a browser-session cookie (gone when the browser closes) whose token
+  // also stops working after a day, for browsers that restore session cookies on restart.
+  const token = await new SignJWT(persist ? { sub: userId, v } : { sub: userId, v, rm: 0 })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${MAX_AGE}s`)
+    .setExpirationTime(`${persist ? MAX_AGE : SHORT_AGE}s`)
     .sign(secret);
   cookies().set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: MAX_AGE,
+    ...(persist ? { maxAge: MAX_AGE } : {}),
   });
 }
 
@@ -46,13 +49,13 @@ export function destroySession() {
 }
 
 /** Cookie contents, signature-checked only. Tokens issued before `v` existed read as v=0. */
-async function readSessionClaims(): Promise<{ id: string; v: number; iat: number } | null> {
+async function readSessionClaims(): Promise<{ id: string; v: number; iat: number; rm: boolean } | null> {
   const token = cookies().get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
     if (typeof payload.sub !== "string") return null;
-    return { id: payload.sub, v: typeof payload.v === "number" ? payload.v : 0, iat: payload.iat ?? 0 };
+    return { id: payload.sub, v: typeof payload.v === "number" ? payload.v : 0, iat: payload.iat ?? 0, rm: payload.rm !== 0 };
   } catch {
     return null;
   }
@@ -77,6 +80,7 @@ export async function renewSession() {
   const claims = await readSessionClaims();
   if (!claims || !sessionNeedsRenewal(claims.iat)) return false;
   if ((await readSessionUserId()) !== claims.id) return false;
+  if (!claims.rm) return false; // a "don't remember" sign-in is never stretched
   await createSession(claims.id);
   return true;
 }

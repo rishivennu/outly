@@ -2,11 +2,13 @@ import "server-only";
 import { getConfig } from "./settings";
 import { db } from "./db";
 import { decrypt } from "./crypto";
+import { randomBytes } from "node:crypto";
 import { env } from "./env";
 import { HttpError } from "./http";
-import { storage } from "./storage";
 import { sbAuth, supabaseConfigured } from "./supabase/server";
 import type { SessionUser } from "./auth";
+import { hashDeletionToken, newDeletionToken, runCleanups } from "./account-cleanup";
+import { cleanupKeys } from "./account-cleanup-core";
 
 /**
  * The creator's own data: take a copy, or delete the studio for good.
@@ -114,7 +116,21 @@ export async function deleteAccount(user: Pick<SessionUser, "id" | "actor">, con
     select: { id: true, provider: true, providerRef: true, taxPercent: true, issuer: true, payment: { select: { provider: true, providerRef: true } } },
   });
   const biz = legacy.length ? (await getConfig("payments")).business : null;
+  // 1053: every uploaded object gets a durable cleanup row, written in the SAME transaction that deletes the
+  // account, so a crash can never leave files nobody will remove. The person keeps a status link (the token).
+  const keys = cleanupKeys(media);
+  const token = newDeletionToken();
+  const deletionId = `del_${randomBytes(12).toString("base64url")}`; // never derived from the token
   await db.$transaction([
+    db.accountDeletion.create({
+      data: {
+        id: deletionId,
+        tokenHash: hashDeletionToken(token),
+        filesTotal: keys.length,
+        ...(keys.length === 0 ? { status: "done", finishedAt: now } : {}),
+        files: { create: keys.map((key) => ({ key })) },
+      },
+    }),
     ...legacy.map((i) =>
       db.invoice.update({
         where: { id: i.id },
@@ -129,9 +145,8 @@ export async function deleteAccount(user: Pick<SessionUser, "id" | "actor">, con
     db.invoice.updateMany({ where: { userId: me.id }, data: { detachedAt: now } }),
     db.user.delete({ where: { id: me.id } }), // the schema sets the invoices' userId and paymentId to null
   ]);
-  // Files last: an orphaned object is harmless, and a storage hiccup must not leave the row behind.
-  for (const m of media)
-    for (const key of [m.storageKey, m.thumbnailKey])
-      if (key) await storage.remove(key).catch((e) => console.error("[account:delete] storage", key, e));
-  return { ok: true as const };
+  // Files last, and only as a head start: whatever doesn't finish in a few seconds, or fails, is retried
+  // with backoff by the minute sweeper until the bucket confirms it's gone.
+  if (keys.length) await runCleanups({ deletionId, budgetMs: 3_000, limit: 200 }).catch((e) => console.error("[account:delete] cleanup", e));
+  return { ok: true as const, status: token };
 }

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { cn, formatDuration } from "@/lib/utils";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
-import type { Draft, HookResult, Step, Tone, UploadState } from "./types";
+import type { Draft, HooksState, Step, Tone, UploadState } from "./types";
 
 const EXAMPLES = ["How a ₹5 shampoo sachet changed Indian retail", "My 5 AM routine that actually stuck", "Why Blockbuster said no to Netflix"];
 
@@ -26,7 +26,7 @@ interface Props {
   submittedStory: string | null;
   onSubmitStory: () => void;
   onEditStory: () => void;
-  hooks: { loading: boolean; result: HookResult | null; index: number; tone: Tone; error: string | null };
+  hooks: HooksState;
   onTryAnother: () => void;
   onTone: (t: Tone) => void;
   onUse: (text: string) => void;
@@ -95,7 +95,7 @@ export function Assistant(p: Props) {
         </span>
         <div>
           <h2 className="text-sm font-semibold">Outlly assistant</h2>
-          <p className="text-xs text-muted-foreground">{p.hooks.loading || p.copyLoading ? "Thinking…" : "Here with you"}</p>
+          <p className="text-xs text-muted-foreground">{p.hooks.loading || p.hooks.more || p.copyLoading ? "Writing…" : "Here with you"}</p>
         </div>
       </header>
 
@@ -136,11 +136,11 @@ export function Assistant(p: Props) {
           </div>
         )}
 
-        <AnimatePresence>{p.hooks.loading && !result && <Typing label="Thinking about how to open this…" />}</AnimatePresence>
+        <AnimatePresence>{p.hooks.loading && !result?.understood && <Typing label={p.hooks.status || "Reading your idea…"} />}</AnimatePresence>
 
         {p.hooks.error && <Bubble from="outly" className="text-destructive">{p.hooks.error}</Bubble>}
 
-        {result && (
+        {result?.understood && (
           <>
             <Bubble from="outly">
               <span className="font-semibold">Oh, I like this one.</span> {result.understood}
@@ -150,7 +150,7 @@ export function Assistant(p: Props) {
             <motion.div layout initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
               <div className="rounded-3xl bg-secondary/50 p-4 hairline">
                 <p className="eyebrow mb-1.5">Original</p>
-                <p className="text-[15px] text-muted-foreground">{result.original}</p>
+                {result.original ? <p className="text-[15px] text-muted-foreground">{result.original}</p> : <div className="skeleton h-4 w-3/4 rounded-full" aria-hidden="true" />}
               </div>
 
               <div className={cn("relative overflow-hidden rounded-3xl p-[1.5px]", p.chosenHook ? "bg-border" : "lime-bg")}>
@@ -159,15 +159,20 @@ export function Assistant(p: Props) {
                     <p className="eyebrow !text-foreground">Suggested</p>
                     {current && (
                       <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-[11px] font-semibold text-accent">
-                        {current.angle} <span className="tabular text-accent/70">· {p.hooks.index + 1}/{result.hooks.length}</span>
+                        {current.angle} <span className="tabular text-accent/70">· {p.hooks.index + 1}/{p.hooks.more ? Math.max(3, result.hooks.length) : result.hooks.length}</span>
                       </span>
                     )}
                   </div>
                   <AnimatePresence mode="wait">
-                    {p.hooks.loading ? (
+                    {p.hooks.loading || !current ? (
                       <motion.div key="l" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-2 py-1">
                         <div className="skeleton h-5 w-11/12 rounded-full" />
                         <div className="skeleton h-5 w-2/3 rounded-full" />
+                        {p.hooks.status && (
+                          <p className="pt-1 text-xs text-muted-foreground" role="status">
+                            {p.hooks.status}
+                          </p>
+                        )}
                       </motion.div>
                     ) : editing ? (
                       <motion.div key="e" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -189,8 +194,9 @@ export function Assistant(p: Props) {
                         <Button variant="lime" onClick={() => p.onUse((tweak || current?.text || "").trim())} disabled={p.hooks.loading || !(tweak || current?.text)}>
                           <Check className="h-4 w-4" /> Use this
                         </Button>
-                        <Button variant="subtle" onClick={p.onTryAnother} disabled={p.hooks.loading}>
-                          <RefreshCw className={cn("h-4 w-4", p.hooks.loading && "animate-spin")} /> Try another
+                        <Button variant="subtle" onClick={p.onTryAnother} disabled={p.hooks.loading || (p.hooks.more && p.hooks.index >= result.hooks.length - 1)}>
+                          <RefreshCw className={cn("h-4 w-4", (p.hooks.loading || (p.hooks.more && p.hooks.index >= result.hooks.length - 1)) && "animate-spin")} />
+                          {p.hooks.more && p.hooks.index >= result.hooks.length - 1 ? "Writing the next…" : "Try another"}
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => setEditing((e) => !e)} aria-label={editing ? "Done editing" : "Tweak it yourself"} aria-pressed={editing}>
                           {editing ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}

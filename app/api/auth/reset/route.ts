@@ -12,6 +12,7 @@ const schema = z.discriminatedUnion("step", [
     email,
     code: z.string().trim().min(1, "Enter the 6-digit code from the email.").max(20),
     password: z.string().min(8, "Use at least 8 characters").max(200),
+    remember: z.boolean().optional(),
   }),
 ]);
 
@@ -30,7 +31,7 @@ export const POST = route(
     }
     const user = await verifyCode(b.email, b.code, "reset");
     await setPassword(user.id, b.password);
-    return json({ ok: true, ...(await beginSignIn(user.id)) });
+    return json({ ok: true, ...(await beginSignIn(user.id, "other", { remember: b.remember })) });
   },
   { auth: false, limit: [10, 10 * 60_000] },
 );

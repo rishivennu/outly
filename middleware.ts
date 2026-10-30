@@ -7,7 +7,7 @@ import { REF_COOKIE, REF_DAYS, REF_VISITOR, isCode } from "./lib/referral-core";
 
 const AUTH_PAGES = ["/login", "/signup"];
 // Marketing pages anyone can read.
-const OPEN = ["/", "/privacy", "/terms", "/contact", "/help", "/waitlist", "/maintenance", "/unsubscribe", "/app-auth"];
+const OPEN = ["/", "/privacy", "/terms", "/contact", "/help", "/waitlist", "/maintenance", "/unsubscribe", "/account-deleted", "/app-auth"];
 // A review link is its own credential: the reviewer has no account here.
 // A share link (/r/code) and a team invite must work before the visitor has an account.
 const OPEN_PREFIX = ["/review/", "/r/", "/team/accept"];
@@ -26,10 +26,10 @@ const LH_HINT = "outlly_lh";
 // Waitlist on: the whole public site becomes the waitlist page (user's call, 10-12g). These still work:
 // the waitlist page itself, the legal pages its form links to, and links that are their own credential
 // (emailed invites, team invites, client review links, share links).
-const WAITLIST_OPEN = ["/waitlist", "/privacy", "/terms", "/unsubscribe", "/app-auth"];
+const WAITLIST_OPEN = ["/waitlist", "/privacy", "/terms", "/unsubscribe", "/account-deleted", "/app-auth"];
 // Maintenance on: strangers only reach these. /login lets members back in; nobody can sign up.
 // /unsubscribe: leaving a mailing list must work whatever mode the site is in.
-const MAINTENANCE_OPEN = ["/maintenance", "/login", "/privacy", "/terms", "/unsubscribe", "/app-auth"];
+const MAINTENANCE_OPEN = ["/maintenance", "/login", "/privacy", "/terms", "/unsubscribe", "/account-deleted", "/app-auth"];
 const WAITLIST_PREFIX = ["/review/", "/r/", "/team/accept"];
 
 function sync(req: NextRequest, res: NextResponse, name: string, on: boolean, maxAge: number) {

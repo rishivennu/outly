@@ -11,7 +11,8 @@ export const DELETE = route(
     const { confirm } = Body.parse(await req.json());
     const out = await deleteAccount(user, confirm);
     destroySession();
-    return json(out);
+    // The status page reads its token from the #fragment, so it never reaches a server log or a Referer.
+    return json({ ok: true, status: `/account-deleted#${out.status}` });
   },
   { limit: [3, 3600_000] },
 );

@@ -9,6 +9,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
+export const LOCK_SQL = "supabase/migrations/0002_lock_all_tables.sql";
 
 function push(env, extra = []) {
   const r = spawnSync("prisma", ["db", "push", "--skip-generate", ...extra], { cwd: ROOT, env, shell: true, encoding: "utf8" });
@@ -48,5 +49,18 @@ if (import.meta.main ?? true) {
     console.log("db-sync: only unique-constraint warnings (safe for new columns); retrying with --accept-data-loss");
     r = push(env, ["--accept-data-loss"]);
   }
-  process.exit(r.status);
+  if (r.status !== 0) process.exit(r.status);
+
+  // 1053: lock every table (new ones included) out of the public Data API, on every deploy. A failure
+  // stops the build: shipping a table the anon key can read is worse than a delayed deploy.
+  console.log("db-sync: locking tables out of the public Data API (RLS)...");
+  const lock = spawnSync("prisma", ["db", "execute", "--schema", "prisma/schema.prisma", "--file", LOCK_SQL], {
+    cwd: ROOT,
+    env: { ...env, DATABASE_URL: env.DIRECT_URL },
+    shell: true,
+    encoding: "utf8",
+  });
+  process.stdout.write((lock.stdout ?? "") + (lock.stderr ?? ""));
+  if (lock.status !== 0) console.error("db-sync: the RLS lock failed. Run supabase/migrations/0002_lock_all_tables.sql by hand, then redeploy.");
+  process.exit(lock.status ?? 1);
 }

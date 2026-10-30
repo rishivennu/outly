@@ -115,10 +115,11 @@ export const GUIDES: Record<string, Guide> = {
     name: "Settings",
     intro: "Settings is where you make Outlly yours.",
     stops: [
-      { target: '[aria-labelledby="you"]', title: "You", body: "Your name and time zone. Posts are scheduled in this time zone." },
-      { target: '[aria-labelledby="look"]', title: "Look", body: "Light, dark, or match your device." },
-      { target: '[aria-labelledby="tf-h"]', title: "Two-step sign-in", body: "A code at sign-in keeps others out, even if they know your password." },
-      { target: '[aria-labelledby="tour-h"]', title: "Replay the tour", body: "Bring back the tour and these page tips any time." },
+      // 1053: one category shows at a time, so the stops point at the menu (the "Category" button on a phone).
+      { target: '[data-settings-nav="profile"], #settings-nav > button', title: "Profile", body: "Your name, time zone and avatar. Posts are scheduled in this time zone." },
+      { target: '[data-settings-nav="appearance"], #settings-nav > button', title: "Appearance", body: "Light, dark, or match your device." },
+      { target: '[data-settings-nav="security"], #settings-nav > button', title: "Security", body: "Two-step sign-in and remembered devices. A code at sign-in keeps others out." },
+      { target: '[data-settings-nav="personalization"], #settings-nav > button', title: "Replay the tour", body: "Under Personalization: bring back the tour and these page tips any time." },
     ],
   },
 };

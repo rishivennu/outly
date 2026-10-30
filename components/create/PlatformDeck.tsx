@@ -20,7 +20,8 @@ interface Props {
   onDraft: (p: Platform, patch: Partial<Draft>) => void;
   accounts: Partial<Record<Platform, AccountView>>;
   media: { src: string | null; poster: string | null; duration?: number | null; width?: number | null; height?: number | null };
-  loading: boolean;
+  /** Places whose copy is still being written (each one unlocks as soon as its own copy lands). */
+  writing: Platform[];
   rewriting: Platform | null;
   onRewrite: (p: Platform) => void;
   onConnect: (p: Platform) => void;
@@ -155,7 +156,7 @@ export function PlatformDeck(p: Props) {
                     <span className="block text-sm font-semibold">
                       {PLATFORM_META[pl].name} <span className="font-normal text-muted-foreground">{PLATFORM_META[pl].format}</span>
                     </span>
-                    <span className={cn("block truncate text-xs", s.tone === "done" ? "text-success" : s.tone === "warn" ? "text-warning" : "text-muted-foreground")}>{p.loading && d.enabled ? "Writing…" : s.label}</span>
+                    <span className={cn("block truncate text-xs", s.tone === "done" ? "text-success" : s.tone === "warn" ? "text-warning" : "text-muted-foreground")}>{p.writing.includes(pl) && d.enabled ? "Writing…" : s.label}</span>
                   </span>
                 </button>
                 <label htmlFor={`send-${pl}`} className="relative flex min-h-[44px] cursor-pointer items-center gap-2 rounded-b-3xl border-t border-border/60 px-3.5 text-xs font-semibold">
@@ -244,7 +245,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
   return (
     <div className="grid gap-8 sm:grid-cols-[minmax(0,240px)_minmax(0,1fr)] sm:items-start">
       <div className={cn("transition", !d.enabled && "opacity-40 grayscale")}>
-        {p.loading ? (
+        {p.writing.includes(pl) ? (
           <div className={cn("skeleton mx-auto w-full max-w-[280px] rounded-[26px]", pl === "x" ? "aspect-[4/5]" : "aspect-[9/16]")} />
         ) : pl === "instagram" ? (
           <InstagramReel {...preview} />
@@ -295,7 +296,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
           </div>
         )}
 
-        <fieldset disabled={!d.enabled || p.loading} className="space-y-4 disabled:opacity-50">
+        <fieldset disabled={!d.enabled || p.writing.includes(pl)} className="space-y-4 disabled:opacity-50">
           <legend className="sr-only">{meta.name} copy</legend>
           {pl === "youtube" && (
             <div>
@@ -380,7 +381,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
           <Button
             variant={d.reviewed && !blocked ? "outline" : "primary"}
             onClick={() => (d.reviewed ? set({ reviewed: false }) : p.onReviewed())}
-            disabled={!d.enabled || blocked || p.loading || !connected}
+            disabled={!d.enabled || blocked || p.writing.includes(pl) || !connected}
             aria-pressed={d.reviewed}
           >
             <motion.span animate={flash ? { scale: [1, 1.35, 1], rotate: [0, -12, 0] } : {}} className="inline-flex">
@@ -388,7 +389,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
             </motion.span>
             {d.reviewed ? "Looks good" : "This looks good"}
           </Button>
-          <Button variant="ghost" onClick={() => p.onRewrite(pl)} disabled={!d.enabled || p.rewriting === pl || p.loading}>
+          <Button variant="ghost" onClick={() => p.onRewrite(pl)} disabled={!d.enabled || p.rewriting === pl || p.writing.includes(pl)}>
             <RefreshCw className={cn("h-4 w-4", p.rewriting === pl && "animate-spin")} /> Rewrite this one
           </Button>
         </div>

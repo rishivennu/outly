@@ -11,7 +11,7 @@ export function WaitlistForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [badEmail, setBadEmail] = useState(false);
-  const [done, setDone] = useState<(Joined & { email: string }) | null>(null);
+  const [done, setDone] = useState<(Joined & { email: string; name: string | null; at: string }) | null>(null);
   const doneRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -20,6 +20,7 @@ export function WaitlistForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (busy) return; // a double tap sends one request
     if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) {
       setError("Add the email you want the invite sent to.");
       setBadEmail(true);
@@ -30,7 +31,7 @@ export function WaitlistForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
     setBadEmail(false);
     try {
       const r = await api<Joined>("/api/waitlist", { method: "POST", json: { email: form.email, name: form.name || undefined, source: fromGoogle ? "google" : "page" } });
-      setDone({ ...r, email: form.email.trim().toLowerCase() });
+      setDone({ ...r, email: form.email.trim().toLowerCase(), name: form.name.trim() || null, at: new Date().toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }) });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something got in the way. Try again in a moment.");
       setBadEmail(err instanceof ApiError && err.status === 400);
@@ -39,33 +40,55 @@ export function WaitlistForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
     }
   };
 
-  if (done)
+  if (done) {
+    // A receipt for the sign-up (1053). The place in line is the real one the server counted, and only a fresh
+    // join gets it: anyone can type any address, so an address already on the list learns nothing more.
+    const rows: [string, React.ReactNode][] = [
+      ...(done.name ? ([["Name", done.name]] as [string, React.ReactNode][]) : []),
+      ["Email", done.email],
+      ...(!done.already ? ([["Joined", done.at]] as [string, React.ReactNode][]) : []),
+      ["Status", done.already ? "On the list, original spot kept" : "Waiting for an invite"],
+      ...(!done.already && typeof done.position === "number" && done.position > 1 ? ([["Ahead of you", (done.position - 1).toLocaleString()]] as [string, React.ReactNode][]) : []),
+    ];
     return (
-      <div className="wl-card wl-done flex flex-col items-center px-6 py-10 text-center sm:px-10" role="status">
-        <span className="wl-check grid h-16 w-16 place-items-center rounded-full bg-success text-white">
-          <Check className="h-8 w-8" strokeWidth={3} aria-hidden="true" />
-        </span>
-        <h2 ref={doneRef} tabIndex={-1} className="mt-6 font-display text-[28px] font-bold tracking-[-0.02em] outline-none">
-          {done.already ? "You're already on the list." : "You're on the list."}
-        </h2>
-        {done.already ? (
-          <p className="mt-3 max-w-sm text-[16px] leading-relaxed text-[hsl(var(--ap-ink2))]">
-            <b className="font-semibold text-foreground">{done.email}</b> keeps its original spot. If your invite has already gone out, look for
-            &ldquo;Your Outlly invite is here&rdquo; in your inbox (and spam).
-          </p>
-        ) : (
-          <>
-            <p className="mt-5 font-display text-[64px] font-bold leading-none tracking-[-0.04em]">
-              <span className="sr-only">Your place in line: </span>#{done.position}
-            </p>
-            <p className="mt-2 text-[14px] font-semibold uppercase tracking-[0.08em] text-[hsl(var(--ap-ink2))]">in line</p>
-            <p className="mt-5 max-w-sm text-[16px] leading-relaxed text-[hsl(var(--ap-ink2))]">
-              We&apos;ll email <b className="font-semibold text-foreground">{done.email}</b> the moment your spot comes up. One email, nothing else.
-            </p>
-          </>
-        )}
+      <div className="wl-card wl-done wl-ticket overflow-hidden text-left" role="status">
+        <div className="flex flex-col items-center px-6 pb-6 pt-9 text-center sm:px-10">
+          <span className="wl-check grid h-16 w-16 place-items-center rounded-full bg-success text-white">
+            <Check className="h-8 w-8" strokeWidth={3} aria-hidden="true" />
+          </span>
+          <p className="mt-5 text-[12px] font-semibold uppercase tracking-[0.16em] text-[hsl(var(--ap-ink2))]">Waitlist confirmation</p>
+          <h2 ref={doneRef} tabIndex={-1} className="mt-1 font-display text-[28px] font-bold tracking-[-0.02em] outline-none">
+            {done.already ? "You're already on the list." : "You're on the list."}
+          </h2>
+          {!done.already && typeof done.position === "number" && done.position > 0 && (
+            <>
+              <p className="mt-4 font-display text-[64px] font-bold leading-none tracking-[-0.04em]">
+                <span className="sr-only">Your place in line: </span>#{done.position.toLocaleString()}
+              </p>
+              <p className="mt-2 text-[14px] font-semibold uppercase tracking-[0.08em] text-[hsl(var(--ap-ink2))]">in line</p>
+            </>
+          )}
+        </div>
+        {/* The tear line of a ticket stub. */}
+        <div className="mx-6 h-0 border-t-2 border-dashed border-foreground/15 sm:mx-10" aria-hidden="true" />
+        <dl className="px-6 pb-2 pt-5 text-[15px] sm:px-10">
+          {rows.map(([k, v], i) => (
+            <div key={k} className="rcpt-row flex items-baseline justify-between gap-4 py-1.5" style={{ animationDelay: `${300 + i * 90}ms` }}>
+              <dt className="shrink-0 text-[hsl(var(--ap-ink2))]">{k}</dt>
+              <dd className="min-w-0 truncate text-right font-medium">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="px-6 pb-8 pt-3 text-[14.5px] leading-relaxed text-[hsl(var(--ap-ink2))] sm:px-10">
+          {done.already ? (
+            <>If your invite has already gone out, look for &ldquo;Your Outlly invite is here&rdquo; in your inbox (and spam).</>
+          ) : (
+            <>We&apos;ll email <b className="font-semibold text-foreground">{done.email}</b> the moment your spot comes up. One email, nothing else.</>
+          )}
+        </p>
       </div>
     );
+  }
 
   return (
     <form onSubmit={submit} noValidate className="wl-card px-5 py-6 sm:px-8 sm:py-8" aria-describedby={error ? "wl-error" : undefined}>

@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: { platform: st
   const p = params.platform;
   await loadKeys();
   const pending = takeOAuthState(p, req.nextUrl.searchParams.get("state"));
-  if (pending?.mode === "login" && p === "youtube") return googleSignIn(req, pending.returnTo);
+  if (pending?.mode === "login" && p === "youtube") return googleSignIn(req, pending.returnTo, pending.remember);
   const user = await getCurrentUser();
   // A Google sign-in whose state cookie is gone (other tab, expired after 10 min, or started on another
   // domain than APP_URL) used to drop the visitor on /login with no word of what happened. Say it.
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: { platform: st
 }
 
 /** Continue with Google: sign in (or create the studio), then link the YouTube channel if there is one. */
-async function googleSignIn(req: NextRequest, returnTo: string) {
+async function googleSignIn(req: NextRequest, returnTo: string, remember?: boolean) {
   const fail = (reason: string) => NextResponse.redirect(new URL(`/login?google_error=${encodeURIComponent(reason)}`, env.APP_URL));
   const code = req.nextUrl.searchParams.get("code");
   if (!code) return fail(req.nextUrl.searchParams.get("error") ?? "denied");
@@ -62,7 +62,7 @@ async function googleSignIn(req: NextRequest, returnTo: string) {
     if (user.created) await attachReferral(user.id, clientIp(req)).catch((e) => console.error("[referral] attach", e));
     if (user.created) await attachSource(user.id).catch((e) => console.error("[growth] source", e));
     // Authenticator on: Google was the first step only. No session (and no channel link) until the app code.
-    if ((await beginSignIn(user.id)).twoFactor) {
+    if ((await beginSignIn(user.id, "other", { remember })).twoFactor) {
       const half = new URL("/login", env.APP_URL);
       half.searchParams.set("step", "2fa");
       if (returnTo && returnTo !== "/home") half.searchParams.set("next", returnTo);

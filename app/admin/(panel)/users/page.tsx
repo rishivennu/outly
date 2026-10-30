@@ -6,8 +6,11 @@ import { SAMPLE_DOMAIN } from "@/lib/admin/sample";
 import { PLATFORMS, PLATFORM_META } from "@/lib/domain";
 import { Card, Empty, PageHead, Pill, Table, ago, fmtDate } from "@/components/admin/ui";
 import { FilterChips, FilterSelect, SearchBox } from "@/components/admin/SearchBox";
+import { RefreshButton } from "@/components/admin/RefreshButton";
+import { looksRelayed, placeLabel } from "@/lib/geo";
 
 export const metadata = { title: "Users" };
+export const dynamic = "force-dynamic"; // Refresh must always read fresh rows
 const PER = 50;
 
 type Params = { q?: string; f?: string; plan?: string; joined?: string; platform?: string; tag?: string; sort?: string; page?: string };
@@ -96,7 +99,8 @@ export default async function Users({ searchParams }: { searchParams: Params }) 
       take: PER,
       skip: (page - 1) * PER,
       select: {
-        id: true, name: true, email: true, createdAt: true, lastActiveAt: true, foundingNo: true, totpEnabledAt: true,
+        id: true, name: true, email: true, createdAt: true, lastActiveAt: true, lastSeenAt: true, foundingNo: true, totpEnabledAt: true, timezone: true,
+        locCountry: true, locRegion: true, locCity: true, locVia: true, locAt: true,
         subscriptions: { where: { status: "active" }, take: 1, select: { priceMinor: true, currency: true, cancelAtPeriodEnd: true, plan: { select: { name: true } } } },
         _count: { select: { tickets: true, posts: true } },
       },
@@ -110,7 +114,12 @@ export default async function Users({ searchParams }: { searchParams: Params }) 
   const narrowing = [q, f, plan, joined, platform, tag].filter(Boolean).length;
   return (
     <>
-      <PageHead eyebrow="Run" title="Users" body={`${total.toLocaleString("en-IN")} ${narrowing ? "matching" : "creator accounts"}. Last active updates once a day per user.`} />
+      <PageHead
+        eyebrow="Run"
+        title="Users"
+        body={`${total.toLocaleString("en-IN")} ${narrowing ? "matching" : "creator accounts"}. Last seen updates every minute while someone is in the app; locations are approximate, estimated from the network address.`}
+        actions={<RefreshButton total={total} loadedAt={new Date().toISOString()} />}
+      />
       <Card>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <FilterChips param="f" current={f} options={[{ value: "", label: "All" }, { value: "paying", label: "Paying" }, { value: "active", label: "Active 7d" }, { value: "dormant", label: "Dormant" }]} />
@@ -131,7 +140,7 @@ export default async function Users({ searchParams }: { searchParams: Params }) 
         {rows.length === 0 ? (
           <Empty title={q ? `No one matches "${q}"` : narrowing ? "No one matches these filters" : "No users yet"} body={q || narrowing ? "Loosen a filter or try part of an email or a first name." : "Sign-ups appear here as soon as someone creates an account."} />
         ) : (
-          <Table head={["User", "Plan", "Last active", "Joined", "Posts", "Tickets"]}>
+          <Table head={["User", "Plan", "Last seen", "Location", "Joined", "Posts", "Tickets"]}>
             {rows.map((u) => {
               const s = u.subscriptions[0];
               return (
@@ -146,7 +155,11 @@ export default async function Users({ searchParams }: { searchParams: Params }) 
                     <span className="block text-[12px] text-muted-foreground">{u.email}</span>
                   </td>
                   <td>{s ? <span className="flex flex-wrap items-center gap-1.5"><Pill tone="lime">{s.plan.name}</Pill><span className="text-[12px] text-muted-foreground">{formatMoney(s.priceMinor, s.currency)}</span>{s.cancelAtPeriodEnd && <Pill tone="warn">cancelling</Pill>}</span> : <span className="text-muted-foreground">Free</span>}</td>
-                  <td className="whitespace-nowrap">{ago(u.lastActiveAt)}</td>
+                  <td className="whitespace-nowrap">
+                    {ago(u.lastSeenAt ?? u.lastActiveAt)}
+                    {(u.lastSeenAt ?? u.lastActiveAt) && <span className="block text-[11.5px] text-muted-foreground">{fmtStamp(u.lastSeenAt ?? u.lastActiveAt)}</span>}
+                  </td>
+                  <td className="min-w-[12rem]"><Place u={u} /></td>
                   <td className="whitespace-nowrap text-muted-foreground">{fmtDate(u.createdAt)}</td>
                   <td className="tabular">{u._count.posts}</td>
                   <td className="tabular">{u._count.tickets}</td>
@@ -164,5 +177,28 @@ export default async function Users({ searchParams }: { searchParams: Params }) 
         )}
       </Card>
     </>
+  );
+}
+
+const fmtStamp = (d: Date | null) => (d ? d.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) + " IST" : "");
+
+type Loc = { timezone: string; locCountry: string | null; locRegion: string | null; locCity: string | null; locVia: string | null; locAt: Date | null };
+
+/** Where the network says they are (1053): approximate, from the IP only, so it can be a VPN or a carrier hub. */
+function Place({ u }: { u: Loc }) {
+  const net = placeLabel({ country: u.locCountry, region: u.locRegion, city: u.locCity, via: u.locVia });
+  const relayed = u.locVia === "tor" || looksRelayed(u.locCountry, u.timezone);
+  if (!net) return <span className="text-[12.5px] text-muted-foreground">Unknown</span>;
+  return (
+    <div className="text-[12.5px] leading-snug">
+      <span className="block" title="Estimated from the network address. Not an exact address.">
+        <span aria-hidden>≈ </span>
+        {net}
+      </span>
+      <span className="flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted-foreground">
+        Approximate (network){u.locAt ? ` · ${ago(u.locAt)}` : ""}
+        {relayed && <Pill tone="warn">{u.locVia === "tor" ? "Tor" : "possible VPN"}</Pill>}
+      </span>
+    </div>
   );
 }

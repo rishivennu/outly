@@ -40,7 +40,7 @@ export function AvatarPicker() {
   const faceName = ORB_FACES.find((f) => f.id === orb.face)?.name;
 
   return (
-    <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }} className="glass rounded-[32px] p-6 sm:p-8 lg:col-span-2" aria-labelledby="av-h" aria-busy={saving}>
+    <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }} className="glass rounded-[32px] p-6 sm:p-8" aria-labelledby="av-h" aria-busy={saving}>
       <div className="flex flex-wrap items-center gap-5">
         <OrbArt orb={orb} size={88} label={`Your avatar: ${colorName} orb, ${faceName} face`} className="av-preview" />
         <div className="min-w-0 flex-1">

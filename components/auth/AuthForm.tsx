@@ -61,6 +61,9 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
   const [recovery, setRecovery] = useState(false);
   const [wait, setWait] = useState(0); // seconds until another code may be sent
   const [note, setNote] = useState<string | null>(null);
+  // "Remember this device" (1053). Remembered: stays signed in for 14 days and, after one full two-step
+  // sign-in, skips the second step here for 30. Not remembered: a session that ends with the browser.
+  const [remember, setRemember] = useState(true);
   const codeRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
@@ -230,10 +233,10 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
         await api("/api/auth/signup", { method: "POST", json: { ...form, timezone: tz.current } });
         return go();
       }
-      if (step === "password") return after(await api<{ twoFactor?: boolean }>("/api/auth/login", { method: "POST", json: { email: form.email, password: form.password } }));
-      if (step === "code") return after(await api<{ twoFactor?: boolean }>("/api/auth/code/verify", { method: "POST", json: byPhone ? { phone, code: c } : { email: form.email, code: c } }));
-      if (step === "reset") return after(await api<{ twoFactor?: boolean }>("/api/auth/reset", { method: "POST", json: { step: "confirm", email: form.email, code: c, password: form.password } }));
-      await api("/api/auth/2fa", { method: "POST", json: { code: c, via: twoVia } });
+      if (step === "password") return after(await api<{ twoFactor?: boolean }>("/api/auth/login", { method: "POST", json: { email: form.email, password: form.password, remember } }));
+      if (step === "code") return after(await api<{ twoFactor?: boolean }>("/api/auth/code/verify", { method: "POST", json: byPhone ? { phone, code: c, remember } : { email: form.email, code: c, remember } }));
+      if (step === "reset") return after(await api<{ twoFactor?: boolean }>("/api/auth/reset", { method: "POST", json: { step: "confirm", email: form.email, code: c, password: form.password, remember } }));
+      await api("/api/auth/2fa", { method: "POST", json: { code: c, via: twoVia, remember } });
       go();
     } catch (e) {
       // The halfway sign-in ran out: back to the start rather than a dead end.
@@ -424,6 +427,7 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
             </div>
           </div>
         )}
+        {mode === "login" && <RememberChoice value={remember} onChange={setRemember} twoStep={step === "2fa"} />}
         {mode === "login" && (
           <p id="otp-note" role="status" className={note ? "text-sm leading-relaxed text-muted-foreground" : "sr-only"}>
             {note}
@@ -490,7 +494,7 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
           <span className="h-px flex-1 bg-border" />
         </div>
         <div className="gs-in space-y-3">
-          <GoogleButton from={mode} next={next} label={mode === "login" ? "Sign in with Google" : "Sign up with Google"} />
+          <GoogleButton from={mode} next={next} remember={mode === "login" ? remember : undefined} label={mode === "login" ? "Sign in with Google" : "Sign up with Google"} />
           {google && <GoogleHelp compact defaultOpen={googleError === "access_denied"} />}
         </div>
         <p className="gs-in text-center text-sm text-muted-foreground">
@@ -510,5 +514,40 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
         )}
       </form>
     </div>
+  );
+}
+
+/**
+ * Two plain choices rather than a lone checkbox, so "not remembered" is a decision too (1053). Native radios:
+ * arrow keys move between them and screen readers announce the group.
+ */
+function RememberChoice({ value, onChange, twoStep }: { value: boolean; onChange: (v: boolean) => void; twoStep: boolean }) {
+  const opt = (on: boolean) =>
+    "flex min-h-11 flex-1 cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-[13.5px] font-medium transition-colors hairline has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring " +
+    (on ? "bg-lime/15 text-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground");
+  const dot = (on: boolean) => "grid h-4 w-4 shrink-0 place-items-center rounded-full border-2 " + (on ? "border-lime-ink" : "border-muted-foreground/60");
+  return (
+    <fieldset className="gs-in">
+      <legend className="sr-only">Remember this device?</legend>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <label className={opt(value)}>
+          <input type="radio" name="remember" className="sr-only" checked={value} onChange={() => onChange(true)} aria-describedby="remember-hint" />
+          <span className={dot(value)} aria-hidden="true">{value && <span className="h-1.5 w-1.5 rounded-full bg-lime-ink" />}</span>
+          Remember this device
+        </label>
+        <label className={opt(!value)}>
+          <input type="radio" name="remember" className="sr-only" checked={!value} onChange={() => onChange(false)} aria-describedby="remember-hint" />
+          <span className={dot(!value)} aria-hidden="true">{!value && <span className="h-1.5 w-1.5 rounded-full bg-lime-ink" />}</span>
+          Don&apos;t remember this device
+        </label>
+      </div>
+      <p id="remember-hint" className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+        {value
+          ? twoStep
+            ? "You'll stay signed in, and this device won't ask for the second step again for 30 days. Skip it on a shared or public computer."
+            : "You'll stay signed in on this device. Skip it on a shared or public computer."
+          : "You'll be signed out when the browser closes, and nothing about this device is kept."}
+      </p>
+    </fieldset>
   );
 }

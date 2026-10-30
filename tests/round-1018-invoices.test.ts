@@ -42,7 +42,7 @@ describe("account deletion keeps invoices for tax law", () => {
     const p2 = await pay(u.id, "legacy");
     const old = await db.invoice.create({ data: { number: `OUT-TEST-${Date.now()}-${n}`, paymentId: p2.id, userId: u.id, customerName: u.name, customerEmail: u.email, description: "Pro plan, 1 month", amountMinor: 49900, currency: "INR" } });
 
-    expect(await account.deleteAccount({ id: u.id, actor: null }, u.email)).toEqual({ ok: true });
+    expect(await account.deleteAccount({ id: u.id, actor: null }, u.email)).toMatchObject({ ok: true });
     expect(await db.user.count({ where: { id: u.id } })).toBe(0);
     expect(await db.payment.count({ where: { id: { in: [p.id, p2.id] } } })).toBe(0);
 

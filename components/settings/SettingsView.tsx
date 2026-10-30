@@ -1,8 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { CalendarClock, Compass, Eye, LogOut, Mail, Trophy } from "lucide-react";
+import { Bell, CalendarClock, Compass, CreditCard, Eye, Gift, Lock, Mail, Palette, ShieldCheck, Sparkles, Trophy, UserRound, Users } from "lucide-react";
 import { startTour } from "@/components/onboarding/Tour";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
@@ -12,7 +11,6 @@ import { CursorToggle } from "@/components/shell/AvatarCursor";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { useUser, tzShort } from "@/components/shell/UserContext";
 import { api, ApiError } from "@/lib/client/api";
-import { forgetBillingCopies } from "@/lib/client/forget-billing";
 import { TeamCard } from "./TeamCard";
 import { ReferralCard } from "./ReferralCard";
 import { AvatarPicker } from "./AvatarPicker";
@@ -22,6 +20,10 @@ import { PhoneCard } from "./PhoneCard";
 import { YourDataCard } from "./YourDataCard";
 import { AlertsCard } from "./AlertsCard";
 import { ALERT_DEFAULTS, type AlertPrefs } from "@/lib/alerts-core";
+import { SettingsShell, Disclosure, useUnsaved, type SettingsCategory } from "./SettingsShell";
+import { RememberedDevicesCard, SessionsCard } from "./SecurityCards";
+import { ConnectedAccountsCard, LocationCard } from "./PrivacyCards";
+import { BillingDetailsSection, HistorySection, InvoicesSection, MemberBillingNote, MethodsSection, PaymentsBento, PlanSection, type BillingSummary } from "./BillingCards";
 
 function zones(): string[] {
   const anyIntl = Intl as unknown as { supportedValuesOf?: (k: string) => string[] };
@@ -86,7 +88,8 @@ function WeeklyReportCard({ initial }: { initial: boolean }) {
   );
 }
 
-export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS }: { weeklyReport?: boolean; alerts?: AlertPrefs }) {
+/** Name and time zone. Says when it has unsaved changes, so switching category or leaving never loses them silently. */
+function ProfileForm() {
   const user = useUser();
   const router = useRouter();
   const toast = useToast();
@@ -94,7 +97,6 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS }: {
   const [timezone, setTimezone] = useState(user.timezone);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [leaving, setLeaving] = useState(false);
   // Server and browser Intl data differ, so zone lists and short names render after mount (no hydration mismatch).
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -104,6 +106,7 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS }: {
     return z.includes(timezone) ? z : [timezone, ...z];
   }, [timezone, mounted]);
   const dirty = name.trim() !== user.name || timezone !== user.timezone;
+  useUnsaved("profile", dirty);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,115 +122,189 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS }: {
       setSaving(false);
     }
   };
-
-  const logout = async () => {
-    setLeaving(true);
-    try {
-      await api("/api/auth/logout", { method: "POST" });
-    } finally {
-      await forgetBillingCopies();
-      window.location.href = "/login";
-    }
+  const reset = () => {
+    setName(user.name);
+    setTimezone(user.timezone);
+    setError(null);
   };
 
   return (
-    <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-14">
-      <p className="eyebrow mb-3">Settings</p>
-      <h1 className="display max-w-3xl text-[clamp(2.6rem,6vw,4.6rem)]">Make it yours.</h1>
-
-      <div className="mt-10 grid max-w-5xl gap-4 lg:grid-cols-[1.1fr_1fr]">
-        {user.workspace ? (
-          <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-[32px] p-6 sm:p-8" aria-labelledby="you">
-            <h2 id="you" className="text-2xl font-semibold tracking-tight">You</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{user.workspace.me.name} · {user.workspace.me.email}</p>
-            <p className="mt-5 text-sm">
-              You're in <b>{user.workspace.ownerName}</b>'s studio. Your own name, time zone and emails are changed from your own studio.
-            </p>
-          </motion.section>
-        ) : (
-        <motion.form onSubmit={save} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-[32px] p-6 sm:p-8" aria-labelledby="you">
-          <h2 id="you" className="text-2xl font-semibold tracking-tight">You</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
-          <div className="mt-6 space-y-5">
-            <div>
-              <Label htmlFor="name">What should we call you?</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoComplete="name" required />
-            </div>
-            <div>
-              <Label htmlFor="tz">
-                Your time zone <span className="tabular">{mounted ? tzShort(timezone) : ""}</span>
-              </Label>
-              <select id="tz" value={timezone} onChange={(e) => setTimezone(e.target.value)} className="h-12 w-full rounded-2xl bg-secondary/60 px-4 text-base text-foreground hairline focus-visible:outline-2">
-                {allZones.map((z) => (
-                  <option key={z} value={z}>
-                    {z.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs text-muted-foreground">Scheduling and the calendar use this.</p>
-            </div>
-          </div>
-          {error && (
-            <p role="alert" className="mt-4 text-sm text-destructive">
-              {error}
-            </p>
-          )}
-          <Button type="submit" variant="primary" className="mt-6" disabled={!dirty || saving}>
-            {saving ? "Saving…" : "Save changes"}
-          </Button>
-        </motion.form>
-        )}
-
-        <div className="grid content-start gap-4">
-          <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="glass rounded-[32px] p-6 sm:p-8" aria-labelledby="look">
-            <div className="flex items-center gap-4">
-              <Icon3D name="settings" size={64} className="shrink-0" />
-              <div>
-                <h2 id="look" className="text-2xl font-semibold tracking-tight">Look</h2>
-                <p className="mt-1 max-w-sm text-sm text-muted-foreground">Outlly comes in light and dark. System follows your device.</p>
-              </div>
-            </div>
-            <ThemeToggle plain className="mt-5" />
-            <CursorToggle />
-          </motion.section>
-
-          <section className="glass flex flex-wrap items-center justify-between gap-4 rounded-[32px] p-6" aria-labelledby="tour-h">
-            <div>
-              <h2 id="tour-h" className="text-lg font-semibold">Guided tour</h2>
-              <p className="text-sm text-muted-foreground">A one-minute walk from Home to Settings. Replaying it also brings back the tips each page shows the first time.</p>
-            </div>
-            <Button variant="outline" onClick={() => startTour()}>
-              <Compass className="h-4 w-4" aria-hidden="true" /> Replay the tour
-            </Button>
-          </section>
+    <form onSubmit={save} className="glass rounded-[32px] p-6 sm:p-8" aria-labelledby="you">
+      <h2 id="you" className="text-2xl font-semibold tracking-tight">You</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
+      <div className="mt-6 grid gap-5 sm:grid-cols-2">
+        <div>
+          <Label htmlFor="name">What should we call you?</Label>
+          <Input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoComplete="name" required />
         </div>
-
-        {!user.workspace && <AvatarPicker />}
-        {!user.workspace && <TwoStepCard email={user.email} />}
-        {!user.workspace && <PhoneCard />}
-        <SnippetsCard />
-        {/* Refer & Earn (1052) has its history, so it gets the full row; the weekly report pairs with Your data. */}
-        <div className="grid lg:col-span-2">
-          <ReferralCard />
+        <div>
+          <Label htmlFor="tz">
+            Your time zone <span className="tabular">{mounted ? tzShort(timezone) : ""}</span>
+          </Label>
+          <select id="tz" value={timezone} onChange={(e) => setTimezone(e.target.value)} aria-describedby="tz-d" className="h-12 w-full rounded-2xl bg-secondary/60 px-4 text-base text-foreground hairline focus-visible:outline-2">
+            {allZones.map((z) => (
+              <option key={z} value={z}>
+                {z.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
+          <p id="tz-d" className="mt-2 text-xs text-muted-foreground">Scheduling and the calendar use this.</p>
         </div>
-        {!user.workspace && <WeeklyReportCard initial={weeklyReport} />}
-        {!user.workspace && <YourDataCard email={user.email} />}
-        {!user.workspace && <div className="lg:col-span-2"><AlertsCard initial={alerts} /></div>}
-        <div className="lg:col-span-2">
-          <TeamCard />
-        </div>
-
-
-        <section className="glass flex flex-wrap items-center justify-between gap-4 rounded-[32px] p-6 lg:col-span-2" aria-label="Session">
-          <div>
-            <h2 className="text-lg font-semibold">Heading out?</h2>
-            <p className="text-sm text-muted-foreground">Your drafts and schedule stay put.</p>
-          </div>
-          <Button variant="ghost" onClick={logout} disabled={leaving}>
-            <LogOut className="h-4 w-4" /> {leaving ? "Signing out…" : "Sign out"}
-          </Button>
-        </section>
       </div>
-    </div>
+      {error && (
+        <p role="alert" className="mt-4 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Button type="submit" variant="primary" disabled={!dirty || saving}>
+          {saving ? "Saving…" : "Save changes"}
+        </Button>
+        {dirty && !saving && (
+          <Button type="button" variant="ghost" onClick={reset}>
+            Discard
+          </Button>
+        )}
+      </div>
+    </form>
   );
+}
+
+function Look() {
+  return (
+    <section className="glass rounded-[32px] p-6 sm:p-8" aria-labelledby="look">
+      <div className="flex items-center gap-4">
+        <Icon3D name="settings" size={56} className="shrink-0" />
+        <div>
+          <h2 id="look" className="text-2xl font-semibold tracking-tight">Look</h2>
+          <p className="mt-1 max-w-sm text-sm text-muted-foreground">Outlly comes in light and dark. System follows your device.</p>
+        </div>
+      </div>
+      <ThemeToggle plain className="mt-5" />
+      <CursorToggle />
+    </section>
+  );
+}
+
+function Note({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="glass rounded-[32px] p-6 sm:p-8">
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{children}</p>
+    </section>
+  );
+}
+
+export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, billing = null, initialTab }: { weeklyReport?: boolean; alerts?: AlertPrefs; billing?: BillingSummary | null; initialTab?: string }) {
+  const user = useUser();
+  const ws = user.workspace;
+  const owner = ws?.ownerName ?? "the owner";
+
+  const categories: SettingsCategory[] = [
+    {
+      id: "profile",
+      label: "Profile",
+      icon: UserRound,
+      blurb: "Your name, time zone and avatar.",
+      content: ws ? (
+        <Note title="You">
+          {ws.me.name} · {ws.me.email}. You&apos;re in <b className="text-foreground">{ws.ownerName}</b>&apos;s studio. Your own name, time zone and emails are changed from your own studio.
+        </Note>
+      ) : (
+        <>
+          <ProfileForm />
+          <AvatarPicker />
+        </>
+      ),
+    },
+    {
+      id: "appearance",
+      label: "Appearance",
+      icon: Palette,
+      blurb: "Light or dark, and how the cursor looks.",
+      content: <Look />,
+    },
+    {
+      id: "security",
+      label: "Security",
+      icon: ShieldCheck,
+      blurb: "Two-step sign-in, remembered devices and where you're signed in.",
+      content: (
+        <>
+          {!ws && <TwoStepCard email={user.email} />}
+          <RememberedDevicesCard twoStepNote={!ws} />
+          {!ws && <PhoneCard />}
+          <SessionsCard />
+        </>
+      ),
+    },
+    {
+      id: "personalization",
+      label: "Personalization",
+      icon: Sparkles,
+      blurb: "Shortcuts that make writing faster, and the guided tour.",
+      content: (
+        <>
+          <SnippetsCard />
+          <Disclosure title="Guided tour" hint="Replay the one-minute walk, and bring back each page's first-time tips.">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">A one-minute walk from Home to Settings. Replaying it also brings back the tips each page shows the first time.</p>
+              <Button variant="outline" onClick={() => startTour()}>
+                <Compass className="h-4 w-4" aria-hidden="true" /> Replay the tour
+              </Button>
+            </div>
+          </Disclosure>
+        </>
+      ),
+    },
+    {
+      id: "notifications",
+      label: "Notifications",
+      icon: Bell,
+      blurb: "The Monday report and the alerts we send you.",
+      content: ws ? (
+        <Note title="Emails come from your own studio">Weekly reports and alerts for {owner}&apos;s studio go to {owner}.</Note>
+      ) : (
+        <>
+          <WeeklyReportCard initial={weeklyReport} />
+          <AlertsCard initial={alerts} />
+        </>
+      ),
+    },
+    { id: "team", label: "Team", icon: Users, blurb: "Who can work in this studio.", content: <TeamCard /> },
+    { id: "referral", label: "Referral", icon: Gift, blurb: "Share your link and see who joined through it.", content: <ReferralCard /> },
+    {
+      id: "billing",
+      label: "Billing & Subscription",
+      icon: CreditCard,
+      blurb: "Your plan, how you pay, payment history and invoices.",
+      content: billing ? (
+        <>
+          <PaymentsBento b={billing} />
+          <PlanSection b={billing} />
+          <MethodsSection b={billing} />
+          <HistorySection b={billing} />
+          <InvoicesSection b={billing} />
+          <BillingDetailsSection b={billing} />
+        </>
+      ) : (
+        <MemberBillingNote owner={owner} />
+      ),
+    },
+    {
+      id: "privacy",
+      label: "Data & Privacy",
+      icon: Lock,
+      blurb: "Your data, the accounts Outlly can post to, and what we know about where you are.",
+      content: (
+        <>
+          {!ws && <YourDataCard email={user.email} />}
+          <ConnectedAccountsCard />
+          <LocationCard />
+        </>
+      ),
+    },
+  ];
+
+  return <SettingsShell title="Make it yours." intro="Everything about your account, one category at a time. Changes save where you make them." categories={categories} initialTab={initialTab} />;
 }

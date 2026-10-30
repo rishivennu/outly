@@ -11,6 +11,8 @@ import { formatMoney } from "@/lib/billing/money";
 import { stripe } from "@/lib/billing/providers";
 import { activeGateway, capturePaypal, completePayment, confirmYoupi, expireSubscriptions, failPayment } from "@/lib/billing/service";
 import { BillingView, type ReturnNotice } from "@/components/billing/BillingView";
+import { paymentReceipt } from "@/lib/billing/receipt";
+import type { Receipt } from "@/lib/billing/receipt-core";
 import { captionUsage, postUsage, replyUsage, storageUsage, uploadLimitBytes } from "@/lib/billing/entitlements";
 import { accessFor } from "@/lib/billing/access";
 import { isPaidSub } from "@/lib/billing/access-core";
@@ -65,13 +67,27 @@ async function handleYoupiReturn(userId: string, paymentId: string): Promise<Ret
   }
 }
 
-export default async function BillingPage({ searchParams }: { searchParams: { checkout?: string; session_id?: string; token?: string; p?: string; plan?: string; paid?: string; cycle?: string } }) {
+type Sp = { checkout?: string; session_id?: string; token?: string; p?: string; plan?: string; paid?: string; cycle?: string };
+
+/** The receipt slip for whatever checkout just came back (1053), read from our own payment row. */
+async function receiptFor(userId: string, sp: Sp, cancelledId: string | null): Promise<Receipt | null> {
+  if (cancelledId) return paymentReceipt(userId, cancelledId, { cancelled: true });
+  let id: string | null = null;
+  if (sp.checkout === "return" && sp.session_id) id = (await db.payment.findFirst({ where: { provider: "stripe", providerRef: sp.session_id, userId }, select: { id: true } }))?.id ?? null;
+  else if (sp.checkout === "paypal" && sp.token) id = (await db.payment.findFirst({ where: { provider: "paypal", providerRef: sp.token, userId }, select: { id: true } }))?.id ?? null;
+  else if (sp.checkout === "youpi" && sp.p) id = sp.p.slice(0, 64);
+  else if (sp.paid) id = (await db.invoice.findFirst({ where: { number: sp.paid.slice(0, 40), userId }, select: { paymentId: true } }))?.paymentId ?? null;
+  return id ? paymentReceipt(userId, id) : null;
+}
+
+export default async function BillingPage({ searchParams }: { searchParams: Sp }) {
   const user = await getCurrentUser();
   if (!user) redirect("/api/auth/expired?next=/billing");
   if (user.actor) redirect("/home"); // billing belongs to the workspace owner
   await expireSubscriptions(user.id);
 
   let notice: ReturnNotice | null = null;
+  let cancelledId: string | null = null;
   if (searchParams.checkout === "return" && searchParams.session_id) notice = await handleStripeReturn(user.id, searchParams.session_id);
   else if (searchParams.checkout === "paypal" && searchParams.token) notice = await handlePaypalReturn(user.id, searchParams.token);
   else if (searchParams.checkout === "youpi" && searchParams.p) notice = await handleYoupiReturn(user.id, searchParams.p.slice(0, 64));
@@ -81,10 +97,14 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
       where: { userId: user.id, status: "pending", ...(searchParams.token ? { provider: "paypal", providerRef: searchParams.token } : { provider: { in: ["stripe", "paypal"] } }) },
       orderBy: { createdAt: "desc" },
     });
-    if (pending) await failPayment(pending.id, "Customer left checkout");
+    if (pending) {
+      await failPayment(pending.id, "Customer left checkout");
+      cancelledId = pending.id;
+    }
     notice = { tone: "info", text: "Checkout cancelled. You weren't charged." };
   } else if (searchParams.paid) notice = { tone: "ok", text: `Payment received. Invoice ${searchParams.paid} is below and on its way to ${user.email}.` };
 
+  const receipt = await receiptFor(user.id, searchParams, cancelledId).catch(() => null);
   const [plans, subs, invoices, gw, usage, display, replies, captions, upload, beta, betaCfg, founding, badges, storage, access] = await Promise.all([
     listPlans(),
     db.subscription.findMany({ where: { userId: user.id, status: "active" }, include: { plan: true }, orderBy: { createdAt: "desc" } }),
@@ -141,6 +161,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { ch
     <BillingView
       email={user.email}
       notice={notice}
+      receipt={receipt}
       focusPlan={searchParams.plan ?? null}
       cycle={searchParams.cycle === "year" ? "year" : "month"}
       gateway={gw.provider}

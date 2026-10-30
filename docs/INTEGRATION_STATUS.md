@@ -10,7 +10,7 @@ against fakes. "Verified live" means it was exercised against the real service i
 | Supabase Auth (email + password) | Yes | Yes: demo account migrated into the real project on sign-in; wrong password rejected (401) | Email confirmation is skipped (see below) |
 | Supabase Storage (private bucket, direct + resumable upload) | Yes | Yes, through the app: signed direct upload, server size + magic-byte check, idempotent complete, thumbnail, fake-MP4 rejected (415), 60 MB refused (413). Browser TUS verified in Edge with a 13 MB file: 3 x 6 MB chunks, live % and ETA, no console errors. Resume-after-reload is implemented but was not exercised live | Free plan caps objects at 50 MB |
 | Supabase Postgres | Schema ready | **No** (app still runs on local SQLite) | Need the database password / connection string |
-| Row Level Security | SQL written (`supabase/migrations/0001_rls.sql`) | No (DB not switched yet) | Run after the Postgres switch |
+| Row Level Security | Every public table locked by `supabase/migrations/0002_lock_all_tables.sql` (RLS on, restrictive deny for anon/authenticated, grants revoked) | Yes, the build runs it after each `prisma db push` | Tested on a real Postgres in `tests/round-1053-rls.test.ts` |
 | Instagram Reels publishing | Yes | **No** | Meta app + app review, professional IG account |
 | YouTube Shorts publishing | Yes | **No** | Google Cloud OAuth client; audit to post publicly |
 | X video posting | Yes | **No** | Paid X API tier (Basic or higher) |

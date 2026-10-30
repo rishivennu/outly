@@ -6,7 +6,7 @@ import Link from "next/link";
 import { UploadZone } from "@/components/shared/UploadZone";
 import { useToast } from "@/components/shared/Toast";
 import { defaultSchedule } from "@/components/shared/DateTimePicker";
-import { api, ApiError } from "@/lib/client/api";
+import { api, ApiError, streamApi } from "@/lib/client/api";
 import { uploadVideo } from "@/lib/client/upload";
 import { takeHandoff, takeSharedFile, validateVideoFile } from "@/lib/client/handoff";
 import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
@@ -26,7 +26,7 @@ import { readVideo } from "./frame";
 import { primeGroove } from "./Groove";
 import { DeviceDrafts } from "./DeviceDrafts";
 import { findDeviceDraftByPost, getDeviceDraft, newDeviceId, removeDeviceDraft, saveDeviceDraft, type DeviceTarget } from "@/lib/client/device-drafts";
-import { emptyDraft, NOTES, type AccountView, type Draft, type HookResult, type MediaView, type PlatformCopy, type PostView, type Step, type Tone, type UploadState } from "./types";
+import { emptyDraft, NOTES, type AccountView, type Draft, type Hook, type HookResult, type HooksState, NO_HOOKS, type MediaView, type PlatformCopy, type PostView, type Step, type Tone, type UploadState } from "./types";
 
 interface Props {
   accounts: AccountView[];
@@ -76,8 +76,12 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   });
   const [story, setStory] = useState(initialPost?.story ?? initialStory ?? "");
   const [submittedStory, setSubmittedStory] = useState<string | null>(initialPost?.story ?? null);
-  const [hooks, setHooks] = useState<{ loading: boolean; result: HookResult | null; index: number; tone: Tone; error: string | null }>({ loading: false, result: null, index: 0, tone: "default", error: null });
+  const [hooks, setHooks] = useState<HooksState>(NO_HOOKS);
   const seen = useRef<string[]>([]);
+  // One writer at a time: asking again cancels the answer still coming (no stale hooks landing late).
+  const hooksAbort = useRef<AbortController | null>(null);
+  const copyAbort = useRef(new Map<string, AbortController>());
+  const [copyWriting, setCopyWriting] = useState<Platform[]>([]);
   const [hook, setHook] = useState<string | null>(initialPost?.hook ?? null);
 
   /* ---------------- platforms ---------------- */
@@ -310,13 +314,38 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   /* ================= hooks ================= */
   const fetchHooks = useCallback(
     async (tone: Tone, exclude: string[], text = submittedStory ?? story) => {
-      setHooks((h) => ({ ...h, loading: true, error: null, tone }));
+      hooksAbort.current?.abort();
+      const ctrl = new AbortController();
+      hooksAbort.current = ctrl;
+      setHooks((h) => ({ ...h, loading: true, more: true, status: "Reading your idea…", error: null, tone, index: 0 }));
+      // Parts land as the model writes them: what it understood, the plain title, then each hook.
+      let part: HookResult = { understood: "", insight: "", original: "", hooks: [], source: "gemini" };
+      const show = (patch: Partial<HookResult>, status: string) => {
+        part = { ...part, ...patch };
+        const r = part;
+        setHooks((h) => ({ ...h, loading: !r.hooks.length, status, result: r }));
+      };
       try {
-        const r = await api<HookResult>("/api/ai/hooks", { method: "POST", json: { story: text, tone, exclude } });
+        const r = await streamApi<HookResult>(
+          "/api/ai/hooks",
+          { story: text, tone, exclude },
+          (ev) => {
+            if (ctrl.signal.aborted) return;
+            if (ev.t === "understood") show({ understood: String(ev.text), insight: String(ev.insight ?? "") }, "Writing the first hook…");
+            else if (ev.t === "original") show({ original: String(ev.text) }, part.hooks.length ? `Writing hook ${part.hooks.length + 1} of 3…` : "Writing the first hook…");
+            else if (ev.t === "hook") show({ hooks: [...part.hooks, ev.hook as Hook] }, `Writing hook ${Math.min(part.hooks.length + 2, 3)} of 3…`);
+          },
+          { signal: ctrl.signal },
+        );
+        if (ctrl.signal.aborted) return;
         seen.current = [...seen.current, ...r.hooks.map((x) => x.text)].slice(-30);
-        setHooks({ loading: false, result: r, index: 0, tone, error: null });
+        setHooks((h) => ({ loading: false, more: false, status: "", result: r, index: Math.min(h.index, Math.max(0, r.hooks.length - 1)), tone, error: null }));
       } catch (e) {
-        setHooks((h) => ({ ...h, loading: false, error: e instanceof ApiError ? e.message : "I lost my train of thought. Let's try again." }));
+        if (ctrl.signal.aborted) return;
+        // Keep any hooks that already arrived; only say sorry when there is nothing to show.
+        setHooks((h) => ({ ...h, loading: false, more: false, status: "", result: part.hooks.length ? { ...part, original: part.original || text } : h.result, error: part.hooks.length ? null : e instanceof ApiError ? e.message : "I lost my train of thought. Let's try again." }));
+      } finally {
+        if (hooksAbort.current === ctrl) hooksAbort.current = null;
       }
     },
     [story, submittedStory],
@@ -332,7 +361,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const tryAnother = () => {
     const r = hooks.result;
     if (r && hooks.index < r.hooks.length - 1) setHooks((h) => ({ ...h, index: h.index + 1 }));
-    else fetchHooks(hooks.tone, seen.current);
+    else if (!hooks.more) fetchHooks(hooks.tone, seen.current); // the next one is still being written
   };
 
   /* ================= platform copy ================= */
@@ -346,11 +375,40 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const fetchCopy = useCallback(
     async (platforms: Platform[], h: string) => {
       if (!platforms.length) return;
+      const key = [...platforms].sort().join(",");
+      copyAbort.current.get(key)?.abort();
+      const ctrl = new AbortController();
+      copyAbort.current.set(key, ctrl);
+      const left = new Set(platforms);
+      const settle = (pl: Platform) => {
+        left.delete(pl);
+        setCopyWriting((w) => w.filter((x) => x !== pl));
+      };
+      setCopyWriting((w) => [...new Set([...w, ...platforms])]);
       try {
-        const r = await api<{ items: PlatformCopy[] }>("/api/ai/platform", { method: "POST", json: { story: submittedStory ?? story, hook: h, platforms } });
-        applyCopy(r.items);
+        // Each place's copy is shown the moment it is written, so the first card is ready in a second or two.
+        const r = await streamApi<{ items: PlatformCopy[] }>(
+          "/api/ai/platform",
+          { story: submittedStory ?? story, hook: h, platforms },
+          (ev) => {
+            const item = ev.item as PlatformCopy | undefined;
+            if (ev.t !== "item" || !item || ctrl.signal.aborted || !left.has(item.platform)) return;
+            applyCopy([item]);
+            settle(item.platform);
+          },
+          { signal: ctrl.signal },
+        );
+        if (ctrl.signal.aborted) return;
+        // Only the places not yet shown: a caption already on screen may be under the creator's thumbs.
+        applyCopy(r.items.filter((c) => left.has(c.platform)));
       } catch (e) {
+        if (ctrl.signal.aborted) return;
         toast(e instanceof ApiError ? e.message : "Couldn't write the copy just now. You can type your own.", "info");
+      } finally {
+        if (copyAbort.current.get(key) === ctrl) {
+          copyAbort.current.delete(key);
+          [...left].forEach(settle);
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -502,7 +560,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   /* ================= render ================= */
   if (phase !== "edit") {
     return (
-      <div className="relative min-h-dvh overflow-hidden px-5 py-12 sm:px-10">
+      <div className="relative overflow-hidden px-5 py-12 sm:px-10 lg:min-h-dvh">
         <Glow />
         <div className="relative">
           {phase === "publishing" && livePost ? <PublishingView initial={livePost} onAnother={another} /> : <ScheduledView when={scheduledFor ?? when.toISOString()} tz={tz} poster={poster} onAnother={another} />}
@@ -523,7 +581,8 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
       onSubmitStory={submitStory}
       onEditStory={() => {
         setSubmittedStory(null);
-        setHooks({ loading: false, result: null, index: 0, tone: "default", error: null });
+        hooksAbort.current?.abort();
+        setHooks(NO_HOOKS);
       }}
       hooks={hooks}
       onTryAnother={tryAnother}
@@ -544,13 +603,13 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const showVideo = step === "video" || step === "story";
 
   return (
-    <div className="relative flex min-h-dvh gap-0">
+    <div className="relative flex gap-0 lg:min-h-dvh">
       <Glow />
       <JourneyRail step={step} reachable={reachable} onGo={setStep} thumb={poster} title={hook?.split("\n")[0]} saved={saved} />
 
       <div className="relative min-w-0 flex-1">
         <JourneyBar step={step} reachable={reachable} onGo={setStep} />
-        <div className="mx-auto flex w-full max-w-3xl flex-col px-4 pb-16 pt-6 sm:px-8 lg:max-w-4xl lg:pt-8">
+        <div className="mx-auto flex w-full max-w-3xl flex-col px-4 pb-4 pt-6 sm:px-8 lg:max-w-4xl lg:pb-16 lg:pt-8">
           {/* Steps animate in on mount. No exit choreography: a nested exit that never settles must not strand the next step. */}
             {showVideo && !hasMedia && (
               <motion.section key="drop" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} aria-labelledby="drop-title" className={`${createFont.variable} font-create flex flex-col items-center pt-2 sm:pt-4 lg:pt-10`}>
@@ -649,7 +708,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                   onDraft={onDraft}
                   accounts={accounts}
                   media={{ src, poster, ...meta }}
-                  loading={copyLoading}
+                  writing={copyWriting}
                   rewriting={rewriting}
                   onRewrite={rewrite}
                   onConnect={connect}

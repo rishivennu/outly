@@ -21,8 +21,9 @@ export const TRY_LIMIT: Record<TryKey, number> = {
 export const TRY_BUDGET_MS = 12_000;
 // One model and short timeouts, so both calls together end inside the budget (5 + 6 s), and a slow model is
 // cut off instead of finishing (and billing) after the visitor already got a 504.
-const HOOK_CALL = { models: ["gemini-flash-lite-latest"], timeoutMs: 5_000 };
-const COPY_CALL = { models: ["gemini-flash-lite-latest"], timeoutMs: 6_000 };
+// Two light models: if the first is silent for 2.5 s the second races it (lib/ai/llm.ts), still inside the budget.
+const HOOK_CALL = { models: ["gemini-flash-lite-latest", "gemini-3.5-flash-lite"], timeoutMs: 5_000 };
+const COPY_CALL = { models: ["gemini-flash-lite-latest", "gemini-3.5-flash-lite"], timeoutMs: 6_000 };
 
 /**
  * Visitor text as one plain line: no control characters, no markup brackets, single spaces. Double quotes become

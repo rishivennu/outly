@@ -22,6 +22,44 @@ export function json<T>(data: T, init?: ResponseInit) {
   return NextResponse.json(data, init);
 }
 
+/** The client asked for a live answer (lib/client/api.ts streamApi sends this Accept). */
+export const wantsStream = (req: Request) => (req.headers.get("accept") ?? "").includes("application/x-ndjson");
+
+/**
+ * Newline-delimited JSON events (1053): an AI answer shows its first part while the rest is written.
+ * `run` sends parts as they finish; whatever it returns goes last as {t:"done", data}. A failure after the
+ * stream has started can no longer change the status code, so it arrives as {t:"error"} instead.
+ */
+export function ndjson(run: (send: (ev: Record<string, unknown>) => void) => Promise<unknown>) {
+  const enc = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    async start(c) {
+      let open = true;
+      const send = (ev: Record<string, unknown>) => {
+        if (!open) return;
+        try {
+          c.enqueue(enc.encode(`${JSON.stringify(ev)}\n`));
+        } catch {
+          open = false; // the client went away
+        }
+      };
+      try {
+        send({ t: "done", data: await run(send) });
+      } catch (e) {
+        if (!(e instanceof HttpError)) console.error("[stream]", e);
+        send({ t: "error", error: e instanceof HttpError ? e.message : "Something got in the way.", code: e instanceof HttpError ? e.code : "INTERNAL" });
+      }
+      open = false;
+      try {
+        c.close();
+      } catch {
+        /* already closed */
+      }
+    },
+  });
+  return new Response(body, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store", "x-accel-buffering": "no" } });
+}
+
 /**
  * CSRF: session cookie is SameSite=Lax, and every state-changing request must
  * carry an Origin (or Referer) that matches APP_URL / Host. Browsers set Origin

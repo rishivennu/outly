@@ -62,7 +62,7 @@ export function SnippetsCard() {
   }
 
   return (
-    <section className="glass rounded-[32px] p-6 lg:col-span-2" aria-labelledby={`${id}-h`}>
+    <section className="glass rounded-[32px] p-6" aria-labelledby={`${id}-h`}>
       <div className="mb-4 flex items-start gap-3">
         <BookmarkPlus className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
         <div>

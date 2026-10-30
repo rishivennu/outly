@@ -1,5 +1,6 @@
 import "server-only";
-import { env } from "../env";
+import { llmText, type LlmOpts } from "./llm";
+import { cleanJson, partialArray, partialString } from "./llm-core";
 import type { Platform } from "../domain";
 import { DEFAULT_RULES, enginePrompt, polish, type EngineWhy } from "./caption-engine";
 import { captionRules } from "./engine-store";
@@ -257,73 +258,72 @@ function offlineCopy(story: string, hook: string, platforms: Platform[]): Platfo
 /* Gemini (optional)                                                    */
 /* ------------------------------------------------------------------ */
 
-const MODELS = ["gemini-flash-lite-latest", "gemini-flash-latest"];
+export type GeminiOpts = LlmOpts & { onModel?: (model: string) => void };
 
-export type GeminiOpts = { temperature?: number; timeoutMs?: number; models?: string[]; onModel?: (model: string) => void };
+/** Pieces of a hook answer as they finish, in the order the model writes them. */
+export type HookPart = { t: "understood"; text: string; insight: string } | { t: "original"; text: string } | { t: "hook"; i: number; hook: Hook };
 
+const cleanHook = (h: Partial<Hook> | null | undefined): Hook => ({ angle: asText(h?.angle).slice(0, 40) || "Fresh angle", text: asText(h?.text).slice(0, 500) });
+
+/**
+ * One JSON answer from the fastest working model (lib/ai/llm.ts races Gemini models, and Kimi when it has
+ * a key). Kept under its old name so every caller (replies, support, Pip, reviews) got the speed-up at once.
+ */
 export async function gemini<T>(system: string, prompt: string, opts: GeminiOpts = {}): Promise<T | null> {
-  if (!env.GEMINI_API_KEY) return null;
-  for (const model of opts.models ?? MODELS) {
-    try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json", temperature: opts.temperature ?? 0.9 },
-        }),
-        signal: AbortSignal.timeout(opts.timeoutMs ?? 15_000),
-      });
-      if (!r.ok) continue;
-      const j = await r.json();
-      const txt = j.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (txt) {
-        const out = JSON.parse(txt) as T;
-        opts.onModel?.(model);
-        return out;
-      }
-    } catch {
-      /* try next model */
-    }
+  const r = await llmText(system, prompt, { ...opts, json: true }).catch(() => null);
+  if (!r) return null;
+  try {
+    const out = JSON.parse(cleanJson(r.text)) as T;
+    opts.onModel?.(r.model);
+    return out;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 const VOICE = `You are a warm, sharp creative collaborator for short-form video creators. Talk like a friend who is great at hooks. Never sound like a corporate tool. Use at most one emoji per line, and only when it adds energy.`;
 
 /** `opts` tunes the model call (the public Try it box passes a tight timeout and one model). */
-export async function generateHooks(story: string, tone: Tone, exclude: string[], opts: GeminiOpts = {}): Promise<HookResult> {
+export async function generateHooks(story: string, tone: Tone, exclude: string[], opts: GeminiOpts & { onPart?: (p: HookPart) => void } = {}): Promise<HookResult> {
   const fallback = offlineHooks(story, tone, exclude);
+  const { onPart, ...rest } = opts;
+  let said = false;
+  let told = false;
+  let sent = 0;
+  const call: GeminiOpts = !onPart
+    ? rest
+    : {
+        ...rest,
+        onText: (t) => {
+          rest.onText?.(t);
+          const u = said ? null : partialString(t, "understood");
+          if (u) (said = true), onPart({ t: "understood", text: u, insight: fallback.insight });
+          const o = told ? null : partialString(t, "original");
+          if (o) (told = true), onPart({ t: "original", text: o });
+          const hs = partialArray<Hook>(t, "hooks").map(cleanHook).filter((h) => h.text);
+          for (; sent < Math.min(hs.length, 3); sent++) onPart({ t: "hook", i: sent, hook: hs[sent] });
+        },
+      };
   const toneLine = { default: "confident and curious", punchier: "shorter and sharper, under 10 words", professional: "polished and credible, no emoji, no slang", genz: "Gen Z voice, lowercase, playful, still clear" }[tone];
   const g = await gemini<{ understood: string; original: string; hooks: Hook[] }>(
     VOICE,
     `Creator says the video is about: """${story}"""\nTone: ${toneLine}.\nEach hook stops the scroll in 5-10 words and uses a DIFFERENT hook type from: ${DEFAULT_RULES.hooks.join("; ")}. No engagement bait, no em dashes, no facts that are not in the story.\nAvoid these hooks: ${JSON.stringify(exclude)}\nReturn JSON {"understood": one-sentence paraphrase showing you get it, "original": the plain un-optimised title, "hooks": [{"angle": 2-word label like "The twist", "text": hook, may use one \\n line break}] x3}`,
-    opts,
+    call,
   );
-  const hooks = (Array.isArray(g?.hooks) ? g.hooks : [])
-    .map((h) => ({ ...h, angle: asText(h?.angle).slice(0, 40) || "Fresh angle", text: asText(h?.text).slice(0, 500) }))
-    .filter((h) => h.text);
+  const hooks = (Array.isArray(g?.hooks) ? g.hooks : []).map(cleanHook).filter((h) => h.text);
   if (!g || !hooks.length) return fallback;
   return { ...fallback, understood: asText(g.understood) || fallback.understood, original: asText(g.original) || fallback.original, hooks: hooks.slice(0, 3), source: "gemini" };
 }
 
-export async function generatePlatformCopy(story: string, hook: string, platforms: Platform[], opts: GeminiOpts = {}): Promise<PlatformCopy[]> {
+export async function generatePlatformCopy(story: string, hook: string, platforms: Platform[], opts: GeminiOpts & { onItem?: (c: PlatformCopy) => void } = {}): Promise<PlatformCopy[]> {
   const rules = await captionRules();
   const tidy = (c: PlatformCopy): PlatformCopy => {
     const { copy } = polish(c.platform, { title: c.title, caption: c.caption, description: c.description, hashtags: c.hashtags }, rules);
     return { ...c, ...copy, title: c.title === undefined ? undefined : copy.title, description: c.description === undefined ? undefined : copy.description };
   };
   const fallback = offlineCopy(story, hook, platforms).map(tidy);
-  const g = await gemini<{ items: (PlatformCopy & { formula?: unknown; hookType?: unknown; cta?: unknown; signal?: unknown })[] }>(
-    `${VOICE}\n\n${enginePrompt(rules, platforms)}`,
-    `Video story: """${story}"""\nChosen hook: """${hook}"""\nWrite captions for: ${platforms.join(", ")}. Build each one on the chosen hook, adapted to that platform's rules, with a DIFFERENT formula each time. youtube needs "title" and "description" (caption may be empty); the others need "caption".\nReturn JSON {"items":[{"platform","title"?,"caption","description"?,"hashtags": "#a #b","formula": formula name,"hookType": hook type,"cta": the CTA type,"signal": the signal it optimises for}]}`,
-    opts,
-  );
-  if (!Array.isArray(g?.items) || !g.items.length) return fallback;
-  return fallback.map((f) => {
-    const m = g.items.find((i) => i && i.platform === f.platform);
-    if (!m) return f;
+  type Item = PlatformCopy & { formula?: unknown; hookType?: unknown; cta?: unknown; signal?: unknown };
+  const shape = (f: PlatformCopy, m: Item): PlatformCopy => {
     // Models drift on shape (hashtags as an array, a number for a title...). Coerce every field to text.
     const caption = asText(m.caption) || f.caption;
     const formula = asText(m.formula).slice(0, 60);
@@ -336,6 +336,32 @@ export async function generatePlatformCopy(story: string, hook: string, platform
       note: f.note,
       why: formula ? { formula, hook: asText(m.hookType).slice(0, 40), cta: asText(m.cta).slice(0, 40), signal: asText(m.signal).slice(0, 60) } : undefined,
     });
+  };
+  const { onItem, ...rest } = opts;
+  const done = new Set<Platform>();
+  const call: GeminiOpts = !onItem
+    ? rest
+    : {
+        ...rest,
+        onText: (t) => {
+          rest.onText?.(t);
+          for (const m of partialArray<Item>(t, "items")) {
+            const f = fallback.find((x) => m && x.platform === m.platform);
+            if (f && !done.has(f.platform)) done.add(f.platform), onItem(shape(f, m));
+          }
+        },
+      };
+  const raw = await gemini<{ items: Item[] } | Item[]>(
+    `${VOICE}\n\n${enginePrompt(rules, platforms)}`,
+    `Video story: """${story}"""\nChosen hook: """${hook}"""\nWrite captions for: ${platforms.join(", ")}. Build each one on the chosen hook, adapted to that platform's rules, with a DIFFERENT formula each time. youtube needs "title" and "description" (caption may be empty); the others need "caption".\nReturn JSON {"items":[{"platform","title"?,"caption","description"?,"hashtags": "#a #b","formula": formula name,"hookType": hook type,"cta": the CTA type,"signal": the signal it optimises for}]}`,
+    call,
+  );
+  // A bare array instead of {"items": [...]} (seen in the 10-30 benchmark) used to throw the AI copy away.
+  const g = Array.isArray(raw) ? { items: raw } : raw;
+  if (!Array.isArray(g?.items) || !g.items.length) return fallback;
+  return fallback.map((f) => {
+    const m = g.items.find((i) => i && i.platform === f.platform);
+    return m ? shape(f, m) : f;
   });
 }
 

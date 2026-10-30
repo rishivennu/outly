@@ -1,4 +1,5 @@
 import "server-only";
+import { pruneDeletions } from "../account-cleanup";
 import { db } from "../db";
 import { storage } from "../storage";
 import { DRAFT_TTL_DAYS } from "../domain";
@@ -75,6 +76,8 @@ export async function pruneOldData(now: Date = new Date()) {
     // Pip's access log (1049): a year is enough to answer "who looked at my invoices?"
     db.pipAccessLog.deleteMany({ where: { createdAt: { lt: before(365) } } }),
   ]);
+  // Deletion status records (1053): kept 30 days after the files are gone, for the person's status link.
+  const deletions = await pruneDeletions(now).catch(() => 0);
   // Batches of 500, a few per run, so a backlog drains without one huge delete.
   const drafts = { drafts: 0, media: 0 };
   for (let i = 0; i < 10; i++) {
@@ -95,5 +98,6 @@ export async function pruneOldData(now: Date = new Date()) {
     dmMessages: dmMessages.count,
     dmThreads: dmThreads.count,
     pipAccess: pipAccess.count,
+    deletions,
   };
 }

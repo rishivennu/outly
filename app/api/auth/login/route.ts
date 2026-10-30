@@ -24,7 +24,7 @@ export const POST = route(
       throw e;
     }
     // With an authenticator turned on this sets the halfway cookie, and the form asks for the app code next.
-    return json({ ok: true, ...(await beginSignIn(user.id)) });
+    return json({ ok: true, ...(await beginSignIn(user.id, "other", { remember: body.remember })) });
   },
   { auth: false, limit: [10, 60_000] },
 );

@@ -12,6 +12,7 @@ export const signupSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("That email doesn't look quite right"),
   password: z.string().min(1, "Password, please").max(200),
+  remember: z.boolean().optional(), // "Remember this device" (1053)
 });
 
 export const mediaMetaSchema = z.object({

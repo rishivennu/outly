@@ -1,8 +1,9 @@
 import { sameSitePath } from "@/lib/safe-next";
 
 /** Continue with Google: a plain link, so it works before any JavaScript has loaded. */
-export function GoogleButton({ from, next, label = "Continue with Google" }: { from: "login" | "signup"; next?: string | null; label?: string }) {
+export function GoogleButton({ from, next, label = "Continue with Google", remember }: { from: "login" | "signup"; next?: string | null; label?: string; remember?: boolean }) {
   const q = new URLSearchParams({ from });
+  if (remember !== undefined) q.set("remember", remember ? "1" : "0");
   const safe = sameSitePath(next); // not "//", "/\\" or a hidden tab/newline (all leave the site)
   if (safe) q.set("next", safe);
   return (

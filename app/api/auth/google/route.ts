@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
   }
   const redirectUri = `${env.APP_URL}/api/accounts/youtube/callback`;
   const start = await new YouTubePublisher().connect(redirectUri, { identity: true });
-  saveOAuthState("youtube", { state: start.state, returnTo: safeReturnTo(req.nextUrl.searchParams.get("next") ?? "/home"), mode: "login" });
+  const rm = req.nextUrl.searchParams.get("remember");
+  saveOAuthState("youtube", { state: start.state, returnTo: safeReturnTo(req.nextUrl.searchParams.get("next") ?? "/home"), mode: "login", remember: rm === "1" ? true : rm === "0" ? false : undefined });
   return NextResponse.redirect(start.url);
 }

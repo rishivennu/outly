@@ -15,6 +15,7 @@ import {
 import { claimCode, issueTwoFactor, WA_MESSAGE } from "./whatsapp";
 import { whatsappAvailable } from "../whatsapp";
 import { maskPhone } from "../phone";
+import { forgetAllTrusted, forgetThisBrowser, rememberDevice, trustedFor } from "../trusted-device";
 
 /**
  * Two-step sign-in with an authenticator app. After the first step (password, email code or Google) a
@@ -48,13 +49,25 @@ const fingerprint = (u: { totpEnabledAt: Date | null; totpLastStep: number | nul
  * `first` says how step one was done. A WhatsApp sign-in code can't also be the second step: that would be
  * the same phone twice, so those sign-ins only get the authenticator app or a recovery code.
  */
-export async function beginSignIn(userId: string, first: "whatsapp" | "other" = "other"): Promise<{ twoFactor: boolean }> {
+export async function beginSignIn(
+  userId: string,
+  first: "whatsapp" | "other" = "other",
+  { remember }: { remember?: boolean } = {},
+): Promise<{ twoFactor: boolean; trusted?: boolean }> {
   const u = await db.user.findUnique({ where: { id: userId }, select: { totpEnabledAt: true, totpLastStep: true, recoveryCodes: true } });
+  // "Don't remember this device" (1053): nothing stays behind, including an older remembered-device cookie.
+  if (remember === false) await forgetThisBrowser();
   if (!u?.totpEnabledAt) {
-    await createSession(userId);
+    await createSession(userId, { persist: remember !== false });
     return { twoFactor: false };
   }
-  const token = await new SignJWT({ sub: userId, p: "2fa", f: fingerprint(u), m: first }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime(`${CHALLENGE_S}s`).sign(secret);
+  // A device remembered after an earlier full sign-in skips the second step. Only when the person didn't
+  // just say "don't remember", and never past its 30 days, a password change or "sign out everywhere".
+  if (remember !== false && (await trustedFor(userId))) {
+    await createSession(userId);
+    return { twoFactor: false, trusted: true };
+  }
+  const token = await new SignJWT({ sub: userId, p: "2fa", f: fingerprint(u), m: first, r: remember === true ? 1 : remember === false ? 0 : -1 }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime(`${CHALLENGE_S}s`).sign(secret);
   cookies().set(CHALLENGE_COOKIE, token, { httpOnly: true, secure: env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: CHALLENGE_S });
   return { twoFactor: true };
 }
@@ -64,14 +77,14 @@ export function clearChallenge() {
   cookies().delete(CHALLENGE_COOKIE);
 }
 
-async function challengeUser(): Promise<{ id: string; f: string; m: string }> {
+async function challengeUser(): Promise<{ id: string; f: string; m: string; r?: boolean }> {
   const t = cookies().get(CHALLENGE_COOKIE)?.value;
   const gone = new HttpError(401, "That sign-in took too long. Start again with your email.", "2FA_EXPIRED");
   if (!t) throw gone;
   try {
     const { payload } = await jwtVerify(t, secret, { algorithms: ["HS256"] });
     if (payload.p !== "2fa" || typeof payload.sub !== "string" || typeof payload.f !== "string") throw gone;
-    return { id: payload.sub, f: payload.f, m: typeof payload.m === "string" ? payload.m : "other" };
+    return { id: payload.sub, f: payload.f, m: typeof payload.m === "string" ? payload.m : "other", r: payload.r === 1 ? true : payload.r === 0 ? false : undefined };
   } catch {
     throw gone;
   }
@@ -134,7 +147,7 @@ export async function sendChallengeWhatsApp() {
 }
 
 /** Second step of sign-in: app code or recovery code, or (via "whatsapp") the code just sent to the proven number. */
-export async function completeSignIn(input: string, via: "app" | "whatsapp" = "app") {
+export async function completeSignIn(input: string, via: "app" | "whatsapp" = "app", rememberNow?: boolean) {
   const ch = await challengeUser();
   const userId = ch.id;
   const u = await db.user.findUnique({ where: { id: userId }, select: { totpSecret: true, totpLastStep: true, recoveryCodes: true, totpEnabledAt: true } });
@@ -152,7 +165,10 @@ export async function completeSignIn(input: string, via: "app" | "whatsapp" = "a
     used = "whatsapp";
   } else used = await spendFactor(userId, u, input);
   cookies().delete(CHALLENGE_COOKIE);
-  await createSession(userId);
+  const remember = rememberNow ?? ch.r;
+  await createSession(userId, { persist: remember !== false });
+  if (remember === true) await rememberDevice(userId);
+  else if (remember === false) await forgetThisBrowser();
   return { used, recoveryLeft: parseHashes((await db.user.findUnique({ where: { id: userId }, select: { recoveryCodes: true } }))?.recoveryCodes).length };
 }
 
@@ -197,6 +213,7 @@ export async function enable(userId: string, code: string) {
     where: { id: userId },
     data: { totpEnabledAt: new Date(), totpLastStep: step, recoveryCodes: JSON.stringify(codes.map((c) => recoveryDigest(env.AUTH_SECRET, c))) },
   });
+  await forgetAllTrusted(userId); // a fresh second step: no device skips it until it has been used once
   await securityMail(userId, "on");
   return { recoveryCodes: codes };
 }
@@ -207,6 +224,7 @@ export async function disable(userId: string, code: string) {
   if (!u?.totpEnabledAt) return { ok: true };
   await spendFactor(userId, u, code);
   await db.user.update({ where: { id: userId }, data: { totpSecret: null, totpEnabledAt: null, totpLastStep: null, recoveryCodes: null } });
+  await forgetAllTrusted(userId);
   await securityMail(userId, "off");
   return { ok: true };
 }

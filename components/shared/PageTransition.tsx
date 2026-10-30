@@ -13,7 +13,7 @@ let lastPath: string | null = null;
 /**
  * Wraps a route segment (used from template.tsx, which remounts on every navigation).
  * The page's top-level blocks settle in one after another (the shared GSAP pageStagger, 10-22) while a
- * three-layer water wave with rolling crests sweeps up and splashes across the screen. The very first load
+ * three-layer water wave with rolling crests sweeps up the screen (no splash rings since 1053: the user asked for the circle to go). The very first load
  * gets neither, so nothing delays paint. Runs before paint (layout effect), so blocks never flash first.
  */
 export function PageTransition({ children }: { children: React.ReactNode }) {
@@ -41,8 +41,6 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
           <div className="pw-sheet"><span className="pw-crest" /></div>
           <div className="pw-sheet"><span className="pw-crest" /></div>
           <div className="pw-sheet"><span className="pw-crest" /></div>
-          <span className="pw-ripple" />
-          <span className="pw-ripple" />
         </div>
       )}
     </>

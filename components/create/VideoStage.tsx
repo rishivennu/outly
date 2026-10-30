@@ -173,6 +173,10 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
                     <p className="truncate text-sm font-semibold">{upload.progress < 1 ? "Bringing it over" : "Making it ready"}</p>
                     <p className="truncate text-[11px] font-bold uppercase tracking-[0.1em] text-[hsl(var(--lime))]">{etaLabel ?? (upload.progress < 1 ? "On its way" : "Almost there")}</p>
                   </div>
+                  {/* The number has its own slot in the header (1053): inside the track the rocket rode over it near 100%. */}
+                  <span className="w-[3.25rem] shrink-0 text-right font-mono text-sm font-semibold tabular-nums text-white/85" aria-hidden="true">
+                    {Math.round(upload.progress * 100)}%
+                  </span>
                   {onCancel && (
                     <button
                       type="button"
@@ -192,7 +196,6 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
                       <OutlyMark variant="ink" size={18} className="la-rocket la-rocket-anim" />
                     </span>
                   </span>
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold tabular-nums text-white/60">{Math.round(upload.progress * 100)}%</span>
                 </div>
               </motion.div>
             )}

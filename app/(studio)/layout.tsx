@@ -8,7 +8,7 @@ import { MobileNav, MobileTopBar, Sidebar } from "@/components/shell/Nav";
 import { Tour } from "@/components/onboarding/Tour";
 import { PageGuide } from "@/components/onboarding/PageGuide";
 import { CommandPalette } from "@/components/shell/CommandPalette";
-import { touchActivity } from "@/lib/activity";
+import { touchActivity, touchPlace } from "@/lib/activity";
 import { touchPresence } from "@/lib/presence";
 import { liveNow } from "@/lib/social/registry";
 import { LivePlatformsProvider } from "@/components/shell/LivePlatforms";
@@ -32,6 +32,8 @@ export default async function StudioLayout({ children }: { children: React.React
   // Maintenance: members who joined before it started carry on; anyone newer waits on the maintenance page.
   if (site.maintenance && !joinedBeforeMaintenance({ createdAt: user.joinedAt }, site.since)) redirect("/maintenance?preview");
   void touchActivity(user.id); // daily-active tracking for the admin console; never blocks or throws
+  const h = headers();
+  void touchPlace(user.actor?.id ?? user.id, (n) => h.get(n)); // approximate network location for the admin console (1053)
   void touchPresence(user.actor?.id ?? user.id); // online now (1037); the LiveCount poll keeps it fresh
   return (
     <UserProvider user={{ id: user.id, name: user.name, email: user.email, avatar: user.avatar, timezone: user.timezone, workspace: user.actor ? { ownerName: user.name, role: user.role === "manager" ? "manager" : "editor", me: { name: user.actor.name, email: user.actor.email } } : null }}>
@@ -42,7 +44,8 @@ export default async function StudioLayout({ children }: { children: React.React
       </a>
       <div className="flex min-h-dvh">
         <Sidebar />
-        <div className="min-w-0 flex-1">
+        {/* A column that is exactly the screen when the page is short: no empty scroll below the content (1053). */}
+        <div className="flex min-h-dvh min-w-0 flex-1 flex-col overflow-x-clip">
           <WorkspaceBar />
           {site.maintenance && site.endsAt && (
             <div className="border-b border-border/60 bg-[hsl(var(--lime)/0.14)] px-4 py-2">
@@ -51,7 +54,8 @@ export default async function StudioLayout({ children }: { children: React.React
           )}
           <MobileTopBar />
           <AppNavBar />
-          <main id="main" className="relative min-h-dvh pb-[calc(env(safe-area-inset-bottom)+11rem)] lg:pb-0">
+          {/* Room for the floating tab bar (68px + 12px gap) and a little air, no more: it was 11rem plus each page's own. */}
+          <main id="main" className="relative flex-1 pb-[calc(max(12px,env(safe-area-inset-bottom))+92px)] lg:pb-0">
             {children}
           </main>
         </div>

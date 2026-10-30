@@ -87,6 +87,66 @@ export async function api<T>(url: string, init?: RequestInit & { json?: unknown 
   return data as T;
 }
 
+/**
+ * A POST whose answer arrives in parts (1053, the AI writers): `onEvent` gets each part the moment the
+ * server sends it, the promise resolves with the final `done` data. Same errors as api(); a server that
+ * answers with plain JSON (an older deploy) still works. Gives up after `timeoutMs` of silence.
+ */
+export async function streamApi<T>(url: string, json: unknown, onEvent: (ev: { t: string } & Record<string, unknown>) => void, { signal, timeoutMs = 30_000 }: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<T> {
+  memo.clear();
+  const quiet = new AbortController();
+  const stop = () => quiet.abort();
+  signal?.addEventListener("abort", stop);
+  let timer = setTimeout(stop, timeoutMs);
+  const poke = () => {
+    clearTimeout(timer);
+    timer = setTimeout(stop, timeoutMs);
+  };
+  try {
+    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json", accept: "application/x-ndjson, application/json" }, body: JSON.stringify(json), credentials: "same-origin", signal: quiet.signal });
+    if (!(res.headers.get("content-type") ?? "").includes("ndjson") || !res.body) {
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 && typeof window !== "undefined") window.location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
+      if (!res.ok) {
+        planLimit(res.status, data);
+        throw new ApiError(res.status, data.error ?? "Something got in the way.", data.code, data);
+      }
+      return data as T;
+    }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (value) buf += dec.decode(value, { stream: !done });
+      poke();
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) >= 0 || (done && buf.trim())) {
+        const line = (nl >= 0 ? buf.slice(0, nl) : buf).trim();
+        buf = nl >= 0 ? buf.slice(nl + 1) : "";
+        if (!line) continue;
+        let ev: { t: string } & Record<string, unknown>;
+        try {
+          ev = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (ev.t === "done") return ev.data as T;
+        if (ev.t === "error") throw new ApiError(500, String(ev.error ?? "Something got in the way."), ev.code as string | undefined);
+        onEvent(ev);
+      }
+      if (done) throw new ApiError(0, "We lost the connection. Let's try again.");
+    }
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    if (signal?.aborted) throw e; // the caller cancelled: let them tell
+    throw new ApiError(0, quiet.signal.aborted ? "That took longer than it should. Let's try again." : "We lost the connection. Let's try again.");
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", stop);
+  }
+}
+
 /** Streams a file with real progress (fetch has no upload progress). */
 export function uploadWithProgress<T>(url: string, file: File, onProgress: (p: number) => void, signal?: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {

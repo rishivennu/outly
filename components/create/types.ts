@@ -34,6 +34,10 @@ export interface PlatformCopy {
 }
 export type Tone = "default" | "punchier" | "professional" | "genz";
 
+/** The hook writer's state. `more` = hooks are still arriving; `status` = what it is doing right now. */
+export type HooksState = { loading: boolean; more: boolean; status: string; result: HookResult | null; index: number; tone: Tone; error: string | null };
+export const NO_HOOKS: HooksState = { loading: false, more: false, status: "", result: null, index: 0, tone: "default", error: null };
+
 export type UploadState =
   | { kind: "idle" }
   | { kind: "uploading"; progress: number; eta?: number | null }

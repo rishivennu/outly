@@ -181,7 +181,7 @@ describe("account deletion", () => {
     const post = await db.post.create({ data: { userId: u.id, mediaId: media.id, status: "draft" } });
     await db.postTarget.create({ data: { postId: post.id, platform: "x", caption: "bye" } });
     await db.idea.create({ data: { userId: u.id, text: "an idea" } });
-    expect(await account.deleteAccount({ id: u.id, actor: null }, u.email.toUpperCase())).toEqual({ ok: true });
+    expect(await account.deleteAccount({ id: u.id, actor: null }, u.email.toUpperCase())).toMatchObject({ ok: true });
     expect(await db.user.count({ where: { id: u.id } })).toBe(0);
     expect(await db.post.count({ where: { id: post.id } })).toBe(0);
     expect(await db.postTarget.count({ where: { postId: post.id } })).toBe(0);

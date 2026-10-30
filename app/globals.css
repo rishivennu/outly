@@ -542,13 +542,6 @@ html:not(.dark) .o3d-floor { background: radial-gradient(closest-side, rgba(30, 
 .pw-sheet:nth-child(2) .pw-crest { animation-duration: .7s; animation-direction: reverse; }
 @keyframes pw-rise { to { transform: translate3d(0, calc(-215vh - 100px), 0); } }
 @keyframes pw-roll { to { transform: translate3d(calc(var(--p) * -1), 0, 0); } }
-/* the splash: two rings ripple out from the middle as the water passes */
-.pw-ripple { position: absolute; left: 50%; top: 52%; width: 70vmax; aspect-ratio: 1; margin: -35vmax 0 0 -35vmax; border-radius: 50%;
-  border: 2px solid hsl(var(--lime) / .55); box-shadow: 0 0 40px hsl(190 95% 60% / .35), inset 0 0 40px hsl(var(--lime) / .25);
-  transform: scale(.1); animation: pw-ripple 1s cubic-bezier(.2, .7, .3, 1) .38s both; }
-.js .pw-ripple { opacity: 0; }
-.pw-ripple + .pw-ripple { animation-delay: .52s; border-color: hsl(190 95% 60% / .45); }
-@keyframes pw-ripple { 0% { opacity: .9; transform: scale(.1); } 100% { opacity: 0; transform: scale(1.15); } }
 @media (prefers-reduced-motion: reduce) {
   .page-in { animation: page-fade .25s linear both; }
   .page-wave { display: none; }
@@ -2118,6 +2111,8 @@ html:has(.sky-space) [aria-labelledby="cc-title"] { background: hsl(var(--card))
 .deck-arrow{position:absolute;top:calc(50% - 28px);z-index:2;display:grid;place-items:center;width:44px;height:44px;border-radius:999px;background:hsl(var(--card));color:hsl(var(--foreground));box-shadow:0 0 0 1px hsl(var(--foreground)/.1),0 8px 24px -8px rgb(0 0 0/.35);transition:background .2s}
 .deck-arrow:hover{background:hsl(var(--secondary))}
 .deck-arrow:focus-visible{outline:2px solid hsl(var(--ring));outline-offset:2px}
+/* Touch screens swipe the rail; the arrow only covered the next card there (1053). */
+@media (pointer:coarse){.deck-arrow{display:none}}
 
 /* ---------- Pricing cards (10-16k): style variants (Admin > Pricing > Card style) + rocket CTA ---------- */
 .pc-accent{color:hsl(var(--lime-ink))}
@@ -2567,3 +2562,29 @@ html.js .tr-stage[data-print="wait"] .tr-reel { transform: translateY(0); }
 }
 
 .rcpt-tick { display: inline-block; width: 13px; height: 13px; stroke-width: 3; vertical-align: -1px; color: #2f7d32; }
+
+/* Settings (1053): cards inside a category are quieter than the old wall of big glass cards. */
+.settings-panel .glass { border-radius: 24px; padding: 1.25rem; }
+@media (min-width: 640px) { .settings-panel .glass { padding: 1.5rem; } }
+.settings-panel .glass h2.text-2xl { font-size: 1.2rem; line-height: 1.6rem; }
+.settings-panel .glass + .glass { margin-top: 0; }
+
+/* Settings > Billing (1053): the ways to pay drift slowly round the wallet; still for reduced motion. */
+@keyframes pay-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
+.pay-bento .pay-chip { animation: pay-float 7s ease-in-out infinite; }
+.pay-chip-static { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .pay-bento .pay-chip { animation: none; } }
+
+/* Payment receipt (1053): the slip prints down out of a slot, its lines appear, then the stamp lands. Time
+   based, once per outcome; reduced motion shows it finished. */
+.rcpt-edge { -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 14px 100%; mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 14px 100%; }
+.rcpt-slip { margin-bottom: 0.625rem; }
+@keyframes rcpt-print { 0% { transform: translateY(-104%); } 70% { transform: translateY(2%); } 100% { transform: translateY(0); } }
+@keyframes rcpt-row { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rcpt-stamp { 0% { opacity: 0; transform: scale(1.6) rotate(-14deg); } 60% { opacity: 1; transform: scale(0.94) rotate(-8deg); } 100% { opacity: 1; transform: scale(1) rotate(-8deg); } }
+.rcpt-print { animation: rcpt-print 900ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.rcpt-row { animation: rcpt-row 260ms ease-out both; }
+.rcpt-stamp { transform: rotate(-8deg); }
+.rcpt-stamp-in { animation: rcpt-stamp 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) { .rcpt-print, .rcpt-row, .rcpt-stamp-in { animation: none; } }
+

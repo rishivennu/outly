@@ -87,7 +87,7 @@ export function PhoneCard() {
   };
 
   return (
-    <section className="glass rounded-[32px] p-6 sm:p-8 lg:col-span-2" aria-labelledby="ph-h">
+    <section className="glass rounded-[32px] p-6 sm:p-8" aria-labelledby="ph-h">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <MessageCircle className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />

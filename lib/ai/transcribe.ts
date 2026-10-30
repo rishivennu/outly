@@ -6,7 +6,8 @@ import { cleanWords, cuesFromWords, wordsFromCues, wordsFromFunasr, type Subtitl
 import { subtitleRules } from "./engine-store";
 import { assertPublicUrl } from "../net/assert-public";
 
-const MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest"];
+// gemini-flash-latest stopped answering (30 s+ timeouts, 10-30 benchmark), so it no longer goes first.
+const MODELS = ["gemini-3.6-flash", "gemini-flash-lite-latest"];
 
 const prompt = (rules: SubtitleRules) => `Transcribe the speech in this audio word by word, for on-screen video subtitles.
 Return JSON {"language": BCP-47 code, "words": [{"w": "word", "s": start seconds, "e": end seconds}]}.
@@ -42,7 +43,7 @@ async function viaGemini(wav: ArrayBuffer, offset: number, duration: number, rul
           contents: [{ role: "user", parts: [{ inline_data: { mime_type: "audio/wav", data } }, { text: prompt(rules) }] }],
           generationConfig: { responseMimeType: "application/json", temperature: 0.1 },
         }),
-        signal: AbortSignal.timeout(55_000),
+        signal: AbortSignal.timeout(40_000),
       });
       if (!r.ok) {
         lastErr = `${model} ${r.status}`;

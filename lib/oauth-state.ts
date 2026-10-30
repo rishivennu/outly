@@ -11,6 +11,8 @@ interface Pending {
   returnTo: string;
   /** "login": this Google consent also signs the creator in (Continue with Google). */
   mode?: "connect" | "login";
+  /** Continue with Google: the "Remember this device" choice on the sign-in page (1053). */
+  remember?: boolean;
   exp: number;
 }
 const name = (p: Platform) => `oauth_${p}`;

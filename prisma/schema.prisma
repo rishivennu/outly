@@ -48,6 +48,13 @@ model User {
   foundingPct     Int? // lifetime discount locked in when the seat was claimed
   foundingKey     String?   @unique // one seat per real inbox (Gmail dots and +tags folded away)
   foundingRetiredNo Int? // a revoked member's number, kept so it is never handed out again
+  // Where they last used Outlly from (1053). Approximate: read from the network (Cloudflare/Vercel IP
+  // headers), never an address, and a VPN can place them anywhere. Written only when it changes.
+  locCountry      String? // ISO 3166-1 alpha-2
+  locRegion       String?
+  locCity         String?
+  locVia          String? // "cloudflare" | "vercel" | "tor"
+  locAt           DateTime?
 
   socialAccounts SocialAccount[]
   aiUsage        AiUsage[]
@@ -73,8 +80,27 @@ model User {
   planGrants   PlanGrant[]
   referralsMade Referral[] @relation("ReferralsMade")
   referral      Referral?  @relation("ReferralReceived")
+  trustedDevices TrustedDevice[]
 
   @@index([lastSeenAt])
+}
+
+/// A browser the person chose to remember at sign-in (1053). The cookie holds `id.secret`; only a hash of
+/// the secret is stored. While it is valid, sign-in on that browser skips the second step (the password or
+/// email code is still asked). Deleting the row signs that browser out (sessions carry its id as `td`).
+model TrustedDevice {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secretHash   String
+  tokenVersion Int // a password change or "sign out everywhere" bumps the user's version and ends it
+  label        String // "Chrome on Android"
+  place        String? // approximate, from the network, at the time it was remembered
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime @default(now())
+  expiresAt    DateTime
+
+  @@index([userId])
 }
 
 /// One-time sign-in codes sent by email. Only a keyed hash of the code is stored; no link to User, so a
@@ -820,4 +846,38 @@ model AuditLog {
   @@index([email, createdAt])
   @@index([targetType, targetId])
   @@index([createdAt])
+}
+
+/// An account deletion in progress (1053). The User row is gone the moment it is created; this is only what
+/// the person's status link needs: no email, no name, just counts. Pruned 30 days after it finishes.
+model AccountDeletion {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique // sha256 of the status link token, which only the person who deleted holds
+  status     String    @default("running") // running | done | failed (failed = a file kept failing; staff alerted)
+  filesTotal Int       @default(0)
+  filesDone  Int       @default(0)
+  createdAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  files StorageCleanup[]
+
+  @@index([status, createdAt])
+}
+
+/// One uploaded object to remove (a video, a thumbnail). Retried with backoff by the minute sweeper until it
+/// is gone; removing an object that is already gone counts as done, so a retry can never do harm.
+model StorageCleanup {
+  id         String    @id @default(cuid())
+  deletionId String?
+  key        String
+  attempts   Int       @default(0)
+  nextAt     DateTime  @default(now())
+  doneAt     DateTime?
+  lastError  String?
+  createdAt  DateTime  @default(now())
+
+  deletion AccountDeletion? @relation(fields: [deletionId], references: [id], onDelete: Cascade)
+
+  @@unique([deletionId, key])
+  @@index([doneAt, nextAt])
 }

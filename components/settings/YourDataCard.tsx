@@ -1,37 +1,24 @@
 "use client";
 import { useId, useState } from "react";
-import { Download, MonitorSmartphone, ShieldCheck, Trash2 } from "lucide-react";
+import { Download, ShieldCheck, Trash2 } from "lucide-react";
 import { openPrivacyNotice } from "@/components/shared/PrivacyNotice";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
-import { useToast } from "@/components/shared/Toast";
 import { api, ApiError } from "@/lib/client/api";
 import { forgetBillingCopies } from "@/lib/client/forget-billing";
 
 /**
- * Your data: sign out on every device, take a copy of everything, or close the studio for good.
+ * Your data: take a copy of everything, or close the studio for good. ("Sign out everywhere" moved to
+ * Settings > Security in 1053, next to the remembered devices it also clears.)
  * Deleting asks for the email typed out, which is slower than a checkbox on purpose.
  */
 export function YourDataCard({ email }: { email: string }) {
-  const toast = useToast();
   const id = useId();
-  const [busy, setBusy] = useState<"all" | "delete" | null>(null);
+  const [busy, setBusy] = useState<"delete" | null>(null);
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const matches = confirm.trim().toLowerCase() === email.toLowerCase();
-
-  const everywhere = async () => {
-    setBusy("all");
-    try {
-      await api("/api/auth/logout-all", { method: "POST" });
-      await forgetBillingCopies();
-      window.location.href = "/login";
-    } catch (e) {
-      toast(e instanceof ApiError ? e.message : "Couldn't sign out everywhere. Try again in a moment.", "info");
-      setBusy(null);
-    }
-  };
 
   const remove = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,9 +26,9 @@ export function YourDataCard({ email }: { email: string }) {
     setBusy("delete");
     setError(null);
     try {
-      await api("/api/settings/account", { method: "DELETE", json: { confirm: confirm.trim() } });
+      const r = await api<{ ok: boolean; status?: string }>("/api/settings/account", { method: "DELETE", json: { confirm: confirm.trim() } });
       await forgetBillingCopies();
-      window.location.href = "/";
+      window.location.href = r.status?.startsWith("/account-deleted#") ? r.status : "/";
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something got in the way. Nothing was deleted.");
       setBusy(null);
@@ -49,14 +36,14 @@ export function YourDataCard({ email }: { email: string }) {
   };
 
   return (
-    <section id="your-data" className="glass scroll-mt-24 rounded-[32px] p-6 sm:p-8 lg:col-span-2" aria-labelledby={`${id}-h`}>
+    <section id="your-data" className="glass scroll-mt-24 rounded-[32px] p-6 sm:p-8" aria-labelledby={`${id}-h`}>
       <h2 id={`${id}-h`} className="text-2xl font-semibold tracking-tight">Your data</h2>
       <p className="mt-1 max-w-xl text-sm text-muted-foreground">It belongs to you. Take a copy whenever you like.</p>
       <Button type="button" variant="outline" className="mt-4" onClick={openPrivacyNotice}>
         <ShieldCheck className="h-4 w-4" aria-hidden="true" /> How we handle your data
       </Button>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+      <div className="mt-6 grid gap-3">
         <div className="flex flex-col justify-between gap-3 rounded-3xl bg-secondary/50 p-5 hairline">
           <div>
             <h3 className="font-semibold">Download my data</h3>
@@ -72,15 +59,6 @@ export function YourDataCard({ email }: { email: string }) {
               Or as JSON, for moving to another app
             </a>
           </div>
-        </div>
-        <div className="flex flex-col justify-between gap-3 rounded-3xl bg-secondary/50 p-5 hairline">
-          <div>
-            <h3 className="font-semibold">Sign out everywhere</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Ends every session on every phone and computer, this one included. Handy after using a shared device.</p>
-          </div>
-          <Button variant="outline" className="self-start" onClick={everywhere} disabled={busy !== null}>
-            <MonitorSmartphone className="h-4 w-4" aria-hidden="true" /> {busy === "all" ? "Signing out…" : "Sign out everywhere"}
-          </Button>
         </div>
       </div>
 
