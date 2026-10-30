@@ -15,10 +15,12 @@ import { REF_COOKIE, REF_VISITOR, isCode, makeCode, maskEmail, normalizeReferral
 export { REF_COOKIE };
 
 /**
- * Refer & Earn (1052). The FRIEND who signs up through someone's link gets a free month of Creator after
- * their first verified payment for an eligible plan. The month is stacked after the period they paid for.
- * One reward per account and per inbox, never for referring yourself, and a refund or chargeback of the
- * qualifying payment takes it back. Rows: invited (opened the link) -> registered -> paid -> rewarded.
+ * Refer & Earn (1052, reward flipped in 1066). The SHARER earns a free month of Creator when a friend who
+ * signed up through their link makes a first verified payment for an eligible plan (Creator, Studio, Pro).
+ * The month is stacked after the sharer's own paid period and after any month they already earned, so
+ * nothing overlaps. One reward per friend account and per friend inbox, never for referring yourself, and
+ * a refund or chargeback of the qualifying payment takes it back.
+ * Rows: invited (opened the link) -> registered -> paid -> rewarded.
  */
 
 const SYSTEM: Actor = { login: "system", role: null };
@@ -133,35 +135,45 @@ const fmtDay = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", mont
  */
 async function issueReward(referralId: string, now = new Date()) {
   const cfg = await referralConfig();
-  const r = await db.referral.findUnique({ where: { id: referralId }, include: { referred: { select: { id: true, name: true, email: true, emailVerifiedAt: true, emailVerifiedFor: true } }, grant: true } });
-  if (!r || r.status !== "paid" || r.grant || !r.referred || !r.paymentId) return null;
+  const r = await db.referral.findUnique({
+    where: { id: referralId },
+    include: { referred: { select: { id: true, name: true, email: true, emailVerifiedAt: true, emailVerifiedFor: true } }, referrer: { select: { id: true, name: true, email: true } }, grant: true },
+  });
+  if (!r || r.status !== "paid" || r.grant || !r.referred || !r.referrer || !r.paymentId) return null;
   if (!isProven(r.referred)) return null; // waits for the address to be verified (settleReferral)
   const pay = await db.payment.findUnique({ where: { id: r.paymentId }, select: { status: true } });
   if (pay?.status !== "succeeded") return null;
   const plan = await db.plan.findUnique({ where: { slug: cfg.rewardPlan } });
   if (!plan) return null;
-  // Stacked after the paid period: the latest end among the friend's paid plans.
-  const subs = await db.subscription.findMany({ where: { userId: r.referred.id, status: "active", currentPeriodEnd: { gt: now } } });
-  const paidUntil = subs.filter(isPaidSub).reduce<Date | null>((a, s) => (!a || s.currentPeriodEnd > a ? s.currentPeriodEnd : a), null);
+  // The month goes to the sharer, stacked after whatever they already have: the end of their own paid
+  // period, or of a month an earlier friend earned them, whichever is later. Two friends = two months.
+  const sharer = r.referrer;
+  const [subs, earned] = await Promise.all([
+    db.subscription.findMany({ where: { userId: sharer.id, status: "active", currentPeriodEnd: { gt: now } } }),
+    db.planGrant.findMany({ where: { userId: sharer.id, source: "referral", status: "active", endsAt: { gt: now } }, select: { endsAt: true } }),
+  ]);
+  const ends = [...subs.filter(isPaidSub).map((s) => s.currentPeriodEnd), ...earned.map((g) => g.endsAt)];
+  const paidUntil = ends.reduce<Date | null>((a, d) => (!a || d > a ? d : a), null);
   const win = rewardWindow(paidUntil, now, cfg.rewardDays);
   try {
     const g = await db.$transaction(async (tx) => {
       const flip = await tx.referral.updateMany({ where: { id: r.id, status: "paid" }, data: { status: "rewarded" } });
       if (!flip.count) return null;
       return tx.planGrant.create({
-        data: { userId: r.referred!.id, email: r.referred!.email.toLowerCase(), planId: plan.id, source: "referral", status: "active", startsAt: win.startsAt, endsAt: win.endsAt, durationDays: cfg.rewardDays, note: `Refer & Earn: qualifying payment ${r.paymentId}`, grantedBy: "system", referralId: r.id },
+        data: { userId: sharer.id, email: sharer.email.toLowerCase(), planId: plan.id, source: "referral", status: "active", startsAt: win.startsAt, endsAt: win.endsAt, durationDays: cfg.rewardDays, note: `Refer & Earn: ${r.referred!.email} made qualifying payment ${r.paymentId}`, grantedBy: "system", referralId: r.id },
       });
     });
     if (!g) return null;
-    await audit({ actor: SYSTEM, action: "referral.reward", targetType: "referral", targetId: r.id, email: r.referred.email, after: { grant: g.id, plan: plan.slug, startsAt: g.startsAt, endsAt: g.endsAt } });
-    const days = cfg.rewardDays === 30 ? "1 month" : `${cfg.rewardDays} days`;
+    await audit({ actor: SYSTEM, action: "referral.reward", targetType: "referral", targetId: r.id, email: sharer.email, after: { grant: g.id, plan: plan.slug, startsAt: g.startsAt, endsAt: g.endsAt, friend: r.referred.email } });
+    const days = cfg.rewardDays % 30 === 0 ? `${cfg.rewardDays / 30} month${cfg.rewardDays === 30 ? "" : "s"}` : `${cfg.rewardDays} days`;
+    const friend = r.referred.name.split(" ")[0] || "A friend";
     await sendEmail({
-      to: r.referred.email,
+      to: sharer.email,
       kind: "referral",
-      subject: `Your free ${days} of ${plan.name} is ready`,
-      html: templates.referralFriendReward({ name: r.referred.name, plan: plan.name, length: days, starts: fmtDay(g.startsAt), until: fmtDay(g.endsAt), url: `${env.APP_URL}/settings#referral` }),
+      subject: `You earned ${days} of ${plan.name} free`,
+      html: templates.referralReward({ name: sharer.name, friend, plan: plan.name, length: days, starts: fmtDay(g.startsAt), until: fmtDay(g.endsAt), url: `${env.APP_URL}/settings#referral` }),
     }).catch((e) => console.error("[referral] email", e));
-    await adminEvent("referral", `${r.referred.name} earned ${days} of ${plan.name}`, "Refer & Earn: first qualifying payment", "/admin/referrals").catch(() => {});
+    await adminEvent("referral", `${sharer.name} earned ${days} of ${plan.name}`, `Refer & Earn: ${r.referred.name} made a first qualifying payment`, "/admin/referrals").catch(() => {});
     return g;
   } catch (e) {
     if ((e as { code?: string }).code === "P2002") return null; // already granted
@@ -171,7 +183,7 @@ async function issueReward(referralId: string, now = new Date()) {
 
 /**
  * A payment just succeeded (completePayment, any gateway). If this account came through a link and this is
- * its first qualifying payment, record it and issue the friend's month. Never throws.
+ * its first qualifying payment, record it and give the SHARER their month. Never throws.
  */
 export async function rewardReferredFriend(paymentId: string) {
   try {
@@ -217,7 +229,8 @@ async function disqualify(r: { id: string; referred?: { email: string } | null }
     db.referral.update({ where: { id: r.id }, data: { status: "disqualified", disqualifiedAt: now, disqualifiedReason: reason.slice(0, 300) } }),
     ...(before.grant && before.grant.status !== "revoked" ? [db.planGrant.update({ where: { id: before.grant.id }, data: { status: "revoked", liveKey: null, revokedAt: now, revokedBy: actor.login, revokeReason: reason.slice(0, 300) } })] : []),
   ]);
-  const email = r.referred?.email ?? before.grant?.email ?? null;
+  // The trail sits with whoever held the month: the sharer (1066), or the friend for a pre-1066 reward.
+  const email = before.grant?.email ?? r.referred?.email ?? null;
   await audit({ actor, action: "referral.revoke", targetType: "referral", targetId: r.id, email, before: { status: before.status, grant: before.grant?.id ?? null, grantStatus: before.grant?.status ?? null }, after: { status: "disqualified" }, note: reason });
   return before;
 }
@@ -247,7 +260,7 @@ export async function adminRevokeReferral(id: string, reason: string, actor: Act
 export async function referralSummary(userId: string) {
   const [code, cfg] = await Promise.all([ensureReferralCode(userId), referralConfig()]);
   const now = new Date();
-  const [rows, plan, eligible, myReward] = await Promise.all([
+  const [rows, plan, eligible, earned] = await Promise.all([
     db.referral.findMany({
       where: { referrerId: userId },
       include: { referred: { select: { name: true, email: true, emailVerifiedAt: true, emailVerifiedFor: true } }, grant: { select: { status: true, endsAt: true, startsAt: true } } },
@@ -256,7 +269,8 @@ export async function referralSummary(userId: string) {
     }),
     db.plan.findUnique({ where: { slug: cfg.rewardPlan }, select: { name: true } }),
     db.plan.findMany({ where: { slug: { in: cfg.eligiblePlans } }, select: { name: true }, orderBy: { sortOrder: "asc" } }),
-    db.referral.findUnique({ where: { referredId: userId }, include: { grant: { select: { status: true, startsAt: true, endsAt: true } } } }),
+    // Months this account earned by sharing (1066). Revoked ones (refund, chargeback, abuse) don't count.
+    db.planGrant.findMany({ where: { userId, source: "referral", status: { not: "revoked" }, referralId: { not: null } }, select: { startsAt: true, endsAt: true } }),
   ]);
   const history = rows
     .filter((r) => r.status !== "invited" || !!r.visitorKey)
@@ -286,10 +300,13 @@ export async function referralSummary(userId: string) {
       disqualified: count("Referral disqualified"),
     },
     history: history.slice(0, 50),
-    // This account's own reward, if it joined through someone's link.
-    mine: myReward
-      ? { status: referralLabel({ status: myReward.status, verified: true, grant: myReward.grant }, now), startsAt: myReward.grant?.startsAt.toISOString() ?? null, endsAt: myReward.grant?.endsAt.toISOString() ?? null }
-      : null,
+    // What sharing has earned this account: how many months, and until when the free time runs.
+    earned: (() => {
+      const live = earned.filter((g) => g.endsAt > now);
+      const until = live.reduce<Date | null>((a, g) => (!a || g.endsAt > a ? g.endsAt : a), null);
+      const from = live.reduce<Date | null>((a, g) => (!a || g.startsAt < a ? g.startsAt : a), null);
+      return { count: earned.length, startsAt: from?.toISOString() ?? null, until: until?.toISOString() ?? null };
+    })(),
   };
 }
 

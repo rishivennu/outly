@@ -14,7 +14,6 @@ import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn, compact } from "@/lib/utils";
 import type { AnalyticsSummary } from "@/lib/analytics";
 import type { Platform } from "@/lib/domain";
-import { PlatformTabs } from "./PlatformTabs";
 import { LiveStrip } from "./LiveStrip";
 import { ProfileReview } from "./ProfileReview";
 import { AccountDrill, ReportButtons } from "./AccountDrill";
@@ -43,8 +42,9 @@ function CountUp({ value, format = compact, className }: { value: number; format
   );
 }
 
-/** Page frame: one readable width, so a 1760px screen doesn't stretch every row edge to edge. */
-const FRAME = "mx-auto w-full max-w-[1320px] px-5 pb-20 pt-8 sm:px-10 lg:pt-12";
+/** Page frame: one readable width, so a 1760px screen doesn't stretch every row edge to edge. The top padding
+ * lives on the tab bar above (analytics/layout.tsx, 1065), which stays put while the views under it change. */
+const FRAME = "mx-auto w-full max-w-[1320px] px-5 pb-20 sm:px-10";
 
 function RangePicker({ value, onPick }: { value: number; onPick: (d: number) => void }) {
   return (
@@ -101,7 +101,8 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
   // shimmer at zero, so show the one thing that unlocks this page instead.
   if (!data.hasData && !anyConnected) {
     return (
-      <div className={FRAME}>
+      // No tab bar on this screen: the layout's bar hides itself when it finds data-analytics-empty (globals.css).
+      <div className={cn(FRAME, "pt-8 lg:pt-12")} data-analytics-empty="">
         <div className="flex min-h-[60dvh] flex-col items-center justify-center px-6 text-center">
           <Icon3D name="analytics" size={104} className="animate-bob mb-7" />
           <h1 className="display text-[clamp(2.2rem,5vw,3.2rem)]">Connect a place to see your numbers.</h1>
@@ -126,7 +127,6 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
   if (!data.hasData) {
     return (
       <div className={FRAME}>
-        <PlatformTabs connected={connected} />
         {/* Still the page's h1, but a slim card: the live numbers below are the real content here. */}
         <section aria-labelledby="insight" className="glass mt-8 flex flex-col gap-5 rounded-[28px] p-6 sm:flex-row sm:items-center sm:p-8">
           <Icon3D name="analytics" size={72} className="shrink-0" />
@@ -159,8 +159,6 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
 
   return (
     <div className={cn(FRAME, "transition-opacity", loading && "opacity-60")} aria-busy={loading}>
-      <PlatformTabs connected={connected} />
-
       {/* The human headline comes first and is the page's h1. The range picker sits with it because it
           changes exactly these numbers. */}
       <header className="mt-10 flex flex-wrap items-end justify-between gap-6">
@@ -186,7 +184,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
         </div>
       </header>
 
-      <dl className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <dl data-route-stagger="" className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {[
           { k: "Views", v: data.totals.views },
           { k: "Likes", v: data.totals.likes },

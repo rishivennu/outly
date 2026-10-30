@@ -3,6 +3,7 @@ import { atRisk, REASON_ACTION, REASON_LABEL } from "@/lib/admin/retention";
 import { formatMoney } from "@/lib/billing/money";
 import { SAMPLE_DOMAIN } from "@/lib/admin/sample";
 import { Card, CardTitle, Empty, PageHead, Pill, Table, ago, fmtDate, type Tone } from "@/components/admin/ui";
+import { DataSwap } from "@/components/shared/DataSwap";
 import { FilterChips } from "@/components/admin/SearchBox";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { WinbackButton } from "@/components/admin/WinbackButton";
@@ -56,6 +57,7 @@ export default async function RetentionPage({ searchParams }: { searchParams: { 
         <div className="mb-4">
           <FilterChips param="f" current={f} options={[{ value: "", label: "At risk" }, { value: "high", label: "High only" }, { value: "paid", label: "Paying" }, { value: "all", label: "Everyone" }]} />
         </div>
+        <DataSwap k={f}>
         {rows.length === 0 ? (
           <Empty title="Nobody looks at risk" body="When a creator goes quiet, starts posting less or hits a failure, they show up here with what to do next." />
         ) : (
@@ -96,6 +98,7 @@ export default async function RetentionPage({ searchParams }: { searchParams: { 
             ))}
           </Table>
         )}
+        </DataSwap>
       </Card>
     </>
   );

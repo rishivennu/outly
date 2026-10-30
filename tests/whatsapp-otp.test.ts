@@ -68,7 +68,7 @@ describe("wiring", () => {
   test("a WhatsApp first step can't also be the second", () => {
     const s = src("lib/otp/two-factor.ts");
     expect(s).toContain('ch.m === "whatsapp"');
-    expect(src("app/api/auth/code/verify/route.ts")).toContain('beginSignIn(user.id, "whatsapp")');
+    expect(src("app/api/auth/code/verify/route.ts")).toContain('beginSignIn(user.id, "whatsapp"');
   });
   test("only a proven number is saved", () => {
     const s = src("lib/otp/whatsapp.ts");

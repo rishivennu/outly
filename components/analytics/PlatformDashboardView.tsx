@@ -7,7 +7,6 @@ import { ArrowDownRight, ArrowRight, ArrowUpRight, ChevronDown, CircleAlert, Ext
 import { Button } from "@/components/ui/button";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
-import { PlatformTabs } from "./PlatformTabs";
 import { api, ApiError, cachedApi } from "@/lib/client/api";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn, compact } from "@/lib/utils";
@@ -96,8 +95,8 @@ export function PlatformDashboardView({ platform, initial, connected, renderedAt
   }, []);
 
   return (
-    <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-14" aria-busy={busy}>
-      <PlatformTabs connected={connected} />
+    // The tab bar (and the top padding) live in analytics/layout.tsx since 1065, so a tab switch only moves this.
+    <div className="px-5 pb-16 sm:px-10" aria-busy={busy}>
 
       <header className="mt-8 flex flex-wrap items-end justify-between gap-5">
         <div className="flex min-w-0 items-center gap-4">
@@ -216,7 +215,7 @@ function Live({ platform, data }: { platform: Platform; data: PlatformDashboard 
   const color = PLATFORM_HALO[platform];
   return (
     <>
-      <dl className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6" data-stagger>
+      <dl className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6" data-stagger data-route-stagger="">
         {data.headline.map((h, i) => (
           <motion.div key={h.key} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="glass flex flex-col rounded-[24px] p-5">
             <dt className="text-sm text-muted-foreground">{h.label}</dt>

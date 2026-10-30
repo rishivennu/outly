@@ -1,5 +1,5 @@
-import { FunLoader } from "@/components/shared/FunLoader";
+import { RouteSkeleton } from "@/components/shared/RouteSkeleton";
 
 export default function Loading() {
-  return <FunLoader label="Opening Outlly" />;
+  return <RouteSkeleton shape="cards" label="Opening Outlly" />;
 }

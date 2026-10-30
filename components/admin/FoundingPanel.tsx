@@ -48,7 +48,7 @@ export function FoundingPanel({ initial }: { initial: FoundingState }) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
       <Card>
-        <CardTitle hint="Signup page seat counter, the claim email, the stamp on Home and Billing." action={<Pill tone={on ? "info" : "muted"}>{on ? "Open" : "Closed"}</Pill>}>
+        <CardTitle hint="Signup page seat counter, the one-time invitation on Home, the badge for paying members." action={<Pill tone={on ? "info" : "muted"}>{on ? "Open" : "Closed"}</Pill>}>
           Founding seats
         </CardTitle>
         <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4 hairline", on ? "bg-accent/10" : "bg-secondary/40")}>
@@ -94,12 +94,12 @@ export function FoundingPanel({ initial }: { initial: FoundingState }) {
       </Card>
 
       <Card>
-        <CardTitle hint="A seat needs a confirmed inbox: Google sign-in, an emailed code, or the claim link.">Seats</CardTitle>
+        <CardTitle hint="A seat needs a successful payment for a paid plan and a confirmed inbox. Free accounts are never seated.">Seats</CardTitle>
         <dl className="grid grid-cols-3 gap-3">
           {[
             ["Taken", c.used],
             ["Left", c.left],
-            ["Not confirmed", c.waiting],
+            ["Held, unpaid", c.unpaid],
           ].map(([k, v]) => (
             <div key={k} className="rounded-2xl bg-secondary/50 p-3">
               <dt className="text-[12px] font-semibold text-muted-foreground">{k}</dt>
@@ -107,8 +107,8 @@ export function FoundingPanel({ initial }: { initial: FoundingState }) {
             </div>
           ))}
         </dl>
-        <Button type="button" variant="subtle" className="mt-4 w-full" disabled={!!busy || !on || c.left === 0} title={on ? undefined : "Open founding seats first"} onClick={() => setAsk("backfill")}>
-          <Users className="h-4 w-4" aria-hidden /> Offer seats to existing members, oldest first
+        <Button type="button" variant="subtle" className="mt-4 w-full" disabled={!!busy || !on || c.left === 0 || c.payers === 0} title={on ? (c.payers === 0 ? "Every paying customer already has a seat" : undefined) : "Open founding seats first"} onClick={() => setAsk("backfill")}>
+          <Users className="h-4 w-4" aria-hidden /> Seat paying customers without one, oldest first
         </Button>
       </Card>
 
@@ -137,14 +137,17 @@ export function FoundingPanel({ initial }: { initial: FoundingState }) {
       <Card className="lg:col-span-2">
         <CardTitle hint="In seat order. Revoking takes the discount away and retires the number.">Founding members</CardTitle>
         {st.members.length === 0 ? (
-          <Empty title="No founding members yet" body="Open the seats. People who confirm their inbox are numbered as they claim." />
+          <Empty title="No founding members yet" body="Open the seats. Customers are numbered as their first payment goes through." />
         ) : (
           <Table label="Founding members" head={["No.", "Member", "Discount", "Joined", <span key="a" className="sr-only">Action</span>]}>
             {st.members.map((m) => (
               <tr key={m.id}>
                 <td className="whitespace-nowrap font-display text-[15px] font-bold tabular">#{m.no}</td>
                 <td className="max-w-[320px] truncate">{m.name ? `${m.name} (${m.email})` : m.email}</td>
-                <td className="whitespace-nowrap text-muted-foreground">{m.pct}% for life</td>
+                <td className="whitespace-nowrap text-muted-foreground">
+                  {m.pct}% for life
+                  {!m.paid && <Pill className="ml-2" tone="muted">held, unpaid: badge hidden</Pill>}
+                </td>
                 <td className="whitespace-nowrap text-muted-foreground">{ago(m.at)}</td>
                 <td className="text-right">
                   <Button type="button" size="sm" variant="ghost" disabled={!!busy} onClick={() => setAsk({ id: m.id, label: `#${m.no} ${m.email}` })} aria-label={`Revoke founding seat #${m.no}`}>
@@ -171,7 +174,7 @@ export function FoundingPanel({ initial }: { initial: FoundingState }) {
         open={ask === "backfill"}
         onOpenChange={(o) => !o && setAsk(null)}
         title={`Offer up to ${c.left} seat${c.left === 1 ? "" : "s"} to existing members?`}
-        body="Oldest first. Members whose inbox is already confirmed get a seat and the welcome email now. Everyone else gets the claim link, and the seat goes to whoever confirms first."
+        body="Oldest first, paying customers only. Those whose inbox is already confirmed get a seat and the welcome email now. The rest get the claim link, and the seat goes to whoever confirms first."
         confirmLabel="Offer seats"
         tone="primary"
         busy={busy === "backfill"}

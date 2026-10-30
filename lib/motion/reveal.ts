@@ -41,7 +41,7 @@ const pending = new Map<HTMLElement, gsap.core.Tween>(); // section heads waitin
 const queue = new Set<HTMLElement>();
 let raf = 0;
 
-const reduced = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+export const reduced = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 // Phones: a short lift and fade only. Big slides while the finger is still scrolling cost frames on low-end devices.
 const coarse = () => typeof matchMedia !== "undefined" && matchMedia("(hover: none) and (pointer: coarse)").matches;
 let weak: boolean | null = null;
@@ -52,7 +52,7 @@ const lowPower = () => {
   weak = !!n.connection?.saveData || ((n.hardwareConcurrency ?? 8) <= 4 && (n.deviceMemory ?? 8) <= 4);
   return weak;
 };
-const simple = () => coarse() || lowPower();
+export const simple = () => coarse() || lowPower();
 const num = (el: HTMLElement, v: string, d: number) => {
   const n = parseFloat(el.style.getPropertyValue(v));
   return Number.isFinite(n) ? n : d;

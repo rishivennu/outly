@@ -78,48 +78,65 @@ describe("team seats", () => {
   });
 });
 
-describe("referral free month (1052: the friend gets it)", () => {
+describe("referral free month (1066: the sharer gets it)", () => {
   const verified = async (tag: string, extra: Record<string, unknown> = {}) => {
     const u = await mk(tag, extra);
     return db.user.update({ where: { id: u.id }, data: { emailVerifiedAt: new Date(), emailVerifiedFor: u.email } });
   };
-  test("a verified friend's first payment earns them one Creator month, stacked after it, only once", async () => {
+  test("a verified friend's first payment earns the SHARER one Creator month, only once per friend", async () => {
     const owner = await mk("ref-owner");
     const code = await ref.ensureReferralCode(owner.id);
     expect(await ref.ensureReferralCode(owner.id)).toBe(code); // stable
     const buyer = await verified("ref-buyer", { referredById: owner.id });
     await pay(buyer.id, "creator");
-    const paid = await db.subscription.findFirstOrThrow({ where: { userId: buyer.id, status: "active", provider: { not: "referral" } } });
-    const grants = await db.planGrant.findMany({ where: { userId: buyer.id, source: "referral" }, include: { plan: true } });
+    const grants = await db.planGrant.findMany({ where: { userId: owner.id, source: "referral" }, include: { plan: true } });
     expect(grants).toHaveLength(1);
-    expect(grants[0]).toMatchObject({ status: "active", grantedBy: "system" });
+    expect(grants[0]).toMatchObject({ status: "active", grantedBy: "system", email: owner.email.toLowerCase() });
     expect(grants[0].plan.slug).toBe("creator");
-    // starts when the paid month ends, so the two never overlap or cancel each other
-    expect(Math.abs(grants[0].startsAt.getTime() - paid.currentPeriodEnd.getTime())).toBeLessThan(5_000);
-    expect(await db.emailLog.count({ where: { to: buyer.email, kind: "referral" } })).toBe(1);
-    // the sharer earns nothing
-    expect(await db.planGrant.count({ where: { userId: owner.id } })).toBe(0);
-    expect(await db.subscription.count({ where: { userId: owner.id, provider: "referral" } })).toBe(0);
+    // the sharer has no paid plan, so the month starts now
+    expect(Math.abs(grants[0].startsAt.getTime() - Date.now())).toBeLessThan(60_000);
+    expect(grants[0].endsAt.getTime() - grants[0].startsAt.getTime()).toBe(30 * 86_400_000);
+    expect(await db.emailLog.count({ where: { to: owner.email, kind: "referral" } })).toBe(1);
+    // the friend earns nothing
+    expect(await db.planGrant.count({ where: { userId: buyer.id, source: "referral" } })).toBe(0);
+    expect(await db.emailLog.count({ where: { to: buyer.email, kind: "referral" } })).toBe(0);
 
     // a second payment by the same friend doesn't issue another month
     await pay(buyer.id, "studio");
-    expect(await db.planGrant.count({ where: { userId: buyer.id, source: "referral" } })).toBe(1);
+    expect(await db.planGrant.count({ where: { userId: owner.id, source: "referral" } })).toBe(1);
     const s = await ref.referralSummary(owner.id);
     expect(s.code).toBe(code);
     expect(s.stats.rewarded).toBe(1);
+    expect(s.earned.count).toBe(1);
+    expect(s.earned.until).toBe(grants[0].endsAt.toISOString());
     expect(s.url).toEndWith(`/signup?ref=${code}`);
     expect(s.history[0].friend).not.toContain(buyer.email); // masked
+    expect((await ref.referralSummary(buyer.id)).earned.count).toBe(0);
   });
-  test("an unverified friend's month waits for the address, then arrives", async () => {
+  test("a paying sharer's month waits for their paid period, and a second friend's month queues after the first", async () => {
+    const owner = await mk("ref-q-owner");
+    await pay(owner.id, "creator");
+    const paidEnd = (await db.subscription.findFirstOrThrow({ where: { userId: owner.id, status: "active", priceMinor: { gt: 0 } } })).currentPeriodEnd;
+    const a = await verified("ref-q-a", { referredById: owner.id });
+    const b = await verified("ref-q-b", { referredById: owner.id });
+    await pay(a.id, "creator");
+    await pay(b.id, "pro-manager");
+    const [g1, g2] = await db.planGrant.findMany({ where: { userId: owner.id, source: "referral" }, orderBy: { startsAt: "asc" } });
+    expect(Math.abs(g1.startsAt.getTime() - paidEnd.getTime())).toBeLessThan(5_000);
+    expect(g2.startsAt.getTime()).toBe(g1.endsAt.getTime());
+    expect((await ref.referralSummary(owner.id)).earned).toMatchObject({ count: 2, until: g2.endsAt.toISOString() });
+  });
+  test("an unverified friend's payment waits for their address, then the sharer's month arrives", async () => {
     const owner = await mk("ref-wait-owner");
     const buyer = await mk("ref-wait", { referredById: owner.id });
     await pay(buyer.id, "creator");
     expect(await db.referral.findUnique({ where: { referredId: buyer.id } })).toMatchObject({ status: "paid" });
-    expect(await db.planGrant.count({ where: { userId: buyer.id, source: "referral" } })).toBe(0);
+    expect(await db.planGrant.count({ where: { userId: owner.id, source: "referral" } })).toBe(0);
     await db.user.update({ where: { id: buyer.id }, data: { emailVerifiedAt: new Date(), emailVerifiedFor: buyer.email } });
     await ref.settleReferral(buyer.id);
     await ref.settleReferral(buyer.id); // idempotent
-    expect(await db.planGrant.count({ where: { userId: buyer.id, source: "referral" } })).toBe(1);
+    expect(await db.planGrant.count({ where: { userId: owner.id, source: "referral" } })).toBe(1);
+    expect(await db.planGrant.count({ where: { userId: buyer.id, source: "referral" } })).toBe(0);
     expect(await db.referral.findUnique({ where: { referredId: buyer.id } })).toMatchObject({ status: "rewarded" });
   });
 });

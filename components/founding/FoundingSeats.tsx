@@ -45,7 +45,7 @@ export function FoundingSeats({ initial }: { initial: FoundingPublic }) {
           )}
         </p>
         <p className="mt-0.5 text-[12.5px] leading-snug text-muted-foreground">
-          {s.left > 0 ? `${s.pct}% off every paid plan, for life. Join with ${s.gmailOnly ? "Gmail" : "your email"} and confirm the inbox to claim one.` : "Thank you to everyone who joined early."}
+          {s.left > 0 ? `${s.pct}% off every paid plan, for life. Join with ${s.gmailOnly ? "Gmail" : "your email"} and subscribe to any paid plan to claim one.` : "Thank you to everyone who joined early."}
         </p>
         <div role="progressbar" aria-label="Founding seats taken" aria-valuemin={0} aria-valuemax={s.limit} aria-valuenow={taken} className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
           <div className="h-full rounded-full bg-lime" style={{ width: `${pct}%` }} />

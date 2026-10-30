@@ -5,6 +5,7 @@ import { formatMoney } from "@/lib/billing/money";
 import { SAMPLE_DOMAIN } from "@/lib/admin/sample";
 import { PLATFORMS, PLATFORM_META } from "@/lib/domain";
 import { Card, Empty, PageHead, Pill, Table, ago, fmtDate } from "@/components/admin/ui";
+import { DataSwap } from "@/components/shared/DataSwap";
 import { FilterChips, FilterSelect, SearchBox } from "@/components/admin/SearchBox";
 import { RefreshButton } from "@/components/admin/RefreshButton";
 import { looksRelayed, placeLabel } from "@/lib/geo";
@@ -137,6 +138,7 @@ export default async function Users({ searchParams }: { searchParams: Params }) 
             </Link>
           )}
         </div>
+        <DataSwap k={[q, f, plan, joined, platform, tag, sort, page].join("|")}>
         {rows.length === 0 ? (
           <Empty title={q ? `No one matches "${q}"` : narrowing ? "No one matches these filters" : "No users yet"} body={q || narrowing ? "Loosen a filter or try part of an email or a first name." : "Sign-ups appear here as soon as someone creates an account."} />
         ) : (
@@ -175,6 +177,7 @@ export default async function Users({ searchParams }: { searchParams: Params }) 
             {page < pages ? <a className="rounded-full px-3 py-1.5 hairline hover:bg-secondary" href={link(page + 1)}>Next</a> : <span />}
           </nav>
         )}
+        </DataSwap>
       </Card>
     </>
   );

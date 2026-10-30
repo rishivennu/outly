@@ -50,7 +50,7 @@ describe("referral codes", () => {
 });
 
 describe("refund takes the referral month back", () => {
-  test("refunding the friend's first payment revokes their Refer & Earn month and disqualifies the referral", async () => {
+  test("refunding the friend's first payment revokes the sharer's Refer & Earn month and disqualifies the referral", async () => {
     const db = (await import("../lib/db")).db;
     const svc = await import("../lib/billing/service");
     await (await import("../lib/billing/plans")).ensurePlans();
@@ -61,11 +61,11 @@ describe("refund takes the referral month back", () => {
     const buyer = await db.user.update({ where: { id: b0.id }, data: { emailVerifiedAt: new Date(), emailVerifiedFor: b0.email } });
     const s = await svc.startCheckout(buyer.id, "creator");
     await svc.completePayment(s.paymentId, `mock_${s.paymentId}`);
-    expect(await db.planGrant.count({ where: { userId: buyer.id, source: "referral", status: "active" } })).toBe(1);
+    expect(await db.planGrant.count({ where: { userId: owner.id, source: "referral", status: "active" } })).toBe(1);
     await svc.refundPayment(s.paymentId, "test", "abuse check");
-    expect(await db.planGrant.count({ where: { userId: buyer.id, source: "referral", status: "active" } })).toBe(0);
+    expect(await db.planGrant.count({ where: { userId: owner.id, source: "referral", status: "active" } })).toBe(0);
     expect(await db.referral.findUnique({ where: { referredId: buyer.id } })).toMatchObject({ status: "disqualified" });
-    expect(await db.auditLog.count({ where: { action: "referral.revoke", email: buyer.email } })).toBe(1);
-    expect(await db.planGrant.count({ where: { userId: owner.id } })).toBe(0);
+    expect(await db.auditLog.count({ where: { action: "referral.revoke", email: owner.email.toLowerCase() } })).toBe(1);
+    expect(await db.planGrant.count({ where: { userId: buyer.id } })).toBe(0); // the friend never held a month
   }, 30_000);
 });

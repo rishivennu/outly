@@ -14,7 +14,7 @@ export function PlatformTabs({ connected }: { connected: Partial<Record<Platform
   const live = useLivePlatforms();
   const tabs = [{ href: "/analytics", label: "Overview", platform: null as Platform | null }, ...live.map((p) => ({ href: `/analytics/${p}`, label: PLATFORM_META[p].name, platform: p }))];
   return (
-    <nav aria-label="Analytics views" className="-mx-1 overflow-x-auto px-1 pb-1">
+    <nav aria-label="Analytics views" data-route-tabs="" className="-mx-1 overflow-x-auto px-1 pb-1">
       <ul className="flex w-max gap-1 rounded-full bg-secondary/60 p-1 hairline">
         {tabs.map((t) => {
           const active = path === t.href;
@@ -35,5 +35,19 @@ export function PlatformTabs({ connected }: { connected: Partial<Record<Platform
         })}
       </ul>
     </nav>
+  );
+}
+
+/**
+ * The tab bar as the analytics layout renders it (1065): it stays mounted while Overview and each platform
+ * swap underneath, so its pill glides and the bar itself never reloads. Overview is a centred column and a
+ * platform dashboard runs full width, so the bar lines up with whichever is showing.
+ */
+export function AnalyticsTabsBar({ connected }: { connected: Partial<Record<Platform, boolean>> }) {
+  const path = usePathname();
+  return (
+    <div data-route-static="" className={cn("an-tabs px-5 pt-8 sm:px-10 lg:pt-12", path === "/analytics" && "mx-auto w-full max-w-[1320px]")}>
+      <PlatformTabs connected={connected} />
+    </div>
   );
 }

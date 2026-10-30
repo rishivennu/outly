@@ -94,6 +94,24 @@ export function restack(g: { startsAt: Date; endsAt: Date }, paidUntil: Date, no
   return { startsAt: paidUntil, endsAt: new Date(paidUntil.getTime() + len) };
 }
 
+/**
+ * 1066: a sharer can hold several earned months that haven't started. A renewal pushes them as a queue: each
+ * starts where the one before ends, never on top of it. Returns only the ones that move, with their new dates.
+ */
+export function restackQueue<G extends { id: string; startsAt: Date; endsAt: Date }>(grants: G[], paidUntil: Date, now: Date) {
+  let cursor = paidUntil;
+  const moved: { id: string; startsAt: Date; endsAt: Date }[] = [];
+  for (const g of [...grants].filter((x) => x.startsAt > now).sort((x, y) => x.startsAt.getTime() - y.startsAt.getTime())) {
+    const len = g.endsAt.getTime() - g.startsAt.getTime();
+    if (g.startsAt < cursor) {
+      const next = { id: g.id, startsAt: cursor, endsAt: new Date(cursor.getTime() + len) };
+      moved.push(next);
+      cursor = next.endsAt;
+    } else if (g.endsAt > cursor) cursor = g.endsAt;
+  }
+  return moved;
+}
+
 // ---- storage (1052): one total allowance per plan, enforced on the server ----
 export const MB = 1024 * 1024;
 

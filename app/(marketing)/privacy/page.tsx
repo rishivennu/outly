@@ -176,7 +176,7 @@ export default function PrivacyPage() {
             <li><strong>Workspace</strong> (<code>ol_ws</code>): remembers which studio you are working in if you belong to a team.</li>
             <li><strong>Connecting a platform:</strong> a short-lived, encrypted cookie that protects the sign-in round trip. It expires after 10 minutes.</li>
             <li><strong>Preferences:</strong> practice mode (<code>studio_sim</code>), theme, language and your cookie choice (<code>outly-consent</code>).</li>
-            <li><strong>Referrals</strong> (<code>ol_ref</code>): if a friend invited you, so both of you get the free month.</li>
+            <li><strong>Referrals</strong> (<code>ol_ref</code>): if a friend invited you, so they can get their free month when you join a paid plan.</li>
             <li><strong>Pip chat:</strong> your current conversation is kept in this browser tab only, and cleared when the tab closes.</li>
           </ul>
           <p>

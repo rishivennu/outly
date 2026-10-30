@@ -3,7 +3,7 @@ import { db } from "../db";
 import { HttpError } from "../http";
 import { isProven } from "../founding";
 import { ensurePlans } from "./plans";
-import { DAY_MS, cleanEmail, grantEnd, grantState, isPaidSub, pickAccess, restack, type AccessCandidate, type AccessSource } from "./access-core";
+import { DAY_MS, cleanEmail, grantEnd, grantState, isPaidSub, pickAccess, restackQueue, type AccessCandidate, type AccessSource } from "./access-core";
 
 /**
  * Centralised access (1052). Every place that asks "what may this account do" goes through bestAccess():
@@ -225,10 +225,8 @@ export async function activatePendingGrants(userId: string, now = new Date()) {
  */
 export async function restackReferralGrants(userId: string, paidUntil: Date, now = new Date()) {
   const later = await db.planGrant.findMany({ where: { userId, source: "referral", status: "active", startsAt: { gt: now } } });
-  for (const g of later) {
-    const moved = restack(g, paidUntil, now);
-    if (moved) await db.planGrant.update({ where: { id: g.id }, data: moved });
-  }
+  // Several earned months queue up one after another (1066), so none of them is lost under another.
+  for (const m of restackQueue(later, paidUntil, now)) await db.planGrant.update({ where: { id: m.id }, data: { startsAt: m.startsAt, endsAt: m.endsAt } });
 }
 
 /** One account's plan picture for the admin: who they are, what wins now, every source and the trail. */

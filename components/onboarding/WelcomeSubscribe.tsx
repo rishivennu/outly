@@ -27,7 +27,7 @@ export const welcomeKey = (id: string) => `outly:welcome-subscribe:${id}`;
  * First-time greeting that invites a free user to subscribe. Shown once per account per device.
  * It never stacks on the guided tour: if the tour hasn't been done yet it waits for it to close.
  */
-export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "month" }: { firstName: string; offer: WelcomeOffer | null; freeLimit: number; freePeriod?: "week" | "month" }) {
+export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "month", foundingFull = null }: { firstName: string; offer: WelcomeOffer | null; freeLimit: number; freePeriod?: "week" | "month"; foundingFull?: number | null }) {
   const user = useUser();
   const [open, setOpen] = useState(false);
   const [card, setCard] = useState<HTMLDivElement | null>(null);
@@ -115,6 +115,9 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
                   <p id="welcome-sub-body" data-w="line" className="mt-2.5 text-[14.5px] leading-relaxed text-foreground/80">
                     {welcomePitch(freeLimit, offer, freePeriod)}
                   </p>
+                  {foundingFull ? (
+                    <p data-w="line" className="mt-3 text-[13px] leading-relaxed text-foreground/70">All {foundingFull} founding member spots have been filled. Every paid plan is still open whenever you want more.</p>
+                  ) : null}
                   {offer && (
                     <div data-w="offer" className="mt-5 rounded-2xl bg-lime/[0.08] p-4 hairline">
                       <div className="flex items-baseline justify-between gap-3">

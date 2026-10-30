@@ -4,7 +4,7 @@
  */
 export default function AdminLoading() {
   return (
-    <div role="status" aria-live="polite" className="admin-skel">
+    <div role="status" data-route-skeleton="" className="admin-skel">
       <span className="sr-only">Loading</span>
       <div className="mb-7 space-y-3" aria-hidden>
         <div className="skeleton h-8 w-64 max-w-[70%] rounded-xl" />

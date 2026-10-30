@@ -1,7 +1,11 @@
 "use client";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { ChevronDown, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { tabIn } from "@/lib/motion/route";
+
+const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export type SettingsCategory = { id: string; label: string; blurb: string; icon: LucideIcon; content: React.ReactNode };
 
@@ -38,6 +42,17 @@ export function SettingsShell({ title, intro, categories, initialTab }: { title:
   const [menuOpen, setMenuOpen] = useState(false);
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
   const headRefs = useRef<Record<string, HTMLHeadingElement | null>>({});
+
+  // 1065: a category switch slides the new panel in from the side of the one picked (down the list = from
+  // the right), instead of the panel popping in. Not on first paint, and nothing else on the page moves.
+  const shownTab = useRef(active);
+  useIso(() => {
+    const was = shownTab.current;
+    shownTab.current = active;
+    if (was === active) return undefined;
+    const dir = ids.indexOf(active) < ids.indexOf(was) ? -1 : 1;
+    return tabIn(document.getElementById(`panel-${active}`), dir);
+  }, [active]);
 
   // The URL decides after mount (the server can't know the hash), then stays in step with it.
   useEffect(() => {
@@ -96,14 +111,16 @@ export function SettingsShell({ title, intro, categories, initialTab }: { title:
           onClick={() => go(c.id, mobile && !window.matchMedia("(min-width: 1024px)").matches)}
           aria-current={on ? "page" : undefined}
           className={cn(
-            "group flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
-            on ? "bg-lime/15 text-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground",
+            "group relative flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[14px] font-medium transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+            on ? "text-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground",
           )}
         >
-          <Ico className={cn("h-[18px] w-[18px] shrink-0", on ? "text-lime-ink" : "opacity-80 group-hover:opacity-100")} aria-hidden="true" />
-          <span className="min-w-0 flex-1 truncate">{c.label}</span>
+          {/* The selection glides between categories (1065), like the sidebar's pill. */}
+          {on && <motion.span layoutId="settings-pill" className="absolute inset-0 rounded-xl bg-lime/15" transition={{ type: "spring", stiffness: 520, damping: 42 }} aria-hidden="true" />}
+          <Ico className={cn("relative h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110", on ? "text-lime-ink" : "opacity-80 group-hover:opacity-100")} aria-hidden="true" />
+          <span className="relative min-w-0 flex-1 truncate">{c.label}</span>
           {dirty[c.id] && (
-            <span className="h-2 w-2 shrink-0 rounded-full bg-warning" title="Unsaved changes">
+            <span className="relative h-2 w-2 shrink-0 rounded-full bg-warning" title="Unsaved changes">
               <span className="sr-only">(unsaved changes)</span>
             </span>
           )}

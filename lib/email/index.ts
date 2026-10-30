@@ -415,29 +415,21 @@ export const templates = {
   foundingVerify: (o: { name: string; url: string; left: number; pct: number; stamp: string }) =>
     wrap(
       "Claim your founding seat",
-      `<img src="${esc(o.stamp)}" width="96" height="95" alt="" style="display:block;width:96px;height:auto;margin:0 auto 14px;border:0">${p(`Hi ${esc(o.name)}, a founding seat is waiting for you: ${o.pct}% off every paid plan, for life. We give seats only to confirmed Gmail inboxes, so one person gets one seat. Tap below to confirm this address is yours:`)}${btn(o.url, "Confirm and claim my seat")}${small(`The link works for 7 days. Seats go in the order they're claimed, and ${o.left} ${o.left === 1 ? "is" : "are"} left right now. Didn't sign up for Outlly? Ignore this and nothing happens.`)}`,
+      `<img src="${esc(o.stamp)}" width="96" height="95" alt="" style="display:block;width:96px;height:auto;margin:0 auto 14px;border:0">${p(`Hi ${esc(o.name)}, thanks for subscribing. A founding seat is waiting for you: ${o.pct}% off every paid plan, for life. We give seats only to confirmed Gmail inboxes, so one person gets one seat. Tap below to confirm this address is yours:`)}${btn(o.url, "Confirm and claim my seat")}${small(`The link works for 7 days. Seats go in the order they're claimed, and ${o.left} ${o.left === 1 ? "is" : "are"} left right now. Didn't sign up for Outlly? Ignore this and nothing happens.`)}`,
       {
         kicker: "Founding member",
         preheader: `Confirm your Gmail to lock in ${o.pct}% off for life`,
         tiles: pair({ tone: "ink", html: stat(`${o.left}`, `founding seat${o.left === 1 ? "" : "s"} left`, "ink", 44) }, { tone: "forest", html: stat(`${o.pct}% off`, "for life", "forest", 34) }),
       },
     ),
-  referralReward: (o: { name: string; friend: string; plan: string; until: string; url: string }) =>
+  /** Refer & Earn (1066): the sharer earned a free month because a friend they invited made a first payment. */
+  referralReward: (o: { name: string; friend: string; plan: string; length: string; starts: string; until: string; url: string }) =>
     wrap(
-      "You earned a free month",
-      `${p(`Hi ${esc(o.name)}, ${esc(o.friend)} just upgraded after joining with your link. Thank you!`)}${btn(o.url, "Share your link again")}`,
-      {
-        kicker: "Referral",
-        tiles: pair({ tone: "ink", html: stat("1 month", `of ${esc(o.plan)}, free`, "ink", 38) }, { tone: "forest", html: stat(esc(o.until), "free until", "forest", 28) }),
-      },
-    ),
-  /** Refer & Earn (1052): the friend who joined through a link gets their free month after the first payment. */
-  referralFriendReward: (o: { name: string; plan: string; length: string; starts: string; until: string; url: string }) =>
-    wrap(
-      `Your free ${esc(o.length)} of ${esc(o.plan)}`,
-      `${p(`Hi ${esc(o.name)}, thanks for joining Outlly through a friend's link. Your first payment is in, so ${esc(o.length)} of ${esc(o.plan)} is yours, free. It starts when the period you paid for ends, so you never lose a day.`)}${btn(o.url, "See your reward")}`,
+      `You earned ${esc(o.length)} of ${esc(o.plan)} free`,
+      `${p(`Hi ${esc(o.name)}, ${esc(o.friend)} joined Outlly with your invite link and just made their first payment. Thank you for sharing! Your free ${esc(o.length)} of ${esc(o.plan)} is confirmed.`)}${p("If you are on a paid plan, it starts when your current paid period ends, so you never lose a day.")}${btn(o.url, "Invite another friend")}`,
       {
         kicker: "Refer & Earn",
+        preheader: `${esc(o.friend)} became a paying customer, so ${esc(o.length)} of ${esc(o.plan)} is yours`,
         tiles: pair({ tone: "ink", html: stat(esc(o.starts), "starts", "ink", 28) }, { tone: "forest", html: stat(esc(o.until), "free until", "forest", 28) }),
       },
     ),

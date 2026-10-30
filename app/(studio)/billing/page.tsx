@@ -67,7 +67,7 @@ async function handleYoupiReturn(userId: string, paymentId: string): Promise<Ret
   }
 }
 
-type Sp = { checkout?: string; session_id?: string; token?: string; p?: string; plan?: string; paid?: string; cycle?: string };
+type Sp = { checkout?: string; session_id?: string; token?: string; p?: string; plan?: string; paid?: string; cycle?: string; founding?: string };
 
 /** The receipt slip for whatever checkout just came back (1053), read from our own payment row. */
 async function receiptFor(userId: string, sp: Sp, cancelledId: string | null): Promise<Receipt | null> {
@@ -130,7 +130,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Sp }
     ? { planName: best.plan.name, source: best.source, endsAt: best.endsAt.toISOString() }
     : null;
   // Founding members see the price checkout will really charge, with the list price struck through.
-  const fpct = founding?.kind === "member" ? founding.pct : null;
+  // 1067: so does anyone a payment would seat (a spot is open for them), because checkout charges them that too.
+  const fpct = founding && founding.kind !== "full" ? founding.pct : null;
   const off = (minor: number) => foundingPrice(minor, fpct);
   // The redeem box shows to members holding a code, and to everyone while the beta is on (codes made by hand).
   const betaPlanName = (slug: string) => plans.find((p) => p.slug === slug)?.name ?? "Creator";
@@ -173,6 +174,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Sp }
       current={sub ? { planSlug: sub.plan.slug, planName: sub.plan.name, priceMinor: sub.priceMinor, currency: sub.currency, interval: sub.interval, periodEnd: sub.currentPeriodEnd.toISOString(), cancelAtPeriodEnd: sub.cancelAtPeriodEnd, pausedUntil: sub.pausedUntil && sub.pausedUntil > new Date() ? sub.pausedUntil.toISOString() : null, provider: sub.provider } : null}
       beta={betaOffer}
       founding={founding}
+      foundingStatus={searchParams.founding?.slice(0, 20) ?? null}
       badges={badges}
       access={extra}
       usage={{

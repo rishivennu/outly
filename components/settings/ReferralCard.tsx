@@ -21,7 +21,7 @@ type Summary = {
   terms: { plan: string; days: number; eligible: string[] };
   stats: { invited: number; registered: number; awaiting: number; verified: number; rewarded: number; disqualified: number };
   history: { id: string; friend: string; status: Status; at: string; rewardStarts: string | null; rewardEnds: string | null }[];
-  mine: { status: Status; startsAt: string | null; endsAt: string | null } | null;
+  earned: { count: number; startsAt: string | null; until: string | null };
 };
 
 // Soft tones only: each status reads by its words first, colour is a hint.
@@ -36,9 +36,9 @@ const TONE: Record<Status, string> = {
 };
 
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "");
-const list = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} or ${xs[xs.length - 1]}`);
+const list = (xs: string[]) => (xs.length <= 1 ? xs.join("") : xs.length === 2 ? `${xs[0]} or ${xs[1]}` : `${xs.slice(0, -1).join(", ")}, or ${xs[xs.length - 1]}`);
 
-/** Refer & Earn: the friend who joins with this link gets a free month after their first payment. */
+/** Refer & Earn (1066): when a friend who joined with this link makes a first payment, the SHARER gets a free month. */
 export function ReferralCard() {
   const toast = useToast();
   const [s, setS] = useState<Summary | null>(null);
@@ -51,26 +51,37 @@ export function ReferralCard() {
   }, []);
 
   const copy = async () => {
-    if (!s) return;
+    if (!s) return false;
     try {
       await navigator.clipboard.writeText(s.url);
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
+      return true;
     } catch {
       toast("Couldn't copy. Select the link and copy it yourself.", "error");
+      return false;
     }
   };
-  const share = async () => {
+  // The main button: the phone's share sheet where there is one, otherwise the link goes on the clipboard.
+  const invite = async () => {
     if (!s) return;
-    try {
-      await navigator.share({ title: "Join me on Outlly", text: `Plan and publish your content with Outlly. Sign up with my link and get a free month of ${s.terms.plan} after your first payment.`, url: s.url });
-    } catch {
-      /* closed the share sheet */
+    if (canShare) {
+      try {
+        await navigator.share({ title: "Join me on Outlly", text: "I plan and publish my content with Outlly. Join me with my link:", url: s.url });
+        return;
+      } catch (e) {
+        if ((e as { name?: string }).name === "AbortError") return; // closed the share sheet
+      }
     }
+    if (await copy()) toast("Link copied. Send it to a friend.", "ok");
   };
 
   const days = s?.terms.days ?? 30;
-  const length = days % 30 === 0 ? `${days / 30} month${days === 30 ? "" : "s"}` : `${days} days`;
+  const length = days === 30 ? "one month" : days % 30 === 0 ? `${days / 30} months` : `${days} days`;
+  const cta = days % 30 === 0 ? `${days / 30} Month${days === 30 ? "" : "s"}` : `${days} Days`;
+  const unit = days === 30 ? "month" : "reward";
+  const earned = s?.earned;
+  const freeNow = earned?.until && new Date(earned.until) > new Date() ? earned.until : null;
   const tiles: [string, number][] = s
     ? [
         ["Invited", s.stats.invited],
@@ -88,11 +99,11 @@ export function ReferralCard() {
           <Gift className="h-5 w-5" />
         </span>
         <div>
-          <h2 id="ref-h" className="text-2xl font-semibold tracking-tight">Refer a friend, they get a free month</h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            {s
-              ? `A friend who signs up with your link gets ${length} of ${s.terms.plan} free after their first payment on ${list(s.terms.eligible) || "a paid plan"}. It starts when their paid period ends, so nothing is lost.`
-              : "A friend who signs up with your link gets a free month after their first payment."}
+          <h2 id="ref-h" className="text-2xl font-semibold tracking-tight">Refer a friend, get a free month</h2>
+          <p className="mt-1 text-[15px] font-medium">Love Outlly? Share it with a friend and get rewarded!</p>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            When your friend signs up using your referral link and makes their first payment for {s ? list(s.terms.eligible) || "a paid plan" : "a paid plan"},{" "}
+            <strong className="font-semibold text-foreground">you&rsquo;ll get {length} of {s?.terms.plan ?? "Creator"} free.</strong> Your reward starts after their qualifying payment is confirmed.
           </p>
         </div>
       </div>
@@ -103,24 +114,19 @@ export function ReferralCard() {
         <p className="mt-5 rounded-2xl bg-secondary/60 p-4 text-sm text-muted-foreground">Refer &amp; Earn is paused right now. Friends you already invited keep any reward they earned.</p>
       ) : (
         <>
-          {s?.mine && (
+          {earned && earned.count > 0 && (
             <p className="mt-5 flex items-start gap-2 rounded-2xl bg-secondary/60 p-4 text-sm" role="status">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-lime-ink" aria-hidden="true" />
               <span>
-                You joined with a friend's link.{" "}
-                {s.mine.status === "Reward granted" && s.mine.endsAt
-                  ? `Your free ${s.terms.plan} time runs ${day(s.mine.startsAt)} to ${day(s.mine.endsAt)}.`
-                  : s.mine.status === "Reward expired"
-                    ? "Your free month has been used."
-                    : s.mine.status === "Referral disqualified"
-                      ? "This invite did not qualify for a reward."
-                      : `Make your first payment on ${list(s.terms.eligible)} and your free month is added after it.`}
+                You&rsquo;ve earned {earned.count} free {unit}
+                {earned.count === 1 ? "" : "s"} so far. Thank you for sharing!{" "}
+                {freeNow ? `Your free ${s!.terms.plan} time runs ${earned.startsAt ? `${day(earned.startsAt)} to ` : "until "}${day(freeNow)}.` : ""}
               </span>
             </p>
           )}
 
-          <div className="mt-5 flex flex-wrap items-center gap-2">
-            <label htmlFor="ref-url" className="sr-only">Your invite link</label>
+          <label htmlFor="ref-url" className="mt-5 block text-sm font-medium">Your invite link</label>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <input
               id="ref-url"
               readOnly
@@ -128,15 +134,14 @@ export function ReferralCard() {
               onFocus={(e) => e.currentTarget.select()}
               className="h-12 min-w-0 flex-1 basis-64 rounded-2xl bg-secondary/60 px-4 text-sm text-foreground hairline focus-visible:outline-2"
             />
-            <Button variant="lime" onClick={copy} disabled={!s} aria-live="polite" className="h-12">
+            <Button variant="outline" onClick={copy} disabled={!s} aria-live="polite" className="h-12">
               {copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />} {copied ? "Copied" : "Copy link"}
             </Button>
-            {canShare && (
-              <Button variant="outline" onClick={share} disabled={!s} className="h-12">
-                <Share2 className="h-4 w-4" aria-hidden="true" /> Share
-              </Button>
-            )}
           </div>
+          <Button variant="lime" onClick={invite} disabled={!s} className="mt-3 h-12 w-full sm:w-auto">
+            <Share2 className="h-4 w-4" aria-hidden="true" /> Invite a Friend &amp; Earn {cta} Free
+          </Button>
+          <p className="mt-2 text-sm italic text-muted-foreground">Share your link, invite a friend, and unlock your free {unit} when they become a paying customer.</p>
 
           {s && (
             <dl className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -174,9 +179,10 @@ export function ReferralCard() {
           )}
 
           <ul className="mt-5 space-y-1 text-xs text-muted-foreground">
-            <li>One reward per person and per inbox. Referring yourself does not count.</li>
-            <li>The reward is added only after a verified payment, never for a sign up alone.</li>
-            <li>If that payment is refunded or charged back, the free month is removed.</li>
+            <li>One reward per friend and per inbox. Referring yourself does not count.</li>
+            <li>The reward is added only after your friend&rsquo;s payment is verified, never for a sign up alone.</li>
+            <li>Each friend who pays earns you another {unit}. On a paid plan, your free time starts when your current paid period ends, so you never lose a day.</li>
+            <li>If your friend&rsquo;s payment is refunded or charged back, that free {unit} is removed.</li>
           </ul>
         </>
       )}

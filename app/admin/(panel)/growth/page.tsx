@@ -4,6 +4,7 @@ import { channelStats, growthFunnel, leads, rangeStart, referralBoard, type Rang
 import { LISTS, channelLabel, worstStep, type LeadKind } from "@/lib/growth/core";
 import { SAMPLE_DOMAIN } from "@/lib/admin/sample";
 import { Card, CardTitle, Empty, PageHead, Pill, Table } from "@/components/admin/ui";
+import { DataSwap } from "@/components/shared/DataSwap";
 import { FilterChips } from "@/components/admin/SearchBox";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { LeadLists, type LeadView } from "@/components/admin/growth/LeadLists";
@@ -37,6 +38,7 @@ export default async function GrowthPage({ searchParams }: { searchParams: { r?:
 
       <Card className="mb-5">
         <CardTitle hint={`People who arrived in the ${RANGE_LABEL[r]}. Each bar shows how many of the step before made it.`}>Signup funnel</CardTitle>
+        <DataSwap k={r}>
         <ol className="grid gap-3">
           {steps.map((s, i) => (
             <li key={s.key} className="grid items-center gap-x-4 gap-y-1 sm:grid-cols-[180px_1fr_120px]">
@@ -56,6 +58,7 @@ export default async function GrowthPage({ searchParams }: { searchParams: { r?:
             Biggest drop: <b>{worst.label.toLowerCase()}</b>, only {pct(worst.rate)} make it. Start with that lead list below.
           </p>
         )}
+        </DataSwap>
         <p className="mt-3 text-[12px] text-muted-foreground">Waitlist and signups are counted separately: when the waitlist is off, people sign up without joining it, so step 2 can be bigger than step 1.</p>
       </Card>
 
@@ -69,6 +72,7 @@ export default async function GrowthPage({ searchParams }: { searchParams: { r?:
           <CardTitle hint="Tag every link you post. Signups are credited to the first tagged link they clicked.">Campaign links</CardTitle>
           <CampaignLinks base={env.APP_URL} />
           <h3 className="mb-3 mt-7 text-[13.5px] font-semibold">Which channels bring real users ({RANGE_LABEL[r]})</h3>
+          <DataSwap k={r}>
           {channels.length === 0 ? (
             <Empty title="No signups in this range" body="Share a campaign link and the first signups from it show up here." />
           ) : (
@@ -88,10 +92,11 @@ export default async function GrowthPage({ searchParams }: { searchParams: { r?:
               ))}
             </Table>
           )}
+          </DataSwap>
         </Card>
 
         <Card>
-          <CardTitle hint={`${refs.total} signup${refs.total === 1 ? "" : "s"} from friends' links, ${refs.paid} of them paid. Each friend who pays gets a free Creator month. Details in Refer & Earn.`}>Referral leaderboard</CardTitle>
+          <CardTitle hint={`${refs.total} signup${refs.total === 1 ? "" : "s"} from friends' links, ${refs.paid} of them paid. Each friend who pays earns the sharer a free Creator month. Details in Refer & Earn.`}>Referral leaderboard</CardTitle>
           {refs.rows.length === 0 ? (
             <Empty title="No referrals yet" body="When a creator's share link brings someone in, they show up here." />
           ) : (

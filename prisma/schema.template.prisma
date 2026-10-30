@@ -48,6 +48,7 @@ model User {
   foundingPct     Int? // lifetime discount locked in when the seat was claimed
   foundingKey     String?   @unique // one seat per real inbox (Gmail dots and +tags folded away)
   foundingRetiredNo Int? // a revoked member's number, kept so it is never handed out again
+  foundingPromoAt DateTime? // 1067: the one-time founding invitation on Home was closed (kept on every device)
   // Where they last used Outlly from (1053). Approximate: read from the network (Cloudflare/Vercel IP
   // headers), never an address, and a VPN can place them anywhere. Written only when it changes.
   locCountry      String? // ISO 3166-1 alpha-2

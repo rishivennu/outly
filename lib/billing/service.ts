@@ -9,7 +9,8 @@ import { adminEvent } from "../admin/route";
 import { formatMoney, type Currency } from "./money";
 import { chargeCurrency, isCurrency, parsePrices } from "./currency";
 import { hasYearly, priceFor, type Cycle } from "./cycle";
-import { FOUNDING_DEFAULT, foundingPrice } from "../founding-config";
+import { foundingPrice } from "../founding-config";
+import { foundingPctFor, onPaidFounding, releaseUnpaidFounding } from "../founding";
 import { normalizeDisplay } from "./display";
 import { issueInvoice } from "./invoice";
 import { sendEmail, templates } from "../email";
@@ -74,7 +75,9 @@ export async function startCheckout(userId: string, planSlug: string, wanted?: C
   if (provider === "mock" && !mockAllowed()) throw new HttpError(503, "Payments are being set up. Paid plans open shortly.", "GATEWAY");
   const listed = priceFor({ ...plan, prices: parsePrices(plan.prices) }, chargeCurrency(provider, wanted ?? (isCurrency(plan.currency) ? plan.currency : "INR"), plan.currency), want, display.freeMonths);
   // Founding members (1036): the discount they claimed with, on every paid plan and cycle, for life.
-  const charge = user.foundingNo ? { ...listed, priceMinor: foundingPrice(listed.priceMinor, user.foundingPct ?? FOUNDING_DEFAULT.discountPct) } : listed;
+  // 1067: someone this payment would seat (a founding spot is open for them) pays the founding price too.
+  const fpct = await foundingPctFor(user.id);
+  const charge = fpct ? { ...listed, priceMinor: foundingPrice(listed.priceMinor, fpct) } : listed;
   // Reuse a recent pending attempt for the same plan, so double-clicks don't create duplicate payments.
   const recent = await db.payment.findFirst({
     where: { userId, planId: plan.id, status: "pending", provider, interval: charge.interval, createdAt: { gt: new Date(Date.now() - 20 * 60_000) } },
@@ -175,7 +178,8 @@ export async function completePayment(paymentId: string, providerRef?: string) {
   if (!p.sample) {
     const u = await db.user.findUnique({ where: { id: p.userId }, select: { name: true } });
     await adminEvent("subscription_new", `${u?.name ?? "A user"} subscribed to ${plan.name}`, formatMoney(p.amountMinor, p.currency), "/admin/payments");
-    await rewardReferredFriend(p.id); // the friend's Refer & Earn month, when this is their first qualifying payment
+    await rewardReferredFriend(p.id); // Refer & Earn: the sharer's month, when this is the friend's first qualifying payment
+    await onPaidFounding(p.userId); // 1067: a paid plan is what earns a founding seat (never throws)
   }
   return { payment: fresh, invoice };
 }
@@ -302,6 +306,8 @@ export async function refundPayment(paymentId: string, by: string, reason: strin
   ]);
   // 1052: a refunded qualifying payment ends the friend's Refer & Earn month and disqualifies the referral.
   if (!p.sample && !(await revokeReferralForPayment(p.id, by))) await revokeReferralReward(p.userId, p.createdAt).catch((e) => console.error("[refund] referral revoke", e));
+  // 1067: refunding the last real payment gives the founding seat back (never throws).
+  if (!p.sample) await releaseUnpaidFounding(p.userId);
   // 1049: the refunded invoice gets its credit note straight away (the daily cron catches any that fail here).
   const credit = p.invoice ? await issueCreditNote(p.invoice.id, reason || null).catch((e) => (console.error("[refund] credit note", e), null)) : null;
   if (!p.sample) {
@@ -335,6 +341,7 @@ export async function markExternalRefund(paymentId: string, kind: "refund" | "ch
   }
   const revoked = await revokeReferralForPayment(p.id, "system", kind);
   if (refunded && !revoked) await revokeReferralReward(p.userId, p.createdAt).catch((e) => console.error("[refund] referral revoke", e));
+  if (refunded) await releaseUnpaidFounding(p.userId);
   if (refunded || kind === "chargeback") {
     const amount = formatMoney(p.amountMinor, p.currency);
     await adminEvent("refund", kind === "chargeback" ? `Chargeback opened: ${p.user.name}` : `Refunded at ${p.provider}: ${p.user.name}`, `${amount}${revoked ? ", Refer & Earn month ended" : ""}`, "/admin/payments?status=refunded").catch(() => {});

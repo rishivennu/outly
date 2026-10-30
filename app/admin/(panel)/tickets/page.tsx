@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin/guard";
 import { Card, Empty, PageHead, Pill, STATUS_TONE, ago } from "@/components/admin/ui";
+import { DataSwap } from "@/components/shared/DataSwap";
 import { FilterChips, SearchBox } from "@/components/admin/SearchBox";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +32,7 @@ export default async function Tickets({ searchParams }: { searchParams: { s?: st
           <FilterChips param="s" current={s} options={[{ value: "active", label: "Needs action" }, { value: "open", label: "Open" }, { value: "pending", label: "Waiting on customer" }, { value: "resolved", label: "Resolved" }, { value: "", label: "All" }]} />
           <SearchBox placeholder="Ref, email or subject" />
         </div>
+        <DataSwap k={`${s}|${q ?? ""}`}>
         {rows.length === 0 ? (
           <Empty title={s === "active" ? "Inbox zero" : "No tickets here"} body={s === "active" ? "Every ticket is answered. Pip is handling the rest." : "Nothing matches these filters."} />
         ) : (
@@ -55,6 +57,7 @@ export default async function Tickets({ searchParams }: { searchParams: { s?: st
             ))}
           </ul>
         )}
+        </DataSwap>
       </Card>
     </>
   );

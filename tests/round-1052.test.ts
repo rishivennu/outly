@@ -1,6 +1,6 @@
-/** 1052: plan grants, Refer & Earn (the friend gets the month), total storage, and the inbox reel preview. */
+/** 1052: plan grants, Refer & Earn (1066: the sharer gets the month), total storage, and the inbox reel preview. */
 import { beforeAll, describe, expect, test } from "bun:test";
-import { DAY_MS, MB, cleanEmail, fitsStorage, grantEnd, grantState, isPaidSub, pickAccess, restack, rewardWindow, storageFigures } from "../lib/billing/access-core";
+import { DAY_MS, MB, cleanEmail, fitsStorage, grantEnd, grantState, isPaidSub, pickAccess, restack, restackQueue, rewardWindow, storageFigures } from "../lib/billing/access-core";
 import { maskEmail, normalizeReferral, referralLabel, shareUrl } from "../lib/referral-core";
 import { aspectOf, instagramMedia, relatedComments, youtubeEmbed, youtubeThumb } from "../lib/inbox-media";
 import { can } from "../lib/admin/perms";
@@ -60,6 +60,12 @@ describe("referral month is stacked after the paid period", () => {
     expect(restack({ startsAt: day(30), endsAt: day(60) }, day(60), now)).toEqual({ startsAt: day(60), endsAt: day(90) });
     expect(restack({ startsAt: day(-1), endsAt: day(29) }, day(60), now)).toBeNull(); // already running
     expect(restack({ startsAt: day(70), endsAt: day(100) }, day(60), now)).toBeNull(); // already after
+  });
+  test("1066: several earned months queue after a renewal instead of piling up", () => {
+    const q = restackQueue([{ id: "b", startsAt: day(60), endsAt: day(90) }, { id: "a", startsAt: day(30), endsAt: day(60) }], day(45), now);
+    expect(q).toEqual([{ id: "a", startsAt: day(45), endsAt: day(75) }, { id: "b", startsAt: day(75), endsAt: day(105) }]);
+    expect(restackQueue([{ id: "a", startsAt: day(70), endsAt: day(100) }], day(60), now)).toEqual([]); // already after
+    expect(restackQueue([{ id: "a", startsAt: day(-1), endsAt: day(29) }], day(60), now)).toEqual([]); // already running
   });
   test("labels, masking, links and config", () => {
     expect(referralLabel({ status: "registered", verified: false })).toBe("Registered");
@@ -238,7 +244,7 @@ describe("database: review fixes", () => {
     await db.user.update({ where: { id: u.id }, data: { referredById: owner.id } });
     const s = await svc.startCheckout(u.id, "creator");
     await svc.completePayment(s.paymentId, `mock_${s.paymentId}`);
-    const g = await db.planGrant.findFirstOrThrow({ where: { userId: u.id, source: "referral" } });
+    const g = await db.planGrant.findFirstOrThrow({ where: { userId: owner.id, source: "referral" } });
     return { svc, u, owner, paymentId: s.paymentId, g };
   };
 
@@ -250,22 +256,22 @@ describe("database: review fixes", () => {
     expect(r).toMatchObject({ status: "revoked", liveKey: null });
   }, 30_000);
   test("a refund made at the gateway ends the month, once", async () => {
-    const { svc, u, paymentId } = await referred("ref-gw");
+    const { svc, u, owner, paymentId } = await referred("ref-gw");
     expect(await svc.markExternalRefund(paymentId, "refund", "re_1")).toBe(true);
     expect(await db.payment.findUniqueOrThrow({ where: { id: paymentId } })).toMatchObject({ status: "refunded" });
-    expect(await db.planGrant.count({ where: { userId: u.id, source: "referral", status: "active" } })).toBe(0);
+    expect(await db.planGrant.count({ where: { userId: owner.id, source: "referral", status: "active" } })).toBe(0);
     expect(await db.referral.findUnique({ where: { referredId: u.id } })).toMatchObject({ status: "disqualified" });
     expect(await db.subscription.count({ where: { userId: u.id, status: "active" } })).toBe(0);
     // the webhook retries: nothing more happens
     expect(await svc.markExternalRefund(paymentId, "refund", "re_1")).toBe(false);
-    expect(await db.auditLog.count({ where: { action: "referral.revoke", email: u.email } })).toBe(1);
+    expect(await db.auditLog.count({ where: { action: "referral.revoke", email: owner.email.toLowerCase() } })).toBe(1);
   }, 30_000);
   test("a chargeback ends the month but leaves the payment for the dispute", async () => {
-    const { svc, u, paymentId } = await referred("ref-cb");
+    const { svc, owner, paymentId } = await referred("ref-cb");
     expect(await svc.markExternalRefund(paymentId, "chargeback", "fraud")).toBe(true);
     expect(await db.payment.findUniqueOrThrow({ where: { id: paymentId } })).toMatchObject({ status: "succeeded" });
-    expect(await db.planGrant.count({ where: { userId: u.id, source: "referral", status: "active" } })).toBe(0);
-    expect((await db.auditLog.findFirstOrThrow({ where: { action: "referral.revoke", email: u.email } })).note).toMatch(/charged back/);
+    expect(await db.planGrant.count({ where: { userId: owner.id, source: "referral", status: "active" } })).toBe(0);
+    expect((await db.auditLog.findFirstOrThrow({ where: { action: "referral.revoke", email: owner.email.toLowerCase() } })).note).toMatch(/charged back/);
   }, 30_000);
 });
 

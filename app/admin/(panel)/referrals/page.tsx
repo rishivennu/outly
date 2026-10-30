@@ -15,7 +15,7 @@ export default async function ReferralsAdminPage() {
       <PageHead
         eyebrow="Run"
         title="Refer & Earn"
-        body="A friend who joins with someone's link gets a free stretch of a plan after their first verified payment. Investigate odd patterns and disqualify with a reason."
+        body="The sharer earns a free stretch of a plan when a friend who joined with their link makes a first verified payment. Investigate odd patterns and disqualify with a reason."
       />
       <ReferralsPanel
         initial={JSON.parse(JSON.stringify({ rows, totals, config }))}

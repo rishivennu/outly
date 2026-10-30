@@ -76,7 +76,7 @@ function UsageMeter({ u }: { u: Usage }) {
   );
 }
 
-export function BillingView(props: { email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; invoices: Inv[]; beta?: BetaOffer | null; founding?: FoundingMine; badges?: Badges }) {
+export function BillingView(props: { email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; invoices: Inv[]; beta?: BetaOffer | null; founding?: FoundingMine; foundingStatus?: string | null; badges?: Badges }) {
   const { plans, current } = props;
   const router = useRouter();
   const toast = useToast();
@@ -243,7 +243,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
         ))}
       </section>
 
-      {props.founding && <FoundingCard f={props.founding} where="billing" />}
+      {(props.founding || props.foundingStatus) && <FoundingCard f={props.founding ?? null} status={props.foundingStatus} />}
       {props.beta && <BetaRedeem offer={props.beta} />}
 
       <section aria-labelledby="plans" className="mt-10 max-w-5xl">

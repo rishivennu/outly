@@ -62,7 +62,7 @@ export function Sidebar() {
   const scroller = useScrolling();
   return (
     <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
-      <aside className="lg-glass flex h-full w-[240px] flex-col overflow-hidden rounded-[28px]" aria-label="Primary">
+      <aside data-route-order="" className="lg-glass flex h-full w-[240px] flex-col overflow-hidden rounded-[28px]" aria-label="Primary">
         <div ref={scroller} data-lenis-prevent className="nav-scroll flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-4 pt-5 [&>*]:shrink-0">
         <Link href="/home" className="mb-6 flex min-h-11 items-center gap-2 rounded-2xl px-2 text-[18px] transition-opacity hover:opacity-80" aria-label="Outlly dashboard" title="Dashboard">
           <OutlyLogo size={30} />
@@ -106,12 +106,22 @@ export function Sidebar() {
             ]),
             { href: "/support", label: "Help centre", icon: LifeBuoy },
             { href: "/settings", label: "Settings", icon: Settings },
-          ].map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} data-tour={TOUR[href]} aria-current={isActive(path, href) ? "page" : undefined} className={cn("flex h-10 items-center gap-3 rounded-2xl px-3 text-[13.5px] transition-colors duration-200", isActive(path, href) ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground")}>
-              <Icon className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-              {label}
-            </Link>
-          ))}
+          ].map(({ href, label, icon: Icon }) => {
+            // 1065: the same gliding pill as the Studio list (one layoutId), so the selection travels between
+            // the two groups instead of one item blinking off and another blinking on.
+            const active = isActive(path, href);
+            return (
+              <Link key={href} href={href} data-tour={TOUR[href]} aria-current={active ? "page" : undefined} className={cn("group relative flex h-10 items-center gap-3 rounded-2xl px-3 text-[13.5px] transition-colors duration-200", active ? "text-foreground" : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground")}>
+                {active && (
+                  <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-2xl bg-secondary" transition={{ type: "spring", stiffness: 520, damping: 42 }}>
+                    <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-lime" />
+                  </motion.span>
+                )}
+                <Icon className={cn("relative h-4 w-4 transition-transform duration-200 group-hover:scale-110", active && "text-lime-ink")} strokeWidth={active ? 2.2 : 1.8} aria-hidden="true" />
+                <span className="relative">{label}</span>
+              </Link>
+            );
+          })}
           <Link href="/" className="group flex h-10 items-center gap-3 rounded-2xl px-3 text-[13.5px] text-muted-foreground transition-colors duration-200 hover:bg-foreground/[0.04] hover:text-foreground">
             <Globe className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
             Outlly website

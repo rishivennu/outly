@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin/guard";
 import { formatMoney } from "@/lib/billing/money";
 import { activeGateway } from "@/lib/billing/service";
 import { Card, Empty, PageHead, Pill, STATUS_TONE, Table, fmtDate } from "@/components/admin/ui";
+import { DataSwap } from "@/components/shared/DataSwap";
 import { FilterChips, SearchBox } from "@/components/admin/SearchBox";
 import { RefundButton } from "@/components/admin/RefundButton";
 
@@ -36,6 +37,7 @@ export default async function Payments({ searchParams }: { searchParams: { statu
           <FilterChips param="status" current={status} options={[{ value: "", label: "All" }, { value: "succeeded", label: `Paid · ${count("succeeded")}` }, { value: "failed", label: `Failed · ${count("failed")}` }, { value: "pending", label: `Pending · ${count("pending")}` }, { value: "refunded", label: `Refunded · ${count("refunded")}` }]} />
           <SearchBox placeholder="Customer or invoice number" />
         </div>
+        <DataSwap k={`${status}|${q ?? ""}`}>
         {rows.length === 0 ? (
           <Empty title="No payments here" body={status || q ? "Nothing matches these filters." : "Payments show up the moment a customer checks out."} />
         ) : (
@@ -68,6 +70,7 @@ export default async function Payments({ searchParams }: { searchParams: { statu
             ))}
           </Table>
         )}
+        </DataSwap>
       </Card>
     </>
   );

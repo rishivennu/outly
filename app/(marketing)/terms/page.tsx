@@ -85,7 +85,7 @@ export default function TermsPage() {
             <li>You can cancel any time in Billing. You keep your plan until the end of the period you paid for, then your account moves to Free. You can resume before that date.</li>
             <li>If we change a plan’s price, the price you pay now stays the same until your current period ends, and we tell you before the new price applies.</li>
             <li>If you were charged by mistake or something did not work, ask from the Pip chat. A person reviews every refund request, and refunds go back to the original payment method.</li>
-            <li>Refer and Earn: a friend who signs up through your link gets one month of Creator free after their first payment for a paid plan, once their email address is verified. The month starts when the period they paid for ends. One reward per person and per inbox; signing up yourself through your own link does not count.</li>
+            <li>Refer and Earn: when a friend signs up through your referral link and makes their first payment for Creator, Studio or Pro, you get one month of Creator free, once their payment is confirmed and their email address is verified. If you are on a paid plan, the month starts when your current paid period ends. Each friend who pays earns one month; one reward per friend and per inbox, and signing up yourself through your own link does not count.</li>
             <li>Referral rewards and plans given by Outlly have no cash value. A referral month is withdrawn if the payment that earned it is refunded or charged back, or if the link is abused.</li>
           </ul>
 

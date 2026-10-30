@@ -915,6 +915,13 @@ html:not(.dark) .footer-word { --fw-s0: hsl(82 85% 16%); --fw-s1: hsl(82 85% 26%
 /* The loading skeleton waits a beat before showing, so fast pages swap straight in without a flash. */
 .admin-skel { animation: admin-skel-in .2s ease-out .12s both; }
 @keyframes admin-skel-in { from { opacity: 0; } to { opacity: 1; } }
+/* 1065 route loaders (components/shared/RouteSkeleton.tsx): same beat before showing, and the slow-load pill
+   fades in on opacity alone (it is centred with a transform, which a transform keyframe would undo). */
+.route-skel { animation: admin-skel-in .2s ease-out .12s both; }
+.route-slow { animation: route-slow-in .3s ease-out both; }
+@keyframes route-slow-in { from { opacity: 0; } to { opacity: 1; } }
+/* Analytics with nothing connected and nothing published shows one call to action and no tab bar. */
+[data-route-stage]:has([data-analytics-empty]) .an-tabs { display: none; }
 .admin-blob { animation: admin-blob 22s ease-in-out infinite alternate; }
 @keyframes admin-blob { 0% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(6%,-4%,0) scale(1.12); } 100% { transform: translate3d(-5%,5%,0) scale(.94); } }
 .bell-ring { animation: bell-ring .9s var(--ease-out); transform-origin: 50% 10%; }
@@ -934,7 +941,7 @@ html[data-contrast="more"] :focus-visible { outline: 3px solid hsl(var(--ring)) 
 html[data-contrast="more"] a:not([class*="btn"]) { text-decoration-thickness: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .admin-page-in, .admin-skel, .admin-blob, .bell-ring, .offline-bar, .chat-pop, .consent-in { animation: none; }
+  .admin-page-in, .admin-skel, .route-skel, .route-slow, .admin-blob, .bell-ring, .offline-bar, .chat-pop, .consent-in { animation: none; }
   .admin-card, .kpi-card:hover { transition: none; transform: none; }
 }
 

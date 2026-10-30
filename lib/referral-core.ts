@@ -35,8 +35,9 @@ export const REF_VISITOR = "ol_refv";
 export const shareUrl = (appUrl: string, code: string) => `${appUrl.replace(/\/$/, "")}/signup?ref=${code}`;
 
 /**
- * Refer & Earn (1052): the FRIEND who signs up through a link gets `rewardDays` of `rewardPlan` after their
- * first verified payment for one of `eligiblePlans`. The month starts when the period they paid for ends.
+ * Refer & Earn (1052, flipped in 1066): the SHARER gets `rewardDays` of `rewardPlan` when a friend who signed
+ * up through their link makes a first verified payment for one of `eligiblePlans`. The month starts when the
+ * sharer's own paid period (and any month they already earned) ends.
  */
 export interface ReferralConfig {
   enabled: boolean;

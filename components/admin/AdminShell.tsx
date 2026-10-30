@@ -82,11 +82,19 @@ function NavList({ role, path, badges, onNavigate, layoutId }: { role: AdminRole
   );
 }
 
-function Footer({ admin, path, onNavigate }: { admin: { name: string; role: AdminRole }; path: string; onNavigate?: () => void }) {
+function Footer({ admin, path, onNavigate, layoutId }: { admin: { name: string; role: AdminRole }; path: string; onNavigate?: () => void; layoutId: string }) {
+  const mine = path === "/admin/account";
   return (
     <div className="mt-auto flex flex-col gap-1 pt-4">
-      <Link href="/admin/account" onClick={onNavigate} aria-current={path === "/admin/account" ? "page" : undefined} className={cn("flex h-10 items-center gap-3 rounded-2xl px-3 text-[13.5px] transition-colors", path === "/admin/account" ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground")}>
-        <KeyRound className="h-4 w-4" aria-hidden /> My password
+      {/* 1065: the same pill as the list above (shared layoutId), so it glides down here too. */}
+      <Link href="/admin/account" onClick={onNavigate} aria-current={mine ? "page" : undefined} className={cn("group relative flex h-10 items-center gap-3 rounded-2xl px-3 text-[13.5px] transition-colors duration-200", mine ? "text-foreground" : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground")}>
+        {mine && (
+          <motion.span layoutId={layoutId} className="absolute inset-0 rounded-2xl bg-secondary" transition={{ type: "spring", stiffness: 520, damping: 42 }}>
+            <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-lime" />
+          </motion.span>
+        )}
+        <KeyRound className={cn("relative h-4 w-4 transition-transform duration-200 group-hover:scale-110", mine && "text-lime-ink")} aria-hidden />
+        <span className="relative">My password</span>
       </Link>
       <Link href="/" className="flex h-10 items-center gap-3 rounded-2xl px-3 text-[13.5px] text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground">
         <Globe className="h-4 w-4" aria-hidden /> View the site
@@ -126,7 +134,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
     <div className="admin-root sky-host relative isolate flex min-h-dvh">
       <StarField nebula />
       <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
-        <aside className="glass hairline flex h-full w-[248px] flex-col overflow-hidden rounded-[28px]" aria-label="Admin sidebar">
+        <aside data-route-order="" className="glass hairline flex h-full w-[248px] flex-col overflow-hidden rounded-[28px]" aria-label="Admin sidebar">
           <ScrollArea className="px-3 pb-3 pt-5">
             <div className="mb-6 flex items-center justify-between gap-2 px-2">
               <Link href="/admin" className="text-[17px]" aria-label="Admin overview">
@@ -135,7 +143,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
               <span className="rounded-full bg-lime/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-lime-ink">Admin</span>
             </div>
             <NavList role={admin.role} path={path} badges={badges} layoutId="admin-pill" />
-            <Footer admin={admin} path={path} />
+            <Footer admin={admin} path={path} layoutId="admin-pill" />
           </ScrollArea>
         </aside>
       </div>
@@ -181,7 +189,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
                   </button>
                 </div>
                 <NavList role={admin.role} path={path} badges={badges} onNavigate={() => setOpen(false)} layoutId="admin-pill-m" />
-                <Footer admin={admin} path={path} onNavigate={() => setOpen(false)} />
+                <Footer admin={admin} path={path} onNavigate={() => setOpen(false)} layoutId="admin-pill-m" />
               </ScrollArea>
             </motion.aside>
           </>

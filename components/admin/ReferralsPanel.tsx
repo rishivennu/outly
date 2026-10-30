@@ -113,7 +113,7 @@ export function ReferralsPanel({ initial, plans }: { initial: { rows: Row[]; tot
       </Card>
 
       <Card>
-        <CardTitle hint="The referred friend gets the reward after their first verified payment on an eligible plan. It starts when their paid period ends.">
+        <CardTitle hint="The sharer gets the reward when a friend they invited makes a first verified payment on an eligible plan. It starts after the sharer's own paid period and any month they already earned.">
           <span className="inline-flex items-center gap-2"><Gift className="h-4 w-4" aria-hidden /> Reward terms</span>
         </CardTitle>
         <div className="grid gap-4">

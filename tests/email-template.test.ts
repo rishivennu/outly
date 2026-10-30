@@ -40,7 +40,7 @@ const all = () => ({
     settingsUrl: "https://outlly.test/settings",
   }),
   teamInvite: templates.teamInvite({ owner: "Ana", role: "editor", url: "https://outlly.test/invite" }),
-  referralReward: templates.referralReward({ name: "Tej", friend: "Ana", plan: "Pro", until: "1 Dec 2026", url: "https://outlly.test/referrals" }),
+  referralReward: templates.referralReward({ name: "Tej", friend: "Ana", plan: "Creator", length: "1 month", starts: "1 Nov 2026", until: "1 Dec 2026", url: "https://outlly.test/settings#referral" }),
   test: templates.test("resend"),
 });
 

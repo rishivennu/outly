@@ -32,7 +32,7 @@ import { homePulse } from "@/lib/retention/pulse";
 import { isPlatform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { myFounding } from "@/lib/founding";
-import { FoundingCard } from "@/components/founding/FoundingCard";
+import { FoundingWelcome, type FoundingPromo } from "@/components/founding/FoundingWelcome";
 import { listProfiles, postFilter } from "@/lib/profiles";
 import { trustBadges } from "@/lib/badges";
 import { ProfileSwitcher } from "@/components/home/ProfileSwitcher";
@@ -64,7 +64,7 @@ async function welcomeOffer(user: { id: string; createdAt: Date; actor: unknown 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Home" };
 
-export default async function HomePage({ searchParams }: { searchParams?: { recapAt?: string; founding?: string } }) {
+export default async function HomePage({ searchParams }: { searchParams?: { recapAt?: string } }) {
   const user = (await getCurrentUser())!;
   // One parallel wave: every query below is independent, so the page pays one database round trip, not four.
   // Pulse only needs the connections and the published count, so it chains on those two instead of waiting for all.
@@ -125,6 +125,12 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
   };
   // one tick, so every signed URL on the page goes out as a single batch
   const [dv, nv] = await Promise.all([Promise.all(drafts.map(postView)), next ? postView(next) : null]);
+  // 1067: the founding invitation is a one-time popup, only for accounts the server says can still earn a seat
+  // and that haven't closed it on any device. Members get their badge below; nothing else founding sits on Home.
+  const promo: FoundingPromo | null =
+    founding?.kind === "offer" && !founding.seen ? { kind: "offer", left: founding.left, limit: founding.limit, pct: founding.pct, proven: founding.proven }
+    : founding?.kind === "reserved" && !founding.seen ? { kind: "reserved", no: founding.no, pct: founding.pct }
+    : null;
   const when = nv?.scheduledAt
     ? new Intl.DateTimeFormat("en-US", { timeZone: user.timezone, weekday: "long", hour: "numeric", minute: "2-digit" }).format(new Date(nv.scheduledAt))
     : null;
@@ -132,16 +138,19 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
   return (
     <div className="relative overflow-hidden">
       <HomeHero firstName={user.name.split(" ")[0]} />
-      {(founding || searchParams?.founding) && <FoundingCard f={founding} where="home" status={searchParams?.founding?.slice(0, 20) ?? null} />}
       {profiles.length >= 2 ? (
         <ProfileSwitcher profiles={profiles} activeId={scope.active?.id ?? null}>
           <TrustBadges b={badges} className="mt-3" />
         </ProfileSwitcher>
       ) : (
-        (badges.verifiedManager || (badges.foundingNo && !founding)) && <div className="mx-auto max-w-5xl px-5 pb-4 sm:px-10"><TrustBadges b={badges} /></div>
+        (badges.verifiedManager || badges.foundingNo) && <div className="mx-auto max-w-5xl px-5 pb-4 sm:px-10"><TrustBadges b={badges} /></div>
       )}
       <SetupChecklist state={setup} />
-      {welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} freePeriod={welcome.freePeriod} />}
+      {promo ? (
+        <FoundingWelcome promo={promo} />
+      ) : (
+        welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} freePeriod={welcome.freePeriod} foundingFull={founding?.kind === "full" ? founding.limit : null} />
+      )}
       {(pulse || recap || (saved && saved.posts > 0)) && (
         <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-4 sm:px-10">
           {recap && <WeekRecap r={recap} canEmail={!user.actor} />}

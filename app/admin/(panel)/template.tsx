@@ -1,15 +1,10 @@
-"use client";
-import { useEffect, useLayoutEffect, useRef } from "react";
-import { pageStagger } from "@/lib/motion/reveal";
-
-const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+import { RouteStage } from "@/components/shared/RouteStage";
 
 /**
- * Remounts on each admin navigation: the page's panels settle in one after another (the shared GSAP
- * pageStagger, 10-22). Kept short and close to the ground, since this is a working console. Reduced motion: none.
+ * Every admin route renders into the shared route stage (1065, lib/motion/route.ts): a new section opens
+ * through a short sideways mask, a ticket pushes in, and filters, search, pagination and Refresh (query
+ * changes and router.refresh) never replay it. Kept short: this is a working console. Reduced motion: a fade.
  */
 export default function Template({ children }: { children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useIso(() => pageStagger(ref.current, { duration: 0.4, y: 6, x: 10, below: true }), []);
-  return <div ref={ref}>{children}</div>;
+  return <RouteStage base="/admin">{children}</RouteStage>;
 }

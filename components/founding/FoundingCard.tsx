@@ -1,8 +1,7 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Award, Loader2, MailCheck } from "lucide-react";
+import { ArrowDown, Award, Loader2, MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/Toast";
 import { api } from "@/lib/client/api";
@@ -12,6 +11,7 @@ import { FoundingStamp } from "./FoundingStamp";
 const NOTE: Record<string, string> = {
   claimed: "Confirmed. Your founding seat is yours.",
   full: "Your Gmail is confirmed, but the last founding seat went just before you. Sorry about that.",
+  unpaid: "Your Gmail is confirmed. A founding seat comes with your first paid plan.",
   expired: "That link has expired or was already replaced. Send a fresh one below.",
   not_gmail: "Founding seats are for Gmail addresses only.",
   taken: "That Gmail inbox already holds a founding seat on another account.",
@@ -19,21 +19,27 @@ const NOTE: Record<string, string> = {
   busy: "Too many tries just now. Wait a few minutes and try again.",
 };
 
-/** Home and Billing: the stamp and number for members; for everyone else with a seat open, the one-tap claim. */
-export function FoundingCard({ f, where, status }: { f: FoundingMine; where: "home" | "billing"; status?: string | null }) {
+const WRAP = "mt-6 max-w-5xl";
+const plans = () => document.getElementById("plans")?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+
+/**
+ * Billing only (1067): the stamp and number for members, a held seat waiting on its first payment, the
+ * one-tap claim for paying customers, and a plain "every seat is taken" note for free accounts. The
+ * invitation itself is a one-time popup on Home, so free accounts with a seat open see nothing extra here.
+ */
+export function FoundingCard({ f, status }: { f: FoundingMine; status?: string | null }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const router = useRouter();
   const note = said ?? (status && Object.hasOwn(NOTE, status) ? NOTE[status] : null);
-  const wrap = where === "home" ? "mx-auto max-w-5xl px-5 pb-4 sm:px-10" : "mt-6 max-w-5xl";
 
-  // Back from the claim link with no seat to show (full, wrong inbox, expired): just say what happened.
-  if (!f) {
+  // Back from the claim link with no seat to show (full, wrong inbox, expired), or nothing to show: just say what happened.
+  if (!f || f.kind === "offer") {
     if (!note || status === "claimed") return null;
     return (
-      <div className={wrap}>
+      <div className={WRAP}>
         <p role="status" className="glass flex items-center gap-3 rounded-[22px] p-4 text-sm">
           <FoundingStamp size={40} tilt={false} />
           {note}
@@ -41,24 +47,55 @@ export function FoundingCard({ f, where, status }: { f: FoundingMine; where: "ho
       </div>
     );
   }
+
   if (f.kind === "member") {
     return (
-      <div className={wrap}>
+      <div className={WRAP}>
         <section aria-labelledby="founding-h" className="glass flex flex-col items-start gap-4 rounded-[28px] p-5 sm:flex-row sm:items-center sm:p-6">
           <FoundingStamp size={76} label="Outlly founding member stamp" />
           <div className="min-w-0 flex-1">
             <p className="eyebrow">Founding member</p>
             <h2 id="founding-h" className="mt-1 text-lg font-semibold tracking-tight">You're founding member <span className="tabular">#{f.no}</span></h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {f.pct}% off every paid plan, for life.{where === "billing" ? " The prices below already include it." : " It's applied at checkout automatically."}
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">{f.pct}% off every paid plan, for life. The prices below already include it.</p>
             {note && status === "claimed" && <p role="status" className="mt-2 text-sm font-medium text-lime-ink">{note}</p>}
           </div>
-          {where === "home" && (
-            <Link href="/billing" className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-4 text-sm font-semibold hairline hover:bg-secondary">
-              See your prices <ArrowRight className="h-4 w-4" aria-hidden />
-            </Link>
-          )}
+        </section>
+      </div>
+    );
+  }
+
+  if (f.kind === "reserved") {
+    return (
+      <div className={WRAP}>
+        <section aria-labelledby="founding-h" className="glass flex flex-col items-start gap-4 rounded-[28px] p-5 sm:flex-row sm:items-center sm:p-6">
+          <FoundingStamp size={68} />
+          <div className="min-w-0 flex-1">
+            <p className="eyebrow">Founding seat held</p>
+            <h2 id="founding-h" className="mt-1 text-lg font-semibold tracking-tight">Seat <span className="tabular">#{f.no}</span> is waiting for your first plan</h2>
+            <p className="mt-1 text-sm text-muted-foreground">You joined early, so we kept it for you. Subscribe to any paid plan and it becomes your Founding Member badge. The prices below already include your founding price.</p>
+          </div>
+          <Button type="button" variant="primary" onClick={plans} className="min-h-[44px] shrink-0">
+            See plans <ArrowDown className="h-4 w-4" aria-hidden />
+          </Button>
+        </section>
+      </div>
+    );
+  }
+
+  if (f.kind === "full") {
+    return (
+      <div className={WRAP}>
+        <section aria-labelledby="founding-h" className="glass flex flex-col items-start gap-4 rounded-[28px] p-5 sm:flex-row sm:items-center sm:p-6">
+          <FoundingStamp size={56} tilt={false} />
+          <div className="min-w-0 flex-1">
+            <p className="eyebrow">Founding members</p>
+            <h2 id="founding-h" className="mt-1 text-lg font-semibold tracking-tight">All <span className="tabular">{f.limit}</span> founding spots have been filled</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Thank you to everyone who joined early. You can still upgrade to a paid plan any time to post more and unlock every feature.</p>
+            {note && <p role="status" className="mt-2 text-sm font-medium">{note}</p>}
+          </div>
+          <Button type="button" variant="primary" onClick={plans} className="min-h-[44px] shrink-0">
+            Upgrade <ArrowDown className="h-4 w-4" aria-hidden />
+          </Button>
         </section>
       </div>
     );
@@ -92,20 +129,21 @@ export function FoundingCard({ f, where, status }: { f: FoundingMine; where: "ho
     }
   }
 
+  // claim: a paying customer with a seat open that isn't theirs yet.
   return (
-    <div className={wrap}>
+    <div className={WRAP}>
       <section aria-labelledby="founding-h" className="glass flex flex-col items-start gap-4 rounded-[28px] p-5 sm:flex-row sm:items-center sm:p-6">
         <FoundingStamp size={68} />
         <div className="min-w-0 flex-1">
           <p className="eyebrow">Founding seat waiting</p>
           <h2 id="founding-h" className="mt-1 text-lg font-semibold tracking-tight">
-            Claim {f.pct}% off for life: <span className="tabular">{f.left}</span> of <span className="tabular">{f.limit}</span> seats left
+            Your founding seat is ready: <span className="tabular">{f.left}</span> of <span className="tabular">{f.limit}</span> left
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {f.reason === "ready" ? (
-              <>Your inbox <span className="font-medium text-foreground">{f.email}</span> is already confirmed. One tap and the seat is yours.</>
+              <>Thanks for subscribing. Your inbox <span className="font-medium text-foreground">{f.email}</span> is confirmed, so one tap and the seat is yours.</>
             ) : (
-              <>Seats go only to confirmed Gmail inboxes. We'll email a one-tap link to <span className="font-medium text-foreground">{f.email}</span>; tap it and the seat is yours.</>
+              <>Thanks for subscribing. Seats go only to confirmed Gmail inboxes, so we'll email a one-tap link to <span className="font-medium text-foreground">{f.email}</span>; tap it and the seat is yours.</>
             )}
           </p>
           {note && <p role="status" className="mt-2 text-sm font-medium">{note}</p>}

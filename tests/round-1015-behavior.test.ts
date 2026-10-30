@@ -138,7 +138,7 @@ describe("runAnalysis keeps every version", () => {
     const v2 = await b.runAnalysis({ rangeDays: 7, by: "Tester" });
     expect(v1.version).toBe(1);
     expect(v2.version).toBe(2);
-    expect(v1.model).toBe("gemini-flash-latest");
+    expect(v1.model).toMatch(/^gemini-/); // 1053: whichever model wins the race
     expect(v1.focus).toBe("why no publishing?");
     expect(v1.result.changes).toEqual([]); // first ever run has nothing to compare
     expect(v2.result.changes).toEqual(["Users up by 0"]);

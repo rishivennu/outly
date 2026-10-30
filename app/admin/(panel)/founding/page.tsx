@@ -13,7 +13,7 @@ export default async function FoundingAdminPage() {
       <PageHead
         eyebrow="Setup"
         title="Founding members"
-        body="Choose how many founding seats exist. Each goes to a confirmed inbox, gets a number and a stamp, and pays less on every paid plan for life."
+        body="Choose how many founding seats exist. Each goes to a paying customer with a confirmed inbox, gets a number and a badge, and pays less on every paid plan for life."
       />
       <FoundingPanel initial={await foundingState()} />
     </>
