@@ -4,7 +4,7 @@
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, minHeight: "100dvh", display: "grid", placeItems: "center", fontFamily: "system-ui, sans-serif", background: "#faf8f3", color: "#121214", textAlign: "center", padding: 24 }}>
+      <body style={{ margin: 0, minHeight: "100dvh", display: "grid", placeItems: "center", fontFamily: "system-ui, sans-serif", background: "#f8fafc", color: "#121214", textAlign: "center", padding: 24 }}>
         <main>
           <div aria-hidden style={{ width: 72, height: 72, borderRadius: 22, background: "#9ff218", margin: "0 auto 20px" }} />
           <h1 style={{ fontSize: 28, margin: "0 0 8px" }}>Outlly hit a snag.</h1>

@@ -255,7 +255,7 @@ export function MarketingNav() {
 
         <div className="ml-auto flex items-center gap-1.5 lg:ml-0">
           {/* 1040: live creator count lives in the bar (moved from the hero); full words where there is room. */}
-          <LiveCount className="mnav-live hidden flex-nowrap whitespace-nowrap px-2 md:inline-flex lg:hidden xl:inline-flex" />
+          <LiveCount className="mnav-live hidden flex-nowrap whitespace-nowrap px-2 md:inline-flex lg:hidden 2xl:inline-flex" />
           <ThemeToggle compact className="hidden sm:inline-flex" />
           {signedIn ? (
             <Link
@@ -267,7 +267,7 @@ export function MarketingNav() {
             </Link>
           ) : (
             <>
-              <AnimatedLink href="/login" className="hidden h-11 rounded-full px-4 text-[14.5px] font-semibold text-foreground/80 transition-colors hover:text-foreground sm:inline-flex">
+              <AnimatedLink href="/login" className="hidden h-11 rounded-full px-3.5 text-[14px] font-medium text-foreground/70 transition-colors hover:text-foreground sm:inline-flex">
                 Log in
               </AnimatedLink>
               <Link

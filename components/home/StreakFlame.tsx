@@ -7,7 +7,7 @@ import { streakTier } from "./streak-tier";
 
 
 const TIER = [
-  { scale: 0.84, flick: "0s", sparks: 0, outer: "#ece5d6", mid: "#dcd2bf", core: "#f7f2e8", aura: null, bg: "hsl(var(--secondary))" },
+  { scale: 0.84, flick: "0s", sparks: 0, outer: "#e2e8f0", mid: "#cbd5e1", core: "#f1f5f9", aura: null, bg: "hsl(var(--secondary))" },
   { scale: 0.88, flick: "1.7s", sparks: 2, outer: "#ffc21a", mid: "#ff9a1a", core: "#fff3b0", aura: null, bg: "linear-gradient(160deg, #ffb35c, #ff8a2a)" },
   { scale: 0.95, flick: "1.25s", sparks: 4, outer: "#ffc21a", mid: "#ff7a1a", core: "#fff0a0", aura: null, bg: "linear-gradient(160deg, #ffa547, #ff6f1a)" },
   { scale: 1, flick: "1s", sparks: 6, outer: "#ffb21a", mid: "#ff5a1f", core: "#ffe680", aura: "#ff3d6a", bg: "linear-gradient(160deg, #ff9640, #f2522a)" },

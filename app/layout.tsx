@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Bricolage_Grotesque, DM_Sans, Fraunces, Instrument_Serif, Plus_Jakarta_Sans } from "next/font/google";
+import { Bricolage_Grotesque, DM_Sans, Fraunces, Inter, Instrument_Serif, Manrope, Plus_Jakarta_Sans } from "next/font/google";
 import localFont from "next/font/local";
 import { MotionRoot } from "@/components/shared/MotionRoot";
 import { themeScript } from "@/lib/theme/script";
@@ -16,14 +16,17 @@ import "./mobile-app.css";
 import { appScript } from "@/lib/app-mode";
 
 /*
- * Type system. Display: Bricolage Grotesque (optical sizes, a little ink-trap warmth).
- * Body: DM Sans, a humanist geometric that reads soft at 15-17px. Accent: Instrument
- * Serif italic, used for one word per headline at most. All self-hosted by next/font,
- * swap + size-adjusted fallbacks, so there is no layout shift and no third-party request.
+ * Type system (1062). Display: Manrope, a clean geometric grotesk that holds up at 48px and at 16px.
+ * Body: Inter, built for screens, very readable at 14-17px. Accent: Instrument Serif italic, used for
+ * one word per headline at most. All self-hosted by next/font, swap + size-adjusted fallbacks, so there
+ * is no layout shift and no third-party request. Both are variable fonts: one file each covers 400-800.
  */
-const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage", display: "swap", axes: ["opsz", "wdth"] });
-// No opsz axis (10-16): it tripled the file (132 KB) for a change you can't see at 15-17px.
-const body = DM_Sans({ subsets: ["latin"], variable: "--font-dmsans", display: "swap" });
+const display = Manrope({ subsets: ["latin"], variable: "--font-manrope", display: "swap" });
+const body = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+// The pre-1062 pair, kept as Admin > Site fonts > "Outlly classic". Declared only; downloaded when that set is live.
+// No opsz axis on DM Sans (10-16): it tripled the file (132 KB) for a change you can't see at 15-17px.
+const classicDisplay = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage", display: "swap", axes: ["opsz", "wdth"], preload: false });
+const classicBody = DM_Sans({ subsets: ["latin"], variable: "--font-dmsans", display: "swap", preload: false });
 const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["italic"], variable: "--font-instrument", display: "swap" });
 /*
  * 1046: Admin > Site fonts can swap the whole set (lib/fonts.ts). These raw names feed the role variables
@@ -66,7 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // The Content Security Policy only runs scripts carrying this request's nonce (set by middleware.ts).
   const nonce = headers().get("x-nonce") ?? undefined;
   return (
-    <html lang="en" className={`dark ${display.variable} ${body.variable} ${serif.variable} ${gopher.variable} ${jakarta.variable} ${fraunces.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`dark ${display.variable} ${body.variable} ${classicDisplay.variable} ${classicBody.variable} ${serif.variable} ${gopher.variable} ${jakarta.variable} ${fraunces.variable}`} suppressHydrationWarning>
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
         {/* Inside the Android app: mark <html> before first paint so the app layout (app/mobile-app.css) never flashes the web one. */}

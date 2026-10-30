@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Check, Loader2, RotateCcw } from "lucide-react";
+import { ArrowRight, Check, Loader2, RotateCcw } from "lucide-react";
 import { api, ApiError } from "@/lib/client/api";
 
 type Joined = { already: boolean; position?: number; waiting?: number };
@@ -43,7 +43,7 @@ function bars(seed: string) {
 }
 
 /** Apple-style sign-up card that is also a ticket printer: the receipt feeds out of its slot when you join. */
-export function WaitlistForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
+export function WaitlistForm({ fromGoogle = false, beta = false }: { fromGoogle?: boolean; beta?: boolean }) {
   const [form, setForm] = useState({ name: "", email: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -233,7 +233,7 @@ export function WaitlistForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
   const who = form.name.trim() || (form.email.includes("@") ? form.email.trim().split("@")[0] : "") || "You";
   return (
     <div className="wl-printer" data-state={busy ? "busy" : "idle"}>
-      <form onSubmit={submit} noValidate className="wl-card wl-head relative px-5 pb-8 pt-6 sm:px-8 sm:pb-9 sm:pt-8" aria-describedby={error ? "wl-error" : undefined}>
+      <form onSubmit={submit} noValidate className="wl-card wl-head relative px-5 pb-7 pt-5 sm:px-7 sm:pb-8 sm:pt-6" aria-describedby={error ? "wl-error" : undefined}>
         <p className="mb-4 flex items-center gap-2.5 text-[12px] font-semibold uppercase tracking-[0.16em] text-[hsl(var(--ap-ink2))]">
           <span className="wl-led" aria-hidden="true" /> {busy ? "Printing your number" : "Ticket machine"}
         </p>
@@ -245,7 +245,7 @@ export function WaitlistForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
         <div className="wl-fields">
           <label className="wl-field">
             <span className="wl-label">First name <span className="font-normal text-[hsl(var(--ap-ink2))]">(optional)</span></span>
-            <input name="name" autoComplete="given-name" maxLength={80} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="wl-input" />
+            <input name="name" autoComplete="given-name" maxLength={80} placeholder="Alex" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="wl-input" />
           </label>
           <label className="wl-field relative">
             <span className="wl-label">Email</span>
@@ -257,6 +257,7 @@ export function WaitlistForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
               autoComplete="email"
               required
               maxLength={200}
+              placeholder="you@example.com"
               aria-invalid={badEmail || undefined}
               aria-describedby={badEmail ? "wl-error" : undefined}
               value={form.email}
@@ -297,11 +298,12 @@ export function WaitlistForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
             "Joining…"
           ) : (
             <>
-              Join the waitlist<span className="wl-cta-sub"><span className="wl-cta-dot" aria-hidden="true">· </span>Get early access</span>
+              Join the waitlist
+              <ArrowRight className="h-[18px] w-[18px]" aria-hidden="true" />
             </>
           )}
         </button>
-        <p className="mt-4 text-center text-[13px] leading-snug text-[hsl(var(--ap-ink2))]">One email when you&apos;re in. No newsletter, no spam.</p>
+        <p className="mt-3.5 text-center text-[13px] leading-snug text-[hsl(var(--ap-ink2))]">{beta ? "Free during beta · No credit card required" : "Free plan to start · No credit card required"}</p>
         <div className="wl-slot" aria-hidden="true">
           <span />
         </div>

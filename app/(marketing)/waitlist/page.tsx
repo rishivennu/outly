@@ -33,10 +33,11 @@ export default async function WaitlistPage({ searchParams }: { searchParams: { f
   if (!s.waitlist) redirect("/signup");
   const counts = await waitlistCounts();
   const beta = await isBeta();
+  // 1062 copy. "Free throughout the beta" is only said while the site really is in beta (Admin > Beta).
   const early = [
-    "We let creators in a few at a time, in the order they joined.",
-    beta ? "Free while Outlly is in beta. No card needed." : "Free to start. No card needed.",
-    "One email when your invite is ready. Nothing else.",
+    "Early access, offered in the order people join.",
+    beta ? "Free to use throughout the beta. No credit card required." : "Free plan to start. No credit card required.",
+    "One email when your invitation is ready. No unnecessary emails.",
   ];
   return (
     // No solid canvas here (1039): the brand sky behind every public page has to show through.
@@ -45,14 +46,17 @@ export default async function WaitlistPage({ searchParams }: { searchParams: { f
         <span className="wl-pix" aria-hidden="true" />
         <div className="wl-split wl-rise">
           <div className="wl-headcell">
-            <p className="inline-flex items-center gap-2 rounded-full bg-lime/15 px-3 py-1 text-[13px] font-semibold text-[hsl(var(--lime-ink))] shadow-[inset_0_0_0_1px_hsl(var(--lime-ink)/.25)]">
-              <span className="wl-live" aria-hidden="true" /> {beta ? "Outlly beta · early access" : "Outlly early access"}
+            <p className="wl-eyebrow">
+              <span className="wl-live" aria-hidden="true" /> {beta ? "Outlly beta · Early access" : "Outlly · Early access"}
             </p>
-            <h1 id="wl-title" className="mt-4 text-balance font-display text-[clamp(2rem,4.6vw,3.25rem)] font-bold leading-[1.04] tracking-[-0.035em]">
-              Create once. Post everywhere. Get your <span className="wl-accent">hours</span> back.
+            <h1 id="wl-title" className="wl-title">
+              <span className="wl-title-l">Create once.</span> <span className="wl-title-l">Publish everywhere.</span>{" "}
+              <span className="wl-title-l">
+                Get your <span className="wl-accent">time</span> back.
+              </span>
             </h1>
-            <p className="mt-4 max-w-[34rem] text-pretty text-[16.5px] leading-relaxed text-[hsl(var(--ap-ink2))]">
-              Outlly is an all-in-one content studio. Plan, create, schedule and publish to all your social accounts from one place, then see how every post did.
+            <p className="wl-lede">
+              Outlly is your all-in-one content studio. Plan, create, schedule, and publish across your social platforms from one place. Track performance and spend less time managing content.
             </p>
           </div>
 
@@ -83,19 +87,19 @@ export default async function WaitlistPage({ searchParams }: { searchParams: { f
           </div>
 
           <div id="join" className="wl-formcell scroll-mt-24">
-            <h2 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[hsl(var(--ap-ink2))]">What early access means</h2>
-            <ul className="mt-3 grid gap-2">
+            <h2 className="wl-kicker">Why join the waitlist?</h2>
+            <ul className="wl-benefits">
               {early.map((t) => (
-                <li key={t} className="flex items-start gap-2.5 text-[15px] leading-snug text-foreground/85">
-                  <span className="mt-[1px] inline-grid h-5 w-5 shrink-0 place-items-center rounded-full bg-lime/20 text-[hsl(var(--lime-ink))]" aria-hidden="true">
-                    <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                <li key={t}>
+                  <span className="wl-tick" aria-hidden="true">
+                    <Check className="h-3 w-3" strokeWidth={3.2} />
                   </span>
                   {t}
                 </li>
               ))}
             </ul>
             <div className="mt-6">
-              <WaitlistForm fromGoogle={searchParams.from === "google"} />
+              <WaitlistForm fromGoogle={searchParams.from === "google"} beta={beta} />
             </div>
             {counts.total >= 25 && (
               <p className="mt-5 text-center text-[14.5px] font-semibold text-foreground/80">{counts.total.toLocaleString("en")} creators have joined so far.</p>

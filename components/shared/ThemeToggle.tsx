@@ -12,7 +12,7 @@ function apply(choice: ThemeChoice) {
   const el = document.documentElement;
   el.classList.toggle("dark", dark);
   el.dataset.theme = choice;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0c0c0e" : "#faf8f3");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0c0c0e" : "#f5f7fa");
 }
 
 export function useTheme() {

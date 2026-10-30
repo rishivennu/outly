@@ -8,6 +8,9 @@ import { OverviewCharts } from "@/components/admin/OverviewCharts";
 import { SampleData } from "@/components/admin/SampleData";
 import { cn } from "@/lib/utils";
 import { Greeting } from "@/components/shared/Greeting";
+import { LiveGlobeCard } from "@/components/admin/live/LiveGlobeCard";
+import { liveMap } from "@/lib/admin/live-map";
+import { LIVE_DEFAULT_MIN } from "@/lib/live-map-core";
 
 export const metadata = { title: "Overview" };
 
@@ -38,7 +41,9 @@ function Kpi({ label, value, sub, change, invert, tone }: { label: string; value
 
 export default async function Overview({ searchParams }: { searchParams: { denied?: string } }) {
   const admin = await requireAdmin("overview");
-  const o = await overview(90);
+  // Live globe (1062): people and places are Users-area data, so only roles that can open Users see it.
+  const showLive = can(admin.role, "users");
+  const [o, live] = await Promise.all([overview(90), showLive ? liveMap(LIVE_DEFAULT_MIN).catch(() => null) : Promise.resolve(null)]);
   const k = o.kpi;
   const money = can(admin.role, "payments");
   const empty = k.totalUsers < 3 && !o.sample;
@@ -78,6 +83,7 @@ export default async function Overview({ searchParams }: { searchParams: { denie
           </>
         )}
       </div>
+      {live && <LiveGlobeCard initial={live} />}
       <OverviewCharts series={o.series} revenueByPlan={money ? o.revenueByPlan : []} currency={o.currency} showMoney={money} />
     </>
   );

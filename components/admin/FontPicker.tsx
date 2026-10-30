@@ -19,8 +19,8 @@ function applyHere(cfg: FontConfig) {
 }
 
 /**
- * Admin > Site fonts. Four sets, each previewed in its own faces so they can be compared side by side
- * before switching. A pick saves at once (optimistic, rolls back on error).
+ * Admin > Site fonts. Five sets, each previewed in its own faces and headline setting (weight, tracking,
+ * leading) so they can be compared side by side before switching. A pick saves at once (optimistic, rolls back on error).
  */
 export function FontPicker({ initial }: { initial: FontConfig }) {
   const toast = useToast();
@@ -48,7 +48,7 @@ export function FontPicker({ initial }: { initial: FontConfig }) {
 
   return (
     <Card>
-      <CardTitle hint={cfg.set === FONTS_DEFAULT.set ? "Using the original fonts." : `Using ${fontSetById(cfg.set).name}.`}>Typeface</CardTitle>
+      <CardTitle hint={cfg.set === FONTS_DEFAULT.set ? "Using the default set, Manrope + Inter." : `Using ${fontSetById(cfg.set).name}.`}>Typeface</CardTitle>
       <fieldset disabled={busy !== null}>
         <legend className="sr-only">Site typeface</legend>
         <div className="grid gap-3 md:grid-cols-2">
@@ -64,7 +64,10 @@ export function FontPicker({ initial }: { initial: FontConfig }) {
               >
                 <input type="radio" name="site-fonts" value={f.id} checked={on} onChange={() => pick(f.id)} className="peer sr-only" />
                 <span className="flex items-center justify-between gap-2">
-                  <span className="text-[15px] font-semibold">{f.name}</span>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-[15px] font-semibold">{f.name}</span>
+                    {f.id === FONTS_DEFAULT.set && <Pill>Default</Pill>}
+                  </span>
                   {on ? (
                     <Pill tone="ok">
                       <Check className="h-3 w-3" aria-hidden />
@@ -74,7 +77,7 @@ export function FontPicker({ initial }: { initial: FontConfig }) {
                 </span>
                 {/* Preview in the set's own faces, whatever the site is using right now. */}
                 <span aria-hidden className="block">
-                  <span className="block text-[28px] leading-[1.05]" style={{ fontFamily: f.display, fontWeight: 650, letterSpacing: "-0.025em" }}>
+                  <span className="block text-[28px]" style={{ fontFamily: f.display, fontWeight: f.look.weight, letterSpacing: f.look.tracking, lineHeight: f.look.leading, fontVariationSettings: f.look.axes ?? "normal" }}>
                     Create once.{" "}
                     <span style={{ fontFamily: f.serif, fontStyle: "italic", fontWeight: 400 }}>Publish</span> everywhere.
                   </span>

@@ -12,7 +12,7 @@
  * - jakarta: Plus Jakarta Sans headlines and body (geometric, open, friendly) with Fraunces italic as the
  *            accent. Both OFL, via next/font, not preloaded.
  */
-export const FONT_SET_IDS = ["current", "apple", "gopher", "jakarta"] as const;
+export const FONT_SET_IDS = ["current", "classic", "apple", "gopher", "jakarta"] as const;
 export type FontSetId = (typeof FONT_SET_IDS)[number];
 
 export interface FontConfig {
@@ -27,17 +27,29 @@ export interface FontSet {
   display: string;
   body: string;
   serif: string;
+  /** How headlines are set in this face (the same values fontCss / globals.css use), for the admin preview. */
+  look: { weight: number; tracking: string; leading: number; axes?: string };
 }
 
 const SYS = "system-ui, sans-serif";
 export const FONT_SETS: readonly FontSet[] = [
   {
     id: "current",
-    name: "Outlly original",
-    hint: "Bricolage Grotesque headlines, DM Sans body, Instrument Serif italic for the accent word.",
+    name: "Outlly (Manrope + Inter)",
+    hint: "Manrope headlines, Inter body, Instrument Serif italic for the accent word. The default since 1062.",
+    display: `var(--font-manrope), var(--font-inter), ${SYS}`,
+    body: `var(--font-inter), ${SYS}`,
+    serif: "var(--font-instrument), Georgia, serif",
+    look: { weight: 700, tracking: "-0.032em", leading: 1.08 },
+  },
+  {
+    id: "classic",
+    name: "Outlly classic",
+    hint: "The pre-1062 pair: Bricolage Grotesque headlines, a touch condensed, DM Sans body, Instrument Serif accent.",
     display: `var(--font-bricolage), var(--font-dmsans), ${SYS}`,
     body: `var(--font-dmsans), ${SYS}`,
     serif: "var(--font-instrument), Georgia, serif",
+    look: { weight: 650, tracking: "-0.028em", leading: 1.02, axes: '"wdth" 96, "opsz" 72' },
   },
   {
     id: "apple",
@@ -46,6 +58,7 @@ export const FONT_SETS: readonly FontSet[] = [
     display: `-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", ${SYS}`,
     body: `-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", ${SYS}`,
     serif: `ui-serif, "New York", "Iowan Old Style", Georgia, serif`,
+    look: { weight: 700, tracking: "-0.032em", leading: 1.08 },
   },
   {
     id: "gopher",
@@ -54,6 +67,7 @@ export const FONT_SETS: readonly FontSet[] = [
     display: `var(--font-gopher), ${SYS}`,
     body: `var(--font-gopher), ${SYS}`,
     serif: `var(--font-gopher), ${SYS}`,
+    look: { weight: 700, tracking: "-0.02em", leading: 1.08 },
   },
   {
     id: "jakarta",
@@ -62,6 +76,7 @@ export const FONT_SETS: readonly FontSet[] = [
     display: `var(--font-jakarta), ${SYS}`,
     body: `var(--font-jakarta), ${SYS}`,
     serif: "var(--font-fraunces), Georgia, serif",
+    look: { weight: 700, tracking: "-0.035em", leading: 1.08 },
   },
 ];
 
@@ -85,6 +100,9 @@ export function fontCss(cfg: FontConfig): string {
     `:root:root{--font-display:${f.display};--font-body:${f.body};--font-serif:${f.serif}}`,
     `.display,h1,h2,h3,h4,.stamp-mini-big{font-variation-settings:normal}`,
   ];
+  // Classic: Bricolage's width and optical axes, and the tighter headline set it was tuned with.
+  if (c.set === "classic")
+    lines.splice(1, 1, `.display{font-weight:650;font-variation-settings:"wdth" 96,"opsz" 72;letter-spacing:-0.028em;line-height:1.02}h1,h2,h3,h4{font-variation-settings:"wdth" 96;letter-spacing:-0.02em}`);
   // Go is wide with a tall x-height: open headline tracking a little and keep the accent upright-weighted.
   if (c.set === "gopher") lines.push(`.display{letter-spacing:-0.02em}.accent-serif{letter-spacing:-0.005em}`);
   // Jakarta runs a little wide at display sizes; Fraunces italic is already tight.
