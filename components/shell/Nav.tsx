@@ -31,14 +31,39 @@ export function isActive(path: string | null, href: string) {
   return path === href || path.startsWith(`${href}/`);
 }
 
+/**
+ * Marks a scroll box with data-scrolling while it moves and for a moment after (1064), so its slim scrollbar
+ * (.nav-scroll in globals.css) can show a little more while in use and fade back when idle.
+ */
+function useScrolling() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const on = () => {
+      if (!el.hasAttribute("data-scrolling")) el.setAttribute("data-scrolling", "");
+      if (t) clearTimeout(t);
+      t = setTimeout(() => el.removeAttribute("data-scrolling"), 800);
+    };
+    el.addEventListener("scroll", on, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", on);
+      if (t) clearTimeout(t);
+    };
+  }, []);
+  return ref;
+}
+
 export function Sidebar() {
   const path = usePathname();
   const user = useUser();
   const studio = MAIN.filter((m) => m.href !== "/create");
+  const scroller = useScrolling();
   return (
     <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
       <aside className="lg-glass flex h-full w-[240px] flex-col overflow-hidden rounded-[28px]" aria-label="Primary">
-        <div data-lenis-prevent className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-4 pt-5 [&>*]:shrink-0">
+        <div ref={scroller} data-lenis-prevent className="nav-scroll flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-4 pt-5 [&>*]:shrink-0">
         <Link href="/home" className="mb-6 flex min-h-11 items-center gap-2 rounded-2xl px-2 text-[18px] transition-opacity hover:opacity-80" aria-label="Outlly dashboard" title="Dashboard">
           <OutlyLogo size={30} />
         </Link>

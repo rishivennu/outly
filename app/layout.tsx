@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Bricolage_Grotesque, DM_Sans, Fraunces, Inter, Instrument_Serif, Manrope, Plus_Jakarta_Sans } from "next/font/google";
+import { Archivo, Bricolage_Grotesque, DM_Sans, Fraunces, Inter, Instrument_Serif, Manrope, Plus_Jakarta_Sans, Rubik, Space_Mono, Tinos } from "next/font/google";
 import localFont from "next/font/local";
 import { MotionRoot } from "@/components/shared/MotionRoot";
 import { themeScript } from "@/lib/theme/script";
@@ -48,6 +48,12 @@ const gopher = localFont({
 // Fourth set (Admin > Site fonts > Jakarta + Fraunces). Declared only; downloaded when that set is live.
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", display: "swap", preload: false });
 const fraunces = Fraunces({ subsets: ["latin"], style: ["italic"], variable: "--font-fraunces", display: "swap", preload: false });
+// 1063: "Acumin Pro + Times New Roman" and "Magnode + Alpha Lyrae". Open stand-ins for the paid faces (lib/fonts.ts).
+// Declared only, so nobody downloads them unless that set is live.
+const archivo = Archivo({ subsets: ["latin"], variable: "--font-archivo", display: "swap", axes: ["wdth"], preload: false });
+const tinos = Tinos({ subsets: ["latin"], weight: ["400", "700"], style: ["normal", "italic"], variable: "--font-tinos", display: "swap", preload: false });
+const rubik = Rubik({ subsets: ["latin"], variable: "--font-rubik", display: "swap", preload: false });
+const spaceMono = Space_Mono({ subsets: ["latin"], weight: ["400", "700"], style: ["normal", "italic"], variable: "--font-spacemono", display: "swap", preload: false });
 
 import { LaunchHost } from "@/components/billing/RocketCta";
 import { LiquidGlass } from "@/components/shared/LiquidGlass";
@@ -69,7 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // The Content Security Policy only runs scripts carrying this request's nonce (set by middleware.ts).
   const nonce = headers().get("x-nonce") ?? undefined;
   return (
-    <html lang="en" className={`dark ${display.variable} ${body.variable} ${classicDisplay.variable} ${classicBody.variable} ${serif.variable} ${gopher.variable} ${jakarta.variable} ${fraunces.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`dark ${display.variable} ${body.variable} ${classicDisplay.variable} ${classicBody.variable} ${serif.variable} ${gopher.variable} ${jakarta.variable} ${fraunces.variable} ${archivo.variable} ${tinos.variable} ${rubik.variable} ${spaceMono.variable}`} suppressHydrationWarning>
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
         {/* Inside the Android app: mark <html> before first paint so the app layout (app/mobile-app.css) never flashes the web one. */}

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Minus, Moon, Plus } from "lucide-react";
 import { Shell, SectionHead } from "./bits";
+import { Reveal } from "./Reveal";
 import { cn } from "@/lib/utils";
 import { OUTLLY_MIN_PER_VIDEO, TIME_DEFAULTS, minutesLabel, timeSaved } from "@/lib/marketing/time-saved";
 import { eveningWeek, EVENING_MIN } from "@/lib/marketing/evenings";
@@ -89,7 +90,7 @@ export function TimeSaved() {
       <Shell>
         <SectionHead id="time-title" eyebrow="Time saved" title="Get your evenings back." body="Set your week. Watch what posting by hand takes out of it, then what's left with Outlly." />
 
-        <div className="ev-card mt-10">
+        <Reveal fx="depth" className="ev-card mt-10">
           <div className="grid gap-3 sm:grid-cols-3">
             <Dial label="Videos a week" value={videos} min={1} max={30} unit={videos === 1 ? "video" : "videos"} onChange={change(setVideos)} />
             <Dial label="Platforms per video" value={platforms} min={1} max={3} unit={platforms === 1 ? "platform" : "platforms"} onChange={change(setPlatforms)} />
@@ -147,7 +148,7 @@ export function TimeSaved() {
             {latest > EVENING_MIN ? "Some nights run past midnight by hand. " : ""}
             By hand: re-exporting, captions, hashtags and title, then uploading, once per platform ({minutesLabel(r.manualWeek)} a week). With Outlly we count {OUTLLY_MIN_PER_VIDEO} minutes a video: one upload, then a read over the drafts ({minutesLabel(r.outllyWeek)}). An estimate from your numbers, not a promise.
           </p>
-        </div>
+        </Reveal>
       </Shell>
     </section>
   );

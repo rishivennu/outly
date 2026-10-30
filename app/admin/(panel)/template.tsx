@@ -10,6 +10,6 @@ const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
  */
 export default function Template({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  useIso(() => pageStagger(ref.current, { duration: 0.4, y: 8 }), []);
+  useIso(() => pageStagger(ref.current, { duration: 0.4, y: 6, x: 10, below: true }), []);
   return <div ref={ref}>{children}</div>;
 }

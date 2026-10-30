@@ -91,7 +91,7 @@ function CompareGrid({ tools, groups }: { tools: Tool[]; groups: Flags }) {
           <details key={g.label} data-cmp-group open={gi === ROW_GROUPS.findIndex((x) => groups?.[x.label] !== false)} className="group/g ap-tile mt-4 !rounded-[26px] shadow-[0_0_0_1px_hsl(var(--foreground)/.06)]">
             <summary className="flex min-h-[64px] cursor-pointer list-none items-center gap-3 px-4 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
               <span className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-3">
-                <h3 className="font-display text-[20px] font-bold leading-tight tracking-[-0.02em] sm:text-[24px]">{g.label}</h3>
+                <h3 className="font-display text-[18px] font-bold leading-tight tracking-[-0.02em] sm:text-[20px]">{g.label}</h3>
                 <span className="text-[13px] text-muted-foreground">
                   {g.rows} {g.rows === 1 ? "row" : "rows"} · Outlly yes on {ours}
                 </span>

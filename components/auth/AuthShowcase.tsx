@@ -1,8 +1,9 @@
 "use client";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { OutlyMark } from "@/components/brand/Logo";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
+import { GlobeStage } from "@/components/waitlist/globe/GlobeStage";
 
 /**
  * Where each colour blob sits, per route. The panel lives in the shared layout, so switching between
@@ -38,6 +39,18 @@ export function AuthShowcase({ eyebrow = "With Outlly you can", lines = ["Make i
   const path = usePathname();
   const pose = path.startsWith("/signup") ? "signup" : path.startsWith("/admin") ? "admin" : "login";
   const first = useRef(true);
+  // 1063: the waitlist globe turns in the middle of the panel on sign in and sign up (not the admin sign in).
+  // It stays mounted between the two routes because the panel lives in the shared layout.
+  // Below lg the panel is display:none, so the globe is only mounted where it can be seen.
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const on = () => setWide(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  const globe = pose !== "admin";
 
   // Entrance + ambient life (once per mount).
   useGSAP(() => {
@@ -94,6 +107,7 @@ export function AuthShowcase({ eyebrow = "With Outlly you can", lines = ["Make i
     <section
       ref={ref}
       aria-hidden="true"
+      data-globe={globe || undefined}
       className="gs-stage relative isolate hidden min-h-[560px] flex-col justify-between overflow-hidden rounded-[22px] bg-[hsl(240_10%_6%)] p-8 text-white sm:rounded-[26px] lg:flex xl:p-10"
     >
       {/* The light. Blurred blobs on a near-black base; an ink pool bottom left keeps the copy readable. */}
@@ -114,6 +128,12 @@ export function AuthShowcase({ eyebrow = "With Outlly you can", lines = ["Make i
       </div>
 
       <OutlyMark variant="white" size={44} className="as-mark gs-in" />
+
+      {globe && (
+        <div className="as-globe">
+          {wide && <GlobeStage />}
+        </div>
+      )}
 
       <div className="relative max-w-[440px]">
         <p className="as-eyebrow gs-in text-[15px] font-medium text-white/80">{eyebrow}</p>

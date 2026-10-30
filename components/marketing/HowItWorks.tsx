@@ -23,7 +23,9 @@ export function HowItWorks() {
         </div>
         <ol className="mt-14 grid gap-px overflow-hidden rounded-[1.75rem] border border-border bg-border sm:grid-cols-3 lg:mt-5">
           {STEPS.map((s, i) => (
-            <li key={s.n} data-flick="" data-spot="" className="how-step bg-background p-7 sm:p-8">
+            <li key={s.n} data-flick="" data-spot="" className="how-step relative bg-background p-7 sm:p-8">
+              {/* Below lg: this step's share of the progress line, filled as it scrolls up (ScrollScenes.tsx). */}
+              <span aria-hidden="true" className="how-bar" />
               <Reveal delay={i * 0.08}>
                 <span className="how-n display block text-[2.6rem] text-lime-ink">{s.n}</span>
                 <div className="mt-4 flex items-center gap-3">

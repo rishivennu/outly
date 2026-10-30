@@ -120,11 +120,11 @@ export function FinalCta({ beta = false }: { beta?: boolean }) {
   return (
     <section className="pb-24 pt-10 sm:pb-32" aria-labelledby="cta-title">
       <Shell>
-        <Reveal y={40}>
+        <Reveal fx="depth" y={40}>
           <div className="ap-canvas relative overflow-hidden rounded-[2.25rem] px-6 pt-14 text-center sm:px-12 sm:pt-20">
             <Reveal stagger y={20} className="relative mx-auto flex max-w-3xl flex-col items-center">
               <AppIcon brand="outly" size={64} />
-              <h2 id="cta-title" className="display mt-7 text-balance text-[clamp(2.2rem,6vw,4.25rem)]">
+              <h2 id="cta-title" className="display mt-7 text-balance text-[clamp(2rem,3.4vw+1rem,3rem)]">
                 {first}
                 {second && (
                   <>
@@ -133,7 +133,7 @@ export function FinalCta({ beta = false }: { beta?: boolean }) {
                   </>
                 )}
               </h2>
-              <p className="mt-5 max-w-xl text-pretty text-[17px] leading-relaxed text-[hsl(var(--ap-ink2))] sm:text-lg">{FINAL_CTA.body}</p>
+              <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-[hsl(var(--ap-ink2))]">{FINAL_CTA.body}</p>
               <FinalCtaButtons />
               <p className="mt-3 text-[13px] text-[hsl(var(--ap-ink2))]">{beta ? "Free while in beta. No card needed." : "Start free. No card needed."}</p>
             </Reveal>

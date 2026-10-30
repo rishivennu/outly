@@ -1,5 +1,6 @@
 import { Shell, SectionHead } from "./bits";
 import { TrustLive } from "./TrustLive";
+import { Reveal } from "./Reveal";
 import { trustCounts } from "@/lib/marketing/trust-stats";
 import { floorNice } from "@/lib/marketing/trust-core";
 
@@ -15,7 +16,10 @@ export async function Trust() {
     <section id="trust" className="scroll-mt-24 overflow-hidden py-16 sm:py-20" aria-labelledby="trust-title">
       <Shell>
         <SectionHead id="trust-title" eyebrow="Trust" title="Your accounts, kept safe." body="Here's the receipt: the real numbers, and what Outlly does with the keys to your channels." />
-        <TrustLive creators={c.creators} posts={posts} platforms={c.platforms} />
+        {/* The printer rises into place through its mask; the receipt then prints on its own (TrustLive). */}
+        <Reveal>
+          <TrustLive creators={c.creators} posts={posts} platforms={c.platforms} />
+        </Reveal>
       </Shell>
     </section>
   );

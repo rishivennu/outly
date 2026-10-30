@@ -5,7 +5,7 @@ import { SignupCta } from "./SignupCta";
 import { StampChip } from "@/components/brand/Stamps";
 import { Shell } from "./bits";
 import { splitWords } from "./Split";
-import { HERO, PLATFORM_PITCH } from "@/lib/marketing/content";
+import { HERO } from "@/lib/marketing/content";
 import type { Platform } from "@/lib/domain";
 
 /**
@@ -13,10 +13,8 @@ import type { Platform } from "@/lib/domain";
  * accent, collaborator name tags floating beside it, then the arched card fan rising from
  * the bottom edge. Works in both themes; the fan cards keep their own saturated colours.
  */
-export function Hero({ showHow = true, beta = false, live }: { showHow?: boolean; beta?: boolean; live?: Platform[] }) {
-  // Only the places you can publish to today; the "Publishes to" row right below lists the ones coming soon.
-  const pitch = live ? PLATFORM_PITCH.filter((p) => live.includes(p.id as Platform)) : PLATFORM_PITCH.slice(0, 3);
-  const soon = PLATFORM_PITCH.length - pitch.length;
+// `live` is still accepted, but the platform list lives in the "Publishes to" ticker right below (1063 trimmed the hero).
+export function Hero({ showHow = true, beta = false }: { showHow?: boolean; beta?: boolean; live?: Platform[] }) {
   // Words unfold one after another on load (Play pass in globals.css); the accent word is written in last.
   const l1 = splitWords("Your content deserves");
   const l2 = splitWords("to be", l1.next);
@@ -31,18 +29,19 @@ export function Hero({ showHow = true, beta = false, live }: { showHow?: boolean
         <div className="relative w-full">
           <CursorTag name="Meera" tone="teal" side="l" className="left-[2%] top-[4%] hidden md:inline-flex lg:left-[8%]" />
           <CursorTag name="Arjun" tone="pink" side="r" className="right-[2%] top-[58%] hidden md:inline-flex lg:right-[8%]" />
-          <h1 id="hero-title" className="display hf-h1 mx-auto max-w-[17ch] text-balance text-[clamp(2.5rem,6.6vw,5rem)]">
+          {/* 10.98em is the old 17ch measured in Manrope. ch follows the font, so it changed when the web font swapped in and the headline briefly wrapped to three lines (1064). */}
+          <h1 id="hero-title" className="display hf-h1 mx-auto max-w-[10.98em] text-balance text-[clamp(2.375rem,4.2vw+0.5rem,3.5rem)]">
             <span className="hf-line is-split">{l1.nodes}</span>{" "}
             <span className="hf-line is-split">
               {l2.nodes} <span className="accent-serif hf-accent sw" style={{ ["--wi" as string]: l2.next }}>everywhere.</span>
             </span>
           </h1>
         </div>
-        <p className="hf-in mt-4 max-w-xl text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-[19px]" style={{ ["--d" as string]: ".7s" }}>
+        <p className="hf-in mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-[17px]" style={{ ["--d" as string]: ".7s" }}>
           {HERO.sub}
         </p>
 
-        <div className="hf-in mt-5 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center" style={{ ["--d" as string]: ".8s" }}>
+        <div className="hf-cta mt-5 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center" style={{ ["--d" as string]: ".8s" }}>
           <SignupCta
             magnet
             label={HERO.primary.label}
@@ -59,14 +58,14 @@ export function Hero({ showHow = true, beta = false, live }: { showHow?: boolean
           </Link>}
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
+        <div className="mt-5 flex flex-wrap items-center justify-center">
         <p className="hf-in glass hairline inline-flex items-center gap-2 rounded-full py-1.5 pl-2 pr-4 text-[13px] font-medium text-foreground/85" style={{ ["--d" as string]: ".85s" }}>
           {beta ? (
             <>
               <StampChip>Beta</StampChip>
               <span className="text-lime-ink dark:text-lime">Free during beta</span>
               {/* the long half only where it fits on one line */}
-              <span aria-hidden="true" className="hidden text-foreground/40 sm:inline">&mdash;</span>
+              <span aria-hidden="true" className="hidden text-foreground/40 sm:inline">&middot;</span>
               <span className="hidden sm:inline">{HERO.eyebrow}</span>
             </>
           ) : (
@@ -77,20 +76,6 @@ export function Hero({ showHow = true, beta = false, live }: { showHow?: boolean
           )}
         </p>
 
-        <dl className="hf-in flex flex-wrap justify-center gap-x-7 gap-y-2" style={{ ["--d" as string]: ".9s" }}>
-          {pitch.map((p) => (
-            <div key={p.id} className="flex items-baseline gap-1.5">
-              <dt className="text-sm font-semibold">{p.name}</dt>
-              <dd className="text-sm text-muted-foreground">{p.format}</dd>
-            </div>
-          ))}
-          {soon > 0 && (
-            <div className="flex items-baseline">
-              <dt className="sr-only">Coming soon</dt>
-              <dd className="text-sm text-muted-foreground">{soon} more coming soon</dd>
-            </div>
-          )}
-        </dl>
         </div>
       </Shell>
 

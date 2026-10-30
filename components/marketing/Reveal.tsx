@@ -9,8 +9,11 @@ import { registerReveal, type RevealFx } from "@/lib/motion/reveal";
  * Content is only hidden under html.js (set by the inline head script), so it is never lost if JS fails,
  * and anything already on screen at load plays at once. Reduced motion gets a short fade, no movement.
  *
- * fx picks the choreography: "rise" (default), "stagger" (children one after another), "cards"
- * (centre first), "tiles" (bento tiles in reading order), "rows" (comparison groups), "footer".
+ * fx picks the choreography (1064: all of them are mask reveals, see lib/motion/reveal.ts): "rise" (default,
+ * uncovered top to bottom while it lifts), "depth" (an iris that opens with a little scale), "wipe" (sideways,
+ * `dir` picks the side), "stagger" (children one after another), "cards" (the recommended plan first, the
+ * rest open away from it), "tiles" (bento: the lead tile, then the others outward from it), "rows"
+ * (comparison groups), "footer".
  */
 export function Reveal({
   children,
@@ -20,6 +23,7 @@ export function Reveal({
   as: Tag = "div",
   stagger = false,
   fx,
+  dir,
 }: {
   children: React.ReactNode;
   delay?: number;
@@ -29,6 +33,8 @@ export function Reveal({
   /** Children rise one after another instead of the wrapper moving as one block. */
   stagger?: boolean;
   fx?: RevealFx;
+  /** "wipe" only: which way it is uncovered. Default: left to right. */
+  dir?: "left" | "right";
 }) {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -42,6 +48,7 @@ export function Reveal({
       data-reveal=""
       data-stagger={stagger || fx === "cards" ? "" : undefined}
       data-rv={fx}
+      data-dir={dir}
       className={className}
       style={{ ["--reveal-delay" as string]: `${delay}s`, ["--reveal-y" as string]: `${y}px` }}
     >

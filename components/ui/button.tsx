@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "ripple-host relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium transition-[transform,background-color,color,box-shadow,opacity] duration-200 ease-out active:scale-[0.97] disabled:pointer-events-none disabled:text-muted-foreground [&_svg]:shrink-0",
+  "ripple-host btn-lift relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium transition-[transform,translate,background-color,color,box-shadow,opacity] duration-200 [transition-timing-function:var(--ease-liquid)] active:scale-[0.97] disabled:pointer-events-none disabled:text-muted-foreground [&_svg]:shrink-0",
   {
     variants: {
       variant: {

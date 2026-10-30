@@ -29,11 +29,11 @@ export function SectionHead({
   return (
     <Reveal y={0} className={cn("rv-head", align === "center" && "mx-auto text-center", "max-w-2xl", className)}>
       <p className="rv-eyebrow eyebrow mb-5">{eyebrow}</p>
-      <h2 id={id} className="display text-balance text-[clamp(2.1rem,5.4vw,3.6rem)]">
+      <h2 id={id} className="display text-balance text-[clamp(1.875rem,2.6vw+1rem,2.625rem)]">
         {/* words unfold one after another when the head scrolls in (Play pass in globals.css) */}
         <span className="rv-words">{splitWords(title).nodes}</span>
       </h2>
-      {body && <p className="rv-body mt-5 text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-lg">{body}</p>}
+      {body && <p className="rv-body mt-4 text-pretty text-[15px] leading-relaxed text-muted-foreground sm:text-base">{body}</p>}
     </Reveal>
   );
 }

@@ -10,7 +10,7 @@ export const HERO = {
   eyebrow: "One upload · three destinations",
   h1: "Your content deserves to be everywhere.",
   sub: "Upload once. Let AI tailor your content for every platform. Publish and track everything from one creative workspace.",
-  primary: { label: "Start creating", href: "/signup" },
+  primary: { label: "Start creating free", href: "/signup" },
   secondary: { label: "See how it works", href: "#how" },
 } as const;
 
@@ -25,7 +25,7 @@ export const STEPS: Step[] = [
   {
     n: "01",
     title: "Drop your video",
-    body: "Drag in a file (up to 50 MB per file on the Free plan) and it lands in your library straight away. We read duration, aspect ratio and resolution so nothing surprises you later.",
+    body: "Drag in a file (the Free plan holds 50 MB in total) and it lands in your library straight away. We read duration, aspect ratio and resolution so nothing surprises you later.",
     icon: "upload",
   },
   {
@@ -201,7 +201,7 @@ export const FAQS: Faq[] = [
   },
   {
     q: "Is there a limit on how big my video can be?",
-    a: "Yes, 50 MB per file on the Free plan. A trimmed vertical clip of a minute or two usually fits; a long 4K export will not. Paid plans raise the cap, so larger files are what Creator and Studio are for.",
+    a: "Yes. The Free plan gives you 50 MB of storage, and one file can use all of it. A trimmed vertical clip of a minute or two usually fits; a long 4K export will not. Creator raises storage to 500 MB and Studio to 50 GB.",
   },
   {
     q: "What happens when one platform fails?",
@@ -231,7 +231,7 @@ export const PLANS: Plan[] = [
     price: "Free",
     note: "Try the whole flow",
     state: "available",
-    bullets: ["One workspace", "3 posts a week (resets every Monday)", "Uploads up to 50 MB per file", "10 inbox replies a week", "AI captions on 2 videos a month; burning captions into the video is on paid plans", "Instagram Reels, YouTube Shorts and X", "Scheduling, statuses and retries"],
+    bullets: ["One workspace", "3 posts a week (resets every Monday)", "50 MB of storage", "10 inbox replies a week", "AI captions on 2 videos a month; burning captions into the video is on paid plans", "Instagram Reels, YouTube Shorts and X", "Scheduling, statuses and retries"],
   },
   {
     name: "Creator",

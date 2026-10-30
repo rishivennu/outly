@@ -15,7 +15,7 @@ export default async function FontsAdminPage() {
       <PageHead
         eyebrow="Setup"
         title="Site fonts"
-        body="Switch the typeface across the whole site: marketing pages, the app and this admin. A pick saves at once and visitors see it within about five minutes."
+        body="Switch the typeface across the whole site: marketing pages, the app and this admin. A pick saves at once and every visitor sees it within 30 seconds, no deploy needed."
       />
       <FontPicker initial={fonts} />
     </>

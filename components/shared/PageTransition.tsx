@@ -15,22 +15,29 @@ let lastPath: string | null = null;
  * The page's top-level blocks settle in one after another (the shared GSAP pageStagger, 10-22) while a
  * three-layer water wave with rolling crests sweeps up the screen (no splash rings since 1053: the user asked for the circle to go). The very first load
  * gets neither, so nothing delays paint. Runs before paint (layout effect), so blocks never flash first.
+ *
+ * 1064: the site wave is quicker (about 1.1 s, was 1.7 s) and never blocks a click (pointer-events: none).
+ * The studio ("app" variant) drops the wave altogether: a working screen slides in a few pixels sideways and
+ * settles in under half a second, and its lower panels settle once as they scroll into view.
  */
-export function PageTransition({ children }: { children: React.ReactNode }) {
+export function PageTransition({ children, variant = "site" }: { children: React.ReactNode; variant?: "site" | "app" }) {
   const path = usePathname();
   const [first] = useState(() => !seen);
   // Inside the Android app screens move the iOS way (push, pop, cross-fade, sheet) instead of the web's wave.
   const [kind] = useState<AppNav | null>(() => (isApp() ? appNavKind(first ? null : lastPath, path, consumeBack()) : null));
-  const [wave, setWave] = useState(!first && kind === null);
+  const [wave, setWave] = useState(!first && kind === null && variant === "site");
   const ref = useRef<HTMLDivElement>(null);
-  useIso(() => (first || kind !== null ? undefined : pageStagger(ref.current, { delay: 0.16 })), []);
+  useIso(() => {
+    if (first || kind !== null) return undefined;
+    return variant === "app" ? pageStagger(ref.current, { duration: 0.45, x: 14, y: 6, below: true }) : pageStagger(ref.current, { delay: 0.12, duration: 0.5, y: 12 });
+  }, []);
   useEffect(() => {
     lastPath = path;
   }, [path]);
   useEffect(() => {
     seen = true;
     if (!wave) return;
-    const t = setTimeout(() => setWave(false), 1700);
+    const t = setTimeout(() => setWave(false), 1200);
     return () => clearTimeout(t);
   }, [wave]);
   return (

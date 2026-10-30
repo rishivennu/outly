@@ -7,7 +7,7 @@ import { FONT_SETS, FONTS_DEFAULT, fontCss, fontSetById, type FontConfig, type F
 import { cn } from "@/lib/utils";
 import { Card, CardTitle, Pill } from "./ui";
 
-/** Apply a set to this tab right away (the site-wide stylesheet is cached for a few minutes). */
+/** Apply a set to this tab right away (visitors get it from /api/pip-theme within 30 seconds). */
 function applyHere(cfg: FontConfig) {
   let el = document.getElementById("font-live") as HTMLStyleElement | null;
   if (!el) {
@@ -19,7 +19,7 @@ function applyHere(cfg: FontConfig) {
 }
 
 /**
- * Admin > Site fonts. Five sets, each previewed in its own faces and headline setting (weight, tracking,
+ * Admin > Site fonts. Seven sets, each previewed in its own faces and headline setting (weight, tracking,
  * leading) so they can be compared side by side before switching. A pick saves at once (optimistic, rolls back on error).
  */
 export function FontPicker({ initial }: { initial: FontConfig }) {
@@ -37,7 +37,7 @@ export function FontPicker({ initial }: { initial: FontConfig }) {
       const r = await adminApi<{ fonts: FontConfig }>("/api/admin/fonts", { method: "PUT", json: next });
       setCfg(r.fonts);
       applyHere(r.fonts);
-      toast(`Site fonts are now ${fontSetById(r.fonts.set).name}. Live for visitors within about five minutes.`);
+      toast(`Site fonts are now ${fontSetById(r.fonts.set).name}. Live for every visitor within 30 seconds.`);
     } catch (e) {
       setCfg(prev);
       toast((e as Error).message, "error");
@@ -79,7 +79,7 @@ export function FontPicker({ initial }: { initial: FontConfig }) {
                 <span aria-hidden className="block">
                   <span className="block text-[28px]" style={{ fontFamily: f.display, fontWeight: f.look.weight, letterSpacing: f.look.tracking, lineHeight: f.look.leading, fontVariationSettings: f.look.axes ?? "normal" }}>
                     Create once.{" "}
-                    <span style={{ fontFamily: f.serif, fontStyle: "italic", fontWeight: 400 }}>Publish</span> everywhere.
+                    <span style={{ fontFamily: f.serif, fontStyle: "italic", fontWeight: f.accent?.weight ?? 400, letterSpacing: f.accent?.tracking }}>Publish</span> everywhere.
                   </span>
                   <span className="mt-3 block text-[15px] leading-relaxed text-muted-foreground" style={{ fontFamily: f.body }}>
                     Upload one video and Outlly tailors it for Reels, Shorts and X. 0123456789

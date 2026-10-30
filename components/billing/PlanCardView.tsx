@@ -57,7 +57,7 @@ export function PlanCardView({
   const accent = la ? "la-accent" : hot && v === "bold" ? "" : "pc-accent";
 
   const pill = hot && name && v !== "classic" ? (
-    <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.1em]", v === "bold" ? "bg-[#0b0b0d] text-white" : "bg-lime text-[hsl(var(--lime-foreground))]")}>Popular</span>
+    <span className={cn("pc-pill shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.1em]", v === "bold" ? "bg-[#0b0b0d] text-white" : "bg-lime text-[hsl(var(--lime-foreground))]")}>Popular</span>
   ) : !live ? (
     <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", la ? "la-box la-mute" : "border border-border text-muted-foreground")}>Soon</span>
   ) : null;

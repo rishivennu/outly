@@ -121,7 +121,7 @@ export function CursorTag({ name, tone, side, className }: { name: string; tone:
 const SPARKS: [string, string, number][] = [["8%", "18%", 14], ["90%", "12%", 12], ["16%", "62%", 10], ["84%", "58%", 16], ["36%", "8%", 9], ["66%", "30%", 11], ["4%", "40%", 9], ["96%", "38%", 10]];
 export function Sparkles() {
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+    <div aria-hidden="true" data-parallax="-48" className="pointer-events-none absolute inset-0">
       {SPARKS.map(([l, t, s], i) => (
         // The twinkle runs on a wrapper span: animating the <svg> itself forces an SVG layout every frame.
         <span key={i} className="hf-spark absolute block" style={{ left: l, top: t, width: s, height: s, animationDelay: `${-i * 0.7}s` }}>

@@ -525,9 +525,9 @@ html:not(.dark) .o3d-floor { background: radial-gradient(closest-side, rgba(30, 
 /* three sheets, each a body that fades out downward plus a rolling crest on top */
 .pw-sheet { position: absolute; left: 0; right: 0; top: 100%; height: 115vh; will-change: transform;
   --c: var(--lime); --a: .62; --p: 520px; --h: 74px;
-  animation: pw-rise 1.25s cubic-bezier(.62, .02, .3, 1) forwards; }
-.pw-sheet:nth-child(2) { --c: 190 95% 58%; --a: .5; --p: 380px; --h: 58px; animation-delay: .08s; }
-.pw-sheet:nth-child(3) { --c: 228 100% 64%; --a: .42; --p: 680px; --h: 92px; animation-delay: .16s; }
+  animation: pw-rise .95s cubic-bezier(.62, .02, .3, 1) forwards; }
+.pw-sheet:nth-child(2) { --c: 190 95% 58%; --a: .5; --p: 380px; --h: 58px; animation-delay: .06s; }
+.pw-sheet:nth-child(3) { --c: 228 100% 64%; --a: .42; --p: 680px; --h: 92px; animation-delay: .12s; }
 /* one element per wave (crest + body under a single mask) so there is no seam to see */
 .pw-crest { position: absolute; left: 0; top: calc(var(--h) * -1); bottom: 0; width: calc(100% + var(--p)); will-change: transform;
   background: linear-gradient(180deg, hsl(0 0% 100% / .7) 0, hsl(0 0% 100% / .7) calc(var(--h) * .14), hsl(var(--c) / var(--a)) calc(var(--h) * .36),
@@ -575,6 +575,9 @@ html.js [data-reveal][data-stagger]:not([data-shown]) > * { opacity: 0; }
 /* Failsafe: if the engine never registers anything (html.rv-on stays off), show everything after 3s. */
 @keyframes rv-failsafe { to { opacity: 1; } }
 html.js:not(.rv-on) [data-reveal]:not([data-shown]), html.js:not(.rv-on) [data-reveal][data-stagger]:not([data-shown]) > * { animation: rv-failsafe 0s linear 3s forwards; }
+/* Demo (1064): the destination cards wait for the story tiles above them, then open one after another. */
+html.js .bx-demo[data-reveal]:not([data-shown]) ~ .la-demo > li { opacity: 0; }
+html.js:not(.rv-on) .bx-demo[data-reveal]:not([data-shown]) ~ .la-demo > li { animation: rv-failsafe 0s linear 3s forwards; }
 /* masked headline: the words rise out of their own line box */
 .rv-mask { display: block; overflow: hidden; padding-bottom: .12em; margin-bottom: -.12em; }
 .rv-mask > .rv-line { display: block; transition: transform .8s var(--ease-liquid) var(--reveal-delay, 0s), opacity .6s var(--ease-liquid) var(--reveal-delay, 0s); }
@@ -1058,7 +1061,7 @@ a.bx-lime:hover .bx-arrow, .bx-arrow:hover { transform: rotate(45deg); backgroun
 /* section head (same for both sections) */
 .bx-head { display: flex; flex-direction: column; gap: 10px; margin-bottom: 26px; }
 @media (min-width: 1024px) { .bx-head { flex-direction: row; align-items: flex-end; justify-content: space-between; margin-bottom: 32px; } }
-.bx-head h2 { font-size: clamp(2.1rem, 4.8vw, 3.5rem); }
+.bx-head h2 { font-size: clamp(1.875rem, 2.6vw + 1rem, 2.625rem); }
 
 /* the pictures: lime glow on ink, lime-to-green with a softer glow on cream */
 .bx-hot { --h1: var(--lime); --h2: var(--energy-a); }
@@ -1374,8 +1377,11 @@ html:not(.dark) .hf-glow { background: radial-gradient(50% 40% at 50% 80%, hsl(7
 .hf-fan { height: 100%; }
 .hf-slot { pointer-events: auto; }
 .hf-slot { position: relative; margin: 0 -26px; transform: translateY(calc(var(--y) + 40px)) rotate(var(--r)); transform-origin: 50% 120%; opacity: 0;
-  animation: hf-rise .9s var(--ease-out) var(--d) forwards; }
+  animation: hf-rise .9s var(--ease-out) var(--d) forwards, hf-clip .95s var(--ease-liquid) var(--d) both; }
 @keyframes hf-rise { to { opacity: 1; transform: translateY(var(--y)) rotate(var(--r)); } }
+/* 1064: each card is also uncovered from the stage floor up while it rises, a second layer of motion under
+   the lift. The window opens well past the card (shadow, hover lift) and the last frame drops the clip. */
+@keyframes hf-clip { from { clip-path: inset(100% -90px -90px -90px round 28px); } 98% { clip-path: inset(-90px -90px -90px -90px round 28px); } to { clip-path: none; } }
 .hf-card { position: relative; width: 220px; height: 330px; border-radius: 28px; padding: 20px; overflow: hidden; color: #fbfcfe; isolation: isolate;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.22), 0 30px 60px -28px rgba(0,0,0,.7); }
 .hf-hero { width: 250px; height: 380px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.5), 0 0 60px -10px hsl(var(--lime) / .6), 0 40px 70px -30px rgba(0,0,0,.75); }
@@ -1547,13 +1553,19 @@ body[data-scroll-locked] .pb-rail { display: none; }
   :root { --ease-elastic: cubic-bezier(.34, 1.56, .64, 1); --ease-spring: cubic-bezier(.34, 1.8, .64, 1); }
 }
 
-/* Words unfold from a squashed, tilted sliver, pinned at their top-left corner. */
+/* Words rise out of their own line (1064, replaces the elastic unfold): each word travels up from below while
+   a clip window that stays fixed on the page uncovers it, so it reads as text coming up through a slot.
+   The clip moves against the transform by the same amount, which keeps the window still. The window runs
+   .3em past each side, so descenders and italic overhang are never cut, and it is a no-op once settled. */
 .sw { display: inline-block; transform-origin: 0 0; }
-@keyframes sw-unfold { from { transform: translate3d(40%, -10%, 0) scale(.85, .1) rotate(8deg); } to { transform: none; } }
+@keyframes sw-rise {
+  from { transform: translate3d(0, calc(100% + .6em), 0); clip-path: inset(calc(-100% - .9em) -.3em calc(100% + .3em) -.3em); }
+  to { transform: none; clip-path: inset(-.3em -.3em -.3em -.3em); }
+}
 @keyframes sw-fade { from { opacity: 0; } to { opacity: 1; } }
-/* The accent word is written in left to right with a small hop, like a hand-lettered note. */
+/* The accent word is written in left to right while it lifts the last few pixels into place. */
 @keyframes sw-write { from { clip-path: inset(-30% 100% -30% -10%); } to { clip-path: inset(-30% -10% -30% -10%); } }
-@keyframes sw-hop { from { translate: 0 .22em; rotate: -5deg; } to { translate: 0 0; rotate: 0deg; } }
+@keyframes sw-lift { from { translate: 0 .28em; } to { translate: 0 0; } }
 
 /* Hero: the gradient moves from the line onto each word, so the words can move on their own. */
 .hf-line.is-split { background: none; color: inherit; padding-bottom: 0; }
@@ -1581,27 +1593,31 @@ body[data-scroll-locked] .pb-rail { display: none; }
 .how-step[data-on] .how-n { text-shadow: 0 0 26px hsl(var(--lime) / .45); }
 @media (prefers-reduced-motion: reduce) { .how-node, .how-n { transition: none; } }
 @media (forced-colors: active) { .how-rail::before, .how-fill, .how-node { background: CanvasText; } }
-.hf-h1 .sw { --wd: calc(.04s + var(--wi, 0) * 60ms); animation: sw-unfold .8s var(--ease-elastic) var(--wd) both, sw-fade-lcp .2s linear var(--wd) both; }
-.hf-h1 .sw.accent-serif { animation: sw-fade-lcp .2s linear var(--wd) both, sw-write .7s cubic-bezier(.6, .05, .3, 1) var(--wd) both, sw-hop .8s var(--ease-elastic) var(--wd) both; }
+.hf-h1 .sw { --wd: calc(.04s + var(--wi, 0) * 70ms); animation: sw-rise .85s var(--ease-liquid) var(--wd) backwards, sw-fade-lcp .2s linear var(--wd) both; }
+.hf-h1 .sw.accent-serif { animation: sw-fade-lcp .2s linear var(--wd) both, sw-write .75s cubic-bezier(.6, .05, .3, 1) var(--wd) both, sw-lift .8s var(--ease-liquid) var(--wd) both; }
 /* The rest of the hero drops in from just above, after the headline. */
 @keyframes hf-drop { from { opacity: 0; translate: 0 -.75em; } to { opacity: 1; translate: 0 0; } }
 .hf-in { animation: hf-drop .5s var(--ease-out) var(--d, .05s) both; }
+/* The hero's calls to action arrive one after another, 80ms apart, right after the line above them (1064). */
+.hf-cta > * { animation: hf-drop .5s var(--ease-out) calc(var(--d, .05s) + var(--k, 0) * 80ms) both; }
+.hf-cta > :nth-child(2) { --k: 1; }
+.hf-cta > :nth-child(3) { --k: 2; }
 /* The collaborator tags plop on like stickers and settle at a slight tilt, then keep drifting. */
-@keyframes hf-plop { from { scale: 0; rotate: -20deg; translate: 0 -2.5em; } to { scale: 1; rotate: var(--tr, 0deg); translate: 0 0; } }
+@keyframes hf-plop { from { opacity: 0; scale: .7; rotate: calc(var(--tr, 0deg) - 6deg); translate: 0 -1.2em; } to { opacity: 1; scale: 1; rotate: var(--tr, 0deg); translate: 0 0; } }
 .hf-tag-teal { --tr: -5deg; --pd: 1s; }
 .hf-tag-pink { --tr: 4deg; --pd: 1.15s; }
-.hf-tag { animation: hf-plop .8s var(--ease-elastic) var(--pd, 1s) both, hf-drift 6s ease-in-out var(--dd, 0s) infinite; }
+.hf-tag { animation: hf-plop .7s var(--ease-liquid) var(--pd, 1s) both, hf-drift 6s ease-in-out var(--dd, 0s) infinite; }
 
 /* Section heads: the same unfold, played when the head scrolls into view. */
 .rv-words { display: block; }
 html.js .rv-head:not([data-shown]) .rv-words .sw { opacity: 0; }
-.rv-head[data-shown] .rv-words .sw { --wd: calc(.04s + var(--wi, 0) * 55ms); animation: sw-unfold .875s var(--ease-elastic) var(--wd) both, sw-fade .2s linear var(--wd) both; }
-.rv-head[data-shown] .rv-words .sw.accent-serif { animation: sw-fade .2s linear var(--wd) both, sw-write .8s cubic-bezier(.6, .05, .3, 1) var(--wd) both, sw-hop .9s var(--ease-elastic) var(--wd) both; }
+.rv-head[data-shown] .rv-words .sw { --wd: calc(.04s + var(--wi, 0) * 60ms); animation: sw-rise .8s var(--ease-liquid) var(--wd) backwards, sw-fade .2s linear var(--wd) both; }
+.rv-head[data-shown] .rv-words .sw.accent-serif { animation: sw-fade .2s linear var(--wd) both, sw-write .75s cubic-bezier(.6, .05, .3, 1) var(--wd) both, sw-lift .8s var(--ease-liquid) var(--wd) both; }
 
-/* Icons inside a Reveal plop in: from nothing, spun and lifted, landing with a spring. */
-@keyframes pop-in { from { scale: 0; rotate: -20deg; translate: 0 -.6em; } to { scale: 1; rotate: 0deg; translate: 0 0; } }
-html.js [data-reveal]:not([data-shown]) .pop-in { scale: 0; }
-[data-reveal][data-shown] .pop-in { animation: pop-in .8s var(--ease-elastic) calc(var(--reveal-delay, 0s) + .15s) both; }
+/* Icons inside a Reveal settle in a beat after their card: up from a little smaller, no spin, no spring (1064). */
+@keyframes pop-in { from { opacity: 0; scale: .72; translate: 0 .4em; } to { opacity: 1; scale: 1; translate: 0 0; } }
+html.js [data-reveal]:not([data-shown]) .pop-in { opacity: 0; }
+[data-reveal][data-shown] .pop-in { animation: pop-in .6s var(--ease-liquid) calc(var(--reveal-delay, 0s) + .22s) both; }
 .flick { will-change: auto; }
 
 /* Sticker pile (Difference): tilted pills that spring in one after another. */
@@ -1613,20 +1629,21 @@ html.js [data-reveal]:not([data-shown]) .pop-in { scale: 0; }
 .stk-ink { background: hsl(var(--foreground)); color: hsl(var(--background)); }
 .stk-pink { background: #d4246f; color: #fbfcfe; }
 .stk-blue { background: #1f5fe0; color: #fbfcfe; }
-@keyframes stk-pop { from { scale: 0; rotate: var(--s0, -24deg); } to { scale: 1; rotate: var(--sr, 0deg); } }
-html.js .stk-wrap:not([data-shown]) .stk { scale: 0; }
-.stk-wrap[data-shown] .stk { animation: stk-pop .85s var(--ease-elastic) calc(.1s + var(--si, 0) * 72ms) both; }
+@keyframes stk-pop { from { opacity: 0; scale: .6; rotate: calc(var(--sr, 0deg) - 8deg); translate: 0 .5em; } to { opacity: 1; scale: 1; rotate: var(--sr, 0deg); translate: 0 0; } }
+html.js .stk-wrap:not([data-shown]) .stk { opacity: 0; }
+.stk-wrap[data-shown] .stk { animation: stk-pop .6s var(--ease-liquid) calc(.1s + var(--si, 0) * 70ms) both; }
 
-/* Button labels: letters squash down and spring back in a ripple (MotionFx sets data-bouncing). */
+/* Button labels: on press the letters dip a few percent and flow back in a ripple (MotionFx sets data-bouncing).
+   1064: no squash, spin or spring any more; a restrained press. */
 .bt { display: inline-block; white-space: nowrap; }
 .bt-w { display: inline-block; white-space: nowrap; }
 .bt-c { display: inline-block; transform-origin: 50% 50%; }
 @keyframes bt-squash {
-  0% { transform: none; animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
-  20% { transform: translate3d(0, 55%, 0) scaleY(.3) rotate(17deg); animation-timing-function: var(--ease-spring); }
+  0% { transform: none; animation-timing-function: cubic-bezier(.4, 0, .7, .4); }
+  28% { transform: translate3d(0, 14%, 0) scaleY(.9); animation-timing-function: var(--ease-liquid); }
   100% { transform: none; }
 }
-[data-bouncing] .bt-c { animation: bt-squash .725s both; animation-delay: calc(var(--ci, 0) / var(--cn, 1) * .225s); }
+[data-bouncing] .bt-c { animation: bt-squash .5s both; animation-delay: calc(var(--ci, 0) / var(--cn, 1) * .16s); }
 
 /* Footer sign-off, written like a signature, in the site font. Each letter is a fill path (.fw-f, the whole glyph, so the
    "o" keeps its hole) under pen paths (.fw-p, one per contour, pathLength=1 so a dash of 1 is the whole outline). The pen
@@ -1659,9 +1676,9 @@ html.js .stk-wrap:not([data-shown]) .stk { scale: 0; }
 @media (prefers-reduced-motion: reduce) {
   .hf-h1 .sw, .hf-h1 .sw.accent-serif, .hf-tag, .bt-c, [data-bouncing] .bt-c { animation: none; }
   .hf-tag { rotate: var(--tr, 0deg); }
-  .hf-in { animation: sw-fade .3s linear both; }
+  .hf-in, .hf-cta > * { animation: sw-fade .3s linear both; }
   .rv-head[data-shown] .rv-words .sw, .rv-head[data-shown] .rv-words .sw.accent-serif { animation: sw-fade .3s linear both; }
-  html.js [data-reveal]:not([data-shown]) .pop-in, html.js .stk-wrap:not([data-shown]) .stk { scale: 1; }
+  html.js [data-reveal]:not([data-shown]) .pop-in, html.js .stk-wrap:not([data-shown]) .stk { scale: 1; opacity: 1; }
   [data-reveal][data-shown] .pop-in, .stk-wrap[data-shown] .stk { animation: none; }
 }
 
@@ -2428,7 +2445,7 @@ html[data-contrast="more"] .lg-glass::before, html[data-contrast="more"] .lg-gla
 /* Scroll reveal, one card at a time (TryItStage). Hidden only after the script arms the wall. */
 .try-wall.tc-armed [data-tc]:not([data-in]) { opacity: 0; }
 .try-wall.tc-armed [data-tc]:not([data-in]) .pop-in { scale: 0; }
-.try-wall [data-tc][data-in] .pop-in { animation: pop-in .8s var(--ease-elastic) .3s both; }
+.try-wall [data-tc][data-in] .pop-in { animation: pop-in .6s var(--ease-liquid) .3s both; }
 @media (prefers-reduced-motion: reduce) { .try-wall.tc-armed [data-tc]:not([data-in]) { opacity: 1; } .try-wall [data-tc] .pop-in { animation: none; scale: 1; } }
 
 .try-wall :is(button, a, input):focus-visible { outline: 3px solid hsl(var(--foreground)); outline-offset: 3px; }
@@ -2878,4 +2895,46 @@ html.js .tr-stage[data-print="wait"] .tr-reel { transform: translateY(0); }
 .lg-def ul { display: grid; gap: 6px; padding-left: 18px; list-style: disc; line-height: 1.55; max-width: 72rem; }
 .lg-def b { color: #fff; }
 @media (prefers-reduced-motion: reduce) { .lg-live::after { animation: none; } .lg-btn, .lg-zoom button, .lg-place { transition: none; } }
+
+
+/* 1063: the waitlist globe on the sign in / sign up panel. Sized to the panel's free height so the mark
+   and the promise never collide with it; the lime light dims a little so the dots read against it. */
+.as-globe { position: relative; flex: 1 1 auto; display: grid; place-items: center; min-height: 0; margin: 4px -8px; }
+.as-globe .wl-globe { width: min(100%, 460px, 54dvh); margin: auto; }
+.gs-stage[data-globe] .as-pose:first-child .as-drift { opacity: .55; }
+.gs-stage[data-globe] .as-pose:nth-child(3) .as-drift { opacity: .45; }
+
+/* ---------- 1064: press feedback, the studio sidebar's scrollbar, the step progress line ---------- */
+/* Buttons: settle a pixel up on hover and press down a little on click, on the same liquid curve as the page.
+   Only on devices that hover; the press itself is in the Button classes (active:scale). */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .btn-lift:not(:disabled):hover { translate: 0 -1px; }
+}
+/* Reduced motion: no lift, no press (active:scale works through the --tw-scale vars), colour fades stay. */
+@media (prefers-reduced-motion: reduce) { .btn-lift { transition-property: background-color, color, box-shadow, opacity; } .btn-lift.btn-lift:active { --tw-scale-x: 1; --tw-scale-y: 1; } }
+
+/* Studio sidebar: a hairline scrollbar on a clear track. Neutral, barely there at rest; a little stronger while
+   the pointer is over the sidebar or it is scrolling (Nav sets data-scrolling), then it fades back. Native
+   scrolling, keyboard and screen readers are untouched: the bar is restyled, never hidden. */
+@property --sb { syntax: "<color>"; inherits: true; initial-value: transparent; }
+.nav-scroll { --sb: hsl(var(--foreground) / .1); scrollbar-width: thin; scrollbar-color: var(--sb) transparent;
+  transition: --sb .6s var(--ease-liquid); }
+@media (prefers-reduced-motion: reduce) { .nav-scroll { transition: none; } }
+.nav-scroll:hover, .nav-scroll[data-scrolling] { --sb: hsl(var(--foreground) / .26); }
+/* Safari and older Chromium only: elsewhere the standard props above win (same pattern as the admin bars). */
+@supports not (scrollbar-width: thin) {
+  .nav-scroll::-webkit-scrollbar { width: 6px; }
+  .nav-scroll::-webkit-scrollbar-track { background: transparent; }
+  .nav-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--sb); border: 1px solid transparent; background-clip: padding-box; }
+  .nav-scroll::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+}
+@media (forced-colors: active) { .nav-scroll { scrollbar-color: auto; } }
+
+/* How it works below lg: each step carries a thin lime line along its top that fills as the step scrolls
+   up the screen (ScrollScenes scrubs it). On lg the pinned rail above the grid does this instead. */
+.how-bar { position: absolute; left: 0; right: 0; top: 0; height: 2px; background: hsl(var(--lime)); transform: scaleX(0); transform-origin: 0 50%; pointer-events: none; }
+@media (min-width: 1024px) { .how-bar { display: none; } }
+html:not(.js) .how-bar { transform: none; }
+@media (prefers-reduced-motion: reduce) { .how-bar { transform: none; } }
+@media (forced-colors: active) { .how-bar { background: CanvasText; } }
 
