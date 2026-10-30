@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Loader2, RotateCcw } from "lucide-react";
+import { Check, Loader2, RotateCcw } from "lucide-react";
 import { api, ApiError } from "@/lib/client/api";
 
 type Joined = { already: boolean; position?: number; waiting?: number };
@@ -11,6 +11,9 @@ type Done = Joined & { email: string; name: string | null; at: string };
  * pressing "Join the waitlist" again (or coming back tomorrow) used to drop people back on the empty form.
  */
 const KEY = "outlly.waitlist.receipt";
+/** Same shape check on blur, while fixing, and on submit (the server checks properly). */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const BAD_EMAIL = "That email doesn't look quite right. Check it for a typo.";
 const KEEP_MS = 30 * 86_400_000;
 
 function load(): Done | null {
@@ -88,8 +91,8 @@ export function WaitlistForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (busy) return; // a double tap sends one request
-    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) {
-      setError("Add the email you want the invite sent to.");
+    if (!EMAIL_RE.test(form.email.trim())) {
+      setError(form.email.trim() ? BAD_EMAIL : "Add the email you want the invite sent to.");
       setBadEmail(true);
       emailRef.current?.focus();
       return;
@@ -226,6 +229,7 @@ export function WaitlistForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
     );
   }
 
+  const emailOk = EMAIL_RE.test(form.email.trim());
   const who = form.name.trim() || (form.email.includes("@") ? form.email.trim().split("@")[0] : "") || "You";
   return (
     <div className="wl-printer" data-state={busy ? "busy" : "idle"}>
@@ -243,7 +247,7 @@ export function WaitlistForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
             <span className="wl-label">First name <span className="font-normal text-[hsl(var(--ap-ink2))]">(optional)</span></span>
             <input name="name" autoComplete="given-name" maxLength={80} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="wl-input" />
           </label>
-          <label className="wl-field">
+          <label className="wl-field relative">
             <span className="wl-label">Email</span>
             <input
               ref={emailRef}
@@ -256,9 +260,30 @@ export function WaitlistForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
               aria-invalid={badEmail || undefined}
               aria-describedby={badEmail ? "wl-error" : undefined}
               value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="wl-input"
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm({ ...form, email: v });
+                // Once flagged, the message clears the moment the address is fixed, not on the next submit.
+                if (badEmail && EMAIL_RE.test(v.trim())) {
+                  setBadEmail(false);
+                  setError(null);
+                }
+              }}
+              onBlur={(e) => {
+                // read the field itself: autofill can set the value and blur in the same tick
+                const v = e.target.value.trim();
+                if (v && !EMAIL_RE.test(v)) {
+                  setBadEmail(true);
+                  setError(BAD_EMAIL);
+                }
+              }}
+              className="wl-input pr-10"
             />
+            {emailOk && !badEmail && (
+              <span className="wl-ok" aria-hidden="true">
+                <Check className="h-3.5 w-3.5" strokeWidth={3} />
+              </span>
+            )}
           </label>
         </div>
         {error && (
@@ -266,9 +291,15 @@ export function WaitlistForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
             {error}
           </p>
         )}
-        <button type="submit" disabled={busy} className="ap-btn mt-5 w-full disabled:opacity-70">
+        <button type="submit" disabled={busy} className="wl-cta lime-glow mt-5 w-full disabled:opacity-70">
           {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-          {busy ? "Joining…" : "Join the waitlist"}
+          {busy ? (
+            "Joining…"
+          ) : (
+            <>
+              Join the waitlist<span className="wl-cta-sub"><span className="wl-cta-dot" aria-hidden="true">· </span>Get early access</span>
+            </>
+          )}
         </button>
         <p className="mt-4 text-center text-[13px] leading-snug text-[hsl(var(--ap-ink2))]">One email when you&apos;re in. No newsletter, no spam.</p>
         <div className="wl-slot" aria-hidden="true">

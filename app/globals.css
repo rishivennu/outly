@@ -2637,3 +2637,142 @@ html.js .tr-stage[data-print="wait"] .tr-reel { transform: translateY(0); }
 .wl-steps > li::before, .wl-steps > li::after { content: ""; position: absolute; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 9999px; background: hsl(var(--ap-tile)); }
 .wl-steps > li::before { left: -8px; } .wl-steps > li::after { right: -8px; }
 .wl-no { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 12px; font-weight: 700; letter-spacing: .12em; color: hsl(var(--ap-ink2)); }
+
+/* ===================================================================================================== */
+/* Waitlist 1061: one big card on a dotted stage. Left, the brand-green world panel with the globe; right, */
+/* the headline and sign-up. Brand palette only: logo lime and green, deep green-black, neutrals.          */
+/* ===================================================================================================== */
+.wl-stage { position: relative; padding: 18px 12px 64px; }
+@media (min-width: 640px) { .wl-stage { padding: 32px 24px 88px; } }
+.wl-pix { position: absolute; inset: -40px 0 0; pointer-events: none; z-index: 0;
+  background-image: radial-gradient(hsl(var(--foreground) / .13) 1px, transparent 1.4px); background-size: 14px 14px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 60% at 50% 38%, #000 25%, transparent 78%); mask-image: radial-gradient(ellipse 75% 60% at 50% 38%, #000 25%, transparent 78%); }
+.dark .wl-pix { background-image: radial-gradient(hsl(var(--lime) / .14) 1px, transparent 1.4px); }
+
+.wl-split { position: relative; z-index: 1; margin: 0 auto; max-width: 1200px; display: grid; grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "head" "world" "form"; border-radius: 30px; padding: 8px; background: hsl(var(--ap-tile));
+  box-shadow: 0 1px 2px rgb(0 0 0 / .05), 0 40px 90px -40px rgb(10 40 15 / .45); }
+.dark .wl-split { box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .07), 0 40px 90px -40px rgb(0 0 0 / .8); }
+@media (min-width: 1024px) {
+  .wl-split { grid-template-columns: minmax(0, 1.06fr) minmax(0, 1fr); grid-template-rows: auto 1fr; grid-template-areas: "world head" "world form"; padding: 10px; border-radius: 34px; }
+}
+
+/* The world panel. Deep brand green, lit lime from behind the globe. White type on it is 12:1 and up. */
+.wl-world { grid-area: world; position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; border-radius: 24px; color: #fff;
+  background: radial-gradient(90% 60% at 50% 38%, hsl(98 70% 20%) 0%, hsl(122 58% 11%) 48%, hsl(140 55% 5%) 100%); }
+.wl-world::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+  background-image: radial-gradient(hsl(78 100% 60% / .16) 1px, transparent 1.3px); background-size: 18px 18px;
+  -webkit-mask-image: linear-gradient(180deg, #000, transparent 60%); mask-image: linear-gradient(180deg, #000, transparent 60%); }
+@media (min-width: 1024px) { .wl-world { min-height: 720px; border-radius: 26px; } }
+.wl-world-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 18px 0; }
+@media (min-width: 640px) { .wl-world-top { padding: 24px 26px 0; } }
+.wl-chip { border-radius: 9999px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; letter-spacing: .02em; color: hsl(78 100% 72%);
+  background: hsl(78 100% 55% / .1); box-shadow: inset 0 0 0 1px hsl(78 100% 60% / .32); }
+
+/* Frosted "what Outlly does" strip at the foot of the panel (the reference's testimonial strip). */
+.wl-offer { margin: auto 10px 10px; border-radius: 20px; padding: 16px; background: hsl(0 0% 100% / .07);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .12), inset 0 1px 0 hsl(0 0% 100% / .1); }
+@media (min-width: 640px) { .wl-offer { margin: auto 14px 14px; padding: 20px 22px; } }
+.wl-offer-lead { font-size: 15px; line-height: 1.45; font-weight: 500; color: hsl(0 0% 100% / .92); text-wrap: pretty; }
+.wl-offer-grid { list-style: none; margin-top: 14px; padding: 0; display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 480px) { .wl-offer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 18px; } }
+.wl-offer-ic { display: inline-grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 11px; color: hsl(var(--lime-foreground));
+  background: linear-gradient(160deg, hsl(78 100% 62%), hsl(110 85% 48%)); box-shadow: 0 6px 16px -6px hsl(90 100% 50% / .55); }
+
+.wl-headcell { grid-area: head; padding: 22px 16px 18px; }
+.wl-formcell { grid-area: form; padding: 22px 12px 14px; }
+@media (min-width: 640px) { .wl-headcell { padding: 34px 32px 20px; } .wl-formcell { padding: 26px 32px 22px; } }
+@media (min-width: 1024px) { .wl-headcell { padding: 52px 48px 0 52px; align-self: end; } .wl-formcell { padding: 28px 48px 34px 52px; } }
+.wl-accent { color: hsl(var(--lime-ink)); }
+.dark .wl-accent { color: hsl(var(--lime)); }
+.wl-live { position: relative; width: 7px; height: 7px; border-radius: 9999px; background: hsl(var(--lime-ink)); }
+.dark .wl-live { background: hsl(var(--lime)); }
+.wl-live::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: inherit; animation: wl-ping 2.4s var(--ease-out) infinite; }
+@keyframes wl-ping { 0% { transform: scale(1); opacity: .6; } 80%, 100% { transform: scale(2.8); opacity: 0; } }
+
+/* The form card sits flat on the panel here: a hairline instead of a floating shadow. */
+.wl-formcell .wl-card { background: hsl(var(--ap-canvas) / .55); box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .08); }
+.dark .wl-formcell .wl-card { background: hsl(0 0% 100% / .03); box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .08); }
+.wl-ok { position: absolute; right: 14px; bottom: 11px; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 9999px;
+  background: hsl(var(--lime)); color: hsl(var(--lime-foreground)); animation: wl-pop .35s var(--ease-out) both; }
+
+/* The primary CTA: brand lime, dark ink (14:1). Wraps between its two halves on narrow phones. */
+.wl-cta { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: .35rem; row-gap: 0; min-height: 52px; padding: 8px 1.4rem;
+  border-radius: 9999px; background: hsl(var(--lime)); color: hsl(var(--lime-foreground)); font-size: 16px; font-weight: 700; line-height: 1.2; text-align: center;
+  transition: transform .2s var(--ease-out), filter .25s, box-shadow .25s; }
+.wl-cta:hover { filter: brightness(1.05) saturate(1.05); box-shadow: 0 0 0 1px hsl(var(--lime) / .6), 0 12px 34px -8px hsl(var(--lime) / .7); }
+.wl-cta:active { transform: scale(.97); }
+.wl-cta:focus-visible { outline: 2px solid hsl(var(--foreground)); outline-offset: 3px; }
+.wl-cta-sub { white-space: nowrap; font-weight: 600; }
+/* Narrow phones: "Get early access" drops to its own smaller line instead of wrapping mid-phrase. */
+@media (max-width: 459px) { .wl-cta-sub { flex-basis: 100%; font-size: 13.5px; } .wl-cta-dot { display: none; } }
+
+/* How it works, one slim row under the card. */
+.wl-how { position: relative; z-index: 1; list-style: none; margin: 14px auto 0; padding: 0; max-width: 1200px; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 768px) { .wl-how { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; } }
+.wl-how > li { display: flex; align-items: flex-start; gap: 14px; border-radius: 20px; padding: 16px 18px; background: hsl(var(--ap-tile) / .82); box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .07); }
+.wl-how .wl-no { display: inline-grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; border-radius: 9999px; background: hsl(var(--lime) / .18); color: hsl(var(--lime-ink)); }
+.dark .wl-how .wl-no { color: hsl(var(--lime)); }
+
+/* ---- The globe -------------------------------------------------------------------------------------- */
+.wl-globe { position: relative; width: min(100%, 300px); aspect-ratio: 1; margin: 2px auto 6px; }
+@media (min-width: 480px) { .wl-globe { width: min(100%, 360px); } }
+/* Desktop: the globe takes the middle of whatever height the form column gives the panel. */
+@media (min-width: 1024px) { .wl-globe { width: min(100%, 580px); margin: auto; } .wl-world .wl-offer { margin-top: 0; } }
+/* Server-rendered placeholder: a lit lime-rimmed sphere where the globe will be, so nothing pops in. */
+.wl-globe-ph { position: absolute; left: 19%; top: 19%; width: 62%; height: 62%; border-radius: 9999px; transition: opacity .7s ease;
+  background: radial-gradient(circle at 36% 30%, #123d17, #0a2410 55%, #04120a);
+  box-shadow: inset 0 0 0 1px hsl(78 100% 62% / .45), inset -16px -20px 50px rgb(0 0 0 / .45), 0 0 60px 10px hsl(90 100% 50% / .16); }
+.wl-globe[data-ready] .wl-globe-ph { opacity: 0; }
+.wl-globe-canvas, .wl-cglobe { position: absolute; inset: 0; opacity: 0; transition: opacity .8s ease; }
+.wl-globe[data-ready] .wl-globe-canvas, .wl-globe[data-ready] .wl-cglobe { opacity: 1; }
+.wl-globe-canvas > canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+.wl-orb-pos { position: absolute; left: 0; top: 0; will-change: transform; }
+.wl-orb { display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 9999px; color: hsl(78 100% 70%);
+  background: radial-gradient(circle at 35% 30%, hsl(120 45% 16%), hsl(140 55% 7%)); box-shadow: inset 0 0 0 1px hsl(78 100% 62% / .4), 0 8px 20px -8px hsl(90 100% 50% / .5);
+  transition: transform .35s var(--ease-out), box-shadow .35s, color .25s; }
+.wl-orb:hover { transform: scale(1.2); color: #fff; box-shadow: inset 0 0 0 1px hsl(78 100% 65% / .85), 0 0 0 4px hsl(78 100% 55% / .14), 0 0 28px 4px hsl(85 100% 55% / .5); }
+.wl-orb-sm { width: 34px; height: 34px; }
+
+/* CSS globe (phones, slow devices, reduced motion): the dot map slides inside a shaded circle. Compositor only. */
+.wl-cglobe-sphere { position: absolute; left: 19%; top: 19%; width: 62%; height: 62%; border-radius: 9999px; overflow: hidden; isolation: isolate; transform: translateZ(0);
+  background: radial-gradient(circle at 36% 30%, #123d17, #0a2410 55%, #04120a); box-shadow: inset 0 0 0 1px hsl(78 100% 62% / .45); }
+.wl-cglobe-strip { position: absolute; top: 0; left: 0; width: 400%; height: 100%; background-repeat: repeat-x; background-size: 50% 100%; opacity: .95; will-change: transform; }
+.wl-cglobe[data-moving] .wl-cglobe-strip { animation: wl-spin 72s linear infinite; }
+@keyframes wl-spin { from { transform: translate3d(-50%, 0, 0); } to { transform: translate3d(0, 0, 0); } }
+.wl-cglobe-shade { position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(circle at 34% 28%, hsl(80 100% 80% / .16), transparent 36%), radial-gradient(circle at 50% 50%, transparent 46%, rgb(3 14 6 / .55) 74%, rgb(3 14 6 / .94) 100%);
+  box-shadow: inset 0 0 0 1px hsl(78 100% 62% / .4), inset 0 0 24px hsl(90 100% 50% / .18); }
+.wl-cglobe-glow { position: absolute; left: 8%; top: 8%; width: 84%; height: 84%; border-radius: 9999px; pointer-events: none;
+  background: radial-gradient(circle, hsl(85 100% 55% / .3) 38%, hsl(110 90% 45% / .1) 55%, transparent 70%); }
+.wl-cglobe[data-breathe] .wl-cglobe-glow { animation: wl-breathe 5s ease-in-out infinite; }
+@keyframes wl-breathe { 0%, 100% { opacity: .75; transform: scale(.97); } 50% { opacity: 1; transform: scale(1.02); } }
+.wl-cglobe-pulse { position: absolute; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 9999px; background: #e4ffa0; box-shadow: 0 0 8px hsl(80 100% 60% / .9); }
+.wl-cglobe-pulse::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; border: 1.5px solid hsl(80 100% 65% / .8); opacity: 0; }
+.wl-cglobe[data-breathe] .wl-cglobe-pulse::after { animation: wl-ring 3.6s ease-out infinite; animation-delay: inherit; }
+@keyframes wl-ring { 0% { transform: scale(1); opacity: .8; } 70%, 100% { transform: scale(4.2); opacity: 0; } }
+.wl-cglobe-arc { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.wl-cglobe-arc path { fill: none; stroke: hsl(80 100% 65%); stroke-width: 1.2; stroke-linecap: round; opacity: .85; }
+/* The arc breathes (opacity on the whole layer), so phones never repaint a stroke per frame. */
+.wl-cglobe-arc { opacity: .55; }
+.wl-cglobe[data-moving] .wl-cglobe-arc { animation: wl-arc 4.5s ease-in-out infinite; }
+@keyframes wl-arc { 0%, 100% { opacity: .2; } 50% { opacity: .9; } }
+.wl-cglobe-ring { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.wl-cglobe-ring ellipse { fill: none; stroke: hsl(80 100% 65% / .22); stroke-width: .6; }
+/* Three icons on one tilted ellipse: x and y each swing (ease-in-out ~ sine), a quarter lap apart. */
+.wl-corbit { position: absolute; inset: 0; transform: rotate(-14deg); }
+.wl-corb-x { position: absolute; left: 50%; top: 50%; transform: translateX(-46cqw); }
+.wl-cglobe { container-type: size; }
+.wl-corb-y > .wl-orb { transform: translate(-50%, -50%) rotate(14deg); }
+.wl-cglobe[data-moving] .wl-corb-x { animation: wl-ox 12s ease-in-out infinite alternate; }
+.wl-cglobe[data-moving] .wl-corb-y { animation: wl-oy 12s ease-in-out infinite alternate; }
+.wl-corb-x:nth-child(2) { transform: translateX(30cqw); } .wl-corb-x:nth-child(3) { transform: translateX(10cqw); }
+@keyframes wl-ox { from { transform: translateX(-46cqw); } to { transform: translateX(46cqw); } }
+@keyframes wl-oy { from { transform: translateY(-15cqh); } to { transform: translateY(15cqh); } }
+.wl-corb-y { display: block; }
+.wl-corb-x:nth-child(2) > .wl-corb-y { transform: translateY(11cqh); } .wl-corb-x:nth-child(3) > .wl-corb-y { transform: translateY(-14.5cqh); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-live::after, .wl-ok, .wl-cglobe-strip, .wl-cglobe-glow, .wl-cglobe-pulse::after, .wl-cglobe-arc, .wl-corb-x, .wl-corb-y { animation: none !important; }
+  .wl-globe-ph, .wl-globe-canvas, .wl-cglobe, .wl-orb, .wl-cta { transition: none; }
+}
