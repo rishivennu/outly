@@ -49,25 +49,25 @@ function StatusPill({ status }: { status: string }) {
   return <span className={cn("inline-flex h-6 shrink-0 items-center rounded-full px-2.5 text-[12px] font-semibold", s.cls)}>{s.label}</span>;
 }
 
-/** Wordmark chips, drawn in type and two circles so no brand image files are needed. */
+/** The real brand marks (public/brand/pay), sized per logo so they read at the same visual weight. */
+const LOGO: Record<MethodId, { src: string; w: number; h: number; cls: string }> = {
+  visa: { src: "/brand/pay/visa.png", w: 198, h: 64, cls: "h-[15px]" },
+  mc: { src: "/brand/pay/mastercard.png", w: 101, h: 64, cls: "h-[22px]" },
+  apple: { src: "/brand/pay/apple-pay.png", w: 50, h: 21, cls: "h-[19px]" },
+  gpay: { src: "/brand/pay/google-pay.png", w: 46, h: 40, cls: "h-[22px]" },
+  upi: { src: "/brand/pay/upi.png", w: 181, h: 64, cls: "h-[20px]" },
+};
 function Chip({ id, className, style }: { id: MethodId; className?: string; style?: React.CSSProperties }) {
-  const base = "pay-chip inline-flex h-9 items-center justify-center rounded-xl px-3 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.8)] ring-1 ring-white/10";
-  const body =
-    id === "visa" ? <span className="text-[15px] font-black italic tracking-tight text-[#1a1f71]">VISA</span>
-    : id === "mc" ? (
-      <span className="flex items-center" aria-hidden="true">
-        <span className="h-5 w-5 rounded-full bg-[#eb001b]" />
-        <span className="-ml-2 h-5 w-5 rounded-full bg-[#f79e1b] mix-blend-multiply" />
-      </span>
-    )
-    : id === "apple" ? <span className="text-[13.5px] font-semibold tracking-tight text-white">Apple Pay</span>
-    : id === "gpay" ? <span className="text-[13.5px] font-semibold tracking-tight text-[#3c4043]"><span className="text-[#4285f4]">G</span> Pay</span>
-    : <span className="text-[14px] font-black italic tracking-tight"><span className="text-[#097939]">UP</span><span className="text-[#ed752e]">I</span></span>;
-  const bg = id === "apple" ? "bg-black" : "bg-white";
+  const label = METHODS.find((m) => m.id === id)?.label ?? id;
+  const l = LOGO[id];
   return (
-    <span className={cn(base, bg, className)} style={style} title={METHODS.find((m) => m.id === id)?.label}>
-      {body}
-      <span className="sr-only">{METHODS.find((m) => m.id === id)?.label}</span>
+    <span
+      className={cn("pay-chip inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.8)] ring-1 ring-black/5", className)}
+      style={style}
+      title={label}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={l.src} alt={label} width={l.w} height={l.h} loading="lazy" decoding="async" draggable={false} className={cn("w-auto select-none", l.cls)} />
     </span>
   );
 }
