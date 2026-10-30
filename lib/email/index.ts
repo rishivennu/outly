@@ -5,11 +5,16 @@ import { db } from "../db";
 import { env } from "../env";
 import { getConfig, type EmailConfig } from "../settings";
 import { isOptedOut, listFor, unsubPageUrl, unsubPostUrl, type List } from "./unsubscribe";
+import { htmlToText } from "./text";
+
+export { htmlToText } from "./text";
 
 export interface Mail {
   to: string;
   subject: string;
   html: string;
+  /** Plain-text part. Built from `html` when left out, so no email ever goes out HTML-only. */
+  text?: string;
   kind: "invoice" | "ticket_opened" | "ticket_reply" | "test" | "subscription" | "maintenance" | "weekly_report" | "team_invite" | "referral" | "waitlist" | "notice" | "nudge" | "winback" | "growth" | "otp" | "security" | "beta" | "founding";
   attachments?: { filename: string; content: Buffer }[];
   /** Secrets (a sign-in code) masked in the Outbox copy once a real provider has delivered the email. */
@@ -46,6 +51,7 @@ export async function sendEmail(m: Mail, cfgOverride?: EmailConfig): Promise<{ o
             to: [m.to],
             subject: m.subject,
             html: m.html,
+            text: m.text ?? htmlToText(m.html),
             reply_to: cfg.replyTo || undefined,
             headers: list ? unsubscribeHeaders(m.to, list) : undefined,
             attachments: m.attachments?.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })),
