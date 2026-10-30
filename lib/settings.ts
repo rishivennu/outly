@@ -86,7 +86,7 @@ export const DEFAULTS = {
     razorpay: { keyId: "", keySecret: "", webhookSecret: "" },
     paypal: { clientId: "", clientSecret: "", webhookId: "" },
     youpi: { ...YOUPI_DEFAULT },
-    business: { name: "Outlly", address: "Bengaluru, India", gstin: "", taxPercent: 0 },
+    business: { name: "Outlly", address: "Gowthami Enclave, G-24, opposite ESI Hospital, Cantonment, Vizianagaram, Andhra Pradesh 535003, India", gstin: "", taxPercent: 0 },
   } as PaymentConfig,
   email: { provider: "mock", from: "Outlly <hello@mail.outlly.com>", marketingFrom: "", replyTo: "", resend: { apiKey: "" } } as EmailConfig,
   whatsapp: { enabled: false, phoneNumberId: "", wabaId: "", token: "", template: "outlly_code", lang: "en" } as WhatsAppConfig,
