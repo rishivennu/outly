@@ -54,3 +54,17 @@ function sampleAll(m: typeof import("../lib/email")): Record<string, string> {
     test: m.templates.test("resend"),
   };
 }
+
+describe("postal address in the footer (1058)", () => {
+  test("every template carries the marker, and withAddress fills it escaped", () => {
+    const html = mod.templates.test("resend");
+    expect(html).toContain("<!--outlly:address-->");
+    const out = mod.withAddress(html, "Outlly", "12 MG Road, <Bengaluru> 560001");
+    expect(out).not.toContain("<!--outlly:address-->");
+    expect(out).toContain("Outlly, 12 MG Road, &lt;Bengaluru&gt; 560001");
+  });
+  test("no address saved: the marker just disappears", () => {
+    const out = mod.withAddress(mod.templates.test("resend"), "", "");
+    expect(out).not.toContain("outlly:address");
+  });
+});

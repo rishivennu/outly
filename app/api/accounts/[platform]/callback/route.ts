@@ -58,7 +58,7 @@ async function googleSignIn(req: NextRequest, returnTo: string, remember?: boole
     const tok = await yt.exchange(code, `${env.APP_URL}/api/accounts/youtube/callback`);
     const who = await googleIdentity(tok.access_token);
     if (!who.email || who.email_verified === false) return fail("unverified");
-    const user = await signInWithGoogle({ email: who.email, name: who.name, picture: who.picture });
+    const user = await signInWithGoogle({ email: who.email, name: who.name, picture: who.picture }, { adult: req.cookies.get("outlly_adult")?.value === "1" });
     if (user.created) await attachReferral(user.id, clientIp(req)).catch((e) => console.error("[referral] attach", e));
     if (user.created) await attachSource(user.id).catch((e) => console.error("[growth] source", e));
     // Authenticator on: Google was the first step only. No session (and no channel link) until the app code.
@@ -85,6 +85,8 @@ async function googleSignIn(req: NextRequest, returnTo: string, remember?: boole
     if (e instanceof HttpError && e.code === "waitlist") return NextResponse.redirect(new URL("/waitlist?from=google", env.APP_URL));
     // Maintenance: members still get in (they already have an account), but no new account is made.
     if (e instanceof HttpError && e.code === "maintenance") return fail("maintenance");
+    // New account without the 18+ box ticked: back to signup, where the box is.
+    if (e instanceof HttpError && e.code === "age") return NextResponse.redirect(new URL("/signup?google_error=age", env.APP_URL));
     console.error("[google sign-in]", e, (e as { technical?: string }).technical ?? "");
     return fail(googleReason(e));
   }

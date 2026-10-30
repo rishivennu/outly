@@ -62,9 +62,10 @@ describe("email wrapper", () => {
 
   test("loads both brand fonts and keeps a safe fallback stack inline", () => {
     const html = templates.test("resend");
-    expect(html).toContain('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque');
-    expect(html).toContain("@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque");
-    expect(html).toContain("family=DM+Sans");
+    // Self-hosted (1058): nothing in an email may load from Google.
+    expect(html).toContain('<link rel="stylesheet" href="https://outlly.test/brand/email/fonts/fonts.css">');
+    expect(html).toContain("@import url('https://outlly.test/brand/email/fonts/fonts.css');");
+    expect(html).not.toMatch(/googleapis|gstatic/);
     expect(html).toContain("'Bricolage Grotesque','Segoe UI',Helvetica,Arial,sans-serif");
     expect(html).toContain("'DM Sans',Helvetica,Arial,sans-serif");
     for (const m of html.matchAll(/font-family:([^;"]+)/g)) {

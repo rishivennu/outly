@@ -1,7 +1,7 @@
 import { sameSitePath } from "@/lib/safe-next";
 
 /** Continue with Google: a plain link, so it works before any JavaScript has loaded. */
-export function GoogleButton({ from, next, label = "Continue with Google", remember }: { from: "login" | "signup"; next?: string | null; label?: string; remember?: boolean }) {
+export function GoogleButton({ from, next, label = "Continue with Google", remember, onClick }: { from: "login" | "signup"; next?: string | null; label?: string; remember?: boolean; onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void }) {
   const q = new URLSearchParams({ from });
   if (remember !== undefined) q.set("remember", remember ? "1" : "0");
   const safe = sameSitePath(next); // not "//", "/\\" or a hidden tab/newline (all leave the site)
@@ -9,6 +9,7 @@ export function GoogleButton({ from, next, label = "Continue with Google", remem
   return (
     <a
       href={`/api/auth/google?${q}`}
+      onClick={onClick}
       className="google-btn flex min-h-12 w-full items-center justify-center gap-3 rounded-full bg-secondary px-5 text-[15px] font-semibold text-foreground transition-[transform,background-color,box-shadow] duration-200 hover:-translate-y-px hover:bg-secondary/70 hover:shadow-[0_10px_24px_-16px_hsl(var(--foreground)/0.5)] hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:translate-y-0 active:scale-[0.985] motion-reduce:transform-none motion-reduce:transition-colors"
     >
       <svg viewBox="0 0 48 48" className="h-5 w-5" aria-hidden="true">

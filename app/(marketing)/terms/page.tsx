@@ -16,7 +16,7 @@ export default function TermsPage() {
       <Shell>
         <PageHead
           title="Terms"
-          updated="29 October 2026"
+          updated="30 October 2026"
           lead="Short and specific. By creating an account or using Outlly, you agree to these terms and to our Privacy page."
         />
 
@@ -81,13 +81,22 @@ export default function TermsPage() {
           <ul>
             <li>Outlly has a Free plan and paid plans. Each plan’s price, posts per month, total storage, AI features and team seats are shown in Billing before you pay, with taxes where they apply. Prices are in the currency of the country you are in.</li>
             <li>Storage is the total size of everything your account keeps, on every device. If you move to a plan with less storage, your files stay, but new uploads pause until you are under the new allowance.</li>
-            <li>Paid plans renew automatically at the end of each period until you cancel. Payments are taken by Stripe, Razorpay or PayPal, under their terms.</li>
-            <li>Cancel any time in Billing. You keep your plan until the end of the period you paid for, then your account moves to Free. You can resume before that date.</li>
+            <li>Each payment covers one month or one year, as shown next to the button before you pay. Plans do not renew automatically and we never charge you again without a new payment from you. When the period ends, you can pay for another one or your account moves to Free. Payments are taken by Stripe, Razorpay, PayPal or UPI, under their terms.</li>
+            <li>You can cancel any time in Billing. You keep your plan until the end of the period you paid for, then your account moves to Free. You can resume before that date.</li>
             <li>If we change a plan’s price, the price you pay now stays the same until your current period ends, and we tell you before the new price applies.</li>
             <li>If you were charged by mistake or something did not work, ask from the Pip chat. A person reviews every refund request, and refunds go back to the original payment method.</li>
             <li>Refer and Earn: a friend who signs up through your link gets one month of Creator free after their first payment for a paid plan, once their email address is verified. The month starts when the period they paid for ends. One reward per person and per inbox; signing up yourself through your own link does not count.</li>
             <li>Referral rewards and plans given by Outlly have no cash value. A referral month is withdrawn if the payment that earned it is refunded or charged back, or if the link is abused.</li>
           </ul>
+
+          <h2 id="copyright">Copyright complaints</h2>
+          <p>
+            If something published or stored through Outlly uses your work without permission, email <a href="mailto:support@outlly.com">support@outlly.com</a> with
+            the subject &ldquo;Copyright notice&rdquo; and include: the work you own, where it appears on Outlly, your name, address, phone and email, a statement
+            that you believe in good faith the use is not authorised, a statement that your notice is accurate and that you are the owner or allowed to act for
+            them, and your physical or electronic signature. We act on complete notices quickly and tell the account holder, who can send a counter-notice.
+            Accounts that infringe repeatedly are closed.
+          </p>
 
           <h2>What we are responsible for</h2>
           <p>

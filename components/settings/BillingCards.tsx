@@ -87,7 +87,7 @@ export function PaymentsBento({ b }: { b: BillingSummary }) {
       ? `${b.plan.name} is paused until ${day(b.plan.pausedUntil)}.`
       : b.plan.cancelAtPeriodEnd
         ? `${b.plan.name} ends on ${day(b.plan.periodEnd)}.`
-        : `${b.plan.name} renews on ${day(b.plan.periodEnd)}.`;
+        : `${b.plan.name} is paid through ${day(b.plan.periodEnd)}.`;
   const tiles = [
     { Ico: CreditCard, t: "Pay your way", d: "Cards, wallets and UPI, depending on where you are." },
     { Ico: Receipt, t: "Invoice in seconds", d: "A PDF in your inbox the moment a payment clears." },
@@ -194,7 +194,7 @@ export function PlanSection({ b }: { b: BillingSummary }) {
               ? `Paused until ${day(p.pausedUntil)}. Your paid days pick up after, to ${day(p.periodEnd)}.`
               : p.cancelAtPeriodEnd
                 ? `Ends on ${day(p.periodEnd)}, then you move to Free. Nothing else will be charged.`
-                : `Renews on ${day(p.periodEnd)} through ${gwName(p.provider)}.`}
+                : `Paid through ${day(p.periodEnd)} on ${gwName(p.provider)}. It does not renew or charge you again on its own.`}
         </p>
       </div>
       {b.extra && (

@@ -64,6 +64,16 @@ describe("waitlist", () => {
     expect(r).toEqual({ id: u.id, created: false });
   });
 
+  test("1058: Google makes no new account without the 18+ confirmation, existing members unaffected", async () => {
+    await settings.saveConfig("site", { waitlist: false });
+    const fresh = `age-${tag()}@test.dev`;
+    await expect(provider.signInWithGoogle({ email: fresh })).rejects.toMatchObject({ status: 403, code: "age" });
+    expect(await db.user.findUnique({ where: { email: fresh } })).toBeNull();
+    const made = await provider.signInWithGoogle({ email: fresh }, { adult: true });
+    expect(made.created).toBe(true);
+    expect(await provider.signInWithGoogle({ email: fresh })).toEqual({ id: made.id, created: false });
+  });
+
   test("turning it off with inviteAll emails everyone still waiting", async () => {
     await settings.saveConfig("site", { waitlist: true });
     await site.joinWaitlist(`late-${tag()}@test.dev`);

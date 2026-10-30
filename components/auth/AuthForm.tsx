@@ -12,6 +12,8 @@ import { OutlyMark } from "@/components/brand/Logo";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
 import { sameSitePath } from "@/lib/safe-next";
 
+const AGE_ERROR = "Please confirm you're 18 or older to create an account.";
+
 const GOOGLE_ERRORS: Record<string, string> = {
   access_denied: "Google didn't let you in. While Outlly is in testing, only approved testers can use Google sign-in. See the help below.",
   denied: "Google sign-in was cancelled. Nothing was connected.",
@@ -22,6 +24,7 @@ const GOOGLE_ERRORS: Record<string, string> = {
   config: "Google refused this site's app keys (client ID or secret). An admin needs to fix them in Admin > Social platforms > YouTube.",
   redirect: "Google doesn't recognise this site's return address. An admin needs to add it under Authorised redirect URIs in Google Cloud.",
   server: "Google signed you in, but our database didn't answer. Try again in a minute.",
+  age: "To create an account with Google, first tick \"I'm 18 or older\", then press Continue with Google again.",
   maintenance: "Outlly is in a short maintenance window, so new accounts are paused. If you already have an account, sign in with the email it uses.",
 };
 
@@ -67,6 +70,10 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
   const codeRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
+  // 1058: signing up (email or Google) needs a ticked "18 or older". The server checks it too.
+  const ageRef = useRef<HTMLInputElement>(null);
+  const [adult, setAdult] = useState(false);
+  const askAge = () => { setError(AGE_ERROR); ageRef.current?.focus(); };
   const byPhone = step === "code" && via === "whatsapp";
   const target = byPhone ? `wa:${phone.replace(/\D/g, "")}` : form.email.trim().toLowerCase();
   /** Second step on screen: ask once whether a WhatsApp code is on offer for this sign-in. */
@@ -215,6 +222,7 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
   const submit = async (e?: React.FormEvent, typed?: string) => {
     e?.preventDefault();
     if (busy || inFlight.current) return;
+    if (mode === "signup" && !adult) return askAge();
     const c = typed ?? code;
     if (mode === "login" && (step === "code" || step === "reset") && (!sentTo || sentTo !== target)) return sendCode();
     if (step === "reset" && form.password.length < 8) {
@@ -230,7 +238,7 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
     if (step !== "password" && mode === "login") setNote("Checking your code…");
     try {
       if (mode === "signup") {
-        await api("/api/auth/signup", { method: "POST", json: { ...form, timezone: tz.current } });
+        await api("/api/auth/signup", { method: "POST", json: { ...form, adult, timezone: tz.current } });
         return go();
       }
       if (step === "password") return after(await api<{ twoFactor?: boolean }>("/api/auth/login", { method: "POST", json: { email: form.email, password: form.password, remember } }));
@@ -438,6 +446,19 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
             {error}
           </p>
         )}
+        {mode === "signup" && (
+          <label className="gs-in flex min-h-11 cursor-pointer items-start gap-3 rounded-xl px-1 py-1.5 text-[13.5px] leading-snug has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring">
+            <input
+              ref={ageRef}
+              type="checkbox"
+              checked={adult}
+              onChange={(e) => { setAdult(e.target.checked); document.cookie = `outlly_adult=${e.target.checked ? "1; max-age=1800" : "; max-age=0"}; path=/; samesite=lax`; if (e.target.checked && (error === AGE_ERROR || error === GOOGLE_ERRORS.age)) setError(null); }}
+              aria-describedby={error === AGE_ERROR ? "auth-error" : undefined}
+              className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-lime-ink"
+            />
+            <span>I&apos;m 18 or older.</span>
+          </label>
+        )}
         <div className="gs-in">
           <Button type="submit" variant="lime" className="auth-cta h-12 w-full text-[15px]" disabled={busy} aria-busy={busy}>
             {cta}
@@ -494,7 +515,7 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
           <span className="h-px flex-1 bg-border" />
         </div>
         <div className="gs-in space-y-3">
-          <GoogleButton from={mode} next={next} remember={mode === "login" ? remember : undefined} label={mode === "login" ? "Sign in with Google" : "Sign up with Google"} />
+          <GoogleButton from={mode} next={next} remember={mode === "login" ? remember : undefined} label={mode === "login" ? "Sign in with Google" : "Sign up with Google"} onClick={mode === "signup" ? (e) => { if (!adult) { e.preventDefault(); askAge(); } } : undefined} />
           {google && <GoogleHelp compact defaultOpen={googleError === "access_denied"} />}
         </div>
         <p className="gs-in text-center text-sm text-muted-foreground">
@@ -507,7 +528,7 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
         )}
         {mode === "signup" && (
           <p className="gs-in text-center text-xs leading-relaxed text-muted-foreground">
-            By creating an account you agree to the{" "}
+            Signing up with email or Google, you agree to the{" "}
             <Link href="/terms" className="font-medium text-foreground underline underline-offset-4">Terms</Link> and{" "}
             <Link href="/privacy" className="font-medium text-foreground underline underline-offset-4">Privacy Policy</Link>.
           </p>

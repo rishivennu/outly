@@ -344,7 +344,7 @@ export async function subscription(ctx: PipCtx, _a: PipArgs, _range: DateRange |
   }
   if (s) {
     const ends = day(s.currentPeriodEnd, ctx.tz);
-    const next = s.pausedUntil && s.pausedUntil > ctx.now ? `Paused until ${day(s.pausedUntil, ctx.tz)}` : s.cancelAtPeriodEnd ? `Ends ${ends}` : `Renews ${ends}`;
+    const next = s.pausedUntil && s.pausedUntil > ctx.now ? `Paused until ${day(s.pausedUntil, ctx.tz)}` : s.cancelAtPeriodEnd ? `Ends ${ends}` : `Paid through ${ends} (does not renew on its own)`;
     r.rows.push({
       id: s.id,
       cells: { plan: s.plan.name, status: s.status === "past_due" ? "Payment due" : "Active", price: `${money(s.priceMinor, s.currency)} ${s.interval === "year" ? "a year" : "a month"}`, next },

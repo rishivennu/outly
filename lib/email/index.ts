@@ -34,7 +34,8 @@ export async function sendEmail(m: Mail, cfgOverride?: EmailConfig): Promise<{ o
     const row = await db.emailLog.create({ data: { to: m.to, subject: m.subject, html: "", kind: m.kind, provider: cfg.provider, status: "skipped", error: `Unsubscribed from ${list === "weekly" ? "the weekly report" : "marketing email"}` } });
     return { ok: true, status: "skipped", id: row.id };
   }
-  m = { ...m, html: withUnsubscribe(m.html, m.to, list) };
+  const biz = (await getConfig("payments").catch(() => null))?.business;
+  m = { ...m, html: withAddress(withUnsubscribe(m.html, m.to, list), biz?.name ?? "Outlly", biz?.address ?? "") };
   let status = "mocked";
   let error: string | undefined;
   if (cfg.provider === "resend") {
@@ -91,6 +92,13 @@ export function unsubscribeHeaders(to: string, list: List): Record<string, strin
 }
 
 const UNSUB_MARK = "<!--outlly:unsub-->";
+/** Filled at send time with the business name and postal address (Admin > Integrations > Business). CAN-SPAM wants it on marketing mail. */
+const ADDRESS_MARK = "<!--outlly:address-->";
+
+export function withAddress(html: string, name: string, address: string): string {
+  const line = [name, address].map((x) => x.trim()).filter(Boolean).join(", ");
+  return html.split(ADDRESS_MARK).join(line ? `<div style="padding-top:4px;font-family:${BODY}">${esc(line)}</div>` : "");
+}
 /** Fills the footer's slot: an Unsubscribe link on marketing email, nothing on account email. */
 export function withUnsubscribe(html: string, to: string, list: List | null): string {
   if (!html.includes(UNSUB_MARK)) return html;
@@ -105,7 +113,8 @@ const appUrl = () => (process.env.APP_URL ?? "").replace(/\/$/, "");
 /** Gmail and Outlook strip web fonts, so every inline style repeats the fallback stack. */
 const DISPLAY = "'Bricolage Grotesque','Segoe UI',Helvetica,Arial,sans-serif";
 const BODY = "'DM Sans',Helvetica,Arial,sans-serif";
-const FONT_CSS = "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=DM+Sans:wght@400;500;700&display=swap";
+/** Self-hosted (1058): opening an email must not hand the reader's IP to Google (Munich court, 2022). */
+const fontCss = () => `${appUrl()}/brand/email/fonts/fonts.css`;
 
 /**
  * Soft sunrise (2026-10-29), after the user's Headspace reference: a white card on a warm grey page, a pastel
@@ -188,6 +197,7 @@ Questions? Just reply to this email or visit our <a href="${appUrl()}/help" styl
 <div style="padding-top:14px;font-family:${BODY}">You are receiving this because you have an Outlly account.</div>
 ${UNSUB_MARK}
 <div style="padding-top:4px;font-family:${BODY}">&copy; ${new Date().getFullYear()} Outlly</div>
+${ADDRESS_MARK}
 </td></tr>`;
 
 interface WrapOpts {
@@ -218,9 +228,9 @@ const wrap = (title: string, body: string, o: WrapOpts = {}) => {
 <meta name="color-scheme" content="light only">
 <meta name="supported-color-schemes" content="light only">
 <title>${title}</title>
-<link rel="stylesheet" href="${FONT_CSS}">
+<link rel="stylesheet" href="${fontCss()}">
 <style>
-@import url('${FONT_CSS}');
+@import url('${fontCss()}');
 body{margin:0;padding:0;width:100%!important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
 table{border-collapse:separate}
 img{border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic}

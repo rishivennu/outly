@@ -170,7 +170,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
         action === "cancel" ? `Done. ${current?.planName} stays active until ${day(current!.periodEnd)}.`
         : action === "pause" ? `Paused until ${day(r.pausedUntil!)}. Your ${r.daysKept} paid day${r.daysKept === 1 ? "" : "s"} wait for you.`
         : action === "unpause" ? "Welcome back. Your plan is running again."
-        : "Welcome back. Your plan will renew as usual.",
+        : `Welcome back. Your plan stays paid through ${day(current!.periodEnd)} and won't renew on its own.`,
         "ok",
       );
       setConfirm(false);
@@ -220,7 +220,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
             {current && <span className="ml-2 text-base font-medium text-muted-foreground tabular">{current.priceMinor > 0 ? <>{formatMoney(current.priceMinor, current.currency)}{intervalLabel(current.interval)}</> : current.provider === "beta" ? "free, early member" : "free month"}</span>}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {!current ? "No card on file. Upgrade any time; you'll get an invoice by email straight away." : current.pausedUntil ? <>Paused until <b className="text-foreground">{day(current.pausedUntil)}</b>. Free limits apply until then, and your paid days run again after, to <b className="text-foreground">{day(current.periodEnd)}</b>.</> : current.cancelAtPeriodEnd ? <>Ends on <b className="text-foreground">{day(current.periodEnd)}</b>, then you move to Free. Nothing else will be charged.</> : <>Renews on <b className="text-foreground">{day(current.periodEnd)}</b>.</>}
+            {!current ? "No card on file. Upgrade any time; you'll get an invoice by email straight away." : current.pausedUntil ? <>Paused until <b className="text-foreground">{day(current.pausedUntil)}</b>. Free limits apply until then, and your paid days run again after, to <b className="text-foreground">{day(current.periodEnd)}</b>.</> : current.cancelAtPeriodEnd ? <>Ends on <b className="text-foreground">{day(current.periodEnd)}</b>, then you move to Free. Nothing else will be charged.</> : <>Paid through <b className="text-foreground">{day(current.periodEnd)}</b>. It does not renew or charge you again on its own.</>}
           </p>
           {props.access && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-lime/15 px-3 py-1 text-[12.5px] text-foreground" role="status">
@@ -304,13 +304,19 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
                         {busy === p.slug ? "Opening checkout" : otherCycle ? `Switch to ${y ? "yearly" : "monthly"}` : current ? `Switch to ${p.name}${y ? " yearly" : ""}` : `Upgrade to ${p.name}${y ? " yearly" : ""}`}
                       </Button>
                     )}
+                    {/* 1058: the terms sit next to the button, not only in the footnote. */}
+                    {!mine && p.state !== "soon" && p.priceMinor > 0 && (
+                      <p className="mt-2 text-center text-[12px] leading-snug text-muted-foreground">
+                        One payment of {y ? formatMoney(y.priceMinor, y.currency) : formatMoney(p.priceMinor, p.currency)} for {y ? "1 year" : "1 month"}. It does not renew or charge you again on its own.
+                      </p>
+                    )}
                   </div>
                 </article>
               </li>
             );
           })}
         </ul>
-        <p className="mt-3 text-[12.5px] text-muted-foreground">Prices include applicable taxes. Switching plans starts the new one today; cancel any time and keep access until the period ends.</p>
+        <p className="mt-3 text-[12.5px] text-muted-foreground">Prices include applicable taxes. Each payment covers one period and nothing is charged automatically: when it ends you can pay again or stay on Free. Switching plans starts the new one today.</p>
       </section>
 
       <section aria-labelledby="inv" className="mt-10 max-w-5xl">

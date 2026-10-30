@@ -95,7 +95,7 @@ export const GUIDES: Record<string, Guide> = {
     name: "Billing",
     intro: "Billing has your plan, usage and invoices.",
     stops: [
-      { target: '[aria-labelledby="cur"]', title: "Your plan", body: "What you're on, and when it renews." },
+      { target: '[aria-labelledby="cur"]', title: "Your plan", body: "What you're on, and when it runs out." },
       { target: '[role="progressbar"][aria-labelledby="usage-l"]', title: "Usage", body: "How much of this month's allowance you've used." },
       { target: '[aria-labelledby="plans"]', title: "Change plan", body: "Upgrade or switch any time." },
       { target: '[aria-labelledby="inv"]', title: "Invoices", body: "Every payment, ready to download as a PDF." },

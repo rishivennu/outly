@@ -211,5 +211,5 @@ async function route(req: NextRequest, headers: Headers) {
 
 export const config = {
   // Pages only. API routes do their own auth and return JSON 401s.
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|\\.well-known|.*\\.(?:svg|png|jpg|gif|webp|ico|txt|xml|js|html|webmanifest)$).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|\\.well-known|.*\\.(?:svg|png|jpg|gif|webp|ico|txt|xml|js|css|woff2?|html|webmanifest)$).*)"],
 };

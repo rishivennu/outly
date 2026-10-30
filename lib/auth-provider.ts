@@ -137,7 +137,7 @@ export async function setPassword(userId: string, password: string) {
  * Continue with Google. Google has already verified the address, so an existing studio with the
  * same email is signed in, and a new one is created otherwise. Password sign-in stays untouched.
  */
-export async function signInWithGoogle(who: { email: string; name?: string; picture?: string }) {
+export async function signInWithGoogle(who: { email: string; name?: string; picture?: string }, opts: { adult?: boolean } = {}) {
   const email = who.email.toLowerCase();
   const existing = await db.user.findUnique({ where: { email } });
   if (existing) {
@@ -146,6 +146,9 @@ export async function signInWithGoogle(who: { email: string; name?: string; pict
     return { id: existing.id, created: false };
   }
   await assertMayCreateAccount(email);
+  // Accounts are 18+ (1058). The Google callback has no form, so the signup page leaves the ticked box in
+  // the outlly_adult cookie; without it no new studio is made (existing members above are unaffected).
+  if (!opts.adult) throw new HttpError(403, "Please confirm you're 18 or older to create an account.", "age");
   // The Google callback carries no body, so the browser leaves its time zone in a cookie before redirecting.
   const u = await joined(await db.user.create({ data: { email, name: who.name?.trim() || email.split("@")[0], avatar: who.picture ?? null, emailVerifiedAt: new Date(), emailVerifiedFor: email, ...tzData(cookieTimezone()) }, select: { id: true } }), true);
   return { id: u.id, created: true };

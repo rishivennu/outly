@@ -24,6 +24,8 @@ const nextConfig = {
       source: "/(brand|samples)/:path*",
       headers: [{ key: "Cache-Control", value: "public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800" }],
     },
+    // Email fonts (1058): mail apps load @font-face cross-origin, which needs CORS. Google Fonts sent this header for us before.
+    { source: "/brand/email/fonts/:path*", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
     { source: "/offline.html", headers: [{ key: "Content-Security-Policy", value: staticCsp }] },
     // Phone check page (1042): its own script file only, same-origin requests only.
     { source: "/check.html", headers: [{ key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" }, { key: "Cache-Control", value: "no-store" }] },
