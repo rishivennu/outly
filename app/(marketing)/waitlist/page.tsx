@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowDown, CalendarClock, Check, ChevronRight, RotateCcw, Sparkles } from "lucide-react";
+import { CalendarClock, Check, ChevronRight, RotateCcw, Sparkles, Ticket } from "lucide-react";
 import { AppIcon, type Brand } from "@/components/brand/brands";
 import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
 import { siteStatus, waitlistCounts } from "@/lib/site";
@@ -48,7 +48,7 @@ export default async function WaitlistPage({ searchParams }: { searchParams: { f
             Here&apos;s what you get on day one. We&apos;re letting creators in a few at a time, so every first post goes out right.
           </p>
           <a href="#join" className="wl-rise lime-glow mt-6 inline-flex h-12 items-center gap-2 rounded-full bg-lime px-6 text-[15px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform active:scale-95" style={{ animationDelay: ".15s" }}>
-            Save my spot <ArrowDown className="h-4 w-4" aria-hidden="true" />
+            <Ticket className="h-4 w-4" aria-hidden="true" /> Take a number
           </a>
         </div>
       </section>
@@ -151,15 +151,15 @@ export default async function WaitlistPage({ searchParams }: { searchParams: { f
             {counts.total >= 25 && (
               <p className="mt-4 text-[15px] font-semibold text-foreground/80">{counts.total.toLocaleString("en")} creators have joined so far.</p>
             )}
-            <ol className="mt-6 grid gap-3 sm:grid-cols-3 lg:mt-auto lg:grid-cols-1 xl:grid-cols-3" aria-label="How the waitlist works">
+            <ol className="wl-steps mt-6 grid gap-3 sm:grid-cols-3 lg:mt-auto lg:grid-cols-1 xl:grid-cols-3" aria-label="How the waitlist works">
               {[
                 ["Join", "Leave your email. It takes five seconds."],
                 ["Get your invite", "We let people in by the order they joined."],
                 ["Start posting", "Sign up with that email and bring a video."],
               ].map(([t, b], i) => (
                 <li key={t} className="rounded-[20px] bg-[hsl(var(--ap-canvas))] p-4">
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-foreground font-display text-[14px] font-bold text-background" aria-hidden="true">{i + 1}</span>
-                  <p className="mt-3 font-display text-[17px] font-bold tracking-[-0.015em]">{t}</p>
+                  <span className="wl-no" aria-hidden="true">No. 0{i + 1}</span>
+                  <p className="mt-2 font-display text-[17px] font-bold tracking-[-0.015em]">{t}</p>
                   <p className="mt-1 text-[14px] leading-relaxed text-[hsl(var(--ap-ink2))]">{b}</p>
                 </li>
               ))}

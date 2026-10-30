@@ -7,6 +7,7 @@ import { useToast } from "@/components/shared/Toast";
 import { adminApi } from "@/lib/client/admin-api";
 import { cn } from "@/lib/utils";
 import { Card, CardTitle, Pill } from "./ui";
+import { ServiceLogo, type Service } from "@/components/brand/ServiceLogo";
 
 export type Secret = { set: boolean; last4: string };
 type Pay = {
@@ -47,18 +48,21 @@ export function SecretField({ id, label, saved, value, onChange, placeholder }: 
   );
 }
 
-function Choice<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; label: string; options: { value: T; title: string; body: string; badge?: string }[] }) {
+function Choice<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; label: string; options: { value: T; title: string; body: string; badge?: string; logo?: Service }[] }) {
   return (
-    <div role="radiogroup" aria-label={label} className={cn("grid gap-2.5", options.length > 3 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3")}>
+    <div role="radiogroup" aria-label={label} className={cn("grid gap-2.5", options.length > 3 ? "sm:grid-cols-2 lg:grid-cols-3" : options.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3")}>
       {options.map((o) => {
         const on = value === o.value;
         return (
           <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => onChange(o.value)} className={cn("relative rounded-[20px] p-4 text-left transition-all duration-300 hairline", on ? "bg-lime/[0.08] ring-2 ring-lime" : "hover:bg-secondary/50")}>
             <span className="flex items-center justify-between gap-2">
-              <span className="font-display text-[15px] font-semibold">{o.title}</span>
+              <span className="flex min-w-0 items-center gap-2.5">
+                {o.logo && <ServiceLogo service={o.logo} size={34} />}
+                <span className="font-display text-[15px] font-semibold">{o.title}</span>
+              </span>
               {o.badge && <Pill tone={on ? "lime" : "muted"}>{o.badge}</Pill>}
             </span>
-            <span className="mt-1 block text-[12.5px] leading-snug text-muted-foreground">{o.body}</span>
+            <span className="mt-2 block text-[12.5px] leading-snug text-muted-foreground">{o.body}</span>
           </button>
         );
       })}
@@ -194,11 +198,11 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
           value={p.provider}
           onChange={(v) => setP((x) => ({ ...x, provider: v }))}
           options={[
-            { value: "mock", title: "Mock", body: "Fake checkout with test cards and UPI. Nothing is charged.", badge: "testing" },
-            { value: "stripe", title: "Stripe", body: "Cards, wallets, global currencies. Hosted Checkout.", badge: "global" },
-            { value: "razorpay", title: "Razorpay", body: "UPI, cards, netbanking in India. Popup checkout.", badge: "India" },
-            { value: "paypal", title: "PayPal", body: "PayPal balance and cards in 200+ countries. Redirect checkout.", badge: "global" },
-            { value: "youpi", title: "YOUPI (UPI)", body: "Your own UPI gateway on your server. No fees, INR only, no refund API.", badge: "self-hosted" },
+            { logo: "mock", value: "mock", title: "Mock", body: "Fake checkout with test cards and UPI. Nothing is charged.", badge: "testing" },
+            { logo: "stripe", value: "stripe", title: "Stripe", body: "Cards, wallets, global currencies. Hosted Checkout.", badge: "global" },
+            { logo: "razorpay", value: "razorpay", title: "Razorpay", body: "UPI, cards, netbanking in India. Popup checkout.", badge: "India" },
+            { logo: "paypal", value: "paypal", title: "PayPal", body: "PayPal balance and cards in 200+ countries. Redirect checkout.", badge: "global" },
+            { logo: "upi", value: "youpi", title: "YOUPI (UPI)", body: "Your own UPI gateway on your server. No fees, INR only, no refund API.", badge: "self-hosted" },
           ]}
         />
 
@@ -325,8 +329,8 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
           value={m.provider}
           onChange={(v) => setM((x) => ({ ...x, provider: v }))}
           options={[
-            { value: "mock", title: "Mock", body: "Emails are saved to the Outbox so you can read them. Nothing is sent.", badge: "testing" },
-            { value: "resend", title: "Resend", body: "Real delivery with your verified domain. Free tier is 3,000 a month.", badge: "live" },
+            { logo: "mock", value: "mock", title: "Mock", body: "Emails are saved to the Outbox so you can read them. Nothing is sent.", badge: "testing" },
+            { logo: "resend", value: "resend", title: "Resend", body: "Real delivery with your verified domain. Free tier is 3,000 a month.", badge: "live" },
           ]}
         />
         <div className="mt-5 grid gap-4 sm:grid-cols-2">

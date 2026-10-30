@@ -174,7 +174,9 @@ export function MarketingNav() {
     }
   };
 
-  const ctaHref = waitlist ? "/waitlist" : "/signup";
+  // On the waitlist page itself the button scrolls to the form. Navigating to the same page remounted it (the
+  // marketing template), which threw away a receipt someone had just printed (1055).
+  const ctaHref = waitlist ? (pathname === "/waitlist" ? "#join" : "/waitlist") : "/signup";
   const ctaLabel = waitlist ? "Join the waitlist" : "Start creating";
 
   return (

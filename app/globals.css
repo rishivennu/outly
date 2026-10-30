@@ -2588,3 +2588,54 @@ html.js .tr-stage[data-print="wait"] .tr-reel { transform: translateY(0); }
 .rcpt-stamp-in { animation: rcpt-stamp 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 @media (prefers-reduced-motion: reduce) { .rcpt-print, .rcpt-row, .rcpt-stamp-in { animation: none; } }
 
+
+/* Waitlist printer (1055). The form card is a ticket machine: a paper stub peeks out of its slot and shows who it
+   is printing for as you type. Joining feeds the whole receipt out of the slot in thermal steps (time based, once),
+   the head buzzes while it prints, then the stamp lands. Reduced motion shows the finished receipt. */
+.wl-printer { position: relative; }
+.wl-printer .wl-head { position: relative; z-index: 2; } /* the head and its slot sit over the paper */
+.wl-rcpt .rcpt-row { animation: none; } /* the lines print with the paper, not after it */
+.wl-slot { position: absolute; z-index: 3; left: 22px; right: 22px; bottom: -8px; height: 16px; border-radius: 9999px; background: linear-gradient(180deg, #2a313b, #0d1117);
+  box-shadow: 0 4px 10px rgb(0 0 0 / .22), inset 0 1px 0 rgb(255 255 255 / .12); }
+.wl-slot > span { position: absolute; inset: 6px 12px auto; height: 3px; border-radius: 9999px; background: #000; }
+.wl-slot::after { content: ""; position: absolute; inset: 6px 14px auto; height: 3px; border-radius: 9999px; background: hsl(var(--lime)); opacity: 0; filter: blur(1px); }
+.wl-led { display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: hsl(var(--foreground) / .2); box-shadow: 0 0 0 3px hsl(var(--foreground) / .06); }
+.wl-printer[data-state="busy"] .wl-led { background: #f5b301; animation: wl-blink .5s steps(2, end) infinite; }
+.wl-printer[data-state="done"] .wl-led { background: hsl(var(--success)); box-shadow: 0 0 0 3px hsl(var(--success) / .18); }
+@keyframes wl-blink { 50% { opacity: .25; } }
+
+/* The stub that peeks out under the form. */
+.wl-stub { position: relative; z-index: 1; margin: 0 38px; height: 40px; overflow: hidden; }
+.wl-stub .rcpt { --z: 5px; padding: 14px 14px 12px; font-size: 11px; line-height: 1.3; text-transform: uppercase; letter-spacing: .06em;
+  display: flex; justify-content: space-between; gap: 10px; transition: transform .25s steps(3, end); }
+.wl-stub .rcpt > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.wl-printer:hover .wl-stub .rcpt, .wl-printer:focus-within .wl-stub .rcpt { transform: translateY(3px); }
+.wl-printer[data-state="busy"] .wl-stub .rcpt { animation: wl-nudge .6s steps(4, end) infinite; }
+@keyframes wl-nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
+
+/* The receipt. The track grows with the paper, so the page makes room line by line like a real till roll. */
+.wl-feed { display: grid; grid-template-rows: 1fr; margin: 0 32px; }
+.wl-feed > div { min-height: 0; overflow: hidden; padding-bottom: 4px; }
+.wl-rcpt { filter: drop-shadow(0 14px 18px rgb(15 23 42 / .14)); }
+.wl-rcpt .rcpt-row > :last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.wl-num { font-family: var(--font-display), system-ui, sans-serif; font-size: 64px; font-weight: 800; line-height: 1; letter-spacing: -.04em; text-align: center; margin-top: 4px; }
+.wl-stamp { position: absolute; right: 14px; top: 122px; padding: 4px 10px; border: 2.5px solid #2f5d00; border-radius: 8px; color: #2f5d00;
+  font-weight: 800; font-size: 13px; letter-spacing: .14em; transform: rotate(-8deg); opacity: .85; mix-blend-mode: multiply; }
+.wl-stamp.wl-stamp-inline { position: relative; right: auto; top: auto; display: table; margin: 2px auto 6px; }
+.wl-feed[data-play] { animation: wl-track 2.4s steps(24, end) .2s both; }
+.wl-feed[data-play] .wl-rcpt { animation: wl-paper 2.4s steps(24, end) .2s both; }
+.wl-feed[data-play] .wl-stamp { animation: rcpt-stamp 420ms cubic-bezier(0.22, 1, 0.36, 1) 2.75s both; }
+.wl-printer[data-play] .wl-slot::after { animation: wl-heat 2.4s linear .2s both; }
+@keyframes wl-track { from { grid-template-rows: 0fr; } to { grid-template-rows: 1fr; } }
+@keyframes wl-paper { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+@keyframes wl-heat { 0% { opacity: 0; } 8%, 88% { opacity: .9; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .wl-feed[data-play], .wl-feed[data-play] .wl-rcpt, .wl-feed[data-play] .wl-stamp,
+  .wl-printer[data-play] .wl-slot::after, .wl-printer .wl-led, .wl-printer .wl-stub .rcpt { animation: none !important; transition: none; }
+}
+
+/* Waitlist steps as torn ticket stubs (1055). */
+.wl-steps > li { position: relative; border: 1.5px dashed hsl(var(--foreground) / .14); }
+.wl-steps > li::before, .wl-steps > li::after { content: ""; position: absolute; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 9999px; background: hsl(var(--ap-tile)); }
+.wl-steps > li::before { left: -8px; } .wl-steps > li::after { right: -8px; }
+.wl-no { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 12px; font-weight: 700; letter-spacing: .12em; color: hsl(var(--ap-ink2)); }

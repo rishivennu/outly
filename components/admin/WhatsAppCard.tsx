@@ -1,11 +1,12 @@
 "use client";
 import { useState } from "react";
-import { CheckCircle2, MessageCircle, Send, Wifi, XCircle } from "lucide-react";
+import { CheckCircle2, Send, Wifi, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { adminApi } from "@/lib/client/admin-api";
 import { Card, CardTitle, Pill } from "./ui";
+import { ServiceLogo } from "@/components/brand/ServiceLogo";
 import { SecretField, type Secret, type SecretEdit } from "./IntegrationsForm";
 
 export type WhatsAppView = { enabled: boolean; phoneNumberId: string; wabaId: string; token: Secret; template: string; lang: string };
@@ -67,7 +68,7 @@ export function WhatsAppCard({ initial }: { initial: WhatsAppView }) {
         hint="Sign-in codes on WhatsApp, next to the email ones. Members can add a number in Settings, then use it to sign in or as their second step."
         action={<Pill tone={saved.enabled ? "ok" : "muted"}>{saved.enabled ? "On" : "Off"}</Pill>}
       >
-        <span className="inline-flex items-center gap-2"><MessageCircle className="h-4 w-4" aria-hidden />WhatsApp codes</span>
+        <span className="inline-flex items-center gap-2.5"><ServiceLogo service="whatsapp" size={26} />WhatsApp codes</span>
       </CardTitle>
 
       <div className="grid gap-4 md:grid-cols-2">
