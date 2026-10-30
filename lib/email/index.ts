@@ -218,7 +218,6 @@ const wrap = (title: string, body: string, o: WrapOpts = {}) => {
 <meta name="color-scheme" content="light only">
 <meta name="supported-color-schemes" content="light only">
 <title>${title}</title>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="${FONT_CSS}">
 <style>
 @import url('${FONT_CSS}');
