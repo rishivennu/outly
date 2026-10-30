@@ -39,6 +39,14 @@ describe("real templates", () => {
     expect(t.split("\n").some((l) => l.length === 0)).toBe(true);
   });
 
+  test("the add-WhatsApp code email says what it's for and ignores the requester's name (1060)", () => {
+    const t = mod.htmlToText(mod.templates.otp({ name: null, code: "482913", minutes: 10, kind: "link" }));
+    expect(t).toContain("adding a WhatsApp number");
+    expect(t).toContain("If that wasn't you, ignore this email.");
+    expect(t).not.toContain("sign in to Outlly.");
+    expect(t).not.toMatch(/\bHi\b/);
+  });
+
   test("every template produces non-empty text without markup", () => {
     for (const [name, html] of Object.entries(sampleAll(mod))) {
       const t = mod.htmlToText(html);

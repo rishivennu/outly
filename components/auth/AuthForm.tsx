@@ -2,11 +2,13 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, KeyRound, Mail, MessageCircle } from "lucide-react";
+import { ArrowRight, CircleCheck, Eye, EyeOff, KeyRound, Mail, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { api, ApiError } from "@/lib/client/api";
 import { GoogleButton } from "./GoogleButton";
+import { OtpBoxes, type OtpBoxesHandle } from "./OtpBoxes";
+import { PhoneInput, WhatsAppAuth, WhatsAppGlyph } from "./WhatsAppAuth";
 import { GoogleHelp } from "@/components/onboarding/GoogleHelp";
 import { OutlyMark } from "@/components/brand/Logo";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
@@ -37,7 +39,9 @@ type Step = "password" | "code" | "reset" | "2fa";
  *
  * Sign in has three steps sharing one slot, so the card never grows: password, or an emailed 6-digit
  * code instead; then, for studios with an authenticator app, the app code (or a recovery code).
- * "Forgot password?" swaps in a fourth: an emailed reset code plus a new password, which signs you in.
+ * "Forgot password?" swaps in a fourth: a reset code (email or WhatsApp) plus a new password, typed twice;
+ * then back to sign in with the new one. With WhatsApp switched on (1060), "Continue with WhatsApp" opens
+ * its own screen (WhatsAppAuth) that signs in, or signs up, with a code sent there.
  */
 export function AuthForm({ mode, google = false, whatsapp = false, title, subtitle, banner }: { mode: "login" | "signup"; google?: boolean; whatsapp?: boolean; title: string; subtitle: string; banner?: React.ReactNode }) {
   const router = useRouter();
@@ -54,8 +58,12 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
   const [form, setForm] = useState({ name: "", email: demo ? "creator@studio.dev" : mode === "signup" ? (params.get("email") ?? "").slice(0, 200) : "", password: demo ? "studio123" : "" });
   const [step, setStep] = useState<Step>(mode === "login" && params.get("step") === "2fa" ? "2fa" : "password");
   const [sentTo, setSentTo] = useState<string | null>(null); // email (or wa:number) the last code went to
-  // Sign-in codes can go to WhatsApp instead of email when the admin has it switched on.
+  // Reset codes can go to WhatsApp instead of email when the admin has it switched on.
   const [via, setVia] = useState<"email" | "whatsapp">("email");
+  // Continue with WhatsApp: its own screen in place of this form.
+  const [wa, setWa] = useState(false);
+  const [confirmPw, setConfirmPw] = useState("");
+  const [success, setSuccess] = useState<string | null>(null);
   const [phone, setPhone] = useState("");
   // Second step: the app (or a recovery code), or a code sent to the account's WhatsApp number.
   const [twoVia, setTwoVia] = useState<"app" | "whatsapp">("app");
@@ -67,14 +75,18 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
   // "Remember this device" (1053). Remembered: stays signed in for 14 days and, after one full two-step
   // sign-in, skips the second step here for 30. Not remembered: a session that ends with the browser.
   const [remember, setRemember] = useState(true);
-  const codeRef = useRef<HTMLInputElement>(null);
+  const codeRef = useRef<HTMLInputElement>(null); // the recovery-code field
+  const boxesRef = useRef<OtpBoxesHandle>(null); // the six code boxes
+  const focusCode = () => (codeRef.current ?? boxesRef.current)?.focus();
   const emailRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
   // 1058: signing up (email or Google) needs a ticked "18 or older". The server checks it too.
   const ageRef = useRef<HTMLInputElement>(null);
   const [adult, setAdult] = useState(false);
   const askAge = () => { setError(AGE_ERROR); ageRef.current?.focus(); };
-  const byPhone = step === "code" && via === "whatsapp";
+  // A reset code by WhatsApp. (Signing in by WhatsApp has its own screen, WhatsAppAuth.)
+  const byPhone = via === "whatsapp" && step === "reset";
+  // What the last code was sent to, so changing the email or number asks for a new one.
   const target = byPhone ? `wa:${phone.replace(/\D/g, "")}` : form.email.trim().toLowerCase();
   /** Second step on screen: ask once whether a WhatsApp code is on offer for this sign-in. */
   useEffect(() => {
@@ -146,7 +158,7 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
     inFlight.current = false;
     lastSent.current = null;
     setBusy(false);
-    requestAnimationFrame(() => codeRef.current?.focus());
+    requestAnimationFrame(focusCode);
   };
   const switchTo = (s: Step) => {
     // Leaving the authenticator step: drop the halfway sign-in on the server too.
@@ -155,21 +167,24 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
     if (s === "reset" || step === "reset") setSentTo(null);
     setStep(s);
     setError(null);
+    setSuccess(null);
+    setConfirmPw("");
     setNote(s === "code" ? "Signing in with an email code." : s === "reset" ? "Resetting your password." : s === "password" && step !== "password" ? "Signing in with your password." : null);
     lastSent.current = null;
     setCode("");
     setRecovery(false);
     setTwoVia("app");
-    if (s !== "code") setVia("email");
-    requestAnimationFrame(() => (s === "2fa" || (s === "code" && sentTo) ? codeRef.current : emailRef.current)?.focus());
+    if (s === "password" || s === "2fa") setVia("email"); // code <-> reset keep the channel you chose
+    requestAnimationFrame(() => (s === "2fa" || (s === "code" && sentTo) ? focusCode() : emailRef.current?.focus()));
   };
   /** Email code <-> WhatsApp code, on the code step. */
   const switchVia = (v: "email" | "whatsapp") => {
     setVia(v);
+    setPhone(""); // the number field starts empty again
     setError(null);
     setCode("");
     lastSent.current = null;
-    setNote(v === "whatsapp" ? "Signing in with a WhatsApp code." : "Signing in with an email code.");
+    setNote(v === "whatsapp" ? "Resetting with a WhatsApp code." : "Resetting with an email code.");
     requestAnimationFrame(() => (v === "whatsapp" ? phoneRef.current : emailRef.current)?.focus());
   };
   /** Second step: send a code to the account's WhatsApp number instead of using the app. */
@@ -185,7 +200,7 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
       lastSent.current = null;
       setNote(`A 6-digit code is on its way to ${r.phone ?? "your number"} on WhatsApp. It works for 10 minutes.`);
       setBusy(false);
-      requestAnimationFrame(() => codeRef.current?.focus());
+      requestAnimationFrame(focusCode);
     } catch (e) {
       const m = e instanceof ApiError && /(\d+) seconds/.exec(e.message);
       if (m) setWait(Number(m[1]));
@@ -198,20 +213,22 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
     setBusy(true);
     setError(null);
     try {
-      if (step === "reset") await api("/api/auth/reset", { method: "POST", json: { step: "send", email: form.email } });
-      else if (byPhone) await api("/api/auth/code", { method: "POST", json: { phone } });
+      if (step === "reset") await api("/api/auth/reset", { method: "POST", json: byPhone ? { step: "send", phone } : { step: "send", email: form.email } });
       else await api("/api/auth/code", { method: "POST", json: { email: form.email } });
       setSentTo(target);
       setCode("");
-      if (step === "reset") setForm((f) => ({ ...f, password: "" }));
+      if (step === "reset") {
+        setForm((f) => ({ ...f, password: "" }));
+        setConfirmPw("");
+      }
       setWait(60);
       setNote(
         byPhone
-          ? `If ${phone.trim()} is the WhatsApp number on an Outlly account, a 6-digit code is on its way there. It works for 10 minutes.`
+          ? `If ${phone} is the WhatsApp number on an Outlly account, a 6-digit code is on its way there. It works for 10 minutes.`
           : `If ${form.email.trim()} has an Outlly account, a 6-digit code is on its way. It works for 10 minutes.`,
       );
       setBusy(false);
-      requestAnimationFrame(() => codeRef.current?.focus());
+      requestAnimationFrame(focusCode);
     } catch (e) {
       const m = e instanceof ApiError && /(\d+) seconds/.exec(e.message);
       if (m) setWait(Number(m[1]));
@@ -225,25 +242,51 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
     if (mode === "signup" && !adult) return askAge();
     const c = typed ?? code;
     if (mode === "login" && (step === "code" || step === "reset") && (!sentTo || sentTo !== target)) return sendCode();
+    if (step === "reset" && c.length !== 6) {
+      setError("Enter all 6 digits of the code.");
+      return setTries((n) => n + 1);
+    }
     if (step === "reset" && form.password.length < 8) {
       setError("Choose a new password of at least 8 characters.");
       return setTries((n) => n + 1);
     }
+    if (step === "reset" && form.password !== confirmPw) {
+      setError("The two passwords don't match. Type the same new password in both boxes.");
+      return setTries((n) => n + 1);
+    }
     const sig = `${step}:${step === "2fa" ? twoVia : via}:${c}`;
-    if (step !== "password" && mode === "login" && lastSent.current === sig) return; // this exact code is already being checked
+    const byCode = step !== "password" && mode === "login";
+    if (byCode && lastSent.current === sig) return; // this exact code is already being checked
     inFlight.current = true;
-    lastSent.current = step !== "password" ? sig : null;
+    lastSent.current = byCode ? sig : null;
     setBusy(true);
     setError(null);
-    if (step !== "password" && mode === "login") setNote("Checking your code…");
+    if (byCode) setNote("Checking your code…");
     try {
       if (mode === "signup") {
         await api("/api/auth/signup", { method: "POST", json: { ...form, adult, timezone: tz.current } });
         return go();
       }
       if (step === "password") return after(await api<{ twoFactor?: boolean }>("/api/auth/login", { method: "POST", json: { email: form.email, password: form.password, remember } }));
-      if (step === "code") return after(await api<{ twoFactor?: boolean }>("/api/auth/code/verify", { method: "POST", json: byPhone ? { phone, code: c, remember } : { email: form.email, code: c, remember } }));
-      if (step === "reset") return after(await api<{ twoFactor?: boolean }>("/api/auth/reset", { method: "POST", json: { step: "confirm", email: form.email, code: c, password: form.password, remember } }));
+      if (step === "code") return after(await api<{ twoFactor?: boolean }>("/api/auth/code/verify", { method: "POST", json: { email: form.email, code: c, remember } }));
+      if (step === "reset") {
+        const r = await api<{ email: string | null }>("/api/auth/reset", { method: "POST", json: { step: "confirm", ...(byPhone ? { phone } : { email: form.email }), code: c, password: form.password } });
+        // Back to sign in with the new password. Every other device was signed out. An email reset gets the
+        // address back to fill in; a WhatsApp reset doesn't (a recycled number mustn't learn the old owner's email).
+        setStep("password");
+        setVia("email");
+        setSentTo(null);
+        setCode("");
+        setConfirmPw("");
+        setForm((f) => ({ ...f, email: r.email ?? f.email, password: "" }));
+        setNote(null);
+        setSuccess("Password changed. Sign in with your new password. Any other devices were signed out.");
+        inFlight.current = false;
+        lastSent.current = null;
+        setBusy(false);
+        requestAnimationFrame(() => document.getElementById(r.email ? "password" : "email")?.focus());
+        return;
+      }
       await api("/api/auth/2fa", { method: "POST", json: { code: c, via: twoVia, remember } });
       go();
     } catch (e) {
@@ -253,12 +296,10 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
       fail(e);
     }
   };
-  /** Six digits typed or pasted: no need to hunt for the button. */
-  const onCode = (v: string) => {
-    const digits = recovery ? v.slice(0, 20) : v.replace(/\D/g, "").slice(0, 6);
-    setCode(digits);
-    // A reset also needs the new password, so it waits for the button.
-    if (!recovery && step !== "reset" && digits.length === 6 && !busy && !inFlight.current) void submit(undefined, digits);
+  /** Six digits typed or pasted: no need to hunt for the button. A reset also needs the new password, so it waits. */
+  const onCodeDone = (digits: string) => {
+    if (step !== "reset" && !busy && !inFlight.current) void submit(undefined, digits);
+    else if (step === "reset") requestAnimationFrame(() => document.getElementById("new-password")?.focus());
   };
 
   const sent = (step === "code" || step === "reset") && !!sentTo && sentTo === target;
@@ -271,15 +312,26 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
           ? "Enter the 6-digit code we just sent to your WhatsApp."
           : "Open your authenticator app and enter the 6-digit code it shows for Outlly."
       : step === "code"
-        ? byPhone
-          ? "We'll send a 6-digit code to the WhatsApp number on your account."
-          : "We'll email you a 6-digit code, so there's no password to remember."
+        ? "We'll email you a 6-digit code, so there's no password to remember."
         : step === "reset"
-          ? "We'll email you a 6-digit code. Enter it with a new password and you're signed straight in."
+          ? byPhone
+            ? "We'll send a 6-digit code to the WhatsApp number on your account. Enter it, then choose a new password."
+            : "We'll email you a 6-digit code. Enter it, then choose a new password."
           : subtitle;
   const cta = busy
     ? (step === "code" || step === "reset") && !sent ? "Sending your code…" : step === "reset" ? "Saving your password…" : mode === "login" ? "Opening Outlly…" : "Setting up your account…"
-    : mode === "signup" ? "Get started" : step === "code" && !sent ? (byPhone ? "Send code on WhatsApp" : "Email me a code") : step === "reset" ? (sent ? "Save password and sign in" : "Email me a reset code") : step === "2fa" ? "Verify and sign in" : "Sign in";
+    : mode === "signup" ? "Create account" : step === "code" && !sent ? "Email me a code" : step === "reset" ? (sent ? "Save new password" : byPhone ? "Send reset code on WhatsApp" : "Email me a reset code") : step === "2fa" ? "Verify and sign in" : "Sign in";
+  /** "Continue with WhatsApp": its own screen, sign in and sign up alike. */
+  const useWhatsApp = () => {
+    if (step === "2fa") void api("/api/auth/2fa", { method: "DELETE" }).catch(() => {});
+    setStep("password");
+    setError(null);
+    setSuccess(null);
+    setNote(null);
+    setWa(true);
+  };
+  // The same pill as Continue with Google, so the ways in read as one set.
+  const altBtn = "flex min-h-12 w-full items-center justify-center gap-3 rounded-full bg-secondary px-5 text-[15px] font-semibold text-foreground transition-[transform,background-color,box-shadow] duration-200 hover:-translate-y-px hover:bg-secondary/70 hover:shadow-[0_10px_24px_-16px_hsl(var(--foreground)/0.5)] hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:translate-y-0 active:scale-[0.985] motion-reduce:transform-none motion-reduce:transition-colors";
   const textBtn = "inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-60";
 
   const other = mode === "login" ? "/signup" : "/login";
@@ -287,13 +339,61 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
   const label = "mb-1.5 text-[14px] font-semibold text-foreground";
   const field = "h-12 rounded-xl border border-foreground/45 bg-card shadow-[0_1px_2px_hsl(var(--foreground)/0.05)] hover:border-foreground/60 focus:border-foreground/75 focus:bg-card";
 
+  const pwToggle = (
+    <button
+      type="button"
+      onClick={() => setShowPw((v) => !v)}
+      aria-label={showPw ? "Hide password" : "Show password"}
+      aria-pressed={showPw}
+      className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+    >
+      {showPw ? <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" /> : <Eye className="h-[18px] w-[18px]" aria-hidden="true" />}
+    </button>
+  );
+  // A reset doesn't sign in (you sign in with the new password next), so there's nothing to remember there.
+  const remembering = mode === "login" && step !== "reset" ? <RememberChoice value={remember} onChange={setRemember} twoStep={step === "2fa"} /> : null;
+
+  if (wa)
+    return (
+      // The same root as the form below, so React keeps the node (and GSAP's data-gs-ready) when switching back.
+      <div ref={ref} className="gs-stage">
+        <div className="mb-4 flex [@media(max-height:800px)]:hidden"><OutlyMark size={34} /></div>
+        <WhatsAppAuth
+          mode={mode}
+          remember={remember}
+          rememberSlot={remembering}
+          timezone={() => tz.current}
+          onSignedIn={(r) => {
+            if (r.twoFactor) setWa(false);
+            after(r);
+          }}
+          onBack={() => setWa(false)}
+          onFail={() => setTries((n) => n + 1)}
+          cls={{ field, label, textBtn }}
+        />
+      </div>
+    );
+
+  const mismatch = step === "reset" && confirmPw.length > 0 && confirmPw !== form.password;
   return (
     <div ref={ref} className="gs-stage">
       <div className="gs-in mb-4 flex [@media(max-height:800px)]:hidden"><OutlyMark size={34} /></div>
       <h1 className="gs-in font-display text-[clamp(2rem,3.4vw,2.5rem)] font-bold leading-[1.05] tracking-[-0.035em]">{heading}</h1>
       <p className="gs-in mb-6 mt-2.5 max-w-[40ch] text-[15px] leading-relaxed text-muted-foreground">{sub}</p>
       {step !== "2fa" && banner}
+      {success && (
+        <p role="status" className="mb-4 flex items-start gap-2.5 rounded-xl bg-lime/15 px-4 py-3 text-sm font-medium text-foreground">
+          <CircleCheck className="mt-0.5 h-[18px] w-[18px] shrink-0 text-lime-ink" aria-hidden="true" />
+          {success}
+        </p>
+      )}
       <form onSubmit={submit} className="w-full space-y-4 [@media(max-height:800px)]:space-y-3" noValidate>
+        {step === "password" && (
+          <p className="gs-in -mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+            Email &amp; password
+          </p>
+        )}
         {mode === "signup" && (
           <div className="gs-in">
             <Label htmlFor="name" className={label}>Your name</Label>
@@ -301,11 +401,7 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
           </div>
         )}
         {byPhone && (
-        <div className="gs-in">
-          <Label htmlFor="phone" className={label}>Your WhatsApp number</Label>
-          <Input ref={phoneRef} id="phone" type="tel" inputMode="tel" autoComplete="tel" required placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value.slice(0, 32))} aria-describedby="phone-hint" className={field} />
-          <p id="phone-hint" className="mt-1.5 text-xs text-muted-foreground">The number you added in Settings. Indian numbers can skip the +91.</p>
-        </div>
+        <PhoneInput ref={phoneRef} id="phone" label="Your WhatsApp number" hint="The WhatsApp number on your account." onPhone={(full) => setPhone(full)} cls={{ field, label }} />
         )}
         {step !== "2fa" && !byPhone && (
         <div className="gs-in">
@@ -313,24 +409,21 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
           <Input ref={emailRef} id="email" type="email" inputMode="email" autoComplete="email" required placeholder="you@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={field} />
         </div>
         )}
-        {(mode === "signup" || step === "password") && (
+        {step === "password" && (
         <div className="gs-in">
-          {mode === "login" && (
+          {mode === "login" ? (
             <div className="mb-1.5 flex items-center justify-between gap-3">
               <Label htmlFor="password" className={`${label} mb-0`}>Password</Label>
-              <button type="button" onClick={() => switchTo("reset")} className="-my-2 -mr-1 inline-flex min-h-11 items-center rounded-lg px-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+              <button type="button" onClick={() => switchTo("reset")} className="-my-2 -mr-1 inline-flex min-h-11 items-center rounded-lg px-1 text-[13px] font-semibold text-lime-ink underline-offset-4 transition-colors hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
                 Forgot password?
               </button>
             </div>
-          )}
-          {mode === "signup" && (
+          ) : (
           <Label htmlFor="password" className={label}>
             Password
-            {mode === "signup" && (
-              <span id="pw-hint" className="text-xs font-normal text-muted-foreground" aria-live="polite">
-                {form.password.length > 0 && form.password.length < 8 ? `${8 - form.password.length} more to go` : "At least 8 characters"}
-              </span>
-            )}
+            <span id="pw-hint" className="text-xs font-normal text-muted-foreground" aria-live="polite">
+              {form.password.length > 0 && form.password.length < 8 ? `${8 - form.password.length} more to go` : "At least 8 characters"}
+            </span>
           </Label>
           )}
           <div className="relative">
@@ -349,15 +442,7 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
               aria-describedby={[mode === "signup" ? "pw-hint" : "", caps ? "pw-caps" : ""].filter(Boolean).join(" ") || undefined}
               className={`${field} pr-12`}
             />
-            <button
-              type="button"
-              onClick={() => setShowPw((v) => !v)}
-              aria-label={showPw ? "Hide password" : "Show password"}
-              aria-pressed={showPw}
-              className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              {showPw ? <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" /> : <Eye className="h-[18px] w-[18px]" aria-hidden="true" />}
-            </button>
+            {pwToggle}
           </div>
           {caps && (
             <p id="pw-caps" className="mt-2 text-xs font-medium text-warning">
@@ -368,40 +453,57 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
         )}
         {(sent || step === "2fa") && (
           <div>
-            <div className="mb-1.5 flex items-center justify-between gap-3">
-              <Label htmlFor="otp" className={`${label} mb-0`}>{step === "2fa" ? (recovery ? "Recovery code" : twoVia === "whatsapp" ? "WhatsApp code" : "Authenticator code") : "6-digit code"}</Label>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <Label htmlFor="otp" className={`${label} mb-0`}>{step === "2fa" ? (recovery ? "Recovery code" : twoVia === "whatsapp" ? "WhatsApp code" : "Authenticator code") : byPhone ? "WhatsApp code" : "Email code"}</Label>
               {step === "2fa" && twoVia === "whatsapp" && (
-                <button type="button" onClick={sendTwoFactorWa} disabled={busy || wait > 0} className={`${textBtn} -my-2 -mr-3 text-xs`}>
-                  {wait > 0 ? `Send again in ${wait}s` : "Send a new code"}
+                <button type="button" onClick={sendTwoFactorWa} disabled={busy || wait > 0} className={`${textBtn} tabular -my-2 -mr-3 text-xs`}>
+                  {wait > 0 ? `Resend code in ${clock(wait)}` : "Resend code"}
                 </button>
               )}
               {(step === "code" || step === "reset") && (
-                <button type="button" onClick={sendCode} disabled={busy || wait > 0} className={`${textBtn} -my-2 -mr-3 text-xs`}>
-                  {wait > 0 ? `Send again in ${wait}s` : "Send a new code"}
+                <button type="button" onClick={sendCode} disabled={busy || wait > 0} className={`${textBtn} tabular -my-2 -mr-3 text-xs`}>
+                  {wait > 0 ? `Resend code in ${clock(wait)}` : "Resend code"}
                 </button>
               )}
             </div>
-            <Input
-              ref={codeRef}
-              id="otp"
-              name="otp"
-              value={code}
-              onChange={(e) => onCode(e.target.value)}
-              inputMode={recovery ? "text" : "numeric"}
-              autoComplete="one-time-code"
-              autoCapitalize="none"
-              spellCheck={false}
-              pattern={recovery ? undefined : "[0-9]*"}
-              maxLength={recovery ? 20 : 6}
-              placeholder={recovery ? "abcde-12345" : "000000"}
-              required
-              aria-invalid={error ? true : undefined}
-              aria-describedby={[note ? "otp-note" : "", error ? "auth-error" : ""].filter(Boolean).join(" ") || undefined}
-              className={`${field} tabular text-center text-[22px] font-semibold ${recovery ? "tracking-[0.12em]" : "tracking-[0.42em]"}`}
-            />
+            {recovery ? (
+              <Input
+                ref={codeRef}
+                id="otp"
+                name="otp"
+                value={code}
+                onChange={(e) => setCode(e.target.value.slice(0, 20))}
+                inputMode="text"
+                autoComplete="one-time-code"
+                autoCapitalize="none"
+                spellCheck={false}
+                maxLength={20}
+                placeholder="abcde-12345"
+                required
+                aria-invalid={error ? true : undefined}
+                aria-describedby={[note ? "otp-note" : "", error ? "auth-error" : ""].filter(Boolean).join(" ") || undefined}
+                className={`${field} tabular text-center text-[22px] font-semibold tracking-[0.12em]`}
+              />
+            ) : (
+              <OtpBoxes
+                ref={boxesRef}
+                id="otp"
+                label={step === "2fa" ? (twoVia === "whatsapp" ? "6-digit WhatsApp code" : "6-digit authenticator code") : "6-digit code"}
+                value={code}
+                onChange={(v) => {
+                  setCode(v);
+                  if (error) setError(null);
+                }}
+                onComplete={onCodeDone}
+                disabled={busy}
+                invalid={!!error}
+                describedBy={[note ? "otp-note" : "", error ? "auth-error" : ""].filter(Boolean).join(" ") || undefined}
+              />
+            )}
           </div>
         )}
         {step === "reset" && sent && (
+          <>
           <div>
             <Label htmlFor="new-password" className={label}>
               New password
@@ -423,19 +525,35 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
                 aria-describedby="npw-hint"
                 className={`${field} pr-12`}
               />
-              <button
-                type="button"
-                onClick={() => setShowPw((v) => !v)}
-                aria-label={showPw ? "Hide password" : "Show password"}
-                aria-pressed={showPw}
-                className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-              >
-                {showPw ? <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" /> : <Eye className="h-[18px] w-[18px]" aria-hidden="true" />}
-              </button>
+              {pwToggle}
             </div>
           </div>
+          <div>
+            <Label htmlFor="confirm-password" className={label}>
+              Confirm new password
+              {confirmPw.length > 0 && (
+                <span id="cpw-hint" className={`text-xs font-normal ${mismatch ? "text-destructive" : "text-muted-foreground"}`} aria-live="polite">
+                  {mismatch ? "Doesn't match yet" : "Matches"}
+                </span>
+              )}
+            </Label>
+            <Input
+              id="confirm-password"
+              type={showPw ? "text" : "password"}
+              autoComplete="new-password"
+              required
+              maxLength={200}
+              placeholder="Type it again"
+              value={confirmPw}
+              onChange={(e) => setConfirmPw(e.target.value)}
+              aria-invalid={mismatch || undefined}
+              aria-describedby={confirmPw.length > 0 ? "cpw-hint" : undefined}
+              className={field}
+            />
+          </div>
+          </>
         )}
-        {mode === "login" && <RememberChoice value={remember} onChange={setRemember} twoStep={step === "2fa"} />}
+        {remembering}
         {mode === "login" && (
           <p id="otp-note" role="status" className={note ? "text-sm leading-relaxed text-muted-foreground" : "sr-only"}>
             {note}
@@ -469,7 +587,7 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
           <div className="gs-in -my-1 flex justify-center">
             {step === "2fa" ? (
               <div className="flex flex-wrap justify-center gap-x-1">
-                <button type="button" className={textBtn} onClick={() => { setRecovery((r) => twoVia === "whatsapp" ? false : !r); setTwoVia("app"); setCode(""); setError(null); lastSent.current = null; requestAnimationFrame(() => codeRef.current?.focus()); }}>
+                <button type="button" className={textBtn} onClick={() => { setRecovery((r) => twoVia === "whatsapp" ? false : !r); setTwoVia("app"); setCode(""); setError(null); lastSent.current = null; requestAnimationFrame(focusCode); }}>
                   <KeyRound className="h-4 w-4" aria-hidden="true" />
                   {recovery || twoVia === "whatsapp" ? "Use the app code instead" : "Use a recovery code instead"}
                 </button>
@@ -480,21 +598,23 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
                   </button>
                 )}
               </div>
-            ) : step === "code" && whatsapp ? (
+            ) : step === "reset" ? (
               <div className="flex flex-wrap justify-center gap-x-1">
-                <button type="button" className={textBtn} onClick={() => switchVia(via === "whatsapp" ? "email" : "whatsapp")}>
-                  {via === "whatsapp" ? <Mail className="h-4 w-4" aria-hidden="true" /> : <MessageCircle className="h-4 w-4" aria-hidden="true" />}
-                  {via === "whatsapp" ? "Email me the code instead" : "Get the code on WhatsApp"}
-                </button>
+                {whatsapp && (
+                  <button type="button" className={textBtn} onClick={() => { setSentTo(null); switchVia(via === "whatsapp" ? "email" : "whatsapp"); }}>
+                    {via === "whatsapp" ? <Mail className="h-4 w-4" aria-hidden="true" /> : <MessageCircle className="h-4 w-4" aria-hidden="true" />}
+                    {via === "whatsapp" ? "Reset by email instead" : "Reset with WhatsApp instead"}
+                  </button>
+                )}
                 <button type="button" className={textBtn} onClick={() => switchTo("password")}>
                   <KeyRound className="h-4 w-4" aria-hidden="true" />
-                  Use my password
+                  Back to sign in
                 </button>
               </div>
             ) : (
               <button type="button" className={textBtn} onClick={() => switchTo(step === "password" ? "code" : "password")}>
                 {step !== "password" ? <KeyRound className="h-4 w-4" aria-hidden="true" /> : <Mail className="h-4 w-4" aria-hidden="true" />}
-                {step === "reset" ? "Back to sign in" : step === "code" ? "Use my password" : "Email me a code instead"}
+                {step === "code" ? "Use my password" : "Email me a code instead"}
               </button>
             )}
           </div>
@@ -507,7 +627,7 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
             </button>
 . Lost your phone and codes? <Link href="/help" className="rounded font-semibold text-lime-ink underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">Get help</Link>.
           </p>
-        ) : (
+        ) : step === "reset" ? null : (
         <>
         <div className="gs-in flex items-center gap-3 text-xs text-muted-foreground" aria-hidden="true">
           <span className="h-px flex-1 bg-border" />
@@ -515,6 +635,12 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
           <span className="h-px flex-1 bg-border" />
         </div>
         <div className="gs-in space-y-3">
+          {whatsapp && (
+            <button type="button" onClick={useWhatsApp} className={altBtn}>
+              <WhatsAppGlyph />
+              {mode === "login" ? "Continue with WhatsApp" : "Sign up with WhatsApp"}
+            </button>
+          )}
           <GoogleButton from={mode} next={next} remember={mode === "login" ? remember : undefined} label={mode === "login" ? "Sign in with Google" : "Sign up with Google"} onClick={mode === "signup" ? (e) => { if (!adult) { e.preventDefault(); askAge(); } } : undefined} />
           {google && <GoogleHelp compact defaultOpen={googleError === "access_denied"} />}
         </div>
@@ -528,7 +654,7 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
         )}
         {mode === "signup" && (
           <p className="gs-in text-center text-xs leading-relaxed text-muted-foreground">
-            Signing up with email or Google, you agree to the{" "}
+            By creating an account, you agree to the{" "}
             <Link href="/terms" className="font-medium text-foreground underline underline-offset-4">Terms</Link> and{" "}
             <Link href="/privacy" className="font-medium text-foreground underline underline-offset-4">Privacy Policy</Link>.
           </p>
@@ -537,6 +663,9 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
     </div>
   );
 }
+
+/** 47 -> "0:47". */
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 /**
  * Two plain choices rather than a lone checkbox, so "not remembered" is a decision too (1053). Native radios:

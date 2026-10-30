@@ -375,10 +375,8 @@ html:not(.dark) .fade-title { color: hsl(var(--foreground)); }
   box-shadow: inset 0 0 0 1px hsl(var(--lime) / 0.45);
 }
 
-/* Big gradient display text: the dark-tuned stops are too pale on warm white. */
-html:not(.dark) .energy-text {
-  background-image: linear-gradient(100deg, hsl(150 84% 30%), hsl(104 80% 32%) 55%, hsl(82 92% 30%));
-}
+/* 1060: the accent word is solid lime-ink in both themes (5.4:1 on light). A gradient background here, without
+   background-clip:text, painted a green box behind the words ("your video", "fit everywhere.", "you are."). */
 
 /* Grain was authored to overlay on black. */
 html:not(.dark) .grain::after {

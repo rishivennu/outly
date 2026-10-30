@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "../db";
 import { env } from "../env";
 import { HttpError } from "../http";
-import { rateLimit } from "../rate-limit";
+import { limitShared, rateLimit } from "../rate-limit";
 import { sendEmail, templates } from "../email";
 import { maskPhone, normalizePhone } from "../phone";
 import { whatsappAvailable } from "../whatsapp";
@@ -15,6 +15,7 @@ import { checkOtp, codeDigest, isCodeShape, newCode, normalizeCode, OTP_MAX_ATTE
  *   wa:+91…              sign in with a number already proven on an account
  *   add:<userId>:+91…    prove a number before it's saved on the account
  *   2fa:<userId>         second step of sign-in, sent to the proven number
+ * A "reset" code shares the wa: key with sign-in but not the purpose, so one can never be spent as the other.
  */
 export const WA_MESSAGE: Record<Exclude<OtpVerdict, "ok">, string> = {
   wrong: "That code doesn't match. Check the latest WhatsApp message from Outlly and try again.",
@@ -32,22 +33,27 @@ export function parsePhone(input: string) {
   return p;
 }
 
-async function requireOn() {
+/** Exported names used by lib/otp/wa-auth (Continue with WhatsApp). */
+export async function requireOn() {
   if (!(await whatsappAvailable())) throw new HttpError(503, "WhatsApp codes aren't switched on yet. Use an email code or your password.", "WA_UNAVAILABLE");
 }
 
-/** Per-number limits, checked before anything else so the answer doesn't depend on whether the number has an account. */
-function limits(phone: string, purpose: OtpPurpose) {
-  const cool = rateLimit(`otp:wa:cool:${purpose}:${phone}`, 1, OTP_RESEND_MS);
+/**
+ * Per-number limits, checked before anything else so the answer doesn't depend on whether the number has an account.
+ * Shared across server instances (awaited), because every message is paid for: a local-first window would let each
+ * instance send one more before the shared block landed.
+ */
+export async function limits(phone: string, purpose: OtpPurpose) {
+  const cool = await limitShared(`otp:wa:cool:${purpose}:${phone}`, 1, OTP_RESEND_MS);
   if (!cool.ok) throw new HttpError(429, `A code is already on its way. You can ask for another in ${cool.retryAfter} seconds.`, "OTP_COOLDOWN");
-  const hour = rateLimit(`otp:wa:hour:${purpose}:${phone}`, OTP_PER_HOUR, 60 * 60_000);
+  const hour = await limitShared(`otp:wa:hour:${purpose}:${phone}`, OTP_PER_HOUR, 60 * 60_000);
   if (!hour.ok) throw new HttpError(429, "That's a lot of codes for one number. Try again in an hour, or use an email code.", "OTP_HOURLY");
-  const day = rateLimit(`otp:wa:day:${phone}`, WA_PER_DAY, 24 * 60 * 60_000);
+  const day = await limitShared(`otp:wa:day:${phone}`, WA_PER_DAY, 24 * 60 * 60_000);
   if (!day.ok) throw new HttpError(429, "That number has had its WhatsApp codes for today. Use an email code or your password.", "OTP_DAILY");
 }
 
 /** Makes a code under `key`, sends it to `phone`, and retires older codes for the key once it's delivered. */
-async function deliver(key: string, purpose: OtpPurpose, phone: string): Promise<{ ok: boolean; error?: string }> {
+export async function deliver(key: string, purpose: OtpPurpose, phone: string): Promise<{ ok: boolean; error?: string }> {
   const code = newCode();
   const row = await db.otpCode.create({ data: { email: key, purpose, codeHash: codeDigest(env.AUTH_SECRET, purpose, key, code), expiresAt: new Date(Date.now() + OTP_TTL_MS) } });
   const sent = await whatsappChannel.send(phone, code, { name: null, purpose });
@@ -79,23 +85,26 @@ export async function claimCode(key: string, purpose: OtpPurpose, codeIn: string
 const fail = (v: OtpVerdict) => new HttpError(401, WA_MESSAGE[v as Exclude<OtpVerdict, "ok">] ?? WA_MESSAGE.wrong, `OTP_${v.toUpperCase()}`);
 
 // ------------------------------------------------------------------------------------------------ sign in
-/** Same answer whether or not the number is on an account, like the email codes. */
-export async function issuePhoneLogin(phoneIn: string) {
+/**
+ * Same answer whether or not the number is on an account, like the email codes. `reset` is Forgot password
+ * by WhatsApp (1060): the same proven number, a code that only works for setting a new password.
+ */
+export async function issuePhoneLogin(phoneIn: string, purpose: "login" | "reset" = "login") {
   const phone = parsePhone(phoneIn);
   await requireOn();
-  limits(phone, "login");
+  await limits(phone, purpose);
   const user = await db.user.findUnique({ where: { phone }, select: { id: true, phoneVerifiedAt: true } });
   if (!user?.phoneVerifiedAt) {
     await new Promise((r) => setTimeout(r, 300 + Math.floor(Math.random() * 500)));
     return { ok: true as const };
   }
-  await deliver(`wa:${phone}`, "login", phone); // a failure is logged, not shown: it would confirm the account
+  await deliver(`wa:${phone}`, purpose, phone); // a failure is logged, not shown: it would confirm the account
   return { ok: true as const };
 }
 
-export async function verifyPhoneLogin(phoneIn: string, code: string) {
+export async function verifyPhoneLogin(phoneIn: string, code: string, purpose: "login" | "reset" = "login") {
   const phone = parsePhone(phoneIn);
-  const v = await claimCode(`wa:${phone}`, "login", code);
+  const v = await claimCode(`wa:${phone}`, purpose, code);
   if (v !== "ok") throw fail(v);
   const user = await db.user.findUnique({ where: { phone }, select: { id: true, phoneVerifiedAt: true } });
   if (!user?.phoneVerifiedAt) throw fail("wrong");
@@ -104,7 +113,7 @@ export async function verifyPhoneLogin(phoneIn: string, code: string) {
 }
 
 // ----------------------------------------------------------------------------------------------- settings
-async function securityMail(userId: string, change: "phone" | "phone-off") {
+export async function securityMail(userId: string, change: "phone" | "phone-off") {
   const u = await db.user.findUnique({ where: { id: userId }, select: { email: true, name: true } });
   if (!u) return;
   await sendEmail({
@@ -128,7 +137,7 @@ export async function startPhoneAdd(userId: string, phoneIn: string) {
   if (!mine.ok) throw new HttpError(429, "That's a lot of numbers in an hour. Try again later.", "OTP_HOURLY");
   const owner = await db.user.findUnique({ where: { phone }, select: { id: true } });
   if (owner && owner.id !== userId) throw new HttpError(409, "That number is already on another Outlly account.", "PHONE_TAKEN");
-  limits(phone, "phone");
+  await limits(phone, "phone");
   const sent = await deliver(`add:${userId}:${phone}`, "phone", phone);
   if (!sent.ok) throw new HttpError(502, "WhatsApp didn't take the message. Check the number has WhatsApp, then try again.", "WA_SEND_FAILED");
   return { ok: true as const, phone: maskPhone(phone) };
@@ -161,8 +170,10 @@ export async function removePhone(userId: string) {
 /** Sends the second-step code to the account's proven number. Callers check the halfway sign-in first. */
 export async function issueTwoFactor(userId: string, phone: string) {
   await requireOn();
-  limits(phone, "2fa");
+  await limits(phone, "2fa");
   const sent = await deliver(`2fa:${userId}`, "2fa", phone);
   if (!sent.ok) throw new HttpError(502, "WhatsApp didn't take the message. Use your authenticator app or a recovery code.", "WA_SEND_FAILED");
   return { ok: true as const, phone: maskPhone(phone) };
 }
+
+export { requireOn as requireWhatsApp, limits as phoneLimits, deliver as deliverPhoneCode };

@@ -77,8 +77,8 @@ export async function signUp(name: string, email: string, password: string, time
 export async function signIn(email: string, password: string) {
   email = email.toLowerCase();
   const local = await db.user.findUnique({ where: { email } });
-  const wrong = new HttpError(401, "That email and password don't match.");
-  if (local && !local.passwordHash && !local.authId) throw new HttpError(401, "This studio signs in with Google. Use Continue with Google.");
+  const wrong = new HttpError(401, "That email and password don't match. If you signed up with Google or WhatsApp, use that, or reset your password.");
+  if (local && !local.passwordHash && !local.authId) throw wrong; // no password set: the same answer as a wrong one
   if (!useSupabase()) {
     if (!local?.passwordHash || !(await verifyPassword(password, local.passwordHash))) throw wrong;
     return { id: local.id };
@@ -131,6 +131,37 @@ export async function setPassword(userId: string, password: string) {
     await db.user.update({ where: { id: u.id }, data: { passwordHash: await hashPassword(password) } });
   }
   await revokeAllSessions(u.id);
+}
+
+/**
+ * Continue with WhatsApp, last step (1060). Both the number and the inbox were just proven by codes
+ * (lib/otp/wa-auth). New email: a new studio with both verified, and no password (one can be added later
+ * with Forgot password, like a Google studio). Email already on an account: the number is linked to it
+ * rather than making a duplicate, unless that account already has a different number.
+ */
+export async function createOrLinkWithPhone(name: string, email: string, phone: string, timezone?: string | null) {
+  email = email.toLowerCase();
+  const taken = await db.user.findUnique({ where: { phone }, select: { id: true, phoneVerifiedAt: true } });
+  const existing = await db.user.findUnique({ where: { email }, select: { id: true, phone: true } });
+  if (taken && taken.id !== existing?.id) {
+    if (taken.phoneVerifiedAt) throw new HttpError(409, "That WhatsApp number was just added to another account. Start again, or sign in with that number.", "PHONE_TAKEN");
+    // Typed into another account but never proven there: the person who just proved it owns it.
+    await db.user.update({ where: { id: taken.id }, data: { phone: null, phoneVerifiedAt: null } });
+  }
+  if (existing) {
+    if (existing.phone && existing.phone !== phone) throw new HttpError(409, "This account already uses another WhatsApp number. Sign in with your email, then change the number in Settings.", "PHONE_OTHER");
+    await db.user.update({ where: { id: existing.id }, data: { phone, phoneVerifiedAt: new Date() } });
+    await markEmailVerified(existing.id);
+    return { id: existing.id, created: false, linked: !existing.phone };
+  }
+  await assertMayCreateAccount(email);
+  try {
+    const u = await joined(await db.user.create({ data: { name, email, phone, phoneVerifiedAt: new Date(), emailVerifiedAt: new Date(), emailVerifiedFor: email, ...tzData(timezone) }, select: { id: true } }), true);
+    return { id: u.id, created: true, linked: false };
+  } catch (e) {
+    if ((e as { code?: string }).code === "P2002") throw new HttpError(409, "That email or number was just used for another account. Start again.", "TAKEN");
+    throw e;
+  }
 }
 
 /**

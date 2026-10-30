@@ -468,19 +468,48 @@ export const templates = {
   growth: (o: { subject: string; body: string; url: string; cta: string }) =>
     wrap(esc(o.subject), `${o.body.split(/\n{2,}/).map((para) => p(esc(para).replace(/\n/g, "<br>"))).join("")}${btn(o.url, esc(o.cta))}`, { kicker: "From the Outlly team", tone: "cream" }),
   /** Sign-in code. The digits sit in their own tile, spaced for reading aloud, and lead the subject line. */
-  otp: (o: { name: string | null; code: string; minutes: number; reset?: boolean }) =>
-    wrap(
-      o.reset ? "Reset your password" : "Your sign-in code",
-      o.reset
-        ? `${p(`${o.name ? `Hi ${esc(o.name)}, here` : "Here"} is the code to choose a new Outlly password. It works once, for the next ${o.minutes} minutes.`)}${p("If you didn't ask for it, you can ignore this email: your password stays as it is.")}${small("Outlly will never ask you to read this code out on a call or type it anywhere except the Outlly reset page.")}`
-        : `${p(`${o.name ? `Hi ${esc(o.name)}, here` : "Here"} is the code to sign in to Outlly. It works once, for the next ${o.minutes} minutes.`)}${p("If you didn't ask for it, you can ignore this email. Nobody can sign in without the code, and it never leaves this message.")}${small("Outlly will never ask you to read this code out on a call or type it anywhere except the Outlly sign-in page.")}`,
-      {
-        kicker: o.reset ? "Password" : "Sign in",
-        tone: "cream",
-        preheader: o.reset ? `${o.code} is your Outlly password reset code` : `${o.code} is your Outlly sign-in code`,
-        tiles: tile("ink", `<div style="font-family:${BODY};font-size:13px;color:${TONE.ink.sub}">Your code</div><div style="padding-top:6px;font-family:${DISPLAY};font-size:46px;line-height:1.05;font-weight:bold;letter-spacing:10px;color:${TONE.ink.fg}">${esc(o.code)}</div>`),
+  otp: (o: { name: string | null; code: string; minutes: number; reset?: boolean; kind?: "signin" | "reset" | "signup" | "link" }) => {
+    const k = o.kind ?? (o.reset ? "reset" : "signin");
+    const hi = o.name ? `Hi ${esc(o.name)}, here` : "Here";
+    const T = {
+      reset: {
+        title: "Reset your password",
+        body: `${p(`${hi} is the code to choose a new Outlly password. It works once, for the next ${o.minutes} minutes.`)}${p("If you didn't ask for it, you can ignore this email: your password stays as it is.")}`,
+        page: "the Outlly reset page",
+        kicker: "Password",
+        pre: "Outlly password reset code",
       },
-    ),
+      // 1060 review: the address already has an account and someone is adding a WhatsApp number to it. Say exactly
+      // that (and never use the requester's name), so the code can't be talked out of the owner as a sign-in code.
+      link: {
+        title: "Adding WhatsApp to your account",
+        body: `${p(`Someone is adding a WhatsApp number to the Outlly account for this email, so it can be used to sign in. This code finishes it. It works once, for the next ${o.minutes} minutes.`)}${p("<b>If that wasn't you, ignore this email.</b> Without the code nothing changes, and your account stays as it is.")}`,
+        page: "the Outlly sign-up page you started on",
+        kicker: "Account",
+        pre: "code to add WhatsApp to your Outlly account",
+      },
+      signup: {
+        title: "Confirm your email",
+        body: `${p(`${hi} is the code to confirm this email for your new Outlly account. It works once, for the next ${o.minutes} minutes.`)}${p("If you didn't ask for it, you can ignore this email. Nothing is made without the code.")}`,
+        page: "the Outlly sign-up page",
+        kicker: "Sign up",
+        pre: "code to confirm your email for Outlly",
+      },
+      signin: {
+        title: "Your sign-in code",
+        body: `${p(`${hi} is the code to sign in to Outlly. It works once, for the next ${o.minutes} minutes.`)}${p("If you didn't ask for it, you can ignore this email. Nobody can sign in without the code, and it never leaves this message.")}`,
+        page: "the Outlly sign-in page",
+        kicker: "Sign in",
+        pre: "Outlly sign-in code",
+      },
+    }[k];
+    return wrap(T.title, `${T.body}${small(`Outlly will never ask you to read this code out on a call or type it anywhere except ${T.page}.`)}`, {
+      kicker: T.kicker,
+      tone: "cream",
+      preheader: `${o.code} is your ${T.pre}`,
+      tiles: tile("ink", `<div style="font-family:${BODY};font-size:13px;color:${TONE.ink.sub}">Your code</div><div style="padding-top:6px;font-family:${DISPLAY};font-size:46px;line-height:1.05;font-weight:bold;letter-spacing:10px;color:${TONE.ink.fg}">${esc(o.code)}</div>`),
+    });
+  },
   securitySubject: (change: SecurityChange) =>
     change === "on" ? "Two-step sign-in is on" : change === "off" ? "Two-step sign-in was turned off" : change === "phone" ? "A WhatsApp number was added" : change === "phone-off" ? "Your WhatsApp number was removed" : "New recovery codes were made",
   /** Sent after any change to two-step sign-in, so the owner hears about it even if it wasn't them. */
