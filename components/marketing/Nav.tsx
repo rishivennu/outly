@@ -14,12 +14,11 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { LiveCount } from "@/components/shared/LiveCount";
 import { cn } from "@/lib/utils";
 
-// `back`: what the flip side of the link says on hover (1069, FlipText); defaults to the label.
-const LINKS: { id: string; label: string; back?: string }[] = [
-  { id: "how", label: "How it works", back: "See the flow" },
+const LINKS = [
+  { id: "how", label: "How it works" },
   { id: "features", label: "Product" }, // opens the Product mega menu on lg+
   { id: "compare", label: "Compare" }, // lives inside Product; kept here for the scrollspy
-  { id: "pricing", label: "Pricing", back: "Plans" },
+  { id: "pricing", label: "Pricing" },
   { id: "faq", label: "FAQ" },
 ];
 
@@ -179,7 +178,6 @@ export function MarketingNav() {
   // marketing template), which threw away a receipt someone had just printed (1055).
   const ctaHref = waitlist ? (pathname === "/waitlist" ? "#join" : "/waitlist") : "/signup";
   const ctaLabel = waitlist ? "Join the waitlist" : "Start creating";
-  const ctaBack = waitlist ? "Save my spot" : "Let's go";
 
   return (
     <header className="mnav sticky top-0 z-50 px-3 pt-3 sm:px-6" data-scrolled={scrolled || open}>
@@ -234,7 +232,7 @@ export function MarketingNav() {
                   aria-current={active === l.id ? "true" : undefined}
                   className={cn("mnav-link", active === l.id && "is-active")}
                 >
-                  <FlipText text={l.label} back={l.back} />
+                  <FlipText text={l.label} />
                 </Link>
               </li>
               ),
@@ -266,7 +264,7 @@ export function MarketingNav() {
               className="lime-glow inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-lime px-4 text-[14px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 active:scale-95 sm:px-5"
             >
               <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
-              <FlipText text="Dashboard" back="Open studio" tone="inherit" />
+              <FlipText text="Dashboard" tone="inherit" />
             </Link>
           ) : (
             <>
@@ -278,7 +276,7 @@ export function MarketingNav() {
                 data-mag=""
                 className="lime-glow group inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-lime px-4 text-[14px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 active:scale-95 sm:px-5"
               >
-                <FlipText text={ctaLabel} back={ctaBack} tone="inherit" />
+                <FlipText text={ctaLabel} tone="inherit" />
                 <ArrowRight className="hidden h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 sm:block" aria-hidden="true" />
               </Link>
             </>

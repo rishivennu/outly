@@ -2968,7 +2968,10 @@ html.cfx-hot .cfx-ring > i { width: 54px; height: 54px; background: hsl(var(--li
 html.dark.cfx-hot .cfx-ring > i { border-color: hsl(var(--lime) / .35); }
 html.cfx-down .cfx-ring > i { scale: .82; }
 html.cfx-down .cfx-dot > i { scale: .75; }
-html:is(.cfx-text, .cfx-out) .cfx > i, html:not(.cfx-on) .cfx > i { opacity: 0; }
+html:is(.cfx-text, .cfx-out) .cfx > i, html:not(.cfx-live) .cfx > i { opacity: 0; }
+/* studio: a roomier ring around the 32px avatar cursor */
+.cfx-soft > i { width: 44px; height: 44px; }
+html.cfx-hot .cfx-soft > i { width: 58px; height: 58px; }
 html.cfx-on.cfx-out, html.cfx-on.cfx-out * { cursor: auto !important; } /* window lost focus: never leave the page with no cursor */
 @media (forced-colors: active) { .cfx { display: none; } html.cfx-on, html.cfx-on * { cursor: auto !important; } }
 @media print { .cfx { display: none; } }
@@ -3006,3 +3009,15 @@ html.js .rv-head:not([data-shown]) .rv-kw .sw { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .hf-kw .sw, .rv-head[data-shown] .rv-kw .sw { animation: sw-fade .3s linear both; }
 }
+
+/* CaptionPop (1070): Reel-style captions, one word at a time, popping in where the last one was. */
+.cap-pop { display: inline-grid; place-items: center; }
+.cap-w, .cap-line { grid-area: 1 / 1; font-family: var(--font-display, inherit); font-weight: 900; text-transform: uppercase; letter-spacing: -.01em; line-height: 1; color: #fff;
+  -webkit-text-stroke: .09em rgb(0 0 0 / .85); paint-order: stroke fill; text-shadow: 0 3px 0 rgb(0 0 0 / .35), 0 6px 18px rgb(0 0 0 / .35); white-space: nowrap; }
+.cap-line { white-space: normal; text-align: center; }
+@keyframes cap-pop { 0% { opacity: 0; transform: scale(.55) translateY(.15em); } 55% { opacity: 1; transform: scale(1.12); } 100% { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: no-preference) { .cap-w { animation: cap-pop .2s cubic-bezier(.2, .9, .3, 1) both; } }
+/* left-aligned: the raised centre card covers the Reels card's right edge */
+.hf-cap { position: absolute; z-index: 5; left: 20px; top: 124px; justify-items: start; font-size: 21px; }
+/* phones: the centre card leaves the Reels card about 80px showing, too narrow for a caption */
+@media (max-width: 767px) { .hf-cap { display: none; } }

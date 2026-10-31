@@ -3,13 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import { OrbArt } from "@/components/brand/OrbAvatar";
 import { useUser } from "@/components/shell/UserContext";
 import { defaultOrb, resolveAvatar } from "@/lib/avatar";
+import { CursorFx } from "@/components/shared/CursorFx";
 
 /**
  * Avatar cursor (10-15): the mouse pointer becomes your avatar (photo or orb), no arrow.
  * On clickable things the avatar gets a lime ring; text fields keep the normal text cursor, so
  * typing and selecting still feel native. Mouse and trackpad only (touch has no cursor), and the
  * system cursor comes back under forced colours. On by default; Settings > Look turns it off
- * (saved per device).
+ * (saved per device). 1070: while it is on, a lime ring trails the avatar (CursorFx variant="ring").
  */
 const KEY = "outly-avatar-cursor";
 const EVT = "outly-avatar-cursor";
@@ -125,9 +126,12 @@ export function AvatarCursor() {
   }, [on, photo, orb.color, orb.face]);
 
   return (
-    <div ref={art} aria-hidden="true" style={{ position: "fixed", width: 0, height: 0, overflow: "hidden", pointerEvents: "none" }}>
-      <OrbArt orb={orb} size={24} />
-    </div>
+    <>
+      <div ref={art} aria-hidden="true" style={{ position: "fixed", width: 0, height: 0, overflow: "hidden", pointerEvents: "none" }}>
+        <OrbArt orb={orb} size={24} />
+      </div>
+      {on && <CursorFx variant="ring" />}
+    </>
   );
 }
 
@@ -139,7 +143,7 @@ export function CursorToggle() {
     <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl p-3 pl-4 hairline">
       <div className="min-w-0">
         <p className="text-sm font-semibold" id="ac-l">Avatar cursor</p>
-        <p className="text-[13px] text-muted-foreground" id="ac-d">Your avatar follows the mouse pointer. Text fields keep the normal cursor.</p>
+        <p className="text-[13px] text-muted-foreground" id="ac-d">Your avatar follows the mouse pointer, with a lime ring trailing it. Text fields keep the normal cursor.</p>
       </div>
       <label className="flex min-h-[44px] shrink-0 cursor-pointer items-center">
         <input

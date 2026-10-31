@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Icon3D, type IconName } from "@/components/brand/Icon3D";
 import { PlatformGlyph } from "@/components/shared/PlatformIcon";
 import { useWaitlist } from "./useWaitlist";
+import { CaptionPop } from "./CaptionPop";
 import type { Platform } from "@/lib/domain";
 
 /*
@@ -13,10 +14,11 @@ import type { Platform } from "@/lib/domain";
  * fan is aria-hidden and its pill is removed from the tab order. Motion is CSS only and
  * reduced motion switches it off in globals.css.
  */
-export type FanCard = { key: string; title: string; sub: string; icon: IconName; tone: string; platform?: Platform; rot: number; y: number; hideSm?: boolean };
+// `caption`: Reel-style word-by-word captions on the card (CaptionPop).
+export type FanCard = { key: string; title: string; sub: string; icon: IconName; tone: string; platform?: Platform; rot: number; y: number; hideSm?: boolean; caption?: string };
 const CARDS: FanCard[] = [
   { key: "sched", title: "Schedule", sub: "Best time, picked for you", icon: "schedule", tone: "hf-purple", rot: -15, y: 96, hideSm: true },
-  { key: "ig", title: "Reels", sub: "Instagram caption", icon: "hashtags", tone: "hf-pink", platform: "instagram", rot: -8, y: 34 },
+  { key: "ig", title: "Reels", sub: "Instagram caption", icon: "hashtags", tone: "hf-pink", platform: "instagram", rot: -8, y: 34, caption: "Upload once. Post everywhere." },
   { key: "you", title: "Your video", sub: "Upload once", icon: "upload", tone: "hf-lime", rot: 0, y: 0 },
   { key: "yt", title: "Shorts", sub: "YouTube title", icon: "hook-generator", tone: "hf-red", platform: "youtube", rot: 8, y: 34 },
   { key: "x", title: "X posts", sub: "Copy that fits", icon: "write-captions", tone: "hf-blue", platform: "x", rot: 15, y: 96, hideSm: true },
@@ -71,6 +73,7 @@ export function HeroFan({ cards = CARDS, cta, framed = false }: { cards?: FanCar
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/90 text-black shadow-sm"><PlatformGlyph platform={c.platform} className="h-4 w-4" /></span>
                 ) : null}
               </div>
+              {c.caption ? <CaptionPop text={c.caption} srText={false} className="hf-cap" /> : null}
               {c.key === "you" && pill ? (
                 <Link href={pill.href} tabIndex={-1} className="hf-pill">
                   {pill.label}

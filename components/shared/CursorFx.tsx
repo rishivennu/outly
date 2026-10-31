@@ -16,6 +16,9 @@ import { useEffect } from "react";
  * Mouse and trackpad only: touch, reduced motion and forced colours keep the system cursor. The native
  * cursor is only hidden (html.cfx-on) once the first mouse move has placed ours, so it is never lost if
  * this never runs. Everything is transform-only in one rAF loop that stops when it has settled.
+ *
+ * variant="ring" (1070, studio): only the trailing ring, around the avatar cursor (AvatarCursor mounts it
+ * while that is on). The native cursor stays, since the avatar IS the native cursor; no dot, no trail.
  */
 const HOT = "a[href], button:not(:disabled), [role='button'], [role='tab'], [role='switch'], [role='menuitem'], [role='option'], [role='radio'], [role='checkbox'], label, summary, select, [data-cursor='hot']";
 const TEXT = "input:not([type='checkbox'], [type='radio'], [type='range'], [type='button'], [type='submit'], [type='color'], [type='file']), textarea, [contenteditable='true'], [contenteditable=''], iframe";
@@ -29,7 +32,7 @@ const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
 type P = { x: number; y: number };
 type Mag = { el: HTMLElement; x: number; y: number };
 
-export function CursorFx() {
+export function CursorFx({ variant = "full" }: { variant?: "full" | "ring" }) {
   useEffect(() => {
     const fine = window.matchMedia("(hover: hover) and (pointer: fine)");
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -47,16 +50,17 @@ export function CursorFx() {
         document.body.appendChild(w);
         return w;
       };
-      const trail = Array.from({ length: TRAIL }, (_, i) => {
+      const full = variant === "full";
+      const trail = Array.from({ length: full ? TRAIL : 0 }, (_, i) => {
         const w = make("cfx-trail", 2147482990 + i);
         const f = 1 - i / TRAIL;
         w.style.setProperty("--o", (0.5 * f).toFixed(2));
         w.style.setProperty("--s", (0.45 + 0.55 * f).toFixed(2));
         return w;
       }).reverse(); // nearest speck first
-      const ring = make("cfx-ring", 2147483000);
-      const dot = make("cfx-dot", 2147483001);
-      const els = [...trail, ring, dot];
+      const ring = make(full ? "cfx-ring" : "cfx-ring cfx-soft", 2147483000);
+      const dot = full ? make("cfx-dot", 2147483001) : null;
+      const els = [...trail, ring, ...(dot ? [dot] : [])];
 
       const m: P = { x: -100, y: -100 };
       const r: P = { x: -100, y: -100 };
@@ -89,7 +93,7 @@ export function CursorFx() {
           r.y = m.y;
         }
         put(ring, r);
-        put(dot, m);
+        if (dot) put(dot, m);
         t.forEach((p, i) => {
           const lead = i === 0 ? m : t[i - 1];
           p.x += (lead.x - p.x) * ease(LINK);
@@ -140,7 +144,8 @@ export function CursorFx() {
             p.x = m.x;
             p.y = m.y;
           });
-          set("cfx-on", true);
+          set("cfx-live", true);
+          if (full) set("cfx-on", true);
         }
         set("cfx-out", false);
         classify(e.target as Element | null);
@@ -180,7 +185,7 @@ export function CursorFx() {
         window.removeEventListener("blur", onBlur);
         for (const g of mags.values()) g.el.style.removeProperty("translate");
         els.forEach((el) => el.remove());
-        ["cfx-on", "cfx-out", "cfx-hot", "cfx-text", "cfx-down"].forEach((c) => root.classList.remove(c));
+        ["cfx-on", "cfx-live", "cfx-out", "cfx-hot", "cfx-text", "cfx-down"].forEach((c) => root.classList.remove(c));
       };
     };
 
@@ -200,7 +205,7 @@ export function CursorFx() {
       alive?.();
       alive = null;
     };
-  }, []);
+  }, [variant]);
 
   return null;
 }
