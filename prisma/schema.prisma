@@ -82,6 +82,7 @@ model User {
   referralsMade Referral[] @relation("ReferralsMade")
   referral      Referral?  @relation("ReferralReceived")
   trustedDevices TrustedDevice[]
+  sessions       UserSession[]
 
   @@index([lastSeenAt])
 }
@@ -100,6 +101,23 @@ model TrustedDevice {
   createdAt    DateTime @default(now())
   lastUsedAt   DateTime @default(now())
   expiresAt    DateTime
+
+  @@index([userId])
+}
+
+/// A signed-in browser or app (1080), for Settings > Active sessions. The session cookie carries its id as
+/// `sid`; deleting the row signs that browser out on its next request. Cookies from before 1080 have no `sid`
+/// and keep working until "Sign out other sessions" (a token version bump) or their own expiry ends them.
+model UserSession {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label      String // "Chrome on Windows"
+  place      String? // approximate, from the network, at sign-in
+  app        Boolean  @default(false) // signed in through the Outlly app
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now()) // touched at most every 5 minutes
+  expiresAt  DateTime
 
   @@index([userId])
 }

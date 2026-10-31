@@ -3105,3 +3105,96 @@ html.js .rv-head:not([data-shown]) .rv-kw .sw { opacity: 0; }
 .fw-ring :is(input, textarea):focus-visible, html[data-contrast="more"] .fw-ring :is(input, textarea):focus-visible { outline: none !important; }
 html[data-contrast="more"] .fw-ring:has(:is(input, textarea):focus) { box-shadow: 0 0 0 3px hsl(var(--ring)); }
 @media (forced-colors: active) { .fw-ring:has(:is(input, textarea):focus) { outline: 2px solid Highlight; outline-offset: 2px; } }
+
+/* 1080: Analytics dashboard ("pulse", components/dashboard/*). Strokes and bars use lime-ink so they hold 3:1 on the
+   light card; dark mode swaps in full lime. Motion is driven by components/dashboard/motion.ts; the keyframe below
+   is only the no-JS reveal and stands down once the script writes `animation: none`. */
+.pulse-card { position: relative; border-radius: 24px; background: hsl(var(--card)); box-shadow: 0 0 0 1px hsl(var(--foreground) / .08), 0 18px 40px -32px rgba(0, 0, 0, .35);
+  transition: box-shadow .3s var(--ease-liquid), transform .3s var(--ease-liquid); }
+.dark .pulse-card { background: linear-gradient(180deg, hsl(var(--card)), hsl(240 5% 7%)); box-shadow: 0 0 0 1px hsl(0 0% 100% / .07), 0 24px 50px -36px rgba(0, 0, 0, .8); }
+.pulse-card:hover { box-shadow: 0 0 0 1px hsl(var(--foreground) / .14), 0 22px 46px -30px rgba(0, 0, 0, .4); }
+.dark .pulse-card:hover { box-shadow: 0 0 0 1px hsl(var(--lime) / .22), 0 24px 50px -30px rgba(0, 0, 0, .85); }
+.pulse-card[aria-pressed="true"] { box-shadow: 0 0 0 2px hsl(var(--lime-ink) / .7), 0 22px 46px -30px rgba(0, 0, 0, .4); }
+.dark .pulse-card[aria-pressed="true"] { box-shadow: 0 0 0 2px hsl(var(--lime) / .6), 0 24px 50px -30px rgba(0, 0, 0, .85); }
+.pulse-ico { display: inline-grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 10px; background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+.pulse-card:hover .pulse-ico, .pulse-card:focus-within .pulse-ico { background: hsl(var(--lime) / .18); color: hsl(var(--lime-ink)); }
+.dark .pulse-card:hover .pulse-ico, .dark .pulse-card:focus-within .pulse-ico { color: hsl(var(--lime)); }
+.pulse-icon-btn { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 16px; background: hsl(var(--secondary) / .6); color: hsl(var(--foreground));
+  box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .08); transition: background-color .2s ease; }
+.pulse-icon-btn:hover { background: hsl(var(--secondary)); }
+.pulse-icon-btn:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.pulse-status { display: inline-flex; align-items: center; gap: 8px; }
+.pulse-status-dot { position: relative; width: 8px; height: 8px; border-radius: 999px; background: hsl(var(--lime-ink)); }
+.dark .pulse-status-dot { background: hsl(var(--lime)); }
+.pulse-status-dot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: inherit; opacity: 0; }
+@media (prefers-reduced-motion: no-preference) { .pulse-status-dot::after { animation: pulse-ping 2.4s ease-out infinite; } }
+@keyframes pulse-ping { 0% { transform: scale(1); opacity: .5; } 70%, 100% { transform: scale(2.6); opacity: 0; } }
+
+/* sliding indicators: JS sets --x / --w (left offset + width) */
+.pulse-underline { position: absolute; left: 0; bottom: 0; height: 2px; width: var(--w, 0px); transform: translateX(var(--x, 0px)); border-radius: 2px; background: hsl(var(--lime-ink)); }
+.dark .pulse-underline { background: hsl(var(--lime)); }
+.pulse-seg { display: inline-flex; gap: 2px; padding: 4px; border-radius: 16px; background: hsl(var(--secondary) / .6); box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .08); }
+.pulse-seg-pill { position: absolute; top: 4px; bottom: 4px; left: 0; width: var(--w, 0px); transform: translateX(var(--x, 0px)); border-radius: 12px; background: hsl(var(--background));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .12), 0 0 0 1px hsl(var(--foreground) / .08); }
+.dark .pulse-seg-pill { background: hsl(240 4% 18%); }
+@media (prefers-reduced-motion: no-preference) { .pulse-underline, .pulse-seg-pill { transition: transform .35s var(--ease-liquid), width .35s var(--ease-liquid); } }
+
+.pulse-delta { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: 999px; font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pulse-delta.is-up { background: hsl(var(--lime) / .16); color: hsl(var(--lime-ink)); }
+.pulse-delta.is-down { background: hsl(var(--destructive) / .1); color: hsl(var(--destructive)); }
+.pulse-delta.is-flat { background: hsl(var(--secondary)); color: hsl(var(--muted-foreground)); }
+.dark .pulse-delta.is-up { background: hsl(var(--lime) / .14); color: hsl(var(--lime)); }
+.dark .pulse-delta.is-down { background: hsl(var(--destructive) / .14); }
+
+.pulse-spark { overflow: visible; }
+.pulse-spark.pulse-up { color: hsl(var(--lime-ink)); }
+.pulse-spark.pulse-down { color: hsl(var(--destructive)); }
+.pulse-spark.pulse-flat { color: hsl(var(--muted-foreground)); }
+.dark .pulse-spark.pulse-up { color: hsl(var(--lime)); }
+
+/* Views over time */
+.pulse-grid { stroke: hsl(var(--foreground) / .08); stroke-width: 1; shape-rendering: crispEdges; }
+.pulse-axis { fill: hsl(var(--muted-foreground)); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.pulse-line { stroke: hsl(var(--lime-ink)); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.dark .pulse-line { stroke: hsl(var(--lime)); filter: drop-shadow(0 0 6px hsl(var(--lime) / .35)); }
+.pulse-prev { stroke: hsl(var(--muted-foreground) / .75); stroke-width: 1.5; stroke-dasharray: 4 5; stroke-linecap: round; }
+.pulse-stop { stop-color: hsl(var(--lime)); }
+.pulse-cross line { stroke: hsl(var(--foreground) / .28); stroke-width: 1; stroke-dasharray: 3 4; }
+.pulse-cross circle { fill: hsl(var(--card)); stroke: hsl(var(--lime-ink)); stroke-width: 2.5; }
+.dark .pulse-cross circle { stroke: hsl(var(--lime)); }
+.pulse-cross { transition: opacity .15s ease; }
+.pulse-bar { background: hsl(var(--lime-ink)); }
+.dark .pulse-bar { background: hsl(var(--lime)); }
+.pulse-tip { z-index: 5; min-width: 168px; padding: 10px 12px; border-radius: 14px; font-size: 12.5px; color: hsl(var(--foreground)); background: hsl(var(--card) / .86);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5); backdrop-filter: blur(14px) saturate(1.5); box-shadow: 0 0 0 1px hsl(var(--foreground) / .1), 0 16px 34px -18px rgba(0, 0, 0, .45);
+  transition: opacity .15s ease; will-change: transform; }
+@media (prefers-reduced-transparency: reduce) { .pulse-tip { background: hsl(var(--card)); backdrop-filter: none; -webkit-backdrop-filter: none; } }
+.pulse-tip-date { font-weight: 600; margin-bottom: 6px; }
+.pulse-tip-row { display: flex; align-items: center; gap: 8px; color: hsl(var(--muted-foreground)); line-height: 1.6; }
+.pulse-tip-row b { margin-left: auto; padding-left: 12px; color: hsl(var(--foreground)); font-weight: 600; font-variant-numeric: tabular-nums; }
+.pulse-tip-delta { margin-top: 6px; font-weight: 600; }
+.pulse-tip-delta.is-up { color: hsl(var(--lime-ink)); }
+.dark .pulse-tip-delta.is-up { color: hsl(var(--lime)); }
+.pulse-tip-delta.is-down { color: hsl(var(--destructive)); }
+.pulse-key { display: inline-block; width: 14px; height: 0; flex: none; border-top: 2.5px solid hsl(var(--lime-ink)); border-radius: 2px; }
+.dark .pulse-key-cur { border-top-color: hsl(var(--lime)); }
+.pulse-key-prev { border-top: 2px dashed hsl(var(--muted-foreground)); }
+.pulse-empty { padding: 16px 18px; border-radius: 18px; background: hsl(var(--card) / .9); box-shadow: 0 0 0 1px hsl(var(--foreground) / .08), 0 16px 40px -24px rgba(0, 0, 0, .35); }
+
+/* no-JS reveal (JS replaces it with the rAF stagger) */
+@keyframes pulse-in { from { opacity: 0; transform: translate3d(0, 10px, 0); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: no-preference) { [data-enter-root]:not([data-enter-js]) [data-enter] { animation: pulse-in .6s var(--ease-liquid) both; } }
+@media (prefers-reduced-motion: reduce) { .pulse-card, .pulse-cross, .pulse-tip, .pulse-icon-btn { transition: none; } }
+@media (forced-colors: active) { .pulse-line, .pulse-cross circle { stroke: CanvasText; } .pulse-bar, .pulse-underline, .pulse-seg-pill { background: Highlight; } .pulse-card { outline: 1px solid CanvasText; } }
+/* 1080 pulse sidebar: the hover plate (Nav.tsx useGlide) and the selected row */
+.pulse-glide { position: absolute; left: 0; right: 0; top: 0; height: 44px; border-radius: 16px; pointer-events: none; opacity: 0; background: hsl(var(--foreground) / .05); }
+.pulse-glide[data-on="1"] { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) { .pulse-glide { transition: transform .3s var(--ease-liquid), height .3s var(--ease-liquid), opacity .2s ease; } }
+.pulse-nav-pill { background: hsl(var(--secondary)); box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .06); }
+.dark .pulse-nav-pill { background: linear-gradient(90deg, hsl(var(--lime) / .1), hsl(var(--secondary)) 60%); }
+[data-shell="pulse"] [data-glide]:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
+/* 1080 Active sessions: a signed-out row folds shut (grid rows 1fr -> 0fr) instead of vanishing */
+.sess-row { display: grid; grid-template-rows: 1fr; }
+.sess-row-in { min-height: 0; overflow: hidden; }
+.sess-row.is-leaving { grid-template-rows: 0fr; opacity: 0; border-top-color: transparent; }
+@media (prefers-reduced-motion: no-preference) { .sess-row { transition: grid-template-rows .3s var(--ease-liquid), opacity .2s ease, border-color .3s ease; } }

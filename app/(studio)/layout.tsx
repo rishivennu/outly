@@ -10,6 +10,8 @@ import { PageGuide } from "@/components/onboarding/PageGuide";
 import { CommandPalette } from "@/components/shell/CommandPalette";
 import { touchActivity, touchPlace } from "@/lib/activity";
 import { touchPresence } from "@/lib/presence";
+import { touchSession } from "@/lib/sessions";
+import { dashboardFor } from "@/lib/dashboard-style";
 import { liveNow } from "@/lib/social/registry";
 import { LivePlatformsProvider } from "@/components/shell/LivePlatforms";
 import { WorkspaceBar } from "@/components/shell/WorkspaceBar";
@@ -28,13 +30,14 @@ export default async function StudioLayout({ children }: { children: React.React
   const user = await getCurrentUser();
   // Signed cookie the database refuses: clear it on the way to sign-in, or middleware bounces /login back here (1042).
   if (!user) redirect(`/api/auth/expired?next=${encodeURIComponent(headers().get("x-path") ?? "/home")}`);
-  const [live, site, notice] = await Promise.all([liveNow(), siteStatus(), getConfig("updates")]);
+  const [live, site, notice, dash] = await Promise.all([liveNow(), siteStatus(), getConfig("updates"), dashboardFor()]);
   // Maintenance: members who joined before it started carry on; anyone newer waits on the maintenance page.
   if (site.maintenance && !joinedBeforeMaintenance({ createdAt: user.joinedAt }, site.since)) redirect("/maintenance?preview");
   void touchActivity(user.id); // daily-active tracking for the admin console; never blocks or throws
   const h = headers();
   void touchPlace(user.actor?.id ?? user.id, (n) => h.get(n)); // approximate network location for the admin console (1053)
   void touchPresence(user.actor?.id ?? user.id); // online now (1037); the LiveCount poll keeps it fresh
+  void touchSession(); // Active sessions "last active" (1080), at most every 5 minutes
   return (
     <UserProvider user={{ id: user.id, name: user.name, email: user.email, avatar: user.avatar, timezone: user.timezone, workspace: user.actor ? { ownerName: user.name, role: user.role === "manager" ? "manager" : "editor", me: { name: user.actor.name, email: user.actor.email } } : null }}>
       <LivePlatformsProvider value={live}>
@@ -43,7 +46,7 @@ export default async function StudioLayout({ children }: { children: React.React
         Skip to main content
       </a>
       <div className="flex min-h-dvh">
-        <Sidebar />
+        <Sidebar variant={dash.style} />
         {/* A column that is exactly the screen when the page is short: no empty scroll below the content (1053). */}
         <div className="flex min-h-dvh min-w-0 flex-1 flex-col overflow-x-clip">
           <WorkspaceBar />

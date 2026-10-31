@@ -40,6 +40,11 @@ import { TrustBadges } from "@/components/shared/TrustBadges";
 import { savedTime } from "@/lib/retention/time-saved";
 import { TimeSavedCard } from "@/components/home/TimeSavedCard";
 import { soft } from "@/lib/budget";
+import { dashboardFor } from "@/lib/dashboard-style";
+import { getPulse } from "@/lib/dashboard/pulse";
+import { analyticsScope } from "@/lib/profiles";
+import { PulseHome } from "@/components/dashboard/PulseHome";
+import { DashboardSwitch } from "@/components/home/DashboardSwitch";
 
 const NEW_FOR_DAYS = 14;
 /** 1079: the longest Home waits for any one optional card. Past it the card sits out this visit and the page renders. */
@@ -64,11 +69,73 @@ async function welcomeOffer(user: { id: string; createdAt: Date; actor: unknown 
   return { freeLimit: ent.postLimit, freePeriod: ent.postPeriod, offer };
 }
 
+type HomeUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
+
+/**
+ * 1080: the analytics Home ("pulse"). Keeps the first-run pieces (checklist, founding / subscribe greeting) above
+ * the dashboard and drops the classic cards. Null when the numbers can't be read in time, so Home falls back to classic.
+ */
+async function pulseView(user: HomeUser, canSwitch: boolean) {
+  const [scope, accountIds] = await Promise.all([postFilter(user), analyticsScope(user)]);
+  const [, data, next, live, published, welcome, founding, firstWin] = await Promise.all([
+    loadKeys(),
+    soft(getPulse(user.id, 7, accountIds), CARD_MS, null, "home analytics"),
+    db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() }, ...scope.where }, select: { title: true, scheduledAt: true }, orderBy: { scheduledAt: "asc" } }),
+    connectedPlatforms(user.id),
+    db.post.count({ where: { userId: user.id, status: { in: ["published", "partial"] } } }),
+    soft(welcomeOffer(user), CARD_MS, null, "home welcome"),
+    user.actor ? null : soft(myFounding(user.id), CARD_MS, null, "home founding"),
+    soft(
+      Promise.all([
+        db.media.findFirst({ where: { userId: user.id }, select: { id: true } }),
+        db.post.findFirst({ where: { userId: user.id, launchedAt: { not: null } }, select: { id: true } }),
+      ]),
+      CARD_MS,
+      [null, null] as const,
+      "home first win",
+    ),
+  ]);
+  if (!data) return null;
+  const setup = {
+    connected: { instagram: !!live.instagram, youtube: !!live.youtube },
+    instagram: { oauth: hasCredentials("instagram"), token: canConnectWithToken("instagram") },
+    youtube: { oauth: hasCredentials("youtube") },
+    uploaded: !!firstWin[0],
+    scheduled: !!firstWin[1] || published > 0,
+  };
+  const promo: FoundingPromo | null =
+    founding?.kind === "offer" && !founding.seen ? { kind: "offer", left: founding.left, limit: founding.limit, pct: founding.pct, proven: founding.proven }
+    : founding?.kind === "reserved" && !founding.seen ? { kind: "reserved", no: founding.no, pct: founding.pct }
+    : null;
+  const nextPost = next?.scheduledAt
+    ? { title: next.title ?? "Untitled post", when: new Intl.DateTimeFormat("en-US", { timeZone: user.timezone, weekday: "short", hour: "numeric", minute: "2-digit" }).format(next.scheduledAt) }
+    : null;
+  const firstName = user.name.split(" ")[0];
+  return (
+    <div className="relative">
+      <div className="pt-4">
+        <SetupChecklist state={setup} />
+        {promo ? (
+          <FoundingWelcome promo={promo} />
+        ) : (
+          welcome && <WelcomeSubscribe firstName={firstName} offer={welcome.offer} freeLimit={welcome.freeLimit} freePeriod={welcome.freePeriod} foundingFull={founding?.kind === "full" ? founding.limit : null} />
+        )}
+      </div>
+      <PulseHome initial={data} firstName={firstName} canSwitch={canSwitch} nextPost={nextPost} />
+    </div>
+  );
+}
+
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Home" };
 
 export default async function HomePage({ searchParams }: { searchParams?: { recapAt?: string } }) {
   const user = (await getCurrentUser())!;
+  const dash = await dashboardFor();
+  if (dash.style === "pulse") {
+    const view = await pulseView(user, dash.canSwitch).catch(() => null);
+    if (view) return view;
+  }
   // One parallel wave: every query below is independent, so the page pays one database round trip, not four.
   // Pulse only needs the connections and the published count, so it chains on those two instead of waiting for all.
   const liveP = connectedPlatforms(user.id);
@@ -143,6 +210,7 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
 
   return (
     <div className="relative overflow-hidden">
+      {dash.canSwitch && <div className="mx-auto flex max-w-5xl justify-end px-5 pt-4 sm:px-10"><DashboardSwitch current="classic" /></div>}
       <HomeHero firstName={user.name.split(" ")[0]} />
       {profiles.length >= 2 ? (
         <ProfileSwitcher profiles={profiles} activeId={scope.active?.id ?? null}>

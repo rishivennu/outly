@@ -22,6 +22,7 @@ import { AlertsCard } from "./AlertsCard";
 import { ALERT_DEFAULTS, type AlertPrefs } from "@/lib/alerts-core";
 import { SettingsShell, Disclosure, useUnsaved, type SettingsCategory } from "./SettingsShell";
 import { RememberedDevicesCard, SessionsCard } from "./SecurityCards";
+import { ActiveSessionsCard } from "./ActiveSessionsCard";
 import { ConnectedAccountsCard, LocationCard } from "./PrivacyCards";
 import { BillingDetailsSection, HistorySection, InvoicesSection, MemberBillingNote, MethodsSection, PaymentsBento, PlanSection, type BillingSummary } from "./BillingCards";
 
@@ -232,6 +233,7 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, bil
       content: (
         <>
           {!ws && <TwoStepCard email={user.email} />}
+          <ActiveSessionsCard />
           <RememberedDevicesCard twoStepNote={!ws} />
           {!ws && <PhoneCard />}
           <SessionsCard />

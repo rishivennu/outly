@@ -10,6 +10,7 @@ import { PRICING_DISPLAY_DEFAULT, type PricingDisplay } from "./billing/display"
 import { YOUPI_DEFAULT, type YoupiConfig } from "./billing/youpi";
 import { BETA_DEFAULT, type BetaConfig } from "./beta-config";
 import { FOUNDING_DEFAULT, type FoundingConfig } from "./founding-config";
+import { DASHBOARD_DEFAULT, type DashboardConfig } from "./dashboard-config";
 
 /**
  * Integration config lives in the DB so the admin can switch providers without a deploy.
@@ -99,6 +100,7 @@ export const DEFAULTS = {
   beta: BETA_DEFAULT as BetaConfig,
   founding: FOUNDING_DEFAULT as FoundingConfig,
   referral: REFERRAL_DEFAULT as ReferralConfig,
+  dashboard: DASHBOARD_DEFAULT as DashboardConfig,
   platforms: Object.fromEntries(["instagram", "youtube", "x", "tiktok", "facebook", "threads", "linkedin"].map((p) => [p, { clientId: "", clientSecret: "" }])) as PlatformKeys,
 };
 type Key = keyof typeof DEFAULTS;

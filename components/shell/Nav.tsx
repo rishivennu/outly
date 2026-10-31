@@ -13,6 +13,8 @@ import { NoticesBell } from "./NoticesBell";
 import { SignOutButton } from "./SignOutButton";
 import { PaletteButton } from "./PaletteButton";
 import { LiveCount } from "@/components/shared/LiveCount";
+import { AnimIcon, useIconPlay } from "@/components/icons/animated";
+import type { DashboardStyle } from "@/lib/dashboard-config";
 
 const MAIN = [
   { href: "/home", label: "Home", icon: Home },
@@ -23,6 +25,11 @@ const MAIN = [
   { href: "/inbox", label: "Inbox", icon: MessagesSquare },
   { href: "/approvals", label: "Approvals", icon: ClipboardCheck },
 ];
+
+/** Animated-icon names for the pulse sidebar (1080), by route. */
+const ANIM: Record<string, string> = { "/home": "home", "/create": "plus", "/content": "content", "/calendar": "calendar", "/analytics": "analytics", "/inbox": "inbox", "/approvals": "approvals", "/accounts": "accounts", "/billing": "billing", "/support": "help", "/settings": "settings", "/": "website" };
+/** The selection pill glides on a time-based curve in the pulse shell (no spring overshoot). */
+const GLIDE = { type: "tween", duration: 0.35, ease: [0.16, 1, 0.3, 1] } as const;
 
 const TOUR: Record<string, string> = { "/home": "home", "/billing": "billing", "/support": "support", "/settings": "settings", "/create": "new-post", "/content": "content", "/calendar": "calendar", "/analytics": "analytics", "/inbox": "inbox", "/approvals": "approvals", "/accounts": "accounts" };
 
@@ -56,7 +63,11 @@ function useScrolling() {
   return ref;
 }
 
-export function Sidebar() {
+export function Sidebar({ variant = "classic" }: { variant?: DashboardStyle }) {
+  return variant === "pulse" ? <PulseSidebar /> : <ClassicSidebar />;
+}
+
+function ClassicSidebar() {
   const path = usePathname();
   const user = useUser();
   const studio = MAIN.filter((m) => m.href !== "/create");
@@ -258,5 +269,127 @@ export function MobileTopBar() {
         <NoticesBell placement="below" />
       </div>
     </header>
+  );
+}
+
+/**
+ * 1080: hover highlight for the pulse sidebar. One soft plate per group follows the pointer from row to row on a
+ * fixed .3s curve (CSS .pulse-glide), appearing in place on first hover so it never sweeps in from the top.
+ */
+function useGlide<T extends HTMLElement>() {
+  const box = useRef<T>(null);
+  const plate = useRef<HTMLSpanElement>(null);
+  const onPointerOver = (e: React.PointerEvent) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>("[data-glide]");
+    const g = plate.current;
+    if (!row || !g || !box.current?.contains(row)) return;
+    const first = g.dataset.on !== "1";
+    if (first) g.style.transition = "opacity .2s ease";
+    g.style.transform = `translate3d(0,${row.offsetTop}px,0)`;
+    g.style.height = `${row.offsetHeight}px`;
+    g.dataset.on = "1";
+    if (first) {
+      void g.offsetWidth;
+      g.style.transition = "";
+    }
+  };
+  const onPointerLeave = () => {
+    if (plate.current) plate.current.dataset.on = "0";
+  };
+  return { box, plate, handlers: { onPointerOver, onPointerLeave } };
+}
+
+function PulseRow({ href, label, active, small, external }: { href: string; label: string; active: boolean; small?: boolean; external?: boolean }) {
+  const ic = useIconPlay();
+  return (
+    <Link
+      href={href}
+      data-glide=""
+      data-tour={TOUR[href]}
+      aria-current={active ? "page" : undefined}
+      {...ic.handlers}
+      className={cn("group relative z-[1] flex items-center gap-3 rounded-2xl px-3 transition-colors duration-200", small ? "h-10 text-[13.5px]" : "h-11 text-[14.5px] font-medium", active ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+    >
+      {active && (
+        <motion.span layoutId="nav-pill-pulse" className="pulse-nav-pill absolute inset-0 rounded-2xl" transition={GLIDE}>
+          <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-lime" />
+        </motion.span>
+      )}
+      <span className={cn("relative grid shrink-0 place-items-center", active && "text-lime-ink")}>
+        <AnimIcon name={ANIM[href] ?? "home"} size={small ? 16 : 18} iconRef={ic.ref} />
+      </span>
+      <span className="relative">{label}</span>
+      {external && <ArrowUpRight className="relative ml-auto h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />}
+    </Link>
+  );
+}
+
+/** 1080: the sidebar that goes with the analytics dashboard. Same links and order as the classic one; the rows play
+ *  their icons on hover or focus and share a gliding hover plate. */
+function PulseSidebar() {
+  const path = usePathname();
+  const user = useUser();
+  const studio = MAIN.filter((m) => m.href !== "/create");
+  const scroller = useScrolling();
+  const top = useGlide<HTMLElement>();
+  const bottom = useGlide<HTMLDivElement>();
+  const plus = useIconPlay();
+  const lower = [
+    ...(user.workspace ? [] : [
+      { href: "/accounts", label: "Connected accounts" },
+      { href: "/billing", label: "Billing" },
+    ]),
+    { href: "/support", label: "Help centre" },
+    { href: "/settings", label: "Settings" },
+  ];
+  return (
+    <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
+      <aside data-route-order="" data-shell="pulse" className="lg-glass flex h-full w-[240px] flex-col overflow-hidden rounded-[28px]" aria-label="Primary">
+        <div ref={scroller} data-lenis-prevent className="nav-scroll flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-4 pt-5 [&>*]:shrink-0">
+        <Link href="/home" className="mb-6 flex min-h-11 items-center gap-2 rounded-2xl px-2 text-[18px] transition-opacity hover:opacity-80" aria-label="Outlly dashboard" title="Dashboard">
+          <OutlyLogo size={30} />
+        </Link>
+
+        <Link
+          href="/create"
+          data-tour="new-post"
+          aria-current={isActive(path, "/create") ? "page" : undefined}
+          {...plus.handlers}
+          className="lime-glow mb-3 flex h-12 items-center gap-2.5 rounded-2xl bg-lime px-4 text-[15px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-px active:scale-[0.98]"
+        >
+          <AnimIcon name="plus" size={18} iconRef={plus.ref} />
+          New post
+        </Link>
+        <PaletteButton />
+
+        <p className="eyebrow mb-2 px-3 text-[11px]">Studio</p>
+        <nav ref={top.box} {...top.handlers} className="relative flex flex-col gap-0.5">
+          <span ref={top.plate} aria-hidden="true" className="pulse-glide" />
+          {studio.map(({ href, label }) => <PulseRow key={href} href={href} label={label} active={isActive(path, href)} />)}
+        </nav>
+
+        <div className="mt-auto flex flex-col gap-0.5 pt-6">
+          <p className="eyebrow mb-2 px-3 text-[11px]">Workspace</p>
+          <div ref={bottom.box} {...bottom.handlers} className="relative flex flex-col gap-0.5">
+            <span ref={bottom.plate} aria-hidden="true" className="pulse-glide" />
+            {lower.map(({ href, label }) => <PulseRow key={href} href={href} label={label} active={isActive(path, href)} small />)}
+            <PulseRow href="/" label="Outlly website" active={false} small external />
+          </div>
+          <ThemeToggle compact plain className="mb-1 mt-2 self-start" />
+          <div className="mt-2 flex items-center gap-0.5 rounded-2xl p-1.5 hairline">
+            <Link href="/settings" className="flex min-w-0 flex-1 items-center gap-2 rounded-xl p-1 hover:bg-secondary/60">
+              <OrbAvatar avatar={user.workspace ? null : user.avatar} seed={user.workspace?.me.email ?? user.email} size={32} />
+              <span className="min-w-0">
+                <span className="block truncate text-[13px] font-semibold">{user.workspace?.me.name ?? user.name}</span>
+                <span className="block truncate text-[11.5px] text-muted-foreground">{user.workspace ? `In ${user.workspace.ownerName}'s studio` : user.email}</span>
+              </span>
+            </Link>
+            <NoticesBell placement="side" />
+            <SignOutButton />
+          </div>
+        </div>
+        </div>
+      </aside>
+    </div>
   );
 }
