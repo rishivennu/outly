@@ -2281,14 +2281,16 @@ html:not(.dark) .hf-aura { background: radial-gradient(circle, hsl(78 100% 45% /
    Text sits above every layer on a tint that is at least as opaque as .glass, so contrast never drops. */
 :root {
   --lg-angle: 135deg;                 /* where the light comes from (plugin: stroke angle) */
-  --lg-tint-top: 0 0% 100% / .76;
-  --lg-tint-bottom: 0 0% 100% / .66;
   --lg-frost: 9px;                    /* the plugin defaults to 0; UI text needs a calm surface, the rim still bends */
   --lg-rim: .95;
-  --lg-glow: inset 0 0 14px hsl(0 0% 100% / .55), inset 0 1px 0 hsl(0 0% 100% / .9);
-  --lg-edge: 0 0 0 .5px hsl(240 10% 10% / .1);
   --lg-sheen: .38;
   --lg-bright: 1.04;                  /* backdrop brightness; dark glass dims what shows through */
+  /* 1071 light: a white rim and white glow vanish on a white page, so light glass read as a flat card.
+     A cool tint, a shaded lower rim and an inner bottom edge give it thickness; tint stays >= .6 for 4.5:1. */
+  --lg-tint-top: 214 60% 99% / .7;
+  --lg-tint-bottom: 216 40% 96% / .58;
+  --lg-glow: inset 0 1px 0 hsl(0 0% 100% / .95), inset 0 -1px 0 hsl(216 30% 30% / .07), inset 0 0 18px hsl(0 0% 100% / .5);
+  --lg-edge: 0 0 0 .5px hsl(216 30% 25% / .14);
 }
 .dark {
   /* 1028: was .7/.64, which let a bright backdrop pull muted sidebar labels to 3.3:1. Now >=4.5:1 on a worst-case stripe. */
@@ -2341,6 +2343,11 @@ html:not(.dark) .hf-aura { background: radial-gradient(circle, hsl(78 100% 45% /
     -webkit-backdrop-filter: blur(6px) var(--lg-url) saturate(190%) brightness(1.04);
     backdrop-filter: blur(6px) var(--lg-url) saturate(190%) brightness(1.04);
   }
+}
+/* light: the rim's lit corner stays white, the far corner turns a cool shade so the edge shows on white */
+html:not(.dark) .lg-glass::before {
+  background: linear-gradient(var(--lg-angle), hsl(0 0% 100% / .95), hsl(0 0% 100% / .3) 26%, hsl(216 30% 40% / 0) 50%,
+    hsl(216 30% 40% / .08) 72%, hsl(216 32% 38% / .26));
 }
 /* Solid for people who asked for less transparency or more contrast. */
 @media (prefers-reduced-transparency: reduce) {
@@ -3021,3 +3028,24 @@ html.js .rv-head:not([data-shown]) .rv-kw .sw { opacity: 0; }
 .hf-cap { position: absolute; z-index: 5; left: 20px; top: 124px; justify-items: start; font-size: 21px; }
 /* phones: the centre card leaves the Reels card about 80px showing, too narrow for a caption */
 @media (max-width: 767px) { .hf-cap { display: none; } }
+
+/* 1071: light marketing nav. Same problem as .lg-glass: white rim, white sheen, white page. Cool tint plus a shaded
+   far rim and an inner bottom edge. Scrolled stays >= .62 so the dark CTA under it keeps text at 4.5:1. */
+html:not(.dark) .mnav-bar { background: linear-gradient(180deg, hsl(214 60% 99% / .66), hsl(216 40% 96% / .52));
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .95), inset 0 -1px 0 hsl(216 30% 30% / .07), 0 0 0 .5px hsl(216 30% 25% / .14),
+    0 12px 32px -16px hsl(216 40% 25% / .3); }
+html:not(.dark) .mnav[data-scrolled="true"] .mnav-bar { background: linear-gradient(180deg, hsl(214 60% 99% / .76), hsl(216 40% 96% / .64));
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .95), inset 0 -1px 0 hsl(216 30% 30% / .08), 0 0 0 .5px hsl(216 30% 25% / .16),
+    0 18px 40px -20px hsl(216 40% 25% / .38); }
+html:not(.dark) .mnav-bar::before { background: linear-gradient(115deg, hsl(0 0% 100% / .95), hsl(0 0% 100% / .3) 28%,
+    hsl(216 30% 40% / 0) 52%, hsl(216 30% 40% / .1) 76%, hsl(216 32% 38% / .28)); }
+@media (prefers-reduced-transparency: reduce) { html:not(.dark) .mnav-bar, html:not(.dark) .mnav[data-scrolled="true"] .mnav-bar { background: hsl(var(--card)); } }
+html[data-contrast="more"]:not(.dark) .mnav-bar { background: hsl(var(--card)); }
+
+/* 1071: a pill that holds an input and a button rings itself only while the INPUT has focus; the input draws
+   nothing (More contrast forces input rings with !important, which doubled up with the pill), and a focused
+   button keeps its own ring so there is never a ring inside a ring. */
+.fw-ring:has(:is(input, textarea):focus) { box-shadow: 0 0 0 2px hsl(var(--ring)); }
+.fw-ring :is(input, textarea):focus-visible, html[data-contrast="more"] .fw-ring :is(input, textarea):focus-visible { outline: none !important; }
+html[data-contrast="more"] .fw-ring:has(:is(input, textarea):focus) { box-shadow: 0 0 0 3px hsl(var(--ring)); }
+@media (forced-colors: active) { .fw-ring:has(:is(input, textarea):focus) { outline: 2px solid Highlight; outline-offset: 2px; } }

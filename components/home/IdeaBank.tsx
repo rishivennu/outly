@@ -76,7 +76,7 @@ export function IdeaBank({ wide = false }: { wide?: boolean }) {
         <h2 id={`${id}-h`} className="eyebrow flex items-center gap-2"><Lightbulb className="h-3.5 w-3.5" aria-hidden="true" /> Ideas</h2>
         {list.length > 0 && <span className="text-[13px] text-muted-foreground tabular">{list.length} saved</span>}
       </div>
-      <form onSubmit={add} className="flex items-center gap-2 rounded-full bg-secondary/60 p-1.5 pl-4 hairline focus-within:ring-2 focus-within:ring-ring">
+      <form onSubmit={add} className="fw-ring flex items-center gap-2 rounded-full bg-secondary/60 p-1.5 pl-4 hairline">
         <label htmlFor={`${id}-in`} className="sr-only">New idea</label>
         <input
           ref={input}

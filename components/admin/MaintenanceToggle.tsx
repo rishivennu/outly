@@ -115,7 +115,7 @@ export function MaintenanceToggle({ initial, subscribers }: { initial: Site; sub
                 </button>
               );
             })}
-            <label className="flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-[13px] hairline focus-within:ring-2 focus-within:ring-ring">
+            <label className="fw-ring flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-[13px] hairline">
               <span className="text-muted-foreground">Custom</span>
               <input
                 type="number"
