@@ -64,9 +64,9 @@ export function HomeHero({ firstName }: { firstName: string }) {
             </Link>
             <Link
               href="/calendar"
-              className="glass hairline inline-flex h-14 items-center justify-center gap-2 rounded-full px-6 text-base font-medium transition-colors hover:bg-secondary"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-[15px] font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
             >
-              <CalendarClock className="h-[18px] w-[18px]" aria-hidden="true" /> Open calendar
+              <CalendarClock className="h-4 w-4" aria-hidden="true" /> Open calendar
             </Link>
           </div>
         </div>
@@ -74,7 +74,7 @@ export function HomeHero({ firstName }: { firstName: string }) {
         {/* pointer-events-none: the fan's -64px top margin collapses through this wrapper and lifts it
             over the buttons above, so it must never catch clicks. The fan is decorative and aria-hidden, so nothing in it needs them. */}
         <div className="pointer-events-none relative mt-4 sm:mt-6">
-          <HeroFan cards={STUDIO_CARDS} cta={{ href: "/create", label: "Create something" }} />
+          <HeroFan cards={STUDIO_CARDS} cta={null} />
         </div>
       </div>
 

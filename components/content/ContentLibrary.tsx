@@ -89,12 +89,12 @@ export function ContentLibrary({ initial, views }: { initial: PostView[]; views:
       </header>
 
       <div role="tablist" aria-label="Filter by status" className="scrollbar-none -mx-1 mt-8 flex gap-2 overflow-x-auto px-1 pb-1">
-        {FILTERS.map((f) => (
+        {FILTERS.filter((f) => f.id === "all" || f.id === filter || counts[f.id] > 0).map((f) => (
           <button key={f.id} role="tab" aria-selected={filter === f.id} onClick={() => {
               setFilter(f.id);
               window.history.replaceState(null, "", f.id === "all" ? "/content" : `/content?filter=${f.id}`);
-            }} className={cn("relative h-11 shrink-0 rounded-full px-4 text-sm font-medium transition", filter === f.id ? "text-[hsl(var(--lime-foreground))]" : "text-muted-foreground hairline hover:text-foreground")}>
-            {filter === f.id && <motion.span layoutId="content-filter" className="lime-bg absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+            }} className={cn("relative h-11 shrink-0 rounded-full px-4 text-sm font-medium transition", filter === f.id ? "text-background" : "text-muted-foreground hairline hover:text-foreground")}>
+            {filter === f.id && <motion.span layoutId="content-filter" className="bg-foreground absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
             <span className="relative">
               {f.label} <span className={cn("tabular", filter === f.id && "opacity-60")}>{counts[f.id]}</span>
             </span>

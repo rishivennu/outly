@@ -1,5 +1,6 @@
 "use client";
-import { FileDown, FileSpreadsheet } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown, FileDown, FileSpreadsheet } from "lucide-react";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn, compact } from "@/lib/utils";
@@ -7,18 +8,49 @@ import type { AnalyticsSummary } from "@/lib/analytics";
 
 type Acct = AnalyticsSummary["byAccount"][number];
 
-/** Download the numbers on screen as a client-ready PDF or CSV (same range and account). */
+/**
+ * Download the numbers on screen as a client-ready PDF or CSV (same range and account). One quiet "Download"
+ * button that opens the two formats, so the header doesn't offer two equal buttons before you've read anything.
+ */
 export function ReportButtons({ days, account }: { days: number; account: string | null }) {
   const q = `days=${days}${account ? `&account=${encodeURIComponent(account)}` : ""}`;
-  const cls = "inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-medium hairline hover:bg-secondary/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      box.current?.querySelector("button")?.focus();
+    };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  const ring = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  const item = cn("flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium hover:bg-secondary", ring);
   return (
-    <div className="flex shrink-0 gap-2" role="group" aria-label="Download report">
-      <a href={`/api/reports?format=pdf&${q}`} download className={cls}>
-        <FileDown className="h-4 w-4" aria-hidden="true" /> PDF report
-      </a>
-      <a href={`/api/reports?format=csv&${q}`} download className={cls}>
-        <FileSpreadsheet className="h-4 w-4" aria-hidden="true" /> CSV
-      </a>
+    <div ref={box} className="relative shrink-0">
+      <button type="button" aria-expanded={open} aria-controls="report-menu" onClick={() => setOpen((o) => !o)} className={cn("inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-medium hairline hover:bg-secondary/70", ring)}>
+        <FileDown className="h-4 w-4" aria-hidden="true" /> Download
+        <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
+      </button>
+      {open && (
+        <div id="report-menu" className="absolute left-0 top-full z-30 mt-2 w-60 rounded-2xl bg-background p-1.5 shadow-xl hairline">
+          <a href={`/api/reports?format=pdf&${q}`} download onClick={() => setOpen(false)} className={item}>
+            <FileDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span><span className="block">PDF report</span><span className="block text-xs font-normal text-muted-foreground">Ready to send a client</span></span>
+          </a>
+          <a href={`/api/reports?format=csv&${q}`} download onClick={() => setOpen(false)} className={item}>
+            <FileSpreadsheet className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span><span className="block">CSV spreadsheet</span><span className="block text-xs font-normal text-muted-foreground">Every number, for Excel or Sheets</span></span>
+          </a>
+        </div>
+      )}
     </div>
   );
 }

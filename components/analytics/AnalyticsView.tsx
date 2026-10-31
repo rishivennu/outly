@@ -50,8 +50,8 @@ function RangePicker({ value, onPick }: { value: number; onPick: (d: number) => 
   return (
     <div role="radiogroup" aria-label="Time range" className="flex shrink-0 gap-1 rounded-full bg-secondary/60 p-1 hairline">
       {RANGES.map((r) => (
-        <button key={r.d} type="button" role="radio" aria-checked={value === r.d} onClick={() => onPick(r.d)} className={cn("relative h-11 rounded-full px-4 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", value === r.d ? "text-[hsl(var(--lime-foreground))]" : "text-muted-foreground hover:text-foreground")}>
-          {value === r.d && <motion.span layoutId="range" className="lime-bg absolute inset-0 rounded-full" />}
+        <button key={r.d} type="button" role="radio" aria-checked={value === r.d} onClick={() => onPick(r.d)} className={cn("relative h-11 rounded-full px-4 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", value === r.d ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+          {value === r.d && <motion.span layoutId="range" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
           <span className="relative">{r.label}</span>
         </button>
       ))}
@@ -179,8 +179,8 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
           </ul>
         </section>
         <div className="flex flex-wrap items-center gap-3">
-          <ReportButtons days={data.rangeDays} account={drill} />
           <RangePicker value={data.rangeDays} onPick={pick} />
+          <ReportButtons days={data.rangeDays} account={drill} />
         </div>
       </header>
 

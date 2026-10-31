@@ -43,9 +43,10 @@ function tiltReset(e: React.PointerEvent<HTMLDivElement>) {
 }
 
 /** `framed`: the landing's original boxed stage (hard sides, 64px fade into the page), which the dotted rule below lines up with. */
-export function HeroFan({ cards = CARDS, cta, framed = false }: { cards?: FanCard[]; cta?: { href: string; label: string }; framed?: boolean }) {
+/** `cta={null}`: no pill on the centre card, for pages that already show the real button right above the fan. */
+export function HeroFan({ cards = CARDS, cta, framed = false }: { cards?: FanCard[]; cta?: { href: string; label: string } | null; framed?: boolean }) {
   const waitlist = useWaitlist();
-  const pill = cta ?? (waitlist ? { href: "/waitlist", label: "Join waitlist" } : { href: "/signup", label: "Get started" });
+  const pill = cta === null ? null : cta ?? (waitlist ? { href: "/waitlist", label: "Join waitlist" } : { href: "/signup", label: "Get started" });
   return (
     <div aria-hidden="true" className={`hf-stage ${framed ? "hf-framed" : ""} pointer-events-none relative mx-auto -mt-[64px] h-[404px] w-full max-w-[1180px] select-none overflow-hidden sm:h-[448px]`}>
       <div className="hf-fan absolute inset-x-0 bottom-0 flex items-end justify-center">
@@ -70,7 +71,7 @@ export function HeroFan({ cards = CARDS, cta, framed = false }: { cards?: FanCar
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/90 text-black shadow-sm"><PlatformGlyph platform={c.platform} className="h-4 w-4" /></span>
                 ) : null}
               </div>
-              {c.key === "you" ? (
+              {c.key === "you" && pill ? (
                 <Link href={pill.href} tabIndex={-1} className="hf-pill">
                   {pill.label}
                   <span className="grid h-7 w-7 place-items-center rounded-full bg-lime text-[hsl(var(--lime-foreground))]"><ArrowUpRight className="h-4 w-4" /></span>

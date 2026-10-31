@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, Gift, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,8 @@ export type BetaOffer = { code: { code: string; months: number; planName: string
 
 /**
  * First-member code on Billing. Members who were issued a code see it filled in; anyone with a code from
- * the team can type it. Redeeming switches the plan on straight away.
+ * the team can type it. Redeeming switches the plan on straight away. Without an issued code the card stays
+ * folded to one small "Have a beta code?" button (most people don't have one); the emailed /billing#beta link opens it.
  */
 export function BetaRedeem({ offer }: { offer: BetaOffer }) {
   const toast = useToast();
@@ -19,7 +20,28 @@ export function BetaRedeem({ offer }: { offer: BetaOffer }) {
   const [code, setCode] = useState(offer.code?.code ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [open, setOpen] = useState(!!offer.code);
+  useEffect(() => {
+    if (window.location.hash === "#beta") setOpen(true);
+  }, []);
   if (offer.redeemed) return null;
+  if (!open) {
+    return (
+      <section id="beta" aria-label="Beta code" className="mt-6 max-w-5xl">
+        <button
+          type="button"
+          aria-expanded={false}
+          onClick={() => {
+            setOpen(true);
+            requestAnimationFrame(() => document.getElementById("beta-code")?.focus());
+          }}
+          className="inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-medium text-muted-foreground hairline transition-colors hover:text-foreground"
+        >
+          <Gift className="h-4 w-4" aria-hidden /> Have a beta code?
+        </button>
+      </section>
+    );
+  }
 
   async function redeem(e: React.FormEvent) {
     e.preventDefault();

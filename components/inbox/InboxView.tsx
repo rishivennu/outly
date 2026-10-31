@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { ExternalLink, Lightbulb, MessagesSquare, RefreshCw, Send, Sparkles } from "lucide-react";
+import { ExternalLink, Lightbulb, Link2, MessagesSquare, RefreshCw, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
@@ -139,6 +139,11 @@ export function InboxView({ initial, dms, initialTab = "comments" }: { initial: 
                   We didn&apos;t show anything rather than guess.
                 </p>
                 {g.items[0].hint && <p className="mt-2 text-foreground/85">{g.items[0].hint}</p>}
+                {copy.kind === "reconnect" && (
+                  <a href={`/api/accounts/${g.platform}/connect?returnTo=${encodeURIComponent("/inbox")}`} className="mt-3 inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-5 text-sm font-semibold text-background transition-transform active:scale-[0.97]">
+                    <Link2 className="h-4 w-4" aria-hidden="true" /> {copy.action}
+                  </a>
+                )}
                 {(g.items.length > 1 || details.length > 0) && (
                   <details className="mt-2">
                     <summary className="cursor-pointer text-xs text-muted-foreground">{g.items.length > 1 ? "Which posts" : "What the platform said"}</summary>

@@ -91,9 +91,11 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
           <Button variant="ghost" size="icon" onClick={() => go(1)} aria-label="Next week">
             <ChevronRight className="h-5 w-5" />
           </Button>
-          <Button variant="subtle" size="sm" onClick={() => setStart(addDaysKey(today, -weekdayOf(today)))} disabled={days.includes(today)}>
-            Today
-          </Button>
+          {!days.includes(today) && (
+            <Button variant="subtle" size="sm" onClick={() => setStart(addDaysKey(today, -weekdayOf(today)))}>
+              Today
+            </Button>
+          )}
           <Button asChild variant="lime" size="sm">
             <Link href="/create/bulk">
               <Layers className="h-4 w-4" aria-hidden /> Plan a batch
