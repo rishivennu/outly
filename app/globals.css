@@ -886,6 +886,17 @@ html:not(.dark) .footer-word { --fw-s0: hsl(82 85% 16%); --fw-s1: hsl(82 85% 26%
 @media (prefers-reduced-motion: reduce) {
   .pip *, .pip .pip-body { animation: none !important; }
 }
+/* Pip watching the auth form (1075): eyes glide to the caret, close for passwords; the bubble types its line. */
+.pip .pip-gaze { transition: transform .16s cubic-bezier(.2,.7,.2,1); }
+.pip-shut .pip-eyes { animation: none; }
+.pip-watch .pip-happy .pip-body { animation: pip-breathe 3.6s ease-in-out infinite; }
+.pw-bubble { position: relative; max-width: calc(100% - 72px); white-space: nowrap; border-radius: 14px; padding: 8px 13px;
+  font-size: 14px; font-weight: 600; line-height: 1.3; background: hsl(var(--foreground)); color: hsl(var(--background)); box-shadow: 0 10px 24px -14px hsl(var(--foreground) / .55); }
+.pw-bubble::before { content: ""; position: absolute; left: -5px; top: 50%; width: 11px; height: 11px; transform: translateY(-50%) rotate(45deg); border-radius: 2px; background: inherit; }
+.pw-bubble > span { position: relative; }
+.pw-rest { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .pip .pip-gaze { transition: none; } }
+@media (forced-colors: active) { .pw-bubble { border: 1px solid CanvasText; } }
 
 /* ---------------------------------------------------------------- liquid UI (2026-10-12) */
 .liquid-panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .55s var(--ease-out); }

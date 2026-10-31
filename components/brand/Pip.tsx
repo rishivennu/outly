@@ -42,7 +42,14 @@ const EYES: Record<PipMood, React.ReactNode> = {
   dizzy: (<><path className="pip-swirl" d="M49 54a3 3 0 1 1 3 3 5.5 5.5 0 1 1 5.5-5.5" /><path className="pip-swirl pip-swirl-r" d="M69 54a3 3 0 1 1 3 3 5.5 5.5 0 1 1 5.5-5.5" /></>),
 };
 
-export function Pip({ size = 96, mood = "idle", className, title, situation, palette, style }: { size?: number; mood?: PipMood; className?: string; title?: string; situation?: PipSituation; palette?: string; style?: React.CSSProperties }) {
+/** Closed eyes (1075): two flat lines, for "I'm not looking." while a password is typed. */
+const SHUT = (<><path d="M44 55h9" /><path d="M65 55h9" /></>);
+
+/**
+ * `gaze` moves the eyes by [x, y] in the 120-unit box (about +-8 x, +-5 y stays inside the cloud), so Pip can
+ * look at a caret or the pointer. `shut` closes them.
+ */
+export function Pip({ size = 96, mood = "idle", className, title, situation, palette, style, gaze, shut = false }: { size?: number; mood?: PipMood; className?: string; title?: string; situation?: PipSituation; palette?: string; style?: React.CSSProperties; gaze?: readonly [number, number]; shut?: boolean }) {
   const id = useId().replace(/:/g, "");
   const body = `pip-b-${id}`;
   const rim = `pip-r-${id}`;
@@ -55,7 +62,7 @@ export function Pip({ size = 96, mood = "idle", className, title, situation, pal
       viewBox="0 0 120 120"
       width={size}
       height={size}
-      className={cn("pip", `pip-${mood}`, `pip-sit-${situation ?? moodSituation(mood)}`, className)}
+      className={cn("pip", `pip-${mood}`, `pip-sit-${situation ?? moodSituation(mood)}`, shut && "pip-shut", className)}
       style={palette ? { ...(paletteVars(paletteById(palette)) as React.CSSProperties), ...style } : style}
       role={title ? "img" : undefined}
       aria-hidden={title ? undefined : true}
@@ -94,8 +101,10 @@ export function Pip({ size = 96, mood = "idle", className, title, situation, pal
           <ellipse cx="42" cy="38" rx="16" ry="7" fill="#ffffff" opacity="0.22" filter={`url(#${soft})`} transform="rotate(-18 42 38)" />
         </g>
         <path d={CLOUD} fill="none" style={{ stroke: "var(--pip-edge, #c9c2ff)" }} strokeOpacity="0.35" strokeWidth="1.2" />
-        <g className="pip-eyes" fill="none" stroke="#ffffff" strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round">
-          {EYES[mood]}
+        <g className="pip-gaze" style={gaze ? { transform: `translate(${gaze[0].toFixed(2)}px, ${gaze[1].toFixed(2)}px)` } : undefined}>
+          <g className="pip-eyes" fill="none" stroke="#ffffff" strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round">
+            {shut ? SHUT : EYES[mood]}
+          </g>
         </g>
       </g>
       {mood === "think" && (

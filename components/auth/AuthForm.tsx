@@ -10,6 +10,7 @@ import { GoogleButton } from "./GoogleButton";
 import { OtpBoxes, type OtpBoxesHandle } from "./OtpBoxes";
 import { PhoneInput, WhatsAppAuth, WhatsAppGlyph } from "./WhatsAppAuth";
 import { OutlyMark } from "@/components/brand/Logo";
+import { PipWatch } from "./PipWatch";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
 import { sameSitePath } from "@/lib/safe-next";
 
@@ -82,6 +83,8 @@ export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { 
   // 1058: signing up (email or Google) needs a ticked "18 or older". The server checks it too.
   const ageRef = useRef<HTMLInputElement>(null);
   const [adult, setAdult] = useState(false);
+  // Which control has focus, so Pip (PipWatch, 1075) knows where to look and what to say.
+  const [focused, setFocused] = useState<string | null>(null);
   const askAge = () => { setError(AGE_ERROR); ageRef.current?.focus(); };
   // A reset code by WhatsApp. (Signing in by WhatsApp has its own screen, WhatsAppAuth.)
   const byPhone = via === "whatsapp" && step === "reset";
@@ -380,13 +383,14 @@ export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { 
       <h1 className="gs-in font-display text-[clamp(2rem,3.4vw,2.5rem)] font-bold leading-[1.05] tracking-[-0.035em]">{heading}</h1>
       <p className="gs-in mb-6 mt-2.5 max-w-[40ch] text-[15px] leading-relaxed text-muted-foreground">{sub}</p>
       {step !== "2fa" && banner}
+      <PipWatch mode={mode} step={step} focus={focused} name={form.name} email={form.email} password={form.password} busy={busy} error={error} success={success} sent={sent} adult={adult} />
       {success && (
         <p role="status" className="mb-4 flex items-start gap-2.5 rounded-xl bg-lime/15 px-4 py-3 text-sm font-medium text-foreground">
           <CircleCheck className="mt-0.5 h-[18px] w-[18px] shrink-0 text-lime-ink" aria-hidden="true" />
           {success}
         </p>
       )}
-      <form onSubmit={submit} className="w-full space-y-4 [@media(max-height:800px)]:space-y-3" noValidate>
+      <form onSubmit={submit} onFocus={(e) => setFocused(e.target.id || null)} onBlur={() => setFocused(null)} className="w-full space-y-4 [@media(max-height:800px)]:space-y-3" noValidate>
         {step === "password" && (
           <p className="gs-in -mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             <Mail className="h-3.5 w-3.5" aria-hidden="true" />
