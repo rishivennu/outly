@@ -2945,3 +2945,64 @@ html:not(.js) .how-bar { transform: none; }
 @media (prefers-reduced-motion: reduce) { .how-bar { transform: none; } }
 @media (forced-colors: active) { .how-bar { background: CanvasText; } }
 
+
+/* ---- 1069: cursor, nav flip, text scramble, kinetic words (after vennu-orcin.vercel.app) ---- */
+/* CursorFx: system cursor hidden only once ours is placed; text fields keep the text cursor. */
+html.cfx-on, html.cfx-on * { cursor: none !important; }
+html.cfx-on :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="button"], [type="submit"], [type="color"], [type="file"]), textarea, [contenteditable="true"], [contenteditable=""]) { cursor: text !important; }
+.cfx { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; will-change: transform; }
+.cfx > i { position: absolute; left: 0; top: 0; display: block; border-radius: 9999px; translate: -50% -50%;
+  transition: width .22s var(--ease-liquid), height .22s var(--ease-liquid), opacity .2s ease, scale .18s var(--ease-liquid), background-color .2s, border-color .2s; }
+/* Light: a solid ink dot that steps aside on clickable things so the label stays clear. Dark: a lime dot in
+   difference blend (lime on the dark page, near black on a lime button) that swells like the reference. */
+.cfx-dot > i { width: 8px; height: 8px; background: hsl(var(--foreground)); }
+html.dark .cfx-dot { mix-blend-mode: difference; }
+html.dark .cfx-dot > i { background: hsl(var(--lime)); }
+.cfx-ring > i { width: 34px; height: 34px; border: 1.5px solid hsl(var(--lime-ink) / .65); }
+.dark .cfx-ring > i { border-color: hsl(var(--lime) / .55); }
+.cfx-trail > i { width: 5px; height: 5px; background: hsl(var(--lime-ink)); opacity: var(--o, .3); scale: var(--s, 1); transition: opacity .2s ease; }
+.dark .cfx-trail > i { background: hsl(var(--lime)); }
+html.cfx-hot .cfx-dot > i { width: 4px; height: 4px; }
+html.dark.cfx-hot .cfx-dot > i { width: 18px; height: 18px; }
+html.cfx-hot .cfx-ring > i { width: 54px; height: 54px; background: hsl(var(--lime) / .1); border-color: hsl(var(--lime-ink) / .4); }
+html.dark.cfx-hot .cfx-ring > i { border-color: hsl(var(--lime) / .35); }
+html.cfx-down .cfx-ring > i { scale: .82; }
+html.cfx-down .cfx-dot > i { scale: .75; }
+html:is(.cfx-text, .cfx-out) .cfx > i, html:not(.cfx-on) .cfx > i { opacity: 0; }
+html.cfx-on.cfx-out, html.cfx-on.cfx-out * { cursor: auto !important; } /* window lost focus: never leave the page with no cursor */
+@media (forced-colors: active) { .cfx { display: none; } html.cfx-on, html.cfx-on * { cursor: auto !important; } }
+@media print { .cfx { display: none; } }
+
+/* FlipText: the face tips back and away, the back rolls up in lime (nav links, nav button). */
+@layer components { .ft { display: inline-grid; } .scr { display: inline-block; } }
+.ft { position: relative; justify-items: center; align-items: center; perspective: 500px; overflow: hidden; padding-block: .22em; margin-block: -.22em; }
+.ft-face, .ft-back { grid-area: 1 / 1; white-space: nowrap; transform-origin: 50% 100%; backface-visibility: hidden; }
+.ft-back { opacity: 0; user-select: none; -webkit-user-select: none; color: hsl(var(--lime-ink)); font-weight: 700; transform: rotateX(-90deg) translateZ(1.4em); }
+.ft[data-tone="inherit"] .ft-back, .mnav-link.is-active .ft-back { color: inherit; }
+.ft-back .scr-x { color: inherit; opacity: .5; }
+@media (prefers-reduced-motion: no-preference) {
+  .ft-face, .ft-back { transition: transform .38s var(--ease-liquid), opacity .28s ease; }
+  :is(a, button, [role="button"]):is(:focus-visible) .ft-face { transform: rotateX(90deg) translateZ(1.4em); opacity: 0; }
+  :is(a, button, [role="button"]):is(:focus-visible) .ft-back { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  :is(a, button, [role="button"]):hover .ft-face { transform: rotateX(90deg) translateZ(1.4em); opacity: 0; }
+  :is(a, button, [role="button"]):hover .ft-back { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .ft-back { visibility: hidden; } }
+@media (forced-colors: active) { .ft-back { visibility: hidden; } .ft-face { transform: none !important; opacity: 1 !important; } }
+
+/* ScrambleText: the real words go see-through while an aria-hidden overlay decodes on top, so the width never moves. */
+.scr { position: relative; }
+.scr[data-scrambling] > .scr-t { color: transparent; }
+.scr-o { position: absolute; inset: 0; white-space: inherit; pointer-events: none; user-select: none; -webkit-user-select: none; }
+.scr-x { color: hsl(var(--lime-ink)); opacity: .6; }
+
+/* Kinetic words: each word rises out of a blur, one after another (hero line, section intros). */
+@keyframes kw-in { from { opacity: 0; filter: blur(8px); transform: translate3d(0, .45em, 0); } to { opacity: 1; filter: blur(0); transform: none; } }
+.hf-kw .sw { animation: kw-in .75s var(--ease-liquid) calc(var(--d, .7s) + var(--wi, 0) * 38ms) both; }
+html.js .rv-head:not([data-shown]) .rv-kw .sw { opacity: 0; }
+.rv-head[data-shown] .rv-kw .sw { animation: kw-in .7s var(--ease-liquid) calc(.2s + var(--wi, 0) * 22ms) both; }
+@media (prefers-reduced-motion: reduce) {
+  .hf-kw .sw, .rv-head[data-shown] .rv-kw .sw { animation: sw-fade .3s linear both; }
+}

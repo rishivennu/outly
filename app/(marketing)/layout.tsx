@@ -1,6 +1,8 @@
 import { MarketingNav } from "@/components/marketing/Nav";
 import { MarketingFooter } from "@/components/marketing/Footer";
 import { MotionFx } from "@/components/marketing/MotionFx";
+import { CursorFx } from "@/components/shared/CursorFx";
+import { TextFx } from "@/components/shared/TextFx";
 import { StarField } from "@/components/marketing/StarField";
 import { BetaProvider } from "@/components/marketing/BetaContext";
 import { isBeta } from "@/lib/beta";
@@ -25,6 +27,8 @@ export default async function MarketingLayout({ children }: { children: React.Re
       <main id="main">{children}</main>
       <MarketingFooter />
       <MotionFx />
+      <TextFx />
+      <CursorFx />
     </div>
     </BetaProvider>
   );

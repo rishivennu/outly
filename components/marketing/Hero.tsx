@@ -6,6 +6,7 @@ import { StampChip } from "@/components/brand/Stamps";
 import { Shell } from "./bits";
 import { splitWords } from "./Split";
 import { HERO } from "@/lib/marketing/content";
+import { ScrambleText } from "@/components/ui/text-fx";
 import type { Platform } from "@/lib/domain";
 
 /**
@@ -37,8 +38,9 @@ export function Hero({ showHow = true, beta = false }: { showHow?: boolean; beta
             </span>
           </h1>
         </div>
-        <p className="hf-in mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-[17px]" style={{ ["--d" as string]: ".7s" }}>
-          {HERO.sub}
+        {/* 1069: the line arrives word by word, each one rising out of a blur (kinetic words) */}
+        <p className="hf-kw mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-[17px]" style={{ ["--d" as string]: ".55s" }}>
+          {splitWords(HERO.sub).nodes}
         </p>
 
         <div className="hf-cta mt-5 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center" style={{ ["--d" as string]: ".8s" }}>
@@ -66,12 +68,12 @@ export function Hero({ showHow = true, beta = false }: { showHow?: boolean; beta
               <span className="text-lime-ink dark:text-lime">Free during beta</span>
               {/* the long half only where it fits on one line */}
               <span aria-hidden="true" className="hidden text-foreground/40 sm:inline">&middot;</span>
-              <span className="hidden sm:inline">{HERO.eyebrow}</span>
+              <span className="hidden sm:inline"><ScrambleText text={HERO.eyebrow} /></span>
             </>
           ) : (
             <>
               <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-lime" />
-              <span>{HERO.eyebrow}</span>
+              <ScrambleText text={HERO.eyebrow} />
             </>
           )}
         </p>

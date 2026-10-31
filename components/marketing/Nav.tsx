@@ -5,7 +5,7 @@ import { AnimatedLink } from "@/components/ui/animated-link";
 import { useSignedIn } from "./useSignedIn";
 import { useWaitlist } from "./useWaitlist";
 import { useHiddenSections } from "./useHiddenSections";
-import { BounceText } from "./Split";
+import { FlipText } from "@/components/ui/text-fx";
 import { usePathname } from "next/navigation";
 import { ArrowRight, ChevronDown, LayoutDashboard, Menu, X } from "lucide-react";
 import { PRODUCT_ITEMS, ProductPanel, ProductTilesCompact } from "./NavProduct";
@@ -14,11 +14,12 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { LiveCount } from "@/components/shared/LiveCount";
 import { cn } from "@/lib/utils";
 
-const LINKS = [
-  { id: "how", label: "How it works" },
+// `back`: what the flip side of the link says on hover (1069, FlipText); defaults to the label.
+const LINKS: { id: string; label: string; back?: string }[] = [
+  { id: "how", label: "How it works", back: "See the flow" },
   { id: "features", label: "Product" }, // opens the Product mega menu on lg+
   { id: "compare", label: "Compare" }, // lives inside Product; kept here for the scrollspy
-  { id: "pricing", label: "Pricing" },
+  { id: "pricing", label: "Pricing", back: "Plans" },
   { id: "faq", label: "FAQ" },
 ];
 
@@ -178,11 +179,12 @@ export function MarketingNav() {
   // marketing template), which threw away a receipt someone had just printed (1055).
   const ctaHref = waitlist ? (pathname === "/waitlist" ? "#join" : "/waitlist") : "/signup";
   const ctaLabel = waitlist ? "Join the waitlist" : "Start creating";
+  const ctaBack = waitlist ? "Save my spot" : "Let's go";
 
   return (
     <header className="mnav sticky top-0 z-50 px-3 pt-3 sm:px-6" data-scrolled={scrolled || open}>
       <div ref={barRef} className="mnav-bar mx-auto flex h-14 max-w-[1180px] items-center gap-2 rounded-full pl-3 pr-1.5 sm:h-[60px] sm:pl-4 sm:pr-2">
-        <Link href="/" className="flex h-11 items-center gap-2 rounded-full pr-2" aria-label="Outlly home">
+        <Link href="/" data-mag="" className="flex h-11 items-center gap-2 rounded-full pr-2" aria-label="Outlly home">
           <OutlyLogo className="text-[17.4px]" />
         </Link>
 
@@ -219,7 +221,7 @@ export function MarketingNav() {
                     }}
                     className={cn("mnav-link gap-1", (active === l.id || active === "compare") && "is-active", menu && "is-open")}
                   >
-                    {l.label}
+                    <FlipText text={l.label} />
                     <ChevronDown className="np-chev h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </li>
@@ -232,7 +234,7 @@ export function MarketingNav() {
                   aria-current={active === l.id ? "true" : undefined}
                   className={cn("mnav-link", active === l.id && "is-active")}
                 >
-                  {l.label}
+                  <FlipText text={l.label} back={l.back} />
                 </Link>
               </li>
               ),
@@ -260,10 +262,11 @@ export function MarketingNav() {
           {signedIn ? (
             <Link
               href="/home"
+              data-mag=""
               className="lime-glow inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-lime px-4 text-[14px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 active:scale-95 sm:px-5"
             >
               <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
-              Dashboard
+              <FlipText text="Dashboard" back="Open studio" tone="inherit" />
             </Link>
           ) : (
             <>
@@ -272,10 +275,10 @@ export function MarketingNav() {
               </AnimatedLink>
               <Link
                 href={ctaHref}
-                data-bounce=""
+                data-mag=""
                 className="lime-glow group inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-lime px-4 text-[14px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 active:scale-95 sm:px-5"
               >
-                <BounceText text={ctaLabel} />
+                <FlipText text={ctaLabel} back={ctaBack} tone="inherit" />
                 <ArrowRight className="hidden h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 sm:block" aria-hidden="true" />
               </Link>
             </>
