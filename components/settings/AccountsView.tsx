@@ -1,5 +1,4 @@
 "use client";
-import { GoogleHelp } from "@/components/onboarding/GoogleHelp";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
@@ -38,7 +37,7 @@ export type ConnectSetup = Record<Platform, { oauth: boolean; token: boolean }>;
 
 const ERRORS: Record<string, (name: string) => string> = {
   not_configured: (n) => `${n} isn't set up on this server yet, so there's nothing to connect to.`,
-  access_denied: (n) => `${n} didn't give access. While the app is in testing, only approved testers can connect. The help on the card below shows how to get added.`,
+  access_denied: (n) => `${n} didn't give access. Try again and allow everything Outlly asks for: it needs each one to post for you.`,
   state: () => "That sign-in took too long or came from another tab. Let's start it again.",
   exchange: (n) => `${n} signed you in, but the last step failed. What ${n} said is shown on this page.`,
   config: (n) => `${n} turned this server away: its app ID or secret doesn't match the ${n} app. Ask the admin to check both in Admin > Social platforms.`,
@@ -206,7 +205,6 @@ export function AccountsView({ initial, setup, accountLimit = 0 }: { initial: Ac
                     : `You log in on ${PLATFORM_META[p].name}'s own page. Outlly never sees your password.`}
                 </p>
               )}
-              {!ok && p === "youtube" && setup.youtube.oauth && errorReason === "access_denied" && <GoogleHelp className="relative mt-3" defaultOpen />}
               {!ok && p === "instagram" && !setup.instagram.oauth && setup.instagram.token && (
                 <p className="relative mt-4 flex gap-2 rounded-2xl bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
                   <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

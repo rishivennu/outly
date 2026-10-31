@@ -10,6 +10,7 @@ import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
 import { ThemeCycleButton, ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useUser } from "./UserContext";
 import { NoticesBell } from "./NoticesBell";
+import { SignOutButton } from "./SignOutButton";
 import { PaletteButton } from "./PaletteButton";
 import { LiveCount } from "@/components/shared/LiveCount";
 
@@ -128,16 +129,17 @@ export function Sidebar() {
             <ArrowUpRight className="ml-auto h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
           </Link>
           <ThemeToggle compact plain className="mb-1 mt-2 self-start" />
-          <div className="mt-2 flex items-center gap-2 rounded-2xl p-1.5 hairline">
-            <Link href="/settings" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl p-1 hover:bg-secondary/60">
+          <div className="mt-2 flex items-center gap-0.5 rounded-2xl p-1.5 hairline">
+            <Link href="/settings" className="flex min-w-0 flex-1 items-center gap-2 rounded-xl p-1 hover:bg-secondary/60">
               {/* Teammates get their own stable orb; the owner's saved avatar is theirs alone. */}
-              <OrbAvatar avatar={user.workspace ? null : user.avatar} seed={user.workspace?.me.email ?? user.email} size={36} />
+              <OrbAvatar avatar={user.workspace ? null : user.avatar} seed={user.workspace?.me.email ?? user.email} size={32} />
               <span className="min-w-0">
                 <span className="block truncate text-[13px] font-semibold">{user.workspace?.me.name ?? user.name}</span>
                 <span className="block truncate text-[11.5px] text-muted-foreground">{user.workspace ? `In ${user.workspace.ownerName}'s studio` : user.email}</span>
               </span>
             </Link>
             <NoticesBell placement="side" />
+            <SignOutButton />
           </div>
         </div>
         </div>

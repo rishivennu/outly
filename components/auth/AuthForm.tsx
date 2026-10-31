@@ -9,7 +9,6 @@ import { api, ApiError } from "@/lib/client/api";
 import { GoogleButton } from "./GoogleButton";
 import { OtpBoxes, type OtpBoxesHandle } from "./OtpBoxes";
 import { PhoneInput, WhatsAppAuth, WhatsAppGlyph } from "./WhatsAppAuth";
-import { GoogleHelp } from "@/components/onboarding/GoogleHelp";
 import { OutlyMark } from "@/components/brand/Logo";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
 import { sameSitePath } from "@/lib/safe-next";
@@ -17,7 +16,7 @@ import { sameSitePath } from "@/lib/safe-next";
 const AGE_ERROR = "Please confirm you're 18 or older to create an account.";
 
 const GOOGLE_ERRORS: Record<string, string> = {
-  access_denied: "Google didn't let you in. While Outlly is in testing, only approved testers can use Google sign-in. See the help below.",
+  access_denied: "Google sign-in didn't go through. Try again and choose Allow, or use your email instead.",
   denied: "Google sign-in was cancelled. Nothing was connected.",
   unverified: "That Google account doesn't have a verified email, so we can't sign you in with it.",
   state: "That sign-in took too long or came from another tab. Let's start it again.",
@@ -43,7 +42,7 @@ type Step = "password" | "code" | "reset" | "2fa";
  * then back to sign in with the new one. With WhatsApp switched on (1060), "Continue with WhatsApp" opens
  * its own screen (WhatsAppAuth) that signs in, or signs up, with a code sent there.
  */
-export function AuthForm({ mode, google = false, whatsapp = false, title, subtitle, banner }: { mode: "login" | "signup"; google?: boolean; whatsapp?: boolean; title: string; subtitle: string; banner?: React.ReactNode }) {
+export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { mode: "login" | "signup"; google?: boolean; whatsapp?: boolean; title: string; subtitle: string; banner?: React.ReactNode }) {
   const router = useRouter();
   const params = useSearchParams();
   // Only a path on this site: "/%09/evil.com" used to slip past and land people on another site after sign-in.
@@ -642,7 +641,6 @@ export function AuthForm({ mode, google = false, whatsapp = false, title, subtit
             </button>
           )}
           <GoogleButton from={mode} next={next} remember={mode === "login" ? remember : undefined} label={mode === "login" ? "Sign in with Google" : "Sign up with Google"} onClick={mode === "signup" ? (e) => { if (!adult) { e.preventDefault(); askAge(); } } : undefined} />
-          {google && <GoogleHelp compact defaultOpen={googleError === "access_denied"} />}
         </div>
         <p className="gs-in text-center text-sm text-muted-foreground">
           {mode === "login" ? "Don't have an account? " : "Already have an account? "}
