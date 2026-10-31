@@ -143,9 +143,16 @@ function Shape({ shape }: { shape: SkeletonShape }) {
 export function RouteSkeleton({ shape, label, lines = [], frame = "px-5 pb-16 pt-8 sm:px-10 lg:pt-14" }: { shape: SkeletonShape; label: string; lines?: string[]; frame?: string }) {
   const [slow, setSlow] = useState(false);
   const [n, setN] = useState(0);
+  // 1079: a loader still up after 12 s has almost always lost its request (a dropped connection, a deploy
+  // mid-visit). Say so and offer the one fix that works, instead of spinning on forever.
+  const [stuck, setStuck] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setSlow(true), 1200);
-    return () => clearTimeout(t);
+    const u = setTimeout(() => setStuck(true), 12_000);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(u);
+    };
   }, []);
   useEffect(() => {
     if (!slow || lines.length < 2) return;
@@ -156,7 +163,14 @@ export function RouteSkeleton({ shape, label, lines = [], frame = "px-5 pb-16 pt
   return (
     <div data-route-skeleton="" role="status" aria-busy="true" className={cn("route-skel relative", frame)}>
       <span className="sr-only">{label}</span>
-      {slow && (
+      {stuck ? (
+        <div className="route-slow absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap rounded-full bg-background/95 py-1 pl-4 pr-1 text-[13px] font-medium text-foreground/80 shadow-sm hairline" role="alert">
+          <span>Taking longer than usual.</span>
+          <button type="button" onClick={() => location.reload()} className="inline-flex h-11 items-center rounded-full bg-foreground px-4 text-[13px] font-semibold text-background focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
+            Reload
+          </button>
+        </div>
+      ) : slow && (
         <p className="route-slow absolute left-1/2 top-3 z-10 flex h-8 -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-background/90 px-3.5 text-[12.5px] font-medium text-muted-foreground shadow-sm hairline" aria-hidden="true">
           <span className="live-dot" />
           {label}

@@ -1,6 +1,7 @@
 import "server-only";
 import { PLATFORM_META } from "./domain";
 import { generateHooks, generatePlatformCopy, type PlatformCopy } from "./ai/creative";
+import { withBudget } from "./budget";
 
 /**
  * The landing page's "Try it" box (10-28). One line from a visitor in, three real drafts out, written by
@@ -69,12 +70,7 @@ export function toDrafts(copies: PlatformCopy[], topic: string): TryDrafts {
   };
 }
 
-/** The promise's answer, or null once `ms` passes first. */
-export async function withBudget<T>(work: Promise<T>, ms: number): Promise<T | null> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<null>((r) => (timer = setTimeout(() => r(null), ms)));
-  return Promise.race([work, late]).finally(() => clearTimeout(timer));
-}
+export { withBudget }; // moved to lib/budget.ts (1079), still exported here for older imports
 
 const cache = new Map<string, TryResult>();
 const CACHE_MAX = 300;

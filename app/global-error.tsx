@@ -1,7 +1,12 @@
 "use client";
+import { useEffect } from "react";
+import { isChunkError, reloadOnce } from "@/lib/client/chunk-reload";
 
 /** Last resort when the root layout itself fails: no app CSS is guaranteed, so styles are inline. */
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    if (isChunkError(error)) reloadOnce();
+  }, [error]);
   return (
     <html lang="en">
       <body style={{ margin: 0, minHeight: "100dvh", display: "grid", placeItems: "center", fontFamily: "system-ui, sans-serif", background: "#f8fafc", color: "#121214", textAlign: "center", padding: 24 }}>

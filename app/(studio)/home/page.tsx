@@ -39,8 +39,11 @@ import { ProfileSwitcher } from "@/components/home/ProfileSwitcher";
 import { TrustBadges } from "@/components/shared/TrustBadges";
 import { savedTime } from "@/lib/retention/time-saved";
 import { TimeSavedCard } from "@/components/home/TimeSavedCard";
+import { soft } from "@/lib/budget";
 
 const NEW_FOR_DAYS = 14;
+/** 1079: the longest Home waits for any one optional card. Past it the card sits out this visit and the page renders. */
+const CARD_MS = 5000;
 
 /** Free, owner-level accounts that are new or haven't published yet get the subscribe greeting once. */
 async function welcomeOffer(user: { id: string; createdAt: Date; actor: unknown }) {
@@ -81,45 +84,38 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
     db.post.findMany({ where: { userId: user.id, status: "draft", ...scope.where }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() }, ...scope.where }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),
     liveP,
-    welcomeOffer(user).catch(() => null),
+    soft(welcomeOffer(user), CARD_MS, null, "home welcome"),
     publishedP,
-    meP.then((me) => homeRetention({ id: user.id, postingGoal: me?.postingGoal ?? 3, timezone: user.timezone }))
-      .catch((e) => {
-        console.error("[home] retention", e);
-        return null;
-      }),
-    Promise.all([liveP, publishedP])
-      .then(([lv, pub]) =>
+    soft(meP.then((me) => homeRetention({ id: user.id, postingGoal: me?.postingGoal ?? 3, timezone: user.timezone })), CARD_MS, null, "home retention"),
+    soft(
+      Promise.all([liveP, publishedP]).then(([lv, pub]) =>
         Object.values(lv).some(Boolean) || pub > 0 ? homePulse({ id: user.id, timezone: user.timezone }, Object.keys(lv).filter((k) => lv[k as Platform] && isPlatform(k)) as Platform[]) : null,
-      )
-      .catch((e) => {
-        console.error("[home] pulse", e);
-        return null;
-      }),
-    meP
-      .then((me) => lastWeekRecap({ id: user.id, timezone: user.timezone, postingGoal: me?.postingGoal ?? 3, weeklyReport: me?.weeklyReport ?? true }, Number.isNaN(+recapAt) ? new Date() : recapAt))
-      .then((r) => (r && r.key === recapHidden ? null : r))
-      .catch((e) => {
-        console.error("[home] recap", e);
-        return null;
-      }),
-    user.actor ? null : myFounding(user.id),
-    savedTime(user.id, Date.now(), scope.where).catch((e) => {
-      console.error("[home] saved", e);
-      return null;
-    }),
-    storageUsage(user.id).catch((e) => {
-      console.error("[home] storage", e);
-      return null;
-    }),
+      ),
+      CARD_MS,
+      null,
+      "home pulse",
+    ),
+    soft(
+      meP
+        .then((me) => lastWeekRecap({ id: user.id, timezone: user.timezone, postingGoal: me?.postingGoal ?? 3, weeklyReport: me?.weeklyReport ?? true }, Number.isNaN(+recapAt) ? new Date() : recapAt))
+        .then((r) => (r && r.key === recapHidden ? null : r)),
+      CARD_MS,
+      null,
+      "home recap",
+    ),
+    user.actor ? null : soft(myFounding(user.id), CARD_MS, null, "home founding"),
+    soft(savedTime(user.id, Date.now(), scope.where), CARD_MS, null, "home saved"),
+    soft(storageUsage(user.id), CARD_MS, null, "home storage"),
     // 1076: the checklist runs to a first win, so it needs to know about the first upload and the first post sent or booked
-    Promise.all([
-      db.media.findFirst({ where: { userId: user.id }, select: { id: true } }),
-      db.post.findFirst({ where: { userId: user.id, launchedAt: { not: null } }, select: { id: true } }),
-    ]).catch((e) => {
-      console.error("[home] first win", e);
-      return [null, null] as const;
-    }),
+    soft(
+      Promise.all([
+        db.media.findFirst({ where: { userId: user.id }, select: { id: true } }),
+        db.post.findFirst({ where: { userId: user.id, launchedAt: { not: null } }, select: { id: true } }),
+      ]),
+      CARD_MS,
+      [null, null] as const,
+      "home first win",
+    ),
   ]);
   const started = Object.values(live).some(Boolean) || published > 0;
   const steps = ret?.steps ?? [];

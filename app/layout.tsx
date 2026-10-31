@@ -14,6 +14,7 @@ import { PageScrollbar } from "@/components/marketing/PageScrollbar";
 import "./globals.css";
 import "./mobile-app.css";
 import { appScript } from "@/lib/app-mode";
+import { chunkScript } from "@/lib/client/chunk-reload";
 
 /*
  * Type system (1062). Display: Manrope, a clean geometric grotesk that holds up at 48px and at 16px.
@@ -78,6 +79,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`dark ${display.variable} ${body.variable} ${classicDisplay.variable} ${classicBody.variable} ${serif.variable} ${gopher.variable} ${jakarta.variable} ${fraunces.variable} ${archivo.variable} ${tinos.variable} ${rubik.variable} ${spaceMono.variable}`} suppressHydrationWarning>
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* 1079: a tab left open across a deploy reloads once instead of hanging on a chunk the new build dropped. */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: chunkScript }} />
         {/* Inside the Android app: mark <html> before first paint so the app layout (app/mobile-app.css) never flashes the web one. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: appScript }} />
         {/* Landing sections the admin hid (readable hint cookie set by middleware): mark <html> before the
