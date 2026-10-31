@@ -53,6 +53,7 @@ export function Hero({ showHow = true, beta = false }: { showHow?: boolean; beta
           </SignupCta>
           {showHow && <Link
             data-magnet=""
+            data-lens=""
             href={HERO.secondary.href}
             className="glass hairline inline-flex h-14 items-center justify-center rounded-full px-6 text-base font-medium transition-colors hover:bg-secondary"
           >
@@ -61,7 +62,7 @@ export function Hero({ showHow = true, beta = false }: { showHow?: boolean; beta
         </div>
 
         <div className="mt-5 flex flex-wrap items-center justify-center">
-        <p className="hf-in glass hairline inline-flex items-center gap-2 rounded-full py-1.5 pl-2 pr-4 text-[13px] font-medium text-foreground/85" style={{ ["--d" as string]: ".85s" }}>
+        <p data-lens="" className="hf-in glass hairline inline-flex items-center gap-2 rounded-full py-1.5 pl-2 pr-4 text-[13px] font-medium text-foreground/85" style={{ ["--d" as string]: ".85s" }}>
           {beta ? (
             <>
               <StampChip>Beta</StampChip>

@@ -474,7 +474,8 @@ html:not(.dark) .o3d-floor { background: radial-gradient(closest-side, rgba(30, 
 .mnav[data-scrolled="true"] .mnav-bar { background: linear-gradient(180deg, hsl(var(--card) / .8), hsl(var(--card) / .68));
   box-shadow: inset 0 1px 0 hsl(0 0% 100% / .55), inset 0 -1px 0 hsl(0 0% 100% / .12), 0 0 0 1px hsl(var(--foreground) / .08),
     0 18px 40px -20px rgba(0, 0, 0, .45); }
-.dark .mnav[data-scrolled="true"] .mnav-bar { background: linear-gradient(180deg, hsl(var(--card) / .74), hsl(var(--card) / .6));
+/* 1077: denser when scrolled so bright cards (the lime Try it wall) under the pill keep labels at 4.5:1. */
+.dark .mnav[data-scrolled="true"] .mnav-bar { background: linear-gradient(180deg, hsl(var(--card) / .86), hsl(var(--card) / .76));
   box-shadow: inset 0 1px 0 hsl(0 0% 100% / .18), 0 0 0 1px hsl(0 0% 100% / .09), 0 18px 40px -20px rgba(0, 0, 0, .75); }
 @media (prefers-reduced-transparency: reduce) { .mnav-bar, .dark .mnav-bar, .mnav[data-scrolled="true"] .mnav-bar { background: hsl(var(--card)); } .mnav-bar::after { display: none; } }
 
@@ -2375,6 +2376,47 @@ html[data-contrast="more"] .lg-glass::before, html[data-contrast="more"] .lg-gla
   .lg-glass::before, .lg-glass::after { display: none; }
 }
 
+/* ---------- 1077: Liquid glass on the website ([data-lens], components/shared/LiquidGlass.tsx) ----------
+   The marketing nav pill and the hero's glass pieces bend the page at their rim, sharp and colour-true (a colour
+   split, even 1px, turns orange under saturate()),
+   and stay frosted in the middle where the labels sit (--lg-core). Small pieces are thin wafers: a narrower band and
+   a weaker bend than the studio's panels. Tints are untouched, so text keeps the same 4.5:1 it had over the blur.
+   Safari and Firefox keep the frosted pill; less transparency, more contrast and forced colours get it solid. */
+.mnav-bar { --lg-band: 16; --lg-bend: 13; --lg-ca: 0; --lg-core: 14; }
+.glass[data-lens] { --lg-band: 12; --lg-bend: 8; --lg-ca: 0; --lg-core: 12; }
+@media not (prefers-reduced-transparency: reduce) {
+  html[data-lg="refract"]:not([data-contrast="more"]) [data-lens][data-lg-ready] {
+    -webkit-backdrop-filter: var(--lg-url) saturate(1.85) brightness(1.04);
+    backdrop-filter: var(--lg-url) saturate(1.85) brightness(1.04);
+  }
+}
+/* Light mode is blue-white glass (user, 10-31): a cool tint from top to bottom, a pale blue lit rim and sheen.
+   A clear blue (hue 208 to 214) a touch more opaque than the old white, so the page behind cannot wash the labels below 4.5:1. */
+html:not(.dark) .mnav-bar { background: linear-gradient(180deg, hsl(208 100% 97% / .8), hsl(214 82% 92% / .7));
+  box-shadow: inset 0 1px 0 hsl(210 100% 99% / .9), inset 0 -1px 0 hsl(216 40% 60% / .12), 0 0 0 1px hsl(216 40% 30% / .09),
+    0 10px 30px -16px hsl(220 40% 25% / .32); }
+html:not(.dark) .mnav[data-scrolled="true"] .mnav-bar { background: linear-gradient(180deg, hsl(208 100% 97% / .88), hsl(214 82% 92% / .78));
+  box-shadow: inset 0 1px 0 hsl(210 100% 99% / .9), inset 0 -1px 0 hsl(216 40% 60% / .12), 0 0 0 1px hsl(216 40% 30% / .1),
+    0 18px 40px -20px hsl(220 40% 22% / .4); }
+html:not(.dark) .mnav-bar::before { background: linear-gradient(115deg, hsl(205 100% 99% / .95), hsl(210 90% 92% / .35) 30%,
+  hsl(216 60% 80% / .1) 55%, hsl(214 70% 86% / .35) 85%, hsl(205 100% 97% / .75)); }
+html:not(.dark) .mnav-bar::after { background: linear-gradient(180deg, hsl(205 100% 99% / .5), hsl(210 100% 97% / 0)); }
+html:not(.dark) .glass[data-lens] { background: linear-gradient(180deg, hsl(208 100% 97% / .8), hsl(214 82% 92% / .7)); }
+/* The theme switch inside the bar is a lighter blue chip on the blue pane. */
+html:not(.dark) .mnav-bar .glass { background: hsl(210 100% 97.5% / .72); box-shadow: inset 0 1px 0 hsl(205 100% 99% / .9), 0 0 0 1px hsl(214 50% 55% / .12); }
+@media (prefers-reduced-transparency: reduce) {
+  html:not(.dark) .mnav-bar, html:not(.dark) .mnav[data-scrolled="true"] .mnav-bar, html:not(.dark) .glass[data-lens] { background: hsl(212 85% 95.5%); }
+}
+html[data-contrast="more"]:not(.dark) .mnav-bar { background: hsl(var(--card)); }
+/* The glow from the pointer: white light inside the pane, under the labels. No colour (user, 10-14). */
+.lg-shine { position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; opacity: 0;
+  background: radial-gradient(180px circle at var(--lg-x, 50%) var(--lg-y, 50%), hsl(205 100% 99% / .8), hsl(210 100% 97% / .26) 45%, hsl(210 100% 97% / 0) 72%);
+  transition: opacity .35s var(--ease-out, ease); }
+.dark .lg-shine { background: radial-gradient(180px circle at var(--lg-x, 50%) var(--lg-y, 50%), hsl(0 0% 100% / .1), hsl(0 0% 100% / .035) 45%, hsl(0 0% 100% / 0) 72%); }
+[data-lg-lit] > .lg-shine { opacity: 1; transition-duration: .15s; }
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) { .lg-shine { display: none; } }
+html[data-contrast="more"] .lg-shine { display: none; }
+
 /* ---------- Try it (10-28): a staggered wall of colour cards (user reference) ----------
    Tall rounded cards, a white tag pill, a bold short title, a big 3D object in the corner, columns at different
    heights. Brand range only (user, 10-28: no blue). Ink on the light
@@ -3045,18 +3087,7 @@ html.js .rv-head:not([data-shown]) .rv-kw .sw { opacity: 0; }
 /* phones: the centre card leaves the Reels card about 80px showing, too narrow for a caption */
 @media (max-width: 767px) { .hf-cap { display: none; } }
 
-/* 1071: light marketing nav. Same problem as .lg-glass: white rim, white sheen, white page. Cool tint plus a shaded
-   far rim and an inner bottom edge. Scrolled stays >= .62 so the dark CTA under it keeps text at 4.5:1. */
-html:not(.dark) .mnav-bar { background: linear-gradient(180deg, hsl(214 60% 99% / .66), hsl(216 40% 96% / .52));
-  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .95), inset 0 -1px 0 hsl(216 30% 30% / .07), 0 0 0 .5px hsl(216 30% 25% / .14),
-    0 12px 32px -16px hsl(216 40% 25% / .3); }
-html:not(.dark) .mnav[data-scrolled="true"] .mnav-bar { background: linear-gradient(180deg, hsl(214 60% 99% / .76), hsl(216 40% 96% / .64));
-  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .95), inset 0 -1px 0 hsl(216 30% 30% / .08), 0 0 0 .5px hsl(216 30% 25% / .16),
-    0 18px 40px -20px hsl(216 40% 25% / .38); }
-html:not(.dark) .mnav-bar::before { background: linear-gradient(115deg, hsl(0 0% 100% / .95), hsl(0 0% 100% / .3) 28%,
-    hsl(216 30% 40% / 0) 52%, hsl(216 30% 40% / .1) 76%, hsl(216 32% 38% / .28)); }
-@media (prefers-reduced-transparency: reduce) { html:not(.dark) .mnav-bar, html:not(.dark) .mnav[data-scrolled="true"] .mnav-bar { background: hsl(var(--card)); } }
-html[data-contrast="more"]:not(.dark) .mnav-bar { background: hsl(var(--card)); }
+/* 1071 light marketing nav: replaced by the 1077 blue-white glass block (search "1077: Liquid glass"). */
 
 /* 1071: a pill that holds an input and a button rings itself only while the INPUT has focus; the input draws
    nothing (More contrast forces input rings with !important, which doubled up with the pill), and a focused

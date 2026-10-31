@@ -181,7 +181,8 @@ export function MarketingNav() {
 
   return (
     <header className="mnav sticky top-0 z-50 px-3 pt-3 sm:px-6" data-scrolled={scrolled || open}>
-      <div ref={barRef} className="mnav-bar mx-auto flex h-14 max-w-[1180px] items-center gap-2 rounded-full pl-3 pr-1.5 sm:h-[60px] sm:pl-4 sm:pr-2">
+      <div ref={barRef} data-lens="" data-lg-shine="" className="mnav-bar mx-auto flex h-14 max-w-[1180px] items-center gap-2 rounded-full pl-3 pr-1.5 sm:h-[60px] sm:pl-4 sm:pr-2">
+        <span className="lg-shine" aria-hidden="true" />
         <Link href="/" data-mag="" className="flex h-11 items-center gap-2 rounded-full pr-2" aria-label="Outlly home">
           <OutlyLogo className="text-[17.4px]" />
         </Link>
@@ -268,7 +269,7 @@ export function MarketingNav() {
             </Link>
           ) : (
             <>
-              <AnimatedLink href="/login" className="hidden h-11 rounded-full px-3.5 text-[14px] font-medium text-foreground/70 transition-colors hover:text-foreground sm:inline-flex">
+              <AnimatedLink href="/login" className="hidden h-11 rounded-full px-3.5 text-[14px] font-medium text-foreground/80 transition-colors hover:text-foreground sm:inline-flex">
                 Log in
               </AnimatedLink>
               <Link
