@@ -1228,6 +1228,9 @@ html:not(.dark) .bx-gc:not(.dark *) { --bx-a: 40 46% 92%; --bx-b: 38 40% 88.5%; 
   box-shadow: inset 0 0 0 1px hsl(var(--gc) / .35), inset 0 1px 0 #fff, 0 26px 50px -36px hsl(var(--gc) / .6), 0 10px 22px -16px rgb(15 25 45 / .14); }
 html:not(.dark) .bx-demo .bx-gc:not(.dark *).is-on { box-shadow: inset 0 0 0 1px hsl(var(--gc) / .7), inset 0 1px 0 #fff, 0 0 0 3px hsl(var(--gc) / .16), 0 30px 60px -32px hsl(var(--gc) / .7); }
 html:not(.dark) .bx-gc:not(.dark *) .gc-glow { background: radial-gradient(95% 100% at 50% 100%, hsl(var(--gc) / .55) 0%, hsl(var(--gc) / .25) 34%, hsl(var(--gc) / .08) 64%, transparent 84%); }
+/* The bento on the blue mist canvas: cream becomes the same hue 216 mist as the 1062 Try it tile. */
+html:not(.dark) .sky-host :is(.bx, .bx-gc):not(.dark *) { --bx-frame: 216 38% 97.8%; --bx-a: 216 40% 98.2%; --bx-b: 216 30% 94.8%; --bx-edge: 216 22% 84.5%;
+  --bx-mute: 218 12% 32%; --bx-line: 216 18% 77%; --bx-orb: 216 42% 98.5%; }
 html:not(.dark) .bx-gc:not(.dark *) .gc-glow::after { display: none; }
 html:not(.dark) .bx-gc:not(.dark *) .bx-title { color: hsl(240 10% 8%); } html:not(.dark) .bx-gc:not(.dark *) .bx-sub { color: hsl(218 10% 32%); }
 
@@ -1895,6 +1898,18 @@ html:not(.dark) body::before {
     radial-gradient(40% 40% at 100% 0%, hsl(228 100% 70% / .05), transparent 70%),
     radial-gradient(40% 40% at 0% 0%, hsl(78 100% 50% / .06), transparent 70%);
 }
+/* Light public pages: a blue mist canvas in the light theme's own family (user, 10-31). Hue 216 like every light
+   token, only a little more saturated than --background, so it reads blue without turning sky blue. The neutral
+   surfaces (chips, rules, muted fills) move with it so none of them reads grey on it. Scoped with :has(.sky-host),
+   the marketing layout's wrapper, so the studio keeps its off-white. Corner glows: the same lime and indigo pair. */
+html:not(.dark) body:has(.sky-host) { --background: 216 38% 96.6%; --secondary: 216 28% 92.6%; --muted: 216 28% 93.6%; --border: 216 22% 86.5%; }
+html:not(.dark) body:has(.sky-host)::before {
+  background:
+    radial-gradient(60% 45% at 50% 0%, hsl(216 70% 92% / .4), transparent 70%),
+    radial-gradient(55% 60% at 100% 100%, hsl(78 100% 50% / .12), transparent 70%),
+    radial-gradient(50% 55% at 0% 100%, hsl(228 100% 70% / .1), transparent 70%),
+    radial-gradient(40% 40% at 100% 0%, hsl(228 100% 70% / .05), transparent 70%);
+}
 @media (prefers-contrast: more), (forced-colors: active), print { body::before { display: none; } }
 
 /* Posting animation (10-15e): grainy ribbons of light flowing into a glass pill, Pip on top */
@@ -2390,27 +2405,21 @@ html[data-contrast="more"] .lg-glass::before, html[data-contrast="more"] .lg-gla
     backdrop-filter: var(--lg-url) saturate(1.85) brightness(1.04);
   }
 }
-/* Light mode is blue-white glass (user, 10-31): a cool tint from top to bottom, a pale blue lit rim and sheen.
-   A clear blue (hue 208 to 214) a touch more opaque than the old white, so the page behind cannot wash the labels below 4.5:1. */
-html:not(.dark) .mnav-bar { background: linear-gradient(180deg, hsl(208 100% 97% / .8), hsl(214 82% 92% / .7));
-  box-shadow: inset 0 1px 0 hsl(210 100% 99% / .9), inset 0 -1px 0 hsl(216 40% 60% / .12), 0 0 0 1px hsl(216 40% 30% / .09),
-    0 10px 30px -16px hsl(220 40% 25% / .32); }
-html:not(.dark) .mnav[data-scrolled="true"] .mnav-bar { background: linear-gradient(180deg, hsl(208 100% 97% / .88), hsl(214 82% 92% / .78));
-  box-shadow: inset 0 1px 0 hsl(210 100% 99% / .9), inset 0 -1px 0 hsl(216 40% 60% / .12), 0 0 0 1px hsl(216 40% 30% / .1),
-    0 18px 40px -20px hsl(220 40% 22% / .4); }
-html:not(.dark) .mnav-bar::before { background: linear-gradient(115deg, hsl(205 100% 99% / .95), hsl(210 90% 92% / .35) 30%,
-  hsl(216 60% 80% / .1) 55%, hsl(214 70% 86% / .35) 85%, hsl(205 100% 97% / .75)); }
-html:not(.dark) .mnav-bar::after { background: linear-gradient(180deg, hsl(205 100% 99% / .5), hsl(210 100% 97% / 0)); }
-html:not(.dark) .glass[data-lens] { background: linear-gradient(180deg, hsl(208 100% 97% / .8), hsl(214 82% 92% / .7)); }
-/* The theme switch inside the bar is a lighter blue chip on the blue pane. */
-html:not(.dark) .mnav-bar .glass { background: hsl(210 100% 97.5% / .72); box-shadow: inset 0 1px 0 hsl(205 100% 99% / .9), 0 0 0 1px hsl(214 50% 55% / .12); }
-@media (prefers-reduced-transparency: reduce) {
-  html:not(.dark) .mnav-bar, html:not(.dark) .mnav[data-scrolled="true"] .mnav-bar, html:not(.dark) .glass[data-lens] { background: hsl(212 85% 95.5%); }
-}
+/* Light nav (from 1071): cool tint plus a shaded far rim and an inner bottom edge. Scrolled stays >= .62 so the
+   dark CTA under it keeps text at 4.5:1. Blue tints were tried and dropped (user, 10-31). */
+html:not(.dark) .mnav-bar { background: linear-gradient(180deg, hsl(214 60% 99% / .66), hsl(216 40% 96% / .52));
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .95), inset 0 -1px 0 hsl(216 30% 30% / .07), 0 0 0 .5px hsl(216 30% 25% / .14),
+    0 12px 32px -16px hsl(216 40% 25% / .3); }
+html:not(.dark) .mnav[data-scrolled="true"] .mnav-bar { background: linear-gradient(180deg, hsl(214 60% 99% / .76), hsl(216 40% 96% / .64));
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .95), inset 0 -1px 0 hsl(216 30% 30% / .08), 0 0 0 .5px hsl(216 30% 25% / .16),
+    0 18px 40px -20px hsl(216 40% 25% / .38); }
+html:not(.dark) .mnav-bar::before { background: linear-gradient(115deg, hsl(0 0% 100% / .95), hsl(0 0% 100% / .3) 28%,
+    hsl(216 30% 40% / 0) 52%, hsl(216 30% 40% / .1) 76%, hsl(216 32% 38% / .28)); }
+@media (prefers-reduced-transparency: reduce) { html:not(.dark) .mnav-bar, html:not(.dark) .mnav[data-scrolled="true"] .mnav-bar { background: hsl(var(--card)); } }
 html[data-contrast="more"]:not(.dark) .mnav-bar { background: hsl(var(--card)); }
 /* The glow from the pointer: white light inside the pane, under the labels. No colour (user, 10-14). */
 .lg-shine { position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; opacity: 0;
-  background: radial-gradient(180px circle at var(--lg-x, 50%) var(--lg-y, 50%), hsl(205 100% 99% / .8), hsl(210 100% 97% / .26) 45%, hsl(210 100% 97% / 0) 72%);
+  background: radial-gradient(180px circle at var(--lg-x, 50%) var(--lg-y, 50%), hsl(0 0% 100% / .8), hsl(0 0% 100% / .26) 45%, hsl(0 0% 100% / 0) 72%);
   transition: opacity .35s var(--ease-out, ease); }
 .dark .lg-shine { background: radial-gradient(180px circle at var(--lg-x, 50%) var(--lg-y, 50%), hsl(0 0% 100% / .1), hsl(0 0% 100% / .035) 45%, hsl(0 0% 100% / 0) 72%); }
 [data-lg-lit] > .lg-shine { opacity: 1; transition-duration: .15s; }
@@ -3087,7 +3096,7 @@ html.js .rv-head:not([data-shown]) .rv-kw .sw { opacity: 0; }
 /* phones: the centre card leaves the Reels card about 80px showing, too narrow for a caption */
 @media (max-width: 767px) { .hf-cap { display: none; } }
 
-/* 1071 light marketing nav: replaced by the 1077 blue-white glass block (search "1077: Liquid glass"). */
+/* 1071 light marketing nav: moved into the 1077 block (search "1077: Liquid glass") so the lens rules sit beside it. */
 
 /* 1071: a pill that holds an input and a button rings itself only while the INPUT has focus; the input draws
    nothing (More contrast forces input rings with !important, which doubled up with the pill), and a focused
