@@ -6,8 +6,10 @@ import { watchLine, type WatchState } from "@/lib/mascot/watch";
 const REDUCED = "(prefers-reduced-motion: reduce)";
 const clamp = (v: number, a: number) => Math.max(-a, Math.min(a, v));
 /** Furthest the eyes move inside the cloud, in Pip's 120-unit box. */
-const MAX_X = 7.5;
-const MAX_Y = 5;
+const MAX_X = 11;
+const MAX_Y = 7;
+/** Idle look-around on touch screens (no pointer to follow): left, down at the form, right, back. */
+const LOOKS: readonly (readonly [number, number])[] = [[-9, -3], [0, 6], [9, -2], [3, 5], [0, 0]];
 
 /** `value`, a beat after it stops changing, so the bubble answers the name once rather than every keystroke. */
 function useSettled<T>(value: T, ms: number): T {
@@ -60,7 +62,7 @@ function caretPoint(el: HTMLElement): { x: number; y: number } {
  * types its line out. The eyes follow the caret of the field you're in (the pointer when no field has focus),
  * close for passwords, and the line follows the step: your name back to you, "That looks right." for an email
  * that looks like one. Purely decorative for sight; the line is also read once, politely, to screen readers.
- * Reduced motion: no eye tracking, no typing, the line just appears.
+ * Reduced motion: the eyes still follow your typing (no glide), but no typing-out, lean, pop or look-around.
  */
 export function PipWatch(props: WatchState) {
   const name = useSettled(props.name, 500);
@@ -84,18 +86,22 @@ export function PipWatch(props: WatchState) {
     return () => window.clearInterval(t);
   }, [line.say, reduced]);
 
-  // Eyes: towards the caret in the focused field, else towards the pointer. One update per frame at most.
+  // Eyes: towards the caret in the focused field, else towards the pointer, else a slow look around.
+  // One update per frame at most. Reduced motion keeps the caret tracking (it only moves when you type, and
+  // without the glide) but drops the look-around and the lean.
   const { focus, password } = props;
   useEffect(() => {
-    if (reduced) return setGaze([0, 0]);
     let raf = 0;
+    let lastMove = 0;
+    let look = 0;
     let px: { x: number; y: number } | null = null;
     const aim = (p: { x: number; y: number }) => {
       const r = pipRef.current?.getBoundingClientRect();
       if (!r) return;
       const dx = p.x - (r.left + r.width / 2);
       const dy = p.y - (r.top + r.height / 2);
-      setGaze([clamp(dx / 22, MAX_X), clamp(dy / 26, MAX_Y)]);
+      // tanh keeps following the caret across the whole field instead of pinning to the edge after a few letters.
+      setGaze([clamp(MAX_X * Math.tanh(dx / 170), MAX_X), clamp(MAX_Y * Math.tanh(dy / 55), MAX_Y)]);
     };
     const update = () => {
       raf = 0;
@@ -109,8 +115,13 @@ export function PipWatch(props: WatchState) {
     const onMove = (e: PointerEvent) => {
       if (e.pointerType !== "mouse") return;
       px = { x: e.clientX, y: e.clientY };
+      lastMove = Date.now();
       if (!focus) queue();
     };
+    const wander = window.setInterval(() => {
+      if (reduced || focus || document.hidden || Date.now() - lastMove < 3000) return;
+      setGaze(LOOKS[look++ % LOOKS.length]);
+    }, 1400);
     queue();
     document.addEventListener("selectionchange", queue);
     document.addEventListener("input", queue, true);
@@ -118,6 +129,7 @@ export function PipWatch(props: WatchState) {
     window.addEventListener("resize", queue);
     return () => {
       cancelAnimationFrame(raf);
+      window.clearInterval(wander);
       document.removeEventListener("selectionchange", queue);
       document.removeEventListener("input", queue, true);
       window.removeEventListener("pointermove", onMove);
@@ -126,13 +138,15 @@ export function PipWatch(props: WatchState) {
   }, [focus, reduced, password]);
 
   // Shut eyes look a little away, up and to the side.
-  const eyes: readonly [number, number] = line.shut ? [-4, -2.5] : gaze;
+  const eyes: readonly [number, number] = line.shut ? [-6, -4] : gaze;
+  // Pip leans a little towards what it's watching (and away while it isn't looking).
+  const lean = reduced ? undefined : { transform: `translate(${(eyes[0] * 0.25).toFixed(2)}px, ${(eyes[1] * 0.15).toFixed(2)}px) rotate(${(eyes[0] * 0.7).toFixed(2)}deg)` };
   return (
-    <div className="pip-watch gs-in mb-4 flex h-14 items-center gap-2.5 [@media(max-height:700px)]:hidden">
-      <span ref={pipRef} className="shrink-0">
-        <Pip size={56} mood={line.mood} gaze={eyes} shut={line.shut} />
+    <div className="pip-watch gs-in mb-4 flex h-16 items-center gap-2.5 [@media(max-height:700px)]:hidden">
+      <span ref={pipRef} className="pw-lean shrink-0" style={lean}>
+        <Pip size={64} mood={line.mood} gaze={eyes} shut={line.shut} eyes="pill" />
       </span>
-      <p className="pw-bubble" aria-hidden="true">
+      <p key={line.say} className="pw-bubble" aria-hidden="true">
         <span>{line.say.slice(0, n)}</span>
         <span className="pw-rest">{line.say.slice(n)}</span>
       </p>

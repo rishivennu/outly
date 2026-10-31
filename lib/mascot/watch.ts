@@ -52,7 +52,7 @@ export function watchLine(s: WatchState): WatchLine {
     if (s.sent) return { mood: "idle", say: "Check your inbox." };
     return f === "email" && looksLikeEmail(s.email) ? { mood: "idle", say: "That looks right." } : { mood: "idle", say: "I'll email you a code." };
   }
-  if (f === "name") return first ? { mood: "idle", say: `Hi ${first}!` } : { mood: "wave", say: "Hi! What's your name?" };
+  if (f === "name") return { mood: "idle", say: first ? `Hi ${first}!` : "Hi! What's your name?" };
   if (f === "email") {
     if (looksLikeEmail(s.email)) return { mood: "idle", say: "That looks right." };
     if (s.mode === "signup") return { mood: "idle", say: first ? `Nice to meet you, ${first}!` : "And your email?" };

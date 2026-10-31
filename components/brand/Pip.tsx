@@ -43,13 +43,16 @@ const EYES: Record<PipMood, React.ReactNode> = {
 };
 
 /** Closed eyes (1075): two flat lines, for "I'm not looking." while a password is typed. */
-const SHUT = (<><path d="M44 55h9" /><path d="M65 55h9" /></>);
+const SHUT = (<><path d="M43 55h11" /><path d="M64 55h11" /></>);
+/** Big round "watching" eyes (1075b), like the reel's mascot: two white pills that read at small sizes. */
+const PILL = (<><rect x="44" y="45" width="10" height="18" rx="5" fill="#ffffff" stroke="none" /><rect x="64" y="45" width="10" height="18" rx="5" fill="#ffffff" stroke="none" /></>);
+const PILL_MOODS: ReadonlySet<PipMood> = new Set(["idle", "think", "wait", "fly"]);
 
 /**
  * `gaze` moves the eyes by [x, y] in the 120-unit box (about +-8 x, +-5 y stays inside the cloud), so Pip can
- * look at a caret or the pointer. `shut` closes them.
+ * look at a caret or the pointer. `shut` closes them. `eyes="pill"` swaps the line eyes for big round ones.
  */
-export function Pip({ size = 96, mood = "idle", className, title, situation, palette, style, gaze, shut = false }: { size?: number; mood?: PipMood; className?: string; title?: string; situation?: PipSituation; palette?: string; style?: React.CSSProperties; gaze?: readonly [number, number]; shut?: boolean }) {
+export function Pip({ size = 96, mood = "idle", className, title, situation, palette, style, gaze, shut = false, eyes = "line" }: { size?: number; mood?: PipMood; className?: string; title?: string; situation?: PipSituation; palette?: string; style?: React.CSSProperties; gaze?: readonly [number, number]; shut?: boolean; eyes?: "line" | "pill" }) {
   const id = useId().replace(/:/g, "");
   const body = `pip-b-${id}`;
   const rim = `pip-r-${id}`;
@@ -103,7 +106,7 @@ export function Pip({ size = 96, mood = "idle", className, title, situation, pal
         <path d={CLOUD} fill="none" style={{ stroke: "var(--pip-edge, #c9c2ff)" }} strokeOpacity="0.35" strokeWidth="1.2" />
         <g className="pip-gaze" style={gaze ? { transform: `translate(${gaze[0].toFixed(2)}px, ${gaze[1].toFixed(2)}px)` } : undefined}>
           <g className="pip-eyes" fill="none" stroke="#ffffff" strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round">
-            {shut ? SHUT : EYES[mood]}
+            {shut ? SHUT : eyes === "pill" && PILL_MOODS.has(mood) ? PILL : EYES[mood]}
           </g>
         </g>
       </g>
