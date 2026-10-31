@@ -3007,6 +3007,8 @@ html.cfx-on.cfx-out, html.cfx-on.cfx-out * { cursor: auto !important; } /* windo
 .scr[data-scrambling] > .scr-t { color: transparent; }
 .scr-o { position: absolute; inset: 0; white-space: inherit; pointer-events: none; user-select: none; -webkit-user-select: none; }
 .scr-x { color: hsl(var(--lime-ink)); opacity: .6; }
+/* a random glyph sits in a box as wide (in px) as the real letter it stands in for, so the word never changes width */
+.scr-x[style] { display: inline-block; text-align: center; text-indent: 0; }
 
 /* Kinetic words: each word rises out of a blur, one after another (hero line, section intros). */
 @keyframes kw-in { from { opacity: 0; filter: blur(8px); transform: translate3d(0, .45em, 0); } to { opacity: 1; filter: blur(0); transform: none; } }
