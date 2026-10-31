@@ -23,6 +23,8 @@ import type { Cycle } from "@/lib/billing/cycle";
 import { cn } from "@/lib/utils";
 import type { Receipt } from "@/lib/billing/receipt-core";
 import { PaymentReceipt } from "./PaymentReceipt";
+import { GuaranteeCard, type GuaranteeView } from "./GuaranteeCard";
+import { GUARANTEE_LINE } from "@/lib/billing/guarantee-core";
 
 export type ReturnNotice = { tone: "ok" | "info" | "error"; text: string };
 type Current = { planSlug: string; planName: string; priceMinor: number; currency: string; interval: string; periodEnd: string; cancelAtPeriodEnd: boolean; pausedUntil?: string | null; provider?: string } | null;
@@ -76,7 +78,7 @@ function UsageMeter({ u }: { u: Usage }) {
   );
 }
 
-export function BillingView(props: { email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; invoices: Inv[]; beta?: BetaOffer | null; founding?: FoundingMine; foundingStatus?: string | null; badges?: Badges }) {
+export function BillingView(props: { email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; invoices: Inv[]; beta?: BetaOffer | null; founding?: FoundingMine; foundingStatus?: string | null; badges?: Badges; guarantee?: GuaranteeView }) {
   const { plans, current } = props;
   const router = useRouter();
   const toast = useToast();
@@ -243,6 +245,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
         ))}
       </section>
 
+      {props.guarantee && <GuaranteeCard g={props.guarantee} />}
       {(props.founding || props.foundingStatus) && <FoundingCard f={props.founding ?? null} status={props.foundingStatus} />}
       {props.beta && <BetaRedeem offer={props.beta} />}
 
@@ -308,6 +311,8 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
                     {!mine && p.state !== "soon" && p.priceMinor > 0 && (
                       <p className="mt-2 text-center text-[12px] leading-snug text-muted-foreground">
                         One payment of {y ? formatMoney(y.priceMinor, y.currency) : formatMoney(p.priceMinor, p.currency)} for {y ? "1 year" : "1 month"}. It does not renew or charge you again on its own.
+                        {/* 1076: the guarantee covers an account's first payment only, so it's promised only before one. */}
+                        {props.guarantee?.state === "none" && <span className="mt-1 flex items-center justify-center gap-1 font-medium text-foreground"><ShieldCheck className="h-3.5 w-3.5 text-lime-ink" aria-hidden />{GUARANTEE_LINE}</span>}
                       </p>
                     )}
                   </div>
@@ -348,7 +353,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
             ))}
           </ul>
         )}
-        <p className="mt-4 text-[13px] text-muted-foreground">Charged by mistake or need a refund? <Link href="/support?topic=Payments" className="font-medium text-foreground underline underline-offset-4">Ask support</Link> and a person will review it.</p>
+        <p className="mt-4 text-[13px] text-muted-foreground">{props.guarantee?.state === "eligible" ? "Charged by mistake, or something else? " : "Charged by mistake, or need a refund after the 30-day guarantee? "}<Link href="/support?topic=Payments" className="font-medium text-foreground underline underline-offset-4">Ask support</Link> and a person will review it.</p>
       </section>
 
       <ConfirmDialog

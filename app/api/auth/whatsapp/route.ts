@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DISPOSABLE_MESSAGE, isDisposableEmail } from "@/lib/disposable-email";
 import { cookies } from "next/headers";
 import { env } from "@/lib/env";
 import { clientIp, HttpError, json, route } from "@/lib/http";
@@ -13,7 +14,7 @@ const phone = z.string().trim().min(6, "Enter your WhatsApp number").max(32);
 const code = z.string().trim().min(1, "Enter the 6-digit code.").max(20);
 const details = {
   name: z.string().trim().min(1, "What should we call you?").max(80),
-  email: z.string().trim().toLowerCase().email("That email doesn't look quite right").max(200),
+  email: z.string().trim().toLowerCase().email("That email doesn't look quite right").max(200).refine((e) => !isDisposableEmail(e), DISPOSABLE_MESSAGE),
   adult: z.literal(true, { errorMap: () => ({ message: "Please confirm you're 18 or older to create an account." }) }),
 };
 const schema = z.discriminatedUnion("step", [

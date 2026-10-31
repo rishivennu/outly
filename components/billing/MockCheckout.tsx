@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CreditCard, Loader2, Lock, Smartphone } from "lucide-react";
+import { ArrowLeft, CreditCard, Loader2, Lock, ShieldCheck, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { Pip } from "@/components/brand/Pip";
@@ -110,6 +110,10 @@ export function MockCheckout({ paymentId, amountMinor, currency, planName, inter
               <Button type="submit" variant="lime" size="lg" className="mt-5 w-full" disabled={state === "paying"}>
                 {state === "paying" ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Processing</> : <><Lock className="h-4 w-4" aria-hidden /> {state === "failed" ? "Try again" : `Pay ${amount}`}</>}
               </Button>
+              <p className="mt-2.5 flex items-center justify-center gap-1.5 text-[12.5px] text-muted-foreground">
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-lime-ink" aria-hidden />
+                First payment? It has a 30-day money-back guarantee.
+              </p>
             </form>
           )}
         </div>

@@ -10,7 +10,7 @@ const EXTRA: { category: string; q: string; a: string }[] = [
   { category: "Payments", q: "Where can I download my invoices?", a: "Open Billing from the sidebar. Every successful payment has a PDF invoice you can download any time, and a copy is emailed to you the moment the payment goes through." },
   { category: "Payments", q: "My payment failed. Was I charged?", a: "No. A failed payment is never charged. If money left your account anyway, it is usually a temporary hold that your bank releases within 5 to 7 working days. Try again, or use a different method." },
   { category: "Payments", q: "How do I cancel my subscription?", a: "Open Billing and choose Cancel plan. You keep everything until the end of the period you paid for, then the account moves to Free. You can resume any time before that date." },
-  { category: "Payments", q: "Can I get a refund?", a: "If you were charged by mistake or something did not work, ask our team from this chat and a person will review it. Refunds go back to the original payment method." },
+  { category: "Payments", q: "Can I get a refund?", a: "Yes. Your first payment has a 30-day money-back guarantee: open Billing and press Refund my payment, no reason needed. Your plan ends then and you move to Free, keeping your posts and media. Card, PayPal and Razorpay refunds go back at once (banks take 5 to 10 working days to show them); UPI ones are sent back by hand, usually within 2 working days. After 30 days, or for a later payment, ask our team here and a person will review it." },
   { category: "Account", q: "How do I reset my password?", a: "On the sign-in page choose Forgot password, or sign in with Google if that is how you joined. If you no longer have access to the email, contact us from this chat." },
   { category: "Account", q: "How do I change the email on my account?", a: "Email changes need a quick identity check, so ask from this chat and our team will handle it." },
   { category: "Account", q: "How do I delete my account?", a: "Open Settings and find Your data. Choose Delete account and type your account email to confirm. Your uploads, posts and connected accounts are removed and any active plan is cancelled. This can't be undone. To only stop Outlly posting somewhere, disconnect that platform in Accounts instead. You can also download a copy of your data from the same place first." },
@@ -50,10 +50,18 @@ async function fixDeleteAnswer1016() {
   if (answer) await db.faqItem.updateMany({ where: { answer: { in: [OLD_DELETE, OLD_DELETE_1015] } }, data: { answer } });
 }
 
+/** 1076: the refund answer said a person reviews every refund; the 30-day guarantee is self-serve now. Admin edits are left alone. */
+const OLD_REFUND = "If you were charged by mistake or something did not work, ask our team from this chat and a person will review it. Refunds go back to the original payment method.";
+async function fixRefundAnswer() {
+  const answer = EXTRA.find((f) => f.q === "Can I get a refund?")?.a;
+  if (answer) await db.faqItem.updateMany({ where: { answer: OLD_REFUND }, data: { answer } });
+}
+
 export async function ensureFaq() {
   if ((await db.faqItem.count()) > 0) {
     await renameBrandInFaq();
     await fixDeleteAnswer();
+    await fixRefundAnswer();
     return fixDeleteAnswer1016();
   }
   // a unique-key lock row: if two processes race (parallel build workers), only one seeds

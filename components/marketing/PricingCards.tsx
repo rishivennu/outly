@@ -9,6 +9,8 @@ import type { CardStyle } from "@/lib/billing/display";
 import type { Cycle } from "@/lib/billing/cycle";
 import { Reveal } from "./Reveal";
 import { cn } from "@/lib/utils";
+import { ShieldCheck } from "lucide-react";
+import { GUARANTEE_LINE } from "@/lib/billing/guarantee-core";
 
 export type CardPlan = {
   id: string;
@@ -74,7 +76,14 @@ export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; varia
                   live && p.free ? (
                     <RocketCta href="/signup" signup label="Start creating" tone={tone} />
                   ) : live ? (
-                    <RocketCta href={`/billing?plan=${p.slug}${y ? "&cycle=year" : ""}`} label={`Choose ${p.name}${y ? " yearly" : ""}`} tone={tone} />
+                    <>
+                      <RocketCta href={`/billing?plan=${p.slug}${y ? "&cycle=year" : ""}`} label={`Choose ${p.name}${y ? " yearly" : ""}`} tone={tone} />
+                      {/* 1076: the guarantee on every paid card, right under the button. */}
+                      <p className={cn("mt-2.5 flex items-center justify-center gap-1.5 text-[12.5px] font-medium", variant === "live" ? "la-mute" : tone === "ink" ? "text-current" : "text-muted-foreground")}>
+                        <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {GUARANTEE_LINE}
+                      </p>
+                    </>
                   ) : (
                     <p className={cn("text-[13px] leading-relaxed", variant === "live" ? "la-mute" : "text-muted-foreground")}>{beta ? "Not on sale yet. Nothing changes for beta accounts without notice." : "Not on sale yet. You'll see the price here before anything changes."}</p>
                   )

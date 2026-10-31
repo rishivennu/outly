@@ -76,7 +76,7 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
   const recapAt = process.env.NODE_ENV !== "production" && searchParams?.recapAt ? new Date(searchParams.recapAt) : new Date();
   // 1037: the picked profile (or a member's accounts) narrows the drafts and the next post too.
   const [profiles, scope, badges] = await Promise.all([listProfiles(user.id, user.scope), postFilter(user), trustBadges(user.id)]);
-  const [, drafts, next, live, welcome, published, ret, pulse, recap, founding, saved, storage] = await Promise.all([
+  const [, drafts, next, live, welcome, published, ret, pulse, recap, founding, saved, storage, firstWin] = await Promise.all([
     loadKeys(),
     db.post.findMany({ where: { userId: user.id, status: "draft", ...scope.where }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() }, ...scope.where }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),
@@ -112,6 +112,14 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
       console.error("[home] storage", e);
       return null;
     }),
+    // 1076: the checklist runs to a first win, so it needs to know about the first upload and the first post sent or booked
+    Promise.all([
+      db.media.findFirst({ where: { userId: user.id }, select: { id: true } }),
+      db.post.findFirst({ where: { userId: user.id, launchedAt: { not: null } }, select: { id: true } }),
+    ]).catch((e) => {
+      console.error("[home] first win", e);
+      return [null, null] as const;
+    }),
   ]);
   const started = Object.values(live).some(Boolean) || published > 0;
   const steps = ret?.steps ?? [];
@@ -122,6 +130,8 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
     connected: { instagram: !!live.instagram, youtube: !!live.youtube },
     instagram: { oauth: hasCredentials("instagram"), token: canConnectWithToken("instagram") },
     youtube: { oauth: hasCredentials("youtube") },
+    uploaded: !!firstWin[0],
+    scheduled: !!firstWin[1] || published > 0,
   };
   // one tick, so every signed URL on the page goes out as a single batch
   const [dv, nv] = await Promise.all([Promise.all(drafts.map(postView)), next ? postView(next) : null]);

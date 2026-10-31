@@ -19,6 +19,7 @@ import { isPaidSub } from "@/lib/billing/access-core";
 import { betaConfig, myBetaCode } from "@/lib/beta";
 import { myFounding, foundingPrice } from "@/lib/founding";
 import { trustBadges } from "@/lib/badges";
+import { refundStatus } from "@/lib/billing/guarantee";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Billing" };
@@ -105,7 +106,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Sp }
   } else if (searchParams.paid) notice = { tone: "ok", text: `Payment received. Invoice ${searchParams.paid} is below and on its way to ${user.email}.` };
 
   const receipt = await receiptFor(user.id, searchParams, cancelledId).catch(() => null);
-  const [plans, subs, invoices, gw, usage, display, replies, captions, upload, beta, betaCfg, founding, badges, storage, access] = await Promise.all([
+  const [plans, subs, invoices, gw, usage, display, replies, captions, upload, beta, betaCfg, founding, badges, storage, access, refund] = await Promise.all([
     listPlans(),
     db.subscription.findMany({ where: { userId: user.id, status: "active" }, include: { plan: true }, orderBy: { createdAt: "desc" } }),
     db.invoice.findMany({ where: { userId: user.id }, orderBy: { issuedAt: "desc" }, take: 50, include: { payment: { select: { status: true } }, creditNote: { select: { number: true } } } }),
@@ -121,6 +122,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Sp }
     trustBadges(user.id),
     storageUsage(user.id),
     accessFor(user.id),
+    refundStatus(user.id).catch(() => null),
   ]);
   // The plan card is about money: a paid subscription wins over a gift month running alongside it.
   const sub = subs.find((s) => isPaidSub(s)) ?? subs[0] ?? null;
@@ -184,6 +186,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Sp }
         captions: { limit: captions.captionVideos, used: captions.used, burn: captions.burnCaptions },
         storage: { usedBytes: storage.usedBytes, limitBytes: storage.limitBytes, pct: storage.pct, over: storage.over, label: storage.label },
       }}
+      guarantee={refund ? (refund.state === "eligible" ? { ...refund, until: refund.until.toISOString() } : { state: refund.state }) : undefined}
       invoices={invoices.map((i) => ({ number: i.number, description: i.description, amountMinor: i.amountMinor, currency: i.currency, issuedAt: i.issuedAt.toISOString(), refunded: i.payment?.status === "refunded", creditNote: i.creditNote?.number ?? null }))}
     />
   );

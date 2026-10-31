@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { PLATFORMS } from "./domain";
+import { DISPOSABLE_MESSAGE, isDisposableEmail } from "./disposable-email";
 
 export const platformSchema = z.enum(PLATFORMS);
 
 export const signupSchema = z.object({
   name: z.string().trim().min(1, "What should we call you?").max(80),
-  email: z.string().trim().toLowerCase().email("That email doesn't look quite right"),
+  email: z.string().trim().toLowerCase().email("That email doesn't look quite right").refine((e) => !isDisposableEmail(e), DISPOSABLE_MESSAGE),
   password: z.string().min(8, "Use at least 8 characters").max(200),
   /** 1058: Outlly is 18+ (Terms; India's DPDP Act treats under-18s as children). Checked here, not just in the form. */
   adult: z.literal(true, { errorMap: () => ({ message: "Please confirm you're 18 or older to create an account." }) }),

@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { DISPOSABLE_MESSAGE, isDisposableEmail } from "@/lib/disposable-email";
 import { json, route } from "@/lib/http";
 import { joinWaitlist } from "@/lib/site";
 import { campaignCookie } from "@/lib/growth/source";
 
 const Body = z.object({
-  email: z.string().trim().toLowerCase().email("That email doesn't look right.").max(200),
+  email: z.string().trim().toLowerCase().email("That email doesn't look right.").max(200).refine((e) => !isDisposableEmail(e), DISPOSABLE_MESSAGE),
   name: z.string().trim().max(80).optional(),
   source: z.string().trim().max(40).optional(),
 });

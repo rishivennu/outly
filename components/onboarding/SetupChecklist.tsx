@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Compass, X } from "lucide-react";
+import { ArrowRight, CalendarPlus, Check, Compass, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/components/shell/UserContext";
 import { useToast } from "@/components/shared/Toast";
@@ -14,7 +14,13 @@ export type SetupState = {
   connected: { instagram: boolean; youtube: boolean };
   instagram: { oauth: boolean; token: boolean };
   youtube: { oauth: boolean };
+  /** 1076: at least one file in the media library */
+  uploaded: boolean;
+  /** 1076: at least one post has left draft (published or scheduled) */
+  scheduled: boolean;
 };
+
+const COUNT = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
 
 const hiddenKey = (id: string) => `outly:setup-hidden:${id}`;
 
@@ -23,7 +29,7 @@ const NOTICES: Record<string, { text: string; tone: "ok" | "info" | "error" }> =
   channel_later: { text: "You're signed in. YouTube didn't link this time; try Sign in with Google again from the checklist.", tone: "info" },
 };
 
-/** First-run checklist on Home: the four steps from sign-up to a connected, toured studio. */
+/** First-run checklist on Home: sign-up to a first post on the calendar, connected and toured on the way. */
 export function SetupChecklist({ state }: { state: SetupState }) {
   const user = useUser();
   const toast = useToast();
@@ -77,6 +83,8 @@ export function SetupChecklist({ state }: { state: SetupState }) {
     { id: "account", title: "Create your Outlly account", done: true, body: "Done. You're in." },
     { id: "instagram", title: "Connect Instagram", done: connected.instagram },
     { id: "youtube", title: "Sign in with Google to link YouTube", done: connected.youtube },
+    { id: "upload", title: "Upload your first video or photo", done: state.uploaded },
+    { id: "schedule", title: "Schedule your first post", done: state.scheduled },
     { id: "tour", title: "Take the guided tour", done: toured },
   ];
   const doneCount = steps.filter((s) => s.done).length;
@@ -113,6 +121,18 @@ export function SetupChecklist({ state }: { state: SetupState }) {
         );
       return <p className="text-sm text-muted-foreground">Google sign-in isn&apos;t set up on this server yet.</p>;
     }
+    if (id === "upload")
+      return (
+        <Button asChild size="sm" variant={connected.instagram || connected.youtube ? "primary" : "outline"}>
+          <Link href="/create"><Upload className="h-4 w-4" aria-hidden="true" /> Upload a file</Link>
+        </Button>
+      );
+    if (id === "schedule")
+      return (
+        <Button asChild size="sm" variant={state.uploaded ? "primary" : "outline"}>
+          <Link href="/create"><CalendarPlus className="h-4 w-4" aria-hidden="true" /> Write and schedule a post</Link>
+        </Button>
+      );
     if (id === "tour")
       return (
         <Button size="sm" variant="outline" onClick={() => startTour()}>
@@ -125,6 +145,8 @@ export function SetupChecklist({ state }: { state: SetupState }) {
   const notes: Record<string, string> = {
     instagram: "You log in on Instagram's own page and pick the account. Outlly never sees your password. Needs a professional (Business or Creator) account.",
     youtube: "Pick your Gmail on Google's page; the channel on that account links automatically.",
+    upload: "Drag a video or photo into the composer. It stays in your media library for later posts too.",
+    schedule: "Pick a time on the composer, or post now. Outlly sends it for you, even with this tab closed.",
     tour: "One minute: posting, the calendar, live analytics, the inbox and approvals.",
   };
 
@@ -134,7 +156,7 @@ export function SetupChecklist({ state }: { state: SetupState }) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="eyebrow mb-1.5">Getting started</p>
-            <h2 id="setup-h" className="text-xl font-semibold tracking-tight">Set up Outlly in four steps</h2>
+            <h2 id="setup-h" className="text-xl font-semibold tracking-tight">Set up Outlly in {COUNT[steps.length] ?? steps.length} steps</h2>
           </div>
           <Button size="icon-sm" variant="ghost" onClick={dismiss} aria-label="Hide the setup checklist" className="h-11 w-11">
             <X className="h-4 w-4" aria-hidden="true" />

@@ -39,7 +39,7 @@ export async function Pricing() {
           align="center"
           eyebrow="Pricing"
           title={paid ? "Simple pricing. Start free." : beta ? "Free while we are in beta." : "Start free."}
-          body={paid ? "Start on Free and upgrade when you need more. Cancel any time; you keep access until the period ends. Invoices land in your inbox the moment you pay." : PRICING_NOTE}
+          body={paid ? "Start on Free and upgrade when you need more. Your first payment comes with a 30-day money-back guarantee you claim yourself from Billing, and nothing renews on its own. Invoices land in your inbox the moment you pay." : PRICING_NOTE}
         />
 
         {paid && (
