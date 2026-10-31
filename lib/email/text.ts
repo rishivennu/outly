@@ -2,7 +2,7 @@
  * 1056. Plain-text twin of every HTML email. Mail sent as HTML only is a classic spam signal
  * (SpamAssassin MIME_HTML_ONLY, and Gmail/Outlook filters weigh it too), so each send carries
  * a multipart/alternative text part built from the same HTML. Links keep their URL, hidden
- * preheaders and images are dropped, table cells read left to right.
+ * preheaders and images are dropped (a title image keeps its alt), table cells read left to right.
  */
 
 const NAMED: Record<string, string> = {
@@ -30,6 +30,8 @@ export function htmlToText(html: string): string {
   s = s.replace(/<!--[\s\S]*?-->/g, "");
   // Hidden preheader (and any other display:none block) is inbox-preview text, not body copy.
   s = s.replace(/<(span|div)\b[^>]*display\s*:\s*none[^>]*>[\s\S]*?<\/\1>/gi, "");
+  // 1073: a title drawn as an image (the Pacifico pill) keeps its words: an image inside an h1 becomes its alt.
+  s = s.replace(/(<h1\b[^>]*>)\s*<img\b[^>]*?\balt\s*=\s*"([^"]*)"[^>]*>/gi, "$1$2");
   s = s.replace(/<img\b[^>]*>/gi, "");
   // Source newlines are layout noise in HTML; only tags decide line breaks below.
   s = s.replace(/\s*\n\s*/g, " ");

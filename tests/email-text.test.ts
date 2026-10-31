@@ -75,4 +75,8 @@ describe("postal address in the footer (1058)", () => {
     const out = mod.withAddress(mod.templates.test("resend"), "", "");
     expect(out).not.toContain("outlly:address");
   });
+  test("a title drawn as an image keeps its words from the alt text", () => {
+    const t = mod.htmlToText(`<h1 style="margin:0"><img class="ttl" src="https://x.test/api/email/title?t=a" width="440" alt="Ana &amp; Co invited you"></h1><p>Body</p>`);
+    expect(t).toBe("Ana & Co invited you\n\nBody\n");
+  });
 });

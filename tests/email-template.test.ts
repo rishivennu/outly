@@ -73,10 +73,38 @@ describe("email wrapper", () => {
     }
   });
 
-  test("h1 uses the display font and body copy is 15px or larger", () => {
+  test("title is a signed Pacifico image with the words as alt, styled in the display font when images are off", () => {
     const html = templates.refund({ name: "Tej", amount: "$1", number: "INV-9" });
     expect(html).toMatch(/<h1[^>]+font-family:'Bricolage Grotesque'/);
+    const m = html.match(/<img class="ttl" src="https:\/\/outlly\.test\/api\/email\/title\?t=([^&"]+)&amp;s=([A-Za-z0-9_-]{22})" width="440" height="(\d+)" alt="Your refund is on its way"/);
+    expect(m).not.toBeNull();
+    expect(decodeURIComponent(m![1])).toBe("Your refund is on its way");
     expect(html).toContain("font-size:16px;line-height:1.6");
+    // Entities are decoded before drawing, and re-escaped in alt.
+    const inv = templates.teamInvite({ owner: "Ana & Co", role: "editor", url: "https://outlly.test/invite" });
+    expect(inv).toContain(`t=${encodeURIComponent("Ana & Co invited you to their workspace")}&amp;s=`);
+    expect(inv).toContain('alt="Ana &amp; Co invited you to their workspace"');
+  });
+
+  test("the edge route accepts the template's signature and rejects a tampered title", async () => {
+    const { verifyTitleSig, titleLayout } = await import("../lib/email/title-layout");
+    const html = templates.refund({ name: "Tej", amount: "$1", number: "INV-9" });
+    const [, t, sig] = html.match(/\/api\/email\/title\?t=([^&"]+)&amp;s=([A-Za-z0-9_-]+)"/)!;
+    const title = decodeURIComponent(t);
+    expect(await verifyTitleSig(title, sig, process.env.AUTH_SECRET)).toBe(true);
+    expect(await verifyTitleSig("Your account is locked, call us", sig, process.env.AUTH_SECRET)).toBe(false);
+    expect(await verifyTitleSig(title, sig, undefined)).toBe(false);
+    expect(await verifyTitleSig(title, sig.slice(0, 10), process.env.AUTH_SECRET)).toBe(false);
+    // Layout: short titles take one line at full size; long ones wrap; text Pacifico lacks is refused.
+    expect(titleLayout("We're on it")!.lines).toEqual(["We're on it"]);
+    expect(titleLayout("Adding WhatsApp to your account")!.lines.length).toBe(2);
+    expect(titleLayout("Hi \u{1F680}")).toBeNull();
+  });
+
+  test("a title Pacifico can't draw stays live Bricolage text", () => {
+    const html = templates.teamInvite({ owner: "\u0905\u0928\u093e", role: "editor", url: "https://outlly.test/invite" });
+    expect(html).not.toContain("/api/email/title");
+    expect(html).toMatch(/<h1 class="h1" style="margin:0;font-family:'Bricolage Grotesque'[^>]*>\u0905\u0928\u093e invited you to their workspace<\/h1>/);
   });
 
   test("hidden preheader defaults to the title and can be overridden", () => {
@@ -90,33 +118,38 @@ describe("email wrapper", () => {
     expect(invoice).toContain("Payment received. Thank you!");
   });
 
-  test("bulletproof button is a soft pill in the hero's accent with a white label", () => {
+  test("bulletproof button is a tomato pill with an ink outline, a dark lip and an ink label", () => {
     const html = templates.backOnline({ url: "https://outlly.test/go" });
-    expect(html).toContain('bgcolor="#3f6b2c"');
-    expect(html).toContain("border-radius:999px");
-    expect(html).toMatch(/<a href="https:\/\/outlly\.test\/go"[^>]+color:#ffffff[^>]*>Open Outlly<\/a>/);
-    expect(templates.refund({ name: "Tej", amount: "$1", number: "INV-9" })).not.toContain('bgcolor="#3f6b2c"');
+    expect(html).toContain('<td bgcolor="#23170f" style="background:#23170f;border-radius:999px;padding:0 0 6px 0">');
+    expect(html).toContain('bgcolor="#f2542d" style="background:#f2542d;border:3px solid #23170f;border-radius:999px');
+    expect(html).toMatch(/<a href="https:\/\/outlly\.test\/go"[^>]+color:#23170f[^>]*>Open Outlly &rarr;<\/a>/);
   });
 
-  test("soft sunrise: white card, pastel hero with kicker and illustration, no neon", () => {
+  test("retro paper: cream card, tomato grid hero with ticket, sticker and yellow pill, scalloped edge, no neon", () => {
     const html = templates.invoice({ name: "Tej", number: "INV-1", amount: "$19.00", plan: "Pro", url: "https://outlly.test/billing" });
-    expect(html).toContain("background:#f3f1ec");
-    expect(html).toMatch(/bgcolor="#eef6dc" style="background:#eef6dc;border-radius:24px 24px 0 0/);
-    expect(html).toContain('src="https://outlly.test/brand/email/hero-lime.png"');
-    expect(html).toContain("text-transform:uppercase;color:#3f6b2c\">Billing</div>");
+    expect(html).toContain("background:#efe6cf");
+    expect(html).toContain('bgcolor="#f2542d" style="background-color:#f2542d;background-image:url(\'https://outlly.test/brand/email/retro/grid.png\')');
+    expect(html).toContain("background-image:url('https://outlly.test/brand/email/retro/wave.png')");
+    expect(html).toContain('bgcolor="#ffb800" style="background:#ffb800;border:3px solid #23170f;border-radius:44px');
+    expect(html).toContain("text-transform:uppercase;color:#23170f\">Billing</td>");
+    expect(html).toContain("/brand/email/retro/burst-yay.png");
     expect(html).toContain("$19.00");
     expect(html).toContain('class="stack"');
-    expect(templates.refund({ name: "Tej", amount: "$1", number: "INV-9" })).toContain('src="https://outlly.test/brand/email/hero-cream.png"');
-    expect(templates.security({ name: "Tej", change: "off", url: "https://outlly.test/settings", at: new Date(0) })).toContain("hero-white.png");
+    expect(templates.refund({ name: "Tej", amount: "$1", number: "INV-9" })).toContain("/brand/email/retro/burst-psst.png");
+    const sec = templates.security({ name: "Tej", change: "off", url: "https://outlly.test/settings", at: new Date(0) });
+    expect(sec).not.toContain("burst-");
+    expect(sec).toContain('bgcolor="#2647c8"');
+    expect(templates.otp({ name: "Tej", code: "123456", minutes: 10 })).not.toContain("burst-");
     for (const [name, h] of Object.entries(all())) {
-      expect(h.includes("%%outlly-accent%%"), name).toBe(false);
+      expect(/hero-(lime|cream|white)\.png/.test(h), name).toBe(false);
       expect(/#9ff218|#151713|#0b0d08/i.test(h), name).toBe(false);
     }
   });
 
   test("footer carries the help line, wordmark, tagline, links, reason line and copyright", () => {
     for (const [name, html] of Object.entries(all())) {
-      expect(html, name).toContain("Questions? Just reply to this email");
+      expect(html, name).toContain("Questions? Just reply. A real person from the team reads every one");
+      expect(html, name).toContain('src="https://outlly.test/brand/email/retro/wordmark.png"');
       expect(html, name).toContain("Create once. Publish everywhere.");
       expect(html, name).toContain('href="https://outlly.test/help"');
       expect(html, name).toContain('href="https://outlly.test/privacy"');
@@ -124,7 +157,7 @@ describe("email wrapper", () => {
       expect(html, name).toContain('href="https://outlly.test/settings"');
       expect(html, name).toContain("You are receiving this because you have an Outlly account.");
       expect(html, name).toContain(`&copy; ${new Date().getFullYear()} Outlly`);
-      expect(html, name).toContain("background:#ebe8e2");
+      expect(html, name).toContain("border-top:2px dashed #d9ccb2");
     }
   });
 
