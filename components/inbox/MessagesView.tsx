@@ -251,7 +251,10 @@ function ThreadPane({
     return () => clearInterval(id);
   }, [fetchThread]);
 
-  useEffect(() => bottom.current?.scrollIntoView({ block: "end" }), [messages?.length]);
+  // Braces matter: newer Chromium returns a Promise from scrollIntoView, and React would call it as a cleanup (crash).
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ block: "end" });
+  }, [messages?.length]);
 
   const lastIn = [...(messages ?? [])].reverse().find((m) => m.direction === "in");
 
