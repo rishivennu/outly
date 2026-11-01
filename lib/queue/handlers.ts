@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "../db";
 import { accountContext, freshAccount } from "../live/account";
 import { env } from "../env";
-import { derivePostStatus, isPlatform, type Platform, type TargetStatus } from "../domain";
+import { COVER_AFTER_LIVE, derivePostStatus, isPlatform, PLATFORM_META, supportsCover, type Platform, type TargetStatus } from "../domain";
 import { storage } from "../storage";
 import { probe, thumbnail } from "../media/probe";
 import { isPracticeAccount, publisherForAccount } from "../social/registry";
@@ -69,6 +69,8 @@ async function dispatch<N extends JobName>(name: N, data: JobPayloads[N]) {
       return tokenRefresh(data as JobPayloads["TOKEN_REFRESH"]);
     case "FIRST_COMMENT":
       return firstComment(data as JobPayloads["FIRST_COMMENT"]);
+    case "SET_COVER":
+      return setCover(data as JobPayloads["SET_COVER"]);
   }
 }
 
@@ -109,6 +111,16 @@ async function videoThumbnail({ mediaId }: { mediaId: string }) {
 
 /* ---------------- social ---------------- */
 
+/** A signed URL as a platform must see it: the local driver hands back a path. */
+const absolute = (u: string) => (u.startsWith("http") ? u : `${env.APP_URL}${u}`);
+
+async function readKey(key: string) {
+  const { stream } = await storage.read(key);
+  const chunks: Buffer[] = [];
+  for await (const c of stream) chunks.push(c as Buffer);
+  return Buffer.concat(chunks);
+}
+
 async function loadContext(targetId: string, simulate: SimulationMode | undefined) {
   const t = await db.postTarget.findUnique({
     where: { id: targetId },
@@ -134,6 +146,7 @@ async function loadContext(targetId: string, simulate: SimulationMode | undefine
   const account = accountContext(await freshAccount(acct));
 
   const media = t.post.media;
+  const coverKey = t.post.coverKey;
   const ctx: PublishContext = {
     account,
     media: {
@@ -143,19 +156,18 @@ async function loadContext(targetId: string, simulate: SimulationMode | undefine
       duration: media.duration,
       width: media.width,
       height: media.height,
-      publicUrl: async () => {
-        const u = await storage.signedUrl(media.storageKey, 6 * 3600);
-        return u.startsWith("http") ? u : `${env.APP_URL}${u}`;
-      },
+      publicUrl: async () => absolute(await storage.signedUrl(media.storageKey, 6 * 3600)),
       open: async () => storage.read(media.storageKey),
-      readAll: async () => {
-        const { stream } = await storage.read(media.storageKey);
-        const chunks: Buffer[] = [];
-        for await (const c of stream) chunks.push(c as Buffer);
-        return Buffer.concat(chunks);
-      },
+      readAll: () => readKey(media.storageKey),
     },
     content: { title: t.title, caption: t.caption, description: t.description, hashtags: t.hashtags },
+    // 1083: Instagram and LinkedIn take the cover with the upload; YouTube and Facebook get it once live (SET_COVER).
+    cover: coverKey && supportsCover(t.platform) && !COVER_AFTER_LIVE.includes(t.platform)
+      ? { url: async () => absolute(await storage.signedUrl(coverKey, 6 * 3600)), bytes: () => readKey(coverKey) }
+      : null,
+    noteCover: async (error: string | null) => {
+      await db.postTarget.update({ where: { id: t.id }, data: error ? { coverError: error, coverSetAt: null } : { coverSetAt: new Date(), coverError: null } });
+    },
     simulate,
     attempt: t.attempts,
     resumeRef: t.uploadRef,
@@ -177,13 +189,49 @@ export async function setTarget(id: string, postId: string, status: TargetStatus
     data: { platformStatus: status, ...extra },
   });
   if (!r.count) return false;
-  const t = await db.postTarget.findUnique({ where: { id } });
+  const t = await db.postTarget.findUnique({ where: { id }, include: { post: { select: { coverKey: true } } } });
   await syncPost(postId);
   if (!t) return true;
   // Live with a first comment waiting: post it a few seconds later (a brand-new video can refuse comments for a moment).
   if (status === "published" && t.firstComment?.trim() && !t.firstCommentId && isPlatform(t.platform))
     await enqueue("FIRST_COMMENT", { targetId: id, platform: t.platform }, { delayMs: 5000, jobId: `fc-${id}` });
+  // 1083: live with a cover waiting on a platform that takes it afterwards (YouTube, Facebook).
+  if (status === "published" && t.post?.coverKey && !t.coverSetAt && isPlatform(t.platform) && COVER_AFTER_LIVE.includes(t.platform))
+    await enqueue("SET_COVER", { targetId: id, platform: t.platform }, { delayMs: 3000, jobId: `cv-${id}` });
   return true;
+}
+
+const COVER_TRIES = 4;
+
+/** Plain words for a platform refusing the cover. YouTube refuses custom thumbnails until the channel is verified. */
+export function coverRefusal(platform: Platform) {
+  if (platform === "youtube") return "YouTube only takes custom thumbnails from verified channels. Verify yours at youtube.com/verify, then set it in YouTube Studio.";
+  return `${PLATFORM_META[platform].name} didn't accept the cover, so it kept a frame from the video. You can change it in the app.`;
+}
+
+/**
+ * Put the creator's cover image on their already-live post (YouTube thumbnails.set, Facebook video thumbnails).
+ * Best effort, like the first comment: the post is never touched, a failure is kept on the target (coverError).
+ */
+export async function setCover({ targetId, platform, attempt = 0 }: JobPayloads["SET_COVER"]) {
+  const t = await db.postTarget.findUnique({ where: { id: targetId }, include: { socialAccount: true, post: { select: { coverKey: true } } } });
+  if (!t || t.coverSetAt || !t.post.coverKey || t.platformStatus !== "published" || !t.platformPostId) return;
+  const fail = (msg: string) => db.postTarget.update({ where: { id: t.id }, data: { coverError: msg } });
+  const acct = t.socialAccount;
+  if (!acct || acct.status !== "connected") return void (await fail("The account was disconnected before we could set the cover."));
+  try {
+    const publisher = publisherForAccount(platform, acct);
+    if (!publisher.setCover) return void (await fail(`${PLATFORM_META[platform].name} doesn't let apps set a cover, so it kept a frame from the video.`));
+    const account = accountContext(await freshAccount(acct));
+    await publisher.setCover(account, t.platformPostId, await readKey(t.post.coverKey));
+    await db.postTarget.updateMany({ where: { id: t.id, coverSetAt: null }, data: { coverSetAt: new Date(), coverError: null } });
+  } catch (e) {
+    const pe = asPublisherError(e);
+    // A brand-new video can refuse changes while it processes: worth a few more tries, spaced out.
+    const again = (pe.retryable || pe.code === "MEDIA_REJECTED") && attempt + 1 < COVER_TRIES;
+    if (again) return void (await enqueue("SET_COVER", { targetId, platform, attempt: attempt + 1 }, { delayMs: 15_000 * 2 ** attempt, jobId: `cv-${targetId}-${attempt + 1}` }));
+    await fail(pe.code === "AUTH_EXPIRED" ? "The account needs reconnecting, so the cover didn't go on." : pe.code === "FORBIDDEN" ? coverRefusal(platform) : "The cover didn't go on. You can set it on the platform.");
+  }
 }
 
 const FIRST_COMMENT_TRIES = 4;

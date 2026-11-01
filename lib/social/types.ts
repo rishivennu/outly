@@ -61,6 +61,19 @@ export interface PublishContext {
   checkpoint?: (ref: string) => Promise<void>;
   /** Handle saved by a previous checkpoint, if any. */
   resumeRef?: string | null;
+  /**
+   * 1083: the creator's own cover image (one JPEG), set only when this platform takes it with the upload
+   * (Instagram cover_url, LinkedIn thumbnail). YouTube and Facebook take it after the post is live (setCover).
+   */
+  cover?: CoverContext | null;
+  /** Record what happened to the cover: null = it went on, a string = why it didn't. Never fails the post. */
+  noteCover?: (error: string | null) => Promise<void>;
+}
+
+export interface CoverContext {
+  /** Absolute signed URL a platform can fetch. */
+  url: () => Promise<string>;
+  bytes: () => Promise<Buffer>;
 }
 
 export type SimulationMode = "realistic" | "smooth" | "instagram-reconnect" | "youtube-flaky" | "x-rejects";
@@ -160,6 +173,8 @@ export interface SocialPublisher {
   replyToComment?(account: AccountContext, commentId: string, text: string): Promise<PlatformComment>;
   /** The creator's own first comment on their just-published post (a reply to it on X). */
   postComment?(account: AccountContext, platformPostId: string, text: string): Promise<{ id: string }>;
+  /** 1083: set the creator's cover image on a post that is already up (YouTube thumbnails.set, Facebook thumbnails). */
+  setCover?(account: AccountContext, platformPostId: string, jpeg: Buffer): Promise<void>;
 }
 
 /** fetch() itself failing (DNS, reset, timeout) means we don't know what the platform did. */

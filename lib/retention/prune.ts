@@ -41,9 +41,13 @@ export async function pruneStaleDrafts(now: Date = new Date(), batch = 500) {
     OR: [{ scheduledAt: null }, { scheduledAt: { lt: now } }],
     reviews: { none: { status: "pending", expiresAt: { gt: now } } },
   };
-  const stale = await db.post.findMany({ where, select: { id: true, mediaId: true }, take: batch });
+  const stale = await db.post.findMany({ where, select: { id: true, mediaId: true, coverKey: true }, take: batch });
   if (!stale.length) return { drafts: 0, media: 0 };
   const { count } = await db.post.deleteMany({ where: { ...where, id: { in: stale.map((p) => p.id) } } });
+  // 1083: a cover belongs to its post alone, so it goes once that post row is really gone.
+  const left = new Set((await db.post.findMany({ where: { id: { in: stale.map((p) => p.id) } }, select: { id: true } })).map((p) => p.id));
+  for (const p of stale)
+    if (p.coverKey && !left.has(p.id)) await storage.remove(p.coverKey).catch((e) => console.error("[prune:drafts] cover", p.coverKey, e));
   const orphans = await db.media.findMany({
     where: { id: { in: Array.from(new Set(stale.map((p) => p.mediaId))) }, posts: { none: {} } },
     select: { id: true, storageKey: true, thumbnailKey: true },

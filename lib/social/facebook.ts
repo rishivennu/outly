@@ -1,4 +1,4 @@
-import { commonMediaChecks, httpFailure, PublisherError, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
+import { commonMediaChecks, httpFailure, PublisherError, type AccountContext, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { newState } from "./oauth";
 import { creds, dmsOn } from "./keys";
 
@@ -94,6 +94,16 @@ export class FacebookPublisher implements SocialPublisher {
       return { state: "published", platformPostId: videoId, url };
     }
     return { state: "processing", ref: videoId };
+  }
+
+  /** 1083: the creator's cover on a live Reel: POST /{video-id}/thumbnails with the image and is_preferred. */
+  async setCover(account: AccountContext, videoId: string, jpeg: Buffer) {
+    const form = new FormData();
+    form.set("source", new Blob([new Uint8Array(jpeg)], { type: "image/jpeg" }), "cover.jpg");
+    form.set("is_preferred", "true");
+    form.set("access_token", account.accessToken);
+    const r = await fetch(`${GRAPH}/${videoId}/thumbnails`, { method: "POST", body: form });
+    if (!r.ok) throw await httpFailure(r, "facebook video thumbnails");
   }
 
   async delete(account: { accessToken: string }, id: string) {

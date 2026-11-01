@@ -119,6 +119,25 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
 export const FIRST_COMMENT_LIMIT: Partial<Record<Platform, number>> = { instagram: 2200, youtube: 10000, x: 280 };
 export const supportsFirstComment = (p: string): p is Platform => p in FIRST_COMMENT_LIMIT;
 
+/**
+ * 1083: what each platform does with a custom cover image. "upload" = its API takes the image (YouTube only from
+ * verified channels); "frame" = it only picks a frame from the video; "none" = no way to set one from an app.
+ */
+export const COVER_SUPPORT: Record<Platform, "upload" | "frame" | "none"> = {
+  youtube: "upload",
+  instagram: "upload",
+  facebook: "upload",
+  linkedin: "upload",
+  tiktok: "frame",
+  x: "none",
+  threads: "none",
+};
+export const supportsCover = (p: string): p is Platform => p in COVER_SUPPORT && COVER_SUPPORT[p as Platform] === "upload";
+/** Platforms that take the cover after the post is live (a separate call), not with the upload. */
+export const COVER_AFTER_LIVE: readonly Platform[] = ["youtube", "facebook"];
+/** The cover is stored as one JPEG; YouTube's 2 MB cap is the tightest, so it is everyone's. */
+export const COVER_MAX_BYTES = 2 * 1024 * 1024;
+
 /** Human copy for every error code. Technical detail stays behind a disclosure. */
 export function humanError(platform: Platform, code: ErrorCode | string | null | undefined) {
   const name = PLATFORM_META[platform].name;

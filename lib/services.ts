@@ -18,7 +18,7 @@ import { approvalCurrent } from "./collab-core";
 
 export type MediaView = Awaited<ReturnType<typeof mediaView>>;
 /** A missing or unreachable object should show a placeholder, not crash the page. */
-async function safeSignedUrl(key: string) {
+export async function safeSignedUrl(key: string) {
   try {
     return await storage.signedUrl(key, 6 * 3600);
   } catch (e) {
@@ -60,6 +60,9 @@ export function targetView(t: PostTarget) {
     /** posted | failed | waiting (set, not yet live) | null (none). */
     firstCommentState: !t.firstComment?.trim() ? null : t.firstCommentId ? ("posted" as const) : t.firstCommentError ? ("failed" as const) : ("waiting" as const),
     firstCommentError: t.firstCommentError,
+    /** 1083: the post's cover image went on here (coverSet), or why it didn't (the post is unaffected). */
+    coverSet: !!t.coverSetAt,
+    coverError: t.coverError,
     status: t.platformStatus,
     platformPostId: t.platformPostId,
     url: t.platformUrl,
@@ -98,6 +101,8 @@ export async function postView(p: Post & { targets: PostTarget[]; media: Media; 
     editedBy: p.editedBy,
     editedAt: p.editedAt?.toISOString() ?? null,
     media: await mediaView(p.media),
+    /** 1083: the creator's own cover image, if they added one. */
+    coverUrl: p.coverKey ? await safeSignedUrl(p.coverKey) : null,
     targets: [...p.targets].sort((a, b) => PLATFORMS.indexOf(a.platform as Platform) - PLATFORMS.indexOf(b.platform as Platform)).map(targetView),
   };
 }

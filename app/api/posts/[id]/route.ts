@@ -3,6 +3,7 @@ import { HttpError, json, route } from "@/lib/http";
 import { updatePostSchema } from "@/lib/validation";
 import { launchPost, ownedPost, postView } from "@/lib/services";
 import { enqueue } from "@/lib/queue";
+import { storage } from "@/lib/storage";
 import { isPlatform, PLATFORM_META, REMOVAL, supportsFirstComment, type Platform } from "@/lib/domain";
 import { removeEverywhere } from "@/lib/social/remove";
 import { pinTargets } from "@/lib/profiles";
@@ -75,5 +76,6 @@ export const DELETE = route(async (req, { user, params }) => {
       });
   }
   await db.post.delete({ where: { id: post.id } });
+  if (post.coverKey) await storage.remove(post.coverKey).catch(() => {}); // 1083: the post's own cover goes with it
   return json({ ok: true });
 });

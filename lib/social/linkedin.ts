@@ -62,16 +62,24 @@ export class LinkedInPublisher implements SocialPublisher {
     const init = await fetch(`${REST}/videos?action=initializeUpload`, {
       method: "POST",
       headers: h(tok),
-      body: JSON.stringify({ initializeUploadRequest: { owner: this.owner(ctx), fileSizeBytes: ctx.media.size, uploadCaptions: false, uploadThumbnail: false } }),
+      body: JSON.stringify({ initializeUploadRequest: { owner: this.owner(ctx), fileSizeBytes: ctx.media.size, uploadCaptions: false, uploadThumbnail: !!ctx.cover } }),
     });
     if (!init.ok) throw await httpFailure(init, "linkedin initializeUpload");
-    const v = ((await init.json()) as { value: { video: string; uploadToken?: string; uploadInstructions: { uploadUrl: string; firstByte: number; lastByte: number }[] } }).value;
+    const v = ((await init.json()) as { value: { video: string; uploadToken?: string; thumbnailUploadUrl?: string; uploadInstructions: { uploadUrl: string; firstByte: number; lastByte: number }[] } }).value;
     const bytes = await ctx.media.readAll();
     const etags: string[] = [];
     for (const part of v.uploadInstructions) {
       const put = await fetch(part.uploadUrl, { method: "PUT", headers: { "content-type": "application/octet-stream" }, body: new Uint8Array(bytes.subarray(part.firstByte, part.lastByte + 1)) });
       if (!put.ok) throw await httpFailure(put, "linkedin upload part");
       etags.push(put.headers.get("etag") ?? "");
+    }
+    // 1083: the creator's cover. A feed video still posts if the thumbnail fails, so a refusal is only noted.
+    if (ctx.cover && v.thumbnailUploadUrl) {
+      const ok = await ctx.cover
+        .bytes()
+        .then((jpeg) => fetch(v.thumbnailUploadUrl!, { method: "PUT", headers: { "media-type-family": "STILLIMAGE", "content-type": "application/octet-stream" }, body: new Uint8Array(jpeg) }))
+        .then((res) => res.ok, () => false);
+      await ctx.noteCover?.(ok ? null : "LinkedIn didn't take the cover image, so it picked a frame from the video.");
     }
     const fin = await fetch(`${REST}/videos?action=finalizeUpload`, { method: "POST", headers: h(tok), body: JSON.stringify({ finalizeUploadRequest: { video: v.video, uploadToken: v.uploadToken ?? "", uploadedPartIds: etags } }) });
     if (!fin.ok) throw await httpFailure(fin, "linkedin finalizeUpload");

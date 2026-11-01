@@ -121,13 +121,24 @@ export class InstagramPublisher implements SocialPublisher {
 
   async upload(ctx: PublishContext) {
     const caption = [ctx.content.caption, ctx.content.hashtags].filter(Boolean).join("\n\n");
-    const r = await formPost(`${GRAPH}/${ctx.account.platformUserId}/media`, {
+    const fields: Record<string, string> = {
       media_type: "REELS",
       video_url: await ctx.media.publicUrl(),
       caption,
       share_to_feed: "true",
       access_token: ctx.account.accessToken,
-    });
+    };
+    // 1083: the creator's cover (cover_url wins over thumb_offset). If Instagram refuses the container with it,
+    // try once without: the Reel matters more than its cover, and the creator is told why it has a frame instead.
+    const coverUrl = ctx.cover ? await ctx.cover.url().catch(() => null) : null;
+    const create = (f: Record<string, string>) => formPost(`${GRAPH}/${ctx.account.platformUserId}/media`, f);
+    let r = await create(coverUrl ? { ...fields, cover_url: coverUrl } : fields);
+    if (!r.ok && coverUrl) {
+      const err = await httpFailure(r, "instagram create container (with cover)");
+      if (err.code !== "MEDIA_REJECTED") throw err;
+      r = await create(fields);
+      if (r.ok) await ctx.noteCover?.("Instagram couldn't use the cover image, so it picked a frame from the video.");
+    } else if (r.ok && coverUrl) await ctx.noteCover?.(null);
     if (!r.ok) throw await httpFailure(r, "instagram create container");
     return ((await r.json()) as { id: string }).id;
   }

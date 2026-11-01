@@ -16,6 +16,8 @@ import { api } from "@/lib/client/api";
 import type { BestTimes } from "@/lib/schedule/best-time";
 import type { AccountView, Draft } from "./types";
 import { enabledPlatforms } from "./publish";
+import { MusicNote } from "./MusicNote";
+import { CoverPicker } from "./CoverPicker";
 
 interface Props {
   drafts: Record<Platform, Draft>;
@@ -31,6 +33,13 @@ interface Props {
   error: string | null;
   onLaunch: () => void;
   onEdit: () => void;
+  /** Back to step 1 to swap in a version of the video that has music on it. */
+  onReplaceVideo: () => void;
+  /** 1083: the post's own cover image, if any; it also stands in for the poster in the summary. */
+  coverUrl: string | null;
+  onCover: (url: string | null) => void;
+  /** Saves the draft if needed and returns its id: a cover belongs to a saved post. */
+  ensurePost: () => Promise<string | null>;
 }
 
 export function LaunchPanel(p: Props) {
@@ -63,7 +72,7 @@ export function LaunchPanel(p: Props) {
       <div className="glass mt-8 flex gap-4 rounded-[28px] p-4">
         <div className="relative aspect-[9/16] w-20 shrink-0 overflow-hidden rounded-2xl bg-secondary sm:w-24">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {p.poster && <img src={p.poster} alt="" className="h-full w-full object-cover" />}
+          {(p.coverUrl ?? p.poster) && <img src={(p.coverUrl ?? p.poster)!} alt="" className="h-full w-full object-cover" />}
         </div>
         <div className="min-w-0 flex-1 py-1">
           <p className="line-clamp-2 text-lg font-semibold leading-snug">{p.hook}</p>
@@ -137,6 +146,9 @@ export function LaunchPanel(p: Props) {
           <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{best.reason}</p>
         </motion.section>
       )}
+
+      <CoverPicker targets={targets} coverUrl={p.coverUrl} ensurePost={p.ensurePost} onChange={p.onCover} />
+      {targets.length > 0 && <MusicNote list={list} onReplace={p.onReplaceVideo} />}
 
       <div className="mt-8 flex flex-col items-center gap-3">
         <Button variant="lime" size="xl" className="w-full sm:w-auto sm:min-w-[320px]" disabled={p.busy || targets.length === 0} onClick={p.onLaunch}>

@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { firstCommentLine } from "@/lib/client/first-comment";
+import { coverLine } from "@/lib/client/cover";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -57,7 +58,8 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
   const stoppable = post.targets.filter((t) => STOPPABLE.includes(t.status as TargetStatus));
   const g = useGroove(active);
   /** A live post whose first comment is still on its way keeps a slow poll going, for five minutes at most. */
-  const commentWait = post.targets.some((t) => t.status === "published" && t.firstCommentState === "waiting");
+  // 1083: a cover still going on (YouTube, Facebook set it after live) counts the same way.
+  const commentWait = post.targets.some((t) => (t.status === "published" && t.firstCommentState === "waiting") || coverLine(t, !!post.coverUrl)?.tone === "wait");
   const [commentGaveUp, setCommentGaveUp] = useState(false);
   useEffect(() => {
     if (!commentWait) return;
@@ -343,6 +345,7 @@ function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, reduce 
   const live = t.status === "published";
   const bad = t.status === "failed";
   const fc = firstCommentLine(t);
+  const cv = coverLine(t, !!post.coverUrl);
   const returnTo = encodeURIComponent(`/create?post=${post.id}`);
   const name = post.title || post.media.filename || "Untitled";
   const title = live ? "Live" : canceled ? "Stopped" : bad ? "Needs a hand" : (TITLE[t.status] ?? t.status);
@@ -397,6 +400,11 @@ function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, reduce 
         {fc && !canceled && (
           <p className={cn("mt-2 text-[13px] leading-snug", fc.tone === "bad" ? "text-[#ff8a80]" : fc.tone === "ok" ? "text-white/85" : "text-white/65")} aria-live="polite">
             {fc.text}
+          </p>
+        )}
+        {cv && !canceled && (
+          <p className={cn("mt-1 text-[13px] leading-snug", cv.tone === "bad" ? "text-[#ff8a80]" : cv.tone === "ok" ? "text-white/85" : "text-white/65")} aria-live="polite">
+            {cv.text}
           </p>
         )}
         <span className="absolute right-3 top-3">
@@ -527,6 +535,7 @@ function WhatHappened({ post }: { post: PostView }) {
                 {why && <span className="la-mute">. {why}</span>}
               </p>
               {t.status === "published" && firstCommentLine(t) && <p className="la-mute mt-0.5 text-[13px] leading-snug">{firstCommentLine(t)!.text}</p>}
+              {coverLine(t, !!post.coverUrl) && <p className="la-mute mt-0.5 text-[13px] leading-snug">{coverLine(t, !!post.coverUrl)!.text}</p>}
             </div>
             {t.status === "published" && t.url && (
               <a href={t.url} target="_blank" rel="noopener noreferrer" className="la-round" aria-label={`Open the post on ${meta.name} (opens in a new tab)`}>

@@ -194,6 +194,7 @@ model Post {
   scheduledAt DateTime?
   publishedAt DateTime?
   launchedAt  DateTime? // first time it left draft (published or scheduled): what plan post limits count
+  coverKey    String? // 1083: the creator's own cover image (JPEG), sent to the platforms that take one
   editedAt    DateTime? // last change to the copy (1037); an approval older than this no longer counts
   editedBy    String? // who made that change (name), shown in the draft's activity
   editedById  String? // their user id: nobody but the owner approves their own change
@@ -222,6 +223,8 @@ model PostTarget {
   firstComment    String? // posted as the first comment once the post is live (Instagram, YouTube; a reply on X)
   firstCommentId  String? // the platform's id for that comment, once posted
   firstCommentError String? // why the first comment didn't go up (the post itself is unaffected)
+  coverSetAt      DateTime? // 1083: when the platform took the post's cover image
+  coverError      String? // why the cover didn't go on (the post itself is unaffected)
   platformStatus  String    @default("pending") // pending | queued | uploading | processing | published | failed
   uploadRef       String? // platform upload handle between SOCIAL_UPLOAD and SOCIAL_PUBLISH
   platformPostId  String?

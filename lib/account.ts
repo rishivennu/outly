@@ -108,6 +108,8 @@ export async function deleteAccount(user: Pick<SessionUser, "id" | "actor">, con
     }
   }
   const media = await db.media.findMany({ where: { userId: me.id }, select: { storageKey: true, thumbnailKey: true } });
+  // 1083: cover images belong to posts, not media; they are removed the same durable way.
+  const covers = await db.post.findMany({ where: { userId: me.id, coverKey: { not: null } }, select: { coverKey: true } });
   const now = new Date();
   // Older invoices predate the snapshot columns: fill them in now (gateway from the payment row, which is
   // about to go; tax rate and seller from today's settings), so the kept copy stops changing with settings.
@@ -118,7 +120,7 @@ export async function deleteAccount(user: Pick<SessionUser, "id" | "actor">, con
   const biz = legacy.length ? (await getConfig("payments")).business : null;
   // 1053: every uploaded object gets a durable cleanup row, written in the SAME transaction that deletes the
   // account, so a crash can never leave files nobody will remove. The person keeps a status link (the token).
-  const keys = cleanupKeys(media);
+  const keys = cleanupKeys([...media, ...covers.map((c) => ({ storageKey: c.coverKey, thumbnailKey: null }))]);
   const token = newDeletionToken();
   const deletionId = `del_${randomBytes(12).toString("base64url")}`; // never derived from the token
   await db.$transaction([

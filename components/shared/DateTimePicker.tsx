@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Flame } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { addDaysKey, dayKey, fromTzParts, partsInTz } from "@/lib/client/tz";
 import { tzShort } from "@/components/shell/UserContext";
@@ -23,12 +23,53 @@ function label(h: number, m: number) {
   return `${hh}:${String(m).padStart(2, "0")} ${ap}`;
 }
 
+/** Tracks whether a horizontal strip can scroll either way, and scrolls it about one view at a time. */
+function useStrip() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState({ prev: false, next: false });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setEdge({ prev: el.scrollLeft > 4, next: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+    check();
+    el.addEventListener("scroll", check, { passive: true });
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(check) : null;
+    ro?.observe(el);
+    return () => {
+      el.removeEventListener("scroll", check);
+      ro?.disconnect();
+    };
+  }, []);
+  const go = (dir: 1 | -1) => {
+    const el = ref.current;
+    if (!el) return;
+    const calm = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    el.scrollBy({ left: dir * Math.max(120, el.clientWidth * 0.8), behavior: calm ? "auto" : "smooth" });
+  };
+  return { ref, edge, go };
+}
+
+function StripArrows({ edge, go, what }: { edge: { prev: boolean; next: boolean }; go: (d: 1 | -1) => void; what: string }) {
+  const btn = "grid h-11 w-11 place-items-center rounded-full bg-secondary/70 text-foreground transition hairline hover:bg-secondary disabled:opacity-30 disabled:hover:bg-secondary/70";
+  return (
+    <div className="flex items-center gap-1.5">
+      <button type="button" className={btn} onClick={() => go(-1)} disabled={!edge.prev} aria-label={`Earlier ${what}`}>
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+      </button>
+      <button type="button" className={btn} onClick={() => go(1)} disabled={!edge.next} aria-label={`Later ${what}`}>
+        <ChevronRight className="h-4 w-4" aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 export function DateTimePicker({ value, onChange, tz, peakHours = [] }: Props) {
   const now = new Date();
   const todayKey = dayKey(now, tz);
   const v = partsInTz(value, tz);
   const vKey = dayKey(value, tz);
-  const slotsRef = useRef<HTMLDivElement>(null);
+  const dayStrip = useStrip();
+  const timeStrip = useStrip();
 
   const days = useMemo(
     () =>
@@ -93,7 +134,7 @@ export function DateTimePicker({ value, onChange, tz, peakHours = [] }: Props) {
         {quick.map((q) => {
           const on = vKey === q.key && v.h === q.h && v.min === q.m;
           return (
-            <button key={q.label} type="button" onClick={() => set(q.key, q.h, q.m)} aria-pressed={on} className={cn("h-9 rounded-full px-3.5 text-[13px] font-medium transition", on ? "bg-foreground text-background" : "bg-secondary text-foreground/85 hover:bg-secondary/70 hairline")}>
+            <button key={q.label} type="button" onClick={() => set(q.key, q.h, q.m)} aria-pressed={on} className={cn("h-9 rounded-full px-3.5 text-[13px] font-medium transition", on ? "lime-bg font-semibold shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_6px_16px_-8px_hsl(var(--lime)/0.75)]" : "bg-secondary text-foreground/85 hover:bg-secondary/70 hairline")}>
               {q.label}
             </button>
           );
@@ -101,8 +142,11 @@ export function DateTimePicker({ value, onChange, tz, peakHours = [] }: Props) {
       </div>
 
       <div>
-        <p className="mb-2 text-[13px] font-medium text-muted-foreground" id="dtp-day">Day</p>
-        <div className="scrollbar-none -mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1" role="group" aria-labelledby="dtp-day">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <p className="text-[13px] font-medium text-muted-foreground" id="dtp-day">Day</p>
+          <StripArrows edge={dayStrip.edge} go={dayStrip.go} what="dates" />
+        </div>
+        <div ref={dayStrip.ref} className="scrollbar-none -mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1" role="group" aria-labelledby="dtp-day">
           {days.map((d, i) => {
             const on = d.key === vKey;
             return (
@@ -116,9 +160,9 @@ export function DateTimePicker({ value, onChange, tz, peakHours = [] }: Props) {
                   set(d.key, h, m);
                   if (isPast(d.key, h, m)) set(d.key, Math.min(23, partsInTz(new Date(Date.now() + 3600e3), tz).h), 0);
                 }}
-                className={cn("relative flex h-[76px] w-[60px] shrink-0 snap-start flex-col items-center justify-center rounded-[22px] transition", on ? "text-background" : "bg-secondary/70 text-foreground hover:bg-secondary hairline")}
+                className={cn("relative flex h-[76px] w-[60px] shrink-0 snap-start flex-col items-center justify-center rounded-[22px] transition", on ? "text-[hsl(var(--lime-foreground))]" : "bg-secondary/70 text-foreground hover:bg-secondary hairline")}
               >
-                {on && <motion.span layoutId="dtp-day-pill" className="absolute inset-0 rounded-[22px] bg-foreground" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
+                {on && <motion.span layoutId="dtp-day-pill" className="lime-bg absolute inset-0 rounded-[22px] shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_8px_20px_-10px_hsl(var(--lime)/0.8)]" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
                 <span className="relative text-[11px] font-medium uppercase tracking-wider opacity-70">{i === 0 ? "Today" : d.wd}</span>
                 <span className="relative text-xl font-semibold tabular">{d.d}</span>
               </button>
@@ -130,15 +174,18 @@ export function DateTimePicker({ value, onChange, tz, peakHours = [] }: Props) {
       <div>
         <div className="mb-2 flex items-center justify-between">
           <p className="text-[13px] font-medium text-muted-foreground" id="dtp-time">Time</p>
-          {peakHours.length > 0 && <p className="flex items-center gap-1 text-[12px] text-muted-foreground"><Flame className="h-3.5 w-3.5 text-cyan" aria-hidden="true" /> best time to post</p>}
+          <div className="flex items-center gap-3">
+            {peakHours.length > 0 && <p className="flex items-center gap-1 text-[12px] text-muted-foreground"><Flame className="h-3.5 w-3.5 text-cyan" aria-hidden="true" /> best time to post</p>}
+            <StripArrows edge={timeStrip.edge} go={timeStrip.go} what="times" />
+          </div>
         </div>
-        <div ref={slotsRef} className="scrollbar-none -mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1" role="group" aria-labelledby="dtp-time">
+        <div ref={timeStrip.ref} className="scrollbar-none -mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1" role="group" aria-labelledby="dtp-time">
           {SLOTS.filter((s) => s.h >= 6).map((s) => {
             const on = v.h === s.h && v.min === s.m;
             const past = isPast(vKey, s.h, s.m);
             const peak = peakHours.includes(s.h);
             return (
-              <button key={`${s.h}:${s.m}`} type="button" disabled={past} aria-pressed={on} onClick={() => set(vKey, s.h, s.m)} className={cn("relative h-11 shrink-0 snap-start rounded-full px-4 text-[13px] font-medium tabular transition", on ? "bg-foreground text-background" : "bg-secondary/70 hover:bg-secondary hairline", past && "opacity-30")}>
+              <button key={`${s.h}:${s.m}`} type="button" disabled={past} aria-pressed={on} onClick={() => set(vKey, s.h, s.m)} className={cn("relative h-11 shrink-0 snap-start rounded-full px-4 text-[13px] font-medium tabular transition", on ? "lime-bg font-semibold shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_6px_16px_-8px_hsl(var(--lime)/0.75)]" : "bg-secondary/70 hover:bg-secondary hairline", past && "opacity-30")}>
                 {peak && !on && <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-cyan" aria-hidden="true" />}
                 {label(s.h, s.m)}
                 {peak && <span className="sr-only"> (best time to post)</span>}

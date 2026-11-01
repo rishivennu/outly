@@ -33,7 +33,7 @@ export function DashboardSwitch({ current, className }: { current: DashboardStyl
           aria-checked={s === current}
           disabled={busy !== null}
           onClick={() => void go(s)}
-          className={cn("h-9 rounded-xl px-3 text-[13px] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring", s === current ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+          className={cn("h-9 rounded-xl px-3 text-[13px] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring", s === current ? "lime-bg shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_6px_16px_-8px_hsl(var(--lime)/0.75)]" : "text-muted-foreground hover:text-foreground")}
         >
           {busy === s ? "Switching…" : s === "classic" ? "Classic" : "Analytics"}
         </button>

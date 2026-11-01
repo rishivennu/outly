@@ -102,6 +102,8 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
 
   /* ---------------- persistence ---------------- */
   const [postId, setPostId] = useState<string | null>(initialPost?.id ?? null);
+  /** 1083: the creator's own cover image (stored on the post). */
+  const [coverUrl, setCoverUrl] = useState<string | null>(initialPost?.coverUrl ?? null);
   const postIdRef = useRef<string | null>(initialPost?.id ?? null);
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -254,6 +256,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
           deviceId.current = d.id;
           postIdRef.current = null;
           setPostId(null);
+          setCoverUrl(null);
           window.history.replaceState(null, "", "/create");
           setStory(d.story);
           setSubmittedStory(d.story || null);
@@ -643,6 +646,9 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                 <div className="mt-8 w-full sm:mt-10">
                   <UploadZone compact onFile={(f) => startUpload(f)} />
                 </div>
+                <p className="mt-4 max-w-md text-center text-sm leading-relaxed text-muted-foreground">
+                  Want trending music? Add it in Instagram, YouTube or your editor, export the video, then upload it here. Outlly posts the sound that&apos;s in your video to every platform.
+                </p>
                 <Link href="/create/bulk" className="mt-4 inline-flex min-h-[44px] items-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
                   Several videos? Plan a batch of up to 10
                 </Link>
@@ -726,7 +732,17 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
               <motion.section key="launch" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ type: "spring", stiffness: 200, damping: 26 }}>
                 <h1 className="sr-only">Launch</h1>
                 {allReviewed ? (
-                  <LaunchPanel drafts={drafts} accounts={accounts} poster={poster} hook={hook ?? ""} tz={tz} when={when} onWhen={setWhen} mode={mode} onMode={setMode} busy={launching} error={launchError} onLaunch={launch} onEdit={() => setStep("everywhere")} />
+                  <LaunchPanel drafts={drafts} accounts={accounts} poster={poster} hook={hook ?? ""} tz={tz} when={when} onWhen={setWhen} mode={mode} onMode={setMode} busy={launching} error={launchError} onLaunch={launch}
+                    onEdit={() => setStep("everywhere")}
+                    onReplaceVideo={() => {
+                      setStep("video");
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                      toast("Use Replace under your video to upload the version with music. Your copy stays.", "info");
+                    }}
+                    coverUrl={coverUrl}
+                    onCover={setCoverUrl}
+                    ensurePost={() => save({ force: true, strict: true })}
+                  />
                 ) : (
                   <div className="py-20 text-center">
                     <p className="text-lg">A couple of things still need a look first.</p>

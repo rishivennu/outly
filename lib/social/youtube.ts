@@ -204,6 +204,17 @@ export class YouTubePublisher implements SocialPublisher {
     return { id: ((await r.json()) as { id: string }).id };
   }
 
+  /** 1083: thumbnails.set (about 50 quota units). YouTube answers 403 until the channel is verified. */
+  async setCover(account: AccountContext, videoId: string, jpeg: Buffer) {
+    const r = await fetch(`https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${encodeURIComponent(videoId)}&uploadType=media`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${account.accessToken}`, "content-type": "image/jpeg" },
+      body: new Uint8Array(jpeg),
+    });
+    if (r.status === 403) throw new PublisherError("FORBIDDEN", "Custom thumbnails need a verified channel", `youtube thumbnails.set: HTTP 403\n${(await r.text().catch(() => "")).slice(0, 2000)}`, false);
+    if (!r.ok) throw await httpFailure(r, "youtube thumbnails.set");
+  }
+
   async delete(account: { accessToken: string }, id: string) {
     const r = await fetch(`https://www.googleapis.com/youtube/v3/videos?id=${id}`, {
       method: "DELETE",
