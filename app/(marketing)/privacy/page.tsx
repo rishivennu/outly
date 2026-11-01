@@ -69,7 +69,7 @@ export default function PrivacyPage() {
       <Shell>
         <PageHead
           title="Privacy"
-          updated="18 October 2026"
+          updated="2 November 2026"
           lead="This page describes what Outlly actually does with your data today, in plain language, including exactly what each social platform lets us do once you connect it. If anything here changes, the date above changes with it."
         />
 
@@ -142,10 +142,10 @@ export default function PrivacyPage() {
           </p>
 
           <h2>AI features</h2>
-          <p>Outlly uses Google Gemini for its AI features. Here is exactly what is sent, and only when you use that feature:</p>
+          <p>Outlly uses Google Gemini for its AI features, and Kimi (by Moonshot AI) as a backup for the text features when Gemini is slow or unavailable. Here is exactly what is sent, and only when you use that feature:</p>
           <ul>
             <li><strong>Captions, hooks, titles and hashtags:</strong> the text you write describing your video.</li>
-            <li><strong>Captions from speech:</strong> the audio track of your video, converted to a small sound file. The video picture is not sent. If we switch on our own speech-recognition server (FunASR), the sound file goes there instead of Google.</li>
+            <li><strong>Captions from speech:</strong> the audio track of your video, converted to a small sound file, sent to Google only (never to Kimi). The video picture is not sent. If we switch on our own speech-recognition server (FunASR), the sound file goes there instead of Google.</li>
             <li><strong>Clip highlights:</strong> the subtitle text of your video, so it can suggest the moments worth their own clip.</li>
             <li><strong>Reply suggestions:</strong> the comment or direct message you are replying to, and the sender’s display name.</li>
             <li><strong>Insights on your analytics:</strong> your account and post numbers.</li>
@@ -166,6 +166,7 @@ export default function PrivacyPage() {
             <li><strong>Stripe, Razorpay or PayPal:</strong> takes payments, depending on which you choose at checkout.</li>
             <li><strong>YOUPI (UPI payments):</strong> a payment gateway we run on our own server. It confirms a UPI payment by matching it with our bank&rsquo;s payment alert, so it sees the amount, time, UPI reference and any payer name or UPI ID the alert shows.</li>
             <li><strong>Google (Gemini API):</strong> the AI features above.</li>
+            <li><strong>Moonshot AI (Kimi API):</strong> a backup for the text AI features above (captions, hooks, titles, hashtags, clip highlights, reply suggestions, insights and Pip). It gets the same text Gemini would, only for the requests it answers.</li>
             <li><strong>The social platforms you connect:</strong> as described above.</li>
           </ul>
           <p>Each one only receives what it needs to do that job. Some are outside India, so your data may be processed in other countries under their safeguards.</p>
