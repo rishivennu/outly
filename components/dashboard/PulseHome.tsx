@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/client/api";
 import { cn } from "@/lib/utils";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
@@ -9,6 +9,7 @@ import { AnimIcon, useIconPlay } from "@/components/icons/animated";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { Thumb } from "@/components/shared/Thumb";
 import { useEnter } from "./motion";
+import { useSlider } from "./useSlider";
 import { RollingNumber } from "./RollingNumber";
 import { Sparkline } from "./Sparkline";
 import { ViewsChart } from "./ViewsChart";
@@ -61,27 +62,6 @@ function KpiCard({ k, i }: { k: Kpi; i: number }) {
       <p className="sr-only">{k.hint}</p>
     </article>
   );
-}
-
-/** Tabs and segmented controls share one sliding indicator: measured, then moved with a CSS transform. */
-function useSlider<T extends HTMLElement>(dep: unknown) {
-  const box = useRef<T>(null);
-  const bar = useRef<HTMLSpanElement>(null);
-  const place = useCallback(() => {
-    const b = box.current;
-    const el = b?.querySelector<HTMLElement>('[aria-selected="true"],[aria-checked="true"]');
-    if (!b || !el || !bar.current) return;
-    bar.current.style.width = `${el.offsetWidth}px`;
-    bar.current.style.transform = `translate3d(${el.offsetLeft}px,0,0)`;
-    bar.current.style.opacity = "1";
-  }, []);
-  useLayoutEffect(place, [dep, place]);
-  useEffect(() => {
-    const ro = new ResizeObserver(place);
-    if (box.current) ro.observe(box.current);
-    return () => ro.disconnect();
-  }, [place]);
-  return { box, bar };
 }
 
 export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial: Pulse; firstName: string; canSwitch: boolean; nextPost: { when: string; title: string } | null }) {

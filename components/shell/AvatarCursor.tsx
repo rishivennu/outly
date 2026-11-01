@@ -11,6 +11,8 @@ import { CursorFx } from "@/components/shared/CursorFx";
  * typing and selecting still feel native. Mouse and trackpad only (touch has no cursor), and the
  * system cursor comes back under forced colours. On by default; Settings > Look turns it off
  * (saved per device). 1070: while it is on, a lime ring trails the avatar (CursorFx variant="ring").
+ * 1081: on clickable things it turns into an arrow with a small avatar badge, and the ring steps aside, so
+ * neither ever covers the label you are about to click.
  */
 const KEY = "outly-avatar-cursor";
 const EVT = "outly-avatar-cursor";
@@ -34,13 +36,23 @@ export function setCursorEnabled(on: boolean) {
  * A thin dark halo keeps it visible on white; on clickable things a lime ring appears around it. */
 const SIZE = 32;
 const C = SIZE / 2;
-const wrap = (inner: string, hover: boolean) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">` +
-  `<circle cx="${C}" cy="${C}" r="${hover ? 11.4 : 12.6}" fill="#fff" stroke="rgba(21,19,26,.35)" stroke-width="1"/>` +
+const open = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">`;
+const wrap = (inner: string) => `${open}<circle cx="${C}" cy="${C}" r="12.6" fill="#fff" stroke="rgba(21,19,26,.35)" stroke-width="1"/>${inner}</svg>`;
+
+/* On clickable things (1081): the avatar used to sit centred on the pointer, right over the tab or button
+ * label being clicked. Now it becomes a pointer: an arrow whose tip is the hotspot, with the avatar as a
+ * small lime-ringed badge below-right of it, where a normal cursor's tail is. Everything above and left of
+ * the tip stays visible, so you can read what you are about to click. */
+const HOT_HX = 2;
+const HOT_HY = 2;
+const BADGE = 23.2; // badge centre, both axes
+const ARROW = "M2 2 L2 17.2 L6.1 13.4 L8.9 19.8 L11.7 18.6 L9 12.4 L14.6 12.4 Z";
+const wrapHot = (inner: string) =>
+  `${open}<path d="${ARROW}" fill="#15131a" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>` +
+  `<circle cx="${BADGE}" cy="${BADGE}" r="8.6" fill="#fff" stroke="rgba(21,19,26,.35)" stroke-width="1"/>` +
   inner +
-  (hover ? `<circle cx="${C}" cy="${C}" r="14.2" fill="none" stroke="#c6f432" stroke-width="2.6"/><circle cx="${C}" cy="${C}" r="15.6" fill="none" stroke="rgba(21,19,26,.4)" stroke-width=".8"/>` : "") +
-  `</svg>`;
-const css = (svg: string) => `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}") ${C} ${C}, auto`;
+  `<circle cx="${BADGE}" cy="${BADGE}" r="7.9" fill="none" stroke="#c6f432" stroke-width="1.6"/></svg>`;
+const css = (svg: string, hx = C, hy = C) => `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}") ${hx} ${hy}, ${hx === C ? "auto" : "pointer"}`;
 
 async function photoData(src: string): Promise<string | null> {
   try {
@@ -108,16 +120,16 @@ export function AvatarCursor() {
     };
     const apply = (normal: string, hover: string) => {
       if (dead || !normal) return;
-      root.style.setProperty("--avatar-cursor", css(wrap(normal, false)));
-      root.style.setProperty("--avatar-cursor-hover", css(wrap(hover, true)));
+      root.style.setProperty("--avatar-cursor", css(wrap(normal)));
+      root.style.setProperty("--avatar-cursor-hover", css(wrapHot(hover), HOT_HX, HOT_HY));
       root.setAttribute("data-avatar-cursor", "");
     };
 
     // the orb's own glow sits inside its 100-unit box, so it gets a little more room than the photo
-    apply(orbInner(26, C - 13), orbInner(23, C - 11.5));
+    apply(orbInner(26, C - 13), orbInner(15, BADGE - 7.5));
     if (photo)
       void photoData(photo).then((d) => {
-        if (d) apply(photoInner(d, 23, C - 11.5), photoInner(d, 20.6, C - 10.3));
+        if (d) apply(photoInner(d, 23, C - 11.5), photoInner(d, 13.6, BADGE - 6.8));
       });
     return () => {
       dead = true;

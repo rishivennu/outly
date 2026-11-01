@@ -5,7 +5,7 @@
  * easeOut(clamp01((t - 0.1 - i * 0.045) / 0.7)). Reduced motion keeps the timing but only cross-fades.
  * Time-based: it plays at a fixed pace once the root is on screen, never scrubbed to scroll.
  */
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
 export const easeOut = (x: number) => 1 - (1 - x) ** 3;
@@ -29,6 +29,7 @@ export function useEnter<T extends HTMLElement>() {
     const reduced = prefersReduced();
     for (const it of items) {
       it.style.animation = "none"; // the CSS fallback reveal (globals.css) stands down once JS runs
+      it.style.transition = "none"; // a card's own hover transition (admin-card) would smear every frame
       it.style.opacity = "0";
       if (!reduced) it.style.transform = "translate3d(0,14px,0)";
     }
@@ -44,7 +45,7 @@ export function useEnter<T extends HTMLElement>() {
         if (!reduced) it.style.transform = p < 1 ? `translate3d(0,${(1 - p) * 14}px,0)` : "";
       });
       if (!done) raf.current = requestAnimationFrame(tick);
-      else for (const it of items) { it.style.opacity = ""; it.style.transform = ""; }
+      else for (const it of items) { it.style.opacity = ""; it.style.transform = ""; it.style.transition = ""; }
     };
     raf.current = requestAnimationFrame(tick);
   }, []);
@@ -91,4 +92,29 @@ export function drawIn(write: (p: number) => void, { duration = 0.9, delay = 0 }
   write(0);
   id = requestAnimationFrame(tick);
   return () => cancelAnimationFrame(id);
+}
+
+/**
+ * True once the element has been on screen (and stays true). Reduced motion or no IntersectionObserver:
+ * true at once, so nothing waits to appear.
+ */
+export function useSeen<T extends HTMLElement>(threshold = 0.25) {
+  const ref = useRef<T>(null);
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || prefersReduced() || typeof IntersectionObserver === "undefined") {
+      setSeen(true);
+      return;
+    }
+    const io = new IntersectionObserver((es) => {
+      if (es.some((e) => e.isIntersecting)) {
+        io.disconnect();
+        setSeen(true);
+      }
+    }, { threshold });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [threshold]);
+  return { ref, seen };
 }

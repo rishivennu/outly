@@ -7,6 +7,9 @@ import { DataSwap } from "@/components/shared/DataSwap";
 import { FilterChips } from "@/components/admin/SearchBox";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { WinbackButton } from "@/components/admin/WinbackButton";
+import { EnterRoot } from "@/components/admin/motion/EnterRoot";
+import { RiskMeter } from "@/components/admin/motion/RiskMeter";
+import { RollingNumber } from "@/components/dashboard/RollingNumber";
 
 export const metadata = { title: "At risk" };
 export const dynamic = "force-dynamic";
@@ -34,28 +37,34 @@ export default async function RetentionPage({ searchParams }: { searchParams: { 
         body="Creators likely to leave, scored from what they actually do: posting less, going quiet, failed posts, a signed-out account, a paused or cancelling plan. Paying creators weigh a little more."
       />
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-3">
-        <Card className="!p-5">
+      <EnterRoot>
+      <div className="mb-3 grid gap-3 sm:grid-cols-3">
+        <Card data-enter className="!p-5">
           <p className="text-[12.5px] font-semibold text-muted-foreground">High risk</p>
-          <p className="mt-1 font-display text-[2rem] font-bold leading-none tabular">{high.length}</p>
+          <RollingNumber value={high.length.toLocaleString("en-IN")} className="mt-1 block font-display text-[2rem] font-bold leading-none tabular" />
           <p className="mt-2 text-[12.5px] text-muted-foreground">Score 50 or more</p>
         </Card>
-        <Card className="!p-5">
+        <Card data-enter className="!p-5">
           <p className="text-[12.5px] font-semibold text-muted-foreground">Worth a look</p>
-          <p className="mt-1 font-display text-[2rem] font-bold leading-none tabular">{flagged.length - high.length}</p>
+          <RollingNumber value={(flagged.length - high.length).toLocaleString("en-IN")} className="mt-1 block font-display text-[2rem] font-bold leading-none tabular" />
           <p className="mt-2 text-[12.5px] text-muted-foreground">Score 25 to 49</p>
         </Card>
-        <Card className="!p-5">
+        <Card data-enter className="!p-5">
           <p className="text-[12.5px] font-semibold text-muted-foreground">Revenue at risk</p>
-          <p className="mt-1 font-display text-[2rem] font-bold leading-none tabular">{formatMoney(mrr, currency)}</p>
+          <RollingNumber value={formatMoney(mrr, currency)} className="mt-1 block font-display text-[2rem] font-bold leading-none tabular" />
           <p className="mt-2 text-[12.5px] text-muted-foreground">{paidAtRisk.length} paying creator{paidAtRisk.length === 1 ? "" : "s"}, per billing period</p>
         </Card>
       </div>
 
-      <Card>
+      <Card data-enter className="mb-5 !p-5">
+        <p className="mb-3 text-[12.5px] font-semibold text-muted-foreground">Everyone, by risk</p>
+        <RiskMeter high={high.length} medium={flagged.length - high.length} low={all.length - flagged.length} />
+      </Card>
+
+      <Card data-enter>
         <CardTitle hint={`${total.toLocaleString("en-IN")} creator${total === 1 ? "" : "s"}${total > SHOW ? `, top ${SHOW} shown` : ""}. Win-back emails are limited to one a month per person.`}>Who to reach out to</CardTitle>
         <div className="mb-4">
-          <FilterChips param="f" current={f} options={[{ value: "", label: "At risk" }, { value: "high", label: "High only" }, { value: "paid", label: "Paying" }, { value: "all", label: "Everyone" }]} />
+          <FilterChips glide param="f" current={f} options={[{ value: "", label: "At risk" }, { value: "high", label: "High only" }, { value: "paid", label: "Paying" }, { value: "all", label: "Everyone" }]} />
         </div>
         <DataSwap k={f}>
         {rows.length === 0 ? (
@@ -100,6 +109,7 @@ export default async function RetentionPage({ searchParams }: { searchParams: { 
         )}
         </DataSwap>
       </Card>
+      </EnterRoot>
     </>
   );
 }

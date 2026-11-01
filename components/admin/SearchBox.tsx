@@ -3,6 +3,7 @@ import { useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Search } from "lucide-react";
+import { useSlider } from "@/components/dashboard/useSlider";
 
 /** URL-driven search: debounced, keeps other filters, works with back/forward. */
 export function SearchBox({ placeholder, param = "q" }: { placeholder: string; param?: string }) {
@@ -39,7 +40,7 @@ export function SearchBox({ placeholder, param = "q" }: { placeholder: string; p
   );
 }
 
-export function FilterChips({ param, options, current }: { param: string; options: { value: string; label: string }[]; current: string }) {
+export function FilterChips({ param, options, current, glide = false }: { param: string; options: { value: string; label: string }[]; current: string; glide?: boolean }) {
   const sp = useSearchParams();
   const path = usePathname();
   const href = (v: string) => {
@@ -48,10 +49,41 @@ export function FilterChips({ param, options, current }: { param: string; option
     n.delete("page");
     return `${path}?${n}`;
   };
+  if (glide) return <GlideChips options={options} current={current} href={href} />;
   return (
     <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter">
       {options.map((o) => (
         <Link key={o.value} href={href(o.value)} scroll={false} aria-current={current === o.value ? "true" : undefined} className={current === o.value ? "lime-bg h-9 rounded-full px-3.5 text-[12.5px] font-semibold leading-9" : "h-9 rounded-full bg-secondary/60 px-3.5 text-[12.5px] font-medium leading-9 text-muted-foreground hairline hover:text-foreground"}>
+          {o.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The analytics version of the chips (1081): one lime plate slides to the picked chip the moment it is
+ * clicked (before the server answers), on a single track. Same links and URLs as the plain chips, so
+ * back/forward, new tabs and screen readers behave the same. Reduced motion: the plate jumps.
+ */
+function GlideChips({ options, current, href }: { options: { value: string; label: string }[]; current: string; href: (v: string) => string }) {
+  const [pending, setPending] = useState<string | null>(null);
+  useEffect(() => setPending(null), [current]);
+  const on = pending ?? current;
+  const s = useSlider<HTMLDivElement>(on, { selector: '[data-on="true"]', block: true });
+  return (
+    <div ref={s.box} className="chip-track relative" role="group" aria-label="Filter">
+      <span ref={s.bar} aria-hidden="true" className="chip-plate lime-bg" />
+      {options.map((o) => (
+        <Link
+          key={o.value}
+          href={href(o.value)}
+          scroll={false}
+          data-on={on === o.value ? "true" : undefined}
+          aria-current={current === o.value ? "true" : undefined}
+          onClick={(e) => { if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)) setPending(o.value); }}
+          className={on === o.value ? "chip-glide is-on" : "chip-glide"}
+        >
           {o.label}
         </Link>
       ))}
