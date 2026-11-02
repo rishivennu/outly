@@ -3212,3 +3212,9 @@ html[data-contrast="more"] .fw-ring:has(:is(input, textarea):focus) { box-shadow
 /* funnel bars and the risk meter reveal through a clip, so the rounded ends never stretch */
 .grow-clip { clip-path: inset(0 var(--cut, 100%) 0 0 round 12px); }
 @media (prefers-reduced-motion: no-preference) { .grow-clip { transition: clip-path .7s cubic-bezier(.2,.8,.2,1); transition-delay: var(--d, 0ms); } }
+
+/* 1093 inbox: tinted initials and the Question tag. Ink sits on its own 16% tint, so every hue keeps 4.5:1. */
+.ib-av { background: hsl(var(--h) 70% 50% / .16); color: hsl(var(--h) 60% 28%); }
+.dark .ib-av { background: hsl(var(--h) 60% 55% / .2); color: hsl(var(--h) 85% 80%); }
+.ib-tag-q { background: hsl(262 80% 58% / .12); color: hsl(262 60% 42%); }
+.dark .ib-tag-q { background: hsl(262 60% 60% / .2); color: hsl(262 90% 82%); }

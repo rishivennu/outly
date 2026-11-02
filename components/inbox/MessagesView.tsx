@@ -1,14 +1,14 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, Clock, ExternalLink, Inbox as InboxIcon, Loader2, Paperclip, RefreshCw, Send, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, Clock, ExternalLink, Inbox as InboxIcon, Loader2, Paperclip, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
-import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { useToast } from "@/components/shared/Toast";
 import { api, ApiError } from "@/lib/client/api";
 import { PLATFORM_META } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import type { MessageView, ReplyBlock, ThreadView } from "@/lib/messages/service";
+import { ago, ConnectionStrip, InboxRow, isTyping, isWide, joinNames, Kbd, PersonAvatar, ScopeBar, stripButton, Tag, useMobileLock, type PaneProps } from "./InboxList";
 
 /** 1090: a reply the server has not confirmed yet. It is never drawn as sent until Meta accepted it. */
 type Pending = { clientId: string; text: string; state: "sending" | "failed"; error?: string; at: string };
@@ -23,43 +23,36 @@ const MAX = 1000;
 const LIST_POLL_MS = 30_000;
 const THREAD_POLL_MS = 15_000;
 
-function ago(iso: string) {
-  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return "now";
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  if (s < 7 * 86400) return `${Math.floor(s / 86400)}d`;
-  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
-}
-
 function hoursLeft(iso: string | null) {
   if (!iso) return 0;
   return Math.max(0, (new Date(iso).getTime() - Date.now()) / 3600_000);
 }
 
-function Avatar({ t, size = 40 }: { t: Pick<ThreadView, "participantAvatar" | "participantName" | "platform">; size?: number }) {
+/** 1093: waiting = they wrote last (or it is unread) and Meta still lets us answer here. */
+export const threadNeedsReply = (t: Pick<ThreadView, "unread" | "snippet" | "canReply">) => t.unread > 0 || (t.canReply && !t.snippet.startsWith("You:"));
+export const threadsWaiting = (threads: ThreadView[]) => threads.filter(threadNeedsReply).length;
+
+function ThreadAvatar({ t, size = 40, badge = true }: { t: Pick<ThreadView, "participantAvatar" | "participantName" | "platform">; size?: number; badge?: boolean }) {
   const [broken, setBroken] = useState(false);
-  if (t.participantAvatar && !broken)
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={t.participantAvatar} alt="" width={size} height={size} onError={() => setBroken(true)} referrerPolicy="no-referrer" className="shrink-0 rounded-full object-cover" style={{ width: size, height: size }} />;
-  return (
-    <span aria-hidden="true" className="grid shrink-0 place-items-center rounded-full bg-secondary text-[13px] font-semibold text-foreground" style={{ width: size, height: size }}>
-      {(t.participantName.trim()[0] ?? "?").toUpperCase()}
-    </span>
-  );
+  return <PersonAvatar name={t.participantName} src={broken ? null : t.participantAvatar} platform={badge ? t.platform : undefined} size={size} onBroken={() => setBroken(true)} />;
 }
 
 /** Instagram and Facebook direct messages (1031). The list is our stored copy, fed by Meta's webhooks. */
-export function MessagesView({ initial }: { initial: DmData }) {
+export function MessagesView({ initial, tabs, query, refreshTick, onBusy, onWaiting }: { initial: DmData } & PaneProps) {
   const toast = useToast();
   const [data, setData] = useState<DmData>(initial);
   const [filter, setFilter] = useState<Filter>("all");
+  const [needsOnly, setNeedsOnly] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const synced = useRef(false);
+  const rows = useRef(new Map<string, HTMLButtonElement>());
 
-  const load = useCallback(async (f: Filter, sync = false) => {
+  const seq = useRef(0);
+  // `background` (the poll) never cancels a load already on its way; it just steps aside for any newer one.
+  const load = useCallback(async (f: Filter, sync = false, background = false) => {
+    const mineSeq = background ? seq.current : ++seq.current;
     if (sync) setSyncing(true);
     setError(null);
     try {
@@ -67,9 +60,9 @@ export function MessagesView({ initial }: { initial: DmData }) {
       if (f !== "all") q.set("platform", f);
       if (sync) q.set("sync", "1");
       const next = await api<DmData>(`/api/messages${q.size ? `?${q}` : ""}`);
-      setData(next);
+      if (mineSeq === seq.current) setData(next); // a slower, older answer never overwrites a newer one
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "We couldn't reach your messages just now.");
+      if (mineSeq === seq.current) setError(e instanceof ApiError ? e.message : "We couldn't reach your messages just now.");
     } finally {
       if (sync) setSyncing(false);
     }
@@ -84,9 +77,21 @@ export function MessagesView({ initial }: { initial: DmData }) {
 
   // New messages arrive by webhook; check our copy now and then while the tab is visible.
   useEffect(() => {
-    const id = setInterval(() => document.visibilityState === "visible" && void load(filter), LIST_POLL_MS);
+    const id = setInterval(() => document.visibilityState === "visible" && void load(filter, false, true), LIST_POLL_MS);
     return () => clearInterval(id);
   }, [filter, load]);
+
+  // The header's Refresh asks Meta for anything the webhooks missed.
+  const firstTick = useRef(refreshTick);
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
+  useEffect(() => {
+    if (refreshTick !== firstTick.current) void load(filterRef.current, true);
+  }, [refreshTick, load]);
+  useEffect(() => onBusy(syncing), [syncing, onBusy]);
+
+  const waiting = threadsWaiting(data.threads);
+  useEffect(() => onWaiting(waiting), [waiting, onWaiting]);
 
   const pickFilter = (f: Filter) => {
     setFilter(f);
@@ -94,8 +99,11 @@ export function MessagesView({ initial }: { initial: DmData }) {
     void load(f);
   };
 
+  const q = query.trim().toLowerCase();
+  // An open conversation stays listed after you answer it, so it doesn't jump away mid-thought.
+  const visible = data.threads.filter((t) => (!needsOnly || threadNeedsReply(t) || t.id === openId) && (!q || `${t.participantName} ${t.participantHandle ?? ""} ${t.snippet}`.toLowerCase().includes(q)));
   const open = data.threads.find((t) => t.id === openId) ?? null;
-  const onRead = (id: string) => setData((d) => ({ ...d, threads: d.threads.map((t) => (t.id === id ? { ...t, unread: 0 } : t)) }));
+  const onRead = useCallback((id: string) => setData((d) => ({ ...d, threads: d.threads.map((t) => (t.id === id ? { ...t, unread: 0 } : t)) })), []);
   const onSent = (id: string, m: MessageView) =>
     setData((d) => {
       const t = d.threads.find((x) => x.id === id);
@@ -105,106 +113,199 @@ export function MessagesView({ initial }: { initial: DmData }) {
     });
   const onClosed = (id: string, block: ReplyBlock) => setData((d) => ({ ...d, threads: d.threads.map((t) => (t.id === id ? { ...t, canReply: false, replyBlock: block } : t)) }));
 
-  return (
-    <div className="mt-6">
-      <div className="flex flex-wrap items-center gap-2">
-        {(["all", "instagram", "facebook"] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => pickFilter(f)}
-            aria-pressed={filter === f}
-            className={cn("h-10 rounded-full px-4 text-[13px] font-medium transition hairline", filter === f ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/60")}
-          >
-            {f === "all" ? "Everything" : PLATFORM_META[f].name}
-          </button>
-        ))}
-        <Button variant="ghost" size="sm" onClick={() => load(filter, true)} disabled={syncing} className="ml-auto">
-          <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} aria-hidden="true" /> {syncing ? "Checking…" : "Refresh"}
-        </Button>
-      </div>
+  // J / K walk the conversations (opening one marks it read, as a click does); Escape closes it on a phone.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "Escape" && open && !isWide()) {
+        // In the reply box, the first Escape only leaves the box; the draft stays.
+        if (isTyping(e.target)) {
+          (e.target as HTMLElement).blur();
+          return;
+        }
+        setOpenId(null);
+        return;
+      }
+      if (isTyping(e.target) || (e.key !== "j" && e.key !== "k") || !visible.length) return;
+      const i = visible.findIndex((t) => t.id === openId);
+      const next = visible[e.key === "j" ? Math.min(visible.length - 1, i + 1) : Math.max(0, i - 1)];
+      e.preventDefault();
+      setOpenId(next.id);
+      requestAnimationFrame(() => rows.current.get(next.id)?.focus());
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [visible, openId, open]);
 
+  useMobileLock(!!open);
+
+  const off = data.dmsOff ?? [];
+  const problems = data.problems ?? [];
+
+  return (
+    <>
       {error && (
-        <p role="alert" className="mt-4 text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       )}
-      {!!data.dmsOff?.length && (
-        <div role="status" className="mt-4 rounded-2xl bg-secondary/60 p-4 text-sm hairline">
-          <p className="font-medium text-foreground">
-            {data.dmsOff.length === 2 ? "Instagram and Facebook" : PLATFORM_META[data.dmsOff[0]].name} direct messages are switched off for now.
-          </p>
-          <p className="mt-1 text-muted-foreground">
-            Outlly will bring them in once Meta approves messaging. Comments, publishing and everything else work as usual.
-          </p>
-        </div>
+      {off.length > 0 && (
+        <ConnectionStrip title={`${joinNames(off.map((p) => PLATFORM_META[p].name))} direct messages are switched off for now.`} body="Outlly will bring them in once Meta approves messaging. Comments, publishing and everything else work as usual." />
       )}
-      {(data.problems ?? []).map((p) => (
-        <div key={`${p.platform}-${p.code}`} role="status" className="mt-4 rounded-2xl bg-destructive/10 p-4 text-sm">
-          <p className="font-medium text-destructive">{p.message}</p>
-          {p.detail && (
-            <details className="mt-2">
-              <summary className="cursor-pointer text-xs text-muted-foreground">What {PLATFORM_META[p.platform].name} said</summary>
-              <pre className="mt-1 whitespace-pre-wrap break-all text-[11px] text-muted-foreground">{p.detail}</pre>
-            </details>
+      {problems.length > 0 && <MessageProblems problems={problems} />}
+
+      <div className="-mx-4 min-h-0 flex-1 sm:-mx-6 lg:mx-0 lg:grid lg:grid-cols-[minmax(320px,400px)_1fr] lg:overflow-hidden lg:rounded-[24px] lg:bg-card lg:hairline">
+        <section aria-label="Conversations" className="flex min-h-0 flex-col lg:border-r lg:border-border">
+          <div className="px-4 pb-2 sm:px-6 lg:px-3 lg:pt-3">
+            {tabs}
+            <ScopeBar needsOnly={needsOnly} onNeedsOnly={setNeedsOnly} platforms={["instagram", "facebook"]} platform={filter} onPlatform={(p) => pickFilter(p as Filter)} />
+          </div>
+          <div role="tabpanel" id="inbox-panel-messages" aria-labelledby="inbox-tab-messages" aria-busy={syncing} className="min-h-0 flex-1 border-t border-border/70 lg:overflow-y-auto lg:overscroll-contain">
+            {data.threads.length === 0 ? (
+              <div className="p-10 text-center">
+                <InboxIcon className="mx-auto h-8 w-8 text-muted-foreground" strokeWidth={1.6} aria-hidden="true" />
+                <p className="mt-3 font-medium">{data.accounts ? "No messages yet." : "Connect Instagram or a Facebook Page to see messages."}</p>
+                <p className="mx-auto mt-1 max-w-xs text-sm text-muted-foreground">
+                  {data.accounts
+                    ? "New direct messages show up here within seconds of arriving. Older ones come in when you press Refresh."
+                    : "Go to Accounts and connect Instagram or Facebook. If you connected before messages were added, reconnect once so Outlly can ask for the messaging permission."}
+                </p>
+              </div>
+            ) : visible.length === 0 ? (
+              <div className="p-10 text-center">
+                <Check className="mx-auto h-7 w-7 text-lime-ink" aria-hidden="true" />
+                <p className="mt-3 font-medium">{q ? "Nothing matches that search." : "Nobody is waiting on you."}</p>
+                {!q && needsOnly && (
+                  <button type="button" onClick={() => setNeedsOnly(false)} className="mt-2 min-h-[44px] rounded-full px-4 text-sm font-medium underline hover:bg-secondary">
+                    Show all conversations
+                  </button>
+                )}
+              </div>
+            ) : (
+              <ul aria-label={needsOnly ? "Conversations waiting for you" : "All conversations"}>
+                {visible.map((t) => {
+                  const needs = threadNeedsReply(t);
+                  const hrs = Math.floor(hoursLeft(t.windowEndsAt));
+                  return (
+                    <InboxRow
+                      key={t.id}
+                      id={`row-${t.id}`}
+                      ref={(el) => {
+                        if (el) rows.current.set(t.id, el);
+                        else rows.current.delete(t.id);
+                      }}
+                      selected={t.id === openId}
+                      needsReply={needs}
+                      name={t.participantName}
+                      avatar={<ThreadAvatar t={t} />}
+                      tag={t.practice ? <Tag>Practice</Tag> : null}
+                      time={ago(t.lastMessageAt)}
+                      preview={t.snippet || "No text"}
+                      context={
+                        !t.canReply ? (
+                          <span className="truncate">Reply window closed · answer in the app</span>
+                        ) : needs ? (
+                          <>
+                            <Clock className="h-3.5 w-3.5 shrink-0 text-lime-ink" aria-hidden="true" />
+                            <span className="truncate font-medium text-lime-ink">{hrs >= 1 ? `${hrs} h left to reply` : "Under an hour left to reply"}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <span>Replied</span>
+                          </>
+                        )
+                      }
+                      label={`${t.participantName} on ${PLATFORM_META[t.platform].name}${t.unread ? `, ${t.unread} unread` : ""}${needs ? ", waiting for your reply" : ""}`}
+                      onOpen={() => setOpenId(t.id)}
+                    />
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+          <footer className="hidden items-center gap-3 border-t border-border px-4 py-2 text-[11.5px] text-muted-foreground lg:flex">
+            <span>
+              <Kbd>J</Kbd>
+              <Kbd>K</Kbd> move
+            </span>
+            <span>
+              <Kbd>/</Kbd> search
+            </span>
+            <span className="ml-auto">
+              {waiting} of {data.threads.length} need a reply
+            </span>
+          </footer>
+        </section>
+
+        <div data-inbox-detail={open ? "" : undefined} className={cn("min-h-0 min-w-0 flex-col", open ? "fixed inset-0 z-[60] flex bg-background lg:static lg:z-auto lg:bg-transparent" : "hidden lg:flex")}>
+          {open ? (
+            <ThreadPane
+              key={open.id}
+              thread={open}
+              onBack={() => {
+                const id = open.id;
+                setOpenId(null);
+                requestAnimationFrame(() => rows.current.get(id)?.focus());
+              }}
+              onRead={onRead}
+              onSent={onSent}
+              onClosed={onClosed}
+              toast={toast}
+              readOnly={!!initial.readOnly}
+            />
+          ) : (
+            <div className="grid h-full place-items-center p-10 text-center text-sm text-muted-foreground">Pick a conversation to read it.</div>
           )}
         </div>
-      ))}
+      </div>
+    </>
+  );
+}
 
-      {data.threads.length === 0 ? (
-        <div className="mt-8 rounded-[28px] bg-secondary/40 p-10 text-center hairline">
-          <InboxIcon className="mx-auto h-8 w-8 text-muted-foreground" strokeWidth={1.6} aria-hidden="true" />
-          <p className="mt-3 font-medium">{data.accounts ? "No messages yet." : "Connect Instagram or a Facebook Page to see messages."}</p>
-          <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-            {data.accounts
-              ? "New direct messages show up here within seconds of arriving. Older ones come in when you press Refresh."
-              : "Go to Accounts and connect Instagram or Facebook. If you connected before messages were added, reconnect once so Outlly can ask for the messaging permission."}
-          </p>
-        </div>
-      ) : (
-        <div className="mt-6 grid min-h-[60dvh] gap-4 lg:grid-cols-[minmax(280px,360px)_1fr]">
-          <ul aria-label="Conversations" className={cn("space-y-1.5", open && "hidden lg:block")}>
-            {data.threads.map((t) => (
-              <li key={t.id}>
-                <button
-                  type="button"
-                  onClick={() => setOpenId(t.id)}
-                  aria-current={t.id === openId ? "true" : undefined}
-                  aria-label={`${t.participantName} on ${PLATFORM_META[t.platform].name}${t.unread ? `, ${t.unread} unread` : ""}`}
-                  className={cn(
-                    "flex min-h-[64px] w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                    t.id === openId ? "bg-secondary" : "bg-secondary/40 hover:bg-secondary/70",
-                  )}
-                >
-                  <span className="relative">
-                    <Avatar t={t} />
-                    <PlatformOrb platform={t.platform} size={18} ring className="absolute -bottom-1 -right-1" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className={cn("truncate text-sm", t.unread ? "font-semibold" : "font-medium")}>{t.participantName}</span>
-                      {t.practice && <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[10.5px] font-semibold text-muted-foreground">Practice</span>}
-                      <span className="ml-auto shrink-0 text-xs text-muted-foreground">{ago(t.lastMessageAt)}</span>
-                    </span>
-                    <span className="mt-0.5 flex items-center gap-2">
-                      <span className={cn("truncate text-[13px]", t.unread ? "text-foreground" : "text-muted-foreground")}>{t.snippet || "No text"}</span>
-                      {t.unread > 0 && <span aria-hidden="true" className="ml-auto h-2.5 w-2.5 shrink-0 rounded-full bg-lime" />}
-                    </span>
-                  </span>
-                </button>
+function MessageProblems({ problems }: { problems: Problem[] }) {
+  const [more, setMore] = useState(false);
+  return (
+    <ConnectionStrip
+      title={problems[0].message}
+      body={problems.length > 1 ? `And ${problems.length - 1} more.` : undefined}
+      actions={
+        problems.some((p) => p.detail) || problems.length > 1 ? (
+          <button type="button" onClick={() => setMore((v) => !v)} aria-expanded={more} aria-controls="dm-problems" className={stripButton}>
+            {more ? "Hide" : "Details"}
+          </button>
+        ) : undefined
+      }
+      details={
+        more && (
+          <ul id="dm-problems" className="mt-3 space-y-2 border-t border-warning/20 pt-3">
+            {problems.map((p) => (
+              <li key={`${p.platform}-${p.code}`}>
+                <p className="font-medium">{p.message}</p>
+                {p.detail && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer py-1 text-xs text-muted-foreground">What {PLATFORM_META[p.platform].name} said</summary>
+                    <pre className="mt-1 whitespace-pre-wrap break-all text-[11px] text-muted-foreground">{p.detail}</pre>
+                  </details>
+                )}
               </li>
             ))}
           </ul>
-          <div className={cn(!open && "hidden lg:block")}>
-            {open ? (
-              <ThreadPane key={open.id} thread={open} onBack={() => setOpenId(null)} onRead={onRead} onSent={onSent} onClosed={onClosed} toast={toast} readOnly={!!initial.readOnly} />
-            ) : (
-              <div className="grid h-full place-items-center rounded-[28px] bg-secondary/30 p-10 text-center text-sm text-muted-foreground hairline">Pick a conversation to read it.</div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    />
   );
+}
+
+const dayOf = (iso: string) => new Date(iso).toDateString();
+function dayLabel(iso: string) {
+  const d = new Date(iso);
+  const today = new Date();
+  const y = new Date(today);
+  y.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === y.toDateString()) return "Yesterday";
+  return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 }
 
 function ThreadPane({
@@ -322,25 +423,33 @@ function ThreadPane({
   const appLink = thread.platform === "instagram" ? "https://www.instagram.com/direct/inbox/" : "https://business.facebook.com/latest/inbox";
 
   return (
-    <section aria-label={`Conversation with ${thread.participantName}`} className="flex h-[calc(100dvh-11rem)] min-h-[420px] flex-col rounded-[28px] bg-secondary/30 hairline lg:sticky lg:top-24">
-      <header className="flex items-center gap-3 border-b border-foreground/10 px-3 py-3 sm:px-4">
-        <button type="button" onClick={onBack} aria-label="Back to conversations" className="grid h-11 w-11 place-items-center rounded-full hover:bg-secondary lg:hidden">
+    <section aria-label={`Conversation with ${thread.participantName}`} className="flex min-h-0 flex-1 flex-col">
+      <header className="flex items-center gap-2.5 border-b border-border px-2 pb-2 pt-[max(8px,env(safe-area-inset-top))] lg:gap-3 lg:px-5 lg:py-3">
+        <button type="button" onClick={onBack} aria-label="Back to conversations" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring lg:hidden">
           <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </button>
-        <Avatar t={thread} size={36} />
+        <ThreadAvatar t={thread} size={38} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{thread.participantName}</p>
-          <p className="truncate text-xs text-muted-foreground">
+          <h2 className="truncate text-[14.5px] font-semibold">{thread.participantName}</h2>
+          <p className="truncate text-[12px] text-muted-foreground">
             {thread.participantHandle ? `${thread.participantHandle} · ` : ""}
             {name} · to {thread.accountName}
           </p>
         </div>
-        <a href={appLink} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center gap-1 rounded-full px-3 text-xs font-medium text-muted-foreground hover:bg-secondary">
-          Open in {name} <ExternalLink className="h-3 w-3" aria-hidden="true" />
+        {!locked ? (
+          <span className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-lime/20 px-3 text-[12.5px] font-semibold text-lime-ink" title="Meta lets you reply here for 24 hours after their last message">
+            <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+            <span suppressHydrationWarning>{hrs >= 1 ? `${Math.floor(hrs)} h left` : "Under 1 h left"}</span>
+          </span>
+        ) : block?.code === "WINDOW_CLOSED" ? (
+          <span className="inline-flex h-8 shrink-0 items-center rounded-full bg-secondary px-3 text-[12.5px] font-medium text-muted-foreground">Window closed</span>
+        ) : null}
+        <a href={appLink} target="_blank" rel="noopener noreferrer" aria-label={`Open in ${name}`} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-foreground hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring lg:flex lg:h-10 lg:w-auto lg:items-center lg:gap-1.5 lg:rounded-xl lg:px-3.5 lg:text-[13px] lg:font-medium lg:hairline">
+          <span className="hidden lg:inline">Open in {name}</span> <ExternalLink className="h-4 w-4" aria-hidden="true" />
         </a>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-4" aria-live="polite">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 lg:px-6" aria-live="polite">
         {loadErr && (
           <p role="alert" className="text-sm text-destructive">
             {loadErr}
@@ -349,9 +458,14 @@ function ThreadPane({
         {!messages && !loadErr && <p className="text-sm text-muted-foreground">Opening…</p>}
         {messages && messages.length === 0 && <p className="text-sm text-muted-foreground">No messages stored for this conversation yet.</p>}
         <ol className="space-y-2">
-          {(messages ?? []).map((m) => (
-            <li key={m.id} className={cn("flex", m.direction === "out" ? "justify-end" : "justify-start")}>
-              <div className={cn("max-w-[80%] rounded-[20px] px-3.5 py-2 text-[14.5px]", m.direction === "out" ? "bg-lime/20 text-foreground" : "bg-card text-foreground hairline")}>
+          {(messages ?? []).map((m, i, all) => (
+            <li key={m.id} className={cn("flex flex-wrap", m.direction === "out" ? "justify-end" : "justify-start")}>
+              {(i === 0 || dayOf(all[i - 1].sentAt) !== dayOf(m.sentAt)) && (
+                <p className="mb-1 mt-2 w-full text-center text-[11.5px] font-medium text-muted-foreground first:mt-0" suppressHydrationWarning>
+                  {dayLabel(m.sentAt)}
+                </p>
+              )}
+              <div className={cn("max-w-[80%] rounded-[20px] px-3.5 py-2 text-[14.5px] lg:max-w-[70%]", m.direction === "out" ? "bg-lime/25 text-foreground dark:bg-lime/20" : "bg-secondary text-foreground")}>
                 {m.text && <p className="whitespace-pre-wrap break-words">{m.text}</p>}
                 {m.attachments.map((a, i) =>
                   a.url && /^https:\/\//i.test(a.url) ? (
@@ -413,7 +527,7 @@ function ThreadPane({
         <div ref={bottom} />
       </div>
 
-      <div className="border-t border-foreground/10 px-3 py-3 sm:px-4">
+      <div className="border-t border-border px-3 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 lg:pb-3.5 lg:pl-5 lg:pr-[76px]">
         {/* 1090: the composer is always there. When it can't send, it says why and where to answer instead. */}
         {readOnly ? (
           <p id={`dm-lock-${thread.id}`} role="note" className="mb-2 rounded-2xl bg-secondary/60 p-3.5 text-sm">
@@ -469,8 +583,8 @@ function ThreadPane({
             </ul>
           </div>
         )}
-        <form onSubmit={send} className="flex items-end gap-2">
-          <Button type="button" variant="ghost" size="icon" onClick={suggest} disabled={locked || thinking || !lastIn?.text} aria-label={ideas ? "More reply ideas" : "Suggest replies"} title="Suggest replies" className="h-11 w-11 shrink-0">
+        <form onSubmit={send} className={cn("flex items-end gap-1.5 rounded-[18px] bg-card p-1.5 hairline focus-within:ring-2 focus-within:ring-foreground/25", locked && "opacity-70")}>
+          <Button type="button" variant="ghost" size="icon" onClick={suggest} disabled={locked || thinking || !lastIn?.text} aria-label={ideas ? "More reply ideas" : "Suggest replies"} title="Suggest replies" className="h-11 w-11 shrink-0 rounded-[13px]">
             <Sparkles className={cn("h-4 w-4", thinking && "animate-pulse")} aria-hidden="true" />
           </Button>
           <Textarea
@@ -490,16 +604,24 @@ function ThreadPane({
             aria-describedby={locked ? `dm-lock-${thread.id}` : undefined}
             placeholder={locked ? (readOnly ? "Editors can't reply" : block?.code === "WINDOW_CLOSED" ? "Reply window closed" : "Replies unavailable here") : `Message ${thread.participantName}…`}
             aria-label={`Message ${thread.participantName}`}
-            className="max-h-40 min-h-[44px] py-2.5 text-sm"
+            className="max-h-40 min-h-[44px] rounded-none border-0 bg-transparent px-1 py-2.5 text-[16px] shadow-none outline-none ring-0 [box-shadow:none] focus:bg-transparent lg:text-[14.5px]"
           />
-          <Button type="submit" variant="lime" size="icon" disabled={locked || busy || !text.trim()} aria-label={busy ? "Sending" : "Send message"} className="h-11 w-11 shrink-0">
+          <Button type="submit" variant="lime" size="icon" disabled={locked || busy || !text.trim()} aria-label={busy ? "Sending" : "Send message"} className="h-11 w-11 shrink-0 rounded-[13px]">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Send className="h-4 w-4" aria-hidden="true" />}
           </Button>
         </form>
         {!locked && (
-          <p className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-            <Clock className="h-3 w-3" aria-hidden="true" />
-            {hrs >= 1 ? `You can reply for about ${Math.floor(hrs)} more ${Math.floor(hrs) === 1 ? "hour" : "hours"}.` : "Less than an hour left to reply."} {text.length > MAX - 100 && `${MAX - text.length} characters left.`}
+          <p className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[11.5px] text-muted-foreground">
+            <span className="hidden lg:inline">
+              <Kbd>Enter</Kbd> send
+            </span>
+            <span className="hidden lg:inline">
+              <Kbd>Shift</Kbd>
+              <Kbd>Enter</Kbd> new line
+            </span>
+            <span className="lg:ml-auto" suppressHydrationWarning>
+              {hrs >= 1 ? `You can reply for about ${Math.floor(hrs)} more ${Math.floor(hrs) === 1 ? "hour" : "hours"}.` : "Less than an hour left to reply."} {text.length > MAX - 100 && `${MAX - text.length} characters left.`}
+            </span>
           </p>
         )}
         {err && (
