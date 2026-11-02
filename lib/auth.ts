@@ -15,6 +15,8 @@ export { SESSION_COOKIE };
 const secret = new TextEncoder().encode(env.AUTH_SECRET);
 const MAX_AGE = 60 * 60 * 24 * 14; // 14 days
 const SHORT_AGE = 60 * 60 * 24; // a sign-in that chose "Don't remember this device"
+/** A browser signed in from an app start link (security 1086): only long enough to finish one connect. */
+const HANDOFF_AGE = 15 * 60;
 
 export async function hashPassword(pw: string) {
   return bcrypt.hash(pw, 11);
@@ -62,23 +64,26 @@ async function openSessionRow(userId: string, ageS: number, sid?: string): Promi
   }
 }
 
-export async function createSession(userId: string, { persist = true, sid }: { persist?: boolean; sid?: string } = {}) {
+export async function createSession(userId: string, { persist = true, sid, handoff = false }: { persist?: boolean; sid?: string; handoff?: boolean } = {}) {
   const v = (await db.user.findUnique({ where: { id: userId }, select: { tokenVersion: true } }))?.tokenVersion ?? 0;
-  const id = await openSessionRow(userId, persist ? MAX_AGE : SHORT_AGE, sid);
+  // A hand-off session (1086) is never remembered and lives 15 minutes: see /api/app/start.
+  const age = handoff ? HANDOFF_AGE : persist ? MAX_AGE : SHORT_AGE;
+  const keep = persist && !handoff;
+  const id = await openSessionRow(userId, age, sid);
   // "Don't remember this device" (1053): a browser-session cookie (gone when the browser closes) whose token
   // also stops working after a day, for browsers that restore session cookies on restart.
-  const claims: Record<string, unknown> = { sub: userId, v, ...(id ? { sid: id } : {}), ...(persist ? {} : { rm: 0 }) };
+  const claims: Record<string, unknown> = { sub: userId, v, ...(id ? { sid: id } : {}), ...(keep ? {} : { rm: 0 }), ...(handoff ? { ho: 1 } : {}) };
   const token = await new SignJWT(claims)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${persist ? MAX_AGE : SHORT_AGE}s`)
+    .setExpirationTime(`${age}s`)
     .sign(secret);
   cookies().set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    ...(persist ? { maxAge: MAX_AGE } : {}),
+    ...(keep ? { maxAge: MAX_AGE } : {}),
   });
 }
 
@@ -88,13 +93,13 @@ export function destroySession() {
 }
 
 /** Cookie contents, signature-checked only. Tokens issued before `v` existed read as v=0; before 1080, sid=null. */
-async function readSessionClaims(): Promise<{ id: string; v: number; iat: number; rm: boolean; sid: string | null } | null> {
+async function readSessionClaims(): Promise<{ id: string; v: number; iat: number; rm: boolean; sid: string | null; ho: boolean } | null> {
   const token = cookies().get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
     if (typeof payload.sub !== "string") return null;
-    return { id: payload.sub, v: typeof payload.v === "number" ? payload.v : 0, iat: payload.iat ?? 0, rm: payload.rm !== 0, sid: typeof payload.sid === "string" ? payload.sid : null };
+    return { id: payload.sub, v: typeof payload.v === "number" ? payload.v : 0, iat: payload.iat ?? 0, rm: payload.rm !== 0, sid: typeof payload.sid === "string" ? payload.sid : null, ho: payload.ho === 1 };
   } catch {
     return null;
   }
@@ -113,6 +118,11 @@ const sessionCheck = (sid: string | null) => (sid ? { sessions: { where: { id: s
 /** Signed out from another device: its row is gone. Cookies without `sid` (pre-1080) pass. */
 const sessionAlive = (u: object, sid: string | null) => !sid || ((u as { sessions?: unknown[] }).sessions?.length ?? 0) > 0;
 
+/** True when this browser was signed in by an app start link (1086), not by the person signing in here. */
+export async function isHandoffSession(): Promise<boolean> {
+  return (await readSessionClaims())?.ho ?? false;
+}
+
 /** The Active sessions row id this browser's cookie carries, or null (signed out, or a pre-1080 cookie). */
 export async function currentSessionId(): Promise<string | null> {
   return (await readSessionClaims())?.sid ?? null;
@@ -128,7 +138,7 @@ export async function endSession() {
 /** Re-issue this browser's cookie on the current token version, keeping its row and its remember choice. */
 export async function reissueSession(userId: string) {
   const claims = await readSessionClaims();
-  await createSession(userId, { persist: claims?.rm !== false, sid: claims?.sid ?? undefined });
+  await createSession(userId, { persist: claims?.rm !== false, sid: claims?.sid ?? undefined, handoff: claims?.ho ?? false });
 }
 
 const RENEW_AFTER = 60 * 60 * 24 * 3;
@@ -142,7 +152,7 @@ export async function renewSession() {
   const claims = await readSessionClaims();
   if (!claims || !sessionNeedsRenewal(claims.iat)) return false;
   if ((await readSessionUserId()) !== claims.id) return false;
-  if (!claims.rm) return false; // a "don't remember" sign-in is never stretched
+  if (!claims.rm || claims.ho) return false; // a "don't remember" or hand-off sign-in is never stretched
   await createSession(claims.id, { sid: claims.sid ?? undefined });
   return true;
 }

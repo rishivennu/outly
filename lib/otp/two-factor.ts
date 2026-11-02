@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import { db } from "../db";
@@ -29,13 +30,26 @@ const ISSUER = "Outlly";
 /** Six wrong codes per person per 15 minutes; right ones don't count. */
 const FAILS = [6, 15 * 60_000] as const;
 const failKey = (userId: string) => `2fa:fail:${userId}`;
-const guard = (userId: string) => {
-  if (isLimited(failKey(userId), ...FAILS)) throw new HttpError(429, "Too many wrong codes. Wait a few minutes and try again.", "2FA_LOCKED");
-};
-const wrong = (userId: string, msg: string) => {
+/*
+ * The count lives in the database too (security 1086). The in-memory one is per server instance, so with
+ * several instances (and no shared Redis) each one allowed its own six guesses.
+ */
+const FAIL_FEATURE = "2fa-fail";
+const FAIL_PERIOD = "window";
+const locked = () => new HttpError(429, "Too many wrong codes. Wait a few minutes and try again.", "2FA_LOCKED");
+export async function guard(userId: string) {
+  if (isLimited(failKey(userId), ...FAILS)) throw locked();
+  const since = new Date(Date.now() - FAILS[1]);
+  const n = await db.featureUse.count({ where: { userId, feature: FAIL_FEATURE, period: FAIL_PERIOD, createdAt: { gte: since } } }).catch(() => 0);
+  if (n >= FAILS[0]) throw locked();
+}
+export async function wrong(userId: string, msg: string) {
   rateLimit(failKey(userId), ...FAILS);
+  const since = new Date(Date.now() - FAILS[1]);
+  await db.featureUse.deleteMany({ where: { userId, feature: FAIL_FEATURE, period: FAIL_PERIOD, createdAt: { lt: since } } }).catch(() => {});
+  await db.featureUse.create({ data: { userId, feature: FAIL_FEATURE, period: FAIL_PERIOD, ref: randomUUID() }, select: { id: true } }).catch(() => {});
   return new HttpError(400, msg, "2FA_WRONG");
-};
+}
 
 /** Finish a first-step sign-in: a full session, or the second-step challenge if the account asks for one. */
 /**
@@ -100,7 +114,7 @@ type Factor = { totpSecret: string | null; totpLastStep: number | null; recovery
  * Writes are conditional on the old value, so the same code raced from two tabs only works once.
  */
 async function spendFactor(userId: string, u: Factor, input: string): Promise<"totp" | "recovery"> {
-  guard(userId);
+  await guard(userId);
   if (!u.totpSecret) throw new HttpError(400, "Two-step sign-in isn't set up.", "2FA_OFF");
   const code = normalizeCode(input);
   if (isCodeShape(code)) {
@@ -109,7 +123,7 @@ async function spendFactor(userId: string, u: Factor, input: string): Promise<"t
       const r = await db.user.updateMany({ where: { id: userId, totpLastStep: u.totpLastStep }, data: { totpLastStep: step } });
       if (r.count === 1) return "totp";
     }
-    throw wrong(userId, "That code doesn't match. Use the newest one in your authenticator app.");
+    throw await wrong(userId, "That code doesn't match. Use the newest one in your authenticator app.");
   }
   if (looksLikeRecovery(input)) {
     const left = spendRecovery(parseHashes(u.recoveryCodes), env.AUTH_SECRET, input);
@@ -117,7 +131,7 @@ async function spendFactor(userId: string, u: Factor, input: string): Promise<"t
       const r = await db.user.updateMany({ where: { id: userId, recoveryCodes: u.recoveryCodes }, data: { recoveryCodes: JSON.stringify(left) } });
       if (r.count === 1) return "recovery";
     }
-    throw wrong(userId, "That recovery code doesn't match, or it was already used.");
+    throw await wrong(userId, "That recovery code doesn't match, or it was already used.");
   }
   throw new HttpError(400, "Enter the 6-digit code from your app, or one of your recovery codes.", "2FA_SHAPE");
 }
@@ -158,10 +172,10 @@ export async function completeSignIn(input: string, via: "app" | "whatsapp" = "a
   }
   let used: "totp" | "recovery" | "whatsapp";
   if (via === "whatsapp") {
-    guard(userId);
+    await guard(userId);
     if (!(await whatsappTarget(ch))) throw new HttpError(400, "WhatsApp codes aren't available for this sign-in. Use your authenticator app or a recovery code.", "WA_NOT_OFFERED");
     const v = await claimCode(`2fa:${userId}`, "2fa", input);
-    if (v !== "ok") throw wrong(userId, WA_MESSAGE[v as keyof typeof WA_MESSAGE] ?? WA_MESSAGE.wrong);
+    if (v !== "ok") throw await wrong(userId, WA_MESSAGE[v as keyof typeof WA_MESSAGE] ?? WA_MESSAGE.wrong);
     used = "whatsapp";
   } else used = await spendFactor(userId, u, input);
   cookies().delete(CHALLENGE_COOKIE);
@@ -205,9 +219,9 @@ export async function enable(userId: string, code: string) {
   const u = await db.user.findUnique({ where: { id: userId }, select: { totpSecret: true, totpEnabledAt: true } });
   if (!u?.totpSecret) throw new HttpError(400, "Start the setup again to get a fresh QR code.", "2FA_NO_SETUP");
   if (u.totpEnabledAt) throw new HttpError(409, "Two-step sign-in is already on.", "2FA_ON");
-  guard(userId);
+  await guard(userId);
   const step = verifyTotp(decrypt(u.totpSecret), code);
-  if (step == null) throw wrong(userId, "That code doesn't match. Check the time on your phone is set automatically, then try the newest code.");
+  if (step == null) throw await wrong(userId, "That code doesn't match. Check the time on your phone is set automatically, then try the newest code.");
   const codes = newRecoveryCodes();
   await db.user.update({
     where: { id: userId },

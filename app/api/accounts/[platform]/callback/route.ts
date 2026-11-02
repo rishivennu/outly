@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isHandoffSession } from "@/lib/auth";
+import { APP_CH_COOKIE, APP_RETURN_PATH, holdConnect, validChallenge } from "@/lib/app-handoff";
 import { saveConnectedAccount } from "@/lib/accounts";
 import { env } from "@/lib/env";
 import { isPlatform } from "@/lib/domain";
@@ -31,13 +32,23 @@ export async function GET(req: NextRequest, { params }: { params: { platform: st
   const back = (q: string) => NextResponse.redirect(new URL(`${pending?.returnTo ?? "/accounts"}${(pending?.returnTo ?? "").includes("?") ? "&" : "?"}${q}`, env.APP_URL));
   if (!pending) return back(`connect_error=${p}&reason=state`);
   if (user.role !== "owner") return back(`connect_error=${p}&reason=owner_only`);
+  // 1086: a browser signed in by an app start link may only connect through the app's own flow, which holds
+  // the account until the app that started it finishes. A link someone sent can't attach an account to them.
+  const fromApp = pending.returnTo.startsWith(APP_RETURN_PATH);
+  const ch = req.cookies.get(APP_CH_COOKIE)?.value;
+  if ((await isHandoffSession()) && (!fromApp || !validChallenge(ch))) return back(`connect_error=${p}&reason=state`);
   const code = req.nextUrl.searchParams.get("code");
   if (!code) return back(`connect_error=${p}&reason=${encodeURIComponent(req.nextUrl.searchParams.get("error") ?? "denied")}`);
   try {
     const prof = await getPublisher(p).completeConnect(code, `${env.APP_URL}/api/accounts/${p}/callback`, pending.verifier);
+    const notice = prof.declined?.length ? "&notice=dm_scope" : "";
+    if (fromApp && validChallenge(ch)) {
+      const hold = await holdConnect({ uid: user.id, ch, platform: p, prof });
+      return back(`connected=${p}${notice}&hold=${hold}`);
+    }
     await saveConnectedAccount(user.id, p, prof);
     invalidateDashboards(user.id);
-    return back(`connected=${p}${prof.declined?.length ? "&notice=dm_scope" : ""}`);
+    return back(`connected=${p}${notice}`);
   } catch (e) {
     console.error("[oauth callback]", p, e, (e as { technical?: string }).technical ?? "");
     const res = back(`connect_error=${p}&reason=${connectReason(e)}`);

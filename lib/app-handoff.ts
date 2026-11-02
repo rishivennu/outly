@@ -4,6 +4,9 @@ import { SignJWT, jwtVerify } from "jose";
 import { db } from "./db";
 import { env } from "./env";
 import { safeReturnTo } from "./oauth-state";
+import { decrypt, encrypt } from "./crypto";
+import type { Platform } from "./domain";
+import type { ConnectedProfile } from "./social/types";
 
 /*
  * Google and Meta refuse to show their sign-in pages inside an app WebView, so in the Android app those
@@ -63,7 +66,7 @@ export function returnTarget(params: URLSearchParams): string {
   const next = safeReturnTo(params.get("next"));
   const u = new URL(next, "http://outlly.invalid");
   params.forEach((v, k) => {
-    if (k !== "next") u.searchParams.set(k, v);
+    if (k !== "next" && k !== "hold") u.searchParams.set(k, v);
   });
   return u.pathname + u.search;
 }
@@ -100,18 +103,14 @@ function browserTargetCheck(to: unknown) {
  * (or sent to another phone) is dead after the first open.
  */
 export async function claimStart(uid: string, jti: string) {
-  try {
-    await db.featureUse.create({ data: { userId: uid, feature: "app-start", period: "once", ref: jti }, select: { id: true } });
-    return true;
-  } catch {
-    return false;
-  }
+  return claimOnce(uid, "app-start", jti);
 }
 
-export async function signCode(p: { uid: string | null; ch: string; next: string }) {
-  return new SignJWT({ ch: p.ch, next: p.next, ...(p.uid ? { sub: p.uid } : {}) })
+export async function signCode(p: { uid: string | null; ch: string; next: string; hold?: string | null }) {
+  return new SignJWT({ ch: p.ch, next: p.next, ...(p.uid ? { sub: p.uid } : {}), ...(p.hold ? { hold: p.hold } : {}) })
     .setProtectedHeader({ alg: "HS256" })
     .setAudience("outlly-app-code")
+    .setJti(randomUUID())
     .setIssuedAt()
     .setExpirationTime(`${CODE_TTL}s`)
     .sign(key());
@@ -122,8 +121,61 @@ export async function redeemCode(code: unknown, verifier: unknown) {
   if (typeof code !== "string" || !validVerifier(verifier)) return null;
   try {
     const { payload } = await jwtVerify(code, key(), { algorithms: ["HS256"], audience: "outlly-app-code" });
-    if (payload.ch !== challengeOf(verifier) || typeof payload.next !== "string") return null;
-    return { uid: typeof payload.sub === "string" ? payload.sub : null, next: safeReturnTo(payload.next) };
+    if (payload.ch !== challengeOf(verifier) || typeof payload.next !== "string" || typeof payload.jti !== "string") return null;
+    const uid = typeof payload.sub === "string" ? payload.sub : null;
+    // One use (1086): a copied code can't mint a second session for the same person.
+    if (uid && !(await claimOnce(uid, "app-code", payload.jti))) return null;
+    return { uid, ch: payload.ch as string, next: safeReturnTo(payload.next), hold: typeof payload.hold === "string" && HOLD_ID.test(payload.hold) ? payload.hold : null };
+  } catch {
+    return null;
+  }
+}
+
+async function claimOnce(uid: string, feature: string, jti: string) {
+  try {
+    await db.featureUse.create({ data: { userId: uid, feature, period: "once", ref: jti }, select: { id: true } });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/*
+ * Held connects (security 1086). A start link signs the Custom Tab in as the app's user, so the link alone
+ * must never be enough to attach an account: anyone can mint one for their own studio and send it to
+ * someone else, whose Instagram would then land in the sender's workspace. So a connect that began in the
+ * app is not saved by the callback. It is held here, bound to that user and the app's challenge, and only
+ * /api/app/finish saves it, with the verifier that never left the phone that started the flow.
+ */
+const HOLD_PREFIX = "app-hold:";
+const HOLD_TTL_MS = 15 * 60_000;
+export const HOLD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+type Held = { uid: string; ch: string; platform: Platform; prof: ConnectedProfile };
+
+/** Expired holds carry encrypted tokens, so they're swept on every hold and every take. */
+const sweepHolds = () =>
+  db.setting.deleteMany({ where: { key: { startsWith: HOLD_PREFIX }, updatedAt: { lt: new Date(Date.now() - HOLD_TTL_MS) } } }).catch(() => {});
+
+export async function holdConnect(h: Held): Promise<string> {
+  const id = randomUUID();
+  await sweepHolds();
+  await db.setting.create({ data: { key: HOLD_PREFIX + id, value: encrypt(JSON.stringify(h)) } });
+  return id;
+}
+
+/** The held connect, once: only for the same user and challenge, and only while it is fresh. */
+export async function takeHeld(id: string, uid: string | null, ch: string): Promise<Held | null> {
+  if (!HOLD_ID.test(id) || !uid) return null;
+  await sweepHolds();
+  const row = await db.setting.findUnique({ where: { key: HOLD_PREFIX + id } });
+  if (!row) return null;
+  const gone = await db.setting.deleteMany({ where: { key: HOLD_PREFIX + id, updatedAt: row.updatedAt } });
+  if (gone.count !== 1 || Date.now() - row.updatedAt.getTime() > HOLD_TTL_MS) return null;
+  try {
+    const h = JSON.parse(decrypt(row.value)) as Held;
+    if (h.uid !== uid || h.ch !== ch) return null;
+    if (h.prof.expiresAt) h.prof.expiresAt = new Date(h.prof.expiresAt);
+    return h;
   } catch {
     return null;
   }

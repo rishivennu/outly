@@ -12,7 +12,9 @@ export async function GET(req: NextRequest) {
   const start = await readStart(req.nextUrl.searchParams.get("t"));
   if (!start || (start.uid && !(await claimStart(start.uid, start.jti)))) return NextResponse.redirect(`${APP_DEEP_LINK}?error=expired`);
   if (start.uid) {
-    await createSession(start.uid);
+    // Short-lived and marked (1086): enough to finish this one flow, and the callback holds any connect it
+    // makes until the app proves it started it (lib/app-handoff.ts, held connects).
+    await createSession(start.uid, { handoff: true });
     // A teammate workspace picked earlier in this browser would make the connect run as that workspace.
     cookies().delete(WS_COOKIE);
   }

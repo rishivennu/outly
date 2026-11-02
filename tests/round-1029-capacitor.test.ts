@@ -106,11 +106,14 @@ describe("PKCE handoff codes", () => {
     expect(validVerifier("x".repeat(43) + "!")).toBe(false);
   });
   test("a code only redeems with the verifier that made its challenge", async () => {
-    const code = await signCode({ uid: "u1", ch: CH, next: "/calendar" });
-    expect(await redeemCode(code, VERIFIER)).toEqual({ uid: "u1", next: "/calendar" });
+    // 1086: codes are one use and claimed against a real user, so wrong verifiers are tried first.
+    const u = await mkUser("pkce");
+    const code = await signCode({ uid: u.id, ch: CH, next: "/calendar" });
     expect(await redeemCode(code, VERIFIER.replace("v", "w"))).toBeNull();
     expect(await redeemCode(code, undefined)).toBeNull();
     expect(await redeemCode("not-a-jwt", VERIFIER)).toBeNull();
+    expect(await redeemCode(code, VERIFIER)).toEqual({ uid: u.id, ch: CH, next: "/calendar", hold: null });
+    expect(await redeemCode(code, VERIFIER)).toBeNull();
   });
   test("a code signed out as a start link (other audience) or expired is refused", async () => {
     const start = await signStart({ uid: "u1", to: "/api/auth/google", ch: CH });

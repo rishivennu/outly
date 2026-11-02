@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readSessionUserId } from "@/lib/auth";
-import { APP_CH_COOKIE, APP_DEEP_LINK, returnTarget, signCode, validChallenge } from "@/lib/app-handoff";
+import { APP_CH_COOKIE, APP_DEEP_LINK, HOLD_ID, returnTarget, signCode, validChallenge } from "@/lib/app-handoff";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
   // The cookie is left to expire rather than deleted: Next's client router fetches this URL once for its
   // own payload before loading it for real, and the second load still has to find it.
   if (!validChallenge(ch)) return NextResponse.redirect(`${APP_DEEP_LINK}?error=expired`);
-  const code = await signCode({ uid: await readSessionUserId(), ch, next: returnTarget(req.nextUrl.searchParams) });
+  const hold = req.nextUrl.searchParams.get("hold");
+  const code = await signCode({ uid: await readSessionUserId(), ch, next: returnTarget(req.nextUrl.searchParams), hold: hold && HOLD_ID.test(hold) ? hold : null });
   const link = `${APP_DEEP_LINK}?code=${encodeURIComponent(code)}`;
   // Straight off a consent tap Chrome follows a redirect into the app. After the 2FA step the page got here
   // by script, which Chrome won't let open an app on its own, so show a button to tap.
