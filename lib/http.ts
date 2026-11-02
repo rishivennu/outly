@@ -1,7 +1,7 @@
 import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import { ZodError } from "zod";
-import { getCurrentUser, type SessionUser } from "./auth";
+import { getCurrentUser, SESSION_COOKIE, type SessionUser } from "./auth";
 import { limitShared } from "./rate-limit";
 import { env } from "./env";
 import { getConfig } from "./settings";
@@ -100,6 +100,23 @@ export function clientIp(req: NextRequest) {
 }
 const clientKey = clientIp;
 
+/**
+ * Rate limits (11-02). They used to be per IP only, so a team behind one office network or carrier NAT shared
+ * one budget (a 100-user test on one address got 38% "slow down"). Now:
+ *  - public routes (sign-in, sign-up...) and requests without a session cookie: per IP, as before;
+ *  - signed-in routes: per user at the route's limit, with a per-IP ceiling IP_CEILING_X times higher so one
+ *    address still can't flood a route;
+ *  - a session cookie that turns out to be invalid is charged to the plain per-IP budget, so a made-up cookie
+ *    buys nothing.
+ */
+export const IP_CEILING_X = 10;
+export function ipBudget(limit: number, opts: { auth?: boolean }, hasSession: boolean) {
+  return opts.auth !== false && hasSession ? { prefix: "ipc:", limit: limit * IP_CEILING_X } : { prefix: "", limit };
+}
+const userKey = (userId: string, path: string, method: string) => `u:${userId}:${path}:${method}`;
+const slowDown = (retryAfter: number) =>
+  json({ error: "You're moving fast. Give it a moment.", code: "RATE_LIMITED" }, { status: 429, headers: { "Retry-After": String(retryAfter) } });
+
 /** Public endpoints that stay open during maintenance so members can sign back in. */
 const MAINTENANCE_OPEN = ["/api/maintenance", "/api/auth/login", "/api/auth/code", "/api/auth/2fa", "/api/auth/logout", "/api/support/chat", "/api/health", "/api/email/unsubscribe"];
 
@@ -123,12 +140,12 @@ export function route<C = { params: Record<string, string> }>(
     try {
       assertSameOrigin(req);
       const [limit, windowMs] = opts.limit ?? [120, 60_000];
-      const rl = await limitShared(`${clientKey(req)}:${req.nextUrl.pathname}:${req.method}`, limit, windowMs);
-      if (!rl.ok)
-        return json(
-          { error: "You're moving fast. Give it a moment.", code: "RATE_LIMITED" },
-          { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
-        );
+      const path = req.nextUrl.pathname;
+      const ipKey = `${clientKey(req)}:${path}:${req.method}`;
+      const hasSession = !!req.cookies.get(SESSION_COOKIE)?.value;
+      const ip = ipBudget(limit, opts, hasSession);
+      const rl = await limitShared(ip.prefix + ipKey, ip.limit, windowMs);
+      if (!rl.ok) return slowDown(rl.retryAfter);
       // Maintenance (10-13): members who joined before it began keep working, admins too. Strangers get a
       // 503, except the few public endpoints a member needs to get back in (sign in/out, status, support chat).
       const site = await getConfig("site");
@@ -141,7 +158,15 @@ export function route<C = { params: Record<string, string> }>(
       await loadKeys(); // platform app keys saved in the admin console (cached)
       if (opts.auth !== false) {
         user ??= await getCurrentUser();
-        if (!user) return json({ error: "Please sign in again.", code: "UNAUTHENTICATED" }, { status: 401 });
+        if (!user) {
+          if (hasSession) {
+            const bad = await limitShared(ipKey, limit, windowMs);
+            if (!bad.ok) return slowDown(bad.retryAfter);
+          }
+          return json({ error: "Please sign in again.", code: "UNAUTHENTICATED" }, { status: 401 });
+        }
+        const ul = await limitShared(userKey(user.id, path, req.method), limit, windowMs);
+        if (!ul.ok) return slowDown(ul.retryAfter);
         const blocked = memberBlock(user.role, req.method, req.nextUrl.pathname);
         if (blocked) return json({ error: blocked, code: "ROLE" }, { status: 403 });
       }
