@@ -24,7 +24,7 @@ export class YouTubePublisher implements SocialPublisher {
   readonly platform = "youtube" as const;
 
   /** `identity` adds openid/email so the same consent can also sign the creator in to Outlly. */
-  async connect(redirectUri: string, opts: { identity?: boolean } = {}) {
+  async connect(redirectUri: string, opts: { identity?: boolean; fresh?: boolean } = {}) {
     const state = newState();
     const u = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     u.search = new URLSearchParams({
@@ -33,7 +33,7 @@ export class YouTubePublisher implements SocialPublisher {
       response_type: "code",
       scope: `${opts.identity ? "openid email profile " : ""}${YT_SCOPES}`,
       access_type: "offline",
-      prompt: "consent",
+      prompt: "select_account consent", // 1094/1095: Google's account picker every time, so a different channel is one click away
       include_granted_scopes: "true",
       state,
     }).toString();

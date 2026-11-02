@@ -1,5 +1,6 @@
 "use client";
 import { forwardRef, useEffect, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
@@ -149,34 +150,41 @@ export function ScopeBar({
   platform: Platform | "all";
   onPlatform: (p: Platform | "all") => void;
 }) {
-  const pill = "relative inline-flex h-8 items-center rounded-full px-3.5 text-[13px] font-medium transition before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  // 44px tap height from the pseudo-element; the pill itself stays compact.
+  const seg = "relative inline-flex h-8 items-center whitespace-nowrap rounded-full px-3.5 text-[13px] font-medium transition before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
   return (
-    <div className="mt-2.5 flex items-center gap-1.5">
-      <button type="button" aria-pressed={needsOnly} onClick={() => onNeedsOnly(true)} className={cn(pill, needsOnly ? "bg-foreground text-background" : "text-muted-foreground hairline hover:text-foreground")}>
-        Needs reply
-      </button>
-      <button type="button" aria-pressed={!needsOnly} onClick={() => onNeedsOnly(false)} className={cn(pill, !needsOnly ? "bg-foreground text-background" : "text-muted-foreground hairline hover:text-foreground")}>
-        All
-      </button>
+    <div className="mt-2.5 flex items-center gap-2">
+      <div role="group" aria-label="Which to show" className="flex shrink-0 rounded-full bg-secondary p-0.5">
+        <button type="button" aria-pressed={needsOnly} onClick={() => onNeedsOnly(true)} className={cn(seg, needsOnly ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+          Needs reply
+        </button>
+        <button type="button" aria-pressed={!needsOnly} onClick={() => onNeedsOnly(false)} className={cn(seg, !needsOnly ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+          All
+        </button>
+      </div>
       <span className="flex-1" />
-      {platforms.map((p) => {
-        const on = platform === p;
-        return (
-          <button
-            key={p}
-            type="button"
-            aria-pressed={on}
-            aria-label={on ? `Showing ${PLATFORM_META[p].name} only. Show every platform` : `Show ${PLATFORM_META[p].name} only`}
-            title={PLATFORM_META[p].name}
-            onClick={() => onPlatform(on ? "all" : p)}
-            className="group grid h-11 w-11 place-items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+      {platforms.length > 1 && (
+        <label className="relative flex min-w-0 items-center">
+          <span className="sr-only">Platform</span>
+          {platform !== "all" && <PlatformOrb platform={platform} size={16} className="pointer-events-none absolute left-2.5" />}
+          <select
+            value={platform}
+            onChange={(e) => onPlatform(e.target.value as Platform | "all")}
+            className={cn(
+              "h-11 min-w-0 max-w-[11rem] cursor-pointer appearance-none truncate rounded-full bg-card pr-8 text-[13px] font-medium text-foreground hairline transition hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring lg:h-9",
+              platform === "all" ? "pl-3.5" : "pl-8",
+            )}
           >
-            <span className={cn("grid h-8 w-8 place-items-center rounded-full transition", on ? "bg-secondary ring-2 ring-foreground/70" : "hairline group-hover:bg-secondary", platform !== "all" && !on && "opacity-50")}>
-              <PlatformOrb platform={p} size={18} />
-            </span>
-          </button>
-        );
-      })}
+            <option value="all">All platforms</option>
+            {platforms.map((p) => (
+              <option key={p} value={p}>
+                {PLATFORM_META[p].name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        </label>
+      )}
     </div>
   );
 }

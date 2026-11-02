@@ -113,7 +113,7 @@ async function publishedTargets(userId: string, platform?: Platform, scope: Scop
         media: t.post.media,
         caption: t.caption ?? t.description ?? t.title ?? t.post.hook ?? null,
         postedAt: t.publishedAt,
-        account: acct.platform === "youtube" ? acct.displayName ?? acct.username : `@${acct.username}`,
+        account: acct.platform === "youtube" ? acct.displayName ?? acct.username : `@${acct.username.replace(/^@+/, "")}`,
       },
     });
   }

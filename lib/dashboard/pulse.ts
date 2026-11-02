@@ -24,7 +24,7 @@ async function compute(userId: string, days: PulseRange, accountIds: string[] | 
       where: { publishedAt: { gte: since }, platformStatus: "published", practice: false, post: { userId }, ...acct },
       select: { publishedAt: true, platform: true },
     }),
-    db.socialAccount.findMany({ where: { userId, ...(accountIds ? { id: { in: accountIds } } : {}) }, select: { platform: true } }),
+    db.socialAccount.findMany({ where: { userId, status: { not: "disconnected" }, ...(accountIds ? { id: { in: accountIds } } : {}) }, select: { platform: true } }),
   ]);
   const seen = new Set<string>([...accounts.map((a) => a.platform), ...metrics.map((m) => m.target.platform)]);
   const platforms = PLATFORMS.filter((p) => seen.has(p));

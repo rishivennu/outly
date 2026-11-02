@@ -36,19 +36,22 @@ const PACE: Record<Platform, { upload: [number, number]; process: [number, numbe
 export class MockPublisher implements SocialPublisher {
   constructor(readonly platform: Platform) {}
 
-  async connect(redirectUri: string) {
+  async connect(redirectUri: string, opts: { fresh?: boolean } = {}) {
     const state = newState();
     const u = new URL(redirectUri);
-    u.searchParams.set("code", `mock_code_${this.platform}`);
+    // 1095: practice mode's "different account": a fresh sign-in comes back as another practice account.
+    u.searchParams.set("code", opts.fresh ? `mock_code_${this.platform}_${100 + Math.floor(Math.random() * 900)}` : `mock_code_${this.platform}`);
     u.searchParams.set("state", state);
     return { url: u.toString(), state };
   }
 
-  async completeConnect() {
+  async completeConnect(code = "") {
     await sleep(400);
+    const n = /_(\d{3})$/.exec(code)?.[1];
+    const h = HANDLES[this.platform];
     return {
-      platformUserId: `mock-${this.platform}-001`,
-      ...HANDLES[this.platform],
+      platformUserId: `mock-${this.platform}-${n ?? "001"}`,
+      ...(n ? { username: `${h.username}.${n}`, displayName: `${h.displayName} ${n}` } : h),
       accessToken: `mock_access_${this.platform}_${Date.now()}`,
       refreshToken: `mock_refresh_${this.platform}`,
       expiresAt: new Date(Date.now() + 60 * 24 * 3600 * 1000),

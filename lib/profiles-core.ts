@@ -59,9 +59,11 @@ export type ProfileLike = { id: string; platform: string; username: string; disp
  * profile when it's on that platform; otherwise the first connected account on the platform the person may use.
  */
 export function pickAccount<A extends ProfileLike>(platform: string, pinned: string | null, accounts: A[], scope: Scope, active: string | null = null): A | null {
-  const usable = accounts.filter((a) => a.platform === platform && inScope(scope, a.id));
+  // 1095: a disconnected account is kept for history only. A destination pinned to one falls back like an
+  // unpinned one, so "disconnect, then connect a different account" never strands a post or its retry.
+  const usable = accounts.filter((a) => a.platform === platform && a.status !== "disconnected" && inScope(scope, a.id));
   if (pinned) {
-    const p = accounts.find((a) => a.id === pinned && a.platform === platform);
+    const p = accounts.find((a) => a.id === pinned && a.platform === platform && a.status !== "disconnected");
     if (p) return inScope(scope, p.id) ? p : null;
   }
   const act = active ? usable.find((a) => a.id === active) : undefined;

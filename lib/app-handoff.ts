@@ -7,6 +7,7 @@ import { safeReturnTo } from "./oauth-state";
 import { decrypt, encrypt } from "./crypto";
 import type { Platform } from "./domain";
 import type { ConnectedProfile } from "./social/types";
+import type { ConnectIntent } from "./connect-decision";
 
 /*
  * Google and Meta refuse to show their sign-in pages inside an app WebView, so in the Android app those
@@ -150,7 +151,7 @@ async function claimOnce(uid: string, feature: string, jti: string) {
 const HOLD_PREFIX = "app-hold:";
 const HOLD_TTL_MS = 15 * 60_000;
 export const HOLD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-type Held = { uid: string; ch: string; platform: Platform; prof: ConnectedProfile };
+type Held = { uid: string; ch: string; platform: Platform; prof: ConnectedProfile; intent?: ConnectIntent; expect?: string | null };
 
 /** Expired holds carry encrypted tokens, so they're swept on every hold and every take. */
 const sweepHolds = () =>

@@ -7,6 +7,7 @@ import { instagramIdLooksLikeMetaAppId } from "@/lib/social/keys";
 import { safeReturnTo, saveOAuthState } from "@/lib/oauth-state";
 import { isNativeUA } from "@/lib/app-mode";
 import { APP_AUTH_PAGE } from "@/lib/app-handoff";
+import { ACCOUNT_ID, parseIntent } from "@/lib/connect-decision";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,12 @@ export async function GET(req: NextRequest, props: { params: Promise<{ platform:
     return NextResponse.redirect(to);
   }
   const redirectUri = `${env.APP_URL}/api/accounts/${params.platform}/callback`;
-  const start = await getPublisher(params.platform).connect(redirectUri);
-  await saveOAuthState(params.platform, { state: start.state, verifier: start.codeVerifier, returnTo: safeReturnTo(req.nextUrl.searchParams.get("returnTo")) });
+  // 1095: ?intent=reconnect&expect=<account id> (the Reconnect button on one account), ?intent=new or ?add=1
+  // ("Connect a different account": ask for a fresh sign-in where the platform can), else "auto".
+  const sp = req.nextUrl.searchParams;
+  const intent = parseIntent(sp.get("intent"), sp.get("add"));
+  const expect = intent === "reconnect" && ACCOUNT_ID.test(sp.get("expect") ?? "") ? sp.get("expect") : null;
+  const start = await getPublisher(params.platform).connect(redirectUri, { fresh: intent === "new" || sp.get("fresh") === "1" });
+  await saveOAuthState(params.platform, { state: start.state, verifier: start.codeVerifier, returnTo: safeReturnTo(sp.get("returnTo")), intent, expect });
   return NextResponse.redirect(start.url);
 }

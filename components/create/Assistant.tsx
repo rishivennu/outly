@@ -5,6 +5,7 @@ import { ArrowUp, Check, Pencil, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { cn, formatDuration } from "@/lib/utils";
+import { canSaveCaption } from "./assistant-state";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import type { Draft, HooksState, Step, Tone, UploadState } from "./types";
 
@@ -27,6 +28,9 @@ interface Props {
   onSubmitStory: () => void;
   onEditStory: () => void;
   hooks: HooksState;
+  /** The plain caption the assistant works from: the creator's edit if they made one, else what the writer heard. */
+  original: string;
+  onOriginal: (text: string) => void;
   onTryAnother: () => void;
   onTone: (t: Tone) => void;
   onUse: (text: string) => void;
@@ -70,6 +74,8 @@ export function Assistant(p: Props) {
   const inputId = useId();
   const [editing, setEditing] = useState(false);
   const [tweak, setTweak] = useState("");
+  /** null while the Original card is reading; a string while it is being edited. */
+  const [capEdit, setCapEdit] = useState<string | null>(null);
   const result = p.hooks.result;
   const current = result?.hooks[p.hooks.index];
 
@@ -149,8 +155,64 @@ export function Assistant(p: Props) {
 
             <motion.div layout initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
               <div className="rounded-3xl bg-secondary/50 p-4 hairline">
-                <p className="eyebrow mb-1.5">Original</p>
-                {result.original ? <p className="text-[15px] text-muted-foreground">{result.original}</p> : <div className="skeleton h-4 w-3/4 rounded-full" aria-hidden="true" />}
+                <div className="mb-1.5 flex items-start justify-between gap-2">
+                  <p className="eyebrow">Original</p>
+                  {p.original && capEdit === null && (
+                    <button
+                      type="button"
+                      onClick={() => setCapEdit(p.original)}
+                      aria-label="Edit original caption"
+                      className="-mr-1.5 -mt-2.5 inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    >
+                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Edit
+                    </button>
+                  )}
+                </div>
+                {capEdit !== null ? (
+                  <div>
+                    <label htmlFor={`${inputId}-original`} className="sr-only">
+                      Original caption
+                    </label>
+                    <textarea
+                      id={`${inputId}-original`}
+                      autoFocus
+                      rows={3}
+                      value={capEdit}
+                      maxLength={4000}
+                      onChange={(e) => setCapEdit(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          setCapEdit(null);
+                        } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && canSaveCaption(capEdit)) {
+                          e.preventDefault();
+                          p.onOriginal(capEdit.trim());
+                          setCapEdit(null);
+                        }
+                      }}
+                      className="w-full resize-none rounded-2xl bg-card p-3 text-[15px] leading-relaxed text-foreground hairline"
+                    />
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="lime"
+                        disabled={!canSaveCaption(capEdit)}
+                        onClick={() => {
+                          p.onOriginal(capEdit.trim());
+                          setCapEdit(null);
+                        }}
+                      >
+                        <Check className="h-4 w-4" aria-hidden="true" /> Save
+                      </Button>
+                      <Button variant="subtle" onClick={() => setCapEdit(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : p.original ? (
+                  <p className="text-[15px] text-muted-foreground">{p.original}</p>
+                ) : (
+                  <div className="skeleton h-4 w-3/4 rounded-full" aria-hidden="true" />
+                )}
               </div>
 
               <div className={cn("relative overflow-hidden rounded-3xl p-[1.5px]", p.chosenHook ? "bg-border" : "lime-bg")}>

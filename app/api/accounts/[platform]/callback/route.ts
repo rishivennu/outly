@@ -2,6 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser, isHandoffSession } from "@/lib/auth";
 import { APP_CH_COOKIE, APP_RETURN_PATH, holdConnect, validChallenge } from "@/lib/app-handoff";
 import { saveConnectedAccount } from "@/lib/accounts";
+import { holdChoice, knownAccounts, resolveConnect } from "@/lib/connect-choice";
+import { googleMayLink } from "@/lib/connect-decision";
+import { entitlements } from "@/lib/billing/entitlements";
 import { env } from "@/lib/env";
 import { isPlatform } from "@/lib/domain";
 import { getPublisher, loadKeys } from "@/lib/social/registry";
@@ -41,13 +44,30 @@ export async function GET(req: NextRequest, props: { params: Promise<{ platform:
   const code = req.nextUrl.searchParams.get("code");
   if (!code) return back(`connect_error=${p}&reason=${encodeURIComponent(req.nextUrl.searchParams.get("error") ?? "denied")}`);
   try {
-    const prof = await getPublisher(p).completeConnect(code, `${env.APP_URL}/api/accounts/${p}/callback`, pending.verifier);
-    const notice = prof.declined?.length ? "&notice=dm_scope" : "";
+    const raw = await getPublisher(p).completeConnect(code, `${env.APP_URL}/api/accounts/${p}/callback`, pending.verifier);
+    const notice = raw.declined?.length ? "&notice=dm_scope" : "";
+    const intent = pending.intent ?? "auto";
+    // 1095: which account came back, and whether it may be saved without asking. An account seen here before,
+    // or one that would replace the current account, waits for the creator's answer on the Accounts page.
+    const { prof, decision } = await resolveConnect(user.id, p, raw, intent, pending.expect);
     if (fromApp && validChallenge(ch)) {
-      const hold = await holdConnect({ uid: user.id, ch, platform: p, prof });
+      // The app's own finish step decides again (and asks the same question) once the app holds the verifier.
+      const hold = await holdConnect({ uid: user.id, ch, platform: p, prof, intent, expect: pending.expect ?? null });
       return back(`connected=${p}${notice}&hold=${hold}`);
     }
-    await saveConnectedAccount(user.id, p, prof);
+    if (decision.kind !== "save") {
+      const choose = await holdChoice({ uid: user.id, platform: p, prof, decision });
+      return back(`choose=${choose}${notice}`);
+    }
+    try {
+      await saveConnectedAccount(user.id, p, prof);
+    } catch (e) {
+      // Another account landed on this platform between the decision and the save: ask, don't fail.
+      if (!(e instanceof HttpError && e.code === "REPLACE_NEEDED")) throw e;
+      const again = await resolveConnect(user.id, p, prof, intent, pending.expect);
+      if (again.decision.kind === "save") throw e;
+      return back(`choose=${await holdChoice({ uid: user.id, platform: p, prof: again.prof, decision: again.decision })}${notice}`);
+    }
     invalidateDashboards(user.id);
     return back(`connected=${p}${notice}`);
   } catch (e) {
@@ -84,13 +104,17 @@ async function googleSignIn(req: NextRequest, returnTo: string, remember?: boole
       console.error("[google sign-in] channel", e);
       return undefined;
     });
-    if (channel) {
+    // 1095: signing in links the channel only when nothing needs asking. A channel the creator disconnected
+    // stays disconnected, and a different channel never replaces the one already connected.
+    const link = channel ? googleMayLink(await knownAccounts(user.id, "youtube"), channel.platformUserId, (await entitlements(user.id)).accountLimit > 0) : false;
+    if (channel && link) {
       await saveConnectedAccount(user.id, "youtube", channel);
       invalidateDashboards(user.id);
     }
     const dest = new URL(returnTo, env.APP_URL);
     if (user.created) dest.searchParams.set("welcome", "1");
-    dest.searchParams.set(channel ? "connected" : "notice", channel ? "youtube" : channel === null ? "no_channel" : "channel_later");
+    if (channel && link) dest.searchParams.set("connected", "youtube");
+    else if (!channel) dest.searchParams.set("notice", channel === null ? "no_channel" : "channel_later");
     return NextResponse.redirect(dest);
   } catch (e) {
     // Waitlist on and this Google account has no invite yet: send them to join the line.

@@ -423,11 +423,14 @@ describe("database", () => {
     const media = await db.media.create({ data: { userId: user.id, originalFilename: "a.mp4", storageKey: `lapsed/${s}.mp4`, mimeType: "video/mp4", size: 10, status: "ready" } });
     const post = await db.post.create({ data: { userId: user.id, mediaId: media.id, status: "published", title: "Old" } });
     const t = await db.postTarget.create({ data: { postId: post.id, platform: "youtube", socialAccountId: old.id, platformStatus: "published" } });
-    await saveConnectedAccount(user.id, "youtube", { platformUserId: `yt-new-${s}`, username: "new", accessToken: "n" });
+    // 1095: never without the creator's say-so.
+    await expect(saveConnectedAccount(user.id, "youtube", { platformUserId: `yt-new-${s}`, username: "new", accessToken: "n" })).rejects.toMatchObject({ code: "REPLACE_NEEDED" });
+    expect((await db.socialAccount.findUnique({ where: { id: old.id } }))?.status).toBe("connected");
+    await saveConnectedAccount(user.id, "youtube", { platformUserId: `yt-new-${s}`, username: "new", accessToken: "n" }, { replace: true });
     const kept = await db.socialAccount.findUnique({ where: { id: old.id } });
     expect(kept?.status).toBe("disconnected");
     expect((await db.postTarget.findUnique({ where: { id: t.id } }))?.socialAccountId).toBe(old.id);
-    const back = await saveConnectedAccount(user.id, "youtube", { platformUserId: `yt-old-${s}`, username: "old", accessToken: "t2" });
+    const back = await saveConnectedAccount(user.id, "youtube", { platformUserId: `yt-old-${s}`, username: "old", accessToken: "t2" }, { replace: true });
     expect(back.id).toBe(old.id);
     expect(back.status).toBe("connected");
   });

@@ -1,18 +1,23 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
-import { encrypt } from "./crypto";
+import { decrypt, encrypt } from "./crypto";
+import { HttpError } from "./http";
 import type { Platform } from "./domain";
 import type { ConnectedProfile } from "./social/types";
 import { dmsOn } from "./social/keys";
 import { checkAccounts, entitlements } from "./billing/entitlements";
 
 /**
- * Store a freshly connected account. On most plans that's one account per platform: connecting another
- * replaces it (the old one is set aside as disconnected, so its posts keep their history). A multi-account plan (Pro Multi-Account Manager, 1037) keeps every account side by side, up to
- * its total; reconnecting an account that's already there never counts as a new one.
+ * Store a connected account, keyed by the platform's stable id: a row is only ever updated by the same
+ * account, so two accounts are never merged. On most plans that's one account per platform, and since 1095 a
+ * different account only replaces the current one when the creator said so (`replace`, from the Accounts
+ * page's question); otherwise this refuses with REPLACE_NEEDED. The replaced one is set aside as disconnected,
+ * so its posts keep their history. A multi-account plan (Pro Multi-Account Manager, 1037) keeps every account
+ * side by side, up to its total; reconnecting an account that's already there never counts as a new one.
+ * Callers decide whether to ask first (lib/connect-decision.ts); this is the last line, not the question.
  */
-export async function saveConnectedAccount(userId: string, platform: Platform, prof: ConnectedProfile) {
+export async function saveConnectedAccount(userId: string, platform: Platform, prof: ConnectedProfile, opts: { replace?: boolean } = {}) {
   const data = {
     username: prof.username,
     displayName: prof.displayName ?? null,
@@ -31,6 +36,8 @@ export async function saveConnectedAccount(userId: string, platform: Platform, p
         const others = await tx.socialAccount.count({ where: { userId, status: { not: "disconnected" }, NOT: { platform, platformUserId: prof.platformUserId } } });
         checkAccounts(e, others);
       } else {
+        const others = await tx.socialAccount.findMany({ where: { userId, platform, status: { not: "disconnected" }, NOT: { platformUserId: prof.platformUserId } }, select: { username: true } });
+        if (others.length && !opts.replace) throw new HttpError(409, `${others[0].username} is connected on this platform. Replace it first.`, "REPLACE_NEEDED");
         // One account per platform: the others are set aside, never deleted. A Pro owner whose plan lapsed keeps
         // their accounts and every post linked to them, and reconnecting after renewing brings each one back.
         await tx.socialAccount.updateMany({
@@ -64,4 +71,39 @@ async function subscribeDms(platform: Platform, acct: { platformUserId: string; 
   } catch (e) {
     console.warn(`[dm] ${platform} webhook subscribe skipped:`, (e as Error).message?.slice(0, 300));
   }
+}
+
+/**
+ * Disconnect (1095). A soft disconnect: the row stays, marked disconnected with its keys wiped, so published
+ * posts, their analytics and Inbox history keep pointing at the account they came from (a hard delete used to
+ * cut every post loose and cascade away the DMs). The stable id stays too, which is how a later sign-in knows
+ * the account was here before and asks instead of silently reconnecting it. Where the platform has a revoke
+ * call the grant is revoked as well, unless another studio still uses the same account.
+ */
+export async function disconnectAccounts(userId: string, platform: Platform, id?: string | null) {
+  const rows = await db.socialAccount.findMany({
+    where: { userId, platform, status: { not: "disconnected" }, ...(id ? { id } : {}) },
+    select: { id: true, platformUserId: true, accessToken: true, refreshToken: true },
+  });
+  if (!rows.length) return 0;
+  await db.socialAccount.updateMany({
+    where: { userId, id: { in: rows.map((r) => r.id) } },
+    data: { status: "disconnected", accessToken: encrypt(""), refreshToken: null, tokenExpiresAt: null },
+  });
+  const { revokeAtPlatform } = await import("./social/revoke");
+  await Promise.all(
+    rows.map(async (r) => {
+      if (r.platformUserId.startsWith("mock-")) return;
+      const shared = await db.socialAccount.count({ where: { platform, platformUserId: r.platformUserId, status: { not: "disconnected" } } });
+      if (shared) return; // another studio still posts with this account; revoking the grant would cut it off too
+      let tokens: { accessToken: string; refreshToken: string | null };
+      try {
+        tokens = { accessToken: decrypt(r.accessToken), refreshToken: r.refreshToken ? decrypt(r.refreshToken) : null };
+      } catch {
+        return;
+      }
+      await revokeAtPlatform(platform, tokens);
+    }),
+  );
+  return rows.length;
 }

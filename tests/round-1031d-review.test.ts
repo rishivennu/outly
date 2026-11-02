@@ -13,7 +13,10 @@ describe("Instagram: messages permission left unticked", () => {
     expect(missingScopes("instagram_business_basic, instagram_business_content_publish")).toEqual(["instagram_business_manage_messages"]);
   });
   test("callback tells the creator, Accounts shows it", () => {
-    expect(src("app/api/accounts/[platform]/callback/route.ts")).toContain('prof.declined?.length ? "&notice=dm_scope"');
+    expect(src("app/api/accounts/[platform]/callback/route.ts")).toContain('raw.declined?.length ? "&notice=dm_scope"');
+    // 1095: a sign-in that waits for the reconnect question keeps the notice for after it is saved.
+    expect(src("app/api/accounts/[platform]/callback/route.ts")).toContain("back(`choose=${choose}${notice}`)");
+    expect(src("components/settings/AccountsView.tsx")).toContain('params.get("choose") !== null && params.get("notice") === "dm_scope"');
     expect(src("components/settings/AccountsView.tsx")).toContain('params.get("notice") === "dm_scope"');
   });
 });

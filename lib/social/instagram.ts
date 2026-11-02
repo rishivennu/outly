@@ -1,5 +1,5 @@
 import { creds, dmsOn } from "./keys";
-import { commonMediaChecks, httpFailure, PublisherError, type AccountContext, type CommentTarget, type PlatformComment, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
+import { commonMediaChecks, httpFailure, PublisherError, type AccountContext, type CommentTarget, type PlatformComment, type ConnectOptions, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { formPost, newState } from "./oauth";
 
 // Instagram API with Instagram Login (professional accounts). Reels are published as a container:
@@ -34,7 +34,7 @@ export function missingScopes(granted: string | string[] | undefined): string[] 
 export class InstagramPublisher implements SocialPublisher {
   readonly platform = "instagram" as const;
 
-  async connect(redirectUri: string) {
+  async connect(redirectUri: string, opts: ConnectOptions = {}) {
     const state = newState();
     const u = new URL("https://www.instagram.com/oauth/authorize");
     u.search = new URLSearchParams({
@@ -43,6 +43,8 @@ export class InstagramPublisher implements SocialPublisher {
       response_type: "code",
       scope: instagramScopes(dmsOn("instagram")),
       state,
+      // 1095: Instagram's documented switch to ask for the login even when someone is signed in already.
+      ...(opts.fresh ? { force_reauth: "true" } : {}),
     }).toString();
     return { url: u.toString(), state };
   }

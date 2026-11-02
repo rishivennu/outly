@@ -107,7 +107,7 @@ export function InboxView({ initial, dms, initialTab = "comments" }: { initial: 
   );
 }
 
-const norm = (s: string | null | undefined) => (s ?? "").trim().replace(/^@/, "").toLowerCase();
+const norm = (s: string | null | undefined) => (s ?? "").trim().replace(/^@+/, "").toLowerCase();
 
 /** The creator's own handles, as the platforms print them. A reply from one of these means the comment is answered. */
 function ownNames(comments: InboxComment[]) {
@@ -116,9 +116,11 @@ function ownNames(comments: InboxComment[]) {
   return s;
 }
 const hasOwnReply = (c: InboxComment, mine: Set<string>) => (c.replies ?? []).some((r) => mine.has(norm(r.authorName)));
+/** The creator's own comment under their post: nothing to answer. */
+const isOwn = (c: InboxComment, mine: Set<string>) => mine.has(norm(c.authorName));
 function commentsWaiting(comments: InboxComment[]) {
   const mine = ownNames(comments);
-  return comments.filter((c) => !hasOwnReply(c, mine)).length;
+  return comments.filter((c) => !hasOwnReply(c, mine) && !isOwn(c, mine)).length;
 }
 const keyOf = (c: Pick<InboxComment, "targetId" | "id">) => `${c.targetId}-${c.id}`;
 const titleOf = (c: InboxComment) => c.postTitle ?? "a post";
@@ -138,7 +140,7 @@ function CommentsPane({ initial, hasTabs, tabs, query, refreshTick, onBusy, onWa
   const preview = usePreview();
 
   const mine = useMemo(() => ownNames(data.comments), [data.comments]);
-  const replied = useCallback((c: InboxComment) => answered.has(keyOf(c)) || hasOwnReply(c, mine), [answered, mine]);
+  const replied = useCallback((c: InboxComment) => answered.has(keyOf(c)) || hasOwnReply(c, mine) || isOwn(c, mine), [answered, mine]);
   const waitingList = data.comments.filter((c) => !replied(c));
   useEffect(() => onWaiting(waitingList.length), [waitingList.length, onWaiting]);
   useEffect(() => onBusy(loading), [loading, onBusy]);
@@ -222,7 +224,7 @@ function CommentsPane({ initial, hasTabs, tabs, query, refreshTick, onBusy, onWa
           {error}
         </p>
       )}
-      {data.errors.length > 0 && <CommentProblems errors={data.errors} />}
+      {data.errors.length > 0 && <CommentProblems errors={data.errors} busy={loading} onRetry={() => void load(platform)} />}
 
       <div className="-mx-4 min-h-0 flex-1 sm:-mx-6 lg:mx-0 lg:grid lg:grid-cols-[minmax(320px,400px)_1fr] lg:overflow-hidden lg:rounded-[24px] lg:bg-card lg:hairline">
         <section aria-label="Comments" className="flex min-h-0 flex-col lg:border-r lg:border-border">
@@ -271,7 +273,7 @@ function CommentsPane({ initial, hasTabs, tabs, query, refreshTick, onBusy, onWa
                         done ? (
                           <>
                             <Check className="h-3.5 w-3.5 shrink-0 text-lime-ink" aria-hidden="true" />
-                            <span className="shrink-0 font-medium text-lime-ink">Replied</span>
+                            <span className="shrink-0 font-medium text-lime-ink">{isOwn(c, mine) ? "Your comment" : "Replied"}</span>
                             <span className="truncate">· on {titleOf(c)}</span>
                           </>
                         ) : (
@@ -326,33 +328,83 @@ function CommentsPane({ initial, hasTabs, tabs, query, refreshTick, onBusy, onWa
   );
 }
 
-function CommentProblems({ errors }: { errors: InboxProblem[] }) {
+/** Inbox copy for a platform that didn't hand comments over. The upload wording ("didn't like the video") is wrong here. */
+export function inboxReason(platform: Platform, code: string) {
+  const n = PLATFORM_META[platform].name;
+  switch (code) {
+    case "AUTH_EXPIRED":
+    case "NOT_CONNECTED":
+      return `${n} signed Outlly out. Reconnect it to bring new comments in.`;
+    case "RATE_LIMITED":
+      return `${n} asked us to slow down. Try again in a minute.`;
+    case "MEDIA_REJECTED":
+      return `${n} wouldn't share comments for this post. It may have been deleted, archived or made private.`;
+    case "FORBIDDEN":
+      return `${n} isn't letting Outlly read these comments yet.`;
+    case "NETWORK":
+    case "PLATFORM_DOWN":
+      return `We couldn't reach ${n}. Try again in a minute.`;
+    default:
+      return `${n} didn't send these comments back.`;
+  }
+}
+
+/** The strip's headline: what is missing, in one sentence, without making the creator decode an error. */
+export function problemHeadline(errors: InboxProblem[]) {
+  const reconnect = Array.from(new Set(errors.filter((e) => e.code === "AUTH_EXPIRED" || e.code === "NOT_CONNECTED").map((e) => e.platform)));
+  const rest = errors.filter((e) => !reconnect.includes(e.platform));
+  const posts = (list: InboxProblem[]) => new Set(list.map((e) => e.targetId)).size;
+  const names = (list: InboxProblem[]) => joinNames(Array.from(new Set(list.map((e) => e.platform))).map((p) => PLATFORM_META[p].name));
+  if (reconnect.length) {
+    const title = `Reconnect ${joinNames(reconnect.map((p) => PLATFORM_META[p].name))} to get new comments.`;
+    const n = posts(rest);
+    return { title, body: n ? `Comments on ${n} other ${n === 1 ? "post" : "posts"} didn't load either.` : "Everything else here is up to date.", reconnect, retry: n > 0 };
+  }
+  const n = posts(rest);
+  const title = rest.every((e) => !e.postTitle) ? `Some ${names(rest)} comments didn't load.` : `Comments on ${n} ${names(rest)} ${n === 1 ? "post" : "posts"} didn't load.`;
+  return { title, body: "Everything else here is up to date.", reconnect, retry: true };
+}
+
+function CommentProblems({ errors, busy, onRetry }: { errors: InboxProblem[]; busy: boolean; onRetry: () => void }) {
   const [more, setMore] = useState(false);
   const groups = groupProblems(errors);
-  const reconnect = Array.from(new Set(groups.filter((g) => targetErrorCopy(g.platform, g.code).kind === "reconnect").map((g) => g.platform)));
-  const names = reconnect.map((p) => PLATFORM_META[p].name);
-  const title = reconnect.length ? `${joinNames(names)} ${names.length === 1 ? "needs" : "need"} reconnecting.` : targetErrorCopy(groups[0].platform, groups[0].code).title;
-  const body = reconnect.length ? "New comments from them can't come in until you do." : "We didn't show anything rather than guess.";
+  const head = problemHeadline(errors);
+  // Hidden for this visit only, and only for this exact set of problems: a new one shows the strip again.
+  const sig = errors.map((e) => `${e.platform}:${e.code}:${e.targetId}`).sort().join("|");
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    try {
+      setHidden(sessionStorage.getItem("outlly:inbox-notice") === sig);
+    } catch {}
+  }, [sig]);
+  if (hidden) return null;
+  const hide = () => {
+    try {
+      sessionStorage.setItem("outlly:inbox-notice", sig);
+    } catch {}
+    setHidden(true);
+  };
   return (
     <ConnectionStrip
-      title={title}
-      body={body}
+      title={head.title}
+      body={head.body}
       actions={
         <>
-          {reconnect.map((p) => (
+          {head.reconnect.map((p) => (
             <a key={p} href={`/api/accounts/${p}/connect?returnTo=${encodeURIComponent("/inbox")}`} className={cn(stripButton, "hidden sm:inline-flex")}>
               <Link2 className="h-3.5 w-3.5" aria-hidden="true" /> Reconnect {PLATFORM_META[p].name}
             </a>
           ))}
+          {head.retry && (
+            <button type="button" onClick={onRetry} disabled={busy} className={cn(stripButton, "disabled:opacity-60")}>
+              <RefreshCw className={cn("h-3.5 w-3.5", busy && "animate-spin")} aria-hidden="true" /> {busy ? "Trying…" : "Try again"}
+            </button>
+          )}
           <button type="button" onClick={() => setMore((v) => !v)} aria-expanded={more} aria-controls="inbox-problems" className={stripButton}>
-            {more ? (
-              "Hide"
-            ) : (
-              <>
-                <span className="sm:hidden">{reconnect.length ? "Fix" : "Details"}</span>
-                <span className="hidden sm:inline">Details</span>
-              </>
-            )}
+            {more ? "Hide details" : head.reconnect.length ? <><span className="sm:hidden">Fix</span><span className="hidden sm:inline">Details</span></> : "Details"}
+          </button>
+          <button type="button" onClick={hide} aria-label="Hide this notice" title="Hide this notice" className={cn(stripButton, "w-9 justify-center px-0")}>
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </>
       }
@@ -361,14 +413,16 @@ function CommentProblems({ errors }: { errors: InboxProblem[] }) {
           <ul id="inbox-problems" className="mt-3 space-y-3 border-t border-warning/20 pt-3">
             {groups.map((g) => {
               const copy = targetErrorCopy(g.platform, g.code);
+              const where = g.items.length === 1 ? g.items[0].postTitle ?? `Your ${PLATFORM_META[g.platform].name} account` : `${g.items.length} ${PLATFORM_META[g.platform].name} posts`;
               const titles = g.items.map((e) => e.postTitle).filter(Boolean) as string[];
               const details = Array.from(new Set(g.items.map((e) => e.detail).filter(Boolean))) as string[];
               return (
                 <li key={`${g.platform}-${g.code}`}>
-                  <p className="font-medium">{copy.title}</p>
-                  <p className="mt-0.5 text-muted-foreground">
-                    {g.items.length === 1 ? `${PLATFORM_META[g.platform].name}${titles[0] ? ` · ${titles[0]}` : ""}` : `${g.items.length} ${PLATFORM_META[g.platform].name} posts`}. We didn&apos;t show anything rather than guess.
+                  <p className="flex min-w-0 items-center gap-2 font-medium">
+                    <PlatformOrb platform={g.platform} size={16} />
+                    <span className="truncate">{where}</span>
                   </p>
+                  <p className="mt-0.5 text-foreground/80">{inboxReason(g.platform, g.code)}</p>
                   {g.items[0].hint && <p className="mt-1 text-foreground/85">{g.items[0].hint}</p>}
                   {copy.kind === "reconnect" && (
                     <a href={`/api/accounts/${g.platform}/connect?returnTo=${encodeURIComponent("/inbox")}`} className="mt-2 inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-5 text-sm font-semibold text-background transition-transform active:scale-[0.97]">
@@ -549,12 +603,13 @@ function CommentDetail({
           <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </button>
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[14.5px] font-semibold">Comment on &ldquo;{titleOf(comment)}&rdquo;</h2>
           <p className="truncate text-[12px] text-muted-foreground">
-            {pname}
-            {comment.media?.account ? ` · ${comment.media.account}` : ""}
+            Comment on {pname}
             {position ? ` · ${position}` : replied ? " · Replied" : ""}
           </p>
+          <h2 className="truncate text-[14.5px] font-semibold" title={titleOf(comment)}>
+            {titleOf(comment)}
+          </h2>
         </div>
         <button type="button" onClick={saveIdea} disabled={saved} aria-label={saved ? "Saved as an idea" : `Save ${comment.authorName}'s comment as a video idea`} className={cn(iconBtn, wideBtn, "disabled:text-muted-foreground")}>
           {saved ? <Check className="h-4 w-4" aria-hidden="true" /> : <Lightbulb className="h-4 w-4" aria-hidden="true" />}

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowRight, BarChart3, Check, CircleAlert, KeyRound, Lock, Unplug } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, BarChart3, Check, CircleAlert, History, KeyRound, Lock, RefreshCw, Unplug } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PLATFORM_HALO } from "@/components/shared/PlatformIcon";
@@ -17,6 +17,17 @@ import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { cn } from "@/lib/utils";
 import type { AccountView } from "@/lib/services";
+import type { ChoiceView } from "@/lib/connect-choice";
+import { connectHref, SWITCH_HELP } from "@/lib/social/switch-help";
+import { REVOCABLE_PLATFORMS } from "@/lib/social/revocable";
+import { ConnectChoiceDialog, SwitchGuideDialog } from "./ConnectChoiceDialog";
+
+/** A disconnected account (1095): only its name, so the page can offer to bring it back. */
+export interface PreviousAccount {
+  id: string;
+  platform: Platform;
+  username: string;
+}
 
 const RIM: Record<Platform, string> = { instagram: "330 90% 66%", youtube: "2 95% 64%", x: "222 95% 66%", tiktok: "178 85% 55%", threads: "0 0% 80%", facebook: "214 95% 64%", linkedin: "201 85% 58%" };
 
@@ -47,10 +58,18 @@ const ERRORS: Record<string, (name: string) => string> = {
   wrong_app_id: () => "Instagram login isn't set up right on this server yet (it has the Facebook app ID, not the Instagram one). Connect with a token below for now, or ask the admin to fix it in Admin > Social platforms.",
   account_limit: () => "Your plan's connected accounts are all in use. Disconnect one, or upgrade in Billing to add more.",
   owner_only: (n) => `Only the workspace owner can connect ${n}. Ask them to connect it, or switch to your own studio.`,
+  replace_needed: (n) => `Another ${n} account is connected, and your plan has room for one. Nothing was replaced. Connect again and choose Replace if that's what you want.`,
+  denied: (n) => `You closed the ${n} sign-in before it finished, so nothing changed.`,
 };
 
-export function AccountsView({ initial, setup, accountLimit = 0 }: { initial: AccountView[]; setup: ConnectSetup; accountLimit?: number }) {
+export function AccountsView({ initial, previous: initialPrevious = [], setup, accountLimit = 0 }: { initial: AccountView[]; previous?: PreviousAccount[]; setup: ConnectSetup; accountLimit?: number }) {
   const [accounts, setAccounts] = useState(initial);
+  const [previous, setPrevious] = useState(initialPrevious);
+  // 1095: the question after a sign-in that found a known account (or one that would replace the current one).
+  const [choice, setChoice] = useState<ChoiceView | null>(null);
+  const [choiceBusy, setChoiceBusy] = useState(false);
+  // "Use a different account" on a platform with no account picker: say how first, then go.
+  const [guide, setGuide] = useState<{ platform: Platform; href: string } | null>(null);
   // 1037: a plan with an account limit (Pro Multi-Account Manager) keeps several accounts per platform.
   const multi = accountLimit > 0;
   const room = multi && accounts.length < accountLimit;
@@ -67,6 +86,12 @@ export function AccountsView({ initial, setup, accountLimit = 0 }: { initial: Ac
   useEffect(() => {
     const c = params.get("connected");
     const e = params.get("connect_error");
+    const ch = params.get("choose");
+    if (ch && /^[0-9a-f-]{36}$/.test(ch)) {
+      api<{ choice: ChoiceView }>(`/api/accounts/choice/${ch}`)
+        .then((r) => setChoice(r.choice))
+        .catch((x) => toast(x instanceof ApiError ? x.message : "That sign-in couldn't be finished. Connect again.", "info"));
+    }
     if (c && (PLATFORMS as readonly string[]).includes(c)) {
       if (params.get("notice") === "dm_scope") toast(`${PLATFORM_META[c as Platform].name} is connected, but messages were left unticked, so DMs won't arrive in your Inbox. To get them, reconnect and keep "Manage messages" ticked.`, "info");
       else toast(`${PLATFORM_META[c as Platform].name} is connected. Ready to publish.`);
@@ -83,19 +108,66 @@ export function AccountsView({ initial, setup, accountLimit = 0 }: { initial: Ac
         document.cookie = "outlly-connect-detail=; path=/; max-age=0";
       }
     }
-    if (c || e) router.replace("/accounts");
+    if (c || e || ch) router.replace("/accounts");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [busy, setBusy] = useState(false);
+  // Messages left unticked on a sign-in that waits for an answer: say so once the creator saves it.
+  const [dmScope] = useState(() => params.get("choose") !== null && params.get("notice") === "dm_scope");
+  const prev = (p: Platform) => previous.filter((x) => x.platform === p && !accounts.some((a) => a.id === x.id)).slice(-3);
+
+  /** "Connect a different account": straight to the platform where it has a picker, through the guide where it doesn't. */
+  const startDifferent = (p: Platform, o: { intent?: "new" | "reconnect"; expect?: string } = { intent: "new" }) => {
+    const href = connectHref(p, { ...o, fresh: true });
+    if (SWITCH_HELP[p].picker) window.location.assign(href);
+    else setGuide({ platform: p, href });
+  };
+
+  const answer = async (action: "save" | "discard") => {
+    if (!choice) return null;
+    setChoiceBusy(true);
+    try {
+      return await api<{ account?: AccountView; replaced?: string[]; choice?: ChoiceView }>(`/api/accounts/choice/${choice.id}`, { method: "POST", json: { action } });
+    } catch (x) {
+      toast(x instanceof ApiError ? x.message : "Something got in the way. Connect again.", "error");
+      return null;
+    } finally {
+      setChoiceBusy(false);
+      setChoice(null);
+    }
+  };
+  const onChoiceSave = async () => {
+    const r = await answer("save");
+    if (r?.choice) return setChoice(r.choice); // something changed while the question was open: ask again
+    if (!r?.account) return;
+    const acc = r.account;
+    const gone = new Set(r.replaced ?? []);
+    setPrevious((pv) => [...pv.filter((x) => x.id !== acc.id), ...accounts.filter((x) => gone.has(x.id)).map((x) => ({ id: x.id, platform: x.platform, username: x.username }))]);
+    setAccounts((all) => [...all.filter((x) => x.id !== acc.id && !gone.has(x.id)), acc]);
+    if (dmScope) toast(`${PLATFORM_META[acc.platform].name} ${acc.username} is connected, but messages were left unticked, so DMs won't arrive in your Inbox. To get them, reconnect and keep "Manage messages" ticked.`, "info");
+    else toast(`${PLATFORM_META[acc.platform].name} ${acc.username} is connected. Ready to publish.`);
+    router.refresh();
+  };
+  const onChoiceOther = async () => {
+    const c = choice;
+    if (!c) return;
+    await answer("discard");
+    const d = c.decision;
+    if (d.kind === "replace") return toast(`Nothing changed. ${PLATFORM_META[c.platform].name} stays connected as before.`, "info");
+    // Mismatch: they wanted the account they pressed Reconnect on. Otherwise: a different one.
+    startDifferent(c.platform, d.kind === "mismatch" ? { intent: "reconnect", expect: d.expected.id } : { intent: "new" });
+  };
 
   const disconnect = async ({ platform: p, id, name }: { platform: Platform; id?: string; name: string }) => {
     setBusy(true);
     try {
       await api(`/api/accounts/${p}${id ? `?id=${encodeURIComponent(id)}` : ""}`, { method: "DELETE" });
+      const gone = accounts.filter((x) => (id ? x.id === id : x.platform === p));
       setAccounts((a) => a.filter((x) => (id ? x.id !== id : x.platform !== p)));
+      setPrevious((pv) => [...pv.filter((x) => !gone.some((g) => g.id === x.id)), ...gone.map((x) => ({ id: x.id, platform: x.platform, username: x.username }))]);
       setConfirm(null);
-      toast(`${name} is disconnected. We deleted its keys.`, "info");
+      toast(`${name} is disconnected. Its keys are deleted; its posts and numbers stay.`, "info");
     } catch (e) {
       toast(e instanceof ApiError ? e.message : "Something got in the way.", "error");
     } finally {
@@ -165,6 +237,11 @@ export function AccountsView({ initial, setup, accountLimit = 0 }: { initial: Ac
                               {xok ? "Ready to publish" : `${PLATFORM_META[p].name} needs you to reconnect.`}
                             </p>
                           </div>
+                          {!xok && setup[p].oauth && list.length > 1 && (
+                            <a href={connectHref(p, { intent: "reconnect", expect: x.id })} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={`Reconnect ${x.username}`}>
+                              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                            </a>
+                          )}
                           {list.length > 1 && (
                             <button type="button" onClick={() => setConfirm({ platform: p, id: x.id, name: `@${x.username.replace(/^@/, "")}` })} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={`Disconnect ${x.username}`}>
                               <Unplug className="h-4 w-4" aria-hidden="true" />
@@ -178,16 +255,34 @@ export function AccountsView({ initial, setup, accountLimit = 0 }: { initial: Ac
                 {multi && ok && setup[p].oauth && (
                   room ? (
                     <p className="mt-3 text-sm">
-                      <a href={`/api/accounts/${p}/connect?returnTo=/accounts`} className="inline-flex min-h-11 items-center gap-1 font-medium underline underline-offset-4">
+                      <button type="button" onClick={() => startDifferent(p)} className="inline-flex min-h-11 items-center gap-1 font-medium underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                         Add another {PLATFORM_META[p].name} account <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                      </a>
-                      <span className="block text-xs text-muted-foreground">Sign out of {PLATFORM_META[p].name} first, or you&apos;ll be asked to pick the account you want.</span>
+                      </button>
+                      <span className="block text-xs text-muted-foreground">{SWITCH_HELP[p].how}</span>
                     </p>
                   ) : (
                     <p className="mt-3 text-xs text-muted-foreground">All {accountLimit} account slots are in use.</p>
                   )
                 )}
               </div>
+
+              {!a && setup[p].oauth && prev(p).length > 0 && (
+                <div className="relative mt-4 rounded-2xl bg-secondary/40 px-4 py-3 text-sm">
+                  <p className="flex items-center gap-2 text-muted-foreground">
+                    <History className="h-4 w-4 shrink-0" aria-hidden="true" /> Previously connected
+                  </p>
+                  <ul className="mt-1">
+                    {prev(p).map((x) => (
+                      <li key={x.id} className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate font-medium">{x.username}</span>
+                        <a href={connectHref(p, { intent: "reconnect", expect: x.id })} className="inline-flex min-h-11 shrink-0 items-center font-medium underline underline-offset-4" aria-label={`Reconnect ${x.username}`}>
+                          Reconnect
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {!ok && !setup[p].oauth && !setup[p].token && (
                 <p className="relative mt-4 flex gap-2 rounded-2xl bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
@@ -214,14 +309,27 @@ export function AccountsView({ initial, setup, accountLimit = 0 }: { initial: Ac
                 </p>
               )}
 
-              {setup[p].token && !ok && <TokenConnect defaultOpen={!setup[p].oauth} onConnected={(acc) => setAccounts((all) => (multi ? [...all.filter((x) => x.id !== acc.id), acc] : [...all.filter((x) => x.platform !== p), acc]))} />}
+              {setup[p].token && !ok && <TokenConnect defaultOpen={!setup[p].oauth} onConnected={(acc) => {
+                    setAccounts((all) => (multi ? [...all.filter((x) => x.id !== acc.id), acc] : [...all.filter((x) => x.platform !== p), acc]));
+                    setPrevious((pv) => pv.filter((x) => x.id !== acc.id));
+                  }} />}
 
               <div className="mt-6 flex flex-wrap gap-2">
                 {!ok && setup[p].oauth && (
                   <Button asChild variant={a ? "primary" : "lime"} className="flex-1">
-                    <a href={`/api/accounts/${p}/connect?returnTo=/accounts`}>
+                    <a href={a ? connectHref(p, { intent: "reconnect", expect: a.id }) : connectHref(p)}>
                       {a ? "Reconnect" : p === "youtube" ? "Sign in with Google" : `Log in with ${PLATFORM_META[p].name}`} <ArrowRight className="h-4 w-4" />
                     </a>
+                  </Button>
+                )}
+                {!ok && !a && setup[p].oauth && prev(p).length > 0 && (
+                  <Button variant="ghost" onClick={() => startDifferent(p)}>
+                    <ArrowLeftRight className="h-4 w-4" /> Use a different account
+                  </Button>
+                )}
+                {ok && !multi && setup[p].oauth && (
+                  <Button variant="ghost" onClick={() => startDifferent(p)} aria-label={`Switch to a different ${PLATFORM_META[p].name} account`}>
+                    <ArrowLeftRight className="h-4 w-4" /> Switch account
                   </Button>
                 )}
                 {ok && (
@@ -246,11 +354,26 @@ export function AccountsView({ initial, setup, accountLimit = 0 }: { initial: Ac
         open={confirm !== null}
         onOpenChange={(o) => !o && setConfirm(null)}
         title={confirm ? `Disconnect ${confirm.name}?` : ""}
-        body="We delete the keys we hold for it. Anything already published stays up, and scheduled posts for this destination will stop going out until you reconnect."
+        body={
+          confirm
+            ? `We delete the keys we hold for it${REVOCABLE_PLATFORMS.includes(confirm.platform) ? ` and ask ${PLATFORM_META[confirm.platform].name} to revoke Outlly's access` : ""}. Published posts, their numbers and your messages stay. Scheduled posts for it stop going out until you reconnect.`
+            : ""
+        }
         confirmLabel="Yes, disconnect"
         busy={busy}
         onConfirm={() => confirm && disconnect(confirm)}
       />
+
+      <ConnectChoiceDialog
+        choice={choice}
+        busy={choiceBusy}
+        onSave={onChoiceSave}
+        onOther={onChoiceOther}
+        onClose={() => {
+          void answer("discard");
+        }}
+      />
+      <SwitchGuideDialog platform={guide?.platform ?? null} href={guide?.href ?? "#"} onClose={() => setGuide(null)} />
 
       {soon.length > 0 && (
         <section className="mt-12" aria-labelledby="soon">

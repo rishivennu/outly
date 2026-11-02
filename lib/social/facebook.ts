@@ -1,4 +1,4 @@
-import { commonMediaChecks, httpFailure, PublisherError, type AccountContext, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
+import { commonMediaChecks, httpFailure, PublisherError, type AccountContext, type ConnectOptions, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { newState } from "./oauth";
 import { creds, dmsOn } from "./keys";
 
@@ -16,10 +16,11 @@ export const facebookScopes = (dms: boolean) => (dms ? FACEBOOK_SCOPES : FB_BASE
 export class FacebookPublisher implements SocialPublisher {
   readonly platform = "facebook" as const;
 
-  async connect(redirectUri: string) {
+  async connect(redirectUri: string, opts: ConnectOptions = {}) {
     const state = newState();
     const u = new URL(`https://www.facebook.com/${V}/dialog/oauth`);
-    u.search = new URLSearchParams({ client_id: creds("facebook").clientId, redirect_uri: redirectUri, state, response_type: "code", scope: facebookScopes(dmsOn("facebook")) }).toString();
+    // 1095: reauthenticate makes Facebook ask for the login again instead of continuing as whoever is signed in.
+    u.search = new URLSearchParams({ client_id: creds("facebook").clientId, redirect_uri: redirectUri, state, response_type: "code", scope: facebookScopes(dmsOn("facebook")), ...(opts.fresh ? { auth_type: "reauthenticate" } : {}) }).toString();
     return { url: u.toString(), state };
   }
 
@@ -41,14 +42,10 @@ export class FacebookPublisher implements SocialPublisher {
     const me: { id?: string } = await fetch(`${GRAPH}/me?fields=id&access_token=${userToken}`)
       .then((r) => (r.ok ? (r.json() as Promise<{ id?: string }>) : {}))
       .catch(() => ({}));
-    return {
-      platformUserId: page.id,
-      username: page.name,
-      displayName: page.name,
-      avatar: page.picture?.data?.url,
-      accessToken: page.access_token,
-      metadata: { pages: list.map((p) => ({ id: p.id, name: p.name })), ...(me.id ? { metaUserId: me.id } : {}) },
-    };
+    const metadata = { pages: list.map((p) => ({ id: p.id, name: p.name })), ...(me.id ? { metaUserId: me.id } : {}) };
+    const asProfile = (pg: (typeof list)[number]) => ({ platformUserId: pg.id, username: pg.name, displayName: pg.name, avatar: pg.picture?.data?.url, accessToken: pg.access_token, metadata });
+    // 1095: the other Pages ride along (never stored), so "Connect a different account" can take a Page that isn't here yet.
+    return { ...asProfile(page), ...(list.length > 1 ? { alternatives: list.slice(1).map(asProfile) } : {}) };
   }
 
   /** Page tokens from a long-lived user token don't expire; nothing to refresh. */

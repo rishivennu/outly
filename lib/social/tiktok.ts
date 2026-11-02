@@ -1,4 +1,4 @@
-import { commonMediaChecks, httpFailure, PublisherError, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
+import { commonMediaChecks, httpFailure, PublisherError, type ConnectOptions, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { formPost, newState } from "./oauth";
 import { creds } from "./keys";
 
@@ -13,7 +13,7 @@ const bearer = (t: string) => ({ authorization: `Bearer ${t}`, "content-type": "
 export class TikTokPublisher implements SocialPublisher {
   readonly platform = "tiktok" as const;
 
-  async connect(redirectUri: string) {
+  async connect(redirectUri: string, opts: ConnectOptions = {}) {
     const state = newState();
     const u = new URL("https://www.tiktok.com/v2/auth/authorize/");
     u.search = new URLSearchParams({
@@ -22,6 +22,8 @@ export class TikTokPublisher implements SocialPublisher {
       response_type: "code",
       redirect_uri: redirectUri,
       state,
+      // 1095: always show TikTok's own authorize page (where the account can be switched) instead of skipping it.
+      ...(opts.fresh ? { disable_auto_auth: "1" } : {}),
     }).toString();
     return { url: u.toString(), state };
   }

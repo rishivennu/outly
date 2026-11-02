@@ -1,8 +1,10 @@
 "use client";
 import { whyLine } from "@/lib/ai/caption-engine";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { UploadZone } from "@/components/shared/UploadZone";
 import { useToast } from "@/components/shared/Toast";
 import { defaultSchedule } from "@/components/shared/DateTimePicker";
@@ -10,8 +12,10 @@ import { api, ApiError, streamApi } from "@/lib/client/api";
 import { uploadVideo } from "@/lib/client/upload";
 import { takeHandoff, takeSharedFile, validateVideoFile } from "@/lib/client/handoff";
 import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
+import { cn } from "@/lib/utils";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { Assistant } from "./Assistant";
+import { captionSource, PANEL_OPEN, panelReducer } from "./assistant-state";
 import { JourneyBar, JourneyRail } from "./JourneyRail";
 import { createFont } from "./font";
 import { LaunchPanel, ScheduledView } from "./LaunchPanel";
@@ -45,6 +49,7 @@ interface Props {
 }
 
 type Meta = { duration: number; width: number; height: number };
+const ASSISTANT_PANEL = "create-assistant-panel";
 const LIVE = ["publishing", "published", "partial", "failed"];
 
 export function CreateWorkspace({ accounts: accountList, initialPost, tz, connected, connectError, initialStory, shared, restoreLocal, missingPostId }: Props) {
@@ -83,6 +88,8 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const copyAbort = useRef(new Map<string, AbortController>());
   const [copyWriting, setCopyWriting] = useState<Platform[]>([]);
   const [hook, setHook] = useState<string | null>(initialPost?.hook ?? null);
+  /** The creator's own wording of the Original caption, once they have edited it. Everything the writer is asked for comes from here. */
+  const [editedOriginal, setEditedOriginal] = useState<string | null>(null);
 
   /* ---------------- platforms ---------------- */
   const live = useLivePlatforms();
@@ -120,6 +127,12 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const [phase, setPhase] = useState<"edit" | "publishing" | "scheduled">(initialPost && LIVE.includes(initialPost.status) ? "publishing" : "edit");
   const [livePost, setLivePost] = useState<PostView | null>(initialPost && LIVE.includes(initialPost.status) ? initialPost : null);
   const [scheduledFor, setScheduledFor] = useState<string | null>(null);
+  /** Launch needs the width, so the assistant folds away when you get there and comes back when you leave. */
+  // A post that opens straight on Launch starts folded, so the panel never flashes open first.
+  const [panel, panelDispatch] = useReducer(panelReducer, step, (s0: Step) => panelReducer(PANEL_OPEN, { t: "step", step: s0 }));
+  useEffect(() => {
+    panelDispatch({ t: "step", step });
+  }, [step]);
 
   const meta = useMemo(
     () => ({ duration: media?.duration ?? localMeta?.duration ?? null, width: media?.width ?? localMeta?.width ?? null, height: media?.height ?? localMeta?.height ?? null, size: media?.size ?? fileRef.current?.size ?? null, mimeType: media?.mimeType ?? fileRef.current?.type ?? null }),
@@ -316,7 +329,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
 
   /* ================= hooks ================= */
   const fetchHooks = useCallback(
-    async (tone: Tone, exclude: string[], text = submittedStory ?? story) => {
+    async (tone: Tone, exclude: string[], text = captionSource({ edited: editedOriginal, submittedStory, story })) => {
       hooksAbort.current?.abort();
       const ctrl = new AbortController();
       hooksAbort.current = ctrl;
@@ -351,12 +364,13 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
         if (hooksAbort.current === ctrl) hooksAbort.current = null;
       }
     },
-    [story, submittedStory],
+    [story, submittedStory, editedOriginal],
   );
 
   const submitStory = () => {
     const s = story.trim();
     setSubmittedStory(s);
+    setEditedOriginal(null); // a new story gets a new Original to read
     seen.current = [];
     fetchHooks("default", [], s);
   };
@@ -392,7 +406,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
         // Each place's copy is shown the moment it is written, so the first card is ready in a second or two.
         const r = await streamApi<{ items: PlatformCopy[] }>(
           "/api/ai/platform",
-          { story: submittedStory ?? story, hook: h, platforms },
+          { story: captionSource({ edited: editedOriginal, submittedStory, story }), hook: h, platforms },
           (ev) => {
             const item = ev.item as PlatformCopy | undefined;
             if (ev.t !== "item" || !item || ctrl.signal.aborted || !left.has(item.platform)) return;
@@ -415,7 +429,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [story, submittedStory],
+    [story, submittedStory, editedOriginal],
   );
 
   const chooseHook = async (text: string) => {
@@ -584,10 +598,13 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
       onSubmitStory={submitStory}
       onEditStory={() => {
         setSubmittedStory(null);
+        setEditedOriginal(null);
         hooksAbort.current?.abort();
         setHooks(NO_HOOKS);
       }}
       hooks={hooks}
+      original={editedOriginal ?? hooks.result?.original ?? ""}
+      onOriginal={setEditedOriginal}
       onTryAnother={tryAnother}
       onTone={(t) => fetchHooks(t, [])}
       onUse={chooseHook}
@@ -612,7 +629,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
 
       <div className="relative min-w-0 flex-1">
         <JourneyBar step={step} reachable={reachable} onGo={setStep} />
-        <div className="mx-auto flex w-full max-w-3xl flex-col px-4 pb-4 pt-6 sm:px-8 lg:max-w-4xl lg:pb-16 lg:pt-8">
+        <div className={cn("mx-auto flex w-full max-w-3xl flex-col px-4 pb-4 pt-6 transition-[max-width] duration-500 [transition-timing-function:var(--ease-liquid)] motion-reduce:transition-none sm:px-8 lg:pb-16 lg:pt-8", panel.open ? "lg:max-w-4xl" : "lg:max-w-5xl")}>
           {/* Steps animate in on mount. No exit choreography: a nested exit that never settles must not strand the next step. */}
             {showVideo && !hasMedia && (
               <motion.section key="drop" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} aria-labelledby="drop-title" className={`${createFont.variable} font-create flex flex-col items-center pt-2 sm:pt-4 lg:pt-10`}>
@@ -757,8 +774,30 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
         </div>
       </div>
 
-      <aside aria-label="AI assistant" className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
-        <div className="glass h-full w-[332px] overflow-hidden rounded-[28px] xl:w-[372px]">{assistant}</div>
+      <aside aria-label="AI assistant" className="sticky top-0 hidden h-dvh shrink-0 items-start gap-2 p-3 lg:flex">
+        <Button
+          variant="subtle"
+          size="icon"
+          className="shrink-0"
+          onClick={() => panelDispatch({ t: "toggle" })}
+          aria-expanded={panel.open}
+          aria-controls={ASSISTANT_PANEL}
+          aria-label={panel.open ? "Hide the Outlly assistant" : "Show the Outlly assistant"}
+        >
+          {panel.open ? <PanelRightClose className="h-5 w-5" aria-hidden="true" /> : <PanelRightOpen className="h-5 w-5" aria-hidden="true" />}
+        </Button>
+        {/* Folded, never unmounted: the conversation and everything typed into it is still there when it comes back. */}
+        <div
+          id={ASSISTANT_PANEL}
+          aria-hidden={!panel.open}
+          inert={!panel.open}
+          className={cn(
+            "glass h-full overflow-hidden rounded-[28px] transition-[width,opacity] duration-500 [transition-timing-function:var(--ease-liquid)] motion-reduce:transition-none",
+            panel.open ? "w-[332px] opacity-100 xl:w-[372px]" : "w-0 opacity-0",
+          )}
+        >
+          {assistant}
+        </div>
       </aside>
     </div>
   );

@@ -17,6 +17,14 @@ export interface ConnectedProfile {
   metadata?: Record<string, unknown>;
   /** Set when the person unticked a permission Outlly asked for (1031: Instagram messages). Not stored. */
   declined?: string[];
+  /** 1095: other accounts the same sign-in can act for (a Facebook login's other Pages). Never stored or held. */
+  alternatives?: ConnectedProfile[];
+}
+
+/** 1095: how to start the sign-in. */
+export interface ConnectOptions {
+  /** "Connect a different account": ask the platform for a fresh sign-in or its account picker where it has one. */
+  fresh?: boolean;
 }
 
 /** Decrypted account handed to a publisher. Exists only inside workers, never serialised to the client. */
@@ -150,7 +158,7 @@ export interface PlatformComment {
 export interface SocialPublisher {
   readonly platform: Platform;
   /** Build the OAuth 2.0 authorize URL. Passwords never touch our servers. */
-  connect(redirectUri: string): Promise<OAuthStart>;
+  connect(redirectUri: string, opts?: ConnectOptions): Promise<OAuthStart>;
   /** Exchange the OAuth code for tokens + profile. */
   completeConnect(code: string, redirectUri: string, codeVerifier?: string): Promise<ConnectedProfile>;
   refreshToken(account: AccountContext): Promise<Pick<ConnectedProfile, "accessToken" | "refreshToken" | "expiresAt">>;

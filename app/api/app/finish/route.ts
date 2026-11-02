@@ -3,6 +3,7 @@ import { createSession } from "@/lib/auth";
 import { HttpError, json, route } from "@/lib/http";
 import { redeemCode, takeHeld } from "@/lib/app-handoff";
 import { saveConnectedAccount } from "@/lib/accounts";
+import { holdChoice, resolveConnect } from "@/lib/connect-choice";
 import { invalidateDashboards } from "@/lib/live";
 
 export const dynamic = "force-dynamic";
@@ -20,8 +21,12 @@ export const POST = route(
       // The account the browser connected (1086): saved only now, by the app holding the verifier.
       const held = await takeHeld(done.hold, done.uid, done.ch);
       if (held) {
-        await saveConnectedAccount(held.uid, held.platform, held.prof);
-        invalidateDashboards(held.uid);
+        // 1095: the same rule as the web callback. A known or replacing account waits for the creator's answer.
+        const { prof, decision } = await resolveConnect(held.uid, held.platform, held.prof, held.intent ?? "auto", held.expect);
+        if (decision.kind === "save") {
+          await saveConnectedAccount(held.uid, held.platform, prof);
+          invalidateDashboards(held.uid);
+        } else next = askFirst(next, await holdChoice({ uid: held.uid, platform: held.platform, prof, decision }));
       } else next = connectExpired(next);
     }
     if (done.uid) await createSession(done.uid);
@@ -29,6 +34,14 @@ export const POST = route(
   },
   { auth: false, limit: [20, 60_000] },
 );
+
+/** "connected=instagram" becomes "choose=<id>": the Accounts page asks before anything is saved (1095). */
+function askFirst(next: string, choose: string) {
+  const u = new URL(next, "http://outlly.invalid");
+  u.searchParams.delete("connected");
+  u.searchParams.set("choose", choose);
+  return u.pathname + u.search;
+}
 
 /** "connected=instagram" becomes "connect_error=instagram&reason=state": the Accounts page says start again. */
 function connectExpired(next: string) {
