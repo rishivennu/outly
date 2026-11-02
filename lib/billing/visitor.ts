@@ -7,8 +7,8 @@ import type { Currency } from "./money";
  * The current request's currency, from location only: IP country (Vercel/Cloudflare), else browser language.
  * There is no way to pick another one, so every page, the billing cards and checkout always agree.
  */
-export function visitorCurrency(fallback: Currency = "INR") {
-  const h = headers();
+export async function visitorCurrency(fallback: Currency = "INR") {
+  const h = (await headers());
   return detectCurrency((n) => h.get(n), null, fallback);
 }
 

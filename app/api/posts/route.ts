@@ -1,3 +1,4 @@
+import { isLibraryStatus, libraryPage } from "@/lib/posts/library";
 import { db } from "@/lib/db";
 import { HttpError, json, route } from "@/lib/http";
 import { savePostSchema } from "@/lib/validation";
@@ -24,6 +25,8 @@ export const GET = route(async (req, { user }) => {
       })),
     });
   }
+  // 1091: the Content library's "Load more" (cursor = id of the last post shown).
+  if (req.nextUrl.searchParams.get("library") === "1") return json(await libraryPage(user, req.nextUrl.searchParams.get("cursor"), undefined, undefined, isLibraryStatus(status) ? status : null));
   const posts = await db.post.findMany({
     where: { userId: user.id, ...(await postFilter(user)).where, ...(status && status !== "all" ? { status: status === "failed" ? { in: ["failed", "partial"] } : status } : {}) },
     include: { targets: true, media: true },

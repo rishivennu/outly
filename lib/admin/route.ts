@@ -1,7 +1,7 @@
 import "server-only";
 import type { NextRequest } from "next/server";
 import { ZodError } from "zod";
-import { assertSameOrigin, clientIp, HttpError, json } from "../http";
+import { assertSameOrigin, clientIp, HttpError, json, unwrapCtx, type NextCtx } from "../http";
 import { rateLimit } from "../rate-limit";
 import { getAdmin, type AdminSession } from "./auth";
 import { can, type AdminArea } from "./perms";
@@ -10,7 +10,8 @@ type Handler<C> = (req: NextRequest, ctx: C & { admin: AdminSession }) => Promis
 
 /** Admin API wrapper: same-origin + admin session + role check + rate limit. */
 export function adminRoute<C = { params: Record<string, string> }>(area: AdminArea, handler: Handler<C>, limit: [number, number] = [90, 60_000]) {
-  return async (req: NextRequest, ctx: C) => {
+  return async (req: NextRequest, next: NextCtx<C>) => {
+    const ctx = await unwrapCtx<C>(next);
     try {
       assertSameOrigin(req);
       const ip = clientIp(req);

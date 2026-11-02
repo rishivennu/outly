@@ -57,7 +57,7 @@ export const listProfiles = cache(async (ownerId: string, scope: Scope): Promise
 
 /** The picked profile, if it is still one this person may see. Null = all profiles. */
 export async function activeProfile(user: Pick<SessionUser, "id" | "scope">, list?: ProfileView[]) {
-  const id = cookies().get(ACCT_COOKIE)?.value;
+  const id = (await cookies()).get(ACCT_COOKIE)?.value;
   if (!id) return null;
   const all = list ?? (await listProfiles(user.id, user.scope));
   return all.find((p) => p.id === id) ?? null;
@@ -80,7 +80,7 @@ export async function postFilter(user: Pick<SessionUser, "id" | "scope">) {
 export async function requestScope(ownerId: string): Promise<Scope> {
   let ws: string | undefined;
   try {
-    ws = cookies().get(WS_COOKIE)?.value;
+    ws = (await cookies()).get(WS_COOKIE)?.value;
   } catch {
     return null; // not inside a request (worker, script)
   }

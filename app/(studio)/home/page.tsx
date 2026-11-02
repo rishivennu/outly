@@ -63,7 +63,7 @@ async function welcomeOffer(user: { id: string; createdAt: Date; actor: unknown 
   const paid = plans.filter((p) => p.priceMinor > 0 && p.state === "available");
   const pick = paid.find((p) => p.highlight) ?? paid[0];
   if (!pick) return { freeLimit: ent.postLimit, freePeriod: ent.postPeriod, offer: null };
-  const visitor = visitorCurrency((pick.currency as never) ?? "INR");
+  const visitor = await visitorCurrency((pick.currency as never) ?? "INR");
   const lp = localPrice(pick, visitor.currency);
   const offer: WelcomeOffer = { slug: pick.slug, name: pick.name, price: formatMoney(lp.priceMinor, lp.currency), interval: pick.interval === "year" ? "year" : "month", features: pick.features.slice(0, 3), postLimit: pick.postLimit, aiCaptions: pick.aiCaptions, postPeriod: pick.postPeriod };
   return { freeLimit: ent.postLimit, freePeriod: ent.postPeriod, offer };
@@ -129,7 +129,8 @@ async function pulseView(user: HomeUser, canSwitch: boolean) {
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Home" };
 
-export default async function HomePage({ searchParams }: { searchParams?: { recapAt?: string } }) {
+export default async function HomePage(props: { searchParams?: Promise<{ recapAt?: string }> }) {
+  const searchParams = await props.searchParams;
   const user = (await getCurrentUser())!;
   const dash = await dashboardFor();
   if (dash.style === "pulse") {
@@ -141,7 +142,7 @@ export default async function HomePage({ searchParams }: { searchParams?: { reca
   const liveP = connectedPlatforms(user.id);
   const publishedP = db.post.count({ where: { userId: user.id, status: { in: ["published", "partial"] } } });
   const meP = db.user.findUnique({ where: { id: user.id }, select: { postingGoal: true, weeklyReport: true } });
-  const recapHidden = cookies().get(RECAP_COOKIE)?.value;
+  const recapHidden = (await cookies()).get(RECAP_COOKIE)?.value;
   // Dev only: preview the Monday card on any day (?recapAt=2026-10-19T05:00:00Z).
   const recapAt = process.env.NODE_ENV !== "production" && searchParams?.recapAt ? new Date(searchParams.recapAt) : new Date();
   // 1037: the picked profile (or a member's accounts) narrows the drafts and the next post too.

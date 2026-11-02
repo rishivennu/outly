@@ -17,7 +17,7 @@ export const POST = route(
     const userId = realUserId(user);
     // A token moves with the phone: whoever signs in on it now gets its notifications.
     const d = await db.pushDevice.upsert({ where: { token }, create: { token, platform, userId }, update: { userId, platform } });
-    cookies().set(PUSH_COOKIE, d.id, { httpOnly: true, secure: env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
+    (await cookies()).set(PUSH_COOKIE, d.id, { httpOnly: true, secure: env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
     return json({ ok: true });
   },
   { limit: [20, 60_000] },

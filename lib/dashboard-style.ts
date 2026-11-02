@@ -7,7 +7,7 @@ import { DASH_COOKIE, normalizeDashboard, resolveDashboard, type DashboardStyle 
 export async function dashboardFor(): Promise<{ style: DashboardStyle; canSwitch: boolean }> {
   try {
     const cfg = normalizeDashboard(await getConfig("dashboard"));
-    return { style: resolveDashboard(cfg, cookies().get(DASH_COOKIE)?.value), canSwitch: cfg.userSwitch };
+    return { style: resolveDashboard(cfg, (await cookies()).get(DASH_COOKIE)?.value), canSwitch: cfg.userSwitch };
   } catch {
     return { style: "classic", canSwitch: false };
   }

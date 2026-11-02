@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const next = sameSitePath(req.nextUrl.searchParams.get("next"));
   if (await readSessionUserId()) return NextResponse.redirect(new URL(next ?? "/home", req.url));
-  destroySession();
+  await destroySession();
   const to = new URL("/login", req.url);
   if (next && next !== "/login") to.searchParams.set("next", next);
   const res = NextResponse.redirect(to);

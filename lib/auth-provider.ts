@@ -40,9 +40,9 @@ function tzData(tz?: string | null) {
   return v ? { timezone: v } : {};
 }
 
-function cookieTimezone() {
+async function cookieTimezone() {
   try {
-    return validTimezone(cookies().get(TZ_COOKIE)?.value);
+    return validTimezone((await cookies()).get(TZ_COOKIE)?.value);
   } catch {
     return null; // outside a request scope (worker, script)
   }
@@ -181,6 +181,6 @@ export async function signInWithGoogle(who: { email: string; name?: string; pict
   // the outlly_adult cookie; without it no new studio is made (existing members above are unaffected).
   if (!opts.adult) throw new HttpError(403, "Please confirm you're 18 or older to create an account.", "age");
   // The Google callback carries no body, so the browser leaves its time zone in a cookie before redirecting.
-  const u = await joined(await db.user.create({ data: { email, name: who.name?.trim() || email.split("@")[0], avatar: who.picture ?? null, emailVerifiedAt: new Date(), emailVerifiedFor: email, ...tzData(cookieTimezone()) }, select: { id: true } }), true);
+  const u = await joined(await db.user.create({ data: { email, name: who.name?.trim() || email.split("@")[0], avatar: who.picture ?? null, emailVerifiedAt: new Date(), emailVerifiedFor: email, ...tzData(await cookieTimezone()) }, select: { id: true } }), true);
   return { id: u.id, created: true };
 }

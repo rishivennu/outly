@@ -84,7 +84,7 @@ describe("hand-off session (app start link)", () => {
   test("can't connect an account through the plain web flow", async () => {
     const u = await mkUser("webconnect");
     await createSession(u.id, { handoff: true });
-    saveOAuthState("instagram", { state: "s-1086", returnTo: "/accounts" });
+    await saveOAuthState("instagram", { state: "s-1086", returnTo: "/accounts" });
     const res = await callbackGET(new NextRequest("http://localhost/api/accounts/instagram/callback?state=s-1086&code=abc"), { params: { platform: "instagram" } });
     const loc = new URL(res.headers.get("location")!);
     expect(loc.pathname).toBe("/accounts");
@@ -95,7 +95,7 @@ describe("hand-off session (app start link)", () => {
   test("can't connect through the app flow without the app's challenge cookie", async () => {
     const u = await mkUser("nocookie");
     await createSession(u.id, { handoff: true });
-    saveOAuthState("instagram", { state: "s-1086b", returnTo: "/api/app/return?next=%2Faccounts" });
+    await saveOAuthState("instagram", { state: "s-1086b", returnTo: "/api/app/return?next=%2Faccounts" });
     const res = await callbackGET(new NextRequest("http://localhost/api/accounts/instagram/callback?state=s-1086b&code=abc"), { params: { platform: "instagram" } });
     expect(new URL(res.headers.get("location")!).searchParams.get("reason")).toBe("state");
   });

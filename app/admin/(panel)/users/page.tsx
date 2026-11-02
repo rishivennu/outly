@@ -50,7 +50,8 @@ const ci = (process.env.DATABASE_URL ?? "").startsWith("postgres") ? { mode: "in
 /** Only values from the lists above get through: anything else reads as "no filter". */
 const pick = (v: string | undefined, list: { value: string }[]) => (v && list.some((o) => o.value === v) ? v : "");
 
-export default async function Users({ searchParams }: { searchParams: Params }) {
+export default async function Users(props: { searchParams: Promise<Params> }) {
+  const searchParams = await props.searchParams;
   await requireAdmin("users");
   const q = searchParams.q?.trim().slice(0, 120);
   const f = ["paying", "active", "dormant"].includes(searchParams.f ?? "") ? searchParams.f! : "";

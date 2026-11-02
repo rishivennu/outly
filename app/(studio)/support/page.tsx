@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Help" };
 
 /** Help inside the dashboard: the same answers as the public /help page, plus the requests this person has open with us. */
-export default async function StudioHelp({ searchParams }: { searchParams: { topic?: string; q?: string } }) {
+export default async function StudioHelp(props: { searchParams: Promise<{ topic?: string; q?: string }> }) {
+  const searchParams = await props.searchParams;
   const user = (await getCurrentUser())!;
   const email = user.actor?.email ?? user.email;
   const [faq, tickets] = await Promise.all([

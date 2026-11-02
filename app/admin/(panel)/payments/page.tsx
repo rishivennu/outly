@@ -10,7 +10,8 @@ import { RefundButton } from "@/components/admin/RefundButton";
 
 export const metadata = { title: "Payments" };
 
-export default async function Payments({ searchParams }: { searchParams: { status?: string; q?: string } }) {
+export default async function Payments(props: { searchParams: Promise<{ status?: string; q?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireAdmin("payments");
   const status = searchParams.status ?? "";
   const q = searchParams.q?.trim();

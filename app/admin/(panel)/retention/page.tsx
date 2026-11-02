@@ -17,7 +17,8 @@ export const dynamic = "force-dynamic";
 const LEVEL_TONE: Record<string, Tone> = { high: "bad", medium: "warn", low: "muted" };
 const SHOW = 100;
 
-export default async function RetentionPage({ searchParams }: { searchParams: { f?: string } }) {
+export default async function RetentionPage(props: { searchParams: Promise<{ f?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireAdmin("retention");
   const f = searchParams.f ?? "";
   const all = await atRisk();

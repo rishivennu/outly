@@ -162,7 +162,7 @@ function LiveViews({ delay, className }: { delay: number; className?: string }) 
   const [failed, setFailed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const first = useRef<number | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const shown = useRef(false);
 
   const load = useCallback(async () => {

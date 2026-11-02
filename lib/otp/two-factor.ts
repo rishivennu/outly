@@ -82,17 +82,17 @@ export async function beginSignIn(
     return { twoFactor: false, trusted: true };
   }
   const token = await new SignJWT({ sub: userId, p: "2fa", f: fingerprint(u), m: first, r: remember === true ? 1 : remember === false ? 0 : -1 }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime(`${CHALLENGE_S}s`).sign(secret);
-  cookies().set(CHALLENGE_COOKIE, token, { httpOnly: true, secure: env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: CHALLENGE_S });
+  (await cookies()).set(CHALLENGE_COOKIE, token, { httpOnly: true, secure: env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: CHALLENGE_S });
   return { twoFactor: true };
 }
 
 /** "Start over" on the sign-in page: drop the halfway cookie so the next person starts clean. */
-export function clearChallenge() {
-  cookies().delete(CHALLENGE_COOKIE);
+export async function clearChallenge() {
+  (await cookies()).delete(CHALLENGE_COOKIE);
 }
 
 async function challengeUser(): Promise<{ id: string; f: string; m: string; r?: boolean }> {
-  const t = cookies().get(CHALLENGE_COOKIE)?.value;
+  const t = (await cookies()).get(CHALLENGE_COOKIE)?.value;
   const gone = new HttpError(401, "That sign-in took too long. Start again with your email.", "2FA_EXPIRED");
   if (!t) throw gone;
   try {
@@ -167,7 +167,7 @@ export async function completeSignIn(input: string, via: "app" | "whatsapp" = "a
   const u = await db.user.findUnique({ where: { id: userId }, select: { totpSecret: true, totpLastStep: true, recoveryCodes: true, totpEnabledAt: true } });
   // Fingerprint moved on: this halfway cookie already finished a sign-in (or 2FA was reset). Start again.
   if (!u?.totpEnabledAt || fingerprint(u) !== ch.f) {
-    cookies().delete(CHALLENGE_COOKIE);
+    (await cookies()).delete(CHALLENGE_COOKIE);
     throw new HttpError(401, "That sign-in took too long. Start again with your email.", "2FA_EXPIRED");
   }
   let used: "totp" | "recovery" | "whatsapp";
@@ -178,7 +178,7 @@ export async function completeSignIn(input: string, via: "app" | "whatsapp" = "a
     if (v !== "ok") throw await wrong(userId, WA_MESSAGE[v as keyof typeof WA_MESSAGE] ?? WA_MESSAGE.wrong);
     used = "whatsapp";
   } else used = await spendFactor(userId, u, input);
-  cookies().delete(CHALLENGE_COOKIE);
+  (await cookies()).delete(CHALLENGE_COOKIE);
   const remember = rememberNow ?? ch.r;
   await createSession(userId, { persist: remember !== false });
   if (remember === true) await rememberDevice(userId);

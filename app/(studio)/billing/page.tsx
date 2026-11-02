@@ -81,7 +81,8 @@ async function receiptFor(userId: string, sp: Sp, cancelledId: string | null): P
   return id ? paymentReceipt(userId, id) : null;
 }
 
-export default async function BillingPage({ searchParams }: { searchParams: Sp }) {
+export default async function BillingPage(props: { searchParams: Promise<Sp> }) {
+  const searchParams = await props.searchParams;
   const user = await getCurrentUser();
   if (!user) redirect("/api/auth/expired?next=/billing");
   if (user.actor) redirect("/home"); // billing belongs to the workspace owner
@@ -145,7 +146,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Sp }
         ? { code: null, redeemed: false }
         : null;
 
-  const visitor = visitorCurrency((plans.find((p) => p.priceMinor > 0)?.currency as any) ?? "INR");
+  const visitor = await visitorCurrency((plans.find((p) => p.priceMinor > 0)?.currency as any) ?? "INR");
   // Price each card in what the gateway will actually charge; if that isn't the visitor's currency, show their amount as a hint.
   const priced = plans.map((p) => {
     const lp = localPrice(p, chargeCurrency(gw.provider, visitor.currency, p.currency));

@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Checkout" };
 
 /** The mock gateway's hosted page. Real gateways never land here. */
-export default async function CheckoutPage({ searchParams }: { searchParams: { p?: string } }) {
+export default async function CheckoutPage(props: { searchParams: Promise<{ p?: string }> }) {
+  const searchParams = await props.searchParams;
   const user = await getCurrentUser();
   if (!user) redirect("/api/auth/expired?next=/billing");
   const p = searchParams.p ? await db.payment.findUnique({ where: { id: searchParams.p }, include: { invoice: true } }) : null;

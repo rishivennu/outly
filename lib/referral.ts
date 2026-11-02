@@ -80,7 +80,7 @@ export async function recordOpen(code: string | undefined, visitorKey: string | 
  * can see the attempt; a burst of signups or several from one network are flagged, not refused.
  */
 export async function attachReferral(newUserId: string, ip?: string) {
-  const jar = cookies();
+  const jar = (await cookies());
   const code = jar.get(REF_COOKIE)?.value;
   const visitorKey = jar.get(REF_VISITOR)?.value;
   if (!code) return;

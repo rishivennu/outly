@@ -10,7 +10,7 @@ export const POST = route(
   async (req, { user, params }) => {
     const body = launchSchema.parse(await req.json());
     // The plan's post slot is taken inside launchPost, before the atomic claim (see holdPostSlot).
-    const raw = cookies().get("studio_sim")?.value as SimulationMode | undefined;
+    const raw = (await cookies()).get("studio_sim")?.value as SimulationMode | undefined;
     const simulate = raw && SIMS.includes(raw) ? raw : "realistic";
     await launchPost(user.id, params.id, body.mode, body.scheduledAt ? new Date(body.scheduledAt) : null, simulate);
     return json({ post: await postView(await ownedPost(user.id, params.id)) }, { status: 202 });

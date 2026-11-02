@@ -28,7 +28,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
  * Entrance choreography (GSAP): cards rise in a stagger, KPI numbers count up, bars grow from the left
  * and the cohort grid fills in from the top-left corner. Replays when the range changes or the tab is shown.
  */
-function useBreakdownMotion(ref: React.RefObject<HTMLDivElement>, key: string, active: boolean) {
+function useBreakdownMotion(ref: React.RefObject<HTMLDivElement | null>, key: string, active: boolean) {
   useGSAP(() => {
     const root = ref.current;
     if (!root || !active) return;

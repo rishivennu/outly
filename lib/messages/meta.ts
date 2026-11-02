@@ -54,10 +54,20 @@ function attachmentsOf(m: GMsg) {
   }));
 }
 
-/** Map one conversation; `selfId` is our account (IG professional account id or Page id). */
-export function mapConversation(c: GConv, selfId: string): RemoteThread | null {
-  const other = (c.participants?.data ?? []).find((p) => p.id !== selfId);
+/**
+ * Map one conversation; `selfId` is our account (IG professional account id or Page id).
+ * 1090: Instagram can list our own side under an id other than the `user_id` we stored at connect,
+ * so we also recognise ourselves by username. Matching by id alone could pick our own account as
+ * "the other person", which turned every message around and sent replies to ourselves.
+ */
+export function mapConversation(c: GConv, selfId: string, selfUsername?: string | null): RemoteThread | null {
+  const handle = selfUsername?.replace(/^@/, "").toLowerCase() || null;
+  const isSelf = (p: { id: string; username?: string }) => p.id === selfId || (!!handle && p.username?.toLowerCase() === handle);
+  const people = c.participants?.data ?? [];
+  const other = people.find((p) => !isSelf(p));
   if (!other) return null;
+  // Neither side looks like us: keep the old pick (first one that isn't our id) but say so in the logs.
+  if (people.length > 1 && !people.some(isSelf)) console.warn("[dm] conversation without a recognisable self participant", { conversation: c.id });
   const messages = (c.messages?.data ?? []).map<RemoteMessage>((m) => ({
     mid: m.id,
     fromId: m.from?.id ?? "",
@@ -88,7 +98,7 @@ export async function listConversations(platform: DmPlatform, acct: AccountConte
   const r = await fetch(url, { signal: T(), cache: "no-store" });
   if (!r.ok) throw await httpFailure(r, `${platform} conversations`);
   const data = ((await r.json()) as { data?: GConv[] }).data ?? [];
-  return data.map((c) => mapConversation(c, acct.platformUserId)).filter((x): x is RemoteThread => !!x);
+  return data.map((c) => mapConversation(c, acct.platformUserId, acct.username)).filter((x): x is RemoteThread => !!x);
 }
 
 /** Name, handle and picture of the person, through the platform's user profile API. Best effort. */

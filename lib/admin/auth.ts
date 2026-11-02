@@ -75,11 +75,11 @@ export async function createAdminSession(a: { id: string; role: string; password
     .setIssuedAt()
     .setExpirationTime(`${TTL_S}s`)
     .sign(secret);
-  cookies().set(ADMIN_COOKIE, token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: TTL_S });
+  (await cookies()).set(ADMIN_COOKIE, token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: TTL_S });
 }
 
-export function destroyAdminSession() {
-  cookies().delete(ADMIN_COOKIE);
+export async function destroyAdminSession() {
+  (await cookies()).delete(ADMIN_COOKIE);
 }
 
 export type AdminSession = { id: string; name: string; login: string; role: AdminRole };
@@ -88,7 +88,7 @@ export type AdminSession = { id: string; name: string; login: string; role: Admi
 const adminRow = cache((id: string) => db.adminUser.findUnique({ where: { id } }));
 
 export const getAdmin = cache(async (): Promise<AdminSession | null> => {
-  const token = cookies().get(ADMIN_COOKIE)?.value;
+  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
@@ -103,7 +103,7 @@ export const getAdmin = cache(async (): Promise<AdminSession | null> => {
 /** True when the request carries a validly signed admin cookie. No database read, so it still works
  * while the database is down (used by /api/health to decide who sees diagnostics). */
 export async function hasAdminCookie() {
-  const token = cookies().get(ADMIN_COOKIE)?.value;
+  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
   if (!token) return false;
   try {
     await jwtVerify(token, secret, { algorithms: ["HS256"] });

@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Icon3D, type IconName } from "@/components/brand/Icon3D";
 import { Thumb } from "@/components/shared/Thumb";
@@ -12,6 +12,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { fmt, useUser } from "@/components/shell/UserContext";
 import { PostSheet } from "@/components/posts/PostSheet";
+import { ReelAnalytics } from "@/components/content/ReelAnalytics";
 import { DeviceDrafts } from "@/components/create/DeviceDrafts";
 import { cn, compact, formatDuration } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -19,6 +20,7 @@ import { useToast } from "@/components/shared/Toast";
 import { api } from "@/lib/client/api";
 import { deleteCopy, deletePosts, isFailedPost } from "@/lib/client/failed-posts";
 import type { PostView } from "@/lib/services";
+import type { LibraryCounts, LibraryPage } from "@/lib/posts/library";
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -32,26 +34,111 @@ type F = (typeof FILTERS)[number]["id"];
 /** `/content?filter=draft` opens straight on that tab, so a "Saved to Drafts" link can land here. */
 export const filterFromParam = (v: string | null | undefined): F => (FILTERS.some((f) => f.id === v) ? (v as F) : "all");
 
+/** Live on at least one platform (published or partly published). */
+const hasLive = (p: PostView) => p.targets.some((t) => t.status === "published");
+
 const match = (p: PostView, f: F) => f === "all" || (f === "failed" ? ["failed", "partial"].includes(p.status) : f === "published" ? p.status === "published" : p.status === f);
 
-export function ContentLibrary({ initial, views }: { initial: PostView[]; views: Record<string, number> }) {
+const countIn = (list: Iterable<PostView>, f: F) => {
+  let n = 0;
+  for (const p of list) if (match(p, f)) n++;
+  return n;
+};
+
+/**
+ * 1091: the library arrives one page at a time. `counts` are the server's totals for every post; posts
+ * we have loaded and then changed here (deleted, duplicated, published) adjust them, so the tabs stay true
+ * without loading everything.
+ */
+export function ContentLibrary({
+  initial,
+  views: initialViews,
+  counts: serverCounts,
+  nextCursor: firstCursor = null,
+}: {
+  initial: PostView[];
+  views: Record<string, number>;
+  counts?: LibraryCounts;
+  nextCursor?: string | null;
+}) {
   const { timezone: tz } = useUser();
   const [posts, setPosts] = useState(initial);
+  const [views, setViews] = useState(initialViews);
+  // One cursor per tab: "All" pages through everything, another tab through its own posts only.
+  // Missing = that tab has not fetched yet; null = nothing more to fetch.
+  const [cursors, setCursors] = useState<Partial<Record<F, string | null>>>({ all: firstCursor });
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreErr, setMoreErr] = useState<string | null>(null);
+  // Every post as the server sent it: the difference to `posts` is what changed on this page.
+  const baseline = useRef(new Map(initial.map((p) => [p.id, p] as const)));
   const params = useSearchParams();
   const [filter, setFilter] = useState<F>(() => filterFromParam(params?.get("filter")));
   const [open, setOpen] = useState<PostView | null>(null);
+  // 1088: a post that is live somewhere opens its analytics first; "Details and actions" leads on to the sheet.
+  const [stats, setStats] = useState<PostView | null>(null);
   // ?open=<id> (from the command palette) opens that post. One beat after arriving: the palette hands
   // focus back as it closes, and a sheet opened in that same moment would read it as "clicked outside".
   const want = params?.get("open") ?? null;
   useEffect(() => {
     if (!want) return;
+    let gone = false;
+    let t: ReturnType<typeof setTimeout> | undefined;
     const p = initial.find((x) => x.id === want);
-    if (!p) return;
-    const t = setTimeout(() => setOpen(p), 80);
-    return () => clearTimeout(t);
+    if (p) t = setTimeout(() => setOpen(p), 80);
+    // Not on the first page: fetch just that one (the server checks it is ours).
+    else
+      void api<{ post: PostView }>(`/api/posts/${want}`)
+        .then((r) => !gone && setOpen(r.post))
+        .catch(() => {});
+    return () => {
+      gone = true;
+      if (t) clearTimeout(t);
+    };
   }, [want, initial]);
-  const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.id, posts.filter((p) => match(p, f.id)).length])) as Record<F, number>, [posts]);
+  const counts = useMemo(() => {
+    const local = Object.fromEntries(FILTERS.map((f) => [f.id, countIn(posts, f.id)])) as Record<F, number>;
+    if (!serverCounts) return local;
+    const base = baseline.current.values();
+    const list = [...base];
+    return Object.fromEntries(FILTERS.map((f) => [f.id, Math.max(local[f.id], serverCounts[f.id] - countIn(list, f.id) + local[f.id])])) as Record<F, number>;
+  }, [posts, serverCounts]);
   const shown = posts.filter((p) => match(p, filter));
+  // What "Show more" would fetch on this tab: a cursor, "start" (first page of the tab), or null (all here).
+  const nextFor = (f: F): string | null => {
+    if (cursors.all === null) return null;
+    if (f === "all") return cursors.all ?? null;
+    if (f in cursors) return cursors[f] ?? null;
+    return countIn(posts, f) < counts[f] ? "start" : null;
+  };
+  const next = nextFor(filter);
+  const loadMore = async (f: F = filter) => {
+    const c = nextFor(f);
+    if (!c || loadingMore) return;
+    setLoadingMore(true);
+    setMoreErr(null);
+    try {
+      const q = new URLSearchParams({ library: "1" });
+      if (f !== "all") q.set("status", f);
+      if (c !== "start") q.set("cursor", c);
+      const r = await api<LibraryPage>(`/api/posts?${q}`);
+      for (const p of r.posts) if (!baseline.current.has(p.id)) baseline.current.set(p.id, p);
+      setPosts((ps) => {
+        const have = new Set(ps.map((x) => x.id));
+        return [...ps, ...r.posts.filter((x) => !have.has(x.id))];
+      });
+      setViews((v) => ({ ...v, ...r.views }));
+      setCursors((cs) => ({ ...cs, [f]: r.nextCursor }));
+    } catch {
+      setMoreErr("We couldn't load more just now. Try again in a moment.");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+  // Opening a tab whose posts are not loaded yet fetches its first page instead of showing "nothing here".
+  useEffect(() => {
+    if (filter !== "all" && nextFor(filter) === "start") void loadMore(filter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
   const toast = useToast();
   // Delete failed posts from Outlly: one card's trash button, or every failed one from the Failed tab.
   const [del, setDel] = useState<PostView[] | null>(null);
@@ -76,7 +163,7 @@ export function ContentLibrary({ initial, views }: { initial: PostView[]; views:
         <p className="eyebrow relative mb-3">Content</p>
         <h1 className="display fade-title relative text-[clamp(2.8rem,8vw,6.2rem)] tracking-[-0.045em]">Everything you&apos;ve made.</h1>
         <p className="glass relative mt-4 inline-flex rounded-full px-4 py-1.5 text-sm text-muted-foreground">
-          {posts.length} {posts.length === 1 ? "piece" : "pieces"} · {posts.filter((p) => p.status === "published").length} live
+          {counts.all} {counts.all === 1 ? "piece" : "pieces"} · {counts.published} live
         </p>
         {posts.length >= 4 && <CardWall images={posts.map((p) => p.media.thumbnailUrl)} className="mt-4 hidden sm:flex" height={330} />}
         <div className={cn("relative flex justify-center", posts.length >= 4 ? "-mt-10" : "mt-8")}>
@@ -112,14 +199,18 @@ export function ContentLibrary({ initial, views }: { initial: PostView[]; views:
         </div>
       )}
 
-      {shown.length === 0 ? (
+      {shown.length === 0 && loadingMore ? (
+        <p className="mt-10 flex items-center justify-center gap-2 text-sm text-muted-foreground" role="status">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading...
+        </p>
+      ) : shown.length === 0 ? (
         <Empty filter={filter} />
       ) : (
         <motion.ul layout className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           <AnimatePresence>
             {shown.map((p, i) => (
               <motion.li key={p.id} className="relative" layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0, transition: { delay: Math.min(i * 0.03, 0.3) } }} exit={{ opacity: 0, scale: 0.95 }}>
-                <button type="button" onClick={() => setOpen(p)} className="group block w-full text-left" aria-label={`${p.title ?? "Untitled"}, ${p.status}. Open details`}>
+                <button type="button" onClick={() => (hasLive(p) ? setStats(p) : setOpen(p))} className="group block w-full text-left" aria-label={`${p.title ?? "Untitled"}, ${p.status}. ${hasLive(p) ? "Open analytics" : "Open details"}`}>
                   <div className="relative aspect-[9/16] overflow-hidden rounded-[24px] hairline transition duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_30px_60px_-30px_hsl(var(--energy-b)/0.6)]">
                     <Thumb src={p.media.thumbnailUrl} video={p.media.url} alt="" className="absolute inset-0" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/30" />
@@ -156,6 +247,20 @@ export function ContentLibrary({ initial, views }: { initial: PostView[]; views:
         </motion.ul>
       )}
 
+      {next && (shown.length > 0 || !loadingMore) && (
+        <div className="mt-8 flex flex-col items-center gap-2">
+          <Button variant="subtle" onClick={() => void loadMore()} disabled={loadingMore} className="min-h-[44px]">
+            {loadingMore && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+            {loadingMore ? "Loading..." : filter === "all" ? `Show more (${Math.max(0, counts.all - posts.length)} more)` : `Show more (${Math.max(0, counts[filter] - shown.length)} more)`}
+          </Button>
+          {moreErr && (
+            <p role="alert" className="text-sm text-destructive">
+              {moreErr}
+            </p>
+          )}
+        </div>
+      )}
+
       <ConfirmDialog
         open={!!del}
         onOpenChange={(o) => !o && !deleting && setDel(null)}
@@ -164,6 +269,16 @@ export function ContentLibrary({ initial, views }: { initial: PostView[]; views:
         confirmLabel={deleting ? "Deleting..." : (copy?.confirm ?? "Delete")}
         busy={deleting}
         onConfirm={confirmDelete}
+      />
+
+      <ReelAnalytics
+        post={stats}
+        onClose={() => setStats(null)}
+        onDetails={(p) => {
+          setStats(null);
+          // One beat later, so the sheet doesn't read the popup's closing focus as an outside click.
+          setTimeout(() => setOpen(posts.find((x) => x.id === p.id) ?? p), 80);
+        }}
       />
 
       <PostSheet

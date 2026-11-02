@@ -7,7 +7,8 @@ import { AuthCard } from "@/components/auth/AuthCard";
 export const metadata: Metadata = { title: "Admin sign in", robots: { index: false, follow: false } };
 
 /** Admin sign in on the same floating card as creator sign up (10-15e), with team-console copy on the light panel. */
-export default async function AdminLogin({ searchParams }: { searchParams: { next?: string } }) {
+export default async function AdminLogin(props: { searchParams: Promise<{ next?: string }> }) {
+  const searchParams = await props.searchParams;
   if (await getAdmin()) redirect("/admin");
   const next = searchParams.next?.startsWith("/admin") ? searchParams.next : "/admin";
   return (

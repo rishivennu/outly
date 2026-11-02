@@ -27,7 +27,8 @@ async function invite(ref: string | undefined) {
   }
 }
 
-export default async function SignupPage({ searchParams }: { searchParams: { ref?: string } }) {
+export default async function SignupPage(props: { searchParams: Promise<{ ref?: string }> }) {
+  const searchParams = await props.searchParams;
   const [, seats, inv, whatsapp] = await Promise.all([loadKeys(), foundingPublic(), invite(searchParams.ref), whatsappAvailable().catch(() => false)]);
   const banner = seats || inv ? <>{inv && <ReferralInvite plan={inv.plan} days={inv.days} />}{seats && <FoundingSeats initial={seats} />}</> : null;
   return (

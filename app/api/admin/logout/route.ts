@@ -9,6 +9,6 @@ export async function POST(req: NextRequest) {
   } catch {
     return json({ error: "Blocked." }, { status: 403 });
   }
-  destroyAdminSession();
+  await destroyAdminSession();
   return NextResponse.redirect(new URL("/admin/login", req.url), 303);
 }

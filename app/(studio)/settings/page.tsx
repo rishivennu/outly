@@ -35,7 +35,8 @@ async function billingSummary(userId: string, name: string, email: string): Prom
   };
 }
 
-export default async function SettingsPage({ searchParams }: { searchParams?: { tab?: string } }) {
+export default async function SettingsPage(props: { searchParams?: Promise<{ tab?: string }> }) {
+  const searchParams = await props.searchParams;
   const user = (await getCurrentUser())!;
   // Inside someone else's workspace the profile, email and billing settings are theirs, so they aren't shown.
   const own = user.actor ? null : await db.user.findUnique({ where: { id: user.id }, select: { weeklyReport: true, alertPrefs: true } });

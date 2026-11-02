@@ -20,7 +20,8 @@ function mask(email: string) {
  * mail scanners open every link, so the person presses a button first. The form posts to
  * /api/email/unsubscribe, which does the work and comes back here with ?done=out|in.
  */
-export default async function UnsubscribePage({ searchParams }: { searchParams: { t?: string; done?: string } }) {
+export default async function UnsubscribePage(props: { searchParams: Promise<{ t?: string; done?: string }> }) {
+  const searchParams = await props.searchParams;
   const who = readUnsubToken(searchParams.t);
   if (!who) {
     return (

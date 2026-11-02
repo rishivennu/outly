@@ -7,7 +7,8 @@ import { InboxView } from "@/components/inbox/InboxView";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Inbox" };
 
-export default async function InboxPage({ searchParams }: { searchParams?: { tab?: string } }) {
+export default async function InboxPage(props: { searchParams?: Promise<{ tab?: string }> }) {
+  const searchParams = await props.searchParams;
   const user = (await getCurrentUser())!;
   const [initial, dms, live] = await Promise.all([
     inbox(user.id, undefined, user.scope),

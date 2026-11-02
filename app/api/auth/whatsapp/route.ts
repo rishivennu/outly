@@ -15,7 +15,7 @@ const code = z.string().trim().min(1, "Enter the 6-digit code.").max(20);
 const details = {
   name: z.string().trim().min(1, "What should we call you?").max(80),
   email: z.string().trim().toLowerCase().email("That email doesn't look quite right").max(200).refine((e) => !isDisposableEmail(e), DISPOSABLE_MESSAGE),
-  adult: z.literal(true, { errorMap: () => ({ message: "Please confirm you're 18 or older to create an account." }) }),
+  adult: z.literal(true, { error: "Please confirm you're 18 or older to create an account." }),
 };
 const schema = z.discriminatedUnion("step", [
   z.object({ step: z.literal("send"), phone }),
@@ -29,11 +29,11 @@ const proofCookie = { httpOnly: true, secure: env.APP_URL.startsWith("https"), s
 
 /** The proof made in step 2, or a plain "start again" once it has run out, been used or been retired. */
 async function proven() {
-  const p = await liveProof(cookies().get(PROOF_COOKIE)?.value);
+  const p = await liveProof((await cookies()).get(PROOF_COOKIE)?.value);
   if (!p) throw new HttpError(401, PROOF_GONE, "WA_PROOF_GONE");
   return p;
 }
-const dropCookie = () => cookies().set(PROOF_COOKIE, "", { ...proofCookie, maxAge: 0 });
+const dropCookie = async () => (await cookies()).set(PROOF_COOKIE, "", { ...proofCookie, maxAge: 0 });
 
 /**
  * Continue with WhatsApp (1060), sign in and sign up in one flow. The steps and why each answer gives
@@ -46,15 +46,15 @@ export const POST = route(
     if (b.step === "abandon") {
       // "Start again" or "Sign in another way" after the number was proven: retire the proof so a copy left
       // in this browser can't be used to finish the sign-up later.
-      const p = await liveProof(cookies().get(PROOF_COOKIE)?.value);
+      const p = await liveProof((await cookies()).get(PROOF_COOKIE)?.value);
       if (p) await spendProof(p);
-      dropCookie();
+      await dropCookie();
       return json({ ok: true });
     }
     if (b.step === "verify") {
       const r = await checkWhatsAppCode(b.phone, b.code);
       if ("userId" in r) return json({ ok: true, ...(await beginSignIn(r.userId, "whatsapp", { remember: b.remember })) });
-      cookies().set(PROOF_COOKIE, await startProof(r.phone), { ...proofCookie, maxAge: PROOF_MS / 1000 });
+      (await cookies()).set(PROOF_COOKIE, await startProof(r.phone), { ...proofCookie, maxAge: PROOF_MS / 1000 });
       return json({ ok: true, needsAccount: true });
     }
     const proof = await proven();
@@ -62,7 +62,7 @@ export const POST = route(
     const email = await checkEmailProof(b.email, b.code);
     // Single use: of two requests carrying the same cookie, only one gets past here.
     if (!(await spendProof(proof))) throw new HttpError(401, PROOF_GONE, "WA_PROOF_GONE");
-    dropCookie();
+    await dropCookie();
     const user = await createOrLinkWithPhone(b.name, email, proof.phone, validTimezone(b.timezone));
     if (user.created) {
       await attachReferral(user.id, clientIp(req)).catch((e) => console.error("[referral] attach", e));

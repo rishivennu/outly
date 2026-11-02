@@ -8,11 +8,13 @@ import { PlatformDashboardView } from "@/components/analytics/PlatformDashboardV
 
 export const dynamic = "force-dynamic";
 
-export function generateMetadata({ params }: { params: { platform: string } }) {
+export async function generateMetadata(props: { params: Promise<{ platform: string }> }) {
+  const params = await props.params;
   return { title: isPlatform(params.platform) ? `${PLATFORM_META[params.platform].name} analytics` : "Analytics" };
 }
 
-export default async function PlatformAnalyticsPage({ params }: { params: { platform: string } }) {
+export default async function PlatformAnalyticsPage(props: { params: Promise<{ platform: string }> }) {
+  const params = await props.params;
   if (!isPlatform(params.platform)) notFound();
   const user = (await getCurrentUser())!;
   const [initial, connected] = await Promise.all([dashboardAccount(user, params.platform).then((accountId) => platformDashboard(user.id, params.platform as never, { accountId })), connectedPlatforms(user.id)]);

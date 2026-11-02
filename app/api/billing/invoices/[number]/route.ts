@@ -6,7 +6,8 @@ import { can } from "@/lib/admin/perms";
 import { invoicePdf } from "@/lib/billing/invoice";
 
 /** PDF for the invoice owner, or an admin with access to payments. Anyone else gets a 404, not a 403. */
-export async function GET(_req: NextRequest, { params }: { params: { number: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ number: string }> }) {
+  const params = await props.params;
   const inv = await db.invoice.findUnique({ where: { number: params.number } });
   const [user, admin] = await Promise.all([getCurrentUser(), getAdmin()]);
   // Billing belongs to the workspace owner (1048): inside a team workspace getCurrentUser() IS the owner, so a

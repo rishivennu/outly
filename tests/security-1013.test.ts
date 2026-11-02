@@ -31,9 +31,28 @@ describe("clientIp (rate-limit key)", () => {
     expect(http.clientIp(req("1.2.3.4, 9.9.9.9"))).toBe("9.9.9.9");
     expect(http.clientIp(req("5.5.5.5, 9.9.9.9"))).toBe("9.9.9.9");
   });
-  test("the platform's own req.ip beats any header", () => {
-    expect(http.clientIp(req("1.2.3.4", "8.8.8.8"))).toBe("8.8.8.8");
-    expect(http.clientIp(req())).toBe("local");
+  // Next 15 dropped req.ip: on Vercel the platform sets x-real-ip, and only there is it trusted.
+  const withReal = (xff: string | undefined, real: string) =>
+    ({ headers: new Headers({ ...(xff ? { "x-forwarded-for": xff } : {}), "x-real-ip": real }) }) as never;
+  test("on Vercel the platform's x-real-ip beats any header", () => {
+    const was = process.env.VERCEL;
+    process.env.VERCEL = "1";
+    try {
+      expect(http.clientIp(withReal("1.2.3.4", "8.8.8.8"))).toBe("8.8.8.8");
+      expect(http.clientIp(req())).toBe("local");
+    } finally {
+      if (was === undefined) delete process.env.VERCEL;
+      else process.env.VERCEL = was;
+    }
+  });
+  test("off Vercel a typed x-real-ip is ignored; the proxy's last hop wins", () => {
+    const was = process.env.VERCEL;
+    delete process.env.VERCEL;
+    try {
+      expect(http.clientIp(withReal("1.2.3.4, 9.9.9.9", "6.6.6.6"))).toBe("9.9.9.9");
+    } finally {
+      if (was !== undefined) process.env.VERCEL = was;
+    }
   });
 });
 

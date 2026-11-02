@@ -5,7 +5,8 @@ export const dynamic = "force-dynamic";
 // A review link is a secret. Keep it out of every index.
 export const metadata = { title: "Review this post", robots: { index: false, follow: false, nocache: true } };
 
-export default async function Page({ params }: { params: { token: string } }) {
+export default async function Page(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const data = await reviewPackage(params.token);
   if (!data)
     return (

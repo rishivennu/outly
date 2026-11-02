@@ -13,7 +13,8 @@ export const metadata = { title: "Team invite", robots: { index: false } };
 const btn = "inline-flex h-12 items-center justify-center rounded-full px-6 text-[15px] font-semibold transition-transform hover:-translate-y-px focus-visible:outline-2";
 
 /** Landing page of an invite email. Works signed out: signup and login both come back here. */
-export default async function AcceptPage({ searchParams }: { searchParams: { token?: string } }) {
+export default async function AcceptPage(props: { searchParams: Promise<{ token?: string }> }) {
+  const searchParams = await props.searchParams;
   const token = typeof searchParams.token === "string" ? searchParams.token : "";
   const invite = token.length >= 10 ? await inviteByToken(token) : null;
   const meId = await readSessionUserId();

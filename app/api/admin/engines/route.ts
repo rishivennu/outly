@@ -11,7 +11,7 @@ export const GET = adminRoute("integrations", async () => {
   return json({ captions, subtitles, funasrEnv: !!env.FUNASR_URL });
 });
 
-const Body = z.object({ key: z.enum(["captions", "subtitles"]), rules: z.record(z.unknown()) });
+const Body = z.object({ key: z.enum(["captions", "subtitles"]), rules: z.record(z.string(), z.unknown()) });
 
 export const PUT = adminRoute("integrations", async (req, { admin }) => {
   const { key, rules } = Body.parse(await req.json());

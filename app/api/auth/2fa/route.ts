@@ -23,7 +23,7 @@ export const POST = route(
 /** "Start over": forget the halfway sign-in. */
 export const DELETE = route(
   async () => {
-    clearChallenge();
+    await clearChallenge();
     return json({ ok: true });
   },
   { auth: false, limit: [30, 10 * 60_000] },

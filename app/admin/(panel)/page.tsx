@@ -19,7 +19,8 @@ function delta(now: number, prev: number) {
   return (now - prev) / prev;
 }
 
-export default async function Overview({ searchParams }: { searchParams: { denied?: string } }) {
+export default async function Overview(props: { searchParams: Promise<{ denied?: string }> }) {
+  const searchParams = await props.searchParams;
   const admin = await requireAdmin("overview");
   // Live globe (1062): people and places are Users-area data, so only roles that can open Users see it.
   const showLive = can(admin.role, "users");

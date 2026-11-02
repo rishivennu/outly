@@ -7,7 +7,8 @@ import { CreateWorkspace } from "@/components/create/CreateWorkspace";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Create" };
 
-export default async function CreatePage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
+export default async function CreatePage(props: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const searchParams = await props.searchParams;
   const user = (await getCurrentUser())!;
   let post: PostView | null = null;
   // 1037: one account per platform, the one this post is pinned to, else the picked profile, else the default;

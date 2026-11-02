@@ -9,7 +9,7 @@ export const signupSchema = z.object({
   email: z.string().trim().toLowerCase().email("That email doesn't look quite right").refine((e) => !isDisposableEmail(e), DISPOSABLE_MESSAGE),
   password: z.string().min(8, "Use at least 8 characters").max(200),
   /** 1058: Outlly is 18+ (Terms; India's DPDP Act treats under-18s as children). Checked here, not just in the form. */
-  adult: z.literal(true, { errorMap: () => ({ message: "Please confirm you're 18 or older to create an account." }) }),
+  adult: z.literal(true, { error: "Please confirm you're 18 or older to create an account." }),
 });
 
 export const loginSchema = z.object({
@@ -52,7 +52,7 @@ export const savePostSchema = z.object({
 export const launchSchema = z.object({
   mode: z.enum(["now", "schedule"]),
   scheduledAt: z.string().datetime().optional(),
-  confirmed: z.literal(true, { errorMap: () => ({ message: "Please review the content before sending." }) }),
+  confirmed: z.literal(true, { error: "Please review the content before sending." }),
 });
 
 export const updatePostSchema = z.object({
@@ -100,6 +100,8 @@ export const inboxReplySchema = z.object({
 /** A direct message reply (1031). Instagram caps a message at 1000 characters. */
 export const dmReplySchema = z.object({
   text: z.string().trim().min(1, "Write something first.").max(1000, "Keep it under 1000 characters."),
+  /** 1090: the browser's id for this send, so a double click or retry never messages the person twice. */
+  clientId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/, "Bad message id.").optional(),
 });
 
 export const hookRequestSchema = z.object({

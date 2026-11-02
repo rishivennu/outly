@@ -14,7 +14,7 @@ const Body = z.object({
 export const POST = route(async (req) => {
   const b = Body.parse(await req.json());
   // A campaign link they arrived on says more than which button they pressed.
-  const r = await joinWaitlist(b.email, b.name, campaignCookie() ?? b.source);
+  const r = await joinWaitlist(b.email, b.name, await campaignCookie() ?? b.source);
   // Anyone can post any address here, so an address that was already on the list gets the
   // same answer whether or not it has been invited. Only a fresh join learns its place in line.
   return json(r.already ? { already: true } : { already: false, position: r.position, waiting: r.waiting });

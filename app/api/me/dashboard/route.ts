@@ -15,7 +15,7 @@ export const POST = route(
     const { style } = Body.parse(await req.json());
     const cfg = normalizeDashboard(await getConfig("dashboard"));
     if (!cfg.userSwitch) throw new HttpError(403, "The dashboard style is set for everyone right now.", "locked");
-    cookies().set(DASH_COOKIE, style, { httpOnly: true, secure: env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 365 * 86400 });
+    (await cookies()).set(DASH_COOKIE, style, { httpOnly: true, secure: env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 365 * 86400 });
     return json({ style });
   },
   { limit: [30, 60_000] },

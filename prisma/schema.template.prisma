@@ -209,6 +209,8 @@ model Post {
 
   @@index([userId, status])
   @@index([userId, scheduledAt])
+  // 1091: the Content library lists newest edit first, page by page.
+  @@index([userId, updatedAt])
 }
 
 model PostTarget {

@@ -29,12 +29,12 @@ import { WarmUp } from "@/components/shell/WarmUp";
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   // Signed cookie the database refuses: clear it on the way to sign-in, or middleware bounces /login back here (1042).
-  if (!user) redirect(`/api/auth/expired?next=${encodeURIComponent(headers().get("x-path") ?? "/home")}`);
+  if (!user) redirect(`/api/auth/expired?next=${encodeURIComponent((await headers()).get("x-path") ?? "/home")}`);
   const [live, site, notice, dash] = await Promise.all([liveNow(), siteStatus(), getConfig("updates"), dashboardFor()]);
   // Maintenance: members who joined before it started carry on; anyone newer waits on the maintenance page.
   if (site.maintenance && !joinedBeforeMaintenance({ createdAt: user.joinedAt }, site.since)) redirect("/maintenance?preview");
   void touchActivity(user.id); // daily-active tracking for the admin console; never blocks or throws
-  const h = headers();
+  const h = (await headers());
   void touchPlace(user.actor?.id ?? user.id, (n) => h.get(n)); // approximate network location for the admin console (1053)
   void touchPresence(user.actor?.id ?? user.id); // online now (1037); the LiveCount poll keeps it fresh
   void touchSession(); // Active sessions "last active" (1080), at most every 5 minutes

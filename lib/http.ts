@@ -90,10 +90,13 @@ export function assertSameOrigin(req: NextRequest) {
  * The caller's IP for rate limits. The FIRST X-Forwarded-For entry is whatever the client typed, so
  * rotating it used to dodge every limit. Trust the platform (req.ip on Vercel), else the LAST hop,
  * which our own proxy (scripts/lb.mjs) appends from the real socket. Vercel overwrites XFF with one IP.
+ * Next 15 removed req.ip; on Vercel the same value is the platform-set x-real-ip header (what
+ * @vercel/functions ipAddress() reads). Only trusted on Vercel: elsewhere a client could type it.
  */
 export function clientIp(req: NextRequest) {
   const hops = req.headers.get("x-forwarded-for")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
-  return req.ip || hops[hops.length - 1] || "local";
+  const platform = process.env.VERCEL ? req.headers.get("x-real-ip")?.trim() : undefined;
+  return platform || hops[hops.length - 1] || "local";
 }
 const clientKey = clientIp;
 
@@ -101,13 +104,22 @@ const clientKey = clientIp;
 const MAINTENANCE_OPEN = ["/api/maintenance", "/api/auth/login", "/api/auth/code", "/api/auth/2fa", "/api/auth/logout", "/api/support/chat", "/api/health", "/api/email/unsubscribe"];
 
 type Handler<C> = (req: NextRequest, ctx: C & { user: SessionUser }) => Promise<Response>;
+/** Next 15 hands route handlers `params` as a Promise. Handlers keep receiving the resolved object. */
+export type NextCtx<C> = C extends { params: infer P } ? Omit<C, "params"> & { params: Promise<P> } : C;
+/** Resolves Next 15's Promise params once; a plain object (tests, direct calls) passes through. */
+export async function unwrapCtx<C>(next: NextCtx<C> | C): Promise<C> {
+  const raw = next as { params?: unknown } | undefined;
+  const p = raw?.params as { then?: unknown } | undefined;
+  return (p && typeof p.then === "function" ? { ...raw, params: await (p as Promise<unknown>) } : raw) as C;
+}
 
 /** Wraps a route: CSRF + auth + rate limit + uniform, human-safe error responses. */
 export function route<C = { params: Record<string, string> }>(
   handler: Handler<C>,
   opts: { auth?: boolean; limit?: [number, number] } = {},
 ) {
-  return async (req: NextRequest, ctx: C) => {
+  return async (req: NextRequest, next: NextCtx<C>) => {
+    const ctx = await unwrapCtx<C>(next);
     try {
       assertSameOrigin(req);
       const [limit, windowMs] = opts.limit ?? [120, 60_000];

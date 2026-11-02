@@ -11,7 +11,8 @@ import { APP_AUTH_PAGE } from "@/lib/app-handoff";
 export const dynamic = "force-dynamic";
 
 /** Step 1 of OAuth 2.0: we redirect to the platform. We never see the creator's password. */
-export async function GET(req: NextRequest, { params }: { params: { platform: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ platform: string }> }) {
+  const params = await props.params;
   const user = await getCurrentUser();
   if (!user) return NextResponse.redirect(new URL("/login", env.APP_URL));
   if (!isPlatform(params.platform)) return NextResponse.json({ error: "Unknown platform" }, { status: 404 });
@@ -46,6 +47,6 @@ export async function GET(req: NextRequest, { params }: { params: { platform: st
   }
   const redirectUri = `${env.APP_URL}/api/accounts/${params.platform}/callback`;
   const start = await getPublisher(params.platform).connect(redirectUri);
-  saveOAuthState(params.platform, { state: start.state, verifier: start.codeVerifier, returnTo: safeReturnTo(req.nextUrl.searchParams.get("returnTo")) });
+  await saveOAuthState(params.platform, { state: start.state, verifier: start.codeVerifier, returnTo: safeReturnTo(req.nextUrl.searchParams.get("returnTo")) });
   return NextResponse.redirect(start.url);
 }

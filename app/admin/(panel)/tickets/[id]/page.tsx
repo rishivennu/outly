@@ -9,7 +9,8 @@ import { TicketThread } from "@/components/admin/TicketThread";
 
 export const metadata = { title: "Ticket" };
 
-export default async function TicketPage({ params }: { params: { id: string } }) {
+export default async function TicketPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireAdmin("tickets");
   const t = await db.ticket.findUnique({ where: { id: params.id }, include: { messages: { orderBy: { createdAt: "asc" } }, user: { select: { name: true, email: true, avatar: true, createdAt: true, subscriptions: { where: { status: "active" }, take: 1, include: { plan: true } }, payments: { orderBy: { createdAt: "desc" }, take: 3 } } } } });
   if (!t) notFound();

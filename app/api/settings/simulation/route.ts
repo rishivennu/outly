@@ -6,6 +6,6 @@ const schema = z.object({ mode: z.enum(["realistic", "smooth", "instagram-reconn
 
 export const POST = route(async (req) => {
   const { mode } = schema.parse(await req.json());
-  cookies().set("studio_sim", mode, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
+  (await cookies()).set("studio_sim", mode, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
   return json({ mode });
 });

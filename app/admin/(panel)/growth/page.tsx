@@ -18,7 +18,8 @@ export const dynamic = "force-dynamic";
 const pct = (n: number | null) => (n === null ? "" : `${Math.round(n * 100)}%`);
 const RANGE_LABEL: Record<Range, string> = { "30": "last 30 days", "90": "last 90 days", all: "all time" };
 
-export default async function GrowthPage({ searchParams }: { searchParams: { r?: string } }) {
+export default async function GrowthPage(props: { searchParams: Promise<{ r?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireAdmin("growth");
   const r: Range = searchParams.r === "30" || searchParams.r === "all" ? searchParams.r : "90";
   const since = rangeStart(r);

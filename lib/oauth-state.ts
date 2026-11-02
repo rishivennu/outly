@@ -17,8 +17,8 @@ interface Pending {
 }
 const name = (p: Platform) => `oauth_${p}`;
 
-export function saveOAuthState(p: Platform, v: Omit<Pending, "exp">) {
-  cookies().set(name(p), encrypt(JSON.stringify({ ...v, exp: Date.now() + 10 * 60_000 })), {
+export async function saveOAuthState(p: Platform, v: Omit<Pending, "exp">) {
+  (await cookies()).set(name(p), encrypt(JSON.stringify({ ...v, exp: Date.now() + 10 * 60_000 })), {
     httpOnly: true,
     secure: env.NODE_ENV === "production",
     sameSite: "lax",
@@ -27,9 +27,9 @@ export function saveOAuthState(p: Platform, v: Omit<Pending, "exp">) {
   });
 }
 
-export function takeOAuthState(p: Platform, state: string | null): Pending | null {
-  const raw = cookies().get(name(p))?.value;
-  cookies().delete({ name: name(p), path: "/api/accounts" });
+export async function takeOAuthState(p: Platform, state: string | null): Promise<Pending | null> {
+  const raw = (await cookies()).get(name(p))?.value;
+  (await cookies()).delete({ name: name(p), path: "/api/accounts" });
   if (!raw || !state) return null;
   try {
     const v = JSON.parse(decrypt(raw)) as Pending;

@@ -6,12 +6,12 @@ import { deviceLabel, ipPlace, placeLabel } from "./geo";
 import { MAX_TRUSTED, TRUST_COOKIE, TRUST_DAYS, TRUST_PATH, hashTrustSecret, newTrustSecret, parseTrustCookie, trustCookieValue, trustValid } from "./trusted-core";
 
 const opts = (maxAge: number) => ({ httpOnly: true, secure: env.NODE_ENV === "production", sameSite: "lax" as const, path: TRUST_PATH, maxAge });
-const clearCookie = () => cookies().set(TRUST_COOKIE, "", opts(0));
-const read = () => parseTrustCookie(cookies().get(TRUST_COOKIE)?.value);
+const clearCookie = async () => (await cookies()).set(TRUST_COOKIE, "", opts(0));
+const read = async () => parseTrustCookie((await cookies()).get(TRUST_COOKIE)?.value);
 
 /** This browser is a remembered device for this person (and it still counts). Touches its last-used time. */
 export async function trustedFor(userId: string): Promise<boolean> {
-  const c = read();
+  const c = await read();
   if (!c) return false;
   const [row, u] = await Promise.all([
     db.trustedDevice.findUnique({ where: { id: c.id } }),
@@ -20,7 +20,7 @@ export async function trustedFor(userId: string): Promise<boolean> {
   if (!u || !trustValid(row, { userId, tokenVersion: u.tokenVersion, secret: c.secret })) {
     // Someone else's or a dead one: drop it so it isn't sent again. A dead row of this person's goes too.
     if (row && row.userId === userId) await db.trustedDevice.deleteMany({ where: { id: row.id } });
-    clearCookie();
+    await clearCookie();
     return false;
   }
   await db.trustedDevice.update({ where: { id: c.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
@@ -31,9 +31,9 @@ export async function trustedFor(userId: string): Promise<boolean> {
 export async function rememberDevice(userId: string) {
   const u = await db.user.findUnique({ where: { id: userId }, select: { tokenVersion: true } });
   if (!u) return;
-  const c = read();
+  const c = await read();
   if (c) await db.trustedDevice.deleteMany({ where: { id: c.id, userId } });
-  const h = headers();
+  const h = (await headers());
   const secret = newTrustSecret();
   const row = await db.trustedDevice.create({
     data: {
@@ -46,7 +46,7 @@ export async function rememberDevice(userId: string) {
     },
     select: { id: true },
   });
-  cookies().set(TRUST_COOKIE, trustCookieValue(row.id, secret), opts(TRUST_DAYS * 86400));
+  (await cookies()).set(TRUST_COOKIE, trustCookieValue(row.id, secret), opts(TRUST_DAYS * 86400));
   // Keep the list short: the oldest beyond ten go.
   const extra = await db.trustedDevice.findMany({ where: { userId }, orderBy: { lastUsedAt: "desc" }, skip: MAX_TRUSTED, select: { id: true } });
   if (extra.length) await db.trustedDevice.deleteMany({ where: { id: { in: extra.map((x) => x.id) } } });
@@ -54,9 +54,9 @@ export async function rememberDevice(userId: string) {
 
 /** Forget this browser (sign-out, or "Don't remember this device"). */
 export async function forgetThisBrowser() {
-  const c = read();
+  const c = await read();
   if (c) await db.trustedDevice.deleteMany({ where: { id: c.id } }).catch(() => {});
-  if (cookies().get(TRUST_COOKIE)) clearCookie();
+  if ((await cookies()).get(TRUST_COOKIE)) await clearCookie();
 }
 
 /** Forget every remembered device (sign out everywhere, 2-step turned on or off). */
@@ -66,7 +66,7 @@ export async function forgetAllTrusted(userId: string) {
 
 /** For Settings > Security. `current` marks the browser asking. */
 export async function listTrusted(userId: string) {
-  const c = read();
+  const c = await read();
   const u = await db.user.findUnique({ where: { id: userId }, select: { tokenVersion: true } });
   const rows = await db.trustedDevice.findMany({ where: { userId }, orderBy: { lastUsedAt: "desc" }, select: { id: true, label: true, place: true, createdAt: true, lastUsedAt: true, expiresAt: true, tokenVersion: true } });
   const now = new Date();
@@ -77,6 +77,6 @@ export async function listTrusted(userId: string) {
 
 export async function revokeTrusted(userId: string, id: string) {
   const r = await db.trustedDevice.deleteMany({ where: { id, userId } });
-  if (read()?.id === id) clearCookie();
+  if ((await read())?.id === id) await clearCookie();
   return r.count > 0;
 }

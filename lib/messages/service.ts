@@ -170,6 +170,7 @@ export async function syncAccount(acct: SocialAccount) {
   const ctx = await liveAccount(acct);
   const remote = await listConversations(acct.platform, ctx);
   let stored = 0;
+  let unknown = 0;
   for (const rt of remote) {
     if (!rt.messages.length) continue;
     const { thread, created } = await threadFor(acct, rt.participantId, rt, rt.updatedAt);
@@ -177,7 +178,14 @@ export async function syncAccount(acct: SocialAccount) {
     const msgs = [...rt.messages].sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
     let t = thread;
     for (const rm of msgs) {
-      const m: StoreMsg = { mid: rm.mid, direction: rm.fromId === acct.platformUserId ? "out" : "in", text: rm.text, attachments: rm.attachments, sentAt: rm.sentAt };
+      // 1090: decide by the other person's id (the one we reply to), not by our own id, which Instagram may spell differently.
+      // No sender at all: we cannot tell whose it is, and guessing "in" would re-open the 24-hour window. Skip it.
+      if (!rm.fromId) {
+        unknown++;
+        continue;
+      }
+      const direction = rm.fromId === rt.participantId ? "in" : "out";
+      const m: StoreMsg = { mid: rm.mid, direction, text: rm.text, attachments: rm.attachments, sentAt: rm.sentAt };
       if (!(await storeMessage(t.id, m))) continue;
       stored++;
       // A brand-new thread found by backfill is history, not news: only its newest message counts as unread.
@@ -186,6 +194,7 @@ export async function syncAccount(acct: SocialAccount) {
       t = (await db.dmThread.findUnique({ where: { id: t.id } })) ?? t;
     }
   }
+  if (unknown) console.warn("[messages] skipped backfilled messages without a sender", { accountId: acct.id, count: unknown });
   return { threads: remote.length, stored };
 }
 
@@ -199,8 +208,14 @@ const PRACTICE: Record<DmPlatform, { name: string; handle: string | null; msgs: 
   facebook: [{ name: "Meera Iyer", handle: null, msgs: [[-90, "in", "Hi! Do you ship to Pune?"]] }],
 };
 
+/** 1091: the inbox polls every 30 s; the seed check only needs to run once per user per instance now and then. */
+const seededAt = new Map<string, number>();
+const SEED_RECHECK_MS = 10 * 60_000;
+
 /** Practice accounts get sample conversations so the Messages tab can be tried without Meta. */
-async function seedPractice(userId: string) {
+async function seedPractice(userId: string, now = Date.now()) {
+  const at = seededAt.get(userId);
+  if (at && now - at < SEED_RECHECK_MS) return;
   const accts = await db.socialAccount.findMany({ where: { userId, status: "connected", platform: { in: ["instagram", "facebook"] }, platformUserId: { startsWith: "mock-" } } });
   for (const acct of accts) {
     if (!isDmPlatform(acct.platform)) continue;
@@ -230,6 +245,11 @@ async function seedPractice(userId: string) {
       for (const [j, m] of p.msgs.entries()) await storeMessage(t.id, { mid: `mock-${t.id}-${j}`, direction: m[1], text: m[2], attachments: [], sentAt: at(m[0]) });
     }
   }
+  // Everything checked and in place: skip the per-account counts on the next polls.
+  if (accts.length) {
+    if (seededAt.size > 5000) seededAt.clear();
+    seededAt.set(userId, now);
+  }
 }
 
 /* ------------------------------------------------------------------ read */
@@ -248,6 +268,24 @@ export interface ThreadView {
   practice: boolean;
   canReply: boolean;
   windowEndsAt: string | null;
+  /** 1090: why the composer is locked, in words the creator can act on. Null = they can send. */
+  replyBlock: ReplyBlock | null;
+}
+
+export type ReplyBlockCode = "NOT_CONNECTED" | "DMS_OFF" | "WINDOW_CLOSED";
+export interface ReplyBlock {
+  code: ReplyBlockCode;
+  message: string;
+}
+
+/** The same checks replyToThread makes before calling Meta, so the composer never offers a send that is sure to fail. */
+export function replyBlockFor(t: Pick<DmThread, "platform" | "practice" | "lastInboundAt"> & { account: Pick<SocialAccount, "status"> }, now = Date.now()): ReplyBlock | null {
+  if (!isDmPlatform(t.platform)) return null;
+  const name = PLATFORM_META[t.platform].name;
+  if (t.account.status !== "connected") return { code: "NOT_CONNECTED", message: `Reconnect ${name} in Accounts to answer from Outlly.` };
+  if (!t.practice && !dmsOn(t.platform)) return { code: "DMS_OFF", message: `Replies to ${name} messages are switched off until Meta approves messaging. You can answer in the ${name} app for now.` };
+  if (!windowState(t, now).canReply) return { code: "WINDOW_CLOSED", message: closedCopy(t.platform) };
+  return null;
 }
 
 type ThreadRow = DmThread & { account: Pick<SocialAccount, "username" | "displayName" | "status"> };
@@ -266,6 +304,7 @@ function view(t: ThreadRow, now = Date.now()): ThreadView {
     unread: t.unread,
     practice: t.practice,
     ...windowState(t, now),
+    replyBlock: replyBlockFor(t, now),
   };
 }
 
@@ -315,6 +354,24 @@ export async function getThread(userId: string, id: string, scope: Scope = null)
 function closedCopy(p: DmPlatform) {
   const app = p === "instagram" ? "the Instagram app" : "Messenger or Meta Business Suite";
   return `This conversation is past ${PLATFORM_META[p].name}'s 24-hour reply window. Meta only lets apps answer within 24 hours of the person's last message. You can still reply in ${app}.`;
+}
+
+/**
+ * 1090: one send per (workspace, thread, clientId). A double click, a retry after a dropped
+ * connection or two tabs all share the first attempt's result instead of messaging the person twice.
+ * A failed attempt is forgotten at once so Retry really retries. Per server instance: on several
+ * instances a duplicate can still slip through (documented; a shared store would close it).
+ */
+const SEND_DEDUPE_MS = 10 * 60_000;
+const sends = new Map<string, { at: number; p: Promise<unknown> }>();
+export function sendOnce<T>(key: string, fn: () => Promise<T>, now = Date.now()): { p: Promise<T>; duplicate: boolean } {
+  for (const [k, v] of sends) if (now - v.at > SEND_DEDUPE_MS) sends.delete(k);
+  const hit = sends.get(key);
+  if (hit) return { p: hit.p as Promise<T>, duplicate: true };
+  const p = fn();
+  sends.set(key, { at: now, p });
+  p.catch(() => sends.delete(key));
+  return { p, duplicate: false };
 }
 
 /** Send a reply. The caller holds the weekly reply slot (see app/api/messages/[id]/route.ts). */
@@ -384,7 +441,9 @@ export async function syncAll(userId: string, platform?: DmPlatform, scope: Scop
           : pe.code === "FORBIDDEN"
             ? `${name} didn't share messages yet. Reconnect ${name} so Outlly can ask for the messaging permission. While the Meta app is in Development mode, only people with a role on the app show up.`
             : `We couldn't reach ${name} just now.`;
-      problems.push({ platform: a.platform, code: pe.code, message, detail: pe.technical ?? pe.message });
+      // The platform's raw error body stays in the server log; the browser gets the code only.
+      console.warn("[messages] sync failed", { accountId: a.id, platform: a.platform, code: pe.code, detail: pe.technical ?? pe.message });
+      problems.push({ platform: a.platform, code: pe.code, message, detail: `Error code: ${pe.code}` });
     }
   }
   return problems;

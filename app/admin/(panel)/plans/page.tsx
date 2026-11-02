@@ -7,7 +7,8 @@ import { PlanGrantsPanel } from "@/components/admin/PlanGrantsPanel";
 export const metadata = { title: "Plan grants" };
 export const dynamic = "force-dynamic";
 
-export default async function PlanGrantsPage({ searchParams }: { searchParams: { email?: string } }) {
+export default async function PlanGrantsPage(props: { searchParams: Promise<{ email?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireAdmin("plans");
   const [plans, grants] = await Promise.all([listPlans({ includeHidden: true }), recentGrants()]);
   return (

@@ -28,7 +28,8 @@ const OFFER = [
  * the nav keeps its "Join the waitlist" button pinned, so the CTA is always in reach.
  * DOM order is headline, panel, form (the grid places them), so screen readers meet the h1 first.
  */
-export default async function WaitlistPage({ searchParams }: { searchParams: { from?: string } }) {
+export default async function WaitlistPage(props: { searchParams: Promise<{ from?: string }> }) {
+  const searchParams = await props.searchParams;
   const s = await siteStatus();
   if (!s.waitlist) redirect("/signup");
   const counts = await waitlistCounts();

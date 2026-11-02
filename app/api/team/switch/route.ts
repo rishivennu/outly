@@ -11,7 +11,7 @@ export const POST = route(async (req, { user }) => {
   if (ownerId && ownerId !== me) {
     const seat = await db.teamMember.findFirst({ where: { ownerId, userId: me, status: "active" } });
     if (!seat) throw new HttpError(403, "You're not on that team any more.", "NOT_MEMBER");
-    setWorkspace(ownerId);
-  } else setWorkspace(null);
+    await setWorkspace(ownerId);
+  } else await setWorkspace(null);
   return json({ ok: true });
 });

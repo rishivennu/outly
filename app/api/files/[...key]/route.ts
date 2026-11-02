@@ -11,7 +11,8 @@ const TYPES: Record<string, string> = { mp4: "video/mp4", mov: "video/quicktime"
  * Private storage gateway. The HMAC signature IS the authorization (platforms like
  * Instagram fetch without our cookie), and it expires. Supports Range for video seeking.
  */
-export async function GET(req: NextRequest, { params }: { params: { key: string[] } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ key: string[] }> }) {
+  const params = await props.params;
   const key = params.key.join("/");
   const exp = Number(req.nextUrl.searchParams.get("exp"));
   const sig = req.nextUrl.searchParams.get("sig") ?? "";

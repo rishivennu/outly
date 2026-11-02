@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     // makes until the app proves it started it (lib/app-handoff.ts, held connects).
     await createSession(start.uid, { handoff: true });
     // A teammate workspace picked earlier in this browser would make the connect run as that workspace.
-    cookies().delete(WS_COOKIE);
+    (await cookies()).delete(WS_COOKIE);
   }
   const res = NextResponse.redirect(new URL(start.to, env.APP_URL));
   res.cookies.set(appCookie(start.ch));

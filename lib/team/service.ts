@@ -62,11 +62,11 @@ export async function accept(token: string, me: { id: string; email: string }) {
   if (m.ownerId === me.id) throw new HttpError(400, "That's your own workspace.", "SELF");
   if (m.email.toLowerCase() !== me.email.toLowerCase()) throw new HttpError(403, `This invite is for ${m.email}. Sign in with that email to accept it.`, "WRONG_EMAIL");
   if (m.status !== "active") await db.teamMember.update({ where: { id: m.id }, data: { userId: me.id, status: "active", acceptedAt: new Date() } });
-  setWorkspace(m.ownerId);
+  await setWorkspace(m.ownerId);
   return { ownerId: m.ownerId, ownerName: m.owner.name, role: m.role as TeamRole };
 }
 
-export function setWorkspace(ownerId: string | null) {
-  if (!ownerId) cookies().delete(WS_COOKIE);
-  else cookies().set(WS_COOKIE, ownerId, { httpOnly: true, sameSite: "lax", secure: env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 30 });
+export async function setWorkspace(ownerId: string | null) {
+  if (!ownerId) (await cookies()).delete(WS_COOKIE);
+  else (await cookies()).set(WS_COOKIE, ownerId, { httpOnly: true, sameSite: "lax", secure: env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 30 });
 }

@@ -10,9 +10,9 @@ const nextConfig = {
   compress: process.env.NODE_ENV === "production",
   // Lets parallel dev servers run from one checkout without clobbering each other's build output.
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  // Next 15: stable top-level key (was experimental.serverComponentsExternalPackages); instrumentation is on by default.
+  serverExternalPackages: ["@prisma/client", "bcryptjs", "bullmq", "ioredis"],
   experimental: {
-    serverComponentsExternalPackages: ["@prisma/client", "bcryptjs", "bullmq", "ioredis"],
-    instrumentationHook: true,
     // tree-shake the big icon/animation/chart libraries so pages only ship what they import
     optimizePackageImports: ["lucide-react", "framer-motion", "recharts", "date-fns"],
   },

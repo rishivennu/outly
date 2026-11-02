@@ -3,9 +3,8 @@ import { HttpError, json, route } from "@/lib/http";
 import { updatePostSchema } from "@/lib/validation";
 import { launchPost, ownedPost, postView } from "@/lib/services";
 import { enqueue } from "@/lib/queue";
-import { storage } from "@/lib/storage";
-import { isPlatform, PLATFORM_META, REMOVAL, supportsFirstComment, type Platform } from "@/lib/domain";
-import { removeEverywhere } from "@/lib/social/remove";
+import { supportsFirstComment } from "@/lib/domain";
+import { deletePost } from "@/lib/posts/delete";
 import { pinTargets } from "@/lib/profiles";
 import { copyChanged } from "@/lib/collab-core";
 import { recordEdit } from "@/lib/collab";
@@ -54,28 +53,23 @@ export const PATCH = route(async (req, { user, params }) => {
 });
 
 /**
- * Remove from the studio. With ?platforms=1 the live copies are deleted on every platform that allows it first;
- * if any of those fails, nothing is removed from the studio, so the creator can retry without losing the links.
+ * Remove from the studio (1089: lib/posts/delete.ts). With ?platforms=1 the live copies are deleted on every
+ * platform that allows it first; if any of those fails, nothing is removed from the studio. Anything not yet
+ * sent is stopped before the post goes, so a scheduled job can't publish it afterwards.
  */
-export const DELETE = route(async (req, { user, params }) => {
-  const post = await ownedPost(user.id, params.id);
-  if (post.status === "publishing") throw new HttpError(409, "Let it finish sending first.");
-  const q = new URL(req.url).searchParams;
-  if (q.get("platforms") === "1") {
-    // Instagram/TikTok copies can't be deleted by API; their links vanish with the studio record, so the
-    // caller must confirm the creator saw the "delete it in the app" step (the sheet sends appOnly=ack).
-    const appOnly = post.targets.filter((t) => t.platformStatus === "published" && t.platformPostId && t.removeMode !== "deleted" && isPlatform(t.platform) && !REMOVAL[t.platform].delete);
-    if (appOnly.length && q.get("appOnly") !== "ack")
-      throw new HttpError(409, `${appOnly.map((t) => PLATFORM_META[t.platform as Platform].name).join(" and ")} can't be deleted from here. Delete ${appOnly.length === 1 ? "it" : "those"} in the app first.`, "APP_ONLY_LIVE");
-    const results = await removeEverywhere(user.id, post.id);
-    const failed = results.filter((r) => !r.ok);
-    if (failed.length)
-      throw new HttpError(409, `Couldn't take it down everywhere, so it's still in your studio. ${failed.map((f) => f.message).join(" ")}`, "REMOVE_FAILED", {
-        results,
-        post: await postView(await ownedPost(user.id, post.id)),
-      });
-  }
-  await db.post.delete({ where: { id: post.id } });
-  if (post.coverKey) await storage.remove(post.coverKey).catch(() => {}); // 1083: the post's own cover goes with it
-  return json({ ok: true });
-});
+export const DELETE = route(
+  async (req, { user, params }) => {
+    const q = new URL(req.url).searchParams;
+    try {
+      return json(await deletePost(user, params.id, { platforms: q.get("platforms") === "1", appOnlyAck: q.get("appOnly") === "ack" }));
+    } catch (e) {
+      // The sheet shows what changed (some platforms may have said yes before one said no).
+      if (e instanceof HttpError && e.code === "REMOVE_FAILED") {
+        const post = await db.post.findFirst({ where: { id: params.id, userId: user.id }, include: { targets: true, media: true, reviews: { orderBy: { createdAt: "desc" } } } });
+        throw new HttpError(409, e.message, e.code, { ...(e.extra ?? {}), ...(post ? { post: await postView(post) } : {}) });
+      }
+      throw e;
+    }
+  },
+  { limit: [30, 60_000] },
+);

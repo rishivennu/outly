@@ -12,7 +12,7 @@ import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { useToast } from "@/components/shared/Toast";
 import { fmt, tzShort, useUser } from "@/components/shell/UserContext";
 import { api, ApiError } from "@/lib/client/api";
-import { PLATFORM_META, TARGET_COPY, type TargetStatus } from "@/lib/domain";
+import { PLATFORM_META, TARGET_COPY, type Platform, type TargetStatus } from "@/lib/domain";
 import { targetErrorCopy } from "@/components/shared/errorCopy";
 import type { PostView, TargetView } from "@/lib/services";
 import { TeamNotes } from "./TeamNotes";
@@ -88,15 +88,19 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
 
   const remove = (everywhere: boolean) =>
     run(async () => {
+      let r: { local: "deleted" | "already_gone"; stopped: number; remote: { platform: Platform; outcome: "deleted" | "failed" | "manual" | "kept" }[] } | null = null;
       try {
-        await api(`/api/posts/${post.id}${everywhere ? `?platforms=1${appOnly.length ? "&appOnly=ack" : ""}` : ""}`, { method: "DELETE" });
+        r = await api(`/api/posts/${post.id}${everywhere ? `?platforms=1${appOnly.length ? "&appOnly=ack" : ""}` : ""}`, { method: "DELETE" });
       } catch (e) {
-        // Some platforms said yes before one said no: show what changed, keep the post so the rest can be retried.
-        if (e instanceof ApiError && e.data?.post) onChange(e.data.post as PostView);
-        throw e;
+        // Already gone (another tab, a double click): that is what the creator asked for.
+        if (!(e instanceof ApiError && e.status === 404)) {
+          // Some platforms said yes before one said no: show what changed, keep the post so the rest can be retried.
+          if (e instanceof ApiError && e.data?.post) onChange(e.data.post as PostView);
+          throw e;
+        }
       }
       onRemove(post.id);
-      toast(everywhere ? "Deleted from the platforms and your studio." : "Removed from your studio.", "info");
+      toast(deleteSummary(r), "info");
       onClose();
     });
 
@@ -214,11 +218,9 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
             <Button variant="subtle" onClick={duplicate} disabled={busy}>
               <Copy className="h-4 w-4" /> Duplicate
             </Button>
-            {post.status !== "publishing" && (
-              <Button variant="danger" onClick={() => setView("remove")}>
-                <Trash2 className="h-4 w-4" /> Remove this
-              </Button>
-            )}
+            <Button variant="danger" onClick={() => setView("remove")}>
+              <Trash2 className="h-4 w-4" /> {post.status === "publishing" ? "Stop and remove" : "Remove this"}
+            </Button>
           </div>
           {post.status === "draft" && <p className="text-xs text-muted-foreground">Setting a time saves it with the draft. It goes on the calendar once you launch it from Edit.</p>}
         </div>
@@ -240,6 +242,12 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
 
       {view === "remove" && (
         <div className="space-y-6">
+          {post.status === "publishing" && (
+            <p className="rounded-2xl bg-secondary/50 p-3 text-sm text-muted-foreground">
+              It&rsquo;s being sent right now. Outlly stops every platform that hasn&rsquo;t received it yet. If a platform already has it and is finishing it, that one can&rsquo;t be called back: wait until it&rsquo;s live, then delete it.
+            </p>
+          )}
+          {post.status === "scheduled" && <p className="text-sm text-muted-foreground">It&rsquo;s booked for later. Removing it cancels the booking, so it won&rsquo;t go out.</p>}
           {live.length === 0 ? (
             <p className="text-muted-foreground">This removes it and all its copy from your studio.</p>
           ) : (
@@ -462,4 +470,18 @@ function ReviewBlock({ post, onChange }: { post: PostView; onChange: (p: PostVie
       )}
     </section>
   );
+}
+
+/** What actually happened, in one line: local, remote and anything left for the creator to do. */
+export function deleteSummary(r: { local: string; stopped: number; remote: { platform: Platform; outcome: string }[] } | null) {
+  if (!r) return "It was already removed.";
+  const names = (o: string) => r.remote.filter((x) => x.outcome === o).map((x) => PLATFORM_META[x.platform]?.name ?? x.platform);
+  const del = names("deleted");
+  const manual = names("manual");
+  const kept = names("kept");
+  const parts = [del.length ? `Deleted from ${del.join(", ")} and your studio.` : r.local === "already_gone" ? "It was already removed." : "Removed from your studio."];
+  if (r.stopped) parts.push("Nothing more will be sent.");
+  if (manual.length) parts.push(`Still live on ${manual.join(" and ")}: delete it in the app.`);
+  if (kept.length) parts.push(`Still live on ${kept.join(", ")}.`);
+  return parts.join(" ");
 }

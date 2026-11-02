@@ -1,0 +1,83 @@
+import "server-only";
+import { db } from "../db";
+import { HttpError } from "../http";
+import { isPlatform, PLATFORM_META, REMOVAL, STOPPABLE, type Platform } from "../domain";
+import { removeEverywhere } from "../social/remove";
+import { syncPost } from "../queue/handlers";
+import { storage } from "../storage";
+import { invalidate } from "../cache";
+import { assertPostScope } from "../profiles";
+
+/**
+ * 1089: removing a post from Outlly, safely.
+ *
+ * 1. Not sent yet (draft, scheduled, or still waiting/uploading): every destination that hasn't reached its
+ *    platform is marked CANCELED first. Workers check that marker before each step, and once the row is gone
+ *    they find nothing, so a booked post can't go out after the creator deleted it.
+ * 2. A platform already has it and is finishing it ("processing"): that can't be called back, so nothing is
+ *    removed and the creator is told to wait until it is live, then delete it there.
+ * 3. Live: deleting on the platform happens only with ?platforms=1 (the creator confirmed it), and only where
+ *    the platform's API allows it. Instagram and TikTok can't: the creator acknowledges that (appOnly=ack).
+ *    If any platform delete fails, nothing is removed from Outlly, so the links aren't lost.
+ */
+export type RemoteOutcome = { platform: string; outcome: "deleted" | "failed" | "manual" | "kept"; message?: string; url?: string | null };
+export type DeleteResult = { ok: true; local: "deleted" | "already_gone"; stopped: number; remote: RemoteOutcome[] };
+
+/** In-flight deletes on this instance: a double click or two tabs get the first one's answer. */
+const running = new Map<string, Promise<DeleteResult>>();
+
+export function deletePost(user: { id: string; role?: string | null }, postId: string, opts: { platforms: boolean; appOnlyAck: boolean }) {
+  const k = `${user.id}:${postId}`;
+  const r = running.get(k);
+  if (r) return r;
+  const p = run(user, postId, opts).finally(() => running.delete(k));
+  running.set(k, p);
+  return p;
+}
+
+async function run(user: { id: string; role?: string | null }, postId: string, opts: { platforms: boolean; appOnlyAck: boolean }): Promise<DeleteResult> {
+  const post = await db.post.findFirst({ where: { id: postId, userId: user.id }, include: { targets: true } });
+  if (!post) return { ok: true, local: "already_gone", stopped: 0, remote: [] };
+  await assertPostScope(user.id, post.targets); // 1037: a member limited to some accounts can't delete the others' posts
+  if (opts.platforms && user.role === "editor") throw new HttpError(403, "Editors can't delete posts from the platforms. Ask the owner or a manager.", "ROLE");
+
+  const appOnlyLive = post.targets.filter((t) => t.platformStatus === "published" && t.platformPostId && t.removeMode !== "deleted" && !t.practice && isPlatform(t.platform) && !REMOVAL[t.platform as Platform].delete);
+  if (opts.platforms && appOnlyLive.length && !opts.appOnlyAck)
+    throw new HttpError(409, `${appOnlyLive.map((t) => PLATFORM_META[t.platform as Platform].name).join(" and ")} can't be deleted from here. Delete ${appOnlyLive.length === 1 ? "it" : "those"} in the app first.`, "APP_ONLY_LIVE");
+
+  // Stop everything not yet handed to a platform BEFORE deciding, so nothing can start in between.
+  const stopped = await db.postTarget.updateMany({
+    where: { postId, platformStatus: { in: [...STOPPABLE] } },
+    data: { platformStatus: "failed", errorCode: "CANCELED", errorMessage: "Stopped because the post was deleted." },
+  });
+  const fresh = await db.postTarget.findMany({ where: { postId } });
+  const inFlight = fresh.filter((t) => t.platformStatus === "processing");
+  if (inFlight.length) {
+    if (stopped.count) await syncPost(postId);
+    const names = inFlight.map((t) => (isPlatform(t.platform) ? PLATFORM_META[t.platform as Platform].name : t.platform)).join(" and ");
+    throw new HttpError(409, `${names} already has this video and is finishing it, so it can't be called back. Wait until it's live, then delete it here or in the app.${stopped.count ? " Everything else was stopped." : ""}`, "IN_FLIGHT");
+  }
+
+  const live = fresh.filter((t) => t.platformStatus === "published" && t.platformPostId && t.removeMode !== "deleted");
+  const appOnly = live.filter((t) => !t.practice && isPlatform(t.platform) && !REMOVAL[t.platform as Platform].delete);
+  const remote: RemoteOutcome[] = [];
+  if (opts.platforms) {
+    const results = await removeEverywhere(user.id, postId);
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length)
+      throw new HttpError(409, `Couldn't take it down everywhere, so it's still in your studio${stopped.count ? " (anything not sent yet was stopped)" : ""}. ${failed.map((f) => f.message).join(" ")}`, "REMOVE_FAILED", {
+        results: results.map((r) => ({ platform: r.platform, outcome: r.ok ? "deleted" : "failed", message: r.ok ? undefined : r.message })),
+      });
+    for (const r of results) remote.push({ platform: r.platform, outcome: "deleted" });
+    for (const t of appOnly) remote.push({ platform: t.platform, outcome: "manual", url: t.platformUrl });
+  } else {
+    for (const t of live) if (!t.practice) remote.push({ platform: t.platform, outcome: "kept", url: t.platformUrl });
+  }
+
+  // deleteMany: a second, racing delete finds nothing and is still a success.
+  const gone = await db.post.deleteMany({ where: { id: postId, userId: user.id } });
+  if (post.coverKey) await storage.remove(post.coverKey).catch(() => {});
+  invalidate(`insights:${user.id}:${postId}`);
+  console.info(`[delete] post ${postId} local=${gone.count ? "deleted" : "already_gone"} stopped=${stopped.count} remote=${remote.map((r) => `${r.platform}:${r.outcome}`).join(",") || "-"}`);
+  return { ok: true, local: gone.count ? "deleted" : "already_gone", stopped: stopped.count, remote };
+}

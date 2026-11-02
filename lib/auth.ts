@@ -45,7 +45,7 @@ async function openSessionRow(userId: string, ageS: number, sid?: string): Promi
     }
     let h: Headers | null = null;
     try {
-      h = headers() as unknown as Headers;
+      h = (await headers()) as unknown as Headers;
     } catch {
       /* outside a request (tests, scripts) */
     }
@@ -78,7 +78,7 @@ export async function createSession(userId: string, { persist = true, sid, hando
     .setIssuedAt()
     .setExpirationTime(`${age}s`)
     .sign(secret);
-  cookies().set(SESSION_COOKIE, token, {
+  (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: env.NODE_ENV === "production",
     sameSite: "lax",
@@ -87,14 +87,14 @@ export async function createSession(userId: string, { persist = true, sid, hando
   });
 }
 
-export function destroySession() {
-  cookies().delete(SESSION_COOKIE);
-  cookies().delete("outlly_in"); // readable signed-in hint kept by middleware
+export async function destroySession() {
+  (await cookies()).delete(SESSION_COOKIE);
+  (await cookies()).delete("outlly_in"); // readable signed-in hint kept by middleware
 }
 
 /** Cookie contents, signature-checked only. Tokens issued before `v` existed read as v=0; before 1080, sid=null. */
 async function readSessionClaims(): Promise<{ id: string; v: number; iat: number; rm: boolean; sid: string | null; ho: boolean } | null> {
-  const token = cookies().get(SESSION_COOKIE)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
@@ -132,7 +132,7 @@ export async function currentSessionId(): Promise<string | null> {
 export async function endSession() {
   const sid = await currentSessionId();
   if (sid) await db.userSession.deleteMany({ where: { id: sid } }).catch(() => {});
-  destroySession();
+  await destroySession();
 }
 
 /** Re-issue this browser's cookie on the current token version, keeping its row and its remember choice. */
@@ -179,7 +179,7 @@ export const getCurrentUser = cache(async () => {
   // Or signed out from Active sessions on another device (1080): its row is gone.
   if (!found || found.tokenVersion !== claims.v || !sessionAlive(found, claims.sid)) return null;
   const { tokenVersion: _v, sessions: _s, ...me } = found as typeof found & { sessions?: unknown };
-  const ws = cookies().get(WS_COOKIE)?.value;
+  const ws = (await cookies()).get(WS_COOKIE)?.value;
   if (ws && ws !== id) {
     const seat = await db.teamMember.findFirst({ where: { ownerId: ws, userId: id, status: "active" }, select: { role: true, accountIds: true, owner: { select: USER_SELECT } } });
     if (seat && (TEAM_ROLES as readonly string[]).includes(seat.role))

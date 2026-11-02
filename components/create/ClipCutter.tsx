@@ -25,7 +25,7 @@ export function ClipCutter({ src, filename, duration, cues, words, style, pos, p
   words: Word[];
   style: CaptionStyle;
   pos: CaptionPos;
-  preview: React.RefObject<HTMLVideoElement>;
+  preview: React.RefObject<HTMLVideoElement | null>;
   disabled?: boolean;
   onCut: (file: File) => void;
   onError: (msg: string) => void;

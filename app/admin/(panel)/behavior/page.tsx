@@ -6,7 +6,8 @@ import { BehaviorView } from "@/components/admin/BehaviorView";
 export const metadata = { title: "User behavior" };
 export const dynamic = "force-dynamic";
 
-export default async function BehaviorPage({ searchParams }: { searchParams: { range?: string; tab?: string; v?: string } }) {
+export default async function BehaviorPage(props: { searchParams: Promise<{ range?: string; tab?: string; v?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireAdmin("insights");
   const n = Number(searchParams.range);
   const range: Range = isRange(n) ? n : 30;

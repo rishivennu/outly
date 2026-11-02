@@ -6,7 +6,8 @@ import { can } from "@/lib/admin/perms";
 import { creditNotePdf } from "@/lib/billing/credit-note";
 
 /** Credit note PDF (1049): the workspace owner (never a teammate) or an admin with payments access. Anyone else: 404. */
-export async function GET(_req: NextRequest, { params }: { params: { number: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ number: string }> }) {
+  const params = await props.params;
   const cn = await db.creditNote.findUnique({ where: { number: params.number } });
   const [user, admin] = await Promise.all([getCurrentUser(), getAdmin()]);
   const owner = !!user && !user.actor && user.id === cn?.userId;

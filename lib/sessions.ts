@@ -30,7 +30,7 @@ export async function listSessions(userId: string): Promise<SessionRow[]> {
   if (i > 0) out.unshift(...out.splice(i, 1));
   if (i < 0) {
     const now = new Date().toISOString();
-    out.unshift({ id: "this", label: deviceLabel(headers().get("user-agent")), place: null, app: false, createdAt: now, lastSeenAt: now, current: true, legacy: true });
+    out.unshift({ id: "this", label: deviceLabel((await headers()).get("user-agent")), place: null, app: false, createdAt: now, lastSeenAt: now, current: true, legacy: true });
   }
   return out;
 }

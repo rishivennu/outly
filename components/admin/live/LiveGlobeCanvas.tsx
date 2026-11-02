@@ -28,7 +28,7 @@ type Arc = { a: [number, number, number]; b: [number, number, number]; t0: numbe
 export default function LiveGlobeCanvas({ places, selected, onSelect, lite, still, onSlow, handle }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const api = useRef<GlobeHandle & { setPlaces: (p: LivePlace[]) => void; setSelected: (k: string | null) => void }>();
+  const api = useRef<GlobeHandle & { setPlaces: (p: LivePlace[]) => void; setSelected: (k: string | null) => void } | undefined>(undefined);
   const sel = useRef(onSelect);
   const slow = useRef(onSlow);
   const placesRef = useRef(places);

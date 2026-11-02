@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 export const metadata = { title: "Tickets" };
 const PRIO = { urgent: 0, high: 1, normal: 2 } as Record<string, number>;
 
-export default async function Tickets({ searchParams }: { searchParams: { s?: string; q?: string } }) {
+export default async function Tickets(props: { searchParams: Promise<{ s?: string; q?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireAdmin("tickets");
   const s = searchParams.s ?? "active";
   const q = searchParams.q?.trim();

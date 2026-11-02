@@ -36,7 +36,9 @@
     ".next-mkt/types/**/*.ts",
     ".next-e2e/types/**/*.ts",
     ".next-prod/types/**/*.ts",
-    ".next-r2/types/**/*.ts"
+    ".next-r2/types/**/*.ts",
+    ".next-qa9/types/**/*.ts",
+    ".next-dev50/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

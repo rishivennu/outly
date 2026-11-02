@@ -18,11 +18,12 @@ import { connectDetail, connectReason } from "@/lib/social/connect-reason";
 export const dynamic = "force-dynamic";
 
 /** Step 2: verify state (CSRF), exchange code, store tokens encrypted. */
-export async function GET(req: NextRequest, { params }: { params: { platform: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ platform: string }> }) {
+  const params = await props.params;
   if (!isPlatform(params.platform)) return NextResponse.json({ error: "Unknown platform" }, { status: 404 });
   const p = params.platform;
   await loadKeys();
-  const pending = takeOAuthState(p, req.nextUrl.searchParams.get("state"));
+  const pending = await takeOAuthState(p, req.nextUrl.searchParams.get("state"));
   if (pending?.mode === "login" && p === "youtube") return googleSignIn(req, pending.returnTo, pending.remember);
   const user = await getCurrentUser();
   // A Google sign-in whose state cookie is gone (other tab, expired after 10 min, or started on another

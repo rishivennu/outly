@@ -13,7 +13,7 @@ export const POST = route(
     await forgetAllDevices(realUserId(user));
     await forgetAllTrusted(realUserId(user));
     await forgetThisBrowser();
-    destroySession();
+    await destroySession();
     return json({ ok: true });
   },
   { limit: [10, 60_000] },

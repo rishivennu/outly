@@ -61,7 +61,7 @@ Supabase Free caps each object at 50 MB. R2 has no practical cap, 10 GB free sto
 1. Cloudflare dashboard, **R2 Object Storage**, **Create bucket** `outlly-media` (private, location Automatic).
 2. Bucket **Settings, CORS policy**:
    ```json
-   [{"AllowedOrigins":["https://outly-ecru.vercel.app","http://localhost:3040"],"AllowedMethods":["PUT","GET","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":3600}]
+   [{"AllowedOrigins":["https://www.outlly.com","https://outlly.com","https://outly-ecru.vercel.app","http://localhost:3040"],"AllowedMethods":["PUT","GET","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":3600}]
    ```
 3. R2 overview, **Manage R2 API Tokens, Create API token**: permission **Object Read & Write**, scoped to `outlly-media`. Copy the Access Key ID and Secret Access Key (shown once) and the Account ID.
 4. Environment:

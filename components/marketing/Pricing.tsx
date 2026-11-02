@@ -17,7 +17,7 @@ import { formatMoney, planFeatures, priceLabel } from "@/lib/billing/money";
  */
 export async function Pricing() {
   const [all, display, beta] = await Promise.all([listPlans(), getConfig("pricing").then(normalizeDisplay), isBeta()]);
-  const visitor = visitorCurrency((all.find((p) => p.priceMinor > 0)?.currency as any) ?? "INR");
+  const visitor = await visitorCurrency((all.find((p) => p.priceMinor > 0)?.currency as any) ?? "INR");
   const plans = inCurrency(all, visitor.currency);
   const paid = plans.some((p) => p.state === "available" && p.priceMinor > 0);
   const cards: CardPlan[] = plans.map((p, i) => {

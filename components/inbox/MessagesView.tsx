@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Clock, ExternalLink, Inbox as InboxIcon, Paperclip, RefreshCw, Send, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowLeft, Clock, ExternalLink, Inbox as InboxIcon, Loader2, Paperclip, RefreshCw, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
@@ -8,7 +8,11 @@ import { useToast } from "@/components/shared/Toast";
 import { api, ApiError } from "@/lib/client/api";
 import { PLATFORM_META } from "@/lib/domain";
 import { cn } from "@/lib/utils";
-import type { MessageView, ThreadView } from "@/lib/messages/service";
+import type { MessageView, ReplyBlock, ThreadView } from "@/lib/messages/service";
+
+/** 1090: a reply the server has not confirmed yet. It is never drawn as sent until Meta accepted it. */
+type Pending = { clientId: string; text: string; state: "sending" | "failed"; error?: string; at: string };
+const newClientId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`);
 
 type Problem = { platform: "instagram" | "facebook"; code: string; message: string; detail?: string };
 /** dmsOff (1031f): platforms where the admin switched direct messages off, e.g. while Meta reviews the permission. */
@@ -99,7 +103,7 @@ export function MessagesView({ initial }: { initial: DmData }) {
       const updated = { ...t, snippet: `You: ${m.text}`.slice(0, 140), lastMessageAt: m.sentAt, unread: 0 };
       return { ...d, threads: [updated, ...d.threads.filter((x) => x.id !== id)] };
     });
-  const onClosed = (id: string) => setData((d) => ({ ...d, threads: d.threads.map((t) => (t.id === id ? { ...t, canReply: false } : t)) }));
+  const onClosed = (id: string, block: ReplyBlock) => setData((d) => ({ ...d, threads: d.threads.map((t) => (t.id === id ? { ...t, canReply: false, replyBlock: block } : t)) }));
 
   return (
     <div className="mt-6">
@@ -216,19 +220,19 @@ function ThreadPane({
   onBack: () => void;
   onRead: (id: string) => void;
   onSent: (id: string, m: MessageView) => void;
-  onClosed: (id: string) => void;
+  onClosed: (id: string, block: ReplyBlock) => void;
   toast: ReturnType<typeof useToast>;
   readOnly: boolean;
 }) {
   const [messages, setMessages] = useState<MessageView[] | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [text, setText] = useState("");
-  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [left, setLeft] = useState<number | null>(null);
   const [ideas, setIdeas] = useState<{ label: string; text: string }[] | null>(null);
   const [thinking, setThinking] = useState(false);
-  const [canReply, setCanReply] = useState(thread.canReply);
+  const [block, setBlock] = useState<ReplyBlock | null>(thread.replyBlock ?? (thread.canReply ? null : { code: "WINDOW_CLOSED", message: "" }));
+  const [pending, setPending] = useState<Pending[]>([]);
   const bottom = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const name = PLATFORM_META[thread.platform].name;
@@ -237,7 +241,7 @@ function ThreadPane({
     try {
       const r = await api<{ thread: ThreadView; messages: MessageView[] }>(`/api/messages/${thread.id}`);
       setMessages(r.messages);
-      setCanReply(r.thread.canReply);
+      setBlock(r.thread.replyBlock ?? null);
       setLoadErr(null);
       onRead(thread.id);
     } catch (e) {
@@ -252,9 +256,11 @@ function ThreadPane({
   }, [fetchThread]);
 
   // Braces matter: newer Chromium returns a Promise from scrollIntoView, and React would call it as a cleanup (crash).
+  // 1090: scroll the message list itself, not the page; scrolling the page parked the composer below the fold.
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "end" });
-  }, [messages?.length]);
+    const el = bottom.current?.parentElement;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages?.length, pending.length]);
 
   const lastIn = [...(messages ?? [])].reverse().find((m) => m.direction === "in");
 
@@ -275,36 +281,48 @@ function ThreadPane({
     }
   };
 
-  const send = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const body = text.trim();
-    if (!body || busy) return;
-    setBusy(true);
-    setErr(null);
+  /** Deliver one pending reply. The bubble only turns into a sent message when the server says Meta took it. */
+  const deliver = async (p: Pending) => {
+    setPending((list) => list.map((x) => (x.clientId === p.clientId ? { ...x, state: "sending", error: undefined } : x)));
     try {
-      const r = await api<{ message: MessageView; repliesLeft: number | null; practice: boolean }>(`/api/messages/${thread.id}`, { method: "POST", json: { text: body } });
-      setMessages((m) => [...(m ?? []), r.message]);
+      const r = await api<{ message: MessageView; repliesLeft: number | null; practice: boolean }>(`/api/messages/${thread.id}`, { method: "POST", json: { text: p.text, clientId: p.clientId } });
+      setPending((list) => list.filter((x) => x.clientId !== p.clientId));
+      setMessages((m) => (m?.some((x) => x.id === r.message.id) ? m : [...(m ?? []), r.message]));
       onSent(thread.id, r.message);
-      setText("");
-      setIdeas(null);
       setLeft(typeof r.repliesLeft === "number" ? r.repliesLeft : null);
       if (r.practice) toast("Sent on the practice account. Nothing left Outlly.");
+      void fetchThread(); // pick up the stored copy (and anything that arrived meanwhile)
     } catch (e2) {
-      if (e2 instanceof ApiError && e2.code === "WINDOW_CLOSED") {
-        setCanReply(false);
-        onClosed(thread.id);
+      const code = e2 instanceof ApiError ? e2.code : undefined;
+      const msg = e2 instanceof ApiError ? e2.message : "The message didn't go through. Check your connection and try again.";
+      if (code === "WINDOW_CLOSED" || code === "NOT_CONNECTED" || code === "DMS_OFF") {
+        const b: ReplyBlock = { code, message: msg };
+        setBlock(b);
+        onClosed(thread.id, b);
       }
-      setErr(e2 instanceof ApiError ? e2.message : "The message didn't go through. Let's try again.");
-    } finally {
-      setBusy(false);
+      setPending((list) => list.map((x) => (x.clientId === p.clientId ? { ...x, state: "failed", error: msg } : x)));
     }
   };
 
+  const send = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const body = text.trim();
+    if (!body || block || readOnly || pending.some((x) => x.state === "sending")) return;
+    setErr(null);
+    const p: Pending = { clientId: newClientId(), text: body, state: "sending", at: new Date().toISOString() };
+    setPending((list) => [...list, p]);
+    setText("");
+    setIdeas(null);
+    void deliver(p);
+  };
+  const busy = pending.some((x) => x.state === "sending");
+
   const hrs = hoursLeft(thread.windowEndsAt);
+  const locked = readOnly || !!block;
   const appLink = thread.platform === "instagram" ? "https://www.instagram.com/direct/inbox/" : "https://business.facebook.com/latest/inbox";
 
   return (
-    <section aria-label={`Conversation with ${thread.participantName}`} className="flex h-full min-h-[60dvh] flex-col rounded-[28px] bg-secondary/30 hairline">
+    <section aria-label={`Conversation with ${thread.participantName}`} className="flex h-[calc(100dvh-11rem)] min-h-[420px] flex-col rounded-[28px] bg-secondary/30 hairline lg:sticky lg:top-24">
       <header className="flex items-center gap-3 border-b border-foreground/10 px-3 py-3 sm:px-4">
         <button type="button" onClick={onBack} aria-label="Back to conversations" className="grid h-11 w-11 place-items-center rounded-full hover:bg-secondary lg:hidden">
           <ArrowLeft className="h-5 w-5" aria-hidden="true" />
@@ -322,7 +340,7 @@ function ThreadPane({
         </a>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-4" aria-live="polite">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-4" aria-live="polite">
         {loadErr && (
           <p role="alert" className="text-sm text-destructive">
             {loadErr}
@@ -353,73 +371,56 @@ function ThreadPane({
               </div>
             </li>
           ))}
+          {pending.map((p) => (
+            <li key={p.clientId} className="flex flex-col items-end">
+              <div className={cn("max-w-[80%] rounded-[20px] px-3.5 py-2 text-[14.5px]", p.state === "failed" ? "bg-destructive/10 text-foreground ring-1 ring-destructive/40" : "bg-lime/10 text-foreground opacity-80")}>
+                <p className="whitespace-pre-wrap break-words">{p.text}</p>
+                <p className="mt-0.5 flex items-center justify-end gap-1 text-[10.5px] text-muted-foreground">
+                  {p.state === "sending" ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> Sending…
+                    </>
+                  ) : (
+                    <span className="flex items-center gap-1 font-medium text-destructive">
+                      <AlertCircle className="h-3 w-3" aria-hidden="true" /> Not sent
+                    </span>
+                  )}
+                </p>
+              </div>
+              {p.state === "failed" && (
+                <div className="mt-1 flex max-w-[80%] flex-wrap items-center justify-end gap-2 text-xs">
+                  {p.error && <span className="text-destructive">{p.error}</span>}
+                  {!block && (
+                    <button type="button" onClick={() => void deliver(p)} className="min-h-[32px] rounded-full px-2.5 font-medium underline hover:bg-secondary">
+                      Retry
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPending((list) => list.filter((x) => x.clientId !== p.clientId));
+                      if (!text.trim()) setText(p.text);
+                    }}
+                    className="min-h-[32px] rounded-full px-2.5 font-medium text-muted-foreground underline hover:bg-secondary"
+                  >
+                    Edit
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
         </ol>
         <div ref={bottom} />
       </div>
 
       <div className="border-t border-foreground/10 px-3 py-3 sm:px-4">
+        {/* 1090: the composer is always there. When it can't send, it says why and where to answer instead. */}
         {readOnly ? (
-          <p role="note" className="rounded-2xl bg-secondary/60 p-3.5 text-sm">
+          <p id={`dm-lock-${thread.id}`} role="note" className="mb-2 rounded-2xl bg-secondary/60 p-3.5 text-sm">
             Editors can read messages. The workspace owner or a manager answers them.
           </p>
-        ) : canReply ? (
-          <>
-            {ideas && (
-              <div className="mb-2" role="group" aria-label="Suggested replies">
-                <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                  <Sparkles className="h-3 w-3" aria-hidden="true" /> Tap one, then make it yours
-                </p>
-                <ul className="flex flex-col gap-1.5">
-                  {ideas.map((s) => (
-                    <li key={s.text}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setText(s.text.slice(0, MAX));
-                          requestAnimationFrame(() => box.current?.focus());
-                        }}
-                        aria-pressed={text === s.text}
-                        className="w-full rounded-2xl bg-card px-3.5 py-2.5 text-left text-sm transition hairline hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                      >
-                        <span className="mr-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-lime-ink dark:text-lime">{s.label}</span>
-                        {s.text}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <form onSubmit={send} className="flex items-end gap-2">
-              <Button type="button" variant="ghost" size="icon" onClick={suggest} disabled={thinking || !lastIn?.text} aria-label={ideas ? "More reply ideas" : "Suggest replies"} title="Suggest replies" className="h-11 w-11 shrink-0">
-                <Sparkles className={cn("h-4 w-4", thinking && "animate-pulse")} aria-hidden="true" />
-              </Button>
-              <Textarea
-                ref={box}
-                rows={1}
-                value={text}
-                maxLength={MAX}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                    e.preventDefault();
-                    void send();
-                  }
-                }}
-                placeholder={`Message ${thread.participantName}…`}
-                aria-label={`Message ${thread.participantName}`}
-                className="max-h-40 min-h-[44px] py-2.5 text-sm"
-              />
-              <Button type="submit" variant="lime" size="icon" disabled={busy || !text.trim()} aria-label="Send message" className="h-11 w-11 shrink-0">
-                <Send className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            </form>
-            <p className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-              <Clock className="h-3 w-3" aria-hidden="true" />
-              {hrs >= 1 ? `You can reply for about ${Math.floor(hrs)} more ${Math.floor(hrs) === 1 ? "hour" : "hours"}.` : "Less than an hour left to reply."} {text.length > MAX - 100 && `${MAX - text.length} characters left.`}
-            </p>
-          </>
-        ) : (
-          <div role="note" className="rounded-2xl bg-secondary/60 p-3.5 text-sm">
+        ) : block?.code === "WINDOW_CLOSED" ? (
+          <div id={`dm-lock-${thread.id}`} role="note" className="mb-2 rounded-2xl bg-secondary/60 p-3.5 text-sm">
             <p className="font-medium">The 24-hour reply window has closed.</p>
             <p className="mt-1 text-muted-foreground">
               Meta only lets apps answer within 24 hours of {thread.participantName}&apos;s last message. You can still reply in{" "}
@@ -429,6 +430,77 @@ function ThreadPane({
               . When they write again, you can answer here.
             </p>
           </div>
+        ) : block ? (
+          <div id={`dm-lock-${thread.id}`} role="note" className="mb-2 rounded-2xl bg-secondary/60 p-3.5 text-sm">
+            <p className="font-medium">{block.message}</p>
+            {block.code === "NOT_CONNECTED" ? (
+              <a href="/accounts" className="mt-1 inline-flex min-h-[32px] items-center text-sm underline">
+                Go to Accounts
+              </a>
+            ) : (
+              <a href={appLink} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-[32px] items-center gap-1 text-sm underline">
+                Open {name} <ExternalLink className="h-3 w-3" aria-hidden="true" />
+              </a>
+            )}
+          </div>
+        ) : null}
+        {ideas && (
+          <div className="mb-2" role="group" aria-label="Suggested replies">
+            <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              <Sparkles className="h-3 w-3" aria-hidden="true" /> Tap one, then make it yours
+            </p>
+            <ul className="flex flex-col gap-1.5">
+              {ideas.map((s) => (
+                <li key={s.text}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setText(s.text.slice(0, MAX));
+                      requestAnimationFrame(() => box.current?.focus());
+                    }}
+                    aria-pressed={text === s.text}
+                    className="w-full rounded-2xl bg-card px-3.5 py-2.5 text-left text-sm transition hairline hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  >
+                    <span className="mr-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-lime-ink dark:text-lime">{s.label}</span>
+                    {s.text}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <form onSubmit={send} className="flex items-end gap-2">
+          <Button type="button" variant="ghost" size="icon" onClick={suggest} disabled={locked || thinking || !lastIn?.text} aria-label={ideas ? "More reply ideas" : "Suggest replies"} title="Suggest replies" className="h-11 w-11 shrink-0">
+            <Sparkles className={cn("h-4 w-4", thinking && "animate-pulse")} aria-hidden="true" />
+          </Button>
+          <Textarea
+            ref={box}
+            rows={1}
+            value={text}
+            maxLength={MAX}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+            disabled={locked}
+            aria-disabled={locked}
+            aria-describedby={locked ? `dm-lock-${thread.id}` : undefined}
+            placeholder={locked ? (readOnly ? "Editors can't reply" : block?.code === "WINDOW_CLOSED" ? "Reply window closed" : "Replies unavailable here") : `Message ${thread.participantName}…`}
+            aria-label={`Message ${thread.participantName}`}
+            className="max-h-40 min-h-[44px] py-2.5 text-sm"
+          />
+          <Button type="submit" variant="lime" size="icon" disabled={locked || busy || !text.trim()} aria-label={busy ? "Sending" : "Send message"} className="h-11 w-11 shrink-0">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Send className="h-4 w-4" aria-hidden="true" />}
+          </Button>
+        </form>
+        {!locked && (
+          <p className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
+            <Clock className="h-3 w-3" aria-hidden="true" />
+            {hrs >= 1 ? `You can reply for about ${Math.floor(hrs)} more ${Math.floor(hrs) === 1 ? "hour" : "hours"}.` : "Less than an hour left to reply."} {text.length > MAX - 100 && `${MAX - text.length} characters left.`}
+          </p>
         )}
         {err && (
           <p role="alert" className="mt-2 text-sm text-destructive">
