@@ -2,15 +2,16 @@
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { openPalette } from "./CommandPalette";
+import { cn } from "@/lib/utils";
 
 /** Sidebar way in to the command palette, showing the shortcut so people learn it. */
-export function PaletteButton({ compact = false }: { compact?: boolean }) {
+export function PaletteButton({ compact = false, className }: { compact?: boolean; className?: string }) {
   const [mac, setMac] = useState(false);
   useEffect(() => setMac(/mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent)), []);
   const key = mac ? "Cmd K" : "Ctrl K";
   if (compact)
     return (
-      <button type="button" onClick={openPalette} aria-label="Search or jump" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+      <button type="button" onClick={openPalette} aria-label="Search or jump" className={cn("grid h-11 w-11 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground", className)}>
         <Search className="h-[18px] w-[18px]" aria-hidden="true" />
       </button>
     );

@@ -55,14 +55,16 @@ function RangePicker({ value, onPick, maxDays }: { value: number; onPick: (d: nu
   return (
     <div role="radiogroup" aria-label="Time range" className="flex shrink-0 flex-wrap gap-1 rounded-full bg-secondary/60 p-1 hairline">
       {shown.map((r) => (
-        <button key={r.d} type="button" role="radio" aria-checked={value === r.d} onClick={() => onPick(r.d)} className={cn("relative h-11 rounded-full px-4 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", value === r.d ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+        <button key={r.d} type="button" role="radio" aria-checked={value === r.d} onClick={() => onPick(r.d)} className={cn("relative h-11 rounded-full px-3 text-sm font-medium focus-visible:outline sm:px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", value === r.d ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
           {value === r.d && <motion.span layoutId="range" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
           <span className="relative">{r.label}</span>
         </button>
       ))}
       {maxDays < 365 && (
-        <Link href="/billing" className="inline-flex h-11 items-center rounded-full px-4 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-          More history
+        <Link href="/billing" aria-label="More history" className="inline-flex h-11 items-center rounded-full px-3 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:px-4">
+          {/* 1099: the short label keeps the four options on one row on a 360px phone */}
+          <span className="sm:hidden">More</span>
+          <span className="hidden sm:inline">More history</span>
         </Link>
       )}
     </div>

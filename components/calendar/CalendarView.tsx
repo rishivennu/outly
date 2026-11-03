@@ -92,11 +92,11 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
             <ChevronRight className="h-5 w-5" />
           </Button>
           {!days.includes(today) && (
-            <Button variant="subtle" size="sm" onClick={() => setStart(addDaysKey(today, -weekdayOf(today)))}>
+            <Button variant="subtle" size="sm" className="max-lg:h-11" onClick={() => setStart(addDaysKey(today, -weekdayOf(today)))}>
               Today
             </Button>
           )}
-          <Button asChild variant="lime" size="sm">
+          <Button asChild variant="lime" size="sm" className="max-lg:h-11">
             <Link href="/create/bulk">
               <Layers className="h-4 w-4" aria-hidden /> Plan a batch
             </Link>

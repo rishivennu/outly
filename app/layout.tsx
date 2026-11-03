@@ -14,6 +14,7 @@ import { PageScrollbar } from "@/components/marketing/PageScrollbar";
 import "./globals.css";
 import "./mobile-app.css";
 import { appScript } from "@/lib/app-mode";
+import { installCaptureScript } from "@/lib/pwa-core";
 import { chunkScript } from "@/lib/client/chunk-reload";
 
 /*
@@ -68,6 +69,9 @@ export const metadata: Metadata = {
   // Copyright notice in the page head; the visible one sits in the footer.
   other: { copyright: `\u00A9 ${new Date().getFullYear()} Outlly. All rights reserved.` },
   verification: { google: process.env.GOOGLE_SITE_VERIFICATION?.trim() || undefined },
+  // 1099: launched from the iOS Home Screen it opens full screen with this name under the icon (app/apple-icon.png).
+  appleWebApp: { capable: true, title: "Outlly", statusBarStyle: "default" },
+  applicationName: "Outlly",
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0c0c0e", viewportFit: "cover" };
@@ -83,6 +87,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: chunkScript }} />
         {/* Inside the Android app: mark <html> before first paint so the app layout (app/mobile-app.css) never flashes the web one. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: appScript }} />
+        {/* 1099: keep the browser's one-time install prompt for the studio's "Add to Home Screen" card. */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: installCaptureScript }} />
         {/* Landing sections the admin hid (readable hint cookie set by middleware): mark <html> before the
             first paint so CSS drops their nav and footer links at once, instead of a link flashing in and out. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `try{var m=document.cookie.match(/(?:^|; )outlly_lh=([^;]*)/);if(m)document.documentElement.setAttribute("data-lh",decodeURIComponent(m[1]).split(".").join(" "))}catch(e){}` }} />

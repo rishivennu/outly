@@ -403,7 +403,7 @@ function CommentProblems({ errors, busy, onRetry }: { errors: InboxProblem[]; bu
           <button type="button" onClick={() => setMore((v) => !v)} aria-expanded={more} aria-controls="inbox-problems" className={stripButton}>
             {more ? "Hide details" : head.reconnect.length ? <><span className="sm:hidden">Fix</span><span className="hidden sm:inline">Details</span></> : "Details"}
           </button>
-          <button type="button" onClick={hide} aria-label="Hide this notice" title="Hide this notice" className={cn(stripButton, "w-9 justify-center px-0")}>
+          <button type="button" onClick={hide} aria-label="Hide this notice" title="Hide this notice" className={cn(stripButton, "w-11 justify-center px-0 lg:w-9")}>
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </>

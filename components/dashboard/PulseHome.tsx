@@ -185,7 +185,7 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
           <div ref={rangeS.box} role="radiogroup" aria-label="Date range" onKeyDown={onRangeKey} className="pulse-seg relative">
             <span ref={rangeS.bar} aria-hidden="true" className="pulse-seg-pill" />
             {RANGES.map((r) => (
-              <button key={r} type="button" role="radio" aria-checked={r === range} tabIndex={r === range ? 0 : -1} onClick={() => void pickRange(r)} className={cn("relative z-[1] h-9 min-w-[52px] rounded-[10px] px-3 text-[13.5px] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring", r === range ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+              <button key={r} type="button" role="radio" aria-checked={r === range} tabIndex={r === range ? 0 : -1} onClick={() => void pickRange(r)} className={cn("relative z-[1] h-9 min-w-[52px] rounded-[10px] px-3 text-[13.5px] before:absolute before:-inset-y-1 before:inset-x-0 before:content-[''] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring", r === range ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
                 {r}D
               </button>
             ))}

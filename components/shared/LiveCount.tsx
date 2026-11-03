@@ -72,8 +72,9 @@ export function LiveCount({ compact = false, pill = false, className }: { compac
   if (compact) {
     if (v.online === null) return null;
     return (
-      <span className={cn("lc inline-flex h-9 items-center gap-1 rounded-full px-3 text-[12px] hairline", className)} aria-label={label} title={label}>
-        <Num n={v.online} format={compactCount} /> online
+      <span className={cn("lc inline-flex h-9 items-center gap-1.5 whitespace-nowrap px-1.5 text-[12.5px] font-medium text-muted-foreground", className)} aria-label={label} title={label}>
+        <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[hsl(var(--lime))] shadow-[0_0_0_3px_hsl(var(--lime)/0.18)]" />
+        <span><Num n={v.online} format={compactCount} /> online</span>
       </span>
     );
   }

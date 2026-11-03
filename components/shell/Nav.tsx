@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { ArrowUpRight, BarChart3, CreditCard, LifeBuoy, CalendarDays, ClipboardCheck, Globe, Home, LayoutGrid, MessagesSquare, MoreHorizontal, Plus, Settings, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
-import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
+import { OutlyLogo } from "@/components/brand/Logo";
 import { ThemeCycleButton, ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useUser } from "./UserContext";
 import { NoticesBell } from "./NoticesBell";
@@ -211,7 +211,7 @@ export function MobileNav() {
         ref={panel}
         id="more-panel"
         hidden={!more}
-        className="web-only fixed inset-x-3 bottom-[calc(max(12px,env(safe-area-inset-bottom))+76px)] z-[56] max-h-[60dvh] bg-background/95 shadow-2xl backdrop-blur-xl hairline overflow-y-auto rounded-[28px] p-2 lg:hidden"
+        className="mtab-more web-only fixed inset-x-3 bottom-[calc(max(12px,env(safe-area-inset-bottom))+76px)] z-[56] max-h-[60dvh] bg-background/95 shadow-2xl backdrop-blur-xl hairline overflow-y-auto rounded-[28px] p-2 lg:hidden"
       >
         <ul className="grid grid-cols-1 gap-0.5 min-[400px]:grid-cols-2">
           {extra.map(({ href, label, icon: Icon }) => {
@@ -227,7 +227,7 @@ export function MobileNav() {
           })}
         </ul>
       </div>
-      <nav aria-label="Primary" className="web-only lg-glass fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-40 flex h-[68px] items-center justify-around rounded-[28px] px-1 lg:hidden">
+      <nav aria-label="Primary" className="mtab web-only lg-glass fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-40 flex h-[68px] items-center justify-around rounded-[28px] px-1 lg:hidden">
         {MAIN.filter((m) => TABS.includes(m.href)).map(({ href, label, icon: Icon }) => {
           const active = isActive(path, href) && !more;
           return (
@@ -250,23 +250,41 @@ export function MobileNav() {
   );
 }
 
-/** Phone top bar: brand, theme and notifications. Everything else moved to More in the tab bar. */
+/**
+ * Phone top bar: brand, search, theme and notifications. Everything else lives under More in the tab bar.
+ * 1099: no box. At rest it sits on the page background with no border or shadow; once content scrolls under
+ * it a frosted layer and a hairline fade in (.mtop in globals.css). One 44px button size, 20px icons.
+ */
 export function MobileTopBar() {
+  const [lifted, setLifted] = useState(false);
+  useEffect(() => {
+    let raf = 0;
+    const check = () => {
+      raf = 0;
+      setLifted(window.scrollY > 2);
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(check);
+    };
+    check();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
   return (
-    <header className="web-only sticky top-0 z-30 flex border-b border-border/70 bg-background shadow-[0_10px_24px_-18px_rgb(0_0_0/0.6)] items-center justify-between gap-2 px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] lg:hidden">
-      <Link href="/home" className="flex min-h-11 min-w-0 shrink-0 items-center gap-2 rounded-2xl text-[16px]" aria-label="Outlly dashboard">
-        {/* Hide on a wrapper: on the mark itself, its own "dark:block" outranks min-[480px]:hidden and both logos showed (1050). */}
-        <span className="inline-flex min-[480px]:hidden">
-          <OutlyMark size={26} />
-        </span>
-        <OutlyLogo className="hidden min-[480px]:inline-flex" />
-      </Link>
-      <div className="flex min-w-0 items-center gap-0.5">
-        {/* One cycling button: the three-way switch made the row wider than a phone (10-12f). */}
-        <LiveCount compact className="mr-1 max-[379px]:hidden" />
-        <PaletteButton compact />
-        <ThemeCycleButton />
-        <NoticesBell placement="below" />
+    <header data-mtop="" data-lifted={lifted ? "" : undefined} className="mtop web-only sticky top-0 z-30 lg:hidden">
+      <div className="mtop-row flex h-14 items-center justify-between gap-2 pl-3 pr-1.5 min-[400px]:pl-4 min-[400px]:pr-2.5">
+        <Link href="/home" className="flex h-11 min-w-11 shrink-0 items-center rounded-full px-1.5 text-[17px] transition-opacity duration-150 active:opacity-60" aria-label="Outlly dashboard">
+          <OutlyLogo size={24} />
+        </Link>
+        <div className="flex min-w-0 items-center">
+          <LiveCount compact className="mr-0.5 max-[359px]:hidden" />
+          <PaletteButton compact className="mtop-btn" />
+          <ThemeCycleButton className="mtop-btn" />
+          <NoticesBell placement="below" className="mtop-btn" />
+        </div>
       </div>
     </header>
   );
