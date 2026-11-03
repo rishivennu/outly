@@ -3,6 +3,7 @@ import { HttpError, json, route } from "@/lib/http";
 import { saveConnectedAccount } from "@/lib/accounts";
 import { holdChoice, knownAccounts, takeChoice, viewChoice } from "@/lib/connect-choice";
 import { entitlements } from "@/lib/billing/entitlements";
+import { isMultiAccount } from "@/lib/billing/plan-rules";
 import { accountView } from "@/lib/services";
 import { invalidateDashboards } from "@/lib/live";
 
@@ -34,7 +35,7 @@ export const POST = route(
     if (action === "discard") return json({ ok: true });
     // The answer may come minutes later. If another account was connected on this platform meanwhile, the
     // creator never agreed to replace it: ask again (with the sign-in held anew) instead of failing or replacing.
-    if ((await entitlements(user.id)).accountLimit === 0) {
+    if (!isMultiAccount(await entitlements(user.id))) {
       const agreed = new Set(c.decision.replaces.map((x) => x.id));
       const now = (await knownAccounts(user.id, c.platform)).filter((x) => x.status !== "disconnected" && x.platformUserId !== c.prof.platformUserId);
       if (now.some((x) => !agreed.has(x.id))) {

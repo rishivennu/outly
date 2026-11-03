@@ -25,9 +25,10 @@ import type { Receipt } from "@/lib/billing/receipt-core";
 import { PaymentReceipt } from "./PaymentReceipt";
 import { GuaranteeCard, type GuaranteeView } from "./GuaranteeCard";
 import { GUARANTEE_LINE } from "@/lib/billing/guarantee-core";
+import { AutoRenewToggle, CancelReasons, PriceSurvey, UsageExtras, type CancelWhy } from "./PlanExtras";
 
 export type ReturnNotice = { tone: "ok" | "info" | "error"; text: string };
-type Current = { planSlug: string; planName: string; priceMinor: number; currency: string; interval: string; periodEnd: string; cancelAtPeriodEnd: boolean; pausedUntil?: string | null; provider?: string } | null;
+type Current = { planSlug: string; planName: string; priceMinor: number; currency: string; interval: string; periodEnd: string; cancelAtPeriodEnd: boolean; pausedUntil?: string | null; provider?: string; autoRenew?: boolean } | null;
 type Inv = { number: string; description: string; amountMinor: number; currency: string; issuedAt: string; refunded: boolean; creditNote?: string | null };
 
 const CACHE = "outly-invoices-v1";
@@ -87,6 +88,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
   const anyYear = plans.some((p) => p.year && p.state === "available");
   const save = Math.max(0, ...plans.map((p) => p.year?.save ?? 0));
   const [confirm, setConfirm] = useState(false);
+  const [why, setWhy] = useState<CancelWhy>({ detail: "", interview: false });
   const [notice, setNotice] = useState(props.notice);
   // 1053: a checkout that came back gets a receipt slip built from our payment row; it replaces the text notice.
   const [receipt, setReceipt] = useState<Receipt | null>(props.receipt ?? null);
@@ -130,8 +132,19 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
     const y = cycle === "year" && p.year ? p.year : null;
     if (!online) return toast("You're offline. Reconnect to change plans.", "error");
     setBusy(p.slug);
+    await pay(() => api<any>("/api/billing/checkout", { method: "POST", json: { plan: p.slug, currency: y ? y.currency : p.currency, cycle: y ? "year" : "month" } }));
+  }
+
+  /** 1096: a usage pack goes through exactly the same checkout as a plan. */
+  async function buyPack(packId: string) {
+    if (!online) return toast("You're offline. Reconnect to buy a top-up.", "error");
+    setBusy(`pack-${packId}`);
+    await pay(() => api<any>("/api/billing/topups", { method: "POST", json: { pack: packId } }));
+  }
+
+  async function pay(start: () => Promise<any>) {
     try {
-      const r = await api<any>("/api/billing/checkout", { method: "POST", json: { plan: p.slug, currency: y ? y.currency : p.currency, cycle: y ? "year" : "month" } });
+      const r = await start();
       if (r.kind === "redirect") {
         window.location.href = r.url;
         return;
@@ -167,7 +180,8 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
   async function cancelOrResume(action: "cancel" | "resume" | "pause" | "unpause", months?: number) {
     setBusy(action === "pause" ? `pause-${months}` : action);
     try {
-      const r = await api<{ pausedUntil?: string; daysKept?: number }>("/api/billing/cancel", { method: "POST", json: { action, months } });
+      const feedback = action === "cancel" && why.reason ? { reason: why.reason, detail: why.detail.trim() || undefined, interview: why.interview } : {};
+      const r = await api<{ pausedUntil?: string; daysKept?: number }>("/api/billing/cancel", { method: "POST", json: { action, months, ...feedback } });
       toast(
         action === "cancel" ? `Done. ${current?.planName} stays active until ${day(current!.periodEnd)}.`
         : action === "pause" ? `Paused until ${day(r.pausedUntil!)}. Your ${r.daysKept} paid day${r.daysKept === 1 ? "" : "s"} wait for you.`
@@ -222,7 +236,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
             {current && <span className="ml-2 text-base font-medium text-muted-foreground tabular">{current.priceMinor > 0 ? <>{formatMoney(current.priceMinor, current.currency)}{intervalLabel(current.interval)}</> : current.provider === "beta" ? "free, early member" : "free month"}</span>}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {!current ? "No card on file. Upgrade any time; you'll get an invoice by email straight away." : current.pausedUntil ? <>Paused until <b className="text-foreground">{day(current.pausedUntil)}</b>. Free limits apply until then, and your paid days run again after, to <b className="text-foreground">{day(current.periodEnd)}</b>.</> : current.cancelAtPeriodEnd ? <>Ends on <b className="text-foreground">{day(current.periodEnd)}</b>, then you move to Free. Nothing else will be charged.</> : <>Paid through <b className="text-foreground">{day(current.periodEnd)}</b>. It does not renew or charge you again on its own.</>}
+            {!current ? "No card on file. Upgrade any time; you'll get an invoice by email straight away." : current.pausedUntil ? <>Paused until <b className="text-foreground">{day(current.pausedUntil)}</b>. Free limits apply until then, and your paid days run again after, to <b className="text-foreground">{day(current.periodEnd)}</b>.</> : current.cancelAtPeriodEnd ? <>Ends on <b className="text-foreground">{day(current.periodEnd)}</b>, then you move to Free. Nothing else will be charged.</> : current.autoRenew ? <>Renews on <b className="text-foreground">{day(current.periodEnd)}</b>. We email you 3 days before the charge.</> : <>Paid through <b className="text-foreground">{day(current.periodEnd)}</b>. It does not renew or charge you again on its own.</>}
           </p>
           {props.access && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-lime/15 px-3 py-1 text-[12.5px] text-foreground" role="status">
@@ -235,6 +249,8 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
             <p className="mt-2 text-[12.5px] text-muted-foreground">Your Verified Manager badge appears once your email is confirmed and two or more accounts are connected.</p>
           )}
           <UsageMeter u={props.usage} />
+          <UsageExtras onBuy={buyPack} busy={busy} />
+          {current && current.priceMinor > 0 && !current.pausedUntil && !current.cancelAtPeriodEnd && <AutoRenewToggle on={!!current.autoRenew} provider={current.provider} periodEnd={current.periodEnd} />}
         </div>
         {current && current.priceMinor > 0 && (current.pausedUntil ? (
           <Button variant="lime" onClick={() => cancelOrResume("unpause")} disabled={busy === "unpause"}>{busy === "unpause" && <Loader2 className="h-4 w-4 animate-spin" />}Resume now</Button>
@@ -321,8 +337,10 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
             );
           })}
         </ul>
-        <p className="mt-3 text-[12.5px] text-muted-foreground">Prices include applicable taxes. Each payment covers one period and nothing is charged automatically: when it ends you can pay again or stay on Free. Switching plans starts the new one today.</p>
+        <p className="mt-3 text-[12.5px] text-muted-foreground">Prices include applicable taxes. Each payment covers one period and nothing is charged automatically unless you turn on auto-renew: when it ends you can pay again or stay on Free. Switching plans starts the new one today.</p>
       </section>
+
+      <PriceSurvey currency={props.currency} planSlug={currentSlug} />
 
       <section aria-labelledby="inv" className="mt-10 max-w-5xl">
         <h2 id="inv" className="text-xl font-semibold tracking-tight">Invoices</h2>
@@ -367,6 +385,8 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
         onConfirm={() => cancelOrResume("cancel")}
         extra={
           current && current.priceMinor > 0 && !current.pausedUntil ? (
+            <>
+            <CancelReasons value={why} onChange={setWhy} />
             <div className="mt-5 rounded-2xl bg-lime/15 p-4" role="group" aria-labelledby="pause-h">
               <p id="pause-h" className="text-sm font-semibold">Need a break instead?</p>
               <p className="mt-1 text-[13px] text-muted-foreground">Pause and keep your unused paid days. They start again when the pause ends.</p>
@@ -378,6 +398,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
                 ))}
               </div>
             </div>
+            </>
           ) : null
         }
       />

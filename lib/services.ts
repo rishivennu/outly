@@ -5,7 +5,8 @@ import { HttpError } from "./http";
 import { storage } from "./storage";
 import { isPlatform, PLATFORMS, REMOVAL, STOPPABLE, type Platform, type RemoveMode } from "./domain";
 import { enqueue } from "./queue";
-import { spendPost } from "./billing/entitlements";
+import { spendPost, spendXPosts } from "./billing/entitlements";
+import { recordVoice } from "./ai/voice";
 import { syncPost } from "./queue/handlers";
 import type { SimulationMode } from "./social/types";
 import { isPracticeAccount } from "./social/registry";
@@ -195,8 +196,9 @@ export async function launchPost(userId: string, postId: string, mode: "now" | "
     if (!scheduledAt || scheduledAt.getTime() < Date.now() + 60_000) throw new HttpError(400, "Pick a time at least a minute from now.");
     // Atomic claim (same pattern as scheduledPost()): whoever flips the status wins, so two
     // simultaneous requests can never both schedule — and never both enqueue — the same post.
-    if (!(await claimWithSlot(userId, post, { status: "scheduled", scheduledAt }))) throw new HttpError(409, "This one is already on its way.");
+    if (!(await claimWithSlot(userId, post, toSend, { status: "scheduled", scheduledAt }))) throw new HttpError(409, "This one is already on its way.");
     await markLaunched(post.id);
+    void recordVoice(userId, toSend.map((t) => t.caption));
     await db.$transaction([
       ...toSend.map((t) =>
         db.postTarget.update({ where: { id: t.id }, data: { platformStatus: "pending", socialAccountId: acctOf.get(t.id)!.id, errorCode: null, errorMessage: null, attempts: 0 } }),
@@ -209,9 +211,10 @@ export async function launchPost(userId: string, postId: string, mode: "now" | "
   // Send now: claim first, create records, return immediately, workers do the rest.
   // The claim is what stops a double-click (or a retried fetch) from publishing twice: the status check
   // above is a read, and two requests can both pass it before either write lands.
-  const stamp = await claimWithSlot(userId, post, { status: "publishing", scheduledAt: null });
+  const stamp = await claimWithSlot(userId, post, toSend, { status: "publishing", scheduledAt: null });
   if (!stamp) throw new HttpError(409, "This one is already on its way.");
   await markLaunched(post.id);
+  void recordVoice(userId, toSend.map((t) => t.caption));
   await db.$transaction(
     toSend.map((t) =>
       db.postTarget.update({ where: { id: t.id }, data: { platformStatus: "queued", socialAccountId: acctOf.get(t.id)!.id, errorCode: null, errorMessage: null, attempts: 0, uploadRef: null, publishRequestedAt: null } }),
@@ -231,17 +234,36 @@ export async function launchPost(userId: string, postId: string, mode: "now" | "
 const holdPostSlot = (userId: string, post: Post) =>
   post.status === "scheduled" && post.launchedAt ? Promise.resolve({ fresh: false, release: async () => {} }) : spendPost(userId, post.id);
 
-/** Slot first, then the claim. If the claim is lost or throws (DB hiccup), the slot goes back. */
-async function claimWithSlot(userId: string, post: Post, data: { status: string; scheduledAt: Date | null }) {
+/**
+ * 1096: plans with an X allowance also hold one X post per X destination, every launch. Unlike the post slot
+ * there's no shortcut for booked posts: X can be added to one after booking (a new target id). A destination
+ * already counted this month costs nothing again, so a retry or a move to a new time stays free.
+ */
+const holdXPosts = (userId: string, _post: Post, toSend: Pick<PostTarget, "id" | "platform">[]) =>
+  spendXPosts(userId, toSend.filter((t) => t.platform === "x").map((t) => t.id));
+
+/** Slots first, then the claim. If the claim is lost or throws (DB hiccup), the slots go back. */
+async function claimWithSlot(userId: string, post: Post, toSend: Pick<PostTarget, "id" | "platform">[], data: { status: string; scheduledAt: Date | null }) {
   const slot = await holdPostSlot(userId, post);
-  let stamp: Awaited<ReturnType<typeof claim>>;
+  let x: Awaited<ReturnType<typeof holdXPosts>>;
   try {
-    stamp = await claim(post.id, ["draft", "failed", "partial", "scheduled"], data);
+    x = await holdXPosts(userId, post, toSend);
   } catch (err) {
     if (slot.fresh) await slot.release();
     throw err;
   }
-  if (!stamp && slot.fresh) await slot.release();
+  const giveBack = async () => {
+    if (slot.fresh) await slot.release();
+    if (x.fresh) await x.release();
+  };
+  let stamp: Awaited<ReturnType<typeof claim>>;
+  try {
+    stamp = await claim(post.id, ["draft", "failed", "partial", "scheduled"], data);
+  } catch (err) {
+    await giveBack();
+    throw err;
+  }
+  if (!stamp) await giveBack();
   return stamp;
 }
 

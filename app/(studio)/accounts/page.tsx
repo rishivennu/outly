@@ -25,7 +25,9 @@ export default async function AccountsPage() {
       <AccountsView
         initial={accounts.map(accountView)}
         previous={previous.filter((a): a is typeof a & { platform: Platform } => isPlatform(a.platform))}
-        accountLimit={ent.accountLimit}
+        accountLimit={ent.accountLimit > 0 ? ent.accountLimit : ent.brandLimit + ent.extraBrands > 1 ? (ent.brandLimit + ent.extraBrands) * PLATFORMS.length : 0}
+        brands={ent.brandLimit > 0 ? ent.brandLimit + ent.extraBrands : 0}
+        platformLimit={ent.platformLimit}
         setup={Object.fromEntries(PLATFORMS.map((p) => [p, { oauth: hasCredentials(p), token: canConnectWithToken(p) }])) as ConnectSetup}
       />
     </Suspense>

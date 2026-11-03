@@ -57,12 +57,14 @@ const ERRORS: Record<string, (name: string) => string> = {
   no_channel: () => "That Google account doesn't have a YouTube channel yet. Create one on youtube.com (it takes a minute), then connect again.",
   wrong_app_id: () => "Instagram login isn't set up right on this server yet (it has the Facebook app ID, not the Instagram one). Connect with a token below for now, or ask the admin to fix it in Admin > Social platforms.",
   account_limit: () => "Your plan's connected accounts are all in use. Disconnect one, or upgrade in Billing to add more.",
+  platform_limit: () => "Your plan connects a set number of platforms and they're all in use. Disconnect one, or upgrade in Billing to post everywhere.",
+  brand_limit: (n) => `Your plan's brands are all in use on ${n}. Disconnect one, add a brand pack, or upgrade in Billing.`,
   owner_only: (n) => `Only the workspace owner can connect ${n}. Ask them to connect it, or switch to your own studio.`,
   replace_needed: (n) => `Another ${n} account is connected, and your plan has room for one. Nothing was replaced. Connect again and choose Replace if that's what you want.`,
   denied: (n) => `You closed the ${n} sign-in before it finished, so nothing changed.`,
 };
 
-export function AccountsView({ initial, previous: initialPrevious = [], setup, accountLimit = 0 }: { initial: AccountView[]; previous?: PreviousAccount[]; setup: ConnectSetup; accountLimit?: number }) {
+export function AccountsView({ initial, previous: initialPrevious = [], setup, accountLimit = 0, brands = 0, platformLimit = 0 }: { initial: AccountView[]; previous?: PreviousAccount[]; setup: ConnectSetup; accountLimit?: number; brands?: number; platformLimit?: number }) {
   const [accounts, setAccounts] = useState(initial);
   const [previous, setPrevious] = useState(initialPrevious);
   // 1095: the question after a sign-in that found a known account (or one that would replace the current one).
@@ -185,7 +187,12 @@ export function AccountsView({ initial, previous: initialPrevious = [], setup, a
       </p>
       {multi && (
         <p className="mt-3 text-sm font-medium" aria-live="polite">
-          {accounts.length} of {accountLimit} accounts connected on your plan.
+          {brands > 1 ? `${brands} brands on your plan: up to ${brands} accounts on each platform, ${accounts.length} connected.` : `${accounts.length} of ${accountLimit} accounts connected on your plan.`}
+        </p>
+      )}
+      {platformLimit > 0 && (
+        <p className="mt-3 text-sm font-medium" aria-live="polite">
+          {`Your plan connects any ${platformLimit} platforms. ${new Set(accounts.filter((a) => a.status !== "disconnected").map((a) => a.platform)).size} in use.`}
         </p>
       )}
 

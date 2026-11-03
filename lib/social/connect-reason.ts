@@ -5,7 +5,11 @@
  */
 export function connectReason(e: unknown) {
   if ((e as { code?: string })?.code === "NO_CHANNEL") return "no_channel";
-  if ((e as { code?: string })?.code === "PLAN_LIMIT") return "account_limit"; // 1037: plan's account total reached
+  if ((e as { code?: string })?.code === "PLAN_LIMIT") {
+    // 1096: platform and brand caps name themselves; anything else is the 1037 account total.
+    const f = (e as { extra?: { feature?: string } })?.extra?.feature;
+    return f === "platforms" ? "platform_limit" : f === "brands" ? "brand_limit" : "account_limit";
+  }
   if ((e as { code?: string })?.code === "REPLACE_NEEDED") return "replace_needed"; // 1095: never replace without asking
   const t = `${(e as { technical?: string })?.technical ?? ""} ${(e as Error)?.message ?? ""}`;
   if (/redirect_uri|redirect uri/i.test(t)) return "redirect";

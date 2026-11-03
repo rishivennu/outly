@@ -6,6 +6,7 @@ import { randomToken, sha256 } from "./crypto";
 import { realUserId, type SessionUser } from "./auth";
 import { ownedPost } from "./services";
 import { approveBlock, shouldLogEdit } from "./collab-core";
+import { assertPerk } from "./billing/entitlements";
 
 /**
  * Draft collaboration (1037): who changed what, comments, and approvals given inside the team.
@@ -49,6 +50,7 @@ export async function addComment(u: SessionUser, postId: string, body: string) {
 export async function teamDecide(u: SessionUser, postId: string, decision: "approved" | "changes_requested", note?: string | null) {
   const post = await ownedPost(u.id, postId);
   if (post.status === "published" || post.status === "publishing") throw new HttpError(409, "This one has already gone out.");
+  await assertPerk(u.id, "approvals");
   const a = actorOf(u);
   const block = approveBlock(u.role, a.id, post.editedById);
   if (block) throw new HttpError(403, block, "ROLE");

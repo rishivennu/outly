@@ -6,6 +6,7 @@ import { randomToken, sha256 } from "./crypto";
 import { env } from "./env";
 import { mediaView, ownedPost, targetView } from "./services";
 import { approvalCurrent } from "./collab-core";
+import { assertPerk } from "./billing/entitlements";
 
 export const REVIEW_TTL_MS = 7 * 24 * 3600 * 1000;
 
@@ -53,6 +54,7 @@ export async function createReviewRequest(userId: string, postId: string, create
   const post = await ownedPost(userId, postId);
   if (post.status === "published" || post.status === "publishing")
     throw new HttpError(409, "This one has already gone out, so there's nothing left to review.");
+  await assertPerk(userId, "review-links");
   const token = randomToken(32);
   const review = await db.reviewRequest.create({
     data: { postId: post.id, tokenHash: hashReviewToken(token), expiresAt: new Date(Date.now() + REVIEW_TTL_MS), createdById },

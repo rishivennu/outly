@@ -4,6 +4,7 @@ import { db } from "../db";
 import { cached, invalidate } from "../cache";
 import { priceLabel, type Currency, type PublicPlan } from "./money";
 import { localPrice, parsePrices } from "./currency";
+import { parsePerks } from "./plan-rules";
 
 const FREE_FEATURES = ["One workspace", "3 posts a week", "50 MB of storage", "Instagram Reels, YouTube Shorts and X", "AI captions on 2 videos a month", "10 inbox replies a week", "Scheduling, statuses and retries"];
 
@@ -142,7 +143,7 @@ async function migrateProRename() {
   invalidate("plans:");
 }
 
-type PlanRow = { id: string; slug: string; name: string; priceMinor: number; currency: string; interval: string; note: string; features: string; state: string; highlight: boolean; sortOrder: number; prices: string; yearlyMinor: number; postLimit: number; aiCaptions: boolean; seats: number; postPeriod: string; maxUploadMb: number; replyLimit: number; captionVideos: number; burnCaptions: boolean; accountLimit?: number; storageMb?: number };
+type PlanRow = { id: string; slug: string; name: string; priceMinor: number; currency: string; interval: string; note: string; features: string; state: string; highlight: boolean; sortOrder: number; prices: string; yearlyMinor: number; postLimit: number; aiCaptions: boolean; seats: number; postPeriod: string; maxUploadMb: number; replyLimit: number; captionVideos: number; burnCaptions: boolean; accountLimit?: number; storageMb?: number; yearlyPrices?: string; platformLimit?: number; brandLimit?: number; xPostLimit?: number; analyticsDays?: number; fairUsePosts?: number; perks?: string };
 
 export function toPublic(p: PlanRow): PublicPlan {
   let features: string[] = [];
@@ -156,6 +157,9 @@ export function toPublic(p: PlanRow): PublicPlan {
     features,
     prices: parsePrices(p.prices),
     yearlyMinor: p.yearlyMinor ?? 0,
+    yearlyPrices: parsePrices(p.yearlyPrices ?? "{}"),
+    platformLimit: p.platformLimit ?? 0, brandLimit: p.brandLimit ?? 0, xPostLimit: p.xPostLimit ?? 0, analyticsDays: p.analyticsDays ?? 0, fairUsePosts: p.fairUsePosts ?? 0,
+    perks: parsePerks(p.perks ?? ""),
     state: (["available", "soon", "hidden"].includes(p.state) ? p.state : "available") as PublicPlan["state"],
   };
 }

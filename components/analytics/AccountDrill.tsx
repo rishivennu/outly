@@ -12,7 +12,7 @@ type Acct = AnalyticsSummary["byAccount"][number];
  * Download the numbers on screen as a client-ready PDF or CSV (same range and account). One quiet "Download"
  * button that opens the two formats, so the header doesn't offer two equal buttons before you've read anything.
  */
-export function ReportButtons({ days, account }: { days: number; account: string | null }) {
+export function ReportButtons({ days, account, csv = true, pdf = true }: { days: number; account: string | null; csv?: boolean; pdf?: boolean }) {
   const q = `days=${days}${account ? `&account=${encodeURIComponent(account)}` : ""}`;
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -41,13 +41,14 @@ export function ReportButtons({ days, account }: { days: number; account: string
       </button>
       {open && (
         <div id="report-menu" className="absolute left-0 top-full z-30 mt-2 w-60 rounded-2xl bg-background p-1.5 shadow-xl hairline">
-          <a href={`/api/reports?format=pdf&${q}`} download onClick={() => setOpen(false)} className={item}>
+          {/* 1096: a format the plan doesn't include links to Billing instead of downloading an error. */}
+          <a href={pdf ? `/api/reports?format=pdf&${q}` : "/billing"} {...(pdf ? { download: true } : {})} onClick={() => setOpen(false)} className={item}>
             <FileDown className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span><span className="block">PDF report</span><span className="block text-xs font-normal text-muted-foreground">Ready to send a client</span></span>
+            <span><span className="block">PDF report</span><span className="block text-xs font-normal text-muted-foreground">{pdf ? "Ready to send a client" : "On Agency. Upgrade to send clients PDFs"}</span></span>
           </a>
-          <a href={`/api/reports?format=csv&${q}`} download onClick={() => setOpen(false)} className={item}>
+          <a href={csv ? `/api/reports?format=csv&${q}` : "/billing"} {...(csv ? { download: true } : {})} onClick={() => setOpen(false)} className={item}>
             <FileSpreadsheet className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span><span className="block">CSV spreadsheet</span><span className="block text-xs font-normal text-muted-foreground">Every number, for Excel or Sheets</span></span>
+            <span><span className="block">CSV spreadsheet</span><span className="block text-xs font-normal text-muted-foreground">{csv ? "Every number, for Excel or Sheets" : "On Creator and up. Upgrade to export"}</span></span>
           </a>
         </div>
       )}

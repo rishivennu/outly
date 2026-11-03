@@ -31,7 +31,9 @@ export async function issueInvoice(paymentId: string, opts: { email?: boolean } 
   if (existing) return existing;
   const p = await db.payment.findUniqueOrThrow({ where: { id: paymentId }, include: { user: true, subscription: { include: { plan: true } } } });
   if (p.status !== "succeeded") throw new Error("Invoices are only issued for successful payments");
-  const description = p.subscription ? `${p.subscription.plan.name} plan, 1 ${p.subscription.interval}` : "Outlly subscription";
+  // 1096: a top-up pack names the pack; a renewal reads like the plan it renews.
+  const topUp = p.purpose === "topup" ? (() => { try { return JSON.parse(p.meta ?? "{}") as { label?: string }; } catch { return {}; } })() : null;
+  const description = topUp ? `Top-up: ${topUp.label || "usage pack"}` : p.subscription ? `${p.subscription.plan.name} plan, 1 ${p.subscription.interval}${p.purpose === "renewal" ? " (renewal)" : ""}` : "Outlly subscription";
   // Copy what the PDF prints onto the invoice itself: it must read the same years later, after a
   // change of business details or tax rate, and after the customer deletes their account.
   const biz = (await getConfig("payments")).business;

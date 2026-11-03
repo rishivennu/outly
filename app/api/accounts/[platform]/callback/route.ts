@@ -5,6 +5,7 @@ import { saveConnectedAccount } from "@/lib/accounts";
 import { holdChoice, knownAccounts, resolveConnect } from "@/lib/connect-choice";
 import { googleMayLink } from "@/lib/connect-decision";
 import { entitlements } from "@/lib/billing/entitlements";
+import { isMultiAccount } from "@/lib/billing/plan-rules";
 import { env } from "@/lib/env";
 import { isPlatform } from "@/lib/domain";
 import { getPublisher, loadKeys } from "@/lib/social/registry";
@@ -106,7 +107,7 @@ async function googleSignIn(req: NextRequest, returnTo: string, remember?: boole
     });
     // 1095: signing in links the channel only when nothing needs asking. A channel the creator disconnected
     // stays disconnected, and a different channel never replaces the one already connected.
-    const link = channel ? googleMayLink(await knownAccounts(user.id, "youtube"), channel.platformUserId, (await entitlements(user.id)).accountLimit > 0) : false;
+    const link = channel ? googleMayLink(await knownAccounts(user.id, "youtube"), channel.platformUserId, isMultiAccount(await entitlements(user.id))) : false;
     if (channel && link) {
       await saveConnectedAccount(user.id, "youtube", channel);
       invalidateDashboards(user.id);

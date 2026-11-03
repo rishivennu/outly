@@ -5,6 +5,8 @@ import { isPracticeAccount } from "../social/registry";
 import { dayStamp, parseAlertPrefs, spikeLabel, spikeRatio } from "../alerts-core";
 import { noticeKey } from "./core";
 import { notify } from "./notices";
+import { entitlements } from "../billing/entitlements";
+import { hasPerk } from "../billing/plan-rules";
 
 const CHUNK = 500;
 
@@ -33,7 +35,11 @@ export async function sweepSpikes(now = new Date()) {
     });
     if (!page.length) break;
     cursor = page[page.length - 1].id;
-    const live = page.filter((a) => !isPracticeAccount(a) && parseAlertPrefs(a.user.alertPrefs).spike);
+    const wanted = page.filter((a) => !isPracticeAccount(a) && parseAlertPrefs(a.user.alertPrefs).spike);
+    // Spike alerts are a plan perk (1096): one entitlement read per owner per page, not per account.
+    const perk = new Map<string, boolean>();
+    for (const id of new Set(wanted.map((a) => a.userId))) perk.set(id, hasPerk(await entitlements(id), "spike-alerts"));
+    const live = wanted.filter((a) => perk.get(a.userId));
     if (live.length) {
       const r = await sweepPage(live, now, dayAgo, weekBefore);
       checked += r.checked;

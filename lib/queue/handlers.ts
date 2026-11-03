@@ -298,6 +298,9 @@ async function failTarget(targetId: string, postId: string, err: unknown) {
   const pe = asPublisherError(err);
   // Already live (or stopped meanwhile): a late error changes nothing, and nobody gets a failure notice.
   if (!(await setTarget(targetId, postId, "failed", { errorCode: pe.code, errorMessage: pe.technical ?? pe.message }))) return;
+  // 1096: a post that never reached X doesn't use up the X allowance.
+  const { releaseXPost } = await import("../billing/entitlements");
+  await releaseXPost(targetId);
   if (pe.code === "AUTH_EXPIRED") {
     const t = await db.postTarget.findUnique({ where: { id: targetId }, select: { socialAccountId: true } });
     if (t?.socialAccountId) await db.socialAccount.update({ where: { id: t.socialAccountId }, data: { status: "needs_reconnect" } });

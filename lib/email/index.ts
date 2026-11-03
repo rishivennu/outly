@@ -369,6 +369,21 @@ export const templates = {
         tiles: pair({ tone: "ink", html: stat(esc(o.amount), "refunded", "ink") }, { tone: "white", html: rows([["Invoice", esc(o.number)], ...(o.creditNote ? [["Credit note", esc(o.creditNote)] as [string, string]] : []), ["Arrives", "5 to 7 days"]]) }, 46),
       },
     ),
+  /** 1096: before the plan ends (no auto-renew) or before the automatic charge (auto-renew on). */
+  renewalReminder: (o: { name: string; plan: string; date: string; amount: string; autoRenew: boolean; url: string }) =>
+    wrap(
+      o.autoRenew ? "Your plan renews soon" : "Your plan ends soon",
+      `${p(
+        o.autoRenew
+          ? `Hi ${esc(o.name)}, ${esc(o.plan)} renews automatically on ${esc(o.date)} and we'll charge ${esc(o.amount)} to the card or UPI mandate you set up. Nothing to do. Want to stop it? Turn off auto-renew in Billing before then.`
+          : `Hi ${esc(o.name)}, ${esc(o.plan)} is paid up to ${esc(o.date)}. Renew before then to keep your limits, or turn on auto-renew so you never have to think about it. If you don't, you move to the free plan and your work stays safe.`,
+      )}${btn(o.url, o.autoRenew ? "Manage billing" : "Renew now")}`,
+      {
+        kicker: "Billing",
+        tone: "cream",
+        tiles: pair({ tone: "white", html: stat(esc(o.date), o.autoRenew ? "next charge" : `${esc(o.plan)} ends`, "white", 30) }, { tone: "ink", html: stat(esc(o.amount), o.autoRenew ? "will be charged" : "to renew", "ink", 30) }, 58),
+      },
+    ),
   canceled: (o: { name: string; plan: string; until: string; url: string }) =>
     wrap(
       "Your plan won't renew",

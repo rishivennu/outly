@@ -284,9 +284,9 @@ export async function gemini<T>(system: string, prompt: string, opts: GeminiOpts
 const VOICE = `You are a warm, sharp creative collaborator for short-form video creators. Talk like a friend who is great at hooks. Never sound like a corporate tool. Use at most one emoji per line, and only when it adds energy.`;
 
 /** `opts` tunes the model call (the public Try it box passes a tight timeout and one model). */
-export async function generateHooks(story: string, tone: Tone, exclude: string[], opts: GeminiOpts & { onPart?: (p: HookPart) => void } = {}): Promise<HookResult> {
+export async function generateHooks(story: string, tone: Tone, exclude: string[], opts: GeminiOpts & { onPart?: (p: HookPart) => void; voice?: string } = {}): Promise<HookResult> {
   const fallback = offlineHooks(story, tone, exclude);
-  const { onPart, ...rest } = opts;
+  const { onPart, voice, ...rest } = opts;
   let said = false;
   let told = false;
   let sent = 0;
@@ -306,7 +306,7 @@ export async function generateHooks(story: string, tone: Tone, exclude: string[]
       };
   const toneLine = { default: "confident and curious", punchier: "shorter and sharper, under 10 words", professional: "polished and credible, no emoji, no slang", genz: "Gen Z voice, lowercase, playful, still clear" }[tone];
   const g = await gemini<{ understood: string; original: string; hooks: Hook[] }>(
-    VOICE,
+    VOICE + (voice ?? ""),
     `Creator says the video is about: """${story}"""\nTone: ${toneLine}.\nEach hook stops the scroll in 5-10 words and uses a DIFFERENT hook type from: ${DEFAULT_RULES.hooks.join("; ")}. No engagement bait, no em dashes, no facts that are not in the story.\nAvoid these hooks: ${JSON.stringify(exclude)}\nReturn JSON {"understood": one-sentence paraphrase showing you get it, "original": the plain un-optimised title, "hooks": [{"angle": 2-word label like "The twist", "text": hook, may use one \\n line break}] x3}`,
     call,
   );
@@ -315,7 +315,7 @@ export async function generateHooks(story: string, tone: Tone, exclude: string[]
   return { ...fallback, understood: asText(g.understood) || fallback.understood, original: asText(g.original) || fallback.original, hooks: hooks.slice(0, 3), source: "gemini" };
 }
 
-export async function generatePlatformCopy(story: string, hook: string, platforms: Platform[], opts: GeminiOpts & { onItem?: (c: PlatformCopy) => void } = {}): Promise<PlatformCopy[]> {
+export async function generatePlatformCopy(story: string, hook: string, platforms: Platform[], opts: GeminiOpts & { onItem?: (c: PlatformCopy) => void; voice?: string } = {}): Promise<PlatformCopy[]> {
   const rules = await captionRules();
   const tidy = (c: PlatformCopy): PlatformCopy => {
     const { copy } = polish(c.platform, { title: c.title, caption: c.caption, description: c.description, hashtags: c.hashtags }, rules);
@@ -337,7 +337,7 @@ export async function generatePlatformCopy(story: string, hook: string, platform
       why: formula ? { formula, hook: asText(m.hookType).slice(0, 40), cta: asText(m.cta).slice(0, 40), signal: asText(m.signal).slice(0, 60) } : undefined,
     });
   };
-  const { onItem, ...rest } = opts;
+  const { onItem, voice, ...rest } = opts;
   const done = new Set<Platform>();
   const call: GeminiOpts = !onItem
     ? rest
@@ -352,7 +352,7 @@ export async function generatePlatformCopy(story: string, hook: string, platform
         },
       };
   const raw = await gemini<{ items: Item[] } | Item[]>(
-    `${VOICE}\n\n${enginePrompt(rules, platforms)}`,
+    `${VOICE}${voice ?? ""}\n\n${enginePrompt(rules, platforms)}`,
     `Video story: """${story}"""\nChosen hook: """${hook}"""\nWrite captions for: ${platforms.join(", ")}. Build each one on the chosen hook, adapted to that platform's rules, with a DIFFERENT formula each time. youtube needs "title" and "description" (caption may be empty); the others need "caption".\nReturn JSON {"items":[{"platform","title"?,"caption","description"?,"hashtags": "#a #b","formula": formula name,"hookType": hook type,"cta": the CTA type,"signal": the signal it optimises for}]}`,
     call,
   );

@@ -7,6 +7,7 @@ import type { ConnectedProfile } from "./social/types";
 import type { ConnectDecision, ConnectIntent, KnownAccount } from "./connect-decision";
 import { decideConnect, pickIdentity } from "./connect-decision";
 import { entitlements } from "./billing/entitlements";
+import { isMultiAccount } from "./billing/plan-rules";
 
 /*
  * A connect that needs the creator's say (1095): the platform handed back an account this studio has seen
@@ -48,7 +49,7 @@ export async function resolveConnect(userId: string, platform: Platform, raw: Co
   const rows = await knownAccounts(userId, platform);
   const { alternatives, ...first } = raw;
   const prof = pickIdentity<ConnectedProfile>(first, (alternatives ?? []).map(({ alternatives: _drop, ...p }) => p), rows, intent, expectId);
-  const multi = (await entitlements(userId)).accountLimit > 0;
+  const multi = isMultiAccount(await entitlements(userId));
   return { prof, decision: decideConnect({ rows, platformUserId: prof.platformUserId, intent, expectId, multi }) };
 }
 

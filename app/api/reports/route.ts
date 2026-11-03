@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { route, HttpError } from "@/lib/http";
 import { buildClientReport } from "@/lib/reports/client-report-server";
 import { reportCsv, reportPdf } from "@/lib/reports/client-report";
+import { assertPerk } from "@/lib/billing/entitlements";
+import { analyticsWindow } from "@/lib/billing/plan-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +12,9 @@ export const GET = route(async (req, { user }) => {
   const q = req.nextUrl.searchParams;
   const format = q.get("format") ?? "pdf";
   if (format !== "csv" && format !== "pdf") throw new HttpError(400, "Pick csv or pdf.", "BAD_FORMAT");
-  const days = Math.min(90, Math.max(7, Number(q.get("days") ?? 30) || 30));
+  // 1096: CSV export and client PDFs are plan perks, and a report reads no further back than the plan's history.
+  const e = await assertPerk(user.id, format === "csv" ? "csv-export" : "client-reports");
+  const days = analyticsWindow(e, Number(q.get("days") ?? 30)).days;
   const r = await buildClientReport(user, days, q.get("account"));
   const stamp = new Date().toISOString().slice(0, 10);
   const slug = r.scope.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "all";

@@ -22,6 +22,10 @@ const RANGES = [
   { d: 7, label: "7 days", phrase: "this week" },
   { d: 30, label: "30 days", phrase: "this month" },
   { d: 90, label: "90 days", phrase: "these last three months" },
+  // 1096: longer history on the plans that include it (Creator 1 year, Agency 2 years).
+  { d: 180, label: "6 months", phrase: "these last six months" },
+  { d: 365, label: "1 year", phrase: "this past year" },
+  { d: 730, label: "2 years", phrase: "these last two years" },
 ];
 
 function CountUp({ value, format = compact, className }: { value: number; format?: (n: number) => string; className?: string }) {
@@ -46,21 +50,27 @@ function CountUp({ value, format = compact, className }: { value: number; format
  * lives on the tab bar above (analytics/layout.tsx, 1065), which stays put while the views under it change. */
 const FRAME = "mx-auto w-full max-w-[1320px] px-5 pb-20 sm:px-10";
 
-function RangePicker({ value, onPick }: { value: number; onPick: (d: number) => void }) {
+function RangePicker({ value, onPick, maxDays }: { value: number; onPick: (d: number) => void; maxDays: number }) {
+  const shown = RANGES.filter((r) => r.d <= maxDays);
   return (
-    <div role="radiogroup" aria-label="Time range" className="flex shrink-0 gap-1 rounded-full bg-secondary/60 p-1 hairline">
-      {RANGES.map((r) => (
+    <div role="radiogroup" aria-label="Time range" className="flex shrink-0 flex-wrap gap-1 rounded-full bg-secondary/60 p-1 hairline">
+      {shown.map((r) => (
         <button key={r.d} type="button" role="radio" aria-checked={value === r.d} onClick={() => onPick(r.d)} className={cn("relative h-11 rounded-full px-4 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", value === r.d ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
           {value === r.d && <motion.span layoutId="range" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
           <span className="relative">{r.label}</span>
         </button>
       ))}
+      {maxDays < 365 && (
+        <Link href="/billing" className="inline-flex h-11 items-center rounded-full px-4 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          More history
+        </Link>
+      )}
     </div>
   );
 }
 
 /** renderedAt: when the server built this page; a copy prefetched from the nav (1039) can be a while old. */
-export function AnalyticsView({ initial, connected, focusAccount = null, renderedAt }: { initial: AnalyticsSummary; connected: Partial<Record<Platform, boolean>>; focusAccount?: string | null; renderedAt?: number }) {
+export function AnalyticsView({ initial, connected, focusAccount = null, renderedAt, maxDays = 90, reports = { csv: true, pdf: true } }: { initial: AnalyticsSummary; connected: Partial<Record<Platform, boolean>>; focusAccount?: string | null; renderedAt?: number; maxDays?: number; reports?: { csv: boolean; pdf: boolean } }) {
   const [data, setData] = useState(initial);
   const live = useLivePlatforms();
   const [loading, setLoading] = useState(false);
@@ -90,7 +100,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
     // A copy prefetched from the nav may be a minute or two old: update it quietly (1039).
     else if (renderedAt && Date.now() - renderedAt > 30_000) void load(initial.rangeDays, null, true).catch(() => {});
     // The other ranges, so a switch doesn't wait on the server.
-    return whenIdle(() => RANGES.forEach((r) => r.d !== initial.rangeDays && warmApi(url(r.d, null))), 1200);
+    return whenIdle(() => RANGES.forEach((r) => r.d !== initial.rangeDays && r.d <= Math.min(maxDays, 90) && warmApi(url(r.d, null))), 1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const pick = (d: number) => (d === data.rangeDays ? undefined : load(d, drill));
@@ -179,8 +189,8 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
           </ul>
         </section>
         <div className="flex flex-wrap items-center gap-3">
-          <RangePicker value={data.rangeDays} onPick={pick} />
-          <ReportButtons days={data.rangeDays} account={drill} />
+          <RangePicker value={data.rangeDays} onPick={pick} maxDays={maxDays} />
+          <ReportButtons days={data.rangeDays} account={drill} csv={reports.csv} pdf={reports.pdf} />
         </div>
       </header>
 

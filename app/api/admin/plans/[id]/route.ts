@@ -4,6 +4,7 @@ import { adminRoute, adminEvent } from "@/lib/admin/route";
 import { PlanInput } from "@/lib/admin/schemas";
 import { revalidatePricing } from "@/lib/billing/plans";
 import { formatMoney } from "@/lib/billing/money";
+import { serializePerks } from "@/lib/billing/plan-rules";
 
 export const PATCH = adminRoute<{ params: { id: string } }>("pricing", async (req, { params, admin }) => {
   const before = await db.plan.findUnique({ where: { id: params.id } });
@@ -13,8 +14,17 @@ export const PATCH = adminRoute<{ params: { id: string } }>("pricing", async (re
     if (await db.payment.count({ where: { planId: before.id } })) throw new HttpError(409, "This plan has payments, so its slug is locked. Links and records depend on it.", "SLUG_LOCKED");
     if (await db.plan.findUnique({ where: { slug: d.slug } })) throw new HttpError(409, `Slug "${d.slug}" is taken.`, "DUPLICATE");
   }
-  const { features, prices, ...rest } = d;
-  const p = await db.plan.update({ where: { id: params.id }, data: { ...rest, ...(features ? { features: JSON.stringify(features) } : {}), ...(prices ? { prices: JSON.stringify(prices) } : {}) } });
+  const { features, prices, yearlyPrices, perks, ...rest } = d;
+  const p = await db.plan.update({
+    where: { id: params.id },
+    data: {
+      ...rest,
+      ...(features ? { features: JSON.stringify(features) } : {}),
+      ...(prices ? { prices: JSON.stringify(prices) } : {}),
+      ...(yearlyPrices ? { yearlyPrices: JSON.stringify(yearlyPrices) } : {}),
+      ...(perks !== undefined ? { perks: serializePerks(perks) } : {}),
+    },
+  });
   if (d.highlight) await db.plan.updateMany({ where: { id: { not: p.id } }, data: { highlight: false } });
   revalidatePricing();
   const priceMoved = d.priceMinor !== undefined && d.priceMinor !== before.priceMinor;

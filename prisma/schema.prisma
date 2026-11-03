@@ -83,6 +83,10 @@ model User {
   referral      Referral?  @relation("ReferralReceived")
   trustedDevices TrustedDevice[]
   sessions       UserSession[]
+  topUps         TopUp[]
+  experimentEvents ExperimentEvent[]
+  surveyResponses SurveyResponse[]
+  cancelFeedback  CancelFeedback[]
 
   @@index([lastSeenAt])
 }
@@ -339,6 +343,13 @@ model Plan {
   highlight  Boolean  @default(false)
   sortOrder  Int      @default(0)
   storageMb  Int      @default(0) // total storage on this plan (1052), 0 = no cap
+  yearlyPrices String @default("{}") // 1096: JSON { USD: 7000 } exact yearly prices per currency; missing = scaled from monthly
+  platformLimit Int   @default(0) // 1096: different platforms that can be connected, 0 = any
+  brandLimit Int      @default(0) // 1096: accounts per platform (a "brand" = one of each), 0 = accountLimit rules
+  xPostLimit Int      @default(0) // 1096: posts to X per calendar month, 0 = unlimited
+  analyticsDays Int   @default(0) // 1096: analytics history in days, 0 = the standard 90
+  fairUsePosts Int    @default(0) // 1096: soft monthly ceiling on unlimited posts (admin alert, never a block), 0 = none
+  perks      String   @default("") // 1096: JSON string[] of gated features; "" = every perk (plans made before 1096 keep everything)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -360,6 +371,9 @@ model Subscription {
   cancelAtPeriodEnd Boolean  @default(false)
   canceledAt       DateTime?
   pausedUntil      DateTime? // "pause for a month" instead of cancelling: no renewal charge until then
+  autoRenew        Boolean   @default(false) // 1096: renews by itself (Razorpay Subscriptions / UPI Autopay mandate is live)
+  providerSubId    String?   @unique // 1096: the gateway's subscription id while a mandate exists
+  remindedFor      String? // 1096: last renewal reminder sent, "<periodEnd ms>:<days>"
   sample           Boolean   @default(false)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -385,6 +399,9 @@ model Payment {
   status         String   @default("pending") // pending | succeeded | failed | refunded
   failureReason  String?
   sample         Boolean  @default(false)
+  purpose        String   @default("plan") // 1096: plan | topup | renewal
+  meta           String? // 1096: JSON, e.g. { pack, kind, units } for a top-up
+  variant        String? // 1096: price-test variant this checkout was priced with
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -699,6 +716,7 @@ model FeatureUse {
   feature   String // "reply" | "captions"
   period    String // "2026-W43" (weekly) or "2026-10" (monthly)
   ref       String
+  topUpId   String? // 1096: this use was paid from a top-up pack, refunded to it on release
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -904,4 +922,68 @@ model StorageCleanup {
 
   @@unique([deletionId, key])
   @@index([doneAt, nextAt])
+}
+
+/// 1096: a bought pack. ai/x packs are spent unit by unit after the plan allowance; brand/seat packs add room until expiresAt.
+model TopUp {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String // ai | x | brand | seat
+  pack      String // pack id from the "topups" setting
+  units     Int
+  remaining Int
+  paymentId String?  @unique
+  status    String   @default("active") // active | refunded
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind, status])
+}
+
+/// 1096: price test bookkeeping. One row per person, test and step (exposure | checkout | paid).
+model ExperimentEvent {
+  id         String   @id @default(cuid())
+  experiment String
+  variant    String
+  userId     String
+  kind       String
+  amountMinor Int     @default(0)
+  currency   String   @default("")
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([experiment, userId, kind])
+  @@index([experiment, kind])
+}
+
+/// 1096: Van Westendorp price survey answers, in minor units of `currency`.
+model SurveyResponse {
+  id        String   @id @default(cuid())
+  userId    String
+  survey    String
+  planSlug  String   @default("")
+  currency  String   @default("INR")
+  answers   String // JSON { tooCheap, cheap, expensive, tooExpensive, note? }
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, survey])
+  @@index([survey])
+}
+
+/// 1096: why someone cancelled, and whether they will talk to us about it.
+model CancelFeedback {
+  id        String   @id @default(cuid())
+  userId    String
+  planSlug  String
+  reason    String // one of CANCEL_REASONS (lib/billing/experiments-core.ts)
+  detail    String   @default("")
+  interview Boolean  @default(false)
+  contact   String?
+  status    String   @default("new") // new | contacted | done
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
 }

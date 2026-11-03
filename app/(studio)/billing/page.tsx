@@ -20,6 +20,7 @@ import { betaConfig, myBetaCode } from "@/lib/beta";
 import { myFounding, foundingPrice } from "@/lib/founding";
 import { trustBadges } from "@/lib/badges";
 import { refundStatus } from "@/lib/billing/guarantee";
+import { experimentPrice } from "@/lib/billing/experiments";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Billing" };
@@ -148,7 +149,17 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
 
   const visitor = await visitorCurrency((plans.find((p) => p.priceMinor > 0)?.currency as any) ?? "INR");
   // Price each card in what the gateway will actually charge; if that isn't the visitor's currency, show their amount as a hint.
-  const priced = plans.map((p) => {
+  // 1096: someone in a price test sees the tested price here (this is the exposure), the same number checkout charges.
+  const tests = await Promise.all(
+    plans.map((p) => {
+      const cur = chargeCurrency(gw.provider, visitor.currency, p.currency);
+      return p.priceMinor > 0 && cur === p.currency ? experimentPrice(user.id, p.slug, cur).catch(() => null) : null;
+    }),
+  );
+  const priced = plans.map((p0, i) => {
+    const t = tests[i];
+    // Same scaling as checkout: the monthly list price becomes the test price, yearly keeps its ratio.
+    const p = t ? { ...p0, priceMinor: t.priceMinor, yearlyMinor: p0.yearlyMinor ? Math.round((p0.yearlyMinor * t.priceMinor) / p0.priceMinor) : 0 } : p0;
     const lp = localPrice(p, chargeCurrency(gw.provider, visitor.currency, p.currency));
     const approx = lp.currency !== visitor.currency && p.priceMinor > 0 ? localPrice(p, visitor.currency) : null;
     // Yearly: same rules, so the number on the card is exactly what checkout charges.
@@ -174,7 +185,7 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
       plans={priced}
       currency={visitor.currency}
       currencySource={visitor.source}
-      current={sub ? { planSlug: sub.plan.slug, planName: sub.plan.name, priceMinor: sub.priceMinor, currency: sub.currency, interval: sub.interval, periodEnd: sub.currentPeriodEnd.toISOString(), cancelAtPeriodEnd: sub.cancelAtPeriodEnd, pausedUntil: sub.pausedUntil && sub.pausedUntil > new Date() ? sub.pausedUntil.toISOString() : null, provider: sub.provider } : null}
+      current={sub ? { planSlug: sub.plan.slug, planName: sub.plan.name, priceMinor: sub.priceMinor, currency: sub.currency, interval: sub.interval, periodEnd: sub.currentPeriodEnd.toISOString(), cancelAtPeriodEnd: sub.cancelAtPeriodEnd, pausedUntil: sub.pausedUntil && sub.pausedUntil > new Date() ? sub.pausedUntil.toISOString() : null, provider: sub.provider, autoRenew: sub.autoRenew } : null}
       beta={betaOffer}
       founding={founding}
       foundingStatus={searchParams.founding?.slice(0, 20) ?? null}

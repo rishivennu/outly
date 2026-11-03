@@ -5,6 +5,9 @@ import { HttpError } from "../http";
 import { env } from "../env";
 import { accessFor } from "./access";
 import { fitsStorage, fmtBytes, storageFigures, type AccessSource } from "./access-core";
+import { activeExtras, consumeCredit, creditsLeft, refundCredit } from "./topups";
+import type { TopUpKind } from "./topups-core";
+import { brandsBlock, fairUseCrossed, parsePerks, perkBlock, platformsBlock, type Perk } from "./plan-rules";
 
 export interface Entitlements {
   planSlug: string;
@@ -21,27 +24,38 @@ export interface Entitlements {
   storageMb: number; // total storage across all files; 0 = no cap (1052)
   source: AccessSource; // where the winning plan comes from (1052): paid, gift, admin, referral or free
   accessEndsAt: Date | null; // when that source ends (null for Free)
+  // 1096. Each 0 = not limited, perks null = every perk, so plans made before 1096 work as they did.
+  platformLimit: number; // different platforms connected at once
+  brandLimit: number; // accounts per platform (brands), plus extraBrands from packs
+  extraBrands: number;
+  extraSeats: number; // already included in `seats`
+  xPostLimit: number; // posts to X per calendar month (UTC)
+  analyticsDays: number;
+  fairUsePosts: number;
+  perks: Perk[] | null;
 }
 
 /** Which limit a 402 is about, so the upgrade popup can say the right thing. */
-export type LimitFeature = "posts" | "upload" | "replies" | "captions" | "burn" | "ai" | "seats" | "accounts" | "storage";
+export type LimitFeature = "posts" | "upload" | "replies" | "captions" | "burn" | "ai" | "seats" | "accounts" | "storage" | "platforms" | "brands" | "x" | "perk";
 
 const limit = (message: string, feature: LimitFeature) => new HttpError(402, message, "PLAN_LIMIT", { feature, upgrade: "/billing" });
 
-const UNLIMITED: Omit<Entitlements, "planSlug" | "planName"> = { postLimit: 0, postPeriod: "month", aiCaptions: true, seats: 0, maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true, accountLimit: 0, storageMb: 0, source: "free", accessEndsAt: null };
+const UNLIMITED: Omit<Entitlements, "planSlug" | "planName"> = { postLimit: 0, postPeriod: "month", aiCaptions: true, seats: 0, maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true, accountLimit: 0, storageMb: 0, source: "free", accessEndsAt: null, platformLimit: 0, brandLimit: 0, extraBrands: 0, extraSeats: 0, xPostLimit: 0, analyticsDays: 0, fairUsePosts: 0, perks: null };
 
 /**
  * What this account may do (1052): the best plan live right now across paid and gift subscriptions, admin
  * grants and referral rewards (lib/billing/access.ts), else the Free plan, else no limits.
  */
 export async function entitlements(userId: string): Promise<Entitlements> {
-  const { best } = await accessFor(userId);
+  const [{ best }, extras] = await Promise.all([accessFor(userId), activeExtras(userId)]);
   if (!best) return { planSlug: "free", planName: "Free", ...UNLIMITED };
   const plan = best.plan;
   return {
     planSlug: plan.slug, planName: plan.name, postLimit: plan.postLimit, postPeriod: plan.postPeriod === "week" ? "week" : "month",
-    aiCaptions: plan.aiCaptions, seats: plan.seats, maxUploadMb: plan.maxUploadMb, replyLimit: plan.replyLimit, captionVideos: plan.captionVideos, burnCaptions: plan.burnCaptions, accountLimit: plan.accountLimit ?? 0,
+    aiCaptions: plan.aiCaptions, seats: plan.seats + extras.seats, maxUploadMb: plan.maxUploadMb, replyLimit: plan.replyLimit, captionVideos: plan.captionVideos, burnCaptions: plan.burnCaptions, accountLimit: plan.accountLimit ?? 0,
     storageMb: plan.storageMb ?? 0, source: best.source, accessEndsAt: best.endsAt,
+    platformLimit: plan.platformLimit ?? 0, brandLimit: plan.brandLimit ?? 0, extraBrands: (plan.brandLimit ?? 0) > 0 ? extras.brands : 0, extraSeats: extras.seats,
+    xPostLimit: plan.xPostLimit ?? 0, analyticsDays: plan.analyticsDays ?? 0, fairUsePosts: plan.fairUsePosts ?? 0, perks: parsePerks(plan.perks),
   };
 }
 
@@ -102,7 +116,7 @@ const isClash = (err: unknown) => (err as { code?: string } | null)?.code === "P
  * instant may both back out; that errs on the safe side and a retry goes through.)
  * `fresh:false` = this ref was already counted this period (a retry). `release()` gives the slot back.
  */
-async function reserve(userId: string, feature: string, period: string, ref: string, max: number, onFull: () => HttpError) {
+async function reserve(userId: string, feature: string, period: string, ref: string, max: number, onFull: () => HttpError, credit?: TopUpKind) {
   const key = ref.slice(0, 120);
   // Cheap look first, so an ordinary retry doesn't make Prisma log a unique-constraint error.
   if (await db.featureUse.findFirst({ where: { userId, feature, period, ref: key }, select: { id: true } })) return { fresh: false, release: async () => {} };
@@ -116,8 +130,14 @@ async function reserve(userId: string, feature: string, period: string, ref: str
   const release = async () => { await db.featureUse.deleteMany({ where: { id: row.id } }); };
   const n = await db.featureUse.count({ where: { userId, feature, period } });
   if (n > max) {
-    await release();
-    throw onFull();
+    // 1096: over the plan's allowance, a top-up pack pays for this one use (and gets it back on release).
+    const pack = credit ? await consumeCredit(userId, credit) : null;
+    if (!pack) {
+      await release();
+      throw onFull();
+    }
+    await db.featureUse.update({ where: { id: row.id }, data: { topUpId: pack } });
+    return { fresh: true, release: async () => { await release(); await refundCredit(pack); } };
   }
   return { fresh: true, release };
 }
@@ -129,7 +149,14 @@ async function reserve(userId: string, feature: string, period: string, ref: str
  */
 export async function spendPost(userId: string, postId: string, now = new Date()) {
   const u = await postUsage(userId, now);
-  if (u.postLimit <= 0) return { fresh: false, release: async () => {} };
+  if (u.postLimit <= 0) {
+    // 1096: "unlimited" plans with a fair-use line never block; crossing it once a period tells the admin.
+    if (fairUseCrossed(u.fairUsePosts, u.used, u.used + 1)) {
+      const { adminEvent } = await import("../admin/route");
+      await adminEvent("fair_use", `Fair use passed on ${u.planName}`, `An account passed ${u.fairUsePosts} posts this ${u.postPeriod}. Nothing was blocked.`, `/admin/users?q=${userId}`);
+    }
+    return { fresh: false, release: async () => {} };
+  }
   const p = u.postPeriod;
   const full = () => limit(`You've used all ${u.postLimit} posts on ${u.planName} ${thisPeriod(p)}. Upgrade to post more, or ${resetHint(p)}.`, "posts");
   // Posts sent before slots existed still count (legacy), so the room left is postLimit minus those.
@@ -225,8 +252,8 @@ export const CHUNKS_PER_CAPTION_VIDEO = 15;
 /** Videos with AI captions this month. One video (ref) can be transcribed in many chunks and re-run; it counts once. */
 export async function captionUsage(userId: string, now = new Date()) {
   const e = await entitlements(userId);
-  const used = e.captionVideos > 0 ? await db.featureUse.count({ where: { userId, feature: "captions", period: periodKey("month", now) } }) : 0;
-  return { ...e, used, left: e.captionVideos > 0 ? Math.max(0, e.captionVideos - used) : Infinity };
+  const [used, credits] = e.captionVideos > 0 ? await Promise.all([db.featureUse.count({ where: { userId, feature: "captions", period: periodKey("month", now) } }), creditsLeft(userId, "ai", now)]) : [0, 0];
+  return { ...e, used, credits, left: e.captionVideos > 0 ? Math.max(0, e.captionVideos - used) + credits : Infinity };
 }
 
 /**
@@ -240,14 +267,16 @@ export async function assertCaptionVideo(userId: string, ref: string, now = new 
   const period = periodKey("month", now);
   const key = ref.slice(0, 120) || "unknown";
   const seen = await db.featureUse.findFirst({ where: { userId, feature: "captions", period, ref: key }, select: { id: true } });
-  const full = () => limit(`${e.planName} includes AI captions on ${e.captionVideos} video${e.captionVideos === 1 ? "" : "s"} a month and you've used them. Upgrade for unlimited captions, or type them yourself.`, "captions");
+  const full = () => limit(`${e.planName} includes AI on ${e.captionVideos} video${e.captionVideos === 1 ? "" : "s"} a month and you've used them. Add a top-up, upgrade, or type captions yourself.`, "captions");
   // The video ref comes from the browser (the clip isn't uploaded yet), so the audio itself is metered too:
   // every chunk takes a slot from a monthly budget the server owns. Reusing one ref can't stretch 2 videos into 20.
-  const chunk = await reserve(userId, "caption-chunk", period, randomUUID(), e.captionVideos * CHUNKS_PER_CAPTION_VIDEO, full);
+  // 1096: AI top-up packs widen the chunk budget by the videos they can still pay for.
+  const extra = await creditsLeft(userId, "ai", now);
+  const chunk = await reserve(userId, "caption-chunk", period, randomUUID(), (e.captionVideos + extra) * CHUNKS_PER_CAPTION_VIDEO, full);
   if (seen) return { ...e, release: chunk.release };
   let video: Awaited<ReturnType<typeof reserve>>;
   try {
-    video = await reserve(userId, "captions", period, key, e.captionVideos, full);
+    video = await reserve(userId, "captions", period, key, e.captionVideos, full, "ai");
   } catch (err) {
     await chunk.release();
     throw err;
@@ -275,4 +304,74 @@ export function checkAccounts(e: Pick<Entitlements, "accountLimit" | "planName">
 export function checkSeats(e: Pick<Entitlements, "seats" | "planName">, taken: number) {
   if (taken >= e.seats)
     throw limit(e.seats === 0 ? `${e.planName} doesn't include team seats. Upgrade in Billing to invite people.` : `${e.planName} includes ${e.seats} seat${e.seats === 1 ? "" : "s"} and they're all taken. Remove someone or upgrade.`, "seats");
+}
+
+// ------------------------------------------------------------------ 1096
+
+/** Free connects "any 3 platforms". Reconnecting one already in use is always fine. */
+export function checkPlatforms(e: Pick<Entitlements, "platformLimit" | "planName">, connected: readonly string[], platform: string) {
+  const m = platformsBlock(e, connected, platform);
+  if (m) throw limit(m, "platforms");
+}
+
+/** Brands: up to brandLimit (+ packs) accounts on each platform. */
+export function checkBrands(e: Pick<Entitlements, "brandLimit" | "extraBrands" | "planName">, onPlatform: number, platform: string) {
+  const m = brandsBlock(e, onPlatform, platform);
+  if (m) throw limit(m, "brands");
+}
+
+export function checkPerkOn(e: Pick<Entitlements, "perks" | "planName">, perk: Perk) {
+  const m = perkBlock(e, perk);
+  if (m) throw limit(m, "perk");
+}
+
+/** Throws the upgrade popup when this account's plan doesn't include `perk`. */
+export async function assertPerk(userId: string, perk: Perk) {
+  const e = await entitlements(userId);
+  checkPerkOn(e, perk);
+  return e;
+}
+
+/** Posts to X this month (1096). X charges per post, so capped plans count every X destination sent. */
+export async function xPostUsage(userId: string, now = new Date()) {
+  const e = await entitlements(userId);
+  const [used, credits] = e.xPostLimit > 0 ? await Promise.all([db.featureUse.count({ where: { userId, feature: "x-post", period: periodKey("month", now) } }), creditsLeft(userId, "x", now)]) : [0, 0];
+  return { ...e, used, credits, left: e.xPostLimit > 0 ? Math.max(0, e.xPostLimit - used) + credits : Infinity };
+}
+
+/**
+ * An X destination that failed for good gives its slot back (and the pack unit that paid for it, if any).
+ * Sending it again counts again. Never throws: it runs inside the failure path.
+ */
+export async function releaseXPost(targetId: string) {
+  try {
+    const rows = await db.featureUse.findMany({ where: { feature: "x-post", ref: targetId.slice(0, 120) }, select: { id: true, topUpId: true } });
+    for (const r of rows) {
+      const gone = await db.featureUse.deleteMany({ where: { id: r.id } });
+      if (gone.count === 1 && r.topUpId) await refundCredit(r.topUpId);
+    }
+  } catch (e) {
+    console.error("[x-post release]", targetId, e);
+  }
+}
+
+/**
+ * Holds one X post per X destination (`refs` = target ids) for this month, before the launch claim. A
+ * destination already counted this month costs nothing again (retry, reschedule). Past the plan's allowance
+ * an X top-up pack pays. Returns release() to give back every slot this call took.
+ */
+export async function spendXPosts(userId: string, refs: string[], now = new Date()) {
+  const none = { fresh: false, release: async () => {} };
+  if (!refs.length) return none;
+  const e = await entitlements(userId);
+  if (e.xPostLimit <= 0) return none;
+  const full = () => limit(`${e.planName} includes ${e.xPostLimit} posts to X a month and they're used up. Add an X top-up, upgrade, or untick X for this one.`, "x");
+  const held: Awaited<ReturnType<typeof reserve>>[] = [];
+  try {
+    for (const ref of refs) held.push(await reserve(userId, "x-post", periodKey("month", now), ref, e.xPostLimit, full, "x"));
+  } catch (err) {
+    for (const h of held) if (h.fresh) await h.release();
+    throw err;
+  }
+  return { fresh: held.some((h) => h.fresh), release: async () => { for (const h of held) if (h.fresh) await h.release(); } };
 }

@@ -232,6 +232,12 @@ export const paypal = {
 
 // ---------------------------------------------------------------- razorpay (REST + Checkout.js)
 const basic = (cfg: PaymentConfig) => "Basic " + Buffer.from(`${cfg.razorpay.keyId}:${cfg.razorpay.keySecret}`).toString("base64");
+async function rzp(cfg: PaymentConfig, path: string, body: unknown) {
+  const r = await fetch(`https://api.razorpay.com${path}`, { method: "POST", headers: { authorization: basic(cfg), "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000) });
+  const j: any = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j?.error?.description ?? `Razorpay ${r.status}`);
+  return j;
+}
 export const razorpay = {
   async start(cfg: PaymentConfig, a: StartArgs): Promise<CheckoutStart> {
     const r = await fetch("https://api.razorpay.com/v1/orders", {
@@ -264,6 +270,22 @@ export const razorpay = {
   verifyWebhook(secret: string, raw: string, sig: string | null) {
     if (!sig || !secret) return false;
     return safeEqual(createHmac("sha256", secret).update(raw).digest("hex"), sig);
+  },
+  /** 1096 auto-renew (Razorpay Subscriptions, cards and UPI Autopay): a plan per price point, made on first use. */
+  async createPlan(cfg: PaymentConfig, a: { amountMinor: number; currency: string; interval: "month" | "year"; name: string }) {
+    const j = await rzp(cfg, "/v1/plans", { period: a.interval === "year" ? "yearly" : "monthly", interval: 1, item: { name: `Outlly ${a.name}`.slice(0, 60), amount: a.amountMinor, currency: a.currency } });
+    return j.id as string;
+  },
+  /**
+   * The customer approves the mandate at `shortUrl`; the first charge lands at `startAt` (the end of the
+   * period they already paid for), so nobody is charged twice for the same month.
+   */
+  async createSubscription(cfg: PaymentConfig, a: { planId: string; startAt: Date; totalCount: number; notes: Record<string, string> }) {
+    const j = await rzp(cfg, "/v1/subscriptions", { plan_id: a.planId, total_count: a.totalCount, start_at: Math.floor(a.startAt.getTime() / 1000), customer_notify: 1, notes: a.notes });
+    return { id: j.id as string, shortUrl: (j.short_url as string | undefined) ?? null };
+  },
+  async cancelSubscription(cfg: PaymentConfig, subId: string) {
+    await rzp(cfg, `/v1/subscriptions/${encodeURIComponent(subId)}/cancel`, { cancel_at_cycle_end: 0 });
   },
   async test(cfg: PaymentConfig) {
     const { keyId, keySecret } = cfg.razorpay;

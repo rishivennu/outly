@@ -8,7 +8,7 @@ import type { Currency } from "./money";
 export type Cycle = "month" | "year";
 export const isCycle = (v: unknown): v is Cycle => v === "month" || v === "year";
 
-type PlanLike = { priceMinor: number; currency: string; interval: string; yearlyMinor?: number; prices?: Partial<Record<Currency, number>> };
+type PlanLike = { priceMinor: number; currency: string; interval: string; yearlyMinor?: number; prices?: Partial<Record<Currency, number>>; yearlyPrices?: Partial<Record<Currency, number>> };
 
 /** Does this plan have a yearly option? Only monthly paid plans do (a yearly plan is already yearly). */
 export const hasYearly = (p: { priceMinor: number; interval: string }, enabled: boolean) => enabled && p.interval === "month" && p.priceMinor > 0;
@@ -31,6 +31,9 @@ export function priceFor(p: PlanLike, target: Currency, cycle: Cycle, freeMonths
   const base = isCurrency(p.currency) ? p.currency : "INR";
   const y = yearlyBase(p, freeMonths);
   if (target === base) return { priceMinor: y, currency: base, converted: false, interval: "year" };
+  // 1096: an exact yearly price the admin set for this currency wins over scaling.
+  const set = p.yearlyPrices?.[target];
+  if (set && set > 0) return { priceMinor: set, currency: target, converted: false, interval: "year" };
   return { priceMinor: nicePrice(Math.round((m.priceMinor * y) / p.priceMinor), target), currency: target, converted: true, interval: "year" };
 }
 

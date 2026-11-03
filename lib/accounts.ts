@@ -6,7 +6,8 @@ import { HttpError } from "./http";
 import type { Platform } from "./domain";
 import type { ConnectedProfile } from "./social/types";
 import { dmsOn } from "./social/keys";
-import { checkAccounts, entitlements } from "./billing/entitlements";
+import { checkAccounts, checkBrands, checkPlatforms, entitlements } from "./billing/entitlements";
+import { isMultiAccount } from "./billing/plan-rules";
 
 /**
  * Store a connected account, keyed by the platform's stable id: a row is only ever updated by the same
@@ -32,9 +33,21 @@ export async function saveConnectedAccount(userId: string, platform: Platform, p
   // Count and write in one serializable transaction, so two connects finishing at once can't both take the last place.
   const acct = await db.$transaction(
     async (tx) => {
-      if (e.accountLimit > 0) {
-        const others = await tx.socialAccount.count({ where: { userId, status: { not: "disconnected" }, NOT: { platform, platformUserId: prof.platformUserId } } });
-        checkAccounts(e, others);
+      // 1096: Free connects any N platforms; a platform already in use can always be reconnected or swapped.
+      if (e.platformLimit > 0) {
+        const live = await tx.socialAccount.findMany({ where: { userId, status: { not: "disconnected" } }, select: { platform: true } });
+        checkPlatforms(e, live.map((a) => a.platform), platform);
+      }
+      if (isMultiAccount(e)) {
+        if (e.accountLimit > 0) {
+          const others = await tx.socialAccount.count({ where: { userId, status: { not: "disconnected" }, NOT: { platform, platformUserId: prof.platformUserId } } });
+          checkAccounts(e, others);
+        }
+        // 1096 brands: N brands = up to N accounts on each platform.
+        if (e.brandLimit > 0) {
+          const onPlatform = await tx.socialAccount.count({ where: { userId, platform, status: { not: "disconnected" }, NOT: { platformUserId: prof.platformUserId } } });
+          checkBrands(e, onPlatform, platform);
+        }
       } else {
         const others = await tx.socialAccount.findMany({ where: { userId, platform, status: { not: "disconnected" }, NOT: { platformUserId: prof.platformUserId } }, select: { username: true } });
         if (others.length && !opts.replace) throw new HttpError(409, `${others[0].username} is connected on this platform. Replace it first.`, "REPLACE_NEEDED");

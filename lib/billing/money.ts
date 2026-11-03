@@ -1,4 +1,6 @@
 /** Client-safe money helpers. Amounts are always integer minor units. */
+import type { Perk } from "./plan-rules";
+
 export const CURRENCIES = ["INR", "USD", "EUR", "GBP", "CAD", "AUD", "SGD", "AED"] as const;
 export type Currency = (typeof CURRENCIES)[number];
 
@@ -53,6 +55,20 @@ export interface PublicPlan {
   accountLimit: number;
   /** Total storage across all files in MB; 0 = no cap. */
   storageMb: number;
+  /** 1096. Exact yearly prices in other currencies (minor units); missing ones scale from the monthly price. */
+  yearlyPrices: Partial<Record<Currency, number>>;
+  /** Different platforms connected at once; 0 = every platform. */
+  platformLimit: number;
+  /** Accounts (brands) per platform; 0 = the older rules (one per platform, or accountLimit). */
+  brandLimit: number;
+  /** Posts to X per month; 0 = no X cap. */
+  xPostLimit: number;
+  /** Days of analytics history; 0 = the default 90. */
+  analyticsDays: number;
+  /** "Unlimited" posts past this many a period notify the admin; never blocks. 0 = off. */
+  fairUsePosts: number;
+  /** Extra features on the plan; null = every one. */
+  perks: Perk[] | null;
 }
 
 /**
@@ -63,7 +79,13 @@ export function planFeatures(p: Pick<PublicPlan, "features" | "accountLimit">): 
   const n = p.accountLimit ?? 0;
   if (n <= 0) return p.features;
   const line = `Up to ${n} connected accounts`;
-  const rest = p.features.filter((f) => !/\bconnected accounts?\b/i.test(f));
+  // A line that leads with the account count ("10 accounts, 5 team seats") keeps only the rest, so the card
+  // never says the number twice (1096).
+  const rest = p.features
+    .filter((f) => !/\bconnected accounts?\b/i.test(f))
+    .map((f) => f.replace(/^\s*(up to\s+)?\d+\s+accounts?\s*(,|and|\+|·)\s*/i, ""))
+    .map((f) => (f ? f[0].toUpperCase() + f.slice(1) : f))
+    .filter((f) => f && !/^\s*(up to\s+)?\d+\s+accounts?\s*$/i.test(f));
   const at = rest.findIndex((f) => /^everything in\b/i.test(f));
   return at === 0 ? [rest[0], line, ...rest.slice(1)] : [line, ...rest];
 }

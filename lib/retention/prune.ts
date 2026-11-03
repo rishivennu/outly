@@ -3,10 +3,11 @@ import { pruneDeletions } from "../account-cleanup";
 import { db } from "../db";
 import { storage } from "../storage";
 import { DRAFT_TTL_DAYS } from "../domain";
+import { MAX_ANALYTICS_DAYS } from "../billing/plan-rules";
 
 /**
  * Housekeeping: rows nobody reads any more. Logs and admin noise go after 90 days, per-post metric
- * samples after 180 (the charts only look back 12 weeks), expired sign-in codes after a day.
+ * samples after MAX_ANALYTICS_DAYS (2 years, the longest plan history, 1096), expired sign-in codes after a day.
  * Drafts nobody has touched for DRAFT_TTL_DAYS go too, with their video when no other post uses it
  * (the browser keeps its own copy, see lib/client/device-drafts.ts).
  * Run from the retention cron; every delete is a plain window on a timestamp, so it is safe to repeat.
@@ -72,7 +73,8 @@ export async function pruneOldData(now: Date = new Date()) {
     db.emailLog.deleteMany({ where: { createdAt: { lt: before(90) } } }),
     db.adminEvent.deleteMany({ where: { createdAt: { lt: before(90) } } }),
     db.behaviorAnalysis.deleteMany({ where: { createdAt: { lt: before(90) } } }),
-    db.targetMetric.deleteMany({ where: { capturedAt: { lt: before(180) } } }),
+    // 1096: plans can read up to 2 years of analytics, so samples stay that long (was 180 days).
+    db.targetMetric.deleteMany({ where: { capturedAt: { lt: before(MAX_ANALYTICS_DAYS) } } }),
     db.otpCode.deleteMany({ where: { createdAt: { lt: before(1) } } }),
     pruneDetachedInvoices(now),
     db.dmMessage.deleteMany({ where: { sentAt: { lt: before(DM_KEEP_DAYS) } } }),

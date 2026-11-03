@@ -17,9 +17,13 @@ import { sendEmail, templates } from "../email";
 import { mock, paypal, razorpay, stripe, youpi, type CheckoutStart } from "./providers";
 import { youpiReady, youpiVerdict, type YoupiVerdict } from "./youpi";
 import { revokeReferralForPayment, rewardReferredFriend } from "../referral";
-import { expireGrants, restackReferralGrants } from "./access";
+import { accessFor, expireGrants, restackReferralGrants } from "./access";
 import { GIFT_PROVIDERS, isPaidSub } from "./access-core";
 import { isPaused, pausePlan, resumePlan } from "./pause";
+import { experimentPrice, parseVariantTag, recordExperiment, variantTag } from "./experiments";
+import { normalizeTopups, packBlock, packExpiry, packPrice } from "./topups-core";
+import { refundTopUp } from "./topups";
+import { dropMandate, dropMandates } from "./autorenew";
 
 /** Which gateway serves checkout right now. Falls back to mock if the chosen one is missing keys, and says so. */
 export async function activeGateway() {
@@ -73,11 +77,14 @@ export async function startCheckout(userId: string, planSlug: string, wanted?: C
 
   const { cfg, provider } = await activeGateway();
   if (provider === "mock" && !mockAllowed()) throw new HttpError(503, "Payments are being set up. Paid plans open shortly.", "GATEWAY");
-  const listed = priceFor({ ...plan, prices: parsePrices(plan.prices) }, chargeCurrency(provider, wanted ?? (isCurrency(plan.currency) ? plan.currency : "INR"), plan.currency), want, display.freeMonths);
+  const listed = priceFor({ ...plan, prices: parsePrices(plan.prices), yearlyPrices: parsePrices(plan.yearlyPrices) }, chargeCurrency(provider, wanted ?? (isCurrency(plan.currency) ? plan.currency : "INR"), plan.currency), want, display.freeMonths);
   // Founding members (1036): the discount they claimed with, on every paid plan and cycle, for life.
   // 1067: someone this payment would seat (a founding spot is open for them) pays the founding price too.
+  // 1096: a price test in this currency replaces the list price for the people in it (same yearly ratio).
+  const test = listed.currency === plan.currency ? await experimentPrice(user.id, plan.slug, listed.currency, { expose: false }) : null; // exposure is logged where the price is shown (billing page)
+  const tested = test && plan.priceMinor > 0 ? { ...listed, priceMinor: Math.round((listed.priceMinor * test.priceMinor) / plan.priceMinor) } : listed;
   const fpct = await foundingPctFor(user.id);
-  const charge = fpct ? { ...listed, priceMinor: foundingPrice(listed.priceMinor, fpct) } : listed;
+  const charge = fpct ? { ...tested, priceMinor: foundingPrice(tested.priceMinor, fpct) } : tested;
   // Reuse a recent pending attempt for the same plan, so double-clicks don't create duplicate payments.
   const recent = await db.payment.findFirst({
     where: { userId, planId: plan.id, status: "pending", provider, interval: charge.interval, createdAt: { gt: new Date(Date.now() - 20 * 60_000) } },
@@ -86,7 +93,8 @@ export async function startCheckout(userId: string, planSlug: string, wanted?: C
   const payment =
     recent && recent.amountMinor === charge.priceMinor && recent.currency === charge.currency
       ? recent
-      : await db.payment.create({ data: { userId, planId: plan.id, amountMinor: charge.priceMinor, currency: charge.currency, interval: charge.interval, provider, status: "pending" } });
+      : await db.payment.create({ data: { userId, planId: plan.id, amountMinor: charge.priceMinor, currency: charge.currency, interval: charge.interval, provider, status: "pending", ...(test ? { variant: variantTag(test) } : {}) } });
+  if (test) await recordExperiment({ experiment: test.experiment, variant: test.variant, userId, kind: "checkout", amountMinor: charge.priceMinor, currency: charge.currency });
 
   const args = { paymentId: payment.id, amountMinor: payment.amountMinor, currency: payment.currency, planName: charge.interval === "year" && plan.interval !== "year" ? `${plan.name} (yearly)` : plan.name, user: { name: user.name, email: user.email }, appUrl: env.APP_URL };
   let start: CheckoutStart;
@@ -103,6 +111,66 @@ export async function startCheckout(userId: string, planSlug: string, wanted?: C
   }
   if ("providerRef" in start && start.providerRef) await db.payment.update({ where: { id: payment.id }, data: { providerRef: start.providerRef } }).catch(() => {});
   return { ...start, paymentId: payment.id };
+}
+
+/** 1096: the packs on sale, and whether this person may buy them. */
+export async function topUpOffer(userId: string) {
+  const cfg = normalizeTopups(await getConfig("topups"));
+  const { best } = await accessFor(userId);
+  const planSlug = best?.plan.slug ?? "free";
+  const paid = !!best && best.plan.priceMinor > 0;
+  return { cfg, planSlug, paid, packs: cfg.packs.map((p) => ({ ...p, block: packBlock(cfg, p, planSlug, paid) })) };
+}
+
+/** 1096: one usage pack, paid like a plan but it never touches the subscription. */
+export async function startTopUp(userId: string, packId: string, wanted?: Currency): Promise<CheckoutStart & { paymentId: string }> {
+  const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
+  const offer = await topUpOffer(userId);
+  const pack = offer.cfg.packs.find((p) => p.id === packId);
+  const block = packBlock(offer.cfg, pack, offer.planSlug, offer.paid);
+  if (block || !pack) throw new HttpError(409, block ?? "That pack isn't on sale.", "TOPUP_UNAVAILABLE");
+  const { cfg, provider } = await activeGateway();
+  if (provider === "mock" && !mockAllowed()) throw new HttpError(503, "Payments are being set up. Top-ups open shortly.", "GATEWAY");
+  const price = packPrice(pack, chargeCurrency(provider, wanted ?? "INR", "INR"));
+  const meta = JSON.stringify({ pack: pack.id, kind: pack.kind, units: pack.units, days: pack.days, label: pack.label });
+  const recent = await db.payment.findFirst({ where: { userId, purpose: "topup", meta, status: "pending", provider, createdAt: { gt: new Date(Date.now() - 20 * 60_000) } }, orderBy: { createdAt: "desc" } });
+  const payment =
+    recent && recent.amountMinor === price.priceMinor && recent.currency === price.currency
+      ? recent
+      : await db.payment.create({ data: { userId, amountMinor: price.priceMinor, currency: price.currency, interval: "month", provider, status: "pending", purpose: "topup", meta } });
+  const args = { paymentId: payment.id, amountMinor: payment.amountMinor, currency: payment.currency, planName: `Top-up: ${pack.label}`, user: { name: user.name, email: user.email }, appUrl: env.APP_URL };
+  let start: CheckoutStart;
+  try {
+    start =
+      provider === "stripe" ? await stripe.start(cfg, args)
+      : provider === "razorpay" ? await razorpay.start(cfg, args)
+      : provider === "paypal" ? await paypal.start(cfg, args)
+      : provider === "youpi" ? await youpi.start(cfg, args)
+      : await mock.start(args);
+  } catch (e) {
+    await failPayment(payment.id, `Gateway error: ${(e as Error).message}`);
+    throw new HttpError(502, "The payment gateway didn't respond. You were not charged. Try again in a minute.", "GATEWAY");
+  }
+  if ("providerRef" in start && start.providerRef) await db.payment.update({ where: { id: payment.id }, data: { providerRef: start.providerRef } }).catch(() => {});
+  return { ...start, paymentId: payment.id };
+}
+
+/** Paid top-up: flip the payment once, then exactly one pack (paymentId is unique, so a retry finds it). */
+async function completeTopUp(p: { id: string; userId: string; meta: string | null; amountMinor: number; currency: string; sample: boolean }, providerRef?: string) {
+  let m: { pack?: string; kind?: string; units?: number; days?: number; label?: string } = {};
+  try { m = JSON.parse(p.meta ?? "{}"); } catch { /* checked below */ }
+  if (!m.pack || !m.kind || !m.units) throw new Error("Top-up payment has no pack");
+  const pack = { kind: m.kind, pack: m.pack, units: m.units, days: m.days ?? 90 };
+  // Flip and pack in one transaction: the money is never marked in without the pack (and a racing webhook sees count 0).
+  const flipped = await db.$transaction(async (tx) => {
+    const r = await tx.payment.updateMany({ where: { id: p.id, status: { in: ["pending", "failed"] } }, data: { status: "succeeded", failureReason: null, ...(providerRef ? { providerRef } : {}) } });
+    if (r.count === 1) await tx.topUp.create({ data: { userId: p.userId, kind: pack.kind, pack: pack.pack, units: pack.units, remaining: pack.units, paymentId: p.id, expiresAt: packExpiry({ days: pack.days }) } });
+    return r;
+  });
+  const fresh = await db.payment.findUniqueOrThrow({ where: { id: p.id } });
+  const invoice = flipped.count === 1 ? await invoiceFor(fresh) : await db.invoice.findUnique({ where: { paymentId: p.id } });
+  if (flipped.count === 1 && !p.sample) await adminEvent("topup", `Top-up bought: ${m.label ?? m.pack}`, formatMoney(p.amountMinor, p.currency), "/admin/payments");
+  return { payment: fresh, invoice };
 }
 
 /**
@@ -137,11 +205,13 @@ export async function completePayment(paymentId: string, providerRef?: string) {
   const p = await db.payment.findUnique({ where: { id: paymentId } });
   if (!p) throw new HttpError(404, "Payment not found", "NOT_FOUND");
   // Already paid. If its invoice failed last time, this repeat (webhook retry, return URL) issues it now.
-  if (p.status === "succeeded") return { payment: p, invoice: (await db.invoice.findUnique({ where: { paymentId } })) ?? (p.subscriptionId ? await invoiceFor(p) : null) };
+  if (p.status === "succeeded") return { payment: p, invoice: (await db.invoice.findUnique({ where: { paymentId } })) ?? (p.subscriptionId || p.purpose === "topup" ? await invoiceFor(p) : null) };
+  if (p.purpose === "topup") return completeTopUp(p, providerRef);
   if (!p.planId) throw new Error("Payment has no plan");
   const plan = await db.plan.findUniqueOrThrow({ where: { id: p.planId } });
   const now = new Date();
 
+  let replaced: string[] = []; // 1096: a replaced plan's auto-renew mandate must stop, or it would charge again
   const sub = await db.$transaction(async (tx) => {
     // flip pending -> succeeded only once (a racing webhook sees count 0 and stops)
     const flipped = await tx.payment.updateMany({ where: { id: p.id, status: { in: ["pending", "failed"] } }, data: { status: "succeeded", failureReason: null, ...(providerRef ? { providerRef } : {}) } });
@@ -154,6 +224,7 @@ export async function completePayment(paymentId: string, providerRef?: string) {
     const previous = paid.filter((s) => s.status === "active" && s.currentPeriodEnd > now).sort((a, b) => b.currentPeriodEnd.getTime() - a.currentPeriodEnd.getTime())[0] ?? null;
     const carry = carryOverMs(previous, { priceMinor: p.amountMinor, currency: p.currency, interval, sample: p.sample }, now);
     if (paid.length) await tx.subscription.updateMany({ where: { id: { in: paid.map((s) => s.id) } }, data: { status: "canceled", canceledAt: now } });
+    replaced = paid.filter((s) => s.providerSubId).map((s) => s.id);
     const s = await tx.subscription.create({
       data: {
         userId: p.userId,
@@ -172,6 +243,7 @@ export async function completePayment(paymentId: string, providerRef?: string) {
   });
   const fresh = await db.payment.findUniqueOrThrow({ where: { id: p.id } });
   if (!sub) return { payment: fresh, invoice: await db.invoice.findUnique({ where: { paymentId } }) };
+  await dropMandates(replaced);
   const invoice = await invoiceFor(p);
   // A referral month that hasn't started yet moves to after the new paid period.
   await restackReferralGrants(p.userId, sub.currentPeriodEnd, now).catch((e) => console.error("[referral] restack", e));
@@ -181,6 +253,8 @@ export async function completePayment(paymentId: string, providerRef?: string) {
     await rewardReferredFriend(p.id); // Refer & Earn: the sharer's month, when this is the friend's first qualifying payment
     await onPaidFounding(p.userId); // 1067: a paid plan is what earns a founding seat (never throws)
   }
+  const tag = parseVariantTag(p.variant);
+  if (tag) await recordExperiment({ ...tag, userId: p.userId, kind: "paid", amountMinor: p.amountMinor, currency: p.currency });
   return { payment: fresh, invoice };
 }
 
@@ -245,7 +319,9 @@ export async function failPayment(paymentId: string, reason: string) {
 export async function cancelSubscription(userId: string) {
   const s = await db.subscription.findFirst({ where: { userId, status: "active", provider: { notIn: [...GIFT_PROVIDERS] } }, include: { plan: true }, orderBy: { currentPeriodEnd: "desc" } });
   if (!s) throw new HttpError(404, "You don't have an active paid plan.", "NO_SUBSCRIPTION");
-  await db.subscription.update({ where: { id: s.id }, data: { cancelAtPeriodEnd: true } });
+  // 1096: cancelling also stops an auto-renew mandate, so nothing is charged at the period end.
+  if (s.providerSubId) await dropMandate(s);
+  await db.subscription.update({ where: { id: s.id }, data: { cancelAtPeriodEnd: true, autoRenew: false, providerSubId: null } });
   return s;
 }
 export async function resumeSubscription(userId: string) {
@@ -260,7 +336,9 @@ export async function pauseSubscription(userId: string, months: number, now = ne
   if (!s) throw new HttpError(404, "You don't have an active paid plan.", "NO_SUBSCRIPTION");
   if (isPaused(s, now)) throw new HttpError(409, "Your plan is already paused.", "ALREADY_PAUSED");
   const p = pausePlan(now, s.currentPeriodEnd, months);
-  await db.subscription.update({ where: { id: s.id }, data: { pausedUntil: p.pausedUntil, currentPeriodEnd: p.periodEnd, cancelAtPeriodEnd: false } });
+  // 1096: a mandate would still charge on the old date, so pausing stops auto-renew (they can switch it back on after).
+  if (s.providerSubId) await dropMandate(s);
+  await db.subscription.update({ where: { id: s.id }, data: { pausedUntil: p.pausedUntil, currentPeriodEnd: p.periodEnd, cancelAtPeriodEnd: false, autoRenew: false, providerSubId: null } });
   return { ...s, ...p };
 }
 export async function unpauseSubscription(userId: string, now = new Date()) {
@@ -304,6 +382,8 @@ export async function refundPayment(paymentId: string, by: string, reason: strin
     db.payment.update({ where: { id: p.id }, data: { status: "refunded", failureReason: `Refunded by ${by}${reason ? `: ${reason}` : ""} (${ref})`.slice(0, 300) } }),
     ...(p.subscriptionId ? [db.subscription.updateMany({ where: { id: p.subscriptionId, status: "active" }, data: { status: "canceled", canceledAt: new Date() } })] : []),
   ]);
+  if (p.purpose === "topup") await refundTopUp(p.id); // 1096: what's left in the pack is gone
+  if (p.subscriptionId) await dropMandates([p.subscriptionId]);
   // 1052: a refunded qualifying payment ends the friend's Refer & Earn month and disqualifies the referral.
   if (!p.sample && !(await revokeReferralForPayment(p.id, by))) await revokeReferralReward(p.userId, p.createdAt).catch((e) => console.error("[refund] referral revoke", e));
   // 1067: refunding the last real payment gives the founding seat back (never throws).
@@ -338,6 +418,8 @@ export async function markExternalRefund(paymentId: string, kind: "refund" | "ch
     const won = await db.payment.updateMany({ where: { id: p.id, status: "succeeded" }, data: { status: "refunded", failureReason: `Refunded at ${p.provider}${detail ? `: ${detail}` : ""}`.slice(0, 300) } });
     refunded = won.count === 1;
     if (refunded && p.subscriptionId) await db.subscription.updateMany({ where: { id: p.subscriptionId, status: "active" }, data: { status: "canceled", canceledAt: new Date() } });
+    if (refunded && p.purpose === "topup") await refundTopUp(p.id);
+    if (refunded && p.subscriptionId) await dropMandates([p.subscriptionId]);
   }
   const revoked = await revokeReferralForPayment(p.id, "system", kind);
   if (refunded && !revoked) await revokeReferralReward(p.userId, p.createdAt).catch((e) => console.error("[refund] referral revoke", e));

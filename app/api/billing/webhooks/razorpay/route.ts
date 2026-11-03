@@ -4,16 +4,28 @@ import { json } from "@/lib/http";
 import { getConfig } from "@/lib/settings";
 import { razorpay } from "@/lib/billing/providers";
 import { completePayment, failPayment, markExternalRefund } from "@/lib/billing/service";
+import { onRazorpaySubscription } from "@/lib/billing/autorenew";
 
 /**
  * Point Razorpay at {APP_URL}/api/billing/webhooks/razorpay with order.paid, payment.failed, refund.processed
  * and payment.dispute.created (the last two end a Refer & Earn month the payment earned).
+ * 1096 auto-renew also needs subscription.authenticated, subscription.activated, subscription.charged,
+ * subscription.cancelled, subscription.halted and subscription.completed.
  */
 export async function POST(req: NextRequest) {
   const raw = await req.text();
   const cfg = await getConfig("payments");
   if (!razorpay.verifyWebhook(cfg.razorpay.webhookSecret, raw, req.headers.get("x-razorpay-signature"))) return json({ error: "bad signature" }, { status: 400 });
   const ev = JSON.parse(raw);
+  if (typeof ev?.event === "string" && ev.event.startsWith("subscription.")) {
+    try {
+      await onRazorpaySubscription(ev);
+    } catch (e) {
+      console.error("[razorpay webhook] subscription", e);
+      return json({ error: "retry" }, { status: 500 });
+    }
+    return json({ received: true });
+  }
   const orderId = ev?.payload?.payment?.entity?.order_id ?? ev?.payload?.order?.entity?.id;
   const p = orderId ? await db.payment.findFirst({ where: { provider: "razorpay", providerRef: orderId } }) : null;
   try {

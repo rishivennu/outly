@@ -16,9 +16,13 @@ import { PlanCardView } from "@/components/billing/PlanCardView";
 import { CycleSwitch } from "@/components/billing/CycleSwitch";
 import { CARD_STYLES, CARD_STYLE_META, type CardStyle, type PricingDisplay } from "@/lib/billing/display";
 import { hasYearly, yearlyBase, yearlySaving, type Cycle } from "@/lib/billing/cycle";
+import { PERKS, PERK_LABEL, type Perk } from "@/lib/billing/plan-rules";
+import { PresetPanel } from "@/components/admin/PricingLab";
 
 type Plan = PublicPlan & { subscribers: number; locked: boolean };
-type Draft = { name: string; slug: string; price: string; currency: string; interval: string; note: string; features: string; state: PublicPlan["state"]; highlight: boolean; sortOrder: number; prices: Record<string, string>; yearly: string; postLimit: number; aiCaptions: boolean; seats: number; postPeriod: "week" | "month"; maxUploadMb: number; replyLimit: number; captionVideos: number; burnCaptions: boolean; accountLimit: number; storageMb: number };
+type Draft = { name: string; slug: string; price: string; currency: string; interval: string; note: string; features: string; state: PublicPlan["state"]; highlight: boolean; sortOrder: number; prices: Record<string, string>; yearly: string; postLimit: number; aiCaptions: boolean; seats: number; postPeriod: "week" | "month"; maxUploadMb: number; replyLimit: number; captionVideos: number; burnCaptions: boolean; accountLimit: number; storageMb: number;
+  // 1096
+  yearlyPrices: Record<string, string>; platformLimit: number; brandLimit: number; xPostLimit: number; analyticsDays: number; fairUsePosts: number; perks: Perk[] | null };
 
 const toDraft = (p: Plan): Draft => ({
   name: p.name, slug: p.slug, price: String(p.priceMinor / 100), currency: p.currency, interval: p.interval, note: p.note, features: p.features.join("\n"), state: p.state, highlight: p.highlight, sortOrder: p.sortOrder,
@@ -26,8 +30,10 @@ const toDraft = (p: Plan): Draft => ({
   yearly: p.yearlyMinor ? String(p.yearlyMinor / 100) : "",
   postLimit: p.postLimit ?? 0, aiCaptions: p.aiCaptions ?? true, seats: p.seats ?? 0,
   postPeriod: p.postPeriod === "week" ? "week" : "month", maxUploadMb: p.maxUploadMb ?? 0, replyLimit: p.replyLimit ?? 0, captionVideos: p.captionVideos ?? 0, burnCaptions: p.burnCaptions ?? true, accountLimit: p.accountLimit ?? 0, storageMb: p.storageMb ?? 0,
+  yearlyPrices: Object.fromEntries(Object.entries(p.yearlyPrices ?? {}).map(([k, v]) => [k, String((v as number) / 100)])),
+  platformLimit: p.platformLimit ?? 0, brandLimit: p.brandLimit ?? 0, xPostLimit: p.xPostLimit ?? 0, analyticsDays: p.analyticsDays ?? 0, fairUsePosts: p.fairUsePosts ?? 0, perks: p.perks ?? null,
 });
-const BLANK: Draft = { name: "", slug: "", price: "0", currency: "INR", interval: "month", note: "", features: "", state: "soon", highlight: false, sortOrder: 9, prices: {}, yearly: "", postLimit: 0, aiCaptions: true, seats: 0, postPeriod: "month", maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true, accountLimit: 0, storageMb: 500 };
+const BLANK: Draft = { name: "", slug: "", price: "0", currency: "INR", interval: "month", note: "", features: "", state: "soon", highlight: false, sortOrder: 9, prices: {}, yearly: "", postLimit: 0, aiCaptions: true, seats: 0, postPeriod: "month", maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true, accountLimit: 0, storageMb: 500, yearlyPrices: {}, platformLimit: 0, brandLimit: 0, xPostLimit: 0, analyticsDays: 0, fairUsePosts: 0, perks: null };
 
 const toMinor = (s: string) => {
   const n = Number(s.replace(/,/g, ""));
@@ -38,6 +44,8 @@ function parse(d: Draft) {
   const n = Number(d.price.replace(/,/g, ""));
   const prices: Record<string, number> = {};
   for (const [k, v] of Object.entries(d.prices)) if (v.trim() && k !== d.currency) prices[k] = toMinor(v);
+  const yearlyPrices: Record<string, number> = {};
+  for (const [k, v] of Object.entries(d.yearlyPrices)) if (v.trim() && k !== d.currency) yearlyPrices[k] = toMinor(v);
   return {
     name: d.name.trim(),
     slug: d.slug.trim() || undefined,
@@ -61,6 +69,13 @@ function parse(d: Draft) {
     burnCaptions: d.burnCaptions,
     accountLimit: d.accountLimit,
     storageMb: d.storageMb,
+    yearlyPrices,
+    platformLimit: d.platformLimit,
+    brandLimit: d.brandLimit,
+    xPostLimit: d.xPostLimit,
+    analyticsDays: d.analyticsDays,
+    fairUsePosts: d.fairUsePosts,
+    perks: d.perks,
   };
 }
 
@@ -370,6 +385,8 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
     const badLocal = Object.entries(parsed.prices).find(([, v]) => !Number.isFinite(v) || v <= 0);
     if (badLocal) return setError(`The ${badLocal[0]} price must be a number above zero, or blank to convert automatically.`);
     if (!Number.isFinite(parsed.yearlyMinor) || parsed.yearlyMinor < 0) return setError("Yearly price must be a number, or blank for the automatic one.");
+    const badYearly = Object.entries(parsed.yearlyPrices).find(([, v]) => !Number.isFinite(v) || v <= 0);
+    if (badYearly) return setError(`The yearly ${badYearly[0]} price must be a number above zero, or blank to scale from the monthly one.`);
     setBusy(true);
     setError(null);
     try {
@@ -390,6 +407,17 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
     } finally {
       setBusy(false);
     }
+  }
+
+  /** After the preset is applied or undone: fresh rows, same selection when it still exists. */
+  async function reload() {
+    const fresh = await adminApi<{ plans: (PublicPlan & { subscribers: number })[] }>("/api/admin/plans");
+    const next = fresh.plans.map((p) => ({ ...p, locked: plans.find((o) => o.id === p.id)?.locked ?? false }));
+    setPlans(next);
+    const keep = next.find((p) => p.id === sel) ?? next[0];
+    setSel(keep?.id ?? "new");
+    setDraft(keep ? toDraft(keep) : BLANK);
+    router.refresh();
   }
 
   async function remove() {
@@ -413,6 +441,7 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
   return (
     <div className="flex flex-col gap-5">
       <DisplayPanel value={display} onChange={setDisplay} />
+      <PresetPanel onChanged={reload} />
       {/* plan rail */}
       <ul aria-label="Plans" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {plans.map((p) => (
@@ -562,6 +591,65 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
               <div className="sm:col-span-2">
                 <Toggle label="Burn captions into the video" hint="Free plan: off, so burning is paid-only" checked={draft.burnCaptions} onChange={(v) => set("burnCaptions", v)} />
               </div>
+            </Section>
+
+            <Section n="06" title="Brands, X, history and perks" hint="0 = no limit">
+              <div>
+                <Label htmlFor="pl-platforms">Platforms</Label>
+                <Input id="pl-platforms" type="number" min={0} max={10} step={1} value={draft.platformLimit} onChange={(e) => set("platformLimit", Math.max(0, Math.min(10, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-platforms-hint" />
+                <p id="pl-platforms-hint" className="mt-1 text-[12px] text-muted-foreground">Different platforms they can connect. 0 = all</p>
+              </div>
+              <div>
+                <Label htmlFor="pl-brands">Brands</Label>
+                <Input id="pl-brands" type="number" min={0} max={50} step={1} value={draft.brandLimit} onChange={(e) => set("brandLimit", Math.max(0, Math.min(50, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-brands-hint" />
+                <p id="pl-brands-hint" className="mt-1 text-[12px] text-muted-foreground">{draft.brandLimit ? `${draft.brandLimit} account${draft.brandLimit === 1 ? "" : "s"} on each platform` : "0 = use Connected accounts above"}</p>
+              </div>
+              <div>
+                <Label htmlFor="pl-x">Posts to X per month</Label>
+                <Input id="pl-x" type="number" min={0} max={100000} step={10} value={draft.xPostLimit} onChange={(e) => set("xPostLimit", Math.max(0, Math.min(100000, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-x-hint" />
+                <p id="pl-x-hint" className="mt-1 text-[12px] text-muted-foreground">X charges per post, so this caps the bill. 0 = unlimited</p>
+              </div>
+              <div>
+                <Label htmlFor="pl-days">Analytics history (days)</Label>
+                <Input id="pl-days" type="number" min={0} max={730} step={30} value={draft.analyticsDays} onChange={(e) => set("analyticsDays", Math.max(0, Math.min(730, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-days-hint" />
+                <p id="pl-days-hint" className="mt-1 text-[12px] text-muted-foreground">{draft.analyticsDays ? `${draft.analyticsDays} days` : "0 = the standard 90"}. Max 730</p>
+              </div>
+              <div>
+                <Label htmlFor="pl-fair">Fair use on unlimited posts</Label>
+                <Input id="pl-fair" type="number" min={0} max={100000} step={50} value={draft.fairUsePosts} onChange={(e) => set("fairUsePosts", Math.max(0, Math.min(100000, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-fair-hint" />
+                <p id="pl-fair-hint" className="mt-1 text-[12px] text-muted-foreground">You get an alert when someone passes it. Never blocks. 0 = none</p>
+              </div>
+              <fieldset className="sm:col-span-2">
+                <legend className="text-[14px] font-medium">Perks</legend>
+                <div className="mt-2">
+                  <Toggle label="Every perk" hint="Plans made before Nov 2026 have every perk, so nothing changed for them" checked={draft.perks === null} onChange={(v) => set("perks", v ? null : [...PERKS])} />
+                </div>
+                {draft.perks !== null && (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {PERKS.map((k) => {
+                      const on = draft.perks!.includes(k);
+                      return (
+                        <label key={k} className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-2xl bg-secondary/40 px-4 py-2 text-[13.5px] hairline">
+                          <input type="checkbox" checked={on} onChange={(e) => set("perks", e.target.checked ? [...draft.perks!, k] : draft.perks!.filter((x) => x !== k))} className="h-4 w-4 accent-[hsl(var(--lime))]" />
+                          {PERK_LABEL[k]}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </fieldset>
+              <fieldset className="sm:col-span-2">
+                <legend className="text-[14px] font-medium">Yearly local prices</legend>
+                <p className="mb-3 mt-1 text-[12.5px] leading-relaxed text-muted-foreground">Exact yearly price per currency. Blank = the monthly local price scaled the same way as {draft.currency}.</p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {CURRENCIES.filter((c) => c !== draft.currency).map((c) => (
+                    <div key={c}>
+                      <Label htmlFor={`pl-yp-${c}`}>{c}</Label>
+                      <Input id={`pl-yp-${c}`} inputMode="decimal" placeholder="auto" value={draft.yearlyPrices[c] ?? ""} onChange={(e) => set("yearlyPrices", { ...draft.yearlyPrices, [c]: e.target.value })} />
+                    </div>
+                  ))}
+                </div>
+              </fieldset>
             </Section>
           </div>
 

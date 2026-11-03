@@ -4,6 +4,8 @@ import { env } from "../env";
 import { getConfig } from "../settings";
 import { sendEmail, templates } from "../email";
 import { PLATFORM_META, isPlatform } from "../domain";
+import { entitlements } from "../billing/entitlements";
+import { hasPerk } from "../billing/plan-rules";
 import { recapCopy, recapVisible, recapWindow, reportDue, summarize, type RecapCopy, type WeeklyStats } from "./weekly-core";
 
 /** Posts that went out in [since, until), with their latest numbers. `names` swaps platform ids for display names (email). */
@@ -80,6 +82,8 @@ export async function sendWeeklyReports(now = new Date(), opts: { force?: boolea
     // claim first, so two instances never send the same report twice
     const claimed = await db.user.updateMany({ where: { id: u.id, OR: [{ lastReportAt: null }, { lastReportAt: u.lastReportAt }] }, data: { lastReportAt: now } });
     if (!claimed.count) return;
+    // Plans without the digest perk (1096) still get claimed above, so they don't sit "due" and crowd every batch.
+    if (!hasPerk(await entitlements(u.id), "weekly-digest")) return;
     const stats = await weeklyStats(u.id, now);
     await sendEmail({ to: u.email, kind: "weekly_report", subject: stats.published ? `Your week: ${stats.published} post${stats.published === 1 ? "" : "s"} out` : "Your week on Outlly", html: templates.weeklyReport({ name: u.name, stats, url: `${env.APP_URL}/analytics`, settingsUrl: `${env.APP_URL}/settings` }) }).catch(() => {});
     sent++;

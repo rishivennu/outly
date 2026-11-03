@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CURRENCIES } from "../billing/money";
+import { PERKS } from "../billing/plan-rules";
 
 export const PlanInput = z.object({
   name: z.string().trim().min(1, "Give the plan a name").max(40),
@@ -33,6 +34,21 @@ export const PlanInput = z.object({
   accountLimit: z.number().int().min(0).max(50).default(0),
   /** Total storage for every file, MB (1052). 0 = no cap. Optional so an older editor never wipes it. */
   storageMb: z.number().int().min(0).max(10_000_000).optional(),
+  // 1096. All optional, so an older editor (or a partial PATCH) never resets them.
+  /** Exact yearly prices in other currencies, minor units. */
+  yearlyPrices: z.partialRecord(z.enum(CURRENCIES), z.number().int().min(1, "Yearly local prices must be above zero").max(1_000_000_000)).optional(),
+  /** Different platforms connected at once; 0 = all. */
+  platformLimit: z.number().int().min(0).max(10).optional(),
+  /** Accounts (brands) per platform; 0 = older rules. */
+  brandLimit: z.number().int().min(0).max(50).optional(),
+  /** Posts to X per month; 0 = no cap. */
+  xPostLimit: z.number().int().min(0).max(100_000).optional(),
+  /** Days of analytics history; 0 = 90. */
+  analyticsDays: z.number().int().min(0).max(730).optional(),
+  /** Fair-use line for unlimited posts (alert only); 0 = off. */
+  fairUsePosts: z.number().int().min(0).max(100_000).optional(),
+  /** Perks on the plan; null = every perk. */
+  perks: z.array(z.enum(PERKS)).max(PERKS.length).nullable().optional(),
 });
 
 export const FaqInput = z.object({

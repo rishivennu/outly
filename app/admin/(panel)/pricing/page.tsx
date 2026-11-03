@@ -5,6 +5,7 @@ import { getConfig } from "@/lib/settings";
 import { normalizeDisplay } from "@/lib/billing/display";
 import { PageHead } from "@/components/admin/ui";
 import { PricingEditor } from "@/components/admin/PricingEditor";
+import { PricingLab } from "@/components/admin/PricingLab";
 
 export const metadata = { title: "Pricing" };
 
@@ -27,6 +28,7 @@ export default async function Pricing() {
         display={display}
         initial={plans.map((p) => ({ ...p, subscribers: subs.find((s) => s.planId === p.id)?._count ?? 0, locked: (pays.find((s) => s.planId === p.id)?._count ?? 0) > 0 }))}
       />
+      <PricingLab />
     </>
   );
 }

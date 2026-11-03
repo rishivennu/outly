@@ -8,12 +8,19 @@ export async function paymentReceipt(userId: string, paymentId: string, opts: { 
   const state = receiptState(p.status, opts.cancelled);
   if (!state) return null;
   const plan = p.planId ? await db.plan.findUnique({ where: { id: p.planId }, select: { name: true } }) : null;
+  // 1096: a top-up has no plan; its slip names the pack.
+  let pack: string | null = null;
+  if (p.purpose === "topup") {
+    try {
+      pack = String(JSON.parse(p.meta ?? "{}").label ?? "") || null;
+    } catch {}
+  }
   return {
     paymentId: p.id,
     state,
     amountMinor: p.amountMinor,
     currency: p.currency,
-    planName: plan?.name ?? "Outlly plan",
+    planName: p.purpose === "topup" ? `Top-up: ${pack ?? "usage pack"}` : (plan?.name ?? "Outlly plan"),
     interval: p.interval === "year" ? "year" : "month",
     provider: p.provider,
     invoice: p.invoice?.number ?? null,

@@ -15,6 +15,7 @@ import { TeamCard } from "./TeamCard";
 import { ReferralCard } from "./ReferralCard";
 import { AvatarPicker } from "./AvatarPicker";
 import { SnippetsCard } from "./SnippetsCard";
+import { VoiceMemoryCard } from "@/components/billing/PlanExtras";
 import { TwoStepCard } from "./TwoStepCard";
 import { PhoneCard } from "./PhoneCard";
 import { YourDataCard } from "./YourDataCard";
@@ -244,10 +245,11 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, bil
       id: "personalization",
       label: "Personalization",
       icon: Sparkles,
-      blurb: "Shortcuts that make writing faster, and the guided tour.",
+      blurb: "Shortcuts that make writing faster, your writing voice, and the guided tour.",
       content: (
         <>
           <SnippetsCard />
+          <VoiceMemoryCard />
           <Disclosure title="Guided tour" hint="Replay the one-minute walk, and bring back each page's first-time tips.">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <p className="text-sm text-muted-foreground">A one-minute walk from Home to Settings. Replaying it also brings back the tips each page shows the first time.</p>
