@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-export type SkeletonShape = "overview" | "grid" | "calendar" | "list" | "settings" | "analytics" | "platform" | "cards";
+export type SkeletonShape = "overview" | "grid" | "calendar" | "list" | "settings" | "analytics" | "platform" | "cards" | "billing";
 
 const Bar = ({ className, style }: { className?: string; style?: React.CSSProperties }) => <div className={cn("skeleton rounded-lg", className)} style={style} />;
 const Panel = ({ className, children }: { className?: string; children?: React.ReactNode }) => <div className={cn("rounded-[24px] bg-foreground/[0.025] p-5 hairline", className)}>{children}</div>;
@@ -120,6 +120,29 @@ function Shape({ shape }: { shape: SkeletonShape }) {
             </div>
           </div>
         </>
+      );
+    case "billing":
+      // 1098: header, plan + manage row, the usage grid, plan cards, then payment method + history.
+      return (
+        <div className="max-w-6xl">
+          <Head />
+          <div className="mt-8 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+            <Panel className="h-[300px]">
+              <Bar className="h-4 w-28" />
+              <Bar className="mt-5 h-8 w-48 rounded-xl" />
+              <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3">{[0, 1, 2].map((i) => <Bar key={i} className="h-16 rounded-[18px]" />)}</div>
+            </Panel>
+            <Panel className="h-[300px]">
+              <Bar className="h-4 w-36" />
+              <div className="mt-5"><Rows n={3} h="h-12" /></div>
+            </Panel>
+          </div>
+          <Panel className="mt-4">
+            <Bar className="h-4 w-36" />
+            <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4">{Array.from({ length: 8 }, (_, i) => <Bar key={i} className="h-[92px] rounded-[20px]" />)}</div>
+          </Panel>
+          <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map((i) => <Panel key={i} className="h-80" />)}</div>
+        </div>
       );
     default:
       return (

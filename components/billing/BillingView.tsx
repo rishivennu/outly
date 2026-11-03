@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, Download, FileText, Gift, Info, Loader2, ShieldCheck, WifiOff, X } from "lucide-react";
+import { ArrowRight, CalendarClock, Check, Gift, Info, Loader2, Repeat, ShieldCheck, WifiOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/Toast";
@@ -12,7 +12,9 @@ import { formatMoney, intervalLabel, planFeatures, priceLabel, type PublicPlan }
 import type { CurrencySource } from "@/lib/billing/currency";
 import { CycleSwitch } from "./CycleSwitch";
 import { CurrencyNote } from "./CurrencyNote";
-import { StorageMeter, type StorageMeterData } from "./StorageMeter";
+import type { StorageMeterData } from "./StorageMeter";
+import { BillingHistory, Panel, PaymentMethodCard, StatusPill, UsageGrid } from "./BillingParts";
+import { cycleLabel, type BillingStatus, type EndedSub, type HistoryRow, type MeterView } from "@/lib/billing/overview-core";
 import { CARD_FEATURES } from "./PlanCardView";
 import { BetaRedeem, type BetaOffer } from "./BetaRedeem";
 import { FoundingCard } from "@/components/founding/FoundingCard";
@@ -29,9 +31,7 @@ import { AutoRenewToggle, CancelReasons, PriceSurvey, UsageExtras, type CancelWh
 
 export type ReturnNotice = { tone: "ok" | "info" | "error"; text: string };
 type Current = { planSlug: string; planName: string; priceMinor: number; currency: string; interval: string; periodEnd: string; cancelAtPeriodEnd: boolean; pausedUntil?: string | null; provider?: string; autoRenew?: boolean } | null;
-type Inv = { number: string; description: string; amountMinor: number; currency: string; issuedAt: string; refunded: boolean; creditNote?: string | null };
-
-const CACHE = "outly-invoices-v1";
+const CACHE = "outly-billing-history-v2";
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 
 declare global {
@@ -49,37 +49,12 @@ function loadRazorpay() {
 }
 
 type PricedPlan = PublicPlan & { approx: string | null; year: { priceMinor: number; currency: string; approx: string | null; save: number; was?: number | null } | null; was?: number | null };
-/** limit 0 = unlimited */
+/** limit 0 = unlimited. 1098: the tiles come from `meters`; this keeps the few facts the plan card states. */
 type Usage = { used: number; limit: number; seats: number; aiCaptions: boolean; period?: "week" | "month"; maxUploadMb?: number; replies?: { limit: number; used: number }; captions?: { limit: number; used: number; burn: boolean }; storage?: StorageMeterData };
 type ExtraAccess = { planName: string; source: "admin" | "referral"; endsAt: string } | null;
 
 
-function UsageMeter({ u }: { u: Usage }) {
-  const pct = u.limit > 0 ? Math.min(100, Math.round((u.used / u.limit) * 100)) : 0;
-  return (
-    <div className="mt-4 max-w-md">
-      <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span id="usage-l">Posts {u.period === "week" ? "this week" : "this month"}</span>
-        <span className="tabular text-muted-foreground">{u.limit > 0 ? `${u.used} of ${u.limit}` : `${u.used} · unlimited`}</span>
-      </div>
-      {u.limit > 0 && (
-        <div role="progressbar" aria-labelledby="usage-l" aria-valuemin={0} aria-valuemax={u.limit} aria-valuenow={Math.min(u.used, u.limit)} className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary">
-          <div className={cn("h-full rounded-full", pct >= 100 ? "bg-destructive" : pct >= 80 ? "bg-warning" : "bg-lime")} style={{ width: `${pct}%` }} />
-        </div>
-      )}
-      <p className="mt-2 text-xs text-muted-foreground">
-        {u.seats > 0 ? `${u.seats} team seat${u.seats === 1 ? "" : "s"}` : "No team seats"} · AI captions{" "}
-        {!u.aiCaptions ? "not included" : u.captions && u.captions.limit > 0 ? `on ${Math.max(0, u.captions.limit - u.captions.used)} of ${u.captions.limit} videos left this month` : "included"}
-        {u.captions && !u.captions.burn ? " · Burned-in captions on paid plans" : ""}
-        {u.replies && u.replies.limit > 0 ? ` · Replies ${u.replies.used} of ${u.replies.limit} this week` : ""}
-        {u.maxUploadMb ? ` · Uploads up to ${u.maxUploadMb} MB` : ""}
-      </p>
-      {u.storage && <StorageMeter s={u.storage} className="mt-4" />}
-    </div>
-  );
-}
-
-export function BillingView(props: { email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; invoices: Inv[]; beta?: BetaOffer | null; founding?: FoundingMine; foundingStatus?: string | null; badges?: Badges; guarantee?: GuaranteeView }) {
+export function BillingView(props: { email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; status: BillingStatus; nextCharge: string | null; meters: MeterView[]; history: HistoryRow[]; ended?: EndedSub | null; beta?: BetaOffer | null; founding?: FoundingMine; foundingStatus?: string | null; badges?: Badges; guarantee?: GuaranteeView }) {
   const { plans, current } = props;
   const router = useRouter();
   const toast = useToast();
@@ -103,7 +78,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
     } catch {}
   };
   const [online, setOnline] = useState(true);
-  const [invoices, setInvoices] = useState(props.invoices);
+  const [history, setHistory] = useState(props.history);
   const [cachedAt, setCachedAt] = useState<string | null>(null);
   const focusRef = useRef<HTMLLIElement>(null);
 
@@ -114,17 +89,19 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
     window.addEventListener("online", sync);
     window.addEventListener("offline", sync);
     try {
-      if (props.invoices.length) localStorage.setItem(CACHE, JSON.stringify({ at: new Date().toISOString(), list: props.invoices }));
-      else {
+      if (props.history.length) {
+        localStorage.setItem(CACHE, JSON.stringify({ at: new Date().toISOString(), list: props.history }));
+        setHistory(props.history);
+      } else {
         const c = JSON.parse(localStorage.getItem(CACHE) ?? "null");
-        if (c && !navigator.onLine) { setInvoices(c.list); setCachedAt(c.at); }
+        if (c && !navigator.onLine) { setHistory(c.list); setCachedAt(c.at); }
       }
     } catch {}
     return () => { window.removeEventListener("online", sync); window.removeEventListener("offline", sync); };
-  }, [props.invoices]);
+  }, [props.history]);
 
   useEffect(() => {
-    if (props.focusPlan) focusRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (props.focusPlan) focusRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
     if (props.notice || props.receipt) window.history.replaceState(null, "", "/billing"); // a refresh shouldn't replay the notice
   }, [props.focusPlan, props.notice, props.receipt]);
 
@@ -199,10 +176,27 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
   }
 
   const currentSlug = current?.planSlug ?? "free";
+  const paid = !!current && current.priceMinor > 0;
+  const mineYear = plans.find((p) => p.slug === currentSlug)?.year;
+  const reduce = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const toPlans = (c?: Cycle) => {
+    if (c) setCycle(c);
+    document.getElementById("plans")?.scrollIntoView({ behavior: reduce() ? "auto" : "smooth", block: "start" });
+  };
+  const s = props.status;
+  const due = props.nextCharge ?? s.date;
+  const dueLabel = props.nextCharge ? "Next billing date" : s.key === "paused" ? "Resumes" : s.key === "cancelled" ? "Ends on" : s.key === "expired" ? "Ended on" : s.key === "renewing" ? "Renewal due" : s.key === "gift" ? "Free access until" : paid ? "Paid through" : "Next billing date";
+  const planName = current ? current.planName : props.access ? props.access.planName : props.ended ? props.ended.planName : "Free";
   return (
-    <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-14">
-      <p className="eyebrow mb-3">Billing</p>
-      <h1 className="display max-w-3xl text-[clamp(2.4rem,5.5vw,4.2rem)]">Your plan, invoices and payments.</h1>
+    <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-12">
+      <header className="max-w-6xl">
+        <p className="eyebrow mb-3">Billing</p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <h1 className="display text-[clamp(2.1rem,4.6vw,3.4rem)]">Billing &amp; Subscription</h1>
+          <StatusPill s={s} />
+        </div>
+        <p className="mt-2 max-w-2xl text-[15px] text-muted-foreground">Your plan, what you've used this period, how you pay and every invoice, in one place.</p>
+      </header>
 
       {!online && (
         <p role="status" className="mt-6 inline-flex items-center gap-2 rounded-full bg-warning/15 px-4 py-2 text-sm text-foreground">
@@ -215,7 +209,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
           onClose={() => setReceipt(null)}
           onRetry={() => {
             setReceipt(null);
-            document.getElementById("plans")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+            toPlans();
           }}
         />
       )}
@@ -223,51 +217,142 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
         <div role={notice.tone === "error" ? "alert" : "status"} className={cn("admin-page-in mt-6 flex max-w-3xl items-start gap-3 rounded-2xl p-4 text-sm", notice.tone === "ok" ? "bg-success/15" : notice.tone === "error" ? "bg-destructive/10" : "bg-accent/10")}>
           {notice.tone === "ok" ? <Pip size={40} mood="happy" /> : notice.tone === "error" ? <Pip size={40} mood="sad" /> : <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />}
           <p className="flex-1 pt-1">{notice.text}</p>
-          <button onClick={() => setNotice(null)} className="grid h-8 w-8 place-items-center rounded-full hover:bg-foreground/5" aria-label="Dismiss"><X className="h-4 w-4" /></button>
+          <button onClick={() => setNotice(null)} className="-m-1.5 grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-foreground/5" aria-label="Dismiss"><X className="h-4 w-4" /></button>
         </div>
       )}
 
-      <section aria-labelledby="cur" className="glass mt-8 flex max-w-5xl flex-col gap-5 rounded-[32px] p-6 sm:flex-row sm:items-center sm:p-8">
-        <Pip size={72} mood={current ? "fly" : "idle"} className="shrink-0" />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm text-muted-foreground">Current plan</p>
-          <h2 id="cur" className="mt-1 text-2xl font-semibold tracking-tight">
-            {current ? current.planName : props.access ? props.access.planName : "Free"}
-            {current && <span className="ml-2 text-base font-medium text-muted-foreground tabular">{current.priceMinor > 0 ? <>{formatMoney(current.priceMinor, current.currency)}{intervalLabel(current.interval)}</> : current.provider === "beta" ? "free, early member" : "free month"}</span>}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {!current ? "No card on file. Upgrade any time; you'll get an invoice by email straight away." : current.pausedUntil ? <>Paused until <b className="text-foreground">{day(current.pausedUntil)}</b>. Free limits apply until then, and your paid days run again after, to <b className="text-foreground">{day(current.periodEnd)}</b>.</> : current.cancelAtPeriodEnd ? <>Ends on <b className="text-foreground">{day(current.periodEnd)}</b>, then you move to Free. Nothing else will be charged.</> : current.autoRenew ? <>Renews on <b className="text-foreground">{day(current.periodEnd)}</b>. We email you 3 days before the charge.</> : <>Paid through <b className="text-foreground">{day(current.periodEnd)}</b>. It does not renew or charge you again on its own.</>}
+      <div className="mt-8 grid max-w-6xl gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <Panel id="cur" title="Current plan" action={<StatusPill s={s} withDate={false} />}>
+          <div className="mt-4 flex items-center gap-4">
+            <Pip size={56} mood={current ? "fly" : "idle"} className="shrink-0" />
+            <div className="min-w-0">
+              <p className="truncate text-2xl font-semibold tracking-tight">{planName}</p>
+              <p className="text-[15px] text-muted-foreground tabular">
+                {current ? (current.priceMinor > 0 ? <>{formatMoney(current.priceMinor, current.currency)}{intervalLabel(current.interval)}</> : current.provider === "beta" ? "Free, early member" : "Free month") : props.access ? "Free access" : "No charge"}
+              </p>
+            </div>
+          </div>
+          <dl className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            <div className="rounded-[18px] bg-secondary/40 p-3 hairline">
+              <dt className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground"><Repeat className="h-3.5 w-3.5" aria-hidden />Billing cycle</dt>
+              <dd className="mt-1 text-[15px] font-semibold">{cycleLabel(current?.interval, current?.priceMinor ?? 0)}</dd>
+            </div>
+            <div className="rounded-[18px] bg-secondary/40 p-3 hairline">
+              <dt className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground"><CalendarClock className="h-3.5 w-3.5" aria-hidden />{dueLabel}</dt>
+              <dd className="mt-1 text-[15px] font-semibold tabular">{due ? day(due) : "Nothing due"}</dd>
+            </div>
+            <div className="col-span-2 rounded-[18px] bg-secondary/40 p-3 hairline sm:col-span-1">
+              <dt className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground"><ShieldCheck className="h-3.5 w-3.5" aria-hidden />Renewal</dt>
+              <dd className="mt-1 text-[15px] font-semibold">{!paid ? "Not needed" : current!.pausedUntil ? "On hold" : current!.cancelAtPeriodEnd ? "Won't renew" : current!.autoRenew ? "Automatic" : "Manual"}</dd>
+            </div>
+          </dl>
+          <p className="mt-4 text-sm text-muted-foreground">
+            {!current
+              ? props.ended
+                ? s.key === "renewing"
+                  ? <>Your {props.ended.planName} renewal is being processed. This usually clears within a day; you'll get the invoice by email.</>
+                  : <>Your {props.ended.planName} plan ended on <b className="text-foreground">{day(props.ended.endedAt)}</b>. You're on Free limits now; your posts and media are safe. Pick a plan to continue.</>
+                : props.access
+                  ? <>Paid plan features are on until <b className="text-foreground">{day(props.access.endsAt)}</b>, then you move to Free. No card needed.</>
+                  : "No card on file. Upgrade any time; you'll get an invoice by email straight away."
+              : current.pausedUntil ? <>Paused until <b className="text-foreground">{day(current.pausedUntil)}</b>. Free limits apply until then, and your paid days run again after, to <b className="text-foreground">{day(current.periodEnd)}</b>.</>
+              : current.cancelAtPeriodEnd ? <>Ends on <b className="text-foreground">{day(current.periodEnd)}</b>, then you move to Free. Nothing else will be charged.</>
+              : current.priceMinor <= 0 ? <>Free access runs until <b className="text-foreground">{day(current.periodEnd)}</b>. Nothing is charged.</>
+              : current.autoRenew ? <>Renews on <b className="text-foreground">{day(current.periodEnd)}</b>. We email you 3 days before the charge.</>
+              : <>Paid through <b className="text-foreground">{day(current.periodEnd)}</b>. It does not renew or charge you again on its own.</>}
           </p>
-          {props.access && (
+          {props.access && current && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-lime/15 px-3 py-1 text-[12.5px] text-foreground" role="status">
               <Gift className="h-3.5 w-3.5" aria-hidden />
               {props.access.source === "referral" ? "Referral reward" : "Granted by Outlly"}: {props.access.planName} until {day(props.access.endsAt)}
+            </p>
+          )}
+          {props.access && !current && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-lime/15 px-3 py-1 text-[12.5px] text-foreground">
+              <Gift className="h-3.5 w-3.5" aria-hidden />{props.access.source === "referral" ? "Referral reward" : "Granted by Outlly"}
             </p>
           )}
           {props.badges && <TrustBadges b={props.badges} className="mt-3" />}
           {current?.planSlug === MANAGER_SLUG && props.badges && !props.badges.verifiedManager && (
             <p className="mt-2 text-[12.5px] text-muted-foreground">Your Verified Manager badge appears once your email is confirmed and two or more accounts are connected.</p>
           )}
-          <UsageMeter u={props.usage} />
-          <UsageExtras onBuy={buyPack} busy={busy} />
-          {current && current.priceMinor > 0 && !current.pausedUntil && !current.cancelAtPeriodEnd && <AutoRenewToggle on={!!current.autoRenew} provider={current.provider} periodEnd={current.periodEnd} />}
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button variant={paid && !current!.cancelAtPeriodEnd && !current!.pausedUntil ? "subtle" : "lime"} onClick={() => toPlans()}>
+              {paid ? "Change plan" : props.ended ? "Renew a plan" : "Upgrade"}<ArrowRight className="h-4 w-4" aria-hidden />
+            </Button>
+            {paid && (current!.pausedUntil ? (
+              <Button variant="lime" onClick={() => cancelOrResume("unpause")} disabled={busy === "unpause"}>{busy === "unpause" && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Resume now</Button>
+            ) : current!.cancelAtPeriodEnd ? (
+              <Button variant="lime" onClick={() => cancelOrResume("resume")} disabled={busy === "resume"}>{busy === "resume" && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Keep my plan</Button>
+            ) : null)}
+          </div>
+        </Panel>
+
+        <Panel id="manage-h" title="Manage subscription">
+          {paid && !current!.pausedUntil && !current!.cancelAtPeriodEnd ? (
+            <AutoRenewToggle on={!!current!.autoRenew} provider={current!.provider} periodEnd={current!.periodEnd} />
+          ) : (
+            <p className="mt-4 rounded-2xl bg-secondary/40 px-4 py-3 text-[13px] text-muted-foreground hairline">
+              {!paid ? "Auto-renew becomes available once you're on a paid plan. Until then nothing is ever charged on its own." : current!.pausedUntil ? "Auto-renew is held while your plan is paused." : "Auto-renew is off because this plan is set to end. Keep your plan to turn it back on."}
+            </p>
+          )}
+          <ul className="mt-3 divide-y divide-border text-sm">
+            {paid && mineYear && (
+              <li className="flex items-center justify-between gap-3 py-3">
+                <span className="min-w-0">
+                  <span className="block font-medium">{current!.interval === "year" ? "Billed yearly" : "Billed monthly"}</span>
+                  <span className="block text-[12.5px] text-muted-foreground">{current!.interval === "year" ? "Switch to monthly at your next payment." : mineYear.save > 0 ? `Yearly saves ${mineYear.save}%.` : "Pay once a year instead."}</span>
+                </span>
+                <Button size="sm" variant="outline" className="min-h-[44px] shrink-0" onClick={() => toPlans(current!.interval === "year" ? "month" : "year")}>
+                  Switch to {current!.interval === "year" ? "monthly" : "yearly"}
+                </Button>
+              </li>
+            )}
+            <li className="flex items-center justify-between gap-3 py-3">
+              <span className="min-w-0">
+                <span className="block font-medium">Change plan</span>
+                <span className="block text-[12.5px] text-muted-foreground">A new plan starts today.</span>
+              </span>
+              <Button size="sm" variant="outline" className="min-h-[44px] shrink-0" onClick={() => toPlans()}>See plans</Button>
+            </li>
+            {paid && !current!.cancelAtPeriodEnd && !current!.pausedUntil && (
+              <li className="flex items-center justify-between gap-3 py-3">
+                <span className="min-w-0">
+                  <span className="block font-medium">Pause or cancel</span>
+                  <span className="block text-[12.5px] text-muted-foreground">You keep everything until {day(current!.periodEnd)}. Pausing saves your paid days.</span>
+                </span>
+                <Button size="sm" variant="ghost" className="min-h-[44px] shrink-0" onClick={() => setConfirm(true)}>Cancel plan</Button>
+              </li>
+            )}
+          </ul>
+          <p className="mt-2 flex items-start gap-2 text-[12.5px] leading-snug text-muted-foreground">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            Cancelling never deletes your posts or media. When a paid period ends you move to Free, and you can come back any time.
+          </p>
+        </Panel>
+      </div>
+
+      <Panel id="use-h" title="Plan usage & limits" className="mt-4 max-w-6xl" action={<span className="text-[12.5px] text-muted-foreground">Resets with your plan's period</span>}>
+        <UsageGrid meters={props.meters} />
+        {(!!props.usage.maxUploadMb || (props.usage.captions && !props.usage.captions.burn && props.usage.aiCaptions)) && (
+          <p className="mt-3 text-[12.5px] text-muted-foreground">
+            {[props.usage.maxUploadMb ? `Uploads up to ${props.usage.maxUploadMb} MB each` : null, props.usage.captions && !props.usage.captions.burn && props.usage.aiCaptions ? "Burned-in captions come with paid plans" : null].filter(Boolean).join(" · ")}
+          </p>
+        )}
+        <UsageExtras onBuy={buyPack} busy={busy} packsOnly />
+      </Panel>
+
+      {(props.guarantee || props.founding || props.foundingStatus || props.beta) && (
+        <div className="max-w-6xl">
+          {props.guarantee && <GuaranteeCard g={props.guarantee} />}
+          {(props.founding || props.foundingStatus) && <FoundingCard f={props.founding ?? null} status={props.foundingStatus} />}
+          {props.beta && <BetaRedeem offer={props.beta} />}
         </div>
-        {current && current.priceMinor > 0 && (current.pausedUntil ? (
-          <Button variant="lime" onClick={() => cancelOrResume("unpause")} disabled={busy === "unpause"}>{busy === "unpause" && <Loader2 className="h-4 w-4 animate-spin" />}Resume now</Button>
-        ) : current.cancelAtPeriodEnd ? (
-          <Button variant="lime" onClick={() => cancelOrResume("resume")} disabled={busy === "resume"}>{busy === "resume" && <Loader2 className="h-4 w-4 animate-spin" />}Keep my plan</Button>
-        ) : (
-          <Button variant="ghost" onClick={() => setConfirm(true)}>Cancel plan</Button>
-        ))}
-      </section>
+      )}
 
-      {props.guarantee && <GuaranteeCard g={props.guarantee} />}
-      {(props.founding || props.foundingStatus) && <FoundingCard f={props.founding ?? null} status={props.foundingStatus} />}
-      {props.beta && <BetaRedeem offer={props.beta} />}
-
-      <section aria-labelledby="plans" className="mt-10 max-w-5xl">
+      <section aria-labelledby="plans" className="mt-10 max-w-6xl scroll-mt-20">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 id="plans" className="text-xl font-semibold tracking-tight">Plans</h2>
+          <h2 id="plans" className="scroll-mt-24 text-xl font-semibold tracking-tight">Available plans</h2>
           <CurrencyNote currency={props.currency} source={props.currencySource} className="mr-auto ml-3" />
           {anyYear && <CycleSwitch value={cycle} onChange={setCycle} save={save} />}
           {props.testMode && <p className="inline-flex items-center gap-1.5 rounded-full bg-warning/15 px-3 py-1 text-[12px] font-medium"><ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Test mode: no real money moves</p>}
@@ -315,6 +400,9 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
                       <Button variant="subtle" className="w-full" disabled>Current plan</Button>
                     ) : p.state === "soon" ? (
                       <Button variant="subtle" className="w-full" disabled>Coming soon</Button>
+                    ) : p.priceMinor === 0 && current && current.priceMinor <= 0 ? (
+                      // A gift month isn't cancelled: it simply ends and Free takes over.
+                      <Button variant="subtle" className="w-full" disabled>Free from {day(current.periodEnd)}</Button>
                     ) : p.priceMinor === 0 ? (
                       <Button variant="outline" className="w-full" onClick={() => setConfirm(true)} disabled={!!current?.cancelAtPeriodEnd}>{current?.cancelAtPeriodEnd ? `Switching on ${day(current.periodEnd)}` : "Move to Free"}</Button>
                     ) : (
@@ -340,39 +428,13 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
         <p className="mt-3 text-[12.5px] text-muted-foreground">Prices include applicable taxes. Each payment covers one period and nothing is charged automatically unless you turn on auto-renew: when it ends you can pay again or stay on Free. Switching plans starts the new one today.</p>
       </section>
 
-      <PriceSurvey currency={props.currency} planSlug={currentSlug} />
+      <div className="mt-10 grid max-w-6xl items-start gap-4 lg:grid-cols-[1fr_1.6fr]">
+        <PaymentMethodCard periodEnd={current?.periodEnd ?? null} online={online} />
+        <BillingHistory rows={history} email={props.email} cachedAt={cachedAt} />
+      </div>
+      <p className="mt-4 max-w-6xl text-[13px] text-muted-foreground">{props.guarantee?.state === "eligible" ? "Charged by mistake, or something else? " : "Charged by mistake, or need a refund after the 30-day guarantee? "}<Link href="/support?topic=Payments" className="font-medium text-foreground underline underline-offset-4">Ask support</Link> and a person will review it.</p>
 
-      <section aria-labelledby="inv" className="mt-10 max-w-5xl">
-        <h2 id="inv" className="text-xl font-semibold tracking-tight">Invoices</h2>
-        {cachedAt && <p className="mt-1 text-[12.5px] text-muted-foreground">Saved copy from {day(cachedAt)}.</p>}
-        {invoices.length === 0 ? (
-          <div className="mt-4 flex items-center gap-4 rounded-[24px] p-6 hairline">
-            <FileText className="h-6 w-6 text-muted-foreground" aria-hidden />
-            <p className="text-sm text-muted-foreground">No invoices yet. When you pay for a plan, the invoice appears here and in your inbox ({props.email}).</p>
-          </div>
-        ) : (
-          <ul className="mt-4 divide-y divide-border overflow-hidden rounded-[24px] hairline">
-            {invoices.map((i) => (
-              <li key={i.number} className="flex flex-wrap items-center gap-x-4 gap-y-1 bg-card px-5 py-4">
-                <span className="font-mono text-[13px]">{i.number}</span>
-                <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{i.description}</span>
-                <span className="text-sm tabular text-muted-foreground">{day(i.issuedAt)}</span>
-                <span className={cn("w-24 text-right text-sm font-semibold tabular", i.refunded && "text-muted-foreground line-through")}>{formatMoney(i.amountMinor, i.currency)}</span>
-                {i.refunded && <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium">Refunded</span>}
-                <a href={`/api/billing/invoices/${i.number}`} className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium hairline hover:bg-secondary" aria-label={`Download invoice ${i.number} (PDF)`}>
-                  <Download className="h-4 w-4" aria-hidden /> PDF
-                </a>
-                {i.creditNote && (
-                  <a href={`/api/billing/credit-notes/${i.creditNote}`} className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium hairline hover:bg-secondary" aria-label={`Download credit note ${i.creditNote} for invoice ${i.number} (PDF)`}>
-                    <Download className="h-4 w-4" aria-hidden /> Credit note
-                  </a>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="mt-4 text-[13px] text-muted-foreground">{props.guarantee?.state === "eligible" ? "Charged by mistake, or something else? " : "Charged by mistake, or need a refund after the 30-day guarantee? "}<Link href="/support?topic=Payments" className="font-medium text-foreground underline underline-offset-4">Ask support</Link> and a person will review it.</p>
-      </section>
+      <PriceSurvey currency={props.currency} planSlug={currentSlug} />
 
       <ConfirmDialog
         open={confirm}

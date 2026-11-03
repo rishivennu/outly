@@ -238,6 +238,13 @@ async function rzp(cfg: PaymentConfig, path: string, body: unknown) {
   if (!r.ok) throw new Error(j?.error?.description ?? `Razorpay ${r.status}`);
   return j;
 }
+async function rzpGet(cfg: PaymentConfig, path: string) {
+  const r = await fetch(`https://api.razorpay.com${path}`, { headers: { authorization: basic(cfg) }, signal: AbortSignal.timeout(8_000) });
+  const j: any = await r.json().catch(() => ({}));
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(j?.error?.description ?? `Razorpay ${r.status}`);
+  return j;
+}
 export const razorpay = {
   async start(cfg: PaymentConfig, a: StartArgs): Promise<CheckoutStart> {
     const r = await fetch("https://api.razorpay.com/v1/orders", {
@@ -286,6 +293,21 @@ export const razorpay = {
   },
   async cancelSubscription(cfg: PaymentConfig, subId: string) {
     await rzp(cfg, `/v1/subscriptions/${encodeURIComponent(subId)}/cancel`, { cancel_at_cycle_end: 0 });
+  },
+  /** 1098: read-only lookups for the Billing page's payment method card. */
+  async fetchSubscription(cfg: PaymentConfig, subId: string): Promise<{ status?: string; payment_method?: string; charge_at?: number; short_url?: string } | null> {
+    return rzpGet(cfg, `/v1/subscriptions/${encodeURIComponent(subId)}`);
+  },
+  /** The captured payment behind one of our refs: an order (checkout) or a payment id (renewal charge), card expanded. */
+  async paymentFor(cfg: PaymentConfig, ref: string): Promise<any | null> {
+    let id = ref;
+    if (ref.startsWith("order_")) {
+      const list = await rzpGet(cfg, `/v1/orders/${encodeURIComponent(ref)}/payments`);
+      const paid = (list?.items ?? []).find((x: any) => x.status === "captured" || x.status === "refunded") ?? null;
+      if (!paid) return null;
+      id = paid.id;
+    }
+    return rzpGet(cfg, `/v1/payments/${encodeURIComponent(id)}?expand[]=card`);
   },
   async test(cfg: PaymentConfig) {
     const { keyId, keySecret } = cfg.razorpay;

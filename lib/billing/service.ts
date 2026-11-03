@@ -321,7 +321,7 @@ export async function cancelSubscription(userId: string) {
   const s = await db.subscription.findFirst({ where: { userId, status: "active", provider: { notIn: [...GIFT_PROVIDERS] } }, include: { plan: true }, orderBy: { currentPeriodEnd: "desc" } });
   if (!s) throw new HttpError(404, "You don't have an active paid plan.", "NO_SUBSCRIPTION");
   // 1096: cancelling also stops an auto-renew mandate, so nothing is charged at the period end.
-  if (s.providerSubId) await dropMandate(s);
+  await dropMandate(s); // 1098: also stops a replacement still waiting for approval
   await db.subscription.update({ where: { id: s.id }, data: { cancelAtPeriodEnd: true, autoRenew: false, providerSubId: null } });
   return s;
 }
@@ -338,7 +338,7 @@ export async function pauseSubscription(userId: string, months: number, now = ne
   if (isPaused(s, now)) throw new HttpError(409, "Your plan is already paused.", "ALREADY_PAUSED");
   const p = pausePlan(now, s.currentPeriodEnd, months);
   // 1096: a mandate would still charge on the old date, so pausing stops auto-renew (they can switch it back on after).
-  if (s.providerSubId) await dropMandate(s);
+  await dropMandate(s); // 1098: also stops a replacement still waiting for approval
   await db.subscription.update({ where: { id: s.id }, data: { pausedUntil: p.pausedUntil, currentPeriodEnd: p.periodEnd, cancelAtPeriodEnd: false, autoRenew: false, providerSubId: null } });
   return { ...s, ...p };
 }

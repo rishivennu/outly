@@ -34,7 +34,8 @@ function Bar({ id, label, m, unit }: { id: string; label: string; m: Meter; unit
 }
 
 /** 1096: X posts and AI-captioned videos this month, packs held, and packs on sale. Buying runs the same checkout as a plan. */
-export function UsageExtras({ onBuy, busy }: { onBuy: (packId: string) => void; busy: string | null }) {
+/** 1098: `packsOnly` = the billing page's usage grid already shows the X and AI meters, so only top-ups remain here. */
+export function UsageExtras({ onBuy, busy, packsOnly }: { onBuy: (packId: string) => void; busy: string | null; packsOnly?: boolean }) {
   const [u, setU] = useState<UsageNow | null>(null);
   const [p, setP] = useState<Packs | null>(null);
   useEffect(() => {
@@ -43,10 +44,11 @@ export function UsageExtras({ onBuy, busy }: { onBuy: (packId: string) => void; 
   }, []);
   const onSale = p?.enabled ? p.packs.filter((k) => !k.block) : [];
   if (!u && !p) return null;
+  if (packsOnly && !(p && (p.held.length > 0 || onSale.length > 0)) && !u) return null;
   return (
-    <div className="mt-4 grid max-w-md gap-3">
-      {u && <Bar id="use-x" label="Posts to X this month" m={u.x} unit="posts" />}
-      {u && u.ai.on && <Bar id="use-ai" label="AI-captioned videos this month" m={u.ai} unit="videos" />}
+    <div className={cn("mt-4 grid gap-3", !packsOnly && "max-w-md")}>
+      {u && !packsOnly && <Bar id="use-x" label="Posts to X this month" m={u.x} unit="posts" />}
+      {u && !packsOnly && u.ai.on && <Bar id="use-ai" label="AI-captioned videos this month" m={u.ai} unit="videos" />}
       {u && <p className="text-xs text-muted-foreground">Analytics history: {u.analyticsDays > 0 ? Math.min(730, u.analyticsDays) : 90} days</p>}
       {p && p.held.length > 0 && (
         <ul className="grid gap-1 text-xs text-muted-foreground" aria-label="Your top-ups">

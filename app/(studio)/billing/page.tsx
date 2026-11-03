@@ -13,9 +13,10 @@ import { activeGateway, capturePaypal, completePayment, confirmYoupi, expireSubs
 import { BillingView, type ReturnNotice } from "@/components/billing/BillingView";
 import { paymentReceipt } from "@/lib/billing/receipt";
 import type { Receipt } from "@/lib/billing/receipt-core";
-import { captionUsage, postUsage, replyUsage, storageUsage, uploadLimitBytes } from "@/lib/billing/entitlements";
+import { captionUsage, entitlements, postUsage, replyUsage, storageUsage, uploadLimitBytes, xPostUsage } from "@/lib/billing/entitlements";
+import { accountMeter, billingStatus, historyRows, nextCharge, pickCurrent, type MeterView, type SubView } from "@/lib/billing/overview-core";
 import { accessFor } from "@/lib/billing/access";
-import { isPaidSub } from "@/lib/billing/access-core";
+import { GIFT_PROVIDERS, isGiftProvider, isPaidSub } from "@/lib/billing/access-core";
 import { betaConfig, myBetaCode } from "@/lib/beta";
 import { myFounding, foundingPrice } from "@/lib/founding";
 import { trustBadges } from "@/lib/badges";
@@ -108,10 +109,11 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
   } else if (searchParams.paid) notice = { tone: "ok", text: `Payment received. Invoice ${searchParams.paid} is below and on its way to ${user.email}.` };
 
   const receipt = await receiptFor(user.id, searchParams, cancelledId).catch(() => null);
-  const [plans, subs, invoices, gw, usage, display, replies, captions, upload, beta, betaCfg, founding, badges, storage, access, refund] = await Promise.all([
+  const now = new Date();
+  const [plans, subs, invoices, gw, usage, display, replies, captions, upload, beta, betaCfg, founding, badges, storage, access, refund, ent, x, accounts, scheduled, seatsTaken, loose, lastEnded] = await Promise.all([
     listPlans(),
     db.subscription.findMany({ where: { userId: user.id, status: "active" }, include: { plan: true }, orderBy: { createdAt: "desc" } }),
-    db.invoice.findMany({ where: { userId: user.id }, orderBy: { issuedAt: "desc" }, take: 50, include: { payment: { select: { status: true } }, creditNote: { select: { number: true } } } }),
+    db.invoice.findMany({ where: { userId: user.id }, orderBy: { issuedAt: "desc" }, take: 50, include: { payment: { select: { status: true, planId: true, interval: true, purpose: true } }, creditNote: { select: { number: true } } } }),
     activeGateway(),
     postUsage(user.id),
     getConfig("pricing").then(normalizeDisplay),
@@ -125,9 +127,20 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
     storageUsage(user.id),
     accessFor(user.id),
     refundStatus(user.id).catch(() => null),
+    entitlements(user.id),
+    xPostUsage(user.id),
+    db.socialAccount.findMany({ where: { userId: user.id, status: { not: "disconnected" } }, select: { platform: true } }),
+    db.post.count({ where: { userId: user.id, status: "scheduled" } }),
+    db.teamMember.count({ where: { ownerId: user.id } }),
+    // 1098: the plan that ended most recently, for "Expired"; after 60 days the page just says Free.
+    // 1098: failed and UPI-pending payments have no invoice but belong in the history.
+    db.payment.findMany({ where: { userId: user.id, status: { in: ["failed", "pending"] }, sample: false, invoice: null, createdAt: { gt: new Date(now.getTime() - 60 * 86_400_000) } }, orderBy: { createdAt: "desc" }, take: 20 }),
+    db.subscription.findFirst({ where: { userId: user.id, priceMinor: { gt: 0 }, provider: { notIn: [...GIFT_PROVIDERS] }, currentPeriodEnd: { lte: now, gt: new Date(now.getTime() - 60 * 86_400_000) } }, include: { plan: true }, orderBy: { currentPeriodEnd: "desc" } }),
   ]);
   // The plan card is about money: a paid subscription wins over a gift month running alongside it.
-  const sub = subs.find((s) => isPaidSub(s)) ?? subs[0] ?? null;
+  // 1098: only one still in its period counts; a lapsed one (no cancel, no renewal) shows as Expired instead.
+  const sub = pickCurrent(subs, (s) => isPaidSub(s), now);
+  const ended = !sub && lastEnded && !isGiftProvider(lastEnded.provider) ? { planName: lastEnded.plan.name, endedAt: lastEnded.currentPeriodEnd.toISOString(), autoRenew: lastEnded.autoRenew && lastEnded.status === "active" } : null;
   // Access granted by our team or earned through a referral, shown so the plan in force is never a mystery.
   const best = access.best;
   const extra = best && (best.source === "admin" || best.source === "referral") && best.endsAt
@@ -172,8 +185,41 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
     return { ...p, priceMinor: off(lp.priceMinor), currency: lp.currency, approx: approx ? `about ${formatMoney(off(approx.priceMinor), approx.currency)}` : null, year, was: fpct && lp.priceMinor > 0 ? lp.priceMinor : null };
   });
 
+  const currentView: SubView | null = sub
+    ? { planSlug: sub.plan.slug, planName: sub.plan.name, priceMinor: sub.priceMinor, currency: sub.currency, interval: sub.interval, periodEnd: sub.currentPeriodEnd.toISOString(), cancelAtPeriodEnd: sub.cancelAtPeriodEnd, pausedUntil: sub.pausedUntil && sub.pausedUntil > now ? sub.pausedUntil.toISOString() : null, provider: sub.provider, autoRenew: sub.autoRenew, gift: !isPaidSub(sub) }
+    : null;
+  const status = billingStatus({ current: currentView, grant: extra ? { planName: extra.planName, endsAt: extra.endsAt } : null, ended }, now);
+
+  // 1098: the usage grid, in the plan's own terms. Unlimited = no bar; not on the plan = "Not included".
+  const acc = accountMeter(ent, accounts);
+  const meters: MeterView[] = [
+    { key: "posts", label: usage.postPeriod === "week" ? "Posts this week" : "Posts this month", used: usage.used, limit: usage.postLimit, unit: "posts", href: "/content" },
+    { key: "scheduled", label: "Scheduled posts", used: scheduled, limit: 0, unit: "in the queue", note: scheduled ? "Waiting to publish" : "Nothing queued", href: "/calendar" },
+    ent.aiCaptions
+      ? { key: "ai", label: "AI-captioned videos", used: captions.used, limit: captions.captionVideos, extra: captions.credits || undefined, unit: "videos", note: "This month" }
+      : { key: "ai", label: "AI captions", used: 0, limit: 0, unit: "", locked: true, note: `Not on ${ent.planName}` },
+    { key: "accounts", label: "Connected accounts", used: acc.used, limit: acc.limit, unit: "accounts", note: acc.note, href: "/accounts" },
+    { key: "storage", label: "Storage", used: Math.round(storage.pct), limit: storage.limitBytes > 0 ? 100 : 0, unit: "%", display: storage.label, note: storage.over ? "Over: new uploads are paused" : null },
+    ent.seats > 0
+      ? { key: "seats", label: "Team seats", used: seatsTaken, limit: ent.seats, unit: "seats", note: ent.extraSeats ? `Includes ${ent.extraSeats} from a top-up` : null, href: "/settings#team" }
+      : { key: "seats", label: "Team seats", used: 0, limit: 0, unit: "", locked: true, note: `Not on ${ent.planName}` },
+    ...(ent.xPostLimit > 0 ? [{ key: "x", label: "Posts to X", used: x.used, limit: ent.xPostLimit, extra: x.credits || undefined, unit: "posts", note: "This month" }] : []),
+    ...(replies.replyLimit > 0 ? [{ key: "replies", label: "Replies this week", used: replies.used, limit: replies.replyLimit, unit: "replies", href: "/inbox" }] : []),
+  ];
+  const history = historyRows(
+    invoices.map((i) => ({ number: i.number, description: i.description, amountMinor: i.amountMinor, currency: i.currency, issuedAt: i.issuedAt, creditNote: i.creditNote?.number ?? null, payment: i.payment })),
+    loose,
+    plans,
+    now,
+  );
+
   return (
     <BillingView
+      status={status}
+      nextCharge={nextCharge(currentView, now)}
+      meters={meters}
+      history={history}
+      ended={ended}
       email={user.email}
       notice={notice}
       receipt={receipt}
@@ -199,7 +245,6 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
         storage: { usedBytes: storage.usedBytes, limitBytes: storage.limitBytes, pct: storage.pct, over: storage.over, label: storage.label },
       }}
       guarantee={refund ? (refund.state === "eligible" ? { ...refund, until: refund.until.toISOString() } : { state: refund.state }) : undefined}
-      invoices={invoices.map((i) => ({ number: i.number, description: i.description, amountMinor: i.amountMinor, currency: i.currency, issuedAt: i.issuedAt.toISOString(), refunded: i.payment?.status === "refunded", creditNote: i.creditNote?.number ?? null }))}
     />
   );
 }
