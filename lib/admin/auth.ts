@@ -75,7 +75,10 @@ export async function createAdminSession(a: { id: string; role: string; password
     .setIssuedAt()
     .setExpirationTime(`${TTL_S}s`)
     .sign(secret);
-  (await cookies()).set(ADMIN_COOKIE, token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: TTL_S });
+  // Lax, like the creator session (1110): an iPhone Home Screen app treats its own page loads as coming from
+  // outside, so a Strict cookie was never sent there and the console bounced back to sign in. CSRF stays covered:
+  // every admin write is a POST/PATCH/DELETE through adminRoute (assertSameOrigin), and Lax never rides those cross-site.
+  (await cookies()).set(ADMIN_COOKIE, token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: TTL_S });
 }
 
 export async function destroyAdminSession() {
