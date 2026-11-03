@@ -12,13 +12,13 @@ const STYLES: { id: DashboardStyle; name: string; body: string; points: string[]
     id: "classic",
     name: "Classic",
     body: "The Home people know today: greeting, what is sending, the week, next steps, ideas and recycling.",
-    points: ["Everything on Home as it was", "Sidebar as it was", "Settings > Sessions with Sign out everywhere"],
+    points: ["Everything on Home as it was", "Greeting and next steps up top", "Settings > Sessions with Sign out everywhere"],
   },
   {
     id: "pulse",
     name: "Analytics dashboard",
     body: "Numbers first: rolling KPI cards, a views chart that redraws per range and platform, top posts and the platform split.",
-    points: ["Animated sidebar icons and a gliding hover", "7D, 30D and 90D, per platform", "Settings > Active sessions, one device at a time"],
+    points: ["Rolling numbers and a views chart up top", "7D, 30D and 90D, per platform", "Settings > Active sessions, one device at a time"],
   },
 ];
 
@@ -28,7 +28,7 @@ function Preview({ id }: { id: DashboardStyle }) {
   return (
     <span aria-hidden className="flex h-28 gap-2 overflow-hidden rounded-2xl bg-background/60 p-2.5 hairline">
       <span className="flex w-10 flex-col gap-1.5 rounded-xl bg-secondary/70 p-1.5">
-        {[0, 1, 2, 3, 4].map((i) => <span key={i} className={cn("h-1.5", i === 0 && id === "pulse" ? "rounded-full bg-lime" : bar)} />)}
+        {[0, 1, 2, 3, 4].map((i) => <span key={i} className={cn("h-1.5", i === 0 ? "rounded-full bg-lime" : bar)} />)}
       </span>
       {id === "classic" ? (
         <span className="flex flex-1 flex-col gap-1.5">

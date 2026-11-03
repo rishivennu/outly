@@ -6,7 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CornerDownLeft, Search } from "lucide-react";
 import { api } from "@/lib/client/api";
 import { LETTERS_KEY, isPaletteKey, letterShortcut, rank, type Command } from "@/lib/client/commands";
-import { THEME_KEY } from "@/lib/theme/script";
+import { setTheme } from "@/components/shared/ThemeToggle";
 import { startTour } from "@/components/onboarding/Tour";
 import { showPageTips } from "@/components/onboarding/PageGuide";
 import { useToast } from "@/components/shared/Toast";
@@ -20,13 +20,6 @@ type Brief = { id: string; title: string; status: string; at: string | null };
 type Item = Command & { run?: () => void };
 
 const STATUS: Record<string, string> = { draft: "Draft", scheduled: "Scheduled", publishing: "Sending", published: "Live", partial: "Partly live", failed: "Needs a hand" };
-
-function applyTheme(choice: "light" | "dark" | "system") {
-  localStorage.setItem(THEME_KEY, choice);
-  const dark = choice === "dark" || (choice === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.classList.toggle("dark", dark);
-  document.documentElement.dataset.theme = choice;
-}
 
 /**
  * Ctrl/Cmd+K: jump anywhere, find a post, or do the common things, without the mouse.
@@ -107,9 +100,9 @@ export function CommandPalette() {
       ] : []),
       { id: "settings", group: "Go to", label: "Settings", keywords: "profile timezone email", href: "/settings" },
       { id: "help", group: "Go to", label: "Help centre", keywords: "support faq", href: "/support" },
-      { id: "light", group: "Do", label: "Switch to light theme", keywords: "appearance mode", run: () => applyTheme("light") },
-      { id: "dark", group: "Do", label: "Switch to dark theme", keywords: "appearance mode night", run: () => applyTheme("dark") },
-      { id: "system", group: "Do", label: "Match my device theme", keywords: "appearance system auto", run: () => applyTheme("system") },
+      { id: "light", group: "Do", label: "Switch to light theme", keywords: "appearance mode", run: () => setTheme("light") },
+      { id: "dark", group: "Do", label: "Switch to dark theme", keywords: "appearance mode night", run: () => setTheme("dark") },
+      { id: "system", group: "Do", label: "Match my device theme", keywords: "appearance system auto", run: () => setTheme("system") },
       { id: "tour", group: "Do", label: "Take the tour", keywords: "help intro guide", run: () => { router.push("/home"); startTour("/home"); } },
       { id: "tips", group: "Do", label: "Show tips for this page", keywords: "help guide how explain", run: () => setTimeout(showPageTips, 200) },
       {
@@ -184,7 +177,7 @@ export function CommandPalette() {
                   initial={reduce ? false : { opacity: 0, y: -8, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
-                  transition={{ type: "spring", stiffness: 520, damping: 40 }}
+                  transition={{ duration: reduce ? 0 : 0.22, ease: [0.16, 1, 0.3, 1] }}
                   className="glass-strong flex max-h-[min(560px,80dvh)] w-full max-w-[600px] flex-col overflow-hidden rounded-[28px]"
                 >
                   <Dialog.Title className="sr-only">Search Outlly</Dialog.Title>

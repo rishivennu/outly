@@ -25,8 +25,9 @@ describe("1100 pulse rail", () => {
     expect(rail).toContain("open={open && !expanded}");
     expect(css).toMatch(/html\[data-rail="open"\] \.rail \{ width: 232px;/);
   });
-  test("only the pulse style gets the rail, desktop only", () => {
-    expect(nav).toContain("<PulseRail />");
+  test("every dashboard style gets the rail (1103), desktop only", () => {
+    expect(nav).toContain("return <PulseRail />;");
+    expect(nav).not.toContain("ClassicSidebar");
     expect(rail).toContain('data-shell="pulse"');
     expect(rail).toMatch(/hidden h-dvh[^"]*lg:block/);
   });
@@ -67,9 +68,9 @@ describe("1100 phone drawer", () => {
     expect(nav).not.toContain("more-panel");
     expect(css).not.toContain(".mtab-more");
   });
-  test("top bar: menu button replaces the theme button, still three 44px controls", () => {
+  test("top bar: menu button, and (1103) the theme button back beside it, all 44px", () => {
     expect(bar).toContain('<MobileDrawer className="mtop-btn" />');
-    expect(bar).not.toContain("ThemeCycleButton");
+    expect(bar).toContain('<ThemeCycleButton className="mtop-btn" />');
     expect(drawer).toContain('aria-label="Open menu"');
     expect(drawer).toContain('aria-label="Close menu"');
   });

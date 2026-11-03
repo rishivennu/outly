@@ -38,7 +38,9 @@ describe("motion pass (1064)", () => {
   });
 
   test("the studio sidebar keeps a native, slim, neutral scrollbar", () => {
-    expect(readFileSync("components/shell/Nav.tsx", "utf8")).toContain("nav-scroll");
+    // 1103: the rail is the only studio sidebar; the scrollbar shows while it is open
+    expect(readFileSync("components/shell/PulseRail.tsx", "utf8")).toContain('className="rail-mid nav-scroll"');
+    expect(css).toContain('html[data-rail="open"] .rail-mid.nav-scroll { scrollbar-width: thin; }');
     expect(css).toMatch(/\.nav-scroll \{[^}]*scrollbar-width: thin/);
     expect(css).not.toMatch(/\.nav-scroll[^{]*\{[^}]*scrollbar-width: none/);
     // Legacy webkit styling only where the standard props are missing, so it never overrides them.

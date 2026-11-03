@@ -3316,17 +3316,24 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adj
 @keyframes kpi-rise { from { opacity: 0; transform: translateY(12px); } }
 
 /* ---------------------------------------------------------------------------------------------------------
-   1100: pulse rail. A slim ink pill (fully rounded), cream icons, a lime circle for the current section.
+   1100: pulse rail. A slim pill (fully rounded), a lime circle for the current section. 1103: it follows the
+   page theme and is the sidebar for every dashboard style. Light: the liquid glass the classic sidebar wore
+   (.lg-glass, ink icons). Dark: the ink rail with cream icons, as shipped in 1100 (no rim, no sheen).
    Collapsed is 72px (two 14px gutters around 44px circles); expanded is 232px with labels. The width is set
    before paint from html[data-rail] (railScript), so pages never jump. Only width, radius, opacity and
-   transform move; reduced motion snaps.
+   transform move; reduced motion snaps. Focus rings use --ring (violet in light, lime in dark).
    --------------------------------------------------------------------------------------------------------- */
 .rail {
+  --rail-bg: hsl(var(--glass-solid));
   display: flex; flex-direction: column; height: 100%;
   width: 72px; padding: 14px; border-radius: 36px; overflow: hidden;
-  background: hsl(232 16% 7%); color: hsl(var(--foreground));
+  color: hsl(var(--foreground));
 }
-html.dark .rail { background: hsl(240 5% 10.5%); }
+html.dark .rail { --rail-bg: hsl(240 5% 10.5%); background: var(--rail-bg); box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html.dark .rail::before, html.dark .rail::after { display: none; }
+/* the refraction pass (LiquidGlass) would put an invisible SVG filter back on the opaque ink rail: skip it */
+html.dark[data-lg] .rail.lg-glass[data-lg-ready] { -webkit-backdrop-filter: none; backdrop-filter: none; }
+html.dark[data-contrast="more"] .rail { box-shadow: inset 0 0 0 1px hsl(var(--border)); }
 html[data-rail="open"] .rail { width: 232px; border-radius: 30px; }
 .rail-top, .rail-bottom { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
 .rail-bottom { position: relative; padding-top: 10px; }
@@ -3346,7 +3353,7 @@ html[data-rail="open"] .rail { width: 232px; border-radius: 30px; }
   -webkit-tap-highlight-color: transparent; outline: none;
 }
 .rail-row:hover { color: hsl(var(--foreground)); background: hsl(var(--foreground) / .08); }
-.rail-row:focus-visible { box-shadow: 0 0 0 2px hsl(var(--lime)); color: hsl(var(--foreground)); }
+.rail-row:focus-visible { box-shadow: 0 0 0 2px hsl(var(--ring)); color: hsl(var(--foreground)); }
 .rail-row[aria-current="page"], .rail-row[aria-current="page"]:hover { color: hsl(var(--lime-foreground)); background: transparent; }
 .rail-row[aria-current="page"] .rail-label { font-weight: 600; }
 .rail-pill { position: absolute; inset: 0; border-radius: 9999px; background: hsl(var(--lime)); box-shadow: 0 6px 18px -6px hsl(var(--lime) / .55); }
@@ -3356,6 +3363,12 @@ html[data-rail="open"] .rail { width: 232px; border-radius: 30px; }
 html[data-rail="open"] .rail-label { opacity: 1; transform: none; }
 .rail-new:not([aria-current="page"]) { color: hsl(var(--lime)); box-shadow: inset 0 0 0 1.5px hsl(var(--lime) / .7); }
 .rail-new:not([aria-current="page"]):hover { color: hsl(var(--lime)); background: hsl(var(--lime) / .12); }
+/* light: bright lime is 1.3:1 on the glass, so the outline and icon use lime-ink (5.4:1) */
+html:not(.dark) .rail-new:not([aria-current="page"]) { color: hsl(var(--lime-ink)); box-shadow: inset 0 0 0 1.5px hsl(var(--lime-ink) / .6); }
+html:not(.dark) .rail-new:not([aria-current="page"]):hover { color: hsl(var(--lime-ink)); background: hsl(var(--lime) / .2); }
+/* the outline is a box-shadow too, so keyboard focus adds its ring instead of replacing it */
+.rail-new:not([aria-current="page"]):focus-visible { box-shadow: inset 0 0 0 1.5px hsl(var(--lime) / .7), 0 0 0 2px hsl(var(--ring)); }
+html:not(.dark) .rail-new:not([aria-current="page"]):focus-visible { box-shadow: inset 0 0 0 1.5px hsl(var(--lime-ink) / .6), 0 0 0 2px hsl(var(--ring)); }
 .rail-logo, .rail-me { padding: 0; gap: 10px; }
 .rail-logo:hover, .rail-me:hover { background: transparent; }
 .rail-logo { height: 44px; margin-bottom: 4px; }
@@ -3364,10 +3377,36 @@ html[data-rail="open"] .rail-label { opacity: 1; transform: none; }
 .rail-word { font-family: var(--font-display, inherit); font-size: 19px; font-weight: 700; letter-spacing: -0.045em; color: hsl(var(--foreground)); }
 .rail-me { height: 52px; border-radius: 26px; }
 .rail-avatar { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 9999px; background: hsl(var(--foreground)); transition: box-shadow .2s ease; }
+html:not(.dark) .rail-avatar { background: hsl(var(--card)); box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .1); }
 .rail-me:hover .rail-avatar, .rail-me[data-state="open"] .rail-avatar { box-shadow: 0 0 0 3px hsl(var(--lime) / .45); }
 .rail-me:focus-visible { box-shadow: none; }
-.rail-me:focus-visible .rail-avatar { box-shadow: 0 0 0 2px hsl(232 16% 7%), 0 0 0 4px hsl(var(--lime)); }
+.rail-me:focus-visible .rail-avatar { box-shadow: 0 0 0 2px var(--rail-bg), 0 0 0 4px hsl(var(--ring)); }
 .rail-bell { color: hsl(var(--foreground) / .68); }
+/* 1103 theme: the cycle circle while collapsed, a "Theme" row with the three-way switch while open */
+.rail-theme { display: none; align-items: center; justify-content: space-between; gap: 4px; height: 44px; flex-shrink: 0; padding-left: 8px; font-size: 13px; font-weight: 500; color: hsl(var(--foreground) / .68); white-space: nowrap; }
+html[data-rail="open"] .rail-theme { display: flex; }
+html[data-rail="open"] .rail-theme-cycle { display: none; }
+/* open and taller than the screen (zoom, short windows): the slim neutral scrollbar from 1064 shows. Collapsed it
+   stays hidden, since a 72px rail has no room for one. */
+html[data-rail="open"] .rail-mid.nav-scroll { scrollbar-width: thin; }
+/* When the list is taller than the rail, its cut edge fades (top only once scrolled, bottom only while more is
+   below), so a half-shown row reads as "scroll for more". Scroll-driven, so a list that fits gets no fade at all;
+   browsers without scroll timelines just show the plain edge. Static at each position, so reduced motion is fine. */
+.rail-mid :is(a, button) { scroll-margin-block: 32px; } /* a row focused by keyboard scrolls clear of the faded edge */
+@property --rail-fade-t { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --rail-fade-b { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@supports (animation-timeline: scroll()) {
+  .rail-mid {
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--rail-fade-t), #000 calc(100% - var(--rail-fade-b)), transparent);
+    mask-image: linear-gradient(to bottom, transparent, #000 var(--rail-fade-t), #000 calc(100% - var(--rail-fade-b)), transparent);
+    animation: rail-fade linear both; animation-timeline: scroll(self);
+  }
+}
+@keyframes rail-fade {
+  0% { --rail-fade-t: 0px; --rail-fade-b: 28px; }
+  12%, 88% { --rail-fade-t: 28px; --rail-fade-b: 28px; }
+  100% { --rail-fade-t: 28px; --rail-fade-b: 0px; }
+}
 
 @media (prefers-reduced-motion: no-preference) {
   .rail { transition: width .34s var(--ease-liquid), border-radius .34s var(--ease-liquid); }
@@ -3375,7 +3414,9 @@ html[data-rail="open"] .rail-label { opacity: 1; transform: none; }
   .rail-row:active { transform: scale(.95); }
   .rail-label { transition: opacity .16s ease, transform .34s var(--ease-liquid); }
   html[data-rail="open"] .rail-label { transition-delay: .07s; }
+  html[data-rail="open"] .rail-theme { animation: rail-theme-in .24s ease .1s backwards; }
 }
+@keyframes rail-theme-in { from { opacity: 0; } }
 
 /* Rail tooltips: ink chip, slides out a few pixels from the icon. */
 .rail-tip {

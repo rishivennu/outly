@@ -208,7 +208,8 @@ describe("1099 phone top bar and touch targets", () => {
     expect(css).toMatch(/@media \(orientation: landscape\) and \(max-height: 500px\) \{\s*\.mtop-row \{ height: 48px; \}/);
   });
   test("every control is a 44px .mtop-btn with press feedback and a reduced-motion fallback", () => {
-    expect(bar.match(/className="mtop-btn"/g)?.length).toBe(3);
+    // 1103: search, theme, notifications, menu
+    expect(bar.match(/className="mtop-btn"/g)?.length).toBe(4);
     expect(css).toMatch(/\.mtop-btn \{[^}]*width: 44px; height: 44px;/);
     expect(css).toMatch(/\.mtop-btn:active \{ transform: scale\(0\.9\)/);
     expect(css).toMatch(/prefers-reduced-motion: reduce\) \{\s*\.mtop, \.mtop-btn \{ transition: none; \}/);

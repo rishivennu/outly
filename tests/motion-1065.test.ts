@@ -75,9 +75,10 @@ describe("route transitions (1065): wiring", () => {
   });
 
   test("both sidebars give the order, and every item shares one moving pill", () => {
-    expect(read("components/shell/Nav.tsx")).toContain('data-route-order=""');
+    // 1103: the studio sidebar is the rail for every style; its rows and New post share one pill
+    expect(read("components/shell/PulseRail.tsx")).toContain('data-route-order=""');
     expect(read("components/admin/AdminShell.tsx")).toContain('data-route-order=""');
-    expect((read("components/shell/Nav.tsx").match(/layoutId="nav-pill"/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect((read("components/shell/PulseRail.tsx").match(/layoutId="rail-pill"/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 
   test("studio loaders arrive with the stage instead of a separate spinner", () => {

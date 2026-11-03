@@ -11,7 +11,6 @@ import { CommandPalette } from "@/components/shell/CommandPalette";
 import { touchActivity, touchPlace } from "@/lib/activity";
 import { touchPresence } from "@/lib/presence";
 import { touchSession } from "@/lib/sessions";
-import { dashboardFor } from "@/lib/dashboard-style";
 import { liveNow } from "@/lib/social/registry";
 import { LivePlatformsProvider } from "@/components/shell/LivePlatforms";
 import { WorkspaceBar } from "@/components/shell/WorkspaceBar";
@@ -34,7 +33,7 @@ export default async function StudioLayout({ children }: { children: React.React
   const user = await getCurrentUser();
   // Signed cookie the database refuses: clear it on the way to sign-in, or middleware bounces /login back here (1042).
   if (!user) redirect(`/api/auth/expired?next=${encodeURIComponent((await headers()).get("x-path") ?? "/home")}`);
-  const [live, site, notice, dash, install, welcome] = await Promise.all([liveNow(), siteStatus(), getConfig("updates"), dashboardFor(), getConfig("install"), getConfig("welcome")]);
+  const [live, site, notice, install, welcome] = await Promise.all([liveNow(), siteStatus(), getConfig("updates"), getConfig("install"), getConfig("welcome")]);
   const welcomeCfg = normalizeWelcome(welcome);
   // Maintenance: members who joined before it started carry on; anyone newer waits on the maintenance page.
   if (site.maintenance && !joinedBeforeMaintenance({ createdAt: user.joinedAt }, site.since)) redirect("/maintenance?preview");
@@ -51,7 +50,7 @@ export default async function StudioLayout({ children }: { children: React.React
         Skip to main content
       </a>
       <div className="flex min-h-dvh">
-        <Sidebar variant={dash.style} />
+        <Sidebar />
         {/* A column that is exactly the screen when the page is short: no empty scroll below the content (1053). */}
         <div className="flex min-h-dvh min-w-0 flex-1 flex-col overflow-x-clip">
           <WorkspaceBar />
