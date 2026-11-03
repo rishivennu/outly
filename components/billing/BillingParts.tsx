@@ -37,7 +37,7 @@ export function StatusPill({ s, withDate = true, className }: { s: BillingStatus
 /** A titled card section, the building block of the page. */
 export function Panel({ id, title, action, children, className }: { id: string; title: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <section aria-labelledby={id} className={cn("min-w-0 rounded-[28px] bg-card p-5 hairline sm:p-6", className)}>
+    <section aria-labelledby={id} className={cn("card-glass min-w-0 rounded-[28px] bg-card p-5 hairline sm:p-6", className)}>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <h2 id={id} className="text-[17px] font-semibold tracking-tight">{title}</h2>
         {action}

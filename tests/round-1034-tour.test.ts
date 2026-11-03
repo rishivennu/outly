@@ -3,17 +3,19 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 const tour = readFileSync("components/onboarding/Tour.tsx", "utf8");
-const nav = readFileSync("components/shell/Nav.tsx", "utf8");
+/* 1100: the tour target map moved to nav-items.ts, shared by the classic sidebar and the pulse rail. */
+const nav = readFileSync("components/shell/Nav.tsx", "utf8") + readFileSync("components/shell/nav-items.ts", "utf8") + readFileSync("components/shell/PulseRail.tsx", "utf8");
 const targets = [...tour.matchAll(/target: "([a-z-]+)"/g)].map((m) => m[1]);
 
 describe("guided tour", () => {
   test("covers every studio page in nav order, Home first and Settings last", () => {
     expect(targets).toEqual(["home", "new-post", "content", "calendar", "analytics", "inbox", "approvals", "accounts", "billing", "support", "settings"]);
   });
-  test("every target exists in the nav, and phones have a More fallback", () => {
+  test("every target exists in the nav, and phones fall back to the menu button (1100)", () => {
     for (const t of targets.filter((t) => t !== "new-post")) expect(nav).toContain(`: "${t}"`);
     expect(nav).toContain('data-tour="new-post"');
-    expect(nav).toContain('data-tour="more"');
+    expect(readFileSync("components/shell/MobileDrawer.tsx", "utf8")).toContain('data-tour="menu"');
+    expect(readFileSync("components/onboarding/Spotlight.tsx", "utf8")).toContain('findTarget("menu")');
   });
   test("owner-only pages are skipped for teammates", () => {
     expect(tour).toMatch(/target: "accounts", owner: true/);

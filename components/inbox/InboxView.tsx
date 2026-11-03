@@ -226,7 +226,7 @@ function CommentsPane({ initial, hasTabs, tabs, query, refreshTick, onBusy, onWa
       )}
       {data.errors.length > 0 && <CommentProblems errors={data.errors} busy={loading} onRetry={() => void load(platform)} />}
 
-      <div className="-mx-4 min-h-0 flex-1 sm:-mx-6 lg:mx-0 lg:grid lg:grid-cols-[minmax(320px,400px)_1fr] lg:overflow-hidden lg:rounded-[24px] lg:bg-card lg:hairline">
+      <div className="-mx-4 min-h-0 flex-1 sm:-mx-6 lg:mx-0 lg:grid lg:grid-cols-[minmax(320px,400px)_1fr] lg:overflow-hidden lg:rounded-[24px] lg:bg-card lg:hairline card-glass card-glass-desk">
         <section aria-label="Comments" className="flex min-h-0 flex-col lg:border-r lg:border-border">
           <div className="px-4 pb-2 sm:px-6 lg:px-3 lg:pt-3">
             {tabs}

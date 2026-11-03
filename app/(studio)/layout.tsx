@@ -27,12 +27,15 @@ import { NativeBridge } from "@/components/shell/NativeBridge";
 import { WarmUp } from "@/components/shell/WarmUp";
 import { InstallPrompt } from "@/components/shell/InstallPrompt";
 import { normalizeInstall } from "@/lib/pwa-core";
+import { PwaWelcome } from "@/components/shell/PwaWelcome";
+import { normalizeWelcome } from "@/lib/pwa-welcome";
 
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   // Signed cookie the database refuses: clear it on the way to sign-in, or middleware bounces /login back here (1042).
   if (!user) redirect(`/api/auth/expired?next=${encodeURIComponent((await headers()).get("x-path") ?? "/home")}`);
-  const [live, site, notice, dash, install] = await Promise.all([liveNow(), siteStatus(), getConfig("updates"), dashboardFor(), getConfig("install")]);
+  const [live, site, notice, dash, install, welcome] = await Promise.all([liveNow(), siteStatus(), getConfig("updates"), dashboardFor(), getConfig("install"), getConfig("welcome")]);
+  const welcomeCfg = normalizeWelcome(welcome);
   // Maintenance: members who joined before it started carry on; anyone newer waits on the maintenance page.
   if (site.maintenance && !joinedBeforeMaintenance({ createdAt: user.joinedAt }, site.since)) redirect("/maintenance?preview");
   void touchActivity(user.id); // daily-active tracking for the admin console; never blocks or throws
@@ -60,7 +63,7 @@ export default async function StudioLayout({ children }: { children: React.React
           <MobileTopBar />
           <AppNavBar />
           {/* Room for the floating tab bar (68px + 12px gap) and a little air, no more: it was 11rem plus each page's own. */}
-          <main id="main" className="mmain relative flex-1 pb-[calc(max(12px,env(safe-area-inset-bottom))+92px)] lg:pb-0">
+          <main id="main" tabIndex={-1} className="mmain relative flex-1 outline-none pb-[calc(max(12px,env(safe-area-inset-bottom))+92px)] lg:pb-0">
             {children}
           </main>
         </div>
@@ -70,6 +73,9 @@ export default async function StudioLayout({ children }: { children: React.React
       <AppMoreSheet />
       <AppEffects />
       <NativeBridge />
+      {/* Before the other popups: it decides in a layout effect, so they already see it pending (1100). Off in
+          Admin = not rendered at all, so a head-script flag has nothing to show and nothing waits on it. */}
+      {welcomeCfg.enabled && <PwaWelcome config={welcomeCfg} />}
       <SendingPill />
       <PrivacyNotice />
       <UpgradeDialog />

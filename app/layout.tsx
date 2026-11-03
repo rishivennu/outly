@@ -14,6 +14,8 @@ import { PageScrollbar } from "@/components/marketing/PageScrollbar";
 import "./globals.css";
 import "./mobile-app.css";
 import { appScript } from "@/lib/app-mode";
+import { railScript } from "@/lib/rail";
+import { welcomeScript } from "@/lib/pwa-welcome";
 import { installCaptureScript } from "@/lib/pwa-core";
 import { chunkScript } from "@/lib/client/chunk-reload";
 
@@ -87,6 +89,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: chunkScript }} />
         {/* Inside the Android app: mark <html> before first paint so the app layout (app/mobile-app.css) never flashes the web one. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: appScript }} />
+        {/* Pulse rail open or closed (1100), before paint so the page column never jumps. */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: railScript }} />
+        {/* First launch from the Home Screen (1100): paint the welcome first, never a flash of the dashboard. After appScript. */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: welcomeScript }} />
         {/* 1099: keep the browser's one-time install prompt for the studio's "Add to Home Screen" card. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: installCaptureScript }} />
         {/* Landing sections the admin hid (readable hint cookie set by middleware): mark <html> before the

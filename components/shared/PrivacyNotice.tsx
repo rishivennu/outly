@@ -6,6 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Ban, Clock, Database, Lock, Share2, SlidersHorizontal, X } from "lucide-react";
 import { readConsent } from "@/components/shared/CookieConsent";
 import { useUser } from "@/components/shell/UserContext";
+import { afterWelcome, welcomePending } from "@/lib/pwa-welcome";
 
 /**
  * "How we handle your data", shown once per person per version on their first studio visit (10-18).
@@ -32,6 +33,15 @@ export function privacyPending(userId: string) {
 
 /** Run `cb` once the privacy notice is out of the way (now, if it was already seen). Returns a cleanup. */
 export function afterPrivacy(userId: string, cb: () => void) {
+  // 1100: the Home Screen welcome comes first of all; then the usual order.
+  if (welcomePending()) {
+    let un = () => {};
+    const off = afterWelcome(() => (un = afterPrivacy(userId, cb)));
+    return () => {
+      off();
+      un();
+    };
+  }
   if (!privacyPending(userId)) {
     cb();
     return () => {};
@@ -82,6 +92,7 @@ export function PrivacyNotice() {
     let t = 0;
     const tick = () => {
       if (!privacyPending(userId)) return window.clearInterval(t); // already seen, e.g. opened from Settings
+      if (welcomePending()) return; // 1100: the Home Screen welcome is up; its time does not count
       if (++tries > 340) {
         // About 1.5 minutes: try again next visit, but let the tour and welcome offer go ahead now.
         window.clearInterval(t);

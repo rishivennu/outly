@@ -366,7 +366,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
             const focus = props.focusPlan === p.slug && !mine;
             return (
               <li key={p.id} ref={focus ? focusRef : undefined}>
-                <article className={cn("admin-card flex h-full flex-col rounded-[28px] bg-card p-6 hairline", p.highlight && "border-2 border-lime", focus && "ring-4 ring-lime/40", "hover:-translate-y-1")}>
+                <article className={cn("admin-card card-glass flex h-full flex-col rounded-[28px] bg-card p-6 hairline", p.highlight && "border-2 border-lime", focus && "ring-4 ring-lime/40", "hover:-translate-y-1")}>
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="text-lg font-semibold">{p.name}</h3>
                     {mine ? <span className="rounded-full bg-lime/20 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-lime-ink">Your plan</span> : p.highlight && <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider">Popular</span>}

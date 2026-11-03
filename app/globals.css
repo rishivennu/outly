@@ -3267,12 +3267,11 @@ html[data-contrast="more"] .mtop[data-lifted] { background-color: hsl(var(--back
   .mtop-btn:active { transform: none; }
 }
 
-/* Tab bar (.mtab; not .mnav, that is the marketing header) and its More panel clear the notch and the home indicator when the phone is on its side. */
-.mtab, .mtab-more { left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); }
+/* Tab bar (.mtab; not .mnav, that is the marketing header) clears the notch and the home indicator when the phone is on its side. */
+.mtab { left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); }
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1023px) {
   .mtab { height: 56px; }
   .mtab > a, .mtab > button { height: 48px; }
-  .mtab-more { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 64px); max-height: calc(100dvh - 96px); }
   .mmain { padding-bottom: calc(max(12px, env(safe-area-inset-bottom)) + 76px); }
 }
 
@@ -3296,4 +3295,264 @@ html[data-install-card] .pc { opacity: 0; pointer-events: none; transition: opac
 }
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1023px) {
   .install-card { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 68px); }
+}
+
+/* ---------------------------------------------------------------------------------------------------------
+   1100: pulse rail. A slim ink pill (fully rounded), cream icons, a lime circle for the current section.
+   Collapsed is 72px (two 14px gutters around 44px circles); expanded is 232px with labels. The width is set
+   before paint from html[data-rail] (railScript), so pages never jump. Only width, radius, opacity and
+   transform move; reduced motion snaps.
+   --------------------------------------------------------------------------------------------------------- */
+.rail {
+  display: flex; flex-direction: column; height: 100%;
+  width: 72px; padding: 14px; border-radius: 36px; overflow: hidden;
+  background: hsl(232 16% 7%); color: hsl(var(--foreground));
+}
+html.dark .rail { background: hsl(240 5% 10.5%); }
+html[data-rail="open"] .rail { width: 232px; border-radius: 30px; }
+.rail-top, .rail-bottom { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+.rail-bottom { position: relative; padding-top: 10px; }
+.rail-bottom::before { content: ""; position: absolute; top: 0; left: 10px; right: 10px; height: 1px; background: hsl(var(--foreground) / .1); }
+.rail-mid {
+  flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 2px;
+  margin: 6px -14px; padding: 4px 14px; overflow-x: hidden; overflow-y: auto; scrollbar-width: none;
+}
+.rail-mid::-webkit-scrollbar { display: none; }
+.rail-group { display: flex; flex-direction: column; gap: 2px; }
+.rail-sep { height: 1px; margin: 6px 10px; flex-shrink: 0; background: hsl(var(--foreground) / .1); }
+.rail-row {
+  position: relative; display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+  height: 44px; width: 100%; min-width: 44px; padding: 0 12px; border-radius: 9999px;
+  overflow: hidden; white-space: nowrap; text-align: left;
+  color: hsl(var(--foreground) / .68); font-size: 14px; font-weight: 500;
+  -webkit-tap-highlight-color: transparent; outline: none;
+}
+.rail-row:hover { color: hsl(var(--foreground)); background: hsl(var(--foreground) / .08); }
+.rail-row:focus-visible { box-shadow: 0 0 0 2px hsl(var(--lime)); color: hsl(var(--foreground)); }
+.rail-row[aria-current="page"], .rail-row[aria-current="page"]:hover { color: hsl(var(--lime-foreground)); background: transparent; }
+.rail-row[aria-current="page"] .rail-label { font-weight: 600; }
+.rail-pill { position: absolute; inset: 0; border-radius: 9999px; background: hsl(var(--lime)); box-shadow: 0 6px 18px -6px hsl(var(--lime) / .55); }
+.rail-ic, .rail-label { position: relative; }
+.rail-ic { display: grid; place-items: center; width: 20px; height: 20px; flex-shrink: 0; }
+.rail-label { opacity: 0; transform: translate3d(-6px, 0, 0); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+html[data-rail="open"] .rail-label { opacity: 1; transform: none; }
+.rail-new:not([aria-current="page"]) { color: hsl(var(--lime)); box-shadow: inset 0 0 0 1.5px hsl(var(--lime) / .7); }
+.rail-new:not([aria-current="page"]):hover { color: hsl(var(--lime)); background: hsl(var(--lime) / .12); }
+.rail-logo, .rail-me { padding: 0; gap: 10px; }
+.rail-logo:hover, .rail-me:hover { background: transparent; }
+.rail-logo { height: 44px; margin-bottom: 4px; }
+.rail-disc { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 9999px; background: hsl(var(--foreground) / .1); transition: background-color .2s ease; }
+.rail-logo:hover .rail-disc { background: hsl(var(--foreground) / .16); }
+.rail-word { font-family: var(--font-display, inherit); font-size: 19px; font-weight: 700; letter-spacing: -0.045em; color: hsl(var(--foreground)); }
+.rail-me { height: 52px; border-radius: 26px; }
+.rail-avatar { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 9999px; background: hsl(var(--foreground)); transition: box-shadow .2s ease; }
+.rail-me:hover .rail-avatar, .rail-me[data-state="open"] .rail-avatar { box-shadow: 0 0 0 3px hsl(var(--lime) / .45); }
+.rail-me:focus-visible { box-shadow: none; }
+.rail-me:focus-visible .rail-avatar { box-shadow: 0 0 0 2px hsl(232 16% 7%), 0 0 0 4px hsl(var(--lime)); }
+.rail-bell { color: hsl(var(--foreground) / .68); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .rail { transition: width .34s var(--ease-liquid), border-radius .34s var(--ease-liquid); }
+  .rail-row { transition: color .2s ease, background-color .2s ease, transform .16s var(--ease-liquid), box-shadow .2s ease; }
+  .rail-row:active { transform: scale(.95); }
+  .rail-label { transition: opacity .16s ease, transform .34s var(--ease-liquid); }
+  html[data-rail="open"] .rail-label { transition-delay: .07s; }
+}
+
+/* Rail tooltips: ink chip, slides out a few pixels from the icon. */
+.rail-tip {
+  z-index: 80; padding: 7px 11px; border-radius: 10px; font-size: 12.5px; font-weight: 500; line-height: 1;
+  background: hsl(232 16% 7%); color: hsl(40 33% 95%); box-shadow: 0 8px 24px -8px rgb(0 0 0 / .45);
+}
+html.dark .rail-tip { background: hsl(240 5% 17%); }
+@media (prefers-reduced-motion: no-preference) { .rail-tip { animation: rail-tip-in .18s var(--ease-liquid); } }
+@keyframes rail-tip-in { from { opacity: 0; transform: translate3d(-4px, 0, 0); } }
+
+/* Account menu (desktop dropdown): fades and scales out of the profile circle; out is quicker than in. */
+.acct-menu { transform-origin: var(--radix-popover-content-transform-origin); outline: none; }
+.acct-sep { height: 1px; margin: 6px 10px; background: hsl(var(--foreground) / .08); }
+@media (prefers-reduced-motion: no-preference) {
+  .acct-menu[data-state="open"] { animation: acct-in .22s var(--ease-liquid); }
+  .acct-menu[data-state="closed"] { animation: acct-out .14s ease-in forwards; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .acct-menu[data-state="open"] { animation: page-fade .12s ease; }
+  .acct-menu[data-state="closed"] { animation: acct-fade-out .1s ease forwards; }
+}
+@keyframes acct-in { from { opacity: 0; transform: scale(.94); } }
+@keyframes acct-out { to { opacity: 0; transform: scale(.97); } }
+@keyframes acct-fade-out { to { opacity: 0; } }
+
+/* 1100 phone menu drawer (MobileDrawer): full height from the right, clear of the notch and home indicator. */
+.mdrawer {
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  border-radius: 28px 0 0 28px;
+  box-shadow: inset 1px 0 0 hsl(var(--foreground) / .08), -24px 0 60px -24px rgb(0 0 0 / .45);
+}
+html.dark .mdrawer { background: hsl(240 5% 8.5%); }
+.mdrawer-scrim { -webkit-tap-highlight-color: transparent; }
+@media (prefers-reduced-motion: no-preference) {
+  .mdrawer[data-state="open"] { animation: mdrawer-in .38s var(--ease-liquid); }
+  .mdrawer[data-state="closed"] { animation: mdrawer-out .24s cubic-bezier(.4, 0, 1, 1) forwards; }
+  .mdrawer-scrim[data-state="open"] { animation: page-fade .3s ease; }
+  .mdrawer-scrim[data-state="closed"] { animation: acct-fade-out .24s ease forwards; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mdrawer[data-state="open"], .mdrawer-scrim[data-state="open"] { animation: page-fade .12s ease; }
+  .mdrawer[data-state="closed"], .mdrawer-scrim[data-state="closed"] { animation: acct-fade-out .1s ease forwards; }
+}
+@keyframes mdrawer-in { from { transform: translateX(100%); } }
+@keyframes mdrawer-out { to { transform: translateX(100%); } }
+
+/* 1100 first launch from the Home Screen (PwaWelcome). Hidden unless <head> set html[data-welcome]; always the
+   brand ink with cream text and one lime accent, in either theme. Entrance: a time-based stagger (--i), no springs. */
+.pwa-welcome { display: none; }
+html[data-welcome] .pwa-welcome {
+  position: fixed; inset: 0; z-index: 120; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain;
+  padding: max(28px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  background: hsl(232 16% 7%); color: hsl(40 33% 96%);
+  -webkit-tap-highlight-color: transparent;
+}
+html[data-welcome]:has([data-pwa-welcome]), html[data-welcome]:has([data-pwa-welcome]) body { overflow: hidden; }
+.pw-glow {
+  position: absolute; inset: -20% -30% auto; height: 70%; pointer-events: none;
+  background: radial-gradient(closest-side, hsl(78 100% 55% / .2), transparent); filter: blur(10px);
+}
+.pw-inner { position: relative; margin: auto 0; width: 100%; max-width: 440px; align-self: center; padding: 24px 0 32px; }
+.pw-mark { position: relative; display: grid; place-items: center; width: 84px; height: 84px; border-radius: 9999px; background: hsl(0 0% 100% / .07); box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .1); }
+.pw-ring { position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 1.5px hsl(78 100% 55% / .7); opacity: 0; }
+.pw-kicker { margin-top: 28px; font-size: 12px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: hsl(78 100% 55%); }
+.pw-title { margin-top: 10px; font-family: var(--font-display), var(--font-body), system-ui, sans-serif; font-size: clamp(34px, 9vw, 44px); line-height: 1.04; font-weight: 700; letter-spacing: -.035em; text-wrap: balance; }
+.pw-body { margin-top: 14px; font-size: 16px; line-height: 1.5; color: hsl(40 12% 96% / .74); text-wrap: pretty; }
+.pw-points { margin-top: 26px; display: grid; gap: 12px; }
+.pw-points li { display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 500; color: hsl(40 20% 96% / .9); }
+.pw-tick { display: grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; border-radius: 9999px; background: hsl(78 100% 55% / .16); color: hsl(78 100% 60%); }
+.pw-tick svg { width: 13px; height: 13px; }
+.pw-foot { position: relative; width: 100%; max-width: 440px; align-self: center; }
+/* Phones keep the button in thumb reach at the bottom; wider screens keep it with the words. */
+@media (min-width: 640px) and (min-height: 700px) { .pw-inner { margin: auto 0 0; padding-bottom: 36px; } .pw-foot { margin-bottom: auto; } }
+.pw-cta {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 56px; border-radius: 9999px;
+  font-size: 16px; font-weight: 650; outline: none; transition: transform .18s var(--ease-liquid), filter .2s ease;
+}
+.pw-cta svg { width: 18px; height: 18px; transition: transform .25s var(--ease-liquid); }
+.pw-cta:focus-visible { box-shadow: 0 0 0 3px hsl(232 16% 7%), 0 0 0 5px hsl(40 33% 96%); }
+/* the screen itself takes focus on a tap launch: no ring then, a ring for a keyboard (house rule: never bare outline:none) */
+html[data-welcome] .pwa-welcome:focus:not(:focus-visible) { outline: none; }
+html[data-welcome] .pwa-welcome:focus-visible { outline: 2px solid hsl(40 33% 96% / .6); outline-offset: -6px; }
+html[data-contrast="more"] :is(.pw-body, .pw-points li) { color: hsl(40 33% 96%); }
+@media (forced-colors: active) {
+  .pw-cta { border: 2px solid ButtonText; }
+  .pw-cta:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }
+}
+.pw-cta:active { transform: scale(.97); }
+@media (hover: hover) { .pw-cta:hover { filter: brightness(1.05); } .pw-cta:hover svg { transform: translateX(3px); } }
+@media (prefers-reduced-motion: no-preference) {
+  .pwa-welcome .pw-in { animation: pw-in .7s var(--ease-liquid) both; animation-delay: calc(120ms + var(--i, 0) * 70ms); }
+  .pwa-welcome .pw-mark { animation-name: pw-mark; animation-duration: .8s; }
+  .pwa-welcome .pw-ring { animation: pw-ring 1.4s cubic-bezier(.2, .7, .2, 1) .55s both; }
+  .pwa-welcome .pw-glow { animation: pw-glow 1.4s ease-out both; }
+  .pwa-welcome[data-phase="leaving"] { animation: pw-out .46s cubic-bezier(.4, 0, .2, 1) forwards; }
+  .pwa-welcome[data-phase="leaving"] .pw-inner, .pwa-welcome[data-phase="leaving"] .pw-foot { animation: pw-lift .46s cubic-bezier(.4, 0, .2, 1) forwards; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-welcome] .pwa-welcome { animation: page-fade .2s ease; }
+  .pwa-welcome[data-phase="leaving"] { animation: acct-fade-out .16s ease forwards; }
+  .pw-cta, .pw-cta svg { transition: none; }
+  .pw-cta:active { transform: none; }
+}
+@keyframes pw-in { from { opacity: 0; transform: translateY(14px); } }
+@keyframes pw-mark { from { opacity: 0; transform: scale(.82); } }
+@keyframes pw-ring { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.7); } }
+@keyframes pw-glow { from { opacity: 0; transform: scale(.85); } }
+@keyframes pw-out { to { opacity: 0; } }
+@keyframes pw-lift { to { transform: translateY(-10px) scale(.985); } }
+
+/* ---------- 1100: Liquid glass on every studio card ----------
+   The studio's screen cards wear the same liquid glass as the rail: a cool-to-deep tint, a lit rim on the top-left
+   edge with a softer far edge, and a sheen across the top. Cards: .glass panels, the Analytics dashboard's
+   .pulse-card, and .card-glass (a marker for cards built from bg-card + hairline: Billing, Calendar, Inbox; it never
+   touches the border, so a highlighted plan keeps its lime edge). Art and media cards (thumbnails, the content grid)
+   keep their own look.
+   Painted with backgrounds and inset shadows only: no card changes size, and no pseudo-element collides with a
+   card's own. The shadow stack carries Tailwind's ring and shadow variables plus --cg-ring, so focus rings,
+   selected rings, lime-ring and halo shadows on a card still paint (review 1100: the first cut erased them).
+   Only a desktop with a pointer blurs what is behind; phones keep the tint and rim without the GPU cost (a sticky
+   glass bar still blurs, since content scrolls under it). The Android app keeps its own surfaces. Less
+   transparency, more contrast and forced colours get a solid card, sticky bars included. */
+html:not([data-app]) .mmain :is(.glass, .pulse-card, .card-glass) {
+  --cg-rim: hsl(0 0% 100% / .9);
+  --cg-far: hsl(216 30% 30% / .1);
+  --cg-sheen: linear-gradient(180deg, hsl(0 0% 100% / var(--lg-sheen)), hsl(0 0% 100% / 0) min(72px, 48%));
+  --cg-tint: linear-gradient(180deg, hsl(var(--lg-tint-top)), hsl(var(--lg-tint-bottom)));
+  --cg-ring: var(--lg-edge);
+  background: var(--cg-sheen), var(--cg-tint), hsl(var(--card) / .55);
+  box-shadow: inset 1px 1px 0 var(--cg-rim), inset -1px -1px 0 var(--cg-far), var(--cg-ring), var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000), var(--glass-shadow);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+html.dark:not([data-app]) .mmain :is(.glass, .pulse-card, .card-glass) { --cg-rim: hsl(0 0% 100% / .13); --cg-far: hsl(0 0% 100% / .035); }
+html:not([data-app]) .mmain .glass:is(.sticky, .fixed) {
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.5); backdrop-filter: blur(var(--glass-blur)) saturate(1.5);
+}
+/* rings a card brings with it, carried through --cg-ring */
+html:not([data-app]) .mmain :is(.glass, .pulse-card, .card-glass).lime-ring { --cg-ring: inset 0 0 0 1px hsl(var(--lime) / .45); }
+html:not([data-app]) .mmain .pulse-card:hover { --cg-ring: 0 0 0 1px hsl(var(--foreground) / .14); }
+html.dark:not([data-app]) .mmain .pulse-card:hover { --cg-ring: 0 0 0 1px hsl(var(--lime) / .22); }
+html:not([data-app]) .mmain .pulse-card[aria-pressed="true"] { --cg-ring: 0 0 0 2px hsl(var(--lime-ink) / .7); }
+html.dark:not([data-app]) .mmain .pulse-card[aria-pressed="true"] { --cg-ring: 0 0 0 2px hsl(var(--lime) / .6); }
+/* a clickable glass card, or one that asked for a hover background (which the glass would otherwise swallow), answers
+   the pointer by sharpening its edge: a shadow change, no movement and no new stacking context */
+@media (hover: hover) {
+  html:not([data-app]) .mmain :is(a, button, [class*="hover:bg-"]):is(.glass, .card-glass):hover { --cg-ring: 0 0 0 1px hsl(var(--foreground) / .16); }
+  html.dark:not([data-app]) .mmain :is(a, button, [class*="hover:bg-"]):is(.glass, .card-glass):hover { --cg-ring: 0 0 0 1px hsl(0 0% 100% / .18); }
+}
+@media (min-width: 1024px) and (hover: hover) {
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    /* a light opaque base under the tint keeps body text at 4.5:1 over busy art behind the card */
+    html:not([data-app]) .mmain :is(.glass, .pulse-card, .card-glass) {
+      background: var(--cg-sheen), var(--cg-tint), hsl(var(--card) / .3);
+      -webkit-backdrop-filter: blur(20px) saturate(1.7) brightness(var(--lg-bright));
+      backdrop-filter: blur(20px) saturate(1.7) brightness(var(--lg-bright));
+    }
+  }
+}
+/* glass inside glass: one blur pass is enough */
+html:not([data-app]) .mmain :is(.glass, .pulse-card, .card-glass) :is(.glass, .pulse-card, .card-glass) { -webkit-backdrop-filter: none; backdrop-filter: none; }
+@media (prefers-reduced-transparency: reduce) {
+  html:not([data-app]) .mmain :is(.glass, .pulse-card, .card-glass), html:not([data-app]) .mmain .glass:is(.sticky, .fixed) {
+    background: hsl(var(--glass-solid)); -webkit-backdrop-filter: none; backdrop-filter: none;
+    box-shadow: inset 0 0 0 1px hsl(var(--border)), var(--cg-ring), var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000), var(--glass-shadow);
+  }
+}
+html[data-contrast="more"]:not([data-app]) .mmain :is(.glass, .pulse-card, .card-glass), html[data-contrast="more"]:not([data-app]) .mmain .glass:is(.sticky, .fixed) {
+  background: hsl(var(--card)); -webkit-backdrop-filter: none; backdrop-filter: none;
+  box-shadow: inset 0 0 0 1px hsl(var(--border)), var(--cg-ring), var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000), var(--glass-shadow);
+}
+@media (forced-colors: active) {
+  html:not([data-app]) .mmain :is(.glass, .pulse-card, .card-glass), html:not([data-app]) .mmain .glass:is(.sticky, .fixed) { outline: 1px solid CanvasText; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+/* .card-glass-desk: a card on a desktop only (the Inbox panel runs edge to edge on a phone, no card there) */
+@media (max-width: 1023.98px) {
+  html:not([data-app]) .mmain .card-glass.card-glass-desk { background: none; box-shadow: none; }
+}
+
+@media (forced-colors: active) and (max-width: 1023.98px) {
+  html:not([data-app]) .mmain .card-glass.card-glass-desk { outline-color: transparent; }
+}
+
+/* ---------- 1100: One motion language for the controls that had none of their own ----------
+   Same curve as pages, menus and the drawer (--ease-liquid), time-based, no springs; transform, colour and shadow
+   only, so nothing reflows. Radix switches slide their thumb, tabs ease their colour, and a hoverable glass card
+   eases its edge. Reduced motion keeps the colour change and drops the slide. */
+@media (prefers-reduced-motion: no-preference) {
+  button[role="switch"][data-state] { transition: background-color .24s var(--ease-liquid), box-shadow .24s var(--ease-liquid); }
+  button[role="switch"][data-state] > span[data-state] { transition: transform .28s var(--ease-liquid), background-color .2s ease; }
+  /* only tabs that already name what they transition: a bare duration would animate every property */
+  [role="tablist"] [role="tab"][class*="transition"] { transition-timing-function: var(--ease-liquid); transition-duration: .22s; }
+  html:not([data-app]) .mmain :is(a, button, [class*="hover:bg-"]):is(.glass, .card-glass) { transition: box-shadow .3s var(--ease-liquid); }
+}
+@media (prefers-reduced-motion: reduce) {
+  button[role="switch"][data-state], button[role="switch"][data-state] > span[data-state] { transition: background-color .15s ease; }
 }

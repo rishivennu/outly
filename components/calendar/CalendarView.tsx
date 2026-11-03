@@ -129,7 +129,7 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
                   setDropKey(null);
                   if (id) void moveTo(id, d);
                 }}
-                className={cn("flex min-h-[120px] flex-col rounded-[24px] p-2.5 transition-shadow md:min-h-[420px]", isToday ? "glass lime-ring" : "bg-card/50 hairline", dropKey === d && "ring-2 ring-[hsl(var(--lime))]")}
+                className={cn("flex min-h-[120px] flex-col rounded-[24px] p-2.5 transition-shadow md:min-h-[420px]", isToday ? "glass lime-ring" : "card-glass bg-card/50 hairline", dropKey === d && "ring-2 ring-[hsl(var(--lime))]")}
                 aria-label={fmt(keyDate(d), "UTC", { weekday: "long", month: "long", day: "numeric" })}>
                 <div className="mb-3 flex items-baseline justify-between px-1.5 pt-1">
                   <span className={cn("text-xs font-semibold uppercase tracking-[0.14em]", isToday ? "text-foreground" : "text-muted-foreground")}>{fmt(keyDate(d), "UTC", { weekday: "short" })}</span>

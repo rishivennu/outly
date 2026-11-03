@@ -29,11 +29,11 @@ export function findTarget(target?: string): HTMLElement | null {
   return null;
 }
 
-/** The stop's own target, or on a phone (where most pages live under More) the More button. */
+/** The stop's own target, or on a phone (where most pages live in the menu drawer, 1100) the menu button. */
 function locate(target?: string, moreFallback = false): { el: HTMLElement | null; viaMore: boolean } {
   const el = findTarget(target);
   if (el || !target || !moreFallback) return { el, viaMore: false };
-  const more = findTarget("more");
+  const more = findTarget("menu");
   return { el: more, viaMore: !!more };
 }
 
@@ -44,7 +44,7 @@ type Props = {
   /** Small label over the title, e.g. "Calendar tips". */
   kicker?: string;
   skipLabel?: string;
-  /** Point at More when a target is hidden in the phone's More panel (the welcome tour's nav stops). */
+  /** Point at the menu button when a target is hidden in the phone's drawer (the welcome tour's nav stops). */
   moreFallback?: boolean;
   /** Buttons for the last card; the default is a single "Got it". */
   finish?: (close: () => void, ref: React.Ref<HTMLAnchorElement & HTMLButtonElement>) => React.ReactNode;
@@ -207,7 +207,7 @@ export function Spotlight({ stops, onClose, kicker, skipLabel = "Skip", moreFall
             ))}
           </ul>
         ) : null}
-        {viaMore && <p className="mt-2 text-[13px] font-medium text-foreground/85">On your phone, it&apos;s under More.</p>}
+        {viaMore && <p className="mt-2 text-[13px] font-medium text-foreground/85">On your phone, it&apos;s in the menu.</p>}
         <div className="mt-5 flex items-center gap-2">
           {i > 0 && (
             <button type="button" onClick={() => go(-1)} className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground">

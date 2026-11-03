@@ -196,7 +196,7 @@ describe("1099 PWA basics the banner relies on", () => {
 
 describe("1099 phone top bar and touch targets", () => {
   const nav = src("components/shell/Nav.tsx");
-  const bar = nav.slice(nav.indexOf("export function MobileTopBar"), nav.indexOf("function useGlide"));
+  const bar = nav.slice(nav.indexOf("export function MobileTopBar"));
   const css = src("app/globals.css");
   test("no box at rest: no border, solid fill or shadow classes on the header", () => {
     expect(bar).toContain('className="mtop web-only sticky top-0 z-30 lg:hidden"');

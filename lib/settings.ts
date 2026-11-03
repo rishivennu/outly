@@ -1,3 +1,4 @@
+import { WELCOME_DEFAULT, type WelcomeConfig } from "./pwa-welcome";
 import "server-only";
 import { REFERRAL_DEFAULT, type ReferralConfig } from "./referral-core";
 import { db } from "./db";
@@ -107,6 +108,7 @@ export const DEFAULTS = {
   topups: TOPUP_DEFAULT as TopUpConfig, // 1096
   experiments: EXPERIMENTS_DEFAULT as ExperimentsConfig, // 1096
   install: INSTALL_DEFAULT as InstallConfig, // 1099 Add to Home Screen banner
+  welcome: WELCOME_DEFAULT as WelcomeConfig, // 1100 first launch from the Home Screen
   platforms: Object.fromEntries(["instagram", "youtube", "x", "tiktok", "facebook", "threads", "linkedin"].map((p) => [p, { clientId: "", clientSecret: "" }])) as PlatformKeys,
 };
 type Key = keyof typeof DEFAULTS;

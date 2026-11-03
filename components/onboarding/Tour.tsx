@@ -10,7 +10,7 @@ import { resetGuides, tourState } from "./guides";
  * Welcome tour: a spotlight that walks the real navigation, Home to Settings, one short line per page.
  * Each page then explains itself the first time it's opened (PageGuide.tsx).
  * Targets are `data-tour` names, so the sidebar (desktop) and the bottom bar (mobile) both work;
- * a page that lives under More on a phone points at More.
+ * a page that lives in the phone's menu drawer points at the menu button.
  */
 
 /** owner: only the studio owner has this page (teammates don't see Accounts or Billing). */

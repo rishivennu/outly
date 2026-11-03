@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Cookie } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { afterWelcome } from "@/lib/pwa-welcome";
 
 export const CONSENT_KEY = "outly-consent";
 export type Consent = { v: 1; necessary: true; analytics: boolean; marketing: boolean; at: string };
@@ -43,11 +44,16 @@ export function CookieBanner() {
 
   useEffect(() => {
     const c = readConsent();
-    if (!c) setShow(true);
+    // 1100: on a first launch from the Home Screen the welcome goes first; the choice follows it.
+    let off = () => {};
+    if (!c) off = afterWelcome(() => setShow(true));
     else setPrefs({ analytics: c.analytics, marketing: c.marketing });
     const open = () => { const c2 = readConsent(); if (c2) setPrefs({ analytics: c2.analytics, marketing: c2.marketing }); setCustom(true); setShow(true); };
     window.addEventListener("outly:consent-open", open);
-    return () => window.removeEventListener("outly:consent-open", open);
+    return () => {
+      off();
+      window.removeEventListener("outly:consent-open", open);
+    };
   }, []);
 
   if (!show || path.startsWith("/admin")) return null;
