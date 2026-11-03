@@ -237,6 +237,9 @@ describe("1114 review fixes", () => {
     expect(takeQuiet(100_001)).toBe(false);
     expect(src("components/shell/UserContext.tsx")).toMatch(/forgetVisits\(\);\s*forgetRefreshes\(\);/);
   });
+  test("Analytics warms its other ranges only with something connected", () => {
+    expect(src("components/analytics/AnalyticsView.tsx")).toMatch(/if \(!Object\.values\(connected\)\.some\(Boolean\)\) return;\s*return whenIdle\(/);
+  });
   test("Messages: a quiet pass reads our copy, never a Meta sync, never right after a load", () => {
     const m = src("components/inbox/MessagesView.tsx");
     expect(m).toContain("refreshTick, refreshQuiet, onBusy");

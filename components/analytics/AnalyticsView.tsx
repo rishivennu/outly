@@ -104,7 +104,8 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
     // A copy from the background preload may be a minute or two old, or from before a change made in this tab:
     // update it quietly (1039, 1114: judged on the server's clock).
     else if (isStale(renderedAt, 30_000, lastWriteAt())) void load(data.rangeDays, null, true).catch(() => {});
-    // The other ranges, so a switch doesn't wait on the server.
+    // The other ranges, so a switch doesn't wait on the server. 1114: not with nothing connected (no numbers to switch).
+    if (!Object.values(connected).some(Boolean)) return;
     return whenIdle(() => RANGES.forEach((r) => r.d !== initial.rangeDays && r.d <= Math.min(maxDays, 90) && warmApi(url(r.d, null))), 1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
