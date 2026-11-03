@@ -32,7 +32,7 @@ function Switch({ label, hint, checked, onChange, disabled }: { label: string; h
 
 // ------------------------------------------------------------------ preset (shown inside the plan editor)
 
-type PresetState = { preset: string; plans: string[]; applied: boolean; appliedAt: string | null; appliedBy: string | null; stale?: { plans: string[]; packs: number } };
+type PresetState = { preset: string; plans: string[]; applied: boolean; appliedAt: string | null; appliedBy: string | null; stale?: { plans: string[]; packs: number }; revision?: { name: string; applied: boolean; appliedAt: string | null; appliedBy: string | null } };
 
 /**
  * The November 2026 pricing, applied only when an admin presses the button. A backup of every touched row
@@ -41,20 +41,21 @@ type PresetState = { preset: string; plans: string[]; applied: boolean; appliedA
 export function PresetPanel({ onChanged }: { onChanged: () => Promise<void> | void }) {
   const toast = useToast();
   const [s, setS] = useState<PresetState | null>(null);
-  const [ask, setAsk] = useState<"apply" | "undo" | null>(null);
+  const [ask, setAsk] = useState<"apply" | "undo" | "rev" | "rev-undo" | null>(null);
   const [endBeta, setEndBeta] = useState(false);
   const [founding, setFounding] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     adminApi<PresetState>("/api/admin/plans/preset").then(setS).catch(() => {});
   }, []);
-  async function run(undo: boolean | "copy") {
+  async function run(undo: boolean | "copy" | "rev" | "rev-undo") {
     setBusy(true);
     try {
-      const r = await adminApi<PresetState>("/api/admin/plans/preset", { method: "POST", json: undo === "copy" ? { fixCopy: true } : undo ? { undo: true } : { endBeta, enableFounding: founding } });
+      const body = undo === "rev" ? { revision: "apply" } : undo === "rev-undo" ? { revision: "undo" } : undo === "copy" ? { fixCopy: true } : undo ? { undo: true } : { endBeta, enableFounding: founding };
+      const r = await adminApi<PresetState>("/api/admin/plans/preset", { method: "POST", json: body });
       setS(r);
       await onChanged();
-      toast(undo === "copy" ? "Plan wording fixed" : undo ? "The previous plans are back" : "November 2026 pricing is live");
+      toast(undo === "rev" ? "Revised pricing is live" : undo === "rev-undo" ? "The previous November plans are back" : undo === "copy" ? "Plan wording fixed" : undo ? "The previous plans are back" : "November 2026 pricing is live");
     } catch (e: any) {
       toast(e.message, "error");
     } finally {
@@ -84,11 +85,48 @@ export function PresetPanel({ onChanged }: { onChanged: () => Promise<void> | vo
           <Button type="button" variant="lime" className="rounded-full" disabled={busy} onClick={() => run("copy")}>Fix plan wording</Button>
         )}
         {s.applied ? (
-          <Button type="button" variant="ghost" className="rounded-full" disabled={busy} onClick={() => setAsk("undo")}>Undo preset</Button>
+          <Button type="button" variant="ghost" className="rounded-full" disabled={busy || !!s.revision?.applied} title={s.revision?.applied ? "Undo the revised pricing first" : undefined} onClick={() => setAsk("undo")}>Undo preset</Button>
         ) : (
           <Button type="button" variant="lime" className="rounded-full" disabled={busy} onClick={() => setAsk("apply")}>Apply Nov 2026 pricing</Button>
         )}
       </div>
+      {s.applied && s.revision && (
+        <div className="relative mt-4 flex flex-wrap items-center gap-3 border-t border-border/60 pt-4">
+          <div className="mr-auto min-w-0">
+            <h3 className="text-[14px] font-semibold">Revised prices and limits (unit economics)</h3>
+            <p className="mt-0.5 text-[12.5px] la-mute">
+              {s.revision.applied
+                ? `Applied ${fmtDate(s.revision.appliedAt, true)} by ${s.revision.appliedBy}. Undo puts back the plans and packs it replaced.`
+                : "Starter ₹379, Creator ₹979, Agency ₹3,479 ($8 / $17 / $43) with monthly caps on posts, X, AI captions and AI requests. Free loses X. Packs repriced (X +50 for ₹449)."}
+            </p>
+          </div>
+          {s.revision.applied ? (
+            <Button type="button" variant="ghost" className="rounded-full" disabled={busy} onClick={() => setAsk("rev-undo")}>Undo revision</Button>
+          ) : (
+            <Button type="button" variant="lime" className="rounded-full" disabled={busy} onClick={() => setAsk("rev")}>Apply revised pricing</Button>
+          )}
+        </div>
+      )}
+      <ConfirmDialog
+        open={ask === "rev"}
+        onOpenChange={(o) => !o && setAsk(null)}
+        tone="primary"
+        title="Apply the revised prices and limits?"
+        body="Free, Starter, Creator and Agency get the new prices and monthly caps, and the top-up packs are repriced. People already subscribed keep what they pay until they renew or change plan. You can undo this."
+        confirmLabel="Apply revision"
+        cancelLabel="Not yet"
+        busy={busy}
+        onConfirm={() => run("rev")}
+      />
+      <ConfirmDialog
+        open={ask === "rev-undo"}
+        onOpenChange={(o) => !o && setAsk(null)}
+        title="Undo the revised pricing?"
+        body="The four plans and the packs go back to the rows saved when the revision was applied, including any edits since."
+        confirmLabel="Undo revision"
+        busy={busy}
+        onConfirm={() => run("rev-undo")}
+      />
       <ConfirmDialog
         open={ask === "apply"}
         onOpenChange={(o) => !o && setAsk(null)}

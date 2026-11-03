@@ -90,6 +90,7 @@ export function packBlock(cfg: TopUpConfig, pack: TopUpPack | undefined, planSlu
   if (pack.plans.length && !pack.plans.includes(planSlug)) return "That pack is for a different plan. Upgrade to buy it.";
   if (cfg.paidOnly && !paid) return "Top-ups are for paid plans. Upgrade first; it includes more than a pack would.";
   // Never take money for units the plan can't use, or doesn't need.
+  if (plan && pack.kind === "x" && plan.xPostLimit < 0) return "Your plan doesn't post to X. Upgrade to get X posts.";
   if (plan && pack.kind === "x" && plan.xPostLimit <= 0) return "Your plan already posts to X without a monthly limit.";
   if (plan && pack.kind === "ai" && !plan.aiCaptions) return "Your plan doesn't include AI captions. Upgrade to get them.";
   if (plan && pack.kind === "ai" && plan.captionVideos <= 0) return "Your plan already has AI captions without a monthly limit.";

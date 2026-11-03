@@ -41,8 +41,12 @@ export const PlanInput = z.object({
   platformLimit: z.number().int().min(0).max(10).optional(),
   /** Accounts (brands) per platform; 0 = older rules. */
   brandLimit: z.number().int().min(0).max(50).optional(),
-  /** Posts to X per month; 0 = no cap. */
-  xPostLimit: z.number().int().min(0).max(100_000).optional(),
+  /** Posts to X per month; 0 = no cap, -1 = no X on this plan (1112). */
+  xPostLimit: z.number().int().min(-1).max(100_000).optional(),
+  /** 1112. AI requests per month; 0 = no monthly cap. */
+  aiMonthly: z.number().int().min(0).max(1_000_000).optional(),
+  /** 1112. AI requests per UTC day; 0 = the server default. */
+  aiDaily: z.number().int().min(0).max(10_000).optional(),
   /** Days of analytics history; 0 = 90. */
   analyticsDays: z.number().int().min(0).max(730).optional(),
   /** Fair-use line for unlimited posts (alert only); 0 = off. */

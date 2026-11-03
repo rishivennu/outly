@@ -6,7 +6,7 @@ import { HttpError } from "./http";
 import type { Platform } from "./domain";
 import type { ConnectedProfile } from "./social/types";
 import { dmsOn } from "./social/keys";
-import { checkAccounts, checkBrands, checkPlatforms, entitlements } from "./billing/entitlements";
+import { checkAccounts, checkBrands, checkPlatforms, checkX, entitlements } from "./billing/entitlements";
 import { isMultiAccount } from "./billing/plan-rules";
 
 /**
@@ -37,6 +37,8 @@ export async function saveConnectedAccount(userId: string, platform: Platform, p
       // change left it over the new platform or brand count. Only a NEW account is checked against the caps.
       const known = await tx.socialAccount.findFirst({ where: { userId, platform, platformUserId: prof.platformUserId, status: { not: "disconnected" } }, select: { id: true } });
       // 1096: Free connects any N platforms; a platform already in use can always be reconnected or swapped.
+      // 1112: plans without X (Free) can't add an X account; one already on file stays.
+      if (platform === "x" && !known) checkX(e);
       if (e.platformLimit > 0 && !known) {
         const live = await tx.socialAccount.findMany({ where: { userId, status: { not: "disconnected" } }, select: { platform: true } });
         checkPlatforms(e, live.map((a) => a.platform), platform);

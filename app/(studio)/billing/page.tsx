@@ -22,6 +22,7 @@ import { myFounding, foundingPrice } from "@/lib/founding";
 import { trustBadges } from "@/lib/badges";
 import { refundStatus } from "@/lib/billing/guarantee";
 import { experimentPrice } from "@/lib/billing/experiments";
+import { aiQuota } from "@/lib/ai-quota";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Billing" };
@@ -110,6 +111,7 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
 
   const receipt = await receiptFor(user.id, searchParams, cancelledId).catch(() => null);
   const now = new Date();
+  const aiqP = aiQuota(user.id).catch(() => null); // 1112: runs alongside the batch below
   const [plans, subs, invoices, gw, usage, display, replies, captions, upload, beta, betaCfg, founding, badges, storage, access, refund, ent, x, accounts, scheduled, seatsTaken, loose, lastEnded] = await Promise.all([
     listPlans(),
     db.subscription.findMany({ where: { userId: user.id, status: "active" }, include: { plan: true }, orderBy: { createdAt: "desc" } }),
@@ -192,6 +194,7 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
 
   // 1098: the usage grid, in the plan's own terms. Unlimited = no bar; not on the plan = "Not included".
   const acc = accountMeter(ent, accounts);
+  const aiq = await aiqP;
   const meters: MeterView[] = [
     { key: "posts", label: usage.postPeriod === "week" ? "Posts this week" : "Posts this month", used: usage.used, limit: usage.postLimit, unit: "posts", href: "/content" },
     { key: "scheduled", label: "Scheduled posts", used: scheduled, limit: 0, unit: "in the queue", note: scheduled ? "Waiting to publish" : "Nothing queued", href: "/calendar" },
@@ -204,6 +207,8 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
       ? { key: "seats", label: "Team seats", used: seatsTaken, limit: ent.seats, unit: "seats", note: ent.extraSeats ? `Includes ${ent.extraSeats} from a top-up` : null, href: "/settings#team" }
       : { key: "seats", label: "Team seats", used: 0, limit: 0, unit: "", locked: true, note: `Not on ${ent.planName}` },
     ...(ent.xPostLimit > 0 ? [{ key: "x", label: "Posts to X", used: x.used, limit: ent.xPostLimit, extra: x.credits || undefined, unit: "posts", note: "This month" }] : []),
+    ...(ent.xPostLimit < 0 ? [{ key: "x", label: "Posts to X", used: 0, limit: 0, unit: "", locked: true, note: `Not on ${ent.planName}` }] : []),
+    ...(aiq && aiq.monthLimit > 0 ? [{ key: "ai-requests", label: "AI requests", used: aiq.monthUsed, limit: aiq.monthLimit, unit: "requests", note: aiq.limit ? `This month, up to ${aiq.limit} a day` : "This month" }] : []),
     ...(replies.replyLimit > 0 ? [{ key: "replies", label: "Replies this week", used: replies.used, limit: replies.replyLimit, unit: "replies", href: "/inbox" }] : []),
   ];
   const history = historyRows(

@@ -68,7 +68,8 @@ describe("daily AI cap", () => {
       expect(e.status).toBe(429);
       expect(e.code).toBe("AI_QUOTA");
       expect(e.message).toBe("You've used today's AI help. It resets at midnight UTC.");
-      expect(await quota.aiQuota(u.id)).toMatchObject({ used: 3, limit: 2, left: 0 });
+      // 1112: a refused call is given back, so `used` counts only calls that ran (it feeds the monthly cap).
+      expect(await quota.aiQuota(u.id)).toMatchObject({ used: 2, limit: 2, left: 0 });
     } finally {
       env.AI_DAILY_LIMIT = was;
     }

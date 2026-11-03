@@ -346,10 +346,12 @@ model Plan {
   yearlyPrices String @default("{}") // 1096: JSON { USD: 7000 } exact yearly prices per currency; missing = scaled from monthly
   platformLimit Int   @default(0) // 1096: different platforms that can be connected, 0 = any
   brandLimit Int      @default(0) // 1096: accounts per platform (a "brand" = one of each), 0 = accountLimit rules
-  xPostLimit Int      @default(0) // 1096: posts to X per calendar month, 0 = unlimited
+  xPostLimit Int      @default(0) // 1096: posts to X per calendar month, 0 = unlimited; 1112: -1 = X is not on this plan
   analyticsDays Int   @default(0) // 1096: analytics history in days, 0 = the standard 90
   fairUsePosts Int    @default(0) // 1096: soft monthly ceiling on unlimited posts (admin alert, never a block), 0 = none
   perks      String   @default("") // 1096: JSON string[] of gated features; "" = every perk (plans made before 1096 keep everything)
+  aiMonthly  Int      @default(0) // 1112: AI requests (hooks, ideas, rewrites, replies, reviews) per calendar month (UTC), 0 = no monthly cap
+  aiDaily    Int      @default(0) // 1112: AI requests per UTC day, 0 = the server default (AI_DAILY_LIMIT)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

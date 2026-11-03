@@ -63,6 +63,7 @@ const spaceMono = Space_Mono({ subsets: ["latin"], weight: ["400", "700"], style
 
 import { LaunchHost } from "@/components/billing/RocketCta";
 import { LiquidGlass } from "@/components/shared/LiquidGlass";
+import { themeCss } from "@/lib/theme-css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3040"),
@@ -98,7 +99,7 @@ export async function generateViewport(): Promise<Viewport> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // The Content Security Policy only runs scripts carrying this request's nonce (set by middleware.ts).
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const [nonce, theme] = await Promise.all([headers().then((h) => h.get("x-nonce") ?? undefined), themeCss().catch(() => "")]);
   return (
     <html lang="en" className={`dark ${display.variable} ${body.variable} ${classicDisplay.variable} ${classicBody.variable} ${serif.variable} ${gopher.variable} ${jakarta.variable} ${fraunces.variable} ${archivo.variable} ${tinos.variable} ${rubik.variable} ${spaceMono.variable}`} suppressHydrationWarning>
       <head>
@@ -118,8 +119,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `try{var m=document.cookie.match(/(?:^|; )outlly_lh=([^;]*)/);if(m)document.documentElement.setAttribute("data-lh",decodeURIComponent(m[1]).split(".").join(" "))}catch(e){}` }} />
         {/* Pip colourways (Admin > Mascot colours) and the site font set (Admin > Site fonts). Tiny, cached;
             without it Pip is Indigo and the fonts are the originals. */}
-        {/* eslint-disable-next-line @next/next/no-css-tags */}
-        <link rel="stylesheet" href="/api/pip-theme" />
+        {/* 1113: inlined (about 2 KB) instead of a render-blocking /api/pip-theme request on every first paint. */}
+        <style id="pip-theme" dangerouslySetInnerHTML={{ __html: theme }} />
       </head>
       <body className="font-sans antialiased">
         <MotionRoot>

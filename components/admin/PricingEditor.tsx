@@ -22,7 +22,7 @@ import { PresetPanel } from "@/components/admin/PricingLab";
 type Plan = PublicPlan & { subscribers: number; locked: boolean };
 type Draft = { name: string; slug: string; price: string; currency: string; interval: string; note: string; features: string; state: PublicPlan["state"]; highlight: boolean; sortOrder: number; prices: Record<string, string>; yearly: string; postLimit: number; aiCaptions: boolean; seats: number; postPeriod: "week" | "month"; maxUploadMb: number; replyLimit: number; captionVideos: number; burnCaptions: boolean; accountLimit: number; storageMb: number;
   // 1096
-  yearlyPrices: Record<string, string>; platformLimit: number; brandLimit: number; xPostLimit: number; analyticsDays: number; fairUsePosts: number; perks: Perk[] | null };
+  yearlyPrices: Record<string, string>; platformLimit: number; brandLimit: number; xPostLimit: number; analyticsDays: number; fairUsePosts: number; perks: Perk[] | null; aiMonthly: number; aiDaily: number };
 
 const toDraft = (p: Plan): Draft => ({
   name: p.name, slug: p.slug, price: String(p.priceMinor / 100), currency: p.currency, interval: p.interval, note: p.note, features: p.features.join("\n"), state: p.state, highlight: p.highlight, sortOrder: p.sortOrder,
@@ -31,9 +31,9 @@ const toDraft = (p: Plan): Draft => ({
   postLimit: p.postLimit ?? 0, aiCaptions: p.aiCaptions ?? true, seats: p.seats ?? 0,
   postPeriod: p.postPeriod === "week" ? "week" : "month", maxUploadMb: p.maxUploadMb ?? 0, replyLimit: p.replyLimit ?? 0, captionVideos: p.captionVideos ?? 0, burnCaptions: p.burnCaptions ?? true, accountLimit: p.accountLimit ?? 0, storageMb: p.storageMb ?? 0,
   yearlyPrices: Object.fromEntries(Object.entries(p.yearlyPrices ?? {}).map(([k, v]) => [k, String((v as number) / 100)])),
-  platformLimit: p.platformLimit ?? 0, brandLimit: p.brandLimit ?? 0, xPostLimit: p.xPostLimit ?? 0, analyticsDays: p.analyticsDays ?? 0, fairUsePosts: p.fairUsePosts ?? 0, perks: p.perks ?? null,
+  platformLimit: p.platformLimit ?? 0, brandLimit: p.brandLimit ?? 0, xPostLimit: p.xPostLimit ?? 0, analyticsDays: p.analyticsDays ?? 0, fairUsePosts: p.fairUsePosts ?? 0, perks: p.perks ?? null, aiMonthly: p.aiMonthly ?? 0, aiDaily: p.aiDaily ?? 0,
 });
-const BLANK: Draft = { name: "", slug: "", price: "0", currency: "INR", interval: "month", note: "", features: "", state: "soon", highlight: false, sortOrder: 9, prices: {}, yearly: "", postLimit: 0, aiCaptions: true, seats: 0, postPeriod: "month", maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true, accountLimit: 0, storageMb: 500, yearlyPrices: {}, platformLimit: 0, brandLimit: 0, xPostLimit: 0, analyticsDays: 0, fairUsePosts: 0, perks: null };
+const BLANK: Draft = { name: "", slug: "", price: "0", currency: "INR", interval: "month", note: "", features: "", state: "soon", highlight: false, sortOrder: 9, prices: {}, yearly: "", postLimit: 0, aiCaptions: true, seats: 0, postPeriod: "month", maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true, accountLimit: 0, storageMb: 500, yearlyPrices: {}, platformLimit: 0, brandLimit: 0, xPostLimit: 0, analyticsDays: 0, fairUsePosts: 0, perks: null, aiMonthly: 0, aiDaily: 0 };
 
 const toMinor = (s: string) => {
   const n = Number(s.replace(/,/g, ""));
@@ -76,6 +76,8 @@ function parse(d: Draft) {
     analyticsDays: d.analyticsDays,
     fairUsePosts: d.fairUsePosts,
     perks: d.perks,
+    aiMonthly: d.aiMonthly,
+    aiDaily: d.aiDaily,
   };
 }
 
@@ -606,8 +608,18 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
               </div>
               <div>
                 <Label htmlFor="pl-x">Posts to X per month</Label>
-                <Input id="pl-x" type="number" min={0} max={100000} step={10} value={draft.xPostLimit} onChange={(e) => set("xPostLimit", Math.max(0, Math.min(100000, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-x-hint" />
-                <p id="pl-x-hint" className="mt-1 text-[12px] text-muted-foreground">X charges per post, so this caps the bill. 0 = unlimited</p>
+                <Input id="pl-x" type="number" min={-1} max={100000} step={10} value={draft.xPostLimit} onChange={(e) => set("xPostLimit", Math.max(-1, Math.min(100000, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-x-hint" />
+                <p id="pl-x-hint" className="mt-1 text-[12px] text-muted-foreground">X charges per post, so this caps the bill. 0 = unlimited, -1 = no X on this plan</p>
+              </div>
+              <div>
+                <Label htmlFor="pl-aim">AI requests per month</Label>
+                <Input id="pl-aim" type="number" min={0} max={1000000} step={10} value={draft.aiMonthly} onChange={(e) => set("aiMonthly", Math.max(0, Math.min(1000000, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-aim-hint" />
+                <p id="pl-aim-hint" className="mt-1 text-[12px] text-muted-foreground">Hooks, ideas, rewrites, reply drafts, reviews. 0 = no monthly cap</p>
+              </div>
+              <div>
+                <Label htmlFor="pl-aid">AI requests per day</Label>
+                <Input id="pl-aid" type="number" min={0} max={10000} step={5} value={draft.aiDaily} onChange={(e) => set("aiDaily", Math.max(0, Math.min(10000, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-aid-hint" />
+                <p id="pl-aid-hint" className="mt-1 text-[12px] text-muted-foreground">Stops one loop from spending the month. 0 = the server default</p>
               </div>
               <div>
                 <Label htmlFor="pl-days">Analytics history (days)</Label>

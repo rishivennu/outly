@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { SRC_COOKIE, SRC_DAYS, sourceFromParams } from "./lib/growth/core";
 import { APP_SOURCE } from "./lib/app-mode";
@@ -53,8 +53,26 @@ function hint(req: NextRequest, res: NextResponse, authed: boolean) {
 // database). Cached per instance for a few seconds so a busy site doesn't call it on every page view.
 let status: { at: number; maintenance: boolean; waitlist: boolean; hide: string } | null = null;
 let warned = false;
-async function siteFlags(req: NextRequest) {
+let refreshing: Promise<unknown> | null = null;
+/**
+ * 1113: stale-while-revalidate. Within a minute of the last read, answer from memory at once and refresh in the
+ * background (waitUntil), so a page no longer waits on a second trip to the function region before it renders.
+ * Only a cold instance (or one idle for over a minute) waits. A maintenance switch reaches every instance within
+ * about 95 s (60 s here + 5 s CDN + 30 s stale on /api/maintenance).
+ */
+async function siteFlags(req: NextRequest, ev?: NextFetchEvent) {
   if (status && Date.now() - status.at < 5_000) return status;
+  if (status && ev && Date.now() - status.at < 60_000) {
+    if (!refreshing) {
+      refreshing = readFlags(req).finally(() => (refreshing = null));
+      ev.waitUntil(refreshing);
+    }
+    return status;
+  }
+  return readFlags(req);
+}
+
+async function readFlags(req: NextRequest) {
   let maintenance = status?.maintenance ?? false;
   let waitlist = status?.waitlist ?? false;
   let hide = status?.hide ?? "";
@@ -104,7 +122,7 @@ export function keepAppSource(req: NextRequest, to: URL) {
   return to;
 }
 
-export async function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest, ev?: NextFetchEvent) {
   // Per-request nonce (1033). Next reads it from the request's CSP header and stamps it on its own inline
   // scripts; the root layout reads x-nonce for ours. Every page answer, rewrites included, carries the policy.
   const nonce = newNonce();
@@ -113,7 +131,7 @@ export async function middleware(req: NextRequest) {
   headers.set("x-nonce", nonce);
   headers.set("x-path", req.nextUrl.pathname + req.nextUrl.search); // where a stale session should return to after signing in (1042)
   headers.set("content-security-policy", csp);
-  const res = await route(req, headers);
+  const res = await route(req, headers, ev);
   res.headers.set("Content-Security-Policy", csp);
   res.headers.set("Reporting-Endpoints", `csp="${req.nextUrl.origin}${CSP_REPORT_PATH}"`); // must be absolute
   // The old admin-only notice bar is gone; clear its cookie from browsers that still have it.
@@ -148,7 +166,7 @@ export function appBounce(req: NextRequest) {
   return NextResponse.redirect(u);
 }
 
-async function route(req: NextRequest, headers: Headers) {
+async function route(req: NextRequest, headers: Headers, ev?: NextFetchEvent) {
   const { pathname } = req.nextUrl;
   const pass = () => NextResponse.next({ request: { headers } });
   const bounce = appBounce(req);
@@ -156,7 +174,7 @@ async function route(req: NextRequest, headers: Headers) {
   const alias = SECTION_ALIASES[pathname];
   if (alias) return NextResponse.redirect(new URL(alias, req.url), 308);
   const adminArea = pathname === "/admin" || pathname.startsWith("/admin/");
-  const flags = adminArea ? null : await siteFlags(req);
+  const flags = adminArea ? null : await siteFlags(req, ev);
   const token = req.cookies.get("studio_session")?.value;
   let authed = false;
   if (token) {

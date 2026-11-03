@@ -143,7 +143,7 @@ async function migrateProRename() {
   invalidate("plans:");
 }
 
-type PlanRow = { id: string; slug: string; name: string; priceMinor: number; currency: string; interval: string; note: string; features: string; state: string; highlight: boolean; sortOrder: number; prices: string; yearlyMinor: number; postLimit: number; aiCaptions: boolean; seats: number; postPeriod: string; maxUploadMb: number; replyLimit: number; captionVideos: number; burnCaptions: boolean; accountLimit?: number; storageMb?: number; yearlyPrices?: string; platformLimit?: number; brandLimit?: number; xPostLimit?: number; analyticsDays?: number; fairUsePosts?: number; perks?: string };
+type PlanRow = { id: string; slug: string; name: string; priceMinor: number; currency: string; interval: string; note: string; features: string; state: string; highlight: boolean; sortOrder: number; prices: string; yearlyMinor: number; postLimit: number; aiCaptions: boolean; seats: number; postPeriod: string; maxUploadMb: number; replyLimit: number; captionVideos: number; burnCaptions: boolean; accountLimit?: number; storageMb?: number; yearlyPrices?: string; platformLimit?: number; brandLimit?: number; xPostLimit?: number; analyticsDays?: number; fairUsePosts?: number; perks?: string; aiMonthly?: number; aiDaily?: number };
 
 export function toPublic(p: PlanRow): PublicPlan {
   let features: string[] = [];
@@ -160,6 +160,7 @@ export function toPublic(p: PlanRow): PublicPlan {
     yearlyPrices: parsePrices(p.yearlyPrices ?? "{}"),
     platformLimit: p.platformLimit ?? 0, brandLimit: p.brandLimit ?? 0, xPostLimit: p.xPostLimit ?? 0, analyticsDays: p.analyticsDays ?? 0, fairUsePosts: p.fairUsePosts ?? 0,
     perks: parsePerks(p.perks ?? ""),
+    aiMonthly: p.aiMonthly ?? 0, aiDaily: p.aiDaily ?? 0,
     state: (["available", "soon", "hidden"].includes(p.state) ? p.state : "available") as PublicPlan["state"],
   };
 }

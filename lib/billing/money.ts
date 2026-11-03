@@ -61,7 +61,7 @@ export interface PublicPlan {
   platformLimit: number;
   /** Accounts (brands) per platform; 0 = the older rules (one per platform, or accountLimit). */
   brandLimit: number;
-  /** Posts to X per month; 0 = no X cap. */
+  /** Posts to X per month; 0 = no X cap, -1 = X is not on this plan (1112). */
   xPostLimit: number;
   /** Days of analytics history; 0 = the default 90. */
   analyticsDays: number;
@@ -69,6 +69,10 @@ export interface PublicPlan {
   fairUsePosts: number;
   /** Extra features on the plan; null = every one. */
   perks: Perk[] | null;
+  /** 1112. AI requests per calendar month; 0 = no monthly cap. */
+  aiMonthly: number;
+  /** 1112. AI requests per UTC day; 0 = the server default. */
+  aiDaily: number;
 }
 
 /**

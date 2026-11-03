@@ -12,6 +12,41 @@ const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   // Next 15: stable top-level key (was experimental.serverComponentsExternalPackages); instrumentation is on by default.
   serverExternalPackages: ["@prisma/client", "bcryptjs", "bullmq", "ioredis"],
+  // 1113: keep every server function small (Vercel stores a copy per function per kept deployment, and a
+  // smaller function starts faster). The file tracer sees `resolve(process.cwd(), "storage")` and
+  // `join(process.cwd(), "public", ...)` and copies those folders (plus test, doc and CLI files) into functions.
+  // None are read at runtime: public files are served by the CDN, media lives in the bucket.
+  // public/brand/app stays (lib/brand/icon-url.ts hashes it). Note: Next applies these globs on Linux (Vercel);
+  // on Windows the backslash paths don't match, so a local build still lists them.
+  outputFileTracingExcludes: {
+    "*": [
+      "./storage/**",
+      "./tests/**",
+      "./docs/**",
+      "./scripts/**",
+      "./prisma/*.db",
+      "./prisma/*.db-journal",
+      "./outly-*/**",
+      "./node_modules/@electric-sql/**",
+      "./node_modules/@prisma/engines/**",
+      "./node_modules/prisma/**",
+      "./node_modules/typescript/**",
+      "./node_modules/@swc/core*/**",
+      "./node_modules/esbuild*/**",
+      "./node_modules/@esbuild/**",
+      "./public/audio/**",
+      "./public/samples/**",
+      "./public/brands/**",
+      "./public/brand/avatar-*.png",
+      "./public/brand/bimi.svg",
+      "./public/brand/email/**",
+      "./public/brand/founding/**",
+      "./public/brand/icon-sheet.png",
+      "./public/brand/icons/**",
+      "./public/brand/pay/**",
+      "./public/brand/rocket/**",
+    ],
+  },
   experimental: {
     // tree-shake the big icon/animation/chart libraries so pages only ship what they import
     optimizePackageImports: ["lucide-react", "framer-motion", "recharts", "date-fns"],

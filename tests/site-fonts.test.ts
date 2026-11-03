@@ -82,7 +82,11 @@ describe("site fonts (1046)", () => {
   });
 
   test("theme route serves the font override", () => {
-    const route = readFileSync("app/api/pip-theme/route.ts", "utf8");
-    expect(route).toContain("fontCss(fonts)");
+    // 1113: the CSS is built in lib/theme-css.ts; the route serves it and the root layout inlines it.
+    expect(readFileSync("lib/theme-css.ts", "utf8")).toContain("fontCss(fonts)");
+    expect(readFileSync("app/api/pip-theme/route.ts", "utf8")).toContain("themeCss()");
+    const layout = readFileSync("app/layout.tsx", "utf8");
+    expect(layout).toContain('id="pip-theme"');
+    expect(layout).not.toContain('href="/api/pip-theme"');
   });
 });

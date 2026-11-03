@@ -1,6 +1,4 @@
-import { getConfig } from "@/lib/settings";
-import { MASCOT_DEFAULT, mascotCss } from "@/lib/mascot/palettes";
-import { FONTS_DEFAULT, fontCss } from "@/lib/fonts";
+import { themeCss } from "@/lib/theme-css";
 
 /**
  * Pip's colourways as a tiny stylesheet, linked from the root layout. A plain handler (not route()) so it
@@ -10,9 +8,9 @@ import { FONTS_DEFAULT, fontCss } from "@/lib/fonts";
  * 15 + 10 + 5 = 30 s.
  */
 export async function GET() {
-  const [cfg, fonts] = await Promise.all([getConfig("mascot").catch(() => MASCOT_DEFAULT), getConfig("fonts").catch(() => FONTS_DEFAULT)]);
-  // 1046: the site font set rides along in the same file (one request, same cache) rather than a second stylesheet.
-  return new Response(mascotCss(cfg) + fontCss(fonts), {
+  // 1046: the site font set rides along in the same file. 1113: pages inline this (lib/theme-css.ts); the route
+  // stays for HTML cached before that, and for anything outside the root layout.
+  return new Response(await themeCss(), {
     headers: {
       "content-type": "text/css; charset=utf-8",
       "cache-control": "public, max-age=5",

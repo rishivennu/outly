@@ -30,10 +30,12 @@ export interface Entitlements {
   brandLimit: number; // accounts per platform (brands), plus extraBrands from packs
   extraBrands: number;
   extraSeats: number; // already included in `seats`
-  xPostLimit: number; // posts to X per calendar month (UTC)
+  xPostLimit: number; // posts to X per calendar month (UTC); 1112: -1 = X is not on this plan
   analyticsDays: number;
   fairUsePosts: number;
   perks: Perk[] | null;
+  aiMonthly: number; // 1112: AI requests per calendar month (UTC); 0 = no monthly cap
+  aiDaily: number; // 1112: AI requests per UTC day; 0 = the server default (AI_DAILY_LIMIT)
 }
 
 /** Which limit a 402 is about, so the upgrade popup can say the right thing. */
@@ -41,7 +43,7 @@ export type LimitFeature = "posts" | "upload" | "replies" | "captions" | "burn" 
 
 const limit = (message: string, feature: LimitFeature) => new HttpError(402, message, "PLAN_LIMIT", { feature, upgrade: "/billing" });
 
-const UNLIMITED: Omit<Entitlements, "planSlug" | "planName"> = { postLimit: 0, postPeriod: "month", aiCaptions: true, seats: 0, maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true, accountLimit: 0, storageMb: 0, source: "free", accessEndsAt: null, platformLimit: 0, brandLimit: 0, extraBrands: 0, extraSeats: 0, xPostLimit: 0, analyticsDays: 0, fairUsePosts: 0, perks: null };
+const UNLIMITED: Omit<Entitlements, "planSlug" | "planName"> = { postLimit: 0, postPeriod: "month", aiCaptions: true, seats: 0, maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true, accountLimit: 0, storageMb: 0, source: "free", accessEndsAt: null, platformLimit: 0, brandLimit: 0, extraBrands: 0, extraSeats: 0, xPostLimit: 0, analyticsDays: 0, fairUsePosts: 0, perks: null, aiMonthly: 0, aiDaily: 0 };
 
 /**
  * What this account may do (1052): the best plan live right now across paid and gift subscriptions, admin
@@ -57,6 +59,7 @@ export async function entitlements(userId: string): Promise<Entitlements> {
     storageMb: plan.storageMb ?? 0, source: best.source, accessEndsAt: best.endsAt,
     platformLimit: plan.platformLimit ?? 0, brandLimit: plan.brandLimit ?? 0, extraBrands: (plan.brandLimit ?? 0) > 0 ? extras.brands : 0, extraSeats: extras.seats,
     xPostLimit: plan.xPostLimit ?? 0, analyticsDays: plan.analyticsDays ?? 0, fairUsePosts: plan.fairUsePosts ?? 0, perks: parsePerks(plan.perks),
+    aiMonthly: plan.aiMonthly ?? 0, aiDaily: plan.aiDaily ?? 0,
   };
 }
 
@@ -257,8 +260,11 @@ export async function recordUse(userId: string, feature: "reply" | "captions", r
   });
 }
 
-/** Audio chunks (~1 min each) a capped plan may transcribe per allowed video, re-runs included. */
-export const CHUNKS_PER_CAPTION_VIDEO = 15;
+/**
+ * Audio chunks (~1 min each) a capped plan may transcribe per allowed video, re-runs included. 1112: 4, so a
+ * plan's videos average up to 4 minutes of audio (Shorts and Reels run 1 to 3); was 15.
+ */
+export const CHUNKS_PER_CAPTION_VIDEO = 4;
 
 /** Videos with AI captions this month. One video (ref) can be transcribed in many chunks and re-run; it counts once. */
 export async function captionUsage(userId: string, now = new Date()) {
@@ -326,6 +332,11 @@ export function checkPlatforms(e: Pick<Entitlements, "platformLimit" | "planName
   if (m) throw limit(m, "platforms");
 }
 
+/** 1112: a plan with xPostLimit -1 (Free) doesn't post to X at all. X bills per post, so Free can't carry it. */
+export function checkX(e: Pick<Entitlements, "xPostLimit" | "planName">) {
+  if (e.xPostLimit < 0) throw limit(`Posting to X isn't part of ${e.planName}. Upgrade to post to X, or untick X for this one.`, "x");
+}
+
 /** Brands: up to brandLimit (+ packs) accounts on each platform. */
 export function checkBrands(e: Pick<Entitlements, "brandLimit" | "extraBrands" | "planName">, onPlatform: number, platform: string) {
   const m = brandsBlock(e, onPlatform, platform);
@@ -348,7 +359,7 @@ export async function assertPerk(userId: string, perk: Perk) {
 export async function xPostUsage(userId: string, now = new Date()) {
   const e = await entitlements(userId);
   const [used, credits] = e.xPostLimit > 0 ? await Promise.all([db.featureUse.count({ where: { userId, feature: "x-post", period: periodKey("month", now) } }), creditsLeft(userId, "x", now)]) : [0, 0];
-  return { ...e, used, credits, left: e.xPostLimit > 0 ? Math.max(0, e.xPostLimit - used) + credits : Infinity };
+  return { ...e, used, credits, left: e.xPostLimit > 0 ? Math.max(0, e.xPostLimit - used) + credits : e.xPostLimit < 0 ? 0 : Infinity };
 }
 
 /**
@@ -381,6 +392,7 @@ export async function spendXPosts(userId: string, refs: string[], now = new Date
   const none = { fresh: false, release: async () => {}, settle: async () => {} };
   if (!refs.length) return none;
   const e = await entitlements(userId);
+  checkX(e);
   if (e.xPostLimit <= 0) return none;
   const sell = await packOnSale("x");
   const full = () => limit(`${e.planName} includes ${e.xPostLimit} posts to X a month and they're used up. ${sell ? "Add an X top-up, upgrade," : "Upgrade"} or untick X for this one.`, "x");
