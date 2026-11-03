@@ -38,7 +38,7 @@ describe("1100 welcome screen", () => {
   test("Get started remembers it, then hands over; focus stays inside while up", () => {
     expect(w).toContain("localStorage.setItem(WELCOME_KEY");
     expect(w).toContain("window.dispatchEvent(new Event(WELCOMED_EVENT))");
-    expect(w).toMatch(/e\.key === "Tab"[\s\S]{0,400}preventDefault/);
+    expect(w).toMatch(/e\.key === "Tab"[\s\S]{0,700}preventDefault/); // 1101: a cycle over the screen's controls
   });
   test("safe areas, scroll lock, reduced motion, 56px button", () => {
     for (const s of ["top", "right", "bottom", "left"]) expect(css).toContain(`env(safe-area-inset-${s})`);

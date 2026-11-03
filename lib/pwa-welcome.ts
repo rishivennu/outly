@@ -15,20 +15,31 @@ export interface WelcomeConfig {
   /** "{name}" becomes the person's first name. */
   title: string;
   body: string;
-  /** Up to three short lines with a tick; empty lines are dropped. */
+  /** Up to three short lines with a tick; empty lines are dropped. Not shown since the 1101 redesign (kept so saved settings still load). */
   points: string[];
+  /** The primary action: closes the welcome onto the page it opened on. */
   button: string;
+  /** 1101: secondary actions and the text link. */
+  connect: string;
+  tour: string;
+  skip: string;
 }
 
 export const WELCOME_DEFAULT: WelcomeConfig = {
   enabled: true,
-  title: "Welcome, {name}.",
+  title: "Welcome! Let's get to it.",
   body: "Outlly now lives on your Home Screen. Plan, post and reply from one place, one tap away.",
   points: ["Schedule once, post everywhere", "Every comment and DM in one inbox", "See what is working, every week"],
   button: "Get started",
+  connect: "Connect an account",
+  tour: "Take the 1-minute tour",
+  skip: "Skip to my dashboard",
 };
 
-export const WELCOME_LIMITS = { title: 60, body: 180, point: 48, button: 24, points: 3 } as const;
+/** The pre-1101 default headline: a saved copy of it follows the new default instead of pinning the old words. */
+export const WELCOME_OLD_TITLE = "Welcome, {name}.";
+
+export const WELCOME_LIMITS = { title: 60, body: 180, point: 48, button: 24, points: 3, connect: 28, tour: 28, skip: 28 } as const;
 
 const text = (v: unknown, max: number, d: string) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : d);
 
@@ -39,12 +50,30 @@ export function normalizeWelcome(c: Partial<WelcomeConfig> | null | undefined): 
     : d.points;
   return {
     enabled: typeof c?.enabled === "boolean" ? c.enabled : d.enabled,
-    title: text(c?.title, WELCOME_LIMITS.title, d.title),
+    title: c?.title === WELCOME_OLD_TITLE ? d.title : text(c?.title, WELCOME_LIMITS.title, d.title),
     body: text(c?.body, WELCOME_LIMITS.body, d.body),
     points,
     button: text(c?.button, WELCOME_LIMITS.button, d.button),
+    connect: text(c?.connect, WELCOME_LIMITS.connect, d.connect),
+    tour: text(c?.tour, WELCOME_LIMITS.tour, d.tour),
+    skip: text(c?.skip, WELCOME_LIMITS.skip, d.skip),
   };
 }
+
+/**
+ * The headline as lines to set (1101): one line per sentence, so "Welcome! Let's get to it." breaks after
+ * "Welcome!" and never inside a sentence on a phone. The last word is the lime highlight.
+ * A sentence too long for one line (over 22 characters) is allowed to wrap.
+ */
+export function headlineParts(s: string): { lines: string[]; tail: string; hl: string } {
+  const sents = s.trim().split(/(?<=[.!?])\s+/).filter(Boolean);
+  const last = sents.pop() ?? "";
+  const i = last.lastIndexOf(" ");
+  return { lines: sents, tail: i < 0 ? "" : last.slice(0, i), hl: i < 0 ? last : last.slice(i + 1) };
+}
+
+/** Lines short enough to keep whole (no break inside them). */
+export const HEADLINE_NOWRAP = 22;
 
 /** "{name}" -> first name; without a name the placeholder and the comma before it go. */
 export function fillName(s: string, name: string | null | undefined) {

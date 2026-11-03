@@ -11,16 +11,18 @@ const input = "h-11 w-full rounded-xl bg-background px-3 text-[14px] hairline fo
 /**
  * Admin > Dashboard style > Home Screen welcome (1100). The once-per-device screen people see the first time
  * they open Outlly from their Home Screen. The switch saves at once; the words save with the button.
+ * 1101: headline, screen-reader description and the four action labels; the ticked lines are gone.
  */
 export function WelcomeScreenSettings({ initial }: { initial: WelcomeConfig }) {
   const toast = useToast();
   const [cfg, setCfg] = useState(initial);
   const [draft, setDraft] = useState(initial);
   const [busy, setBusy] = useState(false);
-  const points = [0, 1, 2].map((i) => draft.points[i] ?? "");
-  // Compared the way they are saved (trimmed, blanks dropped), so a stray space or empty box never flips Save on.
-  const lines = (ps: string[]) => ps.map((p) => p.trim()).filter(Boolean).join("\n");
-  const dirty = draft.title.trim() !== cfg.title || draft.body.trim() !== cfg.body || draft.button.trim() !== cfg.button || lines(points) !== lines(cfg.points);
+  // 1101: the screen shows a headline and four actions (the ticked lines went with the redesign).
+  // Compared the way they are saved (trimmed), so a stray space never flips Save on.
+  const WORDS = ["title", "body", "button", "connect", "tour", "skip"] as const;
+  const dirty = WORDS.some((k) => draft[k].trim() !== cfg[k]);
+  const blank = WORDS.some((k) => !draft[k].trim());
 
   async function save(patch: Partial<WelcomeConfig>, msg: string) {
     if (busy) return;
@@ -37,7 +39,7 @@ export function WelcomeScreenSettings({ initial }: { initial: WelcomeConfig }) {
     }
   }
 
-  const field = (label: string, k: "title" | "body" | "button", max: number, hint?: string) => (
+  const field = (label: string, k: (typeof WORDS)[number], max: number, hint?: string) => (
     <label className="grid gap-1.5 text-[13px] font-medium">
       <span className="flex justify-between gap-2">
         {label}
@@ -75,32 +77,17 @@ export function WelcomeScreenSettings({ initial }: { initial: WelcomeConfig }) {
         className="mt-4 grid gap-3"
         onSubmit={(e) => {
           e.preventDefault();
-          void save({ title: draft.title.trim(), body: draft.body.trim(), button: draft.button.trim(), points: points.map((p) => p.trim()).filter(Boolean) }, "Welcome screen saved.");
+          void save(Object.fromEntries(WORDS.map((k) => [k, draft[k].trim()])) as Partial<WelcomeConfig>, "Welcome screen saved.");
         }}
       >
-        {field("Headline", "title", WELCOME_LIMITS.title, "{name} becomes their first name.")}
-        {field("Message", "body", WELCOME_LIMITS.body)}
-        <fieldset className="grid gap-2">
-          <legend className="mb-1.5 text-[13px] font-medium">Ticked lines (leave empty to hide)</legend>
-          {points.map((p, i) => (
-            <input
-              key={i}
-              aria-label={`Line ${i + 1}`}
-              value={p}
-              maxLength={WELCOME_LIMITS.point}
-              disabled={busy}
-              onChange={(e) => {
-                const next = [...points];
-                next[i] = e.target.value;
-                setDraft({ ...draft, points: next });
-              }}
-              className={input}
-            />
-          ))}
-        </fieldset>
-        {field("Button", "button", WELCOME_LIMITS.button)}
+        {field("Headline", "title", WELCOME_LIMITS.title, "One line per sentence; the last word is the lime highlight. {name} becomes their first name.")}
+        {field("Description for screen readers", "body", WELCOME_LIMITS.body, "Read aloud after the headline; not shown on screen.")}
+        {field("Main button", "button", WELCOME_LIMITS.button, "Closes the welcome onto the page it opened on.")}
+        {field("Second button", "connect", WELCOME_LIMITS.connect, "Opens Accounts to connect a platform.")}
+        {field("Third button", "tour", WELCOME_LIMITS.tour, "Starts the guided tour.")}
+        {field("Text link", "skip", WELCOME_LIMITS.skip, "Goes to the dashboard (Home).")}
         <div className="flex flex-wrap items-center gap-2">
-          <button type="submit" disabled={busy || !dirty || !draft.title.trim() || !draft.body.trim() || !draft.button.trim()} className="h-11 rounded-full bg-foreground px-5 text-[14px] font-semibold text-background disabled:opacity-50">
+          <button type="submit" disabled={busy || !dirty || blank} className="h-11 rounded-full bg-foreground px-5 text-[14px] font-semibold text-background disabled:opacity-50">
             Save words
           </button>
           <button type="button" disabled={busy} onClick={() => setDraft({ ...WELCOME_DEFAULT, enabled: cfg.enabled })} className="h-11 rounded-full px-4 text-[14px] font-medium text-muted-foreground hover:bg-secondary disabled:opacity-50">

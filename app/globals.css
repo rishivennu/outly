@@ -3406,69 +3406,125 @@ html.dark .mdrawer { background: hsl(240 5% 8.5%); }
 @keyframes mdrawer-in { from { transform: translateX(100%); } }
 @keyframes mdrawer-out { to { transform: translateX(100%); } }
 
-/* 1100 first launch from the Home Screen (PwaWelcome). Hidden unless <head> set html[data-welcome]; always the
-   brand ink with cream text and one lime accent, in either theme. Entrance: a time-based stagger (--i), no springs. */
+/* 1100 first launch from the Home Screen (PwaWelcome), redesigned in 1101 after the reference: a warm paper page
+   in light, the brand ink in dark; logo top-left, close top-right, a big two-line headline with one lime word, a
+   hero illustration (WelcomeArt) and stacked pill actions with a text link. Hidden unless <head> set
+   html[data-welcome]. Motion: header 400ms fade, headline 600ms rise, art 800ms fade+scale, actions 100ms apart,
+   press .98 in 150ms, exit 300ms fade+slide; all on --pw-ease, no springs. */
 .pwa-welcome { display: none; }
 html[data-welcome] .pwa-welcome {
+  --pw-ease: cubic-bezier(.16, 1, .3, 1);
+  --pw-bg: hsl(40 33% 96%); --pw-fg: hsl(232 16% 9%); --pw-line: hsl(232 16% 9% / .82); --pw-hl: hsl(84 85% 24%);
+  --pw-cta-bg: hsl(232 16% 7%); --pw-cta-fg: hsl(0 0% 100%); --pw-hover: hsl(232 16% 9% / .06);
   position: fixed; inset: 0; z-index: 120; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain;
-  padding: max(28px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
-  background: hsl(232 16% 7%); color: hsl(40 33% 96%);
+  padding: max(12px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  background: var(--pw-bg); color: var(--pw-fg);
   -webkit-tap-highlight-color: transparent;
 }
+html.dark[data-welcome] .pwa-welcome {
+  --pw-bg: hsl(232 16% 7%); --pw-fg: hsl(40 33% 96%); --pw-line: hsl(40 33% 96% / .6); --pw-hl: hsl(78 100% 55%);
+  --pw-cta-bg: hsl(40 33% 96%); --pw-cta-fg: hsl(232 16% 7%); --pw-hover: hsl(40 33% 96% / .08);
+}
 html[data-welcome]:has([data-pwa-welcome]), html[data-welcome]:has([data-pwa-welcome]) body { overflow: hidden; }
-.pw-glow {
-  position: absolute; inset: -20% -30% auto; height: 70%; pointer-events: none;
-  background: radial-gradient(closest-side, hsl(78 100% 55% / .2), transparent); filter: blur(10px);
+.pw-wrap {
+  flex: 1 0 auto; width: 100%; max-width: 480px; margin: 0 auto; display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "top" "title" "art" "act";
 }
-.pw-inner { position: relative; margin: auto 0; width: 100%; max-width: 440px; align-self: center; padding: 24px 0 32px; }
-.pw-mark { position: relative; display: grid; place-items: center; width: 84px; height: 84px; border-radius: 9999px; background: hsl(0 0% 100% / .07); box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .1); }
-.pw-ring { position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 1.5px hsl(78 100% 55% / .7); opacity: 0; }
-.pw-kicker { margin-top: 28px; font-size: 12px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: hsl(78 100% 55%); }
-.pw-title { margin-top: 10px; font-family: var(--font-display), var(--font-body), system-ui, sans-serif; font-size: clamp(34px, 9vw, 44px); line-height: 1.04; font-weight: 700; letter-spacing: -.035em; text-wrap: balance; }
-.pw-body { margin-top: 14px; font-size: 16px; line-height: 1.5; color: hsl(40 12% 96% / .74); text-wrap: pretty; }
-.pw-points { margin-top: 26px; display: grid; gap: 12px; }
-.pw-points li { display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 500; color: hsl(40 20% 96% / .9); }
-.pw-tick { display: grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; border-radius: 9999px; background: hsl(78 100% 55% / .16); color: hsl(78 100% 60%); }
-.pw-tick svg { width: 13px; height: 13px; }
-.pw-foot { position: relative; width: 100%; max-width: 440px; align-self: center; }
-/* Phones keep the button in thumb reach at the bottom; wider screens keep it with the words. */
-@media (min-width: 640px) and (min-height: 700px) { .pw-inner { margin: auto 0 0; padding-bottom: 36px; } .pw-foot { margin-bottom: auto; } }
+.pw-top { grid-area: top; display: flex; align-items: center; justify-content: space-between; min-height: 52px; }
+.pw-brand { display: inline-flex; align-items: center; gap: 9px; font-family: var(--font-display), var(--font-body), system-ui, sans-serif; font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+.pw-x {
+  display: grid; place-items: center; width: 44px; height: 44px; margin-right: -10px; border-radius: 9999px; color: inherit;
+  transition: background-color .2s ease-out, transform .15s var(--pw-ease);
+}
+.pw-x svg { width: 26px; height: 26px; stroke-width: 1.75; }
+.pw-title {
+  grid-area: title; margin-top: clamp(20px, 5dvh, 44px);
+  font-family: var(--font-display), var(--font-body), system-ui, sans-serif; font-size: clamp(32px, 9.6vw, 46px);
+  line-height: 1.04; font-weight: 800; letter-spacing: -.04em; text-wrap: balance;
+}
+.pw-line { display: block; }
+.pw-nowrap { white-space: nowrap; }
+.pw-hl { color: var(--pw-hl); }
+/* Light: the lime-ink word (5.4:1 on the paper) sits on a bright lime marker, so the signature lime is still there. */
+html:not(.dark) .pw-hl { background: linear-gradient(hsl(78 92% 50% / .55), hsl(78 92% 50% / .55)) 0 88% / 100% .22em no-repeat; }
+.pw-art { grid-area: art; display: grid; place-items: center; min-height: 0; padding: clamp(12px, 3dvh, 28px) 0; }
+.pw-art svg { width: min(100%, 400px); max-height: min(40dvh, 380px); height: auto; overflow: visible; }
+.pw-actions { grid-area: act; display: grid; gap: 12px; padding-bottom: 4px; }
 .pw-cta {
-  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 56px; border-radius: 9999px;
-  font-size: 16px; font-weight: 650; outline: none; transition: transform .18s var(--ease-liquid), filter .2s ease;
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 56px; padding: 0 52px;
+  border-radius: 9999px; font-size: 16px; font-weight: 600; letter-spacing: -.005em; outline: none;
+  transition: transform .15s var(--pw-ease), background-color .2s ease-out, filter .2s ease-out;
 }
-.pw-cta svg { width: 18px; height: 18px; transition: transform .25s var(--ease-liquid); }
-.pw-cta:focus-visible { box-shadow: 0 0 0 3px hsl(232 16% 7%), 0 0 0 5px hsl(40 33% 96%); }
-/* the screen itself takes focus on a tap launch: no ring then, a ring for a keyboard (house rule: never bare outline:none) */
-html[data-welcome] .pwa-welcome:focus:not(:focus-visible) { outline: none; }
-html[data-welcome] .pwa-welcome:focus-visible { outline: 2px solid hsl(40 33% 96% / .6); outline-offset: -6px; }
-html[data-contrast="more"] :is(.pw-body, .pw-points li) { color: hsl(40 33% 96%); }
+.pw-cta svg { position: absolute; left: 20px; width: 20px; height: 20px; stroke-width: 2; }
+.pw-primary { background: var(--pw-cta-bg); color: var(--pw-cta-fg); }
+.pw-ghost { box-shadow: inset 0 0 0 1.5px var(--pw-line); color: inherit; }
+.pw-link {
+  justify-self: center; min-height: 44px; margin-top: 4px; padding: 0 10px; border-radius: 10px; font-size: 15px; font-weight: 600;
+  text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 4px; color: inherit; outline: none;
+  transition: transform .15s var(--pw-ease), background-color .2s ease-out;
+}
+.pw-cta:focus-visible, .pw-x:focus-visible, .pw-link:focus-visible { outline: 2px solid var(--pw-fg); outline-offset: 3px; }
+.pw-cta:active, .pw-x:active, .pw-link:active { transform: scale(.98); }
+@media (hover: hover) {
+  .pw-primary:hover { filter: brightness(1.18); }
+  html.dark .pw-primary:hover { filter: brightness(.94); }
+  .pw-ghost:hover, .pw-x:hover, .pw-link:hover { background-color: var(--pw-hover); }
+}
+/* The screen itself (tabindex=-1, never in the Tab order) takes focus on launch so screen readers start on it.
+   It is a container, not a control: no ring on it (a first launch counts as "keyboard" to :focus-visible and would
+   frame the whole screen). Every control inside keeps its own :focus-visible ring. */
+html[data-welcome] .pwa-welcome:focus { outline: none; }
+html[data-contrast="more"] .pw-ghost { box-shadow: inset 0 0 0 2px var(--pw-fg); }
 @media (forced-colors: active) {
   .pw-cta { border: 2px solid ButtonText; }
-  .pw-cta:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }
+  .pw-cta:focus-visible, .pw-x:focus-visible, .pw-link:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }
+  .pw-hl { background: none; }
 }
-.pw-cta:active { transform: scale(.97); }
-@media (hover: hover) { .pw-cta:hover { filter: brightness(1.05); } .pw-cta:hover svg { transform: translateX(3px); } }
+/* Short phones (SE, landscape-ish): smaller type and art, tighter gaps, so nothing scrolls at 360x640. */
+@media (max-height: 700px) and (max-width: 1023px) {
+  .pw-title { margin-top: 10px; font-size: clamp(30px, 8.6vw, 38px); }
+  .pw-art { padding: 8px 0; }
+  .pw-art svg { max-height: 30dvh; }
+  .pw-actions { gap: 10px; }
+  .pw-cta { height: 50px; }
+  .pw-link { margin-top: 0; }
+}
+/* Desktop and tablets in landscape: words and actions on the left, the art takes the right half. */
+@media (min-width: 1024px) and (min-height: 600px) {
+  html[data-welcome] .pwa-welcome { padding: max(24px, env(safe-area-inset-top)) max(40px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(40px, env(safe-area-inset-left)); }
+  .pw-wrap {
+    max-width: 1240px; column-gap: clamp(40px, 6vw, 112px);
+    grid-template-columns: minmax(400px, 520px) minmax(0, 1fr); grid-template-rows: auto 1fr auto auto 1fr;
+    grid-template-areas: "top top" ". art" "title art" "act art" ". art";
+  }
+  .pw-title { align-self: end; margin-top: 0; font-size: clamp(54px, 4.6vw, 72px); }
+  .pw-actions { align-self: start; margin-top: 40px; max-width: 440px; }
+  .pw-art { padding: 0; }
+  .pw-art svg { width: min(100%, 620px); max-height: 72dvh; }
+}
 @media (prefers-reduced-motion: no-preference) {
-  .pwa-welcome .pw-in { animation: pw-in .7s var(--ease-liquid) both; animation-delay: calc(120ms + var(--i, 0) * 70ms); }
-  .pwa-welcome .pw-mark { animation-name: pw-mark; animation-duration: .8s; }
-  .pwa-welcome .pw-ring { animation: pw-ring 1.4s cubic-bezier(.2, .7, .2, 1) .55s both; }
-  .pwa-welcome .pw-glow { animation: pw-glow 1.4s ease-out both; }
-  .pwa-welcome[data-phase="leaving"] { animation: pw-out .46s cubic-bezier(.4, 0, .2, 1) forwards; }
-  .pwa-welcome[data-phase="leaving"] .pw-inner, .pwa-welcome[data-phase="leaving"] .pw-foot { animation: pw-lift .46s cubic-bezier(.4, 0, .2, 1) forwards; }
+  .pwa-welcome .pw-a { animation: pw-fade .4s var(--pw-ease) both; }
+  .pwa-welcome .pw-b { animation: pw-rise .6s var(--pw-ease) .08s both; }
+  .pwa-welcome .pw-c { animation: pw-grow .8s var(--pw-ease) .18s both; }
+  .pwa-welcome .pw-d { animation: pw-rise .6s var(--pw-ease) both; animation-delay: calc(340ms + var(--i, 0) * 100ms); }
+  /* after the entrance the rocket floats a few pixels and the clouds drift: slow, time-based, never bouncy */
+  .pwa-welcome .wa-float { transform-box: fill-box; animation: wa-float 4.8s ease-in-out 1s infinite alternate; }
+  .pwa-welcome .wa-cloud { transform-box: fill-box; animation: wa-drift 9s ease-in-out 1s infinite alternate; }
+  .pwa-welcome .wa-cloud-2 { animation-duration: 11s; animation-direction: alternate-reverse; }
+  .pwa-welcome[data-phase="leaving"] { animation: pw-leave .3s var(--pw-ease) forwards; pointer-events: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   html[data-welcome] .pwa-welcome { animation: page-fade .2s ease; }
-  .pwa-welcome[data-phase="leaving"] { animation: acct-fade-out .16s ease forwards; }
-  .pw-cta, .pw-cta svg { transition: none; }
-  .pw-cta:active { transform: none; }
+  .pwa-welcome[data-phase="leaving"] { animation: acct-fade-out .16s ease forwards; pointer-events: none; }
+  .pw-cta, .pw-x, .pw-link { transition: none; }
+  .pw-cta:active, .pw-x:active, .pw-link:active { transform: none; }
 }
-@keyframes pw-in { from { opacity: 0; transform: translateY(14px); } }
-@keyframes pw-mark { from { opacity: 0; transform: scale(.82); } }
-@keyframes pw-ring { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.7); } }
-@keyframes pw-glow { from { opacity: 0; transform: scale(.85); } }
-@keyframes pw-out { to { opacity: 0; } }
-@keyframes pw-lift { to { transform: translateY(-10px) scale(.985); } }
+@keyframes pw-fade { from { opacity: 0; } }
+@keyframes pw-rise { from { opacity: 0; transform: translateY(14px); } }
+@keyframes pw-grow { from { opacity: 0; transform: scale(.92); } }
+@keyframes pw-leave { to { opacity: 0; transform: translateY(24px); } }
+@keyframes wa-float { to { transform: translate(3px, -6px); } }
+@keyframes wa-drift { to { transform: translateX(8px); } }
 
 /* ---------- 1100: Liquid glass on every studio card ----------
    The studio's screen cards wear the same liquid glass as the rail: a cool-to-deep tint, a lit rim on the top-left

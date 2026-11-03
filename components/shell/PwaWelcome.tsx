@@ -1,13 +1,22 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowRight, Check } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Link2, PlayCircle, Rocket, X } from "lucide-react";
 import { OutlyMark } from "@/components/brand/Logo";
+import { startTour } from "@/components/onboarding/Tour";
+import { cn } from "@/lib/utils";
 import { useUser } from "./UserContext";
-import { WELCOMED_EVENT, WELCOME_KEY, fillName, shouldWelcome, type WelcomeConfig } from "@/lib/pwa-welcome";
+import { WelcomeArt } from "./WelcomeArt";
+import { HEADLINE_NOWRAP, WELCOMED_EVENT, WELCOME_DEFAULT, WELCOME_KEY, fillName, headlineParts, shouldWelcome, type WelcomeConfig } from "@/lib/pwa-welcome";
+
+/** What the person picked on the way out (1101). Every one of them counts as seen. */
+type Exit = "start" | "connect" | "tour" | "skip";
+/** The exit plays for this long (globals.css .pwa-welcome[data-phase="leaving"]); reduced motion gets a short fade. */
+export const WELCOME_EXIT_MS = 300;
 
 type Phase = "ssr" | "show" | "leaving" | "gone";
 const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
-const at = (i: number) => ({ ["--i" as string]: i }) as React.CSSProperties;
+const stagger = (i: number) => ({ ["--i" as string]: i }) as React.CSSProperties;
 
 /**
  * First launch from the Home Screen (1100; rules in lib/pwa-welcome.ts). Server-rendered on every studio load
@@ -23,8 +32,8 @@ const at = (i: number) => ({ ["--i" as string]: i }) as React.CSSProperties;
  */
 export function PwaWelcome({ config }: { config: WelcomeConfig }) {
   const user = useUser();
+  const router = useRouter();
   const [phase, setPhase] = useState<Phase>("ssr");
-  const btn = useRef<HTMLButtonElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const exit = useRef<number | undefined>(undefined);
 
@@ -79,7 +88,7 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
 
   if (phase === "gone") return null;
 
-  const start = () => {
+  const leave = (how: Exit) => {
     if (phase !== "show") return;
     try {
       localStorage.setItem(WELCOME_KEY, new Date().toISOString());
@@ -87,17 +96,27 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
       /* private mode: shows again next launch */
     }
     setPhase("leaving");
+    // Navigate under the exit, so the new page is already there when the screen has faded.
+    if (how === "connect") router.push("/accounts");
+    if (how === "skip" && location.pathname !== "/home") router.push("/home");
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     exit.current = window.setTimeout(() => {
       document.documentElement.removeAttribute("data-welcome");
       window.dispatchEvent(new Event(WELCOMED_EVENT));
       setPhase("gone");
-      // Hand focus to the page, not <body>, so a keyboard user starts at the dashboard (inert is lifted first).
-      requestAnimationFrame(() => document.getElementById("main")?.focus({ preventScroll: true }));
-    }, reduce ? 160 : 460);
+      requestAnimationFrame(() => {
+        // The tour takes focus itself; otherwise hand focus to the page, not <body> (inert is lifted first).
+        if (how === "tour") startTour();
+        else document.getElementById("main")?.focus({ preventScroll: true });
+      });
+    }, reduce ? 160 : WELCOME_EXIT_MS);
   };
 
   const name = user.workspace?.me.name ?? user.name;
+  // A title that was only "{name}" would leave the dialog's label blank for someone without a name.
+  const head = headlineParts(fillName(config.title, name).trim() || WELCOME_DEFAULT.title);
+  const line = (t: string) => cn("pw-line", t.length <= HEADLINE_NOWRAP && "pw-nowrap");
+  const last = head.tail ? `${head.tail} ${head.hl}` : head.hl;
   return (
     <div
       ref={box}
@@ -109,48 +128,64 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
       aria-labelledby="pw-title"
       aria-describedby="pw-body"
       onKeyDown={(e) => {
-        if (e.key === "Escape") start();
-        if (e.key === "Enter" && e.target === box.current) start();
+        if (e.key === "Escape") leave("start");
+        if (e.key === "Enter" && e.target === box.current) leave("start");
         if (e.key === "Tab") {
-          // One control: focus stays on it both ways, never on the page behind. This also keeps Tab off the
-          // browser chrome while the screen is up; Escape or Get started is always the way out.
+          // Focus cycles through the screen's own controls, never onto the page behind or the browser chrome.
+          const items = [...(box.current?.querySelectorAll<HTMLElement>("button:not([disabled])") ?? [])];
+          if (!items.length) return;
+          const at = items.indexOf(document.activeElement as HTMLElement);
+          const next = e.shiftKey ? (at <= 0 ? items.length - 1 : at - 1) : at < 0 || at === items.length - 1 ? 0 : at + 1;
           e.preventDefault();
-          btn.current?.focus();
+          items[next].focus();
         }
       }}
       className="pwa-welcome"
     >
-      <div className="pw-glow" aria-hidden="true" />
-      <div className="pw-inner">
-        <div className="pw-mark pw-in" style={at(0)}>
-          <span className="pw-ring" aria-hidden="true" />
-          <OutlyMark size={52} tone="dark" />
-        </div>
-        <p className="pw-kicker pw-in" style={at(1)}>Outlly</p>
-        <h1 id="pw-title" className="pw-title pw-in" style={at(2)}>
-          {fillName(config.title, name)}
+      <div className="pw-wrap">
+        <header className="pw-top pw-a">
+          <span className="pw-brand">
+            <OutlyMark size={28} />
+            Outlly
+          </span>
+          <button type="button" onClick={() => leave("start")} className="pw-x" aria-label="Close welcome">
+            <X aria-hidden="true" />
+          </button>
+        </header>
+        <h1 id="pw-title" className="pw-title pw-b">
+          {head.lines.map((t, i) => (
+            <span key={i} className={line(t)}>
+              {t}{" "}
+            </span>
+          ))}
+          <span className={line(last)}>
+            {head.tail && `${head.tail} `}
+            <span className="pw-hl">{head.hl}</span>
+          </span>
         </h1>
-        <p id="pw-body" className="pw-body pw-in" style={at(3)}>
+        <p id="pw-body" className="sr-only">
           {config.body}
         </p>
-        {config.points.length > 0 && (
-          <ul className="pw-points">
-            {config.points.map((p, i) => (
-              <li key={i} className="pw-in" style={at(4 + i)}>
-                <span className="pw-tick" aria-hidden="true">
-                  <Check strokeWidth={3} />
-                </span>
-                {p}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      <div className="pw-foot pw-in" style={at(5 + config.points.length)}>
-        <button ref={btn} type="button" onClick={start} className="pw-cta lime-bg">
-          {config.button}
-          <ArrowRight aria-hidden="true" />
-        </button>
+        <div className="pw-art pw-c">
+          <WelcomeArt />
+        </div>
+        <div className="pw-actions">
+          <button type="button" onClick={() => leave("start")} className="pw-cta pw-primary pw-d" style={stagger(0)}>
+            <Rocket aria-hidden="true" />
+            {config.button}
+          </button>
+          <button type="button" onClick={() => leave("connect")} className="pw-cta pw-ghost pw-d" style={stagger(1)}>
+            <Link2 aria-hidden="true" />
+            {config.connect}
+          </button>
+          <button type="button" onClick={() => leave("tour")} className="pw-cta pw-ghost pw-d" style={stagger(2)}>
+            <PlayCircle aria-hidden="true" />
+            {config.tour}
+          </button>
+          <button type="button" onClick={() => leave("skip")} className="pw-link pw-d" style={stagger(3)}>
+            {config.skip}
+          </button>
+        </div>
       </div>
     </div>
   );

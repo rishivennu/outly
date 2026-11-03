@@ -18,6 +18,9 @@ const Body = z
       z.array(z.string().trim().max(WELCOME_LIMITS.point)).max(WELCOME_LIMITS.points),
     ).optional(),
     button: z.string().trim().min(1).max(WELCOME_LIMITS.button).optional(),
+    connect: z.string().trim().min(1).max(WELCOME_LIMITS.connect).optional(),
+    tour: z.string().trim().min(1).max(WELCOME_LIMITS.tour).optional(),
+    skip: z.string().trim().min(1).max(WELCOME_LIMITS.skip).optional(),
   })
   .strict();
 
