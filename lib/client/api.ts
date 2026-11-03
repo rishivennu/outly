@@ -27,18 +27,34 @@ function planLimit(status: number, data: { error?: string; code?: string; featur
  * Any change sent through api() (POST, PATCH, DELETE: a profile switch, a disconnect, a new review)
  * forgets everything, so a cached answer never outlives the thing that changed it.
  */
-const memo = new Map<string, { at: number; p: Promise<unknown> }>();
+const memo = new Map<string, { at: number; p: Promise<unknown>; v?: unknown; done?: boolean }>();
 
 /** The same GET as api(), shared with anyone who asked for it in the last `maxAge` ms (in flight included). */
 export function cachedApi<T>(url: string, maxAge = 60_000): Promise<T> {
   const hit = memo.get(url);
   if (hit && Date.now() - hit.at < maxAge) return hit.p as Promise<T>;
   const p = api<T>(url);
-  memo.set(url, { at: Date.now(), p });
+  const entry: { at: number; p: Promise<unknown>; v?: unknown; done?: boolean } = { at: Date.now(), p };
+  memo.set(url, entry);
+  // 1114: the answer itself too, so a tab opening on a remembered range can paint it in its first frame (peekCached).
+  p.then((v) => ((entry.v = v), (entry.done = true))).catch(() => {});
   // A failure is never remembered: the next ask tries again.
   p.catch(() => memo.get(url)?.p === p && memo.delete(url));
   return p;
 }
+
+/** 1114: a remembered answer that has already arrived (no waiting, no request), or undefined. */
+export function peekCached<T>(url: string, maxAge = 60_000): T | undefined {
+  const hit = memo.get(url);
+  return hit?.done && Date.now() - hit.at < maxAge ? (hit.v as T) : undefined;
+}
+
+/**
+ * 1114: when this tab last sent a change (client clock, 0 = never). A page kept from a background preload checks
+ * it, so a tab rendered before you posted or edited something refreshes itself when you open it.
+ */
+let wroteAt = 0;
+export const lastWriteAt = () => wroteAt;
 
 /**
  * Stale-while-revalidate: hand over what is remembered (up to `keep` ms old) at once, then, if it is
@@ -67,7 +83,7 @@ export function forgetCached(prefix?: string) {
 export async function api<T>(url: string, init?: RequestInit & { json?: unknown }): Promise<T> {
   const { json, ...rest } = init ?? {};
   const writes = (rest.method ?? "GET").toUpperCase() !== "GET";
-  if (writes) memo.clear();
+  if (writes) (memo.clear(), (wroteAt = Date.now()));
   const res = await fetch(url, {
     ...rest,
     headers: { ...(json !== undefined ? { "content-type": "application/json" } : {}), ...rest.headers },
@@ -76,7 +92,7 @@ export async function api<T>(url: string, init?: RequestInit & { json?: unknown 
   });
   const data = await res.json().catch(() => ({}));
   // Again once the change has landed, so a warm-up that ran meanwhile cannot keep the old answer.
-  if (writes) memo.clear();
+  if (writes) (memo.clear(), (wroteAt = Date.now()));
   if (res.status === 401 && typeof window !== "undefined" && !url.startsWith("/api/auth")) {
     window.location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
   }
@@ -94,6 +110,7 @@ export async function api<T>(url: string, init?: RequestInit & { json?: unknown 
  */
 export async function streamApi<T>(url: string, json: unknown, onEvent: (ev: { t: string } & Record<string, unknown>) => void, { signal, timeoutMs = 30_000 }: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<T> {
   memo.clear();
+  wroteAt = Date.now();
   const quiet = new AbortController();
   const stop = () => quiet.abort();
   signal?.addEventListener("abort", stop);

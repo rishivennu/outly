@@ -38,7 +38,7 @@ function ThreadAvatar({ t, size = 40, badge = true }: { t: Pick<ThreadView, "par
 }
 
 /** Instagram and Facebook direct messages (1031). The list is our stored copy, fed by Meta's webhooks. */
-export function MessagesView({ initial, tabs, query, refreshTick, onBusy, onWaiting }: { initial: DmData } & PaneProps) {
+export function MessagesView({ initial, tabs, query, refreshTick, refreshQuiet, onBusy, onWaiting }: { initial: DmData } & PaneProps) {
   const toast = useToast();
   const [data, setData] = useState<DmData>(initial);
   const [filter, setFilter] = useState<Filter>("all");
@@ -50,9 +50,12 @@ export function MessagesView({ initial, tabs, query, refreshTick, onBusy, onWait
   const rows = useRef(new Map<string, HTMLButtonElement>());
 
   const seq = useRef(0);
+  // 1114: when the last load started and whether it is still out, so the freshness pass never repeats one.
+  const lastLoad = useRef({ at: 0, out: false });
   // `background` (the poll) never cancels a load already on its way; it just steps aside for any newer one.
   const load = useCallback(async (f: Filter, sync = false, background = false) => {
     const mineSeq = background ? seq.current : ++seq.current;
+    const mark: { at: number; out: boolean } | null = background ? null : (lastLoad.current = { at: Date.now(), out: true });
     if (sync) setSyncing(true);
     setError(null);
     try {
@@ -65,6 +68,7 @@ export function MessagesView({ initial, tabs, query, refreshTick, onBusy, onWait
       if (mineSeq === seq.current) setError(e instanceof ApiError ? e.message : "We couldn't reach your messages just now.");
     } finally {
       if (sync) setSyncing(false);
+      if (mark) mark.out = false;
     }
   }, []);
 
@@ -86,7 +90,15 @@ export function MessagesView({ initial, tabs, query, refreshTick, onBusy, onWait
   const filterRef = useRef(filter);
   filterRef.current = filter;
   useEffect(() => {
-    if (refreshTick !== firstTick.current) void load(filterRef.current, true);
+    if (refreshTick === firstTick.current) return;
+    // 1114: the page bringing itself up to date reads our copy (no Meta sync), and never right after a load.
+    if (refreshQuiet) {
+      const l = lastLoad.current;
+      if (!l.out && Date.now() - l.at >= 5_000) void load(filterRef.current, false);
+      return;
+    }
+    void load(filterRef.current, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTick, load]);
   useEffect(() => onBusy(syncing), [syncing, onBusy]);
 

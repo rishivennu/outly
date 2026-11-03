@@ -3,6 +3,7 @@ import { ArrowDownRight, ArrowUpRight, CalendarDays, Clock, Eye, Send, Trophy } 
 import type { Pulse } from "@/lib/retention/pulse";
 import { compact } from "@/lib/retention/pulse-core";
 import { cn } from "@/lib/utils";
+import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
 
 /**
  * Home "This week": the three numbers a creator checks first (views, posts out, the next good slot),
@@ -23,7 +24,8 @@ export function WeekPulse({ p }: { p: Pulse }) {
         <div className="rounded-2xl bg-secondary/60 p-4">
           <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Eye className="h-3.5 w-3.5" aria-hidden="true" /> Views, last 7 days</dt>
           <dd className="mt-1.5 flex flex-wrap items-baseline gap-2">
-            <span className="display text-3xl tabular-nums">{compact(p.views)}</span>
+            {/* 1114: counts up each time Home is opened (same timing as Analytics: lib/motion/numbers.ts). */}
+            <AnimatedNumber value={p.views} tier="main" id="home:week-views" srSuffix=" views" className="display text-3xl tabular-nums" />
             {p.viewsChange !== null && (
               <span className={cn("inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold", up ? "bg-success/15 text-success" : "bg-destructive/10 text-destructive")}>
                 {up ? <ArrowUpRight className="h-3 w-3" aria-hidden="true" /> : <ArrowDownRight className="h-3 w-3" aria-hidden="true" />}
@@ -35,7 +37,7 @@ export function WeekPulse({ p }: { p: Pulse }) {
         <div className="rounded-2xl bg-secondary/60 p-4">
           <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Send className="h-3.5 w-3.5" aria-hidden="true" /> Posts out</dt>
           <dd className="mt-1.5 flex items-baseline gap-2">
-            <span className="display text-3xl tabular-nums">{p.postsOut}</span>
+            <AnimatedNumber value={p.postsOut} format="int" id="home:week-posts" srSuffix=" posts" className="display text-3xl tabular-nums" />
             <span className="text-sm text-muted-foreground">since Monday</span>
           </dd>
         </div>

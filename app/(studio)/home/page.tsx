@@ -25,6 +25,7 @@ import { IdeaBank } from "@/components/home/IdeaBank";
 import { RecycleCard } from "@/components/home/RecycleCard";
 import { SendingNow } from "@/components/home/SendingNow";
 import { WeekPulse } from "@/components/home/WeekPulse";
+import { PageFresh } from "@/components/shell/PageFresh";
 import { WeekRecap } from "@/components/home/WeekRecap";
 import { RECAP_COOKIE } from "@/lib/reports/weekly-core";
 import { lastWeekRecap } from "@/lib/reports/weekly";
@@ -123,6 +124,8 @@ async function pulseView(user: HomeUser, canSwitch: boolean) {
         )}
       </div>
       <PulseHome initial={data} firstName={firstName} canSwitch={canSwitch} nextPost={nextPost} />
+      {/* 1114: may open from the background preload; brings itself up to date when that copy is 90 s old. */}
+      <PageFresh renderedAt={Date.now()} maxAge={90_000} />
     </div>
   );
 }
@@ -214,6 +217,7 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
 
   return (
     <div className="relative overflow-hidden">
+      <PageFresh renderedAt={Date.now()} maxAge={90_000} />
       {dash.canSwitch && <div className="page-frame flex justify-end pt-4"><DashboardSwitch current="classic" /></div>}
       <HomeHero firstName={user.name.split(" ")[0]} />
       {profiles.length >= 2 ? (

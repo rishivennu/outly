@@ -17,6 +17,8 @@ export type PaneProps = {
   tabs: ReactNode;
   query: string;
   refreshTick: number;
+  /** 1114: this tick is the page bringing itself up to date (not the Refresh button): skip it after a fresh load. */
+  refreshQuiet?: boolean;
   onBusy: (busy: boolean) => void;
   onWaiting: (n: number) => void;
 };

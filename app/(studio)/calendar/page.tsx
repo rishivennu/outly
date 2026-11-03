@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { postFilter } from "@/lib/profiles";
 import { postView } from "@/lib/services";
 import { CalendarView } from "@/components/calendar/CalendarView";
+import { PageFresh } from "@/components/shell/PageFresh";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Calendar" };
@@ -16,5 +17,11 @@ export default async function CalendarPage() {
     orderBy: { scheduledAt: "asc" },
     take: 300,
   });
-  return <CalendarView initial={await Promise.all(posts.map(postView))} />;
+  // 1114: may open from the background preload; brings itself up to date when that copy is 2 minutes old.
+  return (
+    <>
+      <PageFresh renderedAt={Date.now()} maxAge={120_000} />
+      <CalendarView initial={await Promise.all(posts.map(postView))} />
+    </>
+  );
 }

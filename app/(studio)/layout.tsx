@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
+import { ACCT_COOKIE } from "@/lib/profiles";
 import { UserProvider } from "@/components/shell/UserContext";
 import { AvatarCursor } from "@/components/shell/AvatarCursor";
 import { ToastProvider } from "@/components/shared/Toast";
@@ -43,7 +44,7 @@ export default async function StudioLayout({ children }: { children: React.React
   void touchPresence(user.actor?.id ?? user.id); // online now (1037); the LiveCount poll keeps it fresh
   void touchSession(); // Active sessions "last active" (1080), at most every 5 minutes
   return (
-    <UserProvider user={{ id: user.id, name: user.name, email: user.email, avatar: user.avatar, timezone: user.timezone, workspace: user.actor ? { ownerName: user.name, role: user.role === "manager" ? "manager" : "editor", me: { name: user.actor.name, email: user.actor.email } } : null }}>
+    <UserProvider user={{ id: user.id, name: user.name, email: user.email, avatar: user.avatar, timezone: user.timezone, workspace: user.actor ? { ownerName: user.name, role: user.role === "manager" ? "manager" : "editor", me: { name: user.actor.name, email: user.actor.email } } : null, view: (await cookies()).get(ACCT_COOKIE)?.value ?? null }}>
       <LivePlatformsProvider value={live}>
       <ToastProvider>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground">
@@ -84,7 +85,8 @@ export default async function StudioLayout({ children }: { children: React.React
       <CommandPalette />
       <WhatsNew notice={notice} userId={user.actor?.id ?? user.id} joinedAt={new Date(user.joinedAt).toISOString()} />
       <AvatarCursor />
-      <WarmUp />
+      {/* 1114: preloads every primary tab in the background; the server's clock lets pages judge their age. */}
+      <WarmUp serverNow={Date.now()} />
       <InstallPrompt config={normalizeInstall(install)} />
       </ToastProvider>
       </LivePlatformsProvider>

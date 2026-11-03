@@ -18,6 +18,8 @@ import { cn, compact, formatDuration } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/Toast";
 import { api } from "@/lib/client/api";
+import { mergeFresh } from "@/lib/client/preload";
+import { useTabMemory } from "@/lib/client/tab-state";
 import { deleteCopy, deletePosts, isFailedPost } from "@/lib/client/failed-posts";
 import type { PostView } from "@/lib/services";
 import type { LibraryCounts, LibraryPage } from "@/lib/posts/library";
@@ -72,18 +74,39 @@ export function ContentLibrary({
   // Every post as the server sent it: the difference to `posts` is what changed on this page.
   const baseline = useRef(new Map(initial.map((p) => [p.id, p] as const)));
   const params = useSearchParams();
-  const [filter, setFilter] = useState<F>(() => filterFromParam(params?.get("filter")));
+  // 1114: with no ?filter= in the link (the tab bar's), the filter you left the library on comes back.
+  const kept = useTabMemory<F>("content", (v) => (typeof v === "string" && FILTERS.some((f) => f.id === v) ? (v as F) : null));
+  const restored = !params?.get("filter") && kept.saved && kept.saved !== "all" ? kept.saved : null;
+  const [filter, setFilter] = useState<F>(() => restored ?? filterFromParam(params?.get("filter")));
+  const { save: saveFilter } = kept;
+  useEffect(() => saveFilter(filter), [filter, saveFilter]);
+  useEffect(() => {
+    if (restored) window.history.replaceState(null, "", `/content?filter=${restored}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // 1114: a newer server render (bringing a preloaded copy up to date) refreshes the first page and keeps the rest.
+  const firstPage = useRef(initial);
+  useEffect(() => {
+    if (initial === firstPage.current) return;
+    firstPage.current = initial;
+    for (const p of initial) baseline.current.set(p.id, p);
+    setPosts((ps) => mergeFresh(initial, ps));
+    setViews((v) => ({ ...v, ...initialViews }));
+  }, [initial, initialViews]);
   const [open, setOpen] = useState<PostView | null>(null);
   // 1088: a post that is live somewhere opens its analytics first; "Details and actions" leads on to the sheet.
   const [stats, setStats] = useState<PostView | null>(null);
   // ?open=<id> (from the command palette) opens that post. One beat after arriving: the palette hands
   // focus back as it closes, and a sheet opened in that same moment would read it as "clicked outside".
   const want = params?.get("open") ?? null;
+  // 1114: read through a ref, so a newer server render (PageFresh) never reopens the sheet over your edits.
+  const initialNow = useRef(initial);
+  initialNow.current = initial;
   useEffect(() => {
     if (!want) return;
     let gone = false;
     let t: ReturnType<typeof setTimeout> | undefined;
-    const p = initial.find((x) => x.id === want);
+    const p = initialNow.current.find((x) => x.id === want);
     if (p) t = setTimeout(() => setOpen(p), 80);
     // Not on the first page: fetch just that one (the server checks it is ours).
     else
@@ -94,7 +117,7 @@ export function ContentLibrary({
       gone = true;
       if (t) clearTimeout(t);
     };
-  }, [want, initial]);
+  }, [want]);
   const counts = useMemo(() => {
     const local = Object.fromEntries(FILTERS.map((f) => [f.id, countIn(posts, f.id)])) as Record<F, number>;
     if (!serverCounts) return local;

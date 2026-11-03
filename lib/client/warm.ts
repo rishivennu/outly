@@ -26,6 +26,39 @@ export function warmPage(router: Prefetcher, href: string) {
   }
 }
 
+/** 1114: forget which pages were warmed, after the router dropped its copies (a refresh) or the account changed. */
+export const coolPages = () => pages.clear();
+
+type Refreshable = { refresh: () => void };
+const refreshHooks = new Set<() => void>();
+const wrapped = new WeakSet<object>();
+/**
+ * 1114: call `fn` after every router.refresh(), from anywhere in the app. A refresh (after most changes) empties the
+ * router's prefetch cache, so the background preload has to warm the tabs again. Next has no event for it, so the
+ * shared router's refresh is wrapped once; the wrapper calls the original first and never throws. Returns a cleanup.
+ */
+export function onRouterRefresh(router: Refreshable, fn: () => void) {
+  if (!wrapped.has(router)) {
+    try {
+      const orig = router.refresh;
+      router.refresh = function (this: unknown) {
+        const out = orig.apply(this);
+        refreshHooks.forEach((h) => {
+          try {
+            h();
+          } catch {}
+        });
+        return out;
+      };
+      wrapped.add(router);
+    } catch {
+      /* a frozen router: the preload still re-runs on the next navigation */
+    }
+  }
+  refreshHooks.add(fn);
+  return () => void refreshHooks.delete(fn);
+}
+
 export function warmApi(url: string, maxAge?: number) {
   if (saveData()) return;
   cachedApi(url, maxAge).catch(() => {});

@@ -8,6 +8,7 @@ import { api, ApiError } from "@/lib/client/api";
 import type { GoalState } from "@/lib/retention/core";
 import { cn } from "@/lib/utils";
 import { StreakFlame } from "./StreakFlame";
+import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
 import { TIER_NAME, streakTier } from "./streak-tier";
 
 const CHOICES = [0, 1, 2, 3, 4, 5, 7, 10, 14];
@@ -56,7 +57,10 @@ export function GoalRing({ goal, scheduled, canEdit }: { goal: GoalState; schedu
       <div className="mt-5 flex items-center gap-4 sm:gap-5">
         <StreakFlame streak={goal.streak} met={goal.met} className="w-[clamp(112px,34vw,148px)] shrink-0" />
         <div className="min-w-0">
-          <p className="tabular font-display text-[clamp(2.75rem,8vw,3.5rem)] font-semibold leading-none tracking-tight">{goal.streak}</p>
+          <p className="tabular font-display text-[clamp(2.75rem,8vw,3.5rem)] font-semibold leading-none tracking-tight">
+            {/* 1114: counts up each time Home is opened. */}
+            <AnimatedNumber value={goal.streak} format="int" tier="main" id="home:streak" />
+          </p>
           <p className="mt-1 text-[15px] font-semibold">week streak</p>
           <p className="mt-2 text-sm text-muted-foreground">{goal.streak > 0 ? `Weeks in a row you hit your goal.` : "Hit your goal this week to light it."}</p>
         </div>

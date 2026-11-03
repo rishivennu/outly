@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Check, ExternalLink, Image as ImageIcon, Lightbulb, Link2, MessagesSquare, Play, RefreshCw, Search, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/Toast";
@@ -9,6 +10,8 @@ import { api, ApiError } from "@/lib/client/api";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn } from "@/lib/utils";
+import { useTabMemory } from "@/lib/client/tab-state";
+import { useFresh } from "@/components/shell/PageFresh";
 import type { InboxComment, InboxProblem } from "@/lib/inbox";
 import { MessagesView, threadsWaiting, type DmData } from "./MessagesView";
 import { hasPreview, usePreview, VideoPreview } from "./VideoPreview";
@@ -20,8 +23,22 @@ type Data = { comments: InboxComment[]; errors: InboxProblem[]; targets: number 
  * 1093: the inbox as a mail client. One compact header, one connection strip, a dense list on the left and the open
  * comment or conversation on the right (full screen on a phone). Messages (1031) are the second tab.
  */
-export function InboxView({ initial, dms, initialTab = "comments" }: { initial: Data; dms?: DmData; initialTab?: InboxTab }) {
-  const [tab, setTab] = useState<InboxTab>(dms ? initialTab : "comments");
+export function InboxView({ initial, dms, initialTab = "comments", renderedAt }: { initial: Data; dms?: DmData; initialTab?: InboxTab; renderedAt?: number }) {
+  // 1114: with no ?tab= in the link (the tab bar's), Comments or Messages as you left them.
+  const params = useSearchParams();
+  const keptTab = useTabMemory<InboxTab>("inbox:tab", (v) => (v === "messages" || v === "comments" ? v : null));
+  const restoredTab = dms && !params?.get("tab") && keptTab.saved === "messages" ? "messages" : null;
+  const [tab, setTab] = useState<InboxTab>(restoredTab ?? (dms ? initialTab : "comments"));
+  const { save: saveTab } = keptTab;
+  useEffect(() => saveTab(tab), [tab, saveTab]);
+  useEffect(() => {
+    if (restoredTab) {
+      const u = new URL(window.location.href);
+      u.searchParams.set("tab", "messages");
+      window.history.replaceState(null, "", u.toString());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const pickTab = (t: InboxTab) => {
     setTab(t);
     const u = new URL(window.location.href);
@@ -32,7 +49,12 @@ export function InboxView({ initial, dms, initialTab = "comments" }: { initial: 
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const search = useRef<HTMLInputElement>(null);
-  const [refreshTick, setRefreshTick] = useState(0);
+  const [tick, setTick] = useState({ n: 0, quiet: false });
+  const refreshTick = tick.n;
+  const setRefreshTick = (f: (n: number) => number) => setTick((t) => ({ n: f(t.n), quiet: false }));
+  // 1114: opened from the background preload a minute or more after it was loaded: fetch the latest quietly, the way
+  // the refresh button does (the list stays on screen meanwhile).
+  useFresh(renderedAt, 60_000, () => setTick((t) => ({ n: t.n + 1, quiet: true })));
   const [busy, setBusy] = useState(false);
   // The tab that isn't mounted keeps the count it last had; at first that is worked out from the page's data.
   const [waiting, setWaiting] = useState<Record<InboxTab, number>>(() => ({ comments: commentsWaiting(initial.comments), messages: dms ? threadsWaiting(dms.threads) : 0 }));
@@ -54,7 +76,7 @@ export function InboxView({ initial, dms, initialTab = "comments" }: { initial: 
   }, []);
 
   const tabs = dms ? <InboxTabs tab={tab} onPick={pickTab} counts={waiting} /> : null;
-  const pane: PaneProps = { tabs, query, refreshTick, onBusy: setBusy, onWaiting: tab === "messages" ? onWaitMessages : onWaitComments };
+  const pane: PaneProps = { tabs, query, refreshTick, refreshQuiet: tick.quiet, onBusy: setBusy, onWaiting: tab === "messages" ? onWaitMessages : onWaitComments };
 
   return (
     <div className="flex flex-col gap-3 px-4 pt-3 sm:px-6 lg:h-[100dvh] lg:min-h-[560px] lg:px-6 lg:pb-5 lg:pt-5">
@@ -125,14 +147,27 @@ function commentsWaiting(comments: InboxComment[]) {
 const keyOf = (c: Pick<InboxComment, "targetId" | "id">) => `${c.targetId}-${c.id}`;
 const titleOf = (c: InboxComment) => c.postTitle ?? "a post";
 
-function CommentsPane({ initial, hasTabs, tabs, query, refreshTick, onBusy, onWaiting }: PaneProps & { initial: Data; hasTabs: boolean }) {
+function CommentsPane({ initial, hasTabs, tabs, query, refreshTick, refreshQuiet, onBusy, onWaiting }: PaneProps & { initial: Data; hasTabs: boolean }) {
   const toast = useToast();
   const [data, setData] = useState<Data>(initial);
-  const [platform, setPlatform] = useState<Platform | "all">("all");
+  // 1114: the platform and "needs a reply" filters as you left them (kept per account, for half an hour).
+  const kept = useTabMemory<{ platform: Platform | "all"; needsOnly: boolean }>("inbox:comments", (v) => {
+    const o = v as { platform?: unknown; needsOnly?: unknown } | null;
+    return o && typeof o === "object" && (o.platform === "all" || (typeof o.platform === "string" && o.platform in PLATFORM_META)) && typeof o.needsOnly === "boolean" ? (o as { platform: Platform | "all"; needsOnly: boolean }) : null;
+  });
+  const [platform, setPlatform] = useState<Platform | "all">(kept.saved?.platform ?? "all");
   const live = useLivePlatforms();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsOnly, setNeedsOnly] = useState(true);
+  const [needsOnly, setNeedsOnly] = useState(kept.saved?.needsOnly ?? true);
+  // 1114: a newer server render (a profile switch, a refresh) replaces the list, unless a platform filter loaded its own.
+  const [given, setGiven] = useState(initial);
+  if (initial !== given) {
+    setGiven(initial);
+    if (platform === "all") setData(initial);
+  }
+  const { save: saveFilters } = kept;
+  useEffect(() => saveFilters({ platform, needsOnly }), [platform, needsOnly, saveFilters]);
   const [openKey, setOpenKey] = useState<string | null>(null);
   // Answered from here this visit, even when the platform's copy of the reply hasn't come back yet.
   const [answered, setAnswered] = useState<Set<string>>(() => new Set());
@@ -151,8 +186,11 @@ function CommentsPane({ initial, hasTabs, tabs, query, refreshTick, onBusy, onWa
   const open = data.comments.find((c) => keyOf(c) === openKey) ?? null;
 
   const seq = useRef(0);
+  // 1114: when the last load started and whether it is still out, so the freshness pass never repeats one.
+  const lastLoad = useRef({ at: 0, out: false });
   const load = async (p: Platform | "all") => {
     const mineSeq = ++seq.current;
+    lastLoad.current = { at: Date.now(), out: true };
     setPlatform(p);
     setLoading(true);
     setError(null);
@@ -162,16 +200,28 @@ function CommentsPane({ initial, hasTabs, tabs, query, refreshTick, onBusy, onWa
     } catch (e) {
       if (mineSeq === seq.current) setError(e instanceof ApiError ? e.message : "We couldn't reach your comments just now.");
     } finally {
-      if (mineSeq === seq.current) setLoading(false);
+      if (mineSeq === seq.current) {
+        setLoading(false);
+        lastLoad.current.out = false;
+      }
     }
   };
   const loadRef = useRef(load);
   loadRef.current = load;
   const firstTick = useRef(refreshTick);
   useEffect(() => {
-    if (refreshTick !== firstTick.current) void loadRef.current(platform);
+    const l = lastLoad.current;
+    if (refreshTick === firstTick.current) return;
+    // The quiet pass right after a load (the kept filter's, on opening) would only fetch the same thing again.
+    if (refreshQuiet && (l.out || Date.now() - l.at < 5_000)) return;
+    void loadRef.current(platform);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTick]);
+  // The page arrives with every platform's comments; a kept platform filter loads its own.
+  useEffect(() => {
+    if (kept.saved && kept.saved.platform !== "all") void loadRef.current(kept.saved.platform);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Side by side, the right side is never blank: open the first comment. On a phone the list comes first.
   const firstKey = visible[0] ? keyOf(visible[0]) : null;

@@ -1,15 +1,19 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { visitOf } from "@/lib/motion/visit";
 import { bezier, formatOf, stepperOf, timingFor, type NumberFormat, type NumberTier } from "@/lib/motion/numbers";
 
 const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 /**
- * The last value each metric showed on this device's tab (browser only, never on the server). Coming back to
- * a page, or switching a range, counts from there instead of from zero.
+ * The last value each metric showed on this device's tab (browser only, never on the server), and in which visit of
+ * its page (lib/motion/visit). Within a visit (a range switch, a refresh, a card remounting) a number moves on from
+ * there. 1114: a new visit (opening the tab again, its data already preloaded) counts up from zero, as on first open.
  */
 const seen = new Map<string, number>();
+const seenIn = new Map<string, number>();
 
 /**
  * 1104: how long a number inside a rising KPI card (.kpi-in: 500ms rise, cards 80ms apart) should wait so it
@@ -51,6 +55,7 @@ export function AnimatedNumber({
   srSuffix?: string;
 }) {
   const el = useRef<HTMLSpanElement>(null);
+  const path = usePathname() ?? "";
   const shown = useRef<number | null>(null);
   const played = useRef(false);
   const ok = typeof value === "number" && Number.isFinite(value);
@@ -76,11 +81,12 @@ export function AnimatedNumber({
     const to = value as number;
     const f = format;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const from = shown.current ?? (id ? seen.get(id) : undefined) ?? 0;
+    const visit = visitOf(path);
+    const from = shown.current ?? (id && seenIn.get(id) === visit ? seen.get(id) : undefined) ?? 0;
     // Remembered only for what was really shown (on finishing, or where a count stopped), so a number that
     // unmounts before it scrolls into view still counts on the next visit.
     const remember = () => {
-      if (id && shown.current !== null) seen.set(id, shown.current);
+      if (id && shown.current !== null) (seen.set(id, shown.current), seenIn.set(id, visit));
     };
     if (reduce || from === to) {
       shown.current = to;

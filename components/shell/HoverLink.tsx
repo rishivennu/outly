@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { forwardRef, type ComponentProps } from "react";
 import { useLivePlatforms } from "./LivePlatforms";
 import { warmAnalytics, warmPage } from "@/lib/client/warm";
+import { PRELOAD_TABS } from "@/lib/client/preload";
 
 /**
  * A nav link that warms its route on intent (hover, focus, touch) instead of on sight. The sidebar shows a
@@ -19,6 +20,8 @@ export const HoverLink = forwardRef<HTMLAnchorElement, ComponentProps<typeof Nex
     if (href === "/analytics") return warmAnalytics(router, live);
     // A platform's dashboard renders its numbers on the server: fetch the full page, not just its loader.
     if (href.startsWith("/analytics/")) return warmPage(router, href);
+    // 1114: the primary tabs the background preload keeps (usually already held, so this costs nothing).
+    if ((PRELOAD_TABS as readonly string[]).includes(href)) return warmPage(router, href);
     router.prefetch(href);
   };
   return (

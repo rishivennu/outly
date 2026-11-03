@@ -7,7 +7,9 @@ import { ArrowDownRight, ArrowUpRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
-import { cachedApi } from "@/lib/client/api";
+import { cachedApi, lastWriteAt, peekCached } from "@/lib/client/api";
+import { isStale } from "@/lib/client/preload";
+import { useTabMemory } from "@/lib/client/tab-state";
 import { warmApi, whenIdle } from "@/lib/client/warm";
 import { PLATFORM_META } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
@@ -57,7 +59,15 @@ function RangePicker({ value, onPick, maxDays }: { value: number; onPick: (d: nu
 
 /** renderedAt: when the server built this page; a copy prefetched from the nav (1039) can be a while old. */
 export function AnalyticsView({ initial, connected, focusAccount = null, renderedAt, maxDays = 90, reports = { csv: true, pdf: true } }: { initial: AnalyticsSummary; connected: Partial<Record<Platform, boolean>>; focusAccount?: string | null; renderedAt?: number; maxDays?: number; reports?: { csv: boolean; pdf: boolean } }) {
-  const [data, setData] = useState(initial);
+  const url = (d: number, acct: string | null) => `/api/analytics?days=${d}${acct ? `&account=${encodeURIComponent(acct)}` : ""}`;
+  // 1114: the range and account you left Analytics on come back with you from another tab (a ?account= link wins).
+  // A kept range paints in the first frame when its numbers are still remembered, else it loads like a click.
+  const kept = useTabMemory<{ d: number; acct: string | null }>("analytics", (v) => {
+    const o = v as { d?: unknown; acct?: unknown } | null;
+    return o && typeof o.d === "number" && RANGES.some((r) => r.d === o.d) && o.d <= maxDays && (o.acct === null || (typeof o.acct === "string" && o.acct.length <= 64)) ? (o as { d: number; acct: string | null }) : null;
+  });
+  const start = focusAccount ? null : kept.saved;
+  const [data, setData] = useState(() => (start && !start.acct && start.d !== initial.rangeDays ? (peekCached<AnalyticsSummary>(url(start.d, null)) ?? initial) : initial));
   const reduce = useReducedMotion();
   const live = useLivePlatforms();
   const [loading, setLoading] = useState(false);
@@ -65,8 +75,9 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
 
   // 1037 drilldown: the combined list is remembered so picking one account never hides the others.
   const [drill, setDrill] = useState<string | null>(null);
-  const [accounts, setAccounts] = useState(initial.byAccount);
-  const url = (d: number, acct: string | null) => `/api/analytics?days=${d}${acct ? `&account=${encodeURIComponent(acct)}` : ""}`;
+  const [accounts, setAccounts] = useState(data.byAccount);
+  const { save } = kept;
+  useEffect(() => save({ d: data.rangeDays, acct: drill }), [data.rangeDays, drill, save]);
   const load = async (d: number, acct: string | null, quiet = false) => {
     if (!quiet) setLoading(true);
     try {
@@ -84,8 +95,15 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
   useEffect(() => {
     // Not limited to the current list: the link may be for another profile than the one picked on Home.
     if (focusAccount) void load(initial.rangeDays, focusAccount).catch(() => {});
-    // A copy prefetched from the nav may be a minute or two old: update it quietly (1039).
-    else if (renderedAt && Date.now() - renderedAt > 30_000) void load(initial.rangeDays, null, true).catch(() => {});
+    // 1114: a kept range or account that the first frame couldn't show yet.
+    else if (start && (start.acct || start.d !== data.rangeDays)) {
+      void load(start.d, start.acct).catch(() => {});
+      // The account list beside a drill is the whole range's.
+      if (start.acct && start.d !== initial.rangeDays) void cachedApi<AnalyticsSummary>(url(start.d, null)).then((n) => setAccounts(n.byAccount)).catch(() => {});
+    }
+    // A copy from the background preload may be a minute or two old, or from before a change made in this tab:
+    // update it quietly (1039, 1114: judged on the server's clock).
+    else if (isStale(renderedAt, 30_000, lastWriteAt())) void load(data.rangeDays, null, true).catch(() => {});
     // The other ranges, so a switch doesn't wait on the server.
     return whenIdle(() => RANGES.forEach((r) => r.d !== initial.rangeDays && r.d <= Math.min(maxDays, 90) && warmApi(url(r.d, null))), 1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps

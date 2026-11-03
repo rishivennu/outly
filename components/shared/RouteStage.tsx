@@ -2,6 +2,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { classify, enterRoute, readHints } from "@/lib/motion/route";
+import { visitOf } from "@/lib/motion/visit";
 
 const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
@@ -29,6 +30,8 @@ export function RouteStage({ children, base = "" }: { children: React.ReactNode;
     if (seen.current?.path !== path) seen.current = { path, prev: seen.current ? seen.current.path : lastPath };
     const prev = seen.current.prev;
     lastPath = path;
+    // 1114: a new path is a new visit, even on a page with no numbers, so the next tab's numbers count from zero.
+    visitOf(path);
     if (!prev || prev === path) return undefined;
     const move = classify(prev, path, base, readHints(prev, path));
     return move ? enterRoute(ref.current, move.kind, move.dir) : undefined;

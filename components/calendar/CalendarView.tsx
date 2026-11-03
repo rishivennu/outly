@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Layers, Plus } from "lucide-react";
@@ -13,6 +13,8 @@ import { addDaysKey, dayKey, fromTzParts, partsInTz } from "@/lib/client/tz";
 import { useToast } from "@/components/shared/Toast";
 import { api, ApiError } from "@/lib/client/api";
 import { cn } from "@/lib/utils";
+import { useTabMemory } from "@/lib/client/tab-state";
+import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
 import type { PostView } from "@/lib/services";
 
 const at = (p: PostView) => p.scheduledAt ?? p.publishedAt ?? p.updatedAt;
@@ -22,8 +24,18 @@ const keyDate = (key: string) => new Date(`${key}T12:00:00Z`);
 export function CalendarView({ initial }: { initial: PostView[] }) {
   const { timezone: tz } = useUser();
   const [posts, setPosts] = useState(initial);
+  // 1114: a newer server render (the page bringing a preloaded copy up to date, or a refresh) replaces the list.
+  const [from, setFrom] = useState(initial);
+  if (from !== initial) {
+    setFrom(initial);
+    setPosts(initial);
+  }
   const today = dayKey(new Date(), tz);
-  const [start, setStart] = useState(() => addDaysKey(today, -weekdayOf(today)));
+  // 1114: the week you were on comes back with you from another tab (a Monday, at most a year either way).
+  const week = useTabMemory("calendar", (v) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && weekdayOf(v) === 0 && Math.abs(+keyDate(v) - +keyDate(today)) < 366 * 864e5 ? v : null));
+  const [start, setStart] = useState(() => week.saved ?? addDaysKey(today, -weekdayOf(today)));
+  const { save: saveWeek } = week;
+  useEffect(() => saveWeek(start), [start, saveWeek]);
   const [dir, setDir] = useState(0);
   const [open, setOpen] = useState<PostView | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -73,7 +85,14 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
       <header className="flex flex-wrap items-end justify-between gap-6">
         <div>
           <p className="eyebrow mb-3">Calendar · {tzShort(tz)}</p>
-          <h1 className="display text-[clamp(2.6rem,6vw,4.6rem)]">{weekCount ? `${weekCount} going out this week.` : "A quiet week, so far."}</h1>
+          <h1 className="display text-[clamp(2.6rem,6vw,4.6rem)]">{/* 1114: the count runs up when the Calendar is opened, and moves on as you change week. */}
+            {weekCount ? (
+              <>
+                <AnimatedNumber value={weekCount} format="int" tier="main" id="calendar:week" /> going out this week.
+              </>
+            ) : (
+              "A quiet week, so far."
+            )}</h1>
           {weekCount === 0 && (
             <div className="mt-6 flex items-center gap-4">
               <Icon3D name="schedule" size={72} className="animate-bob shrink-0" />

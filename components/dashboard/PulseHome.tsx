@@ -1,10 +1,11 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api } from "@/lib/client/api";
+import { cachedApi, peekCached } from "@/lib/client/api";
+import { useTabMemory } from "@/lib/client/tab-state";
 import { cn } from "@/lib/utils";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
-import { compact, delta, rate, total, type Pulse, type PulseRange } from "@/lib/dashboard/pulse-core";
+import { compact, delta, isPulseRange, rate, total, type Pulse, type PulseRange } from "@/lib/dashboard/pulse-core";
 import { AnimIcon, useIconPlay } from "@/components/icons/animated";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { Thumb } from "@/components/shared/Thumb";
@@ -64,12 +65,32 @@ function KpiCard({ k, i }: { k: Kpi; i: number }) {
   );
 }
 
+const rangeUrl = (r: number) => `/api/dashboard?days=${r}`;
+
 export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial: Pulse; firstName: string; canSwitch: boolean; nextPost: { when: string; title: string } | null }) {
-  const [range, setRange] = useState<PulseRange>(initial.days);
-  const [data, setData] = useState<Record<number, Pulse>>({ [initial.days]: initial });
+  // 1114: the range and platform tab you left Home on come back with you from another tab. A kept range shows at
+  // once when its numbers are still remembered from this visit's session, else it loads like a click on it.
+  const kept = useTabMemory<{ range: PulseRange; tab: string }>("home:pulse", (v) => {
+    const o = v as { range?: unknown; tab?: unknown } | null;
+    return o && typeof o.range === "number" && isPulseRange(o.range) && typeof o.tab === "string" && o.tab.length < 40 ? (o as { range: PulseRange; tab: string }) : null;
+  });
+  const keptRange = kept.saved?.range ?? null;
+  const [data, setData] = useState<Record<number, Pulse>>(() => {
+    const hit = keptRange && keptRange !== initial.days ? peekCached<Pulse>(rangeUrl(keptRange)) : undefined;
+    return hit ? { [initial.days]: initial, [keptRange as number]: hit } : { [initial.days]: initial };
+  });
+  const [range, setRange] = useState<PulseRange>(() => (keptRange && data[keptRange] ? keptRange : initial.days));
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [tab, setTab] = useState("all");
+  const [tab, setTab] = useState(kept.saved?.tab ?? "all");
+  // A newer server render (the page bringing a preloaded copy up to date) replaces its range's numbers.
+  const [from, setFrom] = useState(initial);
+  if (from !== initial) {
+    setFrom(initial);
+    setData((x) => ({ ...x, [initial.days]: initial }));
+  }
+  const { save } = kept;
+  useEffect(() => save({ range, tab }), [range, tab, save]);
   const { root, replay } = useEnter<HTMLDivElement>();
   const replayIc = useIconPlay();
   const newIc = useIconPlay();
@@ -81,7 +102,8 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
     setLoading(true);
     setFailed(false);
     try {
-      const d = await api<Pulse>(`/api/dashboard?days=${r}`);
+      // 1114: remembered for a minute, so coming back to Home on this range paints it in its first frame.
+      const d = await cachedApi<Pulse>(rangeUrl(r));
       setData((x) => ({ ...x, [r]: d }));
     } catch {
       setFailed(true);
@@ -90,6 +112,11 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
       setLoading(false);
     }
   };
+  // A kept range that wasn't remembered any more loads the way picking it does.
+  useEffect(() => {
+    if (keptRange && keptRange !== range) void pickRange(keptRange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const tabs = ["all", ...p.platforms];
   const key = tabs.includes(tab) ? tab : "all";
