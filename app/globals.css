@@ -1916,8 +1916,8 @@ html:not(.dark) body:has(.sky-host)::before {
    surface edge to edge. 1108: public pages too (their sky glow reached the top edge, so the strip met a tinted band). */
 @media (max-width: 1023.98px) {
   body::before {
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 140px);
-    mask-image: linear-gradient(to bottom, transparent 0, #000 140px);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(env(safe-area-inset-top, 0px) + 12px), #000 calc(env(safe-area-inset-top, 0px) + 152px));
+    mask-image: linear-gradient(to bottom, transparent 0, transparent calc(env(safe-area-inset-top, 0px) + 12px), #000 calc(env(safe-area-inset-top, 0px) + 152px));
   }
 }
 
@@ -2422,6 +2422,15 @@ html:not(.dark) .mnav-bar { background: linear-gradient(180deg, hsl(214 60% 99% 
 html:not(.dark) .mnav[data-scrolled="true"] .mnav-bar { background: linear-gradient(180deg, hsl(214 60% 99% / .76), hsl(216 40% 96% / .64));
   box-shadow: inset 0 1px 0 hsl(0 0% 100% / .95), inset 0 -1px 0 hsl(216 30% 30% / .08), 0 0 0 .5px hsl(216 30% 25% / .16),
     0 18px 40px -20px hsl(216 40% 25% / .38); }
+/* 1108: on phones the pill floats 12px under the status bar, and its soft drop shadow (32-40px blur) reached the top
+   edge as a faint band (1/255 darker), so the bar met a tint. Same layers, tighter shadow: it starts at the pill's
+   lower half and never climbs above 16px. */
+@media (max-width: 1023.98px) {
+  html:not(.dark) .mnav-bar { box-shadow: inset 0 1px 0 hsl(0 0% 100% / .95), inset 0 -1px 0 hsl(216 30% 30% / .07), 0 0 0 .5px hsl(216 30% 25% / .14),
+    0 14px 24px -14px hsl(216 40% 25% / .3); }
+  html:not(.dark) .mnav[data-scrolled="true"] .mnav-bar { box-shadow: inset 0 1px 0 hsl(0 0% 100% / .95), inset 0 -1px 0 hsl(216 30% 30% / .08), 0 0 0 .5px hsl(216 30% 25% / .16),
+    0 18px 32px -18px hsl(216 40% 25% / .38); }
+}
 html:not(.dark) .mnav-bar::before { background: linear-gradient(115deg, hsl(0 0% 100% / .95), hsl(0 0% 100% / .3) 28%,
     hsl(216 30% 40% / 0) 52%, hsl(216 30% 40% / .1) 76%, hsl(216 32% 38% / .28)); }
 @media (prefers-reduced-transparency: reduce) { html:not(.dark) .mnav-bar, html:not(.dark) .mnav[data-scrolled="true"] .mnav-bar { background: hsl(var(--card)); } }

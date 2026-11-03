@@ -42,6 +42,6 @@ describe("1107 status bar from the first byte", () => {
   });
   test("on phones the corner glows fade in below the top edge, so it is exactly the background", () => {
     const css = src("app/globals.css");
-    expect(css).toMatch(/@media \(max-width: 1023\.98px\) \{\s*body::before \{\s*-webkit-mask-image: linear-gradient\(to bottom, transparent 0, #000 140px\);\s*mask-image: linear-gradient\(to bottom, transparent 0, #000 140px\);/);
+    expect(css).toMatch(/@media \(max-width: 1023\.98px\) \{\s*body::before \{\s*-webkit-mask-image: linear-gradient\(to bottom, transparent 0, transparent calc\(env\(safe-area-inset-top, 0px\) \+ 12px\), #000 calc\(env\(safe-area-inset-top, 0px\) \+ 152px\)\);\s*mask-image: linear-gradient\(to bottom, transparent 0, transparent calc\(env\(safe-area-inset-top, 0px\) \+ 12px\), #000 calc\(env\(safe-area-inset-top, 0px\) \+ 152px\)\);/);
   });
 });
