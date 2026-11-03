@@ -21,6 +21,10 @@ const TITLE: Record<string, string> = {
   seats: "Upgrade to add your team",
   accounts: "Upgrade to connect more accounts",
   storage: "Upgrade for more storage",
+  platforms: "Upgrade to post on more platforms",
+  brands: "Upgrade for more brands",
+  x: "Upgrade to post more to X",
+  perk: "This is on a bigger plan",
 };
 
 /**
@@ -40,7 +44,7 @@ export function UpgradeDialog() {
   const member = !!user.workspace;
   // The Android app can't sell plans (Google Play billing rules), so it explains the limit without a way to buy.
   const sells = !useAppMode() || APP_SELLS_PLANS;
-  const title = sells ? (d?.feature && TITLE[d.feature]) || TITLE.posts : "You've reached your plan's limit";
+  const title = sells ? (d?.feature && TITLE[d.feature]) || "Upgrade your plan" : "You've reached your plan's limit";
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && setD(null)}>

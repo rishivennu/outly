@@ -100,6 +100,14 @@ describe("top-up packs", () => {
     expect(packBlock(on, brand, "pro-manager", true)).toBeNull();
     expect(packBlock(on, ai, "free", false)).toMatch(/paid plans/);
     expect(packBlock({ ...on, paidOnly: false }, ai, "free", false)).toBeNull();
+    // a pack that would add nothing on this plan is never sold
+    const lim = { xPostLimit: 100, captionVideos: 150, aiCaptions: true, brandLimit: 2 };
+    const x = on.packs.find((p) => p.kind === "x")!;
+    expect(packBlock(on, ai, "creator", true, lim)).toBeNull();
+    expect(packBlock(on, x, "creator", true, { ...lim, xPostLimit: 0 })).toMatch(/without a monthly limit/);
+    expect(packBlock(on, ai, "creator", true, { ...lim, captionVideos: 0 })).toMatch(/without a monthly limit/);
+    expect(packBlock(on, ai, "creator", true, { ...lim, aiCaptions: false })).toMatch(/doesn't include AI captions/);
+    expect(packBlock(on, brand, "pro-manager", true, { ...lim, brandLimit: 0 })).toMatch(/doesn't count brands/);
     expect(packPrice(ai, "INR").priceMinor).toBe(9900);
     expect(packPrice(ai, "USD")).toMatchObject({ priceMinor: 200, currency: "USD" });
     expect(packExpiry({ days: 30 }, now)).toEqual(at(30));
@@ -301,6 +309,32 @@ describe("X posts and top-up credit", () => {
     expect((await ent.xPostUsage(u.id)).used).toBe(1);
     await ent.releaseXPost("no-such-target"); // never throws
   });
+  test("X counts in the month a post goes out; moving it to another month moves the slot", async () => {
+    const { u } = await onPlan(xPlan.id);
+    const now = new Date();
+    const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 15));
+    const ahead = await ent.spendXPosts(u.id, [`${u.id}-m1`], nextMonth);
+    expect(ahead.fresh).toBe(true);
+    expect((await ent.xPostUsage(u.id)).used).toBe(0); // this month's allowance untouched
+    expect((await ent.xPostUsage(u.id, nextMonth)).used).toBe(1);
+    // rescheduled to this month: counted here, and next month's slot is given back once the claim wins
+    const back = await ent.spendXPosts(u.id, [`${u.id}-m1`], now);
+    await back.settle();
+    expect((await ent.xPostUsage(u.id)).used).toBe(1);
+    expect((await ent.xPostUsage(u.id, nextMonth)).used).toBe(0);
+  });
+  test("over a new platform cap after a plan change: reconnecting an account you have works, a new one doesn't", async () => {
+    const { saveConnectedAccount } = await import("../lib/accounts");
+    const plan = await db.plan.create({ data: { slug: `t1096-pl-${tag()}`, name: "Test Platforms", priceMinor: 100, state: "hidden" } });
+    const { u } = await onPlan(plan.id);
+    const s = tag();
+    await saveConnectedAccount(u.id, "youtube", { platformUserId: `yt-${s}`, username: "yt", accessToken: "a" });
+    await saveConnectedAccount(u.id, "x", { platformUserId: `x-${s}`, username: "x", accessToken: "a" });
+    await db.plan.update({ where: { id: plan.id }, data: { platformLimit: 1 } });
+    await db.socialAccount.updateMany({ where: { userId: u.id, platform: "x" }, data: { status: "needs_reconnect" } });
+    await saveConnectedAccount(u.id, "x", { platformUserId: `x-${s}`, username: "x", accessToken: "b" }); // token expired: fine
+    expect(await status(saveConnectedAccount(u.id, "tiktok", { platformUserId: `tt-${s}`, username: "tt", accessToken: "a" }))).toMatchObject({ status: 402, extra: { feature: "platforms" } });
+  });
   test("plans without an X limit never count", async () => {
     const { u } = await onPlan(openPlan.id);
     expect((await ent.spendXPosts(u.id, ["p1", "p2", "p3"])).fresh).toBe(false);
@@ -501,6 +535,17 @@ describe("the November 2026 preset", () => {
     expect((await settings.getConfig("beta")).enabled).toBe(beta);
     expect(await preset.presetBackup()).toBeNull();
     expect((await preset.undoPricingPreset(actor)).restored).toEqual([]);
+  });
+  test("no card says AI videos; old wording on applied plans is fixed only when an admin asks", async () => {
+    for (const p of preset.PRICING_2026_11) for (const line of p.data.features) expect(line).not.toMatch(/AI videos|add more any time/i);
+    const row = await db.plan.create({ data: { slug: `t1096-copy-${tag()}`, name: "Old copy", priceMinor: 100, state: "hidden", features: JSON.stringify(["500 AI videos, 300 X posts a month", "My own line"]) } });
+    expect((await preset.staleCopy()).plans).toContain(row.slug);
+    const r = await preset.fixPresetCopy(actor);
+    expect(r.fixed).toContain(row.slug);
+    expect(JSON.parse((await db.plan.findUniqueOrThrow({ where: { id: row.id } })).features)).toEqual(["AI captions on 500 videos, 300 X posts", "My own line"]);
+    expect((await preset.staleCopy()).plans).not.toContain(row.slug);
+    expect((await preset.fixPresetCopy(actor)).fixed).not.toContain(row.slug); // twice is harmless
+    await db.plan.delete({ where: { id: row.id } });
   });
 });
 

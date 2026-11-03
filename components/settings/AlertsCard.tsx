@@ -22,9 +22,11 @@ function Toggle({ id, label, hint, on, disabled, onChange }: { id: string; label
 }
 
 /** Custom alerts (1037): engagement spikes and failed posts. Saved one switch at a time, rolled back if the save fails. */
-export function AlertsCard({ initial }: { initial: AlertPrefs }) {
+export function AlertsCard({ initial, spikeAllowed = true }: { initial: AlertPrefs; spikeAllowed?: boolean }) {
   const toast = useToast();
-  const [p, setP] = useState(initial);
+  const [stored, setP] = useState(initial);
+  // 1096: spike alerts are a plan perk. Without it the switch shows off and can't be turned on; the saved choice is kept for an upgrade.
+  const p = spikeAllowed ? stored : { ...stored, spike: false };
   const [saving, setSaving] = useState(false);
   const save = async (patch: Partial<AlertPrefs>, done: string) => {
     const before = p;
@@ -54,7 +56,7 @@ export function AlertsCard({ initial }: { initial: AlertPrefs }) {
       </div>
       <div className="mt-4 divide-y divide-border">
         <Toggle id="al-failed" label="A scheduled post fails" hint="Once per post, with an email the first time. Reconnect alerts always stay on." on={p.failed} disabled={saving} onChange={(v) => save({ failed: v }, v ? "Failure alerts on." : "Failure alerts off.")} />
-        <Toggle id="al-spike" label="Engagement spikes" hint="When an account's views in a day jump well past its usual." on={p.spike} disabled={saving} onChange={(v) => save({ spike: v }, v ? "Spike alerts on." : "Spike alerts off.")} />
+        <Toggle id="al-spike" label="Engagement spikes" hint={spikeAllowed ? "When an account's views in a day jump well past its usual." : "Not on your plan. Upgrade in Billing to get spike alerts."} on={p.spike} disabled={saving || !spikeAllowed} onChange={(v) => save({ spike: v }, v ? "Spike alerts on." : "Spike alerts off.")} />
         {p.spike && (
           <>
             <fieldset className="py-3">

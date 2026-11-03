@@ -6,6 +6,8 @@ import { parseAlertPrefs } from "@/lib/alerts-core";
 import { activeGateway } from "@/lib/billing/service";
 import { accessFor } from "@/lib/billing/access";
 import { isPaidSub } from "@/lib/billing/access-core";
+import { entitlements } from "@/lib/billing/entitlements";
+import { hasPerk } from "@/lib/billing/plan-rules";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings" };
@@ -41,5 +43,8 @@ export default async function SettingsPage(props: { searchParams?: Promise<{ tab
   // Inside someone else's workspace the profile, email and billing settings are theirs, so they aren't shown.
   const own = user.actor ? null : await db.user.findUnique({ where: { id: user.id }, select: { weeklyReport: true, alertPrefs: true } });
   const billing = user.actor ? null : await billingSummary(user.id, user.name, user.email);
-  return <SettingsView weeklyReport={own?.weeklyReport ?? true} alerts={parseAlertPrefs(own?.alertPrefs)} billing={billing} initialTab={typeof searchParams?.tab === "string" ? searchParams.tab : undefined} />;
+  // 1096: a switch for something the plan doesn't include would save fine and then never send anything.
+  const e = user.actor ? null : await entitlements(user.id).catch(() => null);
+  const perks = { digest: !e || hasPerk(e, "weekly-digest"), spike: !e || hasPerk(e, "spike-alerts") };
+  return <SettingsView weeklyReport={own?.weeklyReport ?? true} alerts={parseAlertPrefs(own?.alertPrefs)} perks={perks} billing={billing} initialTab={typeof searchParams?.tab === "string" ? searchParams.tab : undefined} />;
 }

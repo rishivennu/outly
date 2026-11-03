@@ -237,17 +237,17 @@ const holdPostSlot = (userId: string, post: Post) =>
 /**
  * 1096: plans with an X allowance also hold one X post per X destination, every launch. Unlike the post slot
  * there's no shortcut for booked posts: X can be added to one after booking (a new target id). A destination
- * already counted this month costs nothing again, so a retry or a move to a new time stays free.
+ * already counted in that month costs nothing again, so a retry stays free. The month is the one it goes out in.
  */
-const holdXPosts = (userId: string, _post: Post, toSend: Pick<PostTarget, "id" | "platform">[]) =>
-  spendXPosts(userId, toSend.filter((t) => t.platform === "x").map((t) => t.id));
+const holdXPosts = (userId: string, _post: Post, toSend: Pick<PostTarget, "id" | "platform">[], at: Date | null) =>
+  spendXPosts(userId, toSend.filter((t) => t.platform === "x").map((t) => t.id), at ?? new Date());
 
 /** Slots first, then the claim. If the claim is lost or throws (DB hiccup), the slots go back. */
 async function claimWithSlot(userId: string, post: Post, toSend: Pick<PostTarget, "id" | "platform">[], data: { status: string; scheduledAt: Date | null }) {
   const slot = await holdPostSlot(userId, post);
   let x: Awaited<ReturnType<typeof holdXPosts>>;
   try {
-    x = await holdXPosts(userId, post, toSend);
+    x = await holdXPosts(userId, post, toSend, data.scheduledAt);
   } catch (err) {
     if (slot.fresh) await slot.release();
     throw err;
@@ -264,6 +264,7 @@ async function claimWithSlot(userId: string, post: Post, toSend: Pick<PostTarget
     throw err;
   }
   if (!stamp) await giveBack();
+  else await x.settle();
   return stamp;
 }
 

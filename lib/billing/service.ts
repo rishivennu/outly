@@ -119,7 +119,8 @@ export async function topUpOffer(userId: string) {
   const { best } = await accessFor(userId);
   const planSlug = best?.plan.slug ?? "free";
   const paid = !!best && best.plan.priceMinor > 0;
-  return { cfg, planSlug, paid, packs: cfg.packs.map((p) => ({ ...p, block: packBlock(cfg, p, planSlug, paid) })) };
+  const limits = best ? { xPostLimit: best.plan.xPostLimit ?? 0, captionVideos: best.plan.captionVideos, aiCaptions: best.plan.aiCaptions, brandLimit: best.plan.brandLimit ?? 0 } : undefined;
+  return { cfg, planSlug, paid, limits, packs: cfg.packs.map((p) => ({ ...p, block: packBlock(cfg, p, planSlug, paid, limits) })) };
 }
 
 /** 1096: one usage pack, paid like a plan but it never touches the subscription. */
@@ -127,7 +128,7 @@ export async function startTopUp(userId: string, packId: string, wanted?: Curren
   const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
   const offer = await topUpOffer(userId);
   const pack = offer.cfg.packs.find((p) => p.id === packId);
-  const block = packBlock(offer.cfg, pack, offer.planSlug, offer.paid);
+  const block = packBlock(offer.cfg, pack, offer.planSlug, offer.paid, offer.limits);
   if (block || !pack) throw new HttpError(409, block ?? "That pack isn't on sale.", "TOPUP_UNAVAILABLE");
   const { cfg, provider } = await activeGateway();
   if (provider === "mock" && !mockAllowed()) throw new HttpError(503, "Payments are being set up. Top-ups open shortly.", "GATEWAY");

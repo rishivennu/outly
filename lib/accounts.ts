@@ -33,8 +33,11 @@ export async function saveConnectedAccount(userId: string, platform: Platform, p
   // Count and write in one serializable transaction, so two connects finishing at once can't both take the last place.
   const acct = await db.$transaction(
     async (tx) => {
+      // 1096: an account already on file (e.g. its token expired) can always be reconnected, even when a plan
+      // change left it over the new platform or brand count. Only a NEW account is checked against the caps.
+      const known = await tx.socialAccount.findFirst({ where: { userId, platform, platformUserId: prof.platformUserId, status: { not: "disconnected" } }, select: { id: true } });
       // 1096: Free connects any N platforms; a platform already in use can always be reconnected or swapped.
-      if (e.platformLimit > 0) {
+      if (e.platformLimit > 0 && !known) {
         const live = await tx.socialAccount.findMany({ where: { userId, status: { not: "disconnected" } }, select: { platform: true } });
         checkPlatforms(e, live.map((a) => a.platform), platform);
       }
@@ -44,7 +47,7 @@ export async function saveConnectedAccount(userId: string, platform: Platform, p
           checkAccounts(e, others);
         }
         // 1096 brands: N brands = up to N accounts on each platform.
-        if (e.brandLimit > 0) {
+        if (e.brandLimit > 0 && !known) {
           const onPlatform = await tx.socialAccount.count({ where: { userId, platform, status: { not: "disconnected" }, NOT: { platformUserId: prof.platformUserId } } });
           checkBrands(e, onPlatform, platform);
         }

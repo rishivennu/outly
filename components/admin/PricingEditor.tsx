@@ -558,7 +558,7 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
               <div>
                 <Label htmlFor="pl-upload">Max upload per file (MB)</Label>
                 <Input id="pl-upload" type="number" min={0} max={5000} value={draft.maxUploadMb} onChange={(e) => set("maxUploadMb", Math.max(0, Math.min(5000, Math.floor(Number(e.target.value) || 0))))} aria-describedby="pl-upload-hint" />
-                <p id="pl-upload-hint" className="mt-1 text-[12px] text-muted-foreground">0 = the server maximum</p>
+                <p id="pl-upload-hint" className="mt-1 text-[12px] text-muted-foreground">0 = the server maximum. The server caps every file at MAX_UPLOAD_MB (500 MB unless raised in Vercel), so a higher number here does nothing until that is raised too.</p>
               </div>
               <div>
                 <Label htmlFor="pl-storage">Total storage (MB)</Label>

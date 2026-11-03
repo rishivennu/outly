@@ -6,7 +6,8 @@ import { env } from "../env";
 import { accessFor } from "./access";
 import { fitsStorage, fmtBytes, storageFigures, type AccessSource } from "./access-core";
 import { activeExtras, consumeCredit, creditsLeft, refundCredit } from "./topups";
-import type { TopUpKind } from "./topups-core";
+import { normalizeTopups, type TopUpKind } from "./topups-core";
+import { getConfig } from "../settings";
 import { brandsBlock, fairUseCrossed, parsePerks, perkBlock, platformsBlock, type Perk } from "./plan-rules";
 
 export interface Entitlements {
@@ -116,6 +117,16 @@ const isClash = (err: unknown) => (err as { code?: string } | null)?.code === "P
  * instant may both back out; that errs on the safe side and a retry goes through.)
  * `fresh:false` = this ref was already counted this period (a retry). `release()` gives the slot back.
  */
+/** 1096: limit messages offer a top-up only when one is actually on sale for this kind. */
+async function packOnSale(kind: TopUpKind) {
+  try {
+    const c = normalizeTopups(await getConfig("topups"));
+    return c.enabled && c.packs.some((p) => p.kind === kind);
+  } catch {
+    return false;
+  }
+}
+
 async function reserve(userId: string, feature: string, period: string, ref: string, max: number, onFull: () => HttpError, credit?: TopUpKind) {
   const key = ref.slice(0, 120);
   // Cheap look first, so an ordinary retry doesn't make Prisma log a unique-constraint error.
@@ -267,7 +278,8 @@ export async function assertCaptionVideo(userId: string, ref: string, now = new 
   const period = periodKey("month", now);
   const key = ref.slice(0, 120) || "unknown";
   const seen = await db.featureUse.findFirst({ where: { userId, feature: "captions", period, ref: key }, select: { id: true } });
-  const full = () => limit(`${e.planName} includes AI on ${e.captionVideos} video${e.captionVideos === 1 ? "" : "s"} a month and you've used them. Add a top-up, upgrade, or type captions yourself.`, "captions");
+  const sell = await packOnSale("ai");
+  const full = () => limit(`${e.planName} includes AI captions on ${e.captionVideos} video${e.captionVideos === 1 ? "" : "s"} a month and you've used them. ${sell ? "Add a top-up, upgrade," : "Upgrade"} or type captions yourself.`, "captions");
   // The video ref comes from the browser (the clip isn't uploaded yet), so the audio itself is metered too:
   // every chunk takes a slot from a monthly budget the server owns. Reusing one ref can't stretch 2 videos into 20.
   // 1096: AI top-up packs widen the chunk budget by the videos they can still pay for.
@@ -360,12 +372,18 @@ export async function releaseXPost(targetId: string) {
  * destination already counted this month costs nothing again (retry, reschedule). Past the plan's allowance
  * an X top-up pack pays. Returns release() to give back every slot this call took.
  */
+/**
+ * `now` = when the posts go out (the scheduled time, or now for Send now), so booking next month's calendar
+ * uses next month's X allowance. After the launch claim wins, call settle(): a destination moved to another
+ * month gives back the slot it held in the old one.
+ */
 export async function spendXPosts(userId: string, refs: string[], now = new Date()) {
-  const none = { fresh: false, release: async () => {} };
+  const none = { fresh: false, release: async () => {}, settle: async () => {} };
   if (!refs.length) return none;
   const e = await entitlements(userId);
   if (e.xPostLimit <= 0) return none;
-  const full = () => limit(`${e.planName} includes ${e.xPostLimit} posts to X a month and they're used up. Add an X top-up, upgrade, or untick X for this one.`, "x");
+  const sell = await packOnSale("x");
+  const full = () => limit(`${e.planName} includes ${e.xPostLimit} posts to X a month and they're used up. ${sell ? "Add an X top-up, upgrade," : "Upgrade"} or untick X for this one.`, "x");
   const held: Awaited<ReturnType<typeof reserve>>[] = [];
   try {
     for (const ref of refs) held.push(await reserve(userId, "x-post", periodKey("month", now), ref, e.xPostLimit, full, "x"));
@@ -373,5 +391,18 @@ export async function spendXPosts(userId: string, refs: string[], now = new Date
     for (const h of held) if (h.fresh) await h.release();
     throw err;
   }
-  return { fresh: held.some((h) => h.fresh), release: async () => { for (const h of held) if (h.fresh) await h.release(); } };
+  const period = periodKey("month", now);
+  const keys = refs.map((r) => r.slice(0, 120));
+  const settle = async () => {
+    try {
+      const stale = await db.featureUse.findMany({ where: { userId, feature: "x-post", ref: { in: keys }, period: { not: period } }, select: { id: true, topUpId: true } });
+      for (const r of stale) {
+        const gone = await db.featureUse.deleteMany({ where: { id: r.id } });
+        if (gone.count === 1 && r.topUpId) await refundCredit(r.topUpId);
+      }
+    } catch (e) {
+      console.error("[x-post settle]", e);
+    }
+  };
+  return { fresh: held.some((h) => h.fresh), release: async () => { for (const h of held) if (h.fresh) await h.release(); }, settle };
 }

@@ -13,7 +13,7 @@ export const PERK_LABEL: Record<Perk, string> = {
   "csv-export": "CSV analytics export",
   "client-reports": "Client PDF reports",
   approvals: "Team approvals",
-  "spike-alerts": "Spike and failed-post alerts",
+  "spike-alerts": "Spike alerts", // failed-post alerts stay on every plan
   "ai-replies": "AI reply suggestions",
   "review-links": "Review links",
 };

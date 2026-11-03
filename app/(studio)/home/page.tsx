@@ -12,6 +12,7 @@ import { canConnectWithToken, hasCredentials, loadKeys } from "@/lib/social/regi
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
 import { WelcomeSubscribe, type WelcomeOffer } from "@/components/onboarding/WelcomeSubscribe";
 import { entitlements, storageUsage } from "@/lib/billing/entitlements";
+import { hasPerk } from "@/lib/billing/plan-rules";
 import { StorageCard } from "@/components/home/StorageCard";
 import { listPlans } from "@/lib/billing/plans";
 import { visitorCurrency } from "@/lib/billing/visitor";
@@ -142,6 +143,8 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
   const liveP = connectedPlatforms(user.id);
   const publishedP = db.post.count({ where: { userId: user.id, status: { in: ["published", "partial"] } } });
   const meP = db.user.findUnique({ where: { id: user.id }, select: { postingGoal: true, weeklyReport: true } });
+  // 1096: the Monday email is a plan perk; don't offer a switch that would never send.
+  const digestP = user.actor ? Promise.resolve(false) : entitlements(user.id).then((e) => hasPerk(e, "weekly-digest")).catch(() => true);
   const recapHidden = (await cookies()).get(RECAP_COOKIE)?.value;
   // Dev only: preview the Monday card on any day (?recapAt=2026-10-19T05:00:00Z).
   const recapAt = process.env.NODE_ENV !== "production" && searchParams?.recapAt ? new Date(searchParams.recapAt) : new Date();
@@ -228,7 +231,7 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
       )}
       {(pulse || recap || (saved && saved.posts > 0)) && (
         <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-4 sm:px-10">
-          {recap && <WeekRecap r={recap} canEmail={!user.actor} />}
+          {recap && <WeekRecap r={recap} canEmail={!user.actor && (await digestP)} />}
           {pulse && <SendingNow items={pulse.sending} />}
           {pulse && <WeekPulse p={pulse} />}
           {saved && <TimeSavedCard t={saved} />}

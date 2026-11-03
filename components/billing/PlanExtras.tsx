@@ -33,7 +33,7 @@ function Bar({ id, label, m, unit }: { id: string; label: string; m: Meter; unit
   );
 }
 
-/** 1096: X posts and AI videos this month, packs held, and packs on sale. Buying runs the same checkout as a plan. */
+/** 1096: X posts and AI-captioned videos this month, packs held, and packs on sale. Buying runs the same checkout as a plan. */
 export function UsageExtras({ onBuy, busy }: { onBuy: (packId: string) => void; busy: string | null }) {
   const [u, setU] = useState<UsageNow | null>(null);
   const [p, setP] = useState<Packs | null>(null);
@@ -51,7 +51,7 @@ export function UsageExtras({ onBuy, busy }: { onBuy: (packId: string) => void; 
       {p && p.held.length > 0 && (
         <ul className="grid gap-1 text-xs text-muted-foreground" aria-label="Your top-ups">
           {p.held.map((h) => (
-            <li key={h.id}>{h.remaining} of {h.units} {h.kind === "ai" ? "AI videos" : h.kind === "x" ? "X posts" : h.kind === "brand" ? "extra brand" : "extra seat"} left, until {day(h.expiresAt)}</li>
+            <li key={h.id}>{h.remaining} of {h.units} {h.kind === "ai" ? "AI-captioned videos" : h.kind === "x" ? "X posts" : h.kind === "brand" ? "extra brand" : "extra seat"} left, until {day(h.expiresAt)}</li>
           ))}
         </ul>
       )}

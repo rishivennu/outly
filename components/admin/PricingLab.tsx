@@ -11,7 +11,7 @@ import { CANCEL_REASON_LABEL, type CancelReason, type ExperimentsConfig } from "
 import { TOPUP_KINDS, type TopUpConfig, type TopUpKind, type TopUpPack } from "@/lib/billing/topups-core";
 
 const FX = ["USD", "EUR", "GBP"] as const;
-const KIND_LABEL: Record<TopUpKind, string> = { ai: "AI videos", x: "X posts", brand: "Extra brand", seat: "Extra seat" };
+const KIND_LABEL: Record<TopUpKind, string> = { ai: "AI captions (videos)", x: "X posts", brand: "Extra brand", seat: "Extra seat" };
 
 const pct = (n: number) => `${Math.round(n * 1000) / 10}%`;
 const money = (minor: number | null, cur: string) => (minor == null ? "n/a" : formatMoney(minor, cur));
@@ -32,7 +32,7 @@ function Switch({ label, hint, checked, onChange, disabled }: { label: string; h
 
 // ------------------------------------------------------------------ preset (shown inside the plan editor)
 
-type PresetState = { preset: string; plans: string[]; applied: boolean; appliedAt: string | null; appliedBy: string | null };
+type PresetState = { preset: string; plans: string[]; applied: boolean; appliedAt: string | null; appliedBy: string | null; stale?: { plans: string[]; packs: number } };
 
 /**
  * The November 2026 pricing, applied only when an admin presses the button. A backup of every touched row
@@ -48,13 +48,13 @@ export function PresetPanel({ onChanged }: { onChanged: () => Promise<void> | vo
   useEffect(() => {
     adminApi<PresetState>("/api/admin/plans/preset").then(setS).catch(() => {});
   }, []);
-  async function run(undo: boolean) {
+  async function run(undo: boolean | "copy") {
     setBusy(true);
     try {
-      const r = await adminApi<PresetState>("/api/admin/plans/preset", { method: "POST", json: undo ? { undo: true } : { endBeta, enableFounding: founding } });
+      const r = await adminApi<PresetState>("/api/admin/plans/preset", { method: "POST", json: undo === "copy" ? { fixCopy: true } : undo ? { undo: true } : { endBeta, enableFounding: founding } });
       setS(r);
       await onChanged();
-      toast(undo ? "The previous plans are back" : "November 2026 pricing is live");
+      toast(undo === "copy" ? "Plan wording fixed" : undo ? "The previous plans are back" : "November 2026 pricing is live");
     } catch (e: any) {
       toast(e.message, "error");
     } finally {
@@ -74,7 +74,15 @@ export function PresetPanel({ onChanged }: { onChanged: () => Promise<void> | vo
               ? `Applied ${fmtDate(s.appliedAt, true)} by ${s.appliedBy}. Edit any plan below as usual, or undo to put the old rows back.`
               : "Free, Starter ₹299, Creator ₹799, Agency ₹2,499, with brands, X caps, history and perks. Studio is hidden, not deleted. Nothing changes until you press Apply."}
           </p>
+          {s.stale && (s.stale.plans.length > 0 || s.stale.packs > 0) && (
+            <p className="mt-1 text-[12.5px] font-medium">
+              {s.stale.plans.join(", ")}{s.stale.plans.length && s.stale.packs ? " and " : ""}{s.stale.packs ? `${s.stale.packs} top-up pack${s.stale.packs === 1 ? "" : "s"}` : ""} still say "AI videos" (Outlly captions videos, it doesn't make them) or promise brand add-ons that aren't on sale. Fix plan wording swaps only those lines.
+            </p>
+          )}
         </div>
+        {s.stale && (s.stale.plans.length > 0 || s.stale.packs > 0) && (
+          <Button type="button" variant="lime" className="rounded-full" disabled={busy} onClick={() => run("copy")}>Fix plan wording</Button>
+        )}
         {s.applied ? (
           <Button type="button" variant="ghost" className="rounded-full" disabled={busy} onClick={() => setAsk("undo")}>Undo preset</Button>
         ) : (
@@ -201,7 +209,7 @@ export function PricingLab() {
       </Card>
 
       <Card aria-labelledby="lab-topups">
-        <CardTitle hint="One-off packs on top of a plan: AI videos, X posts, an extra brand or seat. Units expire after the days set." action={<Button type="button" variant="lime" className="rounded-full" disabled={busy} onClick={() => save("topups")}>Save packs</Button>}>
+        <CardTitle hint="One-off packs on top of a plan: AI captions on more videos, X posts, an extra brand or seat. A pack is hidden from plans where it would add nothing. Units expire after the days set." action={<Button type="button" variant="lime" className="rounded-full" disabled={busy} onClick={() => save("topups")}>Save packs</Button>}>
           <span id="lab-topups">Top-ups</span>
         </CardTitle>
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
@@ -234,7 +242,7 @@ export function PricingLab() {
                 </span>
               </td>
               <td><Input aria-label={`${p.id} days`} type="number" min={1} max={365} value={p.days} onChange={(e) => setPack(i, { days: intIn(e.target.value, 1, 365) })} className="w-20" /></td>
-              <td><Input aria-label={`${p.id} plans`} value={p.plans.join(", ")} placeholder="any" onChange={(e) => setPack(i, { plans: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} /></td>
+              <td><Input aria-label={`${p.id} plans`} value={p.plans.join(", ")} placeholder="any" onChange={(e) => setPack(i, { plans: e.target.value.split(",").map((s) => s.trim().toLowerCase().replace(/\s+/g, "-")).filter(Boolean) })} /><span className="mt-1 block text-[11px] text-muted-foreground">Plan slugs, e.g. creator, pro-manager</span></td>
               <td><Button type="button" variant="ghost" size="sm" className="min-h-[44px] rounded-full" aria-label={`Remove ${p.id}`} onClick={() => dropPack(i)}>Remove</Button></td>
             </tr>
           ))}

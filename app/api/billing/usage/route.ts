@@ -3,7 +3,7 @@ import { captionUsage, postUsage, replyUsage, storageUsage, xPostUsage } from "@
 
 const n = (v: number) => (Number.isFinite(v) ? v : null); // Infinity (unlimited) -> null in JSON
 
-/** 1096 usage meter: this period's posts, X posts, AI videos, replies and storage, with top-up credits. */
+/** 1096 usage meter: this period's posts, X posts, AI-captioned videos, replies and storage, with top-up credits. */
 export const GET = route(async (_req, { user }) => {
   const [posts, x, ai, replies, storage] = await Promise.all([postUsage(user.id), xPostUsage(user.id), captionUsage(user.id), replyUsage(user.id), storageUsage(user.id)]);
   return json({

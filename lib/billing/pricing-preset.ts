@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "../db";
 import { HttpError } from "../http";
-import { saveConfig } from "../settings";
+import { getConfig, saveConfig } from "../settings";
 import { audit, type Actor } from "./access";
 import { revalidatePricing, ensurePlans } from "./plans";
 import { PERKS, serializePerks, type Perk } from "./plan-rules";
@@ -62,7 +62,7 @@ export const PRICING_2026_11: PresetPlan[] = [
       postLimit: 0, postPeriod: "month", fairUsePosts: 300, xPostLimit: 100, captionVideos: 150, aiCaptions: true, analyticsDays: 365, replyLimit: 0,
       seats: 1, accountLimit: 0, brandLimit: 2, platformLimit: 0, storageMb: 25 * 1024, maxUploadMb: 1024, burnCaptions: true,
       perks: ["weekly-digest", "voice-memory", "csv-export", "ai-replies", "review-links"],
-      features: ["2 brands on every platform", "Unlimited posts, 100 to X a month", "AI on 150 videos, in your own voice", "1 year of analytics and CSV export", "1 helper, review links, AI replies"],
+      features: ["2 brands on every platform", "Unlimited posts, 100 to X a month", "AI captions on 150 videos, in your voice", "1 year of analytics and CSV export", "1 helper, review links, AI replies"],
     },
   },
   {
@@ -71,7 +71,7 @@ export const PRICING_2026_11: PresetPlan[] = [
       name: "Agency", note: "For agencies and managers", priceMinor: 249900, yearlyMinor: 2499000, prices: AGENCY, yearlyPrices: x10(AGENCY), highlight: false, sortOrder: 3, state: "available",
       postLimit: 0, postPeriod: "month", fairUsePosts: 1000, xPostLimit: 300, captionVideos: 500, aiCaptions: true, analyticsDays: 730, replyLimit: 0,
       seats: 5, accountLimit: 0, brandLimit: 5, platformLimit: 0, storageMb: 100 * 1024, maxUploadMb: 2048, burnCaptions: true, perks: [...PERKS],
-      features: ["5 brands, add more any time", "5 team seats with approvals", "500 AI videos, 300 X posts a month", "2 years of analytics, client PDF reports", "100 GB of storage, spike alerts"],
+      features: ["5 brands on every platform", "5 team seats with approvals", "AI captions on 500 videos, 300 X posts", "2 years of analytics, client PDF reports", "100 GB of storage, spike alerts"],
     },
   },
 ];
@@ -130,6 +130,71 @@ export async function applyPricingPreset(actor: Actor, opts: { endBeta?: boolean
   const { adminEvent } = await import("../admin/route");
   await adminEvent("plan_changed", `${actor.login} applied the November 2026 pricing`, "Free, Starter, Creator, Agency. Studio is hidden; people on it keep it. Existing subscribers keep their price until renewal.", "/admin/pricing");
   return { changed, retired: RETIRE };
+}
+
+/**
+ * Wording the first release of this preset got wrong (2026-11-03): "AI videos" read as if Outlly makes videos (it
+ * captions them), and "add more any time" promised brand packs that are off until an admin sells them. Plans that
+ * were applied before the fix keep the old lines until an admin presses "Fix plan wording". Only these exact lines
+ * change; anything an admin wrote stays.
+ */
+export const COPY_FIXES: readonly (readonly [string, string])[] = [
+  ["AI on 150 videos, in your own voice", "AI captions on 150 videos, in your voice"],
+  ["5 brands, add more any time", "5 brands on every platform"],
+  ["500 AI videos, 300 X posts a month", "AI captions on 500 videos, 300 X posts"],
+];
+const OLD_PACK_LABEL = /^(\d+) more AI videos$/;
+
+const fixLines = (raw: string) => {
+  let list: unknown;
+  try {
+    list = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(list)) return null;
+  let hit = false;
+  const next = list.map((s) => {
+    const to = COPY_FIXES.find(([from]) => from === s)?.[1];
+    if (to) hit = true;
+    return to ?? s;
+  });
+  return hit ? next : null;
+};
+
+/** Plans (and saved top-up packs) still showing the old wording. Empty = nothing to fix. */
+export async function staleCopy() {
+  const plans = await db.plan.findMany({ select: { slug: true, features: true } });
+  const slugs = plans.filter((p) => fixLines(p.features)).map((p) => p.slug);
+  const cfg = (await getConfig("topups")) as { packs?: { kind?: string; label?: string }[] } | null;
+  const packs = (cfg?.packs ?? []).filter((p) => p?.kind === "ai" && typeof p.label === "string" && OLD_PACK_LABEL.test(p.label)).length;
+  return { plans: slugs, packs };
+}
+
+/** Pressed by an admin: swap the old lines for the new ones, nothing else. Safe to press twice. */
+export async function fixPresetCopy(actor: Actor) {
+  const plans = await db.plan.findMany({ select: { id: true, slug: true, features: true } });
+  const fixed: string[] = [];
+  for (const p of plans) {
+    const next = fixLines(p.features);
+    if (!next) continue;
+    await db.plan.update({ where: { id: p.id }, data: { features: JSON.stringify(next) } });
+    fixed.push(p.slug);
+  }
+  const cfg = (await getConfig("topups")) as { packs?: { kind?: string; label?: string }[] } | null;
+  let packs = 0;
+  if (cfg?.packs?.length) {
+    const nextPacks = cfg.packs.map((p) => {
+      const m = p?.kind === "ai" && typeof p.label === "string" ? OLD_PACK_LABEL.exec(p.label) : null;
+      if (!m) return p;
+      packs++;
+      return { ...p, label: `AI captions on ${m[1]} more videos` };
+    });
+    if (packs) await saveConfig("topups", { ...cfg, packs: nextPacks } as never);
+  }
+  if (fixed.length) revalidatePricing();
+  await audit({ actor, action: "pricing.preset.copy", targetType: "config", targetId: PRESET_NAME, after: { fixed, packs } });
+  return { fixed, packs };
 }
 
 /** Is there something to undo? */

@@ -19,6 +19,7 @@ import { VoiceMemoryCard } from "@/components/billing/PlanExtras";
 import { TwoStepCard } from "./TwoStepCard";
 import { PhoneCard } from "./PhoneCard";
 import { YourDataCard } from "./YourDataCard";
+import Link from "next/link";
 import { AlertsCard } from "./AlertsCard";
 import { ALERT_DEFAULTS, type AlertPrefs } from "@/lib/alerts-core";
 import { SettingsShell, Disclosure, useUnsaved, type SettingsCategory } from "./SettingsShell";
@@ -42,9 +43,10 @@ const WR_PARTS = [
 ];
 
 /** Monday summary email on/off. Saves the moment it's flipped. */
-function WeeklyReportCard({ initial }: { initial: boolean }) {
+function WeeklyReportCard({ initial, allowed = true }: { initial: boolean; allowed?: boolean }) {
   const toast = useToast();
-  const [on, setOn] = useState(initial);
+  const [stored, setOn] = useState(initial);
+  const on = allowed && stored;
   const [saving, setSaving] = useState(false);
   const flip = async (next: boolean) => {
     setOn(next);
@@ -68,12 +70,14 @@ function WeeklyReportCard({ initial }: { initial: boolean }) {
           </span>
           <div>
             <h2 id="wr-h" className="text-2xl font-semibold tracking-tight">Weekly report</h2>
-            <p id="wr-d" className="mt-1 text-sm text-muted-foreground">An email every Monday at 9 am your time.</p>
+            <p id="wr-d" className="mt-1 text-sm text-muted-foreground">
+              {allowed ? "An email every Monday at 9 am your time." : <>Not on your plan. <Link href="/billing" className="font-medium text-foreground underline underline-offset-2">See plans in Billing</Link> to get it.</>}
+            </p>
           </div>
         </div>
         <label className="flex min-h-[44px] shrink-0 cursor-pointer items-center">
           <span className="sr-only">Email me a weekly report</span>
-          <input type="checkbox" role="switch" checked={on} disabled={saving} aria-describedby="wr-d" onChange={(e) => flip(e.target.checked)} className="peer sr-only" />
+          <input type="checkbox" role="switch" checked={on} disabled={saving || !allowed} aria-describedby="wr-d" onChange={(e) => flip(e.target.checked)} className="peer sr-only" />
           <span aria-hidden className="relative h-7 w-12 shrink-0 rounded-full bg-muted transition-colors peer-checked:bg-lime peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-background after:shadow after:transition-transform after:duration-300 peer-checked:after:translate-x-5" />
         </label>
       </div>
@@ -197,7 +201,7 @@ function Note({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, billing = null, initialTab }: { weeklyReport?: boolean; alerts?: AlertPrefs; billing?: BillingSummary | null; initialTab?: string }) {
+export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, perks = { digest: true, spike: true }, billing = null, initialTab }: { weeklyReport?: boolean; alerts?: AlertPrefs; perks?: { digest: boolean; spike: boolean }; billing?: BillingSummary | null; initialTab?: string }) {
   const user = useUser();
   const ws = user.workspace;
   const owner = ws?.ownerName ?? "the owner";
@@ -270,8 +274,8 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, bil
         <Note title="Emails come from your own studio">Weekly reports and alerts for {owner}&apos;s studio go to {owner}.</Note>
       ) : (
         <>
-          <WeeklyReportCard initial={weeklyReport} />
-          <AlertsCard initial={alerts} />
+          <WeeklyReportCard initial={weeklyReport} allowed={perks.digest} />
+          <AlertsCard initial={alerts} spikeAllowed={perks.spike} />
         </>
       ),
     },

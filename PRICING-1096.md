@@ -62,3 +62,11 @@ an admin applies by hand in Admin > Pricing, with an Undo.
 - Pricing lab: add / remove packs and price-test variants, id and kind for new packs, EUR and GBP pack prices.
 
 Known, accepted: `activeExtras` adds one groupBy per entitlements read. `renewFromCharge` trusts the amount on the verified webhook (Razorpay signs it); it does not compare against the stored subscription price.
+
+## 1097 follow-up (2026-11-03): wording and edge cases
+- Copy: "AI videos" read as if Outlly makes videos; it captions them. Plan cards, pack labels, meters, admin and the PDF now say "AI captions on N videos". "5 brands, add more any time" became "5 brands on every platform" (brand packs are off until sold). The preset was already applied on prod, so Admin > Pricing shows **Fix plan wording**: it swaps only those exact old lines (and old "N more AI videos" pack labels), nothing else.
+- Settings and Home no longer offer a weekly-report or spike-alert switch on plans without that perk (it saved but never sent).
+- A pack that would add nothing on the buyer's plan (X pack on unlimited X, AI pack on unlimited or no AI captions, brand pack on a plan that doesn't count brands) is not sold.
+- Limit messages offer a top-up only when one is on sale; the upgrade popup has titles for platforms, brands, X and perks.
+- An account already on file can always be reconnected, even if a plan change left the owner over the new platform or brand cap.
+- X allowance counts in the month the post goes out (scheduled time), and a post moved to another month moves its slot.
