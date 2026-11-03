@@ -3,7 +3,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { THEME_KEY } from "@/lib/theme/script";
-import { THEME_COLOR, THEME_COOKIE, THEME_COOKIE_AGE, THEME_SWITCH_MS } from "@/lib/theme/colors";
+import { THEME_COOKIE, THEME_COOKIE_AGE, THEME_SWITCH_MS } from "@/lib/theme/colors";
+import { isIosHomeScreenApp, syncStatusBar } from "@/lib/theme/statusbar";
 import { cn } from "@/lib/utils";
 
 export type ThemeChoice = "light" | "dark" | "system";
@@ -26,9 +27,8 @@ let seq = 0;
 function apply(choice: ThemeChoice, animate = false) {
   const dark = choice === "dark" || (choice === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   const el = document.documentElement;
-  // html[data-tc] is what the head script's observer holds every theme-color tag to (lib/theme/script.ts).
-  el.dataset.tc = dark ? THEME_COLOR.dark : THEME_COLOR.light;
-  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", el.dataset.tc!));
+  // theme-color tags + Android app bar icons, for the exact page background of this theme (lib/theme/statusbar.ts)
+  syncStatusBar(dark);
   el.dataset.theme = choice;
   if (el.classList.contains("dark") === dark) return;
   const paint = () => {
@@ -72,8 +72,15 @@ export function setTheme(choice: ThemeChoice) {
   } catch {}
   // the server reads this to send the matching status bar colour with the next page (1107, lib/theme/colors.ts)
   document.cookie = `${THEME_COOKIE}=${choice};path=/;max-age=${THEME_COOKIE_AGE};samesite=lax${location.protocol === "https:" ? ";secure" : ""}`;
+  const before = document.documentElement.dataset.tc;
   apply(choice, true);
   window.dispatchEvent(new CustomEvent<ThemeChoice>(THEME_EVENT, { detail: choice }));
+  // 1108: an iPhone Home Screen app keeps the status bar colour it read when the page loaded and ignores later
+  // changes, so the strip stayed the old theme's colour. Once the cross-fade ends, reload: the server reads the
+  // cookie above and sends the new colour in the first HTML.
+  if (isIosHomeScreenApp() && document.documentElement.dataset.tc !== before) {
+    window.setTimeout(() => window.location.reload(), THEME_SWITCH_MS + 60);
+  }
 }
 
 export function useTheme() {

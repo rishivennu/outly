@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Archivo, Bricolage_Grotesque, DM_Sans, Fraunces, Inter, Instrument_Serif, Manrope, Plus_Jakarta_Sans, Rubik, Space_Mono, Tinos } from "next/font/google";
 import localFont from "next/font/local";
 import { MotionRoot } from "@/components/shared/MotionRoot";
 import { themeScript } from "@/lib/theme/script";
-import { THEME_COLOR } from "@/lib/theme/colors";
+import { THEME_COOKIE, themeColorFor } from "@/lib/theme/colors";
+import { StatusBarSync } from "@/components/shared/StatusBarSync";
 import { CookieBanner } from "@/components/shared/CookieConsent";
 import { DeviceHint } from "@/components/shared/DeviceHint";
 import { Connectivity, Ripples } from "@/components/shared/Connectivity";
@@ -88,7 +89,12 @@ export const metadata: Metadata = {
 // 1105: one theme-color, the dark page background (the default theme). The head script (lib/theme/script.ts) runs
 // right after this tag and swaps it to the saved theme before the first paint; ThemeToggle keeps it in step after.
 // Not a light/dark media pair: that follows the phone's setting, not the theme picked inside Outlly.
-export const viewport: Viewport = { width: "device-width", initialScale: 1, maximumScale: 1, userScalable: false, themeColor: THEME_COLOR.dark, viewportFit: "cover" };
+// 1107/1108: the theme-color in the first HTML follows the theme saved in the cookie, because an iPhone Home Screen
+// app reads it as the page arrives. Root layout reads headers() for the nonce, so every page renders per request
+// anyway and reading the cookie costs nothing. Public pages override it for their own light background.
+export async function generateViewport(): Promise<Viewport> {
+  return { width: "device-width", initialScale: 1, maximumScale: 1, userScalable: false, themeColor: themeColorFor((await cookies()).get(THEME_COOKIE)?.value), viewportFit: "cover" };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // The Content Security Policy only runs scripts carrying this request's nonce (set by middleware.ts).
@@ -128,6 +134,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Ripples />
           <LaunchHost />
           <LiquidGlass />
+          <StatusBarSync />
         </MotionRoot>
       </body>
     </html>

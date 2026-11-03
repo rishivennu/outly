@@ -6,6 +6,18 @@ import { TextFx } from "@/components/shared/TextFx";
 import { StarField } from "@/components/marketing/StarField";
 import { BetaProvider } from "@/components/marketing/BetaContext";
 import { isBeta } from "@/lib/beta";
+import { cookies } from "next/headers";
+import type { Viewport } from "next";
+import { THEME_COOKIE, themeColorFor } from "@/lib/theme/colors";
+
+/**
+ * 1108: public pages have their own light background (lib/theme/colors.ts lightSky), so the status bar colour in the
+ * first HTML is that one for a light user. Only themeColor; Next keeps the rest of the root layout's viewport.
+ * The root layout already renders per request (CSP nonce), so this cookie read does not change caching.
+ */
+export async function generateViewport(): Promise<Viewport> {
+  return { themeColor: themeColorFor((await cookies()).get(THEME_COOKIE)?.value, "sky") };
+}
 
 /** Shell for every public page: one nav, one footer, one skip link. */
 export default async function MarketingLayout({ children }: { children: React.ReactNode }) {

@@ -35,14 +35,14 @@ describe("1105 status bar colour", () => {
   });
   test("the head script sets theme-color for the saved theme before paint", () => {
     expect(themeScript).toContain(`meta[name="theme-color"]`);
-    expect(themeScript).toContain(`e.dataset.tc=d?'${THEME_COLOR.dark}':'${THEME_COLOR.light}'`);
+    expect(themeScript).toContain(`e.dataset.tc=d?'${THEME_COLOR.dark}':s?'${THEME_COLOR.lightSky}':'${THEME_COLOR.light}'`);
     // Next adds a second tag after hydration: the observer holds every one to html[data-tc]
     expect(themeScript).toContain("new MutationObserver(tc).observe(document.head,{childList:true,subtree:true,attributes:true,attributeFilter:['content']})");
     expect(themeScript).toContain("if(m.getAttribute('content')!==e.dataset.tc)");
   });
   test("no hard-coded status bar colour anywhere else", () => {
     const layout = src("app/layout.tsx");
-    expect(layout).toContain("themeColor: THEME_COLOR.dark");
+    expect(layout).toContain("themeColor: themeColorFor((await cookies()).get(THEME_COOKIE)?.value)");
     expect(layout).toContain('statusBarStyle: "default"');
     expect(layout).toContain('"apple-mobile-web-app-capable": "yes"');
     expect(layout).toContain('viewportFit: "cover"');

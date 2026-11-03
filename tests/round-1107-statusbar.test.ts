@@ -32,10 +32,13 @@ describe("1107 status bar from the first byte", () => {
     expect(set.indexOf("document.cookie = `${THEME_COOKIE}=${choice};path=/;max-age=${THEME_COOKIE_AGE};samesite=lax")).toBeGreaterThan(0);
     expect(set.indexOf("document.cookie")).toBeLessThan(set.indexOf("apply(choice, true)"));
   });
-  test("studio pages pick their theme-color from the cookie on the server", () => {
-    const l = src("app/(studio)/layout.tsx");
-    expect(l).toContain("export async function generateViewport(): Promise<Viewport> {");
-    expect(l).toContain("themeColor: themeColorFor((await cookies()).get(THEME_COOKIE)?.value)");
+  test("every page picks its theme-color from the cookie on the server (1108: root + public pages)", () => {
+    const root = src("app/layout.tsx");
+    expect(root).toContain("export async function generateViewport(): Promise<Viewport> {");
+    expect(root).toContain("themeColor: themeColorFor((await cookies()).get(THEME_COOKIE)?.value)");
+    const mkt = src("app/(marketing)/layout.tsx");
+    expect(mkt).toContain('themeColor: themeColorFor((await cookies()).get(THEME_COOKIE)?.value, "sky")');
+    expect(src("app/(studio)/layout.tsx")).not.toContain("generateViewport"); // the root one covers it
   });
   test("on phones the corner glows fade in below the top edge, so it is exactly the background", () => {
     const css = src("app/globals.css");

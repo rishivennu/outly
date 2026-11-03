@@ -156,7 +156,7 @@ describe("1102 wiring", () => {
 describe("1102 zoom lock", () => {
   test("viewport never scales", () => {
     const l = src("app/layout.tsx");
-    expect(l).toMatch(/viewport: Viewport = \{[^}]*maximumScale: 1, userScalable: false/);
+    expect(l).toMatch(/Promise<Viewport> \{\s*return \{[^}]*maximumScale: 1, userScalable: false/); // 1108: generateViewport (theme cookie)
     expect(l).toContain('viewportFit: "cover"');
   });
   test("no double-tap zoom; phone fields at least 16px", () => {

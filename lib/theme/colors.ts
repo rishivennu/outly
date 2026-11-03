@@ -6,7 +6,19 @@
  * (1107: light was #f5f7fa, one step bluer than the page, which renders #f5f7f9). Hex because older Android
  * and iOS builds ignore hsl() in theme-color.
  */
-export const THEME_COLOR = { light: "#f5f7f9", dark: "#0c0c0e" } as const;
+export const THEME_COLOR = { light: "#f5f7f9", dark: "#0c0c0e", lightSky: "#f3f6fa" } as const;
+
+/**
+ * 1108: which page background is on screen. The studio and sign-in pages use the app background; the public pages
+ * (everything under .sky-host, app/(marketing)/layout.tsx) have their own, slightly bluer light background
+ * (216 38% 96.6% = #f3f6fa, globals.css "html:not(.dark) body:has(.sky-host)"). Dark is the same on both.
+ */
+export type Surface = "app" | "sky";
+
+/** The exact status bar colour for a theme on a surface: the page background behind the clock. */
+export function statusBarColor(dark: boolean, surface: Surface = "app") {
+  return dark ? THEME_COLOR.dark : surface === "sky" ? THEME_COLOR.lightSky : THEME_COLOR.light;
+}
 
 /**
  * 1107: the theme choice also lives in this cookie (same name as the localStorage key), so the server can write the
@@ -17,11 +29,11 @@ export const THEME_COOKIE = "outly-theme";
 export const THEME_COOKIE_AGE = 60 * 60 * 24 * 365;
 
 /** The theme-color for a saved choice. System (and anyone not on light or dark) gets one tag per OS appearance. */
-export function themeColorFor(choice: string | undefined) {
-  if (choice === "light") return THEME_COLOR.light;
+export function themeColorFor(choice: string | undefined, surface: Surface = "app") {
+  if (choice === "light") return statusBarColor(false, surface);
   if (choice === "dark" || choice === undefined) return THEME_COLOR.dark; // dark is Outlly's default theme
   return [
-    { media: "(prefers-color-scheme: light)", color: THEME_COLOR.light },
+    { media: "(prefers-color-scheme: light)", color: statusBarColor(false, surface) },
     { media: "(prefers-color-scheme: dark)", color: THEME_COLOR.dark },
   ];
 }
