@@ -61,9 +61,16 @@ describe("1108 status bar on every surface, iPhone and Android", () => {
   test("iPhone Home Screen app reloads after a switch that changes the colour, once the cross-fade ends", () => {
     const t = src("components/shared/ThemeToggle.tsx");
     const set = t.slice(t.indexOf("export function setTheme"), t.indexOf("export function useTheme"));
-    expect(set).toContain("if (isIosHomeScreenApp() && document.documentElement.dataset.tc !== before) {");
-    expect(set).toContain("window.setTimeout(() => window.location.reload(), THEME_SWITCH_MS + 60);");
+    // 1109: compared after the fade (the dark class has flipped), so the welcome's on-screen colour counts too
+    expect(set).toContain("const before = document.documentElement.dataset.tc;");
+    expect(set).toMatch(/if \(isIosHomeScreenApp\(\)\) \{\s*window\.setTimeout\(\(\) => \{\s*if \(syncStatusBar\(\) !== before\) window\.location\.reload\(\);\s*\}, THEME_SWITCH_MS \+ 60\);/);
     expect(set.indexOf("document.cookie")).toBeLessThan(set.indexOf("location.reload"));
     expect(src("lib/theme/statusbar.ts")).toContain("standalone === true");
+  });
+  test("1109: phones mask the landing sky (comets, stars) out of the top rows under the status bar", () => {
+    const css = src("app/globals.css");
+    const i = css.indexOf("@media (max-width: 1023.98px) {\n  body::before {");
+    const block = css.slice(i, css.indexOf("\n}\n", i));
+    expect(block).toMatch(/\.sky \{\s*-webkit-mask-image: linear-gradient\(to bottom, transparent 0, transparent calc\(env\(safe-area-inset-top, 0px\) \+ 12px\), #000 calc\(env\(safe-area-inset-top, 0px\) \+ 72px\)\);\s*mask-image: linear-gradient\(to bottom, transparent 0, transparent calc\(env\(safe-area-inset-top, 0px\) \+ 12px\)/);
   });
 });

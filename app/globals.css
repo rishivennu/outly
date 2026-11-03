@@ -1919,6 +1919,11 @@ html:not(.dark) body:has(.sky-host)::before {
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(env(safe-area-inset-top, 0px) + 12px), #000 calc(env(safe-area-inset-top, 0px) + 152px));
     mask-image: linear-gradient(to bottom, transparent 0, transparent calc(env(safe-area-inset-top, 0px) + 12px), #000 calc(env(safe-area-inset-top, 0px) + 152px));
   }
+  /* 1109: the landing sky's comets and stars could cross the top rows, a moving dot under the status bar. */
+  .sky {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(env(safe-area-inset-top, 0px) + 12px), #000 calc(env(safe-area-inset-top, 0px) + 72px));
+    mask-image: linear-gradient(to bottom, transparent 0, transparent calc(env(safe-area-inset-top, 0px) + 12px), #000 calc(env(safe-area-inset-top, 0px) + 72px));
+  }
 }
 
 /* Posting animation (10-15e): grainy ribbons of light flowing into a glass pill, Pip on top */

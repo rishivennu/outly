@@ -77,9 +77,12 @@ export function setTheme(choice: ThemeChoice) {
   window.dispatchEvent(new CustomEvent<ThemeChoice>(THEME_EVENT, { detail: choice }));
   // 1108: an iPhone Home Screen app keeps the status bar colour it read when the page loaded and ignores later
   // changes, so the strip stayed the old theme's colour. Once the cross-fade ends, reload: the server reads the
-  // cookie above and sends the new colour in the first HTML.
-  if (isIosHomeScreenApp() && document.documentElement.dataset.tc !== before) {
-    window.setTimeout(() => window.location.reload(), THEME_SWITCH_MS + 60);
+  // cookie above and sends the new colour in the first HTML. Compared after the fade, when the dark class has
+  // flipped, so a colour read from the screen (the first-launch welcome) is the new one too.
+  if (isIosHomeScreenApp()) {
+    window.setTimeout(() => {
+      if (syncStatusBar() !== before) window.location.reload();
+    }, THEME_SWITCH_MS + 60);
   }
 }
 
