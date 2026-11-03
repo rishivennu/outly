@@ -9,15 +9,21 @@ import type { CSSProperties } from "react";
 
 export type Bezier = readonly [number, number, number, number];
 
+/**
+ * 1104: one ease-out-cubic for every count. The 1102 expo and quint curves covered about 80% of the distance in
+ * the first frame or two, so a number read as a jump to nearly its value and then a second of the last digit
+ * creeping. This one still lands softly but you can watch it count. Durations are the brief's, unchanged.
+ */
+export const COUNT_EASE: Bezier = [0.33, 1, 0.68, 1];
 export const NUMBER_TIMING = {
-  main: { ms: 1200, ease: [0.16, 1, 0.3, 1] as Bezier },
-  secondary: { ms: 900, ease: [0.22, 1, 0.36, 1] as Bezier },
+  main: { ms: 1200, ease: COUNT_EASE },
+  secondary: { ms: 900, ease: COUNT_EASE },
   pct: { ms: 800, ease: [0, 0, 0.58, 1] as Bezier },
-  refresh: { ms: 700, ease: [0.16, 1, 0.3, 1] as Bezier },
+  refresh: { ms: 700, ease: COUNT_EASE },
 } as const;
 export type NumberTier = keyof typeof NUMBER_TIMING;
 
-/** A tier as a CSS transition timing, e.g. "900ms cubic-bezier(0.22,1,0.36,1)" (rolling digits, odometers). */
+/** A tier as a CSS transition timing, e.g. "900ms cubic-bezier(0.33,1,0.68,1)" (rolling digits, odometers). */
 export const cssTiming = (tier: NumberTier) => {
   const { ms, ease } = NUMBER_TIMING[tier];
   return `${ms}ms cubic-bezier(${ease.join(",")})`;
@@ -100,7 +106,10 @@ export function stepperOf(f: NumberFormat, final: number): (n: number) => string
     const x = Math.abs(n) / div;
     // Under one unit with no decimals, show one ("0.4M"), or the count would sit at "0M".
     const d = dec === 0 && x < 1 ? 1 : dec;
-    return `${n < 0 ? "-" : ""}${x.toFixed(d)}${m[2]}`;
+    const s = x.toFixed(d);
+    // 1104: the first frames of a count from zero said "0.0K"; nothing yet is a plain "0", like the start.
+    if (Number(s) === 0) return "0";
+    return `${n < 0 ? "-" : ""}${s}${m[2]}`;
   };
 }
 

@@ -577,9 +577,9 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   /* ================= render ================= */
   if (phase !== "edit") {
     return (
-      <div className="relative overflow-hidden px-5 py-12 sm:px-10 lg:min-h-dvh">
+      <div className="relative overflow-hidden px-[var(--frame-gutter)] py-12 lg:min-h-dvh">
         <Glow />
-        <div className="relative">
+        <div className="page-frame relative px-0">
           {phase === "publishing" && livePost ? <PublishingView initial={livePost} onAnother={another} /> : <ScheduledView when={scheduledFor ?? when.toISOString()} tz={tz} poster={poster} onAnother={another} />}
         </div>
       </div>
@@ -629,6 +629,8 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
 
       <div className="relative min-w-0 flex-1">
         <JourneyBar step={step} reachable={reachable} onGo={setStep} />
+        {/* The editor is the one studio surface off the page frame on purpose (1104): a narrow, animated writing
+            column between the journey rail and the side panel, with its own tighter gutter. */}
         <div className={cn("mx-auto flex w-full max-w-3xl flex-col px-4 pb-4 pt-6 transition-[max-width] duration-500 [transition-timing-function:var(--ease-liquid)] motion-reduce:transition-none sm:px-8 lg:pb-16 lg:pt-8", panel.open ? "lg:max-w-4xl" : "lg:max-w-5xl")}>
           {/* Steps animate in on mount. No exit choreography: a nested exit that never settles must not strand the next step. */}
             {showVideo && !hasMedia && (

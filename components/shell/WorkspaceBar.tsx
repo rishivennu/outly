@@ -18,7 +18,7 @@ export function WorkspaceBar() {
     }
   };
   return (
-    <div role="status" className="relative z-30 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 bg-secondary/90 px-5 py-2 text-sm backdrop-blur sm:px-10">
+    <div role="status" className="mtop-pre relative z-30 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 bg-secondary/90 px-[var(--frame-gutter)] py-2 text-sm backdrop-blur">
       <p className="flex min-w-0 items-center gap-2">
         <Users className="h-4 w-4 shrink-0 text-lime-ink" aria-hidden="true" />
         <span className="truncate">

@@ -178,7 +178,7 @@ export function AccountsView({ initial, previous: initialPrevious = [], setup, a
   };
 
   return (
-    <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-14">
+    <div className="page-frame pb-16 pt-8 lg:pt-14">
       <p className="eyebrow mb-3">Connected accounts</p>
       <h1 className="display max-w-3xl text-[clamp(2.6rem,6vw,4.6rem)]">Where should we send your content?</h1>
       <p className="mt-4 max-w-xl text-muted-foreground">

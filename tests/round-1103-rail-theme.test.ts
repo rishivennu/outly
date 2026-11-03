@@ -42,13 +42,13 @@ describe("1103 theme control", () => {
     expect(railCss).toContain('html[data-rail="open"] .rail-theme { display: flex; }');
     expect(railCss).toContain('html[data-rail="open"] .rail-theme-cycle { display: none; }');
   });
-  test("phone top bar has the 44px theme button before the bell and menu", () => {
+  test("phone top bar: bell then menu (1105 moved the theme switch into the drawer and retired ThemeCycleButton)", () => {
     const bar = nav.slice(nav.indexOf("export function MobileTopBar"));
-    const i = bar.indexOf("<ThemeCycleButton"), j = bar.indexOf("<NoticesBell"), k = bar.indexOf("<MobileDrawer");
-    expect(i).toBeGreaterThan(0);
-    expect(i).toBeLessThan(j);
+    const j = bar.indexOf("<NoticesBell"), k = bar.indexOf("<MobileDrawer");
+    expect(bar).not.toContain("<ThemeCycleButton");
+    expect(j).toBeGreaterThan(0);
     expect(j).toBeLessThan(k);
-    expect(theme).toMatch(/ThemeCycleButton[\s\S]*h-11 w-11/);
+    expect(theme).not.toContain("export function ThemeCycleButton");
   });
   test("every control stays in step: one setter, an event, and other tabs", () => {
     expect(theme).toContain('export const THEME_EVENT = "outlly:theme";');

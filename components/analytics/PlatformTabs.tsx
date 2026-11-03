@@ -40,13 +40,12 @@ export function PlatformTabs({ connected }: { connected: Partial<Record<Platform
 
 /**
  * The tab bar as the analytics layout renders it (1065): it stays mounted while Overview and each platform
- * swap underneath, so its pill glides and the bar itself never reloads. Overview is a centred column and a
- * platform dashboard runs full width, so the bar lines up with whichever is showing.
+ * swap underneath, so its pill glides and the bar itself never reloads. Overview and every platform dashboard
+ * share the studio page frame (1104), so the bar lines up with whichever is showing.
  */
 export function AnalyticsTabsBar({ connected }: { connected: Partial<Record<Platform, boolean>> }) {
-  const path = usePathname();
   return (
-    <div data-route-static="" className={cn("an-tabs px-5 pt-8 sm:px-10 lg:pt-12", path === "/analytics" && "mx-auto w-full max-w-[1320px]")}>
+    <div data-route-static="" className="an-tabs page-frame pt-8 lg:pt-12">
       <PlatformTabs connected={connected} />
     </div>
   );

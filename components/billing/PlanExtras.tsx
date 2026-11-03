@@ -162,7 +162,7 @@ export function PriceSurvey({ currency, planSlug }: { currency: string; planSlug
     api<{ answered: boolean }>("/api/survey/price").then((r) => setState(r.answered ? "hidden" : "ask")).catch(() => setState("hidden"));
   }, []);
   if (state === "loading" || state === "hidden") return null;
-  if (state === "done") return <p role="status" className="mt-10 max-w-5xl rounded-2xl bg-success/15 px-5 py-4 text-sm">Thanks. That goes straight into how we price Outlly.</p>;
+  if (state === "done") return <p role="status" className="mt-10 rounded-2xl bg-success/15 px-5 py-4 text-sm">Thanks. That goes straight into how we price Outlly.</p>;
   async function send() {
     const n = Object.fromEntries(QUESTIONS.map(({ k }) => [k, Math.round(Number(v[k].replace(/,/g, "")) * 100)])) as Record<K, number>;
     if (QUESTIONS.some(({ k }) => !v[k].trim() || !Number.isFinite(n[k]))) return setErr("Enter a price for each question.");
@@ -178,7 +178,7 @@ export function PriceSurvey({ currency, planSlug }: { currency: string; planSlug
     }
   }
   return (
-    <section aria-labelledby="survey-h" className="mt-10 max-w-5xl rounded-[24px] p-5 hairline sm:p-6">
+    <section aria-labelledby="survey-h" className="mt-10 rounded-[24px] p-5 hairline sm:p-6">
       <div className="flex flex-wrap items-baseline gap-3">
         <h2 id="survey-h" className="text-lg font-semibold tracking-tight">Help us price Outlly</h2>
         <p className="text-[13px] text-muted-foreground">Four quick questions, per month, in {currency}. Thirty seconds.</p>

@@ -152,7 +152,7 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
   const scopeLabel = key === "all" ? "All platforms" : pname(key);
 
   return (
-    <div ref={root} data-enter-root className="mx-auto max-w-6xl px-5 pb-16 pt-6 sm:px-10 lg:pt-8">
+    <div ref={root} data-enter-root className="page-frame pb-16 pt-6 lg:pt-8">
       <header data-enter className="flex flex-wrap items-center justify-between gap-4">
         <div className="min-w-0">
           <h1 className="font-display text-[28px] font-bold tracking-tight sm:text-[32px]">Welcome back, {firstName || "there"}</h1>

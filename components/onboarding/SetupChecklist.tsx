@@ -151,7 +151,7 @@ export function SetupChecklist({ state }: { state: SetupState }) {
   };
 
   return (
-    <section aria-labelledby="setup-h" className="mx-auto max-w-5xl px-5 pb-6 sm:px-10">
+    <section aria-labelledby="setup-h" className="page-frame pb-6">
       <div className="glass rounded-[32px] p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>

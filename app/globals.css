@@ -3253,7 +3253,7 @@ html[data-contrast="more"] .mtop[data-lifted] { background-color: hsl(var(--back
 .mtop-btn {
   display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 9999px;
   color: hsl(var(--foreground) / 0.72);
-  transition: background-color 0.2s ease, color 0.2s ease, transform 0.18s var(--ease-liquid, ease);
+  transition: background-color 0.15s var(--ease-liquid), color 0.15s var(--ease-liquid), transform 0.15s var(--ease-liquid);
   -webkit-tap-highlight-color: transparent;
 }
 .mtop-btn:active { transform: scale(0.9); background-color: hsl(var(--foreground) / 0.08); }
@@ -3262,24 +3262,86 @@ html[data-contrast="more"] .mtop[data-lifted] { background-color: hsl(var(--back
 .mtop-btn svg { width: 20px; height: 20px; stroke-width: 1.85; }
 /* Unread badge: sits on the bell's shoulder with a ring of page colour, so the two never merge. */
 .mtop-btn > span[aria-hidden="true"] { top: 5px; right: 3px; height: 17px; min-width: 17px; font-size: 10px; box-shadow: 0 0 0 2px hsl(var(--background)); }
+/* 1105: the bar settles in once (350ms) and the section title cross-fades as you move (250ms). */
+@media (prefers-reduced-motion: no-preference) {
+  .mtop-row { animation: mtop-in .35s var(--ease-liquid) backwards; }
+  .mtop-title { animation: mtop-title-in .25s var(--ease-liquid) backwards; }
+}
+@keyframes mtop-in { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes mtop-title-in { from { opacity: 0; transform: translateY(4px); } }
+.mtop-logo { transition: opacity .15s var(--ease-liquid); -webkit-tap-highlight-color: transparent; }
+.mtop-logo:active { opacity: .6; }
+/* Banners above the bar (WorkspaceBar, the maintenance countdown) are then the first thing on screen, so the first
+   one clears the notch itself. The bar keeps its own inset because it is the part that stays stuck to the top. */
+@media (max-width: 1023.98px) {
+  .mtop-pre:first-child { padding-top: calc(env(safe-area-inset-top) + 0.5rem); }
+}
 @media (prefers-reduced-motion: reduce) {
   .mtop, .mtop-btn { transition: none; }
   .mtop-btn:active { transform: none; }
 }
 
-/* Tab bar (.mtab; not .mnav, that is the marketing header) clears the notch and the home indicator when the phone is on its side. */
-.mtab { left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); }
+/* Tab bar (.mtab; not .mnav, that is the marketing header) clears the notch and the home indicator when the phone is on its side.
+   1105: its own calm surface instead of liquid glass. Frosted at 82% light / 88% dark, so muted labels hold 4.5:1
+   even over a white or black card scrolling behind; a hairline and one soft shadow; solid for less transparency or more contrast. 12px above the home indicator's safe area. */
+.mtab {
+  --mtab-bg: 0 0% 100% / .82; --mtab-line: 222 20% 18% / .09;
+  left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  background: hsl(var(--mtab-bg));
+  border: 1px solid hsl(var(--mtab-line));
+  box-shadow: 0 10px 28px -14px rgb(16 22 40 / .28), 0 2px 6px -3px rgb(16 22 40 / .1);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  transition: transform .3s var(--ease-liquid), opacity .3s var(--ease-liquid), visibility 0s;
+}
+html.dark .mtab { --mtab-bg: 240 5% 10.5% / .88; --mtab-line: 0 0% 100% / .08; box-shadow: 0 12px 30px -14px rgb(0 0 0 / .7), 0 2px 6px -3px rgb(0 0 0 / .4); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .mtab { --mtab-bg: 0 0% 100%; } html.dark .mtab { --mtab-bg: 240 5% 10.5%; } }
+@media (prefers-reduced-transparency: reduce) { .mtab { --mtab-bg: 0 0% 100%; -webkit-backdrop-filter: none; backdrop-filter: none; } html.dark .mtab { --mtab-bg: 240 5% 10.5%; } }
+html[data-contrast="more"] .mtab { background: hsl(var(--card)); border-color: hsl(var(--border)); -webkit-backdrop-filter: none; backdrop-filter: none; }
+@media (forced-colors: active) { .mtab { border-color: CanvasText; } .mtab-item[aria-current] .mtab-ind { background: Highlight; } }
+/* Tucked away while scrolling down a long page (Nav.tsx useTuckOnScroll): slides below the screen edge, then turns
+   invisible once out of sight so Tab and screen readers skip it; visible again the instant it starts back. */
+.mtab[data-hidden] {
+  transform: translateY(calc(100% + max(12px, env(safe-area-inset-bottom)) + 4px)); opacity: 0; pointer-events: none; visibility: hidden;
+  transition: transform .3s var(--ease-liquid), opacity .3s var(--ease-liquid), visibility 0s .3s;
+}
+/* Tabs: muted until chosen. Colour 250ms, label 200ms, the lime pill grows in place 300ms, a press dips the icon 150ms. */
+.mtab-item { color: hsl(var(--muted-foreground)); -webkit-tap-highlight-color: transparent; transition: color .25s var(--ease-liquid); }
+.mtab-item[aria-current] { color: hsl(var(--foreground)); }
+.mtab-pill { border-radius: 9999px; transition: transform .15s var(--ease-liquid), background-color .2s var(--ease-liquid); }
+.mtab-item:active .mtab-pill { transform: scale(.9); }
+@media (hover: hover) { .mtab-item:not([aria-current]):hover { color: hsl(var(--foreground)); } .mtab-item:not([aria-current]):hover .mtab-pill { background-color: hsl(var(--foreground) / .06); } }
+.mtab-ind {
+  position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(135deg, hsl(var(--lime)) 0%, hsl(84 95% 47%) 100%);
+  opacity: 0; transform: scaleX(.55);
+  transition: transform .3s var(--ease-liquid), opacity .2s var(--ease-liquid);
+}
+.mtab-item[aria-current] .mtab-ind { opacity: 1; transform: none; }
+.mtab-item[aria-current] .mtab-pill > svg { color: hsl(var(--lime-foreground)); }
+.mtab-pill > svg { transition: color .25s var(--ease-liquid); }
+.mtab-label { font-weight: 500; transition: color .2s var(--ease-liquid), font-weight .2s var(--ease-liquid); }
+.mtab-item[aria-current] .mtab-label { font-weight: 650; }
+@media (prefers-reduced-motion: no-preference) {
+  .mtab { animation: mtab-in .4s var(--ease-liquid) backwards; }
+}
+@keyframes mtab-in { from { opacity: 0; transform: translateY(16px); } }
+@media (prefers-reduced-motion: reduce) {
+  .mtab, .mtab-item, .mtab-pill, .mtab-pill > svg, .mtab-ind, .mtab-label { transition: none; }
+  .mtab-item:active .mtab-pill { transform: none; }
+}
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1023px) {
-  .mtab { height: 56px; }
-  .mtab > a, .mtab > button { height: 48px; }
-  .mmain { padding-bottom: calc(max(12px, env(safe-area-inset-bottom)) + 76px); }
+  .mtab { height: 54px; padding: 4px; }
+  .mtab-item { gap: 1px; }
+  .mmain { padding-bottom: calc(max(12px, env(safe-area-inset-bottom)) + 74px); }
 }
 
-/* 1099 Add to Home Screen card: floats 12px above the tab bar. */
+/* 1099 Add to Home Screen card: floats 12px above the tab bar (62px; 54px on a phone on its side, 1105). */
 .install-card {
   left: max(12px, env(safe-area-inset-left));
   right: max(12px, env(safe-area-inset-right));
-  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 80px);
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 74px);
   background: hsl(var(--glass-bg, var(--card)));
   -webkit-backdrop-filter: blur(28px) saturate(1.7);
   backdrop-filter: blur(28px) saturate(1.7);
@@ -3294,7 +3356,7 @@ html[data-install-card] .pc { opacity: 0; pointer-events: none; transition: opac
   .install-card { background: hsl(var(--card)); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1023px) {
-  .install-card { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 68px); }
+  .install-card { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 66px); }
 }
 
 /* Round 1 (1102): app-like touch. No double-tap zoom anywhere, and on phones every text field is at least 16px,
@@ -3453,10 +3515,10 @@ html.dark .rail-tip { background: hsl(240 5% 17%); }
 html.dark .mdrawer { background: hsl(240 5% 8.5%); }
 .mdrawer-scrim { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: no-preference) {
-  .mdrawer[data-state="open"] { animation: mdrawer-in .38s var(--ease-liquid); }
-  .mdrawer[data-state="closed"] { animation: mdrawer-out .24s cubic-bezier(.4, 0, 1, 1) forwards; }
-  .mdrawer-scrim[data-state="open"] { animation: page-fade .3s ease; }
-  .mdrawer-scrim[data-state="closed"] { animation: acct-fade-out .24s ease forwards; }
+  .mdrawer[data-state="open"] { animation: mdrawer-in .35s var(--ease-liquid); }
+  .mdrawer[data-state="closed"] { animation: mdrawer-out .35s var(--ease-liquid) forwards; }
+  .mdrawer-scrim[data-state="open"] { animation: page-fade .35s var(--ease-liquid); }
+  .mdrawer-scrim[data-state="closed"] { animation: acct-fade-out .35s var(--ease-liquid) forwards; }
 }
 @media (prefers-reduced-motion: reduce) {
   .mdrawer[data-state="open"], .mdrawer-scrim[data-state="open"] { animation: page-fade .12s ease; }
@@ -3585,6 +3647,39 @@ html[data-contrast="more"] .pw-ghost { box-shadow: inset 0 0 0 2px var(--pw-fg);
 @keyframes wa-float { to { transform: translate(3px, -6px); } }
 @keyframes wa-drift { to { transform: translateX(8px); } }
 
+/* ------------------------------------------------------------------------------------------------
+ * 1105 notices panel: opens from its bell in 250ms on Outlly's curve; a plain fade under reduced motion.
+ * ---------------------------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .notice-panel { animation: np-in .25s var(--ease-liquid); transform-origin: top right; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notice-panel { animation: page-fade .12s ease; }
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * 1105 theme switch (components/shared/ThemeToggle.tsx apply): one coordinated change of the whole page.
+ * View Transitions cross-fade a snapshot of everything at once, 400ms on cubic-bezier(.16, 1, .3, 1), so the
+ * header, rails, cards, borders, icons and gradients move together and nothing is re-laid out. Browsers without
+ * them transition colour properties only, same timing, for exactly that long (html.theme-anim), never transform,
+ * opacity, shadows or sizes. Neither runs on the first paint, and reduced motion switches instantly (the class
+ * and attribute are never set). The status bar colour is set in the same call.
+ * ---------------------------------------------------------------------------------------------- */
+html[data-theme-switch]::view-transition-old(root),
+html[data-theme-switch]::view-transition-new(root) {
+  animation-duration: 400ms;
+  animation-timing-function: cubic-bezier(.16, 1, .3, 1);
+}
+html.theme-anim,
+html.theme-anim *,
+html.theme-anim *::before,
+html.theme-anim *::after {
+  transition-property: background-color, color, border-color, outline-color, text-decoration-color, fill, stroke !important;
+  transition-duration: .4s !important;
+  transition-timing-function: cubic-bezier(.16, 1, .3, 1) !important;
+  transition-delay: 0s !important;
+}
+
 /* ---------- 1100: Liquid glass on every studio card ----------
    The studio's screen cards wear the same liquid glass as the rail: a cool-to-deep tint, a lit rim on the top-left
    edge with a softer far edge, and a sheen across the top. Cards: .glass panels, the Analytics dashboard's
@@ -3671,3 +3766,16 @@ html[data-contrast="more"]:not([data-app]) .mmain :is(.glass, .pulse-card, .card
 @media (prefers-reduced-motion: reduce) {
   button[role="switch"][data-state], button[role="switch"][data-state] > span[data-state] { transition: background-color .15s ease; }
 }
+
+/* 1104 (Round 3): one fluid frame for every studio page. It replaces the per-page widths (max-w-5xl, 6xl, 1320px,
+   or none at all) so every page shares the same left and right edges at any zoom or screen size. The gutter grows
+   smoothly with the window (20px on a phone, about 40px at 1280, 56px from about 2100px) and the frame stops
+   at 1680px including its gutters. The gutter follows the window, not the column beside the rail, on purpose:
+   one value everywhere, the bars above the page included. In the components layer so a utility on the same element (max-w-4xl for a reading-width form) wins. */
+:root { --frame-max: 1680px; --frame-gutter: clamp(20px, calc(2vw + 14px), 56px); }
+@layer components {
+  .page-frame { width: 100%; max-width: var(--frame-max); margin-inline: auto; padding-inline: var(--frame-gutter); }
+  /* A full-width band inside the frame (the Content header): out to the frame edge, content back on the gutter. */
+  .frame-bleed { margin-inline: calc(var(--frame-gutter) * -1); padding-inline: var(--frame-gutter); }
+}
+

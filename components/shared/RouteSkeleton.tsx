@@ -76,9 +76,12 @@ function Shape({ shape }: { shape: SkeletonShape }) {
         </>
       );
     case "grid":
+      // The Content page opens on a centred full-bleed band (ContentLibrary header), so the outline does too (1104).
       return (
         <>
-          <Head />
+          <div className="frame-bleed -mt-8 flex flex-col items-center pt-10 lg:-mt-14 lg:pt-16 [&>div]:flex [&>div]:w-full [&>div]:flex-col [&>div]:items-center">
+            <Head wide />
+          </div>
           <div className="mt-8 flex flex-wrap gap-2">{[0, 1, 2, 3].map((i) => <Bar key={i} className="h-11 w-24 rounded-full" />)}</div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{[0, 1, 2, 3, 4, 5, 6, 7].map((i) => <Panel key={i} className="h-60" />)}</div>
         </>
@@ -124,7 +127,7 @@ function Shape({ shape }: { shape: SkeletonShape }) {
     case "billing":
       // 1098: header, plan + manage row, the usage grid, plan cards, then payment method + history.
       return (
-        <div className="max-w-6xl">
+        <div>
           <Head />
           <div className="mt-8 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
             <Panel className="h-[300px]">
@@ -163,7 +166,7 @@ function Shape({ shape }: { shape: SkeletonShape }) {
  * swaps straight in without a flash, and the route stage settles the real blocks over it when they arrive.
  * Only a slow load (over 1.2 s) adds the old cheerful line, in a small pill at the top.
  */
-export function RouteSkeleton({ shape, label, lines = [], frame = "px-5 pb-16 pt-8 sm:px-10 lg:pt-14" }: { shape: SkeletonShape; label: string; lines?: string[]; frame?: string }) {
+export function RouteSkeleton({ shape, label, lines = [], frame = "page-frame pb-16 pt-8 lg:pt-14" }: { shape: SkeletonShape; label: string; lines?: string[]; frame?: string }) {
   const [slow, setSlow] = useState(false);
   const [n, setN] = useState(0);
   // 1079: a loader still up after 12 s has almost always lost its request (a dropped connection, a deploy

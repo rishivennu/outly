@@ -3,16 +3,55 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { THEME_KEY } from "@/lib/theme/script";
+import { THEME_COLOR, THEME_SWITCH_MS } from "@/lib/theme/colors";
 import { cn } from "@/lib/utils";
 
 export type ThemeChoice = "light" | "dark" | "system";
 
-function apply(choice: ThemeChoice) {
+type ViewTransitionDoc = Document & { startViewTransition?: (update: () => void) => { ready: Promise<void>; finished: Promise<void> } };
+let fallback = 0;
+// which switch is the latest: an older transition finishing late must not clear a newer one's flag
+let seq = 0;
+
+/**
+ * Paint a theme (1105). `animate` is for a change someone made (a tap, the OS switching for System, another tab),
+ * never the first paint: the head script did that already, with no motion.
+ * 1. The status bar colour (meta theme-color) goes first; phones repaint it at once.
+ * 2. The page then changes as ONE cross-fade of everything, header, rails, cards, borders and icons together,
+ *    for THEME_SWITCH_MS on cubic-bezier(0.16, 1, 0.3, 1) (View Transitions: Chrome and Android 111+, Safari 18+).
+ *    Older browsers get the same timing as a colour-only transition (html.theme-anim in globals.css).
+ * Reduced motion switches instantly. A second call for the theme already showing is a no-op, so the several
+ * theme controls that each listen for the OS change never paint twice.
+ */
+function apply(choice: ThemeChoice, animate = false) {
   const dark = choice === "dark" || (choice === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   const el = document.documentElement;
-  el.classList.toggle("dark", dark);
+  // html[data-tc] is what the head script's observer holds every theme-color tag to (lib/theme/script.ts).
+  el.dataset.tc = dark ? THEME_COLOR.dark : THEME_COLOR.light;
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", el.dataset.tc!));
   el.dataset.theme = choice;
-  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", dark ? "#0c0c0e" : "#f5f7fa"));
+  if (el.classList.contains("dark") === dark) return;
+  const paint = () => {
+    el.classList.toggle("dark", dark);
+  };
+  if (!animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return paint();
+  const doc = document as ViewTransitionDoc;
+  if (typeof doc.startViewTransition === "function") {
+    const n = ++seq;
+    el.dataset.themeSwitch = "";
+    const done = () => {
+      if (n === seq) delete el.dataset.themeSwitch;
+    };
+    const t = doc.startViewTransition(paint);
+    // a second quick switch skips this one: its ready promise rejects, which is expected, not an error
+    t.ready.catch(() => {});
+    t.finished.then(done, done);
+    return;
+  }
+  el.classList.add("theme-anim");
+  paint();
+  window.clearTimeout(fallback);
+  fallback = window.setTimeout(() => el.classList.remove("theme-anim"), THEME_SWITCH_MS + 60);
 }
 
 /** Every theme control on the page listens for this, so the rail, top bar, menus and palette never disagree (1103). */
@@ -31,7 +70,7 @@ export function setTheme(choice: ThemeChoice) {
   try {
     localStorage.setItem(THEME_KEY, choice);
   } catch {}
-  apply(choice);
+  apply(choice, true);
   window.dispatchEvent(new CustomEvent<ThemeChoice>(THEME_EVENT, { detail: choice }));
 }
 
@@ -42,14 +81,14 @@ export function useTheme() {
   useLayoutEffect(() => setChoice((document.documentElement.dataset.theme as ThemeChoice) || stored()), []);
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => stored() === "system" && apply("system");
+    const onChange = () => stored() === "system" && apply("system", true);
     const onSet = (e: Event) => setChoice((e as CustomEvent<ThemeChoice>).detail);
     // another tab changed it: follow along
     const onStore = (e: StorageEvent) => {
       if (e.key !== THEME_KEY) return;
       const c = (e.newValue as ThemeChoice) || "dark";
       setChoice(c);
-      apply(c);
+      apply(c, true);
     };
     mq.addEventListener("change", onChange);
     window.addEventListener(THEME_EVENT, onSet);
@@ -121,21 +160,3 @@ export function ThemeToggle({ compact = false, plain = false, className }: { com
 }
 
 export const NEXT_THEME: Record<ThemeChoice, ThemeChoice> = { light: "dark", dark: "system", system: "light" };
-
-/** One 44px button that cycles Light > Dark > System. For tight bars (the phone top bar, 1103). */
-export function ThemeCycleButton({ className }: { className?: string }) {
-  const { choice, set } = useTheme();
-  const cur = THEME_OPTIONS.find((o) => o.value === choice) ?? THEME_OPTIONS[1];
-  const nxt = THEME_OPTIONS.find((o) => o.value === NEXT_THEME[choice])!;
-  return (
-    <button
-      type="button"
-      onClick={() => set(nxt.value)}
-      aria-label={`Theme: ${cur.label}. Switch to ${nxt.label}`}
-      title={`Theme: ${cur.label}`}
-      className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground", className)}
-    >
-      <cur.Icon className="h-[18px] w-[18px]" aria-hidden />
-    </button>
-  );
-}

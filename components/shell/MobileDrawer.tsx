@@ -2,11 +2,12 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ClipboardCheck, LayoutGrid, Link2, Menu, Settings, X } from "lucide-react";
+import { ClipboardCheck, LayoutGrid, Link2, Menu, Search, Settings, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HoverLink } from "./HoverLink";
 import { AccountRows, WhoCard, menuKeys, useWho } from "./AccountMenu";
 import { useSignOut } from "./SignOutButton";
+import { openPalette } from "./CommandPalette";
 import { TOUR, isActive, type NavItem } from "./nav-items";
 
 /** Studio pages that are not phone tabs (1100). The tab bar holds Home, Create, Calendar, Inbox and Analytics. */
@@ -35,6 +36,7 @@ export function MobileDrawer({ className }: { className?: string }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const loggingOut = useRef(false);
+  const searching = useRef(false);
   const { ask, dialog } = useSignOut();
 
   useEffect(() => setOpen(false), [path]);
@@ -76,6 +78,13 @@ export function MobileDrawer({ className }: { className?: string }) {
               body.current?.querySelector<HTMLElement>("[data-mi]")?.focus({ preventScroll: true });
             }}
             onCloseAutoFocus={(e) => {
+              // Search (1105: it left the top bar) opens the palette once the drawer has gone, same reason as Log out.
+              if (searching.current) {
+                e.preventDefault();
+                searching.current = false;
+                openPalette();
+                return;
+              }
               if (!loggingOut.current) return;
               // Log out confirms once the drawer has gone, so the two dialogs never fight over focus.
               e.preventDefault();
@@ -93,6 +102,18 @@ export function MobileDrawer({ className }: { className?: string }) {
             </div>
             <div className="acct-sep mx-3" role="separator" />
             <div ref={body} data-lenis-prevent className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3 pt-2">
+              <button
+                type="button"
+                data-mi=""
+                onClick={() => {
+                  searching.current = true;
+                  setOpen(false);
+                }}
+                className={cn("group flex w-full items-center gap-3 rounded-xl px-3 font-medium text-foreground/85 outline-none transition-colors duration-150 hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring active:bg-foreground/[0.09]", ROW)}
+              >
+                <Search className="h-[18px] w-[18px] shrink-0 text-muted-foreground" strokeWidth={1.9} aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate text-left">Search or jump</span>
+              </button>
               <nav aria-label="Studio" className="flex flex-col gap-0.5">{drawerItems(who.teammate).map(page)}</nav>
               <div className="acct-sep" role="separator" />
               <AccountRows

@@ -27,7 +27,7 @@ export function BetaRedeem({ offer }: { offer: BetaOffer }) {
   if (offer.redeemed) return null;
   if (!open) {
     return (
-      <section id="beta" aria-label="Beta code" className="mt-6 max-w-5xl">
+      <section id="beta" aria-label="Beta code" className="mt-6">
         <button
           type="button"
           aria-expanded={false}
@@ -59,7 +59,7 @@ export function BetaRedeem({ offer }: { offer: BetaOffer }) {
   }
 
   return (
-    <section id="beta" aria-labelledby="beta-h" className="glass mt-6 max-w-5xl rounded-[28px] p-6 sm:p-7">
+    <section id="beta" aria-labelledby="beta-h" className="glass mt-6 rounded-[28px] p-6 sm:p-7">
       <div className="flex items-start gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-lime/20" aria-hidden><Gift className="h-5 w-5" /></span>
         <div className="min-w-0 flex-1">

@@ -54,7 +54,7 @@ export function ApprovalsBoard({ initial }: { initial: PostView[] }) {
   const total = posts.filter((p) => laneOf(p)).length;
 
   return (
-    <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-14">
+    <div className="page-frame pb-16 pt-8 lg:pt-14">
       <p className="eyebrow mb-3">Team approvals</p>
       <h1 className="display max-w-3xl text-[clamp(2.6rem,6vw,4.6rem)]">Nothing goes out until it&apos;s cleared.</h1>
       <p className="mt-3 max-w-2xl text-muted-foreground">

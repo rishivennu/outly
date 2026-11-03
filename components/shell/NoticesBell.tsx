@@ -69,7 +69,13 @@ export function NoticesBell({ placement = "side", className }: { placement?: "si
     if (!r) return;
     const w = Math.min(360, window.innerWidth - 24);
     if (placement === "side") setPos({ left: Math.min(r.right + 12, window.innerWidth - w - 12), bottom: Math.max(12, window.innerHeight - r.bottom), width: w });
-    else setPos({ top: r.bottom + 8, right: 12, width: w });
+    else {
+      // Under the phone top bar (1105): stops 8px above the floating tab bar (or the screen edge), so a short phone
+      // never stacks the two and the list scrolls inside the panel instead.
+      const tabs = document.querySelector("nav.mtab")?.getBoundingClientRect();
+      const floor = tabs && tabs.height > 0 && !document.querySelector("nav.mtab[data-hidden]") ? tabs.top - 8 : window.innerHeight - 12;
+      setPos({ top: r.bottom + 8, right: 12, width: w, maxHeight: Math.max(200, Math.min(520, floor - r.bottom - 8)) });
+    }
   }, [placement]);
 
   useLayoutEffect(() => {

@@ -214,14 +214,14 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
 
   return (
     <div className="relative overflow-hidden">
-      {dash.canSwitch && <div className="mx-auto flex max-w-5xl justify-end px-5 pt-4 sm:px-10"><DashboardSwitch current="classic" /></div>}
+      {dash.canSwitch && <div className="page-frame flex justify-end pt-4"><DashboardSwitch current="classic" /></div>}
       <HomeHero firstName={user.name.split(" ")[0]} />
       {profiles.length >= 2 ? (
         <ProfileSwitcher profiles={profiles} activeId={scope.active?.id ?? null}>
           <TrustBadges b={badges} className="mt-3" />
         </ProfileSwitcher>
       ) : (
-        (badges.verifiedManager || badges.foundingNo) && <div className="mx-auto max-w-5xl px-5 pb-4 sm:px-10"><TrustBadges b={badges} /></div>
+        (badges.verifiedManager || badges.foundingNo) && <div className="page-frame pb-4"><TrustBadges b={badges} /></div>
       )}
       <SetupChecklist state={setup} />
       {promo ? (
@@ -230,7 +230,7 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
         welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} freePeriod={welcome.freePeriod} foundingFull={founding?.kind === "full" ? founding.limit : null} />
       )}
       {(pulse || recap || (saved && saved.posts > 0)) && (
-        <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-4 sm:px-10">
+        <div className="page-frame grid grid-cols-[minmax(0,1fr)] gap-4 pb-4">
           {recap && <WeekRecap r={recap} canEmail={!user.actor && (await digestP)} />}
           {pulse && <SendingNow items={pulse.sending} />}
           {pulse && <WeekPulse p={pulse} />}
@@ -239,7 +239,7 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
       )}
       {started && (
         // One 12-column bento: next steps beside the streak, ideas beside recycling. Spans adapt to what's there.
-        <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-10 sm:px-10 md:grid-cols-12">
+        <div className="page-frame grid grid-cols-[minmax(0,1fr)] gap-4 pb-10 md:grid-cols-12">
           {steps.length > 0 && <div className="grid min-w-0 md:col-span-7"><NextSteps steps={steps} /></div>}
           {ret && <div className="grid min-w-0 md:col-span-5"><GoalRing goal={ret.goal} scheduled={ret.scheduledThisWeek} canEdit={!user.actor} /></div>}
           <div className={cn("grid min-w-0", ideasWide ? "md:col-span-12" : "md:col-span-7")}><IdeaBank wide={ideasWide} /></div>
@@ -247,12 +247,12 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
         </div>
       )}
       {storage && (
-        <div className="mx-auto max-w-5xl px-5 pb-4 sm:px-10">
+        <div className="page-frame pb-4">
           <StorageCard s={storage} planName={storage.planName} canUpgrade={!user.actor && storage.planSlug !== "pro-manager"} />
         </div>
       )}
       {(dv.length > 0 || nv) && (
-        <section aria-label="Pick up where you left off" className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 px-5 pb-20 sm:px-10 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <section aria-label="Pick up where you left off" className="page-frame grid grid-cols-[minmax(0,1fr)] gap-4 pb-20 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
           {dv.length > 0 && (
             <div className="glass min-w-0 rounded-[32px] p-5">
               <p className="eyebrow mb-4 flex items-center gap-2"><PenLine className="h-3.5 w-3.5" aria-hidden="true" /> Pick up where you left off</p>

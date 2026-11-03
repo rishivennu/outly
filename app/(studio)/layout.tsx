@@ -55,14 +55,15 @@ export default async function StudioLayout({ children }: { children: React.React
         <div className="flex min-h-dvh min-w-0 flex-1 flex-col overflow-x-clip">
           <WorkspaceBar />
           {site.maintenance && site.endsAt && (
-            <div className="border-b border-border/60 bg-[hsl(var(--lime)/0.14)] px-4 py-2">
+            <div className="mtop-pre border-b border-border/60 bg-[hsl(var(--lime)/0.14)] px-4 py-2">
               <Countdown endsAt={site.endsAt} since={site.since} variant="bar" />
             </div>
           )}
           <MobileTopBar />
           <AppNavBar />
-          {/* Room for the floating tab bar (68px + 12px gap) and a little air, no more: it was 11rem plus each page's own. */}
-          <main id="main" tabIndex={-1} className="mmain relative flex-1 outline-none pb-[calc(max(12px,env(safe-area-inset-bottom))+92px)] lg:pb-0">
+          {/* Room for the floating tab bar (62px over the home indicator's safe area, 1105) and 26px of air, so the
+              last card always scrolls clear of it. It was 11rem plus each page's own. */}
+          <main id="main" tabIndex={-1} className="mmain relative flex-1 outline-none pb-[calc(max(12px,env(safe-area-inset-bottom))+88px)] lg:pb-0">
             {children}
           </main>
         </div>

@@ -11,7 +11,7 @@ describe("1102 easing", () => {
     const out = bezier([0.16, 1, 0.3, 1]);
     expect(out(0)).toBe(0);
     expect(out(1)).toBe(1);
-    expect(out(0.5)).toBeGreaterThan(0.9); // expo-like: most of the travel early
+    expect(out(0.5)).toBeGreaterThan(0.9); // expo-like: most of the travel early (why counts moved off it in 1104)
     const lin = bezier([0, 0, 1, 1]);
     for (const x of [0.1, 0.25, 0.5, 0.75, 0.9]) expect(lin(x)).toBeCloseTo(x, 4);
     const io = bezier([0.42, 0, 0.58, 1]);
@@ -35,9 +35,9 @@ describe("1102 easing", () => {
 describe("1102 timings", () => {
   test("the brief's durations", () => {
     expect(NUMBER_TIMING.main.ms).toBe(1200);
-    expect(NUMBER_TIMING.main.ease).toEqual([0.16, 1, 0.3, 1]);
+    expect(NUMBER_TIMING.main.ease).toEqual([0.33, 1, 0.68, 1]);
     expect(NUMBER_TIMING.secondary.ms).toBe(900);
-    expect(NUMBER_TIMING.secondary.ease).toEqual([0.22, 1, 0.36, 1]);
+    expect(NUMBER_TIMING.secondary.ease).toEqual([0.33, 1, 0.68, 1]);
     expect(NUMBER_TIMING.pct.ms).toBe(800);
     expect(NUMBER_TIMING.refresh.ms).toBe(700);
     expect(CHART_MS).toBe(700);
@@ -52,7 +52,7 @@ describe("1102 timings", () => {
     expect(chartMotion(false, 1)).toEqual({ isAnimationActive: true, animationBegin: 160, animationDuration: 700, animationEasing: "ease-in-out" });
     expect(chartMotion(true)).toEqual({ isAnimationActive: false });
     expect(riseIndex(3)).toEqual({ "--i": 3 });
-    expect(cssTiming("secondary")).toBe("900ms cubic-bezier(0.22,1,0.36,1)");
+    expect(cssTiming("secondary")).toBe("900ms cubic-bezier(0.33,1,0.68,1)");
   });
 });
 
@@ -100,7 +100,7 @@ describe("1102 AnimatedNumber", () => {
     expect(a).toMatch(/if \(p >= 1\) \{\s*shown\.current = to;\s*remember\(\);\s*return write\(text\);/);
     // Review 1102: remember only what was shown (finish, jump-past, cleanup), never the target before it counts.
     expect(a).not.toContain("seen.set(id, to)");
-    expect(a).toMatch(/return \(\) => \{\s*cancelAnimationFrame\(raf\);\s*io\?\.disconnect\(\);\s*remember\(\);/);
+    expect(a).toMatch(/return \(\) => \{\s*cancelAnimationFrame\(raf\);\s*clearTimeout\(wait\);\s*io\?\.disconnect\(\);\s*remember\(\);/);
     expect(a).not.toContain("fmt.current = format");
   });
   test("remembers per metric, skips null, honours reduced motion, starts in view", () => {

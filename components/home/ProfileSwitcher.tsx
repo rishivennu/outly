@@ -44,7 +44,7 @@ export function ProfileSwitcher({ profiles, activeId, children }: { profiles: Pr
   };
 
   return (
-    <section aria-labelledby="profiles-h" className="mx-auto max-w-5xl px-5 pb-6 sm:px-10">
+    <section aria-labelledby="profiles-h" className="page-frame pb-6">
       <div className="glass rounded-[32px] p-5 sm:p-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">

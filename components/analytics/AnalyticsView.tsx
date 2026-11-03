@@ -32,7 +32,7 @@ const RANGES = [
 
 /** Page frame: one readable width, so a 1760px screen doesn't stretch every row edge to edge. The top padding
  * lives on the tab bar above (analytics/layout.tsx, 1065), which stays put while the views under it change. */
-const FRAME = "mx-auto w-full max-w-[1320px] px-5 pb-20 sm:px-10";
+const FRAME = "page-frame pb-20";
 
 function RangePicker({ value, onPick, maxDays }: { value: number; onPick: (d: number) => void; maxDays: number }) {
   const shown = RANGES.filter((r) => r.d <= maxDays);
@@ -100,7 +100,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
     return (
       // No tab bar on this screen: the layout's bar hides itself when it finds data-analytics-empty (globals.css).
       <div className={cn(FRAME, "pt-8 lg:pt-12")} data-analytics-empty="">
-        <div className="flex min-h-[60dvh] flex-col items-center justify-center px-6 text-center">
+        <div className="flex min-h-[60dvh] flex-col items-center justify-center text-center">
           <Icon3D name="analytics" size={104} className="animate-bob mb-7" />
           <h1 className="display text-[clamp(2.2rem,5vw,3.2rem)]">Connect a place to see your numbers.</h1>
           <p className="mt-3 max-w-md text-muted-foreground">

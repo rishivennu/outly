@@ -19,7 +19,7 @@ const NOTE: Record<string, string> = {
   busy: "Too many tries just now. Wait a few minutes and try again.",
 };
 
-const WRAP = "mt-6 max-w-5xl";
+const WRAP = "mt-6";
 const plans = () => document.getElementById("plans")?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
 
 /**

@@ -100,7 +100,7 @@ export function HelpCenter({
   const sections = grouped ? categories.map((c) => ({ c, list: results.filter((r) => r.category === c) })) : [{ c: "", list: results }];
 
   return (
-    <div className={variant === "studio" ? "px-5 pb-16 pt-8 sm:px-10 lg:pt-14" : "mx-auto max-w-4xl px-5 pb-24 pt-14 sm:pt-20"}>
+    <div className={variant === "studio" ? "page-frame pb-16 pt-8 lg:pt-14" : "mx-auto max-w-4xl px-5 pb-24 pt-14 sm:pt-20"}>
       {variant === "studio" ? (
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>

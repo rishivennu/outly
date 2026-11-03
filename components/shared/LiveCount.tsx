@@ -13,9 +13,12 @@ let shared: { at: number; v: LiveView } | null = null; // two strips on one page
  */
 /** The live counts, polled once a minute while the tab is visible; null until the first answer. Shared by every strip. */
 export function useLiveView() {
-  const [v, setV] = useState<LiveView | null>(shared?.v ?? null);
+  // Always null on the first render (1104): the page streams in after the layout, whose strip may have filled
+  // `shared` already, and a first render that read it would not match the server HTML (hydration failure).
+  const [v, setV] = useState<LiveView | null>(null);
   useEffect(() => {
     let alive = true;
+    if (shared) setV(shared.v);
     const load = async () => {
       if (document.visibilityState !== "visible") return;
       if (shared && Date.now() - shared.at < POLL_MS / 2) return alive && setV(shared.v);

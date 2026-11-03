@@ -157,8 +157,8 @@ export function ContentLibrary({
   const copy = del ? deleteCopy(del) : null;
 
   return (
-    <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-14">
-      <header className="relative -mx-5 -mt-8 overflow-hidden px-5 pt-10 text-center sm:-mx-10 sm:px-10 lg:-mt-14 lg:pt-16">
+    <div className="page-frame pb-16 pt-8 lg:pt-14">
+      <header className="frame-bleed relative -mt-8 overflow-hidden pt-10 text-center lg:-mt-14 lg:pt-16">
         <div className="pointer-events-none absolute left-1/2 top-[-140px] h-[320px] w-[min(900px,90%)] -translate-x-1/2 rounded-full bg-accent/25 blur-[90px] dark:bg-accent/30" aria-hidden="true" />
         <p className="eyebrow relative mb-3">Content</p>
         <h1 className="display fade-title relative text-[clamp(2.8rem,8vw,6.2rem)] tracking-[-0.045em]">Everything you&apos;ve made.</h1>

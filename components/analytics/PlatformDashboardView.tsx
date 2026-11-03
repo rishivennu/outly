@@ -94,7 +94,7 @@ export function PlatformDashboardView({ platform, initial, connected, renderedAt
 
   return (
     // The tab bar (and the top padding) live in analytics/layout.tsx since 1065, so a tab switch only moves this.
-    <div className="px-5 pb-16 sm:px-10" aria-busy={busy}>
+    <div className="page-frame pb-16" aria-busy={busy}>
 
       <header className="mt-8 flex flex-wrap items-end justify-between gap-5">
         <div className="flex min-w-0 items-center gap-4">

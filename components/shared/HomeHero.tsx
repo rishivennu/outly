@@ -35,7 +35,7 @@ export function HomeHero({ firstName }: { firstName: string }) {
         <Sparkles />
         {/* Live counts (1039): top right on a computer; a phone shows them in its top bar instead. */}
         <LiveCount pill className="absolute right-6 top-5 z-10 hidden lg:inline-flex xl:right-10" />
-        <div className="relative mx-auto flex max-w-6xl flex-col items-center px-5 text-center sm:px-10">
+        <div className="page-frame relative flex flex-col items-center text-center">
           <HeroProps wide />
           <Greeting name={firstName} className="hf-rise-in" />
 
@@ -78,7 +78,7 @@ export function HomeHero({ firstName }: { firstName: string }) {
         </div>
       </div>
 
-      <div className="app-upload relative mx-auto mt-6 max-w-6xl px-5 sm:px-10">
+      <div className="app-upload page-frame relative mt-6">
         <p className="app-hide mb-4 text-center text-sm text-muted-foreground">…or drop a video you already have.</p>
         <UploadZone
           accepted={accepted}

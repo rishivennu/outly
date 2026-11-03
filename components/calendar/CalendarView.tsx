@@ -69,7 +69,7 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
   const range = `${fmt(keyDate(days[0]), "UTC", { month: "short", day: "numeric" })} – ${fmt(keyDate(days[6]), "UTC", { month: "short", day: "numeric" })}`;
 
   return (
-    <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-14">
+    <div className="page-frame pb-16 pt-8 lg:pt-14">
       <header className="flex flex-wrap items-end justify-between gap-6">
         <div>
           <p className="eyebrow mb-3">Calendar · {tzShort(tz)}</p>

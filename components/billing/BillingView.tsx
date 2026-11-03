@@ -188,8 +188,8 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
   const dueLabel = props.nextCharge ? "Next billing date" : s.key === "paused" ? "Resumes" : s.key === "cancelled" ? "Ends on" : s.key === "expired" ? "Ended on" : s.key === "renewing" ? "Renewal due" : s.key === "gift" ? "Free access until" : paid ? "Paid through" : "Next billing date";
   const planName = current ? current.planName : props.access ? props.access.planName : props.ended ? props.ended.planName : "Free";
   return (
-    <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-12">
-      <header className="max-w-6xl">
+    <div className="page-frame pb-16 pt-8 lg:pt-12">
+      <header>
         <p className="eyebrow mb-3">Billing</p>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
           <h1 className="display text-[clamp(2.1rem,4.6vw,3.4rem)]">Billing &amp; Subscription</h1>
@@ -221,7 +221,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
         </div>
       )}
 
-      <div className="mt-8 grid max-w-6xl gap-4 lg:grid-cols-[1.4fr_1fr]">
+      <div className="mt-8 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Panel id="cur" title="Current plan" action={<StatusPill s={s} withDate={false} />}>
           <div className="mt-4 flex items-center gap-4">
             <Pip size={56} mood={current ? "fly" : "idle"} className="shrink-0" />
@@ -332,7 +332,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
         </Panel>
       </div>
 
-      <Panel id="use-h" title="Plan usage & limits" className="mt-4 max-w-6xl" action={<span className="text-[12.5px] text-muted-foreground">Resets with your plan's period</span>}>
+      <Panel id="use-h" title="Plan usage & limits" className="mt-4" action={<span className="text-[12.5px] text-muted-foreground">Resets with your plan's period</span>}>
         <UsageGrid meters={props.meters} />
         {(!!props.usage.maxUploadMb || (props.usage.captions && !props.usage.captions.burn && props.usage.aiCaptions)) && (
           <p className="mt-3 text-[12.5px] text-muted-foreground">
@@ -343,14 +343,14 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
       </Panel>
 
       {(props.guarantee || props.founding || props.foundingStatus || props.beta) && (
-        <div className="max-w-6xl">
+        <div>
           {props.guarantee && <GuaranteeCard g={props.guarantee} />}
           {(props.founding || props.foundingStatus) && <FoundingCard f={props.founding ?? null} status={props.foundingStatus} />}
           {props.beta && <BetaRedeem offer={props.beta} />}
         </div>
       )}
 
-      <section aria-labelledby="plans" className="mt-10 max-w-6xl scroll-mt-20">
+      <section aria-labelledby="plans" className="mt-10 scroll-mt-20">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 id="plans" className="scroll-mt-24 text-xl font-semibold tracking-tight">Available plans</h2>
           <CurrencyNote currency={props.currency} source={props.currencySource} className="mr-auto ml-3" />
@@ -428,11 +428,11 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
         <p className="mt-3 text-[12.5px] text-muted-foreground">Prices include applicable taxes. Each payment covers one period and nothing is charged automatically unless you turn on auto-renew: when it ends you can pay again or stay on Free. Switching plans starts the new one today.</p>
       </section>
 
-      <div className="mt-10 grid max-w-6xl items-start gap-4 lg:grid-cols-[1fr_1.6fr]">
+      <div className="mt-10 grid items-start gap-4 lg:grid-cols-[1fr_1.6fr]">
         <PaymentMethodCard periodEnd={current?.periodEnd ?? null} online={online} />
         <BillingHistory rows={history} email={props.email} cachedAt={cachedAt} />
       </div>
-      <p className="mt-4 max-w-6xl text-[13px] text-muted-foreground">{props.guarantee?.state === "eligible" ? "Charged by mistake, or something else? " : "Charged by mistake, or need a refund after the 30-day guarantee? "}<Link href="/support?topic=Payments" className="font-medium text-foreground underline underline-offset-4">Ask support</Link> and a person will review it.</p>
+      <p className="mt-4 text-[13px] text-muted-foreground">{props.guarantee?.state === "eligible" ? "Charged by mistake, or something else? " : "Charged by mistake, or need a refund after the 30-day guarantee? "}<Link href="/support?topic=Payments" className="font-medium text-foreground underline underline-offset-4">Ask support</Link> and a person will review it.</p>
 
       <PriceSurvey currency={props.currency} planSlug={currentSlug} />
 

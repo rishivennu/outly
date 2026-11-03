@@ -59,6 +59,19 @@ export function isActive(path: string | null, href: string) {
   return path === h || path.startsWith(`${h}/`);
 }
 
+/**
+ * The phone top bar's title (1105): the section you are in, short enough to sit centred between the logo and the
+ * two buttons on a 320px phone. Children use their section's ("/analytics/instagram" is Analytics).
+ */
+const TITLES: [string, string][] = [
+  ["/home", "Home"], ["/create", "Create"], ["/content", "Content"], ["/calendar", "Calendar"], ["/analytics", "Analytics"],
+  ["/inbox", "Inbox"], ["/approvals", "Approvals"], ["/accounts", "Accounts"], ["/billing", "Billing"], ["/support", "Help"],
+  ["/settings", "Settings"],
+];
+export function pageTitle(path: string | null) {
+  return TITLES.find(([h]) => isActive(path, h))?.[1] ?? "";
+}
+
 /** The pulse shell's selection glides on a time-based curve (no spring overshoot). */
 export const GLIDE = { type: "tween", duration: 0.35, ease: [0.16, 1, 0.3, 1] } as const;
 

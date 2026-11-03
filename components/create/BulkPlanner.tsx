@@ -214,7 +214,7 @@ export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: str
   if (done) return <Booked done={done} rows={rows} when={when} />;
 
   return (
-    <div className="mx-auto max-w-4xl px-5 pb-28 pt-8 sm:px-10 lg:pt-14">
+    <div className="page-frame max-w-4xl pb-28 pt-8 lg:pt-14">
       <Link href="/create" className="inline-flex min-h-[44px] items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ChevronLeft className="h-4 w-4" /> One video instead
       </Link>
@@ -419,7 +419,7 @@ Spaced over the days ahead, one a day where they fit. {plan.reason}
 function Booked({ done, rows, when }: { done: Done; rows: Row[]; when: (iso: string) => string }) {
   const ok = done.posts.filter((p) => p.status === "scheduled");
   return (
-    <div className="mx-auto max-w-2xl px-5 pb-20 pt-10 sm:px-10 lg:pt-16">
+    <div className="page-frame max-w-2xl pb-20 pt-10 lg:pt-16">
       <p className="eyebrow mb-3">Batch booked</p>
       <h1 className="display text-[clamp(2.4rem,5.5vw,4rem)]">{ok.length === done.posts.length ? `All ${ok.length} are booked.` : `${ok.length} of ${done.posts.length} booked.`}</h1>
       <ul className="mt-8 space-y-2">

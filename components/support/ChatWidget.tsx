@@ -339,7 +339,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   // Create has its own writing assistant on the right, so a second bubble there only competes with it.
   // Pip still opens on request (help links fire outly:chat-open) and goes away again when closed.
   return (
-    <div className={cn("pc fixed right-4 z-[55] sm:right-6", (path.startsWith("/create") || waitTurn) && !open && "hidden", lift ? "bottom-[96px] lg:bottom-6" : "bottom-[max(16px,env(safe-area-inset-bottom))] sm:bottom-6")}>
+    <div className={cn("pc fixed right-4 z-[55] sm:right-6", (path.startsWith("/create") || waitTurn) && !open && "hidden", lift ? "bottom-[calc(max(12px,env(safe-area-inset-bottom))+74px)] lg:bottom-6" : "bottom-[max(16px,env(safe-area-inset-bottom))] sm:bottom-6")}>
       {open && <div className="pc-scrim fixed inset-0" aria-hidden onClick={close} />}
       {open && (
         <section

@@ -68,9 +68,10 @@ describe("1100 phone drawer", () => {
     expect(nav).not.toContain("more-panel");
     expect(css).not.toContain(".mtab-more");
   });
-  test("top bar: menu button, and (1103) the theme button back beside it, all 44px", () => {
+  test("top bar: bell and menu button, both 44px (1105: the theme switch lives in the drawer)", () => {
     expect(bar).toContain('<MobileDrawer className="mtop-btn" />');
-    expect(bar).toContain('<ThemeCycleButton className="mtop-btn" />');
+    expect(bar).toContain('<NoticesBell placement="below" className="mtop-btn" />');
+    expect(bar).not.toContain("<ThemeCycleButton");
     expect(drawer).toContain('aria-label="Open menu"');
     expect(drawer).toContain('aria-label="Close menu"');
   });

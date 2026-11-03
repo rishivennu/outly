@@ -51,7 +51,7 @@ export function GuaranteeCard({ g }: { g: GuaranteeView }) {
   };
 
   return (
-    <section aria-labelledby="guarantee-h" className="glass mt-6 flex max-w-5xl flex-col gap-4 rounded-[28px] p-5 sm:flex-row sm:items-center sm:p-6">
+    <section aria-labelledby="guarantee-h" className="glass mt-6 flex flex-col gap-4 rounded-[28px] p-5 sm:flex-row sm:items-center sm:p-6">
       <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime/15 text-lime-ink" aria-hidden="true">
         <ShieldCheck className="h-5 w-5" />
       </span>

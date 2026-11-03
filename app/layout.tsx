@@ -4,6 +4,7 @@ import { Archivo, Bricolage_Grotesque, DM_Sans, Fraunces, Inter, Instrument_Seri
 import localFont from "next/font/local";
 import { MotionRoot } from "@/components/shared/MotionRoot";
 import { themeScript } from "@/lib/theme/script";
+import { THEME_COLOR } from "@/lib/theme/colors";
 import { CookieBanner } from "@/components/shared/CookieConsent";
 import { DeviceHint } from "@/components/shared/DeviceHint";
 import { Connectivity, Ripples } from "@/components/shared/Connectivity";
@@ -69,9 +70,14 @@ export const metadata: Metadata = {
   openGraph: { title: "Outlly", description: "Your content deserves to be everywhere.", type: "website" },
   // Google Search Console ownership tag. Set GOOGLE_SITE_VERIFICATION in Vercel to the content="..." value only.
   // Copyright notice in the page head; the visible one sits in the footer.
-  other: { copyright: `\u00A9 ${new Date().getFullYear()} Outlly. All rights reserved.` },
+  other: { copyright: `\u00A9 ${new Date().getFullYear()} Outlly. All rights reserved.`, "apple-mobile-web-app-capable": "yes" },
   verification: { google: process.env.GOOGLE_SITE_VERIFICATION?.trim() || undefined },
   // 1099: launched from the iOS Home Screen it opens full screen with this name under the icon (app/apple-icon.png).
+  // 1105: status bar style stays "default", on purpose. iOS then paints the strip behind the time and battery in the
+  // theme-color (set to the page background of the active theme by the head script and the theme switch) and picks
+  // dark or light indicators to suit it. "black-translucent" would put the app under the bar, but its indicators are
+  // always white, so they vanish on the light theme. Next 15 only writes the new "mobile-web-app-capable" tag;
+  // iOS before 16.4 needs the apple- one (in `other` below) to open full screen.
   appleWebApp: { capable: true, title: "Outlly", statusBarStyle: "default" },
   applicationName: "Outlly",
 };
@@ -79,7 +85,10 @@ export const metadata: Metadata = {
 // Round 1 (1102): an app, not a page, so phones never zoom (pinch, double tap or focusing a field). The user asked
 // for it; iOS Safari still allows pinch whatever this says, and every field is 16px on phones (globals.css), so
 // nothing needs zooming to read or type.
-export const viewport: Viewport = { width: "device-width", initialScale: 1, maximumScale: 1, userScalable: false, themeColor: "#0c0c0e", viewportFit: "cover" };
+// 1105: one theme-color, the dark page background (the default theme). The head script (lib/theme/script.ts) runs
+// right after this tag and swaps it to the saved theme before the first paint; ThemeToggle keeps it in step after.
+// Not a light/dark media pair: that follows the phone's setting, not the theme picked inside Outlly.
+export const viewport: Viewport = { width: "device-width", initialScale: 1, maximumScale: 1, userScalable: false, themeColor: THEME_COLOR.dark, viewportFit: "cover" };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // The Content Security Policy only runs scripts carrying this request's nonce (set by middleware.ts).

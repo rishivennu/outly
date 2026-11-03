@@ -24,6 +24,9 @@ const nextConfig = {
       source: "/(brand|samples)/:path*",
       headers: [{ key: "Cache-Control", value: "public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800" }],
     },
+    // Home-screen icons (1106): always checked with the server (a cheap 304 when unchanged), so an installed app's
+    // update check never gets a stale copy. Listed after the rule above, so this header wins for these files.
+    { source: "/brand/app/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=0, must-revalidate" }] },
     // Email fonts (1058): mail apps load @font-face cross-origin, which needs CORS. Google Fonts sent this header for us before.
     { source: "/brand/email/fonts/:path*", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
     { source: "/offline.html", headers: [{ key: "Content-Security-Policy", value: staticCsp }] },

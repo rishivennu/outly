@@ -131,7 +131,7 @@ export function SettingsShell({ title, intro, categories, initialTab }: { title:
 
   return (
     <DirtyCtx.Provider value={dirtyApi}>
-      <div className="px-5 pb-16 pt-8 sm:px-10 lg:pt-14">
+      <div className="page-frame pb-16 pt-8 lg:pt-14">
         <p className="eyebrow mb-3">Settings</p>
         <h1 className="display max-w-3xl text-[clamp(2.4rem,5.5vw,4.2rem)]">{title}</h1>
         <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-muted-foreground">{intro}</p>
