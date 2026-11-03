@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { THEME_COLOR, statusBarColor, themeColorFor } from "@/lib/theme/colors";
 import { themeScript } from "@/lib/theme/script";
+import { opaqueHex } from "@/lib/theme/statusbar";
 
 const src = (p: string) => readFileSync(join(import.meta.dir, "..", p), "utf8").replace(/\r\n/g, "\n");
 // the browser's hsl() -> 8-bit rgb, the same rounding Chromium and WebKit use
@@ -45,6 +46,17 @@ describe("1108 status bar on every surface, iPhone and Android", () => {
     expect(sb).toContain('const style = dark ? "DARK" : "LIGHT";');
     expect(sb).toContain('cap.nativePromise("SystemBars", "setStyle", { style })');
     expect(src("components/shared/ThemeToggle.tsx")).toContain("syncStatusBar(dark);");
+  });
+  test("while the first-launch welcome is up the bar takes its colour, read off the screen", () => {
+    expect(opaqueHex("rgb(248, 246, 241)")).toBe("#f8f6f1");
+    expect(opaqueHex("rgba(12, 12, 14, 1)")).toBe("#0c0c0e");
+    expect(opaqueHex("rgba(0, 0, 0, 0)")).toBeNull();
+    expect(opaqueHex("rgba(10, 10, 10, 0.5)")).toBeNull();
+    const sb = src("lib/theme/statusbar.ts");
+    expect(sb).toContain('const color = welcomeColor() ?? statusBarColor(');
+    const sync = src("components/shared/StatusBarSync.tsx");
+    expect(sync).toContain('mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-welcome"] });');
+    expect(sync).toContain("return () => mo.disconnect();");
   });
   test("iPhone Home Screen app reloads after a switch that changes the colour, once the cross-fade ends", () => {
     const t = src("components/shared/ThemeToggle.tsx");

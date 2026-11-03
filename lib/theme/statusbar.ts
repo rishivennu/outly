@@ -10,9 +10,26 @@ import { statusBarColor } from "./colors";
 type Cap = { isNativePlatform?: () => boolean; nativePromise?: (p: string, m: string, o: unknown) => Promise<unknown> };
 let lastStyle = "";
 
+/** An opaque computed colour as #rrggbb, or null (transparent, or a format we do not read). */
+export function opaqueHex(css: string) {
+  const m = css.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/);
+  if (!m || (m[4] !== undefined && Number(m[4]) < 1)) return null;
+  return "#" + [m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * The first-launch welcome (html[data-welcome], PwaWelcome) covers the page with its own paper colour, by design
+ * (1101), so while it is up the bar takes that colour, read from the screen itself so it is exact.
+ */
+function welcomeColor() {
+  if (!document.documentElement.hasAttribute("data-welcome")) return null;
+  const w = document.querySelector(".pwa-welcome");
+  return w ? opaqueHex(getComputedStyle(w).backgroundColor) : null;
+}
+
 export function syncStatusBar(dark = document.documentElement.classList.contains("dark")) {
   const el = document.documentElement;
-  const color = statusBarColor(dark, document.querySelector(".sky-host") ? "sky" : "app");
+  const color = welcomeColor() ?? statusBarColor(dark, document.querySelector(".sky-host") ? "sky" : "app");
   if (el.dataset.tc !== color) el.dataset.tc = color;
   document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
     if (m.getAttribute("content") !== color) m.setAttribute("content", color);
