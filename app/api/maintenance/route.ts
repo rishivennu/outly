@@ -12,7 +12,11 @@ import { hiddenAnchors } from "@/lib/landing";
 export async function GET() {
   const [s, landing] = await Promise.all([siteStatus(), getConfig("landing")]);
   // `hide`: landing anchors the admin switched off, so the nav and footer can drop those links.
-  return json({ ...s, hide: hiddenAnchors(landing) }, { headers: { "cache-control": "no-store", "cdn-cache-control": "public, s-maxage=5, stale-while-revalidate=30" } });
+  return json({ ...s, hide: hiddenAnchors(landing) }, {
+    // Not "no-store": Vercel's edge refuses to keep a no-store answer even with cdn-cache-control set (checked live
+    // 1113: always MISS). max-age=0 + must-revalidate still makes browsers ask every time.
+    headers: { "cache-control": "public, max-age=0, must-revalidate", "cdn-cache-control": "public, s-maxage=5, stale-while-revalidate=30" },
+  });
 }
 
 const Body = z.object({ email: z.string().trim().toLowerCase().email("That email doesn't look right.").max(200) });
