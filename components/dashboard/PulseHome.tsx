@@ -52,7 +52,7 @@ function KpiCard({ k, i }: { k: Kpi; i: number }) {
       </p>
       <div className="flex min-w-0 items-end justify-between gap-3">
         <div className="min-w-0">
-          <RollingNumber value={k.value} className="font-display block text-[30px] font-bold tracking-tight sm:text-[32px]" />
+          <RollingNumber value={k.value} tier={k.key === "eng" ? "pct" : i === 0 ? "main" : "secondary"} className="font-display block text-[30px] font-bold tracking-tight sm:text-[32px]" />
           <div className="mt-2"><Delta change={k.change} unit={k.unit} /></div>
         </div>
         <div className="w-[44%] max-w-[120px] shrink-0 max-[420px]:w-[40%]">

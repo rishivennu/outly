@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, FileDown, FileSpreadsheet } from "lucide-react";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
-import { cn, compact } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
 import type { AnalyticsSummary } from "@/lib/analytics";
 
 type Acct = AnalyticsSummary["byAccount"][number];
@@ -98,8 +99,8 @@ export function AccountDrill({ accounts, active, onPick, busy }: { accounts: Acc
                 </span>
               </span>
               <span className="shrink-0 text-right">
-                <span className="tabular block font-semibold">{compact(a.views)}<span className="sr-only"> views</span></span>
-                <span className="tabular block text-sm text-muted-foreground">{a.engagement.toFixed(1)}%<span className="sr-only"> engaged</span></span>
+                <AnimatedNumber value={a.views} id={`drill:${a.accountId}:views`} srSuffix=" views" className="block font-semibold" />
+                <AnimatedNumber value={a.engagement} format="pct" id={`drill:${a.accountId}:eng`} srSuffix=" engaged" className="block text-sm text-muted-foreground" />
               </span>
             </button>
           </li>

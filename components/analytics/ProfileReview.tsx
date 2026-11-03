@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { animate, motion, useInView, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Check, CircleAlert, Clock, LayoutGrid, RefreshCw, Sparkles, TriangleAlert, Users } from "lucide-react";
 import { Pip } from "@/components/brand/Pip";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
@@ -12,6 +12,8 @@ import { cn, compact } from "@/lib/utils";
 import type { ProfileReview as Review, ReviewStat } from "@/lib/live/review-core";
 import type { LiveTotals } from "@/lib/live/review";
 import { SectionHead } from "./SectionHead";
+import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
+import { cssTiming } from "@/lib/motion/numbers";
 
 type Loaded = { review: Review; ai: boolean; stale: boolean; nextRegenAt?: string | null };
 const POLL_MS = 30_000;
@@ -20,25 +22,6 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 /* ------------------------------------------------------------------ */
 /* Small animated pieces                                                */
 /* ------------------------------------------------------------------ */
-
-/** Counts from the last shown value to the new one, so live updates roll forward instead of restarting at 0. */
-function Count({ value, format = compact, className }: { value: number; format?: (n: number) => string; className?: string }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true });
-  const reduce = useReducedMotion();
-  const from = useRef(0);
-  const [shown, setShown] = useState(reduce ? value : 0);
-  useEffect(() => {
-    if (!inView) return;
-    if (reduce) {
-      from.current = value;
-      return setShown(value);
-    }
-    const c = animate(from.current, value, { duration: 1.2, ease: EASE, onUpdate: (v) => ((from.current = v), setShown(v)) });
-    return () => c.stop();
-  }, [inView, value, reduce]);
-  return <span ref={ref} className={cn("tabular", className)}>{format(shown)}</span>;
-}
 
 /** Rolling digits for the live counter. Each digit is a 0-9 strip that slides to its place. */
 function Odometer({ value, label }: { value: number; label: string }) {
@@ -53,7 +36,7 @@ function Odometer({ value, label }: { value: number; label: string }) {
             <span key={`${text.length - i}`} className="relative inline-block h-[1em] w-[0.62em] overflow-hidden">
               <span
                 className="absolute left-0 top-0 flex w-full flex-col items-center"
-                style={{ transform: `translateY(-${Number(ch) * 10}%)`, transition: reduce ? "none" : "transform 900ms cubic-bezier(.22,1,.36,1)" }}
+                style={{ transform: `translateY(-${Number(ch) * 10}%)`, transition: reduce ? "none" : `transform ${cssTiming("secondary")}` }}
               >
                 {Array.from({ length: 10 }, (_, d) => (
                   <span key={d} className="block h-[1em] leading-none">{d}</span>
@@ -109,7 +92,7 @@ function ScoreRing({ score, size = 156 }: { score: number | null; size?: number 
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        {score === null ? <span className="text-2xl font-semibold text-muted-foreground">--</span> : <Count value={score} format={(n) => String(Math.round(n))} className="text-5xl font-semibold tracking-tight" />}
+        {score === null ? <span className="text-2xl font-semibold text-muted-foreground">--</span> : <AnimatedNumber value={score} format="int" tier="main" id="review:score" className="text-5xl font-semibold tracking-tight" />}
         <span className="mt-1 text-sm text-muted-foreground">out of 100</span>
       </div>
     </div>
@@ -132,10 +115,12 @@ function Tile({ className, children, label, delay = 0 }: { className?: string; c
   return (
     <motion.section
       aria-label={label}
-      initial={reduce ? false : { opacity: 0, y: 14 }}
+      // Same start on the server and the client: `initial={false}` only on the client left reduced-motion users with
+      // the server's hidden tile, never patched (1102). MotionRoot drops the rise for them; it just fades.
+      initial={{ opacity: 0, y: 14 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.5, ease: EASE, delay: reduce ? 0 : delay }}
+      transition={{ duration: reduce ? 0.2 : 0.5, ease: EASE, delay: reduce ? 0 : delay }}
       className={cn("glass relative min-w-0 overflow-hidden rounded-[28px] p-5 sm:p-6", className)}
     >
       {children}
@@ -421,7 +406,7 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
                       </dt>
                       <dd className="mt-1.5">
                         <span className="block text-[clamp(1.6rem,2.2vw,2rem)] font-semibold leading-none tracking-tight">
-                          <Count value={s.value} format={fmtStat(s)} />
+                          <AnimatedNumber value={s.value} format={fmtStat(s)} tier={s.format === "pct" ? "pct" : "secondary"} />
                         </span>
                         <span className="mt-1.5 block text-sm text-muted-foreground">{s.hint}</span>
                       </dd>

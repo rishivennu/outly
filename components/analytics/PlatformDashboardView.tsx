@@ -11,15 +11,13 @@ import { api, ApiError, cachedApi } from "@/lib/client/api";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn, compact } from "@/lib/utils";
 import type { Headline, LivePost, PlatformDashboard, Suggestion } from "@/lib/live/types";
+import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
+import { chartMotion, riseIndex, type NumberFormat } from "@/lib/motion/numbers";
 
 const POLL_MS = 60_000;
 
-const fmtValue = (h: Headline) => {
-  if (h.value === null) return "–";
-  if (h.format === "duration") return dur(h.value);
-  if (h.format === "pct") return `${h.value.toFixed(1)}%`;
-  return h.value < 10_000 ? h.value.toLocaleString("en-US") : compact(h.value);
-};
+/** Under ten thousand in full (1,234), then short (12K); the count-up keeps the same unit (lib/motion/numbers.ts). */
+const formatOfHeadline = (h: Headline): NumberFormat => (h.format === "duration" ? dur : h.format === "pct" ? "pct" : "count");
 const dur = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${String(Math.round(s % 60)).padStart(2, "0")}s` : `${s.toFixed(s < 10 ? 1 : 0)}s`);
 const n = (v: number | null | undefined) => (v === null || v === undefined ? "–" : v < 10_000 ? v.toLocaleString("en-US") : compact(v));
 
@@ -215,14 +213,15 @@ function Live({ platform, data }: { platform: Platform; data: PlatformDashboard 
   const color = PLATFORM_HALO[platform];
   return (
     <>
-      <dl className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6" data-stagger data-route-stagger="">
+      {/* The cards rise in themselves (.kpi-in), so the page entrance moves this row as one block. */}
+      <dl className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {data.headline.map((h, i) => (
-          <motion.div key={h.key} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="glass flex flex-col rounded-[24px] p-5">
+          <div key={h.key} className="kpi-in glass flex flex-col rounded-[24px] p-5" style={riseIndex(i)}>
             <dt className="text-sm text-muted-foreground">{h.label}</dt>
-            <dd className="mt-1 text-[1.9rem] font-semibold leading-tight tracking-tight tabular">{fmtValue(h)}</dd>
+            <dd className="mt-1 text-[1.9rem] font-semibold leading-tight tracking-tight"><AnimatedNumber value={h.value} format={formatOfHeadline(h)} id={`live:${platform}:${h.key}`} /></dd>
             {h.delta !== undefined && h.delta !== null && <Delta value={h.delta} days={data.rangeDays} />}
             {h.hint && <p className="mt-1 text-xs leading-snug text-muted-foreground">{h.hint}</p>}
-          </motion.div>
+          </div>
         ))}
       </dl>
       <p className="mt-2 text-xs text-muted-foreground">Last {data.rangeDays} days, straight from {PLATFORM_META[platform].name}. Arrows compare with the {data.rangeDays} days before.</p>
@@ -262,6 +261,7 @@ function Trend({ data, color }: { data: PlatformDashboard; color: string }) {
   const [k, setK] = useState(data.series[0]?.key);
   const s = data.series.find((x) => x.key === k) ?? data.series[0];
   const total = s ? s.points.reduce((a, p) => a + p.value, 0) : 0;
+  const reduce = useReducedMotion();
   return (
     <section aria-labelledby="trend" className="glass rounded-[28px] p-5 sm:p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -296,7 +296,7 @@ function Trend({ data, color }: { data: PlatformDashboard; color: string }) {
                 labelFormatter={(d: string) => new Date(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                 formatter={(v: number) => [v.toLocaleString("en-US"), s.label]}
               />
-              <Area isAnimationActive={false} type="monotone" dataKey="value" stroke={color} strokeWidth={2.2} fill="url(#g-live)" />
+              <Area {...chartMotion(reduce)} type="monotone" dataKey="value" stroke={color} strokeWidth={2.2} fill="url(#g-live)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -365,6 +365,7 @@ function Coach({ suggestions, platform, thinking = false }: { suggestions: Sugge
 
 function Hours({ hours, color }: { hours: NonNullable<PlatformDashboard["hours"]>; color: string }) {
   const peak = hours.reduce((a, b) => (b.value > a.value ? b : a));
+  const reduce = useReducedMotion();
   return (
     <section aria-labelledby="hours" className="glass rounded-[28px] p-5 sm:p-6">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
@@ -377,7 +378,7 @@ function Hours({ hours, color }: { hours: NonNullable<PlatformDashboard["hours"]
             <XAxis dataKey="label" tickLine={false} axisLine={false} interval={3} padding={{ left: 8, right: 8 }} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
             <YAxis hide />
             <Tooltip cursor={{ fill: "hsl(var(--foreground) / 0.05)" }} contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 14, fontSize: 12, color: "hsl(var(--popover-foreground))" }} formatter={(v: number) => [`${v} followers`, "Online"]} />
-            <Bar isAnimationActive={false} dataKey="value" radius={[6, 6, 2, 2]}>
+            <Bar {...chartMotion(reduce)} dataKey="value" radius={[6, 6, 2, 2]}>
               {hours.map((h) => (
                 <Cell key={h.startMinute} fill={color} fillOpacity={h === peak ? 1 : 0.28 + 0.5 * (h.value / (peak.value || 1))} />
               ))}
@@ -403,7 +404,7 @@ function Breakdown({ b, color }: { b: NonNullable<PlatformDashboard["breakdown"]
               <span className="tabular ml-auto text-muted-foreground">{i.value}</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-secondary">
-              <motion.div className="h-full rounded-full" style={{ background: color }} initial={{ width: 0 }} animate={{ width: `${(i.value / max) * 100}%` }} transition={{ delay: 0.1 + k * 0.06, duration: 0.7, ease: [0.22, 1, 0.36, 1] }} />
+              <motion.div className="h-full rounded-full" style={{ background: color }} initial={{ width: 0 }} animate={{ width: `${(i.value / max) * 100}%` }} transition={{ delay: 0.1 + k * 0.06, duration: 0.7, ease: "easeInOut" }} />
             </div>
           </li>
         ))}

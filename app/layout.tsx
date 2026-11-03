@@ -76,7 +76,10 @@ export const metadata: Metadata = {
   applicationName: "Outlly",
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0c0c0e", viewportFit: "cover" };
+// Round 1 (1102): an app, not a page, so phones never zoom (pinch, double tap or focusing a field). The user asked
+// for it; iOS Safari still allows pinch whatever this says, and every field is 16px on phones (globals.css), so
+// nothing needs zooming to read or type.
+export const viewport: Viewport = { width: "device-width", initialScale: 1, maximumScale: 1, userScalable: false, themeColor: "#0c0c0e", viewportFit: "cover" };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // The Content Security Policy only runs scripts carrying this request's nonce (set by middleware.ts).

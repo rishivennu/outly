@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { animate, motion, useInView, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ArrowDownRight, ArrowUpRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn, compact } from "@/lib/utils";
 import type { AnalyticsSummary } from "@/lib/analytics";
 import type { Platform } from "@/lib/domain";
+import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
+import { chartMotion, riseIndex } from "@/lib/motion/numbers";
 import { LiveStrip } from "./LiveStrip";
 import { ProfileReview } from "./ProfileReview";
 import { AccountDrill, ReportButtons } from "./AccountDrill";
@@ -27,24 +29,6 @@ const RANGES = [
   { d: 365, label: "1 year", phrase: "this past year" },
   { d: 730, label: "2 years", phrase: "these last two years" },
 ];
-
-function CountUp({ value, format = compact, className }: { value: number; format?: (n: number) => string; className?: string }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true });
-  const reduce = useReducedMotion();
-  const [shown, setShown] = useState(reduce ? value : 0);
-  useEffect(() => {
-    if (!inView) return;
-    if (reduce) return setShown(value);
-    const c = animate(0, value, { duration: 1.1, ease: [0.22, 1, 0.36, 1], onUpdate: setShown });
-    return () => c.stop();
-  }, [inView, value, reduce]);
-  return (
-    <span ref={ref} className={cn("tabular", className)}>
-      {format(shown)}
-    </span>
-  );
-}
 
 /** Page frame: one readable width, so a 1760px screen doesn't stretch every row edge to edge. The top padding
  * lives on the tab bar above (analytics/layout.tsx, 1065), which stays put while the views under it change. */
@@ -74,6 +58,7 @@ function RangePicker({ value, onPick, maxDays }: { value: number; onPick: (d: nu
 /** renderedAt: when the server built this page; a copy prefetched from the nav (1039) can be a while old. */
 export function AnalyticsView({ initial, connected, focusAccount = null, renderedAt, maxDays = 90, reports = { csv: true, pdf: true } }: { initial: AnalyticsSummary; connected: Partial<Record<Platform, boolean>>; focusAccount?: string | null; renderedAt?: number; maxDays?: number; reports?: { csv: boolean; pdf: boolean } }) {
   const [data, setData] = useState(initial);
+  const reduce = useReducedMotion();
   const live = useLivePlatforms();
   const [loading, setLoading] = useState(false);
   const range = RANGES.find((r) => r.d === data.rangeDays) ?? RANGES[1];
@@ -177,7 +162,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
         <section aria-labelledby="insight" className="min-w-0 max-w-4xl">
           <p className="text-sm font-semibold text-muted-foreground">Published through Outlly</p>
           <h1 id="insight" className="display mt-2 text-[clamp(2.2rem,4.8vw,4.25rem)]">
-            Your content reached <span className="energy-text"><CountUp value={data.totals.views} /></span> people {range.phrase}.
+            Your content reached <span className="energy-text"><AnimatedNumber value={data.totals.views} tier="main" id="analytics:reach" /></span> people {range.phrase}.
           </h1>
           <ul className="mt-4 flex flex-wrap gap-x-7 gap-y-2 text-base text-muted-foreground">
             {change !== null && (
@@ -196,18 +181,19 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
         </div>
       </header>
 
-      <dl data-route-stagger="" className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {/* The cards rise in themselves (.kpi-in), so the page entrance moves this row as one block. */}
+      <dl className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {[
           { k: "Views", v: data.totals.views },
           { k: "Likes", v: data.totals.likes },
           { k: "Comments", v: data.totals.comments },
           { k: "Shares", v: data.totals.shares },
-          { k: "Engagement", v: data.totals.engagement, f: (n: number) => `${n.toFixed(1)}%` },
+          { k: "Engagement", v: data.totals.engagement, f: "pct" as const },
         ].map((m, i, all) => (
-          <div key={m.k} className={cn("glass rounded-[22px] p-5", i === all.length - 1 && "col-span-2 sm:col-span-1")}>
+          <div key={m.k} className={cn("kpi-in glass rounded-[22px] p-5", i === all.length - 1 && "col-span-2 sm:col-span-1")} style={riseIndex(i)}>
             <dt className="text-sm text-muted-foreground">{m.k}</dt>
             <dd className="mt-1.5 text-[clamp(1.75rem,2.4vw,2.25rem)] font-semibold leading-none tracking-tight">
-              <CountUp value={m.v} format={m.f} />
+              <AnimatedNumber value={m.v} format={m.f ?? "compact"} id={`analytics:${m.k}`} />
             </dd>
           </div>
         ))}
@@ -250,8 +236,8 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
                   labelFormatter={(d: string) => new Date(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                   formatter={(v: number, n: string) => [compact(v), PLATFORM_META[n as keyof typeof PLATFORM_META]?.name ?? n]}
                 />
-                {live.map((p) => (
-                  <Area isAnimationActive={false} key={p} type="monotone" dataKey={p} stackId="1" stroke={PLATFORM_HALO[p]} strokeWidth={2} fill={`url(#g-${p})`} />
+                {live.map((p, i) => (
+                  <Area {...chartMotion(reduce, i)} key={p} type="monotone" dataKey={p} stackId="1" stroke={PLATFORM_HALO[p]} strokeWidth={2} fill={`url(#g-${p})`} />
                 ))}
               </AreaChart>
             </ResponsiveContainer>
@@ -274,7 +260,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
                     <span className="tabular w-14 text-right text-muted-foreground">{b.engagement.toFixed(1)}%<span className="sr-only"> engaged</span></span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-secondary" aria-hidden="true">
-                    <motion.div className="h-full rounded-full" style={{ background: PLATFORM_HALO[b.platform] }} initial={{ width: 0 }} animate={{ width: `${(b.views / maxP) * 100}%` }} transition={{ delay: 0.2 + i * 0.1, duration: 0.9, ease: [0.22, 1, 0.36, 1] }} />
+                    <motion.div className="h-full rounded-full" style={{ background: PLATFORM_HALO[b.platform] }} initial={{ width: 0 }} animate={{ width: `${(b.views / maxP) * 100}%` }} transition={reduce ? { duration: 0 } : { delay: 0.2 + i * 0.08, duration: 0.7, ease: "easeInOut" }} />
                   </div>
                 </li>
               ))}

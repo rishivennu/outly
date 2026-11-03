@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
 import { compact, niceMax, resample } from "@/lib/dashboard/pulse-core";
-import { clamp01, easeOut, prefersReduced } from "./motion";
+import { clamp01, easeInOut, prefersReduced } from "./motion";
 
 const N = 60; // every range is drawn with the same number of points, so ranges morph point for point
 const H = 240;
@@ -83,8 +83,9 @@ export function ViewsChart({ cur, prev, dates, days, label }: { cur: number[]; p
       if (reduced) { clipEl.current?.setAttribute("width", String(w)); return; }
       const tick = (now: number) => {
         const t = (now - t0) / 1000;
-        const pl = easeOut(clamp01((t - 0.25) / 1.1));
-        const pa = easeOut(clamp01((t - 0.35) / 0.9));
+        // Charts draw in 700ms ease-in-out (Round 1).
+        const pl = easeInOut(clamp01((t - 0.25) / 0.7));
+        const pa = easeInOut(clamp01((t - 0.35) / 0.7));
         clipEl.current?.setAttribute("width", String(pl * w));
         if (areaEl.current) { areaEl.current.style.opacity = String(pa); areaEl.current.style.transform = `translateY(${(1 - pa) * 18}px)`; }
         if (pl < 1 || pa < 1) raf.current = requestAnimationFrame(tick);
@@ -95,7 +96,7 @@ export function ViewsChart({ cur, prev, dates, days, label }: { cur: number[]; p
     clipEl.current?.setAttribute("width", String(w));
     if (reduced) { set(c1, p1, max1); shown.current = { c: c1, p: p1, max: max1 }; return; }
     const tick = (now: number) => {
-      const k = easeOut(clamp01((now - t0) / 650));
+      const k = easeInOut(clamp01((now - t0) / 700));
       const c = from.c.map((v, i) => v + (c1[i] - v) * k);
       const p = from.p.map((v, i) => v + (p1[i] - v) * k);
       const max = from.max + (max1 - from.max) * k;

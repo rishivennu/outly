@@ -3297,6 +3297,24 @@ html[data-install-card] .pc { opacity: 0; pointer-events: none; transition: opac
   .install-card { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 68px); }
 }
 
+/* Round 1 (1102): app-like touch. No double-tap zoom anywhere, and on phones every text field is at least 16px,
+   which is what stops iOS zooming in when a field takes focus (important: Tailwind's text-sm on a field would
+   otherwise win). Checkboxes, radios, ranges, colour and file pickers keep their size. */
+html { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+  textarea, select, [contenteditable=""], [contenteditable="true"] { font-size: max(16px, 1em) !important; }
+}
+
+/* Analytics number cards arrive 500ms, rising 12px, 80ms apart (style --i). Fill backwards only, so once in, any
+   later transform is free. They never move on hover (1100: hover sharpens the glass edge, never lifts; that is also
+   why they do not carry the admin .kpi-card class). Reduced motion: they are simply there.
+   Kept above the 1100 rail and glass layers on purpose: their tests read those sections to the end of the file. */
+@media (prefers-reduced-motion: no-preference) {
+  .kpi-in { animation: kpi-rise .5s cubic-bezier(.16,1,.3,1) backwards; animation-delay: calc(var(--i, 0) * 80ms); }
+}
+@keyframes kpi-rise { from { opacity: 0; transform: translateY(12px); } }
+
 /* ---------------------------------------------------------------------------------------------------------
    1100: pulse rail. A slim ink pill (fully rounded), cream icons, a lime circle for the current section.
    Collapsed is 72px (two 14px gutters around 44px circles); expanded is 232px with labels. The width is set

@@ -9,6 +9,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
 export const easeOut = (x: number) => 1 - (1 - x) ** 3;
+/** Charts draw in with ease-in-out (Round 1, 700ms). */
+export const easeInOut = (x: number) => (x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2);
 export const prefersReduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 /** Progress of the i-th staggered element at time t (seconds since start). */
 export const stagger = (t: number, i: number) => easeOut(clamp01((t - 0.1 - i * 0.045) / 0.7));
@@ -77,7 +79,7 @@ export function useEnter<T extends HTMLElement>() {
  * A 0..1 progress driven by its own rAF, for one-off draws (sparklines, bars). Calls `write(p)` every frame;
  * reduced motion jumps straight to 1. `delay` in seconds.
  */
-export function drawIn(write: (p: number) => void, { duration = 0.9, delay = 0 } = {}): () => void {
+export function drawIn(write: (p: number) => void, { duration = 0.9, delay = 0, ease = easeOut } = {}): () => void {
   if (prefersReduced()) {
     write(1);
     return () => {};
@@ -85,7 +87,7 @@ export function drawIn(write: (p: number) => void, { duration = 0.9, delay = 0 }
   let id = 0;
   const t0 = performance.now() + delay * 1000;
   const tick = (now: number) => {
-    const p = easeOut(clamp01((now - t0) / (duration * 1000)));
+    const p = ease(clamp01((now - t0) / (duration * 1000)));
     write(p);
     if (p < 1) id = requestAnimationFrame(tick);
   };

@@ -8,18 +8,19 @@ import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
 import { swrApi } from "@/lib/client/api";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
-import { cn, compact } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { Headline, PlatformDashboard, Series } from "@/lib/live/types";
+import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
+import type { NumberFormat, NumberTier } from "@/lib/motion/numbers";
 
 type Slot = PlatformDashboard | "error" | undefined;
 
 const dur = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${String(Math.round(s % 60)).padStart(2, "0")}s` : `${s.toFixed(s < 10 ? 1 : 0)}s`);
-const fmt = (h: Headline) => {
-  if (h.value === null) return "–";
-  if (h.format === "duration") return dur(h.value);
-  if (h.format === "pct") return `${h.value.toFixed(1)}%`;
-  return compact(h.value);
-};
+const formatOfHeadline = (h: Headline): NumberFormat => (h.format === "duration" ? dur : h.format === "pct" ? "pct" : "compact");
+/** A tile's number counts up (components/shared/AnimatedNumber.tsx); null shows a dash. */
+const Num = ({ p, h, tier }: { p: Platform; h: Headline; tier?: NumberTier }) => (
+  <AnimatedNumber value={h.value} format={formatOfHeadline(h)} tier={tier} id={`strip:${p}:${h.key}`} />
+);
 
 /**
  * Small tiles fill the bento evenly next to the 2x2 featured tile (lg: 4 columns). The first four sit
@@ -199,7 +200,7 @@ function Feature({ p, on, d }: { p: Platform; on: boolean; d: Slot }) {
       ) : (
         <span className="relative mt-auto block pt-6">
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-[clamp(2.4rem,4.4vw,3.4rem)] font-semibold leading-none tracking-tight tabular">{fmt(lead)}</span>
+            <span className="text-[clamp(2.4rem,4.4vw,3.4rem)] font-semibold leading-none tracking-tight"><Num p={p} h={lead} tier="main" /></span>
             <Delta v={lead.delta} days={ok.rangeDays} />
           </span>
           <span className="mt-1.5 block text-sm text-muted-foreground">{lead.label}{lead.key === "views" ? `, last ${ok.rangeDays} days` : ""}</span>
@@ -208,7 +209,7 @@ function Feature({ p, on, d }: { p: Platform; on: boolean; d: Slot }) {
             <span className="mt-5 grid grid-cols-3 gap-3 border-t border-border/60 pt-4">
               {rest.slice(0, 3).map((h) => (
                 <span key={h.key} className="min-w-0">
-                  <span className="block truncate text-lg font-semibold tracking-tight tabular">{fmt(h)}</span>
+                  <span className="block truncate text-lg font-semibold tracking-tight"><Num p={p} h={h} /></span>
                   <span className="block truncate text-sm text-muted-foreground">{h.label}</span>
                 </span>
               ))}
@@ -232,7 +233,7 @@ function Small({ p, on, d }: { p: Platform; on: boolean; d: Slot }) {
         <span className="relative mt-auto flex flex-wrap gap-x-6 gap-y-2 pt-4">
           {ok.headline.slice(0, 2).map((h) => (
             <span key={h.key}>
-              <span className="block text-2xl font-semibold tracking-tight tabular">{fmt(h)}</span>
+              <span className="block text-2xl font-semibold tracking-tight"><Num p={p} h={h} /></span>
               <span className="block text-sm text-muted-foreground">{h.label}{h.key === "views" ? `, ${ok.rangeDays} days` : ""}</span>
             </span>
           ))}

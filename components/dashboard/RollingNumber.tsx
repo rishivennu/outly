@@ -1,13 +1,17 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { prefersReduced } from "./motion";
+import { cssTiming as curve, type NumberTier } from "@/lib/motion/numbers";
 
 /**
  * Slot-machine digits (1080). Each digit is a 0-9 strip in a one-line window; changing the value slides
  * every strip to its new digit, the leftmost first. The window's width is its widest digit, so the number
  * never shifts sideways mid-roll. Screen readers get the plain text once, never the strips.
  */
-export function RollingNumber({ value, className }: { value: string; className?: string }) {
+/* Round 1 timings (curve = cssTiming): the first roll by tier (main 1200ms, secondary 900ms, percentages 800ms
+   ease-out), a refresh 700ms. */
+
+export function RollingNumber({ value, className, tier = "secondary" }: { value: string; className?: string; tier?: NumberTier }) {
   const box = useRef<HTMLSpanElement>(null);
   const first = useRef(true);
 
@@ -16,8 +20,9 @@ export function RollingNumber({ value, className }: { value: string; className?:
     if (!el) return;
     const strips = [...el.querySelectorAll<HTMLElement>("[data-strip]")];
     const reduced = prefersReduced();
+    const how = curve(first.current ? tier : "refresh");
     const set = (s: HTMLElement, d: number, i: number, animate: boolean) => {
-      s.style.transition = animate && !reduced ? `transform 900ms cubic-bezier(.2,.8,.2,1) ${i * 60}ms` : "none";
+      s.style.transition = animate && !reduced ? `transform ${how} ${i * 60}ms` : "none";
       s.style.transform = `translate3d(0,${-d * 10}%,0)`;
     };
     if (first.current) {
@@ -41,7 +46,7 @@ export function RollingNumber({ value, className }: { value: string; className?:
       }
     }
     strips.forEach((s, i) => set(s, Number(s.dataset.strip), i, true));
-  }, [value]);
+  }, [value, tier]);
 
   // Digits keep their position from the right, so 999 -> 1,000 rolls the ones into place instead of re-mounting.
   const chars = [...value];

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useId, useRef } from "react";
-import { drawIn } from "./motion";
+import { drawIn, easeInOut } from "./motion";
 
 /**
  * KPI trend line (1080). Drawn left to right by widening a clip rectangle (a dash trick would break with
@@ -16,7 +16,7 @@ export function Sparkline({ data, tone = "up", delay = 0 }: { data: number[]; to
   const area = `${line} L100 32 L0 32 Z`;
   const key = data.join(",");
 
-  useEffect(() => drawIn((p) => clip.current?.setAttribute("width", String(p * 100)), { duration: 1, delay: delay + 0.35 }), [key, delay]);
+  useEffect(() => drawIn((p) => clip.current?.setAttribute("width", String(p * 100)), { duration: 0.7, delay: delay + 0.35, ease: easeInOut }), [key, delay]);
 
   return (
     <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true" className={`pulse-spark pulse-${tone} h-10 w-full`}>
