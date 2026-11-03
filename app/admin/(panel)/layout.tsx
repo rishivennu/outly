@@ -9,8 +9,9 @@ import { can } from "@/lib/admin/perms";
 import { sweeperHealth, type SweeperHealth } from "@/lib/queue/health";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ToastProvider } from "@/components/shared/Toast";
+import { adminAppMeta } from "@/lib/admin/app-meta";
 
-export const metadata: Metadata = { title: { default: "Admin", template: "%s · Outlly admin" }, robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: { default: "Admin", template: "%s · Outlly admin" }, robots: { index: false, follow: false }, ...adminAppMeta };
 export const dynamic = "force-dynamic";
 
 /** What to check when the sweep this deployment relies on has gone quiet. */

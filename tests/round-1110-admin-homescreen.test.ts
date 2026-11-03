@@ -28,4 +28,17 @@ describe("1110 admin console in the iPhone Home Screen app", () => {
       expect([f, /\.(update|create|delete|upsert)(Many)?\(|destroyAdminSession/.test(get)]).toEqual([f, false]);
     }
   });
+  test("admin pages are their own Home Screen app: own manifest, id, start_url and scope", async () => {
+    const { GET } = await import("@/app/admin.webmanifest/route");
+    const res = GET();
+    expect(res.headers.get("content-type")).toContain("application/manifest+json");
+    const m = await res.json();
+    expect([m.id, m.start_url, m.scope, m.display, m.short_name]).toEqual(["/admin", "/admin?source=pwa", "/admin", "standalone", "Admin"]);
+    const { adminAppMeta, ADMIN_MANIFEST } = await import("@/lib/admin/app-meta");
+    expect(ADMIN_MANIFEST).toBe("/admin.webmanifest");
+    expect(adminAppMeta.appleWebApp.title).toBe("Outlly Admin");
+    for (const f of ["app/admin/login/page.tsx", "app/admin/(panel)/layout.tsx"]) expect(src(f)).toContain("robots: { index: false, follow: false }, ...adminAppMeta };");
+    // outside /admin/ so the middleware never sends a phone fetching it to sign in, and .webmanifest skips it entirely
+    expect(src("middleware.ts")).toContain("webmanifest)$).*)");
+  });
 });
