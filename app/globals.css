@@ -1911,6 +1911,15 @@ html:not(.dark) body:has(.sky-host)::before {
     radial-gradient(40% 40% at 100% 0%, hsl(228 100% 70% / .05), transparent 70%);
 }
 @media (prefers-contrast: more), (forced-colors: active), print { body::before { display: none; } }
+/* 1107: on phones the page's top edge meets the status bar, which is one flat colour (meta theme-color, the exact
+   --background). The top corner glows fade in below it, so the bar, the safe area and the top bar read as one
+   surface edge to edge. Studio and app pages only; the marketing canvas keeps its own. */
+@media (max-width: 1023.98px) {
+  body:not(:has(.sky-host))::before {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 140px);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 140px);
+  }
+}
 
 /* Posting animation (10-15e): grainy ribbons of light flowing into a glass pill, Pip on top */
 .pa-stage { position: relative; display: grid; place-items: center; height: 210px; margin: 0 auto 18px; max-width: 560px; overflow: hidden; border-radius: 32px;

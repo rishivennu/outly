@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { THEME_KEY } from "@/lib/theme/script";
-import { THEME_COLOR, THEME_SWITCH_MS } from "@/lib/theme/colors";
+import { THEME_COLOR, THEME_COOKIE, THEME_COOKIE_AGE, THEME_SWITCH_MS } from "@/lib/theme/colors";
 import { cn } from "@/lib/utils";
 
 export type ThemeChoice = "light" | "dark" | "system";
@@ -70,6 +70,8 @@ export function setTheme(choice: ThemeChoice) {
   try {
     localStorage.setItem(THEME_KEY, choice);
   } catch {}
+  // the server reads this to send the matching status bar colour with the next page (1107, lib/theme/colors.ts)
+  document.cookie = `${THEME_COOKIE}=${choice};path=/;max-age=${THEME_COOKIE_AGE};samesite=lax${location.protocol === "https:" ? ";secure" : ""}`;
   apply(choice, true);
   window.dispatchEvent(new CustomEvent<ThemeChoice>(THEME_EVENT, { detail: choice }));
 }

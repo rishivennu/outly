@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
+import type { Viewport } from "next";
+import { THEME_COOKIE, themeColorFor } from "@/lib/theme/colors";
 import { getCurrentUser } from "@/lib/auth";
 import { UserProvider } from "@/components/shell/UserContext";
 import { AvatarCursor } from "@/components/shell/AvatarCursor";
@@ -28,6 +30,15 @@ import { InstallPrompt } from "@/components/shell/InstallPrompt";
 import { normalizeInstall } from "@/lib/pwa-core";
 import { PwaWelcome } from "@/components/shell/PwaWelcome";
 import { normalizeWelcome } from "@/lib/pwa-welcome";
+
+/**
+ * Status bar colour in the first HTML (1107): the theme saved in the cookie decides it, so an iPhone Home Screen app
+ * (which reads it as the page arrives) paints the exact page background behind the clock from the first frame.
+ * Only themeColor is set here; Next keeps the rest of the root layout's viewport.
+ */
+export async function generateViewport(): Promise<Viewport> {
+  return { themeColor: themeColorFor((await cookies()).get(THEME_COOKIE)?.value) };
+}
 
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();

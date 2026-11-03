@@ -27,11 +27,11 @@ function hslHex(h: number, s: number, l: number) {
 const hexRgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 
 describe("1105 status bar colour", () => {
-  test("THEME_COLOR is the --background token of each theme (within 1 per channel)", () => {
+  test("THEME_COLOR is exactly the --background token of each theme, as the browser renders it", () => {
     const tokens = [...css.matchAll(/--background: (\d+) (\d+)% (\d+)%;/g)].slice(0, 2).map((m) => hslHex(+m[1], +m[2], +m[3]));
     const [light, dark] = tokens;
-    hexRgb(THEME_COLOR.light).forEach((v, i) => expect(Math.abs(v - light![i]!)).toBeLessThanOrEqual(1));
-    hexRgb(THEME_COLOR.dark).forEach((v, i) => expect(Math.abs(v - dark![i]!)).toBeLessThanOrEqual(1));
+    expect(hexRgb(THEME_COLOR.light)).toEqual(light!); // rgb(245, 247, 249), measured in Edge and on the iPhone screenshot
+    expect(hexRgb(THEME_COLOR.dark)).toEqual(dark!); // rgb(12, 12, 14)
   });
   test("the head script sets theme-color for the saved theme before paint", () => {
     expect(themeScript).toContain(`meta[name="theme-color"]`);
