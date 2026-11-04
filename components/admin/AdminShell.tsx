@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Award, Gift, BadgeCheck, BookOpen, Construction, FlaskConical, HeartPulse, Hourglass, Rocket, PanelsTopLeft, CreditCard, Globe, Share2, KeyRound, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, ShieldCheck, Tag, Type, Users, X } from "lucide-react";
+import { Activity, Award, BadgePercent, Gift, BadgeCheck, BookOpen, Construction, FlaskConical, HeartPulse, Hourglass, Rocket, PanelsTopLeft, CreditCard, Globe, Share2, KeyRound, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, ShieldCheck, Tag, Type, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
@@ -23,6 +23,7 @@ const NAV: { href: string; label: string; icon: typeof Users; area: AdminArea; g
   { href: "/admin/growth", label: "Growth", icon: Rocket, area: "growth", group: "Run" },
   { href: "/admin/payments", label: "Payments", icon: CreditCard, area: "payments", group: "Run" },
   { href: "/admin/pricing", label: "Pricing", icon: Tag, area: "pricing", group: "Run" },
+  { href: "/admin/campaigns", label: "Offers", icon: BadgePercent, area: "pricing", group: "Run" },
   { href: "/admin/plans", label: "Plan grants", icon: BadgeCheck, area: "plans", group: "Run" },
   { href: "/admin/referrals", label: "Refer & Earn", icon: Gift, area: "referrals", group: "Run" },
   { href: "/admin/tickets", label: "Tickets", icon: LifeBuoy, area: "tickets", group: "Support" },

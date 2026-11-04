@@ -30,6 +30,7 @@ import { InstallPrompt } from "@/components/shell/InstallPrompt";
 import { normalizeInstall } from "@/lib/pwa-core";
 import { PwaWelcome } from "@/components/shell/PwaWelcome";
 import { normalizeWelcome } from "@/lib/pwa-welcome";
+import { PromoSheet } from "@/components/promo/PromoSheet";
 
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -86,6 +87,8 @@ export default async function StudioLayout({ children }: { children: React.React
       <PageGuide />
       <CommandPalette />
       <WhatsNew notice={notice} userId={user.actor?.id ?? user.id} joinedAt={new Date(user.joinedAt).toISOString()} />
+      {/* 1122: the promo offer, once per fresh app entry; it fetches its own offer, so this layout stays fast. */}
+      {!user.actor && <PromoSheet />}
       <AvatarCursor />
       {/* 1114: preloads every primary tab in the background; the server's clock lets pages judge their age. */}
       <WarmUp serverNow={Date.now()} />

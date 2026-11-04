@@ -8,10 +8,9 @@ import { getConfig } from "../settings";
 import { adminEvent } from "../admin/route";
 import { formatMoney, type Currency } from "./money";
 import { noticePaymentFailed, noticePaymentOk } from "../notify-events";
-import { chargeCurrency, isCurrency, parsePrices } from "./currency";
-import { hasYearly, priceFor, type Cycle } from "./cycle";
-import { foundingPrice } from "../founding-config";
-import { foundingPctFor, onPaidFounding, releaseUnpaidFounding } from "../founding";
+import { chargeCurrency } from "./currency";
+import { hasYearly, type Cycle } from "./cycle";
+import { onPaidFounding, releaseUnpaidFounding } from "../founding";
 import { normalizeDisplay } from "./display";
 import { issueInvoice } from "./invoice";
 import { sendEmail, templates } from "../email";
@@ -21,11 +20,14 @@ import { revokeReferralForPayment, rewardReferredFriend } from "../referral";
 import { accessFor, expireGrants, restackReferralGrants } from "./access";
 import { GIFT_PROVIDERS, isPaidSub } from "./access-core";
 import { isPaused, pausePlan, resumePlan } from "./pause";
-import { experimentPrice, parseVariantTag, recordExperiment, variantTag } from "./experiments";
+import { parseVariantTag, recordExperiment, variantTag } from "./experiments";
 import { normalizeTopups, packBlock, packExpiry, packPrice } from "./topups-core";
 import { refundTopUp } from "./topups";
 import { dropMandate, dropMandates } from "./autorenew";
 import { ensureRzpCustomer } from "./saved-cards";
+import { buyerPrice } from "./buyer-price";
+import { checkoutOffer, convertCampaign, OFFER_HOLD_MS, releaseCampaign } from "../campaign";
+import { discountLabel } from "../campaign-core";
 
 /** Which gateway serves checkout right now. Falls back to mock if the chosen one is missing keys, and says so. */
 export async function activeGateway() {
@@ -63,9 +65,33 @@ export function mockAllowed() {
   return env.NODE_ENV !== "production" || process.env.ALLOW_MOCK_PAYMENTS === "true";
 }
 
+/**
+ * 1121: what the invoice prints as the price breakdown: the price before discounts and each discount taken off.
+ * A price test is the price this buyer was shown, so it is the starting price, never a "discount".
+ */
+export function priceMeta(beforeMinor: number, chargedMinor: number, foundingPct: number | null | undefined, offer?: { id: string; label: string; renewMinor: number; until?: string } | null) {
+  const off = beforeMinor - chargedMinor;
+  // 1122: an offer replaces the founding discount for this payment (the lower price wins, they don't stack).
+  // renewMinor is what the subscription renews at afterwards: the offer is for the first payment only.
+  if (offer && off > 0) return JSON.stringify({ price: { listMinor: beforeMinor, discounts: [{ label: offer.label, minor: off }] }, campaign: { id: offer.id, ...(offer.until ? { until: offer.until } : {}) }, renewMinor: offer.renewMinor });
+  if (!foundingPct || off <= 0) return null;
+  return JSON.stringify({ price: { listMinor: beforeMinor, discounts: [{ label: `Founding member discount (${foundingPct}%)`, minor: off }] } });
+}
+
+/** 1122: what a subscription bought with an offer renews at (the price without the offer). */
+export function renewPriceOf(meta: string | null | undefined, paidMinor: number) {
+  try {
+    const m = JSON.parse(meta || "null");
+    return m?.campaign?.id && Number.isInteger(m.renewMinor) && m.renewMinor >= paidMinor ? (m.renewMinor as number) : paidMinor;
+  } catch {
+    return paidMinor;
+  }
+}
+
 /** `wanted` is the visitor's currency (cookie / IP country). The gateway decides what it can actually charge. */
 /** `cycle` is the Monthly / Yearly switch the buyer picked; yearly falls back to monthly if it is switched off. */
-export async function startCheckout(userId: string, planSlug: string, wanted?: Currency, cycle: Cycle = "month"): Promise<CheckoutStart & { paymentId: string }> {
+/** 1122: `campaignId` is an offer the buyer claimed; it is re-checked here and checkout stops if it no longer applies. */
+export async function startCheckout(userId: string, planSlug: string, wanted?: Currency, cycle: Cycle = "month", campaignId?: string | null): Promise<CheckoutStart & { paymentId: string }> {
   const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
   const plan = await db.plan.findUnique({ where: { slug: planSlug } });
   if (!plan || plan.state !== "available") throw new HttpError(404, "That plan isn't available right now.", "PLAN_UNAVAILABLE");
@@ -79,23 +105,24 @@ export async function startCheckout(userId: string, planSlug: string, wanted?: C
 
   const { cfg, provider } = await activeGateway();
   if (provider === "mock" && !mockAllowed()) throw new HttpError(503, "Payments are being set up. Paid plans open shortly.", "GATEWAY");
-  const listed = priceFor({ ...plan, prices: parsePrices(plan.prices), yearlyPrices: parsePrices(plan.yearlyPrices) }, chargeCurrency(provider, wanted ?? (isCurrency(plan.currency) ? plan.currency : "INR"), plan.currency), want, display.freeMonths);
   // Founding members (1036): the discount they claimed with, on every paid plan and cycle, for life.
   // 1067: someone this payment would seat (a founding spot is open for them) pays the founding price too.
   // 1096: a price test in this currency replaces the list price for the people in it (same yearly ratio).
-  const test = listed.currency === plan.currency ? await experimentPrice(user.id, plan.slug, listed.currency, { expose: false }) : null; // exposure is logged where the price is shown (billing page)
-  const tested = test && plan.priceMinor > 0 ? { ...listed, priceMinor: Math.round((listed.priceMinor * test.priceMinor) / plan.priceMinor) } : listed;
-  const fpct = await foundingPctFor(user.id);
-  const charge = fpct ? { ...tested, priceMinor: foundingPrice(tested.priceMinor, fpct) } : tested;
+  // 1122: the same steps live in buyerPrice, which the offer popup and billing page use too.
+  const { test, tested, fpct, foundingMinor } = await buyerPrice(user.id, plan, provider, wanted, want, display.freeMonths);
+  // 1122: a claimed offer, validated again now (live, this person, this plan, beats founding). Never a surprise price.
+  const offer = campaignId ? await checkoutOffer(user.id, campaignId, plan, want, provider, wanted) : null;
+  const charge = { ...tested, priceMinor: offer ? offer.finalMinor : foundingMinor };
+  const meta = priceMeta(tested.priceMinor, charge.priceMinor, offer ? null : fpct, offer ? { id: offer.campaign.id, label: discountLabel(offer.campaign), renewMinor: foundingMinor, until: offer.campaign.endsAt.toISOString() } : null);
   // Reuse a recent pending attempt for the same plan, so double-clicks don't create duplicate payments.
   const recent = await db.payment.findFirst({
-    where: { userId, planId: plan.id, status: "pending", provider, interval: charge.interval, createdAt: { gt: new Date(Date.now() - 20 * 60_000) } },
+    where: { userId, planId: plan.id, status: "pending", provider, interval: charge.interval, createdAt: { gt: new Date(Date.now() - OFFER_HOLD_MS) } },
     orderBy: { createdAt: "desc" },
   });
   const payment =
-    recent && recent.amountMinor === charge.priceMinor && recent.currency === charge.currency
+    recent && recent.amountMinor === charge.priceMinor && recent.currency === charge.currency && (recent.meta ?? null) === meta
       ? recent
-      : await db.payment.create({ data: { userId, planId: plan.id, amountMinor: charge.priceMinor, currency: charge.currency, interval: charge.interval, provider, status: "pending", ...(test ? { variant: variantTag(test) } : {}) } });
+      : await db.payment.create({ data: { userId, planId: plan.id, amountMinor: charge.priceMinor, currency: charge.currency, interval: charge.interval, provider, status: "pending", meta, ...(test ? { variant: variantTag(test) } : {}) } });
   if (test) await recordExperiment({ experiment: test.experiment, variant: test.variant, userId, kind: "checkout", amountMinor: charge.priceMinor, currency: charge.currency });
 
   const args = { paymentId: payment.id, amountMinor: payment.amountMinor, currency: payment.currency, planName: charge.interval === "year" && plan.interval !== "year" ? `${plan.name} (yearly)` : plan.name, user: { name: user.name, email: user.email }, appUrl: env.APP_URL,
@@ -229,7 +256,9 @@ export async function completePayment(paymentId: string, providerRef?: string) {
     const open = await tx.subscription.findMany({ where: { userId: p.userId, status: { in: ["active", "past_due"] } } });
     const paid = open.filter(isPaidSub);
     const previous = paid.filter((s) => s.status === "active" && s.currentPeriodEnd > now).sort((a, b) => b.currentPeriodEnd.getTime() - a.currentPeriodEnd.getTime())[0] ?? null;
-    const carry = carryOverMs(previous, { priceMinor: p.amountMinor, currency: p.currency, interval, sample: p.sample }, now);
+    // 1122: an offer is for this payment only; the subscription renews (and values carried-over time) at the regular price.
+    const renew = renewPriceOf(p.meta, p.amountMinor);
+    const carry = carryOverMs(previous, { priceMinor: renew, currency: p.currency, interval, sample: p.sample }, now);
     if (paid.length) await tx.subscription.updateMany({ where: { id: { in: paid.map((s) => s.id) } }, data: { status: "canceled", canceledAt: now } });
     replaced = paid.filter((s) => s.providerSubId).map((s) => s.id);
     const s = await tx.subscription.create({
@@ -237,7 +266,7 @@ export async function completePayment(paymentId: string, providerRef?: string) {
         userId: p.userId,
         planId: plan.id,
         status: "active",
-        priceMinor: p.amountMinor,
+        priceMinor: renew,
         currency: p.currency,
         interval,
         provider: p.provider,
@@ -263,6 +292,7 @@ export async function completePayment(paymentId: string, providerRef?: string) {
   }
   const tag = parseVariantTag(p.variant);
   if (tag) await recordExperiment({ ...tag, userId: p.userId, kind: "paid", amountMinor: p.amountMinor, currency: p.currency });
+  await convertCampaign(p); // 1122: an offer that was paid for counts once (never throws)
   return { payment: fresh, invoice };
 }
 
@@ -393,6 +423,7 @@ export async function refundPayment(paymentId: string, by: string, reason: strin
   ]);
   if (p.purpose === "topup") await refundTopUp(p.id); // 1096: what's left in the pack is gone
   if (p.subscriptionId) await dropMandates([p.subscriptionId]);
+  await releaseCampaign(p.id); // 1122: a refunded offer payment is no longer a conversion, and its spot frees up
   // 1052: a refunded qualifying payment ends the friend's Refer & Earn month and disqualifies the referral.
   if (!p.sample && !(await revokeReferralForPayment(p.id, by))) await revokeReferralReward(p.userId, p.createdAt).catch((e) => console.error("[refund] referral revoke", e));
   // 1067: refunding the last real payment gives the founding seat back (never throws).
@@ -430,6 +461,8 @@ export async function markExternalRefund(paymentId: string, kind: "refund" | "ch
     if (refunded && p.purpose === "topup") await refundTopUp(p.id);
     if (refunded && p.subscriptionId) await dropMandates([p.subscriptionId]);
   }
+  // 1122: a refund or an open dispute is not a confirmed payment: the conversion and the offer spot come back off.
+  if (refunded || kind === "chargeback") await releaseCampaign(p.id);
   const revoked = await revokeReferralForPayment(p.id, "system", kind);
   if (refunded && !revoked) await revokeReferralReward(p.userId, p.createdAt).catch((e) => console.error("[refund] referral revoke", e));
   if (refunded) await releaseUnpaidFounding(p.userId);

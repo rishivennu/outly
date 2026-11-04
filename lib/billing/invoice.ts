@@ -1,9 +1,12 @@
 import "server-only";
 import { db } from "../db";
 import { env } from "../env";
-import { Pdf } from "./pdf";
-import { INVOICE_LOGO_JPEG } from "./logo";
+import { addMonths, addYears } from "date-fns";
 import { formatMoney } from "./money";
+import { razorpay } from "./providers";
+import { describeRazorpayMethod, gatewayName } from "./overview-core";
+import { invoiceStatus, linesFor, maskMethod, parseLines, verifyCode, type PriceMeta } from "./invoice-core";
+import { renderInvoicePdf } from "./invoice-pdf";
 import { getConfig } from "../settings";
 import { sendEmail, templates } from "../email";
 
@@ -16,9 +19,28 @@ function issuerOf(json: string | null): { name?: string; address?: string; gstin
   }
 }
 
+/** Printed on every invoice and on the verify page. */
+export const SUPPORT_EMAIL = "support@outlly.com";
+
+export const invoiceVerifyCode = (inv: { number: string; amountMinor: number; currency: string; issuedAt: Date; customerEmail: string }) => verifyCode(env.AUTH_SECRET, inv);
+
+/** 1121: how the payment was made, masked, read from the gateway once at issue time. Best effort: null on any failure. */
+async function methodFor(p: { provider: string; providerRef: string | null; sample: boolean }, cfg: unknown): Promise<string | null> {
+  if (p.sample || p.provider === "mock") return "Test checkout";
+  if (p.provider === "youpi") return "UPI";
+  if (p.provider !== "razorpay" || !p.providerRef) return null;
+  try {
+    const got = await Promise.race([razorpay.paymentFor(cfg as never, p.providerRef), new Promise<null>((r) => setTimeout(() => r(null), 4000))]);
+    return maskMethod(describeRazorpayMethod(got)?.label);
+  } catch {
+    return null;
+  }
+}
+
 /** OUT-2026-000042. Sequential per year; retried on the rare unique collision between two parallel payments. */
 async function nextNumber() {
-  const y = new Date().getFullYear();
+  // The year in India time, the same clock the PDF prints dates in (1 Jan 00:00-05:30 IST is still the old year in UTC).
+  const y = Number(new Intl.DateTimeFormat("en-GB", { year: "numeric", timeZone: "Asia/Kolkata" }).format(new Date()));
   const prefix = `OUT-${y}-`;
   const last = await db.invoice.findFirst({ where: { number: { startsWith: prefix } }, orderBy: { number: "desc" }, select: { number: true } });
   const n = last ? parseInt(last.number.slice(prefix.length), 10) + 1 : 1;
@@ -27,8 +49,13 @@ async function nextNumber() {
 
 /** Idempotent: one invoice per successful payment, however many times a webhook fires. */
 export async function issueInvoice(paymentId: string, opts: { email?: boolean } = { email: true }) {
-  const existing = await db.invoice.findUnique({ where: { paymentId } });
-  if (existing) return existing;
+  const existing = await db.invoice.findUnique({ where: { paymentId }, include: { payment: { select: { sample: true } } } });
+  if (existing) {
+    // 1121: a first send that failed is retried by the next webhook / return URL that lands here.
+    const { payment, ...row } = existing;
+    if (!row.emailedAt && opts.email !== false && !payment?.sample) await emailInvoice(row);
+    return row;
+  }
   const p = await db.payment.findUniqueOrThrow({ where: { id: paymentId }, include: { user: true, subscription: { include: { plan: true } } } });
   if (p.status !== "succeeded") throw new Error("Invoices are only issued for successful payments");
   // 1096: a top-up pack names the pack; a renewal reads like the plan it renews.
@@ -36,8 +63,24 @@ export async function issueInvoice(paymentId: string, opts: { email?: boolean } 
   const description = topUp ? `Top-up: ${topUp.label || "usage pack"}` : p.subscription ? `${p.subscription.plan.name} plan, 1 ${p.subscription.interval}${p.purpose === "renewal" ? " (renewal)" : ""}` : "Outlly subscription";
   // Copy what the PDF prints onto the invoice itself: it must read the same years later, after a
   // change of business details or tax rate, and after the customer deletes their account.
-  const biz = (await getConfig("payments")).business;
+  const cfg = await getConfig("payments");
+  const biz = cfg.business;
+  // 1121: the period this payment pays for. A renewal has already moved the end on by one cycle.
+  const sub = p.purpose === "topup" ? null : p.subscription;
+  const periodEnd = sub?.currentPeriodEnd ?? null;
+  const periodStart = !sub ? null : p.purpose === "renewal" ? (sub.interval === "year" ? addYears(sub.currentPeriodEnd, -1) : addMonths(sub.currentPeriodEnd, -1)) : sub.createdAt;
+  // Price breakdown, only when checkout recorded one (Payment.meta on a plan payment) and it adds up to what was paid.
+  let price: PriceMeta | null = null;
+  if (p.purpose !== "topup" && p.meta) {
+    try { price = JSON.parse(p.meta).price ?? null; } catch { price = null; }
+  }
   const snapshot = {
+    paidAt: p.updatedAt,
+    // A stray mandate charge doesn't move the period on, so a period already over when it was paid isn't printed.
+    periodStart: periodStart && periodEnd && periodStart < periodEnd && periodEnd > p.updatedAt ? periodStart : null,
+    periodEnd: periodStart && periodEnd && periodStart < periodEnd && periodEnd > p.updatedAt ? periodEnd : null,
+    method: await methodFor(p, cfg),
+    lines: JSON.stringify(linesFor({ description, amountMinor: p.amountMinor, price })),
     provider: p.provider,
     providerRef: p.providerRef,
     taxPercent: biz.taxPercent || 0,
@@ -56,69 +99,59 @@ export async function issueInvoice(paymentId: string, opts: { email?: boolean } 
     }
   }
   if (!inv) throw new Error("Could not allocate an invoice number");
-  if (opts.email !== false && !p.sample) {
+  if (opts.email !== false && !p.sample) await emailInvoice(inv);
+  return inv;
+}
+
+/** Send the invoice with its PDF. Never throws: the invoice exists either way and a later call retries the send. */
+async function emailInvoice(inv: { id: string; number: string; customerName: string; customerEmail: string; amountMinor: number; currency: string; description: string }) {
+  try {
     const pdf = await invoicePdf(inv.id);
     const r = await sendEmail({
       to: inv.customerEmail,
       subject: `Your Outlly invoice ${inv.number}`,
       kind: "invoice",
-      html: templates.invoice({ name: inv.customerName, number: inv.number, amount: formatMoney(inv.amountMinor, inv.currency), plan: description, url: `${env.APP_URL}/billing` }),
+      html: templates.invoice({ name: inv.customerName, number: inv.number, amount: formatMoney(inv.amountMinor, inv.currency), plan: inv.description, url: `${env.APP_URL}/billing` }),
       attachments: [{ filename: `${inv.number}.pdf`, content: pdf }],
     });
     if (r.ok) await db.invoice.update({ where: { id: inv.id }, data: { emailedAt: new Date() } });
+  } catch (e) {
+    console.error("[billing] invoice email failed", inv.number, e);
   }
-  return inv;
 }
 
 export async function invoicePdf(invoiceId: string): Promise<Buffer> {
-  const inv = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { payment: true } });
+  const inv = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { payment: true, creditNote: { select: { id: true } } } });
   // Invoices issued before the snapshot columns existed fall back to today's settings and the payment row.
   const live = (await getConfig("payments")).business;
   const kept = issuerOf(inv.issuer);
   const biz = { name: kept?.name ?? live.name, address: kept?.address ?? live.address, gstin: kept?.gstin ?? live.gstin, taxPercent: inv.taxPercent ?? live.taxPercent };
   const provider = inv.provider ?? inv.payment?.provider ?? "";
-  const providerRef = inv.providerRef ?? inv.payment?.providerRef ?? "";
-  const d = new Pdf();
-  const ink: [number, number, number] = [0.07, 0.09, 0.03];
-  const mute: [number, number, number] = [0.42, 0.44, 0.39];
-  // Light, print-friendly header: brand gradient strip, the Outlly rocket tile, wordmark, invoice number.
-  d.rect(0, 836, 198, 6, [0.0, 0.78, 0.36]);
-  d.rect(198, 836, 199, 6, [0.42, 0.9, 0.12]);
-  d.rect(397, 836, 198, 6, [0.86, 0.96, 0.05]);
-  d.jpeg(Buffer.from(INVOICE_LOGO_JPEG.base64, "base64"), INVOICE_LOGO_JPEG, 40, 768, 46, 46);
-  d.text(96, 786, "Outlly", 22, true, ink);
-  d.text(96, 772, "Create once. Publish everywhere.", 9, false, mute);
-  d.textR(555, 796, "TAX INVOICE", 11, true, [0.13, 0.45, 0.05]);
-  d.textR(555, 780, inv.number, 10, false, mute);
-  d.line(40, 752, 555, 752);
-
-  d.text(40, 720, "Billed to", 9, true, mute);
-  d.text(40, 704, inv.customerName, 12, true, ink);
-  d.text(40, 689, inv.customerEmail, 10, false, mute);
-  d.text(330, 720, "From", 9, true, mute);
-  d.text(330, 704, biz.name || "Outlly", 12, true, ink);
-  d.text(330, 689, biz.address || "", 10, false, mute);
-  if (biz.gstin) d.text(330, 675, `GSTIN ${biz.gstin}`, 10, false, mute);
-
-  const issued = inv.issuedAt.toISOString().slice(0, 10);
-  d.text(40, 640, `Issued ${issued}`, 10, false, ink);
-  d.text(200, 640, `Payment ${provider.toUpperCase()} ${providerRef.slice(0, 22)}`.trim(), 10, false, mute);
-  d.textR(555, 640, "PAID", 11, true, [0.07, 0.53, 0.24]);
-
-  d.rect(40, 596, 515, 26, [0.95, 0.96, 0.93]);
-  d.text(52, 605, "Description", 9, true, mute);
-  d.textR(543, 605, "Amount", 9, true, mute);
-  const tax = Math.round((inv.amountMinor * (biz.taxPercent || 0)) / (100 + (biz.taxPercent || 0)));
-  d.text(52, 570, inv.description, 11, false, ink);
-  d.textR(543, 570, formatMoney(inv.amountMinor - tax, inv.currency), 11, false, ink);
-  d.line(40, 550, 555, 550);
-  if (tax) {
-    d.text(330, 530, `Tax (${biz.taxPercent}% incl.)`, 10, false, mute);
-    d.textR(543, 530, formatMoney(tax, inv.currency), 10, false, ink);
-  }
-  d.text(330, 506, "Total paid", 12, true, ink);
-  d.textR(543, 506, formatMoney(inv.amountMinor, inv.currency), 14, true, ink);
-  d.text(40, 80, "Thank you for creating with Outlly.", 10, true, ink);
-  d.text(40, 64, "This is a computer-generated invoice and needs no signature.", 9, false, mute);
-  return d.build();
+  const providerRef = inv.providerRef ?? inv.payment?.providerRef ?? null;
+  // 1121: the badge reads the payment record. Only a gateway-confirmed payment is PAID; mock and sample are TEST.
+  const status = invoiceStatus({ paymentStatus: inv.payment?.status ?? null, provider, sample: inv.payment?.sample, refunded: !!inv.creditNote });
+  // Stored lines are only printed when they still add up to what was paid; otherwise one honest line.
+  const stored = parseLines(inv.lines);
+  const lines = stored && stored.reduce((a, l) => a + l.amountMinor, 0) === inv.amountMinor ? stored : linesFor({ description: inv.description, amountMinor: inv.amountMinor });
+  const pdf = await renderInvoicePdf({
+    number: inv.number,
+    issuedAt: inv.issuedAt,
+    paidAt: inv.paidAt ?? (inv.payment?.status === "succeeded" || inv.payment?.status === "refunded" ? inv.payment.updatedAt : null),
+    periodStart: inv.periodStart,
+    periodEnd: inv.periodEnd,
+    oneOff: inv.payment?.purpose === "topup" || inv.description.startsWith("Top-up:"),
+    status,
+    customer: { name: inv.customerName, email: inv.customerEmail },
+    issuer: { name: biz.name || "Outlly", address: biz.address || null, gstin: biz.gstin || null },
+    lines,
+    taxPercent: biz.taxPercent || 0,
+    totalMinor: inv.amountMinor,
+    currency: inv.currency,
+    method: inv.method,
+    gateway: provider ? gatewayName(provider) : null,
+    providerRef,
+    verify: { code: invoiceVerifyCode(inv), url: `${env.APP_URL}/verify-invoice` },
+    support: { email: SUPPORT_EMAIL, website: new URL(env.APP_URL).host },
+  });
+  return Buffer.from(pdf);
 }

@@ -118,7 +118,7 @@ const slowDown = (retryAfter: number) =>
   json({ error: "You're moving fast. Give it a moment.", code: "RATE_LIMITED" }, { status: 429, headers: { "Retry-After": String(retryAfter) } });
 
 /** Public endpoints that stay open during maintenance so members can sign back in. */
-const MAINTENANCE_OPEN = ["/api/maintenance", "/api/auth/login", "/api/auth/code", "/api/auth/2fa", "/api/auth/logout", "/api/support/chat", "/api/health", "/api/email/unsubscribe"];
+const MAINTENANCE_OPEN = ["/api/maintenance", "/api/auth/login", "/api/auth/code", "/api/auth/2fa", "/api/auth/logout", "/api/support/chat", "/api/health", "/api/email/unsubscribe", "/api/invoices/verify"];
 
 type Handler<C> = (req: NextRequest, ctx: C & { user: SessionUser }) => Promise<Response>;
 /** Next 15 hands route handlers `params` as a Promise. Handlers keep receiving the resolved object. */

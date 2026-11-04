@@ -23,6 +23,8 @@ import { trustBadges } from "@/lib/badges";
 import { refundStatus } from "@/lib/billing/guarantee";
 import { experimentPrice } from "@/lib/billing/experiments";
 import { aiQuota } from "@/lib/ai-quota";
+import { campaignWho, quoteOffer } from "@/lib/campaign";
+import { offerLabel, savingLabel } from "@/lib/campaign-core";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Billing" };
@@ -71,7 +73,7 @@ async function handleYoupiReturn(userId: string, paymentId: string): Promise<Ret
   }
 }
 
-type Sp = { checkout?: string; session_id?: string; token?: string; p?: string; plan?: string; paid?: string; cycle?: string; founding?: string };
+type Sp = { checkout?: string; session_id?: string; token?: string; p?: string; plan?: string; paid?: string; cycle?: string; founding?: string; campaign?: string };
 
 /** The receipt slip for whatever checkout just came back (1053), read from our own payment row. */
 async function receiptFor(userId: string, sp: Sp, cancelledId: string | null): Promise<Receipt | null> {
@@ -187,6 +189,31 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
     return { ...p, priceMinor: off(lp.priceMinor), currency: lp.currency, approx: approx ? `about ${formatMoney(off(approx.priceMinor), approx.currency)}` : null, year, was: fpct && lp.priceMinor > 0 ? lp.priceMinor : null };
   });
 
+  // 1122: a claimed offer (?campaign=) re-prices the cards it applies to, with the same server rules checkout uses.
+  // The struck price is what this person pays today without it; an offer that no longer applies just says so.
+  let offerNote: { tone: "ok" | "info"; text: string } | null = null;
+  const claimedId = !user.actor && searchParams.campaign ? searchParams.campaign.slice(0, 40) : null;
+  const claimed = claimedId ? await db.campaign.findUnique({ where: { id: claimedId } }) : null;
+  if (claimedId) {
+    const who = claimed ? await campaignWho(user.id) : null;
+    const rows = claimed ? await db.plan.findMany({ where: { slug: { in: priced.map((p) => p.slug) } } }) : [];
+    let hit = 0;
+    for (const pp of priced) {
+      const row = rows.find((r) => r.slug === pp.slug);
+      if (!claimed || !who || !row) continue;
+      const [m, y] = await Promise.all([
+        quoteOffer(user.id, claimed, row, "month", gw.provider, visitor.currency, who).catch(() => null),
+        pp.year ? quoteOffer(user.id, claimed, row, "year", gw.provider, visitor.currency, who).catch(() => null) : null,
+      ]);
+      // savingLabel: the real saving off the struck price (a founding member's struck price is their founding price).
+      if (m && m.currency === pp.currency && m.cycle === (row.interval === "year" ? "year" : "month")) Object.assign(pp, { priceMinor: m.finalMinor, was: m.originalMinor, offer: claimed.id, offerLabel: savingLabel(claimed, m), approx: null }), hit++;
+      if (y && pp.year && y.currency === pp.year.currency && y.cycle === "year") Object.assign(pp.year, { priceMinor: y.finalMinor, was: y.originalMinor, offer: claimed.id, offerLabel: savingLabel(claimed, y), approx: null }), hit++;
+    }
+    offerNote = hit && claimed
+      ? { tone: "ok", text: `${claimed.title}: ${offerLabel(claimed)} is on the plan${hit > 1 ? "s" : ""} marked below, until ${claimed.endsAt.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: user.timezone || "Asia/Kolkata" })}. First payment only; the card shows the exact price you'll pay.` }
+      : { tone: "info", text: "That offer has ended or doesn't apply to your account, so the cards show your regular prices." };
+  }
+
   const currentView: SubView | null = sub
     ? { planSlug: sub.plan.slug, planName: sub.plan.name, priceMinor: sub.priceMinor, currency: sub.currency, interval: sub.interval, periodEnd: sub.currentPeriodEnd.toISOString(), cancelAtPeriodEnd: sub.cancelAtPeriodEnd, pausedUntil: sub.pausedUntil && sub.pausedUntil > now ? sub.pausedUntil.toISOString() : null, provider: sub.provider, autoRenew: sub.autoRenew, gift: !isPaidSub(sub) }
     : null;
@@ -229,6 +256,7 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
       notice={notice}
       receipt={receipt}
       focusPlan={searchParams.plan ?? null}
+      offerNote={offerNote}
       cycle={searchParams.cycle === "year" ? "year" : "month"}
       gateway={gw.provider}
       // Customers never see a test badge on the live site; it only shows on the local dev server.

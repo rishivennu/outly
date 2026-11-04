@@ -49,13 +49,14 @@ function loadRazorpay() {
   });
 }
 
-type PricedPlan = PublicPlan & { approx: string | null; year: { priceMinor: number; currency: string; approx: string | null; save: number; was?: number | null } | null; was?: number | null };
+/** 1122: `offer` is a claimed promo offer's id when the price shown is the offer price (checked again at checkout). */
+type PricedPlan = PublicPlan & { approx: string | null; year: { priceMinor: number; currency: string; approx: string | null; save: number; was?: number | null; offer?: string; offerLabel?: string } | null; was?: number | null; offer?: string; offerLabel?: string };
 /** limit 0 = unlimited. 1098: the tiles come from `meters`; this keeps the few facts the plan card states. */
 type Usage = { used: number; limit: number; seats: number; aiCaptions: boolean; period?: "week" | "month"; maxUploadMb?: number; replies?: { limit: number; used: number }; captions?: { limit: number; used: number; burn: boolean }; storage?: StorageMeterData };
 type ExtraAccess = { planName: string; source: "admin" | "referral"; endsAt: string } | null;
 
 
-export function BillingView(props: { email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; status: BillingStatus; nextCharge: string | null; meters: MeterView[]; history: HistoryRow[]; ended?: EndedSub | null; beta?: BetaOffer | null; founding?: FoundingMine; foundingStatus?: string | null; badges?: Badges; guarantee?: GuaranteeView }) {
+export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: string } | null; email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; status: BillingStatus; nextCharge: string | null; meters: MeterView[]; history: HistoryRow[]; ended?: EndedSub | null; beta?: BetaOffer | null; founding?: FoundingMine; foundingStatus?: string | null; badges?: Badges; guarantee?: GuaranteeView }) {
   const { plans, current } = props;
   const router = useRouter();
   const toast = useToast();
@@ -112,7 +113,8 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
     const y = cycle === "year" && p.year ? p.year : null;
     if (!online) return toast("You're offline. Reconnect to change plans.", "error");
     setBusy(p.slug);
-    await pay(() => api<any>("/api/billing/checkout", { method: "POST", json: { plan: p.slug, currency: y ? y.currency : p.currency, cycle: y ? "year" : "month" } }));
+    const offer = (y ? y.offer : p.offer) || undefined; // 1122: the server re-checks it and prices it itself
+    await pay(() => api<any>("/api/billing/checkout", { method: "POST", json: { plan: p.slug, currency: y ? y.currency : p.currency, cycle: y ? "year" : "month", ...(offer ? { campaign: offer } : {}) } }));
   }
 
   /** 1096: a usage pack goes through exactly the same checkout as a plan. */
@@ -223,6 +225,13 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
           {notice.tone === "ok" ? <Pip size={40} mood="happy" /> : notice.tone === "error" ? <Pip size={40} mood="sad" /> : <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />}
           <p className="flex-1 pt-1">{notice.text}</p>
           <button onClick={() => setNotice(null)} className="-m-1.5 grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-foreground/5" aria-label="Dismiss"><X className="h-4 w-4" /></button>
+        </div>
+      )}
+
+      {props.offerNote && (
+        <div role="status" className={cn("admin-page-in mt-6 flex max-w-3xl items-start gap-3 rounded-2xl p-4 text-sm", props.offerNote.tone === "ok" ? "bg-success/15" : "bg-accent/10")}>
+          <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <p className="flex-1">{props.offerNote.text}</p>
         </div>
       )}
 
@@ -380,7 +389,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
                     <p className="mt-4 flex flex-wrap items-baseline gap-x-2">
                       <span className="text-[1.7rem] font-semibold tracking-tight tabular">{y ? `${formatMoney(y.priceMinor, y.currency)}/yr` : priceLabel(p)}</span>
                       <s className="text-sm text-muted-foreground tabular" aria-label={`was ${formatMoney((y ? y.was : p.was)!, y ? y.currency : p.currency)}`}>{formatMoney((y ? y.was : p.was)!, y ? y.currency : p.currency)}</s>
-                      <span className="text-[12.5px] font-medium text-lime-ink">Founding price</span>
+                      <span className="text-[12.5px] font-medium text-lime-ink">{(y ? y.offerLabel : p.offerLabel) ? `Offer: ${(y ? y.offerLabel : p.offerLabel)!.toLowerCase()}, first ${y ? "year" : "month"}` : "Founding price"}</span>
                     </p>
                   ) : (
                     <p className="mt-4 text-[1.7rem] font-semibold tracking-tight tabular">{y ? `${formatMoney(y.priceMinor, y.currency)}/yr` : priceLabel(p)}</p>

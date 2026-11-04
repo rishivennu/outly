@@ -3937,6 +3937,59 @@ html.theme-anim *::after {
   .pcard, .pcard-pill, .pcard-cover-btn, .pcard-avatar-btn, .pcard-action, .pcard-link, .pcard-ico { transition: none; }
 }
 
+/* ---------- 1122: promo offer sheet (components/promo/PromoSheet) ----------
+   Rises from below: translateY(100%) + scale .97 + opacity 0 -> rest, 650ms on the house ease-out (no overshoot).
+   Overlay fades 300ms. Content staggers in on --d (delay) / --t (duration). Transform and opacity only, no blur,
+   fixed position (no layout shift). Hover never moves the sheet; only the CTA reacts to a press. */
+.promo-card {
+  --promo-lime: hsl(var(--lime));
+  --promo-coral: #ff8a65;
+  border-radius: 30px 30px 0 0;
+  background: linear-gradient(172deg, #fff8ec 0%, #ffe9d6 48%, #ffd2b8 100%);
+  color: #141414;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 -2px 6px rgba(80, 30, 10, 0.06), 0 -18px 40px -12px rgba(80, 30, 10, 0.22), 0 -40px 90px -30px rgba(0, 0, 0, 0.35);
+}
+@media (min-width: 640px) { .promo-card { border-radius: 30px; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 4px 10px rgba(80, 30, 10, 0.08), 0 22px 48px -14px rgba(80, 30, 10, 0.28), 0 50px 110px -30px rgba(0, 0, 0, 0.45); } }
+.promo-grain { position: absolute; inset: 0; pointer-events: none; opacity: .5; background: radial-gradient(120% 60% at 85% 0%, rgba(255, 255, 255, 0.7), transparent 60%), radial-gradient(90% 50% at 0% 100%, rgba(255, 138, 101, 0.18), transparent 70%); }
+.promo-close { color: #3d2a20; background: rgba(255, 255, 255, 0.55); box-shadow: 0 1px 2px rgba(80, 30, 10, 0.12); transition: background-color var(--m-hover) var(--m-ease-out); }
+.promo-close:hover { background: rgba(255, 255, 255, 0.9); }
+.promo-close:focus-visible, .promo-cta:focus-visible { outline: 3px solid #141414; outline-offset: 3px; }
+.promo-badge { color: #fff; background: #141414; box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.45); }
+.promo-logo { display: inline-flex; border-radius: 11px; box-shadow: 0 4px 10px -4px rgba(80, 30, 10, 0.35); }
+.promo-discount { line-height: .86; letter-spacing: -0.045em; color: #141414; text-shadow: 0 1px 0 #f6c3a6, 0 2px 0 #eeb092, 0 3px 0 #e59d7e, 0 4px 0 #db8c6c, 0 14px 22px rgba(120, 45, 15, 0.28); }
+.promo-num { font-size: clamp(4.4rem, 22vw, 6.2rem); font-weight: 800; }
+.promo-off { font-size: clamp(2.1rem, 10vw, 2.9rem); font-weight: 800; letter-spacing: -0.03em; }
+.promo-tag { background: #fff; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 2px 4px rgba(80, 30, 10, 0.08), 0 12px 24px -10px rgba(80, 30, 10, 0.3); transform: rotate(-2deg); }
+.promo-tag-hole { position: absolute; right: 12px; top: 12px; width: 9px; height: 9px; border-radius: 99px; background: #ffd9c2; box-shadow: inset 0 1px 2px rgba(80, 30, 10, 0.35); }
+.promo-cta { color: #fff; background: #141414; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 2px 0 #000, 0 10px 20px -8px rgba(0, 0, 0, 0.55), 0 22px 40px -18px rgba(80, 30, 10, 0.5); transition: transform var(--m-press) var(--m-ease-out), box-shadow var(--m-press) var(--m-ease-out), background-color var(--m-hover) var(--m-ease-out); }
+.promo-cta:hover { background: #262626; }
+.promo-cta:active { transform: translateY(2px) scale(.99); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 0 0 #000, 0 4px 10px -6px rgba(0, 0, 0, 0.5); }
+.promo-cta:disabled { cursor: default; }
+.promo-confetti { position: absolute; inset: -18px -10px; pointer-events: none; }
+.promo-bit { position: absolute; display: block; transform: rotate(var(--r)); }
+.promo-bit > svg { display: block; animation: promo-float 6.5s ease-in-out calc(var(--i) * -1.1s) infinite alternate; }
+.promo-bit-back { opacity: .55; scale: .85; }
+.promo-bit-mid { opacity: .85; }
+.promo-bit-front { filter: drop-shadow(0 6px 6px rgba(80, 30, 10, 0.22)); }
+.promo-overlay { background: rgba(10, 6, 4, 0.5); animation: promo-fade 300ms var(--m-ease-out) both; }
+.promo-sheet { animation: promo-rise 650ms var(--m-ease-out) both; transform-origin: 50% 100%; }
+.promo-in { animation: promo-item var(--t, 400ms) var(--m-ease-out) var(--d, 0ms) both; }
+.promo-sheet.promo-out { animation: promo-drop 300ms var(--m-ease-in) both; }
+.promo-overlay.promo-out { animation: promo-unfade 300ms var(--m-ease-std) both; }
+@keyframes promo-rise { from { transform: translateY(100%) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes promo-drop { from { transform: none; opacity: 1; } to { transform: translateY(100%) scale(.97); opacity: 0; } }
+@keyframes promo-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes promo-unfade { from { opacity: 1; } to { opacity: 0; } }
+@keyframes promo-item { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes promo-float { from { transform: translateY(0); } to { transform: translateY(-7px); } }
+@media (prefers-reduced-motion: reduce) {
+  .promo-sheet, .promo-in, .promo-bit > svg { animation: none; }
+  .promo-overlay { animation: promo-fade 150ms linear both; }
+  .promo-sheet { animation: promo-fade 150ms linear both; }
+  .promo-sheet.promo-out, .promo-overlay.promo-out { animation: promo-unfade 150ms linear both; }
+  .promo-cta, .promo-cta:active { transition: none; transform: none; }
+}
+
 /* ---------- 1100: Liquid glass on every studio card ----------
    The studio's screen cards wear the same liquid glass as the rail: a cool-to-deep tint, a lit rim on the top-left
    edge with a softer far edge, and a sheen across the top. Cards: .glass panels, the Analytics dashboard's

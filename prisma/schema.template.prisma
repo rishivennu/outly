@@ -97,6 +97,7 @@ model User {
   experimentEvents ExperimentEvent[]
   surveyResponses SurveyResponse[]
   cancelFeedback  CancelFeedback[]
+  campaignEvents  CampaignEvent[] // 1122
 
   @@index([lastSeenAt])
 }
@@ -1050,4 +1051,46 @@ model CancelFeedback {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
+}
+
+/// 1122: a promo offer (flash sale). Admin-managed; the price is always worked out on the server from the real plan
+/// price, so nothing about the offer is hardcoded in the app. Applied once, to the first payment of a listed plan.
+model Campaign {
+  id             String   @id @default(cuid())
+  title          String
+  kind           String   @default("pct") // pct | fixed
+  value          Int      @default(0) // pct: 1-90 (percent off); fixed: minor units off, in `currency`
+  currency       String   @default("INR") // fixed only: the currency `value` is in (other currencies don't get the offer)
+  planSlugs      String   @default("[]") // JSON string[]: the plans it applies to; the first is the one the popup shows
+  startsAt       DateTime
+  endsAt         DateTime
+  banner         String   @default("{}") // JSON { badge, headline, body, benefits: string[], terms }
+  ctaText        String   @default("Claim Offer Now")
+  ctaHref        String   @default("/billing") // a path inside the app; ?campaign=<id>&plan=<slug> is added
+  eligibility    String   @default("all") // all | free | new | lapsed
+  active         Boolean  @default(false)
+  maxRedemptions Int      @default(0) // 0 = no cap
+  redemptions    Int      @default(0) // paid conversions so far
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  events         CampaignEvent[]
+
+  @@index([active, startsAt, endsAt])
+}
+
+/// 1122: what happened to an offer: impression | dismiss | click | conversion. One impression per person per day.
+model CampaignEvent {
+  id         String   @id @default(cuid())
+  campaignId String
+  userId     String?
+  kind       String
+  day        String   @default("") // YYYY-MM-DD (UTC), for the once-a-day impression rule; a conversion adds "#<paymentId>" (one row per payment)
+  paymentId  String?
+  createdAt  DateTime @default(now())
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, userId, kind, day]) // one impression / dismissal / click / conversion per person, offer and day
+  @@index([campaignId, kind])
+  @@index([userId, campaignId])
 }
