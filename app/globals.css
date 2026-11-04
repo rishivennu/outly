@@ -1801,26 +1801,26 @@ html.js .stk-wrap:not([data-shown]) .stk { opacity: 0; }
 .pd-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid currentColor; }
 .pd-ok { color: var(--pc-ok); }
 .pd-warn, .pd-note-warn { color: var(--pc-warn); }
-.pd-total { display: flex; flex-direction: column; padding: 6px 10px; border-radius: 12px; background: var(--pc-fill); }
-/* Pip analytics (1123): headline numbers, estimates, nudges (no charts) */
-.pd-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 6px; }
-.pd-kpi { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 12px; background: var(--pc-fill); min-width: 0; overflow-wrap: anywhere; }
-.pd-kpi-est { background: transparent; border: 1px dashed var(--pc-line); }
+/* Pip typography (1125): Poppins inside the Pip panel only (components/support/font.ts); the rest of Outlly keeps
+   the site font. 800 welcome · 700 title, key points, numbers · 600 section headings · 500 labels · 400 answers. */
+.pc, .pc :is(h1, h2, h3, h4, h5, h6, p, li, button, input, textarea, select, label, a) { font-family: var(--font-pip), var(--font-body), system-ui, sans-serif; font-variation-settings: normal; }
+.pc .pc-display { letter-spacing: -0.02em; line-height: 1.2; }
+.pc .pc-bubble { font-size: 14.5px; line-height: 1.6; font-weight: 400; }
+.pc .pc-muted { font-weight: 500; }
+.pc .pc-eyebrow { font-weight: 600; letter-spacing: 0.01em; }
+.pc strong, .pc b { font-weight: 700; }
+.pc .pc-num { font-weight: 700; font-variant-numeric: tabular-nums; color: hsl(var(--foreground)); }
+.pc .pc-bubble-me .pc-num { color: inherit; }
+.pc .pc-lead { font-weight: 600; color: hsl(var(--foreground)); }
+@media (max-width: 639px) { .pc .pc-bubble { font-size: 15px; line-height: 1.55; } }
+/* Pip answers (1125): no graphs, number cards or tables (user rule); a short footer plus nudges */
 .pd-est { color: var(--pc-muted); border-style: dashed; }
-.pd-badge-xs { padding: 0 6px; font-size: 10.5px; }
+.pd-line { padding-block: 6px; border-top: 1px solid var(--pc-line); overflow-wrap: anywhere; }
+.pd-line:first-child { border-top: 0; padding-top: 0; }
 .pi-card { border-inline-start: 3px solid var(--pc-line); }
 .pi-warn { border-inline-start-color: var(--pc-warn); }
 .pi-good { border-inline-start-color: var(--pc-ok); }
 .pi-info { border-inline-start-color: var(--pc-accent); }
-.pd-search { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 999px; background: var(--pc-fill); }
-.pd-search:focus-within { box-shadow: 0 0 0 2px var(--pc-accent); }
-.pd-search input:focus, .pd-search input:focus-visible { outline: none; }
-.pd-scroll { overflow-x: auto; border: 1px solid var(--pc-line); border-radius: 12px; overscroll-behavior-x: contain; }
-.pd-scroll:focus-visible { outline: 2px solid var(--pc-accent); outline-offset: 2px; }
-.pd-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.pd-table th { position: sticky; top: 0; background: var(--pc-fill); text-align: start; font-weight: 600; font-size: 12px; color: var(--pc-muted); padding: 8px 10px; white-space: nowrap; }
-.pd-table td { padding: 6px 10px; border-top: 1px solid var(--pc-line); vertical-align: middle; max-width: 220px; overflow-wrap: anywhere; }
-.pd-table td.text-end, .pd-table th.text-end { white-space: nowrap; }
 .pd-link:focus-visible { outline: 2px solid var(--pc-accent); outline-offset: 2px; }
 .pc-link:hover { color: hsl(var(--foreground)); }
 .pc-jump { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; background: var(--pc-solid); border: 1px solid var(--pc-line); box-shadow: 0 6px 20px rgba(20,16,60,.16); }

@@ -126,4 +126,24 @@ export function zipLink(r: PipResult, ownerId: string, docs: PipDoc[], what: str
 }
 
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+/** 1125: the one line that names every account needing a reconnect. */
+export const relinkNote = (names: string[]) => ({ level: "warn" as const, text: names.length === 1 ? `Reconnect ${names[0]} to read its numbers.` : `Reconnect ${names.length} accounts to read their numbers: ${names.join(", ")}.` });
+const RELINK = /^Reconnect (?:(.+) to read its numbers|\d+ accounts to read their numbers: (.+))\.$/;
+/** A report runs several lookups, each with its own reconnect line; fold them into one line naming each account once. */
+export function mergeRelink<N extends { level: "info" | "warn"; text: string }>(notes: N[]): N[] {
+  const names: string[] = [];
+  let first = -1;
+  notes.forEach((n, i) => {
+    const m = RELINK.exec(n.text);
+    if (!m) return;
+    if (first < 0) first = i;
+    for (const x of m[1] ? [m[1]] : m[2].split(", ")) if (!names.includes(x)) names.push(x);
+  });
+  if (first < 0) return notes;
+  const out = notes.filter((n) => !RELINK.test(n.text));
+  out.splice(Math.min(first, out.length), 0, relinkNote(names) as N);
+  return out;
+}
+/** How an account is named: "@handle", never "@@handle", and a page or channel name with spaces stays as it is. */
+export const at = (u: string | null | undefined) => { const v = (u ?? "").trim(); return !v ? "" : v.startsWith("@") || /\s/.test(v) ? v : `@${v}`; };
 export const pct = (n: number) => `${n >= 0 ? "+" : ""}${Math.round(n * 10) / 10}%`;

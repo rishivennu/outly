@@ -1,15 +1,16 @@
 "use client";
-import { useId, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, CircleDashed, Database, Download, ExternalLink, FileArchive, Info, Search } from "lucide-react";
-import type { PipLink, PipResult } from "@/lib/pip/types";
+import { useId } from "react";
+import { AlertTriangle, CircleDashed, Database, Download, ExternalLink, FileArchive } from "lucide-react";
+import { ANALYTIC_TOOLS, type PipLink, type PipResult, type PipRow } from "@/lib/pip/types";
 import { cn } from "@/lib/utils";
 
 /**
- * The records card under a Pip answer (1049). Says exactly what was searched (period + timezone), how many
- * matched vs how many are shown, and whether the list is complete, before any row. Downloads are short-lived
- * links that only work in this person's own session.
+ * The small footer under a Pip answer. USER RULE (1125): no graphs, no number cards, no tables; the answer text
+ * carries the numbers. This only says what was looked at (period + timezone), where it came from, any warning,
+ * and for a list question ("my invoices", "posts from August") the top few items as plain lines with their links.
+ * Downloads are short-lived links that only work in this person's own session.
  */
-const FIRST = 8;
+const TOP = 5;
 
 function LinkBtn({ l, compact }: { l: PipLink; compact?: boolean }) {
   const external = /^https?:\/\//.test(l.href);
@@ -29,125 +30,72 @@ function LinkBtn({ l, compact }: { l: PipLink; compact?: boolean }) {
   );
 }
 
+/** One plain line per item: its first column, then at most two more values, each with its label. */
+function lineOf(r: PipResult, row: PipRow) {
+  const [main, ...rest] = r.columns;
+  const more = rest
+    .map((c) => {
+      const v = row.cells[c.key];
+      return v == null || v === "" ? null : c.label ? `${c.label}: ${v}` : String(v);
+    })
+    .filter((x): x is string => !!x)
+    .slice(0, 2);
+  return { main: main ? String(row.cells[main.key] ?? "") : "", more: more.join(" · ") };
+}
+
 export function PipDataCard({ r }: { r: PipResult }) {
-  const [q, setQ] = useState("");
-  const [all, setAll] = useState(false);
   const id = useId();
-  const hasLinks = r.rows.some((x) => x.links?.length);
-  const rows = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    return t ? r.rows.filter((x) => Object.values(x.cells).some((v) => String(v ?? "").toLowerCase().includes(t))) : r.rows;
-  }, [q, r.rows]);
-  const shown = all || q ? rows : rows.slice(0, FIRST);
+  const list = ANALYTIC_TOOLS.includes(r.tool) ? [] : r.rows.slice(0, TOP);
+  const warn = r.notes.filter((n) => n.level === "warn");
+  const total = Math.max(r.found, r.rows.length);
 
   return (
-    <section aria-labelledby={`${id}-t`} className="pc-card pd mt-2 max-w-full p-3 text-[14px]">
-      <header className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-        <div className="min-w-0">
-          <h3 id={`${id}-t`} className="text-[15px] font-semibold leading-snug">{r.title}</h3>
-          <p className="pc-muted text-[12.5px]">
-            {r.range ? `${r.range.label}, ${r.range.tz.replace(/_/g, " ")} time` : "Everything on record"}
-          </p>
-        </div>
-        {r.estimate && <span className="pd-badge pd-est" title="Contains projections, not actuals">Estimate</span>}
-        <span className={cn("pd-badge", r.complete ? "pd-ok" : "pd-warn")}>
-          {r.complete ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> : <CircleDashed className="h-3.5 w-3.5" aria-hidden />}
-          {r.complete ? "Complete" : "Incomplete"}
+    <section aria-labelledby={`${id}-t`} className="pc-card pd mt-2 max-w-full p-3 text-[13px]">
+      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <h3 id={`${id}-t`} className="text-[14px] font-semibold leading-snug">{r.title}</h3>
+        <span className="flex flex-wrap gap-1.5">
+          {r.estimate && <span className="pd-badge pd-est" title="Contains projections, not actuals">Estimate</span>}
+          {!r.complete && (
+            <span className="pd-badge pd-warn">
+              <CircleDashed className="h-3.5 w-3.5" aria-hidden />
+              Incomplete
+            </span>
+          )}
         </span>
       </header>
+      <p className="pc-muted text-[12px]">{r.range ? `${r.range.label}, ${r.range.tz.replace(/_/g, " ")} time` : "Everything on record"}</p>
 
-      {!!r.cards?.length && (
-        <ul className="pd-cards mt-2" aria-label="Key numbers">
-          {r.cards.map((c) => (
-            <li key={c.label} className={cn("pd-kpi", c.kind === "estimate" && "pd-kpi-est")}>
-              <span className="pc-muted flex items-center gap-1 text-[11.5px]">
-                {c.label}
-                {c.kind === "estimate" && <span className="pd-badge pd-est pd-badge-xs">Estimate</span>}
-              </span>
-              <span className="text-[17px] font-semibold leading-tight tabular-nums">{c.value}</span>
-              {c.delta && <span className={cn("text-[11.5px] tabular-nums", /^[-\u2212]/.test(c.delta) ? "pd-note-warn" : /^\+/.test(c.delta) ? "pd-ok" : "pc-muted")}>{c.delta}</span>}
-              {c.hint && <span className="pc-muted text-[11px] leading-snug">{c.hint}</span>}
-            </li>
-          ))}
+      {list.length > 0 && (
+        <ul className="mt-2" aria-label={r.title}>
+          {list.map((row) => {
+            const l = lineOf(r, row);
+            return (
+              <li key={row.id} className="pd-line flex items-start justify-between gap-2">
+                <span className="min-w-0">
+                  <span className="block font-medium leading-snug">{l.main}</span>
+                  {l.more && <span className="pc-muted block text-[12px] leading-snug tabular-nums">{l.more}</span>}
+                </span>
+                {row.links?.map((x) => <LinkBtn key={x.href} l={x} compact />)}
+              </li>
+            );
+          })}
         </ul>
       )}
-
-      {(r.rows.length > 0 || r.found > 0) && !r.cards?.length && (
-        <p className="mt-1.5 text-[13px]">
-          Found <strong>{r.found}</strong>
-          {r.returned !== r.found ? <> · showing <strong>{r.returned}</strong></> : null}
+      {list.length > 0 && total > list.length && (
+        <p className="pc-muted mt-1 text-[12px]">
+          Top {list.length} of {total}.{r.downloads.some((x) => x.download) ? " Download the full list below." : ""}
         </p>
       )}
 
-      {r.totals.length > 0 && (
-        <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Totals">
-          {r.totals.map((t) => (
-            <li key={t.label} className="pd-total">
-              <span className="pc-muted text-[11.5px]">{t.label}</span>
-              <span className="font-semibold tabular-nums">{t.value}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {r.notes.length > 0 && (
+      {warn.length > 0 && (
         <ul className="mt-2 space-y-1">
-          {r.notes.map((n, i) => (
-            <li key={i} className={cn("flex gap-1.5 text-[12.5px] leading-snug", n.level === "warn" ? "pd-note-warn" : "pc-muted")}>
-              {n.level === "warn" ? <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden /> : <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />}
+          {warn.map((n, i) => (
+            <li key={i} className="pd-note-warn flex gap-1.5 text-[12.5px] leading-snug">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
               <span>{n.text}</span>
             </li>
           ))}
         </ul>
-      )}
-
-      {r.rows.length === 0 ? (
-        <p className="pc-muted mt-2 text-[13px]">{r.empty}</p>
-      ) : (
-        <>
-          {r.rows.length > FIRST && (
-            <label className="pd-search mt-2">
-              <Search className="pc-muted h-4 w-4 shrink-0" aria-hidden />
-              <span className="sr-only">Filter these {r.rows.length} rows</span>
-              <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter" className="min-w-0 flex-1 bg-transparent text-[14px]" />
-            </label>
-          )}
-          <div className="pd-scroll mt-2" tabIndex={0} role="region" aria-label={`${r.title}, table`}>
-            <table className="pd-table">
-              <caption className="sr-only">
-                {r.title}. {q ? `${rows.length} match the filter.` : `Showing ${shown.length} of ${r.rows.length}.`}
-              </caption>
-              <thead>
-                <tr>
-                  {r.columns.map((c) => (
-                    <th key={c.key} scope="col" className={cn(c.align === "end" && "text-end")}>{c.label}</th>
-                  ))}
-                  {hasLinks && <th scope="col"><span className="sr-only">Files and links</span></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((row) => (
-                  <tr key={row.id}>
-                    {r.columns.map((c) => (
-                      <td key={c.key} className={cn(c.align === "end" && "text-end tabular-nums", c.mono && "font-mono text-[12.5px]")}>{row.cells[c.key] ?? ""}</td>
-                    ))}
-                    {hasLinks && (
-                      <td className="whitespace-nowrap">
-                        {row.links?.map((l) => <LinkBtn key={l.href} l={l} compact />)}
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {q && rows.length === 0 && <p className="pc-muted mt-1.5 text-[13px]">Nothing matches &ldquo;{q}&rdquo;.</p>}
-          {!q && rows.length > FIRST && (
-            <button type="button" onClick={() => setAll((v) => !v)} className="pc-btn mt-2" aria-expanded={all}>
-              {all ? `Show the first ${FIRST}` : `Show all ${rows.length}`}
-            </button>
-          )}
-        </>
       )}
 
       {r.downloads.length > 0 && (

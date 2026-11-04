@@ -10,7 +10,7 @@ import { isPracticeAccount } from "../social/registry";
 import * as A from "./analytics-core";
 import { platformsNamed } from "./plan";
 import { dayLabel, parseRange, previousRange, type DateRange } from "./range";
-import { base, plural, type PipArgs, type PipCtx } from "./tools-core";
+import { at, base, plural, type PipArgs, type PipCtx } from "./tools-core";
 import { accountsInScope, dashboards, type Acct } from "./tools-content";
 import type { PipResult, PipTool } from "./types";
 
@@ -173,7 +173,7 @@ async function readStats(ctx: PipCtx, from: number, to: number, platform: string
     lastSync: last?.capturedAt.getTime() ?? null,
     capped: snapRows.length >= SNAP_CAP,
     failed: false,
-    stale: stale.filter((s) => isPlatform(s.platform)).map((s) => `${pname(s.platform)} @${s.username} ${s.status === "needs_reconnect" ? "needs reconnecting" : "is disconnected"}`),
+    stale: stale.filter((s) => isPlatform(s.platform)).map((s) => `${pname(s.platform)} ${at(s.username)} ${s.status === "needs_reconnect" ? "needs reconnecting" : "is disconnected"}`),
   };
 }
 
@@ -833,7 +833,7 @@ export const account: Tool = async (ctx, _a, _range, period) => {
       .catch(() => null),
   ]);
   const real = (accts ?? []).filter((x) => isPlatform(x.platform) && !isPracticeAccount(x));
-  for (const x of real) r.rows.push({ id: x.id, cells: { where: `${pname(x.platform)} @${x.username}`, status: STATUS_NAME[x.status] ?? cap(x.status), since: dayLabel(x.createdAt, ctx.tz) }, links: x.status !== "connected" ? [{ label: "Reconnect in Settings", href: "/settings" }] : undefined });
+  for (const x of real) r.rows.push({ id: x.id, cells: { where: `${pname(x.platform)} ${at(x.username)}`, status: STATUS_NAME[x.status] ?? cap(x.status), since: dayLabel(x.createdAt, ctx.tz) }, links: x.status !== "connected" ? [{ label: "Reconnect in Settings", href: "/settings" }] : undefined });
   r.found = r.returned = r.rows.length;
   if (!accts) {
     r.complete = false;
@@ -842,7 +842,7 @@ export const account: Tool = async (ctx, _a, _range, period) => {
   const live = real.filter((x) => x.status === "connected").length;
   const needs = real.filter((x) => x.status === "needs_reconnect");
   r.cards = [{ label: "Connected accounts", value: String(live), hint: needs.length ? `${needs.length} need reconnecting` : undefined }];
-  r.facts.push(`${plural(live, "account")} connected${needs.length ? `; ${needs.map((x) => `${pname(x.platform)} @${x.username}`).join(", ")} ${needs.length === 1 ? "needs" : "need"} reconnecting` : ""}.`);
+  r.facts.push(`${plural(live, "account")} connected${needs.length ? `; ${needs.map((x) => `${pname(x.platform)} ${at(x.username)}`).join(", ")} ${needs.length === 1 ? "needs" : "need"} reconnecting` : ""}.`);
   if (user) {
     r.facts.push(`Workspace: ${user.name}, timezone ${user.timezone}, on Outlly since ${dayLabel(user.createdAt, ctx.tz)}.`);
     if (user.postingGoal) r.facts.push(`Posting goal: ${user.postingGoal} posts a week.`);
@@ -936,7 +936,7 @@ export const postInsight: Tool = async (ctx, a, range, period) => {
       else if (d && p) {
         target = fromLive(p, acct.platform);
         peers = d.posts.filter((x) => x !== p && dated(x)).map((x) => fromLive(x, acct.platform));
-        label = `the last ${d.rangeDays} days on ${pname(acct.platform)} @${acct.username}`;
+        label = `the last ${d.rangeDays} days on ${pname(acct.platform)} ${at(acct.username)}`;
         focusKey = focus;
         r.sources = ["Read live from the platform just now."];
       }

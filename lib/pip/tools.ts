@@ -3,7 +3,7 @@ import { parseRange, type DateRange } from "./range";
 import { creditNotes, invoices, payments, refundsMissingCreditNote, spending, subscription } from "./tools-billing";
 import { activity, engagement, notices, posts, tickets, topPosts, uploads } from "./tools-content";
 import { ANALYTICS } from "./tools-analytics";
-import { base, type PipArgs, type PipCtx } from "./tools-core";
+import { base, mergeRelink, type PipArgs, type PipCtx } from "./tools-core";
 import type { PipResult, PipTool } from "./types";
 
 export type { PipArgs, PipCtx } from "./tools-core";
@@ -45,6 +45,7 @@ export async function runTool(tool: PipTool, ctx: PipCtx, a: PipArgs = {}): Prom
   if (!range && tool === "activity") range = parseRange("last 30 days", ctx.tz, ctx.now);
   const period = text || (range ? ctx.message.slice(0, 160) : null);
   const r = await TOOLS[tool](ctx, a, range, period);
+  r.notes = mergeRelink(r.notes);
   if (unread) r.notes.unshift({ level: "warn", text: `I couldn't read the dates "${text.slice(0, 60)}", so this covers everything on record.` });
   // 1123: the post this card is about travels with the follow-up, so "why did it do better?" has a subject.
   if (r.focus && r.ask.focus == null) r.ask.focus = r.focus.postId;

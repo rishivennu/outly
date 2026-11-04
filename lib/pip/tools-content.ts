@@ -6,7 +6,7 @@ import type { LivePost, PlatformDashboard } from "../live/types";
 import { isPracticeAccount } from "../social/registry";
 import { storage } from "../storage";
 import type { DateRange } from "./range";
-import { base, day, fetchAll, pageArgs, pct, plural, settle, within, type PipArgs, type PipCtx } from "./tools-core";
+import { base, day, fetchAll, pageArgs, pct, plural, at, relinkNote, settle, within, type PipArgs, type PipCtx } from "./tools-core";
 import type { PipResult } from "./types";
 
 /**
@@ -106,14 +106,17 @@ export async function accountsInScope(ctx: PipCtx, platform: string | null | und
 /** One dashboard per account, in parallel; a failure is reported per account, never hidden. */
 export async function dashboards(ctx: PipCtx, accts: Acct[], r: PipResult) {
   const out: { acct: Acct; d: PlatformDashboard }[] = [];
+  // 1125: accounts that need reconnecting are named together in one line, not one warning each.
+  const relink: string[] = [];
   await Promise.all(
     accts.map(async (acct) => {
-      const who = `${pname(acct.platform)} @${acct.username}`;
+      const who = `${pname(acct.platform)} ${at(acct.username)}`;
       try {
         const d = await platformDashboard(ctx.ownerId, acct.platform, { accountId: acct.id });
         if (d.status !== "ok") {
           r.complete = false;
-          r.notes.push({ level: "warn", text: `${who}: ${d.status === "needs_reconnect" ? "needs reconnecting before its numbers can be read." : d.message || "numbers aren't available right now."}` });
+          if (d.status === "needs_reconnect") relink.push(who);
+          else r.notes.push({ level: "warn", text: `${who}: ${d.message || "numbers aren't available right now."}` });
         } else {
           out.push({ acct, d });
           for (const n of d.notes) if (n.level === "warning") r.notes.push({ level: "warn", text: `${who}: ${n.text}` });
@@ -124,6 +127,7 @@ export async function dashboards(ctx: PipCtx, accts: Acct[], r: PipResult) {
       }
     }),
   );
+  if (relink.length) r.notes.unshift(relinkNote(relink));
   return out;
 }
 
@@ -192,7 +196,7 @@ export async function topPosts(ctx: PipCtx, a: PipArgs, range: DateRange | null,
       id: `${x.acct.id}:${x.p.id}`,
       cells: {
         title: short(x.p.title || "Untitled"),
-        where: `${pname(x.acct.platform)} @${x.acct.username}`,
+        where: `${pname(x.acct.platform)} ${at(x.acct.username)}`,
         date: day(x.p.publishedAt, ctx.tz),
         views: x.p.views == null ? "Not reported" : fmtInt(x.p.views),
         rate: x.rate == null ? "Not reported" : `${Math.round(x.rate * 1000) / 10}%`,
@@ -233,7 +237,7 @@ export async function engagement(ctx: PipCtx, a: PipArgs, range: DateRange | nul
   let window = 0;
   for (const { acct, d } of boards) {
     window = Math.max(window, d.rangeDays);
-    const who = `${pname(acct.platform)} @${acct.username}`;
+    const who = `${pname(acct.platform)} ${at(acct.username)}`;
     for (const h of d.headline) {
       if (h.value == null) continue;
       const value = h.format === "pct" ? `${Math.round(h.value * 10) / 10}%` : h.format === "duration" ? `${Math.round(h.value)}s` : fmtInt(h.value);

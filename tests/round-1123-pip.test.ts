@@ -329,9 +329,15 @@ describe("1123 wiring: isolation, permissions, storage", () => {
     expect(widget).toContain("insight:${n.id}");
     expect(widget).toContain("focus: lastData.ask.focus");
   });
-  test("estimates are badged; Pip answers carry no charts (user rule)", () => {
+  test("estimates are badged; Pip answers carry no charts, number cards or tables (user rule)", () => {
     expect(card).toContain("Estimate");
     expect(card).not.toMatch(/chart/i);
+    expect(card).not.toMatch(/<table|r\.cards|r\.totals|pd-kpi/);
+    // A list question still names its top items, each with its own link, and points to the download for the rest.
+    expect(card).toContain("const TOP = 5");
+    expect(card).toContain("ANALYTIC_TOOLS.includes(r.tool) ? [] : r.rows.slice(0, TOP)");
+    expect(card).toContain("Download the full list below.");
+    expect(read("app/globals.css")).not.toMatch(/\.pd-(table|kpi|cards|total)\b/);
     expect(read("lib/pip/types.ts")).not.toMatch(/charts\?:/);
     expect(read("lib/pip/tools-analytics.ts")).not.toMatch(/\.charts\b/);
     expect(existsSync("components/support/PipChartView.tsx")).toBe(false);

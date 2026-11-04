@@ -7,6 +7,7 @@ import { Pip, type PipMood } from "@/components/brand/Pip";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { Answer } from "./Answer";
 import { PipDataCard } from "./PipDataCard";
+import { pipFont } from "./font";
 import type { PipResult } from "@/lib/pip/types";
 import type { Insight } from "@/lib/pip/analytics-core";
 import { CX, LANGS, PIP_DATA, T, langDir, readLang, writeLang, type Lang } from "@/lib/i18n/support";
@@ -348,7 +349,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   // Create has its own writing assistant on the right, so a second bubble there only competes with it.
   // Pip still opens on request (help links fire outly:chat-open) and goes away again when closed.
   return (
-    <div className={cn("pc fixed right-4 z-[55] sm:right-6", (path.startsWith("/create") || waitTurn) && !open && "hidden", lift ? "bottom-[calc(env(safe-area-inset-bottom)+74px)] lg:bottom-6" : "bottom-[max(16px,env(safe-area-inset-bottom))] sm:bottom-6")}>
+    <div className={cn(pipFont.variable, "pc fixed right-4 z-[55] sm:right-6", (path.startsWith("/create") || waitTurn) && !open && "hidden", lift ? "bottom-[calc(env(safe-area-inset-bottom)+74px)] lg:bottom-6" : "bottom-[max(16px,env(safe-area-inset-bottom))] sm:bottom-6")}>
       {open && <div className="pc-scrim fixed inset-0" aria-hidden onClick={close} />}
       {open && (
         <section
@@ -365,7 +366,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
           <header className="pc-head flex items-center gap-3 px-3 py-2.5 sm:px-4">
             <Pip size={40} mood={mood} />
             <div className="min-w-0 flex-1">
-              <h2 id="pc-title" className="truncate text-[15px] font-semibold leading-tight">{t.title}</h2>
+              <h2 id="pc-title" className="truncate text-[15px] font-bold leading-tight">{t.title}</h2>
               <p id="pc-desc" className="pc-muted flex items-center gap-1.5 text-[12.5px]"><span className="pc-dot h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden /><span className="truncate">{t.status}</span></p>
             </div>
             {msgs.length > 0 && (
@@ -381,7 +382,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
             <div ref={listRef} onScroll={onScroll} data-lenis-prevent className="h-full overflow-y-auto overscroll-contain px-4 pb-4 pt-5">
               <div className="pc-welcome mb-5 text-center">
                 <div className="mx-auto grid w-max place-items-center"><Pip size={msgs.length ? 52 : 76} mood={mood} /></div>
-                <p className="mt-2 text-[19px] font-semibold tracking-tight">{cx.welcome}</p>
+                <p className="pc-display mt-2 text-[19px] font-extrabold">{cx.welcome}</p>
                 <p className="pc-muted mx-auto mt-1 max-w-[34ch] text-[14px] leading-relaxed">{t.hello}</p>
               </div>
 
@@ -424,7 +425,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                     {nudges.map((n) => (
                       <li key={n.id} className={cn("pc-card pi-card flex items-start gap-3 p-3", `pi-${n.level}`)}>
                         <div className="min-w-0 flex-1">
-                          <p className="text-[14px] font-semibold leading-snug">{n.title}</p>
+                          <p className="text-[14px] font-bold leading-snug">{n.title}</p>
                           <p className="mt-0.5 text-[13.5px] leading-snug">{n.body}</p>
                           <p className="pc-muted mt-1 text-[12px] leading-snug">{n.evidence}</p>
                           <button type="button" disabled={busy} onClick={() => send(n.ask)} className="pc-btn mt-2">{(pd ?? pdx).ask}</button>
@@ -462,7 +463,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                 {msgs.map((m) => (
                   <div key={m.id} className={cn("pc-in", m.role === "user" ? "pc-from-me" : "pc-from-pip")}>
                     <Bubble role={m.role} label={m.role === "user" ? cx.saidYou : cx.saidPip} error={m.kind === "error"}>
-                      {m.role === "bot" ? <Answer text={m.text} /> : <p className="whitespace-pre-wrap">{m.text}</p>}
+                      {m.role === "bot" ? <Answer text={m.text} emphasis={!!m.data} /> : <p className="whitespace-pre-wrap">{m.text}</p>}
                     </Bubble>
                     {m.data && <PipDataCard r={m.data} />}
                     {m.role === "bot" && !m.kind && m.text !== t.glad && (
