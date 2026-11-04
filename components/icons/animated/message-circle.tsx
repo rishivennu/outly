@@ -35,8 +35,8 @@ const ICON_VARIANTS: Variants = {
       },
       scale: {
         type: "spring",
-        stiffness: 400,
-        damping: 10,
+        bounce: 0, // 1119: critically damped, never overshoots
+        duration: 0.3,
       },
     },
   },

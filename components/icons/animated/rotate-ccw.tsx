@@ -9,6 +9,7 @@ import type { HTMLAttributes } from "react";
 import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
+import { T } from "@/lib/motion/tokens";
 
 export interface RotateCCWIconHandle {
   startAnimation: () => void;
@@ -63,7 +64,7 @@ const RotateCCWIcon = forwardRef<RotateCCWIconHandle, RotateCCWIconProps>(
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth="2"
-          transition={{ type: "spring", stiffness: 250, damping: 25 }}
+          transition={T.nav}
           variants={{
             normal: { rotate: "0deg" },
             animate: { rotate: "-50deg" },

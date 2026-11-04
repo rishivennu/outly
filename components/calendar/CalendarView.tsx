@@ -1,4 +1,5 @@
 "use client";
+import { ease } from "@/lib/motion/tokens";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -124,7 +125,7 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
       </header>
 
       <AnimatePresence mode="wait" initial={false}>
-        <motion.ol key={start} initial={{ opacity: 0, x: dir * 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: dir * -40 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }} className="mt-10 grid gap-3 md:grid-cols-7" data-guide="cal-grid">
+        <motion.ol key={start} initial={{ opacity: 0, x: dir * 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: dir * -40 }} transition={{ duration: 0.25, ease: ease("out") }} className="mt-10 grid gap-3 md:grid-cols-7" data-guide="cal-grid">
           {days.map((d) => {
             const items = byDay.get(d) ?? [];
             const isToday = d === today;

@@ -1,4 +1,5 @@
 "use client";
+import { ease } from "@/lib/motion/tokens";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
@@ -457,7 +458,7 @@ function Posts({ posts, platform }: { posts: LivePost[]; platform: Platform }) {
             {shown.map((p, i) => {
               const e = engagement(p);
               return (
-                <motion.li key={p.id} layout={!reduce} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} className="py-3 first:pt-0 last:pb-0">
+                <motion.li key={p.id} layout={!reduce} transition={{ duration: 0.35, ease: ease("out") }} className="py-3 first:pt-0 last:pb-0">
                   <a href={p.url ?? undefined} target="_blank" rel="noopener noreferrer" className="group grid grid-cols-[56px_1fr] items-center gap-x-4 gap-y-2 rounded-2xl p-1.5 transition-colors hover:bg-foreground/[0.03] sm:grid-cols-[64px_minmax(0,1.6fr)_repeat(4,minmax(0,0.6fr))]">
                     <div className="relative row-span-2 aspect-[9/14] w-14 overflow-hidden rounded-xl bg-secondary sm:row-span-1 sm:w-16">
                       {/* eslint-disable-next-line @next/next/no-img-element */}

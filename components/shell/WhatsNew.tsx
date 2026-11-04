@@ -8,6 +8,7 @@ import { Pip } from "@/components/brand/Pip";
 import { seenUpdateKey, shouldShowUpdate, type UpdateNotice } from "@/lib/updates";
 import { tourKey } from "@/components/onboarding/Tour";
 import { useUser } from "@/components/shell/UserContext";
+import { T, FX } from "@/lib/motion/tokens";
 
 const TELL_US = "/support?write=changes#stuck";
 
@@ -150,7 +151,7 @@ export function WhatsNew({ notice, userId, joinedAt }: { notice: UpdateNotice; u
         {open && (
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild forceMount>
-              <motion.div className="fixed inset-0 z-[80] bg-black/45 backdrop-blur-[4px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+              <motion.div className="fixed inset-0 z-[80] bg-black/45 backdrop-blur-[4px]" {...FX.scrim} />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount {...(notice.body ? {} : { "aria-describedby": undefined })}>
               <div
@@ -162,10 +163,7 @@ export function WhatsNew({ notice, userId, joinedAt }: { notice: UpdateNotice; u
               >
                 <motion.div
                   className="w-full max-w-[460px]"
-                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.96 }}
-                  animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }}
-                  transition={reduce ? { duration: 0.15 } : { type: "spring", stiffness: 380, damping: 34 }}
+                  {...(reduce ? FX.fade : FX.dialog)}
                 >
                   <WhatsNewCard notice={notice} onClose={close} onTell={() => { close(); router.push(TELL_US); }} />
                 </motion.div>

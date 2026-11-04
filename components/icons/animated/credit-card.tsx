@@ -25,15 +25,15 @@ const CARD_VARIANTS: Variants = {
     x: 0,
     transition: {
       type: "spring",
-      stiffness: 280,
-      damping: 18,
+      bounce: 0, // 1119: critically damped, never overshoots
+      duration: 0.3,
     },
   },
   animate: {
-    x: [0, -4, 1.5, 0],
+    x: [0, -4, 0], // 1119: no rebound past rest
     transition: {
       duration: 0.7,
-      times: [0, 0.4, 0.75, 1],
+      times: [0, 0.45, 1],
       ease: "easeInOut",
     },
   },

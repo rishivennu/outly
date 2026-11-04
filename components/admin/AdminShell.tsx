@@ -13,6 +13,7 @@ import { ContrastToggle } from "@/components/shared/ContrastToggle";
 import { can, ROLE_LABEL, type AdminArea, type AdminRole } from "@/lib/admin/perms";
 import { Bell } from "./Bell";
 import { ScrollArea } from "./ScrollArea";
+import { T } from "@/lib/motion/tokens";
 
 const NAV: { href: string; label: string; icon: typeof Users; area: AdminArea; group: "Run" | "Support" | "Setup" }[] = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, area: "overview", group: "Run" },
@@ -61,7 +62,7 @@ function NavList({ role, path, badges, onNavigate, layoutId }: { role: AdminRole
                 return (
                   <Link key={href} href={href} onClick={onNavigate} aria-current={on ? "page" : undefined} className={cn("group relative flex h-10 items-center gap-3 rounded-2xl px-3 text-[14px] font-medium transition-colors duration-200", on ? "text-foreground" : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground")}>
                     {on && (
-                      <motion.span layoutId={layoutId} className="absolute inset-0 rounded-2xl bg-secondary" transition={{ type: "spring", stiffness: 520, damping: 42 }}>
+                      <motion.span layoutId={layoutId} className="absolute inset-0 rounded-2xl bg-secondary" transition={T.glide}>
                         <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-lime" />
                       </motion.span>
                     )}
@@ -90,7 +91,7 @@ function Footer({ admin, path, onNavigate, layoutId }: { admin: { name: string; 
       {/* 1065: the same pill as the list above (shared layoutId), so it glides down here too. */}
       <Link href="/admin/account" onClick={onNavigate} aria-current={mine ? "page" : undefined} className={cn("group relative flex h-10 items-center gap-3 rounded-2xl px-3 text-[13.5px] transition-colors duration-200", mine ? "text-foreground" : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground")}>
         {mine && (
-          <motion.span layoutId={layoutId} className="absolute inset-0 rounded-2xl bg-secondary" transition={{ type: "spring", stiffness: 520, damping: 42 }}>
+          <motion.span layoutId={layoutId} className="absolute inset-0 rounded-2xl bg-secondary" transition={T.glide}>
             <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-lime" />
           </motion.span>
         )}
@@ -180,7 +181,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
               initial={{ x: "-110%" }}
               animate={{ x: 0 }}
               exit={{ x: "-110%" }}
-              transition={{ type: "spring", stiffness: 380, damping: 38 }}
+              transition={T.card}
             >
               <ScrollArea className="px-3 pb-3 pt-4">
                 <div className="mb-5 flex items-center justify-between px-2">

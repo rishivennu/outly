@@ -1,4 +1,5 @@
 "use client";
+import { FX } from "@/lib/motion/tokens";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -52,7 +53,7 @@ export function UpgradeDialog() {
         {open && (
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild forceMount>
-              <motion.div className="fixed inset-0 z-[80] bg-foreground/35 backdrop-blur-[3px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+              <motion.div className="fixed inset-0 z-[80] bg-foreground/35 backdrop-blur-[3px]" {...FX.scrim} />
             </Dialog.Overlay>
             {/* flex-col + my-auto, not grid place-items: a tall card still scrolls from its top on short phones. */}
             <Dialog.Content asChild forceMount>
@@ -62,10 +63,7 @@ export function UpgradeDialog() {
                 onPointerDown={(e) => { if (e.target === e.currentTarget) setD(null); }}
               >
                 <motion.div
-                  initial={{ opacity: 0, y: 20, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                  {...FX.dialog}
                   className="glass-strong mx-auto my-auto w-full max-w-[420px] rounded-[28px] p-5 text-center sm:p-6"
                 >
                   <Pip size={64} mood="idle" className="mx-auto" />

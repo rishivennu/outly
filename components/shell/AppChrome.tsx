@@ -14,6 +14,7 @@ import { useTheme, type ThemeChoice } from "@/components/shared/ThemeToggle";
 import { useUser } from "./UserContext";
 import { NoticesBell } from "./NoticesBell";
 import { HoverLink } from "./HoverLink";
+import { T } from "@/lib/motion/tokens";
 
 /*
  * Android app chrome (Apple HIG + Liquid Glass): large-title navigation bar, floating glass tab bar with a
@@ -29,8 +30,8 @@ const TABS = [
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
-const SPRING = { type: "spring", stiffness: 520, damping: 40, mass: 0.9 } as const;
-const SHEET = { type: "spring", stiffness: 380, damping: 38 } as const;
+const SPRING = T.glide; // 1119: tab and segment pills glide, no overshoot
+const SHEET = T.card;
 
 const isActive = (path: string, href: string) => (href === "/home" ? path === "/home" : path.startsWith(href));
 

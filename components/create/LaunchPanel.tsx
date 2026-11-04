@@ -18,6 +18,7 @@ import type { AccountView, Draft } from "./types";
 import { enabledPlatforms } from "./publish";
 import { MusicNote } from "./MusicNote";
 import { CoverPicker } from "./CoverPicker";
+import { T } from "@/lib/motion/tokens";
 
 interface Props {
   drafts: Record<Platform, Draft>;
@@ -96,7 +97,7 @@ export function LaunchPanel(p: Props) {
       <div role="radiogroup" aria-label="When should this go live?" className="mt-8 grid grid-cols-2 gap-2 rounded-full bg-secondary/60 p-1.5 hairline">
         {(["now", "schedule"] as const).map((m) => (
           <button key={m} type="button" role="radio" aria-checked={p.mode === m} onClick={() => p.onMode(m)} className={cn("relative h-12 rounded-full text-sm font-semibold transition", p.mode === m ? "text-background" : "text-muted-foreground hover:text-foreground")}>
-            {p.mode === m && <motion.span layoutId="launch-mode" className="absolute inset-0 rounded-full bg-foreground" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+            {p.mode === m && <motion.span layoutId="launch-mode" className="absolute inset-0 rounded-full bg-foreground" transition={T.glide} />}
             <span className="relative inline-flex items-center gap-2">
               {m === "now" ? <Send className="h-4 w-4" /> : <CalendarClock className="h-4 w-4" />}
               {m === "now" ? "Send it now" : "Schedule it"}
@@ -185,7 +186,7 @@ export function LaunchPanel(p: Props) {
 export function ScheduledView({ when, tz, poster, onAnother }: { when: string; tz: string; poster: string | null; onAnother: () => void }) {
   return (
     <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="mx-auto flex max-w-xl flex-col items-center py-10 text-center">
-      <motion.div initial={{ rotate: -8, y: 20 }} animate={{ rotate: -4, y: 0 }} transition={{ type: "spring", stiffness: 200, damping: 14 }} className="glass-strong relative mb-10 w-52 rounded-[28px] p-3 shadow-[0_40px_80px_-30px_hsl(var(--warning)/0.4)]">
+      <motion.div initial={{ rotate: -8, y: 20 }} animate={{ rotate: -4, y: 0 }} transition={T.card} className="glass-strong relative mb-10 w-52 rounded-[28px] p-3 shadow-[0_40px_80px_-30px_hsl(var(--warning)/0.4)]">
         <div className="rounded-t-2xl bg-warning px-4 py-2 text-left text-sm font-bold uppercase tracking-wider text-[hsl(var(--lime-foreground))]">{fmt(when, tz, { month: "long" })}</div>
         <div className="flex items-center gap-3 p-4">
           <span className="display text-6xl tabular">{fmt(when, tz, { day: "numeric" })}</span>

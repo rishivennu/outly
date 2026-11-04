@@ -2,6 +2,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { T, FX } from "@/lib/motion/tokens";
 
 interface Props {
   open: boolean;
@@ -30,7 +31,7 @@ export function ConfirmDialog({ open, onOpenChange, title, body, confirmLabel, c
         {open && (
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild forceMount>
-              <motion.div className="fixed inset-0 z-[70] bg-foreground/35 backdrop-blur-[3px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+              <motion.div className="fixed inset-0 z-[70] bg-foreground/35 backdrop-blur-[3px]" {...FX.scrim} />
             </Dialog.Overlay>
             {/* Centred by a grid wrapper, not translate classes: framer-motion writes its own inline
                 transform for y/scale, which wiped -translate-x/-y and pushed the card off-screen on phones. */}
@@ -41,10 +42,7 @@ export function ConfirmDialog({ open, onOpenChange, title, body, confirmLabel, c
                 onPointerDown={(e) => { if (e.target === e.currentTarget && !busy) onOpenChange(false); }}
               >
                 <motion.div
-                  initial={{ opacity: 0, y: 20, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ type: "spring", stiffness: 460, damping: 36 }}
+                  {...FX.dialog}
                   className={`glass-strong w-full ${size === "wide" ? "max-w-[580px]" : "max-w-[420px]"} rounded-[28px] p-5 sm:p-6`}
                 >
                   <Dialog.Title className="text-lg font-semibold tracking-tight [overflow-wrap:anywhere]">{title}</Dialog.Title>

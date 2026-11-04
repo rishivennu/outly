@@ -23,6 +23,7 @@ import { useTabMemory } from "@/lib/client/tab-state";
 import { deleteCopy, deletePosts, isFailedPost } from "@/lib/client/failed-posts";
 import type { PostView } from "@/lib/services";
 import type { LibraryCounts, LibraryPage } from "@/lib/posts/library";
+import { T } from "@/lib/motion/tokens";
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -204,7 +205,7 @@ export function ContentLibrary({
               setFilter(f.id);
               window.history.replaceState(null, "", f.id === "all" ? "/content" : `/content?filter=${f.id}`);
             }} className={cn("relative h-11 shrink-0 rounded-full px-4 text-sm font-medium transition", filter === f.id ? "text-background" : "text-muted-foreground hairline hover:text-foreground")}>
-            {filter === f.id && <motion.span layoutId="content-filter" className="bg-foreground absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+            {filter === f.id && <motion.span layoutId="content-filter" className="bg-foreground absolute inset-0 rounded-full" transition={T.glide} />}
             <span className="relative">
               {f.label} <span className={cn("tabular", filter === f.id && "opacity-60")}>{counts[f.id]}</span>
             </span>

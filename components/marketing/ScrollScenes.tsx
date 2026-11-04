@@ -5,6 +5,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { MOTION_OK } from "@/lib/motion/gsap";
 import { rowsIn } from "@/lib/motion/reveal";
 import { whenLenis } from "./SmoothScroll";
+import { GSAP_EASE, sec as secs } from "@/lib/motion/tokens";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -19,8 +20,13 @@ gsap.registerPlugin(ScrollTrigger);
  *   4. Demo (lg): the section pins and scrolling walks through the four beats; past it, the clock takes over.
  *   5. Comparison: opening a group (or Expand all) brings its rows in, in threes; opening a row deals its cards.
  *   6. Final call to action: the side walls close in on the phone and the tiles settle, once.
- *   8. Parallax (1064): decorative layers marked data-parallax="px" drift against the scroll, scrubbed, a few
- *      dozen px at most. Below lg, How it works fills a thin line along each step as it scrolls up.
+ *   8. Parallax (1064): decorative layers marked data-parallax="px" drift against the scroll, a few dozen px at
+ *      most. The one scroll-linked effect left (parallax is position by definition), smoothed so it never jerks.
+ *      Below lg, How it works fills a thin line along each step once it comes up.
+ *
+ * 1119: everything else is time-based. Scroll only decides WHEN a move starts (the hero lifts away once it is a
+ * fifth scrolled, the pinned steps light one by one); each move then plays at its token pace (lib/motion/tokens),
+ * so a fast flick never fast-forwards it.
  *   7. Section motion (10-23): every section below the hero settles into place as it comes up, each in its own
  *      way (headings drift in behind their content, grids rise, columns arrive one after another). Time-based:
  *      it plays at the same calm pace however fast the page is scrolled.
@@ -33,7 +39,7 @@ gsap.registerPlugin(ScrollTrigger);
  * runs (gsap.matchMedia on MOTION_OK); every section is then just its plain, readable layout.
  * Transforms and opacity only; no layout properties are animated.
  */
-const EASE = "expo.out";
+const EASE = GSAP_EASE.out; // 1119: the token ease-out (lib/motion/tokens.ts)
 
 // Elements another engine already moves: the reveal engine (wrappers other than section heads, which it never
 // moves), bento tiles and comparison groups, and the cursor/hero effects in MotionFx and LandingFx.
@@ -52,7 +58,7 @@ export function ScrollScenes() {
       const { motion, wide, lg } = ctx.conditions as { motion: boolean; wide: boolean; lg: boolean };
       if (!motion) return;
       const k = wide ? 1 : 0.55; // travel scale on phones
-      const scrub = wide ? 0.6 : true;
+      const out = GSAP_EASE.out;
       const fits = (el: HTMLElement) => el.offsetHeight <= innerHeight - 96; // leave room for the floating nav
       // Teardown for the non-GSAP side effects below (inline styles, attributes, listeners, events). Runs when this
       // media set reverts. (ctx.add(fn) would run fn right away, not on revert.)
@@ -61,7 +67,8 @@ export function ScrollScenes() {
       // 1. Hero leave.
       const hero = main.querySelector<HTMLElement>("section[aria-labelledby=hero-title]");
       if (hero) {
-        const tl = gsap.timeline({ defaults: { ease: "none" }, scrollTrigger: { trigger: hero, start: "top top", end: "bottom top", scrub } });
+        // Time-based leave: plays forward once the hero is a fifth scrolled away, back (a little quicker) on return.
+        const tl = gsap.timeline({ paused: true, defaults: { ease: out, duration: secs("section") } });
         const copy = hero.querySelector(":scope > div.relative.flex");
         const fan = hero.querySelector(":scope > div.relative:not(.flex)");
         const glow = hero.querySelector(":scope > .hf-glow");
@@ -84,14 +91,26 @@ export function ScrollScenes() {
             s.style.rotate = p ? `${(o * 5 * p).toFixed(2)}deg` : "";
           });
         };
-        tl.fromTo(deal, { p: 0 }, { p: 1, onUpdate: dealOut }, 0);
+        // Half the old full spread: the deal now lands while the fan is still on screen, and the outer cards must stay
+        // inside its clipped frame.
+        tl.fromTo(deal, { p: 0 }, { p: 0.5, onUpdate: dealOut }, 0);
+        ScrollTrigger.create({
+          trigger: hero,
+          start: "20% top",
+          onEnter: () => void tl.timeScale(1).play(),
+          onLeaveBack: () => void tl.timeScale(1.4).reverse(),
+        });
         undo.push(() => slots.forEach((s) => { s.style.translate = ""; s.style.rotate = ""; }));
       }
 
       // 2. Route line.
-      for (const r of Array.from(main.querySelectorAll("[data-route] svg"))) {
-        gsap.fromTo(r, { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, ease: "none", scrollTrigger: { trigger: r, start: "top 92%", end: "top 55%", scrub } });
-      }
+      // Lines drawn once on enter (route line, the phone step lines). Each starts at scaleX 0, so a failsafe
+      // finishes any whose trigger has not fired although it is already above its start line (a mis-measure after
+      // a pin refresh): a decorative line must never stay missing.
+      const lines: gsap.core.Tween[] = [];
+      const draw = (el: Element, start: string) =>
+        lines.push(gsap.fromTo(el, { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, ease: out, duration: secs("section"), scrollTrigger: { trigger: el, start, once: true } }));
+      for (const r of Array.from(main.querySelectorAll("[data-route] svg"))) draw(r, "top 85%");
 
       // 3. How it works: pinned sequence.
       const how = main.querySelector<HTMLElement>("#how");
@@ -117,30 +136,38 @@ export function ScrollScenes() {
         gsap.set(fill, { scaleX: 1 / 3, transformOrigin: "0% 50%" });
         light(0);
         let at = 0;
-        const tl = gsap.timeline({
-          defaults: { ease: "none" },
-          scrollTrigger: {
+        // The pin still spans the scroll, but the steps no longer follow it: crossing a third of the pin plays the
+        // next step to its end at the section pace (and back the same way), so scroll speed never sets the pace.
+        const tl = gsap.timeline({ paused: true, defaults: { ease: "none" } });
+        let go: gsap.core.Tween | undefined;
+        const to = (n: number) => {
+          go?.kill();
+          go = tl.tweenTo(n, { duration: secs("section"), ease: out });
+        };
+        ScrollTrigger.create({
             trigger: howBox,
             start: "center center",
             end: () => `+=${Math.round(innerHeight * 1.3)}`,
             pin: true,
-            scrub: 0.5,
             anticipatePin: 1,
             invalidateOnRefresh: true,
             onUpdate: (st) => {
               const n = Math.min(2, Math.floor(st.progress * 2.4 + 0.25));
-              if (n !== at) light((at = n));
+              if (n !== at) {
+                light((at = n));
+                to(n);
+              }
             },
-          },
         });
+        // Step n is fully lit at time n; the late steps leave a short hold before the page moves on.
         tl.to(fill, { scaleX: 2 / 3, duration: 1 }, 0)
-          .fromTo(d2, { opacity: 0.3, y: 14 }, { opacity: 1, y: 0, duration: 0.5 }, 0.5)
-          .fromTo(t2, { y: 10 }, { y: 0, duration: 0.5, stagger: 0.04 }, 0.5)
+          .fromTo(d2, { opacity: 0.3, y: 14 }, { opacity: 1, y: 0, duration: 0.6 }, 0.4)
+          .fromTo(t2, { y: 10 }, { y: 0, duration: 0.55, stagger: 0.05 }, 0.4)
           .to(fill, { scaleX: 1, duration: 1 }, 1)
-          .fromTo(d3, { opacity: 0.3, y: 14 }, { opacity: 1, y: 0, duration: 0.5 }, 1.5)
-          .fromTo(t3, { y: 10 }, { y: 0, duration: 0.5, stagger: 0.04 }, 1.5)
-          .to({}, { duration: 0.4 }); // a short hold on the finished row before the page moves on
+          .fromTo(d3, { opacity: 0.3, y: 14 }, { opacity: 1, y: 0, duration: 0.6 }, 1.4)
+          .fromTo(t3, { y: 10 }, { y: 0, duration: 0.55, stagger: 0.05 }, 1.4);
         undo.push(() => {
+          go?.kill();
           rail?.removeAttribute("data-live");
           nodes.forEach((d) => d.removeAttribute("data-on"));
           steps.forEach((s) => s.removeAttribute("data-on"));
@@ -180,32 +207,39 @@ export function ScrollScenes() {
         });
       }
 
-      // 8. Parallax and the small-screen step line. Scrubbed on purpose (they follow the scroll position, both
-      //    ways); decorative only, so nothing readable ever depends on where they are.
+      // 8. Parallax: the one scroll-linked effect (it IS the scroll position, both ways), smoothed by a short lag
+      //    so a flick glides instead of jerking. Decorative only; nothing readable depends on where it is.
+      //    The small-screen step line is time-based: it fills once, at the section pace, as its step comes up.
       for (const el of Array.from(main.querySelectorAll<HTMLElement>("[data-parallax]"))) {
         const n = (parseFloat(el.dataset.parallax ?? "") || 0) * k;
         if (!n) continue;
-        gsap.fromTo(el, { y: -n }, { y: n, ease: "none", scrollTrigger: { trigger: el.parentElement ?? el, start: "top bottom", end: "bottom top", scrub: true, invalidateOnRefresh: true } });
+        gsap.fromTo(el, { y: -n }, { y: n, ease: "none", scrollTrigger: { trigger: el.parentElement ?? el, start: "top bottom", end: "bottom top", scrub: 0.6, invalidateOnRefresh: true } });
       }
       if (!lg) {
-        for (const bar of Array.from(main.querySelectorAll<HTMLElement>("#how .how-bar"))) {
-          gsap.fromTo(bar, { scaleX: 0 }, { scaleX: 1, ease: "none", scrollTrigger: { trigger: bar.parentElement ?? bar, start: "top 88%", end: "top 45%", scrub: wide ? 0.4 : true } });
-        }
+        for (const bar of Array.from(main.querySelectorAll<HTMLElement>("#how .how-bar"))) draw(bar, "top 80%");
       }
+      const late = window.setTimeout(() => {
+        for (const t of lines) {
+          const el = t.targets()[0] as Element | undefined;
+          if (el && t.progress() === 0 && !t.isActive() && el.getBoundingClientRect().top < innerHeight * 0.8) t.scrollTrigger?.kill(), t.play();
+        }
+      }, 4000);
+      undo.push(() => clearTimeout(late));
 
       // 7. Section motion. Created after the pins above, so every start and end already counts their pin spacing.
       // Time-based, not scrubbed: a scene starts when its section comes into view and always plays at the same
       // calm pace, however fast the visitor scrolls (a fast flick no longer fast-forwards it). Once per visit.
       // Sections already scrolled past at load (deep link, reload) settle straight away. Transforms only.
       // Phones get shorter travel and nothing sideways.
-      const DUR = wide ? 1.0 : 0.8; // 1064 brief: composed scenes stay under a second
+      // 1119: section token pace (600ms), a touch longer on wide screens where the travel is longer.
+      const DUR = secs("section") + (wide ? 0.1 : 0);
       const enter = (targets: Array<Element | null | undefined>, trigger: Element, from: gsap.TweenVars, start = "top 88%", stagger = 0, delay = 0) => {
         const list = free(targets);
         if (!list.length) return;
         // The tween's own trigger (not a separate onEnter): it also plays when the section is already in view or
         // scrolled past by the time this runs (a fast scroll during load), so nothing is left waiting off its rest.
         gsap.fromTo(list, from, {
-          x: 0, y: 0, scale: 1, duration: DUR, ease: "power3.out", stagger, delay,
+          x: 0, y: 0, scale: 1, duration: DUR, ease: EASE, stagger, delay,
           scrollTrigger: { trigger, start, once: true, toggleActions: "play none none none" },
         });
       };
@@ -297,7 +331,7 @@ export function ScrollScenes() {
           if (d.matches("[data-cmp-group]")) rowsIn(d);
           else {
             const notes = Array.from(d.querySelectorAll<HTMLElement>(".cmp-note"));
-            if (notes.length) gsap.fromTo(notes, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.7, ease: EASE, stagger: 0.05, clearProps: "opacity,transform" });
+            if (notes.length) gsap.fromTo(notes, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: secs("section"), ease: EASE, stagger: 0.05, clearProps: "opacity,transform" });
           }
         };
         cmp.addEventListener("toggle", onToggle, true); // toggle does not bubble; capture still sees it
@@ -309,12 +343,12 @@ export function ScrollScenes() {
       if (fc) {
         const [l, phone, r] = Array.from(fc.children) as HTMLElement[];
         const tiles = Array.from(fc.querySelectorAll<HTMLElement>(".fc-tile"));
-        const tl = gsap.timeline({ paused: true, defaults: { ease: EASE, duration: 0.95, clearProps: "opacity,transform" } });
+        const tl = gsap.timeline({ paused: true, defaults: { ease: EASE, duration: secs("section") + 0.1, clearProps: "opacity,transform" } });
         if (wide && l && r) {
           tl.fromTo(l, { x: -90 }, { x: 0 }, 0).fromTo(r, { x: 90 }, { x: 0 }, 0);
         }
-        if (phone) tl.fromTo(phone, { y: 110 * k }, { y: 0, duration: 1.0 }, 0.1);
-        if (tiles.length) tl.fromTo(tiles, { opacity: 0, y: 44 }, { opacity: 1, y: 0, duration: 0.8, stagger: { each: 0.06, from: "edges" } }, 0.2);
+        if (phone) tl.fromTo(phone, { y: 110 * k }, { y: 0 }, 0.1);
+        if (tiles.length) tl.fromTo(tiles, { opacity: 0, y: 44 }, { opacity: 1, y: 0, duration: secs("section"), stagger: { each: 0.06, from: "edges" } }, 0.2);
         ScrollTrigger.create({ trigger: fc, start: "top 88%", once: true, onEnter: () => tl.play() });
       }
 

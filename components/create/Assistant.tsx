@@ -8,6 +8,7 @@ import { cn, formatDuration } from "@/lib/utils";
 import { canSaveCaption } from "./assistant-state";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import type { Draft, HooksState, Step, Tone, UploadState } from "./types";
+import { T } from "@/lib/motion/tokens";
 
 const EXAMPLES = ["How a ₹5 shampoo sachet changed Indian retail", "My 5 AM routine that actually stuck", "Why Blockbuster said no to Netflix"];
 
@@ -47,7 +48,7 @@ function Bubble({ from, children, className }: { from: "outly" | "you"; children
       layout="position"
       initial={{ opacity: 0, y: 12, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+      transition={T.card}
       className={cn("max-w-[92%] text-[15px] leading-relaxed", from === "you" ? "ml-auto rounded-[22px] rounded-br-md bg-foreground px-4 py-2.5 text-background" : "text-foreground", className)}
     >
       {children}

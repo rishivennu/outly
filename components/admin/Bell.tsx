@@ -6,6 +6,7 @@ import { AlertTriangle, BellRing, Bell as BellIcon, CreditCard, LifeBuoy, Plug, 
 import { useToast } from "@/components/shared/Toast";
 import type { AdminRole } from "@/lib/admin/perms";
 import { cn } from "@/lib/utils";
+import { T } from "@/lib/motion/tokens";
 
 type Ev = { id: string; kind: string; title: string; body?: string | null; href?: string | null; createdAt: string };
 const SEEN = "outly-admin-seen";
@@ -100,7 +101,7 @@ export function Bell({ role }: { role: AdminRole }) {
             initial={{ opacity: 0, y: -6, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 500, damping: 36 }}
+            transition={T.menu}
             className="glass-strong absolute right-0 top-12 z-50 w-[min(380px,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-[22px]"
             role="region"
             aria-label="Notifications"

@@ -68,7 +68,7 @@ describe("1101 look and motion", () => {
     expect(block).toContain(".pw-b { animation: pw-rise .6s var(--pw-ease) .08s both; }");
     expect(block).toContain(".pw-c { animation: pw-grow .8s var(--pw-ease) .18s both; }");
     expect(block).toContain("calc(340ms + var(--i, 0) * 100ms)");
-    expect(block).toContain("--pw-ease: cubic-bezier(.16, 1, .3, 1);");
+    expect(block).toContain("--pw-ease: var(--m-ease-out);"); // 1119: the shared token, same curve
     expect(block).toMatch(/\.pw-cta:active, \.pw-x:active, \.pw-link:active \{ transform: scale\(\.98\); \}/);
     expect(block).toMatch(/transition: transform \.15s var\(--pw-ease\)/);
     expect(block).toContain('.pwa-welcome[data-phase="leaving"] { animation: pw-leave .3s var(--pw-ease) forwards;');

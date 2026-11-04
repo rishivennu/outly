@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { addDaysKey, dayKey, fromTzParts, partsInTz } from "@/lib/client/tz";
 import { tzShort } from "@/components/shell/UserContext";
+import { T } from "@/lib/motion/tokens";
 
 interface Props {
   value: Date;
@@ -162,7 +163,7 @@ export function DateTimePicker({ value, onChange, tz, peakHours = [] }: Props) {
                 }}
                 className={cn("relative flex h-[76px] w-[60px] shrink-0 snap-start flex-col items-center justify-center rounded-[22px] transition", on ? "text-[hsl(var(--lime-foreground))]" : "bg-secondary/70 text-foreground hover:bg-secondary hairline")}
               >
-                {on && <motion.span layoutId="dtp-day-pill" className="lime-bg absolute inset-0 rounded-[22px] shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_8px_20px_-10px_hsl(var(--lime)/0.8)]" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
+                {on && <motion.span layoutId="dtp-day-pill" className="lime-bg absolute inset-0 rounded-[22px] shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_8px_20px_-10px_hsl(var(--lime)/0.8)]" transition={T.glide} />}
                 <span className="relative text-[11px] font-medium uppercase tracking-wider opacity-70">{i === 0 ? "Today" : d.wd}</span>
                 <span className="relative text-xl font-semibold tabular">{d.d}</span>
               </button>

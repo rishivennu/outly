@@ -1,4 +1,5 @@
 "use client";
+import { FX } from "@/lib/motion/tokens";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -73,15 +74,12 @@ export function FoundingWelcome({ promo }: { promo: FoundingPromo }) {
         {open && (
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild forceMount>
-              <motion.div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[3px] dark:bg-black/60" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} />
+              <motion.div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[3px] dark:bg-black/60" {...FX.scrim} />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount aria-describedby="founding-welcome-body">
               <div className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]" data-lenis-prevent onPointerDown={(e) => { if (e.target === e.currentTarget) close(false); }}>
                 <motion.div
-                  initial={{ opacity: 0, y: 16, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                  {...FX.dialog}
                   className="glass-strong relative w-full max-w-[440px] overflow-hidden rounded-[30px] bg-card/[0.94] p-6 shadow-2xl sm:p-7"
                 >
                   <span aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-lime/20 blur-3xl" />

@@ -142,8 +142,8 @@ describe("1102 wiring", () => {
     expect(src("components/dashboard/ViewsChart.tsx")).toContain("easeInOut(clamp01((now - t0) / 700))");
     expect(src("components/dashboard/Sparkline.tsx")).toContain("duration: 0.7");
   });
-  test("cards: 500ms, 12px, 80ms apart; never lift on hover; reduced motion still", () => {
-    expect(css).toContain("animation: kpi-rise .5s cubic-bezier(.16,1,.3,1) backwards; animation-delay: calc(var(--i, 0) * 80ms);");
+  test("cards: token pace (1119: 450ms), 12px, one stagger step apart and capped; never lift on hover; reduced motion still", () => {
+    expect(css).toContain("animation: kpi-rise var(--m-card) var(--m-ease-out) backwards; animation-delay: min(calc(var(--i, 0) * var(--m-stagger)), 420ms);");
     expect(css).toContain("@keyframes kpi-rise { from { opacity: 0; transform: translateY(12px); } }");
     // 1100: studio cards never move on hover, so they stay off the admin .kpi-card class (which lifts).
     for (const f of ["components/analytics/AnalyticsView.tsx", "components/analytics/PlatformDashboardView.tsx"]) expect(src(f)).not.toContain("kpi-card");

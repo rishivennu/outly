@@ -1,4 +1,5 @@
 "use client";
+import { FX, ease } from "@/lib/motion/tokens";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -169,7 +170,7 @@ export function CommandPalette() {
         {open && (
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild forceMount>
-              <motion.div className="fixed inset-0 z-[90] bg-foreground/35 backdrop-blur-[3px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduce ? 0 : 0.15 }} />
+              <motion.div className="fixed inset-0 z-[90] bg-foreground/35 backdrop-blur-[3px]" {...(reduce ? FX.fade : FX.scrim)} />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount aria-describedby={undefined}>
               <div className="fixed inset-0 z-[91] flex items-start justify-center p-4 pt-[min(14vh,120px)]" data-lenis-prevent onPointerDown={(e) => e.target === e.currentTarget && setOpen(false)}>
@@ -177,7 +178,7 @@ export function CommandPalette() {
                   initial={reduce ? false : { opacity: 0, y: -8, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
-                  transition={{ duration: reduce ? 0 : 0.22, ease: [0.16, 1, 0.3, 1] }}
+                  transition={{ duration: reduce ? 0 : 0.22, ease: ease("out") }}
                   className="glass-strong flex max-h-[min(560px,80dvh)] w-full max-w-[600px] flex-col overflow-hidden rounded-[28px]"
                 >
                   <Dialog.Title className="sr-only">Search Outlly</Dialog.Title>

@@ -45,6 +45,25 @@ const config: Config = {
         serif: ["var(--font-serif)", "Georgia", "serif"],
       },
       letterSpacing: { tightest: "-0.045em" },
+      // 1119 motion tokens (lib/motion/tokens.ts, --m-* in globals.css). A bare `transition` now uses the token
+      // hover timing and the shared ease-out; `duration-menu`, `ease-swap` etc. name the rest of the table.
+      transitionTimingFunction: {
+        DEFAULT: "var(--m-ease-out)",
+        out: "var(--m-ease-out)",
+        in: "var(--m-ease-in)",
+        swap: "var(--m-ease-swap)",
+        std: "var(--m-ease-std)",
+      },
+      transitionDuration: {
+        DEFAULT: "var(--m-hover)",
+        press: "var(--m-press)",
+        hover: "var(--m-hover)",
+        menu: "var(--m-menu)",
+        nav: "var(--m-nav)",
+        page: "var(--m-page)",
+        card: "var(--m-card)",
+        section: "var(--m-section)",
+      },
       keyframes: {
         float: {
           "0%, 100%": { transform: "translateY(0) rotate(var(--rot, 0deg))" },

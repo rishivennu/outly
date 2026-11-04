@@ -1,4 +1,5 @@
 "use client";
+import { T, FX, ease } from "@/lib/motion/tokens";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -245,7 +246,7 @@ export function InstallPrompt({ config: given }: { config: InstallConfig }) {
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16 }}
             animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
-            transition={{ duration: reduce ? 0.15 : 0.32, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: reduce ? 0.15 : 0.32, ease: ease("out") }}
           >
             <div className="flex items-start gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -285,7 +286,7 @@ function IosGuide({ open, onClose }: { open: boolean; onClose: () => void }) {
         {open && (
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild forceMount>
-              <motion.div className="fixed inset-0 z-[80] bg-black/45 backdrop-blur-[4px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+              <motion.div className="fixed inset-0 z-[80] bg-black/45 backdrop-blur-[4px]" {...FX.scrim} />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount aria-describedby="ios-install-d">
               <motion.div
@@ -293,7 +294,7 @@ function IosGuide({ open, onClose }: { open: boolean; onClose: () => void }) {
                 initial={reduce ? { opacity: 0 } : { y: "100%" }}
                 animate={reduce ? { opacity: 1 } : { y: 0 }}
                 exit={reduce ? { opacity: 0 } : { y: "100%" }}
-                transition={reduce ? { duration: 0.15 } : { type: "spring", stiffness: 420, damping: 40 }}
+                transition={reduce ? { duration: 0.15 } : T.card}
               >
                 <span aria-hidden="true" className="mx-auto mb-3 block h-1.5 w-10 rounded-full bg-foreground/15" />
                 <div className="flex items-start gap-3">

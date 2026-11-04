@@ -14,6 +14,7 @@ import { InstagramReel, XPost, YouTubeShort } from "./Previews";
 import { SnippetBar } from "./SnippetBar";
 import { enabledPlatforms, launchGate } from "./publish";
 import type { AccountView, Draft } from "./types";
+import { T, ease } from "@/lib/motion/tokens";
 
 interface Props {
   drafts: Record<Platform, Draft>;
@@ -142,7 +143,7 @@ export function PlatformDeck(p: Props) {
             const d = p.drafts[pl];
             return (
               <div key={pl} role="presentation" className={cn("relative flex min-w-[200px] flex-1 snap-start flex-col rounded-3xl transition", on ? "glass shadow-[0_20px_60px_-30px_var(--halo)]" : "bg-secondary/40", !d.enabled && "opacity-80")} style={{ ["--halo" as string]: PLATFORM_HALO[pl] }}>
-                {on && <motion.span layoutId="deck-tab" className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-foreground/25" transition={{ type: "spring", stiffness: 400, damping: 34 }} />}
+                {on && <motion.span layoutId="deck-tab" className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-foreground/25" transition={T.glide} />}
                 <button
                   type="button"
                   id={`tab-${pl}`}
@@ -198,7 +199,7 @@ export function PlatformDeck(p: Props) {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.25, ease: ease("out") }}
           className="glass relative overflow-hidden rounded-[32px] p-5 sm:p-7"
         >
           {/* Platform tint sits on its own layer: .glass owns the panel background. */}

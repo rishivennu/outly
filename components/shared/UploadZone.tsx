@@ -5,6 +5,7 @@ import { Clapperboard, Rocket, Sparkles, UploadCloud } from "lucide-react";
 import { Collectible } from "./Collectible";
 import { MAX_MB, validateVideoFile } from "@/lib/client/handoff";
 import { cn } from "@/lib/utils";
+import { T } from "@/lib/motion/tokens";
 
 interface Props {
   onFile: (f: File) => void;
@@ -135,7 +136,7 @@ export function UploadZone({ onFile, compact, accepted }: Props) {
             className="pointer-events-none absolute hidden sm:block"
             style={{ left: o.x, top: o.y }}
             animate={over ? { x: o.x.startsWith("-") ? 70 : -70, y: o.y === "78%" ? -40 : 30, scale: 1.15 } : { x: 0, y: 0, scale: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 18 }}
+            transition={T.card}
           >
             <div className="animate-drift" style={{ ["--rot" as string]: `${o.rot}deg`, animationDelay: `${o.delay}s` }}>
               <Collectible platform={o.p} size={60} float />

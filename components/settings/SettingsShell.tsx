@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ChevronDown, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { tabIn } from "@/lib/motion/route";
+import { T } from "@/lib/motion/tokens";
 
 const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
@@ -116,7 +117,7 @@ export function SettingsShell({ title, intro, categories, initialTab }: { title:
           )}
         >
           {/* The selection glides between categories (1065), like the sidebar's pill. */}
-          {on && <motion.span layoutId="settings-pill" className="absolute inset-0 rounded-xl bg-lime/15" transition={{ type: "spring", stiffness: 520, damping: 42 }} aria-hidden="true" />}
+          {on && <motion.span layoutId="settings-pill" className="absolute inset-0 rounded-xl bg-lime/15" transition={T.glide} aria-hidden="true" />}
           <Ico className={cn("relative h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110", on ? "text-lime-ink" : "opacity-80 group-hover:opacity-100")} aria-hidden="true" />
           <span className="relative min-w-0 flex-1 truncate">{c.label}</span>
           {dirty[c.id] && (

@@ -31,6 +31,7 @@ import { primeGroove } from "./Groove";
 import { DeviceDrafts } from "./DeviceDrafts";
 import { findDeviceDraftByPost, getDeviceDraft, newDeviceId, removeDeviceDraft, saveDeviceDraft, type DeviceTarget } from "@/lib/client/device-drafts";
 import { emptyDraft, NOTES, type AccountView, type Draft, type Hook, type HookResult, type HooksState, NO_HOOKS, type MediaView, type PlatformCopy, type PostView, type Step, type Tone, type UploadState } from "./types";
+import { T } from "@/lib/motion/tokens";
 
 interface Props {
   accounts: AccountView[];
@@ -676,7 +677,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
             )}
 
             {showVideo && hasMedia && (
-              <motion.section key="stage" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, x: -30 }} transition={{ type: "spring", stiffness: 200, damping: 26 }} aria-label="Your video">
+              <motion.section key="stage" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, x: -30 }} transition={T.card} aria-label="Your video">
                 <h1 className="sr-only">Create</h1>
                 <VideoStage
                   src={src}
@@ -726,7 +727,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
             )}
 
             {step === "everywhere" && (
-              <motion.section key="deck" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ type: "spring", stiffness: 200, damping: 26 }}>
+              <motion.section key="deck" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={T.card}>
                 <h1 className="sr-only">Make it fit everywhere</h1>
                 <PlatformDeck
                   drafts={drafts}
@@ -748,7 +749,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
             )}
 
             {step === "launch" && (
-              <motion.section key="launch" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ type: "spring", stiffness: 200, damping: 26 }}>
+              <motion.section key="launch" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={T.card}>
                 <h1 className="sr-only">Launch</h1>
                 {allReviewed ? (
                   <LaunchPanel drafts={drafts} accounts={accounts} poster={poster} hook={hook ?? ""} tz={tz} when={when} onWhen={setWhen} mode={mode} onMode={setMode} busy={launching} error={launchError} onLaunch={launch}

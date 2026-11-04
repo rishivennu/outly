@@ -1,6 +1,7 @@
 "use client";
 import gsap from "gsap";
 import { reduced, simple } from "./reveal";
+import { GSAP_EASE, sec } from "./tokens";
 
 /**
  * Route transitions for the studio and the admin console (1065). One language, three strengths:
@@ -28,7 +29,7 @@ export type RouteKind = "page" | "detail" | "tab";
 export type RouteDir = 1 | -1;
 
 const CLEAR = "opacity,transform,transition,clipPath";
-const EASE = "expo.out";
+const EASE = GSAP_EASE.out; // token ease-out (lib/motion/tokens.ts)
 const SKELETON = "[data-route-skeleton]";
 // A block holding a non-portalled fixed overlay is only faded: a transform or clip on an ancestor would
 // re-anchor or cut that overlay while the entrance runs.
@@ -37,7 +38,7 @@ const pinned = (el: HTMLElement) => !!el.querySelector(PINNED);
 
 /** Timings in seconds, inside the brief's ranges: page 300 to 450ms, tab 250 to 400ms. */
 export const ROUTE_TIMING = {
-  page: { mask: 0.42, fade: 0.24, block: 0.45, delay: 0.05, travel: 18, lift: 8, spread: 0.18 },
+  page: { mask: sec("page"), fade: 0.24, block: sec("card"), delay: 0.05, travel: 18, lift: 8, spread: 0.18 },
   detail: { mask: 0, fade: 0, block: 0.38, delay: 0, travel: 24, lift: 0, spread: 0.12 },
   tab: { mask: 0, fade: 0, block: 0.32, delay: 0, travel: 14, lift: 0, spread: 0.1 },
   settle: { block: 0.3, lift: 6, spread: 0.12 },

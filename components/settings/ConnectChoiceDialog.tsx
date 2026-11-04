@@ -1,4 +1,5 @@
 "use client";
+import { FX } from "@/lib/motion/tokens";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
 import { ExternalLink, X } from "lucide-react";
@@ -53,15 +54,12 @@ function Shell({ open, onClose, busy, children }: { open: boolean; onClose: () =
         {open && (
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild forceMount>
-              <motion.div className="fixed inset-0 z-[70] bg-foreground/35 backdrop-blur-[3px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+              <motion.div className="fixed inset-0 z-[70] bg-foreground/35 backdrop-blur-[3px]" {...FX.scrim} />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount>
               <div className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]" data-lenis-prevent>
                 <motion.div
-                  initial={{ opacity: 0, y: 16, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
+                  {...FX.dialog}
                   className="glass-strong relative w-full max-w-[460px] rounded-[28px] p-5 motion-reduce:transition-none sm:p-6"
                 >
                   {children}

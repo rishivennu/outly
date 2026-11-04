@@ -1,6 +1,7 @@
 "use client";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { GSAP_EASE, sec } from "./tokens";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -29,7 +30,7 @@ gsap.registerPlugin(ScrollTrigger);
  */
 export type RevealFx = "rise" | "depth" | "wipe" | "stagger" | "cards" | "tiles" | "rows" | "footer";
 
-const EASE = "expo.out"; // fast start, long soft landing, no overshoot
+const EASE = GSAP_EASE.out; // fast start, long soft landing, no overshoot (token ease-out, lib/motion/tokens.ts)
 const CLIP_EASE = "power3.out"; // the mask opens a touch slower than the block travels, so the edge reads
 const CLEAR = "opacity,transform,transformOrigin,visibility,transition,clipPath";
 const triggers = new Map<HTMLElement, ScrollTrigger>();
@@ -137,6 +138,34 @@ function reveal(targets: HTMLElement[] | HTMLElement, { delay = 0, stagger = 0, 
   gsap.to(list, { opacity: 1, duration: Math.min(0.32, duration * 0.5), ease: "power1.out", ...timed, onInterrupt: clear });
   gsap.to(list, { x: 0, y: 0, scale: 1, duration, ease: EASE, ...timed, onInterrupt: clear });
   gsap.to(list, { clipPath: (i) => plans[i].open, duration: duration * 1.05, ease: CLIP_EASE, ...timed, onComplete: clear, onInterrupt: clear });
+  list.forEach((el, i) => settleMedia(el, at(i), duration));
+}
+
+/**
+ * 1119, from kyma: a picture inside a revealed block settles from a slight zoom while its frame opens, so the
+ * image seems to come to rest rather than slide in with the card. Only pictures that are big (>= 160px wide)
+ * and sit in a frame that clips (overflow hidden/clip), so the zoom never spills past a rounded edge; opt out
+ * with data-no-settle. Time-based like everything else, and cleared at the end.
+ */
+const SETTLE_FROM = 1.06;
+/** Media settling right now: a nested reveal (footer: a block and its children) must not tween one picture twice. */
+const settling = new WeakSet<HTMLElement>();
+function settleMedia(el: HTMLElement, delay: number, duration: number) {
+  const pics = kids(el, "img, video, picture, [data-media]").filter((m) => {
+    if (settling.has(m) || m.closest("[data-no-settle]") || m.offsetWidth < 160) return false;
+    const frame = m.parentElement;
+    if (!frame) return false;
+    const o = getComputedStyle(frame);
+    return /hidden|clip/.test(o.overflow + o.overflowX + o.overflowY);
+  });
+  if (!pics.length) return;
+  pics.forEach((p) => (owner?.add(p), settling.add(p)));
+  const clear = () => {
+    gsap.set(pics, { clearProps: CLEAR });
+    pics.forEach((p) => settling.delete(p));
+  };
+  // A little longer than its frame (so it lands after the frame opens), never past the section pace.
+  gsap.fromTo(pics, { scale: SETTLE_FROM, transformOrigin: "50% 50%" }, { scale: 1, duration: Math.min(duration * 1.2, sec("section")), delay, ease: EASE, overwrite: "auto", onComplete: clear, onInterrupt: clear });
 }
 
 /**

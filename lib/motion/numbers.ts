@@ -6,6 +6,7 @@
  * a refresh (the value changed while on screen) 700ms. Charts draw in 700ms ease-in-out.
  */
 import type { CSSProperties } from "react";
+import { DUR } from "./tokens";
 
 export type Bezier = readonly [number, number, number, number];
 
@@ -30,14 +31,14 @@ export const cssTiming = (tier: NumberTier) => {
 };
 
 /** Recharts props for a chart series: 700ms ease-in-out, a short stagger between series, none when reduced. */
-export const CHART_MS = 700;
+export const CHART_MS = DUR.chart; // 700, token table (lib/motion/tokens.ts)
 export function chartMotion(reduce: boolean | null | undefined, i = 0) {
   return reduce
     ? { isAnimationActive: false as const }
     : { isAnimationActive: true as const, animationBegin: 80 + i * 80, animationDuration: CHART_MS, animationEasing: "ease-in-out" as const };
 }
 
-/** Index for the .kpi-in card stagger (globals.css: 500ms rise of 12px, 80ms apart). */
+/** Index for the .kpi-in card stagger (globals.css: token card 450ms rise of 12px, token stagger 70ms apart, capped at 420ms). */
 export const riseIndex = (i: number) => ({ "--i": i }) as CSSProperties;
 
 /** CSS cubic-bezier(x1, y1, x2, y2) as a function of progress 0..1 (Newton steps, bisection fallback). */

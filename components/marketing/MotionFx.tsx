@@ -17,7 +17,7 @@ import { useEffect } from "react";
 type Spring = { x: number; y: number; r: number; vx: number; vy: number; vr: number; t: number; raf: number };
 
 const K = 120; // stiffness: how hard it pulls home
-const C = 8; // damping: ~0.35 of critical, so it overshoots once or twice
+const C = 22; // 1119: damping ~critical (2 * sqrt(K) = 21.9): it eases home without overshooting
 const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
 
 export function MotionFx() {

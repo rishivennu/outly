@@ -9,6 +9,7 @@ import type { HTMLAttributes } from "react";
 import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
+import { T } from "@/lib/motion/tokens";
 
 export interface SettingsIconHandle {
   startAnimation: () => void;
@@ -70,7 +71,7 @@ const SettingsIcon = forwardRef<SettingsIconHandle, SettingsIconProps>(
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth="2"
-          transition={{ type: "spring", stiffness: 50, damping: 10 }}
+          transition={T.nav}
           variants={{
             normal: {
               rotate: 0,

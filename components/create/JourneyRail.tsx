@@ -4,6 +4,7 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STEPS, type Step } from "./types";
 import { createFont } from "./font";
+import { T } from "@/lib/motion/tokens";
 
 interface Props {
   step: Step;
@@ -24,13 +25,13 @@ export function JourneyRail({ step, reachable, onGo, thumb, title, saved }: Prop
           Step {idx + 1} <span className="text-muted-foreground">of {STEPS.length}</span>
         </p>
         <span className="mt-3 block h-1.5 w-full overflow-hidden rounded-full bg-secondary" aria-hidden="true">
-          <motion.span className="block h-full rounded-full energy-bg" initial={false} animate={{ width: `${((idx + 1) / STEPS.length) * 100}%` }} transition={{ type: "spring", stiffness: 120, damping: 20 }} />
+          <motion.span className="block h-full w-full origin-left rounded-full energy-bg" initial={false} animate={{ scaleX: (idx + 1) / STEPS.length }} transition={T.fill} />
         </span>
       </div>
       <ol className="relative space-y-1">
         {/* Thread connecting the steps, filled up to the current one */}
         <span className="absolute bottom-6 left-[19px] top-6 w-px bg-border" aria-hidden="true" />
-        <motion.span className="absolute left-[19px] top-6 w-px bg-lime" aria-hidden="true" animate={{ height: `calc(${(idx / (STEPS.length - 1)) * 100}% - ${idx === STEPS.length - 1 ? 48 : 0}px)` }} transition={{ type: "spring", stiffness: 120, damping: 20 }} />
+        <motion.span className="absolute bottom-6 left-[19px] top-6 w-px origin-top bg-lime" aria-hidden="true" initial={false} animate={{ scaleY: idx / (STEPS.length - 1) }} transition={T.fill} />
         {STEPS.map((s, i) => {
           const done = i < idx;
           const active = i === idx;

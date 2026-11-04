@@ -7,6 +7,7 @@ import { Ban, Clock, Database, Lock, Share2, SlidersHorizontal, X } from "lucide
 import { readConsent } from "@/components/shared/CookieConsent";
 import { useUser } from "@/components/shell/UserContext";
 import { afterWelcome, welcomePending } from "@/lib/pwa-welcome";
+import { T, FX } from "@/lib/motion/tokens";
 
 /**
  * "How we handle your data", shown once per person per version on their first studio visit (10-18).
@@ -131,7 +132,7 @@ export function PrivacyNotice() {
         {open && (
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild forceMount>
-              <motion.div className="fixed inset-0 z-[80] bg-black/45 backdrop-blur-[4px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+              <motion.div className="fixed inset-0 z-[80] bg-black/45 backdrop-blur-[4px]" {...FX.scrim} />
             </Dialog.Overlay>
             <Dialog.Content
               asChild
@@ -155,10 +156,7 @@ export function PrivacyNotice() {
               >
                 <motion.div
                   className="wn-card relative my-auto w-full max-w-[680px] shrink-0 overflow-hidden rounded-[30px] p-5 sm:p-6"
-                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.96 }}
-                  animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }}
-                  transition={reduce ? { duration: 0.15 } : { type: "spring", stiffness: 380, damping: 34 }}
+                  {...(reduce ? FX.fade : FX.dialog)}
                 >
                   <span aria-hidden className="wn-glow" />
                   <div className="relative flex items-start gap-3">

@@ -64,7 +64,7 @@ describe("1105 theme switch", () => {
     expect(apply).toContain("t.ready.catch(() => {});");
     expect(theme).toContain("apply(choice, true);");
     expect(theme).toContain('apply("system", true)');
-    expect(css).toMatch(/html\[data-theme-switch\]::view-transition-new\(root\) \{\s*animation-duration: 400ms;\s*animation-timing-function: cubic-bezier\(\.16, 1, \.3, 1\);/);
+    expect(css).toMatch(/html\[data-theme-switch\]::view-transition-new\(root\) \{\s*animation-duration: 400ms;\s*animation-timing-function: var\(--m-ease-out\);/); // 1119 token, same curve
   });
   test("fallback transitions colour properties only", () => {
     const fb = css.slice(css.indexOf("html.theme-anim *::after {"), css.indexOf("}", css.indexOf("html.theme-anim *::after {")));
@@ -98,8 +98,9 @@ describe("1105 phone top bar", () => {
     expect(css).toContain(".mtop-row { animation: mtop-in .35s var(--ease-liquid) backwards; }");
     expect(css).toContain(".mtop-title { animation: mtop-title-in .25s var(--ease-liquid) backwards; }");
     expect(rule(".mtop-btn")).toContain("transform 0.15s var(--ease-liquid)");
-    expect(css).toContain('.mdrawer[data-state="open"] { animation: mdrawer-in .35s var(--ease-liquid); }');
-    expect(css).toContain('.mdrawer[data-state="closed"] { animation: mdrawer-out .35s var(--ease-liquid) forwards; }');
+    // 1119: the drawer opens at the nav token (300ms) and leaves faster than it came (menu, ease-in).
+    expect(css).toContain('.mdrawer[data-state="open"] { animation: mdrawer-in var(--m-nav) var(--m-ease-out); }');
+    expect(css).toContain('.mdrawer[data-state="closed"] { animation: mdrawer-out var(--m-menu) var(--m-ease-in) forwards; }');
     expect(css).toContain(".notice-panel { animation: np-in .25s var(--ease-liquid); transform-origin: top right; }");
   });
   test("the drawer keeps search (moved off the bar) and opens it after it has gone", () => {

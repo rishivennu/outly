@@ -8,6 +8,7 @@ import { PLATFORM_META } from "@/lib/domain";
 import { aspectOf, relatedComments, type CommentMedia } from "@/lib/inbox-media";
 import type { InboxComment } from "@/lib/inbox";
 import { cn } from "@/lib/utils";
+import { T, FX } from "@/lib/motion/tokens";
 
 /** Can this comment open a preview at all? */
 export const hasPreview = (c: InboxComment) => !!c.media && !!(c.media.thumbnailUrl || c.media.videoUrl || c.media.embedUrl);
@@ -118,7 +119,7 @@ export function VideoPreview({ state, all, onSelect, onClose, onClosed }: { stat
         {comment && meta && (
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild forceMount>
-              <motion.div className="fixed inset-0 z-[70] bg-foreground/45 backdrop-blur-[4px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+              <motion.div className="fixed inset-0 z-[70] bg-foreground/45 backdrop-blur-[4px]" {...FX.scrim} />
             </Dialog.Overlay>
             <Dialog.Content
               asChild
@@ -136,7 +137,7 @@ export function VideoPreview({ state, all, onSelect, onClose, onClosed }: { stat
                   initial={reduce ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.985 }}
-                  transition={reduce ? { duration: 0.15 } : { type: "spring", stiffness: 420, damping: 38 }}
+                  transition={reduce ? { duration: 0.15 } : T.card}
                   className="relative flex h-dvh w-full flex-col overflow-hidden bg-background md:h-auto md:max-h-[min(90dvh,860px)] md:w-auto md:max-w-[min(1120px,calc(100vw-3rem))] md:flex-row md:rounded-[28px] md:shadow-2xl md:hairline"
                 >
                   <div ref={player} className="relative flex shrink-0 items-center justify-center bg-black md:self-stretch">

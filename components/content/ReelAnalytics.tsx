@@ -1,4 +1,5 @@
 "use client";
+import { FX, ease } from "@/lib/motion/tokens";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
@@ -65,7 +66,7 @@ export function ReelAnalytics({ post, onClose, onDetails }: { post: PostView | n
         {post && (
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild forceMount>
-              <motion.div className="fixed inset-0 z-[70] bg-foreground/35 backdrop-blur-[3px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+              <motion.div className="fixed inset-0 z-[70] bg-foreground/35 backdrop-blur-[3px]" {...FX.scrim} />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount aria-describedby={undefined}>
               <div className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-6" data-lenis-prevent onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -73,7 +74,7 @@ export function ReelAnalytics({ post, onClose, onDetails }: { post: PostView | n
                   initial={{ opacity: 0, y: 18, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  transition={{ duration: 0.22, ease: ease("out") }}
                   className="glass-strong w-full max-w-[640px] rounded-[28px] p-4 sm:p-6"
                 >
                   <div className="flex gap-4">

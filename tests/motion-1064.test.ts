@@ -24,7 +24,7 @@ describe("motion pass (1064)", () => {
   });
 
   test("an entrance killed midway never leaves content hidden or masked", () => {
-    const body = reveal.slice(reveal.indexOf("function reveal("), reveal.indexOf("function bento("));
+    const body = reveal.slice(reveal.indexOf("function reveal("), reveal.indexOf("function settleMedia(")); // 1119: settleMedia moves the inner media, not list
     const tweens = body.match(/gsap\.(to|fromTo)\(list,/g) ?? [];
     expect(tweens.length).toBeGreaterThanOrEqual(4);
     expect((body.match(/onInterrupt: clear/g) ?? []).length).toBe(tweens.length);

@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { askNotify, muteNotify, notifyOnce, notifyState, pingSending, readTimes, recordSendTime, sendSummary, typicalLabel, type NotifyState } from "@/lib/client/sending";
 import { DancingPip, MusicToggle, useGroove } from "./Groove";
 import type { PostView, TargetView } from "./types";
+import { T, ease } from "@/lib/motion/tokens";
 
 /**
  * "Sending it out", styled as a Live Activity (10-16f: columns, side by side; a lone card sits in the middle).
@@ -367,7 +368,7 @@ function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, reduce 
       layout={!reduce}
       initial={reduce ? false : { opacity: 0, y: 24, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ type: "spring", stiffness: 260, damping: 28, delay: reduce ? 0 : i * 0.08 }}
+      transition={{ ...T.card, delay: reduce ? 0 : i * 0.08 }}
       className={cn(
         "la-card la-col relative flex w-full flex-col overflow-hidden rounded-[2rem] p-5 text-white sm:w-[calc(50%-0.625rem)]",
         live && "la-live",
@@ -573,7 +574,7 @@ function Burst() {
           style={{ width: b.s, height: b.round ? b.s : b.s * 0.45, background: `hsl(var(${b.c}))` }}
           initial={{ x: 0, y: 0, opacity: 1, rotate: 0, scale: 0.4 }}
           animate={{ x: b.x, y: [0, b.y, b.y + 80], opacity: [1, 1, 0], rotate: b.rot, scale: 1 }}
-          transition={{ duration: 1.6, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 1.6, ease: ease("out") }}
         />
       ))}
     </div>

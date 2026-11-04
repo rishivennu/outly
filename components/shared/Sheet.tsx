@@ -3,6 +3,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { T, FX } from "@/lib/motion/tokens";
 
 /**
  * One floating surface: bottom sheet on mobile, floating side panel on desktop.
@@ -15,14 +16,14 @@ export function Sheet({ open, onOpenChange, title, description, children, side =
         {open && (
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild forceMount>
-              <motion.div className="fixed inset-0 z-[60] bg-foreground/40 backdrop-blur-[3px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+              <motion.div className="fixed inset-0 z-[60] bg-foreground/40 backdrop-blur-[3px]" {...FX.scrim} />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount aria-describedby={description ? undefined : undefined}>
               <motion.div
                 initial={{ opacity: 0, y: 40 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 30 }}
-                transition={{ type: "spring", stiffness: 420, damping: 38 }}
+                transition={T.card}
                 drag="y"
                 dragConstraints={{ top: 0, bottom: 0 }}
                 dragElastic={{ top: 0, bottom: 0.6 }}

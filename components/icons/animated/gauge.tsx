@@ -22,9 +22,8 @@ interface GaugeIconProps extends HTMLAttributes<HTMLSpanElement> {
 
 const DEFAULT_TRANSITION: Transition = {
   type: "spring",
-  stiffness: 160,
-  damping: 17,
-  mass: 1,
+  bounce: 0, // 1119: critically damped, never overshoots
+  duration: 0.3,
 };
 
 const GaugeIcon = forwardRef<GaugeIconHandle, GaugeIconProps>(

@@ -10,6 +10,7 @@ import { tourKey } from "./Tour";
 import { afterPrivacy } from "@/components/shared/PrivacyNotice";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
 import { APP_SELLS_PLANS, isApp } from "@/lib/app-mode";
+import { T, FX } from "@/lib/motion/tokens";
 
 export type WelcomeOffer = { slug: string; name: string; price: string; interval: string; features: string[]; postLimit: number; aiCaptions: boolean; postPeriod?: "week" | "month" };
 
@@ -44,7 +45,7 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
         .from("[data-w=line]", { opacity: 0, y: 12, stagger: 0.07 }, 0.04)
         .from("[data-w=offer]", { opacity: 0, y: 16, scale: 0.97 }, "<0.18")
         .from("[data-w=feat]", { opacity: 0, x: -8, duration: 0.38, stagger: 0.08 }, "<0.2")
-        .from("[data-w=check]", { scale: 0, rotation: -60, transformOrigin: "50% 50%", duration: 0.45, ease: "back.out(2.4)", stagger: 0.08 }, "<0.05")
+        .from("[data-w=check]", { scale: 0, rotation: -60, transformOrigin: "50% 50%", duration: 0.45, ease: "expo.out", stagger: 0.07 }, "<0.05")
         .from("[data-w=cta]", { opacity: 0, y: 10, stagger: 0.06 }, "-=0.3");
     }, card);
   }, { dependencies: [card], revertOnUpdate: true });
@@ -89,16 +90,13 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
         {open && (
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild forceMount>
-              <motion.div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[3px] dark:bg-black/60" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+              <motion.div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[3px] dark:bg-black/60" {...FX.scrim} />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount aria-describedby="welcome-sub-body">
               <div className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]" data-lenis-prevent onPointerDown={(e) => { if (e.target === e.currentTarget) close(false); }}>
                 <motion.div
                   ref={setCard}
-                  initial={{ opacity: 0, y: 20, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ type: "spring", stiffness: 460, damping: 36 }}
+                  {...FX.dialog}
                   className="glass-strong relative w-full max-w-[460px] overflow-hidden rounded-[30px] bg-card/[0.94] p-6 shadow-2xl sm:p-7"
                 >
                   {/* Near-opaque card (not see-through glass): the busy home page behind it made the grey text unreadable. */}
