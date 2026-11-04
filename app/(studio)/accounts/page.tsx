@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { accountView } from "@/lib/services";
 import { entitlements } from "@/lib/billing/entitlements";
-import { canConnectWithToken, hasCredentials } from "@/lib/social/registry";
+import { canConnectWithToken, hasCredentials, practiceAllowed } from "@/lib/social/registry";
 import { isPlatform, PLATFORMS, type Platform } from "@/lib/domain";
 import { AccountsView, type ConnectSetup } from "@/components/settings/AccountsView";
 
@@ -28,7 +28,7 @@ export default async function AccountsPage() {
         accountLimit={ent.accountLimit > 0 ? ent.accountLimit : ent.brandLimit + ent.extraBrands > 1 ? (ent.brandLimit + ent.extraBrands) * PLATFORMS.length : 0}
         brands={ent.brandLimit > 0 ? ent.brandLimit + ent.extraBrands : 0}
         platformLimit={ent.platformLimit}
-        setup={Object.fromEntries(PLATFORMS.map((p) => [p, { oauth: hasCredentials(p), token: canConnectWithToken(p) }])) as ConnectSetup}
+        setup={Object.fromEntries(PLATFORMS.map((p) => [p, { oauth: hasCredentials(p), token: canConnectWithToken(p), practice: practiceAllowed() }])) as ConnectSetup}
       />
     </Suspense>
   );

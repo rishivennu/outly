@@ -8,6 +8,8 @@ import { getConfig } from "@/lib/settings";
 import { normalizeDisplay } from "@/lib/billing/display";
 import { hasYearly, priceFor, yearlySaving } from "@/lib/billing/cycle";
 import { visitorCurrency } from "@/lib/billing/visitor";
+import { activeGateway } from "@/lib/billing/service";
+import { chargeCurrency } from "@/lib/billing/currency";
 import { CurrencyNote } from "@/components/billing/CurrencyNote";
 import { formatMoney, planFeatures, priceLabel } from "@/lib/billing/money";
 
@@ -16,13 +18,15 @@ import { formatMoney, planFeatures, priceLabel } from "@/lib/billing/money";
  * Priced in the visitor's currency (IP country on Vercel/Cloudflare, else browser language, else their pick).
  */
 export async function Pricing() {
-  const [all, display, beta] = await Promise.all([listPlans(), getConfig("pricing").then(normalizeDisplay), isBeta()]);
+  const [all, display, beta, gw] = await Promise.all([listPlans(), getConfig("pricing").then(normalizeDisplay), isBeta(), activeGateway()]);
   const visitor = await visitorCurrency((all.find((p) => p.priceMinor > 0)?.currency as any) ?? "INR");
-  const plans = inCurrency(all, visitor.currency);
+  // Priced in what the gateway can actually charge, exactly as Billing and checkout do, so the two pages agree.
+  const charged = chargeCurrency(gw.provider, visitor.currency, all.find((p) => p.priceMinor > 0)?.currency ?? "INR");
+  const plans = inCurrency(all, charged);
   const paid = plans.some((p) => p.state === "available" && p.priceMinor > 0);
   const cards: CardPlan[] = plans.map((p, i) => {
     const base = all[i];
-    const y = hasYearly(base, display.yearly) ? priceFor(base, visitor.currency, "year", display.freeMonths) : null;
+    const y = hasYearly(base, display.yearly) ? priceFor(base, charged, "year", display.freeMonths) : null;
     return {
       id: p.id, slug: p.slug, name: p.name, note: p.note, features: planFeatures(p), state: p.state,
       featured: p.highlight || !paid,
@@ -44,7 +48,7 @@ export async function Pricing() {
 
         {paid && (
           <Reveal y={16} className="mt-8 flex justify-center">
-            <CurrencyNote currency={visitor.currency} source={visitor.source} />
+            <CurrencyNote currency={charged} wanted={visitor.currency} source={visitor.source} />
           </Reveal>
         )}
 

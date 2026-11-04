@@ -55,7 +55,7 @@ export function BehaviorBreakdown({ s, active = true }: { s: BehaviorStats; acti
   const segTotal = s.segments.reduce((t, x) => t + x.users, 0) || 1;
   const planMax = Math.max(s.plans.paidAvgActiveDays, s.plans.freeAvgActiveDays, 1);
   return (
-    <div ref={ref} className="gs-stage flex flex-col gap-4">
+    <div ref={ref} className="gs-stage flex flex-col gap-4 [&>*]:min-w-0">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Active today" value={String(s.totals.dau)} sub={`${s.totals.wau} this week, ${s.totals.mau} this month`} />
         <Stat label="Stickiness" value={pct(s.totals.stickiness)} sub="Daily actives as a share of monthly" />
@@ -63,7 +63,7 @@ export function BehaviorBreakdown({ s, active = true }: { s: BehaviorStats; acti
         <Stat label="Have published" value={pct(published?.pct ?? 0)} sub={`${published?.count ?? 0} of ${s.totals.users} users`} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.25fr_1fr]">
+      <div className="grid gap-4 [&>*]:min-w-0 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <Card className="gs-in">
           <CardTitle hint="Each step counts people who also did every step before it">Activation funnel</CardTitle>
           <ol className="flex flex-col gap-3">
@@ -145,7 +145,7 @@ export function BehaviorBreakdown({ s, active = true }: { s: BehaviorStats; acti
         </div>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 [&>*]:min-w-0 lg:grid-cols-3">
         <Card className="gs-in">
           <CardTitle hint={`Every user, by activity in the last ${s.rangeDays} days`}>Segments</CardTitle>
           <div className="gs-bar mb-4 flex h-3 overflow-hidden rounded-full bg-foreground/[0.06]" role="img" aria-label={s.segments.map((x) => `${x.label} ${pct(x.share)}`).join(", ")}>
@@ -194,7 +194,7 @@ export function BehaviorBreakdown({ s, active = true }: { s: BehaviorStats; acti
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid gap-4 [&>*]:min-w-0 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <Card className="gs-in">
           <CardTitle hint={`Accounts connected now; publishing in the last ${s.rangeDays} days, rehearsals excluded`}>Platforms</CardTitle>
           {s.platforms.length ? (
@@ -246,7 +246,7 @@ export function BehaviorBreakdown({ s, active = true }: { s: BehaviorStats; acti
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
+      <div className="grid gap-4 [&>*]:min-w-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <Card className="gs-in">
           <CardTitle hint={`Average active days in the last ${s.rangeDays} days`}>Paid versus free</CardTitle>
           <div className="flex flex-col gap-3">

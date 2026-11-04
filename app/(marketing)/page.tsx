@@ -37,7 +37,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 const metadata: Metadata = {
-  title: "Outlly · Your content deserves to be everywhere",
+  // The root layout appends " · Outlly" to every title, so the home title sets itself absolutely.
+  title: { absolute: "Outlly · Your content deserves to be everywhere" },
   description: DESCRIPTION,
   alternates: { canonical: "/" },
   keywords: [

@@ -109,7 +109,12 @@ export function Assistant(p: Props) {
       <div className="scrollbar-none min-h-0 flex-1 space-y-5 overflow-y-auto px-6 pb-4 pt-3 [mask-image:linear-gradient(to_bottom,transparent_0,#000_28px)]" aria-live="polite">
         {!p.hasMedia && <Bubble from="outly">Hey! Drop a video in and I&apos;ll help it land everywhere it needs to go.</Bubble>}
         {p.hasMedia && p.upload.kind === "uploading" && <Bubble from="outly">Bringing it in. You can start telling me about it while it uploads.</Bubble>}
-        {p.hasMedia && p.upload.kind !== "uploading" && p.meta?.duration ? (
+        {p.hasMedia && p.upload.kind === "failed" && (
+          <Bubble from="outly">
+            That upload didn&apos;t make it. <span className="text-muted-foreground">{p.upload.message} Try it again when you&apos;re ready.</span>
+          </Bubble>
+        )}
+        {p.hasMedia && p.upload.kind !== "uploading" && p.upload.kind !== "failed" && p.meta?.duration ? (
           <Bubble from="outly">
             Your video is in. <span className="text-muted-foreground">{formatDuration(p.meta.duration)}{vertical === null ? "" : vertical ? ", vertical. Perfect for Reels and Shorts." : ", horizontal. It'll sit with bars on vertical feeds."}</span>
           </Bubble>

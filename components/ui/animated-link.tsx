@@ -18,7 +18,7 @@ type Variant = "grow" | "center" | "arrow";
 
 const LINE =
   "relative before:pointer-events-none before:absolute before:inset-x-0 before:-bottom-[0.12em] before:h-[0.07em] before:rounded-full before:bg-current before:content-[''] " +
-  "before:scale-x-0 before:transition-transform before:duration-300 before:ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:before:transition-none " +
+  "before:scale-x-0 before:transition-transform before:duration-300 before:ease-std motion-reduce:before:transition-none " +
   "group-hover/al:before:scale-x-100 group-focus-visible/al:before:scale-x-100";
 
 const ORIGIN: Record<Variant, string> = {

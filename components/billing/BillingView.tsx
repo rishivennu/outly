@@ -56,7 +56,7 @@ type Usage = { used: number; limit: number; seats: number; aiCaptions: boolean; 
 type ExtraAccess = { planName: string; source: "admin" | "referral"; endsAt: string } | null;
 
 
-export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: string } | null; email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; status: BillingStatus; nextCharge: string | null; meters: MeterView[]; history: HistoryRow[]; ended?: EndedSub | null; beta?: BetaOffer | null; founding?: FoundingMine; foundingStatus?: string | null; badges?: Badges; guarantee?: GuaranteeView }) {
+export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: string } | null; email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; charged?: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; status: BillingStatus; nextCharge: string | null; meters: MeterView[]; history: HistoryRow[]; ended?: EndedSub | null; beta?: BetaOffer | null; founding?: FoundingMine; foundingStatus?: string | null; badges?: Badges; guarantee?: GuaranteeView }) {
   const { plans, current } = props;
   const router = useRouter();
   const toast = useToast();
@@ -367,7 +367,7 @@ export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: st
       <section aria-labelledby="plans" className="mt-10 scroll-mt-20">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 id="plans" className="scroll-mt-24 text-xl font-semibold tracking-tight">Available plans</h2>
-          <CurrencyNote currency={props.currency} source={props.currencySource} className="mr-auto ml-3" />
+          <CurrencyNote currency={props.charged ?? props.currency} wanted={props.currency} source={props.currencySource} className="mr-auto ml-3" />
           {anyYear && <CycleSwitch value={cycle} onChange={setCycle} save={save} />}
           {props.testMode && <p className="inline-flex items-center gap-1.5 rounded-full bg-warning/15 px-3 py-1 text-[12px] font-medium"><ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Test mode: no real money moves</p>}
         </div>

@@ -263,6 +263,8 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
       testMode={process.env.NODE_ENV !== "production" && (gw.provider === "mock" || gw.cfg.mode === "test")}
       plans={priced}
       currency={visitor.currency}
+      // What the gateway actually charges: the cards are priced in it, so the pill has to name it too.
+      charged={chargeCurrency(gw.provider, visitor.currency, plans.find((p) => p.priceMinor > 0)?.currency ?? "INR")}
       currencySource={visitor.source}
       current={sub ? { planSlug: sub.plan.slug, planName: sub.plan.name, priceMinor: sub.priceMinor, currency: sub.currency, interval: sub.interval, periodEnd: sub.currentPeriodEnd.toISOString(), cancelAtPeriodEnd: sub.cancelAtPeriodEnd, pausedUntil: sub.pausedUntil && sub.pausedUntil > new Date() ? sub.pausedUntil.toISOString() : null, provider: sub.provider, autoRenew: sub.autoRenew } : null}
       beta={betaOffer}

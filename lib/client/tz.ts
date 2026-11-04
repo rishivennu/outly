@@ -6,15 +6,21 @@ export function partsInTz(d: Date, tz: string) {
 }
 
 /** Wall-clock time in `tz` → real instant. */
+function offsetAt(t: number, tz: string) {
+  const p = partsInTz(new Date(t), tz);
+  return Date.UTC(p.y, p.m - 1, p.d, p.h, p.min) - Math.floor(t / 60_000) * 60_000;
+}
+
+/** Wall-clock time in `tz` → real instant. A time skipped by a DST jump moves forward by
+ *  the gap (02:30 on spring-forward night becomes 03:30); a time that happens twice when the
+ *  clocks go back resolves to the first one. */
 export function fromTzParts(y: number, m: number, d: number, h: number, min: number, tz: string) {
-  const guess = Date.UTC(y, m - 1, d, h, min);
-  let t = guess;
-  for (let i = 0; i < 3; i++) {
-    const p = partsInTz(new Date(t), tz);
-    const asUtc = Date.UTC(p.y, p.m - 1, p.d, p.h, p.min);
-    t += guess - asUtc;
-  }
-  return new Date(t);
+  const wall = Date.UTC(y, m - 1, d, h, min);
+  const before = offsetAt(wall - 86_400_000, tz);
+  const after = offsetAt(wall + 86_400_000, tz);
+  const hits = [wall - before, wall - after].filter((t) => wall - offsetAt(t, tz) === t);
+  if (hits.length) return new Date(Math.min(...hits));
+  return new Date(wall - before);
 }
 
 export function dayKey(d: Date, tz: string) {

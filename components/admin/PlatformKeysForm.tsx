@@ -92,7 +92,7 @@ function PlatformCard({ p, saved, live, base, dm, clash, onSaved }: { p: Platfor
         </p>
       )}
 
-      <div className="mt-5 grid min-w-0 gap-4 [&>*]:min-w-0">
+      <div className="mt-5 grid grid-cols-1 min-w-0 gap-4 [&>*]:min-w-0">
         <div>
           <Label htmlFor={`${p}-id`}>{s.idLabel}</Label>
           <Input id={`${p}-id`} value={id} onChange={(e) => setId(e.target.value)} autoComplete="off" spellCheck={false} className="font-mono text-[14px]" placeholder={`${meta.name} ${s.idLabel.toLowerCase()}`} />
@@ -100,7 +100,7 @@ function PlatformCard({ p, saved, live, base, dm, clash, onSaved }: { p: Platfor
         <SecretField id={`${p}-secret`} label={s.secretLabel} saved={saved.clientSecret} value={secret} onChange={setSecret} placeholder={`Paste the ${s.secretLabel.toLowerCase()}`} />
         <CopyRow label="Callback" value={`${base}/api/accounts/${p}/callback`} />
         {dm && (
-          <div className="grid gap-2" aria-label="Direct messages setup">
+          <div className="grid min-w-0 grid-cols-1 gap-2 [&>*]:min-w-0" aria-label="Direct messages setup">
             <p className="text-[12.5px] font-semibold text-foreground">Direct messages</p>
             <label className="flex min-h-[3.25rem] cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4 py-2.5 hairline">
               <span className="min-w-0">

@@ -152,7 +152,8 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
             <X aria-hidden="true" />
           </button>
         </header>
-        <h1 id="pw-title" className="pw-title pw-b">
+        {/* Not a heading: the dialog is already labelled by it, and studio pages own their only h1. */}
+        <p id="pw-title" className="pw-title pw-b">
           {head.lines.map((t, i) => (
             <span key={i} className={line(t)}>
               {t}{" "}
@@ -162,7 +163,7 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
             {head.tail && `${head.tail} `}
             <span className="pw-hl">{head.hl}</span>
           </span>
-        </h1>
+        </p>
         <p id="pw-body" className="sr-only">
           {config.body}
         </p>

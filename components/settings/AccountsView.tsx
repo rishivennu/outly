@@ -44,7 +44,7 @@ const BLURB: Record<Platform, string> = {
   linkedin: "Native video posts for your network.",
 };
 
-export type ConnectSetup = Record<Platform, { oauth: boolean; token: boolean }>;
+export type ConnectSetup = Record<Platform, { oauth: boolean; token: boolean; practice?: boolean }>;
 
 const ERRORS: Record<string, (name: string) => string> = {
   not_configured: (n) => `${n} isn't set up on this server yet, so there's nothing to connect to.`,
@@ -291,11 +291,19 @@ export function AccountsView({ initial, previous: initialPrevious = [], setup, a
                 </div>
               )}
 
-              {!ok && !setup[p].oauth && !setup[p].token && (
+              {!ok && !setup[p].oauth && !setup[p].token && !setup[p].practice && (
                 <p className="relative mt-4 flex gap-2 rounded-2xl bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
                   <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   <span>
                     {PLATFORM_META[p].name} isn&apos;t switched on yet. An admin adds its app keys in Admin &gt; Social platforms, and it goes live right away.
+                  </span>
+                </p>
+              )}
+              {!ok && !setup[p].oauth && setup[p].practice && (
+                <p className="relative mt-4 flex gap-2 rounded-2xl bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
+                  <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>
+                    {PLATFORM_META[p].name} has no app keys on this server, so Outlly can set up a practice account instead: everything works end to end and nothing is ever posted to {PLATFORM_META[p].name}.
                   </span>
                 </p>
               )}
@@ -322,10 +330,10 @@ export function AccountsView({ initial, previous: initialPrevious = [], setup, a
                   }} />}
 
               <div className="mt-6 flex flex-wrap gap-2">
-                {!ok && setup[p].oauth && (
+                {!ok && (setup[p].oauth || setup[p].practice) && (
                   <Button asChild variant={a ? "primary" : "lime"} className="flex-1">
                     <a href={a ? connectHref(p, { intent: "reconnect", expect: a.id }) : connectHref(p)}>
-                      {a ? "Reconnect" : p === "youtube" ? "Sign in with Google" : `Log in with ${PLATFORM_META[p].name}`} <ArrowRight className="h-4 w-4" />
+                      {a ? "Reconnect" : !setup[p].oauth ? "Set up a practice account" : p === "youtube" ? "Sign in with Google" : `Log in with ${PLATFORM_META[p].name}`} <ArrowRight className="h-4 w-4" />
                     </a>
                   </Button>
                 )}
