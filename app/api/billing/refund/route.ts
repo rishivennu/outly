@@ -12,4 +12,4 @@ export const POST = route(async (req, { user }) => {
   const r = await selfRefund({ id: user.id, email: user.email, name: user.name ?? null }, reason);
   revalidatePath("/billing");
   return json({ ok: true, ...r });
-}, { limit: [3, 60_000] });
+}, { limit: [1, 60_000] }); // this can only ever succeed once per account, so one attempt a minute is plenty

@@ -124,9 +124,18 @@ export function noticeScheduleChange(post: { id: string; userId: string; title: 
 
 /** A new DM came in. At most one alert per conversation per hour, so a chat doesn't buzz on every line. */
 export function noticeNewMessage(userId: string, threadId: string, platform: string, from: string, text: string, now = new Date()) {
-  const hour = now.toISOString().slice(0, 13);
   return quiet(
-    notify(userId, { kind: "new_message", tone: "info", title: `New message from ${from}`.slice(0, 80), body: (text || `Sent you a message on ${name(platform)}.`).slice(0, 140), href: "/inbox?tab=messages", action: "Reply", key: `dm:${threadId}:${hour}` }),
+    (async () => {
+      // At most one an hour per thread, counted from the LAST notice for it, not from the clock hour
+      // (which let 10:59 and 11:01 both through).
+      const last = await db.notice.findFirst({
+        where: { userId, kind: "new_message", key: { startsWith: `dm:${threadId}:` } },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      });
+      if (last && now.getTime() - last.createdAt.getTime() < 60 * 60_000) return;
+      await notify(userId, { kind: "new_message", tone: "info", title: `New message from ${from}`.slice(0, 80), body: (text || `Sent you a message on ${name(platform)}.`).slice(0, 140), href: "/inbox?tab=messages", action: "Reply", key: `dm:${threadId}:${now.getTime()}` });
+    })(),
   );
 }
 

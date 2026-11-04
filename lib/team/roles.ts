@@ -26,6 +26,10 @@ export function memberBlock(role: WorkspaceRole, method: string, path: string): 
     if (/^\/api\/posts\/[^/]+\/launch$/.test(path)) return "Editors can't publish. Send a review link, or ask the owner or a manager to launch it.";
     if (/^\/api\/posts\/[^/]+$/.test(path) && method.toUpperCase() === "DELETE") return "Editors can't delete posts.";
     if (/^\/api\/targets\/[^/]+\/remove$/.test(path)) return "Editors can't take posts down from a platform. Ask the owner or a manager.";
+    // Retry re-publishes the post to the platform, so it is a launch under another name.
+    if (/^\/api\/targets\/[^/]+\/retry$/.test(path)) return "Editors can't publish. Send a review link, or ask the owner or a manager to retry it.";
+    // Comment replies speak for the brand in public, the same as a direct message does in private (1031).
+    if (path === "/api/inbox/reply") return "Editors can't reply from the Inbox. Ask the owner or a manager to answer.";
     // Direct messages speak for the brand in private (1031): editors can read them, managers and the owner answer.
     if (/^\/api\/messages\/[^/]+$/.test(path)) return "Editors can't send direct messages. Ask the owner or a manager to reply.";
   }

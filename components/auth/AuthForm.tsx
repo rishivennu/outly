@@ -53,8 +53,9 @@ export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { 
   const [caps, setCaps] = useState(false);
   const googleError = params.get("google_error");
   const [error, setError] = useState<string | null>(googleError ? (GOOGLE_ERRORS[googleError] ?? GOOGLE_ERRORS.exchange) : null);
-  // Demo credentials are prefilled only when explicitly enabled (local/dev seeds).
-  const demo = mode === "login" && process.env.NEXT_PUBLIC_DEMO_LOGIN === "true";
+  // Demo credentials are prefilled only when explicitly enabled (local/dev seeds), and never in a production
+  // build: a stray NEXT_PUBLIC_DEMO_LOGIN in the live environment must not ship working credentials.
+  const demo = mode === "login" && process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_LOGIN === "true";
   const [form, setForm] = useState({ name: "", email: demo ? "creator@studio.dev" : mode === "signup" ? (params.get("email") ?? "").slice(0, 200) : "", password: demo ? "studio123" : "" });
   const [step, setStep] = useState<Step>(mode === "login" && params.get("step") === "2fa" ? "2fa" : "password");
   const [sentTo, setSentTo] = useState<string | null>(null); // email (or wa:number) the last code went to

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowDown, ArrowUp, Check, ChevronDown, Copy, Loader2, Maximize2, Minimize2, RotateCw, SquarePen, X } from "lucide-react";
 import { Pip, type PipMood } from "@/components/brand/Pip";
+import { useMaybeUser } from "@/components/shell/UserContext";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { Answer } from "./Answer";
 import { PipDataCard } from "./PipDataCard";
@@ -60,6 +61,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const [insights, setInsights] = useState<Insight[]>([]);
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [retrying, setRetrying] = useState<string | null>(null);
+  // Editors can't re-send posts (the retry route refuses them), so the failed-post card offers no Try again for them.
+  const canRetry = useMaybeUser()?.workspace?.role !== "editor";
   const [copied, setCopied] = useState<number | null>(null);
   const [atBottom, setAtBottom] = useState(true);
   const [sleepy, setSleepy] = useState(false);
@@ -196,7 +199,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
       const j = await r.json();
       // Resolved in another tab: lock this one too, and keep what was typed out of the log (it was never sent).
       if (r.status === 409 && j.code === "RESOLVED") { setMsgs((x) => x.slice(0, -1)); setResolved({ to: "" }); return; }
-      if (!r.ok) throw new Error(j.error);
+      if (!r.ok) throw Object.assign(new Error(typeof j.error === "string" ? j.error : ""), { fromServer: true });
       if (typeof j.conversationId === "string") setConv(j.conversationId);
       // "My issue is resolved": a compact offer to close and email the transcript. Nothing closes until they confirm.
       if (j.resolve && typeof j.conversationId === "string") {
@@ -213,8 +216,11 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
         setFails(n);
         if (n >= FAILS_TO_ESCALATE) escalate();
       }
-    } catch {
-      push({ role: "bot", text: T[lang].error, kind: "error" });
+    } catch (e) {
+      // The server's own words when it sent any ("You've used today's AI help", "too many messages"): the
+      // generic line hides the one thing that says what to do next. Anything else keeps the generic line.
+      const said = e instanceof Error && (e as { fromServer?: boolean }).fromServer ? e.message.trim().slice(0, 300) : "";
+      push({ role: "bot", text: said || T[lang].error, kind: "error" });
     } finally {
       setBusy(false);
     }
@@ -489,7 +495,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                           <div className="min-w-0 flex-1">
                             <p className="text-[14px] leading-snug">{text}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
-                              {c.kind === "failed" && !c.reconnect && (
+                              {c.kind === "failed" && !c.reconnect && canRetry && (
                                 <button type="button" onClick={() => retry(c)} disabled={retrying === c.id} className="pc-btn pc-btn-primary">
                                   {retrying === c.id ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <RotateCw className="h-4 w-4" aria-hidden />}
                                   {retrying === c.id ? cx.retrying : cx.retry}

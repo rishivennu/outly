@@ -29,6 +29,10 @@ export function UserProvider({ user, children }: { user: ClientUser; children: R
   }
   return <Ctx.Provider value={user}>{children}</Ctx.Provider>;
 }
+/** Same as useUser, but null outside the studio (marketing pages render some studio widgets, like the chat). */
+export function useMaybeUser() {
+  return useContext(Ctx);
+}
 export function useUser() {
   const u = useContext(Ctx);
   if (!u) throw new Error("useUser outside provider");

@@ -21,5 +21,5 @@ export default async function InboxPage(props: { searchParams?: Promise<{ tab?: 
   ]);
   // Messages (1031) only make sense where Meta delivers them: Instagram or Facebook live, or already connected.
   const showDms = dms.accounts > 0 || dms.threads.length > 0 || live.includes("instagram") || live.includes("facebook");
-  return <InboxView initial={initial} dms={showDms ? { ...dms, dmsOff: dmsOffList(), readOnly: user.role === "editor" } : undefined} initialTab={searchParams?.tab === "messages" ? "messages" : "comments"} renderedAt={Date.now()} />;
+  return <InboxView initial={initial} readOnly={user.role === "editor"} dms={showDms ? { ...dms, dmsOff: dmsOffList(), readOnly: user.role === "editor" } : undefined} initialTab={searchParams?.tab === "messages" ? "messages" : "comments"} renderedAt={Date.now()} />;
 }

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { OutlyMark } from "@/components/brand/Logo";
 import { Pip } from "@/components/brand/Pip";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
+import { useUser } from "@/components/shell/UserContext";
 import { DotText } from "@/components/brand/DotText";
 import { api, ApiError } from "@/lib/client/api";
 import { PLATFORM_META, STOPPABLE, TARGET_COPY, type Platform, type TargetStatus } from "@/lib/domain";
@@ -212,6 +213,8 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
       setBusy(null);
     }
   };
+  // Retry publishes, so an editor seat cannot do it (the route refuses them). Hide the button and say who can.
+  const canRetry = useUser().workspace?.role !== "editor";
   const retry = (t: TargetView) => act(t.id, `/api/targets/${t.id}/retry`);
   const stop = (t: TargetView) => act(t.id, `/api/targets/${t.id}/cancel`);
   // A post that failed (fully or in places) can be cleared out of Outlly from right here.
@@ -288,7 +291,7 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
 
       <ul aria-label="Where your video is going" className="mx-auto mt-10 flex max-w-[56rem] flex-wrap justify-center gap-5">
         {post.targets.map((t, i) => (
-          <LiveActivity key={t.id} t={t} i={i} pct={pctOf(t)} usually={typicalLabel(times[t.platform])} post={post} busy={busy === t.id || busy === "all"} onRetry={() => retry(t)} onStop={() => stop(t)} reduce={!!reduce} />
+          <LiveActivity key={t.id} t={t} i={i} pct={pctOf(t)} usually={typicalLabel(times[t.platform])} post={post} busy={busy === t.id || busy === "all"} onRetry={() => retry(t)} onStop={() => stop(t)} canRetry={canRetry} reduce={!!reduce} />
         ))}
       </ul>
 
@@ -336,7 +339,7 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
   );
 }
 
-function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, reduce }: { t: TargetView; i: number; pct: number; usually: string | null; post: PostView; busy: boolean; onRetry: () => void; onStop: () => void; reduce: boolean }) {
+function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, canRetry, reduce }: { t: TargetView; i: number; pct: number; usually: string | null; post: PostView; busy: boolean; onRetry: () => void; onStop: () => void; canRetry: boolean; reduce: boolean }) {
   const meta = PLATFORM_META[t.platform];
   const canceled = t.status === "failed" && t.errorCode === "CANCELED";
   const h = t.status === "failed" && !canceled ? targetErrorCopy(t.platform, t.errorCode) : null;
@@ -413,7 +416,7 @@ function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, reduce 
             <a href={t.url} target="_blank" rel="noopener noreferrer" className="la-round" aria-label={`See it on ${meta.name} (opens in a new tab)`}>
               <ExternalLink className="h-4 w-4" aria-hidden="true" />
             </a>
-          ) : bad && h?.kind !== "reconnect" ? (
+          ) : bad && h?.kind !== "reconnect" && canRetry ? (
             <button type="button" onClick={onRetry} disabled={busy} className="la-round" aria-label={`${canceled ? "Send it again" : (h?.action ?? "Try again")} on ${meta.name}`}>
               <RefreshCw className={cn("h-4 w-4", busy && "animate-spin")} aria-hidden="true" />
             </button>
@@ -459,10 +462,17 @@ function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, reduce 
               <a href={`/api/accounts/${t.platform}/connect?returnTo=${returnTo}`} className="la-pill">
                 <Link2 className="h-4 w-4" aria-hidden="true" /> {h.action}
               </a>
-              <button type="button" onClick={onRetry} disabled={busy} className="la-pill la-pill-ghost">
-                Already did? Try again
-              </button>
+              {canRetry && (
+                <button type="button" onClick={onRetry} disabled={busy} className="la-pill la-pill-ghost">
+                  Already did? Try again
+                </button>
+              )}
             </div>
+          )}
+          {bad && !canRetry && (
+            <p role="note" className="text-xs leading-snug text-white/65">
+              Editors can&apos;t send posts. The workspace owner or a manager can try this one again.
+            </p>
           )}
           {bad && !canceled && (
             <details className="group text-xs text-white/65">

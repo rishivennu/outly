@@ -103,16 +103,26 @@ describe("1104 analytics numbers count visibly", () => {
 });
 
 describe("1104 review", () => {
+  /**
+   * This one has to read every .tsx under app and components (610 files). That is ~120 ms on its own, but
+   * in a full-suite run file reads in the shared bun process are an order of magnitude slower (the 18-file
+   * check above goes from 0.4 ms to 417 ms in the same run), which took it past the default 5 s timeout.
+   * So: one dirent walk instead of a stat per name, skip the CRLF rewrite for files that never mention the
+   * class, and an explicit timeout for the slow process rather than a smaller check.
+   */
   test("page-frame never shares a class string with its own gutter or centring", () => {
-    const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
-    const walk = (d: string): string[] => readdirSync(d).flatMap((n) => { const p = `${d}/${n}`; return statSync(p).isDirectory() ? walk(p) : /\.tsx?$/.test(n) ? [p] : []; });
+    const { readdirSync, readFileSync } = require("node:fs") as typeof import("node:fs");
+    const walk = (d: string): string[] =>
+      readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(`${d}/${e.name}`) : /\.tsx?$/.test(e.name) ? [`${d}/${e.name}`] : []));
     for (const f of [...walk("app"), ...walk("components")]) {
-      for (const m of src(f).matchAll(/"([^"]*\bpage-frame\b[^"]*)"/g)) {
+      const raw = readFileSync(f, "utf8");
+      if (!raw.includes("page-frame")) continue;
+      for (const m of raw.replace(/\r\n/g, "\n").matchAll(/"([^"]*\bpage-frame\b[^"]*)"/g)) {
         const cls = m[1].split(/\s+/);
         expect(cls.filter((c) => /^(sm:|md:|lg:)?(px-(?!0$)|mx-auto$|-?mx-)/.test(c)), `${f}: ${m[1]}`).toEqual([]);
       }
     }
-  });
+  }, 30_000);
   test("loaders start where their page starts", () => {
     expect(src("app/(studio)/home/loading.tsx")).toContain('frame="page-frame pb-16 pt-4"');
     expect(src("components/shared/RouteSkeleton.tsx")).toContain('"frame-bleed -mt-8 flex flex-col items-center pt-10 lg:-mt-14 lg:pt-16');

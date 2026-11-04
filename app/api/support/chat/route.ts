@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createHash } from "node:crypto";
-import { clientIp, json, route } from "@/lib/http";
+import { clientIp, HttpError, json, route } from "@/lib/http";
 import { answer, answerFaq } from "@/lib/support/bot";
 import { LANG_IDS, resolveT } from "@/lib/i18n/support";
 import { chargeAi } from "@/lib/ai-quota";
@@ -80,8 +80,18 @@ export const POST = route(async (req) => {
   let allowed: boolean | undefined;
   const mayUseAi = async () => {
     if (allowed === undefined) {
-      if (me) await chargeAi(realUserId(me), "support");
-      allowed = me ? true : await visitorMayUseAi(clientIp(req));
+      // Past the daily allowance the chat keeps working without the model: help-centre answers, and plain
+      // sentences over the person's own records. A visitor past the free pool is treated the same way, and
+      // taking the help centre away from someone who has questions left would be the worst answer here.
+      if (me)
+        allowed = await chargeAi(realUserId(me), "support").then(
+          () => true,
+          (e) => {
+            if (e instanceof HttpError && e.status === 429) return false;
+            throw e;
+          },
+        );
+      else allowed = await visitorMayUseAi(clientIp(req));
     }
     return allowed;
   };

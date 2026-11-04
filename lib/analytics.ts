@@ -32,7 +32,7 @@ async function computeAnalytics(userId: string, rangeDays: number, accountIds: s
   // Numbers only (10-14 perf): the post title and thumbnail used to ride along on every metric row,
   // which multiplied the payload by the number of snapshots. Only the top post needs them, fetched below.
   const rows = await db.targetMetric.findMany({
-    where: { capturedAt: { gte: prevSince }, target: { post: { userId }, ...(accountIds ? { socialAccountId: { in: accountIds } } : {}) } },
+    where: { capturedAt: { gte: prevSince }, target: { post: { userId }, practice: false, ...(accountIds ? { socialAccountId: { in: accountIds } } : {}) } },
     select: { capturedAt: true, views: true, likes: true, comments: true, shares: true, target: { select: { platform: true, postId: true, socialAccountId: true } } },
   });
 
@@ -64,7 +64,7 @@ async function computeAnalytics(userId: string, rangeDays: number, accountIds: s
   const weekday = new Map<number, number>();
   for (const s of series) {
     const wd = new Date(s.date).getDay();
-    weekday.set(wd, (weekday.get(wd) ?? 0) + s.instagram + s.youtube + s.x);
+    weekday.set(wd, (weekday.get(wd) ?? 0) + PLATFORMS.reduce((a, p) => a + s[p], 0));
   }
   const bestWd = [...weekday].sort((a, b) => b[1] - a[1])[0];
 

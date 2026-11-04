@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "../db";
 import { env } from "../env";
 import { HttpError } from "../http";
-import { rateLimit } from "../rate-limit";
+import { limitShared } from "../rate-limit";
 import { getConfig } from "../settings";
 import { checkOtp, codeDigest, isCodeShape, newCode, normalizeCode, OTP_MAX_ATTEMPTS, OTP_MESSAGE, OTP_PER_HOUR, OTP_RESEND_MS, OTP_TTL_MS, type OtpPurpose } from "./core";
 import { emailChannel, type OtpChannel } from "./channel";
@@ -20,9 +20,9 @@ export async function issueCode(emailIn: string, purpose: OtpPurpose = "login", 
   // Checked before the account lookup, so the answer is the same for every address.
   if (env.NODE_ENV === "production" && (await getConfig("email")).provider === "mock")
     throw new HttpError(503, "Email sign-in codes aren't switched on yet. Sign in with your password.", "OTP_UNAVAILABLE");
-  const cool = rateLimit(`otp:cool:${purpose}:${email}`, 1, OTP_RESEND_MS);
+  const cool = await limitShared(`otp:cool:${purpose}:${email}`, 1, OTP_RESEND_MS);
   if (!cool.ok) throw new HttpError(429, `A code is already on its way. You can ask for another in ${cool.retryAfter} seconds.`, "OTP_COOLDOWN");
-  const hour = rateLimit(`otp:hour:${purpose}:${email}`, OTP_PER_HOUR, 60 * 60_000);
+  const hour = await limitShared(`otp:hour:${purpose}:${email}`, OTP_PER_HOUR, 60 * 60_000);
   if (!hour.ok) throw new HttpError(429, "That's a lot of codes for one address. Try again in an hour, or sign in with your password.", "OTP_HOURLY");
 
   const user = await db.user.findUnique({ where: { email }, select: { id: true, name: true } });
@@ -52,7 +52,7 @@ export async function verifyCode(emailIn: string, codeIn: string, purpose: OtpPu
   const code = normalizeCode(codeIn);
   if (!isCodeShape(code)) throw new HttpError(400, "Enter the 6-digit code from the email.", "OTP_SHAPE");
   // Caps guessing across re-sent codes too: 5 codes an hour x 5 tries, and never more than 10 tries per 15 minutes.
-  const rl = rateLimit(`otp:verify:${purpose}:${email}`, 10, 15 * 60_000);
+  const rl = await limitShared(`otp:verify:${purpose}:${email}`, 10, 15 * 60_000);
   if (!rl.ok) throw new HttpError(429, "Too many tries. Wait a few minutes, then ask for a new code.", "OTP_LOCKED");
 
   const row = await db.otpCode.findFirst({ where: { email, purpose }, orderBy: { createdAt: "desc" } });

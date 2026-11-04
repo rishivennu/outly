@@ -417,10 +417,13 @@ export async function refundPayment(paymentId: string, by: string, reason: strin
       throw new HttpError(502, `The gateway refused the refund: ${(e as Error).message}`, "GATEWAY");
     }
   }
-  await db.$transaction([
-    db.payment.update({ where: { id: p.id }, data: { status: "refunded", failureReason: `Refunded by ${by}${reason ? `: ${reason}` : ""} (${ref})`.slice(0, 300) } }),
+  // succeeded -> refunded exactly once, however many requests arrive together (two tabs on "Refund my payment",
+  // or an admin refunding while the customer does). The loser stops here: no second credit note, email or revoke.
+  const [flip] = await db.$transaction([
+    db.payment.updateMany({ where: { id: p.id, status: "succeeded" }, data: { status: "refunded", failureReason: `Refunded by ${by}${reason ? `: ${reason}` : ""} (${ref})`.slice(0, 300) } }),
     ...(p.subscriptionId ? [db.subscription.updateMany({ where: { id: p.subscriptionId, status: "active" }, data: { status: "canceled", canceledAt: new Date() } })] : []),
   ]);
+  if (flip.count === 0) return;
   if (p.purpose === "topup") await refundTopUp(p.id); // 1096: what's left in the pack is gone
   if (p.subscriptionId) await dropMandates([p.subscriptionId]);
   await releaseCampaign(p.id); // 1122: a refunded offer payment is no longer a conversion, and its spot frees up

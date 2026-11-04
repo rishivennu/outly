@@ -17,12 +17,14 @@ mock.module("react", () => {
 
 
 const root = join(import.meta.dir, "..");
-const dbFile = join(root, "prisma", "test.db");
+// TEST_DB lets parallel runs use separate files (e.g. TEST_DB=test-a.db); default stays test.db.
+const testDb = /^[\w.-]+\.db$/.test(process.env.TEST_DB ?? "") ? process.env.TEST_DB! : "test.db";
+const dbFile = join(root, "prisma", testDb);
 for (const f of [dbFile, `${dbFile}-journal`]) rmSync(f, { force: true });
 
 Object.assign(process.env, {
   NODE_ENV: "test",
-  DATABASE_URL: "file:./test.db",
+  DATABASE_URL: `file:./${testDb}`,
   AUTH_SECRET: "test-secret-test-secret-test-secret-0123",
   TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
   AUTH_PROVIDER: "local",

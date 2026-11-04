@@ -35,6 +35,16 @@ function offline() {
   );
 }
 
+/* Signed out here, or a session the server no longer accepts (signed out everywhere, password changed):
+   drop the offline copies of Billing and its invoice PDFs at once. The browser does this on the sign-out
+   button too (lib/client/forget-billing.ts), but a revoked session only ever lands on /login, and the next
+   person on a shared device must not be able to open them with the network off. */
+const PRIVATE = /^\/(billing\/?|api\/billing\/invoices\/[\w-]+)$/;
+async function forgetPrivate() {
+  const c = await caches.open(CACHE);
+  for (const req of await c.keys()) if (PRIVATE.test(new URL(req.url).pathname)) await c.delete(req);
+}
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method === "POST" && new URL(req.url).pathname === "/share-target") {
@@ -44,6 +54,7 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== location.origin || url.pathname.startsWith("/admin") || url.pathname.startsWith("/_next/webpack-hmr")) return;
+  if (url.pathname === "/login" || url.pathname === "/api/auth/expired") e.waitUntil(forgetPrivate().catch(() => {}));
   if (!KEEP.some((r) => r.test(url.pathname))) return; // the browser loads it, exactly as with no worker
   e.respondWith(
     fetch(req)

@@ -78,7 +78,7 @@ export default async function LandingPage() {
   const on = (id: Parameters<typeof shown>[1]) => shown(cfg, id);
   return (
     <>
-      {on("faq") && <script type="application/ld+json" nonce={(await headers()).get("x-nonce") ?? undefined} dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />}
+      {on("faq") && <script type="application/ld+json" nonce={(await headers()).get("x-nonce") ?? undefined} dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd).replace(/</g, "\\u003c") }} />}
       {/* Only members and admins reach the landing page during maintenance; they get the countdown here. */}
       {site.maintenance && site.endsAt && (
         <div className="mx-auto mt-4 w-fit max-w-[calc(100%-2.5rem)] rounded-[22px] bg-[hsl(var(--lime)/0.16)] px-4 py-2 hairline">

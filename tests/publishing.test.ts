@@ -72,6 +72,20 @@ beforeEach(() => {
   g.__fake = fake;
 });
 
+/**
+ * requeueStuckTargets is a global sweeper: in a shared test database the stale targets other test files
+ * left behind are swept too, so its own return count is not a fact about this test. Sweep, then report only
+ * what it did to the targets named here, and drop the foreign jobs so the captured queue stays ours.
+ */
+async function sweepMine(ids: string[], olderThanMs: number, now: number) {
+  const before = jobs.length;
+  await requeueStuckTargets(olderThanMs, now);
+  const added = jobs.slice(before);
+  const mine = added.filter((j) => ids.includes(j.data.targetId));
+  jobs = [...jobs.slice(0, before), ...mine];
+  return mine.length;
+}
+
 /** Run queued jobs until the queue is empty (or a cap), like a worker would. */
 async function drain(max = 20) {
   for (let i = 0; i < max && jobs.length; i++) {
@@ -178,16 +192,16 @@ describe("publishing pipeline", () => {
       expect(t.platformStatus).toBe("queued");
       expect(t.attempts).toBe(4);
       // Not yet: the sweeper leaves it alone until the 2 minutes are up...
-      expect(await requeueStuckTargets(QUEUED_STALE_MS, Date.now() + 60_000)).toBe(0);
+      expect(await sweepMine([f.target.id], QUEUED_STALE_MS, Date.now() + 60_000)).toBe(0);
       expect(jobs).toEqual([]);
       // ...then hands it back.
-      expect(await requeueStuckTargets(QUEUED_STALE_MS, Date.now() + 2 * 60_000 + 1000)).toBe(1);
+      expect(await sweepMine([f.target.id], QUEUED_STALE_MS, Date.now() + 2 * 60_000 + 1000)).toBe(1);
       await run();
       t = await target(f.target.id);
       expect(t.platformStatus).toBe("queued");
       expect(t.attempts).toBe(5);
-      expect(await requeueStuckTargets(QUEUED_STALE_MS, Date.now() + 4 * 60_000)).toBe(0);
-      expect(await requeueStuckTargets(QUEUED_STALE_MS, Date.now() + 5 * 60_000 + 1000)).toBe(1);
+      expect(await sweepMine([f.target.id], QUEUED_STALE_MS, Date.now() + 4 * 60_000)).toBe(0);
+      expect(await sweepMine([f.target.id], QUEUED_STALE_MS, Date.now() + 5 * 60_000 + 1000)).toBe(1);
       await run();
       expect(fake.calls.filter((c) => c === "upload").length).toBe(6);
     } finally {
@@ -240,7 +254,7 @@ describe("publishing pipeline", () => {
     await drain();
     expect((await target(f.target.id)).platformStatus).toBe("queued");
     await db.postTarget.update({ where: { id: f.target.id }, data: { platformStatus: "failed", errorCode: "CANCELED" } });
-    expect(await requeueStuckTargets(QUEUED_STALE_MS, Date.now() + 6 * 60_000)).toBe(0);
+    expect(await sweepMine([f.target.id], QUEUED_STALE_MS, Date.now() + 6 * 60_000)).toBe(0);
   });
 
   test("expired token fails only that platform and flags the account for reconnection", async () => {

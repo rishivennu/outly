@@ -6,7 +6,7 @@ import { AlertCircle, ArrowRight, Check, ChevronLeft, ChevronRight, CircleAlert,
 import { Button } from "@/components/ui/button";
 import { Counter, Input, Label, Textarea } from "@/components/ui/field";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
-import { blocking, checksFor } from "@/lib/client/checks";
+import { blocking, checksFor, composedCopy } from "@/lib/client/checks";
 import { FIRST_COMMENT_LIMIT, PLATFORM_META, PLATFORMS, supportsFirstComment, type Platform } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn } from "@/lib/utils";
@@ -241,7 +241,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
   }, [d.reviewed]);
 
   const preview = { draft: d, src: p.media.src, poster: p.media.poster, handle: acct?.username ?? `your${pl}`, name: acct?.displayName ?? acct?.username ?? "You", avatar: acct?.avatar };
-  const igLen = [d.caption, d.hashtags].filter(Boolean).join("\n\n").length;
+  const bodyLen = composedCopy(pl, d).length; // the gate counts caption plus hashtags, so the counter has to as well
 
   return (
     <div className="grid gap-8 sm:grid-cols-[minmax(0,240px)_minmax(0,1fr)] sm:items-start">
@@ -310,14 +310,14 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
           {pl === "youtube" ? (
             <div>
               <Label htmlFor={`${id}-desc`}>
-                Description <Counter value={d.description.length} max={5000} />
+                Description <Counter value={bodyLen} max={meta.captionLimit} />
               </Label>
               <Textarea id={`${id}-desc`} rows={4} value={d.description} onChange={(e) => set({ description: e.target.value })} />
             </div>
           ) : (
             <div>
               <Label htmlFor={`${id}-cap`}>
-                {pl === "x" ? "Post" : "Caption"} <Counter value={pl === "instagram" ? igLen : d.caption.length} max={meta.captionLimit} />
+                {pl === "x" ? "Post" : "Caption"} <Counter value={bodyLen} max={meta.captionLimit} />
               </Label>
               <Textarea id={`${id}-cap`} rows={pl === "x" ? 4 : 6} value={d.caption} onChange={(e) => set({ caption: e.target.value })} placeholder={pl === "x" ? "Say it in one breath." : "Tell them why it matters."} />
             </div>

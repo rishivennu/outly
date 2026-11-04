@@ -19,16 +19,26 @@ export interface Check {
   text: string;
 }
 
+/**
+ * The text the platform will actually receive: every publisher except X appends the hashtags field to the
+ * body (YouTube to the description), so the limit has to count both. Counting the caption alone let a
+ * creator past the gate and the publisher then clipped the end of their caption, or the platform refused it.
+ */
+export function composedCopy(p: Platform, d: Pick<Draft, "caption" | "description" | "hashtags">) {
+  if (p === "x") return d.caption; // no hashtags field on X
+  const body = p === "youtube" ? d.description : d.caption || d.description;
+  return [body, d.hashtags].filter(Boolean).join("\n\n");
+}
+
 export function checksFor(p: Platform, d: Draft, media: { duration?: number | null; width?: number | null; height?: number | null } | null): Check[] {
   const meta = PLATFORM_META[p];
   const out: Check[] = [];
-  const body = p === "youtube" ? d.description : d.caption;
   if (p === "youtube") {
     if (!d.title.trim()) out.push({ level: "error", text: "Add a title. Shorts need one to be found." });
     else if (d.title.length > (meta.titleLimit ?? 100)) out.push({ level: "error", text: `Title is ${d.title.length - 100} characters over.` });
   }
   if (p !== "youtube" && !d.caption.trim()) out.push({ level: "error", text: p === "x" ? "Write something for the post." : "Add a caption." });
-  const full = p === "instagram" ? [d.caption, d.hashtags].filter(Boolean).join("\n\n") : body;
+  const full = composedCopy(p, d);
   if (full.length > meta.captionLimit) out.push({ level: "error", text: `${full.length - meta.captionLimit} characters over ${meta.name}'s limit.` });
   const fc = (d.firstComment ?? "").trim();
   if (fc && supportsFirstComment(p)) {

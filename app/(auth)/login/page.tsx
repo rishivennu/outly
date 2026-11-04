@@ -16,7 +16,7 @@ export default async function LoginPage() {
         google={hasCredentials("youtube")}
         whatsapp={whatsapp}
         title="Welcome back"
-        subtitle={`Sign in to pick up where you left off. Your drafts and schedule are waiting.${process.env.NEXT_PUBLIC_DEMO_LOGIN === "true" ? " The demo account is filled in for you." : ""}`}
+        subtitle={`Sign in to pick up where you left off. Your drafts and schedule are waiting.${process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_LOGIN === "true" ? " The demo account is filled in for you." : ""}`}
       />
     </Suspense>
   );

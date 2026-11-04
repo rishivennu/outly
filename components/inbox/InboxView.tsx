@@ -23,7 +23,7 @@ type Data = { comments: InboxComment[]; errors: InboxProblem[]; targets: number 
  * 1093: the inbox as a mail client. One compact header, one connection strip, a dense list on the left and the open
  * comment or conversation on the right (full screen on a phone). Messages (1031) are the second tab.
  */
-export function InboxView({ initial, dms, initialTab = "comments", renderedAt }: { initial: Data; dms?: DmData; initialTab?: InboxTab; renderedAt?: number }) {
+export function InboxView({ initial, dms, initialTab = "comments", renderedAt, readOnly = false }: { initial: Data; dms?: DmData; initialTab?: InboxTab; renderedAt?: number; readOnly?: boolean }) {
   // 1114: with no ?tab= in the link (the tab bar's), Comments or Messages as you left them.
   const params = useSearchParams();
   const keptTab = useTabMemory<InboxTab>("inbox:tab", (v) => (v === "messages" || v === "comments" ? v : null));
@@ -124,7 +124,7 @@ export function InboxView({ initial, dms, initialTab = "comments", renderedAt }:
         </Button>
       </header>
 
-      {tab === "messages" && dms ? <MessagesView key="messages" initial={dms} {...pane} /> : <CommentsPane key="comments" initial={initial} hasTabs={!!dms} {...pane} />}
+      {tab === "messages" && dms ? <MessagesView key="messages" initial={dms} {...pane} /> : <CommentsPane key="comments" initial={initial} hasTabs={!!dms} readOnly={readOnly} {...pane} />}
     </div>
   );
 }
@@ -147,7 +147,7 @@ function commentsWaiting(comments: InboxComment[]) {
 const keyOf = (c: Pick<InboxComment, "targetId" | "id">) => `${c.targetId}-${c.id}`;
 const titleOf = (c: InboxComment) => c.postTitle ?? "a post";
 
-function CommentsPane({ initial, hasTabs, tabs, query, refreshTick, refreshQuiet, onBusy, onWaiting }: PaneProps & { initial: Data; hasTabs: boolean }) {
+function CommentsPane({ initial, hasTabs, readOnly, tabs, query, refreshTick, refreshQuiet, onBusy, onWaiting }: PaneProps & { initial: Data; hasTabs: boolean; readOnly: boolean }) {
   const toast = useToast();
   const [data, setData] = useState<Data>(initial);
   // 1114: the platform and "needs a reply" filters as you left them (kept per account, for half an hour).
@@ -359,6 +359,7 @@ function CommentsPane({ initial, hasTabs, tabs, query, refreshTick, refreshQuiet
               comment={open}
               replied={replied(open)}
               mine={mine}
+              readOnly={readOnly}
               position={pos >= 0 ? `${pos + 1} of ${waitingList.length} waiting` : null}
               onBack={() => {
                 const k = keyOf(open);
@@ -563,6 +564,7 @@ function CommentDetail({
   comment,
   replied,
   mine,
+  readOnly,
   position,
   onBack,
   onReplied,
@@ -571,6 +573,7 @@ function CommentDetail({
   comment: InboxComment;
   replied: boolean;
   mine: Set<string>;
+  readOnly: boolean;
   position: string | null;
   onBack: () => void;
   onReplied: (c: InboxComment, reply: InboxComment) => void;
@@ -586,6 +589,7 @@ function CommentDetail({
   const input = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const pname = PLATFORM_META[comment.platform].name;
+  const lockId = `comment-lock-${comment.targetId}-${comment.id}`;
   const first = comment.authorName.replace(/^@/, "").split(/\s+/)[0];
 
   // A question in the comments is often the next video. Keep it in the idea bank on Home.
@@ -600,6 +604,7 @@ function CommentDetail({
   };
 
   const suggest = async () => {
+    if (readOnly) return;
     setThinking(true);
     setErr(null);
     try {
@@ -627,7 +632,7 @@ function CommentDetail({
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!text.trim() || busy) return;
+    if (readOnly || !text.trim() || busy) return;
     setBusy(true);
     setErr(null);
     try {
@@ -718,6 +723,12 @@ function CommentDetail({
       </div>
 
       <div className="border-t border-border px-3 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 lg:pb-3.5 lg:pl-5 lg:pr-[76px]">
+        {/* Same as the messages composer: it stays on screen, says who can answer, and sends nothing. */}
+        {readOnly && (
+          <p id={lockId} role="note" className="mb-2 rounded-2xl bg-secondary/60 p-3.5 text-sm">
+            Editors can read comments. The workspace owner or a manager answers them.
+          </p>
+        )}
         {thinking && (
           <div className="mb-2.5" role="status" aria-label="Writing reply ideas">
             <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-lime-ink">
@@ -754,7 +765,7 @@ function CommentDetail({
         )}
 
         <form onSubmit={send} className="flex min-w-0 items-center gap-1.5 rounded-[18px] bg-card p-1.5 hairline focus-within:ring-2 focus-within:ring-foreground/25">
-          <Button type="button" variant="ghost" size="icon" onClick={suggest} disabled={thinking} aria-busy={thinking} aria-label={thinking ? "Writing reply ideas" : ideas ? "More reply ideas" : "Suggest replies"} title="Suggest replies" data-thinking={thinking ? "" : undefined} className="ai-orb shrink-0 rounded-[13px] disabled:opacity-100">
+          <Button type="button" variant="ghost" size="icon" onClick={suggest} disabled={thinking || readOnly} aria-busy={thinking} aria-label={thinking ? "Writing reply ideas" : ideas ? "More reply ideas" : "Suggest replies"} title="Suggest replies" data-thinking={thinking ? "" : undefined} className="ai-orb shrink-0 rounded-[13px] disabled:opacity-100">
             <Sparkles className="ai-orb-icon h-4 w-4" aria-hidden="true" />
           </Button>
           <input
@@ -763,12 +774,14 @@ function CommentDetail({
             onChange={(e) => setText(e.target.value)}
             maxLength={1000}
             dir="auto"
-            placeholder={`Reply to ${first}…`}
+            disabled={readOnly}
+            placeholder={readOnly ? "Editors can't reply" : `Reply to ${first}…`}
             aria-label={`Reply to ${comment.authorName}`}
+            aria-describedby={readOnly ? lockId : undefined}
             className="h-11 min-w-0 flex-1 bg-transparent px-1 text-[16px] text-foreground outline-none placeholder:text-muted-foreground lg:text-[14.5px]"
           />
           {/* shrink-0: the field takes the squeeze on a phone, the send button stays 44px (1044) */}
-          <Button type="submit" variant="lime" size="icon" disabled={busy || !text.trim()} aria-label="Send reply" className="shrink-0 rounded-[13px]">
+          <Button type="submit" variant="lime" size="icon" disabled={busy || readOnly || !text.trim()} aria-label="Send reply" className="shrink-0 rounded-[13px]">
             <Send className="h-4 w-4" aria-hidden="true" />
           </Button>
         </form>

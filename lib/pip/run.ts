@@ -26,10 +26,17 @@ export async function planFor(message: string, context: PipContext, tz: string, 
   return readPlan(raw);
 }
 
-/** Every number in the summary must already appear in the facts. */
+const digits = (s: string) => (s.replace(/,/g, "").match(/\d+(?:\.\d+)?/g) ?? []).map(Number).filter(Number.isFinite);
+
+/**
+ * Every number in the summary must be a number the facts really produced. Compared as whole numbers, not as
+ * text: "7 invoices" used to pass because the digit 7 sits inside the "2027" of a date. A fact may be said as
+ * it stands, rounded or cut to one decimal ("12.5%" told as "13%"); anything else counts as invented and the
+ * plain sentence is used instead.
+ */
 export function numbersBacked(summary: string, facts: string[]) {
-  const pool = facts.join(" ").replace(/,/g, "");
-  return (summary.replace(/,/g, "").match(/\d+(?:\.\d+)?/g) ?? []).every((n) => pool.includes(n));
+  const pool = digits(facts.join(" "));
+  return digits(summary).every((n) => pool.some((p) => p === n || Math.round(p) === n || Math.trunc(p) === n || Math.round(p * 10) / 10 === n));
 }
 
 export function plainSummary(r: PipResult) {

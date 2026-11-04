@@ -15,7 +15,7 @@ export default async function HelpPage(props: { searchParams: Promise<{ topic?: 
   const jsonLd = { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: items.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) };
   return (
     <>
-      <script type="application/ld+json" nonce={(await headers()).get("x-nonce") ?? undefined} dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" nonce={(await headers()).get("x-nonce") ?? undefined} dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <HelpCenter items={items} categories={cats} initialTopic={cats.includes(searchParams.topic as never) ? searchParams.topic! : ""} initialQuery={searchParams.q ?? ""} me={user ? { name: user.name, email: user.email } : null} />
     </>
   );

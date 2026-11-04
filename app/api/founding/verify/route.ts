@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
+import { clientIp } from "@/lib/http";
 import { limitShared } from "@/lib/rate-limit";
 import { checkClaimToken, claimLinkOwnerIsMember, clearFoundingCache, markEmailVerified } from "@/lib/founding";
 
@@ -13,7 +14,8 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   // 1067: the seat's note lives on Billing now (Home only carries the one-time invitation).
   const go = (state: string) => NextResponse.redirect(new URL(`/billing?founding=${state}`, env.APP_URL), 303);
-  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "local";
+  // The first X-Forwarded-For entry is whatever the client typed, so rotating it dodged this limit: use the trusted hop.
+  const ip = clientIp(req);
   if (!(await limitShared(`founding:verify:${ip}`, 20, 10 * 60_000)).ok) return go("busy");
   const t = req.nextUrl.searchParams.get("t") ?? "";
   const u = await checkClaimToken(t);

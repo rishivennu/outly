@@ -29,7 +29,9 @@ export async function planBatch(userId: string, platforms: Platform[], count: nu
  * either books whole or not at all for those reasons. A post that still trips on launch stays a draft and is
  * reported by index; the rest go ahead.
  */
-export async function bookBatch(userId: string, body: z.infer<typeof bulkScheduleSchema>) {
+export async function bookBatch(userId: string, body: z.infer<typeof bulkScheduleSchema>, actor: { role?: string | null } = {}) {
+  // Scheduling a batch IS publishing, so the same rule as /api/posts/[id]/launch applies (1037): editors can't.
+  if (actor.role === "editor") throw new HttpError(403, "Editors can't publish. Send a review link, or ask the owner or a manager to launch it.", "ROLE");
   const accounts = await connectedAccounts(userId);
   // 1037: named accounts become rounds (one post per video per round). Without them it's the old behaviour:
   // one post per video to each platform's default account.

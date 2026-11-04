@@ -495,7 +495,11 @@ async function scheduledPost({ postId }: { postId: string }) {
 /** Safety net for scheduled posts (survives restarts, lost timers, and missed delayed jobs). */
 export async function sweepDuePosts(now = Date.now()) {
   const due = await db.post.findMany({ where: { status: "scheduled", scheduledAt: { lte: new Date(now) } }, select: { id: true }, take: 50 });
-  for (const p of due) await enqueue("SCHEDULED_POST", { postId: p.id }, { jobId: `sched-${p.id}` });
+  // Bucketed per minute like the other sweeps: with Redis a finished job keeps its id (removeOnComplete), so a
+  // fixed id was dropped forever after the first run. A post that bowed out that run (waiting for approval)
+  // would then never be handed back. The claim inside scheduledPost is what stops a double publish, not the id.
+  const dueBucket = Math.floor(now / 60_000);
+  for (const p of due) await enqueue("SCHEDULED_POST", { postId: p.id }, { jobId: `sched-${p.id}-${dueBucket}` });
   const expiring = await db.socialAccount.findMany({
     where: { status: "connected", tokenExpiresAt: { lte: new Date(now + REFRESH_WINDOW_MS) } },
     select: { id: true },

@@ -19,10 +19,10 @@ import { cleanupKeys } from "./account-cleanup-core";
 /** Everything we hold about one creator. Explicit selects only: no password hash, no authenticator
  * secret, no recovery codes, and no platform tokens, so a leaked export cannot be used to sign in or post. */
 export async function exportUser(id: string) {
-  const [profile, accounts, posts, media, ideas, snippets, subscriptions, invoices, dmThreads] = await Promise.all([
+  const [profile, accounts, posts, media, ideas, snippets, subscriptions, invoices, dmThreads, pipChats, notices] = await Promise.all([
     db.user.findUniqueOrThrow({
       where: { id },
-      select: { id: true, name: true, email: true, avatar: true, timezone: true, postingGoal: true, weeklyReport: true, signupSource: true, referralCode: true, createdAt: true, lastActiveAt: true },
+      select: { id: true, name: true, email: true, avatar: true, timezone: true, postingGoal: true, weeklyReport: true, notifyPrefs: true, signupSource: true, referralCode: true, createdAt: true, lastActiveAt: true },
     }),
     db.socialAccount.findMany({
       where: { userId: id },
@@ -67,7 +67,30 @@ export async function exportUser(id: string) {
       },
       orderBy: { lastMessageAt: "desc" },
     }),
+    // Pip chats (1126) and notices (1118) are ours to hold, so they belong in the copy the creator takes.
+    db.pipConversation.findMany({
+      where: { userId: id },
+      select: {
+        ref: true, subject: true, status: true, resolvedAt: true, sentAt: true, sentTo: true, createdAt: true, updatedAt: true,
+        messages: { select: { role: true, text: true, createdAt: true }, orderBy: { createdAt: "asc" } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    db.notice.findMany({
+      where: { userId: id },
+      select: { kind: true, tone: true, title: true, body: true, href: true, readAt: true, hiddenAt: true, createdAt: true },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
+  // Support tickets: the ones linked to this account, plus any raised from the same address while signed out.
+  const tickets = await db.ticket.findMany({
+    where: { OR: [{ userId: id }, { email: profile.email }] },
+    select: {
+      ref: true, email: true, name: true, subject: true, status: true, priority: true, source: true, createdAt: true, updatedAt: true,
+      messages: { select: { author: true, authorName: true, body: true, createdAt: true }, orderBy: { createdAt: "asc" } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
   const plain = (v: string) => {
     try {
       return decrypt(v);
@@ -84,7 +107,32 @@ export async function exportUser(id: string) {
     createdAt: t.createdAt,
     messages: t.messages.map((m) => ({ direction: m.direction, text: plain(m.text), attachments: m.attachments ? (JSON.parse(m.attachments) as unknown) : [], sentAt: m.sentAt })),
   }));
-  return { exportedAt: new Date().toISOString(), app: "Outlly", profile, accounts, posts, media, ideas, snippets, subscriptions, invoices, directMessages };
+  const { notifyPrefs, ...rest } = profile;
+  const prefs = (() => {
+    if (!notifyPrefs) return null;
+    try {
+      return JSON.parse(notifyPrefs) as unknown;
+    } catch {
+      return null;
+    }
+  })();
+  return {
+    exportedAt: new Date().toISOString(),
+    app: "Outlly",
+    profile: rest,
+    notificationSettings: prefs,
+    accounts,
+    posts,
+    media,
+    ideas,
+    snippets,
+    subscriptions,
+    invoices,
+    directMessages,
+    pipChats,
+    supportTickets: tickets,
+    notices,
+  };
 }
 
 /**
@@ -123,6 +171,10 @@ export async function deleteAccount(user: Pick<SessionUser, "id" | "actor">, con
   const keys = cleanupKeys([...media, ...covers.map((c) => ({ storageKey: c.coverKey, thumbnailKey: null }))]);
   const token = newDeletionToken();
   const deletionId = `del_${randomBytes(12).toString("base64url")}`; // never derived from the token
+  // Tickets outlive the account (the schema only clears their userId), so the name and address on them are
+  // anonymised in the SAME transaction: support keeps the thread it needs, nobody keeps the person.
+  const tickets = await db.ticket.findMany({ where: { OR: [{ userId: me.id }, { email: me.email }] }, select: { id: true } });
+  const ticketIds = tickets.map((t) => t.id);
   await db.$transaction([
     db.accountDeletion.create({
       data: {
@@ -145,6 +197,12 @@ export async function deleteAccount(user: Pick<SessionUser, "id" | "actor">, con
       }),
     ),
     db.invoice.updateMany({ where: { userId: me.id }, data: { detachedAt: now } }),
+    ...(ticketIds.length
+      ? [
+          db.ticket.updateMany({ where: { id: { in: ticketIds } }, data: { email: `deleted+${deletionId}@outlly.invalid`, name: null } }),
+          db.ticketMessage.updateMany({ where: { ticketId: { in: ticketIds }, author: "customer" }, data: { authorName: null } }),
+        ]
+      : []),
     db.user.delete({ where: { id: me.id } }), // the schema sets the invoices' userId and paymentId to null
   ]);
   // Files last, and only as a head start: whatever doesn't finish in a few seconds, or fails, is retried

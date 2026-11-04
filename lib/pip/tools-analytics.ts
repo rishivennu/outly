@@ -258,7 +258,14 @@ const uniquePosts = (posts: A.StatPost[]) => {
 const syncedFrom = (w: Win, st: Stats) => Math.max(w.from.getTime(), st.firstSync ? A.DAY_MS * Math.floor(st.firstSync / A.DAY_MS) : w.from.getTime());
 
 const deltaOf = (cur: number, prev: number | null) => (prev == null ? undefined : A.fmtSigned(A.changePct(cur, prev)));
-const nothingYet = (r: PipResult, ctx: PipCtx) => {
+const nothingYet = async (r: PipResult, ctx: PipCtx) => {
+  // Nothing connected is a different answer from nothing published: saying "no posts" there reads as a fault
+  // in Outlly when the one thing missing is an account.
+  const accts = await accountsInScope(ctx, null).catch(() => null);
+  if (accts && !accts.length) {
+    r.empty = ctx.scope ? "None of the accounts you work on are connected, so there are no numbers to read yet." : "You haven't connected an account yet, so I have no numbers to read. Connect one in Accounts and your views start syncing within about 30 minutes.";
+    return r;
+  }
   r.empty = ctx.scope ? "There are no published posts with numbers on the accounts you work on in that period." : "No published posts with numbers in that period yet. Post through Outlly and the numbers start syncing within about 30 minutes.";
   return r;
 };

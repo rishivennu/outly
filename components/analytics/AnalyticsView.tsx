@@ -11,7 +11,7 @@ import { cachedApi, lastWriteAt, peekCached } from "@/lib/client/api";
 import { isStale } from "@/lib/client/preload";
 import { useTabMemory } from "@/lib/client/tab-state";
 import { warmApi, whenIdle } from "@/lib/client/warm";
-import { PLATFORM_META } from "@/lib/domain";
+import { PLATFORMS, PLATFORM_META } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn, compact } from "@/lib/utils";
 import type { AnalyticsSummary } from "@/lib/analytics";
@@ -168,6 +168,9 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
   const shownP = landed.length ? landed : data.byPlatform;
   const quiet = landed.length ? data.byPlatform.filter((b) => b.views <= 0) : [];
   const maxP = Math.max(...shownP.map((b) => b.views), 1);
+  // The chart draws what the data holds, plus whatever is live, so a platform switched on mid-range is never
+  // left out of a total it is already part of.
+  const drawn = PLATFORMS.filter((p) => live.includes(p) || data.byPlatform.some((b) => b.platform === p && b.views > 0));
   const names = (xs: { platform: Platform }[]) => {
     const n = xs.map((x) => PLATFORM_META[x.platform].name);
     return n.length > 1 ? `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}` : n[0];
@@ -181,7 +184,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
         <section aria-labelledby="insight" className="min-w-0 max-w-4xl">
           <p className="text-sm font-semibold text-muted-foreground">Published through Outlly</p>
           <h1 id="insight" className="display mt-2 text-[clamp(2.2rem,4.8vw,4.25rem)]">
-            Your content reached <span className="energy-text"><AnimatedNumber value={data.totals.views} tier="main" id="analytics:reach" /></span> people {range.phrase}.
+            Your content got <span className="energy-text"><AnimatedNumber value={data.totals.views} tier="main" id="analytics:reach" /></span> views {range.phrase}.
           </h1>
           <ul className="mt-4 flex flex-wrap gap-x-7 gap-y-2 text-base text-muted-foreground">
             {change !== null && (
@@ -225,7 +228,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 id="trend" className="text-lg font-semibold">Views over time</h2>
             <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-              {live.map((p) => (
+              {drawn.map((p) => (
                 <li key={p} className="flex items-center gap-1.5">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: PLATFORM_HALO[p] }} aria-hidden="true" /> {PLATFORM_META[p].name}
                 </li>
@@ -237,7 +240,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.series} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
                 <defs>
-                  {live.map((p) => (
+                  {drawn.map((p) => (
                     <linearGradient key={p} id={`g-${p}`} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={PLATFORM_HALO[p]} stopOpacity={0.38} />
                       <stop offset="100%" stopColor={PLATFORM_HALO[p]} stopOpacity={0} />
@@ -255,7 +258,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
                   labelFormatter={(d: string) => new Date(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                   formatter={(v: number, n: string) => [compact(v), PLATFORM_META[n as keyof typeof PLATFORM_META]?.name ?? n]}
                 />
-                {live.map((p, i) => (
+                {drawn.map((p, i) => (
                   <Area {...chartMotion(reduce, i)} key={p} type="monotone" dataKey={p} stackId="1" stroke={PLATFORM_HALO[p]} strokeWidth={2} fill={`url(#g-${p})`} />
                 ))}
               </AreaChart>
