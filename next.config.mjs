@@ -50,6 +50,11 @@ const nextConfig = {
   experimental: {
     // tree-shake the big icon/animation/chart libraries so pages only ship what they import
     optimizePackageImports: ["lucide-react", "framer-motion", "recharts", "date-fns"],
+    // 1116: keep a visited dynamic page in the browser's router cache for 30 s. Without it Next drops the page you
+    // landed on (usually Home) at once, so going back to it refetched (0.65 s) while every preloaded tab opened instantly.
+    // Changes still show at once: they call router.refresh(), which empties this cache, and PageFresh tops a page up
+    // in the background once it is older than its maxAge.
+    staleTimes: { dynamic: 30 },
   },
   images: { formats: ["image/avif", "image/webp"] },
   headers: async () => [
