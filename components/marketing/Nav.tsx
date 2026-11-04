@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatedLink } from "@/components/ui/animated-link";
 import { useSignedIn } from "./useSignedIn";
@@ -28,7 +28,14 @@ const LINKS = [
  * whose top has crossed 40% of the viewport; clicking a link marks it at once. Below lg the
  * links live in a card that drops under the pill and closes on outside tap, Esc, link tap
  * or route change.
+ *
+ * 1117: one row at every desktop width, in this order: logo, the four links, the live count, theme, CTA. Gaps and link
+ * padding scale with the viewport (globals.css), and when the row gets tight the live count gives way first: the
+ * creators half goes, then the whole count (data-fit on the bar), so the links never crowd. Below lg the phone menu
+ * takes over.
  */
+const FIT_STEPS = ["full", "online", "none"] as const;
+const MIN_ROOM = 20; // px kept clear on each side of the links before the live count steps down
 export function MarketingNav() {
   const signedIn = useSignedIn();
   const waitlist = useWaitlist();
@@ -49,6 +56,44 @@ export function MarketingNav() {
   const hoverAt = useRef(0); // a click right after hover opened the menu should not close it again
   const products = PRODUCT_ITEMS.filter((p) => !p.sec || !hidden.has(p.sec));
   const [pill, setPill] = useState<{ l: number; r: number; dir: "left" | "right" | "none" } | null>(null);
+  const logoRef = useRef<HTMLAnchorElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const clusterRef = useRef<HTMLDivElement>(null);
+
+  // Fit (1117): try the full live count, then the "online" half, then none, and keep the first that leaves the links
+  // MIN_ROOM clear on both sides. Re-checked when the bar resizes (the viewport) and when the right-hand group's
+  // content changes (the count arriving, a sign-in); writing data-fit on the bar changes neither, so it can't loop.
+  useLayoutEffect(() => {
+    const bar = barRef.current;
+    const cluster = clusterRef.current;
+    if (!bar || !cluster) return;
+    const fits = () => {
+      if (bar.scrollWidth > bar.clientWidth + 1) return false;
+      const logo = logoRef.current?.getBoundingClientRect();
+      const right = cluster.getBoundingClientRect().left;
+      const nav = navRef.current;
+      if (!logo) return true;
+      if (!nav || !nav.offsetParent) return right - logo.right >= MIN_ROOM;
+      const n = nav.getBoundingClientRect();
+      return Math.min(n.left - logo.right, right - n.right) >= MIN_ROOM;
+    };
+    const fit = () => {
+      for (const step of FIT_STEPS) {
+        bar.dataset.fit = step;
+        if (step === "none" || fits()) break;
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(bar);
+    const mo = new MutationObserver(fit);
+    mo.observe(cluster, { childList: true, subtree: true, characterData: true });
+    void document.fonts?.ready.then(fit);
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, []);
 
   // Liquid indicator: one pill under the active link. The edge in the direction of travel
   // leads and the trailing edge catches up, so it stretches across and settles.
@@ -183,11 +228,11 @@ export function MarketingNav() {
     <header className="mnav sticky top-0 z-50 px-3 pt-3 sm:px-6" data-scrolled={scrolled || open}>
       <div ref={barRef} data-lens="" data-lg-shine="" className="mnav-bar mx-auto flex h-14 max-w-[1180px] items-center gap-2 rounded-full pl-3 pr-1.5 sm:h-[60px] sm:pl-4 sm:pr-2">
         <span className="lg-shine" aria-hidden="true" />
-        <Link href="/" data-mag="" className="flex h-11 items-center gap-2 rounded-full pr-2" aria-label="Outlly home">
+        <Link ref={logoRef} href="/" data-mag="" className="flex h-11 shrink-0 items-center gap-2 rounded-full pr-1" aria-label="Outlly home">
           <OutlyLogo className="text-[17.4px]" />
         </Link>
 
-        <nav aria-label="Sections" className="mx-auto hidden lg:block">
+        <nav ref={navRef} aria-label="Sections" className="mx-auto hidden shrink-0 lg:block">
           <div ref={listRef} className="relative">
           <span
             aria-hidden="true"
@@ -254,28 +299,28 @@ export function MarketingNav() {
           <ProductPanel items={products} onPick={pickProduct} showDemo={!hidden.has("demo")} />
         </div>
 
-        <div className="ml-auto flex items-center gap-1.5 lg:ml-0">
-          {/* 1040: live creator count lives in the bar (moved from the hero); full words where there is room. */}
-          <LiveCount className="mnav-live hidden flex-nowrap whitespace-nowrap px-2 md:inline-flex lg:hidden 2xl:inline-flex" />
-          <ThemeToggle compact className="hidden sm:inline-flex" />
+        <div ref={clusterRef} className="mnav-end ml-auto flex shrink-0 items-center gap-1.5 lg:ml-0">
+          {/* 1040: live creator count lives in the bar (moved from the hero). 1117: one short line, steps down via data-fit. */}
+          <LiveCount nav className="mnav-live hidden px-1.5 md:inline-flex" />
+          <ThemeToggle compact dense className="hidden sm:inline-flex" />
           {signedIn ? (
             <Link
               href="/home"
               data-mag=""
-              className="lime-glow inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-lime px-4 text-[14px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 active:scale-95 sm:px-5"
+              className="lime-glow inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-lime px-4 text-[14px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 active:scale-95 sm:px-5 lg:px-4 xl:px-5"
             >
               <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
               <FlipText text="Dashboard" tone="inherit" />
             </Link>
           ) : (
             <>
-              <AnimatedLink href="/login" className="hidden h-11 rounded-full px-3.5 text-[14px] font-medium text-foreground/80 transition-colors hover:text-foreground sm:inline-flex">
+              <AnimatedLink href="/login" className="hidden h-11 shrink-0 rounded-full px-3.5 text-[14px] font-medium text-foreground/80 transition-colors hover:text-foreground sm:inline-flex lg:px-3 xl:px-3.5">
                 Log in
               </AnimatedLink>
               <Link
                 href={ctaHref}
                 data-mag=""
-                className="lime-glow group inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-lime px-4 text-[14px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 active:scale-95 sm:px-5"
+                className="lime-glow group inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-lime px-4 text-[14px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 active:scale-95 sm:px-5 lg:px-4 xl:px-5"
               >
                 <FlipText text={ctaLabel} tone="inherit" />
                 <ArrowRight className="hidden h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 sm:block" aria-hidden="true" />

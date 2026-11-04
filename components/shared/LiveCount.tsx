@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { Users } from "lucide-react";
 import { compactCount, type LiveView } from "@/lib/presence-core";
 import { cn } from "@/lib/utils";
 
@@ -66,12 +67,35 @@ function Num({ n, format }: { n: number; format: (n: number) => string }) {
   );
 }
 
-/** compact: "3 online" (phone top bar). pill: a glass pill (studio Home). Default: a sentence (website nav, footer). */
-export function LiveCount({ compact = false, pill = false, className }: { compact?: boolean; pill?: boolean; className?: string }) {
+/**
+ * compact: "3 online" (phone top bar). pill: a glass pill (studio Home). nav (1117): one short line for the website
+ * bar, "[people] 8 creators · [dot] 1 online"; the bar hides the creators half, then the whole thing, when space runs
+ * short (data-fit on .mnav-bar). Default: a sentence (footer).
+ */
+export function LiveCount({ compact = false, pill = false, nav = false, className }: { compact?: boolean; pill?: boolean; nav?: boolean; className?: string }) {
   const v = useLiveView();
   if (!v || (v.total === null && v.online === null)) return null;
   const fmt = (n: number) => n.toLocaleString("en-US");
   const label = [v.total !== null ? `${fmt(v.total)} creators on Outlly` : null, v.online !== null ? `${fmt(v.online)} online now` : null].filter(Boolean).join(", ");
+  if (nav) {
+    return (
+      <p className={cn("lc lc-nav inline-flex h-8 items-center gap-1.5 whitespace-nowrap text-[12px] leading-none", className)} title={label}>
+        {v.total !== null && (
+          <span className="lc-total inline-flex items-center gap-1">
+            <Users className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
+            <span><Num n={v.total} format={compactCount} /> creators</span>
+          </span>
+        )}
+        {v.total !== null && v.online !== null && <span className="lc-sep opacity-50" aria-hidden="true">·</span>}
+        {v.online !== null && (
+          <span className="lc-online inline-flex items-center gap-1.5">
+            <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[hsl(142_70%_45%)] shadow-[0_0_0_2.5px_hsl(142_70%_45%/0.2)]" />
+            <span><Num n={v.online} format={compactCount} /> online</span>
+          </span>
+        )}
+      </p>
+    );
+  }
   if (compact) {
     if (v.online === null) return null;
     return (

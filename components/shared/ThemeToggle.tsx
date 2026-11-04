@@ -125,7 +125,8 @@ export const THEME_OPTIONS: { value: ThemeChoice; label: string; Icon: typeof Su
  * A real radio group (1103 review): one Tab stop on the current choice, arrows and Home/End pick and move focus.
  * The account menu leaves arrows inside a radiogroup to it.
  */
-export function ThemeToggle({ compact = false, plain = false, className }: { compact?: boolean; plain?: boolean; className?: string }) {
+/** dense (1117, website bar): 36 x 32 icon buttons in a 36px group; the hit area still reaches the group edge (36 x 36). */
+export function ThemeToggle({ compact = false, plain = false, dense = false, className }: { compact?: boolean; plain?: boolean; dense?: boolean; className?: string }) {
   const { choice, set } = useTheme();
   const group = useRef<HTMLDivElement>(null);
   const pick = (i: number) => {
@@ -141,7 +142,7 @@ export function ThemeToggle({ compact = false, plain = false, className }: { com
     pick(to);
   };
   return (
-    <div ref={group} role="radiogroup" aria-label="Theme" onKeyDown={onKeyDown} className={cn("inline-flex items-center gap-0.5 rounded-full p-1", plain ? "bg-secondary/60" : "glass", className)}>
+    <div ref={group} role="radiogroup" aria-label="Theme" onKeyDown={onKeyDown} className={cn("inline-flex items-center gap-0.5 rounded-full", dense ? "p-0.5" : "p-1", plain ? "bg-secondary/60" : "glass", className)}>
       {THEME_OPTIONS.map(({ value, label, Icon }) => {
         const on = choice === value;
         return (
@@ -156,14 +157,15 @@ export function ThemeToggle({ compact = false, plain = false, className }: { com
             title={label}
             onClick={() => set(value)}
             className={cn(
-              "inline-flex h-9 min-w-9 items-center justify-center gap-1.5 rounded-full px-2.5 text-sm transition-colors",
+              "inline-flex items-center justify-center gap-1.5 rounded-full text-sm transition-colors duration-200",
+              dense ? "relative h-8 w-9 before:absolute before:-inset-y-0.5 before:inset-x-0 before:content-['']" : "h-9 min-w-9 px-2.5",
               // icon-only: 44px wide, and the hit area reaches 4px above and below into the group's padding, so 44 x 44
-              compact && "relative min-w-11 before:absolute before:-inset-y-1 before:inset-x-0 before:content-['']",
+              compact && !dense && "relative min-w-11 before:absolute before:-inset-y-1 before:inset-x-0 before:content-['']",
               on ? "bg-foreground font-medium text-background" : "text-muted-foreground hover:text-foreground",
             )}
           >
             <Icon className="h-4 w-4" aria-hidden />
-            {!compact && <span>{label}</span>}
+            {!compact && !dense && <span>{label}</span>}
           </button>
         );
       })}

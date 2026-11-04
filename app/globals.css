@@ -517,6 +517,20 @@ html:not(.dark) .o3d-floor { background: radial-gradient(closest-side, rgba(30, 
 .mnav-panel { background: hsl(var(--card) / .98); box-shadow: 0 0 0 1px hsl(var(--foreground) / .1), 0 24px 60px -24px rgba(0, 0, 0, .6); transform-origin: top center; animation: mnav-drop .32s cubic-bezier(.22, 1, .36, 1); }
 @keyframes mnav-drop { from { opacity: 0; transform: translateY(-8px) scale(.98); } }
 @media (prefers-reduced-motion: reduce) { .mnav-panel { animation: none; } }
+/* 1117: one-row website bar. Gaps and link padding breathe with the viewport instead of fixed steps; the live count
+   steps down (data-fit, set by MarketingNav) before anything crowds: full -> "online" half -> hidden. */
+@media (min-width: 1024px) {
+  .mnav .mnav-bar { gap: clamp(4px, .5vw, 8px); padding-left: clamp(12px, 1.1vw, 16px); }
+  .mnav .mnav-end { gap: clamp(4px, .45vw, 6px); }
+  .mnav-link { padding: 0 clamp(.6rem, .8vw, .85rem); }
+}
+.mnav-bar[data-fit="online"] .lc-total, .mnav-bar[data-fit="online"] .lc-sep, .mnav-bar[data-fit="none"] .mnav-live { display: none; }
+.lc-nav { color: hsl(var(--foreground) / .6); font-weight: 500; }
+.lc-nav .lc-num { font-weight: 600; color: hsl(var(--foreground) / .9); }
+/* Focus in the bar is brand lime, never the purple accent ring; on the light glass the darker lime ink keeps 3:1. */
+.mnav-bar :focus-visible, .np-panel :focus-visible { outline-color: hsl(var(--lime)); }
+html:not(.dark) .mnav-bar :focus-visible, html:not(.dark) .np-panel :focus-visible { outline-color: hsl(var(--lime-ink)); }
+.mnav-link.is-active:focus-visible { outline-offset: 2px; }
 
 /* ---------- Route change: a soft water sheet sweeps up while the page settles in ----------
    Only transform/opacity/filter animate. Skipped on first load and under reduced motion. */
