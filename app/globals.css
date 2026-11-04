@@ -4110,3 +4110,9 @@ html[data-contrast="more"]:not([data-app]) .mmain :is(.glass, .pulse-card, .card
   /* A full-width band inside the frame (the Content header): out to the frame edge, content back on the gutter. */
   .frame-bleed { margin-inline: calc(var(--frame-gutter) * -1); padding-inline: var(--frame-gutter); }
 }
+
+/* 1130: fallback for the "Outlly classic" headline face (Bricolage Grotesque, wdth 96, opsz 72; app/layout.tsx).
+   Arial scaled to the condensed width Bricolage is set at (measured 1764 vs 1814 units at weight 650 = 97.2%), so a
+   headline wraps on the same words before and after the web font arrives and nothing under it moves. Ascent and
+   descent keep next/font's measured Bricolage metrics, rescaled for the new size-adjust. */
+@font-face { font-family: "Outlly Bricolage Fallback"; src: local("Arial"); size-adjust: 97.22%; ascent-override: 95.66%; descent-override: 27.77%; line-gap-override: 0%; }

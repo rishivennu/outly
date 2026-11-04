@@ -31,7 +31,11 @@ const display = Manrope({ subsets: ["latin"], variable: "--font-manrope", displa
 const body = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 // The pre-1062 pair, kept as Admin > Site fonts > "Outlly classic". Declared only; downloaded when that set is live.
 // No opsz axis on DM Sans (10-16): it tripled the file (132 KB) for a change you can't see at 15-17px.
-const classicDisplay = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage", display: "swap", axes: ["opsz", "wdth"], preload: false });
+// 1130: our own fallback face (globals.css, "Outlly Bricolage Fallback"), not next/font's. Next sizes Arial to Bricolage's
+// default width, but the headlines set it condensed ("wdth" 96), so its fallback ran 8% wide and the hero headline
+// broke onto 3 lines on a 390-412px phone, then snapped to 2 when the 131 KB font landed: the card fan under it jumped
+// 41px (CLS 0.21 on live mobile). The tuned face matches the condensed width, so the lines break the same either way.
+const classicDisplay = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage", display: "swap", axes: ["opsz", "wdth"], preload: false, adjustFontFallback: false, fallback: ["Outlly Bricolage Fallback", "Arial", "sans-serif"] });
 const classicBody = DM_Sans({ subsets: ["latin"], variable: "--font-dmsans", display: "swap", preload: false });
 const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["italic"], variable: "--font-instrument", display: "swap" });
 /*
