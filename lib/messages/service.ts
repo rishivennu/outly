@@ -11,6 +11,7 @@ import { dmsOn } from "../social/keys";
 import { asPublisherError, type AccountContext } from "../social/types";
 import { DM_MAX_CHARS, fetchProfile, isDmPlatform, listConversations, REPLY_WINDOW_MS, sendText, WindowClosedError, type DmPlatform, type RemoteThread } from "./meta";
 import type { DmEvent } from "./webhook";
+import { noticeNewMessage } from "../notify-events";
 
 /**
  * Direct messages (1031): storage and the rules around it.
@@ -158,6 +159,9 @@ export async function ingestEvents(events: DmEvent[], opts: { profileLookups?: n
       if (await storeMessage(thread.id, m)) {
         await touchThread(thread, m, true);
         stored++;
+        // 1118: a new message from someone (not our own reply, not a late or practice one) is worth a heads-up.
+        if (m.direction === "in" && !thread.practice && Date.now() - m.sentAt.getTime() < 3600_000)
+          await noticeNewMessage(acct.userId, thread.id, ev.platform, thread.participantName || thread.participantHandle || "someone", m.text);
       }
     }
   }

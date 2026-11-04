@@ -24,6 +24,7 @@ import { PrivacyNotice } from "@/components/shared/PrivacyNotice";
 import { UpgradeDialog } from "@/components/shared/UpgradeDialog";
 import { AppEffects, AppMoreSheet, AppNavBar, AppTabBar } from "@/components/shell/AppChrome";
 import { NativeBridge } from "@/components/shell/NativeBridge";
+import { PushBridge } from "@/components/shell/PushBridge";
 import { WarmUp } from "@/components/shell/WarmUp";
 import { InstallPrompt } from "@/components/shell/InstallPrompt";
 import { normalizeInstall } from "@/lib/pwa-core";
@@ -74,6 +75,7 @@ export default async function StudioLayout({ children }: { children: React.React
       <AppMoreSheet />
       <AppEffects />
       <NativeBridge />
+      <PushBridge owner={!user.actor} />
       {/* Before the other popups: it decides in a layout effect, so they already see it pending (1100). Off in
           Admin = not rendered at all, so a head-script flag has nothing to show and nothing waits on it. */}
       {welcomeCfg.enabled && <PwaWelcome config={welcomeCfg} />}

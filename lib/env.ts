@@ -63,6 +63,11 @@ const schema = z.object({
   KIMI_API_KEY: z.string().optional().default(""),
   /** Firebase service account (JSON, or the same JSON base64-encoded) for Android app push. Empty = no push. */
   FCM_SERVICE_ACCOUNT: z.string().optional().default(""),
+  /** Web Push (1118). Optional: without them the server makes a VAPID pair once and keeps it encrypted in Settings. */
+  VAPID_PUBLIC_KEY: z.string().optional().default(""),
+  VAPID_PRIVATE_KEY: z.string().optional().default(""),
+  /** Contact the push services can reach (https URL or mailto:). Defaults to APP_URL. */
+  VAPID_SUBJECT: z.string().optional().default(""),
   /* Optional FunASR (Paraformer) subtitle worker, the speech engine FunClip uses. POST audio/wav, returns FunASR JSON. */
   FUNASR_URL: z.string().optional().default(""),
   FUNASR_TOKEN: z.string().optional().default(""),

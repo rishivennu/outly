@@ -8,6 +8,7 @@ import type { ConnectedProfile } from "./social/types";
 import { dmsOn } from "./social/keys";
 import { checkAccounts, checkBrands, checkPlatforms, checkX, entitlements } from "./billing/entitlements";
 import { isMultiAccount } from "./billing/plan-rules";
+import { noticeAccountConnected } from "./notify-events";
 
 /**
  * Store a connected account, keyed by the platform's stable id: a row is only ever updated by the same
@@ -72,6 +73,7 @@ export async function saveConnectedAccount(userId: string, platform: Platform, p
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
   );
   await subscribeDms(platform, acct);
+  await noticeAccountConnected(acct); // 1118: never throws
   return acct;
 }
 

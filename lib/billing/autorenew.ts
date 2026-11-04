@@ -7,6 +7,7 @@ import { getConfig } from "../settings";
 import { sendEmail, templates } from "../email";
 import { adminEvent } from "../admin/route";
 import { formatMoney } from "./money";
+import { noticeAutoRenewStopped, noticePaymentOk, noticeRenewal } from "../notify-events";
 import { razorpay } from "./providers";
 import { issueInvoice } from "./invoice";
 import { GIFT_PROVIDERS } from "./access-core";
@@ -189,6 +190,7 @@ export async function renewFromCharge(providerSubId: string, charge: { id: strin
     return { paymentId, currentPeriodEnd: end, stray: true };
   }
   await adminEvent("subscription_renewed", `${s.user.name} renewed ${s.plan.name}`, formatMoney(charge.amount, charge.currency), "/admin/payments");
+  await noticePaymentOk(paymentId); // 1118: never throws
   return { paymentId, currentPeriodEnd: end, stray: false };
 }
 
@@ -205,6 +207,11 @@ export async function onRazorpaySubscription(ev: { event?: string; payload?: any
     if (pay?.id) await renewFromCharge(sub.id, { id: pay.id, amount: Number(pay.amount), currency: String(pay.currency ?? "INR") }, new Date(), typeof sub.notes?.subscriptionId === "string" ? sub.notes.subscriptionId : null);
   } else if (["subscription.cancelled", "subscription.halted", "subscription.completed", "subscription.paused"].includes(kind)) {
     await db.setting.deleteMany({ where: { key: replaceKey(sub.id) } }); // a replacement that never got approved
+    // 1118: tell the owner, but only when the bank or gateway stopped it. A mandate Outlly itself stopped (cancel,
+    // pause, plan change) already had its providerSubId cleared, so it isn't found here.
+    if (kind === "subscription.halted" || kind === "subscription.cancelled")
+      for (const s of await db.subscription.findMany({ where: { providerSubId: sub.id, status: "active", autoRenew: true }, select: { id: true, userId: true, currentPeriodEnd: true } }))
+        await noticeAutoRenewStopped(s.userId, s.id, kind === "subscription.halted", s.currentPeriodEnd);
     await db.subscription.updateMany({ where: { providerSubId: sub.id }, data: { autoRenew: false, ...(kind === "subscription.paused" ? {} : { providerSubId: null }) } });
     if (kind === "subscription.halted") await adminEvent("payment_failed", "An auto-renew charge kept failing", `Razorpay halted ${sub.id}. The plan ends at its period end unless they renew.`, "/admin/payments?status=failed");
   }
@@ -234,6 +241,7 @@ export async function sendRenewalReminders(now = new Date()) {
       subject: s.autoRenew ? `${s.plan.name} renews on ${format(s.currentPeriodEnd, "d MMM")}` : `${s.plan.name} ends on ${format(s.currentPeriodEnd, "d MMM")}`,
       html: templates.renewalReminder({ name: s.user.name, plan: s.plan.name, date: format(s.currentPeriodEnd, "d MMM yyyy"), amount: formatMoney(s.priceMinor, s.currency), autoRenew: s.autoRenew, url: `${env.APP_URL}/billing` }),
     }).catch((e) => console.error("[renewal reminder]", s.id, e));
+    await noticeRenewal(s.userId, { id: s.id, plan: s.plan.name, at: s.currentPeriodEnd, autoRenew: s.autoRenew, priceMinor: s.priceMinor, currency: s.currency }, step); // 1118
     sent++;
   }
   return { checked: subs.length, sent };

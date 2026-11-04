@@ -7,6 +7,7 @@ import { HttpError } from "../http";
 import { getConfig } from "../settings";
 import { adminEvent } from "../admin/route";
 import { formatMoney, type Currency } from "./money";
+import { noticePaymentFailed, noticePaymentOk } from "../notify-events";
 import { chargeCurrency, isCurrency, parsePrices } from "./currency";
 import { hasYearly, priceFor, type Cycle } from "./cycle";
 import { foundingPrice } from "../founding-config";
@@ -24,6 +25,7 @@ import { experimentPrice, parseVariantTag, recordExperiment, variantTag } from "
 import { normalizeTopups, packBlock, packExpiry, packPrice } from "./topups-core";
 import { refundTopUp } from "./topups";
 import { dropMandate, dropMandates } from "./autorenew";
+import { ensureRzpCustomer } from "./saved-cards";
 
 /** Which gateway serves checkout right now. Falls back to mock if the chosen one is missing keys, and says so. */
 export async function activeGateway() {
@@ -96,7 +98,9 @@ export async function startCheckout(userId: string, planSlug: string, wanted?: C
       : await db.payment.create({ data: { userId, planId: plan.id, amountMinor: charge.priceMinor, currency: charge.currency, interval: charge.interval, provider, status: "pending", ...(test ? { variant: variantTag(test) } : {}) } });
   if (test) await recordExperiment({ experiment: test.experiment, variant: test.variant, userId, kind: "checkout", amountMinor: charge.priceMinor, currency: charge.currency });
 
-  const args = { paymentId: payment.id, amountMinor: payment.amountMinor, currency: payment.currency, planName: charge.interval === "year" && plan.interval !== "year" ? `${plan.name} (yearly)` : plan.name, user: { name: user.name, email: user.email }, appUrl: env.APP_URL };
+  const args = { paymentId: payment.id, amountMinor: payment.amountMinor, currency: payment.currency, planName: charge.interval === "year" && plan.interval !== "year" ? `${plan.name} (yearly)` : plan.name, user: { name: user.name, email: user.email }, appUrl: env.APP_URL,
+    // 1118: Checkout shows the user's saved cards and can save a new one (Razorpay tokenises it, with its own consent).
+    customerId: provider === "razorpay" ? await ensureRzpCustomer(cfg, user) : undefined };
   let start: CheckoutStart;
   try {
     start =
@@ -139,7 +143,8 @@ export async function startTopUp(userId: string, packId: string, wanted?: Curren
     recent && recent.amountMinor === price.priceMinor && recent.currency === price.currency
       ? recent
       : await db.payment.create({ data: { userId, amountMinor: price.priceMinor, currency: price.currency, interval: "month", provider, status: "pending", purpose: "topup", meta } });
-  const args = { paymentId: payment.id, amountMinor: payment.amountMinor, currency: payment.currency, planName: `Top-up: ${pack.label}`, user: { name: user.name, email: user.email }, appUrl: env.APP_URL };
+  const args = { paymentId: payment.id, amountMinor: payment.amountMinor, currency: payment.currency, planName: `Top-up: ${pack.label}`, user: { name: user.name, email: user.email }, appUrl: env.APP_URL,
+    customerId: provider === "razorpay" ? await ensureRzpCustomer(cfg, user) : undefined };
   let start: CheckoutStart;
   try {
     start =
@@ -171,6 +176,7 @@ async function completeTopUp(p: { id: string; userId: string; meta: string | nul
   const fresh = await db.payment.findUniqueOrThrow({ where: { id: p.id } });
   const invoice = flipped.count === 1 ? await invoiceFor(fresh) : await db.invoice.findUnique({ where: { paymentId: p.id } });
   if (flipped.count === 1 && !p.sample) await adminEvent("topup", `Top-up bought: ${m.label ?? m.pack}`, formatMoney(p.amountMinor, p.currency), "/admin/payments");
+  if (flipped.count === 1) await noticePaymentOk(p.id); // 1118 (sample payments stay quiet inside)
   return { payment: fresh, invoice };
 }
 
@@ -253,6 +259,7 @@ export async function completePayment(paymentId: string, providerRef?: string) {
     await adminEvent("subscription_new", `${u?.name ?? "A user"} subscribed to ${plan.name}`, formatMoney(p.amountMinor, p.currency), "/admin/payments");
     await rewardReferredFriend(p.id); // Refer & Earn: the sharer's month, when this is the friend's first qualifying payment
     await onPaidFounding(p.userId); // 1067: a paid plan is what earns a founding seat (never throws)
+    await noticePaymentOk(p.id); // 1118: never throws
   }
   const tag = parseVariantTag(p.variant);
   if (tag) await recordExperiment({ ...tag, userId: p.userId, kind: "paid", amountMinor: p.amountMinor, currency: p.currency });
@@ -314,6 +321,7 @@ export async function failPayment(paymentId: string, reason: string) {
   if (!p || p.status === "succeeded") return;
   await db.payment.update({ where: { id: paymentId }, data: { status: "failed", failureReason: reason.slice(0, 300) } });
   if (!p.sample) await adminEvent("payment_failed", `Payment failed: ${p.user.name}`, `${formatMoney(p.amountMinor, p.currency)} · ${reason.slice(0, 120)}`, "/admin/payments?status=failed");
+  if (p.status !== "failed") await noticePaymentFailed(p.id); // 1118: once per payment, never throws
 }
 
 /** Cancel at period end: access continues until currentPeriodEnd, nothing is refunded automatically. */

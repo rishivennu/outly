@@ -2,6 +2,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { HttpError, json, route } from "@/lib/http";
 import { parseAlertPrefs, serializeAlertPrefs, SPIKE_STEPS } from "@/lib/alerts-core";
+import { syncFromAlerts } from "@/lib/notify";
 
 const schema = z.object({
   spike: z.boolean().optional(),
@@ -25,5 +26,7 @@ export const PATCH = route(async (req, { user }) => {
   const u = await db.user.findUnique({ where: { id: user.id }, select: { alertPrefs: true } });
   const prefs = { ...parseAlertPrefs(u?.alertPrefs), ...body };
   await db.user.update({ where: { id: user.id }, data: { alertPrefs: serializeAlertPrefs(prefs) } });
+  // The same two switches live in Settings > Notifications (1118): keep them in step.
+  if (body.failed !== undefined || body.spike !== undefined) await syncFromAlerts(user.id, prefs);
   return json({ prefs: parseAlertPrefs(serializeAlertPrefs(prefs)) });
 });

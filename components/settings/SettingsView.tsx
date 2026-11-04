@@ -26,6 +26,7 @@ import { SettingsShell, Disclosure, useUnsaved, type SettingsCategory } from "./
 import { RememberedDevicesCard, SessionsCard } from "./SecurityCards";
 import { ActiveSessionsCard } from "./ActiveSessionsCard";
 import { ConnectedAccountsCard, LocationCard } from "./PrivacyCards";
+import { SavedCardsSection } from "@/components/billing/SavedCards";
 import { BillingDetailsSection, HistorySection, InvoicesSection, MemberBillingNote, MethodsSection, PaymentsBento, PlanSection, type BillingSummary } from "./BillingCards";
 
 function zones(): string[] {
@@ -269,11 +270,21 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, per
       id: "notifications",
       label: "Notifications",
       icon: Bell,
-      blurb: "The Monday report and the alerts we send you.",
+      blurb: "Push notifications, what we alert you about, the Monday report.",
       content: ws ? (
         <Note title="Emails come from your own studio">Weekly reports and alerts for {owner}&apos;s studio go to {owner}.</Note>
       ) : (
         <>
+          <Link href="/settings/notifications" className="glass group flex min-h-[88px] items-center gap-4 rounded-[32px] p-6 transition-shadow hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring sm:px-8">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-lime text-[hsl(var(--lime-foreground))]" aria-hidden="true">
+              <Bell className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[17px] font-semibold">Notification settings</span>
+              <span className="block text-sm text-muted-foreground">Push on your phone and computer, each kind of alert, quiet hours, devices and history.</span>
+            </span>
+            <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform duration-200 group-hover:translate-x-1">&rarr;</span>
+          </Link>
           <WeeklyReportCard initial={weeklyReport} allowed={perks.digest} />
           <AlertsCard initial={alerts} spikeAllowed={perks.spike} />
         </>
@@ -291,6 +302,7 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, per
           <PaymentsBento b={billing} />
           <PlanSection b={billing} />
           <MethodsSection b={billing} />
+          <SavedCardsSection />
           <HistorySection b={billing} />
           <InvoicesSection b={billing} />
           <BillingDetailsSection b={billing} />

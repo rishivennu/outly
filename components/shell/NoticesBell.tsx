@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AlertTriangle, Bell, CircleAlert, Info, X } from "lucide-react";
 import { api } from "@/lib/client/api";
+import { setBadge } from "@/lib/client/push";
+import { NOTICES_EVENT } from "./PushBridge";
 import { cn } from "@/lib/utils";
 
 type Notice = { id: string; kind: string; tone: "danger" | "warn" | "info"; title: string; body: string; href: string | null; action: string | null; read: boolean; createdAt: string };
@@ -28,8 +30,8 @@ const when = (iso: string) => {
 /* The sidebar and the mobile top bar each mount a bell (one is hidden by CSS). Share one request between them. */
 type NoticeList = { notices: Notice[]; unread: number };
 let inflight: { at: number; p: Promise<NoticeList> } | null = null;
-function fetchNotices(): Promise<NoticeList> {
-  if (inflight && Date.now() - inflight.at < 2000) return inflight.p;
+function fetchNotices(fresh = false): Promise<NoticeList> {
+  if (!fresh && inflight && Date.now() - inflight.at < 2000) return inflight.p;
   const p = api<NoticeList>("/api/notices");
   inflight = { at: Date.now(), p };
   p.catch(() => (inflight = null));
@@ -46,8 +48,8 @@ export function NoticesBell({ placement = "side", className }: { placement?: "si
   const [unread, setUnread] = useState(0);
   const [pos, setPos] = useState<React.CSSProperties>({});
 
-  const load = useCallback(() => {
-    fetchNotices()
+  const load = useCallback((fresh?: boolean) => {
+    fetchNotices(fresh === true)
       .then((r) => {
         setItems(r.notices);
         setUnread(r.unread);
@@ -60,9 +62,19 @@ export function NoticesBell({ placement = "side", className }: { placement?: "si
   }, [load, path]);
   useEffect(() => {
     const onFocus = () => document.visibilityState === "visible" && load();
+    // 1118: a push just arrived (or a notification was tapped and marked read): reload past the shared request.
+    const onPush = () => load(true);
     document.addEventListener("visibilitychange", onFocus);
-    return () => document.removeEventListener("visibilitychange", onFocus);
+    window.addEventListener(NOTICES_EVENT, onPush);
+    return () => {
+      document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener(NOTICES_EVENT, onPush);
+    };
   }, [load]);
+  // The installed app's icon shows the same unread count as the bell.
+  useEffect(() => {
+    if (items !== null) setBadge(unread);
+  }, [items, unread]);
 
   const place = useCallback(() => {
     const r = btn.current?.getBoundingClientRect();

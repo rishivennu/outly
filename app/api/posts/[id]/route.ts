@@ -8,6 +8,7 @@ import { deletePost } from "@/lib/posts/delete";
 import { pinTargets } from "@/lib/profiles";
 import { copyChanged } from "@/lib/collab-core";
 import { recordEdit } from "@/lib/collab";
+import { noticeScheduleChange } from "@/lib/notify-events";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,8 @@ export const PATCH = route(async (req, { user, params }) => {
     if (post.status === "draft" || post.status === "scheduled") {
       await db.post.update({ where: { id: post.id }, data: { scheduledAt: at } });
       if (post.status === "scheduled") await enqueue("SCHEDULED_POST", { postId: post.id }, { delayMs: at.getTime() - Date.now(), jobId: `sched-${post.id}-${at.getTime()}` });
+      // 1118: a team member moved the owner's scheduled post. The owner moving their own stays quiet.
+      if (post.status === "scheduled" && user.actor && post.scheduledAt?.getTime() !== at.getTime()) await noticeScheduleChange(post, user.actor.name, at, user.timezone);
     } else {
       // A failed or partly-sent post is being booked again: that is a launch, so it goes through launchPost
       // (connections, approval and the plan's post slot), never a bare status write. Editors can't launch (1037).

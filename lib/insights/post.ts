@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "../db";
 import { cached } from "../cache";
+import { noticeMilestones } from "../notify-events";
 import { isPlatform, PLATFORM_META, type Platform } from "../domain";
 import { liveAccount } from "../live/account";
 import { asPublisherError, httpFailure } from "../social/types";
@@ -241,6 +242,8 @@ async function snapshot(r: TargetInsights) {
   for (const k of keys) if (r.metrics[k] === undefined) delta[k] = 0;
   if (last && !keys.some((k) => delta[k] !== 0)) return;
   await db.targetMetric.create({ data: { targetId: r.targetId, ...delta } });
+  // 1118: passed 1K / 10K / 100K / 1M views on this platform since the last snapshot (each one notified once).
+  if (r.metrics.views !== undefined) await noticeMilestones(r.targetId, sum._sum.views ?? 0, r.metrics.views);
 }
 
 const key = (userId: string, postId: string) => `insights:${userId}:${postId}`;

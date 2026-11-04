@@ -5,6 +5,8 @@ import { requeueStuckTargets, sweepDirectUploads, sweepDuePosts } from "@/lib/qu
 import { settle } from "@/lib/queue";
 import { recordSweep } from "@/lib/queue/health";
 import { runCleanups } from "@/lib/account-cleanup";
+import { sweepReminders } from "@/lib/retention/reminders";
+import { cleanupSubs, drainOutbox } from "@/lib/push/webpush";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -29,11 +31,15 @@ async function sweep(req: NextRequest) {
   const cleaned = await sweepDirectUploads().catch(() => 0);
   // Files from deleted accounts (1053): retried with backoff until gone. Bounded, and never fatal.
   const files = await runCleanups({ budgetMs: 10_000 }).catch(() => ({ removed: 0, failed: 0 }));
+  // Notifications (1118): upcoming-post reminders, pushes a push service asked us to retry, lapsed devices.
+  const reminders = await sweepReminders().catch((e) => (console.error("[sweep] reminders", e), null));
+  const push = await drainOutbox().catch((e) => (console.error("[sweep] push", e), null));
+  if (new Date().getMinutes() === 7) await cleanupSubs().catch(() => 0);
   // Without Redis the jobs above are timers in this invocation: let them run before the response ends it
   // (1027). Budget = what is left of maxDuration minus 10 s of headroom; whatever is still running then is
   // held by waitUntil or picked up by the next sweep.
   const running = await settle(Math.max(0, 50_000 - (Date.now() - startedAt)));
-  return NextResponse.json({ ok: true, requeued, cleaned, files, running }, { headers: { "cache-control": "no-store" } });
+  return NextResponse.json({ ok: true, requeued, cleaned, files, reminders, push, running }, { headers: { "cache-control": "no-store" } });
 }
 
 export const GET = sweep;

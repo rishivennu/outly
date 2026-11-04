@@ -3,7 +3,7 @@
    1041: every other page load goes straight to the browser. Proxying them turned any brief network
    failure into "This site can't be reached / ERR_FAILED" on iPhone (no saved copy of /home, and iOS
    drops the offline page from storage), where the browser on its own would simply have loaded it. */
-const CACHE = "outly-offline-v3";
+const CACHE = "outly-offline-v4";
 const KEEP = [/^\/billing\/?$/, /^\/help\/?$/, /^\/api\/billing\/invoices\/[\w-]+$/];
 
 self.addEventListener("install", (e) => {
@@ -56,5 +56,85 @@ self.addEventListener("fetch", (e) => {
       })
       // Always answer with a real response: an empty answer is what shows as ERR_FAILED.
       .catch(async () => (await caches.match(url.pathname)) || (await caches.match("/offline.html")) || offline()),
+  );
+});
+
+/* 1118: Web Push. The server sends a short JSON (lib/push/webpush.ts payloadOf): t title, b body, h path to
+   open, g tag (a newer push with the same tag replaces the older one), i notice id, n unread count. Every push
+   shows a notification, always: iOS stops delivering to a Home Screen app whose pushes stay silent. */
+const ICON = "/brand/app/icon-192.png";
+const BADGE = "/brand/app/badge-96.png";
+const safePath = (h) => (typeof h === "string" && /^\/(?![/\\])/.test(h) ? h : "/home");
+const tell = (msg) => self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((cs) => cs.forEach((c) => c.postMessage(msg)));
+function badge(n) {
+  if (typeof n !== "number" || !("setAppBadge" in self.navigator)) return Promise.resolve();
+  return (n > 0 ? self.navigator.setAppBadge(n) : self.navigator.clearAppBadge()).catch(() => {});
+}
+
+self.addEventListener("push", (e) => {
+  let d = {};
+  try {
+    d = e.data ? e.data.json() : {};
+  } catch (_) {
+    try {
+      d = { b: e.data.text() };
+    } catch (_) {}
+  }
+  const opts = {
+    body: d.b || "You have a new update in Outlly.",
+    icon: ICON,
+    badge: BADGE,
+    timestamp: d.s || Date.now(),
+    data: { h: safePath(d.h), i: d.i || "" },
+    lang: "en",
+  };
+  if (d.g) (opts.tag = d.g), (opts.renotify = true);
+  e.waitUntil(Promise.all([self.registration.showNotification(d.t || "Outlly", opts), badge(d.n), tell({ type: "outlly:notice" })]));
+});
+
+/* A tap opens the page the notice is about: an Outlly window already open is reused (focused, then sent
+   there), otherwise a new one opens. A signed-out session lands on sign-in, which returns to this page. */
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const d = e.notification.data || {};
+  const path = safePath(d.h);
+  const url = new URL(path, self.location.origin).href;
+  e.waitUntil(
+    (async () => {
+      if (d.i)
+        fetch("/api/notices", { method: "PATCH", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ ids: [d.i] }) })
+          .then(() => tell({ type: "outlly:notice" }))
+          .catch(() => {});
+      const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const mine = all.filter((c) => new URL(c.url).origin === self.location.origin && !new URL(c.url).pathname.startsWith("/admin"));
+      const at = (c) => {
+        const u = new URL(c.url);
+        return u.pathname + u.search;
+      };
+      const hit = mine.find((c) => at(c) === path) || mine.find((c) => c.focused) || mine[0];
+      if (!hit) return self.clients.openWindow(url);
+      const w = await hit.focus().catch(() => hit);
+      if (at(hit) === path) return;
+      // navigate() only works on a page this worker controls; otherwise the page routes itself.
+      try {
+        if (await (w || hit).navigate(url)) return;
+      } catch (_) {}
+      (w || hit).postMessage({ type: "outlly:open", href: path });
+    })(),
+  );
+});
+
+/* The browser replaced the subscription by itself: subscribe again with the same key and tell the server,
+   which recognises the device by its old endpoint (app/api/push/renew). */
+self.addEventListener("pushsubscriptionchange", (e) => {
+  e.waitUntil(
+    (async () => {
+      const old = e.oldSubscription;
+      let sub = e.newSubscription;
+      const key = old && old.options && old.options.applicationServerKey;
+      if (!sub && key) sub = await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+      if (!sub || !old) return;
+      await fetch("/api/push/renew", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ old: old.endpoint, sub: sub.toJSON() }) });
+    })().catch(() => {}),
   );
 });

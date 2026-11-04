@@ -28,6 +28,7 @@ import { PaymentReceipt } from "./PaymentReceipt";
 import { GuaranteeCard, type GuaranteeView } from "./GuaranteeCard";
 import { GUARANTEE_LINE } from "@/lib/billing/guarantee-core";
 import { AutoRenewToggle, CancelReasons, PriceSurvey, UsageExtras, type CancelWhy } from "./PlanExtras";
+import { SavedCardsSection } from "./SavedCards";
 
 export type ReturnNotice = { tone: "ok" | "info" | "error"; text: string };
 type Current = { planSlug: string; planName: string; priceMinor: number; currency: string; interval: string; periodEnd: string; cancelAtPeriodEnd: boolean; pausedUntil?: string | null; provider?: string; autoRenew?: boolean } | null;
@@ -63,6 +64,8 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
   const anyYear = plans.some((p) => p.year && p.state === "available");
   const save = Math.max(0, ...plans.map((p) => p.year?.save ?? 0));
   const [confirm, setConfirm] = useState(false);
+  // 1118: opt-in, off by default. Razorpay still asks for its own consent before it tokenises a card.
+  const [saveCard, setSaveCard] = useState(false);
   const [why, setWhy] = useState<CancelWhy>({ detail: "", interview: false });
   const [notice, setNotice] = useState(props.notice);
   // 1053: a checkout that came back gets a receipt slip built from our payment row; it replaces the text notice.
@@ -130,6 +133,8 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
       const rz = new window.Razorpay!({
         key: r.keyId, order_id: r.orderId, amount: r.amount, currency: r.currency, name: "Outlly", description: r.description,
         prefill: { name: r.name, email: r.email }, theme: { color: "#9ff218" },
+        // 1118: with a customer, Checkout lists this person's saved cards; remember_customer lets it offer to save a new one.
+        ...(r.customerId ? { customer_id: r.customerId, remember_customer: saveCard } : {}),
         handler: async (resp: any) => {
           try {
             const v = await api<{ ok: boolean; invoice?: string }>("/api/billing/razorpay/verify", { method: "POST", json: { paymentId: r.paymentId, ...resp } });
@@ -425,6 +430,15 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
             );
           })}
         </ul>
+        {props.gateway === "razorpay" && (
+          <label className="mt-4 flex w-fit max-w-full cursor-pointer items-start gap-3 rounded-2xl bg-secondary/40 p-3 pr-4 text-sm hairline">
+            <input type="checkbox" className="spc-check mt-0.5 h-[18px] w-[18px] shrink-0" checked={saveCard} onChange={(e) => setSaveCard(e.target.checked)} />
+            <span>
+              <span className="block font-medium">Save this card for future transactions</span>
+              <span className="block text-[12.5px] text-muted-foreground">Razorpay keeps it as a secure token after you agree on its screen. Outlly never sees the card number.</span>
+            </span>
+          </label>
+        )}
         <p className="mt-3 text-[12.5px] text-muted-foreground">Prices include applicable taxes. Each payment covers one period and nothing is charged automatically unless you turn on auto-renew: when it ends you can pay again or stay on Free. Switching plans starts the new one today.</p>
       </section>
 
@@ -432,6 +446,7 @@ export function BillingView(props: { email: string; notice: ReturnNotice | null;
         <PaymentMethodCard periodEnd={current?.periodEnd ?? null} online={online} />
         <BillingHistory rows={history} email={props.email} cachedAt={cachedAt} />
       </div>
+      <SavedCardsSection className="mt-4" plansHref="#plans" />
       <p className="mt-4 text-[13px] text-muted-foreground">{props.guarantee?.state === "eligible" ? "Charged by mistake, or something else? " : "Charged by mistake, or need a refund after the 30-day guarantee? "}<Link href="/support?topic=Payments" className="font-medium text-foreground underline underline-offset-4">Ask support</Link> and a person will review it.</p>
 
       <PriceSurvey currency={props.currency} planSlug={currentSlug} />

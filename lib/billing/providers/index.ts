@@ -7,7 +7,7 @@ import { assertPublicUrl } from "../../net/assert-public";
 
 export type CheckoutStart =
   | { kind: "redirect"; url: string; providerRef?: string }
-  | { kind: "razorpay"; orderId: string; keyId: string; amount: number; currency: string; name: string; email: string; description: string; providerRef: string };
+  | { kind: "razorpay"; orderId: string; keyId: string; amount: number; currency: string; name: string; email: string; description: string; providerRef: string; customerId?: string };
 
 export interface StartArgs {
   paymentId: string;
@@ -16,6 +16,8 @@ export interface StartArgs {
   planName: string;
   user: { name: string; email: string };
   appUrl: string;
+  /** 1118: Razorpay customer, so Checkout can offer and save cards (tokenised by Razorpay, never by us). */
+  customerId?: string;
 }
 
 const form = (o: Record<string, string>) => new URLSearchParams(o).toString();
@@ -255,7 +257,25 @@ export const razorpay = {
     });
     const j: any = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j?.error?.description ?? `Razorpay ${r.status}`);
-    return { kind: "razorpay", orderId: j.id, keyId: cfg.razorpay.keyId, amount: a.amountMinor, currency: a.currency, name: a.user.name, email: a.user.email, description: `Outlly ${a.planName}`, providerRef: j.id };
+    return { kind: "razorpay", orderId: j.id, keyId: cfg.razorpay.keyId, amount: a.amountMinor, currency: a.currency, name: a.user.name, email: a.user.email, description: `Outlly ${a.planName}`, providerRef: j.id, ...(a.customerId ? { customerId: a.customerId } : {}) };
+  },
+  /** 1118: one Razorpay customer per Outlly user. fail_existing "0" returns the existing one for the same email. */
+  async ensureCustomer(cfg: PaymentConfig, c: { name: string; email: string }): Promise<string> {
+    const j = await rzp(cfg, "/v1/customers", { name: c.name.slice(0, 50) || "Outlly user", email: c.email, fail_existing: "0" });
+    if (!j?.id) throw new Error("Razorpay returned no customer id");
+    return String(j.id);
+  },
+  /** 1118: cards Razorpay tokenised for this customer (network token / RBI card-on-file). We only ever see the masked view. */
+  async listTokens(cfg: PaymentConfig, customerId: string): Promise<any[]> {
+    const j = await rzpGet(cfg, `/v1/customers/${encodeURIComponent(customerId)}/tokens`);
+    return Array.isArray(j?.items) ? j.items : [];
+  },
+  async deleteToken(cfg: PaymentConfig, customerId: string, tokenId: string): Promise<void> {
+    const r = await fetch(`https://api.razorpay.com/v1/customers/${encodeURIComponent(customerId)}/tokens/${encodeURIComponent(tokenId)}`, { method: "DELETE", headers: { authorization: basic(cfg) }, signal: AbortSignal.timeout(10_000) });
+    if (!r.ok && r.status !== 404) {
+      const j: any = await r.json().catch(() => ({}));
+      throw new Error(j?.error?.description ?? `Razorpay ${r.status}`);
+    }
   },
   /** Checkout.js success handler: HMAC-SHA256(keySecret, `${order_id}|${payment_id}`). */
   verifyPayment(cfg: PaymentConfig, orderId: string, paymentId: string, signature: string) {

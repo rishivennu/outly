@@ -3,6 +3,7 @@ import { db } from "./db";
 import { env } from "./env";
 import { HttpError } from "./http";
 import { entitlements } from "./billing/entitlements";
+import { noticeUsageLimit } from "./notify-events";
 
 /**
  * Per-person caps on model calls. Gemini costs money, so one account (or one loop in a script) can't run up
@@ -55,6 +56,7 @@ export async function chargeAi(userId: string, kind: AiKind = "ai", now: Date = 
     const used = await monthUsed(userId, kind, now);
     if (used > lim.month) {
       await giveBack();
+      await noticeUsageLimit(userId, lim.month, now); // 1118: once a month, never throws
       throw new HttpError(402, monthMessage(lim.month, lim.plan), "PLAN_LIMIT", { feature: "ai", upgrade: "/billing" });
     }
   }

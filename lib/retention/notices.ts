@@ -4,13 +4,31 @@ import { env } from "../env";
 import { getConfig } from "../settings";
 import { sendEmail, templates } from "../email";
 import { pushToUser } from "../push/fcm";
+import { webPushToUser } from "../push/webpush";
+import { decide, ttlFor, urgencyFor } from "../notify-core";
+import { loadNotifyPrefs, unreadCount } from "../notify";
 import { PLATFORM_META, isPlatform } from "../domain";
 import { isPracticeAccount } from "../social/registry";
 import { noticeKey, parseKey, weekStamp } from "./core";
-import { parseAlertPrefs } from "../alerts-core";
 
 export interface NoticeInput {
-  kind: "post_failed" | "post_live" | "reconnect" | "token_expiring" | "goal_nudge" | "engagement_spike";
+  kind:
+    | "post_failed"
+    | "post_live"
+    | "reconnect"
+    | "token_expiring"
+    | "goal_nudge"
+    | "engagement_spike"
+    | "remind"
+    | "schedule_change"
+    | "account_connected"
+    | "new_message"
+    | "milestone"
+    | "payment_ok"
+    | "payment_failed"
+    | "renewal"
+    | "usage_limit"
+    | "plan_update";
   tone: "danger" | "warn" | "info";
   title: string;
   body: string;
@@ -25,20 +43,33 @@ const absolute = (href: string) => (href.startsWith("http") ? href : `${env.APP_
 /**
  * Records a notice once per key. A repeat of the same key brings an old, read notice back to
  * the top instead of piling up copies. Email goes out only the first time, and never in maintenance.
+ * 1118: the creator's notification settings decide where it goes (lib/notify-core.ts decide): an event switched
+ * off makes no notice at all; in-app off files it as read; push waits out quiet hours (it still lands in the bell).
  */
-export async function notify(userId: string, n: NoticeInput, opts: { email?: boolean } = {}) {
+export async function notify(userId: string, n: NoticeInput, opts: { email?: boolean; now?: Date; minutesLeft?: number } = {}) {
+  const now = opts.now ?? new Date();
+  const prefs = await loadNotifyPrefs(userId);
+  const d = decide(prefs, n.kind, now, prefs.tz);
+  if (!d.wanted) return { created: false, id: null, skipped: true };
   const existing = await db.notice.findUnique({ where: { key: n.key } });
   if (existing) {
-    if (existing.readAt) await db.notice.update({ where: { id: existing.id }, data: { readAt: null, title: n.title, body: n.body, createdAt: new Date() } });
+    if (existing.readAt && d.bell) await db.notice.update({ where: { id: existing.id }, data: { readAt: null, hiddenAt: null, title: n.title, body: n.body, createdAt: now } });
     return { created: false, id: existing.id };
   }
   const created = await db.notice
-    .create({ data: { userId, kind: n.kind, tone: n.tone, title: n.title, body: n.body, href: n.href ?? null, action: n.action ?? null, key: n.key } })
+    .create({ data: { userId, kind: n.kind, tone: n.tone, title: n.title, body: n.body, href: n.href ?? null, action: n.action ?? null, key: n.key, readAt: d.bell ? null : now } })
     .catch(() => null); // two workers racing on the same key: the other one won
   if (!created) return { created: false, id: null };
   // Same once-per-key rule as the notice itself, so a retry never buzzes the phone twice.
-  await pushToUser(userId, { title: n.title, body: n.body, href: n.href });
-  if (opts.email && !(await getConfig("site")).maintenance) {
+  if (d.push) {
+    await pushToUser(userId, { title: n.title, body: n.body, href: n.href });
+    await webPushToUser(
+      userId,
+      { title: n.title, body: n.body, href: n.href, tag: n.key, kind: n.kind, id: created.id, badge: await unreadCount(userId).catch(() => 0) },
+      { ttl: ttlFor(n.kind, opts.minutesLeft), urgency: urgencyFor(n.kind) as "normal" | "high" },
+    );
+  }
+  if (opts.email && d.email && !(await getConfig("site")).maintenance) {
     const u = await db.user.findUnique({ where: { id: userId }, select: { name: true, email: true } });
     if (u)
       await sendEmail({
@@ -55,11 +86,11 @@ export async function notify(userId: string, n: NoticeInput, opts: { email?: boo
 export async function noticeFailedTarget(targetId: string, code: string) {
   const t = await db.postTarget.findUnique({
     where: { id: targetId },
-    select: { id: true, practice: true, platform: true, postId: true, socialAccount: { select: { id: true, platformUserId: true } }, post: { select: { userId: true, title: true, hook: true, scheduledAt: true, user: { select: { alertPrefs: true } } } } },
+    select: { id: true, practice: true, platform: true, postId: true, socialAccount: { select: { id: true, platformUserId: true } }, post: { select: { userId: true, title: true, hook: true, scheduledAt: true } } },
   });
   if (!t || t.practice || (t.socialAccount && isPracticeAccount(t.socialAccount))) return;
   // The owner can switch failure alerts off (1037). A sign-out still raises the reconnect notice: that one blocks every post.
-  if (!parseAlertPrefs(t.post.user.alertPrefs).failed) {
+  if (!(await loadNotifyPrefs(t.post.userId)).ev.post_failed) {
     if (code === "AUTH_EXPIRED" && t.socialAccount) await noticeReconnect(t.post.userId, t.socialAccount.id, t.platform);
     return;
   }
@@ -150,9 +181,14 @@ export async function resolveStale(userId: string, now = new Date()) {
   return done.length;
 }
 
-export async function listNotices(userId: string) {
+/** The bell: unread first. History (Settings > Notifications): newest first, up to 60. Cleared ones never show. */
+export async function listNotices(userId: string, opts: { history?: boolean } = {}) {
   await resolveStale(userId).catch(() => 0);
-  const rows = await db.notice.findMany({ where: { userId }, orderBy: [{ readAt: { sort: "asc", nulls: "first" } }, { createdAt: "desc" }], take: 20 });
+  const rows = await db.notice.findMany({
+    where: { userId, hiddenAt: null },
+    orderBy: opts.history ? [{ createdAt: "desc" }] : [{ readAt: { sort: "asc", nulls: "first" } }, { createdAt: "desc" }],
+    take: opts.history ? 60 : 20,
+  });
   return rows.map((n) => ({ id: n.id, kind: n.kind, tone: n.tone, title: n.title, body: n.body, href: n.href, action: n.action, read: !!n.readAt, createdAt: n.createdAt.toISOString() }));
 }
 

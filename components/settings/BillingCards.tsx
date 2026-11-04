@@ -209,7 +209,7 @@ export function PlanSection({ b }: { b: BillingSummary }) {
 export function MethodsSection({ b }: { b: BillingSummary }) {
   const on = new Set(OFFERED[b.gateway] ?? []);
   return (
-    <Card id="billing-methods" title="Payment methods" icon={CreditCard} hint={`Picked at checkout on ${gwName(b.gateway)}. No card is saved with Outlly, so there's nothing here to remove or leak.`}>
+    <Card id="billing-methods" title="Payment methods" icon={CreditCard} hint={b.gateway === "razorpay" ? "Picked at checkout on Razorpay. Cards you choose to save are held by Razorpay as tokens; Outlly stores no card numbers." : `Picked at checkout on ${gwName(b.gateway)}. No card is saved with Outlly, so there's nothing here to remove or leak.`}>
       <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {METHODS.map((m) => {
           const ok = on.has(m.id);

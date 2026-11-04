@@ -26,6 +26,9 @@ model User {
   lastActiveAt DateTime?
   lastSeenAt   DateTime? // presence heartbeat (1037), written at most once a minute; "online" = seen in the last 5 minutes
   alertPrefs   String? // JSON { spike, spikeX, failed, email } custom alerts (1037); null = defaults
+  notifyPrefs  String? // JSON notification settings (1118): events, reminder lead, channels, quiet hours; null = defaults
+  rzpCustomerId    String? // Razorpay customer (1118): saved cards are tokens Razorpay keeps against it; Outlly stores no card data
+  defaultCardToken String? // the saved-card token marked default (Razorpay has no default of its own)
   referralCode String?   @unique // share link /signup?ref={code} (old /r/{code} still works)
   referredById String? // who invited this user (1052: the friend, not the sharer, earns a Creator month on their first payment)
   weeklyReport Boolean   @default(true) // Monday summary email
@@ -73,6 +76,7 @@ model User {
   ideas          Idea[]
   featureUses FeatureUse[]
   pushDevices PushDevice[]
+  webPushSubs WebPushSub[]
   dmThreads   DmThread[]
   betaIssued  BetaCode?  @relation("BetaIssued")
   betaRedeemed BetaCode? @relation("BetaRedeemed")
@@ -659,6 +663,7 @@ model Notice {
   action    String? // button label
   key       String    @unique
   readAt    DateTime?
+  hiddenAt  DateTime? // cleared from history (1118). Kept, not deleted, so its key still stops a repeat
   createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -756,6 +761,51 @@ model PushDevice {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/// 1118: a browser or installed web app (iPhone/iPad Home Screen, Android, desktop) that gets Web Push (VAPID).
+/// Endpoint and keys are AES-256-GCM encrypted at rest and never leave the server; endpointHash is the lookup.
+model WebPushSub {
+  id           String    @id @default(cuid())
+  userId       String
+  endpointHash String    @unique
+  endpoint     String
+  p256dh       String
+  auth         String
+  /// The VAPID public key it was made with: a rotated key means the browser must subscribe again.
+  vapidKey     String
+  platform     String // ios | android | desktop
+  device       String // "iPhone", "Android phone", "Windows PC"
+  client       String // "Home Screen app", "Chrome", "Safari"
+  installed    Boolean   @default(false)
+  failures     Int       @default(0)
+  createdAt    DateTime  @default(now())
+  lastSeenAt   DateTime  @default(now())
+  lastPushAt   DateTime?
+
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outbox PushOutbox[]
+
+  @@index([userId])
+}
+
+/// 1118: a Web Push the push service turned away for now (429, 5xx, no network), retried by the minute sweeper.
+/// One row per device per notice, so a retry can never become a second notification.
+model PushOutbox {
+  id        String   @id @default(cuid())
+  subId     String
+  tag       String
+  payload   String
+  ttl       Int      @default(86400)
+  urgency   String   @default("normal")
+  attempts  Int      @default(1)
+  nextAt    DateTime
+  createdAt DateTime @default(now())
+
+  sub WebPushSub @relation(fields: [subId], references: [id], onDelete: Cascade)
+
+  @@unique([subId, tag])
+  @@index([nextAt])
 }
 
 /// A direct-message conversation on a connected Instagram professional account or Facebook Page (1031).
