@@ -1,3 +1,8 @@
+import { isProfileImg } from "./profile-card-core";
+
+/** A plain boolean (not a type guard), so a non-match keeps the string type for the orb check below. */
+const uploadedAvatar = (v: string): boolean => isProfileImg(v, "avatar");
+
 /**
  * Orb avatars (2026-10-15): a soft, glowing sphere in one colour with a bold black face near the top.
  * Stored on User.avatar as "orb:<colour>:<face>". A real photo URL still wins; anything else
@@ -67,6 +72,8 @@ export function defaultOrb(seed: string): Orb {
 /** Photo URL wins; then a valid saved orb; otherwise the seed's default orb. */
 export function resolveAvatar(avatar: string | null | undefined, seed: string): { photo: string } | { orb: Orb } {
   if (avatar && /^https:\/\/[^\s"'<>]+$/i.test(avatar)) return { photo: avatar };
+  // 1120: a picture uploaded through the cropper, served from our own origin.
+  if (avatar && uploadedAvatar(avatar)) return { photo: avatar };
   if (isOrbValue(avatar)) {
     const [, color, face] = avatar.match(ORB_RE)!;
     return { orb: { color: color as OrbColor, face: face as OrbFace } };

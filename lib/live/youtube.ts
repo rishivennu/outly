@@ -151,6 +151,12 @@ export async function youtubeDashboard(acct: AccountContext, rangeDays = 28): Pr
       bio: c.snippet.description?.split("\n")[0] ?? null,
     },
     headline,
+    totals: {
+      followers: c.statistics.hiddenSubscriberCount ? null : Number(c.statistics.subscriberCount ?? 0),
+      posts: c.statistics.videoCount != null ? Number(c.statistics.videoCount) : null,
+      views: c.statistics.viewCount != null ? Number(c.statistics.viewCount) : null,
+      viewsScope: "all_time",
+    },
     series,
     posts,
     notes,

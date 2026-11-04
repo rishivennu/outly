@@ -59,6 +59,12 @@ model User {
   locCity         String?
   locVia          String? // "cloudflare" | "vercel" | "tor"
   locAt           DateTime?
+  // 1120 creator profile card. All optional: the card shows nothing the creator didn't add or connect.
+  handle       String?   @unique // public @handle: lowercase letters, digits, dots and underscores, 3 to 30
+  bio          String? // up to 160 characters
+  niche        String? // up to 40 characters, e.g. "Travel" (optional)
+  banner       String? // uploaded cover, "/api/u/img/<name>"; null = the theme's own cover art
+  profileLinks String? // JSON { hidden: accountId[], links: { platform, url }[] } (lib/profile-card-core.ts)
 
   socialAccounts SocialAccount[]
   aiUsage        AiUsage[]
@@ -438,6 +444,12 @@ model Invoice {
   providerRef   String?
   taxPercent    Float? // tax rate at issue time
   issuer        String? // JSON {name,address,gstin} of the seller at issue time
+  // 1121: what the redesigned PDF prints, copied at issue time from the payment and the gateway (null on older invoices)
+  paidAt        DateTime? // when the gateway confirmed the payment
+  periodStart   DateTime? // the subscription period this payment covers
+  periodEnd     DateTime?
+  method        String? // masked, e.g. "Visa debit •••• 4242", "UPI · ra•••@okhdfc"; never a full number
+  lines         String? // JSON InvoiceLine[]: plan, add-ons, discounts, as charged
   issuedAt      DateTime  @default(now())
   emailedAt     DateTime?
   detachedAt    DateTime? // the customer deleted their account; kept for tax law until the retention window ends

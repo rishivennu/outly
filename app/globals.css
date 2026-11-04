@@ -3840,6 +3840,103 @@ html.theme-anim *::after {
   .spc-in, .spc-skel { animation: none; }
 }
 
+/* ---------- 1120: creator profile card (components/profile) ----------
+   Light: white surface, grey hairlines, lime accents. Dark: deep teal surface, off-white ink, muted teal lines.
+   Hover 200ms, edit actions 180ms, all on the token ease. Transforms and opacity only. */
+.pcard {
+  --pc-surface: 0 0% 100%;
+  --pc-line: 216 16% 88%;
+  --pc-ink: 222 24% 10%;
+  --pc-muted: 218 12% 38%;
+  --pc-chip: 216 24% 95%;
+  background: hsl(var(--pc-surface));
+  color: hsl(var(--pc-ink));
+  border: 1px solid hsl(var(--pc-line));
+  box-shadow: 0 1px 2px hsl(222 24% 10% / 0.04), 0 18px 40px -22px hsl(222 24% 10% / 0.22);
+  transition: box-shadow 200ms var(--m-ease-out), border-color 200ms var(--m-ease-out);
+}
+.dark .pcard {
+  --pc-surface: 176 42% 9%;
+  --pc-line: 174 24% 19%;
+  --pc-ink: 40 33% 95%;
+  --pc-muted: 168 12% 70%;
+  --pc-chip: 175 32% 14%;
+  box-shadow: 0 1px 2px hsl(0 0% 0% / 0.3), 0 24px 48px -24px hsl(0 0% 0% / 0.7);
+}
+@media (hover: hover) {
+  .pcard:hover { border-color: hsl(var(--lime) / 0.45); box-shadow: 0 1px 2px hsl(222 24% 10% / 0.05), 0 24px 52px -24px hsl(222 24% 10% / 0.3); }
+  .dark .pcard:hover { box-shadow: 0 1px 2px hsl(0 0% 0% / 0.3), 0 28px 60px -26px hsl(0 0% 0% / 0.85), 0 0 0 1px hsl(var(--lime) / 0.12); }
+}
+.pcard-banner { background: hsl(var(--pc-chip)); }
+/* The theme's own cover when none is uploaded: a soft sky with a lime sun and two thin orbits. Decoration only. */
+.pcard-art {
+  background:
+    radial-gradient(60% 120% at 82% 18%, hsl(var(--lime) / 0.55), transparent 60%),
+    radial-gradient(closest-side, transparent 96%, hsl(216 60% 50% / 0.18) 97% 99%, transparent 100%) 8% 140% / 46% 220% no-repeat,
+    radial-gradient(closest-side, transparent 96%, hsl(216 60% 50% / 0.12) 97% 99%, transparent 100%) 0% 160% / 70% 300% no-repeat,
+    linear-gradient(160deg, hsl(208 90% 88%), hsl(216 80% 94%) 55%, hsl(78 70% 90%));
+}
+.dark .pcard-art {
+  background:
+    radial-gradient(55% 110% at 84% 16%, hsl(var(--lime) / 0.35), transparent 62%),
+    radial-gradient(closest-side, transparent 96%, hsl(var(--lime) / 0.16) 97% 99%, transparent 100%) 8% 140% / 46% 220% no-repeat,
+    radial-gradient(closest-side, transparent 96%, hsl(174 40% 60% / 0.12) 97% 99%, transparent 100%) 0% 160% / 70% 300% no-repeat,
+    linear-gradient(160deg, hsl(178 46% 16%), hsl(176 44% 11%) 60%, hsl(160 40% 9%));
+}
+.pcard-pill, .pcard-cover-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem; min-height: 40px; padding: 0 0.95rem; border-radius: 9999px;
+  font-size: 13px; font-weight: 600; color: hsl(222 24% 10%); background: hsl(0 0% 100% / 0.92);
+  box-shadow: 0 1px 2px hsl(222 24% 10% / 0.1), 0 6px 16px -8px hsl(222 24% 10% / 0.35);
+  transition: transform 180ms var(--m-ease-out), background-color 180ms var(--m-ease-out), opacity 180ms var(--m-ease-out);
+}
+.pcard-pill { background: hsl(var(--lime)); color: hsl(var(--lime-foreground)); }
+.pcard-pill:active, .pcard-cover-btn:active, .pcard-action:active, .pcard-avatar-btn:active { transform: scale(0.97); }
+.pcard-pill:disabled, .pcard-cover-btn:disabled, .pcard-action:disabled, .pcard-avatar-btn:disabled { opacity: 0.55; cursor: default; }
+.pcard-pill:focus-visible, .pcard-cover-btn:focus-visible, .pcard-action:focus-visible, .pcard-avatar-btn:focus-visible, .pcard-ico:focus-visible, .pcard-link:focus-visible, .pcard-progress:focus-visible {
+  outline: 2px solid hsl(var(--ring)); outline-offset: 2px;
+}
+/* Change Cover: always there on touch; on a mouse it fades in with the cover's hover or focus. */
+@media (hover: hover) {
+  .pcard-cover-btn { opacity: 0.72; }
+  .pcard:hover .pcard-cover-btn, .pcard-cover-btn:focus-visible { opacity: 1; }
+}
+.pcard-avatar-img { border-radius: 9999px; box-shadow: 0 0 0 4px hsl(var(--pc-surface)), 0 0 0 6px hsl(var(--lime)), 0 14px 30px -12px hsl(222 24% 10% / 0.45); }
+@media (max-width: 639px) { .pcard-avatar-img { width: 92px !important; height: 92px !important; } }
+.pcard-avatar-btn {
+  position: absolute; right: -2px; bottom: -2px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9999px;
+  background: hsl(var(--pc-ink)); color: hsl(var(--pc-surface)); box-shadow: 0 0 0 3px hsl(var(--pc-surface));
+  transition: transform 180ms var(--m-ease-out), opacity 180ms var(--m-ease-out);
+}
+.pcard-progress { border-radius: 12px; padding: 4px; margin: -4px; }
+.pcard-ticks { display: flex; gap: 2px; height: 14px; align-items: stretch; }
+.pcard-tick { flex: 1; border-radius: 2px; background: hsl(var(--pc-line)); }
+/* Lit ticks run lime to teal-green along the bar. */
+.pcard-tick.is-lit { background: hsl(calc(78 + var(--t) * 80) 80% calc(50% - var(--t) * 12%)); }
+.dark .pcard-tick.is-lit { background: hsl(calc(78 + var(--t) * 80) 85% calc(55% - var(--t) * 10%)); }
+.pcard-niche { display: inline-flex; align-items: center; min-height: 24px; padding: 0 0.6rem; border-radius: 9999px; font-size: 12px; font-weight: 600; background: hsl(var(--lime) / 0.18); color: hsl(var(--pc-ink)); border: 1px solid hsl(var(--lime) / 0.5); }
+.pcard-ico { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 9999px; color: hsl(var(--pc-muted)); transition: background-color 180ms var(--m-ease-out), color 180ms var(--m-ease-out); }
+.pcard-ico:hover { background: hsl(var(--pc-chip)); color: hsl(var(--pc-ink)); }
+.pcard-stats { border-top: 1px solid hsl(var(--pc-line)); border-bottom: 1px solid hsl(var(--pc-line)); padding: 1rem 0; }
+.pcard-stat + .pcard-stat { border-left: 1px solid hsl(var(--pc-line)); }
+.pcard-wait { background: hsl(var(--pc-chip)); }
+.pcard-links { border-radius: 18px; border: 1px solid hsl(var(--pc-line)); }
+.pcard-links > li + li { border-left: 1px solid hsl(var(--pc-line)); }
+.pcard-link { display: grid; place-items: center; min-width: 44px; height: 48px; width: 100%; color: hsl(var(--pc-ink)); transition: color 200ms var(--m-ease-out), background-color 200ms var(--m-ease-out); }
+.pcard-links > li:first-child .pcard-link { border-radius: 17px 0 0 17px; }
+.pcard-links > li:last-child .pcard-link { border-radius: 0 17px 17px 0; }
+.pcard-links > li:only-child .pcard-link { border-radius: 17px; }
+.pcard-link:hover { background: hsl(var(--lime) / 0.14); }
+.pcard-action { display: inline-flex; align-items: center; gap: 0.4rem; min-height: 44px; padding: 0 0.9rem; border-radius: 9999px; font-size: 13px; font-weight: 500; color: hsl(var(--pc-muted)); transition: background-color 180ms var(--m-ease-out), color 180ms var(--m-ease-out), transform 180ms var(--m-ease-out); }
+.pcard-action:hover { background: hsl(var(--pc-chip)); color: hsl(var(--pc-ink)); }
+/* The cropper: a round window over the square frame for the avatar. */
+.pc-crop-mask { background: radial-gradient(circle closest-side, transparent 99%, hsl(222 24% 10% / 0.5) 100%); }
+.pc-ico { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 9999px; color: hsl(var(--muted-foreground)); }
+.pc-ico:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+.pc-range { accent-color: hsl(var(--lime)); height: 44px; }
+@media (prefers-reduced-motion: reduce) {
+  .pcard, .pcard-pill, .pcard-cover-btn, .pcard-avatar-btn, .pcard-action, .pcard-link, .pcard-ico { transition: none; }
+}
+
 /* ---------- 1100: Liquid glass on every studio card ----------
    The studio's screen cards wear the same liquid glass as the rail: a cool-to-deep tint, a lit rim on the top-left
    edge with a softer far edge, and a sheen across the top. Cards: .glass panels, the Analytics dashboard's

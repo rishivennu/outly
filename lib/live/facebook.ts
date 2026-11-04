@@ -102,6 +102,8 @@ export async function facebookDashboard(acct: AccountContext, rangeDays = 28): P
     rangeDays,
     profile: { name: p.name, handle: p.username ? `@${p.username}` : p.name, avatar: p.picture?.data?.url ?? null, url: p.link ?? `https://www.facebook.com/${p.id}`, bio: p.about ?? null },
     headline,
+    // A Page reports no post total; the card falls back to the posts sent from Outlly and says so.
+    totals: { followers: p.followers_count ?? null, posts: null, views: sum("views"), viewsScope: "28_days" },
     series: [],
     posts,
     notes,

@@ -21,6 +21,8 @@ export const NUMBER_TIMING = {
   secondary: { ms: 900, ease: COUNT_EASE },
   pct: { ms: 800, ease: [0, 0, 0.58, 1] as Bezier },
   refresh: { ms: 700, ease: COUNT_EASE },
+  /** 1120: the profile card's three stats, the token count duration (1000ms). */
+  profile: { ms: DUR.count, ease: COUNT_EASE },
 } as const;
 export type NumberTier = keyof typeof NUMBER_TIMING;
 
@@ -70,7 +72,8 @@ export function bezier([x1, y1, x2, y2]: Bezier) {
 }
 
 /** Named formats, so callers never pass a fresh function per render. */
-export type NumberPreset = "compact" | "count" | "int" | "pct";
+/** "abbr" (1120): 828, 72.9K, 1.2M, one decimal at every size (the profile card). */
+export type NumberPreset = "compact" | "count" | "int" | "pct" | "abbr";
 export type NumberFormat = NumberPreset | ((n: number) => string);
 
 const intl = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -84,6 +87,7 @@ export function formatOf(f: NumberFormat): (n: number) => string {
   if (f === "pct") return (n) => `${n.toFixed(1)}%`;
   if (f === "int") return (n) => intl.format(Math.round(n));
   if (f === "count") return (n) => (Math.abs(n) < 10_000 ? intl.format(Math.round(n)) : short(n));
+  if (f === "abbr") return (n) => short1.format(n);
   return short;
 }
 

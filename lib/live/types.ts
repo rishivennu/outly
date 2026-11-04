@@ -1,4 +1,5 @@
 import type { Platform } from "../domain";
+import type { PlatformTotals } from "../profile-card-core";
 
 export type DashboardStatus = "ok" | "not_connected" | "not_configured" | "needs_reconnect" | "error";
 
@@ -61,6 +62,8 @@ export interface PlatformDashboard {
   connect?: { oauth: boolean; token: boolean };
   profile?: { name: string; handle: string; avatar: string | null; url: string | null; bio?: string | null };
   headline: Headline[];
+  /** 1120: all-time totals for the profile card (followers, posts, views), each null when the platform doesn't say. */
+  totals?: PlatformTotals;
   series: Series[];
   /** Followers online by hour of the day, already shifted to the creator's timezone. */
   hours?: { startMinute: number; label: string; value: number }[];

@@ -14,6 +14,7 @@ import { api, ApiError } from "@/lib/client/api";
 import { TeamCard } from "./TeamCard";
 import { ReferralCard } from "./ReferralCard";
 import { AvatarPicker } from "./AvatarPicker";
+import { CreatorProfileCard } from "@/components/profile/CreatorProfileCard";
 import { SnippetsCard } from "./SnippetsCard";
 import { VoiceMemoryCard } from "@/components/billing/PlanExtras";
 import { TwoStepCard } from "./TwoStepCard";
@@ -212,13 +213,14 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, per
       id: "profile",
       label: "Profile",
       icon: UserRound,
-      blurb: "Your name, time zone and avatar.",
+      blurb: "Your profile card, name, time zone and avatar.",
       content: ws ? (
         <Note title="You">
           {ws.me.name} · {ws.me.email}. You&apos;re in <b className="text-foreground">{ws.ownerName}</b>&apos;s studio. Your own name, time zone and emails are changed from your own studio.
         </Note>
       ) : (
         <>
+          <CreatorProfileCard />
           <ProfileForm />
           <AvatarPicker />
         </>

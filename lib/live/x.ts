@@ -46,7 +46,8 @@ export async function xDashboard(acct: AccountContext, rangeDays = 28): Promise<
       hashtags: (t.text.match(/#[\p{L}\p{N}_]+/gu) ?? []).length,
     };
   });
-  const sum = (k: "views" | "likes" | "comments" | "shares") => (posts.length ? posts.reduce((a, p) => a + (p[k] ?? 0), 0) : null);
+  // Only a sum of numbers X actually sent: posts without metrics (tier, or stripped) make it null, never 0.
+  const sum = (k: "views" | "likes" | "comments" | "shares") => (posts.some((p) => p[k] !== null) ? posts.reduce((a, p) => a + (p[k] ?? 0), 0) : null);
   return {
     platform: "x",
     status: "ok",
@@ -61,6 +62,7 @@ export async function xDashboard(acct: AccountContext, rangeDays = 28): Promise<
       { key: "replies", label: "Replies", value: sum("comments") },
       { key: "reposts", label: "Reposts + quotes", value: sum("shares") },
     ],
+    totals: { followers: u.public_metrics?.followers_count ?? null, posts: u.public_metrics?.tweet_count ?? null, views: sum("views"), viewsScope: "recent_posts" },
     series: [],
     posts,
     notes,

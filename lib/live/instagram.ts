@@ -132,6 +132,8 @@ export async function instagramDashboard(acct: AccountContext, timezone: string,
     rangeDays,
     profile: { name: me.name || me.username, handle: `@${me.username}`, avatar: me.profile_picture_url ?? null, url: `https://www.instagram.com/${me.username}/`, bio: me.biography ?? null },
     headline,
+    // Instagram keeps no lifetime view count: the card says these are the last 28 days.
+    totals: { followers: me.followers_count ?? null, posts: me.media_count ?? null, views: tv(c, "views"), viewsScope: "28_days" },
     series,
     hours,
     breakdown,
