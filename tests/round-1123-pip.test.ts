@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import * as A from "../lib/pip/analytics-core";
 import { followUpPlan, keywordPlan, readPlan, wantsData } from "../lib/pip/plan";
 import { numbersBacked } from "../lib/pip/run";
@@ -329,11 +329,12 @@ describe("1123 wiring: isolation, permissions, storage", () => {
     expect(widget).toContain("insight:${n.id}");
     expect(widget).toContain("focus: lastData.ask.focus");
   });
-  test("estimates are badged and charts have a table fallback", () => {
+  test("estimates are badged; Pip answers carry no charts (user rule)", () => {
     expect(card).toContain("Estimate");
-    expect(card).toContain("Show the numbers");
-    expect(card).toMatch(/dynamic\(\(\) => import\("\.\/PipChartView"\)/);
-    expect(read("components/support/PipChartView.tsx")).toContain("strokeDasharray={s.estimate");
+    expect(card).not.toMatch(/chart/i);
+    expect(read("lib/pip/types.ts")).not.toMatch(/charts\?:/);
+    expect(read("lib/pip/tools-analytics.ts")).not.toMatch(/\.charts\b/);
+    expect(existsSync("components/support/PipChartView.tsx")).toBe(false);
   });
 });
 
@@ -357,12 +358,9 @@ describe("1123 browser check fixes", () => {
     expect(ta).toContain("There are no other posts on the same platform");
   });
   test("forecast rows reuse the headline's projection; live posts without a usable date are skipped", () => {
-    expect(ta).toContain("f.chunks.map");
+    expect(ta).toContain("f.chunks.map((c) => Math.round(c.total))");
     expect(ta).not.toContain("lr.slope * (full.length + i)");
     expect(ta).toContain("Number.isFinite(Date.parse(x.publishedAt))");
     expect(ta).toContain("didn't send a usable publish date");
-  });
-  test("the chart's table fallback keeps the unit", () => {
-    expect(read("components/support/PipDataCard.tsx")).toContain("c.unit ? ` ${c.unit}` : \"\"");
   });
 });

@@ -1,47 +1,8 @@
 "use client";
 import { useId, useMemo, useState } from "react";
-import dynamic from "next/dynamic";
 import { AlertTriangle, CheckCircle2, CircleDashed, Database, Download, ExternalLink, FileArchive, Info, Search } from "lucide-react";
-import type { PipChart, PipLink, PipResult } from "@/lib/pip/types";
+import type { PipLink, PipResult } from "@/lib/pip/types";
 import { cn } from "@/lib/utils";
-
-/** recharts only loads when a card actually has a chart (1123). */
-const ChartView = dynamic(() => import("./PipChartView"), { ssr: false, loading: () => <div className="pd-chart-wait h-[168px]" aria-hidden /> });
-
-/** A chart plus its numbers as a table, for screen readers and anyone who wants the exact values. */
-function ChartBlock({ c }: { c: PipChart }) {
-  const id = useId();
-  return (
-    <figure className="pd-chart mt-2" aria-labelledby={`${id}-c`}>
-      <figcaption id={`${id}-c`} className="mb-1 flex flex-wrap items-center gap-1.5 text-[12.5px] font-semibold">
-        {c.title}
-        {c.series.some((s) => s.estimate) && <span className="pd-badge pd-est">Includes an estimate</span>}
-      </figcaption>
-      <ChartView c={c} />
-      <details className="pd-details mt-1">
-        <summary className="pc-muted text-[12px]">Show the numbers</summary>
-        <div className="pd-scroll mt-1" tabIndex={0} role="region" aria-label={`${c.title}, numbers`}>
-          <table className="pd-table">
-            <thead>
-              <tr>
-                <th scope="col">{c.kind === "bar" ? "Group" : "Date"}</th>
-                {c.series.map((s) => <th key={s.key} scope="col" className="text-end">{s.estimate ? `${s.label} (estimate)` : s.label}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {c.x.map((x, i) => (
-                <tr key={`${x}-${i}`}>
-                  <td>{x}</td>
-                  {c.series.map((s) => <td key={s.key} className="text-end tabular-nums">{s.values[i] == null ? "No data" : `${s.values[i]!.toLocaleString()}${c.unit ? ` ${c.unit}` : ""}`}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
-    </figure>
-  );
-}
 
 /**
  * The records card under a Pip answer (1049). Says exactly what was searched (period + timezone), how many
@@ -110,8 +71,6 @@ export function PipDataCard({ r }: { r: PipResult }) {
           ))}
         </ul>
       )}
-
-      {r.charts?.map((c) => <ChartBlock key={c.id} c={c} />)}
 
       {(r.rows.length > 0 || r.found > 0) && !r.cards?.length && (
         <p className="mt-1.5 text-[13px]">

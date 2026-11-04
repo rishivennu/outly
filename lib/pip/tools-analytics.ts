@@ -12,12 +12,12 @@ import { platformsNamed } from "./plan";
 import { dayLabel, parseRange, previousRange, type DateRange } from "./range";
 import { base, plural, type PipArgs, type PipCtx } from "./tools-core";
 import { accountsInScope, dashboards, type Acct } from "./tools-content";
-import type { PipChart, PipResult, PipTool } from "./types";
+import type { PipResult, PipTool } from "./types";
 
 /**
  * Pip as a creator's analyst (1123). Every tool here reads ONLY the signed-in workspace's own posts and synced
  * numbers (ownerId from the session; a teammate only the accounts in ctx.scope; rehearsal posts never), through
- * one loader with a per-request memo and a 60 second cache, and hands back cards, charts, rows and short true
+ * one loader with a per-request memo and a 60 second cache, and hands back cards, rows and short true
  * facts. The maths is in analytics-core.ts (pure, tested). Nothing is guessed: a number Outlly doesn't have is
  * said to be unavailable, a projection is labelled an estimate, and a link between two things is never called
  * the cause.
@@ -316,11 +316,6 @@ export const overview: Tool = async (ctx, a, range, period) => {
     { label: "Interactions", value: A.fmtInt(cur.inter), delta: deltaOf(cur.inter, old?.inter ?? null) },
     { label: "Posts published", value: A.fmtInt(nPosts), delta: prevPosts == null ? undefined : deltaOf(nPosts, prevPosts) },
   ];
-  const b = A.bucketDays(st.snaps, st.posts, from, to, ctx.tz);
-  const charts: PipChart[] = [];
-  if (b.keys.length >= 3) charts.push({ id: "views-daily", title: "Views per day", kind: "line", x: b.keys.map(A.shortDay), series: [{ key: "views", label: "Views", values: b.views.map((v) => Math.max(0, v)) }] });
-  if (cur.inter) charts.push({ id: "breakdown", title: "Where the interactions came from", kind: "bar", x: ["Likes", "Comments", "Shares"], series: [{ key: "n", label: "Interactions", values: [cur.likes, cur.comments, cur.shares].map((v) => Math.max(0, v)) }] });
-  r.charts = charts;
   const metric = metricOf(ctx.message);
   const ranked = inWin.filter((p) => p.hasMetrics).sort((x, y) => y[metric] - x[metric] || y.views - x.views);
   const limit = Math.min(Math.max(a.limit ?? 10, 1), 25);
@@ -411,12 +406,6 @@ export const comparePlatforms: Tool = async (ctx, a, range, period) => {
     ...(topE ? [{ label: "Best engagement", value: pname(topE.p), hint: A.fmtRate(topE.er) }] : []),
     ...(topP ? [{ label: "Most views per post", value: pname(topP.p), hint: `typically ${A.fmtInt(topP.perPost!)}` }] : []),
   ];
-  if (rows.length > 1) {
-    r.charts = [
-      { id: "views-by-platform", title: "Views by platform", kind: "bar", x: rows.map((x) => pname(x.p)), series: [{ key: "views", label: "Views", values: rows.map((x) => x.views) }] },
-      { id: "er-by-platform", title: "Engagement rate by platform", kind: "bar", unit: "%", x: rows.map((x) => pname(x.p)), series: [{ key: "er", label: "Engagement rate", values: rows.map((x) => (x.er == null ? null : r1(x.er))) }] },
-    ];
-  }
   if (topF) r.facts.push(`Most followers: ${pname(topF.p)} with ${A.fmtInt(topF.followers!)} (as the platform reports it today).`);
   else if (/\b(follow|subscri)/i.test(ctx.message))
     r.facts.push(`I couldn't read a follower count from any platform just now, so I can't say which has the most followers.${r.notes.some((n) => /reconnect/i.test(n.text)) ? " Some accounts need reconnecting first; they're listed below." : ""}`);
@@ -477,8 +466,6 @@ export const trend: Tool = async (ctx, a, range, period) => {
     const l = full[full.length - 1];
     r.cards.push({ label: "Views a day, latest full week", value: A.fmtInt(l.perDay), delta: deltaOf(l.perDay, f.perDay), hint: `vs ${A.fmtInt(f.perDay)} in the week of ${A.shortDay(f.key)}` });
   }
-  r.charts = [{ id: "views-weekly", title: "Views a day, by week", kind: "line", x: weeks.map((x) => A.shortDay(x.key)), series: [{ key: "perDay", label: "Views a day", values: weeks.map((x) => Math.round(x.perDay)) }] }];
-  if (erWeeks.length >= 3) r.charts.push({ id: "er-weekly", title: "Engagement rate, by week", kind: "line", unit: "%", x: weeks.map((x) => A.shortDay(x.key)), series: [{ key: "er", label: "Engagement rate", values: weeks.map((x) => (x.er == null ? null : r1(x.er))) }] });
   // Unusual days, each with what went out that day or the day before (a link, never a cause).
   const odd = A.anomaliesOf(b.views, b.keys.map(A.shortDay), 14);
   for (const o of odd.slice(0, 3)) {
@@ -535,7 +522,6 @@ export const consistency: Tool = async (ctx, a, range, period) => {
     { label: "Weeks with a post", value: `${c.activeWeeks} of ${c.weeks}` },
     { label: "Longest gap", value: plural(c.longestGapDays, "day") },
   ];
-  r.charts = [{ id: "posts-weekly", title: "Posts per week", kind: "bar", x: weeks.map((x) => A.shortDay(x.key)), series: [{ key: "posts", label: "Posts", values: weeks.map((x) => x.posts) }] }];
   r.facts.push(`${c.verdict}: ${plural(ups.length, "post")} in ${w.label}, about ${r1(c.avg)} a week, with a post in ${c.activeWeeks} of ${c.weeks} weeks.`);
   r.facts.push(`Longest gap between posts: ${plural(c.longestGapDays, "day")}.${c.daysSinceLast != null ? ` Last post ${plural(c.daysSinceLast, "day")} ago.` : ""}`);
   if (goal > 0) {
@@ -596,12 +582,6 @@ export const bestTimes: Tool = async (ctx, a, range, period) => {
   for (const g of order(t.days, A.WEEKDAYS)) add("Day", g);
   for (const g of order(t.blocks, blockKeys)) add("Time", g);
   r.found = r.returned = r.rows.length;
-  const dayG = order(t.days, A.WEEKDAYS);
-  const blockG = order(t.blocks, blockKeys);
-  r.charts = [
-    { id: "by-day", title: "Views vs your usual, by day posted", kind: "bar", unit: "x", x: dayG.map((g) => g.label.slice(0, 3)), series: [{ key: "rel", label: "Times your usual views", values: dayG.map((g) => (g.enough ? r1(g.rel) : null)) }] },
-    { id: "by-time", title: "Views vs your usual, by time posted", kind: "bar", unit: "x", x: blockG.map((g) => g.label.split(" (")[0]), series: [{ key: "rel", label: "Times your usual views", values: blockG.map((g) => (g.enough ? r1(g.rel) : null)) }] },
-  ];
   const when = new Map(rows.map((x) => [x.p.key, A.localWhen(x.p.publishedAt, ctx.tz)]));
   const verdict = (pick: (k: string) => boolean, label: string, g: A.Group) => {
     const inG = rows.filter((x) => pick(x.p.key)).map((x) => x.rel);
@@ -706,8 +686,6 @@ export const formats: Tool = async (ctx, a, range, period) => {
   }
   const tags = A.segment(rows, (p) => p.hashtags, 3).filter((x) => x.enough).slice(0, 3);
   if (tags.length) r.facts.push(`Hashtags that go with your best views: ${tags.map((x) => `${x.label} (${A.fmtX(x.rel)}, ${x.n} posts)`).join(", ")}.`);
-  const fg = (groups.get("Format") ?? []).filter((x) => x.enough);
-  if (fg.length >= 2) r.charts = [{ id: "formats", title: "Views vs your usual, by format", kind: "bar", unit: "x", x: fg.map((x) => x.label.split(" (")[0]), series: [{ key: "rel", label: "Times your usual views", values: fg.map((x) => r1(x.rel)) }] }];
   r.notes.push({ level: "info", text: "Outlly doesn't tag posts with categories, so I group them by format, shape, caption length, hashtags and platform. Each post is compared with the usual on its own platform." });
   return r;
 };
@@ -823,16 +801,6 @@ export const schedule: Tool = async (ctx, a, range, period) => {
     { label: "Missed", value: String(missed?.length ?? 0) },
     { label: "Failed (30 days)", value: String(failed?.length ?? 0) },
   ];
-  if (nUp) {
-    const keys = A.dayKeys(now, now + 14 * A.DAY_MS, ctx.tz);
-    const at = new Map(keys.map((k, i) => [k, i]));
-    const per = keys.map(() => 0);
-    for (const p of up ?? []) {
-      const i = p.scheduledAt ? at.get(A.localDay(p.scheduledAt.getTime(), ctx.tz)) : undefined;
-      if (i !== undefined) per[i]++;
-    }
-    r.charts = [{ id: "calendar", title: "Scheduled posts, next 14 days", kind: "bar", x: keys.map(A.shortDay), series: [{ key: "posts", label: "Posts", values: per }] }];
-  }
   r.facts.push(`${plural(nUp, "post")} scheduled from ${r.range!.label}; ${week} in the next 7 days.`);
   if (up?.[0]?.scheduledAt) r.facts.push(`Next up: "${titleOf(up[0])}" on ${when(up[0].scheduledAt)}.`);
   if (noCaption) r.facts.push(`${plural(noCaption, "scheduled post")} ${noCaption === 1 ? "has" : "have"} no caption on at least one platform.`);
@@ -1073,20 +1041,6 @@ export const forecast: Tool = async (ctx, a, _range, period) => {
   // Table rows are the headline's own daily projection cut into 7-day pieces, so they add up to it exactly.
   const pieces = f.chunks.map((c) => Math.round(c.total));
   if (pieces.length) pieces[pieces.length - 1] += Math.round(f.total) - pieces.reduce((s, v) => s + v, 0);
-  // The chart is per week, so a short last piece is drawn at its weekly pace instead of as a false dip.
-  const projected = f.chunks.map((c) => Math.round((c.total * 7) / c.days));
-  r.charts = [
-    {
-      id: "forecast",
-      title: "Views per week: actual, then estimated",
-      kind: "line",
-      x: [...full.map((x) => A.shortDay(x.key)), ...future],
-      series: [
-        { key: "actual", label: "Actual", values: [...full.map((x) => Math.round(x.views)), ...future.map(() => null)] },
-        { key: "estimate", label: "Estimate", estimate: true, values: [...full.map((x, i) => (i === full.length - 1 ? Math.round(x.views) : null)), ...projected] },
-      ],
-    },
-  ];
   r.rows = [
     ...full.slice(-6).map((x) => ({ id: x.key, cells: { week: A.shortDay(x.key), views: A.fmtInt(x.views), kind: "Actual" } })),
     ...future.map((k, i) => ({ id: `f${i}`, cells: { week: f.chunks[i].days < 7 ? `${k} (${plural(f.chunks[i].days, "day")})` : k, views: A.fmtInt(pieces[i]), kind: "Estimate" } })),
@@ -1145,9 +1099,8 @@ export const report: Tool = async (ctx, a, range, period) => {
     r.facts.push(...fs);
     for (const s of x.sources ?? []) if (!(r.sources ?? []).includes(s)) r.sources = [...(r.sources ?? []), s];
   });
-  const [ov, cp, tr, fm, bt, cs, sg] = got;
+  const [ov, , tr, , bt, cs, sg] = got;
   r.cards = [...(ov?.cards ?? []).slice(0, 3), ...(tr?.cards ?? []).slice(0, 1), ...(cs?.cards ?? []).slice(0, 1)];
-  r.charts = [...(ov?.charts ?? []).slice(0, 1), ...(tr?.charts ?? []).slice(0, 1), ...(cp?.charts ?? []).slice(0, 1), ...(fm?.charts ?? [])].slice(0, 4);
   // The plan: each line comes from a number above, worked out again here from the same rows.
   const rows = A.relative(st.posts.filter((p) => p.publishedAt >= w.from.getTime()));
   const fmt = A.segment(rows, (p) => p.format).filter((x) => x.enough);
