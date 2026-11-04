@@ -47,6 +47,14 @@ const ASKS = /^(is|are|was|were|did|does|do|can|could|will|would|should|has|have
 
 const MAX_WORDS = 18;
 
+/**
+ * A bare "no" / "nothing" is only a goodbye when Pip has just invited more ("Anything else?", "...just let me
+ * know."). Checked before the negation rule, because "no" and "nahi" ARE negations everywhere else.
+ */
+const BARE_DONE = /^(no|nope|nah|na|nothing|none|nahi|nahin|not really|not now|nothing else|nothing more|nothing much|nothing for now|no thanks|no thank you|no all good|no i'?m good|no that'?s all|nope that'?s all|i'?m good|im good|all good|kuch nahi|kuchh nahi|kuch nahin|bas|bas itna hi)( thanks| thank you| thx| ty| for now)?$/;
+const HI_BARE_DONE = ["कुछ नहीं", "नहीं", "बस", "नहीं धन्यवाद", "कुछ नहीं धन्यवाद"];
+const INVITES_MORE = /\?\s*$|anything else|something else|let me know|help (you )?with|any other|और कुछ|कुछ और/i;
+
 function norm(s: string) {
   return s
     .toLowerCase()
@@ -77,5 +85,16 @@ export function isResolutionIntent(text: string): boolean {
  * (a first message of "solved it" has nothing to resolve). History is the browser's last few turns.
  */
 export function wantsToResolve(text: string, history: { role: "user" | "bot"; text: string }[]): boolean {
-  return history.some((h) => h.role === "bot" && h.text.trim()) && isResolutionIntent(text);
+  if (!history.some((h) => h.role === "bot" && h.text.trim())) return false;
+  if (isResolutionIntent(text)) return true;
+  const lastBot = [...history].reverse().find((h) => h.role === "bot")?.text.trim() ?? "";
+  return isDoneReply(text, lastBot);
+}
+
+/** "nothing" / "no thanks" in answer to Pip asking if there is anything else. */
+export function isDoneReply(text: string, lastBot: string): boolean {
+  if (!INVITES_MORE.test(lastBot)) return false;
+  const raw = text.trim().replace(/[.!\s]+$/u, "");
+  if (!raw || raw.length > 40) return false;
+  return BARE_DONE.test(norm(raw)) || HI_BARE_DONE.includes(raw);
 }

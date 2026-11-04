@@ -286,6 +286,11 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
 
   function feedback(m: Msg, good: boolean) {
     setMsgs((x) => x.map((y) => (y.id === m.id ? { ...y, ask: false } : y)));
+    // 1126: "Yes, that helped" is the clearest "resolved" there is. Signed in with a saved chat: offer to close it.
+    if (good && signedIn && conv && !resolved) {
+      setMsgs((x) => x.map((y) => (y.offer ? { ...y, offer: false } : y)));
+      return push({ role: "bot", text: `**${rt.reply}**\n\n${rt.ask}`, kind: "resolve", offer: true });
+    }
     if (good) return push({ role: "bot", text: t.glad });
     const n = fails + 1;
     setFails(n);

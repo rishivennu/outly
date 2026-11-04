@@ -28,7 +28,7 @@ mock.module("next/headers", () => ({ cookies: () => cookieApi, headers: () => ne
 const { db } = await import("../lib/db");
 const { createSession } = await import("../lib/auth");
 const { getConfig } = await import("../lib/settings");
-const { isResolutionIntent, wantsToResolve } = await import("../lib/support/resolve");
+const { isResolutionIntent, wantsToResolve, isDoneReply } = await import("../lib/support/resolve");
 const conv = await import("../lib/support/conversations");
 const { POST: chatPOST } = await import("../app/api/support/chat/route");
 const { POST: convPOST } = await import("../app/api/support/conversation/route");
@@ -78,6 +78,24 @@ describe("resolution intent", () => {
   test("plain thanks, or thanks with another question, never closes", () => {
     for (const s of ["thanks", "thank you", "ok", "great", "thanks! how do I connect YouTube?", "is it resolved?", "my issue is not resolved", "don't close this conversation", "that solved it but what about Instagram?", "resolved?"])
       expect({ s, yes: isResolutionIntent(s) }).toEqual({ s, yes: false });
+  });
+  test("a bare 'nothing' or 'no' after Pip asks for more is a goodbye (live report, 4 Nov)", () => {
+    const greet = [{ role: "bot" as const, text: "Hi! What can I help you with today?" }];
+    const letMeKnow = [{ role: "bot" as const, text: "You are on the free plan right now. If there is anything else you need help with, just let me know." }];
+    for (const s of ["nothing", "Nothing.", "no", "nope", "No thanks", "nothing else", "I'm good", "all good", "kuch nahi", "कुछ नहीं", "nah thanks"]) {
+      expect(wantsToResolve(s, greet)).toBe(true);
+      expect(wantsToResolve(s, letMeKnow)).toBe(true);
+    }
+    expect(wantsToResolve("no", [{ role: "bot", text: "Glad I could help! Anything else?" }])).toBe(true);
+  });
+  test("a bare 'no' is still a no when Pip did not invite more", () => {
+    const stated = [{ role: "bot" as const, text: "Your next post goes out at 6 pm." }];
+    expect(wantsToResolve("no", stated)).toBe(false);
+    expect(wantsToResolve("nothing", stated)).toBe(false);
+    expect(isDoneReply("no, it still fails", "Anything else?")).toBe(false);
+    expect(isDoneReply("nothing works", "Anything else?")).toBe(false);
+    expect(isDoneReply("no I need to change my plan", "Anything else?")).toBe(false);
+    expect(isResolutionIntent("no")).toBe(false);
   });
   test("needs something Pip actually answered first", () => {
     expect(wantsToResolve("My issue is resolved", [])).toBe(false);
@@ -312,6 +330,8 @@ describe("chat widget", () => {
     expect(src.match(/disabled=\{busy \|\| !!resolved\} onClick=\{\(\) => send\(s\)\}/g)?.length).toBe(2);
     expect(src).toContain("[busy, resolved, conv, msgs,");
     expect(src).toContain("reopenRef.current?.focus()");
+    // "Did that help? Yes" offers to resolve in a saved chat, instead of a dead-end line.
+    expect(src).toMatch(/if \(good && signedIn && conv && !resolved\) \{[\s\S]{0,200}kind: "resolve", offer: true/);
     expect(src).toContain("ref={reopenRef}");
   });
 });
