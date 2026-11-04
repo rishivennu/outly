@@ -149,7 +149,7 @@ export function Spotlight({ stops, onClose, kicker, skipLabel = "Skip", moreFall
   let pos: React.CSSProperties = { left: "50%", top: "50%", transform: "translate(-50%, -50%)" };
   if (spot && big) {
     // Sits over the target's lower part, clear of the phone tab bar.
-    pos = { left: "50%", transform: "translateX(-50%)", bottom: phone ? "calc(max(12px, env(safe-area-inset-bottom)) + 88px)" : 24 };
+    pos = { left: "50%", transform: "translateX(-50%)", bottom: phone ? "calc(env(safe-area-inset-bottom) + 88px)" : 24 };
   } else if (spot) {
     const right = spot.right + 10 + W < size.w;
     if (right) pos = { left: spot.right + 10, top: Math.max(12, Math.min(spot.top - 2, size.h - 280)) };

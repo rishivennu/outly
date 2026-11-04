@@ -117,9 +117,11 @@ describe("1105 phone top bar", () => {
 describe("1105 tab bar", () => {
   test("same five tabs on a lighter pill, equal widths, no liquid glass", () => {
     expect(nav).toContain('const TABS = ["/home", "/create", "/calendar", "/inbox", "/analytics"];');
-    expect(tabs).toContain("h-[62px]");
-    expect(tabs).toContain("rounded-full");
-    expect(tabs).toContain("max-w-[480px]");
+    // 1115: docked full width; the 62px height and the 480px row live in .mtab (globals.css).
+    expect(tabs).toContain("fixed inset-x-0 bottom-0");
+    expect(tabs).not.toContain("max-w-[480px]");
+    expect(rule(".mtab")).toContain("height: calc(62px + env(safe-area-inset-bottom));");
+    expect(rule(".mtab")).toContain("calc((100% - 480px) / 2)");
     expect(tabs).not.toContain("lg-glass");
     expect(tabs).toContain("min-w-0 flex-1");
     expect(tabs).toContain("whitespace-nowrap");
@@ -136,8 +138,8 @@ describe("1105 tab bar", () => {
     expect(css).toContain(".mtab { animation: mtab-in .4s var(--ease-liquid) backwards; }");
   });
   test("safe area at the bottom, page padding clears it, solid when asked", () => {
-    expect(rule(".mtab")).toContain("bottom: max(12px, env(safe-area-inset-bottom));");
-    expect(src("app/(studio)/layout.tsx")).toContain("pb-[calc(max(12px,env(safe-area-inset-bottom))+88px)]");
+    expect(rule(".mtab")).toContain("calc(5px + env(safe-area-inset-bottom))");
+    expect(src("app/(studio)/layout.tsx")).toContain("pb-[calc(env(safe-area-inset-bottom)+88px)]");
     expect(css).toContain('html[data-contrast="more"] .mtab { background: hsl(var(--card));');
   });
   test("tucks away scrolling down a long page, back on scroll up, top, end, route change and short pages", () => {
@@ -156,8 +158,10 @@ describe("1105 tab bar", () => {
 });
 
 describe("1105 review fixes", () => {
-  test("dark tab bar is frosted at 88% so muted labels hold 4.5:1 over a white card behind", () => {
-    expect(css).toContain("html.dark .mtab { --mtab-bg: 240 5% 10.5% / .88;");
+  test("tab bar is solid (1115) so muted labels hold 4.5:1 over anything behind", () => {
+    expect(css).toContain("html.dark .mtab { --mtab-bg: 240 5% 10.5%; --mtab-line: 0 0% 100% / .08; }");
+    expect(rule(".mtab")).toContain("--mtab-bg: 0 0% 100%;");
+    expect(rule(".mtab")).not.toContain("backdrop-filter");
   });
   test("only the latest theme switch clears the transition flag", () => {
     expect(theme).toContain("const n = ++seq;");
@@ -169,14 +173,14 @@ describe("1105 review fixes", () => {
     expect(css).toContain(".mtop-pre:first-child { padding-top: calc(env(safe-area-inset-top) + 0.5rem); }");
   });
   test("things that float above the tab bar sit 12px over its top edge", () => {
-    const over = "calc(max(12px,env(safe-area-inset-bottom))+74px)";
-    for (const f of ["components/shared/CookieConsent.tsx", "components/shared/DeviceHint.tsx", "components/support/ChatWidget.tsx"]) {
+    const over = "calc(env(safe-area-inset-bottom)+74px)";
+    for (const f of ["components/shared/CookieConsent.tsx", "components/shared/DeviceHint.tsx", "components/support/ChatWidget.tsx", "components/shared/Toast.tsx"]) {
       const s = src(f);
       expect(s).toContain(over);
       expect(s).not.toMatch(/bottom-\[9[26]px\]/);
     }
-    expect(rule(".install-card")).toContain("bottom: calc(max(12px, env(safe-area-inset-bottom)) + 74px);");
-    expect(css).toContain(".install-card { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 66px); }");
+    expect(rule(".install-card")).toContain("bottom: calc(env(safe-area-inset-bottom) + 74px);");
+    expect(css).toContain(".install-card { bottom: calc(env(safe-area-inset-bottom) + 66px); }");
   });
   test("head script reads the contrast key from its constant", () => {
     expect(themeScript).toContain("localStorage.getItem('outly-contrast')");

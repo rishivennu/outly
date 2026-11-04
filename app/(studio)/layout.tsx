@@ -64,7 +64,7 @@ export default async function StudioLayout({ children }: { children: React.React
           <AppNavBar />
           {/* Room for the floating tab bar (62px over the home indicator's safe area, 1105) and 26px of air, so the
               last card always scrolls clear of it. It was 11rem plus each page's own. */}
-          <main id="main" tabIndex={-1} className="mmain relative flex-1 outline-none pb-[calc(max(12px,env(safe-area-inset-bottom))+88px)] lg:pb-0">
+          <main id="main" tabIndex={-1} className="mmain relative flex-1 outline-none pb-[calc(env(safe-area-inset-bottom)+88px)] lg:pb-0">
             {children}
           </main>
         </div>

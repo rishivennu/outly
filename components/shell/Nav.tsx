@@ -75,8 +75,9 @@ function useTuckOnScroll(path: string | null) {
 }
 
 /**
- * 1105 refinement: a lighter floating pill (62px, was 68) on a calm frosted surface with a hairline and a soft
- * shadow (.mtab in globals.css; no liquid-glass glow). Five equal tabs, each at least 52 x 64px. The active tab
+ * 1105 refinement, 1115 docked: a full-width bar flush with the bottom edge, one solid surface down under the home
+ * indicator with a hairline on top (.mtab in globals.css), the five tabs a 480px row in the middle. 62px plus the
+ * safe area. Five equal tabs, each at least 52 x 51px. The active tab
  * keeps the lime pill with a dark icon and a semibold label; the pill grows in place (300ms), colours move in
  * 250ms, labels in 200ms, a press dips the icon (150ms), and the bar rises in once (400ms), all on
  * cubic-bezier(0.16, 1, 0.3, 1).
@@ -86,7 +87,7 @@ export function MobileNav() {
   const tabs = TABS.map((h) => MAIN.find((m) => m.href === h)!);
   const hidden = useTuckOnScroll(path);
   return (
-    <nav aria-label="Primary" data-hidden={hidden ? "" : undefined} inert={hidden} className="mtab web-only fixed z-40 mx-auto flex h-[62px] max-w-[480px] items-stretch rounded-full p-[5px] lg:hidden">
+    <nav aria-label="Primary" data-hidden={hidden ? "" : undefined} inert={hidden} className="mtab web-only fixed inset-x-0 bottom-0 z-40 flex items-stretch lg:hidden">
       {tabs.map(({ href, label, icon: Icon }) => {
         // One rule for every tab (1053): green marks where you are, nothing else.
         const active = isActive(path, href);

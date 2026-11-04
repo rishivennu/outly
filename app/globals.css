@@ -1919,6 +1919,9 @@ html:not(.dark) body:has(.sky-host)::before {
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(env(safe-area-inset-top, 0px) + 12px), #000 calc(env(safe-area-inset-top, 0px) + 152px));
     mask-image: linear-gradient(to bottom, transparent 0, transparent calc(env(safe-area-inset-top, 0px) + 12px), #000 calc(env(safe-area-inset-top, 0px) + 152px));
   }
+  /* 1115: inside the app the page is one flat fill, edge to edge, like a native app: no corner glows behind the
+     content. Public pages keep their sky (the light landing's blue mist, hue 216). */
+  body:not(:has(.sky-host))::before { display: none; }
   /* 1109: the landing sky's comets and stars could cross the top rows, a moving dot under the status bar. */
   .sky {
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(env(safe-area-inset-top, 0px) + 12px), #000 calc(env(safe-area-inset-top, 0px) + 72px));
@@ -3304,29 +3307,27 @@ html[data-contrast="more"] .mtop[data-lifted] { background-color: hsl(var(--back
   .mtop-btn:active { transform: none; }
 }
 
-/* Tab bar (.mtab; not .mnav, that is the marketing header) clears the notch and the home indicator when the phone is on its side.
-   1105: its own calm surface instead of liquid glass. Frosted at 82% light / 88% dark, so muted labels hold 4.5:1
-   even over a white or black card scrolling behind; a hairline and one soft shadow; solid for less transparency or more contrast. 12px above the home indicator's safe area. */
+/* Tab bar (.mtab; not .mnav, that is the marketing header). 1115: docked like a native app's tab bar: full width,
+   flush with the bottom edge, one solid surface that runs on under the home indicator (the safe area is padding inside
+   the bar, so nothing shows through below it), a hairline on top, no shadow, no blur. Solid, so muted labels hold
+   4.5:1 whatever scrolls behind. The tabs stay a 480px row in the middle of a wide phone or tablet, and clear the notch
+   when the phone is on its side. 62px plus the safe area; whatever floats above it sits at
+   env(safe-area-inset-bottom) + 74px, 12px over its top edge. */
 .mtab {
-  --mtab-bg: 0 0% 100% / .82; --mtab-line: 222 20% 18% / .09;
-  left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right));
-  bottom: max(12px, env(safe-area-inset-bottom));
+  --mtab-bg: 0 0% 100%; --mtab-line: 222 20% 18% / .09;
+  height: calc(62px + env(safe-area-inset-bottom));
+  padding: 5px max(5px, env(safe-area-inset-right), calc((100% - 480px) / 2)) calc(5px + env(safe-area-inset-bottom)) max(5px, env(safe-area-inset-left), calc((100% - 480px) / 2));
   background: hsl(var(--mtab-bg));
-  border: 1px solid hsl(var(--mtab-line));
-  box-shadow: 0 10px 28px -14px rgb(16 22 40 / .28), 0 2px 6px -3px rgb(16 22 40 / .1);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
-  backdrop-filter: blur(20px) saturate(1.6);
+  border-top: 1px solid hsl(var(--mtab-line));
   transition: transform .3s var(--ease-liquid), opacity .3s var(--ease-liquid), visibility 0s;
 }
-html.dark .mtab { --mtab-bg: 240 5% 10.5% / .88; --mtab-line: 0 0% 100% / .08; box-shadow: 0 12px 30px -14px rgb(0 0 0 / .7), 0 2px 6px -3px rgb(0 0 0 / .4); }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .mtab { --mtab-bg: 0 0% 100%; } html.dark .mtab { --mtab-bg: 240 5% 10.5%; } }
-@media (prefers-reduced-transparency: reduce) { .mtab { --mtab-bg: 0 0% 100%; -webkit-backdrop-filter: none; backdrop-filter: none; } html.dark .mtab { --mtab-bg: 240 5% 10.5%; } }
-html[data-contrast="more"] .mtab { background: hsl(var(--card)); border-color: hsl(var(--border)); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html.dark .mtab { --mtab-bg: 240 5% 10.5%; --mtab-line: 0 0% 100% / .08; }
+html[data-contrast="more"] .mtab { background: hsl(var(--card)); border-color: hsl(var(--border)); }
 @media (forced-colors: active) { .mtab { border-color: CanvasText; } .mtab-item[aria-current] .mtab-ind { background: Highlight; } }
 /* Tucked away while scrolling down a long page (Nav.tsx useTuckOnScroll): slides below the screen edge, then turns
    invisible once out of sight so Tab and screen readers skip it; visible again the instant it starts back. */
 .mtab[data-hidden] {
-  transform: translateY(calc(100% + max(12px, env(safe-area-inset-bottom)) + 4px)); opacity: 0; pointer-events: none; visibility: hidden;
+  transform: translateY(calc(100% + 4px)); opacity: 0; pointer-events: none; visibility: hidden;
   transition: transform .3s var(--ease-liquid), opacity .3s var(--ease-liquid), visibility 0s .3s;
 }
 /* Tabs: muted until chosen. Colour 250ms, label 200ms, the lime pill grows in place 300ms, a press dips the icon 150ms. */
@@ -3355,16 +3356,16 @@ html[data-contrast="more"] .mtab { background: hsl(var(--card)); border-color: h
   .mtab-item:active .mtab-pill { transform: none; }
 }
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1023px) {
-  .mtab { height: 54px; padding: 4px; }
+  .mtab { height: calc(54px + env(safe-area-inset-bottom)); padding-top: 4px; padding-bottom: calc(4px + env(safe-area-inset-bottom)); }
   .mtab-item { gap: 1px; }
-  .mmain { padding-bottom: calc(max(12px, env(safe-area-inset-bottom)) + 74px); }
+  .mmain { padding-bottom: calc(env(safe-area-inset-bottom) + 74px); }
 }
 
-/* 1099 Add to Home Screen card: floats 12px above the tab bar (62px; 54px on a phone on its side, 1105). */
+/* 1099 Add to Home Screen card: floats 12px above the tab bar (62px; 54px on a phone on its side, 1105; docked 1115). */
 .install-card {
   left: max(12px, env(safe-area-inset-left));
   right: max(12px, env(safe-area-inset-right));
-  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 74px);
+  bottom: calc(env(safe-area-inset-bottom) + 74px);
   background: hsl(var(--glass-bg, var(--card)));
   -webkit-backdrop-filter: blur(28px) saturate(1.7);
   backdrop-filter: blur(28px) saturate(1.7);
@@ -3379,7 +3380,7 @@ html[data-install-card] .pc { opacity: 0; pointer-events: none; transition: opac
   .install-card { background: hsl(var(--card)); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1023px) {
-  .install-card { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 66px); }
+  .install-card { bottom: calc(env(safe-area-inset-bottom) + 66px); }
 }
 
 /* Round 1 (1102): app-like touch. No double-tap zoom anywhere, and on phones every text field is at least 16px,

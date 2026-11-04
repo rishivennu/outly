@@ -50,7 +50,7 @@ export function DeviceHint() {
       aria-modal="false"
       aria-labelledby="dh-title"
       aria-describedby="dh-body"
-      className={cn("consent-in glass-strong fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-[60] rounded-[22px] p-3.5 pr-2 shadow-2xl md:hidden", lift && "bottom-[calc(max(12px,env(safe-area-inset-bottom))+74px)]")}
+      className={cn("consent-in glass-strong fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-[60] rounded-[22px] p-3.5 pr-2 shadow-2xl md:hidden", lift && "bottom-[calc(env(safe-area-inset-bottom)+74px)]")}
       style={{ animationDelay: "0s" }}
     >
       <div className="flex items-start gap-3">
