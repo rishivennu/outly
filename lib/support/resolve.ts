@@ -1,0 +1,81 @@
+/**
+ * "My issue is resolved" detection for Pip (1126). Pure and client-safe.
+ *
+ * Pip never closes anything on its own: a match only makes it ASK ("Resolve & Send Transcript" or "Continue
+ * Chat"). Even so it stays strict, because the prompt is in the way when someone still has a question:
+ * - a plain "thanks", "ok" or "great" is NOT enough (that's small talk, they may go on);
+ * - a question mark, a follow-up ("but", "also", "one more thing") or a negation ("not resolved",
+ *   "didn't fix it", "still") cancels the match;
+ * - long messages don't count: someone who writes a paragraph is usually explaining a new problem;
+ * - there must already be an answer from Pip in this chat, otherwise there is nothing to resolve.
+ * Asking to close the chat ("can you close this conversation?") is the one case where a "?" is fine.
+ */
+
+const STRONG: RegExp[] = [
+  /\bgot (the|my|an|your|a) (answer|answers|solution|fix|reply|help)\b/,
+  /\bgot (what|everything) (i|we) (needed|wanted|was looking for)\b/,
+  /\b(issue|problem|question|questions|query|doubt|doubts|concern|it|everything)('s| is| was| has been| got| have been| are)? (now )?(resolved|solved|fixed|sorted( out)?|answered|cleared( up)?|clear now)\b/,
+  /\b(that|this|it|you|your answer|the answer)( has| have|'s| really| just| totally)? (solved|resolved|fixed|sorted|answered|cleared)( it| that| this| my| the| everything| everything up)?\b/,
+  /\b(that|this|it) (worked|works now|helped|helps|did it|did the trick|was helpful|is helpful|was perfect|makes sense now)\b/,
+  /\b(works|working|it works) (now|perfectly|fine now)\b/,
+  /\b(very|really|super|so) helpful\b/,
+  /\bhelped (a lot|me|loads)\b/,
+  /\b(that'?s|that is|that will be|that'?ll be|thats) (all|it|everything)\b/,
+  /\b(nothing|no) (else|more)( for now| needed| questions?| thanks| thank you)?\b/,
+  /\bno (further|other|more) (questions|doubts|queries)\b/,
+  /\b(all|i'?m all|we'?re all) (set|sorted|done|good now)\b/,
+  /\b(i'?m|i am|we'?re|we are) (done|good now|sorted|all good)( here| now| for now)?\b/,
+  /\b(i'?m|i am|we'?re|we are) (satisfied|happy|pleased) with\b/,
+  /\b(satisfied|happy) with (the|your|this|that) (answer|reply|help|response|solution)\b/,
+  /\bi understand now\b|\bmakes sense now\b|\bunderstood,? thanks?\b/,
+];
+
+/** Asking for the chat to be closed. Allowed even as a question. */
+const CLOSE = /\b(close|end|finish|wrap up|resolve) (this|the|our|my) (chat|conversation|ticket|session)\b|\bmark (it|this|the chat|the conversation) (as )?(resolved|solved|done|closed)\b|\byou can close (it|this)\b/;
+
+/** Hindi and Hinglish, the second most used language in Pip. Devanagari has no \b, so these are substrings. */
+const HI_STRONG = ["हो गया", "हल हो गया", "समझ गया", "समझ गई", "समझ आ गया", "मिल गया", "बस इतना ही", "और कुछ नहीं चाहिए"];
+const HINGLISH = /\b(ho gaya|ho gya|hogaya|samajh (gaya|gayi|aa gaya)|mil gaya|bas itna hi|aur kuch nahi chahiye)\b/;
+
+const NEGATION = /\b(not|isn'?t|wasn'?t|didn'?t|doesn'?t|don'?t|do not|hasn'?t|haven'?t|aren'?t|never|still|can'?t|cannot|won'?t|unable|nahi|nahin|na)\b/;
+const HI_NEG = ["नहीं", "ना "];
+const FOLLOW_UP = /\b(but|also|another|one more|next question|however|although|though|except|wait|what about|how (do|can|to|about)|can you|could you|help me|why)\b/;
+// "Thanks but no" is not "no more", and "not bad" is small talk, both handled by the rules above.
+
+/** Starts like a question even without the "?": "is it resolved", "did that fix it". */
+const ASKS = /^(is|are|was|were|did|does|do|can|could|will|would|should|has|have|why|how|what|when|where|which|who)\b/;
+
+const MAX_WORDS = 18;
+
+function norm(s: string) {
+  return s
+    .toLowerCase()
+    .normalize("NFKC")
+    .replace(/[\u2018\u2019\u02bc]/g, "'")
+    .replace(/[^\p{L}\p{N}'?\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Does this one message say the person's problem is solved (or ask to close the chat)? */
+export function isResolutionIntent(text: string): boolean {
+  const raw = text.trim();
+  if (!raw || raw.length > 160) return false;
+  const t = norm(raw);
+  if (!t || t.split(" ").length > MAX_WORDS) return false;
+  const close = CLOSE.test(t);
+  const hiNeg = HI_NEG.some((n) => raw.includes(n));
+  // "don't close this chat", "no, it's not resolved", "abhi nahi hua"
+  if (NEGATION.test(t) || hiNeg) return false;
+  if (close) return true;
+  if (/\?/.test(raw) || ASKS.test(t) || FOLLOW_UP.test(t)) return false;
+  return STRONG.some((r) => r.test(t)) || HINGLISH.test(t) || HI_STRONG.some((p) => raw.includes(p));
+}
+
+/**
+ * Offer to resolve? The message must say so AND Pip must already have answered something in this chat
+ * (a first message of "solved it" has nothing to resolve). History is the browser's last few turns.
+ */
+export function wantsToResolve(text: string, history: { role: "user" | "bot"; text: string }[]): boolean {
+  return history.some((h) => h.role === "bot" && h.text.trim()) && isResolutionIntent(text);
+}

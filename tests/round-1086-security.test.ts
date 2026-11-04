@@ -10,7 +10,8 @@ import { NextRequest } from "next/server";
 import { decodeJwt } from "jose";
 
 // cookies() only works inside a Next request; give the code under test a cookie jar instead.
-const jar = new Map<string, { value: string; opts: Record<string, unknown> }>();
+// Shared with other files that mock next/headers: bun keeps the first module mock for the whole run.
+const jar: Map<string, { value: string; opts: Record<string, unknown> }> = ((globalThis as { __testCookieJar?: Map<string, { value: string; opts: Record<string, unknown> }> }).__testCookieJar ??= new Map());
 const cookieApi = {
   get: (n: string) => (jar.has(n) ? { name: n, value: jar.get(n)!.value } : undefined),
   getAll: () => [...jar].map(([name, c]) => ({ name, value: c.value })),

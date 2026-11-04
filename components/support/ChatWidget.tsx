@@ -10,13 +10,13 @@ import { PipDataCard } from "./PipDataCard";
 import { pipFont } from "./font";
 import type { PipResult } from "@/lib/pip/types";
 import type { Insight } from "@/lib/pip/analytics-core";
-import { CX, LANGS, PIP_DATA, T, langDir, readLang, writeLang, type Lang } from "@/lib/i18n/support";
+import { CX, LANGS, PIP_DATA, T, langDir, readLang, resolveT, writeLang, type Lang } from "@/lib/i18n/support";
 import { HUMAN_RE } from "@/lib/support/smalltalk";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
 const STUDIO = ["/home", "/create", "/calendar", "/content", "/analytics", "/inbox", "/approvals", "/accounts", "/billing", "/settings", "/support"];
-type Msg = { id: number; role: "user" | "bot"; text: string; sources?: { id: string; question: string }[]; ask?: boolean; kind?: "escalate" | "ticket" | "error"; data?: PipResult };
+type Msg = { id: number; role: "user" | "bot"; text: string; sources?: { id: string; question: string }[]; ask?: boolean; kind?: "escalate" | "ticket" | "error" | "resolve"; data?: PipResult; offer?: boolean };
 type Card =
   | { kind: "failed"; id: string; platform: Platform; title: string; targetId: string; reconnect: boolean }
   | { kind: "reconnect"; id: string; platform: Platform }
@@ -92,6 +92,12 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     };
   }, []);
   const [announce, setAnnounce] = useState("");
+  // 1126: the saved conversation (signed in), and whether it has been resolved (its transcript emailed).
+  const [conv, setConv] = useState<string | null>(null);
+  const [resolved, setResolved] = useState<{ to: string } | null>(null);
+  const [closing, setClosing] = useState<{ busy: boolean; error: string }>({ busy: false, error: "" });
+  const closingRef = useRef(false);
+  const reopenRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -100,6 +106,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const loadedCtx = useRef(false);
   const t = T[lang];
   const cx = CX[lang];
+  const rt = resolveT(lang);
 
   // restore + language
   useEffect(() => {
@@ -112,6 +119,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
       if (s) {
         setMsgs(s.msgs ?? []); setFails(s.fails ?? 0); setDismissed(s.dismissed ?? []);
         setTicket((x) => ({ ...x, ref: s.ref ?? "" }));
+        if (typeof s.conv === "string") setConv(s.conv);
+        if (s.resolved && typeof s.resolved.to === "string") setResolved({ to: s.resolved.to });
         idRef.current = Math.max(0, ...(s.msgs ?? []).map((m: Msg) => m.id)) + 1;
       } else {
         show = window.setTimeout(() => {
@@ -130,8 +139,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   }, []);
   useEffect(() => {
     // Records cards are never written to storage (1049): someone's invoices stay in memory only.
-    try { sessionStorage.setItem(STORE, JSON.stringify({ msgs: msgs.slice(-40).map(({ data: _d, ...m }) => m), fails, ref: ticket.ref, dismissed })); } catch {}
-  }, [msgs, fails, ticket.ref, dismissed]);
+    try { sessionStorage.setItem(STORE, JSON.stringify({ msgs: msgs.slice(-40).map(({ data: _d, ...m }) => m), fails, ref: ticket.ref, dismissed, conv, resolved })); } catch {}
+  }, [msgs, fails, ticket.ref, dismissed, conv, resolved]);
   useEffect(() => setLift(!!document.querySelector('nav[aria-label="Primary"].fixed')), [path]);
 
   // Follow new messages only if the reader is already at the bottom (or just sent one).
@@ -173,7 +182,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
 
   const send = useCallback(async (text: string, faqId?: string) => {
     const q = text.trim().slice(0, MAX);
-    if (!q || busy) return;
+    if (!q || busy || resolved) return;
     setInput("");
     setNudge(false);
     const history = msgs.filter((m) => !m.kind).map((m) => ({ role: m.role, text: m.text })).slice(-8);
@@ -183,9 +192,17 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     if (!navigator.onLine) return push({ role: "bot", text: T[lang].offline, kind: "error" });
     setBusy(true);
     try {
-      const r = await fetch("/api/support/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, history, lang, page: path.slice(0, 120), ...(faqId ? { faqId } : {}), ...(lastData ? { data: { tool: lastData.ask.tool, period: lastData.ask.period, focus: lastData.ask.focus ?? null } } : {}) }) });
+      const r = await fetch("/api/support/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, history, lang, page: path.slice(0, 120), ...(faqId ? { faqId } : {}), ...(conv ? { conversationId: conv } : {}), ...(lastData ? { data: { tool: lastData.ask.tool, period: lastData.ask.period, focus: lastData.ask.focus ?? null } } : {}) }) });
       const j = await r.json();
+      // Resolved in another tab: lock this one too, and keep what was typed out of the log (it was never sent).
+      if (r.status === 409 && j.code === "RESOLVED") { setMsgs((x) => x.slice(0, -1)); setResolved({ to: "" }); return; }
       if (!r.ok) throw new Error(j.error);
+      if (typeof j.conversationId === "string") setConv(j.conversationId);
+      // "My issue is resolved": a compact offer to close and email the transcript. Nothing closes until they confirm.
+      if (j.resolve && typeof j.conversationId === "string") {
+        setMsgs((x) => x.map((m) => (m.offer ? { ...m, offer: false } : m)));
+        return push({ role: "bot", text: `**${j.answer}**\n\n${resolveT(lang).ask}`, kind: "resolve", offer: true });
+      }
       // Small talk ("hi", "thanks") gets a friendly reply: no "Did that help?" and it never counts as a miss.
       // sources[0] is the question just answered, so a confident reply shows only the others as Related.
       push({ role: "bot", text: j.answer, sources: (j.confident ? j.sources?.slice(1, 4) : j.sources?.slice(0, 3))?.filter((x: { id: string }) => x.id), ask: j.confident && !j.smalltalk && !j.data, data: j.data ?? undefined });
@@ -201,7 +218,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     } finally {
       setBusy(false);
     }
-  }, [busy, msgs, lang, fails, escalate, path]);
+  }, [busy, resolved, conv, msgs, lang, fails, escalate, path]);
 
   // open from anywhere: window.dispatchEvent(new CustomEvent("outly:chat-open", { detail: "optional question" }))
   useEffect(() => {
@@ -320,8 +337,69 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     } catch {}
   }
 
+  // 1126: close the conversation and email the transcript. One request at a time (the ref guards a double tap
+  // before React re-renders); success is only shown once the server says the email went out.
+  async function resolveNow() {
+    if (closingRef.current || !conv) return;
+    closingRef.current = true;
+    setClosing({ busy: true, error: "" });
+    try {
+      const r = await fetch("/api/support/conversation", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "resolve", conversationId: conv }) });
+      const j = await r.json().catch(() => ({}));
+      // Gone (kept 90 days) or not theirs: a retry can never work, so say so and let the chat carry on as a new one.
+      if (r.status === 404) {
+        setConv(null);
+        setMsgs((x) => x.map((m) => (m.offer ? { ...m, offer: false } : m)));
+        setClosing({ busy: false, error: "" });
+        push({ role: "bot", text: typeof j.error === "string" ? j.error : rt.failed, kind: "error" });
+        requestAnimationFrame(() => inputRef.current?.focus());
+        return;
+      }
+      if (!r.ok || !j.ok) throw new Error(typeof j.error === "string" ? j.error : rt.failed);
+      setMsgs((x) => x.map((m) => (m.offer ? { ...m, offer: false } : m)));
+      setResolved({ to: typeof j.to === "string" ? j.to : "" });
+      setClosing({ busy: false, error: "" });
+      setAnnounce(rt.announce);
+      // The offer buttons unmount; keep keyboard focus in the panel that replaces the composer.
+      requestAnimationFrame(() => reopenRef.current?.focus());
+    } catch (e) {
+      setClosing({ busy: false, error: e instanceof Error && e.message ? e.message : rt.failed });
+    } finally {
+      closingRef.current = false;
+    }
+  }
+  function keepChatting(m: Msg) {
+    setMsgs((x) => x.map((y) => (y.id === m.id ? { ...y, offer: false } : y)));
+    setClosing({ busy: false, error: "" });
+    push({ role: "bot", text: rt.kept });
+    inputRef.current?.focus();
+  }
+  async function reopenNow() {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setClosing({ busy: true, error: "" });
+    try {
+      if (conv) {
+        const r = await fetch("/api/support/conversation", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "reopen", conversationId: conv }) });
+        // Gone (kept 90 days) or not theirs: start a fresh conversation instead of failing.
+        if (r.status === 404) setConv(null);
+        else if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(typeof j.error === "string" ? j.error : T[lang].error); }
+      }
+      setResolved(null);
+      setClosing({ busy: false, error: "" });
+      push({ role: "bot", text: rt.reopened });
+      setAnnounce(rt.reopened);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    } catch (e) {
+      setClosing({ busy: false, error: e instanceof Error && e.message ? e.message : T[lang].error });
+    } finally {
+      closingRef.current = false;
+    }
+  }
+
   function newChat() {
     setMsgs([]); setFails(0); setTicket({ busy: false, error: "", ref: "" }); setInput("");
+    setConv(null); setResolved(null); setClosing({ busy: false, error: "" });
     try { sessionStorage.removeItem(STORE); } catch {}
     setAnnounce(cx.newChatDone);
     inputRef.current?.focus();
@@ -329,7 +407,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
 
   if (HIDE.some((h) => path.startsWith(h))) return null;
   const lastBot = [...msgs].reverse().find((m) => m.role === "bot");
-  const mood: PipMood = busy ? "think"
+  const mood: PipMood = resolved ? "happy" : busy ? "think"
     : lastBot?.kind === "error" ? "dizzy"
     : lastBot?.kind === "ticket" || lastBot?.text === t.glad ? "happy"
     : lastBot?.kind === "escalate" ? "sad"
@@ -367,7 +445,13 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
             <Pip size={40} mood={mood} />
             <div className="min-w-0 flex-1">
               <h2 id="pc-title" className="truncate text-[15px] font-bold leading-tight">{t.title}</h2>
-              <p id="pc-desc" className="pc-muted flex items-center gap-1.5 text-[12.5px]"><span className="pc-dot h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden /><span className="truncate">{t.status}</span></p>
+              <p id="pc-desc" className="pc-muted flex items-center gap-1.5 text-[12.5px]">
+                {resolved ? (
+                  <span className="pc-badge-resolved pc-fade inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-semibold"><Check className="h-3 w-3" aria-hidden />{rt.status}</span>
+                ) : (
+                  <><span className="pc-dot h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden /><span className="truncate">{t.status}</span></>
+                )}
+              </p>
             </div>
             {msgs.length > 0 && (
               <button type="button" onClick={newChat} aria-label={cx.newChat} title={cx.newChat} className="pc-icon"><SquarePen className="h-[18px] w-[18px]" aria-hidden /></button>
@@ -428,7 +512,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                           <p className="text-[14px] font-bold leading-snug">{n.title}</p>
                           <p className="mt-0.5 text-[13.5px] leading-snug">{n.body}</p>
                           <p className="pc-muted mt-1 text-[12px] leading-snug">{n.evidence}</p>
-                          <button type="button" disabled={busy} onClick={() => send(n.ask)} className="pc-btn mt-2">{(pd ?? pdx).ask}</button>
+                          <button type="button" disabled={busy || !!resolved} onClick={() => send(n.ask)} className="pc-btn mt-2">{(pd ?? pdx).ask}</button>
                         </div>
                         <button type="button" onClick={() => setDismissed((d) => [...d, `insight:${n.id}`])} aria-label={`${cx.dismiss}: ${n.title}`} className="pc-icon -me-1.5 -mt-1.5"><X className="h-4 w-4" aria-hidden /></button>
                       </li>
@@ -442,7 +526,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                   <h3 id="pc-yours" className="pc-eyebrow mb-2">{pd.yours}</h3>
                   <ul className="flex flex-col gap-2">
                     {pd.suggestions.map((s) => (
-                      <li key={s}><button type="button" onClick={() => send(s)} className="pc-chip w-full text-start">{s}</button></li>
+                      <li key={s}><button type="button" disabled={busy || !!resolved} onClick={() => send(s)} className="pc-chip w-full text-start">{s}</button></li>
                     ))}
                   </ul>
                 </section>
@@ -453,7 +537,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                   <h3 id="pc-pop" className="pc-eyebrow mb-2">{cx.popular}</h3>
                   <ul className="flex flex-col gap-2">
                     {t.suggestions.map((s) => (
-                      <li key={s}><button type="button" onClick={() => send(s)} className="pc-chip w-full text-start">{s}</button></li>
+                      <li key={s}><button type="button" disabled={busy || !!resolved} onClick={() => send(s)} className="pc-chip w-full text-start">{s}</button></li>
                     ))}
                   </ul>
                 </section>
@@ -474,8 +558,21 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                         {!!m.sources?.length && !m.ask && (
                           <>
                             <span className="pc-muted px-1 text-[12px]">{t.related}:</span>
-                            {m.sources.map((s) => <button key={s.id} type="button" disabled={busy} onClick={() => send(s.question, s.id)} className="pc-chip pc-chip-sm text-start">{s.question}</button>)}
+                            {m.sources.map((s) => <button key={s.id} type="button" disabled={busy || !!resolved} onClick={() => send(s.question, s.id)} className="pc-chip pc-chip-sm text-start">{s.question}</button>)}
                           </>
+                        )}
+                      </div>
+                    )}
+                    {m.kind === "resolve" && m.offer && !resolved && (
+                      <div className="pc-offer mt-1.5 ps-1">
+                        <div role="group" aria-label={rt.reply} className="flex flex-wrap items-center gap-2">
+                          <button type="button" onClick={resolveNow} disabled={closing.busy} aria-busy={closing.busy} className="pc-btn pc-btn-primary">
+                            {closing.busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{closing.busy ? rt.sending : rt.resolve}
+                          </button>
+                          <button type="button" onClick={() => keepChatting(m)} disabled={closing.busy} className="pc-btn">{rt.keep}</button>
+                        </div>
+                        {closing.error && (
+                          <p role="alert" className="pc-error mt-2 text-[13px]">{closing.error}</p>
                         )}
                       </div>
                     )}
@@ -504,7 +601,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                         <h4 className="pc-muted mb-1.5 text-[12.5px] font-semibold">{g.category}</h4>
                         <ul className="flex flex-col gap-1.5">
                           {g.items.map((q) => (
-                            <li key={q.id}><button type="button" disabled={busy} onClick={() => { setBrowse(false); send(q.question, q.id); }} className="pc-chip w-full text-start">{q.question}</button></li>
+                            <li key={q.id}><button type="button" disabled={busy || !!resolved} onClick={() => { setBrowse(false); send(q.question, q.id); }} className="pc-chip w-full text-start">{q.question}</button></li>
                           ))}
                         </ul>
                       </div>
@@ -522,7 +619,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                 )}
               </div>
 
-              {waitingEmail && (
+              {waitingEmail && !resolved && (
                 <form onSubmit={raise} className="pc-card pc-in mt-3 p-3" aria-describedby="pc-email-why">
                   <label htmlFor="pc-email" className="text-[13.5px] font-medium">{t.email}</label>
                   <p id="pc-email-why" className="sr-only">{t.escalate}</p>
@@ -541,6 +638,16 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
           </div>
 
           <footer className="pc-foot px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
+            {resolved ? (
+              <div role="status" className="pc-resolved pc-in mb-1 p-3.5">
+                <p className="flex items-center gap-2 text-[14.5px] font-semibold"><span className="pc-resolved-mark grid h-6 w-6 shrink-0 place-items-center rounded-full" aria-hidden><Check className="h-3.5 w-3.5" /></span>{rt.doneTitle}</p>
+                <p className="pc-muted mt-1 text-[13.5px] leading-snug">{rt.doneBody(resolved.to)}</p>
+                <button ref={reopenRef} type="button" onClick={reopenNow} disabled={closing.busy} className="pc-btn mt-2.5">
+                  {closing.busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <RotateCw className="h-4 w-4" aria-hidden />}{closing.busy ? rt.reopening : rt.reopen}
+                </button>
+                {closing.error && <p role="alert" className="pc-error mt-2 text-[13px]">{closing.error}</p>}
+              </div>
+            ) : (<>
             {!waitingEmail && fails > 0 && !ticket.ref && (
               <button type="button" onClick={escalate} className="pc-link mb-1.5 min-h-11 text-[13.5px] font-medium">{t.human}</button>
             )}
@@ -551,6 +658,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                 ref={inputRef}
                 rows={1}
                 value={input}
+                disabled={!!resolved}
                 maxLength={MAX}
                 aria-describedby="pc-hint"
                 onChange={(e) => setInput(e.target.value)}
@@ -558,11 +666,12 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                 placeholder={t.placeholder}
                 className="min-h-11 flex-1 resize-none bg-transparent px-3 py-[11px] text-[16px] leading-[22px] outline-none sm:text-[15px]"
               />
-              <button type="submit" disabled={!input.trim() || busy} aria-label={t.send} title={t.send} className="pc-send grid h-11 w-11 shrink-0 place-items-center rounded-full"><ArrowUp className="h-5 w-5" aria-hidden /></button>
+              <button type="submit" disabled={!input.trim() || busy || !!resolved} aria-label={t.send} title={t.send} className="pc-send grid h-11 w-11 shrink-0 place-items-center rounded-full"><ArrowUp className="h-5 w-5" aria-hidden /></button>
             </form>
             <p id="pc-hint" className={cn("pc-muted mt-1.5 truncate px-2 text-[12px]", left > 100 && "max-sm:sr-only")}>
               {left <= 100 ? <span aria-live="polite" className={cn(left <= 20 && "pc-error font-medium")}>{cx.charsLeft(left)}</span> : cx.hint}
             </p>
+            </>)}
             <div className="mt-0.5 flex items-center justify-between gap-2 ps-1">
               <button type="button" onClick={openBrowse} aria-expanded={browse} className="pc-link inline-flex min-h-11 items-center text-[12.5px]">{t.faqLink}</button>
               <label className="relative shrink-0">

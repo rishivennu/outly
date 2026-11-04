@@ -17,10 +17,12 @@ export interface Mail {
   html: string;
   /** Plain-text part. Built from `html` when left out, so no email ever goes out HTML-only. */
   text?: string;
-  kind: "invoice" | "ticket_opened" | "ticket_reply" | "test" | "subscription" | "maintenance" | "weekly_report" | "team_invite" | "referral" | "waitlist" | "notice" | "nudge" | "winback" | "growth" | "otp" | "security" | "beta" | "founding";
+  kind: "invoice" | "ticket_opened" | "ticket_reply" | "test" | "subscription" | "maintenance" | "weekly_report" | "team_invite" | "referral" | "waitlist" | "notice" | "nudge" | "winback" | "growth" | "otp" | "security" | "beta" | "founding" | "pip_transcript";
   attachments?: { filename: string; content: Buffer }[];
   /** Secrets (a sign-in code) masked in the Outbox copy once a real provider has delivered the email. */
   redact?: string[];
+  /** Personal content (a Pip transcript, 1126): the Outbox keeps only the subject once it really went out, never the body. */
+  private?: boolean;
 }
 
 /**
@@ -76,7 +78,7 @@ export async function sendEmail(m: Mail, cfgOverride?: EmailConfig): Promise<{ o
   // Mock mode in dev keeps the code readable (the Outbox is the only inbox there); real sends, and anything
   // at all in production, never store it.
   const keep = status === "mocked" && env.NODE_ENV !== "production";
-  const logged = keep ? m.html : (m.redact ?? []).reduce((h, x) => (x ? h.split(x).join("&bull;".repeat(x.length)) : h), m.html);
+  const logged = keep ? m.html : m.private ? "" : (m.redact ?? []).reduce((h, x) => (x ? h.split(x).join("&bull;".repeat(x.length)) : h), m.html);
   const row = await db.emailLog.create({
     data: { to: m.to, subject: keep ? m.subject : (m.redact ?? []).reduce((t, x) => (x ? t.split(x).join("*".repeat(x.length)) : t), m.subject), html: logged, kind: m.kind, provider: cfg.provider, status, error },
   });
@@ -326,6 +328,17 @@ const rows = (items: [string, string][], tone: Tone = "white") =>
     )
     .join("")}</table>`;
 
+/**
+ * A Pip message for the transcript email: escaped, then Pip's light markdown (**bold**, [label](link), "- " lists)
+ * turned back into plain HTML. Links only to https or Outlly's own pages; anything else stays as text.
+ */
+const transcriptText = (text: string) =>
+  esc(text.trim())
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+    .replace(/\[([^\]\n]{1,120})\]\(((?:https:\/\/|\/)[^\s)]{0,400})\)/g, (_m, label: string, href: string) => `<a href="${href.startsWith("/") ? appUrl() + href : href}" style="color:${C.ink};font-family:${BODY};text-decoration:underline">${label}</a>`)
+    .replace(/^[-*] /gm, "&bull; ")
+    .replace(/\n/g, "<br>");
+
 export type SecurityChange = "on" | "off" | "codes" | "phone" | "phone-off";
 
 export const templates = {
@@ -359,6 +372,30 @@ export const templates = {
       `${p(`Hi ${esc(o.name || "there")},`)}<div style="font-family:${BODY};font-size:16px;line-height:1.6;color:${C.text};background:#f6ecd4;border:2.5px solid ${C.ink};border-left:6px solid ${C.tomato};border-radius:16px;padding:16px 18px;text-align:left;white-space:pre-wrap">${esc(o.body)}</div>${small(`Status: ${esc(o.status)}. Reply to this email to keep the conversation going.`)}`,
       { kicker: "Support", tone: "cream" },
     ),
+  /**
+   * The Pip chat someone resolved (1126). Each message is a full-width block (no side-by-side columns, so it
+   * reads the same on a phone), labelled "You" or "Pip" with its time, and told apart by colour AND label:
+   * yours on peach with a tomato edge, Pip's on white with a cobalt edge. Only the words that were on screen.
+   */
+  pipTranscript: (o: { name: string; ref: string; subject: string; date: string; tz: string; messages: { who: "you" | "pip"; time: string; text: string }[]; earlier: number; url: string }) => {
+    const block = (m: (typeof o.messages)[number]) => {
+      const you = m.who === "you";
+      const edge = you ? C.tomato : TONE.ink.bg;
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px"><tr><td style="padding:0 0 6px;font-family:${BODY};font-size:13px;line-height:1.4;color:${C.muted};text-align:left"><b style="color:${C.ink};font-family:${BODY}">${you ? "You" : "Pip"}</b> &nbsp;&middot;&nbsp; ${esc(m.time)}</td></tr>
+<tr><td bgcolor="${you ? TONE.cream.bg : C.white}" style="background:${you ? TONE.cream.bg : C.white};border:2px solid ${C.ink};border-left:6px solid ${edge};border-radius:14px;padding:12px 16px;font-family:${BODY};font-size:15px;line-height:1.6;color:${C.text};text-align:left;word-break:break-word">${transcriptText(m.text)}</td></tr></table>`;
+    };
+    return wrap(
+      "Your support conversation",
+      `${p(`Hi ${esc(o.name || "there")}, here is the full conversation you had with Pip, the Outlly support assistant. Times are shown in ${esc(o.tz)}.`)}${o.earlier ? p(`<i>${o.earlier} earlier message${o.earlier === 1 ? " is" : "s are"} not shown here.</i>`) : ""}${o.messages.map(block).join("")}${small("This conversation is marked as resolved. Need more help? Open Pip and choose Reopen Conversation, or reply to this email.")}${btn(o.url, "Get more help")}`,
+      {
+        kicker: "Support",
+        tone: "cream",
+        burst: false,
+        preheader: `Transcript of ${esc(o.ref)}: ${esc(o.subject)}`.slice(0, 140),
+        tiles: tile("white", rows([["Date", esc(o.date)], ["Conversation ID", esc(o.ref)], ["Subject", esc(o.subject)], ["Status", "Resolved"]]), "16px 22px"),
+      },
+    );
+  },
   refund: (o: { name: string; amount: string; number: string; creditNote?: string }) =>
     wrap(
       "Your refund is on its way",

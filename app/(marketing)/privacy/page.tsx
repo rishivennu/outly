@@ -69,7 +69,7 @@ export default function PrivacyPage() {
       <Shell>
         <PageHead
           title="Privacy"
-          updated="2 November 2026"
+          updated="4 November 2026"
           lead="This page describes what Outlly actually does with your data today, in plain language, including exactly what each social platform lets us do once you connect it. If anything here changes, the date above changes with it."
         />
 
@@ -91,7 +91,7 @@ export default function PrivacyPage() {
             <li><strong>Numbers and comments from your accounts:</strong> views, likes, comments, followers and similar figures for your posts, and the comments in your Inbox. Live figures are cached for about a minute and a half; per-post history is kept so your analytics can show trends.</li>
             <li><strong>Billing:</strong> your plan, payment amounts, status and the gateway reference, and invoices with your name and email. Card and bank details go straight to the payment provider. We never see or store them. If you pay by UPI through YOUPI, we send it only the amount and an order number, never your name, email or phone.</li>
             <li><strong>Teams:</strong> if you invite people to your studio, their email address, name and role.</li>
-            <li><strong>Support:</strong> what you write to Pip, our support assistant, and any ticket you open, including the conversation that led to it, so a person can pick it up.</li>
+            <li><strong>Support:</strong> what you write to Pip, our support assistant, and Pip’s replies, when you are signed in, and any ticket you open, including the conversation that led to it, so a person can pick it up. When you resolve a Pip conversation, we email its transcript to your account’s verified email address only.</li>
             <li><strong>Operational logs:</strong> publish attempts, errors, timings and the emails we sent you, so a failed post or a missing email can be explained.</li>
           </ul>
 
@@ -178,7 +178,7 @@ export default function PrivacyPage() {
             <li><strong>Connecting a platform:</strong> a short-lived, encrypted cookie that protects the sign-in round trip. It expires after 10 minutes.</li>
             <li><strong>Preferences:</strong> practice mode (<code>studio_sim</code>), theme, language and your cookie choice (<code>outly-consent</code>).</li>
             <li><strong>Referrals</strong> (<code>ol_ref</code>): if a friend invited you, so they can get their free month when you join a paid plan.</li>
-            <li><strong>Pip chat:</strong> your current conversation is kept in this browser tab only, and cleared when the tab closes.</li>
+            <li><strong>Pip chat:</strong> this tab keeps a copy of the open chat so it survives a reload, and clears it when the tab closes. A signed-in chat is also stored on our side, as described above.</li>
           </ul>
           <p>
             There is no advertising or cross-site tracking. The cookie banner lets you allow or refuse analytics and marketing cookies; today
@@ -202,7 +202,7 @@ export default function PrivacyPage() {
           </ul>
           <p>
             Invoices stay on your Billing page for as long as you have an account. If you delete it, each invoice is kept until 8 years after the date it was issued, because Indian tax law requires it, and is then deleted automatically. A kept invoice holds only what was printed on it: the invoice number, date, plan, amount, tax and the name and email it was made out to. It is no longer linked to any account. Drafts nobody has touched for 3 days are removed
-            automatically. Email logs are deleted after 90 days, post metric history after 180 days and sign-in codes after one day. Your source files stay downloadable from the library for as long as your account exists.
+            automatically. Email logs and Pip conversations are deleted after 90 days (a Pip conversation counts from its last message; a transcript email stores no copy of the chat in our logs), post metric history after 2 years and sign-in codes after one day. Your source files stay downloadable from the library for as long as your account exists.
           </p>
 
           <h2>Your rights</h2>

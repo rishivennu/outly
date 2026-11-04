@@ -4000,6 +4000,18 @@ html.theme-anim *::after {
   .promo-cta, .promo-cta:active { transition: none; transform: none; }
 }
 
+/* ---------- 1126: Pip resolve conversation ----------
+   The resolve offer sits under Pip's reply; once resolved, the composer is replaced by a calm status panel
+   and the header shows a small "Resolved" badge. Colours come from Pip's own tokens so dark mode follows. */
+.pc-offer { animation: pc-in .3s var(--ease-liquid, var(--m-ease-out)) both; }
+.pc-resolved { background: color-mix(in srgb, var(--pc-ok) 9%, var(--pc-solid)); border: 1px solid color-mix(in srgb, var(--pc-ok) 32%, var(--pc-line)); border-radius: 18px; }
+.pc-resolved-mark { background: var(--pc-ok); color: #fff; }
+.dark .pc-resolved-mark { color: #08130d; }
+.pc-badge-resolved { color: var(--pc-ok); background: color-mix(in srgb, var(--pc-ok) 13%, transparent); }
+.pc-fade { animation: pc-fade .3s ease-out both; }
+@keyframes pc-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pc-offer, .pc-fade, .pc-resolved { animation: none; } }
+
 /* ---------- 1100: Liquid glass on every studio card ----------
    The studio's screen cards wear the same liquid glass as the rail: a cool-to-deep tint, a lit rim on the top-left
    edge with a softer far edge, and a sheen across the top. Cards: .glass panels, the Analytics dashboard's

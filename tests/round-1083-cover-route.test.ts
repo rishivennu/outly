@@ -2,12 +2,15 @@
  * 1083: PUT/DELETE /api/posts/[id]/cover. JPEG only, 2 MB cap, the owner's draft only, never after it went
  * out, and the old file is removed when a new one replaces it.
  */
-import { beforeAll, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
 import { NextRequest } from "next/server";
 import * as realAuth from "../lib/auth";
 
 const g = globalThis as unknown as { __coverUser?: unknown };
-mock.module("../lib/auth", () => ({ ...realAuth, getCurrentUser: async () => g.__coverUser ?? null }));
+// bun keeps module mocks for the whole run, so fall back to the real session once this file is done.
+const realGetCurrentUser = realAuth.getCurrentUser;
+mock.module("../lib/auth", () => ({ ...realAuth, getCurrentUser: async () => (g.__coverUser !== undefined ? g.__coverUser : realGetCurrentUser()) }));
+afterAll(() => { delete g.__coverUser; });
 
 let db: typeof import("../lib/db").db;
 let storage: typeof import("../lib/storage").storage;

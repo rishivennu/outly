@@ -296,3 +296,49 @@ export const PIP_DATA: Partial<Record<Lang, { yours: string; suggestions: string
     ask: "Tell me more",
   },
 };
+
+/** Resolve Conversation (1126). Languages without an entry use English. */
+export type ResolveT = {
+  reply: string; ask: string; resolve: string; sending: string; keep: string; kept: string; visitor: string;
+  doneTitle: string; doneBody: (to: string) => string; reopen: string; reopening: string; reopened: string;
+  status: string; retry: string; failed: string; announce: string;
+};
+export const PIP_RESOLVE: Partial<Record<Lang, ResolveT>> & { en: ResolveT } = {
+  en: {
+    reply: "Glad I could help!",
+    ask: "Would you like to close this conversation and receive a copy of the chat transcript by email?",
+    resolve: "Resolve & Send Transcript",
+    sending: "Sending transcript",
+    keep: "Continue Chat",
+    kept: "Sure. What else can I help with?",
+    visitor: "Glad I could help! If anything else comes up, just ask.",
+    doneTitle: "Conversation resolved!",
+    doneBody: (to) => `Your support conversation has been closed, and a copy of the transcript has been sent to ${to || "your registered email address"}.`,
+    reopen: "Reopen Conversation",
+    reopening: "Reopening",
+    reopened: "Conversation reopened. What else can I help with?",
+    status: "Resolved",
+    retry: "Try again",
+    failed: "We couldn't send the email just now. Your conversation is still open and nothing was lost. Try again in a moment.",
+    announce: "Conversation resolved. The transcript was sent to your email.",
+  },
+  hi: {
+    reply: "खुशी हुई कि मैं मदद कर सका!",
+    ask: "क्या आप यह बातचीत बंद करके चैट की एक कॉपी ईमेल पर पाना चाहेंगे?",
+    resolve: "हल करें और ट्रांसक्रिप्ट भेजें",
+    sending: "ट्रांसक्रिप्ट भेजी जा रही है",
+    keep: "चैट जारी रखें",
+    kept: "ज़रूर। और किसमें मदद करूँ?",
+    visitor: "खुशी हुई कि मैं मदद कर सका! कुछ और हो तो बस पूछिए।",
+    doneTitle: "बातचीत हल हो गई!",
+    doneBody: (to) => `आपकी सपोर्ट बातचीत बंद कर दी गई है, और इसकी कॉपी ${to || "आपके रजिस्टर्ड ईमेल"} पर भेज दी गई है।`,
+    reopen: "बातचीत फिर से खोलें",
+    reopening: "खोल रहे हैं",
+    reopened: "बातचीत फिर से खुल गई। और किसमें मदद करूँ?",
+    status: "हल हो गई",
+    retry: "फिर से कोशिश करें",
+    failed: "अभी ईमेल नहीं भेजा जा सका। आपकी बातचीत खुली है और कुछ भी नहीं खोया। थोड़ी देर में फिर कोशिश करें।",
+    announce: "बातचीत हल हो गई। ट्रांसक्रिप्ट आपके ईमेल पर भेज दी गई।",
+  },
+};
+export const resolveT = (l: Lang): ResolveT => PIP_RESOLVE[l] ?? PIP_RESOLVE.en;
