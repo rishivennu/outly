@@ -19,7 +19,14 @@ const Body = z.object({
   lang: z.enum(LANG_IDS).default("en"),
   history: z.array(z.object({ role: z.enum(["user", "bot"]), text: z.string().max(2000) })).max(30).default([]),
   /** The last records card in this chat (1049), so "and in August?" means the same records. */
-  data: z.object({ tool: z.enum(PIP_TOOLS), period: z.string().max(200).nullable().optional() }).optional(),
+  data: z
+    .object({
+      tool: z.enum(PIP_TOOLS),
+      period: z.string().max(200).nullable().optional(),
+      /** 1123: the post the last card was about, so "why did it do better?" means that post. Ownership is re-checked. */
+      focus: z.string().max(200).nullable().optional(),
+    })
+    .optional(),
 });
 
 const DAY = 24 * 3600_000;

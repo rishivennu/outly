@@ -93,8 +93,8 @@ export async function posts(ctx: PipCtx, a: PipArgs, range: DateRange | null, pe
   return r;
 }
 
-type Acct = { id: string; platform: Platform; username: string };
-async function accountsInScope(ctx: PipCtx, platform: string | null | undefined) {
+export type Acct = { id: string; platform: Platform; username: string };
+export async function accountsInScope(ctx: PipCtx, platform: string | null | undefined) {
   const rows = await db.socialAccount.findMany({
     where: { userId: ctx.ownerId, status: { not: "disconnected" }, ...(ctx.scope ? { id: { in: ctx.scope } } : {}), ...(platform && isPlatform(platform) ? { platform } : {}) },
     select: { id: true, platform: true, username: true, platformUserId: true },
@@ -104,7 +104,7 @@ async function accountsInScope(ctx: PipCtx, platform: string | null | undefined)
 }
 
 /** One dashboard per account, in parallel; a failure is reported per account, never hidden. */
-async function dashboards(ctx: PipCtx, accts: Acct[], r: PipResult) {
+export async function dashboards(ctx: PipCtx, accts: Acct[], r: PipResult) {
   const out: { acct: Acct; d: PlatformDashboard }[] = [];
   await Promise.all(
     accts.map(async (acct) => {
@@ -204,7 +204,10 @@ export async function topPosts(ctx: PipCtx, a: PipArgs, range: DateRange | null,
   // found = posts considered; returned = the top ones shown. Short on purpose, so no "showing X of Y" warning.
   r.found = pool.length;
   r.returned = r.rows.length;
-  if (r.rows[0]) r.facts.push(`Top post: "${r.rows[0].cells.title}" on ${r.rows[0].cells.where}, ${r.rows[0].cells.views} views, ${r.rows[0].cells.rate} engagement.`);
+  if (r.rows[0]) {
+    r.facts.push(`Top post: "${r.rows[0].cells.title}" on ${r.rows[0].cells.where}, ${r.rows[0].cells.views} views, ${r.rows[0].cells.rate} engagement.`);
+    r.focus = { postId: r.rows[0].id, title: String(r.rows[0].cells.title) };
+  }
   if (boards.length) r.facts.unshift(`Ranked ${plural(pool.length, "post")} from ${plural(boards.length, "account")} by ${sort === "momentum" ? "views per day" : sort === "engagement" ? "engagement rate" : "views"}.`);
   if (window) r.notes.push({ level: "info", text: `Platforms report your recent posts (about the last ${window} days), so older posts aren't ranked.` });
   if (/trend/i.test(ctx.message)) r.notes.push({ level: "info", text: "Trending here means among your own posts. Outlly can't see what's trending across a whole platform." });

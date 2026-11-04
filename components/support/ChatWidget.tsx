@@ -8,7 +8,8 @@ import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { Answer } from "./Answer";
 import { PipDataCard } from "./PipDataCard";
 import type { PipResult } from "@/lib/pip/types";
-import { CX, LANGS, T, langDir, readLang, writeLang, type Lang } from "@/lib/i18n/support";
+import type { Insight } from "@/lib/pip/analytics-core";
+import { CX, LANGS, PIP_DATA, T, langDir, readLang, writeLang, type Lang } from "@/lib/i18n/support";
 import { HUMAN_RE } from "@/lib/support/smalltalk";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const [lift, setLift] = useState(false);
   const [nudge, setNudge] = useState(false);
   const [cards, setCards] = useState<Card[]>([]);
+  // 1123: evidence-backed nudges from the person's own numbers. Only dismissed ids are stored, never the text.
+  const [insights, setInsights] = useState<Insight[]>([]);
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
@@ -144,11 +147,12 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   };
   const jump = () => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight }); setAtBottom(true); inputRef.current?.focus(); };
 
-  // Account cards: only for signed-in creators inside the studio, fetched once per open session.
+  // Account cards and 1123 nudges: only for signed-in creators inside the studio, fetched once per open session.
   useEffect(() => {
     if (!open || !inStudio || loadedCtx.current) return;
     loadedCtx.current = true;
     fetch("/api/support/context").then((r) => (r.ok ? r.json() : { items: [] })).then((j) => setCards(j.items ?? [])).catch(() => {});
+    fetch("/api/pip/insights").then((r) => (r.ok ? r.json() : { items: [] })).then((j) => setInsights((j.items ?? []).slice(0, 3))).catch(() => {});
   }, [open, inStudio]);
 
   // Pip dozes off when nobody has typed for a while; any activity wakes it.
@@ -178,7 +182,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     if (!navigator.onLine) return push({ role: "bot", text: T[lang].offline, kind: "error" });
     setBusy(true);
     try {
-      const r = await fetch("/api/support/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, history, lang, page: path.slice(0, 120), ...(faqId ? { faqId } : {}), ...(lastData ? { data: { tool: lastData.ask.tool, period: lastData.ask.period } } : {}) }) });
+      const r = await fetch("/api/support/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: q, history, lang, page: path.slice(0, 120), ...(faqId ? { faqId } : {}), ...(lastData ? { data: { tool: lastData.ask.tool, period: lastData.ask.period, focus: lastData.ask.focus ?? null } } : {}) }) });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error);
       // Small talk ("hi", "thanks") gets a friendly reply: no "Did that help?" and it never counts as a miss.
@@ -333,6 +337,11 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     : input.trim() ? "idle" : "wait";
   const waitingEmail = msgs.some((m) => m.kind === "escalate");
   const shown = cards.filter((c) => !dismissed.includes(c.id));
+  const nudges = insights.filter((n) => !dismissed.includes(`insight:${n.id}`));
+  const pd = PIP_DATA[lang];
+  const pdx = PIP_DATA.en!;
+  // Studio pages are signed-in only, so visitors (marketing pages) never see the data starters.
+  const signedIn = inStudio;
   const left = MAX - input.length;
   const returnTo = encodeURIComponent(path);
 
@@ -404,6 +413,36 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                         </li>
                       );
                     })}
+                  </ul>
+                </section>
+              )}
+
+              {nudges.length > 0 && (
+                <section aria-labelledby="pc-worth" className="mb-5">
+                  <h3 id="pc-worth" className="pc-eyebrow mb-2">{(pd ?? pdx).worth}</h3>
+                  <ul className="space-y-2">
+                    {nudges.map((n) => (
+                      <li key={n.id} className={cn("pc-card pi-card flex items-start gap-3 p-3", `pi-${n.level}`)}>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[14px] font-semibold leading-snug">{n.title}</p>
+                          <p className="mt-0.5 text-[13.5px] leading-snug">{n.body}</p>
+                          <p className="pc-muted mt-1 text-[12px] leading-snug">{n.evidence}</p>
+                          <button type="button" disabled={busy} onClick={() => send(n.ask)} className="pc-btn mt-2">{(pd ?? pdx).ask}</button>
+                        </div>
+                        <button type="button" onClick={() => setDismissed((d) => [...d, `insight:${n.id}`])} aria-label={`${cx.dismiss}: ${n.title}`} className="pc-icon -me-1.5 -mt-1.5"><X className="h-4 w-4" aria-hidden /></button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {msgs.length === 0 && signedIn && pd && (
+                <section aria-labelledby="pc-yours" className="mb-5">
+                  <h3 id="pc-yours" className="pc-eyebrow mb-2">{pd.yours}</h3>
+                  <ul className="flex flex-col gap-2">
+                    {pd.suggestions.map((s) => (
+                      <li key={s}><button type="button" onClick={() => send(s)} className="pc-chip w-full text-start">{s}</button></li>
+                    ))}
                   </ul>
                 </section>
               )}

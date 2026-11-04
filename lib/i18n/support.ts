@@ -276,3 +276,23 @@ export const CX: Record<Lang, ChatX> = {
   id: { saidYou: "Kamu bilang", saidPip: "Pip bilang", newChat: "Chat baru", newChatDone: "Chat baru dimulai", copy: "Salin jawaban", copied: "Disalin", jump: "Ke pesan terbaru", welcome: "Hai, aku Pip", popular: "Pertanyaan populer", charsLeft: (n) => `Sisa ${n} karakter`, hint: "Enter untuk kirim. Shift dan Enter untuk baris baru.", expand: "Perbesar chat", shrink: "Perkecil chat", attention: "Perlu perhatianmu", failed: (p, t) => `"${t}" tidak terkirim ke ${p}.`, reconnect: (p) => `${p} minta kamu masuk lagi.`, expiring: (p, d) => `Koneksi ${p} kamu berakhir dalam ${d} hari.`, retry: "Coba lagi", retrying: "Mencoba lagi", retried: (p) => `Dikirim lagi ke ${p}. Aku pantau ya.`, retryFailed: "Percobaan ulang gagal. Coba lagi dari Konten.", reconnectBtn: "Hubungkan lagi", seeAll: "Lihat di Konten", conversation: "Percakapan dengan Pip", dismiss: "Tutup" },
   bn: { saidYou: "আপনি বললেন", saidPip: "Pip বলল", newChat: "নতুন চ্যাট", newChatDone: "নতুন চ্যাট শুরু হয়েছে", copy: "উত্তর কপি করুন", copied: "কপি হয়েছে", jump: "সর্বশেষ বার্তায় যান", welcome: "হাই, আমি Pip", popular: "জনপ্রিয় প্রশ্ন", charsLeft: (n) => `আর ${n}টি অক্ষর বাকি`, hint: "পাঠাতে Enter. নতুন লাইনের জন্য Shift আর Enter.", expand: "চ্যাট বড় করুন", shrink: "চ্যাট ছোট করুন", attention: "আপনার মনোযোগ দরকার", failed: (p, t) => `"${t}" ${p}-এ যায়নি।`, reconnect: (p) => `${p}-এ আবার সাইন ইন করতে হবে।`, expiring: (p, d) => `আপনার ${p} সংযোগ ${d} দিনে শেষ হবে।`, retry: "আবার চেষ্টা করুন", retrying: "আবার চেষ্টা চলছে", retried: (p) => `${p}-এ আবার পাঠানো হয়েছে। আমি নজর রাখব।`, retryFailed: "আবার চেষ্টা কাজ করেনি। Content থেকে চেষ্টা করুন।", reconnectBtn: "আবার যুক্ত করুন", seeAll: "Content-এ দেখুন", conversation: "Pip-এর সাথে কথোপকথন", dismiss: "বন্ধ করুন" },
 };
+
+/**
+ * Pip as a creator assistant (1123): starter questions about the person's own numbers, shown in the studio
+ * when signed in. English only for now: the record lookups are planned from English wording, so a translated
+ * starter could miss its tool. Other languages keep the help-centre suggestions.
+ */
+export const PIP_DATA: Partial<Record<Lang, { yours: string; suggestions: string[]; worth: string; ask: string }>> = {
+  en: {
+    yours: "Ask about your numbers",
+    suggestions: [
+      "How many views did I get this week?",
+      "Compare Instagram and YouTube over the last 30 days",
+      "When is my best time to post?",
+      "Am I posting consistently?",
+      "Give me a full performance report for the last 90 days",
+    ],
+    worth: "Worth a look",
+    ask: "Tell me more",
+  },
+};

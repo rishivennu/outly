@@ -13,6 +13,19 @@ export const PIP_TOOLS = [
   "tickets",
   "notices",
   "activity",
+  // 1123: analysis over the creator's own synced numbers (lib/pip/tools-analytics.ts).
+  "overview",
+  "compare_platforms",
+  "trend",
+  "consistency",
+  "best_times",
+  "formats",
+  "segments",
+  "schedule",
+  "account",
+  "post_insight",
+  "forecast",
+  "report",
 ] as const;
 export type PipTool = (typeof PIP_TOOLS)[number];
 
@@ -20,6 +33,19 @@ export type PipCell = string | number | null;
 export type PipColumn = { key: string; label: string; align?: "end"; mono?: boolean };
 export type PipLink = { label: string; href: string; download?: boolean };
 export type PipRow = { id: string; cells: Record<string, PipCell>; links?: PipLink[] };
+/** A headline number (1123). kind "estimate" = a projection, shown with an Estimate badge, never as an actual. */
+export type PipCard = { label: string; value: string; delta?: string | null; hint?: string; kind?: "actual" | "estimate" };
+/** A small chart (1123). Values are already rounded; null = no data that day (a gap, not a zero). */
+export type PipChart = {
+  id: string;
+  title: string;
+  kind: "line" | "bar";
+  unit?: string;
+  x: string[];
+  series: { key: string; label: string; values: (number | null)[]; estimate?: boolean }[];
+};
+/** The analysis tools: their summaries may run longer than a plain lookup's. */
+export const ANALYTIC_TOOLS: readonly PipTool[] = ["overview", "compare_platforms", "trend", "consistency", "best_times", "formats", "segments", "schedule", "account", "post_insight", "forecast", "report"];
 
 export interface PipResult {
   tool: PipTool;
@@ -40,6 +66,13 @@ export interface PipResult {
   empty: string;
   /** Short, true sentences built from the data: the only thing a summary may draw on. */
   facts: string[];
-  /** Enough to follow up on ("download them", "and in August?"). */
-  ask: { tool: PipTool; period: string | null };
+  /** Enough to follow up on ("download them", "and in August?", "why did it do better?"). */
+  ask: { tool: PipTool; period: string | null; focus?: string | null };
+  /** 1123: headline numbers, charts, where the numbers came from, and whether any of it is a projection. */
+  cards?: PipCard[];
+  charts?: PipChart[];
+  sources?: string[];
+  estimate?: boolean;
+  /** The post this answer is about, so a follow-up "why?" means that post. */
+  focus?: { postId: string; title: string } | null;
 }

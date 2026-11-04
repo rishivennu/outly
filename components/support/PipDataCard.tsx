@@ -1,8 +1,47 @@
 "use client";
 import { useId, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, CircleDashed, Download, ExternalLink, FileArchive, Info, Search } from "lucide-react";
-import type { PipLink, PipResult } from "@/lib/pip/types";
+import dynamic from "next/dynamic";
+import { AlertTriangle, CheckCircle2, CircleDashed, Database, Download, ExternalLink, FileArchive, Info, Search } from "lucide-react";
+import type { PipChart, PipLink, PipResult } from "@/lib/pip/types";
 import { cn } from "@/lib/utils";
+
+/** recharts only loads when a card actually has a chart (1123). */
+const ChartView = dynamic(() => import("./PipChartView"), { ssr: false, loading: () => <div className="pd-chart-wait h-[168px]" aria-hidden /> });
+
+/** A chart plus its numbers as a table, for screen readers and anyone who wants the exact values. */
+function ChartBlock({ c }: { c: PipChart }) {
+  const id = useId();
+  return (
+    <figure className="pd-chart mt-2" aria-labelledby={`${id}-c`}>
+      <figcaption id={`${id}-c`} className="mb-1 flex flex-wrap items-center gap-1.5 text-[12.5px] font-semibold">
+        {c.title}
+        {c.series.some((s) => s.estimate) && <span className="pd-badge pd-est">Includes an estimate</span>}
+      </figcaption>
+      <ChartView c={c} />
+      <details className="pd-details mt-1">
+        <summary className="pc-muted text-[12px]">Show the numbers</summary>
+        <div className="pd-scroll mt-1" tabIndex={0} role="region" aria-label={`${c.title}, numbers`}>
+          <table className="pd-table">
+            <thead>
+              <tr>
+                <th scope="col">{c.kind === "bar" ? "Group" : "Date"}</th>
+                {c.series.map((s) => <th key={s.key} scope="col" className="text-end">{s.estimate ? `${s.label} (estimate)` : s.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {c.x.map((x, i) => (
+                <tr key={`${x}-${i}`}>
+                  <td>{x}</td>
+                  {c.series.map((s) => <td key={s.key} className="text-end tabular-nums">{s.values[i] == null ? "No data" : `${s.values[i]!.toLocaleString()}${c.unit ? ` ${c.unit}` : ""}`}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </figure>
+  );
+}
 
 /**
  * The records card under a Pip answer (1049). Says exactly what was searched (period + timezone), how many
@@ -49,13 +88,32 @@ export function PipDataCard({ r }: { r: PipResult }) {
             {r.range ? `${r.range.label}, ${r.range.tz.replace(/_/g, " ")} time` : "Everything on record"}
           </p>
         </div>
+        {r.estimate && <span className="pd-badge pd-est" title="Contains projections, not actuals">Estimate</span>}
         <span className={cn("pd-badge", r.complete ? "pd-ok" : "pd-warn")}>
           {r.complete ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> : <CircleDashed className="h-3.5 w-3.5" aria-hidden />}
           {r.complete ? "Complete" : "Incomplete"}
         </span>
       </header>
 
-      {(r.rows.length > 0 || r.found > 0) && (
+      {!!r.cards?.length && (
+        <ul className="pd-cards mt-2" aria-label="Key numbers">
+          {r.cards.map((c) => (
+            <li key={c.label} className={cn("pd-kpi", c.kind === "estimate" && "pd-kpi-est")}>
+              <span className="pc-muted flex items-center gap-1 text-[11.5px]">
+                {c.label}
+                {c.kind === "estimate" && <span className="pd-badge pd-est pd-badge-xs">Estimate</span>}
+              </span>
+              <span className="text-[17px] font-semibold leading-tight tabular-nums">{c.value}</span>
+              {c.delta && <span className={cn("text-[11.5px] tabular-nums", /^[-\u2212]/.test(c.delta) ? "pd-note-warn" : /^\+/.test(c.delta) ? "pd-ok" : "pc-muted")}>{c.delta}</span>}
+              {c.hint && <span className="pc-muted text-[11px] leading-snug">{c.hint}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {r.charts?.map((c) => <ChartBlock key={c.id} c={c} />)}
+
+      {(r.rows.length > 0 || r.found > 0) && !r.cards?.length && (
         <p className="mt-1.5 text-[13px]">
           Found <strong>{r.found}</strong>
           {r.returned !== r.found ? <> · showing <strong>{r.returned}</strong></> : null}
@@ -139,6 +197,12 @@ export function PipDataCard({ r }: { r: PipResult }) {
         </div>
       )}
       {r.downloads.some((l) => l.download) && <p className="pc-muted mt-1.5 text-[12px]">Download links work for 10 minutes, only while you&apos;re signed in.</p>}
+      {!!r.sources?.length && (
+        <p className="pc-muted mt-2 flex gap-1.5 text-[11.5px] leading-snug">
+          <Database className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span>Source: {r.sources.join(" · ")}</span>
+        </p>
+      )}
     </section>
   );
 }

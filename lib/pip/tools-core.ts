@@ -31,6 +31,8 @@ export type PipArgs = {
   sort?: PipSort | null;
   compare?: boolean | null;
   limit?: number | null;
+  /** 1123: the post a follow-up is about (a PostTarget id, or "accountId:platformPostId" from top_posts). */
+  focus?: string | null;
 };
 
 export const PAGE = 100;

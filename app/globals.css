@@ -1802,6 +1802,20 @@ html.js .stk-wrap:not([data-shown]) .stk { opacity: 0; }
 .pd-ok { color: var(--pc-ok); }
 .pd-warn, .pd-note-warn { color: var(--pc-warn); }
 .pd-total { display: flex; flex-direction: column; padding: 6px 10px; border-radius: 12px; background: var(--pc-fill); }
+/* Pip analytics (1123): headline numbers, charts, estimates, nudges */
+.pd-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 6px; }
+.pd-kpi { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 12px; background: var(--pc-fill); min-width: 0; overflow-wrap: anywhere; }
+.pd-kpi-est { background: transparent; border: 1px dashed var(--pc-line); }
+.pd-est { color: var(--pc-muted); border-style: dashed; }
+.pd-badge-xs { padding: 0 6px; font-size: 10.5px; }
+.pd-chart { margin-inline: 0; padding: 8px 8px 6px; border: 1px solid var(--pc-line); border-radius: 12px; }
+.pd-chart-wait { border-radius: 8px; background: var(--pc-fill); }
+.pd-details summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+.pd-details summary:focus-visible { outline: 2px solid var(--pc-accent); outline-offset: 2px; border-radius: 6px; }
+.pi-card { border-inline-start: 3px solid var(--pc-line); }
+.pi-warn { border-inline-start-color: var(--pc-warn); }
+.pi-good { border-inline-start-color: var(--pc-ok); }
+.pi-info { border-inline-start-color: var(--pc-accent); }
 .pd-search { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 999px; background: var(--pc-fill); }
 .pd-search:focus-within { box-shadow: 0 0 0 2px var(--pc-accent); }
 .pd-search input:focus, .pd-search input:focus-visible { outline: none; }
