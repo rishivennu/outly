@@ -7,6 +7,11 @@ import type { Platform } from "./domain";
  */
 export const POST_FORMATS = ["video", "photo", "carousel", "story"] as const;
 export type PostFormat = (typeof POST_FORMATS)[number];
+/** The Instagram-only formats with their own composer. Lives here, not in the composer: a server page can't
+ *  read values out of a "use client" file (it gets a client reference, and /create crashed on it). */
+export type SlideFormat = Exclude<PostFormat, "video">;
+export const SLIDE_FORMATS: readonly SlideFormat[] = ["story", "photo", "carousel"];
+export const isSlideFormat = (v: unknown): v is SlideFormat => typeof v === "string" && (SLIDE_FORMATS as readonly string[]).includes(v);
 export const isPostFormat = (x: unknown): x is PostFormat => typeof x === "string" && (POST_FORMATS as readonly string[]).includes(x);
 
 export const FORMAT_LABEL: Record<PostFormat, string> = { video: "Video", photo: "Photo", carousel: "Carousel", story: "Story" };

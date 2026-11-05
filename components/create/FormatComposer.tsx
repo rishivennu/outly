@@ -13,7 +13,7 @@ import { api, ApiError } from "@/lib/client/api";
 import { uploadVideo } from "@/lib/client/upload";
 import { validateVideoFile } from "@/lib/client/handoff";
 import { looksLikePhoto, PHOTO_ACCEPT, uploadPhoto } from "@/lib/client/image";
-import { FEED_MAX_RATIO, FEED_MIN_RATIO, FORMAT_LABEL, MAX_SLIDES, takesCaption, type PostFormat } from "@/lib/formats";
+import { FEED_MAX_RATIO, FEED_MIN_RATIO, FORMAT_LABEL, MAX_SLIDES, SLIDE_FORMATS, takesCaption, type SlideFormat } from "@/lib/formats";
 import { cn } from "@/lib/utils";
 import { T } from "@/lib/motion/tokens";
 import { createFont } from "./font";
@@ -30,8 +30,7 @@ import type { AccountView, MediaView, PostView } from "./types";
  * purpose: no story, hooks or per-platform copy, just the files, the caption (not for a Story) and when.
  * Photos become Instagram-ready JPEGs in the browser; videos use the same upload as the video composer.
  */
-export type SlideFormat = Exclude<PostFormat, "video">;
-export const SLIDE_FORMATS: SlideFormat[] = ["story", "photo", "carousel"];
+export type { SlideFormat };
 
 interface Slide {
   key: string;
