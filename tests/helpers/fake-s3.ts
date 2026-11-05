@@ -119,6 +119,8 @@ export function startFakeS3(opts: { port?: number; accessKeyId: string; secret: 
         }
       }
       if (req.method === "PUT") {
+        // Like R2: a whole-object PUT must say how long it is (1134).
+        if (!req.headers.get("content-length")) return cors(err("MissingContentLength", 411));
         objects.set(key, { body: Buffer.from(await req.arrayBuffer()), type: req.headers.get("content-type") ?? "" });
         return cors(new Response(null, { headers: { etag: '"x"' } }));
       }

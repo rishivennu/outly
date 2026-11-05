@@ -100,9 +100,29 @@ export function makeS3(cfg: S3Config, opts: { pinLength?: boolean } = {}) {
 
   return {
     url,
+    /**
+     * 1134: server-side PUT of a whole object. R2 refuses a PUT without Content-Length (411 MissingContentLength).
+     * aws4fetch hands fetch a Request object, and inside Next that body can go out chunked with no length, so every
+     * photo upload failed. Sign the headers here and give fetch the raw bytes, which always carry their length.
+     */
     async put(key: string, body: Buffer, contentType: string) {
-      const r = await aws.fetch(url(key), { method: "PUT", body, headers: { "content-type": contentType } });
-      if (!r.ok) await fail(r, "put");
+      const bytes = new Uint8Array(body.buffer, body.byteOffset, body.byteLength);
+      for (let attempt = 0; ; attempt++) {
+        const s = await new AwsV4Signer({
+          url: url(key),
+          method: "PUT",
+          headers: { "content-type": contentType },
+          accessKeyId: cfg.accessKeyId,
+          secretAccessKey: cfg.secretAccessKey,
+          region: cfg.region || "auto",
+          service: "s3",
+        }).sign();
+        const r = await fetch(s.url.toString(), { method: "PUT", headers: s.headers, body: bytes, cache: "no-store" });
+        if (r.ok) return;
+        if (attempt >= 2 || (r.status < 500 && r.status !== 429)) await fail(r, "put");
+        await r.body?.cancel().catch(() => {});
+        await new Promise((ok) => setTimeout(ok, 100 * 2 ** attempt));
+      }
     },
     presignGet: (key: string, ttlSec: number) => presign("GET", url(key), ttlSec),
     /** One-shot browser PUT for a whole small file, pinned to exactly `size` bytes. */

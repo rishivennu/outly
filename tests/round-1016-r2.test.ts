@@ -43,6 +43,25 @@ describe("R2 driver against a SigV4-verifying fake", () => {
     expect(await s3.head("thumbs/u1/a.jpg")).toBeNull();
   });
 
+  test("1134: a multi-MB server put goes out with a length and lands byte for byte", async () => {
+    const big = Buffer.alloc(3 * 1024 * 1024 + 17);
+    for (let i = 0; i < big.length; i++) big[i] = (i * 31) & 255;
+    await s3.put("images/u1/big.jpg", big, "image/jpeg");
+    expect(await s3.head("images/u1/big.jpg")).toEqual({ size: big.length, type: "image/jpeg" });
+    // a Buffer that is a slice of a bigger one (non-zero byteOffset) sends only its own bytes
+    const slice = Buffer.from("xxHELLOyy").subarray(2, 7);
+    await s3.put("images/u1/slice.jpg", slice, "image/jpeg");
+    const g = await s3.get("images/u1/slice.jpg");
+    expect(await new Response(g.body).text()).toBe("HELLO");
+  });
+
+  test("1134: the r2 put sends the raw bytes, not an aws4fetch Request", async () => {
+    const src = await Bun.file("lib/storage/s3x.ts").text();
+    const put = src.slice(src.indexOf("async put("), src.indexOf("presignGet"));
+    expect(put).toContain("body: bytes");
+    expect(put).not.toContain("aws.fetch");
+  });
+
   test("presigned GET works, a tampered one is refused", async () => {
     await s3.put("videos/u1/v.mp4", Buffer.from("hello"), "video/mp4");
     const u = await s3.presignGet("videos/u1/v.mp4", 600);
