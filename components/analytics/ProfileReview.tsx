@@ -285,9 +285,9 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
     try {
       const r = await api<Loaded>("/api/analytics/review", { method: "POST" });
       setState(r);
-      toast("Your Gemini review is ready.", "ok");
+      toast("Your Pip AI review is ready.", "ok");
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : "Gemini didn't answer just now. Try again in a minute.", "error");
+      toast(e instanceof ApiError ? e.message : "Pip AI didn't answer just now. Try again in a minute.", "error");
     } finally {
       setBusy(false);
     }
@@ -296,7 +296,7 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
   const r = state?.review;
   const thinking = busy || !state;
   const aiOn = !!state?.ai;
-  const label = r?.source === "ai" ? `Written by Gemini ${ago(r.generatedAt, Date.now())}` : "Worked out from your numbers";
+  const label = r?.source === "ai" ? `Written by Pip AI ${ago(r.generatedAt, Date.now())}` : "Worked out from your numbers";
   const stats = (r?.stats ?? []).filter((s) => s.key !== "views").slice(0, compactMode ? 2 : 4);
   const hasAudience = !!r && (!!r.audience || !!r.bestTimes || !!r.contentMix || r.source === "rules");
   /* Strengths, weaknesses and audience share one row: three cards in thirds, or two in halves. */
@@ -308,11 +308,11 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
       onClick={deep}
       disabled={busy || !aiOn || r?.empty}
       aria-busy={busy}
-      title={!aiOn ? "The Gemini deep review is not switched on for this workspace yet." : undefined}
+      title={!aiOn ? "The Pip AI deep review is not switched on for this workspace yet." : undefined}
       className="pr-ai-btn inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))] disabled:cursor-not-allowed disabled:opacity-55"
     >
       {busy ? <RefreshCw className={cn("h-4 w-4", !reduce && "animate-spin")} aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
-      {busy ? "Gemini is reading your numbers..." : r?.source === "ai" ? (state?.stale ? "Numbers moved: analyse again" : "Analyse again") : "Analyse with Gemini"}
+      {busy ? "Pip AI is reading your numbers..." : r?.source === "ai" ? (state?.stale ? "Numbers moved: analyse again" : "Analyse again") : "Analyse with Pip AI"}
     </button>
   );
 
@@ -321,7 +321,7 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
       id="pr-title"
       kicker="Profile review"
       title="How your profile is really doing"
-      desc={!aiOn && state ? "Worked out from your real numbers. The in-depth Gemini review needs a Gemini key on the server." : "A score out of 100 from your reach, engagement and how often you post, with what to do next."}
+      desc={!aiOn && state ? "Worked out from your real numbers. The in-depth Pip AI review needs an AI key on the server." : "A score out of 100 from your reach, engagement and how often you post, with what to do next."}
     >
       {r && <span className="text-sm text-muted-foreground">{label}</span>}
       {!error && action}
@@ -387,6 +387,18 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
             </div>
           )}
           {r && !busy && r.sample > 0 && <p className="mt-5 text-sm text-muted-foreground">Based on {r.sample} posts{r.platforms.length ? ` across ${r.platforms.map((p) => PLATFORM_META[p].name).join(", ")}` : ""}.</p>}
+          {/* 1140: the method in plain words, so a score is never a black box. */}
+          {r && (
+          <details className="mt-4 text-sm">
+            <summary className="inline-flex min-h-11 cursor-pointer items-center font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]">How this is worked out</summary>
+            <div className="mt-2 space-y-2 leading-relaxed text-muted-foreground">
+              <p>Every number here comes from your connected accounts and from the posts you published through Outlly. Nothing is estimated and nothing is compared with other people.</p>
+              <p>The score is the average of its parts above, each marked out of 100 from your own numbers: how far your posts reach, how many people interact per view, how regularly you publish, and how your last {r.sample} posts moved against the period before.</p>
+              <p>A part with no data is left out of the average rather than counted as zero. Followers and reach are never added together across platforms, because each platform counts them its own way.</p>
+              <p>The written review is Pip AI reading exactly these numbers. It is told to use nothing else, so if a number is missing it says so instead of filling the gap.</p>
+            </div>
+          </details>
+          )}
         </Tile>
 
         {/* Right column: live views, then the key numbers as a 2 x 2 grid under it. */}
@@ -478,7 +490,7 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
                 <dl className="mt-4 flex flex-col gap-4 text-[15px]">
                   <div>
                     <dt className="font-semibold">Who watches</dt>
-                    <dd className="mt-1 leading-relaxed text-muted-foreground">{busy ? <Shimmer lines={2} /> : r.audience ?? "Run the Gemini review to read what your numbers say about who watches."}</dd>
+                    <dd className="mt-1 leading-relaxed text-muted-foreground">{busy ? <Shimmer lines={2} /> : r.audience ?? "Run the Pip AI review to read what your numbers say about who watches."}</dd>
                   </div>
                   {r.bestTimes && (
                     <div>

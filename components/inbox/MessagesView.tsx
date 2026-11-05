@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { api, ApiError } from "@/lib/client/api";
+import { takeDeepLink } from "@/lib/client/deep-link";
 import { PLATFORM_META } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import type { MessageView, ReplyBlock, ThreadView } from "@/lib/messages/service";
@@ -70,6 +71,13 @@ export function MessagesView({ initial, tabs, query, refreshTick, refreshQuiet, 
       if (sync) setSyncing(false);
       if (mark) mark.out = false;
     }
+  }, []);
+
+  // 1136: opened from a notification about one conversation (/inbox?tab=messages&thread=<id>). Read once,
+  // then taken out of the address bar. The conversation may still be on its way: openId waits for it.
+  useEffect(() => {
+    const link = takeDeepLink(["thread"]);
+    if (link) setOpenId(link.thread);
   }, []);
 
   // First visit with nothing stored yet: pull the recent conversations once.

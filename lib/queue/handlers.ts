@@ -278,6 +278,10 @@ export async function syncPost(postId: string) {
     where: { id: postId },
     data: { status, ...(allDone && !post.publishedAt ? { publishedAt: new Date() } : {}) },
   });
+  // 1139: the publishing tracker's lock-screen notification for this post (started, live, failed, needs
+  // action). It decides from the rows themselves and is keyed per stage, so calling it on every change is safe.
+  const { publishingPush } = await import("../retention/publishing-push");
+  await publishingPush(postId).catch((e) => console.error("[publishing-push]", e));
   // The send just settled with something live: one in-app notice (10-16g). Keyed per post, so a retry
   // that finishes later never adds a second one.
   if (post.status === "publishing" && (status === "published" || status === "partial")) {

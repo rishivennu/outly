@@ -11,6 +11,7 @@ import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn } from "@/lib/utils";
 import { useTabMemory } from "@/lib/client/tab-state";
+import { takeDeepLink } from "@/lib/client/deep-link";
 import { useFresh } from "@/components/shell/PageFresh";
 import type { InboxComment, InboxProblem } from "@/lib/inbox";
 import { MessagesView, threadsWaiting, type DmData } from "./MessagesView";
@@ -169,6 +170,17 @@ function CommentsPane({ initial, hasTabs, readOnly, tabs, query, refreshTick, re
   const { save: saveFilters } = kept;
   useEffect(() => saveFilters({ platform, needsOnly }), [platform, needsOnly, saveFilters]);
   const [openKey, setOpenKey] = useState<string | null>(null);
+  // 1136: opened from a notification about one comment (/inbox?comment=<id>&target=<id>). The comment is
+  // only in the list once the platform has been read again, so the automatic "open the first one" below
+  // stands aside for a few seconds rather than snatching the pane away from the one that was asked for.
+  const deep = useRef<{ key: string; at: number } | null>(null);
+  useEffect(() => {
+    const link = takeDeepLink(["comment", "target"]);
+    if (!link) return;
+    const key = `${link.target}-${link.comment}`;
+    deep.current = { key, at: Date.now() };
+    setOpenKey(key);
+  }, []);
   // Answered from here this visit, even when the platform's copy of the reply hasn't come back yet.
   const [answered, setAnswered] = useState<Set<string>>(() => new Set());
   const rows = useRef(new Map<string, HTMLButtonElement>());
@@ -226,6 +238,10 @@ function CommentsPane({ initial, hasTabs, readOnly, tabs, query, refreshTick, re
   // Side by side, the right side is never blank: open the first comment. On a phone the list comes first.
   const firstKey = visible[0] ? keyOf(visible[0]) : null;
   useEffect(() => {
+    if (deep.current && (open ? keyOf(open) === deep.current.key : Date.now() - deep.current.at < 8_000)) {
+      if (open) deep.current = null; // the asked-for comment arrived
+      return;
+    }
     if (!open && firstKey && isWide()) setOpenKey(firstKey);
   }, [open, firstKey]);
 

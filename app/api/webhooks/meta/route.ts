@@ -2,14 +2,16 @@ import { type NextRequest } from "next/server";
 import { json } from "@/lib/http";
 import { creds, loadKeys } from "@/lib/social/keys";
 import { safeEqual } from "@/lib/crypto";
-import { parseWebhook, verifySignature, webhookVerifyToken } from "@/lib/messages/webhook";
+import { parseCommentWebhook, parseWebhook, verifySignature, webhookVerifyToken } from "@/lib/messages/webhook";
 import { ingestEvents } from "@/lib/messages/service";
+import { ingestComments } from "@/lib/messages/comments";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Meta webhooks for Instagram and Messenger direct messages (1031).
- * Dashboard: Webhooks > Instagram (field "messages") and Webhooks > Page (fields "messages", "message_echoes"),
+ * Dashboard: Webhooks > Instagram (fields "messages", "comments") and Webhooks > Page (fields "messages",
+ * "message_echoes", "feed"). Without the comment fields subscribed no comment notification can ever arrive.
  * callback {APP_URL}/api/webhooks/meta, verify token from Admin > Social platforms.
  * Not wrapped in route(): Meta has no session and no Origin header; the signature is the credential.
  */
@@ -41,6 +43,8 @@ export async function POST(req: NextRequest) {
   }
   try {
     await ingestEvents(parseWebhook(body).slice(0, MAX_EVENTS), { profileLookups: 5 });
+    // 1136: comments ride the same delivery. Kept after the messages so a comment problem never loses a DM.
+    await ingestComments(parseCommentWebhook(body).slice(0, MAX_EVENTS));
   } catch (e) {
     console.error("[meta webhook]", e);
     return json({ error: "retry" }, { status: 500 }); // Meta retries; storing is idempotent by message id

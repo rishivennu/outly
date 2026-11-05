@@ -161,7 +161,7 @@ export async function ingestEvents(events: DmEvent[], opts: { profileLookups?: n
         stored++;
         // 1118: a new message from someone (not our own reply, not a late or practice one) is worth a heads-up.
         if (m.direction === "in" && !thread.practice && Date.now() - m.sentAt.getTime() < 3600_000)
-          await noticeNewMessage(acct.userId, thread.id, ev.platform, thread.participantName || thread.participantHandle || "someone", m.text);
+          await noticeNewMessage(acct.userId, thread.id, ev.platform, thread.participantName || thread.participantHandle || "someone", m.text, new Date(), thread.participantAvatar);
       }
     }
   }

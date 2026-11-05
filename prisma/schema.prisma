@@ -78,6 +78,8 @@ model User {
   teamMembers    TeamMember[]      @relation("TeamOwner")
   seats          TeamMember[]      @relation("TeamSeat")
   notices        Notice[]
+  notifyEvents     NotifyEvent[]
+  notifyDeliveries NotifyDelivery[]
   snippets       Snippet[]
   ideas          Idea[]
   featureUses FeatureUse[]
@@ -173,6 +175,8 @@ model SocialAccount {
   user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   targets   PostTarget[]
   dmThreads DmThread[]
+  snapshots AccountSnapshot[] // 1140: daily follower / post / view history
+  syncState AccountSyncState? // 1140: when the background metric sync last ran for this account
 
   @@unique([userId, platform, platformUserId])
   @@index([userId])
@@ -294,6 +298,7 @@ model TargetMetric {
   likes      Int      @default(0)
   comments   Int      @default(0)
   shares     Int      @default(0)
+  saves      Int      @default(0) // 1140: Instagram saves (0 on platforms that never report them)
 
   target PostTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
@@ -1147,4 +1152,125 @@ model CampaignEvent {
   @@unique([campaignId, userId, kind, day]) // one impression / dismissal / click / conversion per person, offer and day
   @@index([campaignId, kind])
   @@index([userId, campaignId])
+}
+
+// ===== NOTIFY round 1141 =====
+// The centralized notification engine's own tables. Nothing here replaces Notice: a Notice is still the one
+// record of "this person was told this once" (its `key` is the unique one). These three sit around it:
+// NotifyEvent in front (what happened, once, whatever retries the source makes), NotifyDelivery behind
+// (what each channel actually did, including the skips and why), NotifyDeadLetter to the side (events the
+// engine gave up on, kept so an admin can see them instead of losing them).
+
+/// Something that happened and may be worth telling someone about. Written by webhooks, by the app and by
+/// the sweeps; processed by lib/notify-engine.ts. `idemKey` is the source's own identity for the event
+/// (a comment id, a slot and date, a payment id): a duplicate delivery writes nothing at all.
+model NotifyEvent {
+  id          String    @id @default(cuid())
+  userId      String
+  /// Event key from lib/notify-core.ts EVENTS, or an engine kind ("idle_30m", "greet_morning").
+  kind        String
+  /// Where it came from: "webhook:meta" | "app" | "sweep" | "platform" | "billing".
+  source      String    @default("app")
+  idemKey     String    @unique
+  /// The connected account it concerns, when it concerns one.
+  accountId   String?
+  /// 1 urgent ... 4 quiet. Decides what survives a digest. lib/notify-core.ts priorityOf.
+  priority    Int       @default(3)
+  /// JSON the notice is built from. Only what the server verified itself; never a guess.
+  payload     String    @default("{}")
+  status      String    @default("pending") // pending | done | skipped | failed | dead
+  attempts    Int       @default(0)
+  lastError   String?
+  nextAt      DateTime  @default(now())
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries NotifyDelivery[]
+
+  @@index([status, nextAt])
+  @@index([userId, createdAt])
+  @@index([kind, createdAt])
+}
+
+/// What one channel did with one notification: sent, skipped (with the reason: switched off, quiet hours,
+/// still inside a cooldown, notifications paused) or failed. The admin's delivery stats and failure list
+/// read this; it is also the honest answer to "was I told about this?".
+model NotifyDelivery {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String?
+  /// The Notice this belongs to, when one was written.
+  noticeId  String?
+  kind      String
+  /// Category from lib/notify-core.ts, so stats group without re-deriving it.
+  category  String   @default("")
+  channel   String // inapp | push | email | fcm
+  status    String // sent | skipped | failed | queued
+  /// Short machine reason for a skip or failure ("quiet_hours", "cooldown", "event_off", "paused", "no_device").
+  reason    String?
+  /// Anything a human needs to understand it. Never a secret, never a token.
+  detail    String?
+  createdAt DateTime @default(now())
+
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event NotifyEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([kind, createdAt])
+}
+
+/// An event the engine could not process after its retries. Kept rather than dropped: a dead letter is a
+/// bug to look at, and the payload is what makes it findable.
+model NotifyDeadLetter {
+  id        String   @id @default(cuid())
+  userId    String?
+  kind      String
+  source    String   @default("")
+  idemKey   String
+  payload   String   @default("{}")
+  error     String   @default("")
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([idemKey])
+}
+
+
+// ===== ANALYTICS round 1140 =====
+
+/// One row per connected account per UTC day, written by the background metric sync from what that
+/// platform's own API reports. No platform gives follower history, so Outlly keeps its own. Every number is
+/// nullable: a metric the API did not return stays null and is shown as "Not available", never as 0.
+model AccountSnapshot {
+  id         String   @id @default(cuid())
+  accountId  String
+  day        String // YYYY-MM-DD in UTC
+  followers  Int?
+  posts      Int?
+  views      Int? // the platform's own window, named by viewsScope; not a daily delta
+  viewsScope String? // 28_days | recent_posts | lifetime
+  capturedAt DateTime @default(now())
+
+  account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, day])
+  @@index([accountId, day])
+}
+
+/// How the background metric sync is getting on with one account: when it last succeeded, what went wrong
+/// last time, and how long the platform asked us to wait. Read by the UI to show a real "last synced" time.
+model AccountSyncState {
+  id            String    @id @default(cuid())
+  accountId     String    @unique
+  lastSyncAt    DateTime? // last run that wrote or confirmed numbers
+  lastTriedAt   DateTime?
+  lastError     String? // a short code (RATE_LIMITED, AUTH_EXPIRED, ...), never a token or body
+  cooldownUntil DateTime? // set when the platform asked us to slow down
+  targetsDone   Int       @default(0) // posts touched by the last run
+  updatedAt     DateTime  @updatedAt
+
+  account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }

@@ -14,6 +14,7 @@ import { cn, compact } from "@/lib/utils";
 import type { Headline, LivePost, PlatformDashboard, Suggestion } from "@/lib/live/types";
 import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
 import { chartMotion, riseIndex, type NumberFormat } from "@/lib/motion/numbers";
+import { ProfileAccounts, ProfileBreakdowns, type ProfileExtras } from "./ProfileExtras";
 
 const POLL_MS = 60_000;
 
@@ -36,8 +37,11 @@ function engagement(p: LivePost) {
 }
 
 /** renderedAt: when the server built this page; a copy prefetched on hover (1039) can be a while old. */
-export function PlatformDashboardView({ platform, initial, connected, renderedAt }: { platform: Platform; initial: PlatformDashboard; connected: Partial<Record<Platform, boolean>>; renderedAt?: number }) {
+export function PlatformDashboardView({ platform, initial, connected, renderedAt, focusAccount = null }: { platform: Platform; initial: PlatformDashboard; connected: Partial<Record<Platform, boolean>>; renderedAt?: number; focusAccount?: string | null }) {
   const [data, setData] = useState(initial);
+  // 1140: the accounts you manage on this platform, plus the format and timing breakdowns for the one shown.
+  const [x, setX] = useState<ProfileExtras | null>(null);
+  const [acct, setAcct] = useState<string | null>(focusAccount);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -58,6 +62,33 @@ export function PlatformDashboardView({ platform, initial, connected, renderedAt
     },
     [platform],
   );
+
+  // One profile at a time: switching account loads that account's own dashboard, never a merge of both.
+  const loadProfile = useCallback(
+    async (accountId: string | null, fresh = false) => {
+      setBusy(true);
+      try {
+        const q = new URLSearchParams({ platform });
+        if (accountId) q.set("account", accountId);
+        if (fresh) q.set("fresh", "1");
+        const r = await api<ProfileExtras>(`/api/analytics/profile?${q.toString()}`);
+        setX(r);
+        setAcct(r.accountId);
+        if (accountId) setData(r);
+        setErr(null);
+      } catch (e) {
+        setErr(e instanceof ApiError ? e.message : "Couldn't load this profile just now.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [platform],
+  );
+  // The breakdowns load after the dashboard is on screen, so they never hold the numbers back.
+  useEffect(() => {
+    void loadProfile(focusAccount, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Poll while the tab is visible; refresh straight away when the creator comes back to it.
   useEffect(() => {
@@ -110,7 +141,7 @@ export function PlatformDashboardView({ platform, initial, connected, renderedAt
           </div>
           <div className="min-w-0">
             <p className="eyebrow mb-1">{name} dashboard</p>
-            <h1 className="display truncate text-[clamp(2rem,4.6vw,3.4rem)] leading-none">{data.profile?.name ?? name}</h1>
+            <h1 className="display truncate pb-[0.08em] text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.05]">{data.profile?.name ?? name}</h1>
             {data.profile && (
               <p className="mt-1.5 flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
                 <span>{data.profile.handle}</span>
@@ -142,7 +173,9 @@ export function PlatformDashboardView({ platform, initial, connected, renderedAt
         </p>
       )}
 
-      {!live ? <NotLive platform={platform} data={data} /> : <Live platform={platform} data={data} />}
+      {x && x.accounts.length > 1 && <ProfileAccounts platform={platform} accounts={x.accounts} active={acct} onPick={(id) => void loadProfile(id)} busy={busy} lastSyncAt={x.lastSyncAt} />}
+
+      {!live ? <NotLive platform={platform} data={data} /> : <Live platform={platform} data={data} x={x} />}
     </div>
   );
 }
@@ -187,7 +220,7 @@ function NotLive({ platform, data }: { platform: Platform; data: PlatformDashboa
   );
 }
 
-function Live({ platform, data }: { platform: Platform; data: PlatformDashboard }) {
+function Live({ platform, data, x }: { platform: Platform; data: PlatformDashboard; x: ProfileExtras | null }) {
   // Gemini ideas load after the numbers are on screen, so a slow model never holds the dashboard back.
   const [ideas, setIdeas] = useState<Suggestion[]>([]);
   const [thinking, setThinking] = useState(false);
@@ -238,6 +271,8 @@ function Live({ platform, data }: { platform: Platform; data: PlatformDashboard 
           {data.breakdown && <Breakdown b={data.breakdown} color={color} />}
         </div>
       )}
+
+      {x && <ProfileBreakdowns x={x} />}
 
       <Posts posts={data.posts} platform={platform} />
       <Notes notes={data.notes} />

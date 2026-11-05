@@ -54,6 +54,12 @@ export function invalidateComments(targetId: string) {
   cache.delete(cacheKey(targetId));
 }
 
+/** 1136: a comment just came in by webhook: the next Inbox load reads the platform again, so it shows. */
+export function forgetComments(accountId: string, targetId: string) {
+  invalidateComments(targetId);
+  ownCache.delete(`own:${accountId}`);
+}
+
 async function cachedComments(targetId: string, load: () => Promise<PlatformComment[]>, now = Date.now()) {
   const hit = cache.get(cacheKey(targetId));
   if (hit && now - hit.at < COMMENT_CACHE_MS) return hit.comments;

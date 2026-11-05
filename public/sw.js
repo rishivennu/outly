@@ -72,14 +72,43 @@ self.addEventListener("fetch", (e) => {
 
 /* 1118: Web Push. The server sends a short JSON (lib/push/webpush.ts payloadOf): t title, b body, h path to
    open, g tag (a newer push with the same tag replaces the older one), i notice id, n unread count. Every push
-   shows a notification, always: iOS stops delivering to a Home Screen app whose pushes stay silent. */
+   shows a notification, always: iOS stops delivering to a Home Screen app whose pushes stay silent.
+   1136: c picture (the sender's photo, else the platform's mark), p platform name, r what a typed reply
+   answers ({k:"dm",t} or {k:"cm",t,c}), w who that reply goes to.
+   1141: q = 1 keeps the notification on screen until it is acted on, a = [{action,title,href}] buttons whose
+   tap opens href inside Outlly. */
 const ICON = "/brand/app/icon-192.png";
 const BADGE = "/brand/app/badge-96.png";
 const safePath = (h) => (typeof h === "string" && /^\/(?![/\\])/.test(h) ? h : "/home");
+/* Our own files, or a profile photo on https. Anything else falls back to the app icon. */
+const safePic = (u) => (typeof u === "string" && u.length <= 600 && (/^\/brand\/[\w./-]+$/.test(u) || /^https:\/\/[^\s"<>]+$/.test(u)) ? u : ICON);
 const tell = (msg) => self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((cs) => cs.forEach((c) => c.postMessage(msg)));
 function badge(n) {
   if (typeof n !== "number" || !("setAppBadge" in self.navigator)) return Promise.resolve();
   return (n > 0 ? self.navigator.setAppBadge(n) : self.navigator.clearAppBadge()).catch(() => {});
+}
+
+/* The buttons. "reply" asks for text where the browser offers it (Chrome on Android); everywhere else,
+   including every iPhone, the same button simply opens the conversation, which is the honest fallback.
+   Browsers draw at most two, so the reply button is kept first and the server already sends no more. */
+const REPLY = "outlly:reply";
+function buttons(d) {
+  const out = [];
+  if (d.r && typeof d.r === "object" && typeof d.r.t === "string")
+    // A browser without inline replies ignores type and placeholder and draws a plain button instead.
+    out.push({ action: REPLY, title: "Reply", type: "text", placeholder: d.w ? `Reply to ${d.w}` : "Write a reply" });
+  for (const a of Array.isArray(d.a) ? d.a : []) {
+    if (!a || typeof a.action !== "string" || typeof a.title !== "string" || !a.title) continue;
+    out.push({ action: `go:${a.action}`, title: a.title.slice(0, 24) });
+  }
+  return out.slice(0, 2);
+}
+
+/* Where each button goes, kept on the notification so a tap after the page was closed still knows. */
+function links(d) {
+  const out = {};
+  for (const a of Array.isArray(d.a) ? d.a : []) if (a && typeof a.action === "string") out[`go:${a.action}`] = safePath(a.href);
+  return out;
 }
 
 self.addEventListener("push", (e) => {
@@ -93,22 +122,58 @@ self.addEventListener("push", (e) => {
   }
   const opts = {
     body: d.b || "You have a new update in Outlly.",
-    icon: ICON,
+    icon: safePic(d.c),
     badge: BADGE,
     timestamp: d.s || Date.now(),
-    data: { h: safePath(d.h), i: d.i || "" },
+    data: { h: safePath(d.h), i: d.i || "", r: d.r || null, p: d.p || "", links: links(d) },
     lang: "en",
   };
   if (d.g) (opts.tag = d.g), (opts.renotify = true);
+  /* q: something is being watched (a post going out), so it must not slip away unnoticed. */
+  if (d.q === 1) opts.requireInteraction = true;
+  const acts = buttons(d);
+  if (acts.length) opts.actions = acts;
   e.waitUntil(Promise.all([self.registration.showNotification(d.t || "Outlly", opts), badge(d.n), tell({ type: "outlly:notice" })]));
 });
 
 /* A tap opens the page the notice is about: an Outlly window already open is reused (focused, then sent
    there), otherwise a new one opens. A signed-out session lands on sign-in, which returns to this page. */
+
+/* A reply typed into the notification. The server decides whether it may be sent and sends it; this only
+   reports back what the platform answered. Nothing says "Sent" until the server says the platform took it. */
+async function sendReply(d, text) {
+  const body = d.r.k === "cm" ? { k: "cm", t: d.r.t, c: d.r.c, text } : { k: "dm", t: d.r.t, text };
+  let out = null;
+  try {
+    const res = await fetch("/api/push/reply", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    out = await res.json().catch(() => null);
+    if (!res.ok) throw new Error((out && out.error) || "not sent");
+  } catch (err) {
+    await self.registration.showNotification("Reply not sent", {
+      body: (out && out.error) || "Outlly could not send that just now. Open the conversation to try again.",
+      icon: ICON,
+      badge: BADGE,
+      tag: `reply-failed:${d.r.t}`,
+      data: { h: safePath(d.h) },
+      lang: "en",
+    });
+    return;
+  }
+  await self.registration.showNotification("Reply sent", { body: text.slice(0, 120), icon: ICON, badge: BADGE, tag: `reply-sent:${d.r.t}`, data: { h: safePath((out && out.href) || d.h) }, lang: "en" });
+  await tell({ type: "outlly:notice" });
+}
+
 self.addEventListener("notificationclick", (e) => {
-  e.notification.close();
   const d = e.notification.data || {};
-  const path = safePath(d.h);
+  /* The reply box: the notification stays while the text goes out, then says what really happened. */
+  if (e.action === REPLY && d.r && typeof e.reply === "string" && e.reply.trim()) {
+    e.notification.close();
+    e.waitUntil(sendReply(d, e.reply.trim().slice(0, 1000)));
+    return;
+  }
+  e.notification.close();
+  /* A button with no typed text (iPhone, or a plain action button) opens where it points. */
+  const path = safePath((d.links && d.links[e.action]) || d.h);
   const url = new URL(path, self.location.origin).href;
   e.waitUntil(
     (async () => {

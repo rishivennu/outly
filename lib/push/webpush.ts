@@ -25,17 +25,78 @@ export interface WebPushMessage {
   id?: string | null;
   /** Unread count for the app icon badge. */
   badge?: number;
+  /** 1136: the picture on the notification: the sender's photo, else the platform's mark (/brand/platforms). */
+  icon?: string | null;
+  /** 1136: the platform it came from, by name ("Instagram"), so the device can say so. */
+  platform?: string | null;
+  /** 1136: what a reply typed into the notification answers. The worker posts it to /api/push/reply. */
+  reply?: PushReply | null;
+  /** 1136: who a reply goes to, for the reply box placeholder ("Reply to Priya"). */
+  who?: string | null;
+  /** 1141: keep the notification on screen until it is acted on (payload key q). For something being watched. */
+  keepOpen?: boolean;
+  /** 1141: buttons under the notification; a tap opens `href` inside Outlly (payload key a). At most two. */
+  actions?: PushAction[] | null;
 }
+
+/** A button on the notification. `action` is the worker's own id for it, `href` a path inside Outlly. */
+export type PushAction = { action: string; title: string; href: string };
+
+/** A direct message thread, or one comment on a post (targetId as in lib/inbox.ts). */
+export type PushReply = { kind: "dm"; threadId: string } | { kind: "comment"; targetId: string; commentId: string };
 
 type Sub = { id: string; endpoint: string; p256dh: string; auth: string; vapidKey: string; failures: number };
 
 const safeHref = (h?: string | null) => (h && /^\/(?![/\\])/.test(h) ? h : "/home");
+/** Our own files, or a picture on https (a platform's profile photo). Anything else is dropped. */
+const safeIcon = (u?: string | null) => (u && u.length <= 600 && (/^\/brand\/[\w./-]+$/.test(u) || /^https:\/\/[^\s"<>]+$/.test(u)) ? u : "");
+const ID = /^[\w:.-]{1,200}$/;
 
-/** The JSON the service worker reads (public/sw.js). Short keys: a push body is capped near 4 KB. */
+/**
+ * 1141: the buttons, trimmed to what a notification can actually show (browsers draw at most two) and
+ * checked here so the worker is never handed a title that would overflow or a link off our own origin.
+ * Spelt out on the wire ({action,title,href}), unlike the other keys: the cost is a few bytes and this is
+ * the shape the rest of the product and the service worker are written against.
+ */
+const ACTION_ID = /^[\w-]{1,24}$/;
+export function actionsOf(list?: PushAction[] | null) {
+  if (!Array.isArray(list)) return undefined;
+  const out = list
+    .filter((a) => a && typeof a.action === "string" && typeof a.title === "string" && ACTION_ID.test(a.action) && !!a.title.trim())
+    .slice(0, 2)
+    .map((a) => ({ action: a.action, title: a.title.trim().slice(0, 24), href: safeHref(a.href) }));
+  return out.length ? out : undefined;
+}
+
+/** The reply target, short keys. Ids that don't look like ours are dropped rather than sent to a worker. */
+function replyOf(r?: PushReply | null) {
+  if (!r) return undefined;
+  if (r.kind === "dm" && ID.test(r.threadId)) return { k: "dm", t: r.threadId };
+  if (r.kind === "comment" && ID.test(r.targetId) && ID.test(r.commentId)) return { k: "cm", t: r.targetId, c: r.commentId };
+  return undefined;
+}
+
+/**
+ * The JSON the service worker reads (public/sw.js). Short keys: a push body is capped near 4 KB.
+ * 1136: c icon, p platform name, r reply target, w who a reply goes to.
+ * 1141: q = 1 keeps it on screen until it is acted on, a = the buttons.
+ * Too big: the body shrinks, then the buttons go, then the icon.
+ */
 export function payloadOf(m: WebPushMessage) {
-  const base = { t: m.title.slice(0, 120), b: m.body.slice(0, 400), h: safeHref(m.href), g: m.tag.slice(0, 64), k: m.kind ?? "", i: m.id ?? "", n: Math.max(0, Math.min(999, m.badge ?? 0)), s: Date.now() };
+  const base: Record<string, unknown> = { t: m.title.slice(0, 120), b: m.body.slice(0, 400), h: safeHref(m.href), g: m.tag.slice(0, 64), k: m.kind ?? "", i: m.id ?? "", n: Math.max(0, Math.min(999, m.badge ?? 0)), s: Date.now() };
+  const icon = safeIcon(m.icon);
+  if (icon) base.c = icon;
+  if (m.platform) base.p = m.platform.slice(0, 40);
+  const r = replyOf(m.reply);
+  if (r) base.r = r;
+  if (r && m.who) base.w = m.who.slice(0, 60);
+  if (m.keepOpen) base.q = 1;
+  const a = actionsOf(m.actions);
+  if (a) base.a = a;
   let s = JSON.stringify(base);
-  if (Buffer.byteLength(s) > MAX_PLAINTEXT) s = JSON.stringify({ ...base, b: base.b.slice(0, 160) });
+  if (Buffer.byteLength(s) > MAX_PLAINTEXT) s = JSON.stringify({ ...base, b: String(base.b).slice(0, 160) });
+  if (Buffer.byteLength(s) > MAX_PLAINTEXT) s = JSON.stringify({ ...base, b: String(base.b).slice(0, 160), a: undefined });
+  if (Buffer.byteLength(s) > MAX_PLAINTEXT) s = JSON.stringify({ ...base, b: String(base.b).slice(0, 160), a: undefined, c: undefined });
   return s;
 }
 

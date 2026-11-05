@@ -172,12 +172,16 @@ const FETCH: Partial<Record<Platform, (a: AccountContext, id: string) => Promise
 
 /* ------------------------------------------------------------ one destination */
 
-type Row = Awaited<ReturnType<typeof loadTargets>>[number];
+/** A PostTarget with its account loaded: what the per-destination reader needs. Exported so the 1140
+ * background sync can hand it rows it queried itself instead of going through one post at a time. */
+export type InsightsTarget = Awaited<ReturnType<typeof loadTargets>>[number];
+type Row = InsightsTarget;
 async function loadTargets(userId: string, postId: string) {
   return db.postTarget.findMany({ where: { postId, post: { userId } }, include: { socialAccount: true } });
 }
 
-async function forTarget(t: Row): Promise<TargetInsights> {
+/** Live numbers for ONE destination, or the reason there are none. The only place a platform is called. */
+export async function targetInsights(t: Row): Promise<TargetInsights> {
   const platform = t.platform as Platform;
   const name = isPlatform(platform) ? PLATFORM_META[platform].name : t.platform;
   const base: TargetInsights = {
@@ -228,14 +232,17 @@ async function forTarget(t: Row): Promise<TargetInsights> {
  * Keep the stored history in step with what the platform says, without double counting: TargetMetric rows
  * are increments (analytics sums them), so the new row is "live total minus what is already stored".
  * At most one row per destination per 30 minutes, so refreshes don't write on every click.
+ * Exported since 1140: the background sync writes history the same way, so there is one definition of
+ * "what a stored delta means" whether the numbers came from a popup or from the sweeper.
  */
-async function snapshot(r: TargetInsights) {
+export async function snapshotTarget(r: TargetInsights) {
   if (r.status !== "live") return;
-  const keys = ["views", "likes", "comments", "shares"] as const;
+  // 1140: saves ride along. Only Instagram reports them, so everywhere else the delta stays 0.
+  const keys = ["views", "likes", "comments", "shares", "saves"] as const;
   if (!keys.some((k) => r.metrics[k] !== undefined)) return;
   const last = await db.targetMetric.findFirst({ where: { targetId: r.targetId }, orderBy: { capturedAt: "desc" }, select: { capturedAt: true } });
   if (last && Date.now() - last.capturedAt.getTime() < SNAPSHOT_EVERY_MS) return;
-  const sum = await db.targetMetric.aggregate({ where: { targetId: r.targetId }, _sum: { views: true, likes: true, comments: true, shares: true } });
+  const sum = await db.targetMetric.aggregate({ where: { targetId: r.targetId }, _sum: { views: true, likes: true, comments: true, shares: true, saves: true } });
   const delta = Object.fromEntries(keys.map((k) => [k, Math.round((r.metrics[k] ?? 0) - (sum._sum[k] ?? 0))])) as Record<(typeof keys)[number], number>;
   // Signed: when a platform corrects a count downwards (removed spam views), the stored total follows it.
   // Metrics this answer didn't include stay as they are rather than dropping to zero.
@@ -255,8 +262,8 @@ export async function postInsights(userId: string, postId: string, opts: { fresh
   const load = async (): Promise<PostInsights> => {
     hit = false;
     const targets = await loadTargets(userId, postId);
-    const results = await Promise.all(targets.map(forTarget));
-    await Promise.all(results.map((r) => snapshot(r).catch((e) => console.warn(`[insights] snapshot ${r.targetId}: ${(e as Error).message}`))));
+    const results = await Promise.all(targets.map(targetInsights));
+    await Promise.all(results.map((r) => snapshotTarget(r).catch((e) => console.warn(`[insights] snapshot ${r.targetId}: ${(e as Error).message}`))));
     return { postId, fetchedAt: new Date().toISOString(), targets: results };
   };
   let v = await cached(k, INSIGHTS_TTL_MS, load);

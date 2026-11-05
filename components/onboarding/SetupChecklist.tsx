@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarPlus, Check, Compass, Upload, X } from "lucide-react";
+import { ArrowRight, BellRing, CalendarPlus, Check, Compass, Share, SquarePlus, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/components/shell/UserContext";
 import { useToast } from "@/components/shared/Toast";
 import { startTour, tourKey } from "./Tour";
+import { installMode, provenInstalled, type InstallMode } from "@/lib/pwa-core";
+import { permission } from "@/lib/client/push";
 import { readConsent } from "@/components/shared/CookieConsent";
 import { afterPrivacy, privacyPending } from "@/components/shared/PrivacyNotice";
 import { cn } from "@/lib/utils";
@@ -24,6 +26,25 @@ const COUNT = ["zero", "one", "two", "three", "four", "five", "six", "seven", "e
 
 const hiddenKey = (id: string) => `outly:setup-hidden:${id}`;
 
+/**
+ * 1136: the last two steps of setting up, and the two that decide whether anything Outlly sends is ever
+ * seen. Both are read from the browser, never from the server: an installed app and a granted permission
+ * are facts about this device, and the checklist must not claim either on a device where it is not true.
+ * A browser that cannot install Outlly at all (a desktop without the prompt, an in-app browser) is not
+ * shown the step, because there would be nothing to do about it.
+ */
+function deviceSetup() {
+  const standalone = (q: string) => window.matchMedia?.(q).matches ?? false;
+  const installed = provenInstalled({
+    standalone: standalone("(display-mode: standalone)") || standalone("(display-mode: fullscreen)") || standalone("(display-mode: minimal-ui)") || standalone("(display-mode: window-controls-overlay)"),
+    iosStandalone: (navigator as Navigator & { standalone?: boolean }).standalone === true,
+    appMode: document.documentElement.hasAttribute("data-app"),
+    referrer: document.referrer,
+  });
+  const mode = installMode({ ua: navigator.userAgent, platform: navigator.platform, maxTouchPoints: navigator.maxTouchPoints, hasPrompt: !!(window as Window & { __outllyInstall?: unknown }).__outllyInstall });
+  return { installed, mode, perm: permission() };
+}
+
 const NOTICES: Record<string, { text: string; tone: "ok" | "info" | "error" }> = {
   no_channel: { text: "You're signed in. That Google account has no YouTube channel yet; create one on youtube.com, then connect it here.", tone: "info" },
   channel_later: { text: "You're signed in. YouTube didn't link this time; try Sign in with Google again from the checklist.", tone: "info" },
@@ -36,6 +57,23 @@ export function SetupChecklist({ state }: { state: SetupState }) {
   const [ready, setReady] = useState(false);
   const [toured, setToured] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const [device, setDevice] = useState<{ installed: boolean; mode: InstallMode; perm: string } | null>(null);
+  const [installing, setInstalling] = useState(false);
+
+  // This device's own two facts, kept fresh: the browser may offer the install prompt a moment after load,
+  // and the notification permission can change in another tab or in the browser's own settings.
+  useEffect(() => {
+    const read = () => setDevice(deviceSetup());
+    read();
+    window.addEventListener("outly:installable", read);
+    window.addEventListener("outly:installed", read);
+    window.addEventListener("focus", read);
+    return () => {
+      window.removeEventListener("outly:installable", read);
+      window.removeEventListener("outly:installed", read);
+      window.removeEventListener("focus", read);
+    };
+  }, []);
 
   useEffect(() => {
     const key = tourKey(user.id);
@@ -86,6 +124,8 @@ export function SetupChecklist({ state }: { state: SetupState }) {
     { id: "upload", title: "Upload your first video or photo", done: state.uploaded },
     { id: "schedule", title: "Schedule your first post", done: state.scheduled },
     { id: "tour", title: "Take the guided tour", done: toured },
+    ...(device && (device.mode || device.installed) ? [{ id: "install", title: "Add Outlly to your home screen", done: device.installed }] : []),
+    ...(device && device.perm !== "unsupported" ? [{ id: "notify", title: "Turn on notifications", done: device.perm === "granted" }] : []),
   ];
   const doneCount = steps.filter((s) => s.done).length;
 
@@ -139,6 +179,47 @@ export function SetupChecklist({ state }: { state: SetupState }) {
           <Compass className="h-4 w-4" aria-hidden="true" /> Start the tour
         </Button>
       );
+    if (id === "install") {
+      if (device?.mode === "prompt")
+        return (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={installing}
+            onClick={async () => {
+              const w = window as Window & { __outllyInstall?: { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> } | null };
+              const ev = w.__outllyInstall;
+              if (!ev) return toast("Your browser took the install prompt back. Use its own menu to add Outlly.", "info");
+              setInstalling(true);
+              try {
+                await ev.prompt();
+                const { outcome } = await ev.userChoice;
+                w.__outllyInstall = null; // a prompt can only be used once
+                if (outcome === "accepted") setDevice(deviceSetup());
+              } catch {
+                toast("That did not open. Use your browser's menu to add Outlly.", "info");
+              } finally {
+                setInstalling(false);
+              }
+            }}
+          >
+            <SquarePlus className="h-4 w-4" aria-hidden="true" /> Add to home screen
+          </Button>
+        );
+      return (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Share className="h-4 w-4 shrink-0" aria-hidden="true" /> Tap Share, then &quot;Add to Home Screen&quot;.
+        </p>
+      );
+    }
+    if (id === "notify")
+      return (
+        <Button asChild size="sm" variant={device?.perm === "denied" ? "outline" : "primary"}>
+          <Link href="/settings/notifications#nf-device">
+            <BellRing className="h-4 w-4" aria-hidden="true" /> {device?.perm === "denied" ? "See how to unblock them" : "Turn on notifications"}
+          </Link>
+        </Button>
+      );
     return null;
   };
 
@@ -148,6 +229,8 @@ export function SetupChecklist({ state }: { state: SetupState }) {
     upload: "Drag a video or photo into the composer. It stays in your media library for later posts too.",
     schedule: "Pick a time on the composer, or post now. Outlly sends it for you, even with this tab closed.",
     tour: "One minute: posting, the calendar, live analytics, the inbox and approvals.",
+    install: "Outlly opens like an app, full screen, and on an iPhone this is what lets notifications reach you at all.",
+    notify: device?.perm === "denied" ? "Your browser is blocking notifications. Only you can undo that, and the settings page shows where." : "A comment, a reply, a post going out or failing: you hear about it while it still matters.",
   };
 
   return (

@@ -122,8 +122,45 @@ export function noticeScheduleChange(post: { id: string; userId: string; title: 
   );
 }
 
+/** 1136: the platform's mark as a notification picture, for when we have no photo of the person. */
+export const platformIcon = (p: string) => (isPlatform(p) ? `/brand/platforms/${p}-192.png` : "/brand/app/icon-192.png");
+const clip = (s: string, n: number) => {
+  const t = s.replace(/\s+/g, " ").trim();
+  return t.length > n ? `${t.slice(0, n - 1).trimEnd()}\u2026` : t;
+};
+
+/**
+ * 1136: someone commented on a post of a connected account (Meta webhook). The notification says which
+ * platform, who, what they wrote and on which post, and carries what a quick reply needs. A busy post buzzes
+ * at most once every 2 minutes (the device shows the latest; Inbox has them all). Meta's retries of the same
+ * comment are the same key, so they never notify twice.
+ */
+export const COMMENT_GAP_MS = 2 * 60_000;
+export function noticeNewComment(
+  userId: string,
+  c: { accountId: string; platform: string; commentId: string; replyTo: string; mediaId: string; targetId: string; postTitle: string | null; from: string; text: string },
+  now = new Date(),
+) {
+  return quiet(
+    (async () => {
+      const base = `cm:${c.accountId}:${c.mediaId}:`;
+      const last = await db.notice.findFirst({ where: { userId, kind: "new_comment", key: { startsWith: base } }, orderBy: { createdAt: "desc" }, select: { createdAt: true, key: true } });
+      if (last?.key === base + c.commentId) return;
+      if (last && now.getTime() - last.createdAt.getTime() < COMMENT_GAP_MS) return;
+      const p = name(c.platform);
+      const on = c.postTitle ? `on \u201c${clip(c.postTitle, 48)}\u201d` : "on your post";
+      const href = `/inbox?comment=${encodeURIComponent(c.replyTo)}&target=${encodeURIComponent(c.targetId)}`;
+      await notify(
+        userId,
+        { kind: "new_comment", tone: "info", title: clip(`New ${p} comment from ${c.from}`, 80), body: `${c.text ? `\u201c${clip(c.text, 120)}\u201d ` : ""}${on}`.slice(0, 200), href, action: "Reply", key: base + c.commentId },
+        { push: { icon: platformIcon(c.platform), platform: p, reply: { kind: "comment", targetId: c.targetId, commentId: c.replyTo }, who: c.from, tag: `cm:${c.accountId}:${c.mediaId}` } },
+      );
+    })(),
+  );
+}
+
 /** A new DM came in. At most one alert per conversation per hour, so a chat doesn't buzz on every line. */
-export function noticeNewMessage(userId: string, threadId: string, platform: string, from: string, text: string, now = new Date()) {
+export function noticeNewMessage(userId: string, threadId: string, platform: string, from: string, text: string, now = new Date(), avatar: string | null = null) {
   return quiet(
     (async () => {
       // At most one an hour per thread, counted from the LAST notice for it, not from the clock hour
@@ -134,7 +171,13 @@ export function noticeNewMessage(userId: string, threadId: string, platform: str
         select: { createdAt: true },
       });
       if (last && now.getTime() - last.createdAt.getTime() < 60 * 60_000) return;
-      await notify(userId, { kind: "new_message", tone: "info", title: `New message from ${from}`.slice(0, 80), body: (text || `Sent you a message on ${name(platform)}.`).slice(0, 140), href: "/inbox?tab=messages", action: "Reply", key: `dm:${threadId}:${now.getTime()}` });
+      // 1136: the platform in the title, the person's photo when Meta shared one, and a quick reply into this thread.
+      const p = name(platform);
+      await notify(
+        userId,
+        { kind: "new_message", tone: "info", title: clip(`New ${p} message from ${from}`, 80), body: clip(text || `Sent you a message on ${p}.`, 140), href: `/inbox?tab=messages&thread=${encodeURIComponent(threadId)}`, action: "Reply", key: `dm:${threadId}:${now.getTime()}` },
+        { push: { icon: avatar && /^https:\/\//.test(avatar) ? avatar : platformIcon(platform), platform: p, reply: { kind: "dm", threadId }, who: from, tag: `dm:${threadId}` } },
+      );
     })(),
   );
 }

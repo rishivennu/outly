@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { json, route } from "@/lib/http";
-import { CATEGORIES, EVENTS, LEADS, applyPatch, validTime, type NotifyPatch } from "@/lib/notify-core";
+import { CATEGORIES, EVENTS, GREET_SLOTS, LEADS, applyPatch, validTime, type NotifyPatch } from "@/lib/notify-core";
 import { loadNotifyPrefs, saveNotifyPrefs } from "@/lib/notify";
 import { vapidKeys } from "@/lib/push/vapid";
 import { devicesOf } from "@/lib/push/web-devices";
@@ -24,6 +24,8 @@ const Patch = z.object({
   lead: z.number().refine((n) => (LEADS as readonly number[]).includes(n), "Pick one of the options").optional(),
   ch: z.object({ push: bool, inApp: bool, email: bool }).optional(),
   quiet: z.object({ on: bool, urgent: bool, start: z.string().refine(validTime, "Use HH:MM").optional(), end: z.string().refine(validTime, "Use HH:MM").optional() }).optional(),
+  // 1141: the assistant's own nudges (greetings per slot, inactivity, growth tips, summaries).
+  assist: z.object({ greet: z.record(z.enum(GREET_SLOTS as unknown as [string, ...string[]]), z.boolean()).optional(), inactivity: bool, growth: bool, summary: bool }).optional(),
 });
 
 export const PATCH = route(

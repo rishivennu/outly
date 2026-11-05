@@ -1,15 +1,17 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { HoverLink as Link } from "@/components/shell/HoverLink";
-import { ArrowDownRight, ArrowRight, ArrowUpRight, CircleAlert, Link2 } from "lucide-react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, CircleAlert, Link2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SectionHead } from "./SectionHead";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
-import { swrApi } from "@/lib/client/api";
+import { api } from "@/lib/client/api";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn } from "@/lib/utils";
+import { freshness } from "@/lib/analytics/core";
 import type { Headline, PlatformDashboard, Series } from "@/lib/live/types";
+import type { AccountCard, AccountsAnswer, PlatformSlot } from "@/lib/analytics/cards";
 import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
 import type { NumberFormat, NumberTier } from "@/lib/motion/numbers";
 
@@ -45,44 +47,81 @@ function smallSpans(m: number): string[] {
   return out.map((c, j) => cn(c, m % 2 === 1 && j === m - 1 && "sm:col-span-2"));
 }
 
-/** Bento of live numbers from the creator's own accounts. The first connected platform gets the big tile
- * (profile, headline with its change, more stats and a trend line); the rest are compact tiles. Each opens
- * that platform's dashboard. */
+/** One tile: either a real account of this creator's, or a platform with nothing connected on it yet. */
+type Tile = { key: string; platform: Platform; card?: AccountCard; slot?: PlatformSlot };
+
+/**
+ * Bento of live numbers from the creator's own accounts. 1140: one tile per ACCOUNT, so a second Instagram
+ * profile is no longer hidden behind the first, and each tile says when Outlly last synced it, offers a
+ * refresh, and offers Connect or Reconnect when the platform has stopped answering. The first account gets
+ * the big tile (profile, headline with its change, more stats and a trend line); the rest are compact.
+ * Nothing is merged: two accounts on one platform stay two tiles with two sets of numbers.
+ */
 export function LiveStrip({ connected }: { connected: Partial<Record<Platform, boolean>> }) {
-  const [data, setData] = useState<Partial<Record<Platform, Slot>>>({});
+  const [cards, setCards] = useState<AccountCard[] | null>(null);
+  const [slots, setSlots] = useState<PlatformSlot[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
   const live = useLivePlatforms();
+
+  const loadAll = useCallback(async () => {
+    try {
+      const r = await api<AccountsAnswer>("/api/analytics/accounts");
+      setCards(r.accounts);
+      setSlots(r.slots);
+    } catch {
+      setCards([]);
+    }
+  }, []);
   useEffect(() => {
-    for (const p of live)
-      if (connected[p])
-        // Warmed from the nav (1039): shown at once when it was, then refreshed if it is getting old.
-        swrApi<PlatformDashboard>(`/api/platforms/${p}`, (d) => setData((x) => ({ ...x, [p]: d }))).catch(() => setData((x) => ({ ...x, [p]: "error" })));
-  }, [connected, live]);
+    void loadAll();
+  }, [loadAll]);
 
-  /* Chosen from what is connected, never from what has loaded, so the big tile never jumps. */
-  const order = useMemo(() => {
-    const lead = live.find((p) => connected[p]) ?? live[0];
-    return lead ? [lead, ...live.filter((p) => p !== lead)] : [];
-  }, [live, connected]);
-  if (!order.length) return null;
-  /* Nothing connected yet: no featured tile to fill, so an even row of compact tiles instead. */
-  const lead = !!connected[order[0]];
-  const spans = lead ? smallSpans(order.length - 1) : [];
-  const solo = order.length === 1;
+  /** Refresh one account from its platform, not the whole page. */
+  const refresh = useCallback(async (id: string) => {
+    setBusy(id);
+    try {
+      const r = await api<{ accounts: AccountCard[] }>(`/api/analytics/accounts?account=${encodeURIComponent(id)}&fresh=1`);
+      const one = r.accounts[0];
+      if (one) setCards((xs) => (xs ?? []).map((c) => (c.accountId === one.accountId ? one : c)));
+    } catch {
+      /* the tile keeps the numbers it had; the error is on the platform's side */
+    } finally {
+      setBusy(null);
+    }
+  }, []);
 
-  const desc = lead ? "Followers and views straight from each platform. Open one for its full dashboard." : undefined;
+  /* Order from what is connected, never from what has loaded, so the big tile never jumps. */
+  const tiles = useMemo<Tile[]>(() => {
+    const order = (p: Platform) => live.indexOf(p);
+    const accounts = (cards ?? []).filter((c) => !c.practice).sort((a, b) => order(a.platform) - order(b.platform) || a.username.localeCompare(b.username));
+    const open = slots.filter((s) => live.includes(s.platform)).sort((a, b) => order(a.platform) - order(b.platform));
+    const fromCards: Tile[] = accounts.map((c) => ({ key: c.accountId, platform: c.platform, card: c }));
+    const fromSlots: Tile[] = open.map((s) => ({ key: `slot:${s.platform}`, platform: s.platform, slot: s }));
+    if (fromCards.length || fromSlots.length) return [...fromCards, ...fromSlots];
+    // Still loading: the platform list keeps the layout steady instead of collapsing and reflowing.
+    return live.map((p) => ({ key: `slot:${p}`, platform: p }));
+  }, [cards, slots, live]);
+
+  if (!tiles.length) return null;
+  const lead = !!tiles[0].card;
+  const spans = lead ? smallSpans(tiles.length - 1) : [];
+  const solo = tiles.length === 1;
+  const anyConnected = Object.values(connected).some(Boolean);
+
+  const desc = lead ? "Followers and views straight from each platform, one card per account. Open one for its full dashboard." : undefined;
   return (
     <section aria-labelledby="live-strip" className="ai-type mt-16">
       <SectionHead id="live-strip" kicker="Live from your accounts" live={lead} title={lead ? "Your accounts right now" : "Connect your accounts"} desc={desc} />
-      {lead ? (
+      {lead || anyConnected ? (
         <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {order.map((p, i) => (
-            <li key={p} className={cn("min-w-0", i === 0 ? cn("sm:col-span-2", solo ? "lg:col-span-4" : "lg:row-span-2") : spans[i - 1])}>
-              {i === 0 ? <Feature p={p} on d={data[p]} /> : <Small p={p} on={!!connected[p]} d={data[p]} />}
+          {tiles.map((t, i) => (
+            <li key={t.key} className={cn("min-w-0", i === 0 ? cn("sm:col-span-2", solo ? "lg:col-span-4" : "lg:row-span-2") : spans[i - 1])}>
+              {i === 0 ? <Feature t={t} loading={cards === null} busy={busy === t.card?.accountId} onRefresh={refresh} /> : <Small t={t} loading={cards === null} busy={busy === t.card?.accountId} onRefresh={refresh} />}
             </li>
           ))}
         </ul>
       ) : (
-        <ConnectNudge platforms={order} />
+        <ConnectNudge platforms={tiles.map((t) => t.platform)} />
       )}
     </section>
   );
@@ -116,14 +155,18 @@ function ConnectNudge({ platforms }: { platforms: Platform[] }) {
 
 const card = "glass group relative flex h-full flex-col overflow-hidden rounded-[24px] p-5 transition-transform duration-300 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0";
 
-function Top({ p, d, big }: { p: Platform; d: Slot; big?: boolean }) {
-  const prof = d && d !== "error" && d.status === "ok" ? d.profile : undefined;
+/** Where a tile opens: that account's own dashboard when we know which account it is. */
+const href = (t: Tile) => `/analytics/${t.platform}${t.card ? `?account=${encodeURIComponent(t.card.accountId)}` : ""}`;
+const dashOf = (t: Tile): Slot => (t.card ? (t.card.dash ?? "error") : undefined);
+
+function Top({ t, big }: { t: Tile; big?: boolean }) {
+  const handle = t.card ? (t.card.username.startsWith("@") ? t.card.username : `@${t.card.username}`) : null;
   return (
     <span className="relative flex min-w-0 items-center gap-2.5 text-[15px] font-medium">
-      <PlatformOrb platform={p} size={big ? 34 : 26} />
+      <PlatformOrb platform={t.platform} size={big ? 34 : 26} />
       <span className="min-w-0 leading-tight">
-        <span className="block truncate">{PLATFORM_META[p].name}</span>
-        {big && prof?.handle ? <span className="block truncate text-sm font-normal text-muted-foreground">{prof.handle.startsWith("@") ? prof.handle : `@${prof.handle}`}</span> : null}
+        <span className="block truncate">{PLATFORM_META[t.platform].name}</span>
+        {handle ? <span className="block truncate text-sm font-normal text-muted-foreground">{handle}</span> : null}
       </span>
       <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
     </span>
@@ -141,20 +184,23 @@ function Halo({ p, big }: { p: Platform; big?: boolean }) {
 }
 
 /** Not connected / loading / error / not ok: the same message in both tile sizes. */
-function State({ on, d, big }: { on: boolean; d: Slot; big?: boolean }) {
-  if (!on) return <span className="relative mt-auto text-sm text-muted-foreground">Not connected yet. Open to connect it.</span>;
-  if (!d)
-    return (
-      <span className="relative mt-auto flex flex-col gap-4" aria-label="Loading">
-        <span className={cn("animate-pulse rounded-lg bg-secondary", big ? "h-14 w-40" : "h-10 w-20")} />
-        {big ? <span className="h-16 w-full animate-pulse rounded-lg bg-secondary" /> : null}
-      </span>
-    );
+function State({ t, loading, big }: { t: Tile; loading: boolean; big?: boolean }) {
+  const d = dashOf(t);
+  if (!t.card) {
+    if (loading)
+      return (
+        <span className="relative mt-auto flex flex-col gap-4" aria-label="Loading">
+          <span className={cn("animate-pulse rounded-lg bg-secondary", big ? "h-14 w-40" : "h-10 w-20")} />
+          {big ? <span className="h-16 w-full animate-pulse rounded-lg bg-secondary" /> : null}
+        </span>
+      );
+    return <span className="relative mt-auto text-sm text-muted-foreground">{t.slot?.message ?? "Not connected yet. Open to connect it."}</span>;
+  }
   /* A calm notice, not alarm-yellow text: the icon and words carry it, and the tile itself is the retry. */
   return (
     <span className="relative mt-auto flex items-start gap-2 text-sm text-muted-foreground">
       <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-      <span>{d === "error" ? "Couldn't load right now. Open it to try again." : d.message}</span>
+      <span>{d === "error" || !d ? "Couldn't load right now. Open it to try again." : d.message}</span>
     </span>
   );
 }
@@ -187,58 +233,111 @@ function Spark({ s }: { s?: Series }) {
   );
 }
 
-function Feature({ p, on, d }: { p: Platform; on: boolean; d: Slot }) {
-  const ok = on && d && d !== "error" && d.status === "ok" ? d : null;
-  const [lead, ...rest] = ok ? ok.headline : [];
-  const trend = ok ? ok.series.find((s) => s.key === lead?.key) ?? ok.series[0] : undefined;
+/**
+ * 1140: the row under a tile's numbers. It says when Outlly last synced this account (never a guess: "Not
+ * synced yet" until the background job has written something), lets you refresh this one account, and turns
+ * into Connect or Reconnect when the platform has stopped answering. Buttons sit outside the tile's link.
+ */
+function Foot({ t, busy, onRefresh }: { t: Tile; busy: boolean; onRefresh: (id: string) => void }) {
+  const d = dashOf(t);
+  const needsReconnect = t.card?.status === "needs_reconnect" || (d && d !== "error" && d.status === "needs_reconnect");
+  const notConnected = !t.card;
+  const name = PLATFORM_META[t.platform].name;
+  if (notConnected) {
+    const oauth = t.slot?.connect?.oauth;
+    if (!oauth) return null;
+    return (
+      <div className="relative z-10 mt-4 border-t border-border/60 pt-3">
+        <Button asChild size="sm" variant="lime" className="h-9">
+          <a href={`/api/accounts/${t.platform}/connect?returnTo=/analytics`}>Connect {name}</a>
+        </Button>
+      </div>
+    );
+  }
+  const f = freshness(t.card!.lastSyncAt);
   return (
-    <Link href={`/analytics/${p}`} className={cn(card, "min-h-[280px] p-6")}>
-      <Halo p={p} big />
-      <Top p={p} d={d} big />
-      {!ok || !lead ? (
-        <State on={on} d={d} big />
-      ) : (
-        <span className="relative mt-auto block pt-6">
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-[clamp(2.4rem,4.4vw,3.4rem)] font-semibold leading-none tracking-tight"><Num p={p} h={lead} tier="main" /></span>
-            <Delta v={lead.delta} days={ok.rangeDays} />
-          </span>
-          <span className="mt-1.5 block text-sm text-muted-foreground">{lead.label}{lead.key === "views" ? `, last ${ok.rangeDays} days` : ""}</span>
-          <Spark s={trend} />
-          {rest.length ? (
-            <span className="mt-5 grid grid-cols-3 gap-3 border-t border-border/60 pt-4">
-              {rest.slice(0, 3).map((h) => (
-                <span key={h.key} className="min-w-0">
-                  <span className="block truncate text-lg font-semibold tracking-tight"><Num p={p} h={h} /></span>
-                  <span className="block truncate text-sm text-muted-foreground">{h.label}</span>
-                </span>
-              ))}
-            </span>
-          ) : null}
-        </span>
+    <div className="relative z-10 mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border/60 pt-3">
+      <span className="text-xs text-muted-foreground">{f.label}</span>
+      <button
+        type="button"
+        onClick={() => onRefresh(t.card!.accountId)}
+        disabled={busy}
+        aria-label={`Refresh ${t.card!.username} on ${name}`}
+        className="ml-auto inline-flex h-9 min-w-[44px] items-center gap-1.5 rounded-full px-3 text-xs font-medium hairline hover:bg-secondary/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        <RefreshCw className={cn("h-3.5 w-3.5", busy && "animate-spin motion-reduce:animate-none")} aria-hidden="true" /> Refresh
+      </button>
+      {needsReconnect && (
+        <Button asChild size="sm" variant="lime" className="h-9">
+          <a href={`/api/accounts/${t.platform}/connect?returnTo=/analytics`}>Reconnect</a>
+        </Button>
       )}
-    </Link>
+    </div>
   );
 }
 
-function Small({ p, on, d }: { p: Platform; on: boolean; d: Slot }) {
-  const ok = on && d && d !== "error" && d.status === "ok" ? d : null;
+function Feature({ t, loading, busy, onRefresh }: { t: Tile; loading: boolean; busy: boolean; onRefresh: (id: string) => void }) {
+  const d = dashOf(t);
+  const ok = d && d !== "error" && d.status === "ok" ? d : null;
+  const [lead, ...rest] = ok ? ok.headline : [];
+  const trend = ok ? ok.series.find((s) => s.key === lead?.key) ?? ok.series[0] : undefined;
+  const p = t.platform;
   return (
-    <Link href={`/analytics/${p}`} className={cn(card, "min-h-[132px]")}>
-      <Halo p={p} />
-      <Top p={p} d={d} />
-      {!ok ? (
-        <State on={on} d={d} />
-      ) : (
-        <span className="relative mt-auto flex flex-wrap gap-x-6 gap-y-2 pt-4">
-          {ok.headline.slice(0, 2).map((h) => (
-            <span key={h.key}>
-              <span className="block text-2xl font-semibold tracking-tight"><Num p={p} h={h} /></span>
-              <span className="block text-sm text-muted-foreground">{h.label}{h.key === "views" ? `, ${ok.rangeDays} days` : ""}</span>
+    <div className={cn(card, "min-h-[280px] p-6")}>
+      <Halo p={p} big />
+      <Link href={href(t)} className="relative flex flex-1 flex-col rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        <Top t={t} big />
+        {!ok || !lead ? (
+          <State t={t} loading={loading} big />
+        ) : (
+          <span className="relative mt-auto block pt-6">
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-[clamp(2.4rem,4.4vw,3.4rem)] font-semibold leading-none tracking-tight"><Num p={p} h={lead} tier="main" /></span>
+              <Delta v={lead.delta} days={ok.rangeDays} />
             </span>
-          ))}
-        </span>
-      )}
-    </Link>
+            <span className="mt-1.5 block text-sm text-muted-foreground">{lead.label}{lead.key === "views" ? `, last ${ok.rangeDays} days` : ""}</span>
+            <Spark s={trend} />
+            {rest.length ? (
+              <span className="mt-5 grid grid-cols-3 gap-3 border-t border-border/60 pt-4">
+                {rest.slice(0, 3).map((h) => (
+                  <span key={h.key} className="min-w-0">
+                    <span className="block truncate text-lg font-semibold tracking-tight"><Num p={p} h={h} /></span>
+                    <span className="block truncate text-sm text-muted-foreground">{h.label}</span>
+                  </span>
+                ))}
+              </span>
+            ) : null}
+          </span>
+        )}
+      </Link>
+      <Foot t={t} busy={busy} onRefresh={onRefresh} />
+    </div>
+  );
+}
+
+function Small({ t, loading, busy, onRefresh }: { t: Tile; loading: boolean; busy: boolean; onRefresh: (id: string) => void }) {
+  const d = dashOf(t);
+  const ok = d && d !== "error" && d.status === "ok" ? d : null;
+  const p = t.platform;
+  return (
+    <div className={cn(card, "min-h-[132px]")}>
+      <Halo p={p} />
+      <Link href={href(t)} className="relative flex flex-1 flex-col rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        <Top t={t} />
+        {!ok ? (
+          <State t={t} loading={loading} />
+        ) : (
+          <span className="relative mt-auto flex flex-wrap gap-x-6 gap-y-2 pt-4">
+            {ok.headline.slice(0, 2).map((h) => (
+              <span key={h.key}>
+                <span className="block text-2xl font-semibold tracking-tight"><Num p={p} h={h} /></span>
+                <span className="block text-sm text-muted-foreground">{h.label}{h.key === "views" ? `, ${ok.rangeDays} days` : ""}</span>
+              </span>
+            ))}
+          </span>
+        )}
+      </Link>
+      <Foot t={t} busy={busy} onRefresh={onRefresh} />
+    </div>
   );
 }

@@ -13,8 +13,9 @@ type Acct = AnalyticsSummary["byAccount"][number];
  * Download the numbers on screen as a client-ready PDF or CSV (same range and account). One quiet "Download"
  * button that opens the two formats, so the header doesn't offer two equal buttons before you've read anything.
  */
-export function ReportButtons({ days, account, csv = true, pdf = true }: { days: number; account: string | null; csv?: boolean; pdf?: boolean }) {
-  const q = `days=${days}${account ? `&account=${encodeURIComponent(account)}` : ""}`;
+export function ReportButtons({ days, account, from = null, to = null, csv = true, pdf = true }: { days: number; account: string | null; from?: string | null; to?: string | null; csv?: boolean; pdf?: boolean }) {
+  // 1140: a custom range travels into the export, so the file covers exactly the window on screen.
+  const q = `days=${days}${from && to ? `&from=${from}&to=${to}` : ""}${account ? `&account=${encodeURIComponent(account)}` : ""}`;
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {

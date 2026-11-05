@@ -4043,6 +4043,47 @@ html.theme-anim *::after {
 @keyframes pc-fade { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .pc-offer, .pc-fade, .pc-resolved { animation: none; } }
 
+/* ===== LIVE round 1139 =====
+   The publishing tracker's honest step progress. Four named steps per destination: finished ones are lit,
+   the one it is on breathes, the rest wait. Nothing here encodes a percentage, because no platform reports one.
+   Colour never carries the meaning on its own: every step has its name under it, and the card's text says the
+   state in words. Also the small thumbnail and the account's photo on a tracker card. */
+.la-steps { display: flex; gap: .375rem; list-style: none; margin: 0; padding: 0; }
+.la-step { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: .3rem; }
+.la-step-bar { display: block; height: .3125rem; border-radius: 999px; background: rgb(255 255 255 / .16); }
+.la-step-name { font-size: .5625rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgb(255 255 255 / .45); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.la-step-done .la-step-bar { background: hsl(var(--lime)); }
+.la-step-done .la-step-name { color: rgb(255 255 255 / .8); }
+.la-step-now .la-step-bar { background: hsl(var(--lime) / .55); }
+.la-step-now .la-step-name { color: #fff; }
+.la-step-bad .la-step-bar { background: #ff5a4d; }
+.la-step-bad .la-step-name { color: #ff8a80; }
+.la-step-beat { animation: la-step-beat 1.6s ease-in-out infinite; }
+@keyframes la-step-beat { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.la-thumb { width: 2.75rem; height: 2.75rem; border-radius: .75rem; object-fit: cover; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .14); background: rgb(255 255 255 / .06); }
+.la-face { width: 1.125rem; height: 1.125rem; border-radius: 999px; object-fit: cover; box-shadow: 0 0 0 1px rgb(255 255 255 / .22); flex: none; }
+html:not(.dark) .la-themed:not(.dark *) .la-step-bar { background: rgb(15 25 45 / .14); }
+html:not(.dark) .la-themed:not(.dark *) .la-step-name { color: rgb(15 25 45 / .55); }
+html:not(.dark) .la-themed:not(.dark *) .la-step-done .la-step-name,
+html:not(.dark) .la-themed:not(.dark *) .la-step-now .la-step-name { color: rgb(15 25 45 / .9); }
+html:not(.dark) .la-themed:not(.dark *) .la-thumb { box-shadow: inset 0 0 0 1px rgb(15 25 45 / .14); background: rgb(15 25 45 / .06); }
+@media (prefers-reduced-motion: reduce) { .la-step-beat { animation: none; opacity: 1; } }
+
+/* ---------- NOTIFY round 1141: notification centre groups ----------
+   The tabs over the notification history. Each is a real button at 44px with a count beside it, so the
+   group is never told by colour alone, and the selected one is marked with aria-selected as well as ink. */
+.nf-tabs { display: flex; flex-wrap: wrap; gap: .5rem; }
+.nf-tab { display: inline-flex; min-height: 44px; align-items: center; gap: .5rem; border-radius: 999px; padding: 0 .9rem;
+  font-size: 13.5px; font-weight: 600; color: hsl(var(--muted-foreground)); background: hsl(var(--nf-soft));
+  box-shadow: inset 0 0 0 1px hsl(var(--border)); transition: color .18s ease, background .18s ease, box-shadow .18s ease; }
+.nf-tab:hover { color: hsl(var(--foreground)); }
+.nf-tab:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.nf-tab.is-on { color: hsl(var(--foreground)); background: hsl(var(--background)); box-shadow: inset 0 0 0 1.5px hsl(var(--foreground) / .5); }
+.nf-tab-n { display: inline-flex; min-width: 1.35rem; height: 1.35rem; align-items: center; justify-content: center;
+  border-radius: 999px; padding: 0 .35rem; font-size: 11.5px; font-weight: 700; background: hsl(var(--foreground) / .1); }
+.nf-tab.is-on .nf-tab-n { background: hsl(var(--foreground) / .16); }
+@media (prefers-reduced-motion: reduce) { .nf-tab { transition: none; } }
+
 /* ---------- 1100: Liquid glass on every studio card ----------
    The studio's screen cards wear the same liquid glass as the rail: a cool-to-deep tint, a lit rim on the top-left
    edge with a softer far edge, and a sheen across the top. Cards: .glass panels, the Analytics dashboard's

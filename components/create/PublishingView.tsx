@@ -19,7 +19,28 @@ import { api, ApiError } from "@/lib/client/api";
 import { PLATFORM_META, STOPPABLE, TARGET_COPY, type Platform, type TargetStatus } from "@/lib/domain";
 import { targetErrorCopy } from "@/components/shared/errorCopy";
 import { cn } from "@/lib/utils";
-import { askNotify, muteNotify, notifyOnce, notifyState, pingSending, readTimes, recordSendTime, sendSummary, typicalLabel, type NotifyState } from "@/lib/client/sending";
+import {
+  askNotify,
+  fetchSending,
+  LIVE_STEPS,
+  liveLabel,
+  liveStep,
+  muteNotify,
+  notifyOnce,
+  notifyState,
+  onSendingWake,
+  pingSending,
+  readTimes,
+  realPercent,
+  recordSendTime,
+  sendSummary,
+  stepText,
+  typicalLabel,
+  updatedLabel,
+  type LivePost,
+  type LiveTarget,
+  type NotifyState,
+} from "@/lib/client/sending";
 import { DancingPip, MusicToggle, useGroove } from "./Groove";
 import type { PostView, TargetView } from "./types";
 import { T, ease } from "@/lib/motion/tokens";
@@ -32,10 +53,14 @@ import { liveSummary, platformFormatLabel, postWords } from "@/lib/client/post-w
  * it stopped, See it once it's live. Text always carries the state; colour backs it up.
  * Pip dances to the groove up top while anything is still moving. This is the only screen that plays music.
  * 1135: photo, carousel and story posts say so (Your carousel, Carousel, Sending your carousel) and show their photos.
+ * 1139: the track is honest. The fill is the steps a destination has really finished (Queued, Uploading,
+ * Publishing, Published) and the readout names the step; a percentage only ever appears if the server really
+ * measured one (realPercent). Each card also names the account it posts to, shows the thumbnail and the
+ * caption going out, and says when the platform last told us something. /api/posts/sending supplies those
+ * facts, and the screen wakes on a push landing on this device, on focus and when the tab comes back, so a
+ * send watched on two devices says the same thing on both.
  */
 const ACTIVE: TargetStatus[] = ["pending", "queued", "uploading", "processing"];
-const STEPS = ["Queued", "Sending", "Processing", "Live"] as const;
-const STEP_OF: Record<string, number> = { pending: 0, queued: 0, uploading: 1, processing: 2, published: 3, failed: 3 };
 const ROW_COPY: Record<string, string> = {
   pending: "Waiting its turn.",
   queued: "Lined up, starting in a moment.",
@@ -43,11 +68,10 @@ const ROW_COPY: Record<string, string> = {
   processing: "Getting it ready to go public.",
   published: "It's live. Go say hi in the comments.",
 };
-const TITLE: Record<string, string> = { pending: "Waiting", queued: "Queued", uploading: "Sending", processing: "Going public", published: "Live" };
 const CODE: Record<Platform, string> = { instagram: "IG", youtube: "YT", x: "X", tiktok: "TT", threads: "TH", facebook: "FB", linkedin: "IN" };
-/** Each status owns a slice of the track; inside it the fill eases forward so slow platforms still look alive. */
-const BAND: Record<string, [number, number, number]> = { pending: [3, 8, 30], queued: [8, 18, 20], uploading: [18, 62, 22], processing: [62, 94, 30] };
 const POLL_MS = 1500;
+/** The tracker's extra facts change slowly (an account, a thumbnail), so they are read less often than the post. */
+const TRACKER_MS = 5000;
 
 export function PublishingView({ initial, onAnother }: { initial: PostView; onAnother: () => void }) {
   const [post, setPost] = useState(initial);
@@ -120,30 +144,48 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
     if (!stoppable.length) setConfirmAll(false);
   }, [stoppable.length]);
 
+  // A second at a time while it moves (the clock), a slower beat afterwards so "Updated 2 min ago" stays true.
   useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const id = setInterval(() => setNow(Date.now()), active ? 1000 : 30_000);
     return () => clearInterval(id);
   }, [active]);
   const elapsed = Math.max(0, Math.floor((now - t0) / 1000));
   const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
 
-  // When did each target enter its current status? Drives the eased fill inside its band.
-  const since = useRef<Record<string, { s: string; at: number; pct: number }>>({});
-  const pctOf = (t: TargetView) => {
-    const prev = since.current[t.id];
-    if (!prev || prev.s !== t.status) since.current[t.id] = { s: t.status, at: now, pct: prev?.pct ?? 0 };
-    const rec = since.current[t.id];
-    let p: number;
-    if (t.status === "published") p = 100;
-    else if (t.status === "failed") p = Math.max(rec.pct, 12);
-    else {
-      const [lo, hi, tau] = BAND[t.status] ?? BAND.pending;
-      p = lo + (hi - lo) * (1 - Math.exp(-Math.max(0, now - rec.at) / 1000 / tau));
+  /**
+   * The tracker's facts for this post, from /api/posts/sending: which account each destination goes to, the
+   * caption going out, the thumbnail, and when the platform last told us something. Read on load, whenever a
+   * status really changes, and on a wake (a push on this device, focus, the tab coming back). Never guessed:
+   * if the request fails the card simply shows what the post itself carries.
+   */
+  const [live, setLive] = useState<LivePost | null>(null);
+  const loadLive = useCallback(async () => {
+    if (document.hidden) return;
+    try {
+      const posts = await fetchSending(post.id);
+      setLive(posts[0] ?? null);
+    } catch {
+      /* keep whatever we already have */
     }
-    if (t.status !== "failed") rec.pct = p;
-    return Math.round(p);
-  };
+  }, [post.id]);
+  const statusKey = post.targets.map((t) => `${t.status}:${t.errorCode ?? ""}`).join("|");
+  useEffect(() => {
+    void loadLive();
+  }, [loadLive, statusKey]);
+  useEffect(
+    () =>
+      onSendingWake(() => {
+        void refresh();
+        void loadLive();
+      }),
+    [refresh, loadLive],
+  );
+  useEffect(() => {
+    if (!polling) return;
+    const id = setInterval(loadLive, TRACKER_MS);
+    return () => clearInterval(id);
+  }, [polling, loadLive]);
+  const trackerOf = (t: TargetView): LiveTarget | null => live?.targets.find((x) => x.id === t.id) ?? null;
 
   // Real send times (10-16g): only targets we watched from the start (pending/queued) count, timed
   // from when this screen first saw them to when they went live. Feeds "usually about N min".
@@ -293,7 +335,7 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
 
       <ul aria-label={postWords(post.format).where} className="mx-auto mt-10 flex max-w-[56rem] flex-wrap justify-center gap-5">
         {post.targets.map((t, i) => (
-          <LiveActivity key={t.id} t={t} i={i} pct={pctOf(t)} usually={typicalLabel(times[t.platform])} post={post} busy={busy === t.id || busy === "all"} onRetry={() => retry(t)} onStop={() => stop(t)} canRetry={canRetry} reduce={!!reduce} />
+          <LiveActivity key={t.id} t={t} i={i} lt={trackerOf(t)} now={now} usually={typicalLabel(times[t.platform])} post={post} busy={busy === t.id || busy === "all"} onRetry={() => retry(t)} onStop={() => stop(t)} canRetry={canRetry} reduce={!!reduce} />
         ))}
       </ul>
 
@@ -341,12 +383,22 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
   );
 }
 
-function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, canRetry, reduce }: { t: TargetView; i: number; pct: number; usually: string | null; post: PostView; busy: boolean; onRetry: () => void; onStop: () => void; canRetry: boolean; reduce: boolean }) {
+/** The first line of whatever copy is going out, for the card's one-line reminder of what this is. */
+const firstLine = (s?: string | null) => (s ?? "").split("\n").find((x) => x.trim())?.trim() ?? null;
+
+function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, canRetry, reduce }: { t: TargetView; i: number; lt: LiveTarget | null; now: number; usually: string | null; post: PostView; busy: boolean; onRetry: () => void; onStop: () => void; canRetry: boolean; reduce: boolean }) {
   const meta = PLATFORM_META[t.platform];
   const canceled = t.status === "failed" && t.errorCode === "CANCELED";
   const h = t.status === "failed" && !canceled ? targetErrorCopy(t.platform, t.errorCode) : null;
-  const step = STEP_OF[t.status] ?? 0;
+  // 1139: the step this destination has really reached, and a percentage only if the server measured one.
+  const step = liveStep(t, post.status);
+  const pct = realPercent(lt?.progress);
+  const acct = lt?.account ?? null;
+  const caption = lt?.caption ?? firstLine(t.title || t.caption);
+  const seen = updatedLabel(lt?.updatedAt, now);
   const isActive = ACTIVE.includes(t.status as TargetStatus);
+  /** The bar is the steps really finished, or the measured upload figure on the step that has one. */
+  const fill = pct !== null && step.state === "uploading" ? Math.round(((step.index + pct / 100) / step.total) * 100) : Math.round(step.fraction * 100);
   const canStop = STOPPABLE.includes(t.status as TargetStatus);
   const live = t.status === "published";
   const bad = t.status === "failed";
@@ -357,7 +409,9 @@ function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, canRetr
   const slideish = words.format !== "video";
   const name = post.title || (slideish && words.count) || post.media.filename || "Untitled";
   const kindLabel = platformFormatLabel(meta.format, post.format);
-  const title = live ? "Live" : canceled ? "Stopped" : bad ? "Needs a hand" : (TITLE[t.status] ?? t.status);
+  // A video post shows its frame here; slide posts already fan their own photos above.
+  const thumb = slideish ? null : post.media.thumbnailUrl;
+  const title = canceled ? "Stopped" : liveLabel(t, post.status);
   const statusLine = canceled
     ? `You stopped this one before it reached ${meta.name}.`
     : h
@@ -375,9 +429,9 @@ function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, canRetr
         ? h?.kind === "reconnect"
           ? "Reconnect to finish"
           : "Tap retry to finish"
-        : canStop
-          ? `Step ${step + 1} of 4${t.attempts > 1 ? `, try ${t.attempts}` : usually ? `, usually ${usually}` : ""}`
-          : "Going public, can't stop now";
+        : step.state === "publishing"
+          ? `${stepText(step)}, can't stop now`
+          : `${stepText(step)}${t.attempts > 1 ? `, try ${t.attempts}` : usually ? `, usually ${usually}` : ""}`;
 
   return (
     <motion.li
@@ -411,10 +465,33 @@ function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, canRetr
         </div>
       </div>
 
+      {/* 1139: who it posts as, what it looks like and the first line going out. All read from the post itself. */}
+      <div className="relative mt-3 flex items-center gap-2.5">
+        {thumb && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={thumb} alt="" className="la-thumb shrink-0" draggable={false} />
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-center gap-1.5">
+            {acct?.avatar ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={acct.avatar} alt="" className="la-face" draggable={false} />
+            ) : (
+              <PlatformOrb platform={t.platform} size={18} />
+            )}
+            <span className="truncate text-[13px] font-semibold">{acct ? (acct.username ? `@${acct.username}` : acct.name) : `Your ${meta.name} account`}</span>
+          </span>
+          {caption && <span className="mt-1 block truncate text-xs leading-snug text-white/60">{caption}</span>}
+        </span>
+      </div>
+
       <div className="la-box relative mt-4 flex min-h-[7.75rem] flex-col justify-center rounded-[1.25rem] p-4 pr-16">
         <p className="text-lg font-semibold leading-tight">{title}</p>
         <p className="mt-1 text-sm leading-snug text-white/65">{statusLine}</p>
-        <p className={cn("mt-2 text-[11px] font-bold uppercase tracking-[0.1em]", bad && !canceled ? "text-[#ff8a80]" : "text-[hsl(var(--lime))]")}>{accent}</p>
+        <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
+          <span className={cn("text-[11px] font-bold uppercase tracking-[0.1em]", bad && !canceled ? "text-[#ff8a80]" : "text-[hsl(var(--lime))]")}>{accent}</span>
+          {seen && <span className="text-[11px] font-semibold text-white/45">{seen}</span>}
+        </p>
         {fc && !canceled && (
           <p className={cn("mt-2 text-[13px] leading-snug", fc.tone === "bad" ? "text-[#ff8a80]" : fc.tone === "ok" ? "text-white/85" : "text-white/65")} aria-live="polite">
             {fc.text}
@@ -442,26 +519,40 @@ function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, canRetr
         </span>
       </div>
 
-      {/* The track. The rocket rides the end of the fill; text carries the state, colour backs it up. */}
+      {/* 1139: the track shows the steps this destination has really finished. The readout names the step; it
+          only ever shows a percentage when the server measured one. The rocket rides the end of the fill. */}
       <div
         className={cn("la-track relative mt-4 h-14 rounded-full", canceled && "la-off")}
         role="progressbar"
         aria-label={`${meta.name} progress`}
         aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={pct}
-        aria-valuetext={`${meta.name}: ${canceled ? "stopped by you" : bad ? "stopped, needs a hand" : `${STEPS[step]}, step ${step + 1} of 4`}`}
+        aria-valuemax={step.total}
+        aria-valuenow={step.index}
+        aria-valuetext={`${meta.name}: ${canceled ? "stopped by you" : step.stalled ? "stopped, needs a hand" : pct === null ? stepText(step) : `${pct} percent uploaded, ${stepText(step)}`}`}
       >
-        <div className={cn("la-fill absolute inset-0 rounded-full", isActive && !reduce && "la-fill-anim")} style={{ ["--p" as string]: `max(3.5rem, ${pct}%)` }}>
+        <div className={cn("la-fill absolute inset-0 rounded-full", isActive && !reduce && "la-fill-anim")} style={{ ["--p" as string]: `max(3.5rem, ${fill}%)` }}>
           {live && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-[hsl(var(--lime-foreground))]">Landed</span>}
         </div>
-        <span className="la-rider" style={{ ["--p" as string]: `max(3.5rem, ${pct}%)` }} aria-hidden="true">
+        <span className="la-rider" style={{ ["--p" as string]: `max(3.5rem, ${fill}%)` }} aria-hidden="true">
           <span className="absolute right-1.5 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center">
             <OutlyMark variant="ink" size={26} className={cn("la-rocket", isActive && !reduce && "la-rocket-anim")} />
           </span>
         </span>
-        {!live && <span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold tabular-nums text-white/60">{bad ? "STOPPED" : `${pct}%`}</span>}
+        {!live && (
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold tabular-nums text-white/60">
+            {bad ? "STOPPED" : pct === null ? `STEP ${step.stepNumber}/${step.total}` : `${pct}%`}
+          </span>
+        )}
       </div>
+
+      <ol className="la-steps relative mt-2.5" aria-hidden="true">
+        {LIVE_STEPS.map((label, n) => (
+          <li key={label} className={cn("la-step", step.stalled ? (n === 0 ? "la-step-bad" : "") : n < step.index ? "la-step-done" : n === step.index ? "la-step-now" : "")}>
+            <span className={cn("la-step-bar", isActive && n === step.index && !reduce && "la-step-beat")} />
+            <span className="la-step-name">{label}</span>
+          </li>
+        ))}
+      </ol>
 
       {(canStop || h?.kind === "reconnect" || (bad && !canceled)) && (
         <div className="relative mt-4 space-y-1">

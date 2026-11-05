@@ -18,7 +18,7 @@ export async function loadNotifyPrefs(userId: string): Promise<NotifyPrefs & { t
 export async function saveNotifyPrefs(userId: string, p: NotifyPrefs) {
   const u = await db.user.findUnique({ where: { id: userId }, select: { alertPrefs: true } });
   const a = parseAlertPrefs(u?.alertPrefs);
-  const clean: NotifyPrefs = { ev: p.ev, lead: p.lead, ch: p.ch, quiet: p.quiet };
+  const clean: NotifyPrefs = { ev: p.ev, lead: p.lead, ch: p.ch, quiet: p.quiet, assist: p.assist };
   await db.user.update({ where: { id: userId }, data: { notifyPrefs: serializeNotifyPrefs(clean), alertPrefs: serializeAlertPrefs({ ...a, failed: p.ev.post_failed, spike: p.ev.engagement_spike }) } });
   return parseNotifyPrefs(serializeNotifyPrefs(clean));
 }

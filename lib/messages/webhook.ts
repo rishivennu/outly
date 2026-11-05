@@ -96,6 +96,63 @@ export function parseWebhook(body: unknown): DmEvent[] {
   return out;
 }
 
+/**
+ * 1136: comments on posts, from the same webhook. Dashboard: Webhooks > Instagram field "comments", and
+ * Webhooks > Page field "feed" (Facebook sends every Page feed change there; only new comments are kept).
+ */
+export interface CommentEvent {
+  platform: DmPlatform;
+  /** Our side: Instagram professional account id, or Page id (SocialAccount.platformUserId). */
+  accountPlatformId: string;
+  commentId: string;
+  /** The post (Instagram media id, or Facebook "<pageId>_<postId>"). */
+  mediaId: string;
+  /** Set when this is a reply inside a comment thread. */
+  parentId: string | null;
+  text: string;
+  fromId: string;
+  /** Instagram username or Facebook name, as Meta sent it. */
+  fromName: string;
+  sentAt: Date;
+}
+
+type IgComment = { id?: string; text?: string; from?: { id?: string; username?: string }; media?: { id?: string }; parent_id?: string };
+type FbFeed = { item?: string; verb?: string; comment_id?: string; post_id?: string; parent_id?: string; message?: string; from?: { id?: string; name?: string }; created_time?: number | string };
+
+const when = (v: unknown) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? new Date(n < 1e12 ? n * 1000 : n) : new Date();
+};
+
+/** New comments in a webhook body. Our own replies, edits, removals and other feed changes are left out. */
+export function parseCommentWebhook(body: unknown): CommentEvent[] {
+  const b = body as { object?: string; entry?: { id?: string; time?: number; changes?: { field?: string; value?: unknown }[] }[] } | null;
+  const platform: DmPlatform | null = b?.object === "instagram" ? "instagram" : b?.object === "page" ? "facebook" : null;
+  if (!platform || !Array.isArray(b?.entry)) return [];
+  const out: CommentEvent[] = [];
+  for (const e of b!.entry) {
+    if (!e?.id) continue;
+    const self = String(e.id);
+    for (const c of e.changes ?? []) {
+      if (!c?.value || typeof c.value !== "object") continue;
+      if (platform === "instagram" && c.field === "comments") {
+        const v = c.value as IgComment;
+        const from = v.from?.id ? String(v.from.id) : "";
+        if (!v.id || !v.media?.id || !from || from === self) continue;
+        out.push({ platform, accountPlatformId: self, commentId: String(v.id), mediaId: String(v.media.id), parentId: v.parent_id ? String(v.parent_id) : null, text: String(v.text ?? ""), fromId: from, fromName: v.from?.username ? `@${String(v.from.username).replace(/^@+/, "")}` : "Someone", sentAt: when(e.time) });
+      }
+      if (platform === "facebook" && c.field === "feed") {
+        const v = c.value as FbFeed;
+        const from = v.from?.id ? String(v.from.id) : "";
+        if (v.item !== "comment" || v.verb !== "add" || !v.comment_id || !v.post_id || !from || from === self) continue;
+        const parent = v.parent_id && v.parent_id !== v.post_id ? String(v.parent_id) : null;
+        out.push({ platform, accountPlatformId: self, commentId: String(v.comment_id), mediaId: String(v.post_id), parentId: parent, text: String(v.message ?? ""), fromId: from, fromName: v.from?.name ? String(v.from.name) : "Someone", sentAt: when(v.created_time ?? e.time) });
+      }
+    }
+  }
+  return out;
+}
+
 /** Meta's signed_request (data deletion / deauthorize callbacks): base64url(sig).base64url(json), HMAC-SHA256. */
 export function parseSignedRequest(signed: string | null, secrets: string[]): { user_id?: string; algorithm?: string } | null {
   if (!signed || !signed.includes(".")) return null;

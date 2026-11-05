@@ -3,13 +3,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Bell, BellOff, BellRing, CalendarClock, Check, CircleAlert, CreditCard, Laptop, Mail, MessageCircle, Moon, MonitorSmartphone,
-  Plus, Send, Share, Smartphone, SquarePlus, Trash2, Rocket, UserRoundCheck, Inbox, X,
+  Plus, Send, Share, Smartphone, SquarePlus, Trash2, Rocket, UserRoundCheck, Inbox, Sparkles, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/Toast";
 import { api, ApiError } from "@/lib/client/api";
 import { cn } from "@/lib/utils";
-import { CATEGORIES, EVENT_INFO, LEADS, type CategoryId, type EventKey, type NotifyPatch, type NotifyPrefs } from "@/lib/notify-core";
+import { CATEGORIES, CENTRE_TABS, EVENT_INFO, GREET_LABEL, GREET_SLOTS, LEADS, centreTabOf, type CategoryId, type CentreTab, type EventKey, type NotifyPatch, type NotifyPrefs } from "@/lib/notify-core";
 import {
   currentSub, deniedHelp, disablePushHere, dismiss, dismissed, enablePush, permission, pushSupport, setBadge, stateOf, syncHere,
   type Device, type PushState, type PushSupport,
@@ -23,6 +23,7 @@ const CAT_ICON: Record<CategoryId, typeof Bell> = { publishing: Rocket, schedule
 const SECTIONS = [
   { id: "nf-device", label: "This device", icon: BellRing },
   { id: "nf-types", label: "What to notify", icon: Bell },
+  { id: "nf-assist", label: "Assistant", icon: Sparkles },
   { id: "nf-delivery", label: "Delivery", icon: Mail },
   { id: "nf-devices", label: "Connected devices", icon: MonitorSmartphone },
   { id: "nf-preview", label: "Preview & test", icon: Send },
@@ -231,6 +232,8 @@ export function NotificationSettings({ initial, spikeAllowed }: { initial: Initi
             </div>
           </section>
 
+          <Assistant prefs={prefs} saving={saving} onSave={save} />
+
           <Delivery prefs={prefs} tz={tz} saving={saving} onSave={save} onTz={async (z) => {
             const before = tz;
             setTz(z);
@@ -254,7 +257,7 @@ export function NotificationSettings({ initial, spikeAllowed }: { initial: Initi
 
 /** What the switches show while the save is on its way (the server's answer replaces it). */
 function optimistic(p: NotifyPrefs, patch: NotifyPatch): NotifyPrefs {
-  const n: NotifyPrefs = { ...p, ev: { ...p.ev }, ch: { ...p.ch, ...patch.ch }, quiet: { ...p.quiet, ...patch.quiet } };
+  const n: NotifyPrefs = { ...p, ev: { ...p.ev }, ch: { ...p.ch, ...patch.ch }, quiet: { ...p.quiet, ...patch.quiet }, assist: { ...p.assist, ...patch.assist, greet: { ...p.assist.greet, ...patch.assist?.greet } } };
   const set = (e: EventKey, v: boolean) => (n.ev[e] = EVENT_INFO[e].essential ? true : v);
   if (typeof patch.all === "boolean") (Object.keys(n.ev) as EventKey[]).forEach((e) => set(e, patch.all!));
   if (patch.category) CATEGORIES.find((c) => c.id === patch.category!.id)?.events.forEach((e) => set(e, patch.category!.on));
@@ -568,10 +571,64 @@ function Preview({ canTest, busy, onTest }: { canTest: boolean; busy: boolean; o
   );
 }
 
+/**
+ * 1141 section 19: the assistant's own nudges. Kept apart from the switches above on purpose: those are
+ * about the creator's accounts and money, these are Outlly speaking for itself, and somebody who wants one
+ * and not the other should not have to hunt. The greeting times are fixed so the copy can name them.
+ */
+function Assistant({ prefs, saving, onSave }: { prefs: NotifyPrefs; saving: boolean; onSave: (p: NotifyPatch, done?: string) => void }) {
+  const a = prefs.assist;
+  const said = (label: string, on: boolean) => `${label} ${on ? "on" : "off"}.`;
+  return (
+    <section id="nf-assist" aria-labelledby="nf-assist-h" className="nf-section">
+      <div>
+        <h2 id="nf-assist-h" className="nf-h2">Your assistant</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Nudges from Outlly itself, timed to your own time zone. Nothing here is about your accounts, so it has its own switches.</p>
+      </div>
+      <div className="nf-card mt-4 px-5 sm:px-6" style={{ "--i": 4 } as React.CSSProperties}>
+        <SwitchRow
+          id="nf-idle"
+          label="Nudge me when I have been away"
+          hint="After 30 minutes, a day, three days and a week away. One nudge each step, never a pile of them."
+          on={a.inactivity}
+          onChange={(v) => onSave({ assist: { inactivity: v } }, said("Away nudges", v))}
+          disabled={saving}
+        />
+        <SwitchRow
+          id="nf-growth"
+          label="Growth tips"
+          hint="A suggestion when your own numbers show something worth doing, like a time of day that keeps working."
+          on={a.growth}
+          onChange={(v) => onSave({ assist: { growth: v } }, said("Growth tips", v))}
+          disabled={saving}
+        />
+        <SwitchRow
+          id="nf-summary"
+          label="One summary when things get busy"
+          hint="When several alerts land close together, Outlly sends one summary instead of buzzing for each."
+          on={a.summary}
+          onChange={(v) => onSave({ assist: { summary: v } }, said("Summaries", v))}
+          disabled={saving}
+        />
+        <div className="border-t border-border/60 py-4">
+          <p className="text-[15px] font-medium leading-snug">Greetings</p>
+          <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">A short hello with what is really on for the day, read from your calendar. Pick the times you want one.</p>
+          <div className="mt-1 grid gap-x-8 sm:grid-cols-2">
+            {GREET_SLOTS.map((s) => (
+              <SwitchRow key={s} id={`nf-greet-${s}`} label={GREET_LABEL[s]} on={a.greet[s]} onChange={(v) => onSave({ assist: { greet: { [s]: v } } }, said(GREET_LABEL[s].split(",")[0], v))} disabled={saving} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function History() {
   const toast = useToast();
   const [items, setItems] = useState<Notice[] | null>(null);
   const [unread, setUnread] = useState(0);
+  const [tab, setTab] = useState<CentreTab>("all");
   const head = useRef<HTMLHeadingElement>(null);
   const load = useCallback(() => {
     api<{ notices: Notice[]; unread: number }>("/api/notices?history=1")
@@ -601,6 +658,9 @@ function History() {
       toast(err instanceof ApiError ? err.message : "Something got in the way.", "error");
     }
   };
+  // 1141: the notification centre's groups. The filter is here and not in the request: the history is one
+  // short list already, and a tab that answers instantly is worth more than a round trip.
+  const shown = useMemo(() => (items ?? []).filter((n) => tab === "all" || centreTabOf(n.kind) === tab), [items, tab]);
   return (
     <section id="nf-history" aria-labelledby="nf-history-h" className="nf-section">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -615,14 +675,28 @@ function History() {
           </div>
         )}
       </div>
+      {items && items.length > 0 && (
+        <div role="tablist" aria-label="Filter notifications" className="nf-tabs mt-4">
+          {CENTRE_TABS.map((t) => {
+            const n = items.filter((x) => t.id === "all" || centreTabOf(x.kind) === t.id).length;
+            if (!n && t.id !== "all") return null;
+            return (
+              <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={cn("nf-tab", tab === t.id && "is-on")}>
+                {t.title}
+                <span className="nf-tab-n">{n}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="nf-card mt-4" style={{ "--i": 8 } as React.CSSProperties}>
         {items === null ? (
           <div className="space-y-3 p-6" aria-hidden="true">{[0, 1, 2].map((k) => <div key={k} className="nf-skel h-12" />)}</div>
-        ) : items.length === 0 ? (
-          <p className="p-6 text-[15px] text-muted-foreground">Nothing here yet. Alerts you get will be listed here.</p>
+        ) : shown.length === 0 ? (
+          <p className="p-6 text-[15px] text-muted-foreground">{items.length === 0 ? "Nothing here yet. Alerts you get will be listed here." : "Nothing in this group."}</p>
         ) : (
           <ul className="nf-rows">
-            {items.map((n) => (
+            {shown.map((n) => (
               <li key={n.id} className="flex items-start gap-3 px-5 py-4 sm:px-6">
                 <span aria-hidden="true" className={cn("mt-2 h-2 w-2 shrink-0 rounded-full", n.read ? "bg-transparent" : "bg-lime")} />
                 <div className="min-w-0 flex-1">

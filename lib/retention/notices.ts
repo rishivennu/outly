@@ -4,8 +4,10 @@ import { env } from "../env";
 import { getConfig } from "../settings";
 import { sendEmail, templates } from "../email";
 import { pushToUser } from "../push/fcm";
-import { webPushToUser } from "../push/webpush";
-import { decide, ttlFor, urgencyFor } from "../notify-core";
+import { webPushToUser, type WebPushMessage } from "../push/webpush";
+import { bucketOf, cooldownFor, decide, kindsInBucket, ttlFor, urgencyFor, type CategoryId } from "../notify-core";
+import { notifyConfig } from "../notify-config";
+import { logDeliveries, plannedRows, type DeliveryRow } from "../notify-log";
 import { loadNotifyPrefs, unreadCount } from "../notify";
 import { PLATFORM_META, isPlatform } from "../domain";
 import { isPracticeAccount } from "../social/registry";
@@ -23,12 +25,17 @@ export interface NoticeInput {
     | "schedule_change"
     | "account_connected"
     | "new_message"
+    | "new_comment"
     | "milestone"
     | "payment_ok"
     | "payment_failed"
     | "renewal"
     | "usage_limit"
-    | "plan_update";
+    | "plan_update"
+    | "greet"
+    | "inactivity"
+    | "growth"
+    | "summary";
   tone: "danger" | "warn" | "info";
   title: string;
   body: string;
@@ -46,11 +53,38 @@ const absolute = (href: string) => (href.startsWith("http") ? href : `${env.APP_
  * 1118: the creator's notification settings decide where it goes (lib/notify-core.ts decide): an event switched
  * off makes no notice at all; in-app off files it as read; push waits out quiet hours (it still lands in the bell).
  */
-export async function notify(userId: string, n: NoticeInput, opts: { email?: boolean; now?: Date; minutesLeft?: number } = {}) {
+/** 1136: extras for the phone or computer notification only (the bell and email don't use them). */
+export type PushExtras = Pick<WebPushMessage, "icon" | "platform" | "reply" | "who" | "keepOpen" | "actions"> & {
+  /** Device tag: a newer push with the same tag replaces the older one (a busy post shows one comment, the latest). */
+  tag?: string;
+};
+
+/**
+ * 1141: when this cooldown bucket last spoke to this creator. The per-category cooldown reads it so a
+ * burst of comments on one post, or three account warnings in a row, arrive as one buzz and not six.
+ */
+export async function lastBucketNotice(userId: string, bucket: CategoryId | "assist", now: Date) {
+  const kinds = kindsInBucket(bucket);
+  if (!kinds.length) return null;
+  const row = await db.notice.findFirst({ where: { userId, kind: { in: kinds }, createdAt: { lte: now } }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+  return row?.createdAt ?? null;
+}
+
+export async function notify(userId: string, n: NoticeInput, opts: { email?: boolean; now?: Date; minutesLeft?: number; push?: PushExtras; eventId?: string | null } = {}) {
   const now = opts.now ?? new Date();
   const prefs = await loadNotifyPrefs(userId);
-  const d = decide(prefs, n.kind, now, prefs.tz);
-  if (!d.wanted) return { created: false, id: null, skipped: true };
+  // 1141: the admin's global pause and per-category cooldowns live in the Setting table, not in the creator's
+  // own switches, so support can quiet a noisy rule for everyone without touching anyone's preferences.
+  const cfg = await notifyConfig();
+  const bucket = bucketOf(n.kind);
+  const cooldownMin = cooldownFor(n.kind, cfg.cooldown);
+  const lastInBucketAt = bucket && cooldownMin > 0 ? await lastBucketNotice(userId, bucket, now) : null;
+  const d = decide(prefs, n.kind, now, prefs.tz, { paused: cfg.paused, cooldownMin, lastInBucketAt });
+  const log = (rows: DeliveryRow[], noticeId?: string | null) => logDeliveries(userId, n.kind, rows, { eventId: opts.eventId ?? null, noticeId: noticeId ?? null });
+  if (!d.wanted) {
+    await log(plannedRows(d));
+    return { created: false, id: null, skipped: true, reason: d.reason };
+  }
   const existing = await db.notice.findUnique({ where: { key: n.key } });
   if (existing) {
     if (existing.readAt && d.bell) await db.notice.update({ where: { id: existing.id }, data: { readAt: null, hiddenAt: null, title: n.title, body: n.body, createdAt: now } });
@@ -60,25 +94,50 @@ export async function notify(userId: string, n: NoticeInput, opts: { email?: boo
     .create({ data: { userId, kind: n.kind, tone: n.tone, title: n.title, body: n.body, href: n.href ?? null, action: n.action ?? null, key: n.key, readAt: d.bell ? null : now } })
     .catch(() => null); // two workers racing on the same key: the other one won
   if (!created) return { created: false, id: null };
+  const rows = plannedRows(d);
   // Same once-per-key rule as the notice itself, so a retry never buzzes the phone twice.
   if (d.push) {
-    await pushToUser(userId, { title: n.title, body: n.body, href: n.href });
-    await webPushToUser(
+    const fcm = await pushToUser(userId, { title: n.title, body: n.body, href: n.href });
+    const web = await webPushToUser(
       userId,
-      { title: n.title, body: n.body, href: n.href, tag: n.key, kind: n.kind, id: created.id, badge: await unreadCount(userId).catch(() => 0) },
+      {
+        title: n.title,
+        body: n.body,
+        href: n.href,
+        tag: opts.push?.tag ?? n.key,
+        kind: n.kind,
+        id: created.id,
+        badge: await unreadCount(userId).catch(() => 0),
+        icon: opts.push?.icon,
+        platform: opts.push?.platform,
+        reply: opts.push?.reply,
+        who: opts.push?.who,
+        keepOpen: opts.push?.keepOpen,
+        actions: opts.push?.actions,
+      },
       { ttl: ttlFor(n.kind, opts.minutesLeft), urgency: urgencyFor(n.kind) as "normal" | "high" },
+    );
+    if (fcm.sent) rows.push({ channel: "fcm", status: "sent", detail: `${fcm.sent} device${fcm.sent === 1 ? "" : "s"}` });
+    rows.push(
+      web.sent ? { channel: "push", status: "sent", detail: `${web.sent} of ${web.devices}` } : web.queued ? { channel: "push", status: "queued", detail: `${web.queued} waiting` } : { channel: "push", status: web.devices ? "failed" : "skipped", reason: web.devices ? "push_error" : "no_device" },
     );
   }
   if (opts.email && d.email && !(await getConfig("site")).maintenance) {
     const u = await db.user.findUnique({ where: { id: userId }, select: { name: true, email: true } });
-    if (u)
+    if (u) {
+      let ok = true;
       await sendEmail({
         to: u.email,
         kind: "notice",
         subject: n.title,
         html: templates.notice({ name: u.name.split(" ")[0], title: n.title, body: n.body, url: absolute(n.href ?? "/home"), action: n.action ?? "Open Outlly", tone: n.tone }),
-      }).catch(() => {});
+      }).catch(() => {
+        ok = false;
+      });
+      rows.push({ channel: "email", status: ok ? "sent" : "failed", reason: ok ? null : "email_error" });
+    }
   }
+  await log(rows, created.id);
   return { created: true, id: created.id };
 }
 
