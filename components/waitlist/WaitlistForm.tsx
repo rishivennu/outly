@@ -78,14 +78,26 @@ export function WaitlistForm({ fromGoogle = false, beta = false }: { fromGoogle?
   }, [done]);
 
   // Any "#join" link on the page (hero button, nav button) lands the cursor in the email field, or on the receipt.
+  // 1137: phones (and anywhere the Lenis glide isn't running) jumped there in one frame; give them a native smooth
+  // scroll instead. Capture phase, so it runs before the Link's own click handler, which then stands down.
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       const a = (e.target as HTMLElement | null)?.closest?.('a[href$="#join"]');
       if (!a) return;
+      const form = document.getElementById("join");
+      const plain = e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+      if (form && plain && !document.documentElement.classList.contains("lenis")) {
+        e.preventDefault();
+        const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        // One column (phones, small tablets): go straight to the form rather than the heading a screen above it.
+        const to = (window.innerWidth < 1024 && form.querySelector<HTMLElement>("[data-join-form]")) || form;
+        to.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
+        if (location.hash !== "#join") history.replaceState(history.state, "", "#join");
+      }
       window.setTimeout(() => (doneRef.current ?? emailRef.current)?.focus({ preventScroll: true }), 450);
     };
-    document.addEventListener("click", onClick);
-    return () => document.removeEventListener("click", onClick);
+    window.addEventListener("click", onClick, true);
+    return () => window.removeEventListener("click", onClick, true);
   }, []);
 
   const submit = async (e: React.FormEvent) => {

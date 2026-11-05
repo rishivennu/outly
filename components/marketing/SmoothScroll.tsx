@@ -10,6 +10,44 @@ let popped = false; // back/forward: let the browser restore the old position
 export const getLenis = () => lenis;
 
 const waiting = new Set<(l: Lenis) => void>();
+
+const LET_GO = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+/**
+ * 1137: arriving on /#section from another page, the browser jumps to the section once, then the sections above it
+ * finish laying out (the scroll scenes add their pin spacing) and push it a screen or more down. Keep it in place
+ * while the page settles (up to 2.5 s), and let go the moment the visitor scrolls or taps themselves.
+ */
+function holdAnchor(id: string) {
+  let el: HTMLElement | null = null;
+  try {
+    el = document.getElementById(decodeURIComponent(id));
+  } catch {
+    return;
+  }
+  if (!el || typeof ResizeObserver === "undefined") return;
+  const target = el;
+  let done = false;
+  const align = () => {
+    if (done) return;
+    const off = target.getBoundingClientRect().top - (parseFloat(getComputedStyle(target).scrollMarginTop) || 0);
+    if (Math.abs(off) < 2) return;
+    const y = window.scrollY + off;
+    if (lenis) lenis.scrollTo(y, { immediate: true, force: true });
+    else window.scrollTo({ top: y, behavior: "instant" as ScrollBehavior });
+  };
+  const ro = new ResizeObserver(align);
+  const quit = () => {
+    done = true;
+    ro.disconnect();
+    window.clearTimeout(timer);
+    for (const e of LET_GO) window.removeEventListener(e, quit);
+  };
+  const timer = window.setTimeout(quit, 2500);
+  for (const e of LET_GO) window.addEventListener(e, quit, { passive: true });
+  ro.observe(document.body);
+  requestAnimationFrame(align);
+  return quit;
+}
 /** Run `cb` with the Lenis instance as soon as it exists (now, or once the lazy import lands). Returns a cancel. */
 export function whenLenis(cb: (l: Lenis) => void): () => void {
   if (lenis) {
@@ -66,7 +104,8 @@ export function SmoothScroll() {
   // A new page starts at the top (or its #anchor) instead of finishing the previous page's glide.
   useEffect(() => {
     if (popped) return void (popped = false);
-    if (!lenis || location.hash) return;
+    if (location.hash) return holdAnchor(location.hash.slice(1));
+    if (!lenis) return;
     lenis.scrollTo(0, { immediate: true, force: true });
   }, [path]);
 

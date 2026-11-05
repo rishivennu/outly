@@ -221,7 +221,8 @@ describe("FCM push", () => {
     const m = fcmMessage("t", { title: "x".repeat(500), body: "y".repeat(5000) }).message;
     expect(m.notification.title.length).toBe(120);
     expect(m.notification.body.length).toBe(400);
-    expect(m.android.notification.channel_id).toBe("outlly_default");
+    expect(m.android.notification.channel_id).toBe("outlly_alert");
+    expect(m.android.notification.sound).toBe("outlly_alert");
   });
   test("only a token FCM disowns is dropped", () => {
     expect(isDeadToken(404, "")).toBe(true);

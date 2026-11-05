@@ -1327,8 +1327,8 @@ html:not(.dark) .la-themed:not(.dark *) .la-fill { box-shadow: inset 0 2px 1px r
 .wl-page { background: transparent; }
 .wl-card { background: hsl(var(--ap-tile)); border-radius: 28px; box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 20px 50px -30px rgb(0 0 0 / .25); }
 /* The waitlist form card (1062): a cool neutral panel, hairline border, restrained shadow. */
-.wl-formcell .wl-card { border-radius: 20px; background: hsl(214 32% 98%); box-shadow: inset 0 0 0 1px hsl(var(--border)), 0 1px 2px rgb(15 23 42 / .04), 0 12px 32px -22px rgb(15 23 42 / .22); }
-.dark .wl-formcell .wl-card { background: hsl(var(--ap-tile)); box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .08); }
+.wl-formcell .wl-card, .wlj-form .wl-card { border-radius: 20px; background: hsl(214 32% 98%); box-shadow: inset 0 0 0 1px hsl(var(--border)), 0 1px 2px rgb(15 23 42 / .04), 0 12px 32px -22px rgb(15 23 42 / .22); }
+.dark .wl-formcell .wl-card, .dark .wlj-form .wl-card { background: hsl(var(--ap-tile)); box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .08); }
 .dark .wl-card { box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .07); }
 .wl-fields { display: grid; gap: 12px; }
 /* 1062: label above, then a real 50px field. Focus is the brand green, errors the destructive red. */
@@ -2906,6 +2906,29 @@ html.js .tr-stage[data-print="wait"] .tr-reel { transform: translateY(0); }
 .wl-how > li { display: flex; align-items: flex-start; gap: 14px; border-radius: 20px; padding: 16px 18px; background: hsl(var(--ap-tile) / .82); box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .07); }
 .wl-how .wl-no { display: inline-grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; border-radius: 9999px; background: hsl(var(--lime) / .18); color: hsl(var(--lime-ink)); }
 .dark .wl-how .wl-no { color: hsl(var(--lime)); }
+
+/* 1137: the waitlist sign-up on the landing page (waitlist mode). Same parts as /waitlist in one two-column card:
+   the pitch and steps on the left, the form on the right; stacked on phones. */
+.wlj-card { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "form" "more"; gap: 4px; border-radius: 30px; padding: 8px; background: hsl(var(--ap-tile));
+  box-shadow: 0 1px 2px rgb(0 0 0 / .05), 0 40px 90px -40px rgb(10 40 15 / .45); }
+.dark .wlj-card { box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .07), 0 40px 90px -40px rgb(0 0 0 / .8); }
+.wlj-head { grid-area: head; padding: 24px 14px 6px; }
+.wlj-form { grid-area: form; padding: 10px 4px 8px; }
+.wlj-more { grid-area: more; padding: 18px 14px 18px; }
+@media (min-width: 640px) { .wlj-head { padding: 36px 30px 6px; } .wlj-form { padding: 10px 22px 12px; } .wlj-more { padding: 22px 30px 30px; } }
+/* Two columns: pitch and steps on the left, the form centred on the right across both rows. */
+@media (min-width: 1024px) {
+  .wlj-card { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); grid-template-rows: auto 1fr; grid-template-areas: "head form" "more form"; gap: 0 8px; padding: 10px; border-radius: 34px; }
+  .wlj-head { padding: 48px 24px 0 48px; }
+  .wlj-more { padding: 28px 24px 48px 48px; }
+  .wlj-form { align-self: center; padding: 32px 32px 32px 8px; }
+}
+.wlj-title { margin-top: 16px; font-family: var(--font-display); font-weight: 700; font-size: clamp(1.9rem, 1.2rem + 2.6vw, 2.75rem); line-height: 1.1;
+  letter-spacing: -0.03em; color: hsl(var(--foreground)); max-width: 15em; text-wrap: balance; }
+.wlj-steps { list-style: none; margin: 26px 0 0; padding: 0; display: grid; gap: 14px; }
+.wlj-steps > li { display: flex; align-items: flex-start; gap: 14px; }
+.wlj-steps .wl-no { display: inline-grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; border-radius: 9999px; background: hsl(var(--lime) / .18); color: hsl(var(--lime-ink)); }
+.dark .wlj-steps .wl-no { color: hsl(var(--lime)); }
 
 /* ---- The globe -------------------------------------------------------------------------------------- */
 .wl-globe { position: relative; width: min(100%, 300px); aspect-ratio: 1; margin: 2px auto 6px; }

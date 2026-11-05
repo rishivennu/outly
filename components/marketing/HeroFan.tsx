@@ -1,9 +1,10 @@
 "use client";
 import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Icon3D, type IconName } from "@/components/brand/Icon3D";
 import { PlatformGlyph } from "@/components/shared/PlatformIcon";
-import { useWaitlist } from "./useWaitlist";
+import { joinHref, useWaitlist } from "./useWaitlist";
 import { CaptionPop } from "./CaptionPop";
 import type { Platform } from "@/lib/domain";
 
@@ -48,7 +49,8 @@ function tiltReset(e: React.PointerEvent<HTMLDivElement>) {
 /** `cta={null}`: no pill on the centre card, for pages that already show the real button right above the fan. */
 export function HeroFan({ cards = CARDS, cta, framed = false }: { cards?: FanCard[]; cta?: { href: string; label: string } | null; framed?: boolean }) {
   const waitlist = useWaitlist();
-  const pill = cta === null ? null : cta ?? (waitlist ? { href: "/waitlist", label: "Join waitlist" } : { href: "/signup", label: "Get started" });
+  const pathname = usePathname();
+  const pill = cta === null ? null : cta ?? (waitlist ? { href: joinHref(pathname), label: "Join waitlist" } : { href: "/signup", label: "Get started" });
   return (
     <div aria-hidden="true" className={`hf-stage ${framed ? "hf-framed" : ""} pointer-events-none relative mx-auto -mt-[64px] h-[404px] w-full max-w-[1180px] select-none overflow-hidden sm:h-[448px]`}>
       <div className="hf-fan absolute inset-x-0 bottom-0 flex items-end justify-center">

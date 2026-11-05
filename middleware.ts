@@ -23,10 +23,11 @@ const HINT = "outlly_in";
 const WL_HINT = "outlly_wl";
 // Readable list of landing sections the admin hid ("how.pricing"), so the nav and footer can drop those links.
 const LH_HINT = "outlly_lh";
-// Waitlist on: the whole public site becomes the waitlist page (user's call, 10-12g). These still work:
+// Waitlist on (1137, replaces 10-12g): the full landing page stays up so visitors can see what Outlly does before
+// they join; its sign-up buttons scroll to the waitlist form on the page. Open: the landing page, help and contact,
 // the waitlist page itself, the legal pages its form links to, and links that are their own credential
-// (emailed invites, team invites, client review links, share links).
-const WAITLIST_OPEN = ["/waitlist", "/privacy", "/terms", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice"];
+// (emailed invites, team invites, client review links, share links). Sign-up and the studio stay closed.
+const WAITLIST_OPEN = ["/", "/help", "/contact", "/waitlist", "/privacy", "/terms", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice"];
 // Maintenance on: strangers only reach these. /login lets members back in; nobody can sign up.
 // /unsubscribe: leaving a mailing list must work whatever mode the site is in.
 const MAINTENANCE_OPEN = ["/maintenance", "/login", "/privacy", "/terms", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice"];
@@ -194,7 +195,7 @@ async function route(req: NextRequest, headers: Headers, ev?: NextFetchEvent) {
     return res;
   }
   if (flags?.maintenance && authed && pathname === "/maintenance" && !req.nextUrl.searchParams.has("preview")) return hint(req, NextResponse.redirect(new URL("/home", req.url)), authed);
-  // Waitlist on: every public page sends signed-out visitors to the waitlist. People who already
+  // Waitlist on: any other public page sends signed-out visitors to the waitlist. People who already
   // have an account keep working: /login stays open, and a signed-in creator is never bounced out
   // of the studio (the signup API still refuses strangers on its own).
   if (flags?.waitlist && !authed && pathname !== "/login" && !WAITLIST_OPEN.includes(pathname) && !WAITLIST_PREFIX.some((p) => pathname.startsWith(p))) {

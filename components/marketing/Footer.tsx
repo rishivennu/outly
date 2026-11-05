@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { AnimatedLink } from "@/components/ui/animated-link";
 import { useSignedIn } from "./useSignedIn";
-import { useWaitlist } from "./useWaitlist";
+import { joinHref, useWaitlist } from "./useWaitlist";
 import { useHiddenSections } from "./useHiddenSections";
 import { usePathname } from "next/navigation";
 import { CookieSettingsButton } from "@/components/shared/CookieConsent";
@@ -62,7 +62,8 @@ export function MarketingFooter() {
     return () => io.disconnect();
   }, []);
   const signedIn = useSignedIn();
-  const hidden = useHiddenSections(usePathname());
+  const pathname = usePathname();
+  const hidden = useHiddenSections(pathname);
   const waitlist = useWaitlist();
   return (
     <footer className="px-3 pb-3 pt-6 sm:px-6 sm:pb-6">
@@ -74,7 +75,7 @@ export function MarketingFooter() {
               Upload once. Publish to Reels, Shorts and X. See exactly what happened to each one.
             </p>
             <Link
-              href={signedIn ? "/home" : waitlist ? "/waitlist" : "/signup"}
+              href={signedIn ? "/home" : waitlist ? joinHref(pathname) : "/signup"}
               data-bounce=""
               className="lime-glow group mt-6 inline-flex h-12 items-center gap-2 rounded-full bg-lime px-5 text-[15px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-px active:scale-95"
             >

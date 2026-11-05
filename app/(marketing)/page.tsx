@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Hero } from "@/components/marketing/Hero";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { Features } from "@/components/marketing/Features";
@@ -18,7 +18,8 @@ import { RouteRule } from "@/components/marketing/bits";
 import { FAQS, HERO } from "@/lib/marketing/content";
 import { getConfig } from "@/lib/settings";
 import { isBeta } from "@/lib/beta";
-import { siteStatus } from "@/lib/site";
+import { siteStatus, waitlistCounts } from "@/lib/site";
+import { WaitlistJoin } from "@/components/marketing/WaitlistJoin";
 import { shown } from "@/lib/landing";
 import { Countdown } from "@/components/maintenance/Countdown";
 import { ScrollScenes } from "@/components/marketing/ScrollScenes";
@@ -77,6 +78,10 @@ export default async function LandingPage() {
   // Both reads are cached in-process for 15 s, so this costs nothing on a busy page.
   const [cfg, site, beta, live] = await Promise.all([getConfig("landing"), siteStatus(), isBeta(), liveNow()]);
   const on = (id: Parameters<typeof shown>[1]) => shown(cfg, id);
+  // Waitlist mode (1137): the whole page stays, plus the sign-up section before the footer. Members (the readable
+  // signed-in hint the middleware keeps in step) already have an account, so they don't get the form.
+  const joinOpen = site.waitlist && (await cookies()).get("outlly_in")?.value !== "1";
+  const joined = joinOpen ? (await waitlistCounts()).total : 0;
   return (
     <>
       {on("faq") && <script type="application/ld+json" nonce={(await headers()).get("x-nonce") ?? undefined} dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd).replace(/</g, "\\u003c") }} />}
@@ -108,6 +113,7 @@ export default async function LandingPage() {
       {on("pricing") && <Pricing />}
       {on("faq") && <Faq />}
       {on("cta") && <FinalCta beta={beta} />}
+      {joinOpen && <WaitlistJoin beta={beta} total={joined} />}
       {/* A page with every section off still needs a heading for screen readers and a way in. */}
       {!on("hero") && <h1 className="sr-only">Outlly</h1>}
       <ScrollScenes />

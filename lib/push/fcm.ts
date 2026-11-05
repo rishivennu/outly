@@ -51,6 +51,14 @@ async function accessToken(sa: ServiceAccount) {
   return cached.token;
 }
 
+/**
+ * The Android channel that plays the Outlly alert tone (res/raw/outlly_alert.mp3 in the app). A channel's sound
+ * is fixed once a phone creates it, so the tone needed a new id; the old "outlly_default" is still the app's
+ * manifest fallback, so builds from before the tone keep showing pushes with the phone's own sound.
+ */
+export const ALERT_CHANNEL = "outlly_alert";
+export const ALERT_SOUND = "outlly_alert";
+
 export interface PushMessage {
   title: string;
   body: string;
@@ -64,7 +72,7 @@ export function fcmMessage(token: string, m: PushMessage) {
       token,
       notification: { title: m.title.slice(0, 120), body: m.body.slice(0, 400) },
       data: { href: m.href && /^\/(?![/\\])/.test(m.href) ? m.href : "/home" },
-      android: { priority: "HIGH", notification: { channel_id: "outlly_default", icon: "ic_notification", color: "#C4FF00" } },
+      android: { priority: "HIGH", notification: { channel_id: ALERT_CHANNEL, sound: ALERT_SOUND, icon: "ic_notification", color: "#C4FF00" } },
     },
   };
 }

@@ -7,6 +7,7 @@ import { WaitlistForm } from "@/components/waitlist/WaitlistForm";
 import { GlobeStage } from "@/components/waitlist/globe/GlobeStage";
 import { siteStatus, waitlistCounts } from "@/lib/site";
 import { isBeta } from "@/lib/beta";
+import { WAITLIST_STEPS, waitlistPerks } from "@/lib/marketing/waitlist-copy";
 
 export const metadata: Metadata = {
   title: "Join the waitlist",
@@ -34,12 +35,8 @@ export default async function WaitlistPage(props: { searchParams: Promise<{ from
   if (!s.waitlist) redirect("/signup");
   const counts = await waitlistCounts();
   const beta = await isBeta();
-  // 1062 copy. "Free throughout the beta" is only said while the site really is in beta (Admin > Beta).
-  const early = [
-    "Early access, offered in the order people join.",
-    beta ? "Free to use throughout the beta. No credit card required." : "Free plan to start. No credit card required.",
-    "One email when your invitation is ready. No unnecessary emails.",
-  ];
+  // 1062 copy, shared with the landing page's waitlist section since 1137.
+  const early = waitlistPerks(beta);
   return (
     // No solid canvas here (1039): the brand sky behind every public page has to show through.
     <div className="wl-page">
@@ -115,11 +112,7 @@ export default async function WaitlistPage(props: { searchParams: Promise<{ from
         </div>
 
         <ol className="wl-how" aria-label="How the waitlist works">
-          {[
-            ["Join", "Leave your email. It takes five seconds."],
-            ["Get your invite", "We let people in by the order they joined."],
-            ["Start posting", "Sign up with that email and bring a video."],
-          ].map(([t, b], i) => (
+          {WAITLIST_STEPS.map(([t, b], i) => (
             <li key={t}>
               <span className="wl-no" aria-hidden="true">0{i + 1}</span>
               <span>

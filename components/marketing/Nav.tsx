@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatedLink } from "@/components/ui/animated-link";
 import { useSignedIn } from "./useSignedIn";
-import { useWaitlist } from "./useWaitlist";
+import { joinHref, useWaitlist } from "./useWaitlist";
 import { useHiddenSections } from "./useHiddenSections";
 import { FlipText } from "@/components/ui/text-fx";
 import { usePathname } from "next/navigation";
@@ -219,10 +219,9 @@ export function MarketingNav() {
     }
   };
 
-  // On the waitlist page itself the button scrolls to the form. Navigating to the same page remounted it (the
-  // marketing template), which threw away a receipt someone had just printed (1055).
-  const ctaHref = waitlist ? (pathname === "/waitlist" ? "#join" : "/waitlist") : "/signup";
-  const ctaLabel = waitlist ? "Join the waitlist" : "Start creating";
+  // Waitlist on (1137): same button, same place, relabelled; it scrolls to the form on the landing page (joinHref).
+  const ctaHref = waitlist ? joinHref(pathname) : "/signup";
+  const ctaLabel = waitlist ? "Join Waitlist" : "Start creating";
 
   return (
     <header className="mnav sticky top-0 z-50 px-3 pt-3 sm:px-6" data-scrolled={scrolled || open}>
