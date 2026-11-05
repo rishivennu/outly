@@ -94,6 +94,23 @@ async function subscribeDms(platform: Platform, acct: { platformUserId: string; 
 }
 
 /**
+ * 1141b: accounts connected before comments joined the webhook subscription get it once, from the sweep, so
+ * comment alerts start without anybody reconnecting. A Setting row marks it done; each call is best effort.
+ */
+const COMMENTS_SUB_KEY = "subs:comments:1141b";
+export async function resubscribeCommentsOnce(): Promise<number> {
+  if (await db.setting.findUnique({ where: { key: COMMENTS_SUB_KEY } })) return 0;
+  const rows = await db.socialAccount.findMany({
+    where: { platform: { in: ["instagram", "facebook"] }, status: "connected" },
+    select: { id: true, platform: true, platformUserId: true, username: true, accessToken: true },
+    take: 500,
+  });
+  for (const a of rows) await subscribeDms(a.platform as Platform, a);
+  await db.setting.upsert({ where: { key: COMMENTS_SUB_KEY }, update: { value: String(rows.length) }, create: { key: COMMENTS_SUB_KEY, value: String(rows.length) } });
+  return rows.length;
+}
+
+/**
  * Disconnect (1095). A soft disconnect: the row stays, marked disconnected with its keys wiped, so published
  * posts, their analytics and Inbox history keep pointing at the account they came from (a hard delete used to
  * cut every post loose and cascade away the DMs). The stable id stays too, which is how a later sign-in knows

@@ -435,4 +435,18 @@ describe("rules around it", () => {
     await saveConnectedAccount(u.id, "youtube", { platformUserId: "yt1", username: "yt", accessToken: "t" });
     expect(calls.length).toBe(before); // other platforms: no call
   });
+
+  test("1141b: connected accounts are resubscribed for comments once, then never again", async () => {
+    const { saveConnectedAccount, resubscribeCommentsOnce } = await import("../lib/accounts");
+    await db.setting.deleteMany({ where: { key: "subs:comments:1141b" } });
+    const u = await db.user.create({ data: { name: "Sub", email: `sub-${Date.now()}@test.dev`, passwordHash: "x" } });
+    stubFetch(() => new Response("{}", { status: 200 }));
+    const acct = await saveConnectedAccount(u.id, "facebook", { platformUserId: `pgs${Date.now()}`, username: "Page", accessToken: "PT" });
+    const calls = stubFetch(() => new Response("{}", { status: 200 }));
+    expect(await resubscribeCommentsOnce()).toBeGreaterThan(0);
+    expect(calls.some((c) => c.url.includes(`/${acct.platformUserId}/subscribed_apps?subscribed_fields=messages,message_echoes,feed`))).toBe(true);
+    const n = calls.length;
+    expect(await resubscribeCommentsOnce()).toBe(0);
+    expect(calls.length).toBe(n);
+  });
 });

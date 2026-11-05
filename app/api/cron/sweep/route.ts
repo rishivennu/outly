@@ -36,6 +36,7 @@ async function sweep(req: NextRequest) {
   const push = await drainOutbox().catch((e) => (console.error("[sweep] push", e), null));
   const assist = await import("@/lib/retention/sweep-notify").then((m) => m.sweepNotify()).catch((e) => (console.error("[sweep] notify", e), null)); // 1141 greetings, inactivity, event queue
   if (new Date().getMinutes() === 7) await cleanupSubs().catch(() => 0);
+  await import("@/lib/accounts").then((m) => m.resubscribeCommentsOnce()).catch((e) => console.error("[sweep] comment subs", e)); // 1141b, runs once
   await import("@/lib/analytics/sync").then((m) => m.syncMetrics({ budgetMs: 8_000 })).catch((e) => console.error("[sweep] metrics", e)); // 1140 analytics background sync
   // Without Redis the jobs above are timers in this invocation: let them run before the response ends it
   // (1027). Budget = what is left of maxDuration minus 10 s of headroom; whatever is still running then is
