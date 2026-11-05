@@ -428,7 +428,9 @@ describe("rules around it", () => {
     const calls = stubFetch(() => new Response("{}", { status: 400 }));
     const acct = await saveConnectedAccount(u.id, "facebook", { platformUserId: `pg${Date.now()}`, username: "Page", accessToken: "PT" });
     expect(acct.status).toBe("connected");
-    expect(calls[0].url).toContain(`/${acct.platformUserId}/subscribed_apps?subscribed_fields=messages,message_echoes`);
+    expect(calls[0].url).toContain(`/${acct.platformUserId}/subscribed_apps?subscribed_fields=messages,message_echoes,feed`);
+    // 1141: a refusal with comments retries messages alone, so DMs never depend on the comment permission
+    expect(calls[1].url).toContain(`subscribed_fields=messages,message_echoes&`);
     const before = calls.length;
     await saveConnectedAccount(u.id, "youtube", { platformUserId: "yt1", username: "yt", accessToken: "t" });
     expect(calls.length).toBe(before); // other platforms: no call

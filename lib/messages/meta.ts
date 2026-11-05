@@ -152,10 +152,17 @@ export async function sendText(platform: DmPlatform, acct: AccountContext, recip
  * subscribes with its own token. Facebook: the Page subscribes with its Page token (needs pages_manage_metadata).
  */
 export async function subscribeMessaging(platform: DmPlatform, acct: AccountContext): Promise<void> {
-  const url =
+  // 1141: comments ride the same subscription (Instagram 'comments', a Page's 'feed'), or comment alerts never
+  // arrive. Meta refuses the whole call when one field is not granted yet, so a refusal retries with messages
+  // alone: losing comment alerts must never cost an account its DMs.
+  const base = platform === "instagram" ? "messages" : "messages,message_echoes";
+  const extra = platform === "instagram" ? "comments" : "feed";
+  const url = (fields: string) =>
     platform === "instagram"
-      ? `${IG}/me/subscribed_apps?subscribed_fields=messages&access_token=${encodeURIComponent(acct.accessToken)}`
-      : `${FB}/${acct.platformUserId}/subscribed_apps?subscribed_fields=messages,message_echoes&access_token=${encodeURIComponent(acct.accessToken)}`;
-  const r = await fetch(url, { method: "POST", signal: T() });
+      ? `${IG}/me/subscribed_apps?subscribed_fields=${fields}&access_token=${encodeURIComponent(acct.accessToken)}`
+      : `${FB}/${acct.platformUserId}/subscribed_apps?subscribed_fields=${fields}&access_token=${encodeURIComponent(acct.accessToken)}`;
+  const first = await fetch(url(`${base},${extra}`), { method: "POST", signal: T() });
+  if (first.ok) return;
+  const r = await fetch(url(base), { method: "POST", signal: T() });
   if (!r.ok) throw await httpFailure(r, `${platform} subscribe webhooks`);
 }
