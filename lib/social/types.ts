@@ -1,4 +1,5 @@
 import type { ErrorCode, Platform } from "../domain";
+import type { PostFormat } from "../formats";
 
 export interface OAuthStart {
   url: string;
@@ -49,6 +50,8 @@ export interface MediaContext {
   /** Stream bytes (YouTube / X push uploads). */
   open: () => Promise<{ stream: NodeJS.ReadableStream; size: number }>;
   readAll: () => Promise<Buffer>;
+  /** 1131: image alt text (Instagram feed photos and carousel images), when the creator wrote one. */
+  altText?: string | null;
 }
 
 export interface TargetContent {
@@ -60,7 +63,12 @@ export interface TargetContent {
 
 export interface PublishContext {
   account: AccountContext;
+  /** The post's main media: the video, or the first slide of a photo, carousel or story post. */
   media: MediaContext;
+  /** 1131: video (default) | photo | carousel | story. */
+  format?: PostFormat;
+  /** 1131: every slide in order (items[0] is `media`). One item for video posts. */
+  items?: MediaContext[];
   content: TargetContent;
   /** Mock-only knob to rehearse failure UX. Real publishers ignore it. */
   simulate?: SimulationMode;

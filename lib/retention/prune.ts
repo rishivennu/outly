@@ -43,7 +43,7 @@ export async function pruneStaleDrafts(now: Date = new Date(), batch = 500) {
     OR: [{ scheduledAt: null }, { scheduledAt: { lt: now } }],
     reviews: { none: { status: "pending", expiresAt: { gt: now } } },
   };
-  const stale = await db.post.findMany({ where, select: { id: true, mediaId: true, coverKey: true }, take: batch });
+  const stale = await db.post.findMany({ where, select: { id: true, mediaId: true, coverKey: true, items: { select: { mediaId: true } } }, take: batch });
   if (!stale.length) return { drafts: 0, media: 0 };
   const { count } = await db.post.deleteMany({ where: { ...where, id: { in: stale.map((p) => p.id) } } });
   // 1083: a cover belongs to its post alone, so it goes once that post row is really gone.
@@ -51,11 +51,12 @@ export async function pruneStaleDrafts(now: Date = new Date(), batch = 500) {
   for (const p of stale)
     if (p.coverKey && !left.has(p.id)) await storage.remove(p.coverKey).catch((e) => console.error("[prune:drafts] cover", p.coverKey, e));
   const orphans = await db.media.findMany({
-    where: { id: { in: Array.from(new Set(stale.map((p) => p.mediaId))) }, posts: { none: {} } },
+    // 1131: carousel slides count too, and a slide another post still uses stays.
+    where: { id: { in: Array.from(new Set(stale.flatMap((p) => [p.mediaId, ...p.items.map((i) => i.mediaId)]))) }, posts: { none: {} }, postItems: { none: {} } },
     select: { id: true, storageKey: true, thumbnailKey: true },
   });
   if (!orphans.length) return { drafts: count, media: 0 };
-  await db.media.deleteMany({ where: { id: { in: orphans.map((m) => m.id) }, posts: { none: {} } } });
+  await db.media.deleteMany({ where: { id: { in: orphans.map((m) => m.id) }, posts: { none: {} }, postItems: { none: {} } } });
   // Only files whose row is really gone: one picked up by a new post in the meantime stays.
   const kept = new Set((await db.media.findMany({ where: { id: { in: orphans.map((m) => m.id) } }, select: { id: true } })).map((m) => m.id));
   const removed = orphans.filter((m) => !kept.has(m.id));

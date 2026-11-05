@@ -192,8 +192,9 @@ model Media {
   status           String   @default("uploaded") // uploading | uploaded | processing | ready | failed
   createdAt        DateTime @default(now())
 
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  posts Post[]
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts     Post[]
+  postItems PostMedia[] // 1131: slides of photo / carousel / story posts
 
   @@index([userId])
 }
@@ -211,6 +212,7 @@ model Post {
   publishedAt DateTime?
   launchedAt  DateTime? // first time it left draft (published or scheduled): what plan post limits count
   coverKey    String? // 1083: the creator's own cover image (JPEG), sent to the platforms that take one
+  format      String    @default("video") // 1131: video | photo | carousel | story
   editedAt    DateTime? // last change to the copy (1037); an approval older than this no longer counts
   editedBy    String? // who made that change (name), shown in the draft's activity
   editedById  String? // their user id: nobody but the owner approves their own change
@@ -222,11 +224,28 @@ model Post {
   targets PostTarget[]
   reviews ReviewRequest[]
   notes   PostNote[]
+  items   PostMedia[]
 
   @@index([userId, status])
   @@index([userId, scheduledAt])
   // 1091: the Content library lists newest edit first, page by page.
   @@index([userId, updatedAt])
+}
+
+/// 1131: the ordered media of a photo, carousel or story post (position 0 is also Post.mediaId).
+/// A video post (format "video") has no rows here and uses Post.mediaId alone.
+model PostMedia {
+  id       String  @id @default(cuid())
+  postId   String
+  mediaId  String
+  position Int
+  altText  String?
+
+  post  Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, position])
+  @@index([mediaId])
 }
 
 model PostTarget {

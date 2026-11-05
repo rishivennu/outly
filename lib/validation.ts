@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PLATFORMS } from "./domain";
+import { MAX_SLIDES, POST_FORMATS } from "./formats";
 import { DISPOSABLE_MESSAGE, isDisposableEmail } from "./disposable-email";
 
 export const platformSchema = z.enum(PLATFORMS);
@@ -47,6 +48,21 @@ export const savePostSchema = z.object({
   story: z.string().max(4000).optional().nullable(),
   hook: z.string().max(500).optional().nullable(),
   targets: z.array(targetDraftSchema).max(PLATFORMS.length),
+  /** 1131: video (the default, one clip) | photo | carousel | story. Not sent = keep what the post is. */
+  format: z.enum(POST_FORMATS).optional(),
+  /** 1131: the slides in order, for every format but video. The first one is also mediaId. */
+  items: z
+    .array(z.object({ mediaId: z.string().cuid(), altText: z.string().trim().max(1000).optional().nullable() }))
+    .max(MAX_SLIDES, `A carousel takes up to ${MAX_SLIDES} slides.`)
+    .refine((xs) => new Set(xs.map((x) => x.mediaId)).size === xs.length, "The same photo is in this post twice.")
+    .optional(),
+}).superRefine((b, ctx) => {
+  if (!b.format || b.format === "video") return;
+  const n = b.items?.length ?? 0;
+  if (n === 0) return void ctx.addIssue({ code: "custom", path: ["items"], message: "Add a photo or video first." });
+  if (b.items![0].mediaId !== b.mediaId) ctx.addIssue({ code: "custom", path: ["items"], message: "The first slide must be the post's media." });
+  if ((b.format === "photo" || b.format === "story") && n !== 1) ctx.addIssue({ code: "custom", path: ["items"], message: b.format === "story" ? "A Story is one photo or one video." : "A photo post is one image." });
+  if (b.format === "carousel" && n < 2) ctx.addIssue({ code: "custom", path: ["items"], message: "A carousel needs at least 2 slides." });
 });
 
 export const launchSchema = z.object({

@@ -1,5 +1,5 @@
 import "server-only";
-import type { Media, Post, PostTarget, ReviewRequest, SocialAccount } from "@prisma/client";
+import type { Media, Post, PostMedia, PostTarget, ReviewRequest, SocialAccount } from "@prisma/client";
 import { db } from "./db";
 import { HttpError } from "./http";
 import { storage } from "./storage";
@@ -34,6 +34,8 @@ export async function mediaView(m: Media) {
     m.storageKey.startsWith("sample/") ? null : safeSignedUrl(m.storageKey),
     m.thumbnailKey ? (m.thumbnailKey.startsWith("/") ? m.thumbnailKey : safeSignedUrl(m.thumbnailKey)) : null,
   ]);
+  // 1131: a photo is its own thumbnail (no second file to keep or clean up).
+  const image = m.mimeType.startsWith("image/");
   return {
     id: m.id,
     filename: m.originalFilename,
@@ -45,7 +47,8 @@ export async function mediaView(m: Media) {
     status: m.status,
     createdAt: m.createdAt.toISOString(),
     url,
-    thumbnailUrl,
+    thumbnailUrl: thumbnailUrl ?? (image ? url : null),
+    kind: image ? ("image" as const) : ("video" as const),
   };
 }
 
@@ -82,7 +85,7 @@ export function targetView(t: PostTarget) {
 }
 export type TargetView = ReturnType<typeof targetView>;
 
-export async function postView(p: Post & { targets: PostTarget[]; media: Media; reviews?: ReviewRequest[] }) {
+export async function postView(p: Post & { targets: PostTarget[]; media: Media; reviews?: ReviewRequest[]; items?: (PostMedia & { media: Media })[] }) {
   // reviews are only included by loaders that need them; undefined means "not loaded", not "none".
   const reviews = p.reviews ? [...p.reviews].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()) : null;
   return {
@@ -102,6 +105,10 @@ export async function postView(p: Post & { targets: PostTarget[]; media: Media; 
     editedBy: p.editedBy,
     editedAt: p.editedAt?.toISOString() ?? null,
     media: await mediaView(p.media),
+    /** 1131: video | photo | carousel | story. */
+    format: (p.format ?? "video") as import("./formats").PostFormat,
+    /** 1131: the slides in order (empty for a video post, or when the loader didn't include them). */
+    items: p.items ? await Promise.all([...p.items].sort((a, b) => a.position - b.position).map(async (i) => ({ ...(await mediaView(i.media)), altText: i.altText }))) : [],
     /** 1083: the creator's own cover image, if they added one. */
     coverUrl: p.coverKey ? await safeSignedUrl(p.coverKey) : null,
     targets: [...p.targets].sort((a, b) => PLATFORMS.indexOf(a.platform as Platform) - PLATFORMS.indexOf(b.platform as Platform)).map(targetView),
@@ -133,7 +140,7 @@ export async function ownedMedia(userId: string, id: string) {
 }
 
 export async function ownedPost(userId: string, id: string) {
-  const p = await db.post.findFirst({ where: { id, userId }, include: { targets: true, media: true, reviews: { orderBy: { createdAt: "desc" } } } });
+  const p = await db.post.findFirst({ where: { id, userId }, include: { targets: true, media: true, reviews: { orderBy: { createdAt: "desc" } }, items: { include: { media: true }, orderBy: { position: "asc" } } } });
   if (!p) throw new HttpError(404, "We couldn't find that post.");
   await assertPostScope(userId, p.targets); // 1037: a member limited to some accounts sees only their posts
   return p;

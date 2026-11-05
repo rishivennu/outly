@@ -236,7 +236,7 @@ export function ContentLibrary({
               <motion.li key={p.id} className="relative" layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0, transition: { delay: Math.min(i * 0.03, 0.3) } }} exit={{ opacity: 0, scale: 0.95 }}>
                 <button type="button" onClick={() => (hasLive(p) ? setStats(p) : setOpen(p))} className="group block w-full text-left" aria-label={`${p.title ?? "Untitled"}, ${p.status}. ${hasLive(p) ? "Open analytics" : "Open details"}`}>
                   <div className="relative aspect-[9/16] overflow-hidden rounded-[24px] hairline transition duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_30px_60px_-30px_hsl(var(--energy-b)/0.6)]">
-                    <Thumb src={p.media.thumbnailUrl} video={p.media.url} alt="" className="absolute inset-0" />
+                    <Thumb src={p.media.thumbnailUrl} video={p.media.kind === "image" ? null : p.media.url} alt="" className="absolute inset-0" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/30" />
                     <StatusBadge status={p.status} className="absolute left-3 top-3" />
                     {p.media.duration ? <span className={cn("tabular absolute right-3 rounded-full bg-black/50 px-2 py-0.5 text-[11px] text-white backdrop-blur", isFailedPost(p) ? "top-[3.6rem]" : "top-3")}>{formatDuration(p.media.duration)}</span> : null}

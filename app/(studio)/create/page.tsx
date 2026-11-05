@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { accountView, ownedPost, postView, type PostView } from "@/lib/services";
 import { composerAccounts } from "@/lib/profiles";
 import { CreateWorkspace } from "@/components/create/CreateWorkspace";
+import { FormatComposer, SLIDE_FORMATS, type SlideFormat } from "@/components/create/FormatComposer";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Create" };
@@ -24,6 +25,11 @@ export default async function CreatePage(props: { searchParams: Promise<Record<s
     }
   }
   const accounts = await composerAccounts(user, pinned);
+  // 1131: Instagram Stories, photos and carousels have their own composer (no story, hooks or per-platform copy).
+  const asked = (SLIDE_FORMATS as string[]).includes(searchParams.format ?? "") ? (searchParams.format as SlideFormat) : null;
+  const slideFormat = post ? (post.format !== "video" ? (post.format as SlideFormat) : null) : asked;
+  if (slideFormat)
+    return <FormatComposer key={post?.id ?? `new-${slideFormat}`} accounts={accounts.map(accountView)} initialPost={post} initialFormat={slideFormat} tz={user.timezone} connected={searchParams.connected ?? null} />;
   // A story to start from: text shared from another app, or an idea picked from the idea bank on Home.
   let initialStory: string | null = null;
   if (!post && searchParams.idea) {

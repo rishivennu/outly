@@ -46,7 +46,7 @@ export function ReviewPage({ token, data }: { token: string; data: ReviewPackage
 
       <div className="mt-8 flex flex-col gap-6 sm:flex-row">
         <div className="relative aspect-[9/16] w-full max-w-[220px] shrink-0 overflow-hidden rounded-3xl bg-secondary hairline">
-          {data.post.media.url ? (
+          {data.post.media.url && data.post.media.kind !== "image" ? (
             <video src={data.post.media.url} poster={data.post.media.thumbnailUrl ?? undefined} controls playsInline className="h-full w-full object-cover" />
           ) : data.post.media.thumbnailUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element */

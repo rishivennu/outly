@@ -672,6 +672,13 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                 <Link href="/create/bulk" className="mt-4 inline-flex min-h-[44px] items-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
                   Several videos? Plan a batch of up to 10
                 </Link>
+                {/* 1131: photos and Stories have their own, shorter composer. */}
+                <nav aria-label="Post something else to Instagram" className="mt-2 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <span>Instagram:</span>
+                  <Link href="/create?format=story" className="pf-chip min-h-[44px] hover:text-foreground">Story</Link>
+                  <Link href="/create?format=photo" className="pf-chip min-h-[44px] hover:text-foreground">Photo</Link>
+                  <Link href="/create?format=carousel" className="pf-chip min-h-[44px] hover:text-foreground">Carousel</Link>
+                </nav>
                 {!initialPost && !restoreLocal && deviceReady && <DeviceDrafts className="mx-auto mt-10 max-w-md text-left" />}
               </motion.section>
             )}

@@ -2,6 +2,7 @@ import "server-only";
 import type { z } from "zod";
 import { db } from "../db";
 import { HttpError } from "../http";
+import { isImageMime } from "../formats";
 import { PLATFORM_META, type Platform } from "../domain";
 import type { bulkScheduleSchema } from "../validation";
 import { connectedAccounts, launchPost, ownedMedia, ownedPost, postView, type PostView } from "../services";
@@ -69,7 +70,11 @@ export async function bookBatch(userId: string, body: z.infer<typeof bulkSchedul
   body.items.forEach((it, i) => {
     if (new Date(it.scheduledAt).getTime() < soon) throw new HttpError(400, `Video ${i + 1}: pick a time at least a minute from now.`);
   });
-  await Promise.all(body.items.map((it) => ownedMedia(userId, it.mediaId)));
+  const owned = await Promise.all(body.items.map((it) => ownedMedia(userId, it.mediaId)));
+  // 1131: a batch is videos. A photo here would become a video post that fails at upload.
+  owned.forEach((m, i) => {
+    if (isImageMime(m.mimeType)) throw new HttpError(400, `Video ${i + 1} is a photo. Post photos from Create, as a photo, carousel or Story.`);
+  });
 
   const posts: PostView[] = [];
   const failed: { index: number; postId: string; message: string }[] = [];

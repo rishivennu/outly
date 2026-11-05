@@ -19,6 +19,8 @@ export async function duplicatePost(userId: string, postId: string) {
       story: src.story,
       hook: src.hook,
       requireApproval: src.requireApproval,
+      format: src.format,
+      items: { create: src.items.map((i) => ({ mediaId: i.mediaId, position: i.position, altText: i.altText })) },
       targets: {
         create: src.targets.map((t) => ({
           platform: t.platform,

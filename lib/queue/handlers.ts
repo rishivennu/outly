@@ -7,7 +7,8 @@ import { COVER_AFTER_LIVE, derivePostStatus, isPlatform, PLATFORM_META, supports
 import { storage } from "../storage";
 import { probe, thumbnail } from "../media/probe";
 import { isPracticeAccount, publisherForAccount } from "../social/registry";
-import { asPublisherError, PublisherError, type PublishContext, type RemoteState, type SimulationMode } from "../social/types";
+import { asPublisherError, PublisherError, type MediaContext, type PublishContext, type RemoteState, type SimulationMode } from "../social/types";
+import { formatIssues, isPostFormat, type PostFormat } from "../formats";
 import { isApproved } from "../review";
 import { enqueue, usingRedis } from "./index";
 import type { JobName, JobPayloads } from "./jobs";
@@ -124,7 +125,7 @@ async function readKey(key: string) {
 async function loadContext(targetId: string, simulate: SimulationMode | undefined) {
   const t = await db.postTarget.findUnique({
     where: { id: targetId },
-    include: { socialAccount: true, post: { include: { media: true } } },
+    include: { socialAccount: true, post: { include: { media: true, items: { include: { media: true }, orderBy: { position: "asc" } } } } },
   });
   if (!t || !isPlatform(t.platform)) return null;
   const acct = t.socialAccount;
@@ -145,21 +146,27 @@ async function loadContext(targetId: string, simulate: SimulationMode | undefine
   // Single-flight, race-safe refresh; a refused refresh throws AUTH_EXPIRED (and marks the account).
   const account = accountContext(await freshAccount(acct));
 
-  const media = t.post.media;
-  const coverKey = t.post.coverKey;
+  const format: PostFormat = isPostFormat(t.post.format) ? t.post.format : "video";
+  const slide = (m: typeof t.post.media, altText?: string | null): MediaContext => ({
+    id: m.id,
+    mimeType: m.mimeType,
+    size: m.size,
+    duration: m.duration,
+    width: m.width,
+    height: m.height,
+    altText: altText ?? null,
+    publicUrl: async () => absolute(await storage.signedUrl(m.storageKey, 6 * 3600)),
+    open: async () => storage.read(m.storageKey),
+    readAll: () => readKey(m.storageKey),
+  });
+  // 1131: photo, carousel and story posts go out from their slides; a video post is its one clip.
+  const items = format === "video" || !t.post.items.length ? [slide(t.post.media)] : t.post.items.map((i) => slide(i.media, i.altText));
+  const coverKey = format === "video" ? t.post.coverKey : null; // a cover is a video's; slides are their own pictures
   const ctx: PublishContext = {
     account,
-    media: {
-      id: media.id,
-      mimeType: media.mimeType,
-      size: media.size,
-      duration: media.duration,
-      width: media.width,
-      height: media.height,
-      publicUrl: async () => absolute(await storage.signedUrl(media.storageKey, 6 * 3600)),
-      open: async () => storage.read(media.storageKey),
-      readAll: () => readKey(media.storageKey),
-    },
+    media: items[0],
+    format,
+    items,
     content: { title: t.title, caption: t.caption, description: t.description, hashtags: t.hashtags },
     // 1083: Instagram and LinkedIn take the cover with the upload; YouTube and Facebook get it once live (SET_COVER).
     cover: coverKey && supportsCover(t.platform) && !COVER_AFTER_LIVE.includes(t.platform)
@@ -189,14 +196,14 @@ export async function setTarget(id: string, postId: string, status: TargetStatus
     data: { platformStatus: status, ...extra },
   });
   if (!r.count) return false;
-  const t = await db.postTarget.findUnique({ where: { id }, include: { post: { select: { coverKey: true } } } });
+  const t = await db.postTarget.findUnique({ where: { id }, include: { post: { select: { coverKey: true, format: true } } } });
   await syncPost(postId);
   if (!t) return true;
   // Live with a first comment waiting: post it a few seconds later (a brand-new video can refuse comments for a moment).
   if (status === "published" && t.firstComment?.trim() && !t.firstCommentId && isPlatform(t.platform))
     await enqueue("FIRST_COMMENT", { targetId: id, platform: t.platform }, { delayMs: 5000, jobId: `fc-${id}` });
   // 1083: live with a cover waiting on a platform that takes it afterwards (YouTube, Facebook).
-  if (status === "published" && t.post?.coverKey && !t.coverSetAt && isPlatform(t.platform) && COVER_AFTER_LIVE.includes(t.platform))
+  if (status === "published" && t.post?.coverKey && (t.post.format ?? "video") === "video" && !t.coverSetAt && isPlatform(t.platform) && COVER_AFTER_LIVE.includes(t.platform))
     await enqueue("SET_COVER", { targetId: id, platform: t.platform }, { delayMs: 3000, jobId: `cv-${id}` });
   return true;
 }
@@ -368,7 +375,9 @@ async function socialUpload(data: JobPayloads["SOCIAL_UPLOAD"]) {
   if (t.platformStatus === "published" || (t.platformStatus === "failed" && t.errorCode === "CANCELED")) return;
   // Already handed to the platform on a previous run (and not a resumable session): don't upload twice.
   if (t.uploadRef && !t.uploadRef.startsWith("session:")) return void (await enqueue("SOCIAL_PUBLISH", data));
-  const issues = publisher.validateMedia(ctx.media).filter((i) => i.level === "error");
+  // 1131: slides are checked against the format's rules (the same ones the composer shows), a video by its platform.
+  const fmt = ctx.format ?? "video";
+  const issues = (fmt === "video" ? publisher.validateMedia(ctx.media) : formatIssues(publisher.platform, fmt, ctx.items ?? [ctx.media])).filter((i) => i.level === "error");
   if (issues.length) return failTarget(t.id, t.postId, new PublisherError("MEDIA_REJECTED", issues[0].message, issues.map((i) => i.message).join("\n"), false));
 
   if (!(await advance(t.id, t.postId, "uploading", { errorCode: null, errorMessage: null }))) return;
@@ -391,13 +400,16 @@ async function socialUpload(data: JobPayloads["SOCIAL_UPLOAD"]) {
   }
 }
 
-async function applyRemote(targetId: string, postId: string, r: RemoteState, data: JobPayloads["SOCIAL_UPLOAD"], poll: number) {
+async function applyRemote(targetId: string, postId: string, r: RemoteState, data: JobPayloads["SOCIAL_UPLOAD"], poll: number, fromRef: string | null) {
   if (r.state === "published") {
     // The only path to "published": the platform confirmed it.
     return setTarget(targetId, postId, "published", { platformPostId: r.platformPostId, platformUrl: r.url ?? null, publishedAt: new Date(), errorCode: null, errorMessage: null });
   }
   if (r.state === "failed") return failTarget(targetId, postId, new PublisherError(r.code, r.message, r.message, false));
-  await db.postTarget.update({ where: { id: targetId }, data: { uploadRef: r.ref } });
+  // 1131: move the ref on only from the one this job read. If another job got there first (a revived duplicate
+  // poll, say), this one stops: writing its older answer back could make a second carousel parent and post twice.
+  const moved = await db.postTarget.updateMany({ where: { id: targetId, uploadRef: fromRef }, data: { uploadRef: r.ref } });
+  if (!moved.count) return;
   if (poll >= MAX_STATUS_POLLS) return failTarget(targetId, postId, new PublisherError("PLATFORM_DOWN", "Processing timed out", `Still processing after ${poll} checks.`, false));
   await enqueue("SOCIAL_STATUS_CHECK", { ...data, poll: poll + 1 }, { delayMs: Math.min(1000 * 1.4 ** poll, 30_000) });
 }
@@ -415,7 +427,7 @@ async function socialPublish(data: JobPayloads["SOCIAL_PUBLISH"]) {
     if (await reconciled(t, ctx, publisher)) return;
     if (!t.publishRequestedAt) await db.postTarget.update({ where: { id: t.id }, data: { publishRequestedAt: new Date() } });
     const r = await publisher.publish(ctx, t.uploadRef);
-    await applyRemote(t.id, t.postId, r, data, 0);
+    await applyRemote(t.id, t.postId, r, data, 0, t.uploadRef);
   } catch (e) {
     const pe = asPublisherError(e);
     if (pe.code === "DUPLICATE" && publisher.findExisting) {
@@ -456,7 +468,7 @@ async function socialStatus(data: JobPayloads["SOCIAL_STATUS_CHECK"]) {
   if (!t.uploadRef || t.platformStatus === "published") return;
   try {
     const r = await publisher.getStatus(ctx, t.uploadRef);
-    await applyRemote(t.id, t.postId, r, data, data.poll);
+    await applyRemote(t.id, t.postId, r, data, data.poll, t.uploadRef);
   } catch (e) {
     if (e instanceof PublisherError && e.retryable && data.poll < MAX_STATUS_POLLS)
       return void (await enqueue("SOCIAL_STATUS_CHECK", { ...data, poll: data.poll + 1 }, { delayMs: statusDelay(data.poll, e.retryAfterMs) }));

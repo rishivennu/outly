@@ -32,7 +32,8 @@ export async function exportUser(id: string) {
     db.post.findMany({
       where: { userId: id },
       select: {
-        id: true, mediaId: true, title: true, story: true, hook: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true,
+        id: true, mediaId: true, format: true, title: true, story: true, hook: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true,
+        items: { select: { mediaId: true, position: true, altText: true }, orderBy: { position: "asc" } },
         targets: {
           select: { platform: true, title: true, caption: true, description: true, hashtags: true, platformStatus: true, platformUrl: true, practice: true, publishedAt: true, createdAt: true },
           orderBy: { platform: "asc" },

@@ -4,7 +4,13 @@ import { formPost, newState } from "./oauth";
 
 // Instagram API with Instagram Login (professional accounts). Reels are published as a container:
 //   POST /{ig-user-id}/media (media_type=REELS, video_url) → poll status_code → POST /{ig-user-id}/media_publish
+// 1131: Stories (media_type=STORIES), photos (image_url) and carousels (a child container per slide with
+// is_carousel_item, then a CAROUSEL container with children) go through the same create → poll → publish steps.
 const GRAPH = "https://graph.instagram.com/v21.0";
+/** Upload ref while carousel slides are still processing: "kids:<id>,<id>,...". The parent is made once all are FINISHED. */
+const KIDS = "kids:";
+/** Checkpoint while slide containers are being created, so a crash resumes instead of making them again. */
+const KIDS_SESSION = "session:igkids:";
 
 // instagram_business_manage_comments is what the inbox needs; without it comment reads return 403.
 const IG_BASE_SCOPES = "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments";
@@ -122,7 +128,12 @@ export class InstagramPublisher implements SocialPublisher {
   }
 
   async upload(ctx: PublishContext) {
-    const caption = [ctx.content.caption, ctx.content.hashtags].filter(Boolean).join("\n\n");
+    const format = ctx.format ?? "video";
+    if (format === "story") return this.container(ctx, { media_type: "STORIES", ...(isImage(ctx.media) ? { image_url: await ctx.media.publicUrl() } : { video_url: await ctx.media.publicUrl() }) }, "instagram create story container");
+    if (format === "photo")
+      return this.container(ctx, { image_url: await ctx.media.publicUrl(), caption: captionOf(ctx), ...(ctx.media.altText?.trim() ? { alt_text: ctx.media.altText.trim().slice(0, 1000) } : {}) }, "instagram create photo container");
+    if (format === "carousel") return this.carouselKids(ctx);
+    const caption = captionOf(ctx);
     const fields: Record<string, string> = {
       media_type: "REELS",
       video_url: await ctx.media.publicUrl(),
@@ -145,23 +156,70 @@ export class InstagramPublisher implements SocialPublisher {
     return ((await r.json()) as { id: string }).id;
   }
 
+  /** One container, its id back. */
+  private async container(ctx: PublishContext, f: Record<string, string>, what: string) {
+    const r = await formPost(`${GRAPH}/${ctx.account.platformUserId}/media`, { ...f, access_token: ctx.account.accessToken });
+    if (!r.ok) throw await httpFailure(r, what);
+    return ((await r.json()) as { id: string }).id;
+  }
+
+  /**
+   * 1131: a child container for every slide, in order. Each one made is checkpointed, so an upload that dies
+   * halfway picks up at the next slide instead of making the first ones again. Returns "kids:<ids>".
+   */
+  private async carouselKids(ctx: PublishContext) {
+    const items = ctx.items ?? [ctx.media];
+    const done = ctx.resumeRef?.startsWith(KIDS_SESSION) ? ctx.resumeRef.slice(KIDS_SESSION.length).split(",").filter(Boolean) : [];
+    for (let i = done.length; i < items.length; i++) {
+      const s = items[i];
+      const f: Record<string, string> = isImage(s)
+        ? { image_url: await s.publicUrl(), is_carousel_item: "true", ...(s.altText?.trim() ? { alt_text: s.altText.trim().slice(0, 1000) } : {}) }
+        : { media_type: "VIDEO", video_url: await s.publicUrl(), is_carousel_item: "true" };
+      done.push(await this.container(ctx, f, `instagram create carousel slide ${i + 1}`));
+      await ctx.checkpoint?.(`${KIDS_SESSION}${done.join(",")}`);
+    }
+    return `${KIDS}${done.join(",")}`;
+  }
+
+  /**
+   * 1131: wait for every slide (videos take a while), then make the CAROUSEL container. Its id becomes the ref,
+   * and from there it is polled and published like any other container.
+   */
+  private async carouselStep(ctx: PublishContext, ref: string): Promise<RemoteState> {
+    const kids = ref.slice(KIDS.length).split(",").filter(Boolean);
+    for (const [i, id] of kids.entries()) {
+      const s = await this.containerStatus(ctx, id);
+      if (s === "ERROR" || s === "EXPIRED") return { state: "failed", code: "MEDIA_REJECTED", message: `Instagram couldn't use slide ${i + 1} (${s}).` };
+      if (s !== "FINISHED") return { state: "processing", ref };
+    }
+    const parent = await this.container(ctx, { media_type: "CAROUSEL", children: kids.join(","), caption: captionOf(ctx) }, "instagram create carousel container");
+    return { state: "processing", ref: parent };
+  }
+
+  /** Same answers as a status check, so a container Instagram refused (ERROR, EXPIRED) fails with its reason
+   *  straight away instead of being polled until it times out. */
   async publish(ctx: PublishContext, containerId: string): Promise<RemoteState> {
-    const s = await this.containerStatus(ctx, containerId);
-    if (s !== "FINISHED") return { state: "processing", ref: containerId };
-    return this.finish(ctx, containerId);
+    return this.getStatus(ctx, containerId);
   }
 
   async getStatus(ctx: PublishContext, ref: string): Promise<RemoteState> {
     if (ref.startsWith("published:")) return { state: "published", platformPostId: ref.slice(10) };
+    if (ref.startsWith(KIDS)) return this.carouselStep(ctx, ref);
     const s = await this.containerStatus(ctx, ref);
     if (s === "ERROR" || s === "EXPIRED") return { state: "failed", code: "MEDIA_REJECTED", message: `Container ${s}` };
     if (s === "PUBLISHED") {
       // Published on an earlier attempt whose response we lost: record it, never publish the container twice.
-      const hit = await this.findExisting(ctx, { since: new Date(Date.now() - 24 * 3600_000) });
-      return hit ? { state: "published", platformPostId: hit.platformPostId, url: hit.url } : { state: "failed", code: "UNKNOWN", message: "Container shows PUBLISHED but the Reel wasn't found on the profile." };
+      const hit = await this.findExisting(ctx, { since: new Date(Date.now() - 24 * 3600_000), uploadRef: ref });
+      return hit ? { state: "published", platformPostId: hit.platformPostId, url: hit.url } : { state: "failed", code: "UNKNOWN", message: "Container shows PUBLISHED but the post wasn't found on the profile." };
     }
     if (s !== "FINISHED") return { state: "processing", ref };
     return this.finish(ctx, ref);
+  }
+
+  /** 1131: true only when this target's own container says PUBLISHED, the one proof that it went out. */
+  private async wentOut(ctx: PublishContext, ref?: string | null) {
+    if (!ref || ref.startsWith(KIDS) || ref.startsWith("session:") || ref.startsWith("published:")) return false;
+    return (await this.containerStatus(ctx, ref).catch(() => null)) === "PUBLISHED";
   }
 
   private async containerStatus(ctx: PublishContext, id: string) {
@@ -181,9 +239,23 @@ export class InstagramPublisher implements SocialPublisher {
     return { state: "published", platformPostId: id, url: (link as { permalink?: string }).permalink };
   }
 
-  /** Match by caption among Reels posted since we asked to publish. */
-  async findExisting(ctx: PublishContext, hint: { since: Date }) {
-    const caption = [ctx.content.caption, ctx.content.hashtags].filter(Boolean).join("\n\n").trim();
+  /**
+   * Match by caption among posts made since we asked to publish. Stories have no caption and live on their own
+   * edge (/stories). With no caption to match, "the newest one since then" could be someone else's (another
+   * Story queued a minute later, or one posted from the phone), so it only counts once our own container says
+   * PUBLISHED. Otherwise null, and the container itself is asked again.
+   */
+  async findExisting(ctx: PublishContext, hint: { since: Date; uploadRef?: string | null }) {
+    if (ctx.format === "story") {
+      if (!(await this.wentOut(ctx, hint.uploadRef))) return null;
+      const r = await fetch(`${GRAPH}/${ctx.account.platformUserId}/stories?fields=id,permalink,timestamp&access_token=${ctx.account.accessToken}`);
+      if (!r.ok) throw await httpFailure(r, "instagram stories lookup");
+      const j = (await r.json()) as { data?: { id: string; permalink?: string; timestamp?: string }[] };
+      const hit = (j.data ?? []).filter((m) => m.timestamp && new Date(m.timestamp) >= hint.since).sort((a, b) => (b.timestamp ?? "").localeCompare(a.timestamp ?? ""))[0];
+      return hit ? { platformPostId: hit.id, url: hit.permalink } : null;
+    }
+    const caption = captionOf(ctx).trim();
+    if (!caption && !(await this.wentOut(ctx, hint.uploadRef))) return null;
     const r = await fetch(`${GRAPH}/${ctx.account.platformUserId}/media?fields=id,caption,permalink,timestamp,media_product_type&limit=10&access_token=${ctx.account.accessToken}`);
     if (!r.ok) throw await httpFailure(r, "instagram media lookup");
     const j = (await r.json()) as { data?: { id: string; caption?: string; permalink?: string; timestamp?: string }[] };
@@ -213,9 +285,12 @@ export class InstagramPublisher implements SocialPublisher {
   }
 
   async delete() {
-    throw new PublisherError("UNKNOWN", "Instagram does not allow deleting Reels through the API. Remove it in the app.", undefined, false);
+    throw new PublisherError("UNKNOWN", "Instagram does not allow deleting posts through the API. Remove it in the app.", undefined, false);
   }
 }
+
+const captionOf = (ctx: PublishContext) => [ctx.content.caption, ctx.content.hashtags].filter(Boolean).join("\n\n");
+const isImage = (m: { mimeType: string }) => m.mimeType.startsWith("image/");
 
 interface IgComment {
   id: string;

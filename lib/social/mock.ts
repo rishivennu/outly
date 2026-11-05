@@ -83,7 +83,7 @@ export class MockPublisher implements SocialPublisher {
   async upload(ctx: PublishContext) {
     await sleep(jitter(...PACE[this.platform].upload));
     this.maybeFail(ctx, "upload");
-    if (ctx.cover) await ctx.noteCover?.(null); // rehearsal: the cover "goes on" with the upload, like Instagram
+    if (ctx.cover && (ctx.format ?? "video") === "video") await ctx.noteCover?.(null); // rehearsal: the cover "goes on" with the upload, like Instagram
     return `mock-upload-${this.platform}-${Date.now().toString(36)}`;
   }
 
