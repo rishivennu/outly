@@ -22,6 +22,7 @@ import { primeGroove } from "./Groove";
 import { PublishingView } from "./PublishingView";
 import { ScheduledView } from "./LaunchPanel";
 import { SaveDraft } from "./SaveDraft";
+import { PostKindSwitch } from "./PostKindSwitch";
 import { formatGate, hashtagCount, IG_CAPTION_MAX, shapeOk } from "./format-gate";
 import type { AccountView, MediaView, PostView } from "./types";
 
@@ -373,6 +374,7 @@ export function FormatComposer({ accounts, initialPost, initialFormat, tz, conne
   return (
     <div className="relative px-4 pb-16 pt-6 sm:px-8 lg:pt-10">
       <div className={cn("mx-auto w-full max-w-3xl", createFont.variable)}>
+        {!initialPost && <PostKindSwitch value="photo" className="mb-7" />}
         <p className="step-pill mx-auto mb-5 w-fit">
           <PlatformOrb platform="instagram" size={18} />
           Instagram

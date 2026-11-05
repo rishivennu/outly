@@ -6,6 +6,7 @@ import Link from "next/link";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UploadZone } from "@/components/shared/UploadZone";
+import { PostKindSwitch } from "./PostKindSwitch";
 import { useToast } from "@/components/shared/Toast";
 import { defaultSchedule } from "@/components/shared/DateTimePicker";
 import { api, ApiError, streamApi } from "@/lib/client/api";
@@ -636,6 +637,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
           {/* Steps animate in on mount. No exit choreography: a nested exit that never settles must not strand the next step. */}
             {showVideo && !hasMedia && (
               <motion.section key="drop" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} aria-labelledby="drop-title" className={`${createFont.variable} font-create flex flex-col items-center pt-2 sm:pt-4 lg:pt-10`}>
+                {!initialPost && <PostKindSwitch value="video" className="mb-7" />}
                 <p className="step-pill mb-5">
                   <span className="step-pill-dot" aria-hidden="true" />
                   Step 1 of 4 <span className="text-muted-foreground/60" aria-hidden="true">·</span> <span className="text-muted-foreground">Your video</span>
@@ -672,13 +674,6 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                 <Link href="/create/bulk" className="mt-4 inline-flex min-h-[44px] items-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
                   Several videos? Plan a batch of up to 10
                 </Link>
-                {/* 1131: photos and Stories have their own, shorter composer. */}
-                <nav aria-label="Post something else to Instagram" className="mt-2 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <span>Instagram:</span>
-                  <Link href="/create?format=story" className="pf-chip min-h-[44px] hover:text-foreground">Story</Link>
-                  <Link href="/create?format=photo" className="pf-chip min-h-[44px] hover:text-foreground">Photo</Link>
-                  <Link href="/create?format=carousel" className="pf-chip min-h-[44px] hover:text-foreground">Carousel</Link>
-                </nav>
                 {!initialPost && !restoreLocal && deviceReady && <DeviceDrafts className="mx-auto mt-10 max-w-md text-left" />}
               </motion.section>
             )}
