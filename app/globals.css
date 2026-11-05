@@ -2137,6 +2137,14 @@ html[data-lh~="faq"] [data-sec="faq"] { display: none !important; }
 .la-pill-ghost:hover{background:rgb(255 255 255/.18)}
 .la-pill:disabled{opacity:.9;cursor:not-allowed;background:#9ca0a8;color:#2b2d31}
 @media (prefers-reduced-motion:reduce){.la-fill,.la-rider{transition:none}.la-fill-anim::after,.la-rocket-anim{animation:none}}
+/* 1135: a photo post's own photos on the route, fanned like prints */
+.la-stack{position:relative;display:block;width:4.75rem;height:3.25rem;flex-shrink:0}
+.la-print{position:absolute;top:.25rem;left:calc(var(--i)*.9rem);width:2.6rem;height:2.6rem;border-radius:.55rem;overflow:hidden;border:2px solid #fbfcfe;box-shadow:0 6px 14px rgb(0 0 0/.45);transform:rotate(calc((var(--i) - (var(--n) - 1)/2)*9deg));transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.la-stack-anim .la-print{animation:la-deal 2.4s cubic-bezier(.45,0,.2,1) infinite;animation-delay:calc(var(--i)*.18s)}
+@keyframes la-deal{0%,100%{translate:0 0}45%{translate:.55rem -.3rem}}
+.la-stack-landed .la-print{transform:rotate(0deg) translateX(calc(var(--i)*-.35rem))}
+.la-more{position:absolute;right:-.2rem;bottom:-.1rem;padding:0 .35rem;border-radius:999px;background:hsl(var(--lime));color:hsl(var(--lime-foreground));font-size:10px;font-weight:700;line-height:1.1rem}
+@media (prefers-reduced-motion:reduce){.la-print{transition:none}.la-stack-anim .la-print{animation:none}}
 .pub-eyebrow{background:hsl(var(--card)/.8);border:1px solid hsl(var(--foreground)/.08);color:hsl(var(--foreground))}
 .pub-pulse{width:8px;height:8px;border-radius:999px;background:hsl(var(--success));box-shadow:0 0 0 0 hsl(var(--success)/.6);animation:pub-ping 1.6s ease-out infinite}
 .pub-pulse-still{animation:none}

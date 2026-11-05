@@ -23,6 +23,7 @@ import { askNotify, muteNotify, notifyOnce, notifyState, pingSending, readTimes,
 import { DancingPip, MusicToggle, useGroove } from "./Groove";
 import type { PostView, TargetView } from "./types";
 import { T, ease } from "@/lib/motion/tokens";
+import { liveSummary, platformFormatLabel, postWords } from "@/lib/client/post-words";
 
 /**
  * "Sending it out", styled as a Live Activity (10-16f: columns, side by side; a lone card sits in the middle).
@@ -30,6 +31,7 @@ import { T, ease } from "@/lib/motion/tokens";
  * and a glowing lime track with the Outlly rocket riding its tip. Stop while it's still moving, Send it again when
  * it stopped, See it once it's live. Text always carries the state; colour backs it up.
  * Pip dances to the groove up top while anything is still moving. This is the only screen that plays music.
+ * 1135: photo, carousel and story posts say so (Your carousel, Carousel, Sending your carousel) and show their photos.
  */
 const ACTIVE: TargetStatus[] = ["pending", "queued", "uploading", "processing"];
 const STEPS = ["Queued", "Sending", "Processing", "Live"] as const;
@@ -192,7 +194,7 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
   const sub = active
     ? "Each platform moves at its own pace. You can leave this page; we'll keep going."
     : allLive
-      ? `Out on ${published.map((t) => PLATFORM_META[t.platform].name).join(" and ")}. Go say hi in the comments.`
+      ? `Out on ${published.map((t) => PLATFORM_META[t.platform].name).join(" and ")}. ${post.format === "story" ? "It's up for the next 24 hours." : "Go say hi in the comments."}`
       : allStopped
         ? "You stopped every upload. Send any of them again whenever you're ready."
         : published.length
@@ -289,7 +291,7 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
         {allLive && !reduce && <Burst />}
       </header>
 
-      <ul aria-label="Where your video is going" className="mx-auto mt-10 flex max-w-[56rem] flex-wrap justify-center gap-5">
+      <ul aria-label={postWords(post.format).where} className="mx-auto mt-10 flex max-w-[56rem] flex-wrap justify-center gap-5">
         {post.targets.map((t, i) => (
           <LiveActivity key={t.id} t={t} i={i} pct={pctOf(t)} usually={typicalLabel(times[t.platform])} post={post} busy={busy === t.id || busy === "all"} onRetry={() => retry(t)} onStop={() => stop(t)} canRetry={canRetry} reduce={!!reduce} />
         ))}
@@ -351,9 +353,20 @@ function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, canRetr
   const fc = firstCommentLine(t);
   const cv = coverLine(t, !!post.coverUrl);
   const returnTo = encodeURIComponent(`/create?post=${post.id}`);
-  const name = post.title || post.media.filename || "Untitled";
+  const words = postWords(post.format, post.items.length);
+  const slideish = words.format !== "video";
+  const name = post.title || (slideish && words.count) || post.media.filename || "Untitled";
+  const kindLabel = platformFormatLabel(meta.format, post.format);
   const title = live ? "Live" : canceled ? "Stopped" : bad ? "Needs a hand" : (TITLE[t.status] ?? t.status);
-  const statusLine = canceled ? `You stopped this one before it reached ${meta.name}.` : h ? h.title : (ROW_COPY[t.status] ?? TARGET_COPY[t.status as TargetStatus] ?? t.status);
+  const statusLine = canceled
+    ? `You stopped this one before it reached ${meta.name}.`
+    : h
+      ? h.title
+      : t.status === "uploading"
+        ? words.sending
+        : live && words.format === "story"
+          ? "It's up. Stories stay for 24 hours."
+          : (ROW_COPY[t.status] ?? TARGET_COPY[t.status as TargetStatus] ?? t.status);
   const accent = live
     ? "Live now"
     : canceled
@@ -383,17 +396,18 @@ function LiveActivity({ t, i, pct, usually, post, busy, onRetry, onStop, canRetr
         <DotText text="YOU" />
         <ArrowRight className="la-arrow h-6 w-6 shrink-0" strokeWidth={3} />
         <DotText text={CODE[t.platform] ?? "GO"} />
+        {slideish && <SlideStack items={post.items} moving={isActive && !reduce} landed={live} />}
       </div>
       <div className="relative mt-3 grid grid-cols-2 gap-3">
         <div className="min-w-0">
-          <p className="font-semibold leading-tight">Your video</p>
+          <p className="font-semibold leading-tight">{words.your}</p>
           <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-white/60" title={name}>
             {name}
           </p>
         </div>
         <div className="min-w-0">
           <h2 className="truncate font-semibold leading-tight">{meta.name}</h2>
-          <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-white/60">{meta.format}</p>
+          <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-white/60">{kindLabel}</p>
         </div>
       </div>
 
@@ -524,7 +538,7 @@ function WhatHappened({ post }: { post: PostView }) {
         <div>
           <p className="la-mute text-[11px] font-bold uppercase tracking-[0.12em]">What happened</p>
           <h2 id="what-happened" className="mt-1 text-xl font-semibold leading-tight">
-            {live.length === rows.length ? `Live in all ${rows.length} places` : `Live in ${live.length} of ${rows.length}`}
+            {liveSummary(live.length, rows.length, rows[0]?.meta.name)}
           </h2>
         </div>
         {live.length > 0 && (
@@ -539,7 +553,7 @@ function WhatHappened({ post }: { post: PostView }) {
             <PlatformOrb platform={t.platform} size={28} />
             <div className="min-w-0 flex-1">
               <p className="font-semibold leading-tight">
-                {meta.name} <span className="la-mute text-xs font-medium">{meta.format}</span>
+                {meta.name} <span className="la-mute text-xs font-medium">{platformFormatLabel(meta.format, post.format)}</span>
               </p>
               <p className={cn("mt-0.5 text-sm leading-snug", t.status === "published" ? "la-accent" : t.status === "failed" && t.errorCode !== "CANCELED" ? "la-warn" : "la-mute")}>
                 {result}
@@ -557,6 +571,26 @@ function WhatHappened({ post }: { post: PostView }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * 1135: a photo post shows its own photos on the route, not the video look. Up to three slides fanned like
+ * prints; while sending they drift toward the platform, once live they settle. Decorative (the text says it all).
+ */
+function SlideStack({ items, moving, landed }: { items: PostView["items"]; moving: boolean; landed: boolean }) {
+  const shown = items.filter((m) => m.thumbnailUrl).slice(0, 3);
+  if (!shown.length) return null;
+  return (
+    <span className={cn("la-stack ml-auto", moving && "la-stack-anim", landed && "la-stack-landed")} aria-hidden="true">
+      {shown.map((m, i) => (
+        <span key={m.id} className="la-print" style={{ ["--i" as string]: i, ["--n" as string]: shown.length }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={m.thumbnailUrl!} alt="" className="h-full w-full object-cover" draggable={false} />
+        </span>
+      ))}
+      {items.length > 3 && <span className="la-more">+{items.length - 3}</span>}
+    </span>
   );
 }
 
