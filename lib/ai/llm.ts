@@ -32,12 +32,14 @@ export type LlmOpts = {
   cacheKey?: string;
   /** The caller went away (closed the tab, asked again): stop every model at once. */
   signal?: AbortSignal;
+  /** 1133: pictures the model looks at before the prompt (base64, JPEG). Only Gemini reads them, so Kimi sits out. */
+  images?: { mime: string; data: string }[];
 };
 
 function candidates(opts: LlmOpts): ModelId[] {
   const g = (opts.models?.length ? opts.models : GEMINI_DEFAULT).map((m) => ALIAS[m] ?? m);
   const list: ModelId[] = env.GEMINI_API_KEY ? [...new Set(g)].map((model) => ({ provider: "gemini" as const, model })) : [];
-  if (env.KIMI_API_KEY) list.push({ provider: "kimi", model: KIMI_MODEL });
+  if (env.KIMI_API_KEY && !opts.images?.length) list.push({ provider: "kimi", model: KIMI_MODEL });
   return list;
 }
 
@@ -55,7 +57,7 @@ async function call(m: ModelId, system: string, prompt: string, opts: LlmOpts, s
           headers: { "x-goog-api-key": env.GEMINI_API_KEY },
           body: {
             systemInstruction: { parts: [{ text: system }] },
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            contents: [{ role: "user", parts: [...(opts.images ?? []).map((i) => ({ inline_data: { mime_type: i.mime, data: i.data } })), { text: prompt }] }],
             generationConfig: { ...(opts.json !== false ? { responseMimeType: "application/json" } : {}), temperature: opts.temperature ?? 0.9 },
           },
         }
@@ -102,11 +104,15 @@ async function call(m: ModelId, system: string, prompt: string, opts: LlmOpts, s
 
 const cache = new Map<string, { at: number; text: string; model: string }>();
 const CACHE_MS = 10 * 60_000;
-const cacheId = (k: string, system: string, prompt: string, t: number | undefined) => createHash("sha256").update(`${k}\u0000${t}\u0000${system}\u0000${prompt}`).digest("base64url");
+const cacheId = (k: string, system: string, prompt: string, t: number | undefined, images: LlmOpts["images"] = []) => {
+  const h = createHash("sha256").update(`${k}\u0000${t}\u0000${system}\u0000${prompt}`);
+  for (const i of images) h.update(`\u0000${i.mime}\u0000`).update(i.data);
+  return h.digest("base64url");
+};
 
 /** The raw text of the fastest good answer, or null when nothing answered in time. */
 export async function llmText(system: string, prompt: string, opts: LlmOpts = {}): Promise<{ text: string; model: string } | null> {
-  const id = opts.cacheKey ? cacheId(opts.cacheKey, system, prompt, opts.temperature) : null;
+  const id = opts.cacheKey ? cacheId(opts.cacheKey, system, prompt, opts.temperature, opts.images) : null;
   const hit = id ? cache.get(id) : undefined;
   if (hit && Date.now() - hit.at < CACHE_MS) {
     opts.onText?.(hit.text);

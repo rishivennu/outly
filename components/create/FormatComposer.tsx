@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Film, GalleryHorizontalEnd, ImageIcon, ImagePlus, RefreshCw, Rocket, Send, Smartphone, X } from "lucide-react";
+import { CalendarClock, CalendarDays, Check, ChevronLeft, ChevronRight, Film, GalleryHorizontalEnd, ImageIcon, ImagePlus, RefreshCw, Rocket, Send, Smartphone, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/shared/Sheet";
 import { DateTimePicker, defaultSchedule } from "@/components/shared/DateTimePicker";
@@ -55,6 +55,18 @@ interface Slide {
 }
 
 /** Arrow keys move through a radio group, which is a single tab stop (the WAI-ARIA radio pattern). */
+/** 1133: what actually stopped an upload, so "Try again" isn't a guess. */
+function uploadError(e: unknown) {
+  if (e instanceof ApiError) return e.message === "Something got in the way." ? `Outlly couldn't save this one (error ${e.status}). Tap Try again.` : e.message;
+  console.error("[upload]", e);
+  const msg = e instanceof Error ? e.message : "";
+  if (/fetch|network|load failed/i.test(msg)) return "Couldn't reach Outlly. Check your connection, then tap Try again.";
+  const name = e instanceof Error && e.name && e.name !== "Error" ? ` (${e.name})` : "";
+  return `This browser couldn't prepare this file${name}. Tap Try again, or save it as a JPEG first.`;
+}
+
+const handle = (u: string) => (u.startsWith("@") ? u : `@${u}`);
+
 function radioKeys<V>(values: readonly V[], current: V, set: (v: V) => void) {
   return (e: KeyboardEvent<HTMLElement>) => {
     const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
@@ -68,6 +80,8 @@ function radioKeys<V>(values: readonly V[], current: V, set: (v: V) => void) {
 
 interface Props {
   accounts: AccountView[];
+  /** 1133: every Instagram account this person can post to, so one with two connected can pick. */
+  choices?: AccountView[];
   initialPost: PostView | null;
   initialFormat: SlideFormat;
   tz: string;
@@ -92,9 +106,16 @@ function fromMedia(m: MediaView, altText?: string | null): Slide {
   };
 }
 
-export function FormatComposer({ accounts, initialPost, initialFormat, tz, connected }: Props) {
+export function FormatComposer({ accounts, choices, initialPost, initialFormat, tz, connected }: Props) {
   const toast = useToast();
-  const ig = accounts.find((a) => a.platform === "instagram") ?? null;
+  // The page hands over the account this post goes out on (pinned, else the picked profile). With two or more
+  // Instagram accounts connected, the creator picks one here and the post is pinned to it when saved.
+  const first = accounts.find((a) => a.platform === "instagram") ?? null;
+  const own = (choices ?? []).filter((a) => a.platform === "instagram");
+  const options = own.length ? own : first ? [first] : [];
+  const many = options.length > 1;
+  const [igId, setIgId] = useState<string | null>(first?.id ?? options[0]?.id ?? null);
+  const ig = options.find((a) => a.id === igId) ?? first;
   const igReady = ig?.status === "connected";
   const target = initialPost?.targets.find((t) => t.platform === "instagram");
 
@@ -170,7 +191,7 @@ export function FormatComposer({ accounts, initialPost, initialFormat, tz, conne
         }
       } catch (e) {
         if (ctrl.signal.aborted) return;
-        patch(s.key, { status: "failed", error: e instanceof ApiError ? e.message : "Something got in the way." });
+        patch(s.key, { status: "failed", error: uploadError(e) });
       } finally {
         if (aborts.current.get(s.key) === ctrl) aborts.current.delete(s.key);
       }
@@ -283,7 +304,7 @@ export function FormatComposer({ accounts, initialPost, initialFormat, tz, conne
               title: (words.split("\n")[0] || `Instagram ${FORMAT_LABEL[format].toLowerCase()}`).slice(0, 120),
               format,
               items,
-              targets: [{ platform: "instagram", caption: words || null, hashtags: takesCaption(format) ? hashtags.trim() || null : null }],
+              targets: [{ platform: "instagram", ...(many && ig ? { accountId: ig.id } : {}), caption: words || null, hashtags: takesCaption(format) ? hashtags.trim() || null : null }],
             },
           });
           if (!postIdRef.current) {
@@ -304,11 +325,11 @@ export function FormatComposer({ accounts, initialPost, initialFormat, tz, conne
       chain.current = next;
       return next as Promise<string | null>;
     },
-    [savable, uploading, gate.errors, done, format, caption, hashtags, toast],
+    [savable, uploading, gate.errors, done, format, caption, hashtags, toast, many, ig],
   );
 
   // Save as you go once the files are up and the post has its shape.
-  const fingerprint = JSON.stringify([format, done.map((s) => [s.media!.id, s.altText]), caption, hashtags]);
+  const fingerprint = JSON.stringify([format, done.map((s) => [s.media!.id, s.altText]), caption, hashtags, many ? ig?.id : null]);
   const lastSaved = useRef<string | null>(initialPost ? fingerprint : null);
   useEffect(() => {
     if (phase !== "edit" || !savable || lastSaved.current === fingerprint) return;
@@ -318,6 +339,70 @@ export function FormatComposer({ accounts, initialPost, initialFormat, tz, conne
     }, 1000);
     return () => clearTimeout(t);
   }, [fingerprint, savable, phase, save]);
+
+  /* ================= assistant ================= */
+  // 1133: once the photos are up, the Outlly assistant looks at them (and reads any words in them) and writes the
+  // caption, hashtags and a description for each photo. On its own it only fills what is still empty;
+  // "Write again" replaces the caption and hashtags, and any description it wrote before.
+  const [ai, setAi] = useState<"idle" | "reading" | "done">("idle");
+  const aiSeen = useRef(new Set<string>(slides.map((s) => s.media?.id).filter((x): x is string => !!x)));
+  const aiAlt = useRef(new Map<string, string>());
+  const aiCtrl = useRef<AbortController | null>(null);
+  useEffect(() => () => aiCtrl.current?.abort(), []);
+  const photoIds = done.filter((s) => s.kind === "image").map((s) => s.media!.id);
+  const photoKey = photoIds.join(",");
+  const canWrite = takesCaption(format) && photoIds.length > 0;
+
+  const writeWithAi = useCallback(
+    async (auto: boolean) => {
+      const ids = photoKey ? photoKey.split(",") : [];
+      if (!ids.length || (format !== "photo" && format !== "carousel")) return;
+      aiCtrl.current?.abort();
+      const ctrl = new AbortController();
+      aiCtrl.current = ctrl;
+      for (const id of ids) aiSeen.current.add(id);
+      setAi("reading");
+      try {
+        const r = await api<{ caption?: string; hashtags?: string; slides?: { mediaId: string; altText: string }[]; skipped?: string }>("/api/ai/photo-caption", {
+          method: "POST",
+          json: { mediaIds: ids, format, auto },
+          signal: ctrl.signal,
+        });
+        if (ctrl.signal.aborted) return;
+        if (r.skipped || !r.caption) return setAi("idle");
+        setCaption((c) => (auto && c.trim() ? c : r.caption!));
+        setHashtags((h) => (auto && h.trim() ? h : r.hashtags ?? h));
+        const alts = new Map((r.slides ?? []).filter((x) => x.altText).map((x) => [x.mediaId, x.altText]));
+        setSlides((xs) =>
+          xs.map((s) => {
+            const id = s.media?.id;
+            const alt = id ? alts.get(id) : undefined;
+            if (!id || !alt || s.kind !== "image") return s;
+            const mine = s.altText.trim() && s.altText !== aiAlt.current.get(id);
+            if (mine) return s;
+            aiAlt.current.set(id, alt);
+            return { ...s, altText: alt };
+          }),
+        );
+        setAi("done");
+      } catch (e) {
+        if (ctrl.signal.aborted) return;
+        setAi("idle");
+        if (!auto) toast(e instanceof ApiError ? e.message : "The assistant couldn't reach your photos. Try again.", "error");
+      } finally {
+        if (aiCtrl.current === ctrl) aiCtrl.current = null;
+      }
+    },
+    [photoKey, format, toast],
+  );
+
+  // On its own once uploads settle, for photos it hasn't seen yet.
+  useEffect(() => {
+    if (phase !== "edit" || uploading || !canWrite) return;
+    if (!photoKey.split(",").some((id) => !aiSeen.current.has(id))) return;
+    const t = setTimeout(() => void writeWithAi(true), 500);
+    return () => clearTimeout(t);
+  }, [photoKey, uploading, phase, canWrite, writeWithAi]);
 
   const connect = async () => {
     const id = savable ? await save({ force: true }) : postIdRef.current;
@@ -470,9 +555,24 @@ export function FormatComposer({ accounts, initialPost, initialFormat, tz, conne
 
         {takesCaption(format) ? (
           <section aria-labelledby="cap-title" className="glass mt-8 rounded-[28px] p-5">
-            <h2 id="cap-title" className="text-base font-semibold">
-              <label htmlFor="ig-caption">Caption</label>
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id="cap-title" className="text-base font-semibold">
+                <label htmlFor="ig-caption">Caption</label>
+              </h2>
+              <Button type="button" variant="subtle" size="md" disabled={!canWrite || ai === "reading"} onClick={() => void writeWithAi(false)}>
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+                {ai === "reading" ? "Reading your photos…" : ai === "done" ? "Write again" : "Write with assistant"}
+              </Button>
+            </div>
+            <p aria-live="polite" className="mt-1 text-xs text-muted-foreground">
+              {ai === "reading"
+                ? "The Outlly assistant is looking at your photos and reading any words in them."
+                : ai === "done"
+                  ? "Written by the Outlly assistant from your photos, with a description for each one. Change anything you like."
+                  : canWrite
+                    ? "The assistant can write this from your photos."
+                    : "Add photos and the assistant writes the caption for you."}
+            </p>
             <textarea id="ig-caption" value={caption} onChange={(e) => setCaption(e.target.value)} rows={5} placeholder="Say what this is about. The first line shows before 'more'."
               className="mt-3 w-full resize-y rounded-2xl bg-background/60 p-3 text-base leading-relaxed hairline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
             <label htmlFor="ig-tags" className="mt-3 block text-sm font-medium">Hashtags</label>
@@ -493,11 +593,29 @@ export function FormatComposer({ accounts, initialPost, initialFormat, tz, conne
           <div className="flex items-center gap-3">
             <PlatformOrb platform="instagram" size={36} />
             <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold">{ig ? ig.username : "Instagram"}</p>
+              <p className="truncate font-semibold">{ig ? (many ? `Posting to ${handle(ig.username)}` : ig.username) : "Instagram"}</p>
               <p className="text-sm text-muted-foreground">{igReady ? (ig?.mock ? "Practice account: nothing reaches Instagram" : `Goes up as a ${label}`) : ig ? "Needs you to reconnect" : "Not connected yet"}</p>
             </div>
             {!igReady && <Button variant="primary" onClick={() => void connect()}>{ig ? "Reconnect" : "Connect"}</Button>}
           </div>
+          {many && ig && (
+            <div role="radiogroup" aria-label="Which Instagram account should this go to?" onKeyDown={radioKeys(options.map((a) => a.id), ig.id, setIgId)} className="mt-4 grid gap-2 sm:grid-cols-2">
+              {options.map((a) => {
+                const on = a.id === ig.id;
+                return (
+                  <button key={a.id} type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1} onClick={() => setIgId(a.id)}
+                    className={cn("flex min-h-[52px] items-center gap-3 rounded-[18px] px-3 text-left transition hairline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-foreground text-background" : "hover:bg-secondary/60")}>
+                    <PlatformOrb platform="instagram" size={28} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold">{handle(a.username)}</span>
+                      <span className={cn("block text-xs", on ? "text-background/70" : "text-muted-foreground")}>{a.status === "connected" ? (a.mock ? "Practice account" : "Ready to post") : "Needs reconnecting"}</span>
+                    </span>
+                    {on && <Check className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           <div role="radiogroup" aria-label="When should this go live?" onKeyDown={radioKeys(["now", "schedule"] as const, mode, setMode)} className="mt-5 grid grid-cols-2 gap-2 rounded-full bg-secondary/60 p-1.5 hairline">
             {(["now", "schedule"] as const).map((m) => (

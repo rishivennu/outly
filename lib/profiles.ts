@@ -135,6 +135,11 @@ export async function pinTargets(user: Pick<SessionUser, "id" | "scope">, wants:
  * One account per platform for the composer: the one each destination will go out on. The composer was
  * built around one account per platform, so it keeps working unchanged with several.
  */
+/** 1133: every account this person can post to on one platform (the composer's account picker). */
+export async function platformAccounts(user: Pick<SessionUser, "id" | "scope">, platform: string) {
+  return (await ownAccounts(user.id)).filter((a) => a.platform === platform && inScope(user.scope, a.id));
+}
+
 export async function composerAccounts(user: Pick<SessionUser, "id" | "scope">, pinned: Record<string, string | null> = {}) {
   const [all, active] = await Promise.all([ownAccounts(user.id), activeProfile(user)]);
   const out = [];
