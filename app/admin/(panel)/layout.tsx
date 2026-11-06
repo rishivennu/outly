@@ -55,7 +55,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         {sweep?.stale && (
           <div role="alert" className="mb-6 flex flex-wrap items-start gap-3 rounded-[20px] bg-warning/12 px-4 py-3 text-[13.5px] hairline">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
-            <span className="min-w-[16rem] flex-1">
+            <span className="min-w-0 flex-1 sm:min-w-[16rem]">
               <strong className="font-semibold">Scheduled posts aren't going out on time.</strong>{" "}
               The minute sweep {sweep.lastAt === null ? "has no recorded run yet" : `last ran ${ago(Date.now() - sweep.lastAt)}`}
               {late > 0 ? `, and ${late} scheduled post${late === 1 ? " is" : "s are"} overdue` : ""}. {SWEEP_FIX[sweep.source]}

@@ -10,7 +10,7 @@ import { PlatformGlyph } from "@/components/shared/PlatformIcon";
 import { useUser } from "@/components/shell/UserContext";
 import { api, ApiError } from "@/lib/client/api";
 import { PLATFORM_META } from "@/lib/domain";
-import { isProfileImg, litTicks, publicLinks, viewsLabel, type CardStat, type ProfileCardView } from "@/lib/profile-card-core";
+import { isProfileImg, litTicks, profileSetUp, publicLinks, viewsLabel, type CardStat, type ProfileCardView } from "@/lib/profile-card-core";
 import type { CropKind } from "@/lib/profile-crop";
 import { cn } from "@/lib/utils";
 import { ImageCropper } from "./ImageCropper";
@@ -63,6 +63,7 @@ export function CreatorProfileCard() {
   const shown = card ? publicLinks(card.links) : [];
   const lit = card ? litTicks(card.progress, TICKS) : 0;
   const m = (x: object) => (reduce ? PC.fade : x);
+  const compact = profileSetUp(card);
 
   return (
     <motion.section {...m(PC.card)} className="pcard relative mx-auto w-full max-w-[560px] overflow-hidden rounded-[32px]" aria-labelledby={`${ids}-name`} aria-busy={loading}>
@@ -76,14 +77,29 @@ export function CreatorProfileCard() {
             <span aria-hidden="true" className="pcard-art absolute inset-0" />
           )}
         </motion.div>
-        <div className="absolute right-3 top-3 flex gap-2 sm:right-4 sm:top-4">
-          <button type="button" onClick={() => edit("name")} className="pcard-pill" disabled={!card}>
-            <PenLine className="h-4 w-4" aria-hidden="true" /> Edit Profile
-          </button>
-        </div>
-        <button type="button" onClick={() => setCrop("banner")} className="pcard-cover-btn absolute bottom-3 right-3 sm:right-4" disabled={!card}>
-          <Camera className="h-4 w-4" aria-hidden="true" /> <span>Change Cover</span>
-        </button>
+        {compact ? (
+          // Set up already: two quiet icons in the cover's corner, clear of the name, avatar and stats. Same sheet,
+          // same cropper, same save as the full buttons; the label is the tooltip (hover or keyboard focus).
+          <div className="absolute right-2 top-2 flex gap-1.5 sm:right-3 sm:top-3" role="group" aria-label="Edit your card">
+            <button type="button" onClick={() => edit("name")} className="pcard-icon-btn" aria-label="Edit profile details" data-tip="Edit details">
+              <PenLine className="h-[18px] w-[18px]" aria-hidden="true" />
+            </button>
+            <button type="button" onClick={() => setCrop("banner")} className="pcard-icon-btn" aria-label="Change cover image" data-tip="Change cover">
+              <Camera className="h-[18px] w-[18px]" aria-hidden="true" />
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="absolute right-3 top-3 flex gap-2 sm:right-4 sm:top-4">
+              <button type="button" onClick={() => edit("name")} className="pcard-pill" disabled={!card}>
+                <PenLine className="h-4 w-4" aria-hidden="true" /> Edit Profile
+              </button>
+            </div>
+            <button type="button" onClick={() => setCrop("banner")} className="pcard-cover-btn absolute bottom-3 right-3 sm:right-4" disabled={!card}>
+              <Camera className="h-4 w-4" aria-hidden="true" /> <span>Change Cover</span>
+            </button>
+          </>
+        )}
       </div>
 
       <div className="relative px-5 pb-5 sm:px-7 sm:pb-7">
@@ -91,7 +107,7 @@ export function CreatorProfileCard() {
         <div className="flex items-end justify-between gap-4">
           <motion.div {...m(PC.avatar)} className="pcard-avatar relative -mt-12 shrink-0 sm:-mt-14">
             <OrbAvatar avatar={avatar} seed={user.email} size={112} className="pcard-avatar-img" label={`${name}'s picture`} />
-            <button type="button" onClick={() => setCrop("avatar")} className="pcard-avatar-btn" aria-label="Change Picture" disabled={!card}>
+            <button type="button" onClick={() => setCrop("avatar")} className="pcard-avatar-btn" aria-label="Change Picture" title="Change picture" disabled={!card}>
               <Camera className="h-4 w-4" aria-hidden="true" />
             </button>
           </motion.div>

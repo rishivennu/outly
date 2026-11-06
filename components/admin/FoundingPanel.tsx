@@ -139,12 +139,12 @@ export function FoundingPanel({ initial }: { initial: FoundingState }) {
         {st.members.length === 0 ? (
           <Empty title="No founding members yet" body="Open the seats. Customers are numbered as their first payment goes through." />
         ) : (
-          <Table label="Founding members" head={["No.", "Member", "Discount", "Joined", <span key="a" className="sr-only">Action</span>]}>
+          <Table label="Founding members" lead={1} head={["No.", "Member", "Discount", "Joined", <span key="a" className="sr-only">Action</span>]}>
             {st.members.map((m) => (
               <tr key={m.id}>
                 <td className="whitespace-nowrap font-display text-[15px] font-bold tabular">#{m.no}</td>
                 <td className="max-w-[320px] truncate">{m.name ? `${m.name} (${m.email})` : m.email}</td>
-                <td className="whitespace-nowrap text-muted-foreground">
+                <td className="text-muted-foreground sm:whitespace-nowrap">
                   {m.pct}% for life
                   {!m.paid && <Pill className="ml-2" tone="muted">held, unpaid: badge hidden</Pill>}
                 </td>

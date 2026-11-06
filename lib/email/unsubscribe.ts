@@ -19,6 +19,7 @@ export const MARKETING: Partial<Record<string, List>> = {
   nudge: "news",
   winback: "news",
   growth: "news",
+  announcement: "news",
   weekly_report: "weekly",
 };
 

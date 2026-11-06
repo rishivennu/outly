@@ -35,6 +35,8 @@ async function sweep(req: NextRequest) {
   const reminders = await sweepReminders().catch((e) => (console.error("[sweep] reminders", e), null));
   const push = await drainOutbox().catch((e) => (console.error("[sweep] push", e), null));
   const assist = await import("@/lib/retention/sweep-notify").then((m) => m.sweepNotify()).catch((e) => (console.error("[sweep] notify", e), null)); // 1141 greetings, inactivity, event queue
+  // 1142: the one-time waitlist update email. Fixes its cutoff on the first sweep after deploy; sends a short batch once launched.
+  const campaign = await import("@/lib/campaigns").then((m) => m.sweepCampaigns()).catch((e) => (console.error("[sweep] campaign", e), null));
   if (new Date().getMinutes() === 7) await cleanupSubs().catch(() => 0);
   await import("@/lib/accounts").then((m) => m.resubscribeCommentsOnce()).catch((e) => console.error("[sweep] comment subs", e)); // 1141b, runs once
   await import("@/lib/analytics/sync").then((m) => m.syncMetrics({ budgetMs: 8_000 })).catch((e) => console.error("[sweep] metrics", e)); // 1140 analytics background sync
@@ -42,7 +44,7 @@ async function sweep(req: NextRequest) {
   // (1027). Budget = what is left of maxDuration minus 10 s of headroom; whatever is still running then is
   // held by waitUntil or picked up by the next sweep.
   const running = await settle(Math.max(0, 50_000 - (Date.now() - startedAt)));
-  return NextResponse.json({ ok: true, requeued, cleaned, files, reminders, push, assist, running }, { headers: { "cache-control": "no-store" } });
+  return NextResponse.json({ ok: true, requeued, cleaned, files, reminders, push, assist, campaign, running }, { headers: { "cache-control": "no-store" } });
 }
 
 export const GET = sweep;

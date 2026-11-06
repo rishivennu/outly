@@ -6,7 +6,7 @@ import { SAMPLE_DOMAIN } from "@/lib/admin/sample";
 import { PLATFORMS, PLATFORM_META } from "@/lib/domain";
 import { Card, Empty, PageHead, Pill, Table, ago, fmtDate } from "@/components/admin/ui";
 import { DataSwap } from "@/components/shared/DataSwap";
-import { FilterChips, FilterSelect, SearchBox } from "@/components/admin/SearchBox";
+import { FilterChips, FilterSelect, MoreFilters, SearchBox } from "@/components/admin/SearchBox";
 import { RefreshButton } from "@/components/admin/RefreshButton";
 import { looksRelayed, placeLabel } from "@/lib/geo";
 
@@ -123,20 +123,27 @@ export default async function Users(props: { searchParams: Promise<Params> }) {
         actions={<RefreshButton total={total} loadedAt={new Date().toISOString()} />}
       />
       <Card>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        {/* Phones: status chips in one sideways row, search on its own full-width row, Plan + Sort side by side,
+            the rest behind "More filters". From 640px: chips and search share a row, every filter sits in one
+            row that wraps only when it runs out of room. All of it lives in the URL, so it survives refresh and back. */}
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <FilterChips param="f" current={f} options={[{ value: "", label: "All" }, { value: "paying", label: "Paying" }, { value: "active", label: "Active 7d" }, { value: "dormant", label: "Dormant" }]} />
           <SearchBox placeholder="Search name or email" />
         </div>
-        <div role="group" aria-label="More filters" className="mb-4 flex flex-wrap items-end gap-2.5 border-t border-border/60 pt-3">
-          <FilterSelect param="plan" label="Plan" current={plan} options={PLANS} />
-          <FilterSelect param="joined" label="Joined" current={joined} options={JOINED} />
-          <FilterSelect param="platform" label="Connected" current={platform} options={PLATS} />
-          <FilterSelect param="tag" label="Who" current={tag} options={TAGS} />
-          <FilterSelect param="sort" label="Sort" current={sort} options={SORTS} />
-          {narrowing + (sort ? 1 : 0) > 0 && (
-            <Link href="/admin/users" scroll={false} className="inline-flex h-11 items-center rounded-full px-4 text-[13px] font-medium text-muted-foreground hover:bg-secondary hover:text-foreground">
-              Clear filters
+        <div role="group" aria-label="More filters" className="mb-4 grid grid-flow-row-dense grid-cols-2 items-end gap-2.5 border-t border-border/60 pt-3 sm:flex sm:flex-wrap">
+          <FilterSelect fill param="plan" label="Plan" current={plan} options={PLANS} />
+          <FilterSelect fill param="sort" label="Sort" current={sort} options={SORTS} />
+          <MoreFilters active={[joined, platform, tag].filter(Boolean).length}>
+            <FilterSelect fill param="joined" label="Joined" current={joined} options={JOINED} />
+            <FilterSelect fill param="platform" label="Connected" current={platform} options={PLATS} />
+            <FilterSelect fill param="tag" label="Who" current={tag} options={TAGS} />
+          </MoreFilters>
+          {narrowing + (sort ? 1 : 0) > 0 ? (
+            <Link href="/admin/users" scroll={false} className="inline-flex h-11 items-center justify-center rounded-full px-4 text-[13px] font-medium text-muted-foreground hairline hover:bg-secondary hover:text-foreground">
+              Clear all
             </Link>
+          ) : (
+            <span aria-hidden className="sm:hidden" />
           )}
         </div>
         <DataSwap k={[q, f, plan, joined, platform, tag, sort, page].join("|")}>

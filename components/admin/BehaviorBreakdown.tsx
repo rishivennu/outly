@@ -4,6 +4,7 @@ import { Area, Bar, BarChart, CartesianGrid, ComposedChart, Line, ResponsiveCont
 import type { BehaviorStats } from "@/lib/admin/behavior";
 import { cn } from "@/lib/utils";
 import { Card, CardTitle, Empty, Pill, Table, ago } from "./ui";
+import { ScrollX } from "@/components/ui/scroll-x";
 import { hoursText, pct, pname } from "./behavior-fmt";
 import { MOTION_OK, countUp, gsap, settleCounts, useGSAP } from "@/lib/motion/gsap";
 
@@ -119,7 +120,7 @@ export function BehaviorBreakdown({ s, active = true }: { s: BehaviorStats; acti
 
       <Card className="gs-in">
         <CardTitle hint="Share of each weekly sign-up group that was active in each week after joining">Weekly cohorts</CardTitle>
-        <div className="relative -mx-5 overflow-x-auto px-5 sm:-mx-6 sm:px-6">
+        <ScrollX label="Weekly cohorts" className="pin-first -mx-5 px-5 sm:-mx-6 sm:px-6">
           <table className="w-full min-w-[620px] border-separate border-spacing-1 text-[12px]">
             <thead>
               <tr>
@@ -142,7 +143,7 @@ export function BehaviorBreakdown({ s, active = true }: { s: BehaviorStats; acti
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollX>
       </Card>
 
       <div className="grid gap-4 [&>*]:min-w-0 lg:grid-cols-3">
@@ -198,7 +199,7 @@ export function BehaviorBreakdown({ s, active = true }: { s: BehaviorStats; acti
         <Card className="gs-in">
           <CardTitle hint={`Accounts connected now; publishing in the last ${s.rangeDays} days, rehearsals excluded`}>Platforms</CardTitle>
           {s.platforms.length ? (
-            <Table head={["Platform", "Connected", "Needs reconnect", "Publishes", "Success"]} className="[&_table]:min-w-[520px]">
+            <Table head={["Platform", "Connected", "Needs reconnect", "Publishes", "Success"]} minWidth={520}>
               {s.platforms.map((p) => (
                 <tr key={p.platform}>
                   <td className="font-medium">{pname(p.platform)}</td>

@@ -143,7 +143,7 @@ export function BetaPanel({ initial }: { initial: BetaState }) {
           <p className="flex items-center gap-2 font-display text-[15px] font-semibold"><Gift className="h-4 w-4" aria-hidden /> Make a code by hand</p>
           <p className="mt-1 text-[12.5px] text-muted-foreground">For a partner or a giveaway. Works for any account, once, and doesn't use a seat.</p>
           <div className="mt-3 flex flex-wrap items-end gap-2">
-            <div className="min-w-[14rem] flex-1">
+            <div className="min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[14rem]">
               <Label htmlFor="beta-note">Who it's for (optional)</Label>
               <Input id="beta-note" value={note} maxLength={120} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Priya, creator meetup" />
             </div>

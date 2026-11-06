@@ -59,7 +59,7 @@ export function NotificationsPanel({ initial, adminLogin }: { initial: NotifyCon
   const greet = (s: GreetSlot, p: { on?: boolean; lines?: string[] }) => save({ greet: { [s]: p } }, "Greeting saved.", `greet-${s}`);
 
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-1 gap-4">
       <Card>
         <CardTitle
           hint="The emergency brake. Push and email stop for everyone; the bell keeps filling, so nothing is lost, and essential alerts (a sign-out, a failed payment) still go out."
@@ -195,7 +195,7 @@ export function NotificationsPanel({ initial, adminLogin }: { initial: NotifyCon
           <span className="flex items-center gap-2"><Send className="h-4 w-4" aria-hidden="true" /> Test send</span>
         </CardTitle>
         <div className="flex flex-wrap items-end gap-3 rounded-[18px] p-4 hairline">
-          <div className="min-w-[16rem] flex-1">
+          <div className="min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[16rem]">
             <Label htmlFor="nt-to">Your own creator account</Label>
             <Input id="nt-to" type="email" className="mt-1" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>

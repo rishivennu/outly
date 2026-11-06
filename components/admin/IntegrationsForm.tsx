@@ -19,7 +19,7 @@ type Pay = {
   youpi: { gatewayUrl: string; merchantId: string; webhookSecret: Secret; minVerification: 1 | 2 };
   business: { name: string; address: string; gstin: string; taxPercent: number };
 };
-type Mailer = { provider: "mock" | "resend"; from: string; marketingFrom?: string; replyTo: string; resend: { apiKey: Secret } };
+type Mailer = { provider: "mock" | "resend"; from: string; marketingFrom?: string; replyTo: string; resend: { apiKey: Secret; webhookSecret?: Secret } };
 /** undefined = keep, "" = keep, string = replace, null = remove */
 export type SecretEdit = string | null | undefined;
 
@@ -106,13 +106,14 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
   const [mail, setMail] = useState(email);
   const [m, setM] = useState({ provider: email.provider, from: email.from, marketingFrom: email.marketingFrom ?? "", replyTo: email.replyTo });
   const [ms, setMs] = useState<SecretEdit>(undefined);
+  const [mw, setMw] = useState<SecretEdit>(undefined);
   const [to, setTo] = useState("");
   const [mBusy, setMBusy] = useState<"save" | "test" | null>(null);
   const [mRes, setMRes] = useState<{ ok: boolean; message: string } | null>(null);
 
   const sec = (k: string) => (ps[k] === undefined || ps[k] === "" ? undefined : ps[k]);
   const pDirty = JSON.stringify({ provider: pay.provider, mode: pay.mode, stripePk: pay.stripe.publishableKey, rzpId: pay.razorpay.keyId, ppId: pay.paypal.clientId, ppHook: pay.paypal.webhookId, ypUrl: pay.youpi?.gatewayUrl ?? "", ypId: pay.youpi?.merchantId ?? "", ypLevel: pay.youpi?.minVerification ?? 1, business: pay.business }) !== JSON.stringify(p) || Object.values(ps).some((v) => v !== undefined && v !== "");
-  const mDirty = JSON.stringify({ provider: mail.provider, from: mail.from, marketingFrom: mail.marketingFrom ?? "", replyTo: mail.replyTo }) !== JSON.stringify(m) || (ms !== undefined && ms !== "");
+  const mDirty = JSON.stringify({ provider: mail.provider, from: mail.from, marketingFrom: mail.marketingFrom ?? "", replyTo: mail.replyTo }) !== JSON.stringify(m) || (ms !== undefined && ms !== "") || (mw !== undefined && mw !== "");
 
   const missing =
     p.provider === "stripe" ? !(pay.stripe.secretKey.set || sec("stripe.secretKey")) || ps["stripe.secretKey"] === null
@@ -163,9 +164,10 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
     setMBusy("save");
     setMRes(null);
     try {
-      const r = await adminApi<{ email: Mailer }>("/api/admin/integrations", { method: "PUT", json: { key: "email", patch: { ...m, resend: { apiKey: ms === "" ? undefined : ms } } } });
+      const r = await adminApi<{ email: Mailer }>("/api/admin/integrations", { method: "PUT", json: { key: "email", patch: { ...m, resend: { apiKey: ms === "" ? undefined : ms, webhookSecret: mw === "" ? undefined : mw } } } });
       setMail(r.email);
       setMs(undefined);
+      setMw(undefined);
       toast("Email settings saved");
     } catch (e: any) {
       setMRes({ ok: false, message: e.message });
@@ -338,7 +340,9 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
           <div><Label htmlFor="em-mf">Marketing from (optional)</Label><Input id="em-mf" value={m.marketingFrom} onChange={(e) => setM((x) => ({ ...x, marketingFrom: e.target.value }))} placeholder="Outlly <hi@news.outlly.com>" /><p className="mt-1.5 text-[12px] text-muted-foreground">Nudges, win-back, weekly report. Empty = same as From.</p></div>
           <div><Label htmlFor="em-r">Reply-to (optional)</Label><Input id="em-r" type="email" value={m.replyTo} onChange={(e) => setM((x) => ({ ...x, replyTo: e.target.value }))} placeholder="support@yourdomain.com" /></div>
           <div className={cn("liquid-panel sm:col-span-2")} data-open={m.provider === "resend"}>
-            <div><div className="liquid-inner"><SecretField id="em-k" label="Resend API key" saved={mail.resend.apiKey} value={ms} onChange={setMs} placeholder="re_…" /></div></div>
+            <div><div className="liquid-inner"><SecretField id="em-k" label="Resend API key" saved={mail.resend.apiKey} value={ms} onChange={setMs} placeholder="re_…" />
+              <div className="mt-4"><SecretField id="em-w" label="Webhook signing secret (optional)" saved={mail.resend.webhookSecret ?? { set: false, last4: "" }} value={mw} onChange={setMw} placeholder="whsec_…" /></div>
+              <p className="mt-1.5 text-[12px] text-muted-foreground">In Resend, add a webhook to <span className="font-mono">/api/webhooks/resend</span> on your live domain for delivered, bounced, complained and failed events, then paste its secret here. Campaigns then show real delivery.</p></div></div>
           </div>
         </div>
         <Result r={mRes} />

@@ -348,6 +348,14 @@ export interface ProfileCardView {
   fetchedAt: string;
 }
 
+/**
+ * 1142: the creator has made the card their own (saved a bio, handle, niche or cover). From then on the card's
+ * edit controls shrink to two quiet icons (pencil, camera) so they stop covering the cover; before that the full
+ * "Edit Profile" and "Change Cover" buttons stay, as the prompt to set the card up.
+ */
+export const profileSetUp = (c: Pick<ProfileCardView, "bio" | "handle" | "niche" | "banner"> | null | undefined) =>
+  !!c && !!(c.bio?.trim() || c.handle?.trim() || c.niche?.trim() || c.banner);
+
 /** Uploaded profile images: "/api/u/img/avatar-<userId>-<rand>". The id keeps the file the owner's; rand busts caches. */
 export const IMG_NAME_RE = /^(avatar|banner)-([a-z0-9]{8,40})-([a-z0-9]{12,32})$/;
 export const IMG_PREFIX = "/api/u/img/";

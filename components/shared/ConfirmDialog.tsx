@@ -18,13 +18,15 @@ interface Props {
   extra?: React.ReactNode;
   /** "wide" fits a small form (e.g. an email composer) */
   size?: "default" | "wide";
+  /** Confirm stays off until the caller's precondition holds (e.g. "I checked the preview"). */
+  disabled?: boolean;
 }
 
 /**
  * Small glass confirmation for destructive actions. Radix gives it the focus
  * trap, Escape handling and aria-modal; the cancel button keeps initial focus.
  */
-export function ConfirmDialog({ open, onOpenChange, title, body, confirmLabel, cancelLabel = "Keep it", busy, tone = "danger", onConfirm, extra, size = "default" }: Props) {
+export function ConfirmDialog({ open, onOpenChange, title, body, confirmLabel, cancelLabel = "Keep it", busy, tone = "danger", onConfirm, extra, size = "default", disabled = false }: Props) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <AnimatePresence>
@@ -54,7 +56,7 @@ export function ConfirmDialog({ open, onOpenChange, title, body, confirmLabel, c
                         {cancelLabel}
                       </Button>
                     </Dialog.Close>
-                    <Button variant={tone} className="min-w-[8rem] flex-1" onClick={onConfirm} disabled={busy}>
+                    <Button variant={tone} className="min-w-[8rem] flex-1" onClick={onConfirm} disabled={busy || disabled}>
                       {busy ? "Working…" : confirmLabel}
                     </Button>
                   </div>

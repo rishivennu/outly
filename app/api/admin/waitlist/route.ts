@@ -5,14 +5,27 @@ import { adminRoute } from "@/lib/admin/route";
 // Bulk email (back-online notice, waitlist invites) can run for up to ~40 s; give the function room.
 export const maxDuration = 60;
 import { getConfig } from "@/lib/settings";
-import { inviteWaitlist, setWaitlist, waitlistCounts, waitlistRecent } from "@/lib/site";
+import { inviteWaitlist, setWaitlist, waitlistCounts, waitlistList, type WaitlistQuery } from "@/lib/site";
 
-async function state() {
+/** Table filters from the query string (1142). Anything odd falls back to the default rather than erroring. */
+const List = z.object({
+  q: z.string().max(120).optional().catch(undefined),
+  from: z.string().max(10).optional().catch(undefined),
+  to: z.string().max(10).optional().catch(undefined),
+  sort: z.enum(["new", "old"]).optional().catch(undefined),
+  status: z.enum(["all", "waiting", "invited"]).optional().catch(undefined),
+  page: z.coerce.number().int().min(1).max(100_000).optional().catch(undefined),
+  per: z.coerce.number().int().min(5).max(100).optional().catch(undefined),
+});
+
+/** The switch, the counts and one page of members. Counts and members come from WaitlistEntry, whatever the switch says. */
+async function state(f: WaitlistQuery = {}) {
   const c = await getConfig("site");
-  return { waitlist: !!c.waitlist, since: c.waitlistSince, counts: await waitlistCounts(), recent: await waitlistRecent(50) };
+  const [counts, list] = await Promise.all([waitlistCounts(), waitlistList(f)]);
+  return { waitlist: !!c.waitlist, since: c.waitlistSince, counts, list };
 }
 
-export const GET = adminRoute("site", async () => json(await state()));
+export const GET = adminRoute("site", async (req) => json(await state(List.parse(Object.fromEntries(req.nextUrl.searchParams)))));
 
 const Put = z.object({ waitlist: z.boolean(), inviteAll: z.boolean().optional() });
 

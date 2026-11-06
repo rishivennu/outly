@@ -156,7 +156,7 @@ export function ReferralsPanel({ initial, plans }: { initial: { rows: Row[]; tot
       <Card className="lg:col-span-2">
         <CardTitle hint="Search by email or referral code. Flags are signals, not proof: check before you disqualify.">Referrals</CardTitle>
         <form className="mb-4 flex flex-wrap items-end gap-2" onSubmit={(e) => { e.preventDefault(); void load(); }}>
-          <div className="min-w-[14rem] flex-1">
+          <div className="min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[14rem]">
             <Label htmlFor="rf-q">Email or code</Label>
             <Input id="rf-q" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="name@example.com or ab12cd" />
           </div>

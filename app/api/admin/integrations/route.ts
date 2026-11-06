@@ -26,7 +26,7 @@ const Email = z.object({
   from: z.string().trim().max(120).regex(SENDER, "From must be an email, or Name <email>").optional(),
   marketingFrom: z.union([z.literal(""), z.string().trim().max(120).regex(SENDER, "Marketing from must be an email, or Name <email>")]).optional(),
   replyTo: z.union([z.literal(""), z.string().trim().email()]).optional(),
-  resend: z.object({ apiKey: secret }).optional(),
+  resend: z.object({ apiKey: secret, webhookSecret: secret }).optional(),
 });
 
 const WhatsApp = z.object({

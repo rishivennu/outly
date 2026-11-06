@@ -3,6 +3,7 @@ import { useState } from "react";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn, compact } from "@/lib/utils";
+import { ScrollX } from "@/components/ui/scroll-x";
 import { compareValue } from "@/lib/analytics/core";
 import type { AnalyticsSummary } from "@/lib/analytics";
 
@@ -56,7 +57,7 @@ export function Compare({ accounts }: { accounts: Acct[] }) {
         })}
       </div>
 
-      <div className="mt-5 overflow-x-auto">
+      <ScrollX label="Compare accounts" className="pin-first mt-5 [--pin-bg:var(--background)]">
         <table className="w-full min-w-[520px] text-sm">
           <caption className="sr-only">Comparable metrics for the accounts you picked, with each one&apos;s difference from the baseline.</caption>
           <thead>
@@ -95,7 +96,7 @@ export function Compare({ accounts }: { accounts: Acct[] }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
       <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
         Only metrics that mean the same thing everywhere are compared: views, posts published and engagement.
         {mixed ? " These are different platforms, and each one counts a view its own way, so read the gap as a direction, not a score." : " Followers and reach are left out because they are counted differently per platform and are never added together."}

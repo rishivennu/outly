@@ -143,7 +143,7 @@ export function LeadLists({ lists, total }: { lists: Record<LeadKind, LeadView[]
         {rows.length === 0 ? (
           <Empty title="Nobody on this list" body={temp ? "Try another temperature, or All." : "Good news: nobody is stuck at this step right now."} />
         ) : (
-          <Table label={meta.label} head={[
+          <Table label={meta.label} lead={1} head={[
             <label key="all" className="-m-3 inline-flex h-11 w-11 cursor-pointer items-center justify-center">
               <input type="checkbox" className="h-4 w-4 accent-[hsl(var(--lime))]" checked={allOn} disabled={!pickable.length} onChange={() => setPicked(allOn ? new Set() : new Set(pickable.map((l) => l.ref)))} aria-label={allOn ? "Unselect everyone" : `Select all ${pickable.length} not emailed this week`} />
             </label>,

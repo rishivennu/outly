@@ -99,7 +99,7 @@ export function WhatsAppCard({ initial }: { initial: WhatsAppView }) {
       </div>
 
       <div className="mt-5 flex flex-wrap items-end gap-2">
-        <div className="min-w-[14rem] flex-1">
+        <div className="min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[14rem]">
           <Label htmlFor="wa-to">Send a sample code to</Label>
           <Input id="wa-to" type="tel" inputMode="tel" autoComplete="off" value={to} onChange={(e) => setTo(e.target.value)} placeholder="+91 98765 43210" />
         </div>

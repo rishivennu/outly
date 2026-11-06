@@ -372,7 +372,7 @@ export function PricingLab() {
           ))}
         </ul>
         {lab.cancels.recent.length ? (
-          <Table label="Recent cancellations" head={["When", "Who", "Plan", "Reason", "Note", "Follow-up"]}>
+          <Table label="Recent cancellations" lead={1} head={["When", "Who", "Plan", "Reason", "Note", "Follow-up"]}>
             {lab.cancels.recent.map((f) => (
               <tr key={f.id}>
                 <td className="whitespace-nowrap">{fmtDate(f.createdAt)}</td>

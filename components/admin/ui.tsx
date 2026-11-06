@@ -1,4 +1,6 @@
+import * as React from "react";
 import { cn } from "@/lib/utils";
+import { ScrollX } from "@/components/ui/scroll-x";
 
 /** Server-safe building blocks for admin pages. */
 export function PageHead({ eyebrow, greet, title, body, actions }: { eyebrow?: string; greet?: React.ReactNode; title: string; body?: React.ReactNode; actions?: React.ReactNode }) {
@@ -65,26 +67,84 @@ export function Empty({ title, body, children }: { title: string; body?: string;
   );
 }
 
-/** A table that becomes a scroller on narrow screens instead of breaking the layout. */
-export function Table({ head, children, className, label = "Table" }: { head: React.ReactNode[]; children: React.ReactNode; className?: string; label?: string }) {
-  // Focusable so keyboard users can scroll it sideways on a phone (axe: scrollable-region-focusable).
+/** Plain text of a header cell, for the label each value carries in the phone card layout. */
+function headText(h: React.ReactNode): string {
+  if (h === null || h === undefined || typeof h === "boolean") return "";
+  if (typeof h === "string" || typeof h === "number") return String(h);
+  if (Array.isArray(h)) return h.map(headText).join("");
+  if (React.isValidElement<{ children?: React.ReactNode }>(h)) return headText(h.props.children);
+  return "";
+}
+/**
+ * What a column holds on the phone card: an sr-only header (e.g. "Action") or an empty one is a column of buttons;
+ * a header that is itself a control with no text (a select-all checkbox) is a row picker, pinned to the card's corner.
+ */
+function headKind(h: React.ReactNode): "action" | "select" | "field" {
+  if (typeof h === "string") return h.trim() === "" ? "action" : "field";
+  if (!React.isValidElement<{ className?: string }>(h)) return "field";
+  if (/\bsr-only\b/.test(h.props.className ?? "")) return "action";
+  return headText(h).trim() === "" ? "select" : "field";
+}
+
+type TableProps = {
+  head: React.ReactNode[];
+  children: React.ReactNode;
+  className?: string;
+  label?: string;
+  /**
+   * How the table behaves below 640px. "cards" (default): every row becomes a stacked card, the lead column as its
+   * title and every other cell under its own header label, so nothing hides off to the right. "scroll": the table
+   * stays a grid (for matrices that only make sense side by side) inside its own scroller, with the first column pinned.
+   */
+  mobile?: "cards" | "scroll";
+  /** Which column names the row (the card's title on phones). Defaults to the first. */
+  lead?: number;
+  /** Narrowest the table may get on wide screens before it scrolls inside its card. */
+  minWidth?: number;
+};
+
+/**
+ * The admin data table. From 640px up it is a normal table that scrolls inside its card if the card is narrower
+ * than it (never the page). On phones it turns into labelled cards (or a pinned-column scroller, see `mobile`).
+ * Labels are read from `head`, so every page gets the phone layout without changing how it writes its rows.
+ */
+export function Table({ head, children, className, label = "Table", mobile = "cards", lead = 0, minWidth = 640 }: TableProps) {
+  const labels = head.map(headText);
+  const kinds = head.map(headKind);
+  const rows = React.Children.map(children, (row) => {
+    if (!React.isValidElement<{ children?: React.ReactNode }>(row) || row.type !== "tr") return row;
+    let col = 0;
+    const cells = React.Children.map(row.props.children, (cell) => {
+      if (!React.isValidElement<{ colSpan?: number; "data-label"?: string }>(cell) || (cell.type !== "td" && cell.type !== "th")) return cell;
+      const i = col;
+      col += Math.max(1, Number(cell.props.colSpan) || 1);
+      const kind = Number(cell.props.colSpan) > 1 ? "full" : i === lead ? "lead" : (kinds[i] ?? "field");
+      // Explicit roles keep the table semantics when the phone layout turns rows into grid cards.
+      return React.cloneElement(cell as React.ReactElement<Record<string, unknown>>, {
+        role: cell.type === "th" ? "rowheader" : "cell",
+        "data-cell": kind,
+        "data-label": kind === "field" ? (cell.props["data-label"] ?? labels[i] ?? undefined) : undefined,
+      });
+    });
+    return React.cloneElement(row as React.ReactElement<Record<string, unknown>>, { role: "row" }, cells);
+  });
   return (
-    <div role="region" aria-label={label} tabIndex={0} className={cn("relative -mx-5 overflow-x-auto px-5 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring sm:-mx-6 sm:px-6", className)}>
-      <table className="w-full min-w-[640px] border-separate border-spacing-0 text-[13.5px]">
-        <thead>
-          <tr>
+    <ScrollX label={label} className={cn("atable -mx-5 px-5 sm:-mx-6 sm:px-6", mobile === "cards" ? "atable--cards" : "atable--scroll pin-first", className)}>
+      <table role="table" className="w-full border-separate border-spacing-0 text-[13.5px]" style={{ minWidth }}>
+        <thead role="rowgroup">
+          <tr role="row">
             {head.map((h, i) => (
-              <th key={i} scope="col" className="border-b border-border pb-2.5 pr-4 text-left text-[11.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground last:pr-0">
+              <th key={i} scope="col" role="columnheader" data-kind={kinds[i]} className="border-b border-border pb-2.5 pr-4 text-left text-[11.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground last:pr-0">
                 {h}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="[&_td]:border-b [&_td]:border-border/60 [&_td]:py-3 [&_td]:pr-4 [&_td:last-child]:pr-0 [&_tr:last-child_td]:border-0 [&_tr]:transition-colors [&_tr:hover]:bg-foreground/[0.02]">
-          {children}
+        <tbody role="rowgroup" className="[&_td]:border-b [&_td]:border-border/60 [&_td]:py-3 [&_td]:pr-4 [&_td:last-child]:pr-0 [&_tr:last-child_td]:border-0 [&_tr]:transition-colors [&_tr:hover]:bg-foreground/[0.02]">
+          {rows}
         </tbody>
       </table>
-    </div>
+    </ScrollX>
   );
 }
 

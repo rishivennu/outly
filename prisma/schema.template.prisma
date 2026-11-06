@@ -723,6 +723,47 @@ model WaitlistEntry {
   @@index([invitedAt, createdAt])
 }
 
+/// 1142: one-off email campaigns. `id` is the campaign key (outlly_waitlist_update_announcement_2026), so each
+/// campaign exists once. `cutoff` is fixed the first time the row is created and never moves: only waitlist members
+/// who joined before it are eligible, so people who join afterwards never get the historical email.
+model EmailCampaign {
+  id         String                   @id
+  subject    String
+  cutoff     DateTime
+  createdAt  DateTime                 @default(now())
+  launchedAt DateTime?
+  launchedBy String?
+  /// Every eligible address has its recipient row (set after the launch snapshot finishes; a crashed launch is refilled by the sweep).
+  snapshotAt DateTime?
+  doneAt     DateTime?
+  recipients EmailCampaignRecipient[]
+}
+
+/// One row per address per campaign (unique), written once at launch. The row, not the EmailLog, is the record of
+/// whether that person got it: pending -> sending -> accepted (Resend took it) -> delivered | bounced | complained,
+/// or failed / skipped (unsubscribed). A row that is not pending is never sent again.
+model EmailCampaignRecipient {
+  id          String        @id @default(cuid())
+  campaignId  String
+  email       String // lower-case, trimmed
+  waitlistId  String?
+  status      String        @default("pending") // pending | sending | accepted | delivered | bounced | complained | failed | skipped | mocked
+  attempts    Int           @default(0)
+  nextAt      DateTime      @default(now())
+  providerId  String?
+  emailLogId  String?
+  error       String?
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  campaign    EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, email])
+  @@index([campaignId, status, nextAt])
+  @@index([providerId])
+}
+
 /// In-app alerts (reconnect, failed post, goal nudge). `key` dedupes, so a sweep can run every minute safely.
 model Notice {
   id        String    @id @default(cuid())

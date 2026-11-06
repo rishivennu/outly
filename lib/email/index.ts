@@ -17,12 +17,14 @@ export interface Mail {
   html: string;
   /** Plain-text part. Built from `html` when left out, so no email ever goes out HTML-only. */
   text?: string;
-  kind: "invoice" | "ticket_opened" | "ticket_reply" | "test" | "subscription" | "maintenance" | "weekly_report" | "team_invite" | "referral" | "waitlist" | "notice" | "nudge" | "winback" | "growth" | "otp" | "security" | "beta" | "founding" | "pip_transcript";
+  kind: "invoice" | "ticket_opened" | "ticket_reply" | "test" | "subscription" | "maintenance" | "weekly_report" | "team_invite" | "referral" | "waitlist" | "notice" | "nudge" | "winback" | "growth" | "otp" | "security" | "beta" | "founding" | "pip_transcript" | "announcement";
   attachments?: { filename: string; content: Buffer }[];
   /** Secrets (a sign-in code) masked in the Outbox copy once a real provider has delivered the email. */
   redact?: string[];
   /** Personal content (a Pip transcript, 1126): the Outbox keeps only the subject once it really went out, never the body. */
   private?: boolean;
+  /** Resend Idempotency-Key (1142): a retry after a timeout can't send the same campaign email twice. */
+  idempotencyKey?: string;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface Mail {
  * and never leaves the server. A provider failure is logged and returned, never thrown, so a
  * payment or ticket is never rolled back because an email bounced.
  */
-export async function sendEmail(m: Mail, cfgOverride?: EmailConfig): Promise<{ ok: boolean; status: string; error?: string; id: string }> {
+export async function sendEmail(m: Mail, cfgOverride?: EmailConfig): Promise<{ ok: boolean; status: string; error?: string; id: string; providerId?: string; code?: number }> {
   const cfg = cfgOverride ?? (await getConfig("email"));
   const list = listFor(m.kind);
   // Marketing to someone who pressed Unsubscribe: don't send, but leave a row so the Outbox explains the gap.
@@ -42,6 +44,8 @@ export async function sendEmail(m: Mail, cfgOverride?: EmailConfig): Promise<{ o
   m = { ...m, html: withAddress(withUnsubscribe(m.html, m.to, list), biz?.name ?? "Outlly", biz?.address ?? "") };
   let status = "mocked";
   let error: string | undefined;
+  let providerId: string | undefined;
+  let code: number | undefined;
   if (cfg.provider === "resend") {
     if (!cfg.resend.apiKey) {
       status = "failed";
@@ -50,7 +54,7 @@ export async function sendEmail(m: Mail, cfgOverride?: EmailConfig): Promise<{ o
       try {
         const r = await fetch("https://api.resend.com/emails", {
           method: "POST",
-          headers: { authorization: `Bearer ${cfg.resend.apiKey}`, "content-type": "application/json" },
+          headers: { authorization: `Bearer ${cfg.resend.apiKey}`, "content-type": "application/json", ...(m.idempotencyKey ? { "idempotency-key": m.idempotencyKey.slice(0, 256) } : {}) },
           body: JSON.stringify({
             from: senderFor(m.kind, cfg),
             to: [m.to],
@@ -63,8 +67,12 @@ export async function sendEmail(m: Mail, cfgOverride?: EmailConfig): Promise<{ o
           }),
           signal: AbortSignal.timeout(12_000),
         });
-        if (r.ok) status = "sent";
-        else {
+        code = r.status;
+        if (r.ok) {
+          status = "sent";
+          // Resend's id for this email: delivery webhooks (bounced, delivered) refer to it.
+          providerId = ((await r.json().catch(() => ({}))) as { id?: string }).id || undefined;
+        } else {
           status = "failed";
           const j = await r.json().catch(() => ({}));
           error = `Resend ${r.status}: ${(j as any).message ?? r.statusText}`;
@@ -82,7 +90,7 @@ export async function sendEmail(m: Mail, cfgOverride?: EmailConfig): Promise<{ o
   const row = await db.emailLog.create({
     data: { to: m.to, subject: keep ? m.subject : (m.redact ?? []).reduce((t, x) => (x ? t.split(x).join("*".repeat(x.length)) : t), m.subject), html: logged, kind: m.kind, provider: cfg.provider, status, error },
   });
-  return { ok: status !== "failed", status, error, id: row.id };
+  return { ok: status !== "failed", status, error, id: row.id, providerId, code };
 }
 
 /** Marketing kinds go out from the news. sender when one is set; account email always from `from`. */
@@ -555,6 +563,13 @@ export const templates = {
       { kicker: "We saved your spot", tone: "lime" },
     ),
   /** Plain one-to-one note from the team (Growth page). Body is plain text; blank lines become paragraphs. */
+  /** 1142: the one-time note to everyone already on the waitlist (lib/campaigns.ts). The copy is the brief's, word for word. */
+  waitlistUpdate: () =>
+    wrap(
+      "Waitlist update",
+      `${p("Hey there!")}${p("First of all, thank you for joining the Outlly waitlist!")}${p("We&#39;re working hard to build a better space for creators to plan their content, manage their social platforms, schedule posts and understand their growth &mdash; all in one place.")}${p("We&#39;ve also been improving our waitlist experience to make sure everything is smoother and more transparent.")}${p(`<strong style="color:${C.ink}">Your waitlist registration is safe, and you&#39;re still on the list.</strong>`)}${p("We&#39;re excited to have you as part of the early Outlly community.")}${p("Stay tuned. Something exciting is coming!")}${p("Your content deserves to be everywhere.")}${p(`&mdash; Team Outlly<br>Website: <a href="https://outlly.com" style="color:${C.ink};font-weight:600">https://outlly.com</a>`)}`,
+      { kicker: "Waitlist", preheader: "Your waitlist registration is safe, and you're still on the list." },
+    ),
   growth: (o: { subject: string; body: string; url: string; cta: string }) =>
     wrap(esc(o.subject), `${o.body.split(/\n{2,}/).map((para) => p(esc(para).replace(/\n/g, "<br>"))).join("")}${btn(o.url, esc(o.cta))}`, { kicker: "From the Outlly team", tone: "cream" }),
   /** Sign-in code. The digits sit in their own tile, spaced for reading aloud, and lead the subject line. */

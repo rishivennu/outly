@@ -114,7 +114,7 @@ export function PlanGrantsPanel({ plans, initialList, initialEmail }: { plans: P
       <Card>
         <CardTitle hint="Exact email. Works for people who haven't signed up yet: the grant waits for that address to be verified.">Find an account</CardTitle>
         <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => { e.preventDefault(); void lookup(); }}>
-          <div className="min-w-[16rem] flex-1">
+          <div className="min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[16rem]">
             <Label htmlFor="pg-q">Email</Label>
             <Input id="pg-q" type="email" inputMode="email" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} placeholder="name@example.com" />
           </div>

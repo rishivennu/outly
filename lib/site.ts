@@ -166,18 +166,97 @@ export async function setWaitlist(on: boolean, by: string, opts: { inviteAll?: b
   return { site: next, invited };
 }
 
-export async function waitlistCounts() {
-  const since = new Date(Date.now() - 86_400_000);
-  const [waiting, invited, today] = await Promise.all([
-    db.waitlistEntry.count({ where: { invitedAt: null } }),
-    db.waitlistEntry.count({ where: { invitedAt: { not: null } } }),
-    db.waitlistEntry.count({ where: { createdAt: { gte: since } } }),
-  ]);
-  return { waiting, invited, total: waiting + invited, today };
+/** Start of today, this week (Monday) and this month on the India clock, as instants. The admin reads the waitlist in IST. */
+export function istBounds(now = new Date()) {
+  const IST = 330 * 60_000;
+  const local = new Date(now.getTime() + IST); // wall clock in IST, read with the UTC getters
+  const day = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - IST;
+  const week = day - ((local.getUTCDay() + 6) % 7) * 86_400_000;
+  const month = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), 1) - IST;
+  return { day: new Date(day), week: new Date(week), month: new Date(month) };
 }
+
+/**
+ * Waitlist numbers (1142: + week, month, latest). Straight counts of WaitlistEntry, whatever the switch says:
+ * turning waitlist mode on or off never touches these rows, so the total is the same either way.
+ * `today`, `week` and `month` are calendar periods on the India clock; `last24h` is the rolling day.
+ */
+export async function waitlistCounts(now = new Date()) {
+  const b = istBounds(now);
+  const since = (d: Date) => db.waitlistEntry.count({ where: { createdAt: { gte: d } } });
+  const [total, waiting, today, week, month, last24h, latest] = await Promise.all([
+    db.waitlistEntry.count(),
+    db.waitlistEntry.count({ where: { invitedAt: null } }),
+    since(b.day),
+    since(b.week),
+    since(b.month),
+    since(new Date(now.getTime() - 86_400_000)),
+    db.waitlistEntry.findFirst({ orderBy: { createdAt: "desc" }, select: { createdAt: true } }),
+  ]);
+  return { total, waiting, invited: total - waiting, today, week, month, last24h, latestAt: latest?.createdAt.toISOString() ?? null };
+}
+
+export type WaitlistRow = { id: string; email: string; name: string | null; source: string | null; createdAt: string; invitedAt: string | null };
+const toRow = (r: { id: string; email: string; name: string | null; source: string | null; createdAt: Date; invitedAt: Date | null }): WaitlistRow => ({
+  id: r.id,
+  email: r.email,
+  name: r.name,
+  source: r.source,
+  createdAt: r.createdAt.toISOString(),
+  invitedAt: r.invitedAt?.toISOString() ?? null,
+});
 
 /** Most recent people first, for the admin table. */
 export async function waitlistRecent(take = 50) {
   const rows = await db.waitlistEntry.findMany({ orderBy: { createdAt: "desc" }, take });
-  return rows.map((r) => ({ id: r.id, email: r.email, name: r.name, source: r.source, createdAt: r.createdAt.toISOString(), invitedAt: r.invitedAt?.toISOString() ?? null }));
+  return rows.map(toRow);
+}
+
+export type WaitlistQuery = { q?: string; from?: string; to?: string; sort?: "new" | "old"; status?: "all" | "waiting" | "invited"; page?: number; per?: number };
+
+// Case-insensitive search: Postgres needs `mode`, SQLite's LIKE already ignores ASCII case (and rejects `mode`).
+const ci = (process.env.DATABASE_URL ?? "").startsWith("postgres") ? { mode: "insensitive" as const } : {};
+
+/** `from` / `to` are IST calendar days (YYYY-MM-DD), both inclusive. Anything unparsable is ignored, not an error. */
+function waitlistWhere(f: WaitlistQuery) {
+  const day = (s: string | undefined, end: boolean) => {
+    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+    const t = Date.parse(`${s}T00:00:00+05:30`);
+    return Number.isNaN(t) ? null : new Date(t + (end ? 86_400_000 : 0));
+  };
+  const from = day(f.from, false);
+  const to = day(f.to, true);
+  const q = f.q?.trim().toLowerCase().slice(0, 120);
+  return {
+    ...(q ? { OR: [{ email: { contains: q, ...ci } }, { name: { contains: q, ...ci } }] } : {}),
+    ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } } : {}),
+    ...(f.status === "waiting" ? { invitedAt: null } : f.status === "invited" ? { invitedAt: { not: null } } : {}),
+  };
+}
+
+/** Searchable, filterable, paged member list for the admin Waitlist page. The DB is the source: nothing is cached. */
+export async function waitlistList(f: WaitlistQuery = {}) {
+  const per = Math.min(100, Math.max(5, Math.floor(f.per ?? 25)));
+  const where = waitlistWhere(f);
+  const total = await db.waitlistEntry.count({ where });
+  const pages = Math.max(1, Math.ceil(total / per));
+  const page = Math.min(pages, Math.max(1, Math.floor(f.page ?? 1)));
+  const rows = await db.waitlistEntry.findMany({ where, orderBy: [{ createdAt: f.sort === "old" ? "asc" : "desc" }, { id: "asc" }], skip: (page - 1) * per, take: per });
+  return { rows: rows.map(toRow), total, page, pages, per };
+}
+
+/** A spreadsheet cell: quoted, and a leading = + - @ (or tab / CR) defused so Excel never runs it as a formula. */
+export const csvCell = (v: string | null | undefined) => {
+  let s = String(v ?? "");
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return `"${s.replace(/"/g, '""')}"`;
+};
+
+/** Every matching member as CSV (same filters as the table, no paging). Times in UTC ISO plus an IST column. */
+export async function waitlistCsv(f: WaitlistQuery = {}) {
+  const rows = await db.waitlistEntry.findMany({ where: waitlistWhere(f), orderBy: [{ createdAt: f.sort === "old" ? "asc" : "desc" }, { id: "asc" }] });
+  const ist = (d: Date) => d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
+  const head = ["email", "name", "source", "joined_utc", "joined_ist", "status", "invited_utc"];
+  const lines = rows.map((r) => [r.email, r.name, r.source, r.createdAt.toISOString(), ist(r.createdAt), r.invitedAt ? "invited" : "waiting", r.invitedAt?.toISOString() ?? ""].map(csvCell).join(","));
+  return { csv: "\uFEFF" + [head.join(","), ...lines].join("\r\n") + "\r\n", count: rows.length };
 }
