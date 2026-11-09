@@ -15,6 +15,12 @@ const OPEN_PREFIX = ["/review/", "/r/", "/team/accept"];
 // (og image, icons) or a typo, and a typo deserves the 404 page, not a sign-in wall.
 const STUDIO = ["/home", "/create", "/content", "/calendar", "/analytics", "/inbox", "/approvals", "/accounts", "/billing", "/settings", "/support", "/mascot", "/share-target", "/app-share"];
 const needsSession = (p: string) => STUDIO.some((s) => p === s || p.startsWith(s + "/"));
+// 1143: pages that must never show up in Google. robots.txt used to block them, but a blocked URL can still be
+// indexed from a link ("Indexed, though blocked by robots.txt", /home, Search Console 11-06) and Google never sees a
+// noindex it may not fetch. So robots.txt now lets them be crawled and every answer here says noindex, the
+// sign-in and waitlist redirects included. Public pages (/, legal, help, contact, waitlist) are not in this list.
+const NOINDEX = [...STUDIO, ...AUTH_PAGES, "/admin", "/review", "/r", "/team", "/maintenance", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice"];
+export const noIndex = (p: string) => NOINDEX.some((s) => p === s || p.startsWith(s + "/"));
 // Old or guessed marketing URLs that point at a section of the home page.
 const SECTION_ALIASES: Record<string, string> = { "/pricing": "/#pricing", "/faq": "/#faq", "/features": "/#features" };
 
@@ -135,6 +141,7 @@ export async function middleware(req: NextRequest, ev?: NextFetchEvent) {
   const res = await route(req, headers, ev);
   res.headers.set("Content-Security-Policy", csp);
   res.headers.set("Reporting-Endpoints", `csp="${req.nextUrl.origin}${CSP_REPORT_PATH}"`); // must be absolute
+  if (noIndex(req.nextUrl.pathname)) res.headers.set("X-Robots-Tag", "noindex, nofollow");
   // The old admin-only notice bar is gone; clear its cookie from browsers that still have it.
   if (req.cookies.get("outlly_af")) res.cookies.delete("outlly_af");
   // Campaign links (Growth page): remember the FIRST utm link a visitor arrived on, for 30 days,

@@ -8,8 +8,10 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        // The app itself needs a session; crawling it only produces login redirects.
-        disallow: ["/api/", "/admin", "/home", "/create", "/content", "/calendar", "/analytics", "/inbox", "/approvals", "/billing", "/settings", "/support", "/mascot", "/accounts", "/share-target", "/login", "/signup", "/unsubscribe", "/review/", "/team/"],
+        // 1143: only the API is blocked. The app pages used to be listed here too, but a blocked page can still be
+        // indexed from a link, and Google can't read a noindex it may not fetch. Those pages now answer with
+        // X-Robots-Tag: noindex (middleware.ts, NOINDEX), which removes them from the index for good.
+        disallow: ["/api/"],
       },
     ],
     sitemap: `${BASE}/sitemap.xml`,
