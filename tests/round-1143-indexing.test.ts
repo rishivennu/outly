@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { NextRequest } from "next/server";
-import { middleware, noIndex } from "../middleware";
+import { config, middleware, noIndex } from "../middleware";
 import robots from "../app/robots";
 
 // 1143: Search Console said "Indexed, though blocked by robots.txt" for /home. A robots.txt block keeps Google from
@@ -64,5 +64,12 @@ describe("1143 indexing", () => {
 
   test("the landing page and the public pages never get the header", async () => {
     for (const p of ["/", "/help", "/contact", "/privacy", "/waitlist"]) expect((await hit(p, true)).robots).toBeNull();
+  });
+
+  test("share images (no file extension) skip the middleware, so waitlist mode can't redirect them", () => {
+    const m = new RegExp("^" + config.matcher[0] + "$");
+    expect(m.test("/opengraph-image-pwu6ef")).toBe(false);
+    expect(m.test("/twitter-image")).toBe(false);
+    for (const p of ["/", "/home", "/login", "/waitlist", "/help"]) expect(m.test(p)).toBe(true);
   });
 });

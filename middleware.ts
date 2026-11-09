@@ -237,5 +237,7 @@ async function route(req: NextRequest, headers: Headers, ev?: NextFetchEvent) {
 
 export const config = {
   // Pages only. API routes do their own auth and return JSON 401s.
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|\\.well-known|.*\\.(?:svg|png|jpg|gif|webp|ico|txt|xml|js|css|woff2?|html|webmanifest)$).*)"],
+  // 1143: opengraph-image / twitter-image are generated share images with no file extension. Waitlist mode sent
+  // them to /waitlist, so shared links had no preview picture and Search Console listed the image as a page.
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|opengraph-image|twitter-image|\\.well-known|.*\\.(?:svg|png|jpg|gif|webp|ico|txt|xml|js|css|woff2?|html|webmanifest)$).*)"],
 };
