@@ -30,7 +30,7 @@ import { liveNow } from "@/lib/social/registry";
 export const dynamic = "force-dynamic";
 
 const DESCRIPTION =
-  "Upload one video. Outlly's AI tailors the caption, hook, hashtags and title for Instagram Reels, YouTube Shorts and X, then publishes or schedules it and tracks every destination separately.";
+  "Upload one video. Outlly's AI writes the caption, hook and hashtags for Reels, Shorts and X, then publishes it and tracks every post.";
 
 export async function generateMetadata(): Promise<Metadata> {
   const beta = await isBeta();

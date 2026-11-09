@@ -3,7 +3,7 @@ import { PageHead, Prose, Shell } from "@/components/marketing/bits";
 
 export const metadata: Metadata = {
   title: "Privacy",
-  description: "What Outlly stores, what each connected platform (Instagram, YouTube, X, TikTok, Threads, Facebook, LinkedIn) lets us do, who processes your data, and how to get it deleted.",
+  description: "What Outlly stores, what each connected platform lets us do, who processes your data, and how to get it deleted.",
   alternates: { canonical: "/privacy" },
   openGraph: { title: "Privacy · Outlly", description: "What Outlly stores, why, and how to remove it.", url: "/privacy" },
 };

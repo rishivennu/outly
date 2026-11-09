@@ -3,7 +3,7 @@ import { PageHead, Prose, Shell } from "@/components/marketing/bits";
 
 export const metadata: Metadata = {
   title: "Terms",
-  description: "The terms of using Outlly: what you keep, plans and billing, and the rules of Instagram, YouTube, X, TikTok, Threads, Facebook and LinkedIn that apply when you publish through us.",
+  description: "Outlly's terms: what you keep, plans and billing, and the platform rules (Instagram, YouTube, X and more) that apply when you publish.",
   alternates: { canonical: "/terms" },
   openGraph: { title: "Terms · Outlly", description: "The terms of using Outlly.", url: "/terms" },
 };

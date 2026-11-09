@@ -11,7 +11,8 @@ import { WAITLIST_STEPS, waitlistPerks } from "@/lib/marketing/waitlist-copy";
 
 export const metadata: Metadata = {
   title: "Join the waitlist",
-  description: "Outlly is one place to plan, create, schedule and publish your posts to every platform. We're letting creators in a few at a time. Leave your email and we'll send your invite.",
+  description: "Plan, schedule and publish your posts to every platform from one place. Outlly lets creators in a few at a time; join to get your invite.",
+  alternates: { canonical: "/waitlist" },
 };
 export const dynamic = "force-dynamic";
 
