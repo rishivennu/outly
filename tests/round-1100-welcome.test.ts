@@ -1,27 +1,25 @@
-/** 1100: first launch from the Home Screen gets a welcome, once per device, before any other popup. */
+/** 1100: the studio welcome, before any other popup. Since 1142 it greets on every entry (round-1142-welcome). */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { WELCOME_DEFAULT, WELCOME_KEY, fillName, normalizeWelcome, shouldWelcome, welcomeScript } from "../lib/pwa-welcome";
+import { WELCOME_DEFAULT, WELCOME_SESSION_KEY, fillName, normalizeWelcome, shouldWelcome, welcomeScript } from "../lib/pwa-welcome";
 
 const src = (p: string) => readFileSync(p, "utf8");
 const w = src("components/shell/PwaWelcome.tsx");
 const css = src("app/globals.css");
-const base = { standalone: true, appMode: false, referrer: "", path: "/home", seen: false };
+const base = { referrer: "", path: "/home", seen: false, origin: "https://outlly.com" };
 
 describe("1100 when the welcome shows", () => {
-  test("installed launch on a studio page, first time only", () => {
+  test("a studio page, once per entry", () => {
     expect(shouldWelcome(base)).toBe(true);
-    expect(shouldWelcome({ ...base, standalone: false, iosStandalone: true })).toBe(true);
     expect(shouldWelcome({ ...base, seen: true })).toBe(false);
-    expect(shouldWelcome({ ...base, standalone: false })).toBe(false); // a browser tab
     expect(shouldWelcome({ ...base, path: "/login" })).toBe(false);
   });
-  test("never inside the Android app", () => {
-    expect(shouldWelcome({ ...base, appMode: true })).toBe(false);
-    expect(shouldWelcome({ ...base, referrer: "android-app://com.outlly.app/" })).toBe(false);
+  test("the Android app greets too (1142: every entry)", () => {
+    expect(shouldWelcome({ ...base, referrer: "android-app://com.outlly.app/" })).toBe(true);
   });
   test("head script: same rules, before paint, after appScript in the root layout", () => {
-    for (const s of ['hasAttribute("data-app")', "android-app://", "(display-mode: standalone)", "navigator.standalone===true", `localStorage.getItem("${WELCOME_KEY}")`, 'setAttribute("data-welcome","")']) expect(welcomeScript).toContain(s);
+    for (const s of [`sessionStorage.getItem("${WELCOME_SESSION_KEY}")`, 'setAttribute("data-welcome","")']) expect(welcomeScript).toContain(s);
+    for (const s of ['hasAttribute("data-app")', "(display-mode: standalone)", "localStorage"]) expect(welcomeScript).not.toContain(s);
     const layout = src("app/layout.tsx");
     expect(layout.indexOf("__html: welcomeScript")).toBeGreaterThan(layout.indexOf("__html: appScript"));
     expect(src("app/(studio)/layout.tsx")).toContain("{welcomeCfg.enabled && <PwaWelcome config={welcomeCfg} />}");
@@ -36,7 +34,7 @@ describe("1100 welcome screen", () => {
     expect(w).toContain('aria-labelledby="pw-title"');
   });
   test("Get started remembers it, then hands over; focus stays inside while up", () => {
-    expect(w).toContain("localStorage.setItem(WELCOME_KEY");
+    expect(w).toContain('sessionStorage.setItem(WELCOME_SESSION_KEY, "1")');
     expect(w).toContain("window.dispatchEvent(new Event(WELCOMED_EVENT))");
     expect(w).toMatch(/e\.key === "Tab"[\s\S]{0,700}preventDefault/); // 1101: a cycle over the screen's controls
   });

@@ -1,14 +1,20 @@
 import "server-only";
 import { db } from "../db";
-import { cached } from "../cache";
+import { cachedStale } from "../cache";
 import { storage } from "../storage";
 import { PLATFORMS } from "../domain";
 import { bucket, type Pulse, type PulseRange, type TopPost } from "./pulse-core";
 
-/** Same 60 s per-creator copy as Analytics: metrics only change when the sync job writes them. */
+/**
+ * Same 60 s per-creator copy as Analytics: metrics only change when the sync job writes them. 1142: a copy up to
+ * 15 minutes old answers at once while a fresh one loads behind it, so opening Home never waits on these queries
+ * twice in a row on the same server. Deleting a post clears it (lib/posts/delete.ts).
+ */
+export const PULSE_FRESH_MS = 60_000;
+export const PULSE_STALE_MS = 15 * 60_000;
 export function getPulse(userId: string, days: PulseRange, accountIds: string[] | null): Promise<Pulse> {
   const ids = accountIds ? [...new Set(accountIds)].sort() : null;
-  return cached(`pulse:${userId}:${days}:${ids ? ids.join(",") : "all"}`, 60_000, () => compute(userId, days, ids));
+  return cachedStale(`pulse:${userId}:${days}:${ids ? ids.join(",") : "all"}`, PULSE_FRESH_MS, PULSE_STALE_MS, () => compute(userId, days, ids));
 }
 
 async function compute(userId: string, days: PulseRange, accountIds: string[] | null): Promise<Pulse> {

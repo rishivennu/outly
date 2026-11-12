@@ -54,8 +54,22 @@ const proRow = () => ({ ...PRO_MANAGER, currency: "INR", interval: "month", feat
 
 const FREE_MIGRATION_KEY = "migrate:free-limits-1026";
 
-export async function ensurePlans() {
-  if ((await db.plan.count()) > 0) {
+const MIGRATION_KEYS = [FREE_MIGRATION_KEY, PRO_MIGRATION_KEY, PRO_RENAME_KEY, STORAGE_MIGRATION_KEY];
+let ensuring: Promise<void> | null = null;
+
+/**
+ * Seeds plans on an empty database and runs the one-time migrations. 1142: it runs on every free account's
+ * entitlements read (several per Home render), so the common case is one round trip (the plan count and the four
+ * migration markers read together) and calls made at the same moment share it.
+ */
+export function ensurePlans(): Promise<void> {
+  return (ensuring ??= ensurePlansNow().finally(() => (ensuring = null)));
+}
+
+async function ensurePlansNow() {
+  const [count, done] = await Promise.all([db.plan.count(), db.setting.count({ where: { key: { in: MIGRATION_KEYS } } })]);
+  if (count > 0 && done === MIGRATION_KEYS.length) return;
+  if (count > 0) {
     await migrateFreeLimits();
     await migrateProManager();
     await migrateProRename();

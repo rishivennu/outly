@@ -56,17 +56,17 @@ export function WelcomeScreenSettings({ initial }: { initial: WelcomeConfig }) {
 
   return (
     <Card>
-      <CardTitle hint="Shown once per device, the first time someone opens Outlly from their Home Screen (iPhone, iPad and Android). Never in a browser tab or inside the Android app. Cookie choice, privacy notice and the tour wait until they press the button. Escape also closes it, and that counts as seen.">
-        Home Screen welcome
+      <CardTitle hint="Shown every time someone comes into Outlly: a new browser tab, a launch from the Home Screen or the Android app, or signing in. Once per visit, so moving between pages or reloading does not bring it back. Cookie choice, privacy notice and the tour wait until they press the button. Escape also closes it.">
+        Welcome screen
       </CardTitle>
       <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-3 hairline focus-within:ring-2 focus-within:ring-ring">
-        <span className="text-[14px] font-medium">Show a welcome on the first Home Screen launch</span>
+        <span className="text-[14px] font-medium">Show a welcome each time someone comes into Outlly</span>
         <input
           type="checkbox"
           role="switch"
           checked={cfg.enabled}
           disabled={busy}
-          onChange={(e) => save({ enabled: e.target.checked }, e.target.checked ? "Home Screen welcome on." : "Home Screen welcome off for everyone.")}
+          onChange={(e) => save({ enabled: e.target.checked }, e.target.checked ? "Welcome screen on." : "Welcome screen off for everyone.")}
           className="peer sr-only"
         />
         <span aria-hidden className={cn("relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200", cfg.enabled ? "bg-lime" : "bg-foreground/20")}>
@@ -80,7 +80,7 @@ export function WelcomeScreenSettings({ initial }: { initial: WelcomeConfig }) {
           void save(Object.fromEntries(WORDS.map((k) => [k, draft[k].trim()])) as Partial<WelcomeConfig>, "Welcome screen saved.");
         }}
       >
-        {field("Headline", "title", WELCOME_LIMITS.title, "One line per sentence; the last word is the lime highlight. {name} becomes their first name.")}
+        {field("Headline", "title", WELCOME_LIMITS.title, "One line per sentence; the last word is the lime highlight. {greeting} becomes Good morning, Good afternoon or Good evening on their clock; {name} becomes their first name.")}
         {field("Description for screen readers", "body", WELCOME_LIMITS.body, "Read aloud after the headline; not shown on screen.")}
         {field("Main button", "button", WELCOME_LIMITS.button, "Closes the welcome onto the page it opened on.")}
         {field("Second button", "connect", WELCOME_LIMITS.connect, "Opens Accounts to connect a platform.")}

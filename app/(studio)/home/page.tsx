@@ -49,8 +49,13 @@ import { PulseHome } from "@/components/dashboard/PulseHome";
 import { DashboardSwitch } from "@/components/home/DashboardSwitch";
 
 const NEW_FOR_DAYS = 14;
-/** 1079: the longest Home waits for any one optional card. Past it the card sits out this visit and the page renders. */
-const CARD_MS = 5000;
+/**
+ * 1079: the longest Home waits for any one optional card. Past it the card sits out this visit and the page renders.
+ * 1142: 1.5 s (was 5 s): one slow greeting card held the whole Home for up to five seconds.
+ */
+const CARD_MS = 1500;
+/** The dashboard numbers are the page itself (without them Home falls back to the classic cards), so they get longer. */
+const PULSE_MS = 5000;
 
 /** Free, owner-level accounts that are new or haven't published yet get the subscribe greeting once. */
 async function welcomeOffer(user: { id: string; createdAt: Date; actor: unknown }) {
@@ -81,7 +86,7 @@ async function pulseView(user: HomeUser, canSwitch: boolean) {
   const [scope, accountIds] = await Promise.all([postFilter(user), analyticsScope(user)]);
   const [, data, next, live, published, welcome, founding, firstWin] = await Promise.all([
     loadKeys(),
-    soft(getPulse(user.id, 7, accountIds), CARD_MS, null, "home analytics"),
+    soft(getPulse(user.id, 7, accountIds), PULSE_MS, null, "home analytics"),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() }, ...scope.where }, select: { title: true, scheduledAt: true }, orderBy: { scheduledAt: "asc" } }),
     connectedPlatforms(user.id),
     db.post.count({ where: { userId: user.id, status: { in: ["published", "partial"] } } }),

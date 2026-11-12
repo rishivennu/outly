@@ -152,7 +152,7 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
       const bs = [...el.querySelectorAll<HTMLElement>("[data-bar]")];
       const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       bs.forEach((b) => { b.style.transition = "none"; b.style.transform = reduced ? "" : "scaleX(0)"; });
-      requestAnimationFrame(() => requestAnimationFrame(() => bs.forEach((b, i) => { b.style.transition = reduced ? "none" : `transform 800ms cubic-bezier(.2,.8,.2,1) ${200 + i * 70}ms`; b.style.transform = ""; })));
+      requestAnimationFrame(() => requestAnimationFrame(() => bs.forEach((b, i) => { b.style.transition = reduced ? "none" : `transform 500ms cubic-bezier(.2,.8,.2,1) ${80 + i * 40}ms`; b.style.transform = ""; })));
     };
     grow();
     const r = root.current;

@@ -180,6 +180,11 @@ export interface SocialPublisher {
   /** Hide without deleting (YouTube: private) or show again. Optional: only platforms whose API allows it. */
   setVisibility?(account: AccountContext, platformPostId: string, visible: boolean): Promise<void>;
   /**
+   * 1142: is this post still on the platform? Only where the API can't delete (Instagram): the creator deletes it
+   * in the app, and Outlly checks it is really gone before it records "deleted". False = gone; throws when unsure.
+   */
+  exists?(account: AccountContext, platformPostId: string): Promise<boolean>;
+  /**
    * Duplicate guard. Called before retrying a step whose outcome is unknown (timeout after we asked the
    * platform to publish). Returns the post if it already went live, so we record it instead of posting twice.
    */

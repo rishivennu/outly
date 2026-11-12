@@ -64,7 +64,8 @@ export const DELETE = route(
   async (req, { user, params }) => {
     const q = new URL(req.url).searchParams;
     try {
-      return json(await deletePost(user, params.id, { platforms: q.get("platforms") === "1", appOnlyAck: q.get("appOnly") === "ack" }));
+      const appOnly = q.get("appOnly");
+      return json(await deletePost(user, params.id, { platforms: q.get("platforms") === "1", appOnlyAck: appOnly === "ack" || appOnly === "verify", verify: appOnly === "verify" }));
     } catch (e) {
       // The sheet shows what changed (some platforms may have said yes before one said no).
       if (e instanceof HttpError && e.code === "REMOVE_FAILED") {

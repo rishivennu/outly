@@ -90,7 +90,8 @@ export async function postUsage(userId: string, now = new Date()) {
   const e = await entitlements(userId);
   const from = periodStart(e.postPeriod, now);
   // launchedAt is when the post was sent or booked; older rows only have createdAt.
-  // Spent slots (FeatureUse "post") survive deleting the post; the post count covers posts sent before slots existed.
+  // Spent slots (FeatureUse "post"); the post count covers posts sent before slots existed. 1142: deleting a post
+  // through Outlly (lib/posts/delete.ts) gives its slot back; a row removed any other way does not.
   const [spent, legacy] = await Promise.all([
     e.postLimit > 0 ? db.featureUse.count({ where: { userId, feature: "post", period: periodKey(e.postPeriod, now) } }) : 0,
     db.post.count({ where: { userId, status: { not: "draft" }, OR: [{ launchedAt: { gte: from } }, { launchedAt: null, createdAt: { gte: from } }] } }),
@@ -159,7 +160,7 @@ async function reserve(userId: string, feature: string, period: string, ref: str
 /**
  * Spends one post for `postId` in the current period, before the launch claim. Same post again in the same
  * period (retry, reschedule) costs nothing; a failed post relaunched in a later period costs one there.
- * Deleting the post doesn't give the slot back. Returns release() to call if the launch then fails.
+ * 1142: deleting the post in Outlly gives the slot back (releasePostSlot). Returns release() to call if the launch then fails.
  */
 export async function spendPost(userId: string, postId: string, now = new Date()) {
   const u = await postUsage(userId, now);

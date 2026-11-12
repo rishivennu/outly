@@ -101,6 +101,36 @@ export async function removeFromPlatform(userId: string, targetId: string, actio
   return updated;
 }
 
+/**
+ * 1142: for a platform whose API can't delete (Instagram), the creator deletes the post in the app and Outlly
+ * checks the platform no longer has it before recording it as deleted, so the studio never claims a delete that
+ * didn't happen. "gone" is recorded on the destination; "live" and "unknown" change nothing.
+ */
+export async function confirmGone(userId: string, targetId: string, record = true): Promise<"gone" | "live" | "unknown"> {
+  const t = await db.postTarget.findFirst({ where: { id: targetId, post: { userId } }, include: { socialAccount: true } });
+  if (!t || !isPlatform(t.platform)) return "unknown";
+  if (t.removeMode === "deleted" || t.practice) return "gone";
+  const acct = t.socialAccount;
+  if (!acct || acct.status !== "connected" || !t.platformPostId) return "unknown";
+  const publisher = publisherForAccount(t.platform, acct);
+  if (!publisher.exists) return "unknown";
+  try {
+    if (await publisher.exists(await liveAccount(acct), t.platformPostId)) return "live";
+  } catch (e) {
+    console.warn(`[remove] ${t.platform} check ${t.id}: ${asPublisherError(e).technical ?? (e instanceof Error ? e.message : e)}`);
+    return "unknown";
+  }
+  if (record) await markDeleted(userId, t.id);
+  return "gone";
+}
+
+/** 1142: record a destination as deleted on the platform (after confirmGone said so). */
+export async function markDeleted(userId: string, targetId: string) {
+  await db.postTarget.updateMany({ where: { id: targetId, post: { userId } }, data: { removedAt: new Date(), removeMode: "deleted", platformUrl: null } });
+  invalidateComments(targetId);
+  invalidateDashboards(userId);
+}
+
 export type EverywhereResult = { platform: Platform; ok: boolean; message?: string };
 
 /**

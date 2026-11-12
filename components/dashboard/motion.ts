@@ -2,7 +2,9 @@
 /**
  * The analytics dashboard's motion (1080), after the Arix brief: ONE requestAnimationFrame loop per root that
  * writes transform and opacity straight to element.style (no React state per frame), staggered as
- * easeOut(clamp01((t - 0.1 - i * 0.045) / 0.7)). Reduced motion keeps the timing but only cross-fades.
+ * easeOut(clamp01((t - 0.02 - min(i, 8) * 0.03) / 0.36)). Reduced motion keeps the timing but only cross-fades.
+ * 1142: quicker (was 0.1 s + 45 ms apart over 0.7 s, so a full Home kept fading in for about 1.5 s and read as
+ * a slow page). Now the last card is settled by about 0.6 s, however many there are.
  * Time-based: it plays at a fixed pace once the root is on screen, never scrubbed to scroll.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,7 +15,7 @@ export const easeOut = (x: number) => 1 - (1 - x) ** 3;
 export const easeInOut = (x: number) => (x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2);
 export const prefersReduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 /** Progress of the i-th staggered element at time t (seconds since start). */
-export const stagger = (t: number, i: number) => easeOut(clamp01((t - 0.1 - i * 0.045) / 0.7));
+export const stagger = (t: number, i: number) => easeOut(clamp01((t - 0.02 - Math.min(i, 8) * 0.03) / 0.36));
 
 /**
  * Plays every [data-enter] inside the root, in DOM order, when the root first scrolls into view.

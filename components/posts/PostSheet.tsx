@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { firstCommentLine } from "@/lib/client/first-comment";
 import { coverLine } from "@/lib/client/cover";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CalendarClock, Check, Copy, Eye, EyeOff, ExternalLink, Link as LinkIcon, MessageSquareWarning, PenLine, ShieldCheck, Trash2, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/shared/Sheet";
@@ -41,7 +42,10 @@ interface Props {
 export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Props) {
   const { timezone: tz } = useUser();
   const toast = useToast();
+  const router = useRouter();
   const [view, setView] = useState<"detail" | "reschedule" | "remove" | "takedown">("detail");
+  /** 1142: the second step of a delete. Nothing is deleted until the creator says yes on this one. */
+  const [confirm, setConfirm] = useState<"everywhere" | "studio" | null>(null);
   const [takedownId, setTakedownId] = useState<string | null>(null);
   const [when, setWhen] = useState<Date>(() => defaultSchedule(tz));
   const [busy, setBusy] = useState(false);
@@ -49,6 +53,7 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
 
   useEffect(() => {
     setView("detail");
+    setConfirm(null);
     setTakedownId(null);
     setError(null);
     setWhen(post?.scheduledAt ? new Date(post.scheduledAt) : defaultSchedule(tz));
@@ -88,9 +93,10 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
 
   const remove = (everywhere: boolean) =>
     run(async () => {
-      let r: { local: "deleted" | "already_gone"; stopped: number; remote: { platform: Platform; outcome: "deleted" | "failed" | "manual" | "kept" }[] } | null = null;
+      let r: DeleteAnswer | null = null;
       try {
-        r = await api(`/api/posts/${post.id}${everywhere ? `?platforms=1${appOnly.length ? "&appOnly=ack" : ""}` : ""}`, { method: "DELETE" });
+        // 1142: Instagram and TikTok are deleted in their app first; "verify" makes Outlly check they are gone.
+        r = await api(`/api/posts/${post.id}${everywhere ? `?platforms=1${appOnly.length ? "&appOnly=verify" : ""}` : ""}`, { method: "DELETE" });
       } catch (e) {
         // Already gone (another tab, a double click): that is what the creator asked for.
         if (!(e instanceof ApiError && e.status === 404)) {
@@ -101,6 +107,8 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
       }
       onRemove(post.id);
       toast(deleteSummary(r), "info");
+      // 1142: the freed post shows at once on Home, Create and Billing (server pages and the preloaded tabs).
+      router.refresh();
       onClose();
     });
 
@@ -253,12 +261,12 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
           ) : (
             <>
               <p className="text-muted-foreground">
-                It&rsquo;s live on {live.map((t) => PLATFORM_META[t.platform].name).join(", ")}. Choose whether it comes down there too.
+                It&rsquo;s live on {names(live)}. Do you want to delete it there too, or only from your studio?
               </p>
               {appOnly.length > 0 && (
                 <div className="rounded-2xl bg-secondary/50 p-3 text-sm">
                   <p className="text-muted-foreground">
-                    {appOnly.map((t) => PLATFORM_META[t.platform].name).join(" and ")} {appOnly.length === 1 ? "doesn't" : "don't"} let apps delete posts. Open {appOnly.length === 1 ? "it" : "each one"} and delete it in the app first. The link goes away once it&rsquo;s out of your studio.
+                    {names(appOnly)} {appOnly.length === 1 ? "doesn't" : "don't"} let apps delete posts. To delete it there too, open it, tap the three dots, then Delete, and come back here. Outlly checks {names(appOnly)} before it removes anything, so your studio and {names(appOnly)} stay in step.
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {appOnly.map((t) =>
@@ -274,19 +282,47 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
               )}
             </>
           )}
-          <div className="grid gap-2">
-            {deletable.length > 0 && (
-              <Button variant="danger" onClick={() => remove(true)} disabled={busy}>
-                <Trash2 className="h-4 w-4" /> {busy ? "Deleting…" : `Delete from ${deletable.map((t) => PLATFORM_META[t.platform].name).join(", ")} and my studio`}
+          {confirm === null ? (
+            <div className="grid gap-2">
+              {live.length > 0 ? (
+                <>
+                  <Button variant="danger" onClick={() => setConfirm("everywhere")} disabled={busy}>
+                    <Trash2 className="h-4 w-4" /> Delete from {names(live)} and my studio
+                  </Button>
+                  <Button variant="subtle" onClick={() => setConfirm("studio")} disabled={busy}>
+                    Delete from my studio only (stays live on {names(live)})
+                  </Button>
+                </>
+              ) : (
+                <Button variant="danger" onClick={() => remove(false)} disabled={busy}>
+                  <Trash2 className="h-4 w-4" /> {busy ? "Removing…" : "Yes, remove it"}
+                </Button>
+              )}
+              <Button variant="ghost" onClick={() => setView("detail")}>
+                Keep it
               </Button>
-            )}
-            <Button variant={deletable.length > 0 ? "subtle" : "danger"} onClick={() => remove(false)} disabled={busy}>
-              {busy ? "Removing…" : live.length > 0 ? "Remove from my studio only (stays live)" : "Yes, remove it"}
-            </Button>
-            <Button variant="ghost" onClick={() => setView("detail")}>
-              Keep it
-            </Button>
-          </div>
+            </div>
+          ) : (
+            <div role="alertdialog" aria-labelledby="del-confirm" aria-describedby="del-confirm-more" className="space-y-3 rounded-2xl bg-destructive/5 p-4 hairline">
+              <p id="del-confirm" className="font-semibold">
+                {confirm === "everywhere" ? `Delete it from ${names(live)} and your studio?` : "Delete it from your studio only?"}
+              </p>
+              <p id="del-confirm-more" className="text-sm text-muted-foreground">
+                {confirm === "everywhere"
+                  ? `This can't be undone. The video, its views and its comments on ${names(live)} go for good.${appOnly.length ? ` Delete it in the ${names(appOnly)} app first: Outlly checks, and removes nothing while it's still up.` : ""}`
+                  : `It stays live on ${names(live)} with its views and comments. Outlly stops tracking it, and this can't be undone here.`}{" "}
+                If it counted toward your plan&rsquo;s posts, you get that post back.
+              </p>
+              <div className="grid gap-2">
+                <Button variant="danger" onClick={() => remove(confirm === "everywhere")} disabled={busy}>
+                  <Trash2 className="h-4 w-4" /> {busy ? (confirm === "everywhere" ? "Deleting…" : "Removing…") : confirm === "everywhere" ? "Yes, delete everywhere" : "Yes, delete from my studio"}
+                </Button>
+                <Button variant="ghost" onClick={() => setConfirm(null)} disabled={busy}>
+                  Back
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -473,7 +509,20 @@ function ReviewBlock({ post, onChange }: { post: PostView; onChange: (p: PostVie
 }
 
 /** What actually happened, in one line: local, remote and anything left for the creator to do. */
-export function deleteSummary(r: { local: string; stopped: number; remote: { platform: Platform; outcome: string }[] } | null) {
+type DeleteAnswer = {
+  local: "deleted" | "already_gone";
+  stopped: number;
+  remote: { platform: Platform; outcome: "deleted" | "failed" | "manual" | "kept" }[];
+  quota?: { used: number; left: number | null; limit: number; period: "week" | "month"; freed: boolean } | null;
+};
+
+/** "Instagram", "Instagram and YouTube", "Instagram, YouTube and X". */
+const names = (ts: { platform: Platform }[]) => {
+  const n = [...new Set(ts.map((t) => PLATFORM_META[t.platform].name))];
+  return n.length < 2 ? (n[0] ?? "") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`;
+};
+
+export function deleteSummary(r: { local: string; stopped: number; remote: { platform: Platform; outcome: string }[]; quota?: DeleteAnswer["quota"] } | null) {
   if (!r) return "It was already removed.";
   const names = (o: string) => r.remote.filter((x) => x.outcome === o).map((x) => PLATFORM_META[x.platform]?.name ?? x.platform);
   const del = names("deleted");
@@ -483,5 +532,8 @@ export function deleteSummary(r: { local: string; stopped: number; remote: { pla
   if (r.stopped) parts.push("Nothing more will be sent.");
   if (manual.length) parts.push(`Still live on ${manual.join(" and ")}: delete it in the app.`);
   if (kept.length) parts.push(`Still live on ${kept.join(", ")}.`);
+  // 1142: the count right after the delete, so the creator knows they can post again.
+  const q = r.quota;
+  if (q && q.left !== null && q.limit > 0) parts.push(q.left > 0 ? `You can post ${q.left} more this ${q.period}.` : `No posts left this ${q.period}.`);
   return parts.join(" ");
 }

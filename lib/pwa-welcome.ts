@@ -1,10 +1,11 @@
 import { STUDIO_RE } from "./pwa-core";
 
 /**
- * First launch from the Home Screen (1100). The first time Outlly opens installed (iPhone/iPad from the Home
- * Screen, Android Chrome/Edge/Samsung as an installed app), the studio opens on a short welcome with Get started.
- * Once per device: iOS gives a Home Screen app its own storage, so the key is naturally per install there.
- * Never inside the Android app (it has its own onboarding), never in a plain browser tab.
+ * The studio welcome (1100, every entry since 1142). Each time someone comes into Outlly (a new tab, a cold
+ * launch of the installed app or the Android app, signing in) the studio opens on a short welcome that greets
+ * them by the time of day on their own clock ("Good morning, Maya."). Once per entry: sessionStorage remembers it
+ * for the rest of that tab or app run, so moving between pages or reloading never brings it back. A tab opened
+ * from inside the studio (a link to a post) is the same visit, not a new entry, so it doesn't greet again.
  *
  * Decided in <head> (welcomeScript) so the very first paint is the welcome, not a flash of the dashboard.
  * The studio renders the welcome on every load, hidden by CSS unless html[data-welcome] is set.
@@ -27,8 +28,8 @@ export interface WelcomeConfig {
 
 export const WELCOME_DEFAULT: WelcomeConfig = {
   enabled: true,
-  title: "Welcome! Let's get to it.",
-  body: "Outlly now lives on your Home Screen. Plan, post and reply from one place, one tap away.",
+  title: "{greeting}, {name}. Let's get to it.",
+  body: "Plan, post and reply from one place.",
   points: ["Schedule once, post everywhere", "Every comment and DM in one inbox", "See what is working, every week"],
   button: "Get started",
   connect: "Connect an account",
@@ -38,6 +39,20 @@ export const WELCOME_DEFAULT: WelcomeConfig = {
 
 /** The pre-1101 default headline: a saved copy of it follows the new default instead of pinning the old words. */
 export const WELCOME_OLD_TITLE = "Welcome, {name}.";
+/** 1142: earlier defaults that a saved copy may still hold. They follow the new default (the time-of-day greeting). */
+export const WELCOME_OLD_TITLES = [WELCOME_OLD_TITLE, "Welcome! Let's get to it."];
+export const WELCOME_OLD_BODIES = ["Outlly now lives on your Home Screen. Plan, post and reply from one place, one tap away."];
+
+/** 1142: the greeting for an hour on the person's own clock (0-23). Morning 5-11, afternoon 12-16, evening the rest. */
+export function greetingFor(hour: number) {
+  const h = ((Math.floor(hour) % 24) + 24) % 24;
+  return h >= 5 && h < 12 ? "Good morning" : h >= 12 && h < 17 ? "Good afternoon" : "Good evening";
+}
+
+/** "{greeting}" becomes the time-of-day greeting. A headline without it is the admin's own words and stays as written. */
+export function fillGreeting(s: string, hour: number) {
+  return s.split("{greeting}").join(greetingFor(hour));
+}
 
 export const WELCOME_LIMITS = { title: 60, body: 180, point: 48, button: 24, points: 3, connect: 28, tour: 28, skip: 28 } as const;
 
@@ -50,8 +65,8 @@ export function normalizeWelcome(c: Partial<WelcomeConfig> | null | undefined): 
     : d.points;
   return {
     enabled: typeof c?.enabled === "boolean" ? c.enabled : d.enabled,
-    title: c?.title === WELCOME_OLD_TITLE ? d.title : text(c?.title, WELCOME_LIMITS.title, d.title),
-    body: text(c?.body, WELCOME_LIMITS.body, d.body),
+    title: typeof c?.title === "string" && WELCOME_OLD_TITLES.includes(c.title.trim()) ? d.title : text(c?.title, WELCOME_LIMITS.title, d.title),
+    body: typeof c?.body === "string" && WELCOME_OLD_BODIES.includes(c.body.trim()) ? d.body : text(c?.body, WELCOME_LIMITS.body, d.body),
     points,
     button: text(c?.button, WELCOME_LIMITS.button, d.button),
     connect: text(c?.connect, WELCOME_LIMITS.connect, d.connect),
@@ -81,16 +96,27 @@ export function fillName(s: string, name: string | null | undefined) {
   return first ? s.split("{name}").join(first) : s.replace(/,?\s*\{name\}/g, "").replace(/\s+([.!?])/g, "$1");
 }
 
-/** localStorage: set once Get started is pressed. */
+/** localStorage: when the welcome was last closed on this device (kept for reference; it no longer stops it). */
 export const WELCOME_KEY = "outlly:pwa-welcomed";
+/** 1142: sessionStorage, set when this entry's welcome is closed. A new tab or a new app launch starts without it. */
+export const WELCOME_SESSION_KEY = "outlly:welcomed-entry";
 /** Fired on window when the welcome has gone; popups waiting on it go ahead. */
 export const WELCOMED_EVENT = "outly:welcomed";
 
+/** A tab opened from a studio page of this same site: still the same visit, so no second greeting. */
+export function fromInsideStudio(referrer: string | undefined, origin: string) {
+  if (!referrer || !origin || !referrer.startsWith(origin + "/")) return false;
+  try {
+    return STUDIO_RE.test(new URL(referrer).pathname);
+  } catch {
+    return false;
+  }
+}
+
 /** The same test the head script runs, for the client fallback (a soft navigation after signing in). */
-export function shouldWelcome(o: { standalone: boolean; iosStandalone?: boolean; appMode: boolean; referrer?: string; path: string; seen: boolean }) {
-  if (o.seen || o.appMode) return false;
-  if ((o.referrer ?? "").startsWith("android-app://")) return false;
-  if (!(o.standalone || o.iosStandalone)) return false;
+export function shouldWelcome(o: { path: string; seen: boolean; referrer?: string; origin?: string }) {
+  if (o.seen) return false;
+  if (fromInsideStudio(o.referrer, o.origin ?? "")) return false;
   return STUDIO_RE.test(o.path);
 }
 
@@ -98,11 +124,11 @@ export function shouldWelcome(o: { standalone: boolean; iosStandalone?: boolean;
 export const WELCOME_WATCHDOG_MS = 10_000;
 
 /**
- * Runs after appScript (which marks the Android app) so data-app is already known. If the page never hydrates
- * (a failed chunk on a bad connection), the watchdog lifts the screen so nobody is stuck on a first launch;
- * PwaWelcome cancels it (window.__owT) the moment it hydrates.
+ * Decides before the first paint, so an entry paints the welcome, not a flash of the dashboard. If the page never
+ * hydrates (a failed chunk on a bad connection), the watchdog lifts the screen so nobody is stuck on it;
+ * PwaWelcome cancels it (window.__owT) the moment it hydrates. Storage blocked: no welcome (it could never be closed for good).
  */
-export const welcomeScript = `try{var d=document.documentElement,m=function(q){return window.matchMedia(q).matches};if(!d.hasAttribute("data-app")&&document.referrer.indexOf("android-app://")!==0&&(m("(display-mode: standalone)")||m("(display-mode: fullscreen)")||navigator.standalone===true)&&${STUDIO_RE}.test(location.pathname)&&!localStorage.getItem("${WELCOME_KEY}")){d.setAttribute("data-welcome","");window.__owT=setTimeout(function(){d.removeAttribute("data-welcome")},${WELCOME_WATCHDOG_MS})}}catch(e){}`;
+export const welcomeScript = `try{var d=document.documentElement,r=document.referrer,o=location.origin,i=false;try{i=!!r&&r.indexOf(o+"/")===0&&${STUDIO_RE}.test(new URL(r).pathname)}catch(e){}if(!i&&${STUDIO_RE}.test(location.pathname)&&!sessionStorage.getItem("${WELCOME_SESSION_KEY}")){d.setAttribute("data-welcome","");window.__owT=setTimeout(function(){d.removeAttribute("data-welcome")},${WELCOME_WATCHDOG_MS})}}catch(e){}`;
 
 /** The welcome is on screen (or about to be): the flag is set and the studio rendered it. */
 export function welcomePending() {

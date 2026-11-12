@@ -10,8 +10,8 @@ const block = css.slice(css.indexOf("/* 1100 first launch from the Home Screen (
 
 describe("1101 headline", () => {
   test("the new default, split per sentence, last word highlighted", () => {
-    expect(WELCOME_DEFAULT.title).toBe("Welcome! Let's get to it.");
-    expect(headlineParts(WELCOME_DEFAULT.title)).toEqual({ lines: ["Welcome!"], tail: "Let's get to", hl: "it." });
+    expect(WELCOME_DEFAULT.title).toBe("{greeting}, {name}. Let's get to it."); // 1142
+    expect(headlineParts("Good morning, Maya. Let's get to it.")).toEqual({ lines: ["Good morning, Maya."], tail: "Let's get to", hl: "it." });
     expect(headlineParts("Hello")).toEqual({ lines: [], tail: "", hl: "Hello" });
     expect(headlineParts("Hi Maya. Ready? Go now.")).toEqual({ lines: ["Hi Maya.", "Ready?"], tail: "Go", hl: "now." });
   });
@@ -22,6 +22,7 @@ describe("1101 headline", () => {
   });
   test("a saved copy of the old default follows the new one; a custom title stays", () => {
     expect(normalizeWelcome({ title: WELCOME_OLD_TITLE }).title).toBe(WELCOME_DEFAULT.title);
+    expect(normalizeWelcome({ title: "Welcome! Let's get to it." }).title).toBe(WELCOME_DEFAULT.title);
     expect(normalizeWelcome({ title: "Hey {name}." }).title).toBe("Hey {name}.");
   });
   test("lime highlight: bright in dark, lime-ink with a lime marker in light", () => {
@@ -37,7 +38,7 @@ describe("1101 actions keep working", () => {
     expect(w).toContain('if (how === "connect") router.push("/accounts")');
     expect(w).toContain('if (how === "skip" && location.pathname !== "/home") router.push("/home")');
     expect(w).toContain('if (how === "tour") startTour();');
-    expect(w).toMatch(/const leave = \(how: Exit\) => \{\s*if \(phase !== "show"\) return;\s*try \{\s*localStorage\.setItem\(WELCOME_KEY/);
+    expect(w).toMatch(/const leave = \(how: Exit\) => \{\s*if \(phase !== "show"\) return;\s*try \{\s*sessionStorage\.setItem\(WELCOME_SESSION_KEY/);
   });
   test("close X and Escape both close it; Tab cycles inside the screen", () => {
     expect(w).toContain('aria-label="Close welcome"');

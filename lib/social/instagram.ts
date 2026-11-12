@@ -285,7 +285,30 @@ export class InstagramPublisher implements SocialPublisher {
   }
 
   async delete() {
+    // Instagram Login (graph.instagram.com) has no media delete; DELETE /<media> is only on the Facebook Login API.
     throw new PublisherError("UNKNOWN", "Instagram does not allow deleting posts through the API. Remove it in the app.", undefined, false);
+  }
+
+  /**
+   * 1142: false once the creator has deleted it in the Instagram app. Graph answers a deleted post with code 100 /
+   * subcode 33, but the same answer also means "missing permissions", so it only counts as gone when the same token
+   * still reads its own account (/me = the account that published it). Anything else throws: never a guess.
+   */
+  async exists(account: AccountContext, mediaId: string) {
+    const opts = { signal: AbortSignal.timeout(8000) };
+    const tok = encodeURIComponent(account.accessToken);
+    const r = await fetch(`${GRAPH}/${encodeURIComponent(mediaId)}?fields=id&access_token=${tok}`, opts);
+    if (r.ok) return true;
+    const body = await r.clone().text().catch(() => "");
+    const missing = r.status === 404 || (r.status === 400 && /"code"\s*:\s*100\b/.test(body) && /"error_subcode"\s*:\s*33\b/.test(body));
+    if (!missing) throw await httpFailure(r, "instagram media check");
+    const me = await fetch(`${GRAPH}/me?fields=id,user_id&access_token=${tok}`, { signal: AbortSignal.timeout(8000) });
+    if (!me.ok) throw await httpFailure(me, "instagram media check (account)");
+    const who = (await me.json().catch(() => ({}))) as { id?: string; user_id?: string | number };
+    const ids = [who.id, who.user_id].filter((x) => x != null).map(String);
+    if (account.platformUserId && ids.length && !ids.includes(String(account.platformUserId)))
+      throw new PublisherError("UNKNOWN", "Instagram answered for a different account, so the post could not be checked.", undefined, true);
+    return false;
   }
 }
 

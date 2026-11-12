@@ -7,7 +7,7 @@ import { startTour } from "@/components/onboarding/Tour";
 import { cn } from "@/lib/utils";
 import { useUser } from "./UserContext";
 import { WelcomeArt } from "./WelcomeArt";
-import { HEADLINE_NOWRAP, WELCOMED_EVENT, WELCOME_DEFAULT, WELCOME_KEY, fillName, headlineParts, shouldWelcome, type WelcomeConfig } from "@/lib/pwa-welcome";
+import { HEADLINE_NOWRAP, WELCOMED_EVENT, WELCOME_DEFAULT, WELCOME_KEY, WELCOME_SESSION_KEY, fillGreeting, fillName, headlineParts, shouldWelcome, type WelcomeConfig } from "@/lib/pwa-welcome";
 
 /** What the person picked on the way out (1101). Every one of them counts as seen. */
 type Exit = "start" | "connect" | "tour" | "skip";
@@ -18,11 +18,23 @@ type Phase = "ssr" | "show" | "leaving" | "gone";
 const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 const stagger = (i: number) => ({ ["--i" as string]: i }) as React.CSSProperties;
 
+/** The hour (0-23) in a time zone; an unknown zone falls back to this machine's clock. */
+function hourIn(tz: string | undefined) {
+  try {
+    if (tz) return Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: tz }).format(new Date())) % 24;
+  } catch {
+    /* bad zone name */
+  }
+  return new Date().getHours();
+}
+
 /**
- * First launch from the Home Screen (1100; rules in lib/pwa-welcome.ts). Server-rendered on every studio load
- * and hidden by CSS unless <head> set html[data-welcome], so an installed first launch paints the welcome at
- * once. It is a dialog only while it shows (other popups look for [role="dialog"] and must not see a hidden
- * one). Get started (or Escape) remembers it on this device, plays a short exit and hands over to the page.
+ * The welcome on every entry into the studio (1100, per entry since 1142; rules in lib/pwa-welcome.ts).
+ * Server-rendered on every studio load and hidden by CSS unless <head> set html[data-welcome], so an entry paints
+ * the welcome at once. The greeting follows the time of day: the server sets it on the account's time zone and the
+ * browser corrects it to the device clock before the first hydrated paint. It is a dialog only while it shows
+ * (other popups look for [role="dialog"] and must not see a hidden one). Any exit (Escape too) remembers it for
+ * this entry (sessionStorage), plays a short exit and hands over to the page.
  * The entrance is a time-based stagger (.pwa-welcome in globals.css); reduced motion gets a plain fade.
  *
  * Review fixes (1100): it decides in a layout effect, which runs before every popup's passive effect whatever the
@@ -34,10 +46,19 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
   const user = useUser();
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("ssr");
+  const [hour, setHour] = useState(() => hourIn(user.timezone));
   const box = useRef<HTMLDivElement>(null);
   const exit = useRef<number | undefined>(undefined);
 
-  useEffect(() => () => window.clearTimeout(exit.current), []);
+  // Unmounted mid-exit: the timer that lifts the screen won't run, so lift it here.
+  useEffect(
+    () => () => {
+      if (exit.current === undefined) return;
+      window.clearTimeout(exit.current);
+      document.documentElement.removeAttribute("data-welcome");
+    },
+    [],
+  );
 
   useIso(() => {
     const d = document.documentElement;
@@ -51,14 +72,14 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
     if (!config.enabled) return done();
     let seen = false;
     try {
-      seen = !!localStorage.getItem(WELCOME_KEY);
+      seen = !!sessionStorage.getItem(WELCOME_SESSION_KEY);
     } catch {
-      seen = true; // storage blocked: we could never remember it, so never show it
+      seen = true; // storage blocked: we could never remember it, so it would greet on every page
     }
+    setHour(new Date().getHours()); // the device clock is where they are right now
     // Head script missed it (signed in, then a soft navigation into the studio): same test, here.
     if (!d.hasAttribute("data-welcome")) {
-      const nav = navigator as Navigator & { standalone?: boolean };
-      const ok = shouldWelcome({ standalone: matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches, iosStandalone: nav.standalone === true, appMode: d.hasAttribute("data-app"), referrer: document.referrer, path: location.pathname, seen });
+      const ok = shouldWelcome({ path: location.pathname, seen, referrer: document.referrer, origin: location.origin });
       if (!ok) return setPhase("gone");
       d.setAttribute("data-welcome", "");
     } else if (seen) return done();
@@ -91,9 +112,10 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
   const leave = (how: Exit) => {
     if (phase !== "show") return;
     try {
+      sessionStorage.setItem(WELCOME_SESSION_KEY, "1");
       localStorage.setItem(WELCOME_KEY, new Date().toISOString());
     } catch {
-      /* private mode: shows again next launch */
+      /* storage blocked */
     }
     setPhase("leaving");
     // Navigate under the exit, so the new page is already there when the screen has faded.
@@ -114,7 +136,7 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
 
   const name = user.workspace?.me.name ?? user.name;
   // A title that was only "{name}" would leave the dialog's label blank for someone without a name.
-  const head = headlineParts(fillName(config.title, name).trim() || WELCOME_DEFAULT.title);
+  const head = headlineParts(fillName(fillGreeting(config.title, hour), name).trim() || fillGreeting(WELCOME_DEFAULT.title, hour).replace(/,?\s*\{name\}/g, ""));
   const line = (t: string) => cn("pw-line", t.length <= HEADLINE_NOWRAP && "pw-nowrap");
   const last = head.tail ? `${head.tail} ${head.hl}` : head.hl;
   return (
@@ -155,13 +177,15 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
         {/* Not a heading: the dialog is already labelled by it, and studio pages own their only h1. */}
         <p id="pw-title" className="pw-title pw-b">
           {head.lines.map((t, i) => (
-            <span key={i} className={line(t)}>
+            <span key={i} className={line(t)} suppressHydrationWarning>
               {t}{" "}
             </span>
           ))}
-          <span className={line(last)}>
+          <span className={line(last)} suppressHydrationWarning>
             {head.tail && `${head.tail} `}
-            <span className="pw-hl">{head.hl}</span>
+            <span className="pw-hl" suppressHydrationWarning>
+              {head.hl}
+            </span>
           </span>
         </p>
         <p id="pw-body" className="sr-only">
