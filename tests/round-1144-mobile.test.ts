@@ -41,9 +41,17 @@ describe("touch targets", () => {
   });
   test("captions floor at 12px on touch, above the 1100 glass block", () => {
     const css = read("app/globals.css");
-    const floor = css.indexOf(".text-\\[11px\\], .text-\\[11\\.5px\\] { font-size: 12px; }");
+    const floor = css.indexOf(".text-\\[11px\\], .text-\\[11\\.5px\\], .pulse-axis, .nf-chip { font-size: 12px; }");
     expect(floor).toBeGreaterThan(0);
     expect(floor).toBeLessThan(css.indexOf("1100: Liquid glass on every studio card"));
+    // the floor must come after the rules it overrides (same specificity, later wins)
+    expect(floor).toBeGreaterThan(css.indexOf(".pulse-axis { fill:"));
+    expect(floor).toBeGreaterThan(css.indexOf(".nf-chip { display:"));
+  });
+  test("notification history links get a 44px tap area on touch", () => {
+    const css = read("app/globals.css");
+    expect(css).toContain('.nf-hist-link::before { content: ""; position: absolute; inset: -8px -4px; }');
+    expect(css.indexOf(".nf-hist-link { position: relative; }")).toBeGreaterThan(css.indexOf(".nf-hist-link { display: inline-flex;"));
   });
 });
 
