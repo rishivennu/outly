@@ -3809,6 +3809,8 @@ html.theme-anim *::after {
 .nf-cat-btn { border-radius: 12px; padding: .25rem 0; min-height: 44px; }
 .nf-switch { position: relative; flex-shrink: 0; width: 48px; height: 28px; border-radius: 9999px; background: hsl(var(--muted)); box-shadow: inset 0 0 0 1px hsl(var(--nf-line));
   transition: background-color .18s var(--ease-liquid), box-shadow .18s var(--ease-liquid), opacity .18s; cursor: pointer; }
+/* 1143: the track stays 48 x 28; the hit area reaches 44px tall (and a little wider) around it. */
+.nf-switch::before { content: ""; position: absolute; inset: -8px -4px; border-radius: 9999px; }
 .nf-switch.is-on { background: hsl(var(--lime)); box-shadow: inset 0 0 0 1px hsl(var(--lime)); }
 .nf-switch:disabled { cursor: not-allowed; opacity: .55; }
 .nf-switch.is-locked { opacity: .8; }
@@ -3943,6 +3945,9 @@ html.theme-anim *::after {
 }
 .pcard-avatar-img { border-radius: 9999px; box-shadow: 0 0 0 4px hsl(var(--pc-surface)), 0 0 0 6px hsl(var(--lime)), 0 14px 30px -12px hsl(222 24% 10% / 0.45); }
 @media (max-width: 639px) { .pcard-avatar-img { width: 92px !important; height: 92px !important; } }
+/* 1143: on a phone the card's pills reach 44px, and the 36px camera button over the avatar gets a 44px hit area. */
+@media (pointer: coarse) and (max-width: 1023.98px) { .pcard-pill, .pcard-cover-btn { min-height: 44px; } }
+.pcard-avatar-btn::before { content: ""; position: absolute; inset: -4px; border-radius: 9999px; }
 .pcard-avatar-btn {
   position: absolute; right: -2px; bottom: -2px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9999px;
   background: hsl(var(--pc-ink)); color: hsl(var(--pc-surface)); box-shadow: 0 0 0 3px hsl(var(--pc-surface));
@@ -4146,6 +4151,12 @@ html:not(.dark) .la-themed:not(.dark *) .la-thumb { box-shadow: inset 0 0 0 1px 
   border-radius: 999px; padding: 0 .35rem; font-size: 11.5px; font-weight: 700; background: hsl(var(--foreground) / .1); }
 .nf-tab.is-on .nf-tab-n { background: hsl(var(--foreground) / .16); }
 @media (prefers-reduced-motion: reduce) { .nf-tab { transition: none; } }
+
+/* 1143 (Astryx mobile type): on a phone held in the hand, captions never drop under 12px. The compact 11 and 11.5px
+   captions keep their size on desktop; tiny count badges (10px) are left alone so they still fit their pill. */
+@media (pointer: coarse) and (max-width: 1023.98px) {
+  .text-\[11px\], .text-\[11\.5px\] { font-size: 12px; }
+}
 
 /* ---------- 1100: Liquid glass on every studio card ----------
    The studio's screen cards wear the same liquid glass as the rail: a cool-to-deep tint, a lit rim on the top-left

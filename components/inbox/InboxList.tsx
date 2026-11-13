@@ -121,7 +121,7 @@ export function InboxTabs({ tab, onPick, counts }: { tab: InboxTab; onPick: (t: 
             }
           }}
           className={cn(
-            "inline-flex h-10 items-center justify-center gap-2 rounded-[9px] text-[13.5px] font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
+            "inline-flex h-10 items-center justify-center gap-2 rounded-[9px] text-[13.5px] touch:h-11 font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
             tab === t ? "bg-card text-foreground shadow-sm dark:bg-foreground/10" : "text-muted-foreground hover:text-foreground",
           )}
         >

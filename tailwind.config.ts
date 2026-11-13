@@ -79,6 +79,11 @@ const config: Config = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  // 1143 (Astryx DR3): `touch:` is a phone or tablet held in the hand, narrower than the desktop breakpoint and with a
+  // finger for a pointer. Compact controls use it to reach the 44px touch target there and stay compact on desktop.
+  plugins: [
+    require("tailwindcss-animate"),
+    require("tailwindcss/plugin")(({ addVariant }: { addVariant: (name: string, def: string) => void }) => addVariant("touch", "@media (pointer: coarse) and (max-width: 1023.98px)")),
+  ],
 };
 export default config;

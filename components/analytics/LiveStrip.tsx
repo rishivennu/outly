@@ -263,7 +263,7 @@ function Foot({ t, busy, onRefresh }: { t: Tile; busy: boolean; onRefresh: (id: 
         onClick={() => onRefresh(t.card!.accountId)}
         disabled={busy}
         aria-label={`Refresh ${t.card!.username} on ${name}`}
-        className="ml-auto inline-flex h-9 min-w-[44px] items-center gap-1.5 rounded-full px-3 text-xs font-medium hairline hover:bg-secondary/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className="ml-auto inline-flex h-9 min-w-[44px] touch:h-11 items-center gap-1.5 rounded-full px-3 text-xs font-medium hairline hover:bg-secondary/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         <RefreshCw className={cn("h-3.5 w-3.5", busy && "animate-spin motion-reduce:animate-none")} aria-hidden="true" /> Refresh
       </button>

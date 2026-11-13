@@ -47,6 +47,7 @@ export function MarketingNav() {
   const [open, setOpen] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const menuBtn = useRef<HTMLButtonElement>(null);
   const lockUntil = useRef(0);
   const listRef = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState(false);
@@ -191,7 +192,13 @@ export function MarketingNav() {
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // 1144: Escape from inside the panel hands focus back to the menu button, not to the page top.
+      const inside = panelRef.current?.contains(document.activeElement);
+      setOpen(false);
+      if (inside) menuBtn.current?.focus();
+    };
     // pointerdown, not click: closes before the tap lands on whatever is underneath.
     const onDown = (e: PointerEvent) => {
       const t = e.target as Node;
@@ -327,6 +334,7 @@ export function MarketingNav() {
             </>
           )}
           <button
+            ref={menuBtn}
             type="button"
             className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-foreground transition-colors hover:bg-foreground/[0.06] lg:hidden"
             aria-label={open ? "Close menu" : "Open menu"}

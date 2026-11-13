@@ -97,7 +97,7 @@ export function MobileNav() {
               <span className="mtab-ind" aria-hidden="true" />
               <Icon className="relative h-5 w-5" strokeWidth={2} aria-hidden="true" />
             </span>
-            <span className="mtab-label whitespace-nowrap text-[11px] leading-[13px]">{label}</span>
+            <span className="mtab-label whitespace-nowrap text-[12px] leading-[14px]">{label}</span>
           </Link>
         );
       })}

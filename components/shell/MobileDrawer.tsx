@@ -91,7 +91,7 @@ export function MobileDrawer({ className }: { className?: string }) {
               loggingOut.current = false;
               ask(trigger.current);
             }}
-            className="mdrawer fixed bottom-0 right-0 top-0 z-[66] flex w-[min(86vw,360px)] flex-col bg-background outline-none lg:hidden"
+            className="mdrawer fixed bottom-0 right-0 top-0 z-[66] flex w-[min(85vw,360px)] flex-col bg-background outline-none lg:hidden"
           >
             <Dialog.Title className="sr-only">Menu</Dialog.Title>
             <div className="flex items-center gap-2 px-3 pb-3 pt-3">

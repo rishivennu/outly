@@ -75,7 +75,7 @@ export default function ContactPage() {
                 <a
                   href={s.href}
                   aria-label={`${s.label} (placeholder, not live yet)`}
-                  className="inline-flex items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  className="inline-flex min-h-11 items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {s.handle}
                 </a>

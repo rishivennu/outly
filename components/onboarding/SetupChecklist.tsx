@@ -241,7 +241,7 @@ export function SetupChecklist({ state }: { state: SetupState }) {
             <p className="eyebrow mb-1.5">Getting started</p>
             <h2 id="setup-h" className="text-xl font-semibold tracking-tight">Set up Outlly in {COUNT[steps.length] ?? steps.length} steps</h2>
           </div>
-          <Button size="icon-sm" variant="ghost" onClick={dismiss} aria-label="Hide the setup checklist" className="h-11 w-11">
+          <Button size="icon-sm" variant="ghost" onClick={dismiss} aria-label="Hide the setup checklist" className="h-11 w-11 shrink-0">
             <X className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>

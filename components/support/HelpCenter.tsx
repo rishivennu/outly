@@ -158,7 +158,7 @@ export function HelpCenter({
       <div ref={tabsRef} role="tablist" aria-label="Topics" className="relative mx-auto mt-8 flex w-max max-w-full gap-1 overflow-x-auto rounded-full bg-secondary p-1">
         <span aria-hidden className="blob-tab clip-pill absolute inset-y-1 rounded-full bg-card shadow-sm" style={{ width: pill.tw, ["--l" as string]: `${pill.x}px`, ["--r" as string]: `${Math.max(0, pill.tw - pill.x - pill.w)}px` }} />
         {tabs.map((c) => (
-          <button key={c || "all"} data-cat={c} role="tab" aria-selected={cat === c} onClick={() => setCat(c)} className={cn("relative z-10 h-10 shrink-0 rounded-full px-4 text-sm font-medium transition-colors", cat === c ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+          <button key={c || "all"} data-cat={c} role="tab" aria-selected={cat === c} onClick={() => setCat(c)} className={cn("relative z-10 h-10 shrink-0 rounded-full px-4 touch:h-11 text-sm font-medium transition-colors", cat === c ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
             {c || t.all}
           </button>
         ))}
