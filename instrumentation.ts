@@ -1,6 +1,10 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    await import("./instrumentation-node");
+    const [{ initializePostHogLogCapture }] = await Promise.all([
+      import("./lib/posthog-logs"),
+      import("./instrumentation-node"),
+    ]);
+    initializePostHogLogCapture("nextjs");
   }
 }
 

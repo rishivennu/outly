@@ -2,6 +2,7 @@ import { z } from "zod";
 import { json } from "@/lib/http";
 import { adminRoute, adminEvent } from "@/lib/admin/route";
 import { isRange, listAnalyses, runAnalysis } from "@/lib/admin/behavior";
+import { withAiTurn } from "@/lib/posthog-ai";
 
 export const dynamic = "force-dynamic";
 // A Gemini read of the whole snapshot can take 10 to 40 seconds.
@@ -23,7 +24,7 @@ export const POST = adminRoute(
   "insights",
   async (req, { admin }) => {
     const { rangeDays, focus } = RunInput.parse(await req.json());
-    const a = await runAnalysis({ rangeDays: rangeDays as 7 | 30 | 90, focus, by: admin.name || admin.login });
+    const a = await withAiTurn({ distinctId: admin.id }, () => runAnalysis({ rangeDays: rangeDays as 7 | 30 | 90, focus, by: admin.name || admin.login }));
     await adminEvent("behavior_analysis", `Behavior analysis v${a.version} ready`, a.headline, `/admin/behavior?tab=ai&v=${a.id}`);
     return json({ analysis: a });
   },

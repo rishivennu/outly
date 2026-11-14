@@ -8,6 +8,7 @@ import { subtitleRules } from "@/lib/ai/engine-store";
 import { normalizeCues } from "@/lib/captions/cues";
 import { highlightPrompt, parseHighlights } from "@/lib/captions/subtitle-engine";
 import { env } from "@/lib/env";
+import { withAiTurn } from "@/lib/posthog-ai";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -27,7 +28,7 @@ export const POST = route(
     const cues = normalizeCues(raw, duration);
     const rules = await subtitleRules();
     const { system, prompt } = highlightPrompt(cues, rules);
-    const out = await gemini<unknown>(system, prompt, { temperature: 0.4, timeoutMs: 30_000, models: ["gemini-3.6-flash", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"] });
+    const out = await withAiTurn({ distinctId: realUserId(user) }, () => gemini<unknown>(system, prompt, { temperature: 0.4, timeoutMs: 30_000, models: ["gemini-3.6-flash", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"] }));
     if (!out) throw new HttpError(502, "Gemini didn't answer just now. Try again in a minute.", "AI_FAILED");
     return json({ clips: parseHighlights(out, cues, duration, rules) });
   },

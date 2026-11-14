@@ -4,6 +4,7 @@ import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { api, ApiError } from "@/lib/client/api";
+import posthog from "posthog-js";
 
 const TOPICS = ["A question", "Something is broken", "A feature idea", "Billing", "Privacy or legal"] as const;
 
@@ -29,6 +30,7 @@ export function ContactForm() {
         method: "POST",
         json: { email: f.email, name: f.name || undefined, reason: "form", website: f.website || undefined, transcript: [{ role: "user", text: `[${f.topic}] ${f.message.trim()}`.slice(0, 2000) }] },
       });
+      posthog.capture("contact_form_submitted", { topic: f.topic });
       setDone(r.ref);
     } catch (e2) {
       setErr(e2 instanceof ApiError ? e2.message : "That didn't send. Check your connection and try again.");

@@ -4,6 +4,7 @@ import { generateHooks } from "@/lib/ai/creative";
 import { chargeAi } from "@/lib/ai-quota";
 import { realUserId } from "@/lib/auth";
 import { voiceFor } from "@/lib/ai/voice";
+import { withAiTurn } from "@/lib/posthog-ai";
 
 // Streams when asked (Accept: application/x-ndjson): the first hook shows in about a second instead of
 // after the whole answer. Plain JSON for everyone else (older app builds, scripts).
@@ -13,8 +14,8 @@ export const POST = route(
     const uid = realUserId(user);
     await chargeAi(uid);
     const opts = { cacheKey: uid, signal: req.signal, voice: await voiceFor(uid) };
-    if (!wantsStream(req)) return json(await generateHooks(story, tone, exclude, opts));
-    return ndjson((send) => generateHooks(story, tone, exclude, { ...opts, onPart: (p) => send(p) }));
+    if (!wantsStream(req)) return json(await withAiTurn({ distinctId: uid }, () => generateHooks(story, tone, exclude, opts)));
+    return ndjson((send) => withAiTurn({ distinctId: uid }, () => generateHooks(story, tone, exclude, { ...opts, onPart: (p) => send(p) })));
   },
   { limit: [30, 60_000] },
 );

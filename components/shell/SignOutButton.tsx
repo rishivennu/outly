@@ -5,6 +5,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { api } from "@/lib/client/api";
 import { forgetBillingCopies } from "@/lib/client/forget-billing";
 import { cn } from "@/lib/utils";
+import posthog from "posthog-js";
 
 /**
  * Sign out, asking first (1072). 1100: shared as a hook so the rail's logout button and the account menu's
@@ -27,6 +28,7 @@ export function useSignOut() {
     try {
       await api("/api/auth/logout", { method: "POST" });
     } finally {
+      posthog.reset();
       await forgetBillingCopies();
       window.location.href = "/login";
     }

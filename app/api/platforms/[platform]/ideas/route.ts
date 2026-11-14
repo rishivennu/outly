@@ -3,6 +3,7 @@ import { isPlatform } from "@/lib/domain";
 import { platformIdeas } from "@/lib/live";
 import { chargeAi } from "@/lib/ai-quota";
 import { realUserId } from "@/lib/auth";
+import { withAiTurn } from "@/lib/posthog-ai";
 
 export const dynamic = "force-dynamic";
 // The model can take a few seconds; the dashboard itself never waits for this.
@@ -13,8 +14,9 @@ export const GET = route(
   async (_req, { user, params }) => {
     const p = params.platform ?? "";
     if (!isPlatform(p)) throw new HttpError(404, "We don't support that platform yet.");
-    await chargeAi(realUserId(user));
-    return json({ suggestions: await platformIdeas(user.id, p) });
+    const uid = realUserId(user);
+    await chargeAi(uid);
+    return json({ suggestions: await withAiTurn({ distinctId: uid }, () => platformIdeas(user.id, p)) });
   },
   { limit: [20, 60_000] },
 );

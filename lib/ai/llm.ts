@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { captureAiGeneration, hasAiTurn, withAiTurn } from "../posthog-ai";
 import { env } from "../env";
 import { HEDGE_MS, deltaText, wholeText, freshStat, isHardFailure, keyOf, rank, recordFail, recordOk, sseEvents, type ModelId, type ModelStat } from "./llm-core";
 
@@ -50,6 +51,17 @@ class CallError extends Error {
 }
 
 async function call(m: ModelId, system: string, prompt: string, opts: LlmOpts, signal: AbortSignal, onDelta: (full: string) => void): Promise<string> {
+  const startedAt = Date.now();
+  let firstTokenAt: number | undefined;
+  const input = [
+    { role: "system", content: system },
+    {
+      role: "user",
+      content: opts.images?.length
+        ? [...opts.images.map((image) => ({ type: "image", mime_type: image.mime })), { type: "text", text: prompt }]
+        : prompt,
+    },
+  ];
   const req: { url: string; headers: Record<string, string>; body: unknown } =
     m.provider === "gemini"
       ? {
@@ -71,35 +83,63 @@ async function call(m: ModelId, system: string, prompt: string, opts: LlmOpts, s
             messages: [{ role: "system", content: system }, { role: "user", content: prompt }],
           },
         };
-  const r = await fetch(req.url, { method: "POST", headers: { "content-type": "application/json", ...req.headers }, body: JSON.stringify(req.body), signal });
-  if (!r.ok || !r.body) throw new CallError(r.status, (await r.text().catch(() => "")).slice(0, 400));
-  const reader = r.body.getReader();
-  const dec = new TextDecoder();
-  let buf = "";
-  let text = "";
-  let raw = ""; // kept only while nothing has streamed, for an answer that arrives as one plain JSON body
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const chunk = dec.decode(value, { stream: true });
-    buf += chunk;
-    if (!text && raw.length < 2_000_000) raw += chunk;
-    const { events, rest } = sseEvents(buf);
-    buf = rest;
-    let grew = false;
-    for (const e of events) {
-      const d = deltaText(m.provider, e);
-      if (d) (text += d), (grew = true);
+  try {
+    const r = await fetch(req.url, { method: "POST", headers: { "content-type": "application/json", ...req.headers }, body: JSON.stringify(req.body), signal });
+    if (!r.ok || !r.body) throw new CallError(r.status, (await r.text().catch(() => "")).slice(0, 400));
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    let text = "";
+    let raw = ""; // kept only while nothing has streamed, for an answer that arrives as one plain JSON body
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = dec.decode(value, { stream: true });
+      buf += chunk;
+      if (!text && raw.length < 2_000_000) raw += chunk;
+      const { events, rest } = sseEvents(buf);
+      buf = rest;
+      let grew = false;
+      for (const e of events) {
+        const d = deltaText(m.provider, e);
+        if (d) (text += d), (grew = true), (firstTokenAt ??= Date.now());
+      }
+      if (grew) onDelta(text);
     }
-    if (grew) onDelta(text);
+    for (const e of sseEvents(buf + "\n\n").events) text += deltaText(m.provider, e);
+    if (!text.trim() && raw.trimStart().match(/^[[{]/)) {
+      text = wholeText(m.provider, raw);
+      if (text.trim()) onDelta(text); // so the race sees this model wrote, like a streamed answer
+    }
+    if (!text.trim()) throw new CallError(204, "empty");
+    await captureAiGeneration({
+      provider: m.provider === "kimi" ? "moonshot" : "gemini",
+      model: m.model,
+      input,
+      output: text,
+      latency: (Date.now() - startedAt) / 1000,
+      stream: true,
+      timeToFirstToken: firstTokenAt ? (firstTokenAt - startedAt) / 1000 : undefined,
+      requestUrl: req.url,
+      temperature: opts.temperature ?? 0.9,
+      spanName: "llm_completion",
+    });
+    return text;
+  } catch (error) {
+    await captureAiGeneration({
+      provider: m.provider === "kimi" ? "moonshot" : "gemini",
+      model: m.model,
+      input,
+      latency: (Date.now() - startedAt) / 1000,
+      stream: true,
+      requestUrl: req.url,
+      temperature: opts.temperature ?? 0.9,
+      httpStatus: error instanceof CallError ? error.status : undefined,
+      error: error instanceof CallError ? error.body : error instanceof Error ? error.message : "request_failed",
+      spanName: "llm_completion",
+    });
+    throw error;
   }
-  for (const e of sseEvents(buf + "\n\n").events) text += deltaText(m.provider, e);
-  if (!text.trim() && raw.trimStart().match(/^[[{]/)) {
-    text = wholeText(m.provider, raw);
-    if (text.trim()) onDelta(text); // so the race sees this model wrote, like a streamed answer
-  }
-  if (!text.trim()) throw new CallError(204, "empty");
-  return text;
 }
 
 const cache = new Map<string, { at: number; text: string; model: string }>();
@@ -112,6 +152,7 @@ const cacheId = (k: string, system: string, prompt: string, t: number | undefine
 
 /** The raw text of the fastest good answer, or null when nothing answered in time. */
 export async function llmText(system: string, prompt: string, opts: LlmOpts = {}): Promise<{ text: string; model: string } | null> {
+  if (!hasAiTurn()) return withAiTurn({}, () => llmText(system, prompt, opts));
   const id = opts.cacheKey ? cacheId(opts.cacheKey, system, prompt, opts.temperature, opts.images) : null;
   const hit = id ? cache.get(id) : undefined;
   if (hit && Date.now() - hit.at < CACHE_MS) {

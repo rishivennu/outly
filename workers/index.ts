@@ -7,12 +7,21 @@ import IORedis from "ioredis";
 import { QUEUE_NAMES, type JobName } from "../lib/queue/jobs";
 import { requeueStuckTargets, runJob, sweepDuePosts } from "../lib/queue/handlers";
 import { recordSweep } from "../lib/queue/health";
+import { emitPostHogLog, initializePostHogLogCapture } from "../lib/posthog-logs";
+
+initializePostHogLogCapture("worker");
 
 const url = process.env.REDIS_URL;
 if (!url) throw new Error("REDIS_URL is required for the worker process");
 const connection = new IORedis(url, { maxRetriesPerRequest: null });
 
 const concurrency: Record<string, number> = { media: 2, system: 4, "social-instagram": 3, "social-youtube": 2, "social-x": 4 };
+
+emitPostHogLog("Queue worker started", {
+  event: "queue_worker_started",
+  queue_count: QUEUE_NAMES.length,
+  redis_configured: true,
+});
 
 for (const q of QUEUE_NAMES) {
   const w = new Worker(q, async (job) => runJob(job.name as JobName, job.data), { connection, concurrency: concurrency[q] ?? 2 });

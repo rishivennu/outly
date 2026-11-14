@@ -46,7 +46,7 @@ export default async function StudioLayout({ children }: { children: React.React
   void touchPresence(user.actor?.id ?? user.id); // online now (1037); the LiveCount poll keeps it fresh
   void touchSession(); // Active sessions "last active" (1080), at most every 5 minutes
   return (
-    <UserProvider user={{ id: user.id, name: user.name, email: user.email, avatar: user.avatar, timezone: user.timezone, workspace: user.actor ? { ownerName: user.name, role: user.role === "manager" ? "manager" : "editor", me: { name: user.actor.name, email: user.actor.email } } : null, view: (await cookies()).get(ACCT_COOKIE)?.value ?? null }}>
+    <UserProvider user={{ id: user.id, name: user.name, email: user.email, avatar: user.avatar, timezone: user.timezone, identity: user.actor ?? undefined, workspace: user.actor ? { ownerName: user.name, role: user.role === "manager" ? "manager" : "editor", me: { name: user.actor.name, email: user.actor.email } } : null, view: (await cookies()).get(ACCT_COOKIE)?.value ?? null }}>
       <LivePlatformsProvider value={live}>
       <ToastProvider>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground">
