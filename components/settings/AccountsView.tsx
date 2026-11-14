@@ -21,6 +21,7 @@ import type { ChoiceView } from "@/lib/connect-choice";
 import { connectHref, SWITCH_HELP } from "@/lib/social/switch-help";
 import { REVOCABLE_PLATFORMS } from "@/lib/social/revocable";
 import { ConnectChoiceDialog, SwitchGuideDialog } from "./ConnectChoiceDialog";
+import posthog from "posthog-js";
 
 /** A disconnected account (1095): only its name, so the page can offer to bring it back. */
 export interface PreviousAccount {
@@ -95,6 +96,7 @@ export function AccountsView({ initial, previous: initialPrevious = [], setup, a
         .catch((x) => toast(x instanceof ApiError ? x.message : "That sign-in couldn't be finished. Connect again.", "info"));
     }
     if (c && (PLATFORMS as readonly string[]).includes(c)) {
+      posthog.capture("social_account_connected", { platform: c });
       if (params.get("notice") === "dm_scope") toast(`${PLATFORM_META[c as Platform].name} is connected, but messages were left unticked, so DMs won't arrive in your Inbox. To get them, reconnect and keep "Manage messages" ticked.`, "info");
       else toast(`${PLATFORM_META[c as Platform].name} is connected. Ready to publish.`);
     }
@@ -147,6 +149,7 @@ export function AccountsView({ initial, previous: initialPrevious = [], setup, a
     const gone = new Set(r.replaced ?? []);
     setPrevious((pv) => [...pv.filter((x) => x.id !== acc.id), ...accounts.filter((x) => gone.has(x.id)).map((x) => ({ id: x.id, platform: x.platform, username: x.username }))]);
     setAccounts((all) => [...all.filter((x) => x.id !== acc.id && !gone.has(x.id)), acc]);
+    posthog.capture("social_account_connected", { platform: acc.platform });
     if (dmScope) toast(`${PLATFORM_META[acc.platform].name} ${acc.username} is connected, but messages were left unticked, so DMs won't arrive in your Inbox. To get them, reconnect and keep "Manage messages" ticked.`, "info");
     else toast(`${PLATFORM_META[acc.platform].name} ${acc.username} is connected. Ready to publish.`);
     router.refresh();
@@ -169,6 +172,7 @@ export function AccountsView({ initial, previous: initialPrevious = [], setup, a
       setAccounts((a) => a.filter((x) => (id ? x.id !== id : x.platform !== p)));
       setPrevious((pv) => [...pv.filter((x) => !gone.some((g) => g.id === x.id)), ...gone.map((x) => ({ id: x.id, platform: x.platform, username: x.username }))]);
       setConfirm(null);
+      posthog.capture("social_account_disconnected", { platform: p });
       toast(`${name} is disconnected. Its keys are deleted; its posts and numbers stay.`, "info");
     } catch (e) {
       toast(e instanceof ApiError ? e.message : "Something got in the way.", "error");
@@ -422,6 +426,7 @@ function TokenConnect({ onConnected, defaultOpen }: { onConnected: (a: AccountVi
       const r = await api<{ account: AccountView }>("/api/accounts/instagram/token", { method: "POST", json: { token } });
       setToken("");
       onConnected(r.account);
+      posthog.capture("social_account_connected", { platform: "instagram", connection_method: "token" });
       toast(`Instagram ${r.account.username} is connected for real. Your live dashboard is ready.`);
     } catch (x) {
       setErr(x instanceof ApiError ? x.message : "That token didn't work.");

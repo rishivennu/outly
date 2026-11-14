@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import posthog from "posthog-js";
 import { ErrorScreen, ghostPill, pill } from "@/components/shared/ErrorScreen";
 import { isChunkError, reloadOnce } from "@/lib/client/chunk-reload";
 
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error(error);
+    posthog.captureException(error);
     // 1079: an old build's chunk is gone after a deploy; one reload picks up the new build.
     if (isChunkError(error)) reloadOnce();
   }, [error]);

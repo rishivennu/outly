@@ -33,6 +33,7 @@ import { DeviceDrafts } from "./DeviceDrafts";
 import { findDeviceDraftByPost, getDeviceDraft, newDeviceId, removeDeviceDraft, saveDeviceDraft, type DeviceTarget } from "@/lib/client/device-drafts";
 import { emptyDraft, NOTES, type AccountView, type Draft, type Hook, type HookResult, type HooksState, NO_HOOKS, type MediaView, type PlatformCopy, type PostView, type Step, type Tone, type UploadState } from "./types";
 import { T } from "@/lib/motion/tokens";
+import posthog from "posthog-js";
 
 interface Props {
   accounts: AccountView[];
@@ -178,6 +179,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
           if (ctrl.signal.aborted) return null;
           setMedia(r.media);
           setUpload({ kind: "done" });
+          posthog.capture("video_uploaded");
           return r.media;
         } catch (e) {
           if (ctrl.signal.aborted) return null;
@@ -527,7 +529,10 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
     // Mid-upload this waits for the video to land, then saves.
     if (!media && upload.kind === "uploading") toast("Saving as soon as your video finishes uploading.", "info");
     const id = await save({ force: true });
-    if (id) toast("Saved to Drafts. Find it under Content.");
+    if (id) {
+      posthog.capture("draft_saved");
+      toast("Saved to Drafts. Find it under Content.");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [media, save, upload.kind]);
 
@@ -556,6 +561,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
       const id = await save({ force: true, strict: true });
       if (!id) throw new ApiError(400, "Add a video first.");
       const r = await api<{ post: PostView }>(`/api/posts/${id}/launch`, { method: "POST", json: { mode, scheduledAt: mode === "schedule" ? when.toISOString() : undefined, confirmed: true } });
+      posthog.capture("post_launched", { mode, destination_count: r.post.targets.length });
       if (deviceId.current) void removeDeviceDraft(deviceId.current); // it's out (or booked): no copy to keep
       if (mode === "now") {
         setLivePost(r.post);

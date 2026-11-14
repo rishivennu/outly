@@ -7,6 +7,8 @@ import { recordSweep } from "@/lib/queue/health";
 import { runCleanups } from "@/lib/account-cleanup";
 import { sweepReminders } from "@/lib/retention/reminders";
 import { cleanupSubs, drainOutbox } from "@/lib/push/webpush";
+import { emitPostHogLog, flushPostHogLogs } from "@/lib/posthog-logs";
+import { after } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -44,6 +46,15 @@ async function sweep(req: NextRequest) {
   // (1027). Budget = what is left of maxDuration minus 10 s of headroom; whatever is still running then is
   // held by waitUntil or picked up by the next sweep.
   const running = await settle(Math.max(0, 50_000 - (Date.now() - startedAt)));
+  emitPostHogLog("Scheduled maintenance sweep completed", {
+    event: "scheduled_maintenance_sweep_completed",
+    duration_ms: Date.now() - startedAt,
+    requeued,
+    cleaned,
+    files_removed: files.removed,
+    files_failed: files.failed,
+  });
+  after(flushPostHogLogs);
   return NextResponse.json({ ok: true, requeued, cleaned, files, reminders, push, assist, campaign, running }, { headers: { "cache-control": "no-store" } });
 }
 

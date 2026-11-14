@@ -11,6 +11,7 @@ import { planFor, runPip } from "@/lib/pip/run";
 import { PIP_TOOLS } from "@/lib/pip/types";
 import { wantsToResolve } from "@/lib/support/resolve";
 import { openConversation, recordTurn } from "@/lib/support/conversations";
+import { withAiTurn } from "@/lib/posthog-ai";
 
 const Body = z.object({
   message: z.string().trim().min(1).max(800),
@@ -77,6 +78,7 @@ export const POST = route(async (req) => {
   }
   // Charged only when a model call is about to happen (an English help-question tap never calls it).
   // Signed in: the per-person daily counter (throws 429 past it). Visitor: the free pool above.
+  return withAiTurn({ distinctId: who ?? undefined, sessionId: conv?.id ?? null }, async () => {
   let allowed: boolean | undefined;
   const mayUseAi = async () => {
     if (allowed === undefined) {
@@ -106,4 +108,5 @@ export const POST = route(async (req) => {
     }
   }
   return reply(await answer(b.message, b.history, b.lang, { signedIn: !!me, page: b.page, ai: await mayUseAi() }));
+  });
 }, { auth: false, limit: [30, 60_000] });

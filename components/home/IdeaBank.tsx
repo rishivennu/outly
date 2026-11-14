@@ -7,6 +7,7 @@ import { Pip } from "@/components/brand/Pip";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/shared/Toast";
 import { api, ApiError } from "@/lib/client/api";
+import posthog from "posthog-js";
 
 type Idea = { id: string; text: string; source: string; done: boolean; createdAt: string };
 /** Note tints, cycled. Text on them stays foreground (see .idea-note). */
@@ -36,6 +37,7 @@ export function IdeaBank({ wide = false }: { wide?: boolean }) {
     try {
       const r = await api<{ idea: Idea }>("/api/ideas", { method: "POST", json: { text: t } });
       setIdeas((x) => [r.idea, ...(x ?? [])]);
+      posthog.capture("idea_created", { source: "manual" });
       setText("");
       input.current?.focus();
     } catch (err) {
@@ -49,6 +51,7 @@ export function IdeaBank({ wide = false }: { wide?: boolean }) {
     setBusy(i.id);
     try {
       await api(`/api/ideas/${i.id}`, { method: "PATCH", json: { done: true } });
+      posthog.capture("idea_used_for_post", { source: i.source });
       router.push(`/create?idea=${i.id}`);
     } catch {
       setBusy(null);

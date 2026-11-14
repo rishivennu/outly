@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, Loader2, RotateCcw } from "lucide-react";
 import { api, ApiError } from "@/lib/client/api";
+import posthog from "posthog-js";
 
 type Joined = { already: boolean; position?: number; waiting?: number };
 type Done = Joined & { email: string; name: string | null; at: string };
@@ -114,6 +115,7 @@ export function WaitlistForm({ fromGoogle = false, beta = false }: { fromGoogle?
     setBadEmail(false);
     try {
       const r = await api<Joined>("/api/waitlist", { method: "POST", json: { email: form.email, name: form.name || undefined, source: fromGoogle ? "google" : "page" } });
+      posthog.capture("waitlist_joined", { already_registered: r.already, source: fromGoogle ? "google" : "page" });
       const d: Done = { ...r, email: form.email.trim().toLowerCase(), name: form.name.trim() || null, at: new Date().toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }) };
       try {
         localStorage.setItem(KEY, JSON.stringify({ ...d, savedAt: Date.now() }));

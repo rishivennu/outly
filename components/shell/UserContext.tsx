@@ -1,5 +1,6 @@
 "use client";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useEffect } from "react";
+import posthog from "posthog-js";
 import { forgetCached } from "@/lib/client/api";
 import { coolPages } from "@/lib/client/warm";
 import { claimFor, forgetRefreshes } from "@/lib/client/preload";
@@ -11,6 +12,8 @@ export interface ClientUser {
   email: string;
   avatar: string | null;
   timezone: string;
+  /** The authenticated account when this context is rendering another workspace's data. */
+  identity?: { id: string; name: string; email: string };
   /** Set while working inside someone else's workspace: whose it is, your role, and who you really are. */
   workspace?: { ownerName: string; role: "editor" | "manager"; me: { name: string; email: string } } | null;
   /** 1114: the profile picked on Home (its cookie value), null for all profiles. It scopes what every page shows. */
@@ -27,6 +30,19 @@ export function UserProvider({ user, children }: { user: ClientUser; children: R
     forgetVisits();
     forgetRefreshes();
   }
+
+  // The studio layout is the client boundary where an authenticated session is available, including
+  // after a refresh or an OAuth callback. The SDK persists this identity for its events and errors.
+  const identity = user.identity ?? user;
+  useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_POSTHOG_KEY || !process.env.NEXT_PUBLIC_POSTHOG_HOST) return;
+
+    const identifiedUserId = posthog.get_property("$user_id");
+    if (typeof identifiedUserId === "string" && identifiedUserId !== identity.id) posthog.reset();
+
+    posthog.identify(identity.id, { email: identity.email, name: identity.name });
+  }, [identity.email, identity.id, identity.name]);
+
   return <Ctx.Provider value={user}>{children}</Ctx.Provider>;
 }
 /** Same as useUser, but null outside the studio (marketing pages render some studio widgets, like the chat). */

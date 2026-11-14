@@ -13,6 +13,7 @@ import { OutlyMark } from "@/components/brand/Logo";
 import { PipWatch } from "./PipWatch";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
 import { sameSitePath } from "@/lib/safe-next";
+import posthog from "posthog-js";
 
 const AGE_ERROR = "Please confirm you're 18 or older to create an account.";
 
@@ -141,6 +142,7 @@ export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { 
   }, [tries, shake]);
 
   const go = () => {
+    posthog.capture(mode === "signup" ? "account_created" : "user_logged_in");
     router.replace(next ?? "/home");
     router.refresh();
   };

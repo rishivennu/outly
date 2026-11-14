@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/client/api";
+import posthog from "posthog-js";
 
 export function AcceptInvite({ token, owner }: { token: string; owner: string }) {
   const [busy, setBusy] = useState(false);
@@ -11,6 +12,7 @@ export function AcceptInvite({ token, owner }: { token: string; owner: string })
     setError(null);
     try {
       await api("/api/team/accept", { method: "POST", json: { token } });
+      posthog.capture("team_invite_accepted");
       window.location.href = "/home";
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Something got in the way.");

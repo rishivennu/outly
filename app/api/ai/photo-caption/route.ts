@@ -6,6 +6,7 @@ import { realUserId } from "@/lib/auth";
 import { chargeAi } from "@/lib/ai-quota";
 import { voiceFor } from "@/lib/ai/voice";
 import { generatePhotoCopy } from "@/lib/ai/photo-caption";
+import { withAiTurn } from "@/lib/posthog-ai";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,7 +60,7 @@ export const POST = route(
       throw e;
     }
     const images = await Promise.all(picked.map(async (p) => ({ mime: "image/jpeg", data: (await bytesOf(p.key)).toString("base64") })));
-    const out = await generatePhotoCopy(images, format, { signal: req.signal, voice: await voiceFor(uid), cacheKey: uid });
+    const out = await withAiTurn({ distinctId: uid }, () => generatePhotoCopy(images, format, { signal: req.signal, voice: await voiceFor(uid), cacheKey: uid }));
     if (!out) {
       if (auto) return json({ skipped: "busy" });
       throw new HttpError(503, "The assistant couldn't look at your photos just now. Try again in a moment, or write your own.", "AI_BUSY");

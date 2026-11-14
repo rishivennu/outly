@@ -29,6 +29,7 @@ import { GuaranteeCard, type GuaranteeView } from "./GuaranteeCard";
 import { GUARANTEE_LINE } from "@/lib/billing/guarantee-core";
 import { AutoRenewToggle, CancelReasons, PriceSurvey, UsageExtras, type CancelWhy } from "./PlanExtras";
 import { SavedCardsSection } from "./SavedCards";
+import posthog from "posthog-js";
 
 export type ReturnNotice = { tone: "ok" | "info" | "error"; text: string };
 type Current = { planSlug: string; planName: string; priceMinor: number; currency: string; interval: string; periodEnd: string; cancelAtPeriodEnd: boolean; pausedUntil?: string | null; provider?: string; autoRenew?: boolean } | null;
@@ -114,6 +115,7 @@ export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: st
     if (!online) return toast("You're offline. Reconnect to change plans.", "error");
     setBusy(p.slug);
     const offer = (y ? y.offer : p.offer) || undefined; // 1122: the server re-checks it and prices it itself
+    posthog.capture("subscription_checkout_started", { purchase_type: "plan", plan_slug: p.slug, billing_cycle: y ? "year" : "month" });
     await pay(() => api<any>("/api/billing/checkout", { method: "POST", json: { plan: p.slug, currency: y ? y.currency : p.currency, cycle: y ? "year" : "month", ...(offer ? { campaign: offer } : {}) } }));
   }
 
@@ -121,6 +123,7 @@ export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: st
   async function buyPack(packId: string) {
     if (!online) return toast("You're offline. Reconnect to buy a top-up.", "error");
     setBusy(`pack-${packId}`);
+    posthog.capture("subscription_checkout_started", { purchase_type: "top_up" });
     await pay(() => api<any>("/api/billing/topups", { method: "POST", json: { pack: packId } }));
   }
 
@@ -174,6 +177,7 @@ export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: st
         "ok",
       );
       setConfirm(false);
+      posthog.capture("subscription_updated", { action });
       router.refresh();
     } catch (e) {
       toast((e as Error).message, "error");
