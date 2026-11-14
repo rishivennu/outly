@@ -85,7 +85,7 @@ function CtaPhone() {
           <span className="h-2.5 w-5 rounded-[3px] bg-foreground/80" />
         </span>
         <span className="block px-4 pt-7">
-          <span className="block text-[11.5px] font-semibold text-[hsl(var(--ap-ink2))]">Today</span>
+          <span className="block text-xs font-semibold text-[hsl(var(--ap-ink2))]">Today</span>
           <span className="mt-0.5 block font-display text-[22px] font-bold tracking-[-0.02em]">All sent.</span>
           <span className="relative mt-3 block aspect-[16/10] overflow-hidden rounded-[18px]" style={{ background: "linear-gradient(140deg,#ffcf8a,#ff7a59 45%,#6c3bff)" }}>
             <span className="absolute inset-0 grid place-items-center">
@@ -98,10 +98,10 @@ function CtaPhone() {
               <span key={s.brand} className={cn("flex items-center gap-2.5 px-3 py-2.5", i > 0 && "border-t border-foreground/[0.08]")}>
                 <AppIcon brand={s.brand} size={30} />
                 <span className="min-w-0 flex-1 leading-tight">
-                  <span className="block text-[13.5px] font-semibold">{s.name}</span>
+                  <span className="block text-[14px] font-semibold">{s.name}</span>
                   <span className="block text-[12px] text-[hsl(var(--ap-ink2))]">{s.what}</span>
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11.5px] font-semibold pill-ink-ok">
+                <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-xs font-semibold pill-ink-ok">
                   <Check className="h-3 w-3" strokeWidth={3} />
                   Live
                 </span>

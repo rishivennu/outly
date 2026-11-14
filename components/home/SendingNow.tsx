@@ -124,7 +124,7 @@ export function SendingNow({ items }: { items: SendingItem[] }) {
                           <span key={i} className={cn("la-step", s.stalled ? (i === 0 ? "la-step-bad" : "") : i < s.index ? "la-step-done" : i === s.index ? "la-step-now" : "")} />
                         ))}
                       </span>
-                      <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">{pct === null ? stepText(s) : `${pct}% uploaded`}</p>
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-white/50">{pct === null ? stepText(s) : `${pct}% uploaded`}</p>
                     </li>
                   );
                 })}

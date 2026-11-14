@@ -18,7 +18,7 @@ export function MusicNote({ list, onReplace }: Props) {
   return (
     <section aria-labelledby="music-note" className="mt-8 rounded-[24px] p-4 text-left hairline sm:p-5">
       <h3 id="music-note" className="flex items-center gap-2 text-sm font-semibold">
-        <Music2 className="h-4 w-4 text-cyan" aria-hidden="true" /> Want trending music on it?
+        <Music2 className="h-4 w-4 text-accent" aria-hidden="true" /> Want trending music on it?
       </h3>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
         Outlly posts your video exactly as you uploaded it, with its own sound. It can&apos;t add music for you: Instagram and YouTube don&apos;t let other apps use their music libraries.

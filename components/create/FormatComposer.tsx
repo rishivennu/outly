@@ -10,6 +10,7 @@ import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { useToast } from "@/components/shared/Toast";
 import { fmt, tzShort } from "@/components/shell/UserContext";
 import { api, ApiError } from "@/lib/client/api";
+import { track } from "@/lib/analytics/track";
 import { uploadVideo } from "@/lib/client/upload";
 import { validateVideoFile } from "@/lib/client/handoff";
 import { looksLikePhoto, PHOTO_ACCEPT, uploadPhoto } from "@/lib/client/image";
@@ -417,6 +418,7 @@ export function FormatComposer({ accounts, choices, initialPost, initialFormat, 
       const id = await save({ force: true, strict: true });
       if (!id) throw new ApiError(400, "Add your photos or videos first.");
       const r = await api<{ post: PostView }>(`/api/posts/${id}/launch`, { method: "POST", json: { mode, scheduledAt: mode === "schedule" ? when.toISOString() : undefined, confirmed: true } });
+      track(mode === "schedule" ? "post_scheduled" : "post_published", { kind: "format" });
       if (mode === "now") {
         setLivePost(r.post);
         setPhase("publishing");

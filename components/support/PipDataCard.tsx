@@ -90,7 +90,7 @@ export function PipDataCard({ r }: { r: PipResult }) {
       {warn.length > 0 && (
         <ul className="mt-2 space-y-1">
           {warn.map((n, i) => (
-            <li key={i} className="pd-note-warn flex gap-1.5 text-[12.5px] leading-snug">
+            <li key={i} className="pd-note-warn flex gap-1.5 text-[13px] leading-snug">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
               <span>{n.text}</span>
             </li>
@@ -105,7 +105,7 @@ export function PipDataCard({ r }: { r: PipResult }) {
       )}
       {r.downloads.some((l) => l.download) && <p className="pc-muted mt-1.5 text-[12px]">Download links work for 10 minutes, only while you&apos;re signed in.</p>}
       {!!r.sources?.length && (
-        <p className="pc-muted mt-2 flex gap-1.5 text-[11.5px] leading-snug">
+        <p className="pc-muted mt-2 flex gap-1.5 text-xs leading-snug">
           <Database className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
           <span>Source: {r.sources.join(" · ")}</span>
         </p>

@@ -211,7 +211,7 @@ describe("1099 phone top bar and touch targets", () => {
     // 1105: notifications and menu only (search and theme moved into the drawer)
     expect(bar.match(/className="mtop-btn"/g)?.length).toBe(2);
     expect(css).toMatch(/\.mtop-btn \{[^}]*width: 44px; height: 44px;/);
-    expect(css).toMatch(/\.mtop-btn:active \{ transform: scale\(0\.9\)/);
+    expect(css).toMatch(/\.mtop-btn:not\(:disabled\):active \{ transform: scale\(0\.96\)/);
     expect(css).toMatch(/prefers-reduced-motion: reduce\) \{\s*\.mtop, \.mtop-btn \{ transition: none; \}/);
     expect(bar).toContain("min-w-11");
   });

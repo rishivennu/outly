@@ -50,10 +50,10 @@ export function RouteRule({ className }: { className?: string }) {
   );
 }
 
-/** Legal / long-form text. Set narrow on purpose: 66 characters is the target measure. */
+/** Legal / long-form text at 16px. Set narrow on purpose: about 62 characters is the target measure. */
 export function Prose({ children }: { children: React.ReactNode }) {
   return (
-    <div className="max-w-[68ch] [&_a]:underline [&_a]:decoration-border [&_a]:underline-offset-2 [&_h2]:mb-3 [&_h2]:mt-12 [&_h2]:text-[1.35rem] [&_h2]:font-semibold [&_h2]:tracking-tight [&_h3]:mb-2 [&_h3]:mt-8 [&_h3]:text-[1.05rem] [&_h3]:font-semibold [&_li]:mb-2 [&_li]:text-[15px] [&_li]:leading-relaxed [&_li]:text-muted-foreground [&_p]:mb-4 [&_p]:text-[15px] [&_p]:leading-relaxed [&_p]:text-muted-foreground [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-5">
+    <div className="max-w-[62ch] [&_a]:underline [&_a]:decoration-border [&_a]:underline-offset-2 [&_h2]:mb-3 [&_h2]:mt-12 [&_h2]:text-[1.35rem] [&_h2]:font-semibold [&_h2]:tracking-tight [&_h3]:mb-2 [&_h3]:mt-8 [&_h3]:text-[1.05rem] [&_h3]:font-semibold [&_li]:mb-2 [&_li]:text-base [&_li]:text-pretty [&_li]:leading-relaxed [&_li]:text-muted-foreground [&_p]:mb-4 [&_p]:text-base [&_p]:text-pretty [&_p]:leading-relaxed [&_p]:text-muted-foreground [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-5">
       {children}
     </div>
   );

@@ -59,7 +59,7 @@ export function AppAuthBridge() {
     if (!link.current) return;
     setState("browser");
     await openInBrowser(link.current).catch(() => {
-      setError("The browser didn't open. Try again.");
+      setError("Sign-in didn't start because the browser didn't open. Try again, or sign in with email.");
       setState("error");
     });
   }, []);
@@ -112,7 +112,7 @@ export function AppAuthBridge() {
 
   if (state === "error")
     return (
-      <BridgeScreen icon={<CircleAlert className="h-8 w-8" />} title="Let's try that again" body={error ?? "Something got in the way."}>
+      <BridgeScreen icon={<CircleAlert className="h-8 w-8" />} title="Let's try that again" body={error ?? "Sign-in didn't finish. Try again, or sign in with email."}>
         <Button variant="lime" size="lg" className="w-full max-w-xs" onClick={() => (to ? location.reload() : location.replace("/login"))}>Try again</Button>
         <Button variant="ghost" onClick={leave}>Go back</Button>
       </BridgeScreen>

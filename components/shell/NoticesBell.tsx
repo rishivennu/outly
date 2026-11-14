@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 type Notice = { id: string; kind: string; tone: "danger" | "warn" | "info"; title: string; body: string; href: string | null; action: string | null; read: boolean; createdAt: string };
 const ICON = { danger: AlertTriangle, warn: CircleAlert, info: Info } as const;
-const TONE = { danger: "text-destructive", warn: "text-warning", info: "text-muted-foreground" } as const;
+const TONE = { danger: "text-destructive", warn: "text-warning-ink", info: "text-muted-foreground" } as const;
 
 const when = (iso: string) => {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);

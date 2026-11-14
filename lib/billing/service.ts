@@ -28,6 +28,10 @@ import { ensureRzpCustomer } from "./saved-cards";
 import { buyerPrice } from "./buyer-price";
 import { checkoutOffer, convertCampaign, OFFER_HOLD_MS, releaseCampaign } from "../campaign";
 import { discountLabel } from "../campaign-core";
+import { getPolicy } from "../subscriptions/policy";
+import { hashKey } from "../subscriptions/keys";
+import { quoteDetailed, type Quote } from "../subscriptions/eligibility";
+import { onChargeback, onPaymentSucceeded, onRefunded, onSubscriptionCanceled } from "../subscriptions/lifecycle";
 
 /** Which gateway serves checkout right now. Falls back to mock if the chosen one is missing keys, and says so. */
 export async function activeGateway() {
@@ -88,10 +92,33 @@ export function renewPriceOf(meta: string | null | undefined, paidMinor: number)
   }
 }
 
+/**
+ * 1147: priceMeta plus the quoted tier and policy version, and the device ledger hash (never the raw id).
+ * What it renews at stays where renewPriceOf reads it: the paid amount, or renewMinor for an offer.
+ */
+export function policyMeta(q: Quote, chargedMinor: number, fpct: number | null | undefined, offer: { id: string; label: string; until?: string } | null, deviceId?: string | null) {
+  const listMinor = Math.max(q.standardMinor, chargedMinor);
+  const base = priceMeta(listMinor, chargedMinor, q.tier === "founding" ? fpct : null, offer ? { ...offer, renewMinor: q.priceMinor } : null);
+  const m: Record<string, unknown> = base ? JSON.parse(base) : {};
+  if (!base && chargedMinor < listMinor) m.price = { listMinor, discounts: [{ label: q.label, minor: listMinor - chargedMinor }] };
+  m.subs = { tier: q.tier, version: q.policyVersion };
+  if (deviceId) m.ledger = { device: hashKey("device", deviceId) };
+  return JSON.stringify(m);
+}
+
+function policyVersionOf(meta: string | null | undefined) {
+  try {
+    const v = JSON.parse(meta || "null")?.subs?.version;
+    return typeof v === "string" ? v.slice(0, 40) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** `wanted` is the visitor's currency (cookie / IP country). The gateway decides what it can actually charge. */
 /** `cycle` is the Monthly / Yearly switch the buyer picked; yearly falls back to monthly if it is switched off. */
 /** 1122: `campaignId` is an offer the buyer claimed; it is re-checked here and checkout stops if it no longer applies. */
-export async function startCheckout(userId: string, planSlug: string, wanted?: Currency, cycle: Cycle = "month", campaignId?: string | null): Promise<CheckoutStart & { paymentId: string }> {
+export async function startCheckout(userId: string, planSlug: string, wanted?: Currency, cycle: Cycle = "month", campaignId?: string | null, opts: { deviceId?: string | null } = {}): Promise<CheckoutStart & { paymentId: string }> {
   const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
   const plan = await db.plan.findUnique({ where: { slug: planSlug } });
   if (!plan || plan.state !== "available") throw new HttpError(404, "That plan isn't available right now.", "PLAN_UNAVAILABLE");
@@ -109,11 +136,19 @@ export async function startCheckout(userId: string, planSlug: string, wanted?: C
   // 1067: someone this payment would seat (a founding spot is open for them) pays the founding price too.
   // 1096: a price test in this currency replaces the list price for the people in it (same yearly ratio).
   // 1122: the same steps live in buyerPrice, which the offer popup and billing page use too.
-  const { test, tested, fpct, foundingMinor } = await buyerPrice(user.id, plan, provider, wanted, want, display.freeMonths);
+  // 1147: with the subscription policy on, quote() decides the price (first-time, returning, founding, legacy).
+  const subs = (await getPolicy()).enabled ? await quoteDetailed({ userId, planSlug, currency: wanted, interval: want, provider, deviceId: opts.deviceId }) : null;
+  const { test, tested, fpct, foundingMinor } = subs ? subs.base : await buyerPrice(user.id, plan, provider, wanted, want, display.freeMonths);
   // 1122: a claimed offer, validated again now (live, this person, this plan, beats founding). Never a surprise price.
   const offer = campaignId ? await checkoutOffer(user.id, campaignId, plan, want, provider, wanted) : null;
-  const charge = { ...tested, priceMinor: offer ? offer.finalMinor : foundingMinor };
-  const meta = priceMeta(tested.priceMinor, charge.priceMinor, offer ? null : fpct, offer ? { id: offer.campaign.id, label: discountLabel(offer.campaign), renewMinor: foundingMinor, until: offer.campaign.endsAt.toISOString() } : null);
+  // 1147: an offer must also beat the quoted price, and a first-time or returning price never goes under its 60% floor.
+  if (subs && offer && (offer.finalMinor >= subs.quote.priceMinor || ((subs.quote.tier === "intro" || subs.quote.tier === "standard") && offer.finalMinor < subs.quote.floorMinor)))
+    throw new HttpError(409, "That offer has ended or doesn't apply to this plan. The regular price is on the card.", "OFFER_UNAVAILABLE");
+  const charge = { ...tested, priceMinor: offer ? offer.finalMinor : subs ? subs.quote.priceMinor : foundingMinor };
+  const offerMeta = offer ? { id: offer.campaign.id, label: discountLabel(offer.campaign), until: offer.campaign.endsAt.toISOString() } : null;
+  const meta = subs
+    ? policyMeta(subs.quote, charge.priceMinor, fpct, offerMeta, opts.deviceId)
+    : priceMeta(tested.priceMinor, charge.priceMinor, offer ? null : fpct, offerMeta ? { ...offerMeta, renewMinor: foundingMinor } : null);
   // Reuse a recent pending attempt for the same plan, so double-clicks don't create duplicate payments.
   const recent = await db.payment.findFirst({
     where: { userId, planId: plan.id, status: "pending", provider, interval: charge.interval, createdAt: { gt: new Date(Date.now() - OFFER_HOLD_MS) } },
@@ -122,7 +157,7 @@ export async function startCheckout(userId: string, planSlug: string, wanted?: C
   const payment =
     recent && recent.amountMinor === charge.priceMinor && recent.currency === charge.currency && (recent.meta ?? null) === meta
       ? recent
-      : await db.payment.create({ data: { userId, planId: plan.id, amountMinor: charge.priceMinor, currency: charge.currency, interval: charge.interval, provider, status: "pending", meta, ...(test ? { variant: variantTag(test) } : {}) } });
+      : await db.payment.create({ data: { userId, planId: plan.id, amountMinor: charge.priceMinor, currency: charge.currency, interval: charge.interval, provider, status: "pending", meta, ...(test ? { variant: variantTag(test) } : {}), ...(subs ? { priceTier: subs.quote.tier } : {}) } });
   if (test) await recordExperiment({ experiment: test.experiment, variant: test.variant, userId, kind: "checkout", amountMinor: charge.priceMinor, currency: charge.currency });
 
   const args = { paymentId: payment.id, amountMinor: payment.amountMinor, currency: payment.currency, planName: charge.interval === "year" && plan.interval !== "year" ? `${plan.name} (yearly)` : plan.name, user: { name: user.name, email: user.email }, appUrl: env.APP_URL,
@@ -204,6 +239,7 @@ async function completeTopUp(p: { id: string; userId: string; meta: string | nul
   const invoice = flipped.count === 1 ? await invoiceFor(fresh) : await db.invoice.findUnique({ where: { paymentId: p.id } });
   if (flipped.count === 1 && !p.sample) await adminEvent("topup", `Top-up bought: ${m.label ?? m.pack}`, formatMoney(p.amountMinor, p.currency), "/admin/payments");
   if (flipped.count === 1) await noticePaymentOk(p.id); // 1118 (sample payments stay quiet inside)
+  if (flipped.count === 1) await onPaymentSucceeded(fresh); // 1147: a pack adds to the month's cost budget (never throws)
   return { payment: fresh, invoice };
 }
 
@@ -272,6 +308,8 @@ export async function completePayment(paymentId: string, providerRef?: string) {
         provider: p.provider,
         currentPeriodEnd: new Date((interval === "year" ? addYears(now, 1) : addMonths(now, 1)).getTime() + carry),
         sample: p.sample,
+        // 1147: the quoted tier is snapshotted with the price; editing the policy later never re-prices it.
+        ...(p.priceTier ? { priceTier: p.priceTier, policyVersion: policyVersionOf(p.meta) } : {}),
       },
     });
     await tx.payment.update({ where: { id: p.id }, data: { subscriptionId: s.id } });
@@ -293,6 +331,7 @@ export async function completePayment(paymentId: string, providerRef?: string) {
   const tag = parseVariantTag(p.variant);
   if (tag) await recordExperiment({ ...tag, userId: p.userId, kind: "paid", amountMinor: p.amountMinor, currency: p.currency });
   await convertCampaign(p); // 1122: an offer that was paid for counts once (never throws)
+  await onPaymentSucceeded(fresh); // 1147: offer ledger, trial conversion, month revenue (never throws)
   return { payment: fresh, invoice };
 }
 
@@ -361,6 +400,7 @@ export async function cancelSubscription(userId: string) {
   // 1096: cancelling also stops an auto-renew mandate, so nothing is charged at the period end.
   await dropMandate(s); // 1098: also stops a replacement still waiting for approval
   await db.subscription.update({ where: { id: s.id }, data: { cancelAtPeriodEnd: true, autoRenew: false, providerSubId: null } });
+  await onSubscriptionCanceled(s); // 1147 (never throws)
   return s;
 }
 export async function resumeSubscription(userId: string) {
@@ -374,6 +414,10 @@ export async function pauseSubscription(userId: string, months: number, now = ne
   const s = await db.subscription.findFirst({ where: { userId, status: "active", priceMinor: { gt: 0 }, currentPeriodEnd: { gt: now }, provider: { notIn: [...GIFT_PROVIDERS] } }, include: { plan: true }, orderBy: { createdAt: "desc" } });
   if (!s) throw new HttpError(404, "You don't have an active paid plan.", "NO_SUBSCRIPTION");
   if (isPaused(s, now)) throw new HttpError(409, "Your plan is already paused.", "ALREADY_PAUSED");
+  // 1147: a pause is not a lapse, so with the policy on it is capped (an intro price can't be parked for months).
+  const policy = await getPolicy();
+  if (policy.enabled && months > policy.maxPauseMonths)
+    throw new HttpError(400, `You can pause for up to ${policy.maxPauseMonths} month${policy.maxPauseMonths === 1 ? "" : "s"}.`, "PAUSE_TOO_LONG");
   const p = pausePlan(now, s.currentPeriodEnd, months);
   // 1096: a mandate would still charge on the old date, so pausing stops auto-renew (they can switch it back on after).
   await dropMandate(s); // 1098: also stops a replacement still waiting for approval
@@ -425,6 +469,7 @@ export async function refundPayment(paymentId: string, by: string, reason: strin
   ]);
   if (flip.count === 0) return;
   if (p.purpose === "topup") await refundTopUp(p.id); // 1096: what's left in the pack is gone
+  await onRefunded(p); // 1147: the offer stays used; the month's revenue drops (never throws)
   if (p.subscriptionId) await dropMandates([p.subscriptionId]);
   await releaseCampaign(p.id); // 1122: a refunded offer payment is no longer a conversion, and its spot frees up
   // 1052: a refunded qualifying payment ends the friend's Refer & Earn month and disqualifies the referral.
@@ -466,6 +511,8 @@ export async function markExternalRefund(paymentId: string, kind: "refund" | "ch
   }
   // 1122: a refund or an open dispute is not a confirmed payment: the conversion and the offer spot come back off.
   if (refunded || kind === "chargeback") await releaseCampaign(p.id);
+  if (refunded) await onRefunded(p); // 1147 (never throws)
+  if (kind === "chargeback") await onChargeback(p, detail); // 1147: medium risk flag, once per payment
   const revoked = await revokeReferralForPayment(p.id, "system", kind);
   if (refunded && !revoked) await revokeReferralReward(p.userId, p.createdAt).catch((e) => console.error("[refund] referral revoke", e));
   if (refunded) await releaseUnpaidFounding(p.userId);

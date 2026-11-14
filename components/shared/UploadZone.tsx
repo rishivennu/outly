@@ -93,7 +93,7 @@ export function UploadZone({ onFile, compact, accepted }: Props) {
         whileTap={{ scale: 0.99 }}
         className={cn(
           "animate-morph group relative flex w-full flex-col items-center justify-center overflow-hidden text-center outline-none transition-colors duration-300 focus-visible:outline-2",
-          compact ? "aspect-[16/10]" : "aspect-[16/10] sm:aspect-[16/9]",
+          compact ? "aspect-[16/10] min-h-[13.5rem]" : "aspect-[16/10] min-h-[13.5rem] sm:aspect-[16/9]",
           over ? "bg-[hsl(var(--card))]" : "bg-card/80",
         )}
         style={{ boxShadow: over ? "inset 0 0 0 2px hsl(var(--lime)/0.85)" : "inset 0 0 0 1px hsl(var(--foreground)/0.1)" }}

@@ -198,12 +198,12 @@ export function CommandPalette() {
                       placeholder="Search pages, actions and posts"
                       className="cp-input h-14 min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted-foreground"
                     />
-                    <kbd className="hidden rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hairline sm:inline">Esc</kbd>
+                    <kbd className="hidden rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground hairline sm:inline">Esc</kbd>
                   </div>
                   <div ref={listRef} id={`${id}-list`} role="listbox" aria-label="Results" className="cp-list min-h-0 flex-1 overflow-y-auto p-2">
                     {groups.map(([g, list]) => (
                       <div key={g} role="group" aria-labelledby={`${id}-g-${g}`} className="mb-1">
-                        <div id={`${id}-g-${g}`} role="presentation" className="eyebrow px-3 pb-1 pt-2 text-[11px]">{g}</div>
+                        <div id={`${id}-g-${g}`} role="presentation" className="eyebrow px-3 pb-1 pt-2 text-xs">{g}</div>
                         {list.map((it) => {
                           const i = ++n;
                           const on = i === active;
@@ -216,13 +216,13 @@ export function CommandPalette() {
                               aria-selected={on}
                               onPointerMove={() => active !== i && setActive(i)}
                               onClick={() => choose(it)}
-                              className={cn("flex min-h-[44px] cursor-pointer items-center gap-3 rounded-2xl px-3 text-[14.5px]", on ? "bg-secondary text-foreground" : "text-foreground/90")}
+                              className={cn("flex min-h-[44px] cursor-pointer items-center gap-3 rounded-2xl px-3 text-[15px]", on ? "bg-secondary text-foreground" : "text-foreground/90")}
                             >
                               <span className="min-w-0 flex-1 truncate">{it.label}</span>
                               {it.hint && <span className="shrink-0 text-xs text-muted-foreground">{it.hint}</span>}
                               {it.shortcut && (
                                 <>
-                                  <kbd className="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hairline" aria-hidden="true">{it.shortcut}</kbd>
+                                  <kbd className="shrink-0 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground hairline" aria-hidden="true">{it.shortcut}</kbd>
                                   <span className="sr-only">, shortcut {it.shortcut}</span>
                                 </>
                               )}

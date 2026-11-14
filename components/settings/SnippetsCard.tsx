@@ -4,7 +4,9 @@ import { BookmarkPlus, Hash, Quote, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
+import { useUndoDelete } from "@/components/shared/useUndoDelete";
 import { api, ApiError } from "@/lib/client/api";
+import { keepaliveDelete, reinsert } from "@/lib/client/deferred-delete";
 import { cn } from "@/lib/utils";
 
 type Snippet = { id: string; kind: "caption" | "hashtags" | "template" | "brand"; name: string; body: string; uses: number };
@@ -24,6 +26,7 @@ const EXAMPLES = [
 /** Manage the snippets the composer offers: add, read, delete. */
 export function SnippetsCard() {
   const toast = useToast();
+  const later = useUndoDelete();
   const id = useId();
   const [list, setList] = useState<Snippet[] | null>(null);
   const [kind, setKind] = useState<(typeof KINDS)[number]["id"]>("caption");
@@ -45,20 +48,30 @@ export function SnippetsCard() {
       setBody("");
       toast("Snippet saved", "ok");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Couldn't save it", "error");
+      toast(err instanceof ApiError ? err.message : "Couldn't save it. Check your connection and try again.", "error");
     } finally {
       setBusy(false);
     }
   }
 
-  async function remove(s: Snippet) {
+  // 1148: gone at once, deleted when the Undo toast goes.
+  function remove(s: Snippet) {
+    const at = Math.max(0, list?.findIndex((y) => y.id === s.id) ?? 0);
+    const url = `/api/snippets/${s.id}`;
     setList((x) => x?.filter((y) => y.id !== s.id) ?? null);
-    try {
-      await api(`/api/snippets/${s.id}`, { method: "DELETE" });
-    } catch {
-      setList((x) => [s, ...(x ?? [])]);
-      toast("Couldn't delete it", "error");
-    }
+    later(
+      `snippet:${s.id}`,
+      {
+        commit: () =>
+          api(url, { method: "DELETE" }).catch((e) => {
+            if (!(e instanceof ApiError && e.status === 404)) throw e;
+          }),
+        flush: () => keepaliveDelete(url),
+        restore: () => setList((x) => reinsert(x ?? [], s, at)),
+        onFail: () => toast(`Couldn't delete ${s.name}, so it's back. Check your connection and try again.`, "error"),
+      },
+      `Deleted ${s.name}.`,
+    );
   }
 
   return (

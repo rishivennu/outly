@@ -27,7 +27,7 @@ export function WeekPulse({ p }: { p: Pulse }) {
             {/* 1114: counts up each time Home is opened (same timing as Analytics: lib/motion/numbers.ts). */}
             <AnimatedNumber value={p.views} tier="main" id="home:week-views" srSuffix=" views" className="display text-3xl tabular-nums" />
             {p.viewsChange !== null && (
-              <span className={cn("inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold", up ? "bg-success/15 text-success" : "bg-destructive/10 text-destructive")}>
+              <span className={cn("inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold", up ? "bg-success/15 text-success-ink" : "bg-destructive/10 text-destructive")}>
                 {up ? <ArrowUpRight className="h-3 w-3" aria-hidden="true" /> : <ArrowDownRight className="h-3 w-3" aria-hidden="true" />}
                 {up ? "+" : ""}{p.viewsChange}% vs last week
               </span>
@@ -68,7 +68,7 @@ export function WeekPulse({ p }: { p: Pulse }) {
               className={cn("flex min-h-[76px] flex-col items-center gap-1 rounded-2xl px-1 py-2.5 transition hover:bg-secondary", d.isToday ? "bg-foreground text-background hover:bg-foreground" : "bg-secondary/40")}
               aria-label={`${d.label} ${d.date}: ${d.published} out, ${d.scheduled} scheduled`}
             >
-              <span className={cn("text-[11px] font-medium", d.isToday ? "text-background/75" : "text-muted-foreground")}>{d.label}</span>
+              <span className={cn("text-xs font-medium", d.isToday ? "text-background/75" : "text-muted-foreground")}>{d.label}</span>
               <span className="text-sm font-semibold tabular-nums">{d.date}</span>
               <span className="flex h-2 items-center gap-0.5" aria-hidden="true">
                 {Array.from({ length: Math.min(3, d.published) }, (_, i) => <i key={`p${i}`} className={cn("block h-1.5 w-1.5 rounded-full", d.isToday ? "bg-[hsl(var(--lime))]" : "bg-success")} />)}

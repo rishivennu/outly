@@ -30,11 +30,11 @@ export function WaitlistJoin({ beta, total }: { beta: boolean; total: number }) 
             </div>
             <div className="wlj-form scroll-mt-24" data-join-form="">
               <WaitlistForm beta={beta} />
-              {total >= 25 && <p className="mt-5 text-center text-[14.5px] font-semibold text-foreground/80">{total.toLocaleString("en")} creators have joined so far.</p>}
+              {total >= 25 && <p className="mt-5 text-center text-[15px] font-semibold text-foreground/80">{total.toLocaleString("en")} creators have joined so far.</p>}
               <p className="mt-3 text-center text-[14px] text-[hsl(var(--ap-ink2))]">
                 Already have an account?{" "}
                 <Link href="/login" className="inline-flex min-h-11 items-center font-semibold text-foreground underline-offset-4 hover:underline">
-                  Log in<ChevronRight className="h-4 w-4" aria-hidden="true" />
+                  Sign in<ChevronRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
               </p>
             </div>
@@ -55,7 +55,7 @@ export function WaitlistJoin({ beta, total }: { beta: boolean; total: number }) 
                   <li key={t}>
                     <span className="wl-no" aria-hidden="true">0{i + 1}</span>
                     <span>
-                      <span className="block font-display text-[15.5px] font-bold tracking-[-0.015em]">{t}</span>
+                      <span className="block font-display text-base font-bold tracking-[-0.015em]">{t}</span>
                       <span className="mt-0.5 block text-[14px] leading-snug text-[hsl(var(--ap-ink2))]">{b}</span>
                     </span>
                   </li>

@@ -34,7 +34,7 @@ export function RecycleCard({ posts }: { posts: Recyclable[] }) {
       router.push(`/create?post=${r.post.id}`);
     } catch (e) {
       setBusy(null);
-      toast(e instanceof ApiError ? e.message : "Couldn't copy that post", "error");
+      toast(e instanceof ApiError ? e.message : "Couldn't copy that post. Check your connection and try again.", "error");
     }
   }
 
@@ -44,9 +44,9 @@ export function RecycleCard({ posts }: { posts: Recyclable[] }) {
       <p className="mb-4 text-sm text-muted-foreground">Your best performers from a while back. Most followers never saw them.</p>
       <ul className="flex flex-col gap-2">
         {posts.map((p) => (
-          <li key={p.id} className="flex items-center gap-3 rounded-2xl p-2">
+          <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl p-2 sm:flex-nowrap sm:gap-y-0">
             <Thumb src={p.thumb} alt="" className="h-16 w-12 shrink-0 rounded-xl" playOnHover={false} />
-            <span className="min-w-0 flex-1">
+            <span className="min-w-0 flex-1 basis-[calc(100%-60px)] sm:basis-auto">
               <span className="block truncate font-medium">{p.title}</span>
               <span className="mt-0.5 flex items-center gap-2 text-sm text-muted-foreground">
                 <span className="inline-flex items-center gap-1"><Eye className="h-3.5 w-3.5" aria-hidden="true" /> {fmt(p.views)} views</span>
@@ -55,7 +55,7 @@ export function RecycleCard({ posts }: { posts: Recyclable[] }) {
                 <span className="ml-1 hidden -space-x-1.5 sm:flex" aria-hidden="true">{p.platforms.slice(0, 3).map((pl) => <PlatformOrb key={pl} platform={pl as Platform} size={20} ring />)}</span>
               </span>
             </span>
-            <Button variant="subtle" onClick={() => again(p)} disabled={busy === p.id} aria-label={`Post "${p.title}" again`}>
+            <Button variant="subtle" className="ml-[60px] sm:ml-0" onClick={() => again(p)} disabled={busy === p.id} aria-label={`Post "${p.title}" again`}>
               <Repeat2 className="h-4 w-4" aria-hidden="true" /> {busy === p.id ? "Copying" : "Post again"}
             </Button>
           </li>

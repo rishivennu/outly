@@ -182,7 +182,7 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       {p.media.thumbnailUrl && <img src={p.media.thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/40" />
-                      <span className="tabular absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur">{fmt(at(p), tz, { hour: "numeric", minute: "2-digit" })}</span>
+                      <span className="tabular absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur">{fmt(at(p), tz, { hour: "numeric", minute: "2-digit" })}</span>
                       <div className="absolute inset-x-0 bottom-0 p-2.5 text-white">
                         <p className="line-clamp-2 text-[13px] font-semibold leading-tight">{p.title ?? "Untitled"}</p>
                         <span className="mt-1.5 flex -space-x-1.5">
@@ -191,7 +191,7 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
                           ))}
                         </span>
                       </div>
-                      {p.status !== "scheduled" && <StatusBadge status={p.status} className="absolute right-2 top-2 hidden scale-90 md:inline-flex" />}
+                      {p.status !== "scheduled" && <StatusBadge status={p.status} className="absolute left-2 top-8 max-w-[calc(100%-1rem)] origin-left scale-90 overflow-hidden whitespace-nowrap md:left-auto md:right-2 md:top-2 md:origin-right" />}
                     </motion.button>
                     </div>
                   ))}
@@ -217,6 +217,7 @@ export function CalendarView({ initial }: { initial: PostView[] }) {
           setOpen(np);
         }}
         onRemove={(id) => setPosts((ps) => ps.filter((x) => x.id !== id))}
+        onRestore={(p) => setPosts((ps) => (ps.some((x) => x.id === p.id) ? ps : [p, ...ps]))}
         onDuplicate={(np) => {
           setPosts((ps) => [np, ...ps]);
           setOpen(np);

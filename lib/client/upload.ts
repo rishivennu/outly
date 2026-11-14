@@ -1,6 +1,7 @@
 "use client";
 
 import { api, ApiError, offerUpgrade, uploadWithProgress } from "./api";
+import { track } from "@/lib/analytics/track";
 
 /**
  * Uploads a video the best way the server supports:
@@ -104,7 +105,11 @@ export async function uploadVideo<M>(file: File, onProgress: UploadProgress, sig
     }
     throw new ApiError(413, `That's a big one. Keep it under ${mb} MB for now.`, "TOO_LARGE");
   }
-  if (!cfg.direct) return uploadWithProgress<UploadedMedia<M>>(`/api/media?name=${encodeURIComponent(file.name)}`, file, (p) => onProgress(p, null), signal);
+  if (!cfg.direct) {
+    const done = await uploadWithProgress<UploadedMedia<M>>(`/api/media?name=${encodeURIComponent(file.name)}`, file, (p) => onProgress(p, null), signal);
+    track("library_upload", { kind: file.type.split("/")[0] || "file" });
+    return done;
+  }
 
   const est = eta();
   const report = (bytes: number) => onProgress(Math.min(0.999, bytes / file.size), est(bytes, file.size));
@@ -135,6 +140,7 @@ export async function uploadVideo<M>(file: File, onProgress: UploadProgress, sig
     const done = await api<UploadedMedia<M>>("/api/media/direct/complete", { method: "POST", json: { mediaId: init.mediaId, uploadId: init.uploadId }, signal });
     localStorage.removeItem(fp(file));
     onProgress(1, 0);
+    track("library_upload", { kind: file.type.split("/")[0] || "file" });
     return done;
   }
 
@@ -193,6 +199,7 @@ export async function uploadVideo<M>(file: File, onProgress: UploadProgress, sig
   const done = await api<UploadedMedia<M>>("/api/media/direct/complete", { method: "POST", json: { mediaId: init.mediaId }, signal });
   localStorage.removeItem(fp(file));
   onProgress(1, 0);
+  track("library_upload", { kind: file.type.split("/")[0] || "file" });
   return done;
 }
 

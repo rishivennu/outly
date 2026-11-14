@@ -157,7 +157,7 @@ export function PlatformDeck(p: Props) {
                     <span className="block text-sm font-semibold">
                       {PLATFORM_META[pl].name} <span className="font-normal text-muted-foreground">{PLATFORM_META[pl].format}</span>
                     </span>
-                    <span className={cn("block truncate text-xs", s.tone === "done" ? "text-success" : s.tone === "warn" ? "text-warning" : "text-muted-foreground")}>{p.writing.includes(pl) && d.enabled ? "Writing…" : s.label}</span>
+                    <span className={cn("block truncate text-xs", s.tone === "done" ? "text-success-ink" : s.tone === "warn" ? "text-warning-ink" : "text-muted-foreground")}>{p.writing.includes(pl) && d.enabled ? "Writing…" : s.label}</span>
                   </span>
                 </button>
                 <label htmlFor={`send-${pl}`} className="relative flex min-h-[44px] cursor-pointer items-center gap-2 rounded-b-3xl border-t border-border/60 px-3.5 text-xs font-semibold">
@@ -168,7 +168,7 @@ export function PlatformDeck(p: Props) {
                     onChange={(e) => p.onDraft(pl, { enabled: e.target.checked })}
                     className="h-5 w-5 shrink-0 cursor-pointer accent-lime focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
                   />
-                  {d.enabled ? <Check className="h-4 w-4 text-success" aria-hidden="true" /> : <MinusCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}
+                  {d.enabled ? <Check className="h-4 w-4 text-success-ink" aria-hidden="true" /> : <MinusCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}
                   <span className={d.enabled ? "text-foreground" : "text-muted-foreground"}>
                     {d.enabled ? "Sending" : "Skipping"} <span className="sr-only">{PLATFORM_META[pl].name}</span>
                   </span>
@@ -276,7 +276,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
         </div>
 
         {d.note && d.enabled && (
-          <div className="flex items-start gap-2.5 rounded-2xl bg-accent/10 px-4 py-3 text-[14.5px]">
+          <div className="flex items-start gap-2.5 rounded-2xl bg-accent/10 px-4 py-3 text-[15px]">
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
             <span>
               {pl === "youtube" ? "YouTube wants a stronger title. I wrote one that people actually search for." : pl === "x" ? "Let's make this impossible to ignore. Short, sharp, no hashtags." : pl === "instagram" ? "Instagram is ready. A hook up front, one ask, and tags that travel." : `${d.note.replace(/\.$/, "")}. Written to its rules.`}
@@ -288,7 +288,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
         {!connected && d.enabled && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-warning/10 px-4 py-3">
             <span className="flex items-center gap-2 text-sm">
-              <CircleAlert className="h-4 w-4 text-warning" aria-hidden="true" />
+              <CircleAlert className="h-4 w-4 text-warning-ink" aria-hidden="true" />
               {acct ? `${meta.name} needs you to reconnect.` : `Connect ${meta.name} to send it here.`}
             </span>
             <Button size="sm" variant="primary" onClick={() => p.onConnect(pl)}>
@@ -342,7 +342,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
                 placeholder={pl === "x" ? "A link, a source, or the next thought. Optional." : "Hashtags, a link, or a question. Optional."}
               />
               <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
-                <p id={`${id}-fc-hint`} className="text-[12.5px] text-muted-foreground">
+                <p id={`${id}-fc-hint`} className="text-[13px] text-muted-foreground">
                   {pl === "x" ? "Posted as a reply to your post a few seconds after it goes live." : "Posted as your first comment a few seconds after it goes live."}
                 </p>
                 {pl !== "x" && d.hashtags.trim() && (
@@ -370,7 +370,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
 
         <ul className="space-y-1.5" aria-label="Checks">
           {p.checks.map((c) => (
-            <li key={c.text} className={cn("flex items-center gap-2 text-[13.5px]", c.level === "error" ? "text-destructive" : c.level === "warning" ? "text-warning" : "text-success")}>
+            <li key={c.text} className={cn("flex items-center gap-2 text-[14px]", c.level === "error" ? "text-destructive" : c.level === "warning" ? "text-warning-ink" : "text-success-ink")}>
               {c.level === "ok" ? <Check className="h-4 w-4" aria-hidden="true" /> : <AlertCircle className="h-4 w-4" aria-hidden="true" />}
               <span className="sr-only">{c.level === "ok" ? "Good: " : c.level === "warning" ? "Heads up: " : "Fix: "}</span>
               {c.text}

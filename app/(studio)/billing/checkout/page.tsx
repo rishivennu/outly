@@ -34,5 +34,5 @@ export default async function CheckoutPage(props: { searchParams: Promise<{ p?: 
   if (!p) return <NotFound />;
   if (p.status === "succeeded") redirect(`/billing?paid=${p.invoice?.number ?? ""}`);
   const plan = p.planId ? await db.plan.findUnique({ where: { id: p.planId } }) : null;
-  return <MockCheckout paymentId={p.id} amountMinor={p.amountMinor} currency={p.currency} planName={plan?.name ?? "Outlly"} interval={plan?.interval ?? "month"} email={user.email} />;
+  return <MockCheckout paymentId={p.id} amountMinor={p.amountMinor} currency={p.currency} planName={plan?.name ?? "Outlly"} interval={plan?.interval ?? "month"} email={user.email} tier={p.priceTier} />;
 }

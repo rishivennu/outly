@@ -60,7 +60,7 @@ export function EditProfileSheet({ open, onOpenChange, card, focus, onSaved }: {
   };
 
   return (
-    <Sheet open={open} onOpenChange={(o) => !busy && onOpenChange(o)} title="Edit Profile" description="How you appear on your profile card.">
+    <Sheet open={open} onOpenChange={(o) => !busy && onOpenChange(o)} title="Edit profile" description="How you appear on your profile card.">
       <form onSubmit={save} className="grid gap-5 pt-2" noValidate>
         <div>
           <Label htmlFor="pc-name">Name</Label>
@@ -168,7 +168,7 @@ export function SocialLinksSheet({ open, onOpenChange, card, onSaved }: { open: 
   };
 
   return (
-    <Sheet open={open} onOpenChange={(o) => !busy && onOpenChange(o)} title="Manage Social Links" description="Choose what shows on your card. Only links with a public address can be opened.">
+    <Sheet open={open} onOpenChange={(o) => !busy && onOpenChange(o)} title="Manage social links" description="Choose what shows on your card. Only links with a public address can be opened.">
       <div className="grid gap-6 pt-2">
         <section aria-labelledby="pl-conn">
           <h3 id="pl-conn" className="eyebrow mb-2">

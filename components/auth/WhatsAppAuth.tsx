@@ -166,7 +166,7 @@ export function WhatsAppAuth({
       return nameRef.current?.focus();
     }
     if (!adult) {
-      setError("Please confirm you're 18 or older to create an account.");
+      setError("Confirm you're 18 or older to create an account.");
       onFail();
       return ageRef.current?.focus();
     }
@@ -264,7 +264,7 @@ export function WhatsAppAuth({
                 For receipts and getting back in. We&apos;ll email a code to confirm it. If you already use it on Outlly, your number is added to that account instead of making a second one.
               </p>
             </div>
-            <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl px-1 py-1.5 text-[13.5px] leading-snug has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring">
+            <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl px-1 py-1.5 text-[14px] leading-snug has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring">
               <input ref={ageRef} type="checkbox" checked={adult} onChange={(e) => { setAdult(e.target.checked); if (e.target.checked && error?.includes("18")) setError(null); }} className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-lime-ink" />
               <span>I&apos;m 18 or older.</span>
             </label>

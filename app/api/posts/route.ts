@@ -28,7 +28,8 @@ export const GET = route(async (req, { user }) => {
     });
   }
   // 1091: the Content library's "Load more" (cursor = id of the last post shown).
-  if (req.nextUrl.searchParams.get("library") === "1") return json(await libraryPage(user, req.nextUrl.searchParams.get("cursor"), undefined, undefined, isLibraryStatus(status) ? status : null));
+  // 1148: `q` searches the whole library (the search box, when not every post is loaded yet).
+  if (req.nextUrl.searchParams.get("library") === "1") return json(await libraryPage(user, req.nextUrl.searchParams.get("cursor"), undefined, undefined, isLibraryStatus(status) ? status : null, req.nextUrl.searchParams.get("q")));
   const posts = await db.post.findMany({
     where: { userId: user.id, ...(await postFilter(user)).where, ...(status && status !== "all" ? { status: status === "failed" ? { in: ["failed", "partial"] } : status } : {}) },
     include: { targets: true, media: true, items: { include: { media: true }, orderBy: { position: "asc" } } },

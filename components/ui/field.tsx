@@ -36,7 +36,7 @@ export function Counter({ value, max }: { value: number; max: number }) {
   const over = value > max;
   const near = value > max * 0.9;
   return (
-    <span className={cn("tabular text-xs", over ? "text-destructive" : near ? "text-warning" : "text-muted-foreground")} aria-live="polite">
+    <span className={cn("tabular text-xs", over ? "text-destructive" : near ? "text-warning-ink" : "text-muted-foreground")} aria-live="polite">
       {value}/{max}
       <span className="sr-only">{over ? " characters, over the limit" : " characters"}</span>
     </span>

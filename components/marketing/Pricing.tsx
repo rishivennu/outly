@@ -11,14 +11,16 @@ import { visitorCurrency } from "@/lib/billing/visitor";
 import { activeGateway } from "@/lib/billing/service";
 import { chargeCurrency } from "@/lib/billing/currency";
 import { CurrencyNote } from "@/components/billing/CurrencyNote";
-import { formatMoney, planFeatures, priceLabel } from "@/lib/billing/money";
+import { formatMoney, planFeatures, priceLabel, type Currency } from "@/lib/billing/money";
+import { floorMinor, getEconomics, getPolicy, yearlyFromMonthly } from "@/lib/subscriptions";
+import { introThen } from "@/components/billing/offer-core";
 
 /**
  * Reads plans from the database, so a price edited in the admin console is live on the next request.
  * Priced in the visitor's currency (IP country on Vercel/Cloudflare, else browser language, else their pick).
  */
 export async function Pricing() {
-  const [all, display, beta, gw] = await Promise.all([listPlans(), getConfig("pricing").then(normalizeDisplay), isBeta(), activeGateway()]);
+  const [all, display, beta, gw, policy, econ] = await Promise.all([listPlans(), getConfig("pricing").then(normalizeDisplay), isBeta(), activeGateway(), getPolicy(), getEconomics()]);
   const visitor = await visitorCurrency((all.find((p) => p.priceMinor > 0)?.currency as any) ?? "INR");
   // Priced in what the gateway can actually charge, exactly as Billing and checkout do, so the two pages agree.
   const charged = chargeCurrency(gw.provider, visitor.currency, all.find((p) => p.priceMinor > 0)?.currency ?? "INR");
@@ -26,13 +28,27 @@ export async function Pricing() {
   const paid = plans.some((p) => p.state === "available" && p.priceMinor > 0);
   const cards: CardPlan[] = plans.map((p, i) => {
     const base = all[i];
-    const y = hasYearly(base, display.yearly) ? priceFor(base, charged, "year", display.freeMonths) : null;
+    const y0 = hasYearly(base, display.yearly) ? priceFor(base, charged, "year", display.freeMonths) : null;
+    // 1147: with the policy on, a visitor sees the first-time price and what returning subscribers pay, from the
+    // same policy checkout quotes from. A yearly price is never under its 60% floor.
+    const on = policy.enabled && p.state === "available" && p.priceMinor > 0 && p.interval !== "year";
+    const target = policy.targetMargin;
+    const y = y0 && on ? { ...y0, priceMinor: Math.max(y0.priceMinor, floorMinor({ plan: p.slug, currency: y0.currency, interval: "year", econ, target })) } : y0;
+    const im = on ? policy.intro[p.slug]?.[charged as Currency] : undefined;
+    const introM = im && im > 0 && im < p.priceMinor ? im : null;
+    const introY = introM && y ? Math.min(y.priceMinor, yearlyFromMonthly({ plan: p.slug, currency: y.currency, monthlyMinor: introM, econ, target })) : null;
     return {
       id: p.id, slug: p.slug, name: p.name, note: p.note, features: planFeatures(p), state: p.state,
       featured: p.highlight || !paid,
       free: p.priceMinor === 0,
       month: { label: priceLabel(p), minor: p.priceMinor, interval: p.interval },
-      year: y ? { label: `${formatMoney(y.priceMinor, y.currency)}/yr`, minor: y.priceMinor, save: yearlySaving(p.priceMinor, y.priceMinor) } : null,
+      year: y
+        ? {
+            label: `${formatMoney(y.priceMinor, y.currency)}/yr`, minor: y.priceMinor, save: yearlySaving(p.priceMinor, y.priceMinor),
+            intro: introY && introY < y.priceMinor ? { label: `${formatMoney(introY, y.currency)}/yr`, minor: introY, then: introThen(y.priceMinor, y.currency, "year", policy.graceDays) } : null,
+          }
+        : null,
+      intro: introM ? { label: `${formatMoney(introM, charged)}/mo`, minor: introM, then: introThen(p.priceMinor, charged, "month", policy.graceDays) } : null,
     };
   });
   return (

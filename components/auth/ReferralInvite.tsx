@@ -26,7 +26,7 @@ export function ReferralInvite({ plan, days }: { plan: string; days: number }) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[14px] font-semibold leading-snug">A friend invited you to Outlly</p>
-        <p className="mt-0.5 text-[12.5px] leading-snug text-muted-foreground">
+        <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
           Sign up free and start planning your posts. When you pick a paid plan, your friend gets {length} of {plan} as a thank you.
         </p>
       </div>

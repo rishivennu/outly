@@ -70,7 +70,7 @@ describe("1101 look and motion", () => {
     expect(block).toContain(".pw-c { animation: pw-grow .8s var(--pw-ease) .18s both; }");
     expect(block).toContain("calc(340ms + var(--i, 0) * 100ms)");
     expect(block).toContain("--pw-ease: var(--m-ease-out);"); // 1119: the shared token, same curve
-    expect(block).toMatch(/\.pw-cta:active, \.pw-x:active, \.pw-link:active \{ transform: scale\(\.98\); \}/);
+    expect(block).toMatch(/\.pw-cta:not\(:disabled\):active, \.pw-x:not\(:disabled\):active, \.pw-link:not\(:disabled\):active \{ transform: scale\(\.96\); \}/);
     expect(block).toMatch(/transition: transform \.15s var\(--pw-ease\)/);
     expect(block).toContain('.pwa-welcome[data-phase="leaving"] { animation: pw-leave .3s var(--pw-ease) forwards;');
     expect(css).toContain("@keyframes pw-leave { to { opacity: 0; transform: translateY(24px); } }");
@@ -78,7 +78,7 @@ describe("1101 look and motion", () => {
   });
   test("reduced motion: no float, no slide, no press scale", () => {
     const reduce = block.slice(block.indexOf("@media (prefers-reduced-motion: reduce)"));
-    expect(reduce).toContain(".pw-cta:active, .pw-x:active, .pw-link:active { transform: none; }");
+    expect(reduce).toContain(".pw-cta:not(:disabled):active, .pw-x:not(:disabled):active, .pw-link:not(:disabled):active { transform: none; }");
     const moving = block.slice(block.indexOf("@media (prefers-reduced-motion: no-preference)"), block.indexOf("@media (prefers-reduced-motion: reduce)"));
     expect(moving).toContain(".wa-float");
     expect(block.split(".wa-float").length).toBe(2); // only inside the no-preference block

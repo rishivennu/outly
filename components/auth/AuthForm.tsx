@@ -13,8 +13,9 @@ import { OutlyMark } from "@/components/brand/Logo";
 import { PipWatch } from "./PipWatch";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
 import { sameSitePath } from "@/lib/safe-next";
+import { track } from "@/lib/analytics/track";
 
-const AGE_ERROR = "Please confirm you're 18 or older to create an account.";
+const AGE_ERROR = "Confirm you're 18 or older to create an account.";
 
 const GOOGLE_ERRORS: Record<string, string> = {
   access_denied: "Google sign-in didn't go through. Try again and choose Allow, or use your email instead.",
@@ -145,7 +146,14 @@ export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { 
     router.refresh();
   };
   const fail = (e: unknown) => {
-    setError(e instanceof ApiError ? e.message : "Something got in the way. Let's try again.");
+    const msg = e instanceof ApiError ? e.message : "Couldn't reach Outlly. Check your connection and try again.";
+    setError(msg);
+    // Put the cursor in the field the error is about.
+    requestAnimationFrame(() => {
+      if (step === "2fa" || ((step === "code" || step === "reset") && sentTo === target)) return focusCode();
+      if (step === "password" && !/email/i.test(msg)) return document.getElementById("password")?.focus();
+      (byPhone ? phoneRef : emailRef).current?.focus();
+    });
     inFlight.current = false;
     lastSent.current = null;
     setBusy(false);
@@ -268,6 +276,7 @@ export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { 
     try {
       if (mode === "signup") {
         await api("/api/auth/signup", { method: "POST", json: { ...form, adult, timezone: tz.current } });
+        track("signup_completed", { method: "email" });
         return go();
       }
       if (step === "password") return after(await api<{ twoFactor?: boolean }>("/api/auth/login", { method: "POST", json: { email: form.email, password: form.password, remember } }));
@@ -410,7 +419,7 @@ export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { 
         {step !== "2fa" && !byPhone && (
         <div className="gs-in">
           <Label htmlFor="email" className={label}>Your email</Label>
-          <Input ref={emailRef} id="email" type="email" inputMode="email" autoComplete="email" required placeholder="you@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={field} />
+          <Input ref={emailRef} id="email" type="email" inputMode="email" autoComplete="email" required placeholder="you@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} aria-invalid={error ? true : undefined} aria-describedby={error ? "auth-error" : undefined} className={field} />
         </div>
         )}
         {step === "password" && (
@@ -443,13 +452,14 @@ export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { 
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               onKeyUp={(e) => setCaps(e.getModifierState?.("CapsLock") ?? false)}
               onBlur={() => setCaps(false)}
-              aria-describedby={[mode === "signup" ? "pw-hint" : "", caps ? "pw-caps" : ""].filter(Boolean).join(" ") || undefined}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={[mode === "signup" ? "pw-hint" : "", caps ? "pw-caps" : "", error ? "auth-error" : ""].filter(Boolean).join(" ") || undefined}
               className={`${field} pr-12`}
             />
             {pwToggle}
           </div>
           {caps && (
-            <p id="pw-caps" className="mt-2 text-xs font-medium text-warning">
+            <p id="pw-caps" className="mt-2 text-xs font-medium text-warning-ink">
               Caps Lock is on.
             </p>
           )}
@@ -569,7 +579,7 @@ export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { 
           </p>
         )}
         {mode === "signup" && (
-          <label className="gs-in flex min-h-11 cursor-pointer items-start gap-3 rounded-xl px-1 py-1.5 text-[13.5px] leading-snug has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring">
+          <label className="gs-in flex min-h-11 cursor-pointer items-start gap-3 rounded-xl px-1 py-1.5 text-[14px] leading-snug has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring">
             <input
               ref={ageRef}
               type="checkbox"
@@ -676,7 +686,7 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2,
  */
 function RememberChoice({ value, onChange, twoStep }: { value: boolean; onChange: (v: boolean) => void; twoStep: boolean }) {
   const opt = (on: boolean) =>
-    "flex min-h-11 flex-1 cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-[13.5px] font-medium transition-colors hairline has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring " +
+    "flex min-h-11 flex-1 cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-[14px] font-medium transition-colors hairline has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring " +
     (on ? "bg-lime/15 text-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground");
   const dot = (on: boolean) => "grid h-4 w-4 shrink-0 place-items-center rounded-full border-2 " + (on ? "border-lime-ink" : "border-muted-foreground/60");
   return (

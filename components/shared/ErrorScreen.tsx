@@ -14,7 +14,7 @@ export function ErrorScreen({ code, title, body, mood = "sad", actions }: { code
         <Pip size={120} mood={mood} />
         {code && <p className="err-eyebrow mt-6 rounded-full px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.1em]">{code}</p>}
         <h1 className="display mt-3 text-[clamp(2rem,6vw,3rem)]">{title}</h1>
-        <p className="err-muted mt-3 text-[15.5px] leading-relaxed">{body}</p>
+        <p className="err-muted mt-3 text-base leading-relaxed">{body}</p>
         <div className="mt-8 flex flex-wrap justify-center gap-2">{actions}</div>
         <p className="err-muted mt-8 text-[13px]">
           Still stuck? <Link href="/help" className="err-link font-medium underline underline-offset-4">Visit the help centre</Link> or ask Pip, bottom right.
@@ -23,6 +23,6 @@ export function ErrorScreen({ code, title, body, mood = "sad", actions }: { code
     </main>
   );
 }
-export const pill = "inline-flex h-12 items-center rounded-full px-6 text-sm font-semibold transition-transform active:scale-[0.97]";
+export const pill = "inline-flex h-12 items-center rounded-full px-6 text-sm font-semibold transition-transform active:scale-[0.96]";
 /** Secondary button on the dark sky. */
 export const ghostPill = `${pill} err-ghost`;

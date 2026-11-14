@@ -110,7 +110,7 @@ export function InboxView({ initial, dms, initialTab = "comments", renderedAt, r
               }
             }}
             placeholder="Search people and comments"
-            className="h-11 w-full rounded-xl bg-card pl-9 pr-10 text-[16px] text-foreground placeholder:text-muted-foreground hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring lg:h-10 lg:text-[13.5px]"
+            className="h-11 w-full rounded-xl bg-card pl-9 pr-10 text-[16px] text-foreground placeholder:text-muted-foreground hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring lg:h-10 lg:text-[14px]"
           />
           <span aria-hidden="true" className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 lg:block">
             <Kbd>/</Kbd>
@@ -354,7 +354,7 @@ function CommentsPane({ initial, hasTabs, readOnly, tabs, query, refreshTick, re
               </ul>
             )}
           </div>
-          <footer className="hidden items-center gap-3 border-t border-border px-4 py-2 text-[11.5px] text-muted-foreground lg:flex">
+          <footer className="hidden items-center gap-3 border-t border-border px-4 py-2 text-xs text-muted-foreground lg:flex">
             <span>
               <Kbd>J</Kbd>
               <Kbd>K</Kbd> move
@@ -507,7 +507,7 @@ function CommentProblems({ errors, busy, onRetry }: { errors: InboxProblem[]; bu
                         </ul>
                       )}
                       {details.map((d) => (
-                        <pre key={d} className="mt-1 whitespace-pre-wrap break-all text-[11px] text-muted-foreground">
+                        <pre key={d} className="mt-1 whitespace-pre-wrap break-all text-xs text-muted-foreground">
                           {d}
                         </pre>
                       ))}
@@ -562,11 +562,11 @@ function ReelCard({ comment, onOpen }: { comment: InboxComment; onOpen: (from: s
             {m.kind === "image" ? <ImageIcon className="h-3.5 w-3.5 lg:h-5 lg:w-5" /> : <Play className="ml-0.5 h-3.5 w-3.5 lg:h-5 lg:w-5" fill="currentColor" />}
           </span>
         </span>
-        <span aria-hidden="true" className="absolute inset-x-2.5 bottom-2.5 hidden text-left text-[12.5px] font-semibold leading-tight text-white lg:line-clamp-2">
+        <span aria-hidden="true" className="absolute inset-x-2.5 bottom-2.5 hidden text-left text-[13px] font-semibold leading-tight text-white lg:line-clamp-2">
           {titleOf(comment)}
         </span>
       </button>
-      <div className="min-w-0 text-[12.5px] leading-relaxed text-muted-foreground lg:mt-2.5">
+      <div className="min-w-0 text-[13px] leading-relaxed text-muted-foreground lg:mt-2.5">
         <p className="font-medium text-foreground lg:hidden">{titleOf(comment)}</p>
         {posted && <p>Posted {posted}</p>}
         {m.account && <p className="truncate">{m.account}</p>}
@@ -615,7 +615,7 @@ function CommentDetail({
       setSaved(true);
       toast(r.existed ? "Already in your idea bank" : "Saved to your idea bank on Home", "ok");
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : "Couldn't save it", "error");
+      toast(e instanceof ApiError ? e.message : "Couldn't save it. Check your connection and try again.", "error");
     }
   };
 
@@ -678,7 +678,7 @@ function CommentDetail({
             Comment on {pname}
             {position ? ` · ${position}` : replied ? " · Replied" : ""}
           </p>
-          <h2 className="truncate text-[14.5px] font-semibold" title={titleOf(comment)}>
+          <h2 className="truncate text-[15px] font-semibold" title={titleOf(comment)}>
             {titleOf(comment)}
           </h2>
         </div>
@@ -707,7 +707,7 @@ function CommentDetail({
                     {when(comment.createdAt)}
                   </span>
                 </p>
-                <p className="mt-1 whitespace-pre-wrap break-words text-[15.5px] leading-relaxed">{comment.text}</p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-base leading-relaxed">{comment.text}</p>
                 <p className="mt-2 flex flex-wrap gap-1.5">
                   {comment.text.includes("?") && <Tag tone="question">Question</Tag>}
                   {comment.practice && <Tag>Practice</Tag>}
@@ -723,9 +723,9 @@ function CommentDetail({
                     <li key={r.id} className="flex gap-2.5">
                       <PersonAvatar name={r.authorName} size={28} />
                       <div className="min-w-0">
-                        <p className="text-[13.5px]">
+                        <p className="text-[14px]">
                           <span className="font-semibold">{r.authorName}</span>
-                          {me && <span className="ml-1.5 rounded-full bg-lime/25 px-1.5 py-px text-[10.5px] font-semibold text-lime-ink">You</span>}
+                          {me && <span className="ml-1.5 rounded-full bg-lime/25 px-1.5 py-px text-xs font-semibold text-lime-ink">You</span>}
                         </p>
                         <p className="whitespace-pre-wrap break-words text-[14px]">{r.text}</p>
                       </div>
@@ -747,7 +747,7 @@ function CommentDetail({
         )}
         {thinking && (
           <div className="mb-2.5" role="status" aria-label="Writing reply ideas">
-            <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-lime-ink">
+            <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-lime-ink">
               <Sparkles className="ai-orb-icon is-on h-3 w-3" aria-hidden="true" /> Writing reply ideas…
             </p>
             <ul className="flex gap-2" aria-hidden="true">
@@ -771,7 +771,7 @@ function CommentDetail({
                       text === s.text ? "bg-lime/15 text-foreground" : "bg-card text-foreground hover:bg-secondary",
                     )}
                   >
-                    <span className="mb-0.5 block text-[10.5px] font-bold uppercase tracking-[0.1em] text-lime-ink">{s.label}</span>
+                    <span className="mb-0.5 block text-xs font-bold uppercase tracking-[0.1em] text-lime-ink">{s.label}</span>
                     {s.text}
                   </button>
                 </li>
@@ -794,7 +794,7 @@ function CommentDetail({
             placeholder={readOnly ? "Editors can't reply" : `Reply to ${first}…`}
             aria-label={`Reply to ${comment.authorName}`}
             aria-describedby={readOnly ? lockId : undefined}
-            className="h-11 min-w-0 flex-1 bg-transparent px-1 text-[16px] text-foreground outline-none placeholder:text-muted-foreground lg:text-[14.5px]"
+            className="h-11 min-w-0 flex-1 bg-transparent px-1 text-[16px] text-foreground outline-none placeholder:text-muted-foreground lg:text-[15px]"
           />
           {/* shrink-0: the field takes the squeeze on a phone, the send button stays 44px (1044) */}
           <Button type="submit" variant="lime" size="icon" disabled={busy || readOnly || !text.trim()} aria-label="Send reply" className="shrink-0 rounded-[13px]">
@@ -811,7 +811,7 @@ function CommentDetail({
             {left === 0 ? "That was your last reply this week on your plan." : `${left} ${left === 1 ? "reply" : "replies"} left this week on your plan.`}
           </p>
         )}
-        <p className="mt-2 hidden items-center gap-3.5 text-[11.5px] text-muted-foreground lg:flex">
+        <p className="mt-2 hidden items-center gap-3.5 text-xs text-muted-foreground lg:flex">
           <span>
             <Kbd>J</Kbd>
             <Kbd>K</Kbd> next / previous

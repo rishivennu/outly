@@ -92,11 +92,11 @@ export function CreatorProfileCard() {
           <>
             <div className="absolute right-3 top-3 flex gap-2 sm:right-4 sm:top-4">
               <button type="button" onClick={() => edit("name")} className="pcard-pill" disabled={!card}>
-                <PenLine className="h-4 w-4" aria-hidden="true" /> Edit Profile
+                <PenLine className="h-4 w-4" aria-hidden="true" /> Edit profile
               </button>
             </div>
             <button type="button" onClick={() => setCrop("banner")} className="pcard-cover-btn absolute bottom-3 right-3 sm:right-4" disabled={!card}>
-              <Camera className="h-4 w-4" aria-hidden="true" /> <span>Change Cover</span>
+              <Camera className="h-4 w-4" aria-hidden="true" /> <span>Change cover</span>
             </button>
           </>
         )}
@@ -107,7 +107,7 @@ export function CreatorProfileCard() {
         <div className="flex items-end justify-between gap-4">
           <motion.div {...m(PC.avatar)} className="pcard-avatar relative -mt-12 shrink-0 sm:-mt-14">
             <OrbAvatar avatar={avatar} seed={user.email} size={112} className="pcard-avatar-img" label={`${name}'s picture`} />
-            <button type="button" onClick={() => setCrop("avatar")} className="pcard-avatar-btn" aria-label="Change Picture" title="Change picture" disabled={!card}>
+            <button type="button" onClick={() => setCrop("avatar")} className="pcard-avatar-btn" aria-label="Change picture" title="Change picture" disabled={!card}>
               <Camera className="h-4 w-4" aria-hidden="true" />
             </button>
           </motion.div>
@@ -161,7 +161,7 @@ export function CreatorProfileCard() {
           {card && (
             <div className="group/bio mt-3 flex items-start gap-2">
               <p className={cn("min-w-0 flex-1 whitespace-pre-line break-words text-[15px] leading-relaxed", !card.bio && "text-[hsl(var(--pc-muted))]")}>{card.bio || "Add a short bio so people know what you make."}</p>
-              <button type="button" onClick={() => edit("bio")} className="pcard-ico -mr-2 -mt-1.5" aria-label="Edit Bio">
+              <button type="button" onClick={() => edit("bio")} className="pcard-ico -mr-2 -mt-1.5" aria-label="Edit bio">
                 <PenLine className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
@@ -212,10 +212,10 @@ export function CreatorProfileCard() {
         {/* Actions */}
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2 border-t border-[hsl(var(--pc-line))] pt-4">
           <button type="button" onClick={() => setSheet("links")} className="pcard-action" disabled={!card}>
-            <Link2 className="h-4 w-4" aria-hidden="true" /> Manage Social Links
+            <Link2 className="h-4 w-4" aria-hidden="true" /> Manage social links
           </button>
           <Link href="/accounts" className="pcard-action">
-            <Plug className="h-4 w-4" aria-hidden="true" /> View Connected Platforms <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+            <Plug className="h-4 w-4" aria-hidden="true" /> View connected platforms <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
           </Link>
         </div>
       </div>

@@ -183,7 +183,7 @@ export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: str
           : overPlan
             ? `${plan!.planName} has ${plan!.left} post${plan!.left === 1 ? "" : "s"} left ${plan!.period === "week" ? "this week" : "this month"} and this batch is ${total}. Remove some or upgrade in Billing.`
             : missingTime
-              ? "Finding times..."
+              ? "Finding times…"
               : null;
 
   const book = async () => {
@@ -335,7 +335,7 @@ Spaced over the days ahead, one a day where they fit. {plan.reason}
                       <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-2xl bg-secondary hairline">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         {r.poster && <img src={r.poster} alt="" className="h-full w-full object-cover" />}
-                        <span className="tabular absolute left-1.5 top-1.5 rounded-full bg-black/60 px-1.5 text-[11px] font-semibold text-white">{i + 1}</span>
+                        <span className="tabular absolute left-1.5 top-1.5 rounded-full bg-black/60 px-1.5 text-xs font-semibold text-white">{i + 1}</span>
                         {r.state !== "ready" && (
                           <div className="absolute inset-0 grid place-items-center bg-black/45 text-white">
                             {r.state === "failed" ? <AlertTriangle className="h-5 w-5" aria-hidden /> : <span className="tabular text-xs font-semibold">{r.state === "waiting" ? "Queued" : `${Math.round(r.progress * 100)}%`}</span>}
@@ -356,7 +356,7 @@ Spaced over the days ahead, one a day where they fit. {plan.reason}
                         <Textarea id={`c-${r.key}`} rows={2} value={r.caption} maxLength={5000} onChange={(e) => patch(r.key, { caption: e.target.value })} placeholder="Caption (optional)" />
                         <div className="flex flex-wrap items-center gap-2">
                           <Button variant={editing === r.key ? "primary" : "subtle"} size="sm" onClick={() => setEditing(editing === r.key ? null : r.key)} aria-expanded={editing === r.key} disabled={!r.at}>
-                            <CalendarClock className="h-4 w-4" /> {r.at ? when(r.at) : "Finding a time..."}
+                            <CalendarClock className="h-4 w-4" /> {r.at ? when(r.at) : "Finding a time…"}
                           </Button>
                           {r.pinned && (
                             <button type="button" className="min-h-[44px] px-1 text-xs text-muted-foreground underline-offset-4 hover:underline" onClick={() => patch(r.key, { pinned: false })}>
@@ -406,7 +406,7 @@ Spaced over the days ahead, one a day where they fit. {plan.reason}
               </p>
               <Button variant="lime" onClick={book} disabled={!canBook}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CalendarCheck2 className="h-4 w-4" aria-hidden />}
-                {busy ? "Booking..." : `Schedule all ${rows.length}`}
+                {busy ? "Booking…" : `Schedule all ${rows.length}`}
               </Button>
             </div>
           )}

@@ -239,7 +239,7 @@ export function AccountsView({ initial, previous: initialPrevious = [], setup, a
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">{x.username}</p>
-                            <p className={cn("flex items-center gap-1 text-xs", xok ? "text-success" : "text-warning")}>
+                            <p className={cn("flex items-center gap-1 text-xs", xok ? "text-success-ink" : "text-warning-ink")}>
                               {xok ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <CircleAlert className="h-3.5 w-3.5" aria-hidden="true" />}
                               {xok ? "Ready to publish" : `${PLATFORM_META[p].name} needs you to reconnect.`}
                             </p>
@@ -374,7 +374,7 @@ export function AccountsView({ initial, previous: initialPrevious = [], setup, a
             ? `We delete the keys we hold for it${REVOCABLE_PLATFORMS.includes(confirm.platform) ? ` and ask ${PLATFORM_META[confirm.platform].name} to revoke Outlly's access` : ""}. Published posts, their numbers and your messages stay. Scheduled posts for it stop going out until you reconnect.`
             : ""
         }
-        confirmLabel="Yes, disconnect"
+        confirmLabel={confirm ? `Disconnect ${confirm.name}` : "Disconnect"}
         busy={busy}
         onConfirm={() => confirm && disconnect(confirm)}
       />

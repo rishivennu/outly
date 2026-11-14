@@ -39,7 +39,7 @@ export function IdeaBank({ wide = false }: { wide?: boolean }) {
       setText("");
       input.current?.focus();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Couldn't save that idea", "error");
+      toast(err instanceof ApiError ? err.message : "Couldn't save that idea. Check your connection and try again.", "error");
     } finally {
       setBusy(null);
     }
@@ -52,7 +52,7 @@ export function IdeaBank({ wide = false }: { wide?: boolean }) {
       router.push(`/create?idea=${i.id}`);
     } catch {
       setBusy(null);
-      toast("Couldn't open that idea", "error");
+      toast("Couldn't open that idea. Check your connection and try again.", "error");
     }
   }
 
@@ -63,7 +63,7 @@ export function IdeaBank({ wide = false }: { wide?: boolean }) {
       toast("Idea removed", "ok");
     } catch {
       setIdeas((x) => (x ? [i, ...x] : [i]));
-      toast("Couldn't remove it", "error");
+      toast("Couldn't remove it. Check your connection and try again.", "error");
     }
   }
 

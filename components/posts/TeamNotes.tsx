@@ -76,7 +76,7 @@ export function TeamNotes({ post, onChange }: { post: PostView; onChange: (p: Po
         </p>
       )}
       {notes === null ? (
-        <p className="mt-3 text-sm text-muted-foreground" aria-live="polite">Loading notes...</p>
+        <p className="mt-3 text-sm text-muted-foreground" aria-live="polite">Loading notes…</p>
       ) : notes.length === 0 ? (
         <p className="mt-3 text-sm text-muted-foreground">No notes yet. Leave one for whoever picks this up next.</p>
       ) : (

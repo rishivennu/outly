@@ -68,7 +68,7 @@ export function UsageExtras({ onBuy, busy, packsOnly }: { onBuy: (packId: string
               </Button>
             ))}
           </div>
-          <p className="mt-2 text-[11.5px] text-muted-foreground">One-off. No subscription change. Used after your plan's own allowance.</p>
+          <p className="mt-2 text-xs text-muted-foreground">One-off. No subscription change. Used after your plan's own allowance.</p>
         </div>
       )}
     </div>

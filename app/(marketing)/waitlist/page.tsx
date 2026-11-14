@@ -76,7 +76,7 @@ export default async function WaitlistPage(props: { searchParams: Promise<{ from
                       <I className="h-[18px] w-[18px]" />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-[14.5px] font-semibold leading-snug text-white">{t}</span>
+                      <span className="block text-[15px] font-semibold leading-snug text-white">{t}</span>
                       <span className="mt-0.5 block text-[13px] leading-snug text-white/75">{b}</span>
                     </span>
                   </li>
@@ -101,12 +101,12 @@ export default async function WaitlistPage(props: { searchParams: Promise<{ from
               <WaitlistForm fromGoogle={searchParams.from === "google"} beta={beta} />
             </div>
             {counts.total >= 25 && (
-              <p className="mt-5 text-center text-[14.5px] font-semibold text-foreground/80">{counts.total.toLocaleString("en")} creators have joined so far.</p>
+              <p className="mt-5 text-center text-[15px] font-semibold text-foreground/80">{counts.total.toLocaleString("en")} creators have joined so far.</p>
             )}
             <p className="mt-3 text-center text-[14px] text-[hsl(var(--ap-ink2))]">
               Already have an account?{" "}
               <Link href="/login" className="inline-flex min-h-11 items-center font-semibold text-foreground underline-offset-4 hover:underline">
-                Log in<ChevronRight className="h-4 w-4" aria-hidden="true" />
+                Sign in<ChevronRight className="h-4 w-4" aria-hidden="true" />
               </Link>
             </p>
           </div>

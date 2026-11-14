@@ -91,12 +91,12 @@ export function PromoCard({ offer, onClose, onClaim, preview }: { offer: Offer; 
         <div className="promo-in mt-4 flex items-end justify-between gap-3" style={{ ["--d" as string]: "550ms", ["--t" as string]: "400ms" }}>
           <div className="promo-tag relative rounded-[18px] px-4 py-3">
             <span aria-hidden className="promo-tag-hole" />
-            <p className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-[#7a4a33]">Price</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#7a4a33]">Price</p>
             <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2">
               <span className="font-display text-[1.9rem] font-extrabold leading-none tabular text-[#141414]">{final}</span>
               <span className="text-[13px] font-semibold text-[#5b3a2a]">{per(offer.cycle)}</span>
             </p>
-            <p className="mt-1 text-[12.5px] text-[#5b3a2a]">
+            <p className="mt-1 text-[13px] text-[#5b3a2a]">
               <s className="tabular" aria-label={`was ${was}`}>{was}</s>
               <span className="ml-1.5">{offer.plan.name}{renew ? `, first ${offer.cycle === "year" ? "year" : "month"}` : ""}</span>
             </p>
@@ -116,16 +116,16 @@ export function PromoCard({ offer, onClose, onClaim, preview }: { offer: Offer; 
         </div>
 
         <div className="promo-in mt-4" style={{ ["--d" as string]: "750ms", ["--t" as string]: "400ms" }}>
-          {offer.body && <Desc className="text-[13.5px] leading-snug text-[#3d2a20]">{offer.body}</Desc>}
+          {offer.body && <Desc className="text-[14px] leading-snug text-[#3d2a20]">{offer.body}</Desc>}
           {!offer.body && <Desc className="sr-only">{`${offer.label} ${offer.plan.name}: ${final} instead of ${was}.`}</Desc>}
           {offer.benefits.length > 0 && (
-            <ul className="mt-2 grid gap-1.5 text-[13.5px] text-[#2a1d16]">
+            <ul className="mt-2 grid gap-1.5 text-[14px] text-[#2a1d16]">
               {offer.benefits.map((b, i) => (
                 <li key={`${i}-${b}`} className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#1f6b3a]" aria-hidden />{b}</li>
               ))}
             </ul>
           )}
-          {offer.terms && <p className="mt-3 text-[11.5px] leading-snug text-[#6b4a3a]">{offer.terms}</p>}
+          {offer.terms && <p className="mt-3 text-xs leading-snug text-[#6b4a3a]">{offer.terms}</p>}
         </div>
       </div>
     </div>

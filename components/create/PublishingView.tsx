@@ -311,7 +311,7 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
               <span className="inline-flex flex-wrap items-center gap-1.5 rounded-full bg-card p-1 pl-3 text-xs font-semibold hairline" role="group" aria-label="Stop every upload?">
                 Stop {stoppable.length} uploads?
                 <button type="button" onClick={stopAll} disabled={busy === "all"} className="lv-stop-yes inline-flex h-11 items-center rounded-full px-4">
-                  Yes, stop all
+                  Stop all {stoppable.length}
                 </button>
                 <button type="button" onClick={() => setConfirmAll(false)} className="inline-flex h-11 items-center rounded-full px-3 hover:bg-secondary">
                   Keep going
@@ -375,7 +375,7 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
         onOpenChange={(o) => busy !== "delete" && setConfirmDel(o)}
         title={delCopy.title}
         body={delCopy.body}
-        confirmLabel={busy === "delete" ? "Deleting..." : delCopy.confirm}
+        confirmLabel={busy === "delete" ? "Deleting…" : delCopy.confirm}
         busy={busy === "delete"}
         onConfirm={removePost}
       />
@@ -455,13 +455,13 @@ function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, can
       <div className="relative mt-3 grid grid-cols-2 gap-3">
         <div className="min-w-0">
           <p className="font-semibold leading-tight">{words.your}</p>
-          <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-white/60" title={name}>
+          <p className="mt-1 truncate text-xs font-semibold uppercase tracking-[0.08em] text-white/60" title={name}>
             {name}
           </p>
         </div>
         <div className="min-w-0">
           <h2 className="truncate font-semibold leading-tight">{meta.name}</h2>
-          <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-white/60">{kindLabel}</p>
+          <p className="mt-1 truncate text-xs font-semibold uppercase tracking-[0.08em] text-white/60">{kindLabel}</p>
         </div>
       </div>
 
@@ -489,8 +489,8 @@ function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, can
         <p className="text-lg font-semibold leading-tight">{title}</p>
         <p className="mt-1 text-sm leading-snug text-white/65">{statusLine}</p>
         <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
-          <span className={cn("text-[11px] font-bold uppercase tracking-[0.1em]", bad && !canceled ? "text-[#ff8a80]" : "text-[hsl(var(--lime))]")}>{accent}</span>
-          {seen && <span className="text-[11px] font-semibold text-white/45">{seen}</span>}
+          <span className={cn("text-xs font-bold uppercase tracking-[0.1em]", bad && !canceled ? "text-[#ff8a80]" : "text-[hsl(var(--lime))]")}>{accent}</span>
+          {seen && <span className="text-xs font-semibold text-white/45">{seen}</span>}
         </p>
         {fc && !canceled && (
           <p className={cn("mt-2 text-[13px] leading-snug", fc.tone === "bad" ? "text-[#ff8a80]" : fc.tone === "ok" ? "text-white/85" : "text-white/65")} aria-live="polite">
@@ -584,7 +584,7 @@ function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, can
               <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-1 font-medium hover:text-white">
                 Technical details <ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" aria-hidden="true" />
               </summary>
-              <dl className="space-y-1 rounded-xl bg-white/5 p-3 font-mono text-[11px] leading-relaxed">
+              <dl className="space-y-1 rounded-xl bg-white/5 p-3 font-mono text-xs leading-relaxed">
                 <div>
                   <dt className="inline text-white/75">code: </dt>
                   <dd className="inline">{t.errorCode ?? "UNKNOWN"}</dd>
@@ -627,7 +627,7 @@ function WhatHappened({ post }: { post: PostView }) {
       <span className="la-grid" aria-hidden="true" />
       <div className="relative flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="la-mute text-[11px] font-bold uppercase tracking-[0.12em]">What happened</p>
+          <p className="la-mute text-xs font-bold uppercase tracking-[0.12em]">What happened</p>
           <h2 id="what-happened" className="mt-1 text-xl font-semibold leading-tight">
             {liveSummary(live.length, rows.length, rows[0]?.meta.name)}
           </h2>

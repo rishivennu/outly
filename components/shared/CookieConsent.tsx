@@ -27,9 +27,26 @@ function save(c: Omit<Consent, "v" | "necessary" | "at">) {
   window.dispatchEvent(new CustomEvent("outly:consent", { detail: full }));
 }
 
+/**
+ * 1147: keep the device id (oly_did, set by middleware) in local storage too, and put it back if the cookie was
+ * cleared, so clearing cookies alone does not unlock a second free trial. Strictly necessary; no other data.
+ */
+const DEVICE_COOKIE = "oly_did";
+const DEVICE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function mirrorDeviceId() {
+  try {
+    const cookie = document.cookie.split("; ").find((c) => c.startsWith(`${DEVICE_COOKIE}=`))?.slice(DEVICE_COOKIE.length + 1) ?? "";
+    const kept = localStorage.getItem(DEVICE_COOKIE) ?? "";
+    if (DEVICE_ID.test(kept) && kept !== cookie) document.cookie = `${DEVICE_COOKIE}=${kept}; Path=/; Max-Age=${60 * 60 * 24 * 730}; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+    else if (DEVICE_ID.test(cookie) && !kept) localStorage.setItem(DEVICE_COOKIE, cookie);
+  } catch {
+    /* storage blocked: the cookie alone still works */
+  }
+}
+
 const ROWS = [
-  { id: "necessary", title: "Necessary", body: "Sign-in, security, your theme and this choice. Always on, the site can't work without them." },
-  { id: "analytics", title: "Analytics", body: "Anonymous counts of which pages are used, so we can fix what's confusing." },
+  { id: "necessary", title: "Necessary", body: "Sign-in, security, a device id for fraud prevention, your theme and this choice. Always on, the site can't work without them." },
+  { id: "analytics", title: "Analytics", body: "Counts of which pages are used and which features are tried, through PostHog (US servers), so we can fix what's confusing. Off until you say yes." },
   { id: "marketing", title: "Marketing", body: "Lets us measure whether our ads work. We never sell your data." },
 ] as const;
 
@@ -43,6 +60,7 @@ export function CookieBanner() {
   useEffect(() => setLift(!!document.querySelector('nav[aria-label="Primary"].fixed')), [path]);
 
   useEffect(() => {
+    mirrorDeviceId();
     const c = readConsent();
     // 1100: on a first launch from the Home Screen the welcome goes first; the choice follows it.
     let off = () => {};
@@ -66,7 +84,7 @@ export function CookieBanner() {
         <div className="min-w-0">
           <h2 id="cc-title" className="font-semibold tracking-tight">Cookies, your call</h2>
           <p id="cc-body" className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
-            We use necessary cookies to run Outlly. With your OK we'd also use analytics to improve it. <Link href="/privacy" className="font-medium text-foreground underline underline-offset-4">Privacy policy</Link>
+            We use necessary cookies to run Outlly, including a device id that stops repeat free trials (fraud prevention). With your OK we'd also use analytics to improve it. <Link href="/privacy" className="font-medium text-foreground underline underline-offset-4">Privacy policy</Link>
           </p>
         </div>
       </div>

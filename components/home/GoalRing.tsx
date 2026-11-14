@@ -41,7 +41,7 @@ export function GoalRing({ goal, scheduled, canEdit }: { goal: GoalState; schedu
       setEditing(false);
       router.refresh();
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : "Couldn't save the goal", "error");
+      toast(e instanceof ApiError ? e.message : "Couldn't save the goal. Check your connection and try again.", "error");
     } finally {
       setSaving(false);
     }

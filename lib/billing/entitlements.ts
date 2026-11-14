@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { db } from "../db";
 import { HttpError } from "../http";
+import { assertBudget, recordCost } from "../subscriptions/costs";
 import { env } from "../env";
 import { accessFor } from "./access";
 import { fitsStorage, fmtBytes, storageFigures, type AccessSource } from "./access-core";
@@ -217,7 +218,10 @@ export async function storageUsage(userId: string) {
  */
 export async function assertStorage(userId: string, incoming: number) {
   const u = await storageUsage(userId);
-  if (fitsStorage(u.usedBytes, u.storageMb, incoming)) return u;
+  if (fitsStorage(u.usedBytes, u.storageMb, incoming)) {
+    await recordCost({ userId, category: "storage", units: incoming / 1e9 }); // 1147: GB-month (never throws)
+    return u;
+  }
   if (u.over) throw limit(`You're using ${fmtBytes(u.usedBytes)} of the ${fmtBytes(u.limitBytes)} on ${u.planName}, so new uploads are paused. Your files are safe. Delete some, or upgrade for more room.`, "storage");
   throw limit(`This file is ${fmtBytes(incoming)} and ${u.planName} has ${fmtBytes(u.remainingBytes)} of storage left. Delete some files, or upgrade for more room.`, "storage");
 }
@@ -394,6 +398,7 @@ export async function spendXPosts(userId: string, refs: string[], now = new Date
   if (!refs.length) return none;
   const e = await entitlements(userId);
   checkX(e);
+  await assertBudget(userId, "x_post", now); // 1147: X API posts pause at 100% of the monthly cost budget
   if (e.xPostLimit <= 0) return none;
   const sell = await packOnSale("x");
   const full = () => limit(`${e.planName} includes ${e.xPostLimit} posts to X a month and they're used up. ${sell ? "Add an X top-up, upgrade," : "Upgrade"} or untick X for this one.`, "x");
@@ -406,7 +411,9 @@ export async function spendXPosts(userId: string, refs: string[], now = new Date
   }
   const period = periodKey("month", now);
   const keys = refs.map((r) => r.slice(0, 120));
+  const fresh = held.filter((h) => h.fresh).length;
   const settle = async () => {
+    if (fresh) await recordCost({ userId, category: "x_post", units: fresh }); // 1147: once the post really goes out (never throws)
     try {
       const stale = await db.featureUse.findMany({ where: { userId, feature: "x-post", ref: { in: keys }, period: { not: period } }, select: { id: true, topUpId: true } });
       for (const r of stale) {

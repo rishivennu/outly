@@ -189,8 +189,8 @@ export function PulseRail() {
                     <OrbAvatar avatar={who.avatar} seed={who.email} size={34} />
                   </span>
                   <span className="rail-label min-w-0">
-                    <span className="block truncate text-[13.5px] font-semibold text-foreground">{who.name}</span>
-                    <span className="block truncate text-[11.5px] font-normal text-muted-foreground">{who.sub}</span>
+                    <span className="block truncate text-[14px] font-semibold text-foreground">{who.name}</span>
+                    <span className="block truncate text-xs font-normal text-muted-foreground">{who.sub}</span>
                   </span>
                 </button>
               </AccountMenu>

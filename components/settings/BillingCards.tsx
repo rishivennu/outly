@@ -144,7 +144,7 @@ export function PaymentsBento({ b }: { b: BillingSummary }) {
         {tiles.map(({ Ico, t, d }) => (
           <li key={t} className="rounded-[20px] bg-white/[0.04] p-4 ring-1 ring-white/[0.06]">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-lime/15 text-lime" aria-hidden="true"><Ico className="h-[18px] w-[18px]" /></span>
-            <p className="mt-3 text-[14.5px] font-semibold">{t}</p>
+            <p className="mt-3 text-[15px] font-semibold">{t}</p>
             <p className="mt-1 text-[13px] leading-snug text-white/65">{d}</p>
           </li>
         ))}
@@ -218,7 +218,7 @@ export function MethodsSection({ b }: { b: BillingSummary }) {
               <Chip id={m.id} className="pay-chip-static h-8 shrink-0 shadow-none" />
               <span className="min-w-0 flex-1">
                 <span className="block text-[14px] font-medium">{m.label}</span>
-                <span className={cn("block text-[12.5px]", ok ? "pill-ink-ok" : "text-muted-foreground")}>{ok ? (m.id === "apple" || m.id === "gpay" ? "At checkout, on supported devices" : "At checkout") : "Not offered right now"}</span>
+                <span className={cn("block text-[13px]", ok ? "pill-ink-ok" : "text-muted-foreground")}>{ok ? (m.id === "apple" || m.id === "gpay" ? "At checkout, on supported devices" : "At checkout") : "Not offered right now"}</span>
               </span>
             </li>
           );
@@ -239,7 +239,7 @@ export function HistorySection({ b }: { b: BillingSummary }) {
             <li key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3">
               <span className="min-w-0 flex-1">
                 <span className="block text-[14px] font-medium">{cycle(p.interval) === "year" ? "Yearly plan" : "Monthly plan"} · {gwName(p.provider)}</span>
-                <span className="block text-[12.5px] text-muted-foreground">
+                <span className="block text-[13px] text-muted-foreground">
                   {day(p.at)}
                   {p.status === "failed" && p.reason ? ` · ${p.reason}` : ""}
                   {p.invoice ? ` · Invoice ${p.invoice}` : ""}
@@ -267,7 +267,7 @@ export function InvoicesSection({ b }: { b: BillingSummary }) {
             <li key={i.number} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[14px] font-medium">{i.number}</span>
-                <span className="block truncate text-[12.5px] text-muted-foreground">{day(i.issuedAt)} · {i.description}</span>
+                <span className="block truncate text-[13px] text-muted-foreground">{day(i.issuedAt)} · {i.description}</span>
               </span>
               <span className="tabular text-[14px] font-medium">{formatMoney(i.amountMinor, i.currency)}</span>
               {i.refunded && <StatusPill status="refunded" />}
@@ -293,11 +293,11 @@ export function BillingDetailsSection({ b }: { b: BillingSummary }) {
     <Card id="billing-details" title="Billing details" icon={UserRound} hint="Printed on every invoice at the moment you pay.">
       <dl className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl bg-secondary/40 p-4">
-          <dt className="text-[12.5px] font-semibold text-muted-foreground">Name</dt>
+          <dt className="text-[13px] font-semibold text-muted-foreground">Name</dt>
           <dd className="mt-1 truncate text-[15px] font-medium">{b.name}</dd>
         </div>
         <div className="rounded-2xl bg-secondary/40 p-4">
-          <dt className="text-[12.5px] font-semibold text-muted-foreground">Invoices go to</dt>
+          <dt className="text-[13px] font-semibold text-muted-foreground">Invoices go to</dt>
           <dd className="mt-1 truncate text-[15px] font-medium">{b.email}</dd>
         </div>
       </dl>

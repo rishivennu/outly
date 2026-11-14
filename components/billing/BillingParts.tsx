@@ -170,7 +170,7 @@ export function PaymentMethodCard({ periodEnd, online }: { periodEnd: string | n
                 : "Outlly never stores card numbers. Each payment is one-off unless you turn on auto-renew."}
             </p>
           </div>
-          {M && <span className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold", M.state === "active" ? "bg-success/15" : M.state === "attention" ? "bg-destructive/12 text-[hsl(0_72%_38%)] dark:text-destructive" : "bg-warning/20")}>{M.state === "active" ? "Active" : M.state === "attention" ? "Needs attention" : "Pending"}</span>}
+          {M && <span className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold", M.state === "active" ? "bg-success/15" : M.state === "attention" ? "bg-destructive/12 text-[hsl(0_72%_38%)] dark:text-destructive" : "bg-warning/20")}>{M.state === "active" ? "Active" : M.state === "attention" ? "Needs attention" : "Pending"}</span>}
         </div>
         {d.last && (
           <p className="mt-3 flex items-center gap-2 text-[13px] text-muted-foreground">
@@ -259,7 +259,7 @@ export function BillingHistory({ rows, email, cachedAt }: { rows: HistoryRow[]; 
       {rows.length === 0 ? (
         <div className="mt-4 flex items-center gap-4 rounded-2xl bg-secondary/40 p-5 hairline">
           <FileText className="h-6 w-6 shrink-0 text-muted-foreground" aria-hidden />
-          <p className="text-sm text-muted-foreground">No payments yet. When you pay for a plan, the invoice appears here and in your inbox ({email}).</p>
+          <p className="min-w-0 break-words text-sm text-muted-foreground">No payments yet. When you pay for a plan, the invoice appears here and in your inbox ({email}).</p>
         </div>
       ) : (
         <>
@@ -277,11 +277,11 @@ export function BillingHistory({ rows, email, cachedAt }: { rows: HistoryRow[]; 
             <tbody className="divide-y divide-border">
               {shown.map((r) => (
                 <tr key={r.id} className="align-middle">
-                  <td className="py-3 pr-3 font-mono text-[12.5px]">{r.number ?? "—"}</td>
+                  <td className="py-3 pr-3 font-mono text-[12.5px]">{r.number ?? "Not issued"}</td>
                   <td className="py-3 pr-3 whitespace-nowrap tabular text-muted-foreground">{day(r.date)}</td>
                   <td className="py-3 pr-3"><span className="line-clamp-1">{r.plan}</span>{r.note && <span className="block text-[12px] text-muted-foreground">{r.note}</span>}</td>
                   <td className={cn("py-3 text-right font-semibold whitespace-nowrap tabular", r.status === "refunded" && "text-muted-foreground line-through")}>{formatMoney(r.amountMinor, r.currency)}</td>
-                  <td className="py-3 pl-4"><span className={cn("rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold", PILL[r.status])}>{HISTORY_LABEL[r.status]}</span></td>
+                  <td className="py-3 pl-4"><span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", PILL[r.status])}>{HISTORY_LABEL[r.status]}</span></td>
                   <td className="py-3 pl-3 text-right"><Downloads r={r} /></td>
                 </tr>
               ))}
@@ -295,9 +295,9 @@ export function BillingHistory({ rows, email, cachedAt }: { rows: HistoryRow[]; 
                   <span className={cn("shrink-0 font-semibold tabular", r.status === "refunded" && "text-muted-foreground line-through")}>{formatMoney(r.amountMinor, r.currency)}</span>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-muted-foreground">
-                  <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold text-foreground", PILL[r.status])}>{HISTORY_LABEL[r.status]}</span>
+                  <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold text-foreground", PILL[r.status])}>{HISTORY_LABEL[r.status]}</span>
                   <span className="tabular">{day(r.date)}</span>
-                  {r.number && <span className="font-mono text-[11.5px]">{r.number}</span>}
+                  {r.number && <span className="font-mono text-xs">{r.number}</span>}
                 </div>
                 {r.note && <p className="mt-1 text-[12px] text-muted-foreground">{r.note}</p>}
                 {r.number && <div className="mt-2 flex"><Downloads r={r} /></div>}

@@ -25,7 +25,7 @@ export function FinalCtaButtons() {
         <ArrowRight className="h-[18px] w-[18px] transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
       </SignupCta>
       <Link href="/login" className="ap-link">
-        Log in
+        Sign in
         <ChevronRight className="h-4 w-4" aria-hidden="true" />
       </Link>
     </div>

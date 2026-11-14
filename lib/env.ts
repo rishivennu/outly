@@ -82,6 +82,12 @@ const schema = z.object({
   /** Help-chat model calls for signed-out visitors: per IP per day, and for all visitors together per day. 0 = no AI for visitors. */
   AI_SUPPORT_ANON_PER_IP: z.coerce.number().int().min(0).default(15),
   AI_SUPPORT_ANON_DAILY: z.coerce.number().int().min(0).default(300),
+  /** PostHog (1149). Defaults live in lib/analytics/config.ts; these override them. The personal key is server only. */
+  NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
+  NEXT_PUBLIC_POSTHOG_HOST: z.string().optional(),
+  POSTHOG_PERSONAL_API_KEY: z.string().optional().default(""),
+  POSTHOG_PROJECT_ID: z.string().optional(),
+  POSTHOG_APP_HOST: z.string().optional(),
 });
 
 export const env = schema.parse(process.env);

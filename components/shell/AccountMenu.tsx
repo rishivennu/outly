@@ -86,8 +86,8 @@ export function WhoCard({ size = 40, className }: { size?: number; className?: s
     <div className={cn("flex min-w-0 items-center gap-3", className)}>
       <OrbAvatar avatar={who.avatar} seed={who.email} size={size} />
       <span className="min-w-0">
-        <span className="block truncate text-[14.5px] font-semibold text-foreground">{who.name}</span>
-        <span className="block truncate text-[12.5px] text-muted-foreground">{who.sub}</span>
+        <span className="block truncate text-[15px] font-semibold text-foreground">{who.name}</span>
+        <span className="block truncate text-[13px] text-muted-foreground">{who.sub}</span>
       </span>
     </div>
   );

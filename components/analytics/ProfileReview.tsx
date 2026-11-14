@@ -57,7 +57,7 @@ function Delta({ value, suffix = "%" }: { value: number | null; suffix?: string 
   const up = value >= 0;
   const flat = Math.abs(value) < 0.5;
   return (
-    <span className={cn("inline-flex shrink-0 items-center gap-0.5 rounded-full px-2 py-0.5 text-[13px] font-semibold", flat ? "bg-secondary text-muted-foreground" : up ? "bg-success/15 pr-good" : "bg-warning/15 text-warning")}>
+    <span className={cn("inline-flex shrink-0 items-center gap-0.5 rounded-full px-2 py-0.5 text-[13px] font-semibold", flat ? "bg-secondary text-muted-foreground" : up ? "bg-success/15 pr-good" : "bg-warning/15 text-warning-ink")}>
       {!flat && (up ? <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /> : <ArrowDownRight className="h-3.5 w-3.5" aria-hidden="true" />)}
       <span className="sr-only">{flat ? "About the same as before" : up ? "Up" : "Down"}</span>
       {flat ? "Flat" : `${Math.abs(value) < 10 ? Math.abs(value).toFixed(1) : Math.round(Math.abs(value))}${suffix}`}
@@ -218,8 +218,8 @@ function LiveViews({ delay, className }: { delay: number; className?: string }) 
         )}
       </div>
       <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-        {data ? `Last ${data.windowDays} days${live ? ", straight from the platforms" : data.source === "stored" ? ", from posts published through Outlly" : ""}.` : "Checking your platforms..."}
-        {gained > 0 && <span className="rounded-full bg-success/15 px-2 py-0.5 text-[13px] font-semibold text-success">+{gained.toLocaleString("en-US")} since you opened this</span>}
+        {data ? `Last ${data.windowDays} days${live ? ", straight from the platforms" : data.source === "stored" ? ", from posts published through Outlly" : ""}.` : "Checking your platforms…"}
+        {gained > 0 && <span className="rounded-full bg-success/15 px-2 py-0.5 text-[13px] font-semibold text-success-ink">+{gained.toLocaleString("en-US")} since you opened this</span>}
       </p>
       {!!data?.platforms.length && (
         <ul className="mt-5 flex flex-col gap-2.5">
@@ -312,7 +312,7 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
       className="pr-ai-btn inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))] disabled:cursor-not-allowed disabled:opacity-55"
     >
       {busy ? <RefreshCw className={cn("h-4 w-4", !reduce && "animate-spin")} aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
-      {busy ? "Pip AI is reading your numbers..." : r?.source === "ai" ? (state?.stale ? "Numbers moved: analyse again" : "Analyse again") : "Analyse with Pip AI"}
+      {busy ? "Pip AI is reading your numbers…" : r?.source === "ai" ? (state?.stale ? "Numbers moved: analyse again" : "Analyse again") : "Analyse with Pip AI"}
     </button>
   );
 
@@ -364,7 +364,7 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
           </div>
           {busy && (
             <div className="mt-5 flex items-center gap-3 text-[15px] text-muted-foreground" role="status">
-              <Pip size={44} mood="think" /> Reading {r?.sample ?? 0} posts and your stats...
+              <Pip size={44} mood="think" /> Reading {r?.sample ?? 0} posts and your stats…
             </div>
           )}
           {r && !compactMode && r.pillars.length > 0 && (
@@ -476,11 +476,11 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
             )}
 
             <Tile label="Working for you" className={third} delay={0.16}>
-              <CardHead title="Working for you" icon={<Check className="h-4 w-4" />} tone="text-success" />
+              <CardHead title="Working for you" icon={<Check className="h-4 w-4" />} tone="text-success-ink" />
               {busy ? <div className="mt-4"><Shimmer /></div> : r.strengths.length ? <Bullets items={r.strengths} dot="bg-success" /> : <p className="mt-4 text-[15px] text-muted-foreground">Nothing scores above 60 yet. The steps above are the fastest way to get there.</p>}
             </Tile>
             <Tile label="Holding you back" className={third} delay={0.18}>
-              <CardHead title="Holding you back" icon={<TriangleAlert className="h-4 w-4" />} tone="text-warning" />
+              <CardHead title="Holding you back" icon={<TriangleAlert className="h-4 w-4" />} tone="text-warning-ink" />
               {busy ? <div className="mt-4"><Shimmer /></div> : r.weaknesses.length ? <Bullets items={r.weaknesses} dot="bg-warning" /> : <p className="mt-4 text-[15px] text-muted-foreground">No pillar is below 45. Keep the rhythm going.</p>}
             </Tile>
 

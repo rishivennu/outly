@@ -22,7 +22,7 @@ export function CmpExpandAll() {
   };
 
   return (
-    <button ref={ref} type="button" onClick={flip} className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold text-foreground/80 transition-colors hover:bg-foreground/[0.06] hover:text-foreground">
+    <button ref={ref} type="button" onClick={flip} className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[14px] font-semibold text-foreground/80 transition-colors hover:bg-foreground/[0.06] hover:text-foreground">
       {allOpen ? <ChevronsDownUp className="h-4 w-4" aria-hidden="true" /> : <ChevronsUpDown className="h-4 w-4" aria-hidden="true" />}
       {allOpen ? "Collapse all" : "Expand all"}
     </button>

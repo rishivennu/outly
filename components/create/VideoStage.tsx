@@ -171,7 +171,7 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
                   <DancingPip size={40} className="groove-glass shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{upload.progress < 1 ? "Bringing it over" : "Making it ready"}</p>
-                    <p className="truncate text-[11px] font-bold uppercase tracking-[0.1em] text-[hsl(var(--lime))]">{etaLabel ?? (upload.progress < 1 ? "On its way" : "Almost there")}</p>
+                    <p className="truncate text-xs font-bold uppercase tracking-[0.1em] text-[hsl(var(--lime))]">{etaLabel ?? (upload.progress < 1 ? "On its way" : "Almost there")}</p>
                   </div>
                   {/* The number has its own slot in the header (1053): inside the track the rocket rode over it near 100%. */}
                   <span className="w-[3.25rem] shrink-0 text-right font-mono text-sm font-semibold tabular-nums text-white/85" aria-hidden="true">

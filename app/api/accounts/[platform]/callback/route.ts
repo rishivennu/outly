@@ -16,6 +16,7 @@ import { signInWithGoogle } from "@/lib/auth-provider";
 import { HttpError, clientIp } from "@/lib/http";
 import { attachReferral } from "@/lib/referral";
 import { attachSource } from "@/lib/growth/source";
+import { captureSignal } from "@/lib/subscriptions/signals";
 import { YouTubePublisher, googleIdentity } from "@/lib/social/youtube";
 import { connectDetail, connectReason } from "@/lib/social/connect-reason";
 
@@ -94,6 +95,7 @@ async function googleSignIn(req: NextRequest, returnTo: string, remember?: boole
     const user = await signInWithGoogle({ email: who.email, name: who.name, picture: who.picture }, { adult: req.cookies.get("outlly_adult")?.value === "1" });
     if (user.created) await attachReferral(user.id, clientIp(req)).catch((e) => console.error("[referral] attach", e));
     if (user.created) await attachSource(user.id).catch((e) => console.error("[growth] source", e));
+    if (user.created) await captureSignal({ req, userId: user.id, event: "signup" }).catch((e) => console.error("[subs] signup signal", e)); // 1147
     // Authenticator on: Google was the first step only. No session (and no channel link) until the app code.
     if ((await beginSignIn(user.id, "other", { remember })).twoFactor) {
       const half = new URL("/login", env.APP_URL);

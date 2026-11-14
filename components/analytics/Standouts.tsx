@@ -72,7 +72,7 @@ export function Standouts({ posts, avgViews }: { posts: StandoutPost[]; avgViews
                 <div className="relative row-span-2 aspect-[9/14] w-12 shrink-0 overflow-hidden rounded-xl bg-secondary sm:row-span-1 sm:w-14">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {p.thumbnailUrl && <img src={p.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-cover" />}
-                  <span className="absolute left-1 top-1 rounded-md bg-background/85 px-1.5 text-[10px] font-bold tabular">{i + 1}</span>
+                  <span className="absolute left-1 top-1 rounded-md bg-background/85 px-1.5 text-xs font-bold tabular">{i + 1}</span>
                 </div>
                 <div className="min-w-0">
                   <p className="line-clamp-2 text-sm font-medium leading-snug">{p.title}</p>
@@ -121,7 +121,7 @@ export function Standouts({ posts, avgViews }: { posts: StandoutPost[]; avgViews
 function Cell({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex items-baseline gap-1 sm:block sm:text-right">
-      <dt className="text-muted-foreground sm:text-[11px]">{k}</dt>
+      <dt className="text-muted-foreground sm:text-xs">{k}</dt>
       <dd className="font-semibold tabular sm:text-sm">{v}</dd>
     </div>
   );

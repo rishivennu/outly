@@ -47,7 +47,7 @@ function KpiCard({ k, i }: { k: Kpi; i: number }) {
   const ic = useIconPlay();
   return (
     <article data-enter {...ic.handlers} className="pulse-card group flex min-w-0 flex-col gap-3 p-4 sm:p-5" aria-label={`${k.label}: ${k.value}`}>
-      <p className="flex items-center gap-2.5 text-[13.5px] font-medium text-muted-foreground">
+      <p className="flex items-center gap-2.5 text-[14px] font-medium text-muted-foreground">
         <span className="pulse-ico"><AnimIcon name={k.icon} size={16} iconRef={ic.ref} /></span>
         <span className="truncate">{k.label}</span>
       </p>
@@ -192,7 +192,7 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
           <button type="button" onClick={replay} {...replayIc.handlers} className="pulse-icon-btn" aria-label="Replay the dashboard animation" title="Replay">
             <AnimIcon name="replay" size={18} iconRef={replayIc.ref} />
           </button>
-          <Link href="/create" {...newIc.handlers} className="lime-glow inline-flex h-11 items-center gap-2 rounded-2xl bg-lime px-4 text-[14.5px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-px active:scale-[0.98]">
+          <Link href="/create" {...newIc.handlers} className="lime-glow inline-flex h-11 items-center gap-2 rounded-2xl bg-lime px-4 text-[15px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 hover:-translate-y-px active:scale-[0.98]">
             <AnimIcon name="plus" size={18} iconRef={newIc.ref} /> New post
           </Link>
         </div>
@@ -212,7 +212,7 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
           <div ref={rangeS.box} role="radiogroup" aria-label="Date range" onKeyDown={onRangeKey} className="pulse-seg relative">
             <span ref={rangeS.bar} aria-hidden="true" className="pulse-seg-pill" />
             {RANGES.map((r) => (
-              <button key={r} type="button" role="radio" aria-checked={r === range} tabIndex={r === range ? 0 : -1} onClick={() => void pickRange(r)} className={cn("relative z-[1] h-9 min-w-[52px] rounded-[10px] px-3 text-[13.5px] before:absolute before:-inset-y-1 before:inset-x-0 before:content-[''] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring", r === range ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+              <button key={r} type="button" role="radio" aria-checked={r === range} tabIndex={r === range ? 0 : -1} onClick={() => void pickRange(r)} className={cn("relative z-[1] h-9 min-w-[52px] rounded-[10px] px-3 text-[14px] before:absolute before:-inset-y-1 before:inset-x-0 before:content-[''] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring", r === range ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
                 {r}D
               </button>
             ))}
@@ -220,7 +220,7 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
           <p className="hidden text-[13px] text-muted-foreground md:block" aria-live="polite">{loading ? "Loading…" : fmtRange(p.dates)}</p>
         </div>
       </div>
-      {failed && <p role="alert" className="mt-3 text-[13.5px] text-destructive">Couldn&apos;t load that range. Showing the last one; try again in a moment.</p>}
+      {failed && <p role="alert" className="mt-3 text-[14px] text-destructive">Couldn&apos;t load that range. Showing the last one; try again in a moment.</p>}
 
       <div id="pulse-panel" role="tabpanel" aria-labelledby={`pt-${key}`} className={cn("transition-opacity duration-300", loading && "opacity-60")}>
         <section aria-label="Key numbers" className="mt-5 grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4 lg:gap-4">
@@ -234,7 +234,7 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
                 <h2 id="vot-h" className="text-[16px] font-semibold tracking-tight">Views over time</h2>
                 <p className="mt-0.5 text-[13px] text-muted-foreground">{scopeLabel}, compared with the {range} days before</p>
               </div>
-              <p className="flex items-center gap-4 text-[12.5px] text-muted-foreground" aria-hidden="true">
+              <p className="flex items-center gap-4 text-[13px] text-muted-foreground" aria-hidden="true">
                 <span className="flex items-center gap-1.5"><span className="pulse-key pulse-key-cur" />This period</span>
                 <span className="flex items-center gap-1.5"><span className="pulse-key pulse-key-prev" />Before</span>
               </p>
@@ -244,9 +244,9 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
               {!p.hasData && (
                 <div className="absolute inset-0 grid place-items-center">
                   <div className="pulse-empty max-w-xs text-center">
-                    <p className="text-[14.5px] font-semibold">Your numbers land here</p>
+                    <p className="text-[15px] font-semibold">Your numbers land here</p>
                     <p className="mt-1 text-[13px] text-muted-foreground">Once a post goes live, its views show up within a few hours.</p>
-                    <Link href="/create" className="mt-3 inline-flex h-11 items-center rounded-2xl bg-secondary px-4 text-[13.5px] font-semibold hairline hover:bg-secondary/70">Create a post</Link>
+                    <Link href="/create" className="mt-3 inline-flex h-11 items-center rounded-2xl bg-secondary px-4 text-[14px] font-semibold hairline hover:bg-secondary/70">Create a post</Link>
                   </div>
                 </div>
               )}
@@ -258,7 +258,7 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
             <p className="mt-0.5 text-[13px] text-muted-foreground">By views in this period</p>
             <div ref={bars}>
               {top.length === 0 ? (
-                <p className="mt-6 rounded-2xl bg-secondary/40 p-4 text-[13.5px] text-muted-foreground">No views yet {key === "all" ? "in this range" : `on ${pname(key)} in this range`}.</p>
+                <p className="mt-6 rounded-2xl bg-secondary/40 p-4 text-[14px] text-muted-foreground">No views yet {key === "all" ? "in this range" : `on ${pname(key)} in this range`}.</p>
               ) : (
                 <ol className="mt-3 flex flex-col gap-1">
                   {top.map((t) => (
@@ -276,7 +276,7 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
                         </span>
                         <span className="shrink-0 text-right">
                           <span className="block text-[14px] font-bold tabular-nums">{compact(t.views)}</span>
-                          <span className="block text-[11.5px] text-muted-foreground">views</span>
+                          <span className="block text-xs text-muted-foreground">views</span>
                         </span>
                       </Link>
                     </li>
@@ -294,13 +294,13 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
               return (
                 <button key={s.pl} type="button" data-enter onClick={() => setTab(s.pl)} aria-pressed={key === s.pl} className={cn("pulse-card group flex flex-col gap-3 p-4 text-left outline-none transition-shadow duration-200 focus-visible:ring-2 focus-visible:ring-ring sm:p-5", key === s.pl && "ring-1 ring-foreground/25")}>
                   <span className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2.5 text-[14.5px] font-semibold"><PlatformOrb platform={s.pl as Platform} size={28} square />{pname(s.pl)}</span>
+                    <span className="flex items-center gap-2.5 text-[15px] font-semibold"><PlatformOrb platform={s.pl as Platform} size={28} square />{pname(s.pl)}</span>
                     <span className="text-[20px] font-bold tabular-nums">{share}%</span>
                   </span>
                   <span className="block h-1.5 overflow-hidden rounded-full bg-foreground/[0.07]">
                     <span className="block h-full rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none" style={{ width: `${share}%`, background: pcolor(s.pl) }} />
                   </span>
-                  <span className="grid grid-cols-3 gap-2 text-[12.5px] text-muted-foreground">
+                  <span className="grid grid-cols-3 gap-2 text-[13px] text-muted-foreground">
                     <span>Views<b className="block text-[14px] font-semibold text-foreground tabular-nums">{compact(s.views)}</b></span>
                     <span>Posts<b className="block text-[14px] font-semibold text-foreground tabular-nums">{s.posts}</b></span>
                     <span>Engagement<b className="block text-[14px] font-semibold text-foreground tabular-nums">{rate(s.inter, s.views).toFixed(1)}%</b></span>

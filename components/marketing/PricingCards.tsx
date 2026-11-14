@@ -23,8 +23,11 @@ export type CardPlan = {
   free: boolean;
   month: { label: string; minor: number; interval: string };
   /** null when the plan has no yearly option (free, already yearly, or yearly switched off). */
-  year: { label: string; minor: number; save: number } | null;
+  year: { label: string; minor: number; save: number; intro?: IntroPrice | null } | null;
+  /** 1147: the first-time subscriber price, server-rendered from the policy; absent while the policy is off. */
+  intro?: IntroPrice | null;
 };
+export type IntroPrice = { label: string; minor: number; then: string };
 
 /** The landing pricing grid: Monthly / Yearly switch, the admin's card style, and rocket CTAs. */
 export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; variant: CardStyle; top: string }) {
@@ -44,7 +47,8 @@ export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; varia
         {plans.map((p) => {
           const live = p.state === "available";
           const y = cycle === "year" && p.year ? p.year : null;
-          const label = y ? y.label : p.month.label;
+          const intro = y ? y.intro : p.intro;
+          const label = intro ? intro.label : y ? y.label : p.month.label;
           const tone = variant === "bold" && p.featured && live ? "ink" : "lime";
           return (
             <li key={p.id}>
@@ -52,7 +56,7 @@ export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; varia
                 variant={variant}
                 name={p.name}
                 note={p.note}
-                priceMinor={y ? y.minor : p.month.minor}
+                priceMinor={intro ? intro.minor : y ? y.minor : p.month.minor}
                 interval={y ? "year" : p.month.interval}
                 save={y?.save ?? 0}
                 state={p.state}
@@ -77,6 +81,11 @@ export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; varia
                     <RocketCta href="/signup" signup label="Start creating" tone={tone} />
                   ) : live ? (
                     <>
+                      {intro && (
+                        <p className={cn("mb-3 text-[13px] leading-snug", variant === "live" ? "la-mute" : tone === "ink" ? "text-current" : "text-muted-foreground")}>
+                          <span className="font-semibold">First-time subscriber offer.</span> {intro.then}
+                        </p>
+                      )}
                       <RocketCta href={`/billing?plan=${p.slug}${y ? "&cycle=year" : ""}`} label={`Choose ${p.name}${y ? " yearly" : ""}`} tone={tone} />
                       {/* 1076: the guarantee on every paid card, right under the button. */}
                       <p className={cn("mt-2.5 flex items-center justify-center gap-1.5 text-[12.5px] font-medium", variant === "live" ? "la-mute" : tone === "ink" ? "text-current" : "text-muted-foreground")}>

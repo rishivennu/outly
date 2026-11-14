@@ -67,7 +67,7 @@ export function Compare({ accounts }: { accounts: Acct[] }) {
                 <th key={r.accountId} scope="col" className="pb-2 pr-4 font-medium">
                   <span className="flex items-center gap-1.5">
                     <PlatformOrb platform={r.platform as Platform} size={16} /> @{r.username.replace(/^@/, "")}
-                    {i === 0 && <span className="rounded-full bg-secondary px-2 py-px text-[10px] font-semibold uppercase tracking-wide">Baseline</span>}
+                    {i === 0 && <span className="rounded-full bg-secondary px-2 py-px text-xs font-semibold uppercase tracking-wide">Baseline</span>}
                   </span>
                 </th>
               ))}
@@ -84,7 +84,7 @@ export function Compare({ accounts }: { accounts: Acct[] }) {
                     <td key={r.accountId} className="py-2.5 pr-4 tabular">
                       <span className="font-semibold">{c.pct ? `${v.toFixed(1)}%` : compact(v)}</span>
                       {d && d.pct !== null && (
-                        <span className={cn("ml-2 text-xs font-medium", d.pct >= 0 ? "text-success" : "text-warning")}>
+                        <span className={cn("ml-2 text-xs font-medium", d.pct >= 0 ? "text-success-ink" : "text-warning-ink")}>
                           {d.pct >= 0 ? "+" : "−"}{Math.round(Math.abs(d.pct))}%
                           <span className="sr-only"> compared with @{base.username.replace(/^@/, "")}</span>
                         </span>

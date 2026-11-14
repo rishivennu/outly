@@ -164,7 +164,7 @@ export function DateTimePicker({ value, onChange, tz, peakHours = [] }: Props) {
                 className={cn("relative flex h-[76px] w-[60px] shrink-0 snap-start flex-col items-center justify-center rounded-[22px] transition", on ? "text-[hsl(var(--lime-foreground))]" : "bg-secondary/70 text-foreground hover:bg-secondary hairline")}
               >
                 {on && <motion.span layoutId="dtp-day-pill" className="lime-bg absolute inset-0 rounded-[22px] shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_8px_20px_-10px_hsl(var(--lime)/0.8)]" transition={T.glide} />}
-                <span className="relative text-[11px] font-medium uppercase tracking-wider opacity-70">{i === 0 ? "Today" : d.wd}</span>
+                <span className="relative text-xs font-medium uppercase tracking-wider opacity-70">{i === 0 ? "Today" : d.wd}</span>
                 <span className="relative text-xl font-semibold tabular">{d.d}</span>
               </button>
             );
@@ -176,7 +176,7 @@ export function DateTimePicker({ value, onChange, tz, peakHours = [] }: Props) {
         <div className="mb-2 flex items-center justify-between">
           <p className="text-[13px] font-medium text-muted-foreground" id="dtp-time">Time</p>
           <div className="flex items-center gap-3">
-            {peakHours.length > 0 && <p className="flex items-center gap-1 text-[12px] text-muted-foreground"><Flame className="h-3.5 w-3.5 text-cyan" aria-hidden="true" /> best time to post</p>}
+            {peakHours.length > 0 && <p className="flex items-center gap-1 text-[12px] text-muted-foreground"><Flame className="h-3.5 w-3.5 text-accent" aria-hidden="true" /> best time to post</p>}
             <StripArrows edge={timeStrip.edge} go={timeStrip.go} what="times" />
           </div>
         </div>

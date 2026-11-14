@@ -18,7 +18,7 @@ const ICON: Record<StepKind, typeof ArrowRight> = {
 
 const TONE: Record<Step["tone"], string> = {
   danger: "bg-destructive/12 text-destructive",
-  warn: "bg-warning/15 text-warning",
+  warn: "bg-warning/15 text-warning-ink",
   info: "bg-secondary text-foreground",
   good: "bg-lime/20 text-lime-ink",
 };

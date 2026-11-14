@@ -25,6 +25,9 @@ import { experimentPrice } from "@/lib/billing/experiments";
 import { aiQuota } from "@/lib/ai-quota";
 import { campaignWho, quoteOffer } from "@/lib/campaign";
 import { offerLabel, savingLabel } from "@/lib/campaign-core";
+import { budgetState, getPolicy, quote, trialState, type Quote } from "@/lib/subscriptions";
+import type { OfferView } from "@/components/billing/BillingView";
+import type { Currency } from "@/lib/billing/money";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Billing" };
@@ -73,7 +76,7 @@ async function handleYoupiReturn(userId: string, paymentId: string): Promise<Ret
   }
 }
 
-type Sp = { checkout?: string; session_id?: string; token?: string; p?: string; plan?: string; paid?: string; cycle?: string; founding?: string; campaign?: string };
+type Sp = { checkout?: string; session_id?: string; token?: string; p?: string; plan?: string; paid?: string; cycle?: string; founding?: string; campaign?: string; review?: string };
 
 /** The receipt slip for whatever checkout just came back (1053), read from our own payment row. */
 async function receiptFor(userId: string, sp: Sp, cancelledId: string | null): Promise<Receipt | null> {
@@ -214,6 +217,58 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
       : { tone: "info", text: "That offer has ended or doesn't apply to your account, so the cards show your regular prices." };
   }
 
+  // 1147: while the subscription policy is on, each paid card carries the server quote (the number checkout charges),
+  // and Billing adds the trial, the monthly allowance and the offer states. Off: nothing below changes the page.
+  const policy = await getPolicy();
+  let offer: OfferView | null = null;
+  let plansOut: (Omit<(typeof priced)[number], "year"> & { quote?: Quote; year: ((typeof priced)[number]["year"] & { quote?: Quote }) | null })[] = priced;
+  if (policy.enabled) {
+    const ask = (slug: string, interval: "month" | "year") =>
+      quote({ userId: user.id, planSlug: slug, currency: visitor.currency as Currency, interval, provider: gw.provider, now }).catch(() => null);
+    const live = (q: Quote | null, currency: string, interval: string) => (q && q.reason !== "policy_off" && q.currency === currency && q.interval === interval ? q : null);
+    const repriced = (q: Quote) => q.tier === "intro" || q.tier === "standard";
+    plansOut = await Promise.all(
+      priced.map(async (pp) => {
+        // A claimed campaign offer prices its own card (checkout re-checks it), so it keeps that price and no summary.
+        const claimedHere = (o: unknown) => !!(o as { offer?: string } | null)?.offer;
+        if (pp.priceMinor <= 0 || pp.state !== "available") return pp;
+        const cycle = pp.interval === "year" ? "year" : "month";
+        const [m0, y0] = await Promise.all([claimedHere(pp) ? null : ask(pp.slug, cycle), pp.year && !claimedHere(pp.year) ? ask(pp.slug, "year") : null]);
+        const m = live(m0, pp.currency, cycle);
+        const y = pp.year ? live(y0, pp.year.currency, "year") : null;
+        return {
+          ...pp,
+          ...(m ? { quote: m, ...(repriced(m) ? { priceMinor: m.priceMinor, was: null, approx: null } : {}) } : {}),
+          year: pp.year ? { ...pp.year, ...(y ? { quote: y, ...(repriced(y) ? { priceMinor: y.priceMinor, was: null, approx: null } : {}) } : {}) } : null,
+        };
+      }),
+    );
+    const reasons = plansOut.flatMap((p) => [p.quote?.reason, p.year?.quote?.reason]);
+    const [trial, budget, flag] = await Promise.all([
+      trialState(user.id, now).catch(() => null),
+      budgetState(user.id, now).catch(() => null),
+      db.riskFlag.findFirst({ where: { userId: user.id, status: "open", action: { in: ["deny_offer", "verify"] } }, orderBy: { createdAt: "desc" }, select: { id: true } }),
+    ]);
+    const gate = reasons.includes("risk_denied") || trial?.reason === "risk_denied" ? "risk_denied" : reasons.includes("needs_verification") || trial?.reason === "needs_verification" ? "needs_verification" : null;
+    offer = {
+      graceDays: policy.graceDays,
+      gate,
+      flagId: flag?.id ?? null,
+      review: searchParams.review === "1",
+      budget: budget?.applies ? budget : null,
+      trial: trial
+        ? {
+            status: trial.trial?.status ?? "none",
+            planName: plans.find((p) => p.slug === trial.planSlug)?.name ?? "Creator",
+            days: trial.trialDays,
+            endsAt: trial.trial ? trial.trial.endsAt.toISOString() : null,
+            // A running trial is shown as running; "used" only hides the start button.
+            block: trial.trial ? null : trial.reason,
+          }
+        : null,
+    };
+  }
+
   const currentView: SubView | null = sub
     ? { planSlug: sub.plan.slug, planName: sub.plan.name, priceMinor: sub.priceMinor, currency: sub.currency, interval: sub.interval, periodEnd: sub.currentPeriodEnd.toISOString(), cancelAtPeriodEnd: sub.cancelAtPeriodEnd, pausedUntil: sub.pausedUntil && sub.pausedUntil > now ? sub.pausedUntil.toISOString() : null, provider: sub.provider, autoRenew: sub.autoRenew, gift: !isPaidSub(sub) }
     : null;
@@ -261,7 +316,8 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
       gateway={gw.provider}
       // Customers never see a test badge on the live site; it only shows on the local dev server.
       testMode={process.env.NODE_ENV !== "production" && (gw.provider === "mock" || gw.cfg.mode === "test")}
-      plans={priced}
+      plans={plansOut}
+      offer={offer}
       currency={visitor.currency}
       // What the gateway actually charges: the cards are priced in it, so the pill has to name it too.
       charged={chargeCurrency(gw.provider, visitor.currency, plans.find((p) => p.priceMinor > 0)?.currency ?? "INR")}

@@ -149,7 +149,7 @@ export function SettingsShell({ title, intro, categories, initialTab }: { title:
             >
               <current.icon className="h-[18px] w-[18px] shrink-0 text-lime-ink" aria-hidden="true" />
               <span className="min-w-0 flex-1">
-                <span className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Category</span>
+                <span className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Category</span>
                 <span className="block truncate text-[15px] font-semibold">{current.label}</span>
               </span>
               {anyDirty && <span className="h-2 w-2 rounded-full bg-warning" aria-hidden="true" />}
@@ -173,7 +173,7 @@ export function SettingsShell({ title, intro, categories, initialTab }: { title:
                     <p className="mt-1 max-w-xl text-sm text-muted-foreground">{c.blurb}</p>
                   </div>
                   {dirty[c.id] && (
-                    <span role="status" className="inline-flex h-7 items-center gap-1.5 rounded-full bg-warning/15 px-3 text-[12.5px] font-semibold pill-ink-warn">
+                    <span role="status" className="inline-flex h-7 items-center gap-1.5 rounded-full bg-warning/15 px-3 text-[13px] font-semibold pill-ink-warn">
                       <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden="true" /> Unsaved changes
                     </span>
                   )}

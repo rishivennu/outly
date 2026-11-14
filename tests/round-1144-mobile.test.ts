@@ -29,7 +29,7 @@ describe("touch targets", () => {
     expect(read("components/auth/AuthForm.tsx")).toContain("flex h-11 w-11 -translate-y-1/2");
     expect(read("app/(marketing)/contact/page.tsx")).toContain("inline-flex min-h-11 items-center rounded-full");
     expect(read("components/support/HelpCenter.tsx")).toContain("rounded-full px-4 touch:h-11");
-    expect(read("components/inbox/InboxList.tsx")).toContain("text-[13.5px] touch:h-11");
+    expect(read("components/inbox/InboxList.tsx")).toContain("text-[14px] touch:h-11");
     expect(read("components/analytics/LiveStrip.tsx")).toContain("min-w-[44px] touch:h-11");
     expect(read("components/onboarding/SetupChecklist.tsx")).toContain('aria-label="Hide the setup checklist" className="h-11 w-11 shrink-0"');
   });

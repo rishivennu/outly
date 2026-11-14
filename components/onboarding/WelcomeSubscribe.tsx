@@ -11,8 +11,10 @@ import { afterPrivacy } from "@/components/shared/PrivacyNotice";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
 import { APP_SELLS_PLANS, isApp } from "@/lib/app-mode";
 import { T, FX } from "@/lib/motion/tokens";
+import { TrialCard } from "@/components/billing/OfferCards";
+import type { TrialView } from "@/components/billing/offer-core";
 
-export type WelcomeOffer = { slug: string; name: string; price: string; interval: string; features: string[]; postLimit: number; aiCaptions: boolean; postPeriod?: "week" | "month" };
+export type WelcomeOffer = { slug: string; name: string; price: string; interval: string; note?: string; features: string[]; postLimit: number; aiCaptions: boolean; postPeriod?: "week" | "month" };
 
 /** One honest sentence built from the real plan limits. */
 export function welcomePitch(freeLimit: number, offer: WelcomeOffer | null, freePeriod: "week" | "month" = "month") {
@@ -28,7 +30,7 @@ export const welcomeKey = (id: string) => `outly:welcome-subscribe:${id}`;
  * First-time greeting that invites a free user to subscribe. Shown once per account per device.
  * It never stacks on the guided tour: if the tour hasn't been done yet it waits for it to close.
  */
-export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "month", foundingFull = null }: { firstName: string; offer: WelcomeOffer | null; freeLimit: number; freePeriod?: "week" | "month"; foundingFull?: number | null }) {
+export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "month", foundingFull = null, trial = null }: { firstName: string; offer: WelcomeOffer | null; freeLimit: number; freePeriod?: "week" | "month"; foundingFull?: number | null; trial?: TrialView | null }) {
   const user = useUser();
   const [open, setOpen] = useState(false);
   const [card, setCard] = useState<HTMLDivElement | null>(null);
@@ -110,7 +112,7 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
                   <Dialog.Title data-w="line" className="pr-10 font-display text-[1.6rem] font-bold leading-tight tracking-[-0.03em]">
                     Hi {firstName}, glad you're here.
                   </Dialog.Title>
-                  <p id="welcome-sub-body" data-w="line" className="mt-2.5 text-[14.5px] leading-relaxed text-foreground/80">
+                  <p id="welcome-sub-body" data-w="line" className="mt-2.5 text-[15px] leading-relaxed text-foreground/80">
                     {welcomePitch(freeLimit, offer, freePeriod)}
                   </p>
                   {foundingFull ? (
@@ -122,8 +124,9 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
                         <p className="font-display text-[1.05rem] font-semibold">{offer.name}</p>
                         <p className="tabular text-[14px]"><b className="font-display text-[1.25rem]">{offer.price}</b><span className="text-foreground/70"> / {offer.interval}</span></p>
                       </div>
+                      {offer.note && <p className="mt-1 text-[13px] text-foreground/75">{offer.note}</p>}
                       {offer.features.length > 0 && (
-                        <ul className="mt-3 flex flex-col gap-1.5 text-[13.5px]">
+                        <ul className="mt-3 flex flex-col gap-1.5 text-[14px]">
                           {offer.features.map((f) => (
                             <li key={f} data-w="feat" className="flex items-start gap-2"><Check data-w="check" className="mt-0.5 h-4 w-4 shrink-0 text-lime-ink" aria-hidden />{f}</li>
                           ))}
@@ -131,6 +134,7 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
                       )}
                     </div>
                   )}
+                  {trial && trial.status === "none" && !trial.block && <TrialCard trial={trial} source="welcome" className="mt-4" />}
                   <div data-w="cta" className="mt-6 flex flex-wrap-reverse gap-2">
                     <Dialog.Close asChild>
                       <Button variant="ghost" className="min-w-[8rem] flex-1 text-foreground/85 hairline">Keep exploring free</Button>

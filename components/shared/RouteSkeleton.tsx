@@ -197,7 +197,7 @@ export function RouteSkeleton({ shape, label, lines = [], frame = "page-frame pb
           </button>
         </div>
       ) : slow && (
-        <p className="route-slow absolute left-1/2 top-3 z-10 flex h-8 -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-background/90 px-3.5 text-[12.5px] font-medium text-muted-foreground shadow-sm hairline" aria-hidden="true">
+        <p className="route-slow absolute left-1/2 top-3 z-10 flex h-8 -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-background/90 px-3.5 text-[13px] font-medium text-muted-foreground shadow-sm hairline" aria-hidden="true">
           <span className="live-dot" />
           {label}
           {line && <span key={line} className="fl-line hidden text-foreground/80 sm:inline">· {line}</span>}

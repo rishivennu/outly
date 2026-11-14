@@ -12,6 +12,8 @@ import { razorpay } from "./providers";
 import { issueInvoice } from "./invoice";
 import { GIFT_PROVIDERS } from "./access-core";
 import { reminderDue, reminderKey, renewedEnd } from "./renewal-core";
+import { onPaymentSucceeded } from "../subscriptions/lifecycle";
+import { paymentKeyFromRazorpay } from "../subscriptions/keys";
 
 /**
  * 1096 auto-renew. Off by default for everyone; the customer turns it on in Billing.
@@ -155,7 +157,7 @@ export async function dropMandates(subIds: string[]) {
  * Razorpay) is still money taken: it is recorded and invoiced, never extends the plan or turns auto-renew
  * back on, and is flagged for a refund. `hint` = the subscription id we put in the mandate's notes.
  */
-export async function renewFromCharge(providerSubId: string, charge: { id: string; amount: number; currency: string }, now = new Date(), hint?: string | null) {
+export async function renewFromCharge(providerSubId: string, charge: { id: string; amount: number; currency: string; paymentKey?: string | null }, now = new Date(), hint?: string | null) {
   const inc = { plan: true, user: { select: { name: true } } } as const;
   let s = await db.subscription.findUnique({ where: { providerSubId }, include: inc });
   let stray = false;
@@ -176,7 +178,7 @@ export async function renewFromCharge(providerSubId: string, charge: { id: strin
   let paymentId: string;
   try {
     paymentId = await db.$transaction(async (tx) => {
-      const p = await tx.payment.create({ data: { userId: sub.userId, subscriptionId: sub.id, planId: sub.planId, amountMinor: charge.amount, currency: charge.currency, interval: sub.interval, provider: "razorpay", providerRef: charge.id, status: "succeeded", purpose: "renewal" } });
+      const p = await tx.payment.create({ data: { userId: sub.userId, subscriptionId: sub.id, planId: sub.planId, amountMinor: charge.amount, currency: charge.currency, interval: sub.interval, provider: "razorpay", providerRef: charge.id, status: "succeeded", purpose: "renewal", ...(sub.priceTier !== "legacy" ? { priceTier: sub.priceTier } : {}) } });
       if (!stray) await tx.subscription.update({ where: { id: sub.id }, data: { currentPeriodEnd: end, status: "active", autoRenew: true, cancelAtPeriodEnd: false } });
       return p.id;
     });
@@ -191,6 +193,8 @@ export async function renewFromCharge(providerSubId: string, charge: { id: strin
   }
   await adminEvent("subscription_renewed", `${s.user.name} renewed ${s.plan.name}`, formatMoney(charge.amount, charge.currency), "/admin/payments");
   await noticePaymentOk(paymentId); // 1118: never throws
+  const paid = await db.payment.findUnique({ where: { id: paymentId } });
+  if (paid) await onPaymentSucceeded(paid, { paymentKey: charge.paymentKey, now }); // 1147: ledger + month (never throws)
   return { paymentId, currentPeriodEnd: end, stray: false };
 }
 
@@ -204,7 +208,7 @@ export async function onRazorpaySubscription(ev: { event?: string; payload?: any
     await db.subscription.updateMany({ where: { providerSubId: sub.id, status: "active" }, data: { autoRenew: true, cancelAtPeriodEnd: false } });
   else if (kind === "subscription.charged") {
     const pay = ev.payload?.payment?.entity;
-    if (pay?.id) await renewFromCharge(sub.id, { id: pay.id, amount: Number(pay.amount), currency: String(pay.currency ?? "INR") }, new Date(), typeof sub.notes?.subscriptionId === "string" ? sub.notes.subscriptionId : null);
+    if (pay?.id) await renewFromCharge(sub.id, { id: pay.id, amount: Number(pay.amount), currency: String(pay.currency ?? "INR"), paymentKey: paymentKeyFromRazorpay(pay) }, new Date(), typeof sub.notes?.subscriptionId === "string" ? sub.notes.subscriptionId : null);
   } else if (["subscription.cancelled", "subscription.halted", "subscription.completed", "subscription.paused"].includes(kind)) {
     await db.setting.deleteMany({ where: { key: replaceKey(sub.id) } }); // a replacement that never got approved
     // 1118: tell the owner, but only when the bank or gateway stopped it. A mandate Outlly itself stopped (cancel,

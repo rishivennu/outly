@@ -13,10 +13,10 @@ function Badge({ path, top, name }: { path: string; top: string; name: string })
         <path d={path} />
       </svg>
       <span className="flex flex-col leading-tight" aria-hidden="true">
-        <span className="text-[10.5px] font-medium text-foreground/70">{top}</span>
+        <span className="text-xs font-medium text-foreground/70">{top}</span>
         <span className="text-[14px] font-semibold">{name}</span>
       </span>
-      <span className="ml-1 rounded-full bg-[hsl(var(--lime))] px-2 py-0.5 text-[11px] font-semibold text-[hsl(var(--lime-foreground))]" aria-hidden="true">
+      <span className="ml-1 rounded-full bg-[hsl(var(--lime))] px-2 py-0.5 text-xs font-semibold text-[hsl(var(--lime-foreground))]" aria-hidden="true">
         Coming soon
       </span>
     </li>
@@ -26,7 +26,7 @@ function Badge({ path, top, name }: { path: string; top: string; name: string })
 export function StoreBadges({ className }: { className?: string }) {
   return (
     <div className={className}>
-      <p className="ft-head mb-2 font-sans text-[11.5px] font-semibold text-foreground/70">Mobile apps in development</p>
+      <p className="ft-head mb-2 font-sans text-xs font-semibold text-foreground/70">Mobile apps in development</p>
       <ul className="flex flex-wrap gap-2" aria-label="Mobile apps, coming soon">
         <Badge path={PLAY} top="Android app on" name="Google Play" />
         <Badge path={APPLE} top="iPhone app on the" name="App Store" />

@@ -32,7 +32,7 @@ const ORIGIN: Record<Variant, string> = {
 function Arrow() {
   return (
     <svg
-      className="ml-[0.3em] size-[0.55em] shrink-0 translate-y-1 opacity-0 transition-all duration-300 group-hover/al:translate-y-0 group-hover/al:opacity-100 group-focus-visible/al:translate-y-0 group-focus-visible/al:opacity-100 motion-reduce:transition-none"
+      className="ml-[0.3em] size-[0.55em] shrink-0 translate-y-1 opacity-0 transition-[opacity,transform] duration-300 group-hover/al:translate-y-0 group-hover/al:opacity-100 group-focus-visible/al:translate-y-0 group-focus-visible/al:opacity-100 motion-reduce:transition-none"
       fill="none"
       viewBox="0 0 10 10"
       aria-hidden="true"

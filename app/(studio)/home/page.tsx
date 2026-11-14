@@ -18,6 +18,8 @@ import { listPlans } from "@/lib/billing/plans";
 import { visitorCurrency } from "@/lib/billing/visitor";
 import { localPrice } from "@/lib/billing/currency";
 import { formatMoney } from "@/lib/billing/money";
+import { getPolicy, quote, trialState } from "@/lib/subscriptions";
+import type { TrialView } from "@/components/billing/offer-core";
 import { homeRetention } from "@/lib/retention/home";
 import { NextSteps } from "@/components/home/NextSteps";
 import { GoalRing } from "@/components/home/GoalRing";
@@ -69,11 +71,25 @@ async function welcomeOffer(user: { id: string; createdAt: Date; actor: unknown 
   if (ent.planSlug !== "free" || (!isNew && published > 0)) return null;
   const paid = plans.filter((p) => p.priceMinor > 0 && p.state === "available");
   const pick = paid.find((p) => p.highlight) ?? paid[0];
-  if (!pick) return { freeLimit: ent.postLimit, freePeriod: ent.postPeriod, offer: null };
+  if (!pick) return { freeLimit: ent.postLimit, freePeriod: ent.postPeriod, offer: null, trial: null as TrialView | null };
   const visitor = await visitorCurrency((pick.currency as never) ?? "INR");
   const lp = localPrice(pick, visitor.currency);
   const offer: WelcomeOffer = { slug: pick.slug, name: pick.name, price: formatMoney(lp.priceMinor, lp.currency), interval: pick.interval === "year" ? "year" : "month", features: pick.features.slice(0, 3), postLimit: pick.postLimit, aiCaptions: pick.aiCaptions, postPeriod: pick.postPeriod };
-  return { freeLimit: ent.postLimit, freePeriod: ent.postPeriod, offer };
+  // 1147: with the first-time pricing policy on, greet with the price this person would actually pay, and the trial.
+  let trial: TrialView | null = null;
+  const policy = await getPolicy().catch(() => null);
+  if (policy?.enabled) {
+    const [q, t] = await Promise.all([
+      quote({ userId: user.id, planSlug: pick.slug, currency: lp.currency as never, interval: offer.interval === "year" ? "year" : "month" }).catch(() => null),
+      trialState(user.id).catch(() => null),
+    ]);
+    if (q && q.tier === "intro") {
+      offer.price = formatMoney(q.priceMinor, q.currency);
+      offer.note = `First-time subscriber offer. Renews at this price while you stay subscribed.`;
+    }
+    if (t && !t.trial && !t.reason) trial = { status: "none", planName: plans.find((p) => p.slug === t.planSlug)?.name ?? "Creator", days: t.trialDays, endsAt: null, block: null };
+  }
+  return { freeLimit: ent.postLimit, freePeriod: ent.postPeriod, offer, trial };
 }
 
 type HomeUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
@@ -125,7 +141,7 @@ async function pulseView(user: HomeUser, canSwitch: boolean) {
         {promo ? (
           <FoundingWelcome promo={promo} />
         ) : (
-          welcome && <WelcomeSubscribe firstName={firstName} offer={welcome.offer} freeLimit={welcome.freeLimit} freePeriod={welcome.freePeriod} foundingFull={founding?.kind === "full" ? founding.limit : null} />
+          welcome && <WelcomeSubscribe firstName={firstName} offer={welcome.offer} freeLimit={welcome.freeLimit} freePeriod={welcome.freePeriod} foundingFull={founding?.kind === "full" ? founding.limit : null} trial={welcome.trial} />
         )}
       </div>
       <PulseHome initial={data} firstName={firstName} canSwitch={canSwitch} nextPost={nextPost} />
@@ -236,7 +252,7 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
       {promo ? (
         <FoundingWelcome promo={promo} />
       ) : (
-        welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} freePeriod={welcome.freePeriod} foundingFull={founding?.kind === "full" ? founding.limit : null} />
+        welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} freePeriod={welcome.freePeriod} foundingFull={founding?.kind === "full" ? founding.limit : null} trial={welcome.trial} />
       )}
       {(pulse || recap || (saved && saved.posts > 0)) && (
         <div className="page-frame grid grid-cols-[minmax(0,1fr)] gap-4 pb-4">

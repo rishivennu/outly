@@ -29,6 +29,9 @@ import { GuaranteeCard, type GuaranteeView } from "./GuaranteeCard";
 import { GUARANTEE_LINE } from "@/lib/billing/guarantee-core";
 import { AutoRenewToggle, CancelReasons, PriceSurvey, UsageExtras, type CancelWhy } from "./PlanExtras";
 import { SavedCardsSection } from "./SavedCards";
+import { BudgetMeter, CheckoutSummaryView, OfferGate, ReviewForm, TrialCard } from "./OfferCards";
+import { checkoutSummary, offerLine, type BudgetView, type QuoteView, type TrialView } from "./offer-core";
+import { track } from "@/lib/analytics/track";
 
 export type ReturnNotice = { tone: "ok" | "info" | "error"; text: string };
 type Current = { planSlug: string; planName: string; priceMinor: number; currency: string; interval: string; periodEnd: string; cancelAtPeriodEnd: boolean; pausedUntil?: string | null; provider?: string; autoRenew?: boolean } | null;
@@ -50,13 +53,15 @@ function loadRazorpay() {
 }
 
 /** 1122: `offer` is a claimed promo offer's id when the price shown is the offer price (checked again at checkout). */
-type PricedPlan = PublicPlan & { approx: string | null; year: { priceMinor: number; currency: string; approx: string | null; save: number; was?: number | null; offer?: string; offerLabel?: string } | null; was?: number | null; offer?: string; offerLabel?: string };
+type PricedPlan = PublicPlan & { approx: string | null; year: { priceMinor: number; currency: string; approx: string | null; save: number; was?: number | null; offer?: string; offerLabel?: string; quote?: QuoteView } | null; was?: number | null; offer?: string; offerLabel?: string; quote?: QuoteView };
+/** 1147: present only while the subscription policy is on; with it off Billing behaves exactly as before. */
+export type OfferView = { graceDays: number; gate: "needs_verification" | "risk_denied" | null; flagId: string | null; trial: TrialView | null; budget: BudgetView | null; review: boolean };
 /** limit 0 = unlimited. 1098: the tiles come from `meters`; this keeps the few facts the plan card states. */
 type Usage = { used: number; limit: number; seats: number; aiCaptions: boolean; period?: "week" | "month"; maxUploadMb?: number; replies?: { limit: number; used: number }; captions?: { limit: number; used: number; burn: boolean }; storage?: StorageMeterData };
 type ExtraAccess = { planName: string; source: "admin" | "referral"; endsAt: string } | null;
 
 
-export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: string } | null; email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; charged?: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; status: BillingStatus; nextCharge: string | null; meters: MeterView[]; history: HistoryRow[]; ended?: EndedSub | null; beta?: BetaOffer | null; founding?: FoundingMine; foundingStatus?: string | null; badges?: Badges; guarantee?: GuaranteeView }) {
+export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: string } | null; email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; charged?: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; status: BillingStatus; nextCharge: string | null; meters: MeterView[]; history: HistoryRow[]; ended?: EndedSub | null; beta?: BetaOffer | null; founding?: FoundingMine; foundingStatus?: string | null; badges?: Badges; guarantee?: GuaranteeView; offer?: OfferView | null }) {
   const { plans, current } = props;
   const router = useRouter();
   const toast = useToast();
@@ -68,6 +73,8 @@ export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: st
   // 1118: opt-in, off by default. Razorpay still asks for its own consent before it tokenises a card.
   const [saveCard, setSaveCard] = useState(false);
   const [why, setWhy] = useState<CancelWhy>({ detail: "", interview: false });
+  // 1147: with a server quote, the exact amount, tier and renewal price are confirmed before any payment window opens.
+  const [summary, setSummary] = useState<PricedPlan | null>(null);
   const [notice, setNotice] = useState(props.notice);
   // 1053: a checkout that came back gets a receipt slip built from our payment row; it replaces the text notice.
   const [receipt, setReceipt] = useState<Receipt | null>(props.receipt ?? null);
@@ -109,11 +116,14 @@ export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: st
     if (props.notice || props.receipt) window.history.replaceState(null, "", "/billing"); // a refresh shouldn't replay the notice
   }, [props.focusPlan, props.notice, props.receipt]);
 
-  async function choose(p: PricedPlan) {
+  async function choose(p: PricedPlan, confirmed = false) {
     const y = cycle === "year" && p.year ? p.year : null;
     if (!online) return toast("You're offline. Reconnect to change plans.", "error");
+    if (!confirmed && (y ? y.quote : p.quote)) return setSummary(p);
+    setSummary(null);
     setBusy(p.slug);
     const offer = (y ? y.offer : p.offer) || undefined; // 1122: the server re-checks it and prices it itself
+    track("checkout_started", { plan: p.slug, cycle: y ? "year" : "month" });
     await pay(() => api<any>("/api/billing/checkout", { method: "POST", json: { plan: p.slug, currency: y ? y.currency : p.currency, cycle: y ? "year" : "month", ...(offer ? { campaign: offer } : {}) } }));
   }
 
@@ -235,6 +245,14 @@ export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: st
         </div>
       )}
 
+      {props.offer && <OfferGate reason={props.offer.gate} flagId={props.offer.flagId} />}
+      {props.offer?.review && !props.offer.gate && (
+        <div className="admin-page-in mt-6 max-w-3xl rounded-2xl bg-accent/10 p-4 text-sm">
+          <p className="font-medium">Ask for a review of your offer or trial</p>
+          <ReviewForm flagId={props.offer.flagId} open />
+        </div>
+      )}
+
       <div className="mt-8 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Panel id="cur" title="Current plan" action={<StatusPill s={s} withDate={false} />}>
           <div className="mt-4 flex items-center gap-4">
@@ -346,8 +364,11 @@ export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: st
         </Panel>
       </div>
 
+      {props.offer && <TrialCard trial={props.offer.trial} onSubscribe={() => toPlans()} />}
+
       <Panel id="use-h" title="Plan usage & limits" className="mt-4" action={<span className="text-[12.5px] text-muted-foreground">Resets with your plan's period</span>}>
         <UsageGrid meters={props.meters} />
+        {props.offer && <BudgetMeter budget={props.offer.budget} />}
         {(!!props.usage.maxUploadMb || (props.usage.captions && !props.usage.captions.burn && props.usage.aiCaptions)) && (
           <p className="mt-3 text-[12.5px] text-muted-foreground">
             {[props.usage.maxUploadMb ? `Uploads up to ${props.usage.maxUploadMb} MB each` : null, props.usage.captions && !props.usage.captions.burn && props.usage.aiCaptions ? "Burned-in captions come with paid plans" : null].filter(Boolean).join(" · ")}
@@ -383,7 +404,7 @@ export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: st
                 <article className={cn("admin-card card-glass flex h-full flex-col rounded-[28px] bg-card p-6 hairline", p.highlight && "border-2 border-lime", focus && "ring-4 ring-lime/40", "hover:-translate-y-1")}>
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="text-lg font-semibold">{p.name}</h3>
-                    {mine ? <span className="rounded-full bg-lime/20 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-lime-ink">Your plan</span> : p.highlight && <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider">Popular</span>}
+                    {mine ? <span className="rounded-full bg-lime/20 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-lime-ink">Your plan</span> : p.highlight && <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider">Popular</span>}
                   </div>
                   {(y ? y.was : p.was) ? (
                     <p className="mt-4 flex flex-wrap items-baseline gap-x-2">
@@ -395,6 +416,14 @@ export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: st
                     <p className="mt-4 text-[1.7rem] font-semibold tracking-tight tabular">{y ? `${formatMoney(y.priceMinor, y.currency)}/yr` : priceLabel(p)}</p>
                   )}
                   {y && y.save > 0 && <p className="text-[12.5px] font-medium text-lime-ink">Billed yearly, save {y.save}%</p>}
+                  {!mine && p.priceMinor > 0 && props.offer && (() => {
+                    const line = offerLine(y ? y.quote : p.quote, props.offer.graceDays);
+                    return line ? (
+                      <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
+                        <span className="font-semibold text-foreground">{line.badge}.</span> {line.text}
+                      </p>
+                    ) : null;
+                  })()}
                   {(y ? y.approx : p.approx) && <p className="text-[12.5px] text-muted-foreground">{y ? y.approx : p.approx} · billed in {y ? y.currency : p.currency}</p>}
                   <p className="mt-1 text-sm text-muted-foreground">{p.note}</p>
                   <div className="mt-5 flex-1 text-sm">
@@ -422,7 +451,7 @@ export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: st
                     ) : (
                       <Button variant={p.highlight || focus ? "lime" : "primary"} className="w-full" onClick={() => choose(p)} disabled={!!busy}>
                         {busy === p.slug && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-                        {busy === p.slug ? "Opening checkout" : otherCycle ? `Switch to ${y ? "yearly" : "monthly"}` : current ? `Switch to ${p.name}${y ? " yearly" : ""}` : `Upgrade to ${p.name}${y ? " yearly" : ""}`}
+                        {busy === p.slug ? "Opening checkout…" : otherCycle ? `Switch to ${y ? "yearly" : "monthly"}` : current ? `Switch to ${p.name}${y ? " yearly" : ""}` : `Upgrade to ${p.name}${y ? " yearly" : ""}`}
                       </Button>
                     )}
                     {/* 1058: the terms sit next to the button, not only in the footnote. */}
@@ -460,6 +489,25 @@ export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: st
 
       <PriceSurvey currency={props.currency} planSlug={currentSlug} />
 
+      {(() => {
+        const sy = summary && cycle === "year" && summary.year ? summary.year : null;
+        const q = summary ? (sy ? sy.quote : summary.quote) : undefined;
+        return (
+          <ConfirmDialog
+            open={!!summary && !!q}
+            onOpenChange={(o) => { if (!o) setSummary(null); }}
+            title={summary ? `Confirm ${summary.name}${sy ? " yearly" : ""}` : "Confirm your plan"}
+            body="Check the amount before you pay. The payment window opens next."
+            confirmLabel="Continue to payment"
+            cancelLabel="Go back"
+            tone="primary"
+            busy={!!busy}
+            onConfirm={() => summary && void choose(summary, true)}
+            extra={summary && q ? <CheckoutSummaryView s={checkoutSummary(q, summary.name, props.offer?.graceDays ?? 7)} planName={summary.name} /> : null}
+          />
+        );
+      })()}
+
       <ConfirmDialog
         open={confirm}
         onOpenChange={setConfirm}
@@ -478,7 +526,7 @@ export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: st
               <p className="mt-1 text-[13px] text-muted-foreground">Pause and keep your unused paid days. They start again when the pause ends.</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {[1, 2, 3].map((m) => (
-                  <Button key={m} variant="subtle" className="flex-1" onClick={() => cancelOrResume("pause", m)} disabled={!!busy}>
+                  <Button key={m} variant="subtle" className="flex-[1_1_auto]" onClick={() => cancelOrResume("pause", m)} disabled={!!busy}>
                     {busy === `pause-${m}` && <Loader2 className="h-4 w-4 animate-spin" />}Pause {m} month{m === 1 ? "" : "s"}
                   </Button>
                 ))}

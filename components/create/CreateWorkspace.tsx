@@ -10,6 +10,7 @@ import { PostKindSwitch } from "./PostKindSwitch";
 import { useToast } from "@/components/shared/Toast";
 import { defaultSchedule } from "@/components/shared/DateTimePicker";
 import { api, ApiError, streamApi } from "@/lib/client/api";
+import { track } from "@/lib/analytics/track";
 import { uploadVideo } from "@/lib/client/upload";
 import { takeHandoff, takeSharedFile, validateVideoFile } from "@/lib/client/handoff";
 import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
@@ -556,6 +557,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
       const id = await save({ force: true, strict: true });
       if (!id) throw new ApiError(400, "Add a video first.");
       const r = await api<{ post: PostView }>(`/api/posts/${id}/launch`, { method: "POST", json: { mode, scheduledAt: mode === "schedule" ? when.toISOString() : undefined, confirmed: true } });
+      track(mode === "schedule" ? "post_scheduled" : "post_published", { kind: "video" });
       if (deviceId.current) void removeDeviceDraft(deviceId.current); // it's out (or booked): no copy to keep
       if (mode === "now") {
         setLivePost(r.post);

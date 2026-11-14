@@ -456,9 +456,9 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
             <Pip size={40} mood={mood} />
             <div className="min-w-0 flex-1">
               <h2 id="pc-title" className="truncate text-[15px] font-bold leading-tight">{t.title}</h2>
-              <p id="pc-desc" className="pc-muted flex items-center gap-1.5 text-[12.5px]">
+              <p id="pc-desc" className="pc-muted flex items-center gap-1.5 text-[13px]">
                 {resolved ? (
-                  <span className="pc-badge-resolved pc-fade inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-semibold"><Check className="h-3 w-3" aria-hidden />{rt.status}</span>
+                  <span className="pc-badge-resolved pc-fade inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"><Check className="h-3 w-3" aria-hidden />{rt.status}</span>
                 ) : (
                   <><span className="pc-dot h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden /><span className="truncate">{t.status}</span></>
                 )}
@@ -521,7 +521,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                       <li key={n.id} className={cn("pc-card pi-card flex items-start gap-3 p-3", `pi-${n.level}`)}>
                         <div className="min-w-0 flex-1">
                           <p className="text-[14px] font-bold leading-snug">{n.title}</p>
-                          <p className="mt-0.5 text-[13.5px] leading-snug">{n.body}</p>
+                          <p className="mt-0.5 text-[14px] leading-snug">{n.body}</p>
                           <p className="pc-muted mt-1 text-[12px] leading-snug">{n.evidence}</p>
                           <button type="button" disabled={busy || !!resolved} onClick={() => send(n.ask)} className="pc-btn mt-2">{(pd ?? pdx).ask}</button>
                         </div>
@@ -605,11 +605,11 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                     <button type="button" onClick={() => setBrowse(false)} aria-label={`${cx.dismiss}: ${t.faqLink}`} className="pc-icon pc-icon-sm -me-1"><X className="h-4 w-4" aria-hidden /></button>
                   </div>
                   {!faqList ? (
-                    <p className="pc-muted mt-2 inline-flex items-center gap-2 text-[13.5px]"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />{t.thinking}</p>
+                    <p className="pc-muted mt-2 inline-flex items-center gap-2 text-[14px]"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />{t.thinking}</p>
                   ) : (
                     faqList.map((g) => (
                       <div key={g.category} className="mt-3">
-                        <h4 className="pc-muted mb-1.5 text-[12.5px] font-semibold">{g.category}</h4>
+                        <h4 className="pc-muted mb-1.5 text-[13px] font-semibold">{g.category}</h4>
                         <ul className="flex flex-col gap-1.5">
                           {g.items.map((q) => (
                             <li key={q.id}><button type="button" disabled={busy || !!resolved} onClick={() => { setBrowse(false); send(q.question, q.id); }} className="pc-chip w-full text-start">{q.question}</button></li>
@@ -632,7 +632,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
 
               {waitingEmail && !resolved && (
                 <form onSubmit={raise} className="pc-card pc-in mt-3 p-3" aria-describedby="pc-email-why">
-                  <label htmlFor="pc-email" className="text-[13.5px] font-medium">{t.email}</label>
+                  <label htmlFor="pc-email" className="text-[14px] font-medium">{t.email}</label>
                   <p id="pc-email-why" className="sr-only">{t.escalate}</p>
                   <div className="mt-2 flex gap-2">
                     <input id="pc-email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" aria-invalid={!!ticket.error} aria-describedby={ticket.error ? "pc-email-err" : undefined} className="pc-field h-11 min-w-0 flex-1 px-4 text-[15px]" />
@@ -651,8 +651,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
           <footer className="pc-foot px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
             {resolved ? (
               <div role="status" className="pc-resolved pc-in mb-1 p-3.5">
-                <p className="flex items-center gap-2 text-[14.5px] font-semibold"><span className="pc-resolved-mark grid h-6 w-6 shrink-0 place-items-center rounded-full" aria-hidden><Check className="h-3.5 w-3.5" /></span>{rt.doneTitle}</p>
-                <p className="pc-muted mt-1 text-[13.5px] leading-snug">{rt.doneBody(resolved.to)}</p>
+                <p className="flex items-center gap-2 text-[15px] font-semibold"><span className="pc-resolved-mark grid h-6 w-6 shrink-0 place-items-center rounded-full" aria-hidden><Check className="h-3.5 w-3.5" /></span>{rt.doneTitle}</p>
+                <p className="pc-muted mt-1 text-[14px] leading-snug">{rt.doneBody(resolved.to)}</p>
                 <button ref={reopenRef} type="button" onClick={reopenNow} disabled={closing.busy} className="pc-btn mt-2.5">
                   {closing.busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <RotateCw className="h-4 w-4" aria-hidden />}{closing.busy ? rt.reopening : rt.reopen}
                 </button>
@@ -660,7 +660,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
               </div>
             ) : (<>
             {!waitingEmail && fails > 0 && !ticket.ref && (
-              <button type="button" onClick={escalate} className="pc-link mb-1.5 min-h-11 text-[13.5px] font-medium">{t.human}</button>
+              <button type="button" onClick={escalate} className="pc-link mb-1.5 min-h-11 text-[14px] font-medium">{t.human}</button>
             )}
             <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="pc-composer flex items-end gap-2 p-1.5">
               <label htmlFor="pc-in" className="sr-only">{t.placeholder}</label>
@@ -684,10 +684,10 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
             </p>
             </>)}
             <div className="mt-0.5 flex items-center justify-between gap-2 ps-1">
-              <button type="button" onClick={openBrowse} aria-expanded={browse} className="pc-link inline-flex min-h-11 items-center text-[12.5px]">{t.faqLink}</button>
+              <button type="button" onClick={openBrowse} aria-expanded={browse} className="pc-link inline-flex min-h-11 items-center text-[13px]">{t.faqLink}</button>
               <label className="relative shrink-0">
                 <span className="sr-only">{t.lang}</span>
-                <select value={lang} onChange={(e) => { const l = e.target.value as Lang; setLang(l); writeLang(l); }} title={t.lang} className="pc-select h-11 max-w-[9.5rem] cursor-pointer appearance-none truncate rounded-full py-0 pe-8 ps-4 text-[12.5px] font-medium">
+                <select value={lang} onChange={(e) => { const l = e.target.value as Lang; setLang(l); writeLang(l); }} title={t.lang} className="pc-select h-11 max-w-[9.5rem] cursor-pointer appearance-none truncate rounded-full py-0 pe-8 ps-4 text-[13px] font-medium">
                   {LANGS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
                 </select>
                 <ChevronDown className="pc-muted pointer-events-none absolute end-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2" aria-hidden />

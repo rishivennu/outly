@@ -35,6 +35,9 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
       { href: "/contact", label: "Contact" },
       { href: "/privacy", label: "Privacy" },
       { href: "/terms", label: "Terms" },
+      { href: "/security", label: "Security" },
+      { href: "/status", label: "Status" },
+      { href: "/changelog", label: "Changelog" },
     ],
   },
 ];
@@ -71,7 +74,7 @@ export function MarketingFooter() {
         <div className="relative grid gap-10 px-6 pb-8 pt-10 sm:px-10 sm:pt-14 md:grid-cols-[1.5fr_1fr_1fr] md:gap-8">
           <div>
             <OutlyLogo size={28} className="text-[20px]" />
-            <p className="ft-body mt-4 max-w-sm text-[15.5px] leading-relaxed text-foreground/75">
+            <p className="ft-body mt-4 max-w-sm text-base leading-relaxed text-foreground/75">
               Upload once. Publish to Reels, Shorts and X. See exactly what happened to each one.
             </p>
             <Link
@@ -91,10 +94,10 @@ export function MarketingFooter() {
               )}
             </Link>
             {!signedIn && (
-              <p className="ft-fine mt-3 text-[13.5px] text-foreground/65">
+              <p className="ft-fine mt-3 text-[14px] text-foreground/65">
                 Already have an account?{" "}
                 <Link href="/login" className="font-semibold text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground">
-                  Log in
+                  Sign in
                 </Link>
               </p>
             )}
@@ -104,7 +107,7 @@ export function MarketingFooter() {
           <div className="grid grid-cols-2 gap-8 md:contents">
             {COLUMNS.map((col) => (
               <nav key={col.title} aria-label={col.title}>
-                <h2 className="ft-head mb-4 font-sans text-[11.5px] font-semibold text-foreground/70">{col.title}</h2>
+                <h2 className="ft-head mb-4 font-sans text-xs font-semibold text-foreground/70">{col.title}</h2>
                 <ul className="flex flex-col">
                   {col.links.filter((l) => !(l.href.startsWith("/#") && hidden.has(l.href.slice(2)))).map((l) => (
                     <li key={l.href} data-sec={l.href.startsWith("/#") ? l.href.slice(2) : undefined}>
@@ -133,7 +136,7 @@ export function MarketingFooter() {
               </li>
             ))}
           </ul>
-          <a href="#main" className="ft-top inline-flex h-11 items-center gap-2 self-start rounded-full px-4 text-[13.5px] font-semibold text-foreground/80 ring-1 ring-foreground/15 transition-colors hover:bg-foreground hover:text-background sm:self-auto">
+          <a href="#main" className="ft-top inline-flex h-11 items-center gap-2 self-start rounded-full px-4 text-[14px] font-semibold text-foreground/80 ring-1 ring-foreground/15 transition-colors hover:bg-foreground hover:text-background sm:self-auto">
             Back to top <ArrowUp className="h-4 w-4" aria-hidden="true" />
           </a>
         </div>
@@ -143,7 +146,7 @@ export function MarketingFooter() {
           <FooterWordmark className="fw-svg" />
         </div>
 
-        <div className="ft-rule ft-fine relative flex flex-col gap-1.5 border-t border-foreground/10 px-6 pb-6 pt-4 text-[12.5px] text-foreground/70 sm:flex-row sm:items-center sm:justify-between sm:px-10">
+        <div className="ft-rule ft-fine relative flex flex-col gap-1.5 border-t border-foreground/10 px-6 pb-6 pt-4 text-[13px] text-foreground/70 sm:flex-row sm:items-center sm:justify-between sm:px-10">
           <p>&copy; {new Date().getFullYear()} Outlly. All rights reserved.{beta ? " In beta." : ""}</p>
           <p>Instagram, YouTube and X are trademarks of their owners. Outlly is not affiliated with them.</p>
         </div>

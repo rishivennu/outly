@@ -101,6 +101,7 @@ model User {
   surveyResponses SurveyResponse[]
   cancelFeedback  CancelFeedback[]
   campaignEvents  CampaignEvent[] // 1122
+  trial           Trial? // 1147
 
   @@index([lastSeenAt])
 }
@@ -413,6 +414,8 @@ model Subscription {
   providerSubId    String?   @unique // 1096: the gateway's subscription id while a mandate exists
   remindedFor      String? // 1096: last renewal reminder sent, "<periodEnd ms>:<days>"
   sample           Boolean   @default(false)
+  priceTier        String    @default("legacy") // 1147: intro | standard | legacy | founding (snapshotted at purchase)
+  policyVersion    String? // 1147: subs.policy version the price came from
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -440,6 +443,7 @@ model Payment {
   purpose        String   @default("plan") // 1096: plan | topup | renewal
   meta           String? // 1096: JSON, e.g. { pack, kind, units } for a top-up
   variant        String? // 1096: price-test variant this checkout was priced with
+  priceTier      String? // 1147: intro | standard | legacy | founding the amount was quoted at
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -721,6 +725,47 @@ model WaitlistEntry {
   invitedAt DateTime?
 
   @@index([invitedAt, createdAt])
+}
+
+/// 1142: one-off email campaigns. `id` is the campaign key (outlly_waitlist_update_announcement_2026), so each
+/// campaign exists once. `cutoff` is fixed the first time the row is created and never moves: only waitlist members
+/// who joined before it are eligible, so people who join afterwards never get the historical email.
+model EmailCampaign {
+  id         String                   @id
+  subject    String
+  cutoff     DateTime
+  createdAt  DateTime                 @default(now())
+  launchedAt DateTime?
+  launchedBy String?
+  /// Every eligible address has its recipient row (set after the launch snapshot finishes; a crashed launch is refilled by the sweep).
+  snapshotAt DateTime?
+  doneAt     DateTime?
+  recipients EmailCampaignRecipient[]
+}
+
+/// One row per address per campaign (unique), written once at launch. The row, not the EmailLog, is the record of
+/// whether that person got it: pending -> sending -> accepted (Resend took it) -> delivered | bounced | complained,
+/// or failed / skipped (unsubscribed). A row that is not pending is never sent again.
+model EmailCampaignRecipient {
+  id          String        @id @default(cuid())
+  campaignId  String
+  email       String // lower-case, trimmed
+  waitlistId  String?
+  status      String        @default("pending") // pending | sending | accepted | delivered | bounced | complained | failed | skipped | mocked
+  attempts    Int           @default(0)
+  nextAt      DateTime      @default(now())
+  providerId  String?
+  emailLogId  String?
+  error       String?
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  campaign    EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, email])
+  @@index([campaignId, status, nextAt])
+  @@index([providerId])
 }
 
 /// In-app alerts (reconnect, failed post, goal nudge). `key` dedupes, so a sweep can run every minute safely.
@@ -1273,4 +1318,95 @@ model AccountSyncState {
   updatedAt     DateTime  @updatedAt
 
   account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+/// 1147: one row per hashed identity key (email | phone | device | payment). No FK on purpose: survives account deletion as a one-way hash.
+model OfferLedger {
+  id            String    @id @default(cuid())
+  kind          String    // email | phone | device | payment
+  keyHash       String
+  trialUsedAt   DateTime?
+  firstPaidAt   DateTime?
+  lastPaidUntil DateTime?
+  userId        String?   // current owner; null after account deletion (no FK on purpose, survives deletion)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([kind, keyHash])
+  @@index([userId])
+}
+
+/// 1147: the once-per-person 7-day trial (Creator features, no card).
+model Trial {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  planId      String
+  startedAt   DateTime  @default(now())
+  endsAt      DateTime
+  status      String    @default("active") // active | converted | expired | canceled
+  convertedAt DateTime?
+  canceledAt  DateTime?
+  expiredAt   DateTime?
+  remindedAt  String? // "2d" | "0d" last reminder sent
+  source      String    @default("billing")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, endsAt])
+}
+
+/// 1147: hashed anti-abuse signals (never a raw IP), pruned after 90 days.
+model SignupSignal {
+  id         String   @id @default(cuid())
+  userId     String?
+  event      String // signup | trial | checkout
+  ipHash     String
+  netHash    String
+  deviceHash String?
+  uaHash     String?
+  country    String?
+  createdAt  DateTime @default(now())
+
+  @@index([ipHash])
+  @@index([netHash, createdAt])
+  @@index([deviceHash])
+  @@index([userId])
+}
+
+/// 1147: every offer/trial risk decision, reviewable by admins.
+model RiskFlag {
+  id             String    @id @default(cuid())
+  userId         String?
+  score          Int
+  level          String // low | medium | high
+  action         String // none | verify | deny_offer
+  reasons        String    @default("[]") // JSON [{ code, weight, detail }]
+  relatedUserIds String    @default("[]")
+  status         String    @default("open") // open | verified | cleared | confirmed
+  context        String    @default("trial") // trial | checkout | signup
+  ticketId       String?
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  note           String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+/// 1147: per-subscriber monthly unit economics (INR paise) and the cost budget that keeps margin >= target.
+model SubscriberMonth {
+  id            String   @id @default(cuid())
+  userId        String
+  month         String // "2026-11" (UTC)
+  tier          String   @default("")
+  revenueMinor  Int      @default(0) // net of GST, INR paise (other currencies at the policy FX)
+  feeMinor      Int      @default(0)
+  costMinor     Int      @default(0)
+  budgetMinor   Int      @default(0)
+  costBreakdown String   @default("{}") // JSON { ai, transcription, x, storage, egress, fixed }
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, month])
+  @@index([month])
 }

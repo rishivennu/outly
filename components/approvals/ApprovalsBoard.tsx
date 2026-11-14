@@ -35,8 +35,8 @@ const EMPTY: Record<Lane, string> = {
 const LANES: { k: Lane; title: string; blurb: string; icon: typeof Check; tone: string }[] = [
   { k: "needs", title: "Needs a reviewer", blurb: "Approval is on, but nobody has the link yet (or it expired).", icon: ShieldQuestion, tone: "text-muted-foreground" },
   { k: "waiting", title: "Waiting on review", blurb: "A teammate has the link. It works for 7 days.", icon: Clock, tone: "text-[hsl(var(--youtube))]" },
-  { k: "changes", title: "Changes requested", blurb: "Read the note, fix it, then send a fresh link.", icon: MessageSquareWarning, tone: "text-warning" },
-  { k: "approved", title: "Approved", blurb: "Cleared to go out on schedule.", icon: Check, tone: "text-success" },
+  { k: "changes", title: "Changes requested", blurb: "Read the note, fix it, then send a fresh link.", icon: MessageSquareWarning, tone: "text-warning-ink" },
+  { k: "approved", title: "Approved", blurb: "Cleared to go out on schedule.", icon: Check, tone: "text-success-ink" },
 ];
 
 export function ApprovalsBoard({ initial }: { initial: PostView[] }) {
@@ -131,6 +131,7 @@ export function ApprovalsBoard({ initial }: { initial: PostView[] }) {
           setOpen(np);
         }}
         onRemove={(id) => setPosts((ps) => ps.filter((x) => x.id !== id))}
+        onRestore={(p) => setPosts((ps) => (ps.some((x) => x.id === p.id) ? ps : [p, ...ps]))}
         onDuplicate={(np) => {
           setPosts((ps) => [np, ...ps]);
           setOpen(np);

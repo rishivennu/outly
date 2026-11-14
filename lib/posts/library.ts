@@ -28,14 +28,25 @@ export type LibraryStatus = (typeof LIBRARY_STATUSES)[number];
 export const isLibraryStatus = (v: unknown): v is LibraryStatus => typeof v === "string" && (LIBRARY_STATUSES as readonly string[]).includes(v);
 const statusWhere = (s?: LibraryStatus | null) => (!s ? {} : s === "failed" ? { status: { in: ["failed", "partial"] } } : { status: s });
 
+// Case-insensitive search: Postgres needs `mode`, SQLite's LIKE already ignores ASCII case (and rejects `mode`). Same as lib/site.ts.
+const ci = (process.env.DATABASE_URL ?? "").startsWith("postgres") ? { mode: "insensitive" as const } : {};
+/** 1148: the library's search box, when not every post is loaded yet: title, caption, hook, file name or tags. */
+export const LIBRARY_Q_MAX = 100;
+const searchWhere = (q?: string | null) => {
+  const s = q?.trim().slice(0, LIBRARY_Q_MAX);
+  if (!s) return {};
+  const c = { contains: s, ...ci };
+  return { AND: [{ OR: [{ title: c }, { hook: c }, { story: c }, { media: { originalFilename: c } }, { targets: { some: { OR: [{ title: c }, { caption: c }, { description: c }, { hashtags: c }] } } }] }] };
+};
+
 /** `filter` is postFilter(user).where (the active profile); the page and API compute it, tests pass {}. */
 type Filter = Awaited<ReturnType<typeof postFilter>>["where"];
 const filterFor = async (user: U, filter?: Filter) => filter ?? (await postFilter(user)).where;
 
-export async function libraryPage(user: U, cursor: string | null = null, take = LIBRARY_PAGE, filter?: Filter, status?: LibraryStatus | null): Promise<LibraryPage> {
+export async function libraryPage(user: U, cursor: string | null = null, take = LIBRARY_PAGE, filter?: Filter, status?: LibraryStatus | null, q?: string | null): Promise<LibraryPage> {
   const n = Math.max(1, Math.min(LIBRARY_PAGE, Math.floor(take) || LIBRARY_PAGE));
   // A tab pages through its own posts, so "Scheduled" never shows an empty grid while the count says 5.
-  const where = { ...(await filterFor(user, filter)), ...statusWhere(status), userId: user.id };
+  const where = { ...(await filterFor(user, filter)), ...statusWhere(status), ...searchWhere(q), userId: user.id };
   // A cursor from another workspace (or a deleted post) simply restarts nothing: it must belong to this user.
   const from = cursor ? await db.post.findFirst({ where: { id: cursor, userId: user.id }, select: { id: true } }) : null;
   if (cursor && !from) return { posts: [], views: {}, nextCursor: null };

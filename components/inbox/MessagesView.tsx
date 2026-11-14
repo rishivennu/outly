@@ -244,7 +244,7 @@ export function MessagesView({ initial, tabs, query, refreshTick, refreshQuiet, 
               </ul>
             )}
           </div>
-          <footer className="hidden items-center gap-3 border-t border-border px-4 py-2 text-[11.5px] text-muted-foreground lg:flex">
+          <footer className="hidden items-center gap-3 border-t border-border px-4 py-2 text-xs text-muted-foreground lg:flex">
             <span>
               <Kbd>J</Kbd>
               <Kbd>K</Kbd> move
@@ -305,7 +305,7 @@ function MessageProblems({ problems }: { problems: Problem[] }) {
                 {p.detail && (
                   <details className="mt-1">
                     <summary className="cursor-pointer py-1 text-xs text-muted-foreground">What {PLATFORM_META[p.platform].name} said</summary>
-                    <pre className="mt-1 whitespace-pre-wrap break-all text-[11px] text-muted-foreground">{p.detail}</pre>
+                    <pre className="mt-1 whitespace-pre-wrap break-all text-xs text-muted-foreground">{p.detail}</pre>
                   </details>
                 )}
               </li>
@@ -450,19 +450,19 @@ function ThreadPane({
         </button>
         <ThreadAvatar t={thread} size={38} />
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[14.5px] font-semibold">{thread.participantName}</h2>
+          <h2 className="truncate text-[15px] font-semibold">{thread.participantName}</h2>
           <p className="truncate text-[12px] text-muted-foreground">
             {thread.participantHandle ? `${thread.participantHandle} · ` : ""}
             {name} · to {thread.accountName}
           </p>
         </div>
         {!locked ? (
-          <span className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-lime/20 px-3 text-[12.5px] font-semibold text-lime-ink" title="Meta lets you reply here for 24 hours after their last message">
+          <span className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-lime/20 px-3 text-[13px] font-semibold text-lime-ink" title="Meta lets you reply here for 24 hours after their last message">
             <Clock className="h-3.5 w-3.5" aria-hidden="true" />
             <span suppressHydrationWarning>{hrs >= 1 ? `${Math.floor(hrs)} h left` : "Under 1 h left"}</span>
           </span>
         ) : block?.code === "WINDOW_CLOSED" ? (
-          <span className="inline-flex h-8 shrink-0 items-center rounded-full bg-secondary px-3 text-[12.5px] font-medium text-muted-foreground">Window closed</span>
+          <span className="inline-flex h-8 shrink-0 items-center rounded-full bg-secondary px-3 text-[13px] font-medium text-muted-foreground">Window closed</span>
         ) : null}
         <a href={appLink} target="_blank" rel="noopener noreferrer" aria-label={`Open in ${name}`} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-foreground hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring lg:flex lg:h-10 lg:w-auto lg:items-center lg:gap-1.5 lg:rounded-xl lg:px-3.5 lg:text-[13px] lg:font-medium lg:hairline">
           <span className="hidden lg:inline">Open in {name}</span> <ExternalLink className="h-4 w-4" aria-hidden="true" />
@@ -481,11 +481,11 @@ function ThreadPane({
           {(messages ?? []).map((m, i, all) => (
             <li key={m.id} className={cn("flex flex-wrap", m.direction === "out" ? "justify-end" : "justify-start")}>
               {(i === 0 || dayOf(all[i - 1].sentAt) !== dayOf(m.sentAt)) && (
-                <p className="mb-1 mt-2 w-full text-center text-[11.5px] font-medium text-muted-foreground first:mt-0" suppressHydrationWarning>
+                <p className="mb-1 mt-2 w-full text-center text-xs font-medium text-muted-foreground first:mt-0" suppressHydrationWarning>
                   {dayLabel(m.sentAt)}
                 </p>
               )}
-              <div className={cn("max-w-[80%] rounded-[20px] px-3.5 py-2 text-[14.5px] lg:max-w-[70%]", m.direction === "out" ? "bg-lime/25 text-foreground dark:bg-lime/20" : "bg-secondary text-foreground")}>
+              <div className={cn("max-w-[80%] rounded-[20px] px-3.5 py-2 text-[15px] lg:max-w-[70%]", m.direction === "out" ? "bg-lime/25 text-foreground dark:bg-lime/20" : "bg-secondary text-foreground")}>
                 {m.text && <p className="whitespace-pre-wrap break-words">{m.text}</p>}
                 {m.attachments.map((a, i) =>
                   a.url && /^https:\/\//i.test(a.url) ? (
@@ -498,7 +498,7 @@ function ThreadPane({
                     </p>
                   ),
                 )}
-                <p className="mt-0.5 text-right text-[10.5px] text-muted-foreground">
+                <p className="mt-0.5 text-right text-xs text-muted-foreground">
                   <span className="sr-only">{m.direction === "out" ? "You, " : `${thread.participantName}, `}</span>
                   {new Date(m.sentAt).toLocaleString(undefined, { hour: "numeric", minute: "2-digit", day: "numeric", month: "short" })}
                 </p>
@@ -507,9 +507,9 @@ function ThreadPane({
           ))}
           {pending.map((p) => (
             <li key={p.clientId} className="flex flex-col items-end">
-              <div className={cn("max-w-[80%] rounded-[20px] px-3.5 py-2 text-[14.5px]", p.state === "failed" ? "bg-destructive/10 text-foreground ring-1 ring-destructive/40" : "bg-lime/10 text-foreground opacity-80")}>
+              <div className={cn("max-w-[80%] rounded-[20px] px-3.5 py-2 text-[15px]", p.state === "failed" ? "bg-destructive/10 text-foreground ring-1 ring-destructive/40" : "bg-lime/10 text-foreground opacity-80")}>
                 <p className="whitespace-pre-wrap break-words">{p.text}</p>
-                <p className="mt-0.5 flex items-center justify-end gap-1 text-[10.5px] text-muted-foreground">
+                <p className="mt-0.5 flex items-center justify-end gap-1 text-xs text-muted-foreground">
                   {p.state === "sending" ? (
                     <>
                       <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> Sending…
@@ -580,7 +580,7 @@ function ThreadPane({
         ) : null}
         {ideas && (
           <div className="mb-2" role="group" aria-label="Suggested replies">
-            <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               <Sparkles className="h-3 w-3" aria-hidden="true" /> Tap one, then make it yours
             </p>
             <ul className="flex flex-col gap-1.5">
@@ -595,7 +595,7 @@ function ThreadPane({
                     aria-pressed={text === s.text}
                     className="w-full rounded-2xl bg-card px-3.5 py-2.5 text-left text-sm transition hairline hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   >
-                    <span className="mr-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-lime-ink dark:text-lime">{s.label}</span>
+                    <span className="mr-2 text-xs font-semibold uppercase tracking-[0.1em] text-lime-ink dark:text-lime">{s.label}</span>
                     {s.text}
                   </button>
                 </li>
@@ -624,14 +624,14 @@ function ThreadPane({
             aria-describedby={locked ? `dm-lock-${thread.id}` : undefined}
             placeholder={locked ? (readOnly ? "Editors can't reply" : block?.code === "WINDOW_CLOSED" ? "Reply window closed" : "Replies unavailable here") : `Message ${thread.participantName}…`}
             aria-label={`Message ${thread.participantName}`}
-            className="max-h-40 min-h-[44px] rounded-none border-0 bg-transparent px-1 py-2.5 text-[16px] shadow-none outline-none ring-0 [box-shadow:none] focus:bg-transparent lg:text-[14.5px]"
+            className="max-h-40 min-h-[44px] rounded-none border-0 bg-transparent px-1 py-2.5 text-[16px] shadow-none outline-none ring-0 [box-shadow:none] focus:bg-transparent lg:text-[15px]"
           />
           <Button type="submit" variant="lime" size="icon" disabled={locked || busy || !text.trim()} aria-label={busy ? "Sending" : "Send message"} className="h-11 w-11 shrink-0 rounded-[13px]">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Send className="h-4 w-4" aria-hidden="true" />}
           </Button>
         </form>
         {!locked && (
-          <p className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[11.5px] text-muted-foreground">
+          <p className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-muted-foreground">
             <span className="hidden lg:inline">
               <Kbd>Enter</Kbd> send
             </span>

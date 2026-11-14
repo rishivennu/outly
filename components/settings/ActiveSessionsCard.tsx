@@ -149,9 +149,9 @@ export function ActiveSessionsCard() {
                     <div className="min-w-0 flex-1">
                       <p className="flex flex-wrap items-center gap-2 text-[14px] font-medium">
                         {s.label}
-                        {s.current && <span className="rounded-full bg-lime/15 px-2 py-0.5 text-[11px] font-semibold text-lime-ink">This device</span>}
+                        {s.current && <span className="rounded-full bg-lime/15 px-2 py-0.5 text-xs font-semibold text-lime-ink">This device</span>}
                       </p>
-                      <p className="text-[12.5px] text-muted-foreground">
+                      <p className="text-[13px] text-muted-foreground">
                         {s.place ? <>Around {s.place} (approximate) · </> : null}
                         {s.current ? "Active now" : lastActive(s.lastSeenAt)}
                         {!s.legacy && <> · Signed in {since(s.createdAt)}</>}
@@ -193,7 +193,7 @@ export function ActiveSessionsCard() {
         <div className="mt-4" onKeyDown={(e) => { if (e.key === "Escape" && confirm) { e.stopPropagation(); cancelConfirm(); } }}>
           {confirm ? (
             <div role="group" aria-labelledby="as-confirm" className="flex flex-wrap items-center gap-2 rounded-2xl bg-secondary/40 p-3">
-              <p id="as-confirm" className="mr-auto text-[13.5px] font-medium">
+              <p id="as-confirm" className="mr-auto text-[14px] font-medium">
                 Sign out {others.length > 0 ? `${others.length} other ${others.length === 1 ? "session" : "sessions"}` : "every other device"}? This one stays signed in.
               </p>
               <Button ref={confirmBtn} variant="danger" size="sm" className="h-11" onClick={() => void signOutOthers()} disabled={busy !== null}>

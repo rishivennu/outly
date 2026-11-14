@@ -204,6 +204,12 @@ export async function deleteAccount(user: Pick<SessionUser, "id" | "actor">, con
           db.ticketMessage.updateMany({ where: { ticketId: { in: ticketIds }, author: "customer" }, data: { authorName: null } }),
         ]
       : []),
+    // 1147: anti-abuse signals and the trial go with the account; offer-ledger rows keep only their one-way hash and
+    // dates (no owner) so a deleted-and-recreated account cannot take the trial or first-time price again.
+    db.signupSignal.deleteMany({ where: { userId: me.id } }),
+    db.trial.deleteMany({ where: { userId: me.id } }),
+    db.offerLedger.updateMany({ where: { userId: me.id }, data: { userId: null } }),
+    db.riskFlag.updateMany({ where: { userId: me.id }, data: { userId: null } }),
     db.user.delete({ where: { id: me.id } }), // the schema sets the invoices' userId and paymentId to null
   ]);
   // Files last, and only as a head start: whatever doesn't finish in a few seconds, or fails, is retried

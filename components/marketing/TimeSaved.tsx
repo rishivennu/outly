@@ -143,8 +143,8 @@ export function TimeSaved() {
             </ul>
           </div>
 
-          <p className="mt-2 ps-[3.25rem] text-[11.5px] text-muted-foreground sm:ps-[4rem]" aria-hidden="true">Times under each day: when you're done posting.</p>
-          <p className="mt-4 text-[12.5px] leading-relaxed text-muted-foreground">
+          <p className="mt-2 ps-[3.25rem] text-xs text-muted-foreground sm:ps-[4rem]" aria-hidden="true">Times under each day: when you're done posting.</p>
+          <p className="mt-4 text-[13px] leading-relaxed text-muted-foreground">
             {latest > EVENING_MIN ? "Some nights run past midnight by hand. " : ""}
             By hand: re-exporting, captions, hashtags and title, then uploading, once per platform ({minutesLabel(r.manualWeek)} a week). With Outlly we count {OUTLLY_MIN_PER_VIDEO} minutes a video: one upload, then a read over the drafts ({minutesLabel(r.outllyWeek)}). An estimate from your numbers, not a promise.
           </p>

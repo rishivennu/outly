@@ -103,7 +103,7 @@ export function PaymentReceipt({ initial, onClose, onRetry }: { initial: Receipt
         <div key={`${r.state}-${animate}`} className={cn("rcpt-slip relative bg-[#fbfdf7] px-6 pb-5 pt-7 text-[#1b2119] shadow-[0_18px_40px_-18px_rgba(0,0,0,0.45)]", animate && "rcpt-print")}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5b6658]">Outlly receipt</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#5b6658]">Outlly receipt</p>
               <h2 id="rcpt-h" className="mt-1 text-[1.25rem] font-semibold leading-tight tracking-tight">{c.title}</h2>
             </div>
             <button type="button" onClick={onClose} className="-mr-2 -mt-2 grid h-11 w-11 shrink-0 place-items-center rounded-full text-[#5b6658] hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1b2119]" aria-label="Close receipt">
@@ -123,7 +123,7 @@ export function PaymentReceipt({ initial, onClose, onRetry }: { initial: Receipt
           <div className="mt-4 flex items-center gap-3">
             <span
               className={cn(
-                "rcpt-stamp grid h-14 w-14 shrink-0 place-items-center rounded-full border-[3px] text-[10px] font-black uppercase tracking-wider",
+                "rcpt-stamp grid h-14 w-14 shrink-0 place-items-center rounded-full border-[3px] text-xs font-black uppercase tracking-wider",
                 r.state === "paid" && "border-[#3f7a12] text-[#3f7a12]",
                 r.state === "pending" && "border-[#9a5b00] text-[#9a5b00]",
                 r.state === "failed" && "border-[#b42318] text-[#b42318]",

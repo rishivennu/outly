@@ -29,7 +29,7 @@ export function SwitchRow({ id, label, hint, on, onChange, disabled, locked, loc
       <div className="min-w-0">
         <p id={`${id}-l`} className="text-[15px] font-medium leading-snug">
           {label}
-          {locked && <span className="ml-2 inline-flex h-5 items-center rounded-full bg-secondary px-2 align-middle text-[11px] font-semibold text-muted-foreground">{lockedNote ?? "Always on"}</span>}
+          {locked && <span className="ml-2 inline-flex h-5 items-center rounded-full bg-secondary px-2 align-middle text-xs font-semibold text-muted-foreground">{lockedNote ?? "Always on"}</span>}
         </p>
         {hint && <p id={`${id}-d`} className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{hint}</p>}
       </div>

@@ -31,6 +31,7 @@ import { normalizeInstall } from "@/lib/pwa-core";
 import { PwaWelcome } from "@/components/shell/PwaWelcome";
 import { normalizeWelcome } from "@/lib/pwa-welcome";
 import { PromoSheet } from "@/components/promo/PromoSheet";
+import { PostHogIdentify } from "@/components/analytics/PostHogIdentify";
 
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -90,6 +91,7 @@ export default async function StudioLayout({ children }: { children: React.React
       {/* 1122: the promo offer, once per fresh app entry; it fetches its own offer, so this layout stays fast. */}
       {!user.actor && <PromoSheet />}
       <AvatarCursor />
+      <PostHogIdentify id={user.actor?.id ?? user.id} joinedAt={new Date(user.joinedAt).toISOString()} />
       {/* 1114: preloads every primary tab in the background; the server's clock lets pages judge their age. */}
       <WarmUp serverNow={Date.now()} />
       <InstallPrompt config={normalizeInstall(install)} />

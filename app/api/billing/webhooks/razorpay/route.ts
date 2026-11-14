@@ -5,6 +5,8 @@ import { getConfig } from "@/lib/settings";
 import { razorpay } from "@/lib/billing/providers";
 import { completePayment, failPayment, markExternalRefund } from "@/lib/billing/service";
 import { onRazorpaySubscription } from "@/lib/billing/autorenew";
+import { notePaymentKey } from "@/lib/subscriptions/lifecycle";
+import { paymentKeyFromRazorpay } from "@/lib/subscriptions/keys";
 import { adminEvent } from "@/lib/admin/route";
 import { formatMoney } from "@/lib/billing/money";
 import { rateLimit } from "@/lib/rate-limit";
@@ -55,6 +57,8 @@ export async function POST(req: NextRequest) {
   }
   try {
     if (p && ev.event === "order.paid") await completePayment(p.id, orderId);
+    // 1147: the card / UPI behind the payment joins the offer ledger as a one-way hash (never throws).
+    if (p && ev.event === "order.paid") await notePaymentKey(p.userId, paymentKeyFromRazorpay(ev?.payload?.payment?.entity));
     if (p && ev.event === "payment.failed") await failPayment(p.id, ev?.payload?.payment?.entity?.error_description ?? "Payment failed");
     if (p && ev.event === "refund.processed") {
       const pay = ev?.payload?.payment?.entity ?? {};

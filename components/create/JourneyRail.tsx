@@ -55,7 +55,7 @@ export function JourneyRail({ step, reachable, onGo, thumb, title, saved }: Prop
                 </span>
                 <span className="min-w-0">
                   <span className={cn("block font-create text-[15px] font-semibold tracking-[-0.01em]", active ? "text-foreground" : "text-muted-foreground")}>{s.label}</span>
-                  <span className="block text-[12.5px] text-muted-foreground">{done ? "Done" : s.hint}</span>
+                  <span className="block text-[13px] text-muted-foreground">{done ? "Done" : s.hint}</span>
                 </span>
               </button>
             </li>
@@ -91,7 +91,7 @@ export function JourneyBar({ step, reachable, onGo }: Pick<Props, "step" | "reac
           <li key={s.id} className="flex flex-1 flex-col gap-1.5">
             <button type="button" disabled={!reachable[s.id] || i === idx} onClick={() => onGo(s.id)} aria-current={i === idx ? "step" : undefined} className="flex min-h-[44px] flex-col justify-center gap-1.5 text-left">
               <span className={cn("h-1 w-full rounded-full", i < idx ? "bg-foreground" : i === idx ? "bg-lime" : "bg-secondary")} />
-              <span className={cn("font-create text-[12.5px] font-semibold tracking-[-0.005em]", i === idx ? "text-foreground" : "text-muted-foreground")}>
+              <span className={cn("font-create text-[13px] font-semibold tracking-[-0.005em]", i === idx ? "text-foreground" : "text-muted-foreground")}>
                 <span className="tabular">{s.n}</span> <span className={cn(i !== idx && "sr-only sm:not-sr-only")}>{s.label}</span>
               </span>
             </button>

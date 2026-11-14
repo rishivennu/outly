@@ -26,7 +26,7 @@ export function TimeSavedCard({ t }: { t: SavedTime }) {
           <p className="mt-1.5 text-sm text-muted-foreground">{t.posts} {t.posts === 1 ? "post" : "posts"} published</p>
         </div>
       </div>
-      <p className="mt-3 text-[12.5px] leading-relaxed text-muted-foreground">
+      <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
         Estimate: {TIME_DEFAULTS.byHand} min per platform by hand, {OUTLLY_MIN_PER_VIDEO} min per video in Outlly.
       </p>
     </section>

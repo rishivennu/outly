@@ -226,7 +226,7 @@ export function Assistant(p: Props) {
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <p className="eyebrow !text-foreground">Suggested</p>
                     {current && (
-                      <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-[11px] font-semibold text-accent">
+                      <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-semibold text-accent">
                         {current.angle} <span className="tabular text-accent/70">· {p.hooks.index + 1}/{p.hooks.more ? Math.max(3, result.hooks.length) : result.hooks.length}</span>
                       </span>
                     )}
@@ -278,7 +278,7 @@ export function Assistant(p: Props) {
                             disabled={p.hooks.loading}
                             aria-pressed={p.hooks.tone === t.id}
                             onClick={() => p.onTone(p.hooks.tone === t.id ? "default" : t.id)}
-                            className={cn("min-h-[36px] rounded-full px-3 text-[12.5px] font-medium transition disabled:opacity-50", p.hooks.tone === t.id ? "bg-foreground text-background" : "text-muted-foreground hairline hover:bg-secondary hover:text-foreground")}
+                            className={cn("min-h-[36px] rounded-full px-3 text-[13px] font-medium transition disabled:opacity-50", p.hooks.tone === t.id ? "bg-foreground text-background" : "text-muted-foreground hairline hover:bg-secondary hover:text-foreground")}
                           >
                             {t.label}
                           </button>

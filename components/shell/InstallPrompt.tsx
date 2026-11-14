@@ -252,7 +252,7 @@ export function InstallPrompt({ config: given }: { config: InstallConfig }) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/brand/app/icon-192.png" alt="" width={44} height={44} className="h-11 w-11 shrink-0 rounded-[12px] shadow-sm ring-1 ring-foreground/10" />
               <div className="min-w-0 flex-1 pt-0.5">
-                <p className="text-[14.5px] font-semibold leading-snug">Get a better Outlly experience</p>
+                <p className="text-[15px] font-semibold leading-snug">Get a better Outlly experience</p>
                 <p className="text-[13px] leading-snug text-muted-foreground">Add Outlly to your Home Screen. It opens full screen, like an app.</p>
               </div>
               <button type="button" onClick={later} aria-label="Not now" className="-mr-1 -mt-1 grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground transition-[background-color,transform] duration-200 hover:bg-foreground/[0.06] hover:text-foreground active:scale-90 motion-reduce:transition-none">
@@ -302,7 +302,7 @@ function IosGuide({ open, onClose }: { open: boolean; onClose: () => void }) {
                   <img src="/brand/app/icon-192.png" alt="" width={48} height={48} className="h-12 w-12 shrink-0 rounded-[13px] shadow-sm ring-1 ring-foreground/10" />
                   <div className="min-w-0 flex-1">
                     <Dialog.Title className="font-display text-[19px] font-bold leading-tight tracking-[-0.02em]">Add Outlly to your Home Screen</Dialog.Title>
-                    <Dialog.Description id="ios-install-d" className="mt-0.5 text-[13.5px] text-muted-foreground">Three taps. It opens full screen, like an app.</Dialog.Description>
+                    <Dialog.Description id="ios-install-d" className="mt-0.5 text-[14px] text-muted-foreground">Three taps. It opens full screen, like an app.</Dialog.Description>
                   </div>
                 </div>
                 <ol className="mt-5 grid gap-2">
@@ -310,7 +310,7 @@ function IosGuide({ open, onClose }: { open: boolean; onClose: () => void }) {
                     <li key={s.title} className="flex items-start gap-3 rounded-2xl bg-secondary/50 p-3 hairline">
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-background text-foreground shadow-sm hairline">{s.icon}</span>
                       <span className="min-w-0 flex-1">
-                        <span className="block text-[14.5px] font-semibold leading-snug">
+                        <span className="block text-[15px] font-semibold leading-snug">
                           <span className="text-muted-foreground">{i + 1}. </span>
                           {s.title}
                         </span>

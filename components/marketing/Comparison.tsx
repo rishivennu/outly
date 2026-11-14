@@ -70,14 +70,14 @@ function CompareGrid({ tools, groups }: { tools: Tool[]; groups: Flags }) {
             <span key={t.id} className="flex min-w-0 flex-col items-center gap-1.5 text-center" aria-hidden="true">
               <span className="lg:hidden"><AppIcon brand={t.id as Brand} size={26} /></span>
               <span className="hidden lg:block"><AppIcon brand={t.id as Brand} size={40} /></span>
-              <span className={cn("max-w-full truncate text-[11px] font-semibold leading-tight lg:text-[15px]", t.id === "outly" ? "text-foreground" : "text-foreground/75")}>{t.name}</span>
+              <span className={cn("max-w-full truncate text-xs font-semibold leading-tight lg:text-[15px]", t.id === "outly" ? "text-foreground" : "text-foreground/75")}>{t.name}</span>
               <span className="hidden text-[12px] leading-tight text-muted-foreground lg:block">{t.sub}</span>
             </span>
           ))}
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between gap-2 px-1 lg:hidden">
-        <p className="text-[12.5px] text-foreground/65">Tap a row for the reasons.</p>
+        <p className="text-[13px] text-foreground/65">Tap a row for the reasons.</p>
         <CmpExpandAll />
       </div>
       <p className="mt-3 hidden px-1 text-[13px] text-foreground/65 lg:block">Click any row to see the reasons behind each answer.</p>
@@ -118,7 +118,7 @@ function CompareGrid({ tools, groups }: { tools: Tool[]; groups: Flags }) {
                                 <CmpIcon value={cell.value} />
                               </span>
                               <span className="sr-only">{name}: </span>
-                              <span className={cn("hidden text-[13.5px] font-semibold lg:inline", MARK[cell.value].tone)}>{CELL_LABEL[cell.value]}</span>
+                              <span className={cn("hidden text-[14px] font-semibold lg:inline", MARK[cell.value].tone)}>{CELL_LABEL[cell.value]}</span>
                               <span className="sr-only lg:hidden">{CELL_LABEL[cell.value]}.</span>
                             </span>
                           ))}
@@ -131,7 +131,7 @@ function CompareGrid({ tools, groups }: { tools: Tool[]; groups: Flags }) {
                             <li key={id} className={cn("cmp-note rounded-[18px] p-4", id === "outly" && "cmp-note-us sm:col-span-2 lg:col-span-1")}>
                               <span className="flex items-center gap-2">
                                 <AppIcon brand={id as Brand} size={24} />
-                                <span className="font-display text-[14.5px] font-semibold">{name}</span>
+                                <span className="font-display text-[15px] font-semibold">{name}</span>
                               </span>
                               <span className="mt-3 flex items-center gap-1.5">
                                 <span className={cn("cmp-chip cmp-chip-sm", MARK[cell.value].chip)}>
@@ -139,7 +139,7 @@ function CompareGrid({ tools, groups }: { tools: Tool[]; groups: Flags }) {
                                 </span>
                                 <span className={cn("text-[14px] font-semibold", MARK[cell.value].tone)}>{CELL_LABEL[cell.value]}</span>
                               </span>
-                              {cell.note && <p className="mt-2 text-[13.5px] leading-relaxed text-foreground/75">{cell.note}</p>}
+                              {cell.note && <p className="mt-2 text-[14px] leading-relaxed text-foreground/75">{cell.note}</p>}
                             </li>
                           ))}
                         </ul>
@@ -153,7 +153,7 @@ function CompareGrid({ tools, groups }: { tools: Tool[]; groups: Flags }) {
         );
       })}
 
-      <ul className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2 px-1 text-[12.5px] text-foreground/70" aria-label="Legend">
+      <ul className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2 px-1 text-[13px] text-foreground/70" aria-label="Legend">
         {CELLS.map((k) => (
           <li key={k} className="inline-flex items-center gap-1.5">
             <span className={cn("cmp-chip cmp-chip-sm", MARK[k].chip)}>

@@ -179,7 +179,7 @@ export function VideoPreview({ state, all, onSelect, onClose, onClosed }: { stat
                         </a>
                       )}
 
-                      <h3 className="mt-5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      <h3 className="mt-5 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                         {thread.length === 1 ? "The comment" : `${thread.length} comments on this post`}
                       </h3>
                       <ul className="mt-2 space-y-1.5">
@@ -235,7 +235,7 @@ function ThreadItem({ c, selected, onPick }: { c: InboxComment; selected: boolea
       >
         <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-medium">
           {c.authorName}
-          {selected && <span className="rounded-full bg-lime/30 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-lime-ink dark:text-lime">Selected</span>}
+          {selected && <span className="rounded-full bg-lime/30 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] text-lime-ink dark:text-lime">Selected</span>}
           <span className="text-xs font-normal text-muted-foreground">{fmtWhen(c.createdAt)}</span>
         </span>
         <span className={cn("mt-1 block whitespace-pre-wrap text-sm [overflow-wrap:anywhere]", !selected && "line-clamp-3")}>{c.text}</span>

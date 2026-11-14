@@ -7,6 +7,7 @@ import { themeScript } from "@/lib/theme/script";
 import { THEME_COOKIE, themeColorFor } from "@/lib/theme/colors";
 import { StatusBarSync } from "@/components/shared/StatusBarSync";
 import { CookieBanner } from "@/components/shared/CookieConsent";
+import { PostHogProvider } from "@/components/analytics/PostHogProvider";
 import { DeviceHint } from "@/components/shared/DeviceHint";
 import { Connectivity, Ripples } from "@/components/shared/Connectivity";
 import { LazyChat } from "@/components/support/LazyChat";
@@ -134,6 +135,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {children}
           <LazyChat />
           <CookieBanner />
+          <PostHogProvider />
           <DeviceHint />
           <Connectivity />
           <Ripples />

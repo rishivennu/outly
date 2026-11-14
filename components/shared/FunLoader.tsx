@@ -39,7 +39,7 @@ export function FunLoader({ label = "Opening Outlly", lines = CHEERS, className 
           <span className="fl-shadow" />
         </div>
 
-        <p className="mt-7 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+        <p className="mt-7 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
         <p className="mt-2 h-8 overflow-hidden font-display text-[1.45rem] font-semibold tracking-tight" aria-live="polite">
           <span key={line} className="fl-line inline-block">{line}</span>
         </p>

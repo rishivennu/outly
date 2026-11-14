@@ -54,7 +54,7 @@ function Rail({ items }: { items: { icon: React.ElementType; label?: string; fil
       {items.map(({ icon: I, label, fill }, i) => (
         <span key={i} className="flex flex-col items-center gap-0.5 drop-shadow">
           <I className={cn("h-6 w-6", fill && "fill-current")} strokeWidth={1.8} />
-          {label && <span className="text-[10px] font-semibold">{label}</span>}
+          {label && <span className="text-xs font-semibold">{label}</span>}
         </span>
       ))}
     </div>
@@ -77,9 +77,9 @@ export function InstagramReel({ draft, src, poster, handle, avatar }: PreviewPro
         <div className="flex items-center gap-2" aria-hidden="true">
           <Avatar name={handle} src={avatar} className="h-7 w-7 ring-1 ring-white/40" />
           <span className="text-[13px] font-semibold">{handle}</span>
-          <span className="rounded-lg border border-white/60 px-2 py-0.5 text-[11px] font-semibold">Follow</span>
+          <span className="rounded-lg border border-white/60 px-2 py-0.5 text-xs font-semibold">Follow</span>
         </div>
-        <p className={cn("whitespace-pre-line text-[12.5px] leading-snug", !more && "line-clamp-2")} aria-hidden="true">
+        <p className={cn("whitespace-pre-line text-[13px] leading-snug", !more && "line-clamp-2")} aria-hidden="true">
           {caption ? <Rich text={caption} tagClass="text-white/95 font-medium" /> : <span className="text-white/60">Your caption shows here</span>}
         </p>
         {caption.length > 80 && (
@@ -87,7 +87,7 @@ export function InstagramReel({ draft, src, poster, handle, avatar }: PreviewPro
             {more ? "less" : "… more"}
           </button>
         )}
-        <div className="flex items-center gap-1.5 text-[11px] text-white/85" aria-hidden="true">
+        <div className="flex items-center gap-1.5 text-xs text-white/85" aria-hidden="true">
           <Music2 className="h-3 w-3" /> {handle} · Original audio
         </div>
       </div>
@@ -107,15 +107,15 @@ export function YouTubeShort({ draft, src, poster, handle, avatar }: PreviewProp
       </div>
       <Rail items={[{ icon: ThumbsUp, label: "8.9K", fill: true }, { icon: ThumbsDown, label: "Dislike", fill: true }, { icon: MessageCircle, label: "204", fill: true }, { icon: Share, label: "Share" }]} />
       <div className="absolute inset-x-0 bottom-0 space-y-2 p-3 pr-12">
-        <p className="line-clamp-2 text-[13.5px] font-semibold leading-snug" aria-hidden="true">
+        <p className="line-clamp-2 text-[14px] font-semibold leading-snug" aria-hidden="true">
           {draft.title || <span className="text-white/60">Your title shows here</span>}
         </p>
         <div className="flex items-center gap-2" aria-hidden="true">
           <Avatar name={handle} src={avatar} className="h-7 w-7" />
-          <span className="text-[12.5px] font-medium">@{handle.replace(/^@/, "").replace(/\s+/g, "").toLowerCase()}</span>
-          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-black">Subscribe</span>
+          <span className="text-[13px] font-medium">@{handle.replace(/^@/, "").replace(/\s+/g, "").toLowerCase()}</span>
+          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-black">Subscribe</span>
         </div>
-        {draft.hashtags && <p className="truncate text-[11px] text-white/80" aria-hidden="true">{draft.hashtags}</p>}
+        {draft.hashtags && <p className="truncate text-xs text-white/80" aria-hidden="true">{draft.hashtags}</p>}
       </div>
     </div>
   );
@@ -128,18 +128,18 @@ export function XPost({ draft, src, poster, handle, name, avatar }: PreviewProps
       <div className="flex gap-3">
         <Avatar name={name} src={avatar} className="h-10 w-10 shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1 text-[14.5px]" aria-hidden="true">
+          <p className="flex items-center gap-1 text-[15px]" aria-hidden="true">
             <span className="truncate font-bold text-white">{name}</span>
             <span className="truncate text-[#71767b]">@{handle.replace(/^@/, "")} · now</span>
             <MoreHorizontal className="ml-auto h-4 w-4 shrink-0 text-[#71767b]" />
           </p>
-          <p className="mt-0.5 whitespace-pre-line break-words text-[14.5px] leading-[1.35]" aria-hidden="true">
+          <p className="mt-0.5 whitespace-pre-line break-words text-[15px] leading-[1.35]" aria-hidden="true">
             {draft.caption ? <Rich text={draft.caption} tagClass="text-[#1d9bf0]" /> : <span className="text-[#71767b]">What&apos;s happening?</span>}
           </p>
           <div className="mt-3 aspect-[4/5] max-h-[340px] w-full overflow-hidden rounded-2xl border border-[#2f3336]">
             <Media src={src} poster={poster} />
           </div>
-          <div className="mt-3 flex justify-between pr-2 text-[12.5px] text-[#71767b]" aria-hidden="true">
+          <div className="mt-3 flex justify-between pr-2 text-[13px] text-[#71767b]" aria-hidden="true">
             <span className="flex items-center gap-1.5"><MessageCircle className="h-4 w-4" /> 48</span>
             <span className="flex items-center gap-1.5"><Repeat2 className="h-4 w-4" /> 212</span>
             <span className="flex items-center gap-1.5"><Heart className="h-4 w-4" /> 1.6K</span>

@@ -204,7 +204,7 @@ describe("motion from the brief", () => {
     const sv = read("components/settings/SettingsView.tsx");
     expect(sv.indexOf("<CreatorProfileCard />")).toBeLessThan(sv.indexOf("<ProfileForm />"));
     const card = read("components/profile/CreatorProfileCard.tsx");
-    for (const a of ["Edit Profile", "Change Cover", "Change Picture", "Edit Bio", "Manage Social Links", "View Connected Platforms"]) expect(card).toContain(a);
+    for (const a of ["Edit profile", "Change cover", "Change picture", "Edit bio", "Manage social links", "View connected platforms"]) expect(card).toContain(a);
     expect(card).toContain("Unavailable");
     expect(card).toContain("max-w-[560px]");
   });

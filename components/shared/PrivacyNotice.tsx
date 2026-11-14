@@ -161,7 +161,7 @@ export function PrivacyNotice() {
                   <span aria-hidden className="wn-glow" />
                   <div className="relative flex items-start gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="wn-eyebrow inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold uppercase tracking-[0.08em]">
+                      <p className="wn-eyebrow inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.08em]">
                         <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--lime))]" />
                         Your privacy · Updated {UPDATED}
                       </p>
@@ -173,7 +173,7 @@ export function PrivacyNotice() {
                       </button>
                     </Dialog.Close>
                   </div>
-                  <Dialog.Description className="relative mt-2 text-[14.5px] leading-relaxed text-muted-foreground">
+                  <Dialog.Description className="relative mt-2 text-[15px] leading-relaxed text-muted-foreground">
                     The short version, in about 30 seconds. Nothing here changes anything you have already set up.
                   </Dialog.Description>
                   <ul className="relative mt-4 grid gap-2 sm:grid-cols-2">
@@ -182,7 +182,7 @@ export function PrivacyNotice() {
                         <span aria-hidden className="wn-tick mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full">
                           <Icon className="h-3.5 w-3.5" strokeWidth={2.5} />
                         </span>
-                        <span className="min-w-0 text-[13.5px] leading-snug">
+                        <span className="min-w-0 text-[14px] leading-snug">
                           <strong className="block text-[14px] font-semibold">{title}</strong>
                           <span className="text-muted-foreground">{body}</span>
                         </span>

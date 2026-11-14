@@ -211,18 +211,18 @@ function DemoActivity({ p, s, beat, retry, moving, onRetry }: { p: Core; s: { st
       <div className="relative mt-3 grid grid-cols-2 gap-3">
         <div className="min-w-0">
           <p className="font-semibold leading-tight">Your video</p>
-          <p className="mt-1 truncate text-[11px] font-medium la-mute">desk-setup.mp4</p>
+          <p className="mt-1 truncate text-xs font-medium la-mute">desk-setup.mp4</p>
         </div>
         <div className="min-w-0">
           <p className="font-semibold leading-tight">Goes out as</p>
-          <p className="mt-1 truncate text-[11px] font-medium la-mute">{FORMAT[p]}</p>
+          <p className="mt-1 truncate text-xs font-medium la-mute">{FORMAT[p]}</p>
         </div>
       </div>
 
       <div className="la-box relative mt-4 flex min-h-[7.75rem] flex-col justify-center rounded-[1.25rem] p-4 pr-16">
         <p key={s.status} className="bx-word text-lg font-semibold leading-tight">{TITLE[s.status] ?? s.status}</p>
         <p className="mt-1 text-sm leading-snug la-mute">{s.note}</p>
-        <p className={cn("mt-2 text-[11.5px] font-semibold", bad ? "la-warn" : "la-accent")}>{accent}</p>
+        <p className={cn("mt-2 text-xs font-semibold", bad ? "la-warn" : "la-accent")}>{accent}</p>
         <span className="absolute right-3 top-3">
           {bad ? (
             <button type="button" onClick={onRetry} disabled={retry === "running"} className="la-round" aria-label={`Try again on ${NAME[p]}`}>

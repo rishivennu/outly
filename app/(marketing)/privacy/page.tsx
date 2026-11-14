@@ -69,7 +69,7 @@ export default function PrivacyPage() {
       <Shell>
         <PageHead
           title="Privacy"
-          updated="4 November 2026"
+          updated="14 November 2026"
           lead="This page describes what Outlly actually does with your data today, in plain language, including exactly what each social platform lets us do once you connect it. If anything here changes, the date above changes with it."
         />
 
@@ -167,6 +167,7 @@ export default function PrivacyPage() {
             <li><strong>YOUPI (UPI payments):</strong> a payment gateway we run on our own server. It confirms a UPI payment by matching it with our bank&rsquo;s payment alert, so it sees the amount, time, UPI reference and any payer name or UPI ID the alert shows.</li>
             <li><strong>Google (Gemini API):</strong> the AI features above.</li>
             <li><strong>Moonshot AI (Kimi API):</strong> a backup for the text AI features above (captions, hooks, titles, hashtags, clip highlights, reply suggestions, insights and Pip). It gets the same text Gemini would, only for the requests it answers.</li>
+            <li><strong>PostHog:</strong> product analytics, only if you allow analytics cookies (see <a href="#analytics">Product analytics</a>). Stored in the US.</li>
             <li><strong>The social platforms you connect:</strong> as described above.</li>
           </ul>
           <p>Each one only receives what it needs to do that job. Some are outside India, so your data may be processed in other countries under their safeguards.</p>
@@ -178,12 +179,42 @@ export default function PrivacyPage() {
             <li><strong>Connecting a platform:</strong> a short-lived, encrypted cookie that protects the sign-in round trip. It expires after 10 minutes.</li>
             <li><strong>Preferences:</strong> practice mode (<code>studio_sim</code>), theme, language and your cookie choice (<code>outly-consent</code>).</li>
             <li><strong>Referrals</strong> (<code>ol_ref</code>): if a friend invited you, so they can get their free month when you join a paid plan.</li>
+            <li><strong>Device id</strong> (<code>oly_did</code>): a random number this browser keeps for 2 years, also copied to its local storage. It is strictly necessary for fraud prevention: it lets us offer the free trial and the first-time price once per person. It is not used for advertising or tracking across sites.</li>
+            <li><strong>Analytics</strong> (only if you allow it): PostHog keeps a random visitor id in a cookie and in local storage (names starting <code>ph_</code>), so visits from the same browser count once.</li>
             <li><strong>Pip chat:</strong> this tab keeps a copy of the open chat so it survives a reload, and clears it when the tab closes. A signed-in chat is also stored on our side, as described above.</li>
           </ul>
           <p>
-            There is no advertising or cross-site tracking. The cookie banner lets you allow or refuse analytics and marketing cookies; today
-            we do not run any, and if we add them they will only load after you allow them.
+            There is no advertising or cross-site tracking. The cookie banner lets you allow or refuse analytics and marketing cookies.
+            Analytics (PostHog, below) only loads after you allow it. We do not run any marketing cookies today; if we add them, they will
+            only load after you allow them.
           </p>
+
+          <h2 id="analytics">Product analytics (PostHog)</h2>
+          <p>
+            If you allow analytics cookies, we use PostHog, Inc. to see how Outlly is used, so we can fix what&rsquo;s confusing. Nothing
+            loads until you say yes, and it stays off if your browser sends Do Not Track.
+          </p>
+          <ul>
+            {/* components/analytics/PostHogProvider.tsx (consent + DNT gate, autocapture on, session recording off, admin pages dropped) and PostHogIdentify.tsx (id, plan, signup date) */}
+            <li><strong>What:</strong> pages viewed, buttons and links clicked (with their label), the page that sent you here, your device and browser type, and key steps such as signing up, starting a trial, uploading or scheduling a post. When you are signed in, these are linked to an internal account id, your plan and your signup date, never your name, email or phone number. We do not record your screen or what you type, and the admin area is never tracked.</li>
+            <li><strong>Your IP address:</strong> PostHog is set to discard it from every event it receives, so it is not stored with your activity.</li>
+            <li><strong>Where and how long:</strong> in PostHog&rsquo;s US region, for PostHog&rsquo;s default retention period for our plan.</li>
+            <li><strong>Your choice:</strong> you can withdraw at any time from Cookie settings in the footer, and tracking stops at once on that device. We never sell this data.</li>
+          </ul>
+
+          <h2 id="trials-and-offers">Preventing repeat trials and offers</h2>
+          <p>
+            The 7-day free trial and the first-time subscriber price are meant for one person, once. To keep them fair, we keep a small set
+            of one-way hashes. A hash is a scrambled code made with a secret key: it lets us recognise the same value again, but nobody,
+            including us, can turn it back into the original.
+          </p>
+          <ul>
+            <li><strong>What:</strong> a hash of your IP address and of its network (the first part of the address), a hash of the device id cookie above, a hash of your browser type and operating system (not its version), and hashes of your normalised email address, your verified WhatsApp number and the payment method you used (for UPI the UPI ID; for cards the card network, last four digits, issuer and expiry, or the fingerprint the payment provider gives us). Your raw IP address is never stored for this. We do not use fingerprinting scripts or probe your fonts or screen.</li>
+            <li><strong>When:</strong> when you sign up, start a trial and pay.</li>
+            <li><strong>Why:</strong> only to stop the same person taking the trial or the first-time price again. An IP address on its own never decides anything: many people share one network.</li>
+            <li><strong>How long:</strong> the IP, network, device and browser hashes are deleted after 90 days. The hashes that record that a trial or a first-time price was used are kept after you delete your account, only as one-way hashes with their dates and no link to any account, for fraud prevention.</li>
+            <li><strong>If we get it wrong:</strong> if your trial or first-time price is refused, Billing shows an Ask for a review link. A person reads every request and can restore the offer. You can also write to us through the <a href="/contact">contact page</a>.</li>
+          </ul>
 
           <h2>Direct messages</h2>
           <p>

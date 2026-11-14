@@ -321,7 +321,7 @@ export function MarketingNav() {
           ) : (
             <>
               <AnimatedLink href="/login" className="hidden h-11 shrink-0 rounded-full px-3.5 text-[14px] font-medium text-foreground/80 transition-colors hover:text-foreground sm:inline-flex lg:px-3 xl:px-3.5">
-                Log in
+                Sign in
               </AnimatedLink>
               <Link
                 href={ctaHref}
@@ -349,7 +349,7 @@ export function MarketingNav() {
 
       <div ref={panelRef} id="mnav-panel" hidden={!open} className="mnav-panel mx-auto mt-2 max-w-[1180px] overflow-hidden rounded-[28px] p-2 lg:hidden">
         <nav aria-label="Sections" className="flex flex-col">
-          <p className="px-4 pb-1 pt-2 text-[11.5px] font-semibold text-muted-foreground">Product</p>
+          <p className="px-4 pb-1 pt-2 text-xs font-semibold text-muted-foreground">Product</p>
           <ProductTilesCompact items={products} onPick={pickProduct} />
           <div className="mx-4 my-2 h-px bg-border" aria-hidden="true" />
           {links.filter((l) => l.id !== "features").map((l) => (
@@ -370,7 +370,7 @@ export function MarketingNav() {
           ))}
           {!signedIn && (
             <Link href="/login" onClick={() => setOpen(false)} className="mt-1 flex h-12 items-center rounded-2xl px-4 text-[16px] font-semibold text-foreground/80 hover:bg-foreground/[0.05] sm:hidden">
-              Log in
+              Sign in
             </Link>
           )}
           <div className="mt-1 flex items-center justify-between rounded-2xl px-4 py-2 sm:hidden">

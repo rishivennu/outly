@@ -168,7 +168,7 @@ export function PlatformDashboardView({ platform, initial, connected, renderedAt
       </header>
 
       {err && (
-        <p role="alert" className="mt-4 rounded-2xl bg-warning/10 px-4 py-3 text-sm text-warning">
+        <p role="alert" className="mt-4 rounded-2xl bg-warning/10 px-4 py-3 text-sm text-warning-ink">
           {err} Showing the numbers from {ago(data.fetchedAt, now)}.
         </p>
       )}
@@ -284,7 +284,7 @@ function Delta({ value, days }: { value: number; days: number }) {
   const up = value >= 0;
   const flat = Math.abs(value) < 1;
   return (
-    <p className={cn("mt-1 inline-flex items-center gap-1 text-xs font-medium", flat ? "text-muted-foreground" : up ? "text-success" : "text-warning")}>
+    <p className={cn("mt-1 inline-flex items-center gap-1 text-xs font-medium", flat ? "text-muted-foreground" : up ? "text-success-ink" : "text-warning-ink")}>
       {!flat && (up ? <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /> : <ArrowDownRight className="h-3.5 w-3.5" aria-hidden="true" />)}
       <span className="sr-only">{flat ? "About the same as" : up ? "Up" : "Down"} </span>
       {flat ? "Flat" : `${Math.abs(value) >= 100 ? Math.round(Math.abs(value)) : Math.abs(value).toFixed(0)}%`}
@@ -364,7 +364,7 @@ function Coach({ suggestions, platform, thinking = false }: { suggestions: Sugge
                 <button onClick={() => setOpen(isOpen ? null : s.id)} aria-expanded={isOpen} className="flex min-h-[48px] w-full items-center gap-3 px-3 py-2.5 text-left">
                   <span className={cn("h-2 w-2 shrink-0 rounded-full", s.impact === "high" ? "bg-lime" : s.impact === "medium" ? "bg-foreground/50" : "bg-foreground/25")} aria-hidden="true" />
                   <span className="flex-1 text-[15px] font-medium leading-snug">{s.title}</span>
-                  {s.source === "ai" && <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">AI</span>}
+                  {s.source === "ai" && <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">AI</span>}
                   <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", isOpen && "rotate-180")} aria-hidden="true" />
                 </button>
                 {isOpen && (
@@ -392,7 +392,7 @@ function Coach({ suggestions, platform, thinking = false }: { suggestions: Sugge
           <Sparkles className="h-3.5 w-3.5 animate-pulse" aria-hidden="true" /> Gemini is reading your numbers for more ideas…
         </p>
       )}
-      <p className="relative mt-4 text-[11px] leading-snug text-muted-foreground">
+      <p className="relative mt-4 text-xs leading-snug text-muted-foreground">
         {ai ? "Worked out from your live numbers. Items tagged AI were written by Gemini from the same numbers." : "Worked out from your live numbers. Nothing here is a guess: each one shows the figures behind it."}
       </p>
     </section>
@@ -498,7 +498,7 @@ function Posts({ posts, platform }: { posts: LivePost[]; platform: Platform }) {
                     <div className="relative row-span-2 aspect-[9/14] w-14 overflow-hidden rounded-xl bg-secondary sm:row-span-1 sm:w-16">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       {p.thumb && <img src={p.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />}
-                      {sort !== "new" && <span className="absolute left-1 top-1 rounded-md bg-background/85 px-1.5 text-[10px] font-bold tabular">{i + 1}</span>}
+                      {sort !== "new" && <span className="absolute left-1 top-1 rounded-md bg-background/85 px-1.5 text-xs font-bold tabular">{i + 1}</span>}
                     </div>
                     <div className="min-w-0">
                       <p className="line-clamp-2 text-sm font-medium leading-snug group-hover:underline group-hover:underline-offset-4">{p.title}</p>
@@ -539,7 +539,7 @@ function Posts({ posts, platform }: { posts: LivePost[]; platform: Platform }) {
 function Stat({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex items-baseline gap-1 sm:block sm:text-right">
-      <dt className="text-muted-foreground sm:text-[11px]">{k}</dt>
+      <dt className="text-muted-foreground sm:text-xs">{k}</dt>
       <dd className="font-semibold tabular sm:text-sm">{v}</dd>
     </div>
   );
@@ -552,12 +552,12 @@ function Notes({ notes }: { notes: PlatformDashboard["notes"] }) {
       {notes.map((x, i) => (
         <li key={i} className="rounded-2xl bg-warning/10 px-4 py-3 text-sm">
           <p className="flex items-start gap-2 text-foreground">
-            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" /> {x.text}
+            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning-ink" aria-hidden="true" /> {x.text}
           </p>
           {x.detail && (
             <details className="mt-1 pl-6">
               <summary className="min-h-[28px] cursor-pointer text-xs text-muted-foreground">Technical detail</summary>
-              <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all text-[11px] text-muted-foreground">{x.detail}</pre>
+              <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all text-xs text-muted-foreground">{x.detail}</pre>
             </details>
           )}
         </li>

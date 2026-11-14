@@ -6,18 +6,18 @@ import { cn } from "@/lib/utils";
  */
 const MAP: Record<string, { label: string; dot: string; text: string }> = {
   draft: { label: "Draft", dot: "bg-muted-foreground", text: "text-muted-foreground" },
-  queued: { label: "Queued", dot: "bg-cyan", text: "text-cyan" },
-  pending: { label: "Queued", dot: "bg-cyan", text: "text-cyan" },
-  uploading: { label: "Uploading", dot: "bg-cyan animate-pulse", text: "text-cyan" },
-  processing: { label: "Processing", dot: "bg-accent animate-pulse", text: "text-accent" },
-  publishing: { label: "Publishing", dot: "bg-accent animate-pulse", text: "text-accent" },
-  scheduled: { label: "Scheduled", dot: "bg-warning", text: "text-warning" },
-  published: { label: "Published", dot: "bg-success", text: "text-success" },
-  partial: { label: "Partly published", dot: "bg-warning", text: "text-warning" },
+  queued: { label: "Queued", dot: "bg-cyan", text: "text-foreground" },
+  pending: { label: "Queued", dot: "bg-cyan", text: "text-foreground" },
+  uploading: { label: "Uploading", dot: "bg-cyan animate-pulse", text: "text-foreground" },
+  processing: { label: "Processing", dot: "bg-accent animate-pulse", text: "text-foreground" },
+  publishing: { label: "Publishing", dot: "bg-accent animate-pulse", text: "text-foreground" },
+  scheduled: { label: "Scheduled", dot: "bg-accent", text: "text-foreground" },
+  published: { label: "Published", dot: "bg-success", text: "text-success-ink" },
+  partial: { label: "Partly published", dot: "bg-warning", text: "text-warning-ink" },
   failed: { label: "Failed", dot: "bg-destructive", text: "text-destructive" },
-  needs_reconnect: { label: "Needs reconnection", dot: "bg-warning", text: "text-warning" },
+  needs_reconnect: { label: "Needs reconnection", dot: "bg-warning", text: "text-warning-ink" },
   disconnected: { label: "Disconnected", dot: "bg-muted-foreground", text: "text-muted-foreground" },
-  connected: { label: "Connected", dot: "bg-success", text: "text-success" },
+  connected: { label: "Connected", dot: "bg-success", text: "text-success-ink" },
 };
 
 /** Status is always dot + word, never colour alone. */

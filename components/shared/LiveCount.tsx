@@ -99,7 +99,7 @@ export function LiveCount({ compact = false, pill = false, nav = false, classNam
   if (compact) {
     if (v.online === null) return null;
     return (
-      <span className={cn("lc inline-flex h-9 items-center gap-1.5 whitespace-nowrap px-1.5 text-[12.5px] font-medium text-muted-foreground", className)} aria-label={label} title={label}>
+      <span className={cn("lc inline-flex h-9 items-center gap-1.5 whitespace-nowrap px-1.5 text-[13px] font-medium text-muted-foreground", className)} aria-label={label} title={label}>
         <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[hsl(var(--lime))] shadow-[0_0_0_3px_hsl(var(--lime)/0.18)]" />
         <span><Num n={v.online} format={compactCount} /> online</span>
       </span>
@@ -123,13 +123,13 @@ export function LiveCount({ compact = false, pill = false, nav = false, classNam
   );
   if (pill) {
     return (
-      <p className={cn("lc glass hairline inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-[12.5px] shadow-sm", className)} aria-label={label} title={label}>
+      <p className={cn("lc glass hairline inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-[13px] shadow-sm", className)} aria-label={label} title={label}>
         {body}
       </p>
     );
   }
   return (
-    <p className={cn("lc inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-[12.5px]", className)} aria-label={label}>
+    <p className={cn("lc inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-[13px]", className)} aria-label={label}>
       {body}
     </p>
   );

@@ -190,7 +190,7 @@ export function Spotlight({ stops, onClose, kicker, skipLabel = "Skip", moreFall
             <X className="h-4 w-4" />
           </button>
         </div>
-        {kicker && <p className="eyebrow mt-1 text-[11px]">{kicker}</p>}
+        {kicker && <p className="eyebrow mt-1 text-xs">{kicker}</p>}
         <h2 id="tour-title" className="mt-1 text-lg font-semibold tracking-tight">
           {stop.title}
         </h2>

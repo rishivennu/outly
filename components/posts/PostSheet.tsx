@@ -11,6 +11,8 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DateTimePicker, defaultSchedule } from "@/components/shared/DateTimePicker";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { useToast } from "@/components/shared/Toast";
+import { useUndoDelete } from "@/components/shared/useUndoDelete";
+import { keepaliveDelete, undoablePost } from "@/lib/client/deferred-delete";
 import { fmt, tzShort, useUser } from "@/components/shell/UserContext";
 import { api, ApiError } from "@/lib/client/api";
 import { PLATFORM_META, TARGET_COPY, type Platform, type TargetStatus } from "@/lib/domain";
@@ -36,12 +38,16 @@ interface Props {
   onChange: (p: PostView) => void;
   onRemove: (id: string) => void;
   onDuplicate: (p: PostView) => void;
+  /** 1148: puts a deleted post back (Undo). Without it, deleting goes through at once, as before. */
+  onRestore?: (p: PostView) => void;
 }
 
-/** Floating detail panel shared by Content and Calendar. Edit / Reschedule / Duplicate / Remove. */
-export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Props) {
+
+/** Floating detail panel shared by Content and Calendar. Edit / Reschedule / Duplicate / Delete. */
+export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRestore }: Props) {
   const { timezone: tz } = useUser();
   const toast = useToast();
+  const later = useUndoDelete();
   const router = useRouter();
   const [view, setView] = useState<"detail" | "reschedule" | "remove" | "takedown">("detail");
   /** 1142: the second step of a delete. Nothing is deleted until the creator says yes on this one. */
@@ -81,7 +87,7 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
       const r = await api<{ post: PostView }>(`/api/posts/${post.id}`, { method: "PATCH", json: { scheduledAt: when.toISOString() } });
       onChange(r.post);
       setView("detail");
-      toast("It's on the calendar. 🗓️");
+      toast("It's on the calendar.");
     });
 
   const duplicate = () =>
@@ -90,6 +96,29 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
       onDuplicate(r.post);
       toast("Made a copy. It's in your drafts.");
     });
+
+  const reversible = !!onRestore && undoablePost(post);
+  /** 1148: off the screen now, deleted when the Undo toast goes. */
+  const removeLater = () => {
+    const p = post;
+    const url = `/api/posts/${p.id}`;
+    onRemove(p.id);
+    onClose();
+    later(`post:${p.id}`, {
+      commit: async () => {
+        try {
+          await api(url, { method: "DELETE" });
+        } catch (e) {
+          if (!(e instanceof ApiError && e.status === 404)) throw e;
+        }
+      },
+      flush: () => keepaliveDelete(url),
+      restore: () => onRestore?.(p),
+      onFail: (e) => toast(e instanceof ApiError ? `${e.message} It's back in your studio.` : "Couldn't delete it, so it's back in your studio. Check your connection and try again.", "error"),
+      // 1142: the freed post shows at once on Home, Create and Billing.
+      onDone: () => router.refresh(),
+    });
+  };
 
   const remove = (everywhere: boolean) =>
     run(async () => {
@@ -133,7 +162,7 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
         view === "reschedule"
           ? "When should this go live?"
           : view === "remove"
-            ? "Remove this?"
+            ? `Delete \u201c${title}\u201d?`
             : view === "takedown" && takedownTarget
               ? `Take it down from ${PLATFORM_META[takedownTarget.platform].name}?`
               : title
@@ -227,7 +256,7 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
               <Copy className="h-4 w-4" /> Duplicate
             </Button>
             <Button variant="danger" onClick={() => setView("remove")}>
-              <Trash2 className="h-4 w-4" /> {post.status === "publishing" ? "Stop and remove" : "Remove this"}
+              <Trash2 className="h-4 w-4" /> {post.status === "publishing" ? "Stop and delete" : "Delete post"}
             </Button>
           </div>
           {post.status === "draft" && <p className="text-xs text-muted-foreground">Setting a time saves it with the draft. It goes on the calendar once you launch it from Edit.</p>}
@@ -255,9 +284,9 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
               It&rsquo;s being sent right now. Outlly stops every platform that hasn&rsquo;t received it yet. If a platform already has it and is finishing it, that one can&rsquo;t be called back: wait until it&rsquo;s live, then delete it.
             </p>
           )}
-          {post.status === "scheduled" && <p className="text-sm text-muted-foreground">It&rsquo;s booked for later. Removing it cancels the booking, so it won&rsquo;t go out.</p>}
+          {post.status === "scheduled" && <p className="text-sm text-muted-foreground">It&rsquo;s booked for later. Deleting it cancels the booking, so it won&rsquo;t go out.</p>}
           {live.length === 0 ? (
-            <p className="text-muted-foreground">This removes it and all its copy from your studio.</p>
+            <p className="text-muted-foreground">This deletes it and all its copy from your studio.{reversible ? " You can undo it for a few seconds." : ""}</p>
           ) : (
             <>
               <p className="text-muted-foreground">
@@ -294,8 +323,8 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
                   </Button>
                 </>
               ) : (
-                <Button variant="danger" onClick={() => remove(false)} disabled={busy}>
-                  <Trash2 className="h-4 w-4" /> {busy ? "Removing…" : "Yes, remove it"}
+                <Button variant="danger" onClick={() => (reversible ? removeLater() : remove(false))} disabled={busy}>
+                  <Trash2 className="h-4 w-4" /> {busy ? "Deleting…" : "Delete post"}
                 </Button>
               )}
               <Button variant="ghost" onClick={() => setView("detail")}>
@@ -315,7 +344,7 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate }: Pr
               </p>
               <div className="grid gap-2">
                 <Button variant="danger" onClick={() => remove(confirm === "everywhere")} disabled={busy}>
-                  <Trash2 className="h-4 w-4" /> {busy ? (confirm === "everywhere" ? "Deleting…" : "Removing…") : confirm === "everywhere" ? "Yes, delete everywhere" : "Yes, delete from my studio"}
+                  <Trash2 className="h-4 w-4" /> {busy ? "Deleting…" : confirm === "everywhere" ? `Delete from ${names(live)}` : "Delete from my studio"}
                 </Button>
                 <Button variant="ghost" onClick={() => setConfirm(null)} disabled={busy}>
                   Back
@@ -440,7 +469,7 @@ function ReviewBlock({ post, onChange }: { post: PostView; onChange: (p: PostVie
       const r = await api<{ post: PostView }>(`/api/posts/${post.id}`, { method: "PATCH", json: { requireApproval: on } });
       onChange(r.post);
     } catch (e) {
-      setErr(e instanceof ApiError ? e.message : "Couldn't save that.");
+      setErr(e instanceof ApiError ? e.message : "Couldn't save that. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
@@ -459,7 +488,7 @@ function ReviewBlock({ post, onChange }: { post: PostView; onChange: (p: PostVie
             <Check className="h-4 w-4" /> Approved by {review.reviewerName ?? "a reviewer"}
           </span>
         ) : review.status === "changes_requested" ? (
-          <span className="inline-flex items-center gap-1.5 text-warning">
+          <span className="inline-flex items-center gap-1.5 text-warning-ink">
             <MessageSquareWarning className="h-4 w-4" /> {review.reviewerName ?? "A reviewer"} asked for changes
           </span>
         ) : review.expired ? (

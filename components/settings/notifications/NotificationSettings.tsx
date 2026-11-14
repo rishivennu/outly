@@ -421,7 +421,7 @@ function CategoryCard({ id, i, prefs, saving, spikeAllowed, onSave }: { id: Cate
           {c.notYet?.map((n) => (
             <div key={n.label} className="py-3">
               <p className="text-[15px] font-medium text-muted-foreground">
-                {n.label} <span className="ml-1 inline-flex h-5 items-center rounded-full bg-secondary px-2 align-middle text-[11px] font-semibold">Not available yet</span>
+                {n.label} <span className="ml-1 inline-flex h-5 items-center rounded-full bg-secondary px-2 align-middle text-xs font-semibold">Not available yet</span>
               </p>
               <p className="mt-0.5 text-[13px] text-muted-foreground">{n.why}</p>
             </div>
@@ -458,7 +458,7 @@ function Delivery({ prefs, tz, saving, onSave, onTz }: { prefs: NotifyPrefs; tz:
                   </select>
                 </label>
               </div>
-              <p className="pb-3 text-[12.5px] text-muted-foreground">The time zone is your profile&apos;s, the same one your schedule uses.</p>
+              <p className="pb-3 text-[13px] text-muted-foreground">The time zone is your profile&apos;s, the same one your schedule uses.</p>
               <div className="border-t border-[hsl(var(--nf-line))]">
                 <SwitchRow id="nf-urgent" label="Let urgent alerts through" hint={`Still notify for ${urgent.join(", ")}.`} on={prefs.quiet.urgent} disabled={saving} onChange={(v) => onSave({ quiet: { urgent: v } }, v ? "Urgent alerts come through quiet hours." : "Quiet hours hold everything.")} />
               </div>
@@ -558,9 +558,9 @@ function Preview({ canTest, busy, onTest }: { canTest: boolean; busy: boolean; o
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/brand/app/icon-192.png" alt="" width={36} height={36} className="h-9 w-9 shrink-0 rounded-[9px]" />
               <div className="min-w-0 flex-1">
-                <p className="flex items-center justify-between gap-2 text-[11.5px] font-medium uppercase tracking-wide text-muted-foreground"><span>Outlly</span><span className="normal-case tracking-normal">now</span></p>
-                <p className="mt-0.5 text-[14.5px] font-semibold leading-snug">{p.title}</p>
-                <p className="text-[13.5px] leading-snug text-muted-foreground">{p.body}</p>
+                <p className="flex items-center justify-between gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"><span>Outlly</span><span className="normal-case tracking-normal">now</span></p>
+                <p className="mt-0.5 text-[15px] font-semibold leading-snug">{p.title}</p>
+                <p className="text-[14px] leading-snug text-muted-foreground">{p.body}</p>
               </div>
             </div>
           </li>
@@ -711,7 +711,7 @@ function History() {
                       {n.title}
                     </p>
                   )}
-                  <p className="mt-0.5 text-[13.5px] text-muted-foreground">{n.body}</p>
+                  <p className="mt-0.5 text-[14px] text-muted-foreground">{n.body}</p>
                   <p className="mt-1 text-[12px] text-muted-foreground">{ago(n.createdAt)}</p>
                 </div>
                 <div className="flex shrink-0">
@@ -729,7 +729,7 @@ function History() {
           </ul>
         )}
       </div>
-      <p className="mt-3 flex items-center gap-2 text-[12.5px] text-muted-foreground">
+      <p className="mt-3 flex items-center gap-2 text-[13px] text-muted-foreground">
         <Moon className="h-3.5 w-3.5" aria-hidden="true" /> Alerts held back by quiet hours are still listed here.
       </p>
     </section>

@@ -5,6 +5,7 @@ import { signupSchema } from "@/lib/validation";
 import { attachReferral } from "@/lib/referral";
 import { attachSource } from "@/lib/growth/source";
 import { assertMayCreateAccount } from "@/lib/site";
+import { captureSignal } from "@/lib/subscriptions/signals";
 
 export const POST = route(
   async (req) => {
@@ -18,6 +19,7 @@ export const POST = route(
     const user = await signUp(body.name, body.email, body.password, timezone);
     await attachReferral(user.id, clientIp(req)).catch((e) => console.error("[referral] attach", e));
     await attachSource(user.id).catch((e) => console.error("[growth] source", e));
+    await captureSignal({ req, userId: user.id, event: "signup" }).catch((e) => console.error("[signals] signup", e)); // 1147 anti-abuse, hashed only
     await createSession(user.id);
     return json({ ok: true });
   },

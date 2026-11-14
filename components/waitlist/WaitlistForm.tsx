@@ -124,7 +124,7 @@ export function WaitlistForm({ fromGoogle = false, beta = false }: { fromGoogle?
       setPlay((n) => n + 1);
       setDone(d);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something got in the way. Try again in a moment.");
+      setError(err instanceof ApiError ? err.message : "Couldn't add you to the waitlist. Check your connection and try again.");
       setBadEmail(err instanceof ApiError && err.status === 400);
     } finally {
       setBusy(false);

@@ -86,9 +86,9 @@ export function RememberedDevicesCard({ twoStepNote = true }: { twoStepNote?: bo
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 text-[14px] font-medium">
                     {d.label}
-                    {d.current && <span className="rounded-full bg-lime/15 px-2 py-0.5 text-[11px] font-semibold text-lime-ink">This device</span>}
+                    {d.current && <span className="rounded-full bg-lime/15 px-2 py-0.5 text-xs font-semibold text-lime-ink">This device</span>}
                   </p>
-                  <p className="text-[12.5px] text-muted-foreground">
+                  <p className="text-[13px] text-muted-foreground">
                     {d.place ? <>Around {d.place} (approximate) · </> : null}Last used {day(d.lastUsedAt)} · Until {day(d.expiresAt)}
                   </p>
                 </div>

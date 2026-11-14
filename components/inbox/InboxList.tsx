@@ -95,7 +95,7 @@ export function PersonAvatar({ name, src, platform, size = 40, onBroken }: { nam
 }
 
 export function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="mr-1 inline-grid min-w-[18px] place-items-center rounded-[5px] border border-border px-1 font-sans text-[10.5px] font-semibold leading-[16px] text-foreground/80">{children}</kbd>;
+  return <kbd className="mr-1 inline-grid min-w-[18px] place-items-center rounded-[5px] border border-border px-1 font-sans text-xs font-semibold leading-[16px] text-foreground/80">{children}</kbd>;
 }
 
 /** Comments / Messages. Real tabs: arrow keys move between them, the panel below is labelled by the selected one. */
@@ -121,13 +121,13 @@ export function InboxTabs({ tab, onPick, counts }: { tab: InboxTab; onPick: (t: 
             }
           }}
           className={cn(
-            "inline-flex h-10 items-center justify-center gap-2 rounded-[9px] text-[13.5px] touch:h-11 font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
+            "inline-flex h-10 items-center justify-center gap-2 rounded-[9px] text-[14px] touch:h-11 font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
             tab === t ? "bg-card text-foreground shadow-sm dark:bg-foreground/10" : "text-muted-foreground hover:text-foreground",
           )}
         >
           {t === "comments" ? "Comments" : "Messages"}
           {counts[t] > 0 && (
-            <span className={cn("rounded-full px-1.5 text-[11px] font-bold leading-[17px]", tab === t ? "bg-lime text-lime-foreground" : "bg-foreground/10 text-foreground/80")}>
+            <span className={cn("rounded-full px-1.5 text-xs font-bold leading-[17px]", tab === t ? "bg-lime text-lime-foreground" : "bg-foreground/10 text-foreground/80")}>
               {counts[t]}
               <span className="sr-only"> waiting</span>
             </span>
@@ -229,7 +229,7 @@ export const InboxRow = forwardRef<HTMLButtonElement, RowProps>(function InboxRo
             <span className="ml-auto shrink-0 text-[12px] text-muted-foreground">{time}</span>
             {needsReply && <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-lime" />}
           </span>
-          <span className={cn("mt-0.5 block truncate text-[13.5px]", needsReply ? "text-foreground" : "text-muted-foreground")}>{preview}</span>
+          <span className={cn("mt-0.5 block truncate text-[14px]", needsReply ? "text-foreground" : "text-muted-foreground")}>{preview}</span>
           <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[12px] text-muted-foreground">{context}</span>
         </span>
       </button>
@@ -239,7 +239,7 @@ export const InboxRow = forwardRef<HTMLButtonElement, RowProps>(function InboxRo
 
 export function Tag({ children, tone = "plain" }: { children: ReactNode; tone?: "plain" | "question" | "practice" }) {
   return (
-    <span className={cn("shrink-0 rounded-full px-2 py-px text-[10.5px] font-semibold", tone === "question" ? "ib-tag-q" : "bg-secondary text-muted-foreground")}>{children}</span>
+    <span className={cn("shrink-0 rounded-full px-2 py-px text-xs font-semibold", tone === "question" ? "ib-tag-q" : "bg-secondary text-muted-foreground")}>{children}</span>
   );
 }
 

@@ -27,8 +27,8 @@ function AccountAccess({ m, accounts, busy, onSave }: { m: Member; accounts: Acc
     onSave(next.length === accounts.length ? null : next);
   };
   return (
-    <div className="w-full sm:w-auto">
-      <button type="button" aria-expanded={open} aria-controls={`acc-${m.id}`} onClick={() => setOpen((o) => !o)} className="h-11 rounded-2xl px-3 text-sm hairline hover:bg-secondary/60 focus-visible:outline-2">
+    <div className={cn("sm:w-auto", open && "w-full")}>
+      <button type="button" aria-expanded={open} aria-controls={`acc-${m.id}`} onClick={() => setOpen((o) => !o)} className="h-11 whitespace-nowrap rounded-2xl px-3 text-sm hairline hover:bg-secondary/60 focus-visible:outline-2">
         {label}
       </button>
       {open && (
@@ -47,7 +47,7 @@ function AccountAccess({ m, accounts, busy, onSave }: { m: Member; accounts: Acc
               </li>
             ))}
           </ul>
-          {!all && picked.size === 0 && <p className="mt-2 text-xs text-warning">No accounts ticked: they can open the studio but can&apos;t see or post to any account.</p>}
+          {!all && picked.size === 0 && <p className="mt-2 text-xs text-warning-ink">No accounts ticked: they can open the studio but can&apos;t see or post to any account.</p>}
         </fieldset>
       )}
     </div>
@@ -240,7 +240,7 @@ export function TeamCard() {
             <ul className="mt-6 divide-y divide-border/60" aria-label="Team members">
               {team.members.map((m) => (
                 <li key={m.id} className="flex flex-wrap items-center gap-3 py-3">
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">
                     <p className="truncate font-medium">{m.name ?? m.email}</p>
                     <p className="truncate text-xs text-muted-foreground">
                       {m.name ? `${m.email} · ` : ""}
@@ -253,7 +253,7 @@ export function TeamCard() {
                     <option value="manager">Manager</option>
                   </select>
                   {team.accounts.length > 1 && <AccountAccess m={m} accounts={team.accounts} busy={busy === m.id} onSave={(ids) => setAccess(m, ids)} />}
-                  <button type="button" onClick={() => remove(m)} disabled={busy === m.id} aria-label={m.status === "invited" ? `Cancel invite for ${m.email}` : `Remove ${m.name ?? m.email}`} className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-2 disabled:opacity-50">
+                  <button type="button" onClick={() => remove(m)} disabled={busy === m.id} aria-label={m.status === "invited" ? `Cancel invite for ${m.email}` : `Remove ${m.name ?? m.email}`} className="ml-auto grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 sm:ml-0 hover:text-destructive focus-visible:outline-2 disabled:opacity-50">
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </li>

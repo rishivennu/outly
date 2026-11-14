@@ -33,11 +33,11 @@ export function SavedPaymentCard({ card, className }: { card: SavedCard; classNa
       <div className="flex h-full flex-col p-[7%]" aria-hidden="true">
         <div className="flex items-start justify-between gap-3 text-[#050505]">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold tracking-[0.16em]">SAVED PAYMENT METHOD</p>
+            <p className="text-xs font-semibold tracking-[0.16em]">SAVED PAYMENT METHOD</p>
             <p className="mt-1 truncate text-[15px] font-semibold leading-tight">{card.issuer ?? card.networkLabel}</p>
           </div>
-          {card.isDefault && <span className="shrink-0 rounded-full bg-[#050505] px-2.5 py-1 text-[11px] font-semibold text-[#B5FF00]">Default</span>}
-          {card.expired && <span className="shrink-0 rounded-full bg-[#050505] px-2.5 py-1 text-[11px] font-semibold text-[#FFB4A8]">Expired</span>}
+          {card.isDefault && <span className="shrink-0 rounded-full bg-[#050505] px-2.5 py-1 text-xs font-semibold text-[#B5FF00]">Default</span>}
+          {card.expired && <span className="shrink-0 rounded-full bg-[#050505] px-2.5 py-1 text-xs font-semibold text-[#FFB4A8]">Expired</span>}
         </div>
 
         <p className="tabular mt-auto font-mono text-[clamp(15px,5.4cqw,19px)] tracking-[0.12em]">
@@ -81,6 +81,6 @@ export function NetworkMark({ network, label }: { network: CardNetwork; label: s
         Ru<span className="text-[#F7941D]">Pay</span>
       </span>
     );
-  if (network === "amex") return <span className="shrink-0 rounded-[4px] bg-[#2E77BC] px-1.5 py-1 text-[11px] font-black leading-none tracking-wide">AMEX</span>;
+  if (network === "amex") return <span className="shrink-0 rounded-[4px] bg-[#2E77BC] px-1.5 py-1 text-xs font-black leading-none tracking-wide">AMEX</span>;
   return <span className="shrink-0 text-[13px] font-semibold text-[#A5A5A5]">{label}</span>;
 }

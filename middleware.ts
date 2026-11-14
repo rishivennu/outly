@@ -7,7 +7,7 @@ import { REF_COOKIE, REF_DAYS, REF_VISITOR, isCode } from "./lib/referral-core";
 
 const AUTH_PAGES = ["/login", "/signup"];
 // Marketing pages anyone can read.
-const OPEN = ["/", "/privacy", "/terms", "/contact", "/help", "/waitlist", "/maintenance", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice"];
+const OPEN = ["/", "/privacy", "/terms", "/contact", "/help", "/changelog", "/status", "/security", "/waitlist", "/maintenance", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice"];
 // A review link is its own credential: the reviewer has no account here.
 // A share link (/r/code) and a team invite must work before the visitor has an account.
 const OPEN_PREFIX = ["/review/", "/r/", "/team/accept"];
@@ -33,10 +33,10 @@ const LH_HINT = "outlly_lh";
 // they join; its sign-up buttons scroll to the waitlist form on the page. Open: the landing page, help and contact,
 // the waitlist page itself, the legal pages its form links to, and links that are their own credential
 // (emailed invites, team invites, client review links, share links). Sign-up and the studio stay closed.
-const WAITLIST_OPEN = ["/", "/help", "/contact", "/waitlist", "/privacy", "/terms", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice"];
+const WAITLIST_OPEN = ["/", "/help", "/contact", "/changelog", "/status", "/security", "/waitlist", "/privacy", "/terms", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice"];
 // Maintenance on: strangers only reach these. /login lets members back in; nobody can sign up.
 // /unsubscribe: leaving a mailing list must work whatever mode the site is in.
-const MAINTENANCE_OPEN = ["/maintenance", "/login", "/privacy", "/terms", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice"];
+const MAINTENANCE_OPEN = ["/maintenance", "/status", "/login", "/privacy", "/terms", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice"];
 const WAITLIST_PREFIX = ["/review/", "/r/", "/team/accept"];
 
 function sync(req: NextRequest, res: NextResponse, name: string, on: boolean, maxAge: number) {
@@ -148,6 +148,9 @@ export async function middleware(req: NextRequest, ev?: NextFetchEvent) {
   // so signup can credit the channel. Never overwritten by a later link.
   const src = req.cookies.get(SRC_COOKIE) ? null : sourceFromParams(req.nextUrl.searchParams);
   if (src) res.cookies.set(SRC_COOKIE, src, { path: "/", httpOnly: true, sameSite: "lax", secure: req.nextUrl.protocol === "https:", maxAge: 60 * 60 * 24 * SRC_DAYS });
+  // 1147: random first-party device id (DEVICE_COOKIE in lib/subscriptions/signals.ts) so a free trial is once per person.
+  // Readable (not httpOnly) so the page can mirror it to localStorage; only its hash is ever stored.
+  if (!req.cookies.get("oly_did")) res.cookies.set("oly_did", crypto.randomUUID(), { path: "/", httpOnly: false, sameSite: "lax", secure: req.nextUrl.protocol === "https:", maxAge: 60 * 60 * 24 * 730 });
   // Refer & Earn (1052): a share link is /signup?ref=CODE. Remember the FIRST link for 30 days (a later one
   // never takes the credit), plus a random visitor id so the opened link becomes the friend's row at signup.
   const ref = req.nextUrl.searchParams.get("ref")?.toLowerCase();
@@ -239,5 +242,5 @@ export const config = {
   // Pages only. API routes do their own auth and return JSON 401s.
   // 1143: opengraph-image / twitter-image are generated share images with no file extension. Waitlist mode sent
   // them to /waitlist, so shared links had no preview picture and Search Console listed the image as a page.
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|opengraph-image|twitter-image|\\.well-known|.*\\.(?:svg|png|jpg|gif|webp|ico|txt|xml|js|css|woff2?|html|webmanifest)$).*)"],
+  matcher: ["/((?!api|ingest|_next/static|_next/image|favicon.ico|opengraph-image|twitter-image|\\.well-known|.*\\.(?:svg|png|jpg|gif|webp|ico|txt|xml|js|css|woff2?|html|webmanifest)$).*)"],
 };

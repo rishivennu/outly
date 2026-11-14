@@ -114,7 +114,7 @@ export function LaunchPanel(p: Props) {
           onClick={() => setPicking(true)}
           className="glass mt-4 flex w-full items-center gap-4 rounded-[24px] p-4 text-left transition hover:bg-secondary/60"
         >
-          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-warning/15 text-warning">
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-warning/15 text-warning-ink">
             <CalendarDays className="h-5 w-5" />
           </span>
           <span className="flex-1">
@@ -131,8 +131,8 @@ export function LaunchPanel(p: Props) {
       {p.mode === "schedule" && best && best.slots.length > 0 && (
         <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} aria-labelledby="best-times" className="mt-3 rounded-[24px] p-4 hairline">
           <h3 id="best-times" className="flex items-center gap-2 text-sm font-semibold">
-            <Flame className="h-4 w-4 text-cyan" aria-hidden="true" /> Best times to post
-            <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{best.source === "yours" ? "From your posts" : "Typical"}</span>
+            <Flame className="h-4 w-4 text-accent" aria-hidden="true" /> Best times to post
+            <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">{best.source === "yours" ? "From your posts" : "Typical"}</span>
           </h3>
           <div className="mt-3 flex flex-wrap gap-2">
             {best.slots.map((s) => {

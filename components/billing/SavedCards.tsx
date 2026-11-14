@@ -96,13 +96,13 @@ export function SavedCardsSection({ id = "billing-saved", className, plansHref =
                 <div className="flex max-w-[360px] flex-wrap items-center gap-2">
                   {!c.isDefault && !c.expired && (
                     <Button variant="outline" size="sm" disabled={!!busy} onClick={() => void act(c, "default")} aria-label={`Make ${cardLabel(c)} the default`}>
-                      <Star className="h-4 w-4" aria-hidden />{busy === `default-${c.id}` ? "Saving" : "Set as default"}
+                      <Star className="h-4 w-4" aria-hidden />{busy === `default-${c.id}` ? "Saving…" : "Set as default"}
                     </Button>
                   )}
                   {confirm === c.id ? (
                     <>
                       <Button variant="outline" size="sm" className="border-destructive/50 text-destructive" disabled={!!busy} onClick={() => void act(c, "remove")}>
-                        {busy === `remove-${c.id}` ? "Removing" : "Yes, remove it"}
+                        {busy === `remove-${c.id}` ? "Removing…" : "Remove card"}
                       </Button>
                       <Button variant="ghost" size="sm" disabled={!!busy} onClick={() => setConfirm(null)}>Keep</Button>
                     </>

@@ -29,7 +29,7 @@ export function WhatsNewCard({ notice, onClose, onTell, preview }: { notice: Pic
       <div className="relative flex items-start gap-3">
         <Pip size={52} mood="happy" />
         <div className="min-w-0 flex-1 pt-0.5">
-          <p suppressHydrationWarning className="wn-eyebrow inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold uppercase tracking-[0.08em]">
+          <p suppressHydrationWarning className="wn-eyebrow inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.08em]">
             <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--lime))]" />
             What changed{date ? ` · ${date}` : ""}
           </p>
@@ -43,7 +43,7 @@ export function WhatsNewCard({ notice, onClose, onTell, preview }: { notice: Pic
           </Dialog.Close>
         )}
       </div>
-      {notice.body && <Body className="relative mt-3 text-[14.5px] leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">{notice.body}</Body>}
+      {notice.body && <Body className="relative mt-3 text-[15px] leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">{notice.body}</Body>}
       {items.length > 0 && (
         <ul className="relative mt-4 grid gap-2">
           {items.map((it, i) => (
@@ -155,7 +155,7 @@ export function WhatsNew({ notice, userId, joinedAt }: { notice: UpdateNotice; u
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount {...(notice.body ? {} : { "aria-describedby": undefined })}>
               <div
-                className="fixed inset-0 z-[81] grid place-items-center overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+                className="fixed inset-0 z-[81] grid place-items-center overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
                 data-lenis-prevent
                 onPointerDown={(e) => {
                   if (e.target === e.currentTarget) close();

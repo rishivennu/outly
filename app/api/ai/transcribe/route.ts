@@ -23,9 +23,10 @@ export const POST = route(
     // Counts per video (ref), not per chunk: a 3-minute clip sent in 60 s chunks uses one allowance.
     const slot = await assertCaptionVideo(user.id, req.nextUrl.searchParams.get("ref") ?? "");
     try {
-      await chargeAi(realUserId(user));
       const offset = Math.max(0, Number(req.nextUrl.searchParams.get("offset")) || 0);
       const duration = Math.max(0.1, Math.min(120, Number(req.nextUrl.searchParams.get("duration")) || 60));
+      // 1147: billed to the monthly cost budget as transcription minutes, not as an AI request.
+      await chargeAi(realUserId(user), "ai", new Date(), { category: "transcription", units: duration / 60 });
       return json(await transcribeWav(buf, offset, duration));
     } catch (e) {
       // Over the daily AI cap, or the model failed: the creator got no captions, so the slot goes back (1027).

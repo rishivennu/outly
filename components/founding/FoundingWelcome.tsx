@@ -93,7 +93,7 @@ export function FoundingWelcome({ promo }: { promo: FoundingPromo }) {
                   <Dialog.Title className="pr-10 font-display text-[1.5rem] font-bold leading-tight tracking-[-0.03em]">
                     {offer ? `Be one of Outlly's first ${offer.limit}` : <>Seat <span className="tabular">#{promo.kind === "reserved" ? promo.no : ""}</span> is still yours</>}
                   </Dialog.Title>
-                  <p id="founding-welcome-body" className="mt-2.5 text-[14.5px] leading-relaxed text-foreground/80">
+                  <p id="founding-welcome-body" className="mt-2.5 text-[15px] leading-relaxed text-foreground/80">
                     {offer
                       ? `Subscribe to any paid plan while spots last and you become a Founding Member: a numbered badge on your profile and ${offer.pct}% off every paid plan, for life.`
                       : `You joined early, so we held a founding seat for you. Subscribe to any paid plan and it becomes your Founding Member badge, with ${promo.pct}% off every paid plan for life.`}

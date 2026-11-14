@@ -4,6 +4,8 @@ import { env } from "./env";
 import { HttpError } from "./http";
 import { entitlements } from "./billing/entitlements";
 import { noticeUsageLimit } from "./notify-events";
+import { assertBudget, recordCost } from "./subscriptions/costs";
+import type { CostCategory } from "./subscriptions/economics";
 
 /**
  * Per-person caps on model calls. Gemini costs money, so one account (or one loop in a script) can't run up
@@ -35,7 +37,9 @@ const monthUsed = async (userId: string, kind: AiKind, now: Date) =>
   (await db.aiUsage.aggregate({ where: { userId, kind, day: { startsWith: utcMonth(now) } }, _sum: { count: true } }))._sum.count ?? 0;
 
 /** Count one call and refuse once a cap is reached. Call it BEFORE the model, not after. */
-export async function chargeAi(userId: string, kind: AiKind = "ai", now: Date = new Date()) {
+/** 1147: `meter` is what this call costs the subscriber's monthly budget (a no-op while the policy is off). */
+export async function chargeAi(userId: string, kind: AiKind = "ai", now: Date = new Date(), meter: { category: CostCategory; units: number } | null = kind === "ai" ? { category: "ai", units: 1 } : null) {
+  if (meter) await assertBudget(userId, meter.category, now);
   const lim = await limitsFor(userId, kind);
   if (!lim.day && !lim.month) return { used: 0, limit: 0, left: Infinity };
   const day = utcDay(now);
@@ -60,6 +64,7 @@ export async function chargeAi(userId: string, kind: AiKind = "ai", now: Date = 
       throw new HttpError(402, monthMessage(lim.month, lim.plan), "PLAN_LIMIT", { feature: "ai", upgrade: "/billing" });
     }
   }
+  if (meter) await recordCost({ userId, ...meter, now });
   return { used: row.count, limit: lim.day, left: lim.day ? Math.max(0, lim.day - row.count) : Infinity };
 }
 

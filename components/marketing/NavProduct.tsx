@@ -36,7 +36,7 @@ function Tile({ item, onPick, compact }: { item: ProductItem; onPick: (sec: stri
         <Icon className="h-[18px] w-[18px]" />
       </span>
       <span className="min-w-0">
-        <span className="block text-[14.5px] font-semibold leading-tight text-foreground">{item.title}</span>
+        <span className="block text-[15px] font-semibold leading-tight text-foreground">{item.title}</span>
         {!compact && <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">{item.desc}</span>}
       </span>
     </>
@@ -73,7 +73,7 @@ export function ProductPanel({ items, onPick, showDemo }: { items: ProductItem[]
           <span className="relative mt-auto block">
             <span className="block font-display text-[19px] font-semibold leading-tight tracking-tight">See it in 60 seconds</span>
             <span className="mt-1 block text-[13px] leading-snug opacity-80">One upload becomes a Reel, a Short and a post.</span>
-            <span className="mt-3 inline-flex items-center gap-1.5 text-[13.5px] font-semibold">
+            <span className="mt-3 inline-flex items-center gap-1.5 text-[14px] font-semibold">
               Watch the demo
               <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
             </span>

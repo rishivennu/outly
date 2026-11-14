@@ -20,7 +20,7 @@ export function ReviewPage({ token, data }: { token: string; data: ReviewPackage
 
   const decide = async (decision: "approved" | "changes_requested") => {
     setError(null);
-    if (!name.trim()) return setError("Please add your name so they know who looked.");
+    if (!name.trim()) return setError("Add your name so they know who looked.");
     if (decision === "changes_requested" && !note.trim()) return setError("Tell them what to change.");
     setBusy(true);
     try {

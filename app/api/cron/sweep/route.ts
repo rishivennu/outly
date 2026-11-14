@@ -38,13 +38,24 @@ async function sweep(req: NextRequest) {
   // 1142: the one-time waitlist update email. Fixes its cutoff on the first sweep after deploy; sends a short batch once launched.
   const campaign = await import("@/lib/campaigns").then((m) => m.sweepCampaigns()).catch((e) => (console.error("[sweep] campaign", e), null));
   if (new Date().getMinutes() === 7) await cleanupSubs().catch(() => 0);
+  const subs = await sweepSubscriptions(new Date()); // 1147: trials, old signals, offer ledger + month rollover (never fatal)
   await import("@/lib/accounts").then((m) => m.resubscribeCommentsOnce()).catch((e) => console.error("[sweep] comment subs", e)); // 1141b, runs once
   await import("@/lib/analytics/sync").then((m) => m.syncMetrics({ budgetMs: 8_000 })).catch((e) => console.error("[sweep] metrics", e)); // 1140 analytics background sync
   // Without Redis the jobs above are timers in this invocation: let them run before the response ends it
   // (1027). Budget = what is left of maxDuration minus 10 s of headroom; whatever is still running then is
   // held by waitUntil or picked up by the next sweep.
   const running = await settle(Math.max(0, 50_000 - (Date.now() - startedAt)));
-  return NextResponse.json({ ok: true, requeued, cleaned, files, reminders, push, assist, campaign, running }, { headers: { "cache-control": "no-store" } });
+  return NextResponse.json({ ok: true, requeued, cleaned, files, reminders, push, assist, campaign, subs, running }, { headers: { "cache-control": "no-store" } });
+}
+
+/** 1147: trials every 5 minutes (expiry + reminders); signal pruning and the ledger/month sweep once an hour. */
+async function sweepSubscriptions(now: Date) {
+  const min = now.getMinutes();
+  const trials = min % 5 === 0 ? await import("@/lib/subscriptions/trial").then((m) => m.sweepTrials(now)).catch((e) => (console.error("[sweep] trials", e), null)) : null;
+  if (min !== 23) return { trials };
+  const signals = await import("@/lib/subscriptions/signals").then((m) => m.pruneSignals(now)).catch((e) => (console.error("[sweep] signals", e), null));
+  const ledger = await import("@/lib/subscriptions/lifecycle").then((m) => m.sweepExpired(now)).catch((e) => (console.error("[sweep] subscriptions", e), null));
+  return { trials, signals, ledger };
 }
 
 export const GET = sweep;

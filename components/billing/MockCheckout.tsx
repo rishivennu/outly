@@ -9,6 +9,7 @@ import { Pip } from "@/components/brand/Pip";
 import { OutlyLogo } from "@/components/brand/Logo";
 import { formatMoney, intervalLabel } from "@/lib/billing/money";
 import { cn } from "@/lib/utils";
+import { tierLabel } from "./offer-core";
 
 const CARDS = [
   { n: "4242 4242 4242 4242", what: "succeeds" },
@@ -19,7 +20,7 @@ const fmtCard = (v: string) => v.replace(/\D/g, "").slice(0, 16).replace(/(.{4})
 const fmtExp = (v: string) => { const d = v.replace(/\D/g, "").slice(0, 4); return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d; };
 
 /** Stands in for a hosted gateway page so the whole paid flow (success, decline, retry, invoice, email) can be tested. */
-export function MockCheckout({ paymentId, amountMinor, currency, planName, interval, email }: { paymentId: string; amountMinor: number; currency: string; planName: string; interval: string; email: string }) {
+export function MockCheckout({ paymentId, amountMinor, currency, planName, interval, email, tier }: { paymentId: string; amountMinor: number; currency: string; planName: string; interval: string; email: string; tier?: string | null }) {
   const router = useRouter();
   const [method, setMethod] = useState<"card" | "upi">("card");
   const [card, setCard] = useState("");
@@ -59,13 +60,14 @@ export function MockCheckout({ paymentId, amountMinor, currency, planName, inter
         <div className="glass-strong admin-page-in rounded-[32px] p-6 sm:p-8">
           <div className="flex items-center justify-between">
             <OutlyLogo size={26} />
-            <span className="rounded-full bg-warning/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider">Test checkout</span>
+            <span className="rounded-full bg-warning/20 px-2.5 py-1 text-xs font-semibold uppercase tracking-wider">Test checkout</span>
           </div>
           <div className="mt-6 flex items-center gap-4">
             <Pip size={64} mood={mood} />
             <div>
               <p className="text-sm text-muted-foreground">Outlly {planName}</p>
               <p className="text-3xl font-semibold tracking-tight tabular">{amount}<span className="text-base font-medium text-muted-foreground">{intervalLabel(interval)}</span></p>
+              {tierLabel(tier) && <p className="mt-1 text-[13px] font-medium text-foreground">{tierLabel(tier)}</p>}
             </div>
           </div>
 
@@ -108,7 +110,7 @@ export function MockCheckout({ paymentId, amountMinor, currency, planName, inter
               </div>
 
               <Button type="submit" variant="lime" size="lg" className="mt-5 w-full" disabled={state === "paying"}>
-                {state === "paying" ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Processing</> : <><Lock className="h-4 w-4" aria-hidden /> {state === "failed" ? "Try again" : `Pay ${amount}`}</>}
+                {state === "paying" ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Processing…</> : <><Lock className="h-4 w-4" aria-hidden /> {state === "failed" ? "Try again" : `Pay ${amount}`}</>}
               </Button>
               <p className="mt-2.5 flex items-center justify-center gap-1.5 text-[12.5px] text-muted-foreground">
                 <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-lime-ink" aria-hidden />

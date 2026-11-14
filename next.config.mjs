@@ -2,6 +2,11 @@
 // Pages the middleware doesn't see (the offline page the service worker keeps) get this script-free one.
 const staticCsp = "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
 
+// 1149: PostHog through a same-origin proxy (/ingest), so the CSP needs nothing new and blockers see a first-party call.
+// Mirrors lib/analytics/config.ts (this file can't import TypeScript).
+const posthogHost = (process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com").trim().replace(/\/+$/, "");
+const posthogAssets = posthogHost.replace(/^https:\/\/(us|eu)\.i\./, "https://$1-assets.i.");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -57,6 +62,10 @@ const nextConfig = {
     staleTimes: { dynamic: 30 },
   },
   images: { formats: ["image/avif", "image/webp"] },
+  rewrites: async () => [
+    { source: "/ingest/static/:path*", destination: `${posthogAssets}/static/:path*` },
+    { source: "/ingest/:path*", destination: `${posthogHost}/:path*` },
+  ],
   headers: async () => [
     // Brand art and sample posters: cached by browsers for a day and by a CDN for a week,
     // so repeat visits and many users at once don't touch the app server for images.
