@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { pollable } from "@/lib/client/idle";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Check, CircleAlert, Clock, LayoutGrid, RefreshCw, Sparkles, TriangleAlert, Users } from "lucide-react";
@@ -170,7 +171,7 @@ function LiveViews({ delay, className }: { delay: number; className?: string }) 
   useEffect(() => {
     let alive = true;
     const loop = async () => {
-      if (!document.hidden) await load();
+      if (pollable()) await load();
       if (alive) timer.current = setTimeout(loop, POLL_MS);
     };
     loop();

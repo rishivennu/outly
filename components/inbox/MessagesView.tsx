@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { pollable } from "@/lib/client/idle";
 import { AlertCircle, ArrowLeft, Check, Clock, ExternalLink, Inbox as InboxIcon, Loader2, Paperclip, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
@@ -89,7 +90,7 @@ export function MessagesView({ initial, tabs, query, refreshTick, refreshQuiet, 
 
   // New messages arrive by webhook; check our copy now and then while the tab is visible.
   useEffect(() => {
-    const id = setInterval(() => document.visibilityState === "visible" && void load(filter, false, true), LIST_POLL_MS);
+    const id = setInterval(() => pollable() && void load(filter, false, true), LIST_POLL_MS);
     return () => clearInterval(id);
   }, [filter, load]);
 
@@ -372,7 +373,7 @@ function ThreadPane({
 
   useEffect(() => {
     void fetchThread();
-    const id = setInterval(() => document.visibilityState === "visible" && void fetchThread(), THREAD_POLL_MS);
+    const id = setInterval(() => pollable() && void fetchThread(), THREAD_POLL_MS);
     return () => clearInterval(id);
   }, [fetchThread]);
 

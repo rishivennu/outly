@@ -15,7 +15,7 @@ export async function GET() {
   return json({ ...s, hide: hiddenAnchors(landing) }, {
     // Not "no-store": Vercel's edge refuses to keep a no-store answer even with cdn-cache-control set (checked live
     // 1113: always MISS). max-age=0 + must-revalidate still makes browsers ask every time.
-    headers: { "cache-control": "public, max-age=0, must-revalidate", "cdn-cache-control": "public, s-maxage=5, stale-while-revalidate=30" },
+    headers: { "cache-control": "public, max-age=0, must-revalidate", "cdn-cache-control": "public, s-maxage=15, stale-while-revalidate=30" },
   });
 }
 

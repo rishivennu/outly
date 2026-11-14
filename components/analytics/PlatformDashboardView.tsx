@@ -1,6 +1,7 @@
 "use client";
 import { ease } from "@/lib/motion/tokens";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { pollable } from "@/lib/client/idle";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -96,7 +97,7 @@ export function PlatformDashboardView({ platform, initial, connected, renderedAt
     let t: ReturnType<typeof setInterval> | undefined;
     const start = () => {
       clearInterval(t);
-      t = setInterval(() => load(false), POLL_MS);
+      t = setInterval(() => pollable() && load(false), POLL_MS);
     };
     const onVis = () => {
       if (document.hidden) clearInterval(t);

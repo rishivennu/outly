@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { pollable } from "@/lib/client/idle";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -67,7 +68,7 @@ export function Bell({ role }: { role: AdminRole }) {
   useEffect(() => {
     setSeen(localStorage.getItem(SEEN) ?? "");
     poll();
-    const t = setInterval(poll, 15_000);
+    const t = setInterval(() => pollable() && poll(), 30_000); // 1150: was every 15 s, hidden tabs included
     const v = () => document.visibilityState === "visible" && poll();
     document.addEventListener("visibilitychange", v);
     return () => {

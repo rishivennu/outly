@@ -1,6 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { pollable } from "@/lib/client/idle";
 import { ChevronLeft, Info, Loader2, MapPin, Minus, Plus, RefreshCw, RotateCcw, TriangleAlert } from "lucide-react";
 import { agoLabel, LIVE_POLL_MS, LIVE_TIMEOUTS_MIN, type LiveMap, type LivePlace } from "@/lib/live-map-core";
 import type { GlobeHandle } from "./LiveGlobeCanvas";
@@ -91,7 +92,7 @@ export function LiveGlobeCard({ initial }: { initial: LiveMap }) {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const loop = () => {
       timer = setTimeout(async () => {
-        if (!document.hidden) await load(timeout);
+        if (pollable()) await load(timeout);
         loop();
       }, LIVE_POLL_MS);
     };

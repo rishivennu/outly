@@ -65,10 +65,11 @@ let refreshing: Promise<unknown> | null = null;
  * 1113: stale-while-revalidate. Within a minute of the last read, answer from memory at once and refresh in the
  * background (waitUntil), so a page no longer waits on a second trip to the function region before it renders.
  * Only a cold instance (or one idle for over a minute) waits. A maintenance switch reaches every instance within
- * about 95 s (60 s here + 5 s CDN + 30 s stale on /api/maintenance).
+ * about 105 s (60 s here + 15 s CDN + 30 s stale on /api/maintenance). 1150: fresh window 5 s -> 15 s, so a quiet
+ * site no longer pays a second function call for most page views.
  */
 async function siteFlags(req: NextRequest, ev?: NextFetchEvent) {
-  if (status && Date.now() - status.at < 5_000) return status;
+  if (status && Date.now() - status.at < 15_000) return status;
   if (status && ev && Date.now() - status.at < 60_000) {
     if (!refreshing) {
       refreshing = readFlags(req).finally(() => (refreshing = null));
@@ -111,6 +112,12 @@ async function readFlags(req: NextRequest) {
   return status;
 }
 
+/** 1150: paths no Outlly page uses but vulnerability scanners try all day (Outlly has no PHP, WordPress or dotfiles). */
+const SCANNER = /\.(?:php\d?|asp|aspx|jsp|cgi|env|ini|sql|bak|old|swp|yml|yaml|config)$|^\/(?:wp-|wordpress|xmlrpc|cgi-bin|phpmyadmin|pma\/|vendor\/|\.git|\.env|\.aws|\.ssh|\.svn|\.ds_store)/i;
+export function isScannerPath(path: string) {
+  return SCANNER.test(path);
+}
+
 /** A real, signed admin session (not just a cookie being present) bypasses maintenance. */
 async function isAdmin(req: NextRequest) {
   const t = req.cookies.get("outly_admin")?.value;
@@ -130,6 +137,8 @@ export function keepAppSource(req: NextRequest, to: URL) {
 }
 
 export async function middleware(req: NextRequest, ev?: NextFetchEvent) {
+  // 1150: bots probing for WordPress, PHP and dotfiles get a bare 404 here, before any function (and its CPU) runs.
+  if (isScannerPath(req.nextUrl.pathname)) return new NextResponse(null, { status: 404, headers: { "cache-control": "public, max-age=3600" } });
   // Per-request nonce (1033). Next reads it from the request's CSP header and stamps it on its own inline
   // scripts; the root layout reads x-nonce for ours. Every page answer, rewrites included, carries the policy.
   const nonce = newNonce();

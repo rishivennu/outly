@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Users } from "lucide-react";
+import { pollable } from "@/lib/client/idle";
 import { compactCount, type LiveView } from "@/lib/presence-core";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +22,7 @@ export function useLiveView() {
     let alive = true;
     if (shared) setV(shared.v);
     const load = async () => {
-      if (document.visibilityState !== "visible") return;
+      if (!pollable()) return; // 1150: visible tab, and someone is there
       if (shared && Date.now() - shared.at < POLL_MS / 2) return alive && setV(shared.v);
       try {
         const r = await fetch("/api/stats/live", { cache: "no-store", credentials: "same-origin" });

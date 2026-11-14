@@ -6,6 +6,7 @@ import { AppIcon } from "@/components/brand/brands";
 import { PLATFORM_META, isPlatform } from "@/lib/domain";
 import { fetchSending, liveLabel, notifyOnce, onSendingWake, sendSummary, type LivePost } from "@/lib/client/sending";
 import { cn } from "@/lib/utils";
+import { pollable } from "@/lib/client/idle";
 
 /**
  * The sending pill (10-16g): a small Live Activity that follows you around the studio while a post sends.
@@ -77,7 +78,8 @@ export function SendingPill() {
   // device shows up here even if this one has notifications off.
   useEffect(() => {
     const every = polling ? (Date.now() - started.current > 120_000 ? SLOW : FAST) : IDLE_MS;
-    const id = setInterval(check, every);
+    // 1150: the quiet heartbeat waits for someone to be there; a send in progress keeps its fast poll.
+    const id = setInterval(() => (polling || pollable()) && void check(), every);
     return () => clearInterval(id);
   }, [polling, check]);
 

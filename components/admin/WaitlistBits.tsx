@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { pollable } from "@/lib/client/idle";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/Toast";
 import { adminApi } from "@/lib/client/admin-api";
@@ -44,7 +45,7 @@ export function AutoRefresh({ every = 30_000 }: { every?: number }) {
   const router = useRouter();
   const [, start] = useTransition();
   useEffect(() => {
-    const tick = () => document.visibilityState === "visible" && start(() => router.refresh());
+    const tick = () => pollable() && start(() => router.refresh());
     const t = setInterval(tick, every);
     document.addEventListener("visibilitychange", tick);
     return () => {

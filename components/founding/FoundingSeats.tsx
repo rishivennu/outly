@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { FoundingPublic } from "@/lib/founding";
+import { pollable } from "@/lib/client/idle";
 import { FoundingStamp } from "./FoundingStamp";
 
 /**
@@ -12,7 +13,7 @@ export function FoundingSeats({ initial }: { initial: FoundingPublic }) {
   useEffect(() => {
     let stop = false;
     const tick = async () => {
-      if (document.hidden) return;
+      if (!pollable()) return;
       try {
         const r = await fetch("/api/founding/seats", { cache: "no-store" });
         if (r.ok && !stop) setS(((await r.json()) as { seats: FoundingPublic | null }).seats);
