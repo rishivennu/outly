@@ -1,9 +1,9 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Maximize2, Minimize2, Pause, Play, RefreshCw, Replace, Volume2, VolumeX, X } from "lucide-react";
+import { Loader2, Maximize2, Minimize2, Pause, Play, RefreshCw, Replace, Volume2, VolumeX, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { aspectLabel, cn, formatBytes, formatDuration, resolutionLabel } from "@/lib/utils";
+import { aspectLabel, cn, formatBytes, formatDuration } from "@/lib/utils";
 import { validateVideoFile } from "@/lib/client/handoff";
 import type { UploadState } from "./types";
 import { OutlyMark } from "@/components/brand/Logo";
@@ -20,11 +20,23 @@ interface Props {
   onCancel?: () => void;
   onError?: (msg: string) => void;
   compact?: boolean;
+  /**
+   * 1152: the one player on the page. The caption editor drives this same element (jump to a caption, live
+   * overlay, clip previews), so there is never a second, out-of-sync copy of the video.
+   */
+  videoRef?: React.RefObject<HTMLVideoElement | null>;
+  /** Drawn over the picture, under the controls: the live caption preview canvas. */
+  overlay?: React.ReactNode;
+  /** Sized by its column (the editor's left rail) instead of by the viewport height. */
+  column?: boolean;
 }
 
-export function VideoStage({ src, poster, filename, meta, upload, onReplace, onRetry, onCancel, onError, compact }: Props) {
+type Load = "loading" | "ready" | "error";
+
+export function VideoStage({ src, poster, filename, meta, upload, onReplace, onRetry, onCancel, onError, compact, videoRef, overlay, column }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
-  const video = useRef<HTMLVideoElement>(null);
+  const own = useRef<HTMLVideoElement>(null);
+  const video = videoRef ?? own;
   const picker = useRef<HTMLInputElement>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -32,6 +44,9 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
   const [d, setD] = useState(meta?.duration ?? 0);
   const [full, setFull] = useState(false);
   const [justIn, setJustIn] = useState(false);
+  /* Never a black box that looks like a loaded video: until a frame is decoded we say we're loading, and a source
+     the browser can't play says so with a retry. */
+  const [load, setLoad] = useState<Load>("loading");
 
   useEffect(() => {
     if (upload.kind !== "done") return;
@@ -49,14 +64,17 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
   useEffect(() => {
     setPlaying(false);
     setT(0);
-  }, [src]);
+    const v = video.current;
+    // A cached source can be ready before React attaches the listeners.
+    setLoad(v && v.readyState >= 2 ? "ready" : "loading");
+  }, [src, video]);
 
   const toggle = useCallback(() => {
     const v = video.current;
     if (!v || !src) return;
     if (v.paused) v.play().catch(() => {});
     else v.pause();
-  }, [src]);
+  }, [src, video]);
 
   const seek = (s: number) => {
     const v = video.current;
@@ -68,6 +86,11 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
   const fullscreen = () => {
     if (document.fullscreenElement) document.exitFullscreen();
     else wrap.current?.requestFullscreen?.().catch(() => {});
+  };
+
+  const reload = () => {
+    setLoad("loading");
+    video.current?.load();
   };
 
   const onKey = (e: React.KeyboardEvent) => {
@@ -90,13 +113,21 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
   const ratio = meta?.width && meta?.height ? meta.width / meta.height : 9 / 16;
   const vertical = ratio < 1;
   const p = d ? (t / d) * 100 : 0;
-  const chips = [
-    meta?.duration ? formatDuration(meta.duration) : null,
-    meta?.width && meta?.height ? resolutionLabel(meta.width, meta.height) : null,
-    meta?.width && meta?.height ? aspectLabel(meta.width, meta.height) : null,
-    meta?.size ? formatBytes(meta.size) : null,
-    meta?.mimeType ? (meta.mimeType.includes("quicktime") ? "MOV" : "MP4") : null,
-  ].filter(Boolean) as string[];
+  const facts: { k: string; v: string }[] = [
+    meta?.duration ? { k: "Length", v: formatDuration(meta.duration) } : null,
+    meta?.width && meta?.height ? { k: "Resolution", v: `${meta.width}×${meta.height}` } : null,
+    meta?.width && meta?.height ? { k: "Aspect ratio", v: aspectLabel(meta.width, meta.height) } : null,
+    meta?.size ? { k: "File size", v: formatBytes(meta.size) } : null,
+    meta?.mimeType ? { k: "Format", v: meta.mimeType.includes("quicktime") ? "MOV" : "MP4" } : null,
+  ].filter(Boolean) as { k: string; v: string }[];
+  const showLoading = !!src && load === "loading" && !poster;
+
+  // Column: as wide as the column, never taller than the screen leaves room for (--stage-h: shorter on phones). Stage: sized by height.
+  const box: React.CSSProperties | undefined = full
+    ? { aspectRatio: String(ratio), height: "100%", maxWidth: "100%" }
+    : column
+      ? { aspectRatio: String(ratio), width: vertical ? `min(100%, calc(var(--stage-h) * ${ratio.toFixed(4)}))` : "100%" }
+      : { aspectRatio: String(ratio), height: vertical ? (compact ? "min(46dvh, 420px)" : "min(64dvh, 680px)") : undefined, width: vertical ? undefined : "100%", maxWidth: "100%" };
 
   return (
     <div className="flex w-full flex-col items-center">
@@ -105,42 +136,70 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
         tabIndex={0}
         role="region"
         aria-label={`Video player${filename ? `: ${filename}` : ""}. Space to play or pause, arrows to seek, M to mute, F for fullscreen.`}
+        aria-busy={showLoading || undefined}
         onKeyDown={onKey}
         className={cn(
-          "group relative isolate overflow-hidden bg-[hsl(240_8%_4%)] shadow-[0_40px_100px_-40px_hsl(262_40%_18%/0.55)] hairline",
-          full ? "flex h-full w-full items-center justify-center rounded-none" : "rounded-[28px]",
+          "group relative isolate mx-auto overflow-hidden bg-[hsl(240_8%_4%)] shadow-[0_40px_100px_-40px_hsl(262_40%_18%/0.55)] hairline",
+          full ? "flex h-full w-full items-center justify-center rounded-none" : column ? "rounded-[24px] [--stage-h:min(54dvh,480px)] md:[--stage-h:min(68dvh,640px)]" : "rounded-[28px]",
         )}
-        style={full ? undefined : { aspectRatio: String(ratio), height: vertical ? (compact ? "min(46dvh, 420px)" : "min(64dvh, 680px)") : undefined, width: vertical ? undefined : "100%", maxWidth: "100%" }}
+        style={full ? undefined : box}
       >
-        {src ? (
-          <video
-            ref={video}
-            src={src}
-            poster={poster ?? undefined}
-            muted={muted}
-            playsInline
-            preload="metadata"
-            className={cn("h-full w-full", full ? "object-contain" : "object-cover")}
-            onClick={toggle}
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-            onTimeUpdate={(e) => setT(e.currentTarget.currentTime)}
-            onLoadedMetadata={(e) => setD(e.currentTarget.duration)}
-            onEnded={() => setPlaying(false)}
-          />
-        ) : poster ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={poster} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <div className="skeleton h-full w-full" />
+        {/* The picture and its caption overlay share one box, so the overlay always lands on the frame (even in fullscreen). */}
+        <div className={cn("relative", full ? "mx-auto" : "h-full w-full")} style={full ? box : undefined}>
+          {src ? (
+            <video
+              ref={video}
+              src={src}
+              poster={poster ?? undefined}
+              muted={muted}
+              playsInline
+              preload="metadata"
+              className="h-full w-full object-cover"
+              onClick={toggle}
+              onPlay={() => (setPlaying(true), setLoad("ready"))}
+              onPause={() => setPlaying(false)}
+              onTimeUpdate={(e) => setT(e.currentTarget.currentTime)}
+              onLoadedMetadata={(e) => setD(e.currentTarget.duration)}
+              onLoadedData={() => setLoad("ready")}
+              onCanPlay={() => setLoad("ready")}
+              onError={() => setLoad("error")}
+              onEnded={() => setPlaying(false)}
+            />
+          ) : poster ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={poster} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="skeleton h-full w-full" />
+          )}
+          {overlay}
+        </div>
+
+        {showLoading && (
+          <div className="skeleton absolute inset-0 grid place-items-center" aria-hidden="true">
+            <span className="flex items-center gap-2 rounded-full bg-black/55 px-3.5 py-2 text-[13px] font-medium text-white">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading your preview
+            </span>
+          </div>
         )}
 
         {/* Soft vignette so controls stay legible on bright footage */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/25" aria-hidden="true" />
+
+        {src && load === "error" && (
+          <div role="alert" className="absolute inset-0 z-[1] grid place-items-center bg-[hsl(240_8%_6%/0.92)] p-5 text-center text-white">
+            <div>
+              <p className="text-sm font-semibold">This preview didn&apos;t load.</p>
+              <p className="mt-1 text-[13px] text-white/80">Your video is still saved. Try loading it again, or replace it.</p>
+              <Button size="sm" variant="subtle" className="mt-3" onClick={reload}>
+                <RefreshCw className="h-4 w-4" aria-hidden="true" /> Load it again
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Centre play affordance */}
         <AnimatePresence>
-          {src && !playing && (
+          {src && !playing && load !== "error" && (
             <motion.button
               type="button"
               initial={{ opacity: 0, scale: 0.8 }}
@@ -148,9 +207,12 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
               exit={{ opacity: 0, scale: 1.15 }}
               onClick={toggle}
               aria-label="Play"
-              className="absolute left-1/2 top-1/2 grid h-20 w-20 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white/15 text-white backdrop-blur-md hairline transition hover:bg-white/25"
+              className={cn(
+                "absolute left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white/15 text-white backdrop-blur-md hairline transition hover:bg-white/25",
+                column ? "h-16 w-16" : "h-20 w-20",
+              )}
             >
-              <Play className="ml-1 h-8 w-8 fill-current" />
+              <Play className={cn("ml-1 fill-current", column ? "h-7 w-7" : "h-8 w-8")} />
             </motion.button>
           )}
         </AnimatePresence>
@@ -218,8 +280,8 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
         </div>
 
         {/* Controls */}
-        {src && (
-          <div className={cn("absolute inset-x-0 bottom-0 flex flex-col gap-1 px-4 pb-3 pt-10 text-white transition-opacity duration-300", playing ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" : "opacity-100")}>
+        {src && load !== "error" && (
+          <div className={cn("absolute inset-x-0 bottom-0 flex flex-col gap-1 px-3 pb-2.5 pt-10 text-white transition-opacity duration-300", playing ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" : "opacity-100")}>
             <input
               type="range"
               className="timeline w-full"
@@ -238,7 +300,7 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
               <button type="button" onClick={() => setMuted((m) => !m)} aria-label={muted ? "Unmute" : "Mute"} aria-pressed={muted} className="grid h-11 w-11 place-items-center rounded-full hover:bg-white/15">
                 {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
               </button>
-              <span className="tabular ml-1 text-xs text-white/85">
+              <span className="tabular ml-1 whitespace-nowrap text-xs text-white/85">
                 {formatDuration(t)} / {formatDuration(d)}
               </span>
               <span className="flex-1" />
@@ -250,15 +312,18 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
         )}
       </div>
 
-      {/* Metadata + replace */}
-      <div className="mt-4 flex max-w-full flex-wrap items-center justify-center gap-1.5">
-        {chips.map((c) => (
-          <span key={c} className="tabular rounded-full bg-secondary/70 px-3 py-1 text-xs text-secondary-foreground hairline">
-            {c}
-          </span>
-        ))}
-        <Button variant="ghost" size="sm" onClick={() => picker.current?.click()} disabled={upload.kind === "uploading"}>
-          <Replace className="h-4 w-4" /> Replace
+      {/* One compact toolbar: what the file is, and the way to swap it. Sits right under the picture. */}
+      <div className={cn("mt-3 flex w-full rounded-2xl bg-secondary/50 hairline", column ? "flex-col gap-0.5 py-1.5 pl-3 pr-1.5" : "max-w-[520px] items-center gap-2 py-1 pl-3 pr-1")}>
+        <dl className={cn("min-w-0 text-xs text-secondary-foreground", column ? "grid grid-cols-3 gap-x-3 gap-y-1 py-1" : "flex flex-1 flex-wrap items-center gap-x-2.5 gap-y-0.5 py-1")} aria-label="Video details">
+          {facts.map((f, i) => (
+            <div key={f.k} className="flex items-center">
+              <dt className="sr-only">{f.k}</dt>
+              <dd className={cn("tabular whitespace-nowrap", i > 0 && !column && "before:mr-2.5 before:text-muted-foreground before:content-['·']")}>{f.v}</dd>
+            </div>
+          ))}
+        </dl>
+        <Button variant="ghost" size="sm" className={cn("shrink-0", column && "-ml-2.5 self-start")} onClick={() => picker.current?.click()} disabled={upload.kind === "uploading"} aria-label="Replace video">
+          <Replace className="h-4 w-4" aria-hidden="true" /> Replace
         </Button>
         <input
           ref={picker}

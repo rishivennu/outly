@@ -95,7 +95,7 @@ export function Assistant(p: Props) {
 
   return (
     <section aria-label="Creative partner" className="flex h-full min-h-0 flex-col">
-      <header className="flex items-center gap-3 px-6 pb-3 pt-6">
+      <header className="flex min-h-[76px] items-center gap-3 py-3 pl-5 pr-16">
         <span className="lime-bg relative grid h-9 w-9 place-items-center rounded-full">
           <Sparkles className="h-4 w-4" aria-hidden="true" />
           <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-success" aria-hidden="true" />
@@ -106,7 +106,7 @@ export function Assistant(p: Props) {
         </div>
       </header>
 
-      <div className="scrollbar-none min-h-0 flex-1 space-y-5 overflow-y-auto px-6 pb-4 pt-3 [mask-image:linear-gradient(to_bottom,transparent_0,#000_28px)]" aria-live="polite">
+      <div className="scrollbar-none min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-4 pt-2 [mask-image:linear-gradient(to_bottom,transparent_0,#000_28px)]" aria-live="polite">
         {!p.hasMedia && <Bubble from="outly">Hey! Drop a video in and I&apos;ll help it land everywhere it needs to go.</Bubble>}
         {p.hasMedia && p.upload.kind === "uploading" && <Bubble from="outly">Bringing it in. You can start telling me about it while it uploads.</Bubble>}
         {p.hasMedia && p.upload.kind === "failed" && (
@@ -122,15 +122,15 @@ export function Assistant(p: Props) {
 
         {p.step !== "video" && (
           <Bubble from="outly">
-            <span className="display block text-[28px] leading-[1.02] tracking-[-0.04em]">What&apos;s this video about?</span>
+            <span className="display block text-[26px] leading-[1.05] tracking-[-0.035em]">What&apos;s this video about?</span>
             {askStory && <span className="mt-2 block text-sm text-muted-foreground">A sentence or two is plenty. Tell it the way you&apos;d tell a friend.</span>}
           </Bubble>
         )}
 
         {askStory && !p.story && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="flex flex-wrap gap-2">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="flex flex-col items-start gap-1.5" role="group" aria-label="Story ideas">
             {EXAMPLES.map((e) => (
-              <button key={e} type="button" onClick={() => p.onStory(e)} className="min-h-[44px] rounded-full px-3.5 py-2 text-left text-[13px] text-muted-foreground hairline transition hover:bg-secondary hover:text-foreground">
+              <button key={e} type="button" onClick={() => p.onStory(e)} className="min-h-[44px] max-w-full rounded-2xl px-3.5 py-2 text-left text-[13px] leading-snug text-muted-foreground hairline transition hover:bg-secondary hover:text-foreground motion-reduce:transition-none">
                 {e}
               </button>
             ))}

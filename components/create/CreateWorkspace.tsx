@@ -3,7 +3,7 @@ import { whyLine } from "@/lib/ai/caption-engine";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { PanelRightClose, PanelRightOpen } from "lucide-react";
+import { PanelRightClose, PanelRightOpen, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UploadZone } from "@/components/shared/UploadZone";
 import { PostKindSwitch } from "./PostKindSwitch";
@@ -136,6 +136,64 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   useEffect(() => {
     panelDispatch({ t: "step", step });
   }, [step]);
+
+  /* 1152: one player for the page. The caption editor seeks it, reads its time and draws its live preview on the
+     canvas laid over it; while captions are on it shows the clean video so the overlay never doubles a burned copy. */
+  const capVideo = useRef<HTMLVideoElement>(null);
+  const capCanvas = useRef<HTMLCanvasElement>(null);
+  const [capLive, setCapLive] = useState(false);
+  const onCapLive = useCallback((on: boolean) => setCapLive(on), []);
+
+  /* 1152: the assistant is a side panel from 1280px; below that the same element opens as a drawer (one instance,
+     so the conversation survives a resize, a close and a reopen). */
+  const [wide, setWide] = useState(false);
+  const [drawer, setDrawer] = useState(false);
+  const drawerFrom = useRef<HTMLElement | null>(null);
+  const drawerClose = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1280px)");
+    const f = () => setWide(mq.matches);
+    f();
+    mq.addEventListener("change", f);
+    return () => mq.removeEventListener("change", f);
+  }, []);
+  const sheet = drawer && !wide;
+  const openDrawer = useCallback(() => {
+    drawerFrom.current = document.activeElement as HTMLElement | null;
+    setDrawer(true);
+  }, []);
+  const closeDrawer = useCallback(() => {
+    setDrawer(false);
+    requestAnimationFrame(() => drawerFrom.current?.focus?.());
+  }, []);
+  useEffect(() => {
+    if (wide) setDrawer(false);
+  }, [wide]);
+  useEffect(() => {
+    if (!sheet) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    requestAnimationFrame(() => drawerClose.current?.focus());
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [sheet]);
+  const onDrawerKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      closeDrawer();
+      return;
+    }
+    if (e.key !== "Tab" || !drawerRef.current) return;
+    // Keep Tab inside the open drawer.
+    const f = [...drawerRef.current.querySelectorAll<HTMLElement>('button:not([disabled]),textarea:not([disabled]),input:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])')].filter((el) => el.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0];
+    const last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) (e.preventDefault(), last.focus());
+    else if (!e.shiftKey && document.activeElement === last) (e.preventDefault(), first.focus());
+  };
 
   const meta = useMemo(
     () => ({ duration: media?.duration ?? localMeta?.duration ?? null, width: media?.width ?? localMeta?.width ?? null, height: media?.height ?? localMeta?.height ?? null, size: media?.size ?? fileRef.current?.size ?? null, mimeType: media?.mimeType ?? fileRef.current?.type ?? null }),
@@ -625,17 +683,20 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   );
 
   const showVideo = step === "video" || step === "story";
+  /** Step 2 with a video: preview, editor and assistant side by side. */
+  const stage = showVideo && hasMedia;
+  const pipShown = wide ? panel.open : drawer;
 
   return (
     <div className="relative flex gap-0 lg:min-h-dvh">
       <Glow />
-      <JourneyRail step={step} reachable={reachable} onGo={setStep} thumb={poster} title={hook?.split("\n")[0]} saved={saved} />
+      <JourneyRail step={step} reachable={reachable} onGo={setStep} thumb={poster} title={hook?.split("\n")[0]} saved={saved} roomy={stage} />
 
-      <div className="relative min-w-0 flex-1">
-        <JourneyBar step={step} reachable={reachable} onGo={setStep} />
+      <div className="relative min-w-0 flex-1" inert={sheet || undefined}>
+        <JourneyBar step={step} reachable={reachable} onGo={setStep} roomy={stage} />
         {/* The editor is the one studio surface off the page frame on purpose (1104): a narrow, animated writing
             column between the journey rail and the side panel, with its own tighter gutter. */}
-        <div className={cn("mx-auto flex w-full max-w-3xl flex-col px-4 pb-4 pt-6 transition-[max-width] duration-500 [transition-timing-function:var(--ease-liquid)] motion-reduce:transition-none sm:px-8 lg:pb-16 lg:pt-8", panel.open ? "lg:max-w-4xl" : "lg:max-w-5xl")}>
+        <div className={cn("mx-auto flex w-full flex-col px-4 pb-4 pt-6 transition-[max-width] duration-500 [transition-timing-function:var(--ease-liquid)] motion-reduce:transition-none sm:px-6 lg:pb-16 lg:pt-8", stage ? (pipShown ? "max-w-[1120px]" : "max-w-[1240px]") : cn("max-w-3xl sm:px-8", panel.open ? "lg:max-w-4xl" : "lg:max-w-5xl"))}>
           {/* Steps animate in on mount. No exit choreography: a nested exit that never settles must not strand the next step. */}
             {showVideo && !hasMedia && (
               <motion.section key="drop" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} aria-labelledby="drop-title" className={`${createFont.variable} font-create flex flex-col items-center pt-2 sm:pt-4 lg:pt-10`}>
@@ -683,8 +744,26 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
             {showVideo && hasMedia && (
               <motion.section key="stage" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, x: -30 }} transition={T.card} aria-label="Your video">
                 <h1 className="sr-only">Create</h1>
+                {/* Below 1280px the assistant lives in a drawer: this is the way in, first, since Step 2 starts there. */}
+                <div className="glass mb-5 flex items-center gap-3 rounded-[22px] p-3 pl-4 xl:hidden">
+                  <span className="lime-bg grid h-9 w-9 shrink-0 place-items-center rounded-full" aria-hidden="true">
+                    <Sparkles className="h-4 w-4" />
+                  </span>
+                  <p className="min-w-0 flex-1 text-[13px] leading-snug">
+                    <span className="block font-semibold">{hook ? "Your hook is set" : submittedStory ? "Pip has ideas for your hook" : "What's this video about?"}</span>
+                    <span className="block text-muted-foreground">{hook ? "Ask the assistant to change it any time." : submittedStory ? "Open the assistant to pick one." : "Tell the assistant in a sentence or two."}</span>
+                  </p>
+                  <Button variant="primary" size="sm" className="shrink-0" onClick={openDrawer} aria-haspopup="dialog" aria-expanded={drawer} aria-controls={ASSISTANT_PANEL}>
+                    Open Pip
+                  </Button>
+                </div>
+                <div className="md:grid md:grid-cols-[minmax(220px,280px)_minmax(0,1fr)] md:items-start md:gap-5 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)] lg:gap-6 xl:grid-cols-[minmax(240px,272px)_minmax(0,1fr)] xl:gap-5 2xl:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] 2xl:gap-6">
+                <div className="md:sticky md:top-20 min-[1800px]:top-6">
                 <VideoStage
-                  src={src}
+                  column
+                  videoRef={capVideo}
+                  overlay={<canvas ref={capCanvas} className="pointer-events-none absolute inset-0 h-full w-full object-cover" aria-hidden="true" />}
+                  src={capLive && preCaption ? preCaption.media.url : src}
                   poster={poster}
                   filename={media?.filename ?? fileRef.current?.name}
                   meta={meta}
@@ -694,8 +773,13 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                   onCancel={cancelUpload}
                   onError={(m) => toast(m, "info")}
                 />
+                </div>
+                <div data-pip={pipShown ? "open" : "closed"} className="group/edit mt-5 min-w-0 space-y-5 md:mt-0">
                 {(preCaption || (src && media && upload.kind === "done")) && (
                   <CaptionBurner
+                    video={capVideo}
+                    canvas={capCanvas}
+                    onLive={onCapLive}
                     key={preCaption?.media.id ?? media?.id}
                     /* always the clean video, so the preview overlay and a re-burn never double the captions */
                     src={(preCaption ? preCaption.media.url : src) ?? src ?? ""}
@@ -726,8 +810,10 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                     onError={(m) => toast(m, "error")}
                   />
                 )}
-                <PublishTo platforms={live} drafts={drafts} accounts={accounts} onToggle={(pl, on) => onDraft(pl, { enabled: on })} />
-                <div className="glass mt-8 rounded-[28px] lg:hidden">{assistant}</div>
+                <PublishTo className="" platforms={live} drafts={drafts} accounts={accounts} onToggle={(pl, on) => onDraft(pl, { enabled: on })} />
+                <SaveDraft className="px-1" state={saved} at={savedAt} onSave={saveDraftNow} busy={saved === "saving"} />
+                </div>
+                </div>
               </motion.section>
             )}
 
@@ -778,15 +864,26 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                 )}
               </motion.section>
             )}
-          {hasMedia && <SaveDraft state={saved} at={savedAt} onSave={saveDraftNow} busy={saved === "saving"} />}
+          {hasMedia && !stage && <SaveDraft state={saved} at={savedAt} onSave={saveDraftNow} busy={saved === "saving"} />}
         </div>
       </div>
 
-      <aside aria-label="AI assistant" className="sticky top-0 hidden h-dvh shrink-0 items-start gap-2 p-3 lg:flex">
+      <aside
+        ref={drawerRef}
+        aria-label="AI assistant"
+        role={sheet ? "dialog" : undefined}
+        aria-modal={sheet || undefined}
+        onKeyDown={sheet ? onDrawerKey : undefined}
+        className={cn(
+          "xl:relative xl:sticky xl:top-0 xl:flex xl:h-dvh xl:shrink-0 xl:items-start xl:p-3",
+          drawer ? "max-xl:fixed max-xl:inset-0 max-xl:z-[60] max-xl:flex max-xl:flex-col max-xl:justify-end md:max-xl:flex-row md:max-xl:justify-end" : "max-xl:hidden",
+        )}
+      >
+        {sheet && <div className="absolute inset-0 bg-[hsl(240_10%_4%/0.55)]" aria-hidden="true" onClick={closeDrawer} />}
         <Button
           variant="subtle"
           size="icon"
-          className="shrink-0"
+          className={cn("hidden shrink-0 xl:inline-flex", panel.open && "xl:absolute xl:right-6 xl:top-[26px] xl:z-[2]")}
           onClick={() => panelDispatch({ t: "toggle" })}
           aria-expanded={panel.open}
           aria-controls={ASSISTANT_PANEL}
@@ -797,13 +894,19 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
         {/* Folded, never unmounted: the conversation and everything typed into it is still there when it comes back. */}
         <div
           id={ASSISTANT_PANEL}
-          aria-hidden={!panel.open}
-          inert={!panel.open}
+          aria-hidden={!pipShown}
+          inert={!pipShown}
           className={cn(
-            "glass h-full overflow-hidden rounded-[28px] transition-[width,opacity] duration-500 [transition-timing-function:var(--ease-liquid)] motion-reduce:transition-none",
-            panel.open ? "w-[332px] opacity-100 xl:w-[372px]" : "w-0 opacity-0",
+            "relative overflow-hidden",
+            sheet ? "glass-strong" : "glass",
+            "xl:h-full xl:rounded-[28px] xl:transition-[width,opacity] xl:duration-500 xl:[transition-timing-function:var(--ease-liquid)] motion-reduce:transition-none",
+            panel.open ? "xl:w-[300px] xl:opacity-100 2xl:w-[340px]" : "xl:w-0 xl:opacity-0",
+            "max-xl:h-[min(88dvh,760px)] max-xl:w-full max-xl:rounded-t-[28px] max-xl:pb-[env(safe-area-inset-bottom)] md:max-xl:m-3 md:max-xl:h-auto md:max-xl:w-[400px] md:max-xl:rounded-[28px] md:max-xl:pb-0",
           )}
         >
+          <Button ref={drawerClose} variant="ghost" size="icon" className="absolute right-3 top-4 z-[2] xl:hidden" onClick={closeDrawer} aria-label="Close Pip">
+            <X className="h-5 w-5" aria-hidden="true" />
+          </Button>
           {assistant}
         </div>
       </aside>

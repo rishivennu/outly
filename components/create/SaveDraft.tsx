@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { RotateCcw, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { autosaveLine, type SaveState } from "./publish";
 import { DRAFT_TTL_DAYS } from "@/lib/client/device-drafts";
 
@@ -11,12 +12,13 @@ interface Props {
   at: string | null;
   onSave: () => void;
   busy: boolean;
+  className?: string;
 }
 
 /** Explicit saving, on every step once a video exists, with the autosave line always on screen. */
-export function SaveDraft({ state, at, onSave, busy }: Props) {
+export function SaveDraft({ state, at, onSave, busy, className }: Props) {
   return (
-    <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
+    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-2", className ?? "mt-6")}>
       <Button variant="subtle" onClick={onSave} disabled={busy}>
         <Save className="h-4 w-4" /> {busy ? "Saving" : "Save draft"}
       </Button>

@@ -52,9 +52,11 @@ describe("1095 launch collapse", () => {
 
   test("the panel is folded by width, not unmounted", () => {
     expect(workspace).toContain('id={ASSISTANT_PANEL}');
-    expect(workspace).toContain('panel.open ? "w-[332px] opacity-100 xl:w-[372px]" : "w-0 opacity-0"');
-    expect(workspace).toContain("inert={!panel.open}");
-    expect(workspace).toContain("aria-hidden={!panel.open}");
+    // 1152: a 320/340px side panel from 1280px; below that the same element is the drawer
+    expect(workspace).toContain('panel.open ? "xl:w-[300px] xl:opacity-100 2xl:w-[340px]" : "xl:w-0 xl:opacity-0"');
+    expect(workspace).toContain("const pipShown = wide ? panel.open : drawer;");
+    expect(workspace).toContain("inert={!pipShown}");
+    expect(workspace).toContain("aria-hidden={!pipShown}");
     // one Assistant element, placed in the aside whether it is open or closed
     expect(workspace).not.toContain("panel.open && <Assistant");
     expect(workspace).not.toContain("panel.open && assistant");

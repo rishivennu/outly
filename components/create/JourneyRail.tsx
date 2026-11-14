@@ -13,12 +13,14 @@ interface Props {
   thumb?: string | null;
   title?: string | null;
   saved?: "idle" | "saving" | "saved" | "error";
+  /** 1152: the editing steps need the width for preview + editor + assistant, so the rail waits for a very wide screen. */
+  roomy?: boolean;
 }
 
-export function JourneyRail({ step, reachable, onGo, thumb, title, saved }: Props) {
+export function JourneyRail({ step, reachable, onGo, thumb, title, saved, roomy }: Props) {
   const idx = STEPS.findIndex((s) => s.id === step);
   return (
-    <nav aria-label="Your journey" className={cn(createFont.variable, "font-create sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col px-5 py-10 xl:flex")}>
+    <nav aria-label="Your journey" className={cn(createFont.variable, "font-create sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col px-5 py-10", roomy ? "min-[1800px]:flex" : "xl:flex")}>
       <div className="mb-8 px-1">
         <p className="eyebrow">New creation</p>
         <p className="mt-2 font-create text-[1.35rem] font-semibold leading-tight tracking-[-0.03em]">
@@ -82,10 +84,10 @@ export function JourneyRail({ step, reachable, onGo, thumb, title, saved }: Prop
 }
 
 /** Compact stepper for small screens. */
-export function JourneyBar({ step, reachable, onGo }: Pick<Props, "step" | "reachable" | "onGo">) {
+export function JourneyBar({ step, reachable, onGo, roomy }: Pick<Props, "step" | "reachable" | "onGo" | "roomy">) {
   const idx = STEPS.findIndex((s) => s.id === step);
   return (
-    <nav aria-label="Your journey" className={cn(createFont.variable, "font-create glass sticky top-0 z-30 mx-3 mt-1 rounded-[22px] px-4 py-3 xl:hidden")}>
+    <nav aria-label="Your journey" className={cn(createFont.variable, "font-create glass sticky top-0 z-30 mx-3 mt-1 rounded-[22px] px-4 py-3", roomy ? "min-[1800px]:hidden" : "xl:hidden")}>
       <ol className="flex items-center gap-2">
         {STEPS.map((s, i) => (
           <li key={s.id} className="flex flex-1 flex-col gap-1.5">
