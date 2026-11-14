@@ -29,7 +29,7 @@ export type StatPost = {
   /** False when Outlly has no numbers for it yet (just published, or the platform hasn't reported). */
   hasMetrics: boolean;
 };
-export type Snap = { at: number; platform: string; key: string; views: number; likes: number; comments: number; shares: number };
+export type Snap = { at: number; platform: string; key: string; views: number; likes: number; comments: number; shares: number; acct?: string | null };
 
 export const interactionsOf = (x: { likes: number; comments: number; shares: number }) => x.likes + x.comments + x.shares;
 /** Interactions per hundred views, or null with no views (never 0%, which would read as "nobody engaged"). */

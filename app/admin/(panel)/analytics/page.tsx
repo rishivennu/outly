@@ -2,6 +2,8 @@ import { ExternalLink } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/guard";
 import { analyticsReport, type Panel } from "@/lib/analytics/posthog-report";
 import { parseRange, type RangeDays } from "@/lib/analytics/posthog-query";
+import { outllyReport, type OutllyReport } from "@/lib/analytics/outlly-report";
+import { parseAnalyticsSource } from "@/lib/analytics/outlly-core";
 import { Card, CardTitle, Empty, PageHead } from "@/components/admin/ui";
 import { FilterChips } from "@/components/admin/SearchBox";
 import { FunnelBars } from "@/components/admin/motion/FunnelBars";
@@ -89,21 +91,101 @@ function ListPanel<T>({ title, hint, panel, empty, render }: { title: string; hi
   );
 }
 
-export default async function AnalyticsPage(props: { searchParams: Promise<{ d?: string }> }) {
+function Stat({ label, value, hint }: { label: string; value: number; hint: string }) {
+  return (
+    <div className="rounded-2xl bg-secondary/50 px-4 py-3">
+      <p className="text-[12px] font-medium text-muted-foreground">{label}</p>
+      <p className="font-display text-[1.5rem] font-bold leading-tight tabular">{n(value)}</p>
+      <p className="text-[12px] text-muted-foreground">{hint}</p>
+    </div>
+  );
+}
+
+/** 1151: the original, built-in view. Outlly's own records, so every account counts and no cookie is needed. */
+function OutllyView({ r }: { r: OutllyReport }) {
+  const quiet = r.daily.every((d) => d.signups === 0 && d.waitlist === 0 && d.published === 0);
+  return (
+    <>
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <Stat label="New accounts" value={r.totals.signups} hint={`last ${r.days} days`} />
+        <Stat label="Waitlist joins" value={r.totals.waitlist} hint={`last ${r.days} days`} />
+        <Stat label="Active people" value={r.totals.active} hint={`used Outlly in ${r.days} days`} />
+        <Stat label="Active today" value={r.totals.activeToday} hint="in the last 24 hours" />
+        <Stat label="Posts published" value={r.totals.published} hint="real posts, not practice" />
+      </div>
+
+      <Card className="mb-5">
+        <CardTitle hint="New accounts per day (UTC), from Outlly's own records.">Signups</CardTitle>
+        {quiet ? (
+          <p className="text-[13.5px] text-muted-foreground">No signups, waitlist joins or published posts in this range yet.</p>
+        ) : (
+          <>
+            <DayBars label="New accounts per day" days={r.daily} value={(i) => r.daily[i].signups} unit="new accounts" />
+            <DataDetails>
+              <SimpleTable caption="Signups, waitlist joins and published posts per day" head={["Day", "Signups", "Waitlist", "Posts"]} rows={r.daily.map((d) => [dayLabel(d.day), d.signups, d.waitlist, d.published])} />
+            </DataDetails>
+          </>
+        )}
+      </Card>
+
+      <div className="mb-5 grid gap-5 xl:grid-cols-2 [&>*]:min-w-0">
+        <Card>
+          <CardTitle hint="People who arrived in this range. Each step counts how many of the step before made it.">Signup funnel</CardTitle>
+          {r.funnel.every((s) => s.count === 0) ? <p className="text-[13.5px] text-muted-foreground">Nobody arrived in this range yet.</p> : <FunnelBars steps={r.funnel} worstKey={null} />}
+        </Card>
+        <Card>
+          <CardTitle hint="Published posts per day (UTC), practice runs left out.">Posts published</CardTitle>
+          {r.totals.published === 0 ? (
+            <p className="text-[13.5px] text-muted-foreground">No posts were published in this range.</p>
+          ) : (
+            <>
+              <DayBars label="Posts published per day" days={r.daily} value={(i) => r.daily[i].published} unit="posts" />
+              <DataDetails>
+                <SimpleTable caption="Posts published per day" head={["Day", "Posts"]} rows={r.daily.map((d) => [dayLabel(d.day), d.published])} />
+              </DataDetails>
+            </>
+          )}
+        </Card>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-3 [&>*]:min-w-0">
+        <ListPanel title="Signup sources" hint="The campaign link, friend's link or direct visit each new account came from." panel={{ ok: true, data: r.sources }} empty="No new accounts in this range." render={(rows) => <SimpleTable caption="Signups by source" head={["Source", "Signups", "Posted", "Paid"]} rows={rows.map((s) => [s.label, s.signups, s.posted, s.paid])} />} />
+        <ListPanel title="Countries" hint="Where new accounts last signed in from, approximately." panel={{ ok: true, data: r.countries }} empty="No new accounts in this range." render={(rows) => <SimpleTable caption="New accounts by country" head={["Country", "Signups"]} rows={rows.map((c) => [c.country, c.signups])} />} />
+        <ListPanel title="Platforms" hint="Where the published posts went." panel={{ ok: true, data: r.platforms }} empty="No posts were published in this range." render={(rows) => <SimpleTable caption="Published posts by platform" head={["Platform", "Posts"]} rows={rows.map((p) => [p.platform, p.posts])} />} />
+      </div>
+    </>
+  );
+}
+
+export default async function AnalyticsPage(props: { searchParams: Promise<{ d?: string; src?: string }> }) {
   await requireAdmin("growth");
-  const days: RangeDays = parseRange((await props.searchParams).d);
+  const sp = await props.searchParams;
+  const days: RangeDays = parseRange(sp.d);
+  const src = parseAnalyticsSource(sp.src);
+  const range = <FilterChips param="d" label="Date range" current={days === 30 ? "" : String(days)} options={[{ value: "7", label: "7 days" }, { value: "", label: "30 days" }, { value: "90", label: "90 days" }]} />;
+  const source = <FilterChips param="src" label="Data source" current={src === "posthog" ? "posthog" : ""} options={[{ value: "", label: "Outlly data" }, { value: "posthog", label: "PostHog" }]} />;
+
+  if (src === "outlly") {
+    const r = await outllyReport(days);
+    return (
+      <>
+        <PageHead title="Analytics" body={`The last ${days} days from Outlly's own records: every account and post counts, no cookies needed. Visitors who never sign up are only in PostHog. Numbers refresh every minute.`} actions={<>{source}{range}</>} />
+        <OutllyView r={r} />
+      </>
+    );
+  }
+
   const report = await analyticsReport(days);
   const open = (
     <a href={report.projectUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-4 text-[13px] font-semibold text-background sm:h-9">
       Open in PostHog <ExternalLink className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">(opens in a new tab)</span>
     </a>
   );
-  const range = <FilterChips param="d" current={days === 30 ? "" : String(days)} options={[{ value: "7", label: "7 days" }, { value: "", label: "30 days" }, { value: "90", label: "90 days" }]} />;
 
   if (!report.connected) {
     return (
       <>
-        <PageHead title="Analytics" body="Site traffic and the signup funnel, from PostHog." actions={open} />
+        <PageHead title="Analytics" body="Site traffic and the signup funnel, from PostHog. Switch to Outlly data for numbers from Outlly's own records." actions={<>{source}{open}</>} />
         <Card>
           <Empty title="Not connected yet" body={`The reports need ${report.missing.join(" and ")} set in the server environment, then a redeploy.`}>
             <p className="max-w-md text-[13.5px] text-muted-foreground">
@@ -119,7 +201,7 @@ export default async function AnalyticsPage(props: { searchParams: Promise<{ d?:
   const { daily, signups, funnel, pages, referrers, countries } = report;
   return (
     <>
-      <PageHead title="Analytics" body={`The last ${days} days of site traffic, from PostHog. Only visitors who accepted analytics cookies are counted; numbers refresh every 5 minutes.`} actions={<>{range}{open}</>} />
+      <PageHead title="Analytics" body={`The last ${days} days of site traffic, from PostHog. Only visitors who accepted analytics cookies are counted; numbers refresh every 5 minutes.`} actions={<>{source}{range}{open}</>} />
 
       <Card className="mb-5">
         <CardTitle hint="Unique visitors and page views per day (UTC).">Visitors</CardTitle>

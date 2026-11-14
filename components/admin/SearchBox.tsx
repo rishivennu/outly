@@ -42,7 +42,7 @@ export function SearchBox({ placeholder, param = "q" }: { placeholder: string; p
   );
 }
 
-export function FilterChips({ param, options, current, glide = false }: { param: string; options: { value: string; label: string }[]; current: string; glide?: boolean }) {
+export function FilterChips({ param, options, current, glide = false, label = "Filter" }: { param: string; options: { value: string; label: string }[]; current: string; glide?: boolean; label?: string }) {
   const sp = useSearchParams();
   const path = usePathname();
   const href = (v: string) => {
@@ -55,8 +55,8 @@ export function FilterChips({ param, options, current, glide = false }: { param:
   // Phones: one segmented row that scrolls sideways inside the card (edge fade shows there is more), never a
   // stack of wrapped rows. From 640px up the chips wrap as before. 44px tall on touch screens, 36px with a mouse.
   return (
-    <ScrollX label="Filter" focusable={false} className="-mx-5 w-[calc(100%+2.5rem)] px-5 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
-      <div className="flex w-max gap-1.5 py-0.5 sm:w-auto sm:flex-wrap" role="group" aria-label="Filter">
+    <ScrollX label={label} focusable={false} className="-mx-5 w-[calc(100%+2.5rem)] px-5 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
+      <div className="flex w-max gap-1.5 py-0.5 sm:w-auto sm:flex-wrap" role="group" aria-label={label}>
         {options.map((o) => (
           <Link key={o.value} href={href(o.value)} scroll={false} aria-current={current === o.value ? "true" : undefined} className={cn("inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-[12.5px] sm:h-9", current === o.value ? "lime-bg font-semibold" : "bg-secondary/60 font-medium text-muted-foreground hairline hover:text-foreground")}>
             {o.label}

@@ -99,6 +99,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const [conv, setConv] = useState<string | null>(null);
   const [resolved, setResolved] = useState<{ to: string } | null>(null);
   const [closing, setClosing] = useState<{ busy: boolean; error: string }>({ busy: false, error: "" });
+  // 1151: can a transcript really be emailed right now (email on, address verified)? Unknown = don't offer.
+  const [transcriptOk, setTranscriptOk] = useState(false);
   const closingRef = useRef(false);
   const reopenRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
@@ -166,6 +168,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     loadedCtx.current = true;
     fetch("/api/support/context").then((r) => (r.ok ? r.json() : { items: [] })).then((j) => setCards(j.items ?? [])).catch(() => {});
     fetch("/api/pip/insights").then((r) => (r.ok ? r.json() : { items: [] })).then((j) => setInsights((j.items ?? []).slice(0, 3))).catch(() => {});
+    fetch("/api/support/conversation").then((r) => (r.ok ? r.json() : null)).then((j) => setTranscriptOk(!!j?.transcript?.available)).catch(() => {});
   }, [open, inStudio]);
 
   // Pip dozes off when nobody has typed for a while; any activity wakes it.
@@ -293,7 +296,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   function feedback(m: Msg, good: boolean) {
     setMsgs((x) => x.map((y) => (y.id === m.id ? { ...y, ask: false } : y)));
     // 1126: "Yes, that helped" is the clearest "resolved" there is. Signed in with a saved chat: offer to close it.
-    if (good && signedIn && conv && !resolved) {
+    if (good && resolved) return;
+    if (good && signedIn && conv && transcriptOk) {
       setMsgs((x) => x.map((y) => (y.offer ? { ...y, offer: false } : y)));
       return push({ role: "bot", text: `**${rt.reply}**\n\n${rt.ask}`, kind: "resolve", offer: true });
     }
@@ -380,6 +384,9 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     }
   }
   function keepChatting(m: Msg) {
+    // 1151: one reply per press. A second tap (before React re-renders) finds the offer gone and does nothing.
+    if (!m.offer || closingRef.current) return;
+    m.offer = false;
     setMsgs((x) => x.map((y) => (y.id === m.id ? { ...y, offer: false } : y)));
     setClosing({ busy: false, error: "" });
     push({ role: "bot", text: rt.kept });
@@ -406,6 +413,39 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     } finally {
       closingRef.current = false;
     }
+  }
+
+  // 1151: "Continue in Pip" on Help centre > Your Pip conversations. Loads that saved chat as it is: a resolved
+  // one stays resolved (with its Reopen button), so nothing reopens unless the person presses Reopen or writes.
+  useEffect(() => {
+    const on = async (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (typeof id !== "string" || !id) return;
+      setOpen(true);
+      try {
+        const r = await fetch(`/api/support/conversation?id=${encodeURIComponent(id)}`);
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(typeof j.error === "string" ? j.error : T[lang].error);
+        const list: Msg[] = (Array.isArray(j.messages) ? j.messages : []).map((m: { role: "user" | "bot"; text: string }, i: number) => ({ id: i + 1, role: m.role, text: m.text }));
+        idRef.current = list.length + 1;
+        setMsgs(list); setFails(0); setInput(""); setClosing({ busy: false, error: "" });
+        setConv(j.id);
+        setResolved(j.status === "resolved" ? { to: typeof j.sentTo === "string" ? j.sentTo : "" } : null);
+        setAnnounce(`${cx.conversation}: ${typeof j.subject === "string" ? j.subject : ""}`);
+      } catch (err) {
+        push({ role: "bot", text: err instanceof Error && err.message ? err.message : T[lang].error, kind: "error" });
+      }
+    };
+    window.addEventListener("outly:pip-conversation", on);
+    return () => window.removeEventListener("outly:pip-conversation", on);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
+
+  /** 1151: after Refresh data succeeds, ask the question behind that card again so the answer uses the fresh numbers. */
+  function askAgain(m: Msg) {
+    const i = msgs.findIndex((x) => x.id === m.id);
+    const q = [...msgs.slice(0, i)].reverse().find((x) => x.role === "user")?.text;
+    if (q) send(q);
   }
 
   function newChat() {
@@ -560,7 +600,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                     <Bubble role={m.role} label={m.role === "user" ? cx.saidYou : cx.saidPip} error={m.kind === "error"}>
                       {m.role === "bot" ? <Answer text={m.text} emphasis={!!m.data} /> : <p className="whitespace-pre-wrap">{m.text}</p>}
                     </Bubble>
-                    {m.data && <PipDataCard r={m.data} />}
+                    {m.data && <PipDataCard r={m.data} onRefreshed={busy || resolved ? undefined : () => askAgain(m)} />}
                     {m.role === "bot" && !m.kind && m.text !== t.glad && (
                       <div className="mt-1 flex flex-wrap items-center gap-1 ps-1">
                         <button type="button" onClick={() => copy(m)} aria-label={copied === m.id ? cx.copied : cx.copy} title={cx.copy} className="pc-icon pc-icon-sm">

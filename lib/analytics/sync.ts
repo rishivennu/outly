@@ -24,6 +24,22 @@ import { dayKey } from "./core";
 export const SYNCABLE: Platform[] = ["instagram", "youtube", "facebook"];
 /** A target whose newest stored row is younger than this is already fresh enough. */
 export const TARGET_STALE_MS = 6 * 3600_000;
+/**
+ * 1151: a post in its first two days moves fast, so its numbers are read every 30 minutes (the cadence the app
+ * promises); after that every 6 hours. One row per post per 30 minutes is also snapshotTarget's own limit.
+ */
+export const HOT_STALE_MS = 30 * 60_000;
+export const HOT_FOR_MS = 48 * 3600_000;
+/** Without a successful sync for this long, an account's numbers are shown as cached, not live. */
+export const SYNC_FRESH_MS = 30 * 60_000;
+
+/** How long a post's stored numbers stay fresh enough, by its age. */
+export const staleAfter = (publishedAt: number, now: number) => (now - publishedAt < HOT_FOR_MS ? HOT_STALE_MS : TARGET_STALE_MS);
+/**
+ * Is this post due a read? `checked` is the newest of its last stored row and its last read (a read that found
+ * nothing new writes no row, and without remembering it the same unchanged post was asked again every minute).
+ */
+export const isDue = (checked: number, publishedAt: number, now: number, force = false) => now - checked >= (force ? HOT_STALE_MS : staleAfter(publishedAt, now));
 /** Posts older than this stop being synced: their counts barely move and the quota is better spent. */
 export const RECENT_DAYS = 45;
 export const TARGETS_PER_ACCOUNT = 6;
@@ -42,7 +58,15 @@ export interface SyncReport {
   cooled: number;
   failed: number;
   ranMs: number;
+  /** 1151: what happened to each account this run, so a manual refresh can say exactly which came back. */
+  outcomes: SyncOutcome[];
 }
+
+/**
+ * ok = fresh numbers came back (or every post was already fresh, confirmed this run).
+ * The codes are short and safe to show: never a token or a response body.
+ */
+export type SyncOutcome = { accountId: string; ok: boolean; code: "SYNCED" | "UP_TO_DATE" | "RATE_LIMITED" | "AUTH_EXPIRED" | "FETCH_FAILED" | "SKIPPED"; synced: number; failed: number };
 
 type Pick_ = { id: string; userId: string; platform: string; lastTriedAt: number };
 
@@ -61,7 +85,7 @@ async function candidates(now: Date, accountIds?: string[]): Promise<Pick_[]> {
 }
 
 /** The recently published destinations of one account whose stored numbers are stale, newest first. */
-async function dueTargets(accountId: string, now: Date) {
+async function dueTargets(accountId: string, now: Date, force = false) {
   const since = new Date(now.getTime() - RECENT_DAYS * 864e5);
   const rows = await db.postTarget.findMany({
     where: {
@@ -79,7 +103,8 @@ async function dueTargets(accountId: string, now: Date) {
   if (!rows.length) return [];
   const last = await db.targetMetric.groupBy({ by: ["targetId"], where: { targetId: { in: rows.map((r) => r.id) } }, _max: { capturedAt: true } });
   const seen = new Map(last.map((l) => [l.targetId, l._max.capturedAt?.getTime() ?? 0]));
-  return rows.filter((r) => now.getTime() - (seen.get(r.id) ?? 0) >= TARGET_STALE_MS).slice(0, TARGETS_PER_ACCOUNT);
+  const checked = (r: (typeof rows)[number]) => Math.max(seen.get(r.id) ?? 0, r.metricsCheckedAt?.getTime() ?? 0);
+  return rows.filter((r) => isDue(checked(r), (r.publishedAt ?? now).getTime(), now.getTime(), force)).slice(0, TARGETS_PER_ACCOUNT);
 }
 
 async function noteSync(accountId: string, data: { lastSyncAt?: Date; lastTriedAt: Date; lastError?: string | null; cooldownUntil?: Date | null; targetsDone?: number }) {
@@ -104,26 +129,32 @@ async function writeDaySnapshot(a: Pick_, now: Date): Promise<boolean> {
   return true;
 }
 
-export async function syncMetrics(opts: { budgetMs?: number; now?: Date; accountIds?: string[] } = {}): Promise<SyncReport> {
+/** `force` (a manual Refresh Data): read every recent post older than 30 minutes, not only the stale ones. */
+export async function syncMetrics(opts: { budgetMs?: number; now?: Date; accountIds?: string[]; force?: boolean } = {}): Promise<SyncReport> {
   const started = Date.now();
   const budget = opts.budgetMs ?? DEFAULT_BUDGET_MS;
   const now = opts.now ?? new Date();
-  const r: SyncReport = { accounts: 0, targets: 0, synced: 0, snapshots: 0, cooled: 0, failed: 0, ranMs: 0 };
+  const r: SyncReport = { accounts: 0, targets: 0, synced: 0, snapshots: 0, cooled: 0, failed: 0, ranMs: 0, outcomes: [] };
   const left = () => budget - (Date.now() - started);
 
   const accts = await candidates(now, opts.accountIds);
   for (const a of accts) {
     if (left() <= 500 || r.targets >= TARGETS_PER_RUN) break;
     r.accounts++;
-    const targets = await dueTargets(a.id, now).catch(() => []);
+    let listed = true;
+    const targets = await dueTargets(a.id, now, opts.force).catch(() => ((listed = false), []));
     let ok = 0;
+    let bad = 0;
+    let tried = 0;
     let stop: string | null = null;
     for (const t of targets) {
       if (left() <= 500 || r.targets >= TARGETS_PER_RUN) break;
       r.targets++;
+      tried++;
       const ins = await targetInsights(t).catch(() => null);
       if (!ins) {
         r.failed++;
+        bad++;
         continue;
       }
       if (ins.status === "error") {
@@ -133,38 +164,51 @@ export async function syncMetrics(opts: { budgetMs?: number; now?: Date; account
           break;
         }
         r.failed++;
+        bad++;
         continue;
       }
       if (ins.status !== "live") continue;
       await snapshotTarget(ins).catch((e) => console.warn(`[sync] snapshot ${ins.targetId}: ${(e as Error).message}`));
+      // Remembered even when nothing changed (no row is written then), so an unchanged post isn't re-read every minute.
+      await db.postTarget.update({ where: { id: t.id }, data: { metricsCheckedAt: now } }).catch(() => {});
       ok++;
       r.synced++;
     }
     if (stop === "RATE_LIMITED") {
       r.cooled++;
       await noteSync(a.id, { lastTriedAt: now, lastError: stop, cooldownUntil: new Date(now.getTime() + COOLDOWN_MS), targetsDone: ok });
+      r.outcomes.push({ accountId: a.id, ok: false, code: "RATE_LIMITED", synced: ok, failed: bad });
       continue;
     }
     if (stop === "AUTH_EXPIRED") {
       r.failed++;
       await noteSync(a.id, { lastTriedAt: now, lastError: stop, cooldownUntil: new Date(now.getTime() + COOLDOWN_MS), targetsDone: ok });
+      r.outcomes.push({ accountId: a.id, ok: false, code: "AUTH_EXPIRED", synced: ok, failed: bad });
+      continue;
+    }
+    // 1151: every post asked failed (or the list itself couldn't be read). That is a failed sync, not a
+    // successful one: lastSyncAt stays where it was, so the app can say how old the numbers really are.
+    if (!listed || (tried > 0 && ok === 0 && bad > 0)) {
+      await noteSync(a.id, { lastTriedAt: now, lastError: "FETCH_FAILED", targetsDone: 0 });
+      r.outcomes.push({ accountId: a.id, ok: false, code: "FETCH_FAILED", synced: 0, failed: bad });
       continue;
     }
     if (left() > 1_000 && (await writeDaySnapshot(a, now).catch(() => false))) r.snapshots++;
-    await noteSync(a.id, { lastSyncAt: now, lastTriedAt: now, lastError: null, cooldownUntil: null, targetsDone: ok });
+    await noteSync(a.id, { lastSyncAt: now, lastTriedAt: now, lastError: bad ? "PARTIAL" : null, cooldownUntil: null, targetsDone: ok });
+    r.outcomes.push({ accountId: a.id, ok: true, code: ok ? "SYNCED" : "UP_TO_DATE", synced: ok, failed: bad });
   }
   r.ranMs = Date.now() - started;
   return r;
 }
 
-export type SyncTimes = Record<string, { lastSyncAt: string | null; lastError: string | null; cooldownUntil: string | null }>;
+export type SyncTimes = Record<string, { lastSyncAt: string | null; lastError: string | null; cooldownUntil: string | null; lastTriedAt?: string | null }>;
 
 /** When each account was last synced, for the cards that have to say how fresh a number is. */
 export async function syncTimes(accountIds: string[]): Promise<SyncTimes> {
   if (!accountIds.length) return {};
-  const rows = await db.accountSyncState.findMany({ where: { accountId: { in: accountIds } }, select: { accountId: true, lastSyncAt: true, lastError: true, cooldownUntil: true } });
+  const rows = await db.accountSyncState.findMany({ where: { accountId: { in: accountIds } }, select: { accountId: true, lastSyncAt: true, lastError: true, cooldownUntil: true, lastTriedAt: true } });
   return Object.fromEntries(
-    rows.map((s) => [s.accountId, { lastSyncAt: s.lastSyncAt?.toISOString() ?? null, lastError: s.lastError, cooldownUntil: s.cooldownUntil?.toISOString() ?? null }]),
+    rows.map((s) => [s.accountId, { lastSyncAt: s.lastSyncAt?.toISOString() ?? null, lastError: s.lastError, cooldownUntil: s.cooldownUntil?.toISOString() ?? null, lastTriedAt: s.lastTriedAt?.toISOString() ?? null }]),
   );
 }
 

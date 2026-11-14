@@ -12,6 +12,9 @@ import { platformsNamed } from "./plan";
 import { dayLabel, parseRange, previousRange, type DateRange } from "./range";
 import { at, base, plural, type PipArgs, type PipCtx } from "./tools-core";
 import { accountsInScope, dashboards, type Acct } from "./tools-content";
+import { compareVerdict, HISTORICAL_RE, statusOf, type AcctStatus, type PlatformData } from "./compare-core";
+import { SYNCABLE, SYNC_FRESH_MS } from "../analytics/sync";
+import { sweeperHealth } from "../queue/health";
 import type { PipResult, PipTool } from "./types";
 
 /**
@@ -117,7 +120,7 @@ async function readStats(ctx: PipCtx, from: number, to: number, platform: string
     db.targetMetric.findMany({
       where: { capturedAt: span, target: tw },
       take: SNAP_CAP,
-      select: { targetId: true, capturedAt: true, views: true, likes: true, comments: true, shares: true, target: { select: { platform: true } } },
+      select: { targetId: true, capturedAt: true, views: true, likes: true, comments: true, shares: true, target: { select: { platform: true, socialAccountId: true } } },
     }),
     db.targetMetric.findFirst({ where: { target: tw }, orderBy: { capturedAt: "asc" }, select: { capturedAt: true } }),
     db.targetMetric.findFirst({ where: { target: tw }, orderBy: { capturedAt: "desc" }, select: { capturedAt: true } }),
@@ -168,13 +171,80 @@ async function readStats(ctx: PipCtx, from: number, to: number, platform: string
   }
   return {
     posts,
-    snaps: snapRows.map((x) => ({ at: x.capturedAt.getTime(), platform: x.target.platform, key: x.targetId, views: x.views, likes: x.likes, comments: x.comments, shares: x.shares })),
+    snaps: snapRows.map((x) => ({ at: x.capturedAt.getTime(), platform: x.target.platform, key: x.targetId, views: x.views, likes: x.likes, comments: x.comments, shares: x.shares, acct: x.target.socialAccountId })),
     firstSync: first?.capturedAt.getTime() ?? null,
     lastSync: last?.capturedAt.getTime() ?? null,
     capped: snapRows.length >= SNAP_CAP,
     failed: false,
     stale: stale.filter((s) => isPlatform(s.platform)).map((s) => `${pname(s.platform)} ${at(s.username)} ${s.status === "needs_reconnect" ? "needs reconnecting" : "is disconnected"}`),
   };
+}
+
+// ---------- 1151: every account's real state, and when its numbers last synced ----------
+export type Health = { id: string; platform: string; username: string; status: AcctStatus; lastSyncAt: number | null; lastTriedAt: number | null; lastError: string | null };
+
+/** Every account in scope, disconnected ones too (their history is still counted), with its sync state. Once per request. */
+export function accountHealth(ctx: PipCtx): Promise<Health[]> {
+  return memo(ctx, "health", async () => {
+    const rows = await db.socialAccount.findMany({
+      where: { userId: ctx.ownerId, ...(ctx.scope ? { id: { in: ctx.scope } } : {}) },
+      select: { id: true, platform: true, username: true, platformUserId: true, status: true, syncState: { select: { lastSyncAt: true, lastTriedAt: true, lastError: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows
+      .filter((a) => isPlatform(a.platform) && !isPracticeAccount(a))
+      .map((a) => ({
+        id: a.id,
+        platform: a.platform,
+        username: a.username,
+        status: (a.status === "connected" || a.status === "needs_reconnect" ? a.status : "disconnected") as AcctStatus,
+        lastSyncAt: a.syncState?.lastSyncAt?.getTime() ?? null,
+        lastTriedAt: a.syncState?.lastTriedAt?.getTime() ?? null,
+        lastError: a.syncState?.lastError ?? null,
+      }));
+  }).catch(() => [] as Health[]);
+}
+
+const reconnectLink = (platform: string) => ({ label: `Reconnect ${pname(platform)}`, href: `/api/accounts/${platform}/connect?returnTo=${encodeURIComponent("/analytics")}` });
+const ERROR_WHY: Record<string, string> = {
+  RATE_LIMITED: "the platform asked Outlly to slow down",
+  AUTH_EXPIRED: "its connection expired",
+  FETCH_FAILED: "the last attempts to read it failed",
+};
+
+/**
+ * 1151: say how fresh the numbers really are, per account: the last successful sync with its time, a warning
+ * when it is older than 30 minutes (or never happened), and a Reconnect action for accounts that aren't
+ * current. Numbers from an older sync are labelled cached, never live. Also warns when the sweeper itself stopped.
+ */
+export async function addFreshness(ctx: PipCtx, r: PipResult, platform: string | null) {
+  const all = (await accountHealth(ctx)).filter((h) => !platform || h.platform === platform);
+  if (!all.length) return;
+  const now = ctx.now.getTime();
+  const synced = all.filter((h) => h.status === "connected" && (SYNCABLE as string[]).includes(h.platform));
+  const rows: NonNullable<PipResult["sync"]>["accounts"] = [];
+  for (const h of synced) {
+    const name = `${pname(h.platform)} ${at(h.username)}`;
+    const stale = h.lastSyncAt == null || now - h.lastSyncAt > SYNC_FRESH_MS;
+    rows.push({ name, platform: h.platform, lastSuccessAt: h.lastSyncAt ? new Date(h.lastSyncAt).toISOString() : null, stale });
+    const why = h.lastError && ERROR_WHY[h.lastError] ? ` because ${ERROR_WHY[h.lastError]}` : "";
+    if (h.lastSyncAt == null) r.notes.push({ level: "warn", text: `${name} hasn't completed a sync yet${why}, so its numbers may be missing.` });
+    else if (stale)
+      r.notes.push({ level: "warn", text: `${name} last synced successfully on ${whenLabel(h.lastSyncAt, ctx.tz)} (${ago(h.lastSyncAt, now)})${why}. These numbers are cached, not live.` });
+  }
+  for (const h of all.filter((x) => x.status !== "connected")) {
+    const link = reconnectLink(h.platform);
+    if (!r.downloads.some((d) => d.href === link.href)) r.downloads.push(link);
+  }
+  if (synced.length) {
+    const sw = await sweeperHealth(now).catch(() => null);
+    if (sw?.stale)
+      r.notes.push({ level: "warn", text: sw.lastAt ? `Outlly's background sync hasn't run since ${whenLabel(sw.lastAt, ctx.tz)}, so numbers aren't updating on their own. Refresh data reads them now.` : "Outlly's background sync hasn't run yet, so numbers aren't updating on their own. Refresh data reads them now." });
+    const newest = synced.map((h) => h.lastSyncAt ?? 0).reduce((a, b) => Math.max(a, b), 0);
+    r.sync = { at: newest ? new Date(newest).toISOString() : null, stale: rows.some((x) => x.stale) || !!sw?.stale, accounts: rows };
+    const okRows = rows.filter((x) => x.lastSuccessAt);
+    if (okRows.length) r.sources = [...(r.sources ?? []), `Last successful sync: ${okRows.map((x) => `${x.name} ${whenLabel(new Date(x.lastSuccessAt!).getTime(), ctx.tz)}`).join(", ")}.`];
+  }
 }
 
 /** Everything for [from, to) on one platform (or all). Reuses a wider load already made in this request. */
@@ -214,6 +284,15 @@ const ago = (at: number, now: number) => {
   const m = Math.max(0, Math.round((now - at) / 60000));
   return m < 2 ? "just now" : m < 90 ? `${m} minutes ago` : m < 48 * 60 ? `${Math.round(m / 60)} hours ago` : `${Math.round(m / 1440)} days ago`;
 };
+/** "14 Nov, 3:05 pm" in the person's timezone: the real timestamp, not only "2 hours ago". */
+function whenLabel(t: number, tz: string) {
+  const o: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" };
+  try {
+    return new Intl.DateTimeFormat("en-IN", { ...o, timeZone: tz }).format(new Date(t));
+  } catch {
+    return new Intl.DateTimeFormat("en-IN", { ...o, timeZone: "UTC" }).format(new Date(t));
+  }
+}
 
 /** Where the numbers came from, how fresh they are, and what the period leaves out. */
 function frame(r: PipResult, ctx: PipCtx, w: Win, st: Stats, explicit: boolean) {
@@ -229,10 +308,11 @@ function frame(r: PipResult, ctx: PipCtx, w: Win, st: Stats, explicit: boolean) 
   }
   if (st.firstSync && st.firstSync > w.from.getTime() + A.DAY_MS)
     r.notes.push({ level: "info", text: `Outlly started tracking your numbers on ${dayLabel(new Date(st.firstSync), ctx.tz)}, so days before that show nothing rather than what really happened.` });
-  for (const s of st.stale) r.notes.push({ level: "warn", text: `${s}, so its numbers may have stopped updating.` });
+  for (const s of st.stale) r.notes.push({ level: "warn", text: `${s}. Its history is kept, but its numbers stopped updating, so they aren't current.` });
   const platforms = [...new Set([...st.posts.map((p) => p.platform), ...st.snaps.map((s) => s.platform)])].map(pname);
-  const fresh = st.lastSync ? `, last synced ${ago(st.lastSync, ctx.now.getTime())}` : "";
-  if (platforms.length) r.sources = [`Outlly's synced numbers for posts published through Outlly on ${list(platforms)}${fresh}. They update about every 30 minutes.`];
+  const fresh = st.lastSync ? `, newest numbers from ${whenLabel(st.lastSync, ctx.tz)}` : "";
+  // 1151: the real cadence (lib/analytics/sync.ts): a post's first two days every 30 minutes, then every 6 hours.
+  if (platforms.length) r.sources = [`Outlly's synced numbers for posts published through Outlly on ${list(platforms)}${fresh}. Posts in their first two days refresh about every 30 minutes, older ones about every 6 hours.`];
 }
 
 /** Activity inside [from, to): the synced deltas added up. */
@@ -363,67 +443,138 @@ export const comparePlatforms: Tool = async (ctx, a, range, period) => {
     "",
     period,
   );
-  const [st, live] = await Promise.all([loadStats(ctx, w.from.getTime(), w.to.getTime(), null), boardsFor(ctx, null, r)]);
+  const [st, live, health] = await Promise.all([loadStats(ctx, w.from.getTime(), w.to.getTime(), null), boardsFor(ctx, null, r), accountHealth(ctx)]);
   frame(r, ctx, w, st, !!range);
   const from = w.from.getTime();
   const to = w.to.getTime();
+  // 1151: a current comparison counts only accounts that are connected now; a historical one keeps the rest.
+  const historical = HISTORICAL_RE.test(ctx.message);
+  const current = new Set(health.filter((h) => h.status === "connected").map((h) => h.id));
+  const counts = (acct: string | null | undefined) => historical || (!!acct && current.has(acct));
+  const posts = st.posts.filter((p) => counts(p.accountId));
+  const snaps = st.snaps.filter((s) => counts(s.acct));
+  // Account-level numbers, per platform, only when every connected account on it answered.
+  const boardOk = new Map<string, boolean>();
   const followers = new Map<string, number>();
   const reach = new Map<string, number>();
+  const liveAt = new Map<string, number>();
   for (const { acct, d } of live.boards) {
     const f = d.headline.find((h) => h.key === "followers" || h.key === "subscribers")?.value;
     if (f != null) followers.set(acct.platform, (followers.get(acct.platform) ?? 0) + f);
     const re = d.headline.find((h) => h.key === "reach")?.value;
     if (re != null) reach.set(acct.platform, (reach.get(acct.platform) ?? 0) + re);
+    const t = Date.parse(d.fetchedAt);
+    if (Number.isFinite(t)) liveAt.set(acct.platform, Math.min(liveAt.get(acct.platform) ?? t, t));
   }
-  const names = [...new Set([...st.posts.map((p) => p.platform), ...st.snaps.map((s) => s.platform), ...live.accts.map((x) => x.platform as string)])].filter(isPlatform);
+  for (const acct of live.accts) {
+    const okNow = live.boards.some((b) => b.acct.id === acct.id);
+    const isCurrent = health.find((h) => h.id === acct.id)?.status === "connected";
+    if (isCurrent) boardOk.set(acct.platform, (boardOk.get(acct.platform) ?? true) && okNow);
+  }
+  const names = [...new Set([...health.map((h) => h.platform), ...posts.map((p) => p.platform), ...snaps.map((s) => s.platform)])].filter(isPlatform);
   if (!names.length) {
     r.empty = ctx.scope ? "None of the accounts you work on are connected." : "Connect an account first; then I can compare your platforms.";
     return r;
   }
   // "Instagram vs YouTube": just the two asked about, not every platform.
-  const asked = platformsNamed(ctx.message).filter((p): p is (typeof names)[number] => (names as string[]).includes(p));
-  if (asked.length >= 2) r.notes.push({ level: "info", text: `Showing only ${list(asked.map(pname))}, as you asked.` });
+  const namedAll = platformsNamed(ctx.message).filter(isPlatform);
+  const named = namedAll.length >= 2;
+  const pick = named ? namedAll : names;
+  const notHere = named ? namedAll.filter((p) => !names.includes(p)) : [];
+  const withMetrics = (p: string) => uniquePosts(posts.filter((x) => x.platform === p && x.hasMetrics)).length;
+  const data: PlatformData[] = pick.map((p) => ({
+    platform: p,
+    name: pname(p),
+    accounts: health.filter((h) => h.platform === p).map((h) => ({ username: h.username, status: h.status })),
+    live: boardOk.has(p) ? (boardOk.get(p) ? "ok" : "failed") : "none",
+    followers: boardOk.get(p) ? (followers.get(p) ?? null) : null,
+    postsWithMetrics: withMetrics(p),
+  }));
+  // A named platform with no account at all: say so plainly, never compare around it.
+  if (notHere.length) {
+    r.complete = false;
+    r.lead = `I couldn't complete this comparison because ${list(notHere.map(pname))} ${notHere.length > 1 ? "aren't" : "isn't"} connected to Outlly, so there's no data for ${notHere.length > 1 ? "them" : "it"}. Connect ${notHere.length > 1 ? "them" : "it"} in Connected accounts first.`;
+    r.empty = r.lead;
+    r.facts = [r.lead];
+    r.downloads.push({ label: "Open Connected accounts", href: "/accounts" });
+    return r;
+  }
+  const v = compareVerdict(data, { historical, named });
+  for (const l of v.left) {
+    const link = { label: `Reconnect ${pname(l.platform)}`, href: `/api/accounts/${l.platform}/connect?returnTo=${encodeURIComponent("/analytics")}` };
+    if (!r.downloads.some((d) => d.href === link.href)) r.downloads.push(link);
+  }
+  if (v.lead) r.lead = v.lead;
+  if (!v.ok) {
+    r.complete = false;
+    r.empty = v.lead ?? "I couldn't compare your platforms just now.";
+    r.facts = [r.empty];
+    return r;
+  }
+  if (v.noInsights.length || v.missing.length || v.left.length) r.complete = false;
+  if (named) r.notes.push({ level: "info", text: `Showing only ${list(v.compared.map(pname))}, as you asked.` });
+  if (historical) r.notes.push({ level: "info", text: "Historical comparison: accounts that are disconnected now are included from their stored history." });
+
   type Row = { p: string; views: number; er: number | null; perPost: number | null; posts: number; followers: number | null };
-  const rows: Row[] = (asked.length >= 2 ? asked : names).map((p) => {
-    const t = totalsIn(st.snaps, from, to, p);
-    const ps = st.posts.filter((x) => x.platform === p && x.hasMetrics);
-    return { p, views: t.views, er: A.erOf(t.inter, t.views), perPost: ps.length ? A.median(ps.map((x) => x.views)) : null, posts: st.posts.filter((x) => x.platform === p).length, followers: followers.get(p) ?? null };
+  const rows: Row[] = v.compared.map((p) => {
+    const t = totalsIn(snaps, from, to, p);
+    const ps = posts.filter((x) => x.platform === p && x.hasMetrics);
+    return {
+      p,
+      views: t.views,
+      er: A.erOf(t.inter, t.views),
+      perPost: ps.length ? A.median(ps.map((x) => x.views)) : null,
+      posts: uniquePosts(posts.filter((x) => x.platform === p)).length,
+      followers: v.metrics.followers ? (followers.get(p) ?? null) : null,
+    };
   });
-  rows.sort((x, y) => y.views - x.views);
+  rows.sort((x, y) => (v.metrics.posts ? y.views - x.views : (y.followers ?? 0) - (x.followers ?? 0)));
+  const NA = "Not compared";
   r.rows = rows.map((x) => ({
     id: x.p,
     cells: {
       where: pname(x.p),
-      followers: x.followers == null ? "Not available" : A.fmtInt(x.followers),
-      views: A.fmtInt(x.views),
-      perPost: x.perPost == null ? "No posts" : A.fmtInt(x.perPost),
-      er: A.fmtRate(x.er),
+      followers: v.metrics.followers && x.followers != null ? A.fmtInt(x.followers) : NA,
+      views: v.metrics.posts ? A.fmtInt(x.views) : NA,
+      perPost: v.metrics.posts ? (x.perPost == null ? "No posts" : A.fmtInt(x.perPost)) : NA,
+      er: v.metrics.posts ? A.fmtRate(x.er) : NA,
       posts: x.posts,
     },
   }));
   r.found = r.returned = r.rows.length;
-  const best = <K extends keyof Row>(k: K) => [...rows].filter((x) => x[k] != null).sort((x, y) => (y[k] as number) - (x[k] as number))[0];
-  const topF = best("followers");
-  const topV = rows[0];
-  const topE = [...rows].filter((x) => x.er != null && x.views >= 100).sort((x, y) => y.er! - x.er!)[0];
-  const topP = [...rows].filter((x) => x.perPost != null && x.posts >= 3).sort((x, y) => y.perPost! - x.perPost!)[0];
+  // A "best" card only for a metric every compared platform has; nothing is called better overall.
+  const topF = v.metrics.followers ? [...rows].sort((x, y) => (y.followers ?? 0) - (x.followers ?? 0))[0] : undefined;
+  const topV = v.metrics.posts && rows.some((x) => x.views > 0) ? rows[0] : undefined;
+  const topE = v.metrics.posts && rows.every((x) => x.er != null && x.views >= 100) ? [...rows].sort((x, y) => y.er! - x.er!)[0] : undefined;
+  const topP = v.metrics.posts && rows.every((x) => x.perPost != null && x.posts >= 3) ? [...rows].sort((x, y) => y.perPost! - x.perPost!)[0] : undefined;
   r.cards = [
     ...(topF ? [{ label: "Most followers", value: pname(topF.p), hint: `${A.fmtInt(topF.followers!)} today` }] : []),
-    { label: "Most views", value: pname(topV.p), hint: `${A.fmtInt(topV.views)} in the period` },
+    ...(topV ? [{ label: "Most views", value: pname(topV.p), hint: `${A.fmtInt(topV.views)} in the period, Outlly-published posts` }] : []),
     ...(topE ? [{ label: "Best engagement", value: pname(topE.p), hint: A.fmtRate(topE.er) }] : []),
     ...(topP ? [{ label: "Most views per post", value: pname(topP.p), hint: `typically ${A.fmtInt(topP.perPost!)}` }] : []),
   ];
-  if (topF) r.facts.push(`Most followers: ${pname(topF.p)} with ${A.fmtInt(topF.followers!)} (as the platform reports it today).`);
-  else if (/\b(follow|subscri)/i.test(ctx.message))
-    r.facts.push(`I couldn't read a follower count from any platform just now, so I can't say which has the most followers.${r.notes.some((n) => /reconnect/i.test(n.text)) ? " Some accounts need reconnecting first; they're listed below." : ""}`);
-  for (const x of rows)
-    r.facts.push(`${pname(x.p)}: ${A.fmtInt(x.views)} views, engagement ${A.fmtRate(x.er)}, ${plural(x.posts, "post")}${x.perPost != null ? `, typically ${A.fmtInt(x.perPost)} views per post` : ""}${x.followers != null ? `, ${A.fmtInt(x.followers)} followers` : ""}.`);
-  if (topE && rows.length > 1) r.facts.push(`Best engagement rate: ${pname(topE.p)} (${A.fmtRate(topE.er)}).`);
-  for (const [p, v] of reach) r.facts.push(`${pname(p)} reach for the last 28 days, as Instagram reports it: ${A.fmtInt(v)} accounts.`);
-  if (rows.length === 1) r.facts.push(`Only ${pname(rows[0].p)} has numbers, so there's nothing to compare it with yet.`);
-  r.notes.push({ level: "info", text: VIEW_NOTE });
-  r.notes.push({ level: "info", text: `Followers are today's count from each platform. Views and engagement cover ${w.label}, from posts published through Outlly.` });
-  if (live.boards.length) r.sources = [...(r.sources ?? []), "Followers and reach: read live from each platform just now."];
+  if (v.lead) r.facts.push(v.lead);
+  if (topF) r.facts.push(`Most followers: ${pname(topF.p)} with ${A.fmtInt(topF.followers!)} (account-level, as the platform reports it today).`);
+  else if (/\b(follow|subscri)/i.test(ctx.message)) r.facts.push("I couldn't read a follower count from every platform just now, so I can't say which has the most followers.");
+  for (const x of rows) {
+    const bits: string[] = [];
+    if (v.metrics.posts) bits.push(`${A.fmtInt(x.views)} views and engagement ${A.fmtRate(x.er)} on ${plural(x.posts, "Outlly-published post")}${x.perPost != null ? `, typically ${A.fmtInt(x.perPost)} views per post` : ""}`);
+    if (v.metrics.followers && x.followers != null) bits.push(`${A.fmtInt(x.followers)} followers`);
+    if (bits.length) r.facts.push(`${pname(x.p)}: ${bits.join("; ")}.`);
+  }
+  if (topE) r.facts.push(`Best engagement rate: ${pname(topE.p)} (${A.fmtRate(topE.er)}).`);
+  // Reach is Instagram's alone: reported as its own number, never used to rank platforms.
+  for (const [p, val] of reach) if (v.compared.includes(p) && boardOk.get(p)) r.facts.push(`${pname(p)} reach for the last 28 days, as Instagram reports it: ${A.fmtInt(val)} accounts (not compared; other platforms don't report reach).`);
+  if (v.metrics.posts) r.notes.push({ level: "info", text: VIEW_NOTE });
+  r.notes.push({
+    level: "info",
+    text: v.metrics.posts
+      ? `Views and engagement cover ${w.label}, from posts published through Outlly only, not the whole account.${v.metrics.followers ? " Followers are today's account-level count from each platform." : ""}`
+      : "Followers are today's account-level count from each platform.",
+  });
+  const liveNames = v.compared.filter((p) => boardOk.get(p));
+  if (v.metrics.followers || reach.size)
+    r.sources = [...(r.sources ?? []), `Account-level numbers (followers, reach): read live from ${list(liveNames.map((p) => `${pname(p)} at ${whenLabel(liveAt.get(p) ?? ctx.now.getTime(), ctx.tz)}`))}.`];
   return r;
 };
 

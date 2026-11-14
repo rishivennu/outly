@@ -35,7 +35,18 @@ function wav(samples: Float32Array, rate = RATE): Blob {
 
 /** Decode the video's soundtrack to 16 kHz mono and cut it into ~60 s WAV chunks. */
 export async function audioChunks(src: string | Blob, signal?: AbortSignal): Promise<{ blob: Blob; offset: number; duration: number }[]> {
-  const data = typeof src === "string" ? await (await fetch(src, { signal })).arrayBuffer() : await src.arrayBuffer();
+  // 1151: a raw "Failed to fetch" (the browser refused to read the video back, or the network dropped) told the
+  // creator nothing. Say what happened and what to do instead.
+  const unreadable = "We couldn't read this video back to transcribe it. Reload the page and try again, or type your captions instead.";
+  let data: ArrayBuffer;
+  if (typeof src === "string") {
+    const res = await fetch(src, { signal }).catch((e) => {
+      if ((e as Error)?.name === "AbortError") throw e;
+      throw new Error(unreadable);
+    });
+    if (!res.ok) throw new Error(unreadable);
+    data = await res.arrayBuffer();
+  } else data = await src.arrayBuffer();
   const Ctx = window.AudioContext || (window as any).webkitAudioContext;
   const ctx: AudioContext = new Ctx();
   let decoded: AudioBuffer;
@@ -265,6 +276,9 @@ export async function cutClips(
       } else rec.resume();
       await video.play();
       await new Promise<void>((res) => {
+        // a part that runs to the end of the video: once playback ends no new frame is presented, so the frame callback
+        // never fires again and the cut sat at 99% for ever. The ended event finishes it.
+        video.onended = () => { paint(); res(); };
         const step = () => {
           paint();
           opts.onProgress?.(Math.min(0.99, (done + Math.max(0, video.currentTime - r.start)) / total));
@@ -273,6 +287,7 @@ export async function cutClips(
         };
         step();
       });
+      video.onended = null;
       video.pause();
       if (rec.state === "recording") rec.pause();
       done += r.end - r.start;

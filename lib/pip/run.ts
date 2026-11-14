@@ -40,26 +40,35 @@ export function numbersBacked(summary: string, facts: string[]) {
 }
 
 export function plainSummary(r: PipResult) {
-  if (!r.rows.length && !r.totals.length && !r.cards?.length) return r.empty || r.facts.slice(0, 2).join(" ");
-  return r.facts.slice(0, ANALYTIC_TOOLS.includes(r.tool) ? 4 : 3).join(" ");
+  const lead = r.lead?.trim() || "";
+  const rest = r.facts.filter((f) => f !== lead);
+  if (!r.rows.length && !r.totals.length && !r.cards?.length) return lead || r.empty || rest.slice(0, 2).join(" ");
+  const body = rest.slice(0, ANALYTIC_TOOLS.includes(r.tool) ? 4 : 3).join(" ");
+  // 1151: a required opening (why a comparison is incomplete) always comes first, word for word.
+  return lead ? `${lead}${body ? ` ${body}` : ""}` : body;
 }
 
 const LANG_NAME: Record<string, string> = { hi: "Hindi", es: "Spanish", fr: "French", de: "German", pt: "Portuguese", ar: "Arabic", zh: "Chinese", ja: "Japanese", ru: "Russian", id: "Indonesian", bn: "Bengali" };
 
 async function summarise(r: PipResult, message: string, lang: string, ai: boolean) {
   const plain = plainSummary(r);
-  if (!ai || !r.facts.length) return plain;
+  const lead = r.lead?.trim() || "";
+  const given = r.facts.filter((f) => f !== lead);
+  // 1151: nothing to word beyond the required opening, so no model call.
+  if (!ai || !given.length || (lead && !r.rows.length && !r.totals.length && !r.cards?.length)) return plain;
   const language = LANG_NAME[lang] ? ` Write in ${LANG_NAME[lang]}.` : "";
   // 1123: analysis answers may run longer, and must keep "estimate" and "not proven to cause" where the facts say so.
   const deep = ANALYTIC_TOOLS.includes(r.tool);
   const size = deep && (r.tool === "report" || r.facts.length > 4) ? "at most five short sentences (under 120 words); answer first, then the reasons" : "at most two short sentences (under 60 words)";
   const caveats = `${r.tool === "report" ? " Lead with the headline numbers (views, engagement); mention what needs more data only after them." : ""}${r.estimate ? " These are estimates: say so." : ""}${r.facts.some((f) => /not proven|don't prove|could be chance|could be normal/i.test(f)) ? " Never say one thing caused another; say they are linked." : ""}`;
   const system = `You are Pip, Outlly's helper. Answer the person's question in ${size} using ONLY the facts given. Never add numbers, dates, names or reasons that are not in the facts.${caveats} No em dashes, no emoji, no markdown.${language} Return JSON {"text": string}.`;
-  const prompt = `Question: ${message.slice(0, 400)}${r.range ? `\nPeriod: ${r.range.label}` : ""}\nFacts:\n${r.facts.map((f) => `- ${f}`).join("\n")}${r.complete ? "" : "\n- The list is incomplete; say so."}`;
+  const prompt = `Question: ${message.slice(0, 400)}${r.range ? `\nPeriod: ${r.range.label}` : ""}\nFacts:\n${given.map((f) => `- ${f}`).join("\n")}${r.complete ? "" : "\n- The list is incomplete; say so."}`;
   const out = await gemini<{ text?: string }>(system, prompt, { temperature: 0.2, timeoutMs: deep ? 10000 : 8000 }).catch(() => null);
   const text = typeof out?.text === "string" ? out.text.trim().replace(/\u2014/g, ", ") : "";
   const facts = r.range ? [...r.facts, r.range.label] : r.facts;
-  return text && text.length <= (deep ? 900 : 400) && numbersBacked(text, facts) && !/\b(caused|because of)\b/i.test(text) ? text : plain;
+  const good = text && text.length <= (deep ? 900 : 400) && numbersBacked(text, facts) && !/\b(caused|because of)\b/i.test(text);
+  if (!good) return plain;
+  return lead && !text.startsWith(lead) ? `${lead} ${text}` : text;
 }
 
 export async function runPip(user: PipUser, plan: PipPlan, message: string, lang: string, ai: () => Promise<boolean>) {

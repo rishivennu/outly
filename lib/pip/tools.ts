@@ -2,7 +2,9 @@ import "server-only";
 import { parseRange, type DateRange } from "./range";
 import { creditNotes, invoices, payments, refundsMissingCreditNote, spending, subscription } from "./tools-billing";
 import { activity, engagement, notices, posts, tickets, topPosts, uploads } from "./tools-content";
-import { ANALYTICS } from "./tools-analytics";
+import { addFreshness, ANALYTICS } from "./tools-analytics";
+import { isPlatform } from "../domain";
+import { ANALYTIC_TOOLS } from "./types";
 import { base, mergeRelink, type PipArgs, type PipCtx } from "./tools-core";
 import type { PipResult, PipTool } from "./types";
 
@@ -49,5 +51,8 @@ export async function runTool(tool: PipTool, ctx: PipCtx, a: PipArgs = {}): Prom
   if (unread) r.notes.unshift({ level: "warn", text: `I couldn't read the dates "${text.slice(0, 60)}", so this covers everything on record.` });
   // 1123: the post this card is about travels with the follow-up, so "why did it do better?" has a subject.
   if (r.focus && r.ask.focus == null) r.ask.focus = r.focus.postId;
+  // 1151: every numbers answer says when its accounts last synced, and whether that is live or cached.
+  if (ANALYTIC_TOOLS.includes(tool) || tool === "top_posts" || tool === "engagement")
+    await addFreshness(ctx, r, a.platform && isPlatform(a.platform) ? a.platform : null).catch(() => {});
   return r;
 }

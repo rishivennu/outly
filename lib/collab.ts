@@ -64,8 +64,15 @@ export async function teamDecide(u: SessionUser, postId: string, decision: "appr
   if (u.actor) await notifyOwner(u.id, post, decision === "approved" ? `${a.name} approved a post` : `${a.name} asked for changes`, text ?? (post.title ?? "A draft"), `decide-${post.id}-${now.getTime()}`);
 }
 
+/** 1151: what the teammate wrote comes first, then which draft, so the panel reads "Priya commented / Loved it · on \u201cMy reel\u201d". */
+export function teamNoteBody(postTitle: string | null, body: string) {
+  const what = body.replace(/\s+/g, " ").trim();
+  const on = postTitle && postTitle.trim() !== what ? ` \u00b7 on \u201c${postTitle.trim().slice(0, 60)}\u201d` : "";
+  return `${what.slice(0, 300 - on.length)}${on}`;
+}
+
 async function notifyOwner(ownerId: string, post: Pick<Post, "id" | "title">, title: string, body: string, key: string) {
   await db.notice
-    .create({ data: { userId: ownerId, kind: "draft_note", tone: "info", title: title.slice(0, 120), body: `${post.title ? `${post.title.slice(0, 60)}: ` : ""}${body}`.slice(0, 300), href: `/create?post=${post.id}`, action: "Open draft", key } })
+    .create({ data: { userId: ownerId, kind: "draft_note", tone: "info", title: title.slice(0, 120), body: teamNoteBody(post.title, body), href: `/create?post=${post.id}`, action: "Open draft", key } })
     .catch(() => {}); // dedupe clash = already told
 }

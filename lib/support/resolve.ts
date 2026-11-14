@@ -98,3 +98,27 @@ export function isDoneReply(text: string, lastBot: string): boolean {
   if (!raw || raw.length > 40) return false;
   return BARE_DONE.test(norm(raw)) || HI_BARE_DONE.includes(raw);
 }
+
+/**
+ * 1151: "email me the transcript", "send me a copy of this chat". Pip answers this itself (offer when it can,
+ * the plain reason when it can't) instead of letting a model guess, which once said "I can't" and then offered it.
+ */
+const TRANSCRIPT = /\btranscripts?\b|\b(email|send|mail|forward)( me| it)? (a |the |my )?copy of (this|the|our|my) (chat|conversation)\b|\b(email|mail) (me )?(this|the|our|my) (chat|conversation)\b/;
+export function asksForTranscript(text: string): boolean {
+  const raw = text.trim();
+  if (!raw || raw.length > 200) return false;
+  const t = norm(raw);
+  if (/\b(don'?t|do not|no need|never mind|stop)\b/.test(t)) return false;
+  return TRANSCRIPT.test(t);
+}
+
+/** 1151: "where are my old chats?", "chat history", "find my previous conversation with Pip". */
+const PAST_CHATS = /\b(chat|conversation|support) histor(y|ies)\b|\bhistory of (my |our )?(chats|conversations)\b|\b(previous|past|old|older|earlier|last|saved|archived) (pip )?(chats?|conversations?)\b|\b(my|our) (pip|support) (chats|conversations)\b|\b(chats?|conversations?) with (pip|you|support)\b/;
+/** Inbox talk ("old conversations in my DMs") is about the Messages page, not Pip. */
+const INBOX = /\b(dms?|inbox|messages page|instagram|youtube|whatsapp|comments?|followers?|fans?)\b/;
+export function asksForPastChats(text: string): boolean {
+  const raw = text.trim();
+  if (!raw || raw.length > 200) return false;
+  const t = norm(raw);
+  return PAST_CHATS.test(t) && !INBOX.test(t);
+}

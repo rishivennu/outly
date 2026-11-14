@@ -23,8 +23,9 @@ export function buildCsp(nonce: string, dev = process.env.NODE_ENV !== "producti
     "img-src 'self' data: blob: https:",
     "media-src 'self' blob: https:",
     "font-src 'self' data: https://checkout.razorpay.com",
-    // Direct uploads go to the storage bucket, sign-in to Supabase, live updates over wss.
-    "connect-src 'self' https: wss:",
+    // Direct uploads go to the storage bucket, sign-in to Supabase, live updates over wss. blob: because the caption
+    // transcriber reads the just-uploaded video back from its local object URL (fetch(blob:)) before the CDN copy exists.
+    "connect-src 'self' https: wss: blob:",
     "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com https://www.youtube.com https://www.youtube-nocookie.com",
     "worker-src 'self' blob:",
     "manifest-src 'self'",

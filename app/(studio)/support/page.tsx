@@ -1,5 +1,7 @@
 import { listFaq, FAQ_CATEGORIES } from "@/lib/support/faq";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, realUserId } from "@/lib/auth";
+import { listConversations } from "@/lib/support/conversations";
+import { PipConversations } from "@/components/support/PipConversations";
 import { db } from "@/lib/db";
 import { HelpCenter } from "@/components/support/HelpCenter";
 import { MyRequests } from "@/components/support/MyRequests";
@@ -12,7 +14,7 @@ export default async function StudioHelp(props: { searchParams: Promise<{ topic?
   const searchParams = await props.searchParams;
   const user = (await getCurrentUser())!;
   const email = user.actor?.email ?? user.email;
-  const [faq, tickets] = await Promise.all([
+  const [faq, tickets, chats] = await Promise.all([
     listFaq(),
     db.ticket.findMany({
       // Only this person's own requests: a teammate inside someone else's workspace sees theirs, not the owner's.
@@ -28,6 +30,8 @@ export default async function StudioHelp(props: { searchParams: Promise<{ topic?
         messages: { where: { author: "admin" }, orderBy: { createdAt: "desc" }, take: 1, select: { body: true, authorName: true, createdAt: true } },
       },
     }),
+    // 1151: this person's own saved Pip chats (the real signed-in person, never the workspace owner's).
+    listConversations(realUserId(user)).catch(() => []),
   ]);
   const items = faq.map((f) => ({ id: f.id, category: f.category, q: f.question, a: f.answer }));
   const cats = FAQ_CATEGORIES.filter((c) => items.some((i) => i.category === c));
@@ -41,6 +45,7 @@ export default async function StudioHelp(props: { searchParams: Promise<{ topic?
       initialQuery={searchParams.q ?? ""}
       me={me}
       extra={
+        <>
         <MyRequests
           tickets={tickets.map((t) => ({
             ref: t.ref,
@@ -50,6 +55,8 @@ export default async function StudioHelp(props: { searchParams: Promise<{ topic?
             reply: t.messages[0] ? { body: t.messages[0].body, by: t.messages[0].authorName ?? "Outlly support" } : null,
           }))}
         />
+        <PipConversations items={chats} />
+        </>
       }
     />
   );

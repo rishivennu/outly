@@ -9,8 +9,8 @@ import { limitShared } from "@/lib/rate-limit";
 import { env } from "@/lib/env";
 import { planFor, runPip } from "@/lib/pip/run";
 import { PIP_TOOLS } from "@/lib/pip/types";
-import { wantsToResolve } from "@/lib/support/resolve";
-import { openConversation, recordTurn } from "@/lib/support/conversations";
+import { asksForPastChats, asksForTranscript, wantsToResolve } from "@/lib/support/resolve";
+import { openConversation, PAST_CHATS_TEXT, PAST_CHATS_VISITOR, recordTurn, transcriptAvailable, transcriptUnavailableText } from "@/lib/support/conversations";
 
 const Body = z.object({
   message: z.string().trim().min(1).max(800),
@@ -71,9 +71,24 @@ export const POST = route(async (req) => {
   };
   // "I got the answer", "that's all, thanks": offer to resolve. Only an offer: nothing closes until they confirm.
   // Plain "thanks" isn't enough (lib/support/resolve.ts); visitors have no inbox on file, so they get the warm reply only.
-  if (!b.faqId && wantsToResolve(b.message, b.history)) {
+  // 1151: "where are my old chats?" gets the real place in the studio, never a made-up "Chat History".
+  if (!b.faqId && asksForPastChats(b.message))
+    return reply({ answer: me ? PAST_CHATS_TEXT : PAST_CHATS_VISITOR, confident: true, sources: [], wantsHuman: false, smalltalk: true });
+  // 1151: the offer only appears when the transcript can really be emailed (email provider on, address
+  // verified). Otherwise one plain reply says why, and never offers what it would then refuse.
+  const done = !b.faqId && wantsToResolve(b.message, b.history);
+  const wantsCopy = !b.faqId && !done && asksForTranscript(b.message);
+  if (done || wantsCopy) {
     const rt = resolveT(b.lang);
-    return reply({ answer: me ? rt.reply : rt.visitor, confident: true, sources: [], wantsHuman: false, smalltalk: true, resolve: !!me }, `${rt.reply}\n\n${rt.ask}`);
+    const base = { confident: true, sources: [], wantsHuman: false, smalltalk: true };
+    if (!who) return reply({ ...base, answer: wantsCopy ? "Transcripts go to the email address on your account, so sign in first and I can offer one." : rt.visitor, resolve: false });
+    const t = await transcriptAvailable(who);
+    if (t.available) {
+      const head = wantsCopy ? "Sure, I can email you this conversation." : rt.reply;
+      return reply({ ...base, answer: head, resolve: true }, `${head}\n\n${rt.ask}`);
+    }
+    const why = transcriptUnavailableText(t.reason);
+    return reply({ ...base, answer: done ? `${rt.reply} ${why}` : why, resolve: false });
   }
   // Charged only when a model call is about to happen (an English help-question tap never calls it).
   // Signed in: the per-person daily counter (throws 429 past it). Visitor: the free pool above.

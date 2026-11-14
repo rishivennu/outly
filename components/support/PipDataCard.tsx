@@ -1,6 +1,6 @@
 "use client";
-import { useId } from "react";
-import { AlertTriangle, CircleDashed, Database, Download, ExternalLink, FileArchive } from "lucide-react";
+import { useId, useRef, useState } from "react";
+import { AlertTriangle, CircleDashed, Database, Download, ExternalLink, FileArchive, Loader2, RefreshCw } from "lucide-react";
 import { ANALYTIC_TOOLS, type PipLink, type PipResult, type PipRow } from "@/lib/pip/types";
 import { cn } from "@/lib/utils";
 
@@ -43,8 +43,76 @@ function lineOf(r: PipResult, row: PipRow) {
   return { main: main ? String(row.cells[main.key] ?? "") : "", more: more.join(" · ") };
 }
 
-export function PipDataCard({ r }: { r: PipResult }) {
+/** "14 Nov, 10:42 am" in the person's timezone (the card's own), for the sync badge. */
+function whenOf(iso: string, tz?: string) {
+  const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" };
+  try {
+    return new Date(iso).toLocaleString("en-IN", { ...opts, ...(tz ? { timeZone: tz } : {}) });
+  } catch {
+    return new Date(iso).toLocaleString("en-IN", opts);
+  }
+}
+
+type RefreshItem = { accountId: string; platform: string; username: string; ok: boolean; code: string; message: string; lastSuccessAt: string | null };
+type RefreshState = { busy: boolean; ok: boolean | null; message: string; items: RefreshItem[] };
+
+/**
+ * 1151: Refresh data. Reads every connected account from its platform now. Success is only shown when fresh
+ * numbers really came back (the server's `ok`); otherwise its own words, per account, and a Try again.
+ */
+function RefreshData({ onRefreshed }: { onRefreshed?: () => void }) {
+  const [s, setS] = useState<RefreshState>({ busy: false, ok: null, message: "", items: [] });
+  const busyRef = useRef(false);
+  async function go() {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setS({ busy: true, ok: null, message: "", items: [] });
+    try {
+      const res = await fetch("/api/pip/refresh", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const j = await res.json().catch(() => ({}));
+      const items: RefreshItem[] = Array.isArray(j.items) ? j.items : [];
+      const message = typeof j.message === "string" && j.message ? j.message : typeof j.error === "string" ? j.error : "Refresh didn't finish. Nothing was changed.";
+      const ok = res.ok && j.ok === true;
+      setS({ busy: false, ok, message, items });
+      if (ok) onRefreshed?.();
+    } catch {
+      setS({ busy: false, ok: false, message: navigator.onLine ? "Refresh didn't finish. Nothing was changed." : "You're offline, so nothing could be refreshed.", items: [] });
+    } finally {
+      busyRef.current = false;
+    }
+  }
+  const failed = s.items.filter((x) => !x.ok);
+  return (
+    <div className="mt-2">
+      <button type="button" onClick={go} disabled={s.busy} aria-busy={s.busy} className="pc-btn">
+        {s.busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <RefreshCw className="h-4 w-4" aria-hidden />}
+        <span>{s.busy ? "Refreshing" : s.ok === false ? "Try again" : "Refresh data"}</span>
+      </button>
+      <div aria-live="polite">
+        {s.ok === true && <p className="pc-muted mt-1.5 text-[12px]">{s.message}</p>}
+        {s.ok === false && (
+          <div role="alert" className="pd-note-warn mt-1.5 text-[13px] leading-snug">
+            <p>{s.message}</p>
+            {failed.length > 0 && (
+              <ul className="mt-1 space-y-0.5">
+                {failed.map((x) => <li key={x.accountId}>{x.message}</li>)}
+              </ul>
+            )}
+          </div>
+        )}
+        {s.ok === true && failed.length > 0 && (
+          <ul className="pd-note-warn mt-1 space-y-0.5 text-[13px] leading-snug">
+            {failed.map((x) => <li key={x.accountId}>{x.message}</li>)}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function PipDataCard({ r, onRefreshed }: { r: PipResult; onRefreshed?: () => void }) {
   const id = useId();
+  const numbers = ANALYTIC_TOOLS.includes(r.tool) || r.tool === "top_posts" || r.tool === "engagement";
   const list = ANALYTIC_TOOLS.includes(r.tool) ? [] : r.rows.slice(0, TOP);
   const warn = r.notes.filter((n) => n.level === "warn");
   const total = Math.max(r.found, r.rows.length);
@@ -55,6 +123,12 @@ export function PipDataCard({ r }: { r: PipResult }) {
         <h3 id={`${id}-t`} className="text-[14px] font-semibold leading-snug">{r.title}</h3>
         <span className="flex flex-wrap gap-1.5">
           {r.estimate && <span className="pd-badge pd-est" title="Contains projections, not actuals">Estimate</span>}
+          {r.sync && r.sync.at && (
+            <span className={cn("pd-badge", r.sync.stale && "pd-warn")} title={r.sync.stale ? "Older than 30 minutes: these numbers come from the last successful sync" : "Synced within the last 30 minutes"}>
+              {r.sync.stale ? `Cached · synced ${whenOf(r.sync.at, r.range?.tz)}` : `Live · synced ${whenOf(r.sync.at, r.range?.tz)}`}
+            </span>
+          )}
+          {r.sync && !r.sync.at && r.sync.accounts.length > 0 && <span className="pd-badge pd-warn">Not synced yet</span>}
           {!r.complete && (
             <span className="pd-badge pd-warn">
               <CircleDashed className="h-3.5 w-3.5" aria-hidden />
@@ -103,6 +177,7 @@ export function PipDataCard({ r }: { r: PipResult }) {
           {r.downloads.map((l) => <LinkBtn key={l.href} l={l} />)}
         </div>
       )}
+      {numbers && r.sync && r.sync.accounts.length > 0 && <RefreshData onRefreshed={onRefreshed} />}
       {r.downloads.some((l) => l.download) && <p className="pc-muted mt-1.5 text-[12px]">Download links work for 10 minutes, only while you&apos;re signed in.</p>}
       {!!r.sources?.length && (
         <p className="pc-muted mt-2 flex gap-1.5 text-xs leading-snug">

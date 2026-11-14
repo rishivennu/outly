@@ -130,6 +130,27 @@ const clip = (s: string, n: number) => {
 };
 
 /**
+ * 1151: who sent it, as a phone shows it first. A name the platform didn't give reads "Someone", never a
+ * lowercase fallback or an empty title. Long names are cut so the rest of the title still fits one line.
+ */
+export const senderOf = (from: string | null | undefined) => clip(from ?? "", 40) || "Someone";
+
+/**
+ * 1151: a comment or DM notification leads with the person and then what they wrote, the way Instagram and
+ * WhatsApp do: title "@priya commented on Instagram", body "Loved this! · on \u201cMy reel\u201d". The words come
+ * first in the body, so the lock screen shows the comment itself, not the post's name.
+ */
+export function commentNotice(c: { platform: string; from: string; text: string; postTitle: string | null }) {
+  const p = name(c.platform);
+  const on = c.postTitle ? ` \u00b7 on \u201c${clip(c.postTitle, 48)}\u201d` : "";
+  const said = clip(c.text, 150);
+  return { title: clip(`${senderOf(c.from)} commented on ${p}`, 80), body: `${said || "Open Inbox to see it"}${on}`.slice(0, 220) };
+}
+export function messageNotice(platform: string, from: string, text: string) {
+  return { title: clip(`${senderOf(from)} messaged you on ${name(platform)}`, 80), body: clip(text, 160) || "Open Inbox to see it." };
+}
+
+/**
  * 1136: someone commented on a post of a connected account (Meta webhook). The notification says which
  * platform, who, what they wrote and on which post, and carries what a quick reply needs. A busy post buzzes
  * at most once every 2 minutes (the device shows the latest; Inbox has them all). Meta's retries of the same
@@ -148,12 +169,11 @@ export function noticeNewComment(
       if (last?.key === base + c.commentId) return;
       if (last && now.getTime() - last.createdAt.getTime() < COMMENT_GAP_MS) return;
       const p = name(c.platform);
-      const on = c.postTitle ? `on \u201c${clip(c.postTitle, 48)}\u201d` : "on your post";
       const href = `/inbox?comment=${encodeURIComponent(c.replyTo)}&target=${encodeURIComponent(c.targetId)}`;
       await notify(
         userId,
-        { kind: "new_comment", tone: "info", title: clip(`New ${p} comment from ${c.from}`, 80), body: `${c.text ? `\u201c${clip(c.text, 120)}\u201d ` : ""}${on}`.slice(0, 200), href, action: "Reply", key: base + c.commentId },
-        { push: { icon: platformIcon(c.platform), platform: p, reply: { kind: "comment", targetId: c.targetId, commentId: c.replyTo }, who: c.from, tag: `cm:${c.accountId}:${c.mediaId}` } },
+        { kind: "new_comment", tone: "info", ...commentNotice(c), href, action: "Reply", key: base + c.commentId },
+        { push: { icon: platformIcon(c.platform), platform: p, reply: { kind: "comment", targetId: c.targetId, commentId: c.replyTo }, who: senderOf(c.from), tag: `cm:${c.accountId}:${c.mediaId}` } },
       );
     })(),
   );
@@ -175,8 +195,8 @@ export function noticeNewMessage(userId: string, threadId: string, platform: str
       const p = name(platform);
       await notify(
         userId,
-        { kind: "new_message", tone: "info", title: clip(`New ${p} message from ${from}`, 80), body: clip(text || `Sent you a message on ${p}.`, 140), href: `/inbox?tab=messages&thread=${encodeURIComponent(threadId)}`, action: "Reply", key: `dm:${threadId}:${now.getTime()}` },
-        { push: { icon: avatar && /^https:\/\//.test(avatar) ? avatar : platformIcon(platform), platform: p, reply: { kind: "dm", threadId }, who: from, tag: `dm:${threadId}` } },
+        { kind: "new_message", tone: "info", ...messageNotice(platform, from, text), href: `/inbox?tab=messages&thread=${encodeURIComponent(threadId)}`, action: "Reply", key: `dm:${threadId}:${now.getTime()}` },
+        { push: { icon: avatar && /^https:\/\//.test(avatar) ? avatar : platformIcon(platform), platform: p, reply: { kind: "dm", threadId }, who: senderOf(from), tag: `dm:${threadId}` } },
       );
     })(),
   );

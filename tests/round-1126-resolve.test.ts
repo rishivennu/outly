@@ -330,8 +330,10 @@ describe("chat widget", () => {
     expect(src.match(/disabled=\{busy \|\| !!resolved\} onClick=\{\(\) => send\(s\)\}/g)?.length).toBe(2);
     expect(src).toContain("[busy, resolved, conv, msgs,");
     expect(src).toContain("reopenRef.current?.focus()");
-    // "Did that help? Yes" offers to resolve in a saved chat, instead of a dead-end line.
-    expect(src).toMatch(/if \(good && signedIn && conv && !resolved\) \{[\s\S]{0,200}kind: "resolve", offer: true/);
+    // "Did that help? Yes" offers to resolve in a saved chat, instead of a dead-end line. 1151: only while not
+    // resolved (the early return) and only when the transcript can really be emailed.
+    expect(src).toContain("if (good && resolved) return;");
+    expect(src).toMatch(/if \(good && signedIn && conv && transcriptOk\) \{[\s\S]{0,200}kind: "resolve", offer: true/);
     expect(src).toContain("ref={reopenRef}");
   });
 });

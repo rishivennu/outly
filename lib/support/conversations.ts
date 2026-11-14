@@ -6,6 +6,7 @@ import { HttpError } from "../http";
 import { sendEmail, templates } from "../email";
 import { isProven } from "../founding";
 import { limitShared } from "../rate-limit";
+import { getConfig } from "../settings";
 
 /**
  * Pip conversations (1126). A signed-in person's chat is written down as it happens, so "Resolve & Send
@@ -35,6 +36,63 @@ const subjectOf = (q: string) => {
 };
 
 export type ConvState = { id: string; status: "open" | "resolved" };
+/** 1151: what a person sees. pending = a transcript email is on its way right now (the send claim is held). */
+export type ConvStatus = "open" | "pending" | "resolved";
+export function convStatus(c: { status: string; sendingAt: Date | null }, now = new Date()): ConvStatus {
+  if (c.status === "resolved") return "resolved";
+  return c.sendingAt && now.getTime() - c.sendingAt.getTime() < SEND_LOCK_MS ? "pending" : "open";
+}
+
+/** Where past chats really live in the studio (1151). Pip says exactly this, never a section that doesn't exist. */
+export const PAST_CHATS_PATH = "/support#pip-conversations";
+export const PAST_CHATS_TEXT =
+  "Your chats with Pip are saved for 90 days. Open **Help centre** in the sidebar, then scroll to **Your Pip conversations** ([open it](/support#pip-conversations)). Press **Continue in Pip** on any of them to pick it up again here.";
+export const PAST_CHATS_VISITOR = "Chats are only saved when you're signed in. Sign in, then open **Help centre** in the sidebar and scroll to **Your Pip conversations**.";
+
+/**
+ * 1151: can this person get a transcript by email right now? Checked before Pip ever offers "Resolve & Send
+ * Transcript", so it never offers something it would then refuse. Email must really leave the server (Resend
+ * with a key; the mock Outbox only counts outside production) and the account's address must be proven.
+ */
+export type TranscriptAvail = { available: boolean; reason: "OK" | "EMAIL_OFF" | "UNVERIFIED" };
+export async function transcriptAvailable(userId: string): Promise<TranscriptAvail> {
+  const [cfg, user] = await Promise.all([
+    getConfig("email").catch(() => null),
+    db.user.findUnique({ where: { id: userId }, select: { email: true, emailVerifiedAt: true, emailVerifiedFor: true } }).catch(() => null),
+  ]);
+  const sends = !!cfg && (cfg.provider === "resend" ? !!cfg.resend?.apiKey : env.NODE_ENV !== "production");
+  if (!sends) return { available: false, reason: "EMAIL_OFF" };
+  if (!user || !isProven(user)) return { available: false, reason: "UNVERIFIED" };
+  return { available: true, reason: "OK" };
+}
+export function transcriptUnavailableText(reason: TranscriptAvail["reason"]) {
+  const kept = "This conversation stays saved under **Help centre**, **Your Pip conversations**.";
+  return reason === "UNVERIFIED"
+    ? `I can't email a transcript yet because your email address isn't verified. Sign in once with an email code to verify it, then ask again. ${kept}`
+    : `Emailing transcripts isn't available right now, so I can't send one. ${kept}`;
+}
+
+export type ConvListItem = { id: string; ref: string; subject: string; status: ConvStatus; updatedAt: string; messages: number; sentTo: string | null };
+/** 1151: this person's own saved chats, newest first. Only theirs: keyed by the real signed-in id. */
+export async function listConversations(userId: string, take = 20): Promise<ConvListItem[]> {
+  const now = new Date();
+  const rows = await db.pipConversation.findMany({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
+    take: Math.min(Math.max(take, 1), 50),
+    select: { id: true, ref: true, subject: true, status: true, sendingAt: true, sentTo: true, updatedAt: true, _count: { select: { messages: true } } },
+  });
+  return rows.map((c) => ({ id: c.id, ref: c.ref, subject: c.subject, status: convStatus(c, now), updatedAt: c.updatedAt.toISOString(), messages: c._count.messages, sentTo: c.status === "resolved" ? c.sentTo : null }));
+}
+
+/** 1151: one saved chat with its messages, to reopen it in the widget. Someone else's id is simply "not found". */
+export async function getConversation(userId: string, id: string) {
+  const c = await db.pipConversation.findFirst({ where: { id, userId }, select: { id: true, ref: true, subject: true, status: true, sendingAt: true, sentTo: true } });
+  if (!c) throw new HttpError(404, "We couldn't find that conversation.", "NOT_FOUND");
+  const rows = await db.pipMessage.findMany({ where: { conversationId: c.id }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 80, select: { role: true, text: true } });
+  rows.reverse();
+  return { id: c.id, ref: c.ref, subject: c.subject, status: convStatus(c), sentTo: c.status === "resolved" ? (c.sentTo ?? "") : null, messages: rows.map((m) => ({ role: m.role === "user" ? ("user" as const) : ("bot" as const), text: m.text })) };
+}
 
 /**
  * The open conversation a new message belongs to. An id that isn't this person's (or no longer exists)

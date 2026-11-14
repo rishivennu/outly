@@ -65,4 +65,8 @@ export interface PipResult {
   estimate?: boolean;
   /** The post this answer is about, so a follow-up "why?" means that post. */
   focus?: { postId: string; title: string } | null;
+  /** 1151: a sentence the answer must open with, word for word (e.g. why a comparison couldn't be completed). */
+  lead?: string | null;
+  /** 1151: when each account's numbers last synced successfully. stale = older than 30 minutes, i.e. cached, not live. */
+  sync?: { at: string | null; stale: boolean; accounts: { name: string; platform: string; lastSuccessAt: string | null; stale: boolean }[] } | null;
 }

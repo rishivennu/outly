@@ -280,6 +280,7 @@ model PostTarget {
   // Taken down from the platform through Outlly. platformStatus stays "published" so history and stats stay true.
   removedAt       DateTime?
   removeMode      String? // deleted (gone from the platform) | hidden (YouTube: made private, can be made public again)
+  metricsCheckedAt DateTime? // 1151: when the background sync last read this post's numbers, even when nothing changed
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

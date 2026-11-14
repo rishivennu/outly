@@ -699,6 +699,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                     key={preCaption?.media.id ?? media?.id}
                     /* always the clean video, so the preview overlay and a re-burn never double the captions */
                     src={(preCaption ? preCaption.media.url : src) ?? src ?? ""}
+                    file={preCaption ? preCaption.file : fileRef.current}
                     filename={(preCaption?.media ?? media)?.filename ?? fileRef.current?.name ?? "video.mp4"}
                     duration={meta?.duration ?? 0}
                     onBurned={(f, kind) => {

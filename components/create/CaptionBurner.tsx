@@ -13,6 +13,8 @@ import { saveBlob } from "@/lib/client/native";
 
 interface Props {
   src: string;
+  /** The creator's local file for this same video, when we still have it: transcribed without a network read. */
+  file?: Blob | null;
   filename: string;
   duration: number;
   /** A captioned copy is ready: parent uploads it and swaps it in. */
@@ -36,7 +38,7 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart
  * Off by default. Turning the switch on reveals transcribe / type, an editable cue list, a live preview
  * and "Burn into video", which makes a new MP4 in the browser and swaps it in as the post's video.
  */
-export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onError }: Props) {
+export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo, onError }: Props) {
   const [on, setOn] = useState(false);
   const [cues, setCues] = useState<Cue[]>([]);
   /* Word timings from the engine: what "cut by text" searches. Typed captions fall back to rough ones. */
@@ -90,7 +92,9 @@ export function CaptionBurner({ src, filename, duration, onBurned, onUndo, onErr
     abort.current = ctrl;
     setNote(null);
     try {
-      const chunks = await audioChunks(src, ctrl.signal);
+      // 1151: read the creator's own file when we still have it. Fetching the blob:/signed URL back is what
+      // failed with "Failed to fetch" (CSP connect-src had no blob:), and a remote re-download is slower anyway.
+      const chunks = await audioChunks(file ?? src, ctrl.signal);
       setBusy({ kind: "transcribe", done: 0, total: chunks.length });
       const all: Cue[] = [];
       const ws: Word[] = [];
