@@ -1,0 +1,9 @@
+fastapi==0.115.*
+uvicorn[standard]==0.32.*
+# ENGINE=funasr
+funasr>=1.1
+modelscope
+torch
+torchaudio
+# ENGINE=whisper
+faster-whisper>=1.1

@@ -12,7 +12,7 @@ export const GET = route(async (_req, { user }) => json(await currentReview(user
 /** Runs the Gemini deep review now. */
 export const POST = route(
   async (_req, { user }) => {
-    await chargeAi(realUserId(user));
+    await chargeAi(realUserId(user), "ai", undefined, undefined, "other");
     try {
       return json({ review: await deepReview(user.id), ai: true, stale: false });
     } catch (e) {

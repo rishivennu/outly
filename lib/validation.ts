@@ -140,6 +140,8 @@ export const platformCopyRequestSchema = z.object({
   story: z.string().trim().min(3).max(4000),
   hook: z.string().trim().min(3).max(500),
   platforms: z.array(platformSchema).min(1),
+  // Phase 3: "Rewrite this one" on copy the creator already has is metered as caption rewriting.
+  intent: z.enum(["write", "rewrite"]).default("write"),
 });
 
 export const replySuggestRequestSchema = z.object({

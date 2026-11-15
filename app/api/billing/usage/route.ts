@@ -10,7 +10,7 @@ export const GET = route(async (_req, { user }) => {
     plan: { slug: posts.planSlug, name: posts.planName },
     posts: { used: posts.used, limit: posts.postLimit, period: posts.postPeriod, left: n(posts.left), fairUse: posts.fairUsePosts },
     x: { used: x.used, limit: x.xPostLimit, credits: x.credits, left: n(x.left) },
-    ai: { used: ai.used, limit: ai.captionVideos, credits: ai.credits, left: n(ai.left), on: ai.aiCaptions },
+    ai: { used: ai.used, limit: ai.captionVideos, credits: ai.credits, left: n(ai.left), on: ai.aiCaptions, unlimited: ai.unlimited, unlimitedUntil: ai.unlimitedUntil },
     replies: { used: replies.used, limit: replies.replyLimit, left: n(replies.left) },
     storage: { usedBytes: storage.usedBytes, limitBytes: storage.limitBytes, limitMb: storage.storageMb },
     analyticsDays: posts.analyticsDays,

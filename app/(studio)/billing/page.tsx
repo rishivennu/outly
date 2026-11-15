@@ -23,6 +23,8 @@ import { trustBadges } from "@/lib/badges";
 import { refundStatus } from "@/lib/billing/guarantee";
 import { experimentPrice } from "@/lib/billing/experiments";
 import { aiQuota } from "@/lib/ai-quota";
+import { AI_FEATURE_LABEL, type AiFeature } from "@/lib/ai/features";
+import { featureUsageMonth } from "@/lib/ai/entitlements";
 import { campaignWho, quoteOffer } from "@/lib/campaign";
 import { offerLabel, savingLabel } from "@/lib/campaign-core";
 import { budgetState, getPolicy, quote, trialState, type Quote } from "@/lib/subscriptions";
@@ -277,10 +279,14 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
   // 1098: the usage grid, in the plan's own terms. Unlimited = no bar; not on the plan = "Not included".
   const acc = accountMeter(ent, accounts);
   const aiq = await aiqP;
+  // With no monthly cap aiQuota skips counting, so the unlimited meter reads every AI call made this month.
+  const aiCalls = aiq?.unlimited ? (await featureUsageMonth(user.id, now).catch(() => [])).reduce((s, r) => s + r.count, 0) : 0;
   const meters: MeterView[] = [
     { key: "posts", label: usage.postPeriod === "week" ? "Posts this week" : "Posts this month", used: usage.used, limit: usage.postLimit, unit: "posts", href: "/content" },
     { key: "scheduled", label: "Scheduled posts", used: scheduled, limit: 0, unit: "in the queue", note: scheduled ? "Waiting to publish" : "Nothing queued", href: "/calendar" },
-    ent.aiCaptions
+    captions.unlimited
+      ? { key: "ai", label: "AI-captioned videos", used: captions.used, limit: 0, unit: "videos", note: unlimitedNote(captions.unlimitedUntil) }
+      : ent.aiCaptions
       ? { key: "ai", label: "AI-captioned videos", used: captions.used, limit: captions.captionVideos, extra: captions.credits || undefined, unit: "videos", note: "This month" }
       : { key: "ai", label: "AI captions", used: 0, limit: 0, unit: "", locked: true, note: `Not on ${ent.planName}` },
     { key: "accounts", label: "Connected accounts", used: acc.used, limit: acc.limit, unit: "accounts", note: acc.note, href: "/accounts" },
@@ -290,7 +296,9 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
       : { key: "seats", label: "Team seats", used: 0, limit: 0, unit: "", locked: true, note: `Not on ${ent.planName}` },
     ...(ent.xPostLimit > 0 ? [{ key: "x", label: "Posts to X", used: x.used, limit: ent.xPostLimit, extra: x.credits || undefined, unit: "posts", note: "This month" }] : []),
     ...(ent.xPostLimit < 0 ? [{ key: "x", label: "Posts to X", used: 0, limit: 0, unit: "", locked: true, note: `Not on ${ent.planName}` }] : []),
-    ...(aiq && aiq.monthLimit > 0 ? [{ key: "ai-requests", label: "AI requests", used: aiq.monthUsed, limit: aiq.monthLimit, unit: "requests", note: aiq.limit ? `This month, up to ${aiq.limit} a day` : "This month" }] : []),
+    // Phase 3: Unlimited AI Access on every feature shows as an indicator, never a limit bar or an upgrade nudge.
+    ...(aiq?.unlimited ? [{ key: "ai-requests", label: "AI requests", used: aiCalls, limit: 0, unit: "requests", note: unlimitedNote(aiq.expiresAt) }] : []),
+    ...(aiq && !aiq.unlimited && aiq.monthLimit > 0 ? [{ key: "ai-requests", label: "AI requests", used: aiq.monthUsed, limit: aiq.monthLimit, unit: "requests", note: aiq.grant ? `This month. Unlimited AI Access for ${grantText(aiq.grant.features)}` : aiq.limit ? `This month, up to ${aiq.limit} a day` : "This month" }] : []),
     ...(replies.replyLimit > 0 ? [{ key: "replies", label: "Replies this week", used: replies.used, limit: replies.replyLimit, unit: "replies", href: "/inbox" }] : []),
   ];
   const history = historyRows(
@@ -339,3 +347,6 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
     />
   );
 }
+
+const unlimitedNote = (until: Date | null) => `Unlimited AI Access${until ? ` until ${until.toISOString().slice(0, 10)}` : ""}`;
+const grantText = (f: "all" | AiFeature[]) => (f === "all" ? "every AI feature" : f.map((x) => AI_FEATURE_LABEL[x].toLowerCase()).join(", "));

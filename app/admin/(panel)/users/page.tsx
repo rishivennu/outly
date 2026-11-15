@@ -9,6 +9,9 @@ import { DataSwap } from "@/components/shared/DataSwap";
 import { FilterChips, FilterSelect, MoreFilters, SearchBox } from "@/components/admin/SearchBox";
 import { RefreshButton } from "@/components/admin/RefreshButton";
 import { looksRelayed, placeLabel } from "@/lib/geo";
+import { can } from "@/lib/admin/perms";
+import { aiAccessRows } from "@/lib/ai/entitlements";
+import { AiAccessButton } from "@/components/admin/AiAccessPanel";
 
 export const metadata = { title: "Users" };
 export const dynamic = "force-dynamic"; // Refresh must always read fresh rows
@@ -33,6 +36,7 @@ const TAGS = [
   { value: "noposts", label: "Never posted" },
   { value: "noaccounts", label: "Nothing connected" },
   { value: "referred", label: "Came from a referral" },
+  { value: "aiunlimited", label: "Unlimited AI Access" },
   { value: "real", label: "Real people only" },
   { value: "sample", label: "Sample users only" },
 ];
@@ -52,7 +56,7 @@ const pick = (v: string | undefined, list: { value: string }[]) => (v && list.so
 
 export default async function Users(props: { searchParams: Promise<Params> }) {
   const searchParams = await props.searchParams;
-  await requireAdmin("users");
+  const admin = await requireAdmin("users");
   const q = searchParams.q?.trim().slice(0, 120);
   const f = ["paying", "active", "dormant"].includes(searchParams.f ?? "") ? searchParams.f! : "";
   const plans = await db.plan.findMany({ orderBy: { sortOrder: "asc" }, select: { slug: true, name: true } });
@@ -84,6 +88,7 @@ export default async function Users(props: { searchParams: Promise<Params> }) {
   if (tag === "noposts") and.push({ posts: { none: {} } });
   if (tag === "noaccounts") and.push({ socialAccounts: { none: { status: "connected" } } });
   if (tag === "referred") and.push({ referredById: { not: null } });
+  if (tag === "aiunlimited") and.push({ aiEntitlements: { some: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } } });
   if (tag === "real") and.push({ NOT: { email: { endsWith: SAMPLE_DOMAIN } } });
   if (tag === "sample") and.push({ email: { endsWith: SAMPLE_DOMAIN } });
   const where = and.length ? { AND: and } : {};
@@ -109,6 +114,9 @@ export default async function Users(props: { searchParams: Promise<Params> }) {
     }),
     db.user.count({ where }),
   ]);
+  // Phase 3 (A4): AI usage this month, monthly limit and Unlimited AI Access for this page of people.
+  const ai = await aiAccessRows(rows.map((r) => r.id)).catch(() => new Map());
+  const manageAi = can(admin.role, "plans");
   const pages = Math.max(1, Math.ceil(total / PER));
   const kept = { ...(q ? { q } : {}), ...(f ? { f } : {}), ...(plan ? { plan } : {}), ...(joined ? { joined } : {}), ...(platform ? { platform } : {}), ...(tag ? { tag } : {}), ...(sort ? { sort } : {}) };
   const link = (p: number) => `?${new URLSearchParams({ ...kept, page: String(p) })}`;
@@ -150,7 +158,7 @@ export default async function Users(props: { searchParams: Promise<Params> }) {
         {rows.length === 0 ? (
           <Empty title={q ? `No one matches "${q}"` : narrowing ? "No one matches these filters" : "No users yet"} body={q || narrowing ? "Loosen a filter or try part of an email or a first name." : "Sign-ups appear here as soon as someone creates an account."} />
         ) : (
-          <Table head={["User", "Plan", "Last seen", "Location", "Joined", "Posts", "Tickets"]}>
+          <Table head={["User", "Plan", "AI this month", "Last seen", "Location", "Joined", "Posts", "Tickets"]}>
             {rows.map((u) => {
               const s = u.subscriptions[0];
               return (
@@ -165,6 +173,7 @@ export default async function Users(props: { searchParams: Promise<Params> }) {
                     <span className="block text-[12px] text-muted-foreground">{u.email}</span>
                   </td>
                   <td>{s ? <span className="flex flex-wrap items-center gap-1.5"><Pill tone="lime">{s.plan.name}</Pill><span className="text-[12px] text-muted-foreground">{formatMoney(s.priceMinor, s.currency)}</span>{s.cancelAtPeriodEnd && <Pill tone="warn">cancelling</Pill>}</span> : <span className="text-muted-foreground">Free</span>}</td>
+                  <td className="min-w-[11rem]"><AiCell row={ai.get(u.id)} userId={u.id} name={u.name} manage={manageAi} /></td>
                   <td className="whitespace-nowrap">
                     {ago(u.lastSeenAt ?? u.lastActiveAt)}
                     {(u.lastSeenAt ?? u.lastActiveAt) && <span className="block text-[11.5px] text-muted-foreground">{fmtStamp(u.lastSeenAt ?? u.lastActiveAt)}</span>}
@@ -188,6 +197,29 @@ export default async function Users(props: { searchParams: Promise<Params> }) {
         </DataSwap>
       </Card>
     </>
+  );
+}
+
+type AiRow = { monthUsed: number; total: number; monthLimit: number; grant: { features: unknown; expiresAt: Date | null } | null };
+
+/** AI usage this month against the plan's monthly limit, and Unlimited AI Access with its expiry. */
+function AiCell({ row, userId, name, manage }: { row: AiRow | undefined; userId: string; name: string; manage: boolean }) {
+  if (!row) return <span className="text-[12.5px] text-muted-foreground">Unknown</span>;
+  const all = row.grant?.features === "all";
+  const near = !row.grant && row.monthLimit > 0 && row.monthUsed >= row.monthLimit * 0.8;
+  return (
+    <div className="flex flex-col items-start gap-1.5 text-[12.5px]">
+      <span className="tabular-nums">
+        {row.monthLimit > 0 ? `${row.monthUsed} of ${row.monthLimit}` : `${row.monthUsed}, no monthly limit`}
+        {row.total > row.monthUsed && <span className="text-muted-foreground"> ({row.total} counted)</span>}
+      </span>
+      {row.grant ? (
+        <Pill tone="ok">{all ? "Unlimited AI" : "Unlimited (some features)"}{row.grant.expiresAt ? `, to ${fmtDate(row.grant.expiresAt)}` : ", permanent"}</Pill>
+      ) : near ? (
+        <Pill tone="warn">Near limit</Pill>
+      ) : null}
+      <AiAccessButton userId={userId} name={name} canManage={manage} />
+    </div>
   );
 }
 

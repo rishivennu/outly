@@ -9,6 +9,7 @@ import { fitsStorage, fmtBytes, storageFigures, type AccessSource } from "./acce
 import { activeExtras, consumeCredit, creditsLeft, refundCredit } from "./topups";
 import { normalizeTopups, type TopUpKind } from "./topups-core";
 import { getConfig } from "../settings";
+import { activeAiGrant } from "../ai/entitlements";
 import { brandsBlock, fairUseCrossed, parsePerks, perkBlock, platformsBlock, type Perk } from "./plan-rules";
 
 export interface Entitlements {
@@ -271,11 +272,18 @@ export async function recordUse(userId: string, feature: "reply" | "captions", r
  */
 export const CHUNKS_PER_CAPTION_VIDEO = 4;
 
-/** Videos with AI captions this month. One video (ref) can be transcribed in many chunks and re-run; it counts once. */
+/**
+ * Videos with AI captions this month. One video (ref) can be transcribed in many chunks and re-run; it counts once.
+ * Phase 3: AI captions on videos are transcription, so an Unlimited AI Access grant on "transcription" (or all) lifts the video cap.
+ */
 export async function captionUsage(userId: string, now = new Date()) {
-  const e = await entitlements(userId);
+  const [e, grant] = await Promise.all([entitlements(userId), activeAiGrant(userId, "transcription", now)]);
+  if (grant) {
+    const used = await db.featureUse.count({ where: { userId, feature: "captions", period: periodKey("month", now) } });
+    return { ...e, aiCaptions: true, captionVideos: 0, used, credits: 0, left: Infinity, unlimited: true, unlimitedUntil: grant.expiresAt };
+  }
   const [used, credits] = e.captionVideos > 0 ? await Promise.all([db.featureUse.count({ where: { userId, feature: "captions", period: periodKey("month", now) } }), creditsLeft(userId, "ai", now)]) : [0, 0];
-  return { ...e, used, credits, left: e.captionVideos > 0 ? Math.max(0, e.captionVideos - used) + credits : Infinity };
+  return { ...e, used, credits, left: e.captionVideos > 0 ? Math.max(0, e.captionVideos - used) + credits : Infinity, unlimited: false, unlimitedUntil: null as Date | null };
 }
 
 /**
@@ -283,7 +291,11 @@ export async function captionUsage(userId: string, now = new Date()) {
  * Returns release(): call it when the transcription then fails, so a failed run doesn't use up the
  * chunk, nor the video slot when this chunk was the one that took it (1027).
  */
-export async function assertCaptionVideo(userId: string, ref: string, now = new Date()) {
+/** `chunkRef` (Phase 3) names one chunk of one run, so the same chunk re-sent in that run (a lost answer, a race) takes no second slot. */
+export async function assertCaptionVideo(userId: string, ref: string, now = new Date(), chunkRef = "") {
+  // Phase 3: a grant covering transcription skips the plan gate and the monthly video and chunk caps. Size, type
+  // and rate limits stay in the route; the per-call AI quota is decided by chargeAi with feature "transcription".
+  if (await activeAiGrant(userId, "transcription", now)) return { ...(await entitlements(userId)), unlimited: true, release: async () => {} };
   const e = await assertAiCaptions(userId);
   if (e.captionVideos <= 0) return { ...e, release: async () => {} };
   const period = periodKey("month", now);
@@ -295,7 +307,7 @@ export async function assertCaptionVideo(userId: string, ref: string, now = new 
   // every chunk takes a slot from a monthly budget the server owns. Reusing one ref can't stretch 2 videos into 20.
   // 1096: AI top-up packs widen the chunk budget by the videos they can still pay for.
   const extra = await creditsLeft(userId, "ai", now);
-  const chunk = await reserve(userId, "caption-chunk", period, randomUUID(), (e.captionVideos + extra) * CHUNKS_PER_CAPTION_VIDEO, full);
+  const chunk = await reserve(userId, "caption-chunk", period, chunkRef ? `c:${chunkRef}`.slice(0, 120) : randomUUID(), (e.captionVideos + extra) * CHUNKS_PER_CAPTION_VIDEO, full);
   if (seen) return { ...e, release: chunk.release };
   let video: Awaited<ReturnType<typeof reserve>>;
   try {

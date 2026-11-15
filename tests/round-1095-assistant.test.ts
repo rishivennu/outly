@@ -7,47 +7,25 @@ const assistant = src("components/create/Assistant.tsx");
 const workspace = src("components/create/CreateWorkspace.tsx");
 
 describe("1095 launch collapse", () => {
-  test("arriving at Launch folds the panel and remembers it was open", () => {
-    const s = panelReducer(PANEL_OPEN, { t: "step", step: "launch" });
-    expect(s).toEqual({ open: false, restore: true });
-  });
-  test("leaving Launch puts it back the way it was", () => {
-    let s = panelReducer(PANEL_OPEN, { t: "step", step: "launch" });
-    s = panelReducer(s, { t: "step", step: "everywhere" });
-    expect(s).toEqual(PANEL_OPEN);
-  });
-  test("a panel closed before Launch stays closed afterwards", () => {
+  // Phase 3 brief B1/B5 replaced the 1095 fold: Pip's conversation and panel stay put across every step,
+  // so arriving at Launch changes nothing and only the creator's own toggle opens or closes it.
+  test("arriving at Launch keeps the panel the way it was", () => {
+    expect(panelReducer(PANEL_OPEN, { t: "step", step: "launch" })).toEqual(PANEL_OPEN);
     const closed: PanelState = { open: false, restore: null };
-    let s = panelReducer(closed, { t: "step", step: "launch" });
-    expect(s).toEqual({ open: false, restore: false });
-    s = panelReducer(s, { t: "step", step: "story" });
-    expect(s).toEqual(closed);
+    expect(panelReducer(closed, { t: "step", step: "launch" })).toEqual(closed);
   });
-  test("opening it by hand on Launch is respected on every re-render", () => {
-    let s = panelReducer(PANEL_OPEN, { t: "step", step: "launch" });
-    s = panelReducer(s, { t: "toggle" });
-    expect(s.open).toBe(true);
-    for (let i = 0; i < 3; i++) s = panelReducer(s, { t: "step", step: "launch" });
-    expect(s.open).toBe(true);
-  });
-  test("closing it by hand before Launch, then Launch, then leaving, keeps the hand-made choice", () => {
+  test("moving between steps never flips a hand-made choice", () => {
     let s = panelReducer(PANEL_OPEN, { t: "toggle" });
-    s = panelReducer(s, { t: "step", step: "launch" });
-    s = panelReducer(s, { t: "step", step: "everywhere" });
+    for (const step of ["launch", "everywhere", "story", "launch"] as const) s = panelReducer(s, { t: "step", step });
     expect(s).toEqual({ open: false, restore: null });
   });
-  test("coming back to Launch folds it again", () => {
-    let s = panelReducer(PANEL_OPEN, { t: "step", step: "launch" });
-    s = panelReducer(s, { t: "toggle" }); // opened by hand on step 4
-    s = panelReducer(s, { t: "step", step: "everywhere" }); // back to open, nothing held
-    expect(s).toEqual(PANEL_OPEN);
-    s = panelReducer(s, { t: "step", step: "launch" });
-    expect(s).toEqual({ open: false, restore: true });
+  test("a fold held by an older session is let go when the step changes", () => {
+    const held: PanelState = { open: false, restore: true };
+    expect(panelReducer(held, { t: "step", step: "everywhere" })).toEqual(PANEL_OPEN);
   });
-  test("toggling never loses what the Launch step is holding", () => {
-    let s = panelReducer(PANEL_OPEN, { t: "step", step: "launch" });
-    s = panelReducer(panelReducer(s, { t: "toggle" }), { t: "toggle" });
-    expect(s).toEqual({ open: false, restore: true });
+  test("toggling flips the panel and clears anything held", () => {
+    expect(panelReducer(PANEL_OPEN, { t: "toggle" })).toEqual({ open: false, restore: null });
+    expect(panelReducer({ open: false, restore: true }, { t: "toggle" })).toEqual(PANEL_OPEN);
   });
 
   test("the panel is folded by width, not unmounted", () => {
@@ -77,11 +55,10 @@ describe("1095 launch collapse", () => {
     expect(workspace).toContain('panelDispatch({ t: "step", step });');
     expect(workspace).toContain('useReducer(panelReducer, step, (s0: Step) => panelReducer(PANEL_OPEN, { t: "step", step: s0 }))');
   });
-  test("a post that opens on Launch starts folded, and the mount dispatch changes nothing", () => {
+  test("a post that opens on Launch starts with the panel open, and the mount dispatch changes nothing", () => {
     const first = panelReducer(PANEL_OPEN, { t: "step", step: "launch" });
-    expect(first.open).toBe(false);
+    expect(first.open).toBe(true);
     expect(panelReducer(first, { t: "step", step: "launch" })).toEqual(first);
-    expect(panelReducer(first, { t: "step", step: "everywhere" })).toEqual(PANEL_OPEN);
   });
 });
 

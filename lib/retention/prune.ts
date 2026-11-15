@@ -5,6 +5,7 @@ import { storage } from "../storage";
 import { DRAFT_TTL_DAYS } from "../domain";
 import { MAX_ANALYTICS_DAYS } from "../billing/plan-rules";
 import { PIP_CHAT_KEEP_DAYS } from "../support/conversations";
+import { RUN_CHUNK_FEATURE, RUN_FEATURE, RUN_TTL_MS } from "../ai/transcribe";
 
 /**
  * Housekeeping: rows nobody reads any more. Logs and admin noise go after 90 days, per-post metric
@@ -71,7 +72,7 @@ export const DM_KEEP_DAYS = 180;
 
 export async function pruneOldData(now: Date = new Date()) {
   const before = (days: number) => new Date(now.getTime() - days * DAY);
-  const [emailLogs, adminEvents, behaviorAnalyses, targetMetrics, otpCodes, invoices, dmMessages, dmThreads, pipAccess, pipChats] = await Promise.all([
+  const [emailLogs, adminEvents, behaviorAnalyses, targetMetrics, otpCodes, invoices, dmMessages, dmThreads, pipAccess, pipChats, captionRuns] = await Promise.all([
     db.emailLog.deleteMany({ where: { createdAt: { lt: before(90) } } }),
     db.adminEvent.deleteMany({ where: { createdAt: { lt: before(90) } } }),
     db.behaviorAnalysis.deleteMany({ where: { createdAt: { lt: before(90) } } }),
@@ -85,6 +86,8 @@ export async function pruneOldData(now: Date = new Date()) {
     db.pipAccessLog.deleteMany({ where: { createdAt: { lt: before(365) } } }),
     // Pip conversations (1126): 90 days after the last message; their messages go with them (cascade).
     db.pipConversation.deleteMany({ where: { updatedAt: { lt: before(PIP_CHAT_KEEP_DAYS) } } }),
+    // Phase 3: transcription run claims and their chunk hashes only matter while the run can still be reused.
+    db.featureUse.deleteMany({ where: { feature: { in: [RUN_FEATURE, RUN_CHUNK_FEATURE] }, period: "run", createdAt: { lt: new Date(now.getTime() - RUN_TTL_MS) } } }),
   ]);
   // Deletion status records (1053): kept 30 days after the files are gone, for the person's status link.
   const deletions = await pruneDeletions(now).catch(() => 0);
@@ -109,6 +112,7 @@ export async function pruneOldData(now: Date = new Date()) {
     dmThreads: dmThreads.count,
     pipAccess: pipAccess.count,
     pipChats: pipChats.count,
+    captionRuns: captionRuns.count,
     deletions,
   };
 }

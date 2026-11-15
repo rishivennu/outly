@@ -53,7 +53,7 @@ export const POST = route(
 
     const uid = realUserId(user);
     try {
-      await chargeAi(uid);
+      await chargeAi(uid, "ai", undefined, undefined, "captions");
     } catch (e) {
       if (auto && e instanceof HttpError) return json({ skipped: e.code ?? "limit" });
       throw e;

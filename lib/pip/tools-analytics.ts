@@ -1019,6 +1019,10 @@ export const account: Tool = async (ctx, _a, _range, period) => {
   } else r.notes.push({ level: "warn", text: "Your plan couldn't be read just now." });
   const quota = (q: Awaited<ReturnType<typeof aiQuota>> | null, what: string) => {
     if (!q) return;
+    if (q.unlimited) {
+      r.facts.push(`${what}: Unlimited AI Access${q.expiresAt ? ` until ${dayLabel(q.expiresAt, ctx.tz)}` : ""}, no daily or monthly limit.`);
+      return "Unlimited";
+    }
     const today = q.limit ? `${q.used} of ${q.limit} today` : `${q.used} today, no daily limit`;
     const month = q.monthLimit ? `, ${q.monthUsed} of ${q.monthLimit} this month` : "";
     r.facts.push(`${what}: ${today}${month}.`);
@@ -1026,7 +1030,7 @@ export const account: Tool = async (ctx, _a, _range, period) => {
   };
   const t = quota(ai, "AI writing help used");
   quota(help, "Pip and help-chat AI used");
-  if (t) r.cards.push({ label: "AI help today", value: ai!.limit ? `${ai!.used} of ${ai!.limit}` : String(ai!.used) });
+  if (t) r.cards.push({ label: "AI help today", value: ai!.unlimited ? "Unlimited" : ai!.limit ? `${ai!.used} of ${ai!.limit}` : String(ai!.used) });
   r.downloads.push({ label: "Open Billing", href: "/billing" });
   return r;
 };

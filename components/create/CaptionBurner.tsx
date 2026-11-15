@@ -1,18 +1,23 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Captions, Clock, Download, Loader2, Lock, Plus, Sparkles, Trash2, Type, Undo2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, Captions, Clock, Download, Loader2, Lock, Plus, RotateCcw, Sparkles, Trash2, Type, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { api, ApiError, offerUpgrade } from "@/lib/client/api";
-import { audioChunks, burnCaptions, drawCue, recorderType } from "@/lib/client/captions";
-import { CAPTION_STYLES, cueAt, cuesFromScript, normalizeCues, toSrt, type CaptionPos, type CaptionStyle, type Cue } from "@/lib/captions/cues";
+import { audioChunks, burnCaptions, drawCue, postChunk, recorderType, type AudioChunk, type ChunkAnswer } from "@/lib/client/captions";
+import { CAPTION_STYLES, cueAt, cuesFromScript, toSrt, type CaptionPos, type CaptionStyle, type Cue } from "@/lib/captions/cues";
 import { cn } from "@/lib/utils";
-import { wordsFromCues, type Word } from "@/lib/captions/subtitle-engine";
+import { mergeSubtitleRules, type Word } from "@/lib/captions/subtitle-engine";
 import { insertCue } from "@/lib/captions/insert";
-import { cueBounds, cueIssues, MAX_CUE_TEXT, nudgeCue, readTrack, restoreCue, retimeCue, swapText, type CaptionTrack, type Edge } from "@/lib/captions/edit";
+import { blockingIssues, cueBounds, cueIssues, MAX_CUE_TEXT, nudgeCue, readTrack, restoreCue, retimeCue, swapText, type CaptionTrack, type CaptionView, type CueIssue, type Edge } from "@/lib/captions/edit";
+import { buildCues, followTrack, keepEnglish, spliceSpan, spliceWords, stitchWords, syncWords } from "@/lib/captions/timing";
+import { runChunks } from "@/lib/captions/run";
+import { isEnglish } from "@/lib/captions/languages";
+import { translateWindows } from "@/lib/captions/translate-core";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/Toast";
 import { TimeStepper } from "./captions/TimeStepper";
+import { CaptionLanguage } from "./captions/CaptionLanguage";
 import { ClipCutter } from "./ClipCutter";
 import { saveBlob } from "@/lib/client/native";
 
@@ -39,9 +44,15 @@ interface Props {
   initialTrack?: unknown;
   /** Every edit, so the draft can keep the captions. null = captions off or no lines. */
   onTrackChange?: (track: CaptionTrack | null) => void;
+  /** A transcribe, translate or burn is running here; leaving the step would stop it, so the parent asks first. */
+  onBusy?: (busy: boolean) => void;
 }
 
-type Busy = null | { kind: "transcribe"; done: number; total: number } | { kind: "burn"; p: number };
+type Busy = null | { kind: "transcribe"; done: number; total: number } | { kind: "burn"; p: number } | { kind: "translate" };
+type Tracks = { orig: Cue[]; en: Cue[] | null; view: CaptionView };
+/** A part of the video whose chunk did not come back: shown with a retry, the rest of the captions still count. */
+type Gap = { index: number; from: number; to: number };
+type Run = { run: string; lang: string; parts: Map<number, ChunkAnswer> };
 
 // Top to bottom, the order they sit on the frame.
 const POSITIONS: { id: CaptionPos; label: string }[] = [
@@ -51,17 +62,37 @@ const POSITIONS: { id: CaptionPos; label: string }[] = [
 ];
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
+const runId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`);
+const sameTimes = (a: Cue[], b: Cue[]) => a.length === b.length && a.every((c, i) => c.start === b[i].start && c.end === b[i].end);
 
 /**
  * Off by default. Turning the switch on reveals transcribe / type, an editable cue list, a live preview
  * and "Burn into video", which makes a new MP4 in the browser and swaps it in as the post's video.
  */
-export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo, onError, video, canvas, onLive, initialTrack, onTrackChange }: Props) {
+export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo, onError, video, canvas, onLive, initialTrack, onTrackChange, onBusy }: Props) {
   const [init] = useState(() => readTrack(initialTrack, duration || Infinity));
   const [on, setOn] = useState(!!init?.cues.length);
-  const [cues, setCues] = useState<Cue[]>(init?.cues ?? []);
+  /* Original words and, once translated, English: one timeline, line for line. `cues` is the track on show. */
+  const [tracks, setTracks] = useState<Tracks>(() => ({ orig: init?.original ?? init?.cues ?? [], en: init?.translated ?? null, view: init?.translated ? (init.view ?? "original") : "original" }));
+  const showing: "orig" | "en" = tracks.view === "english" && tracks.en ? "en" : "orig";
+  const cues = showing === "en" && tracks.en ? tracks.en : tracks.orig;
   const cuesRef = useRef(cues);
   cuesRef.current = cues;
+  /** Edits the track on show; the other track follows its timing. */
+  const setCues = useCallback((next: Cue[] | ((cs: Cue[]) => Cue[])) => {
+    setTracks((t) => {
+      const key = t.view === "english" && t.en ? "en" : "orig";
+      const cur = key === "en" ? t.en! : t.orig;
+      const val = typeof next === "function" ? next(cur) : next;
+      if (key === "en") return { ...t, en: val, orig: followTrack(cur, val, t.orig) };
+      return { ...t, orig: val, en: t.en ? followTrack(cur, val, t.en) : null };
+    });
+  }, []);
+  /** New original lines (transcribe, script): an old translation no longer matches, so it goes. */
+  const replaceOriginal = (orig: Cue[]) => {
+    setTracks({ orig, en: null, view: "original" });
+    setUntranslated([]);
+  };
   /* Word timings from the engine: what "cut by text" searches. Typed captions fall back to rough ones. */
   const [words, setWords] = useState<Word[]>([]);
   const [style, setStyle] = useState<CaptionStyle>(init?.style ?? "pop");
@@ -84,6 +115,17 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
   const [ask, setAsk] = useState<null | "transcribe" | "script">(null);
   /* Whether the server has a transcription engine. null = not known yet; false = typing only, never a fake transcript. */
   const [aiReady, setAiReady] = useState<boolean | null>(null);
+  /* Spoken language: the creator's pick ("auto" = detect) and what the engine heard. */
+  const [langPick, setLangPick] = useState("auto");
+  const [heard, setHeard] = useState(init?.lang ?? "");
+  const [untranslated, setUntranslated] = useState<number[]>([]);
+  /* Latest committed state, read when a run's answers land, so lines edited while chunks were out are kept. */
+  const live = useRef({ tracks, words, untranslated });
+  live.current = { tracks, words, untranslated };
+  const [gaps, setGaps] = useState<Gap[]>([]);
+  /* The decoded audio of this video and the last run, so a retry of one part neither re-reads the file nor re-bills. */
+  const chunksRef = useRef<{ key: Blob | string; chunks: AudioChunk[] } | null>(null);
+  const runRef = useRef<Run | null>(null);
   const toast = useToast();
   const canRecord = typeof window !== "undefined" && !!recorderType();
   /* Plan gates: burning is paid-only; Free gets AI captions on a few videos a month. null = not loaded yet. */
@@ -103,18 +145,26 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
   const trackCb = useRef(onTrackChange);
   trackCb.current = onTrackChange;
   useEffect(() => {
-    trackCb.current?.(on && cues.length ? { v: 1, cues, style, pos } : null);
-  }, [on, cues, style, pos]);
+    const both = tracks.en ? { original: tracks.orig, translated: tracks.en, view: tracks.view } : {};
+    trackCb.current?.(on && cues.length ? { v: 1, cues, style, pos, ...(heard ? { lang: heard } : {}), ...both } : null);
+  }, [on, cues, tracks, style, pos, heard]);
   // One video = one caption allowance, however many chunks or re-runs. Same file + length = same ref.
   const ref = `${filename}:${Math.round(duration * 10)}`;
+  // Another video: its audio, its run and its missing parts start over.
+  useEffect(() => {
+    chunksRef.current = null;
+    runRef.current = null;
+    setGaps([]);
+  }, [src, file]);
 
   useEffect(() => {
     onLive?.(on);
   }, [on, onLive]);
   useEffect(() => () => onLive?.(false), [onLive]);
 
-  // Live preview: the same drawCue the recorder uses, on a transparent canvas over the one player. Every edit
-  // (text, style, position) shows on the next frame, and the list follows the playhead.
+  // Live preview: the same drawCue the recorder uses, on a transparent canvas over the one player. The player's
+  // clock is the only clock: play moves the highlight, pause keeps it, a seek shows the line at the new time, and
+  // every edit (text, timing, style, position, track) shows on the next frame.
   useEffect(() => {
     if (!on) return;
     let raf = 0;
@@ -135,10 +185,12 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
       if (i !== activeRef.current) {
         activeRef.current = i;
         setActive(i);
-        // While it plays, keep the line on screen in view inside the list (never scrolls the page).
+        // Keep the line on screen in view inside the list (never scrolls the page), while it plays or after a
+        // seek, but not while the creator is typing in the list.
         const ol = list.current;
         const row = i >= 0 ? (ol?.children[i] as HTMLElement | undefined) : undefined;
-        if (v && !v.paused && ol && row && (row.offsetTop < ol.scrollTop || row.offsetTop + row.offsetHeight > ol.scrollTop + ol.clientHeight)) {
+        const typingInList = !!ol && ol.contains(document.activeElement);
+        if (v && ol && row && !typingInList && (row.offsetTop < ol.scrollTop || row.offsetTop + row.offsetHeight > ol.scrollTop + ol.clientHeight)) {
           ol.scrollTop = row.offsetTop - 8;
         }
       }
@@ -153,39 +205,86 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
   }, [on, cues, style, pos, video, canvas]);
 
   useEffect(() => () => abort.current?.abort(), []);
+  useEffect(() => onBusy?.(!!busy), [busy, onBusy]);
+  useEffect(() => () => onBusy?.(false), [onBusy]);
 
-  async function transcribe() {
+  /**
+   * Whole video, or only the parts in `retry`. Chunks go up a few at a time, each retried on a passing failure; a
+   * part that still fails is listed with a retry instead of throwing the rest away. If nothing comes back, the
+   * lines you had stay as they were.
+   */
+  async function transcribe(retry?: number[]) {
     const ctrl = new AbortController();
     abort.current = ctrl;
     setNote(null);
     try {
-      // 1151: read the creator's own file when we still have it. Fetching the blob:/signed URL back is what
-      // failed with "Failed to fetch" (CSP connect-src had no blob:), and a remote re-download is slower anyway.
-      const chunks = await audioChunks(file ?? src, ctrl.signal);
-      setBusy({ kind: "transcribe", done: 0, total: chunks.length });
-      const all: Cue[] = [];
-      const ws: Word[] = [];
-      let lang = "";
-      for (let i = 0; i < chunks.length; i++) {
-        const c = chunks[i];
-        const r = await fetch(`/api/ai/transcribe?offset=${c.offset}&duration=${c.duration}&ref=${encodeURIComponent(ref)}`, { method: "POST", body: c.blob, headers: { "content-type": "audio/wav" }, credentials: "same-origin", signal: ctrl.signal });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) {
-          if (r.status === 402 && j.code === "PLAN_LIMIT") offerUpgrade(j.error, j.feature);
-          throw new ApiError(r.status, j.error ?? "Transcription didn't come back.", j.code);
-        }
-        all.push(...(j.cues as Cue[]));
-        if (Array.isArray(j.words)) ws.push(...(j.words as Word[]));
-        lang ||= j.language;
-        setBusy({ kind: "transcribe", done: i + 1, total: chunks.length });
+      const key = file ?? src;
+      let chunks = chunksRef.current?.key === key ? chunksRef.current.chunks : null;
+      if (!chunks) {
+        setBusy({ kind: "transcribe", done: 0, total: 0 });
+        // 1151: read the creator's own file when we still have it. Fetching the blob:/signed URL back is what
+        // failed with "Failed to fetch" (CSP connect-src had no blob:), and a remote re-download is slower anyway.
+        chunks = await audioChunks(file ?? src, ctrl.signal);
+        chunksRef.current = { key, chunks };
       }
-      const clean = normalizeCues(all, duration || Infinity);
-      setCues(clean);
+      const all = chunks;
+      const again = !!retry && !!runRef.current;
+      const run: Run = again ? runRef.current! : { run: runId(), lang: langPick, parts: new Map() };
+      const todo = again ? retry!.filter((i) => all[i]) : all.map((c) => c.index);
+      setBusy({ kind: "transcribe", done: 0, total: todo.length });
+      const out = await runChunks(todo, (i, signal) => postChunk(all[i], { ref, run: run.run, lang: run.lang }, signal), {
+        signal: ctrl.signal,
+        onDone: (_, done, total) => setBusy({ kind: "transcribe", done, total }),
+      });
+      if (out.fatal) {
+        if (out.fatal.status === 402 && out.fatal.code === "PLAN_LIMIT") offerUpgrade(out.fatal.message, out.fatal.data.feature as string | undefined);
+        throw new ApiError(out.fatal.status, out.fatal.message, out.fatal.code);
+      }
+      if (!out.results.size) throw new ApiError(out.failed[0]?.error.status ?? 502, out.failed[0]?.error.message ?? "Transcription didn't come back.", out.failed[0]?.error.code);
+      for (const [i, a] of out.results) run.parts.set(i, a);
+      runRef.current = run;
+      const order = [...run.parts.keys()].sort((a, b) => a - b);
+      const stitched = stitchWords(order.map((i) => ({ from: all[i].from, to: all[i].to, words: run.parts.get(i)!.words })));
+      const lines = order.map((i) => run.parts.get(i)!.lines).find(Boolean);
+      const built = buildCues(stitched, mergeSubtitleRules(lines ?? {}), duration || Infinity);
+      const language = order.map((i) => run.parts.get(i)!.language).find(Boolean) ?? "";
+      const span = (i: number) => ({ from: all[i].from, to: Math.min(all[i].to, duration || Infinity) });
+      const missing: Gap[] = out.failed.map((f) => ({ index: f.index, ...span(f.index) }));
+      const cur = live.current;
+      let next: Cue[];
+      let nextWords: Word[];
+      if (again) {
+        // Only the retried parts change; edits everywhere else stay, including ones made while this ran.
+        next = cur.tracks.orig;
+        nextWords = cur.words;
+        for (const i of out.results.keys()) {
+          next = spliceSpan(next, built, span(i).from, span(i).to);
+          nextWords = spliceWords(nextWords, stitched, span(i).from, span(i).to);
+        }
+        setGaps((g) => [...g.filter((x) => !out.results.has(x.index) && !missing.some((m) => m.index === x.index)), ...missing].sort((a, b) => a.index - b.index));
+      } else {
+        // A part that failed this time keeps the lines it had before, so a re-run never loses captions.
+        next = built;
+        nextWords = stitched;
+        for (const m of missing) {
+          next = spliceSpan(next, cur.tracks.orig, m.from, m.to);
+          nextWords = spliceWords(nextWords, cur.words, m.from, m.to);
+        }
+        setGaps(missing);
+      }
+      const keptEn = again && cur.tracks.en ? keepEnglish(cur.tracks.orig, cur.tracks.en, cur.untranslated, next) : null;
+      if (keptEn) {
+        setTracks({ ...cur.tracks, orig: next, en: keptEn.en });
+        setUntranslated(keptEn.untranslated);
+      } else replaceOriginal(next);
       setTiming(null);
-      setWords(ws.length ? ws : wordsFromCues(clean));
+      setWords(nextWords);
+      if (language) setHeard(language);
       setPlan(null); // re-read what's left this month
-      setNote(clean.length ? `${clean.length} captions${lang ? ` in ${lang}` : ""}. Fix any word by clicking it.` : "We didn't hear any speech. Type your captions instead.");
-      if (!clean.length) setTyping(true);
+      const gapText = missing.length ? ` ${missing.map((m) => `${fmt(m.from)} to ${fmt(m.to)}`).join(", ")} didn't come back. Retry ${missing.length === 1 ? "that part" : "those parts"} below.` : "";
+      const kept = keptEn?.untranslated.length ? " Your English lines are kept. Translate the new lines to add them." : "";
+      setNote(next.length ? `${next.length} captions. Fix any word by clicking it.${gapText}${kept}` : missing.length ? `We couldn't transcribe this video yet.${gapText}` : "We didn't hear any speech. Type your captions instead.");
+      if (!next.length && !missing.length) setTyping(true);
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
       const msg = (e as Error).message;
@@ -197,19 +296,95 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
     }
   }
 
+  /**
+   * English for every line (or only `only`), on the original's timing. Lines the engine left out are listed.
+   * A long video goes in windows of lines, one request each; a window that fails leaves its lines listed.
+   */
+  async function translate(only?: number[]) {
+    const source = tracks.orig;
+    if (!source.length) return;
+    const ctrl = new AbortController();
+    abort.current = ctrl;
+    setBusy({ kind: "translate" });
+    setNote(null);
+    const from = langPick !== "auto" ? langPick : heard || "auto";
+    try {
+      const merged = source.map((c) => ({ ...c }));
+      const done = new Set<number>();
+      const missing = new Set<number>();
+      let firstErr: unknown = null;
+      const wins = translateWindows(source.length, only?.length ? only : undefined);
+      for (let k = 0; k < wins.length; k++) {
+        const w = wins[k];
+        const slice = source.slice(w.lo, w.hi);
+        const ids = w.only ?? slice.map((_, i) => i);
+        try {
+          const r = await api<{ cues: Cue[]; untranslated: number[] }>("/api/ai/translate-captions", { method: "POST", json: { cues: slice, from, to: "en", ...(w.only ? { only: w.only } : {}) }, signal: ctrl.signal });
+          if (!Array.isArray(r.cues) || !sameTimes(r.cues, slice)) throw new Error("The translation came back out of step with your lines, so we didn't use it. Try again.");
+          const left = new Set(r.untranslated ?? []);
+          for (const i of ids) {
+            if (left.has(i)) missing.add(w.lo + i);
+            else {
+              merged[w.lo + i] = { ...merged[w.lo + i], text: r.cues[i].text };
+              done.add(w.lo + i);
+            }
+          }
+        } catch (e) {
+          if ((e as Error).name === "AbortError") throw e;
+          firstErr ??= e;
+          for (const i of ids) missing.add(w.lo + i);
+          // Out of allowance, not set up, or refused: the windows after this one would be refused too.
+          if (e instanceof ApiError && e.status !== 502) {
+            for (const r of wins.slice(k + 1)) for (const i of r.only ?? []) missing.add(r.lo + i);
+            break;
+          }
+        }
+      }
+      if (!done.size && firstErr) throw firstErr;
+      let changed = false;
+      setTracks((t) => {
+        // Lines edited while the translation ran: their times moved, so this answer no longer fits.
+        if (!sameTimes(t.orig, source)) return t;
+        changed = true;
+        const base = only?.length && t.en && sameTimes(t.en, source) ? t.en : null;
+        const en = base ? base.map((c, i) => (done.has(i) ? { ...c, text: merged[i].text } : c)) : merged;
+        return { ...t, en, view: "english" };
+      });
+      if (!changed) return setNote("Your lines changed while we translated. Translate again to match them.");
+      setUntranslated((u) => (only?.length ? [...new Set([...u.filter((i) => !only.includes(i)), ...missing])] : [...missing]).sort((a, b) => a - b));
+      setTiming(null);
+      setNote(`Translated to English on the same timing. Switch between Original and English any time; both can be edited.${missing.size ? ` ${missing.size} line${missing.size === 1 ? "" : "s"} still show the original words.` : ""}`);
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      setNote((e as Error).message);
+      if (e instanceof ApiError && e.code === "NO_AI") setAiReady(false);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   function applyScript() {
     const c = cuesFromScript(script, duration);
     if (!c.length) return setNote("Type a line or two first.");
-    setCues(c);
+    replaceOriginal(c);
     setWords([]);
+    setGaps([]);
     setTiming(null);
     setTyping(false);
     setNote(`Spread ${c.length} captions across the clip. Nudge the times if a line lands early or late.`);
   }
 
+  /* Checked on every change and shown on the line; nothing is changed for the creator. */
+  const issues = useMemo(() => cueIssues(cues, duration, showing === "en" ? tracks.orig : undefined), [cues, duration, showing, tracks.orig]);
+  const issueAt = useMemo(() => {
+    const m = new Map<number, CueIssue>();
+    for (const x of issues) if (!m.has(x.index) || (m.get(x.index)!.level === "warn" && x.level !== "warn")) m.set(x.index, x);
+    return m;
+  }, [issues]);
+
   /** The first thing that would make the burn or the .srt wrong, said plainly, with that line in focus. */
   function blocked() {
-    const issue = cueIssues(cues, duration)[0];
+    const issue = blockingIssues(issues)[0];
     if (!issue) return false;
     setNote(issue.message);
     focusRow(issue.index);
@@ -242,7 +417,8 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
 
   function downloadSrt() {
     if (blocked()) return;
-    void saveBlob(new Blob([toSrt(cues)], { type: "application/x-subrip" }), `${filename.replace(/\.[^.]+$/, "") || "captions"}.srt`).catch(() => {});
+    const tag = showing === "en" ? "-en" : "";
+    void saveBlob(new Blob([toSrt(cues)], { type: "application/x-subrip" }), `${filename.replace(/\.[^.]+$/, "") || "captions"}${tag}.srt`).catch(() => {});
   }
 
   const edit = (i: number, patch: Partial<Cue>) => setCues((cs) => cs.map((c, j) => (j === i ? { ...c, ...patch } : c)));
@@ -252,12 +428,12 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
     const v = video.current;
     if (v) v.currentTime = Math.min(c.start + 0.01, Math.max(0, c.end - 0.01));
   };
-  /* Reorder = the lines swap places, the timing slots stay where the speech is. */
+  /* Reorder = the lines swap places, the timing slots stay where the speech is. Both tracks swap together. */
   const move = (i: number, dir: -1 | 1) => {
     const next = swapText(cues, i, dir);
     if (!next) return;
     const j = i + dir;
-    setCues(next);
+    setTracks((t) => ({ ...t, orig: swapText(t.orig, i, dir) ?? t.orig, en: t.en ? swapText(t.en, i, dir) ?? t.en : null }));
     setMoved(`Caption moved to ${fmt(cues[j].start)}.`);
     if (timing === i) setTiming(j);
     focusRow(j);
@@ -312,6 +488,12 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
   const retime = (i: number, edge: Edge, value: number) => applyRetime(i, edge, retimeCue(cues, i, edge, value, duration));
   const nudge = (i: number, edge: Edge, delta: number) => void applyRetime(i, edge, nudgeCue(cues, i, edge, delta, duration));
   const working = !!busy;
+  const spoken = langPick !== "auto" ? langPick : heard;
+  const canTranslate = aiReady !== false && tracks.orig.length > 0 && !(spoken && isEnglish(spoken));
+  /* Lines still showing the original words in the English track. */
+  const stillOriginal = tracks.en ? untranslated.filter((i) => tracks.en![i] && tracks.orig[i] && tracks.en![i].text === tracks.orig[i].text) : [];
+  /* "Cut by text" searches what was said: real word times, re-spread only on lines edited by hand. */
+  const cutWords = useMemo(() => syncWords(words, tracks.orig), [words, tracks.orig]);
 
   return (
     <section aria-labelledby="cap-title" className="glass rounded-[28px] p-4 sm:p-6">
@@ -343,14 +525,45 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
             {aiReady !== false && (
               <Button type="button" variant="lime" onClick={() => (cues.length ? setAsk("transcribe") : transcribe())} disabled={working}>
                 {busy?.kind === "transcribe" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="h-4 w-4" aria-hidden />}
-                {busy?.kind === "transcribe" ? `Listening${busy.total > 1 ? ` ${busy.done}/${busy.total}` : ""}…` : cues.length ? "Transcribe again" : "Transcribe with AI"}
+                {busy?.kind === "transcribe" ? (busy.total ? `Listening${busy.total > 1 ? ` ${busy.done}/${busy.total}` : ""}…` : "Reading the audio…") : cues.length ? "Transcribe again" : "Transcribe with AI"}
               </Button>
             )}
             <Button type="button" variant="outline" onClick={() => setTyping((t) => !t)} disabled={working} aria-expanded={typing}>
               <Type className="h-4 w-4" aria-hidden /> Type or paste
             </Button>
-            {busy?.kind === "transcribe" && <Button type="button" variant="ghost" onClick={() => abort.current?.abort()}><X className="h-4 w-4" aria-hidden />Stop</Button>}
+            {(busy?.kind === "transcribe" || busy?.kind === "translate") && <Button type="button" variant="ghost" onClick={() => abort.current?.abort()}><X className="h-4 w-4" aria-hidden />Stop</Button>}
           </div>
+          {busy?.kind === "transcribe" && busy.total > 1 && (
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary" role="progressbar" aria-label="Transcribing" aria-valuemin={0} aria-valuemax={busy.total} aria-valuenow={busy.done} aria-valuetext={`${busy.done} of ${busy.total} parts done`}>
+              <div className="h-full rounded-full bg-lime transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${(busy.done / busy.total) * 100}%` }} />
+            </div>
+          )}
+          {aiReady !== false && (
+            <CaptionLanguage
+              hint={langPick}
+              onHint={setLangPick}
+              detected={heard}
+              disabled={working}
+              canTranslate={canTranslate}
+              translating={busy?.kind === "translate"}
+              onTranslate={() => void translate()}
+              hasEnglish={!!tracks.en}
+              view={tracks.en ? tracks.view : "original"}
+              onView={(v) => { setTracks((t) => ({ ...t, view: v })); setTiming(null); setHint(null); setMoved(v === "english" ? "Showing the English captions." : "Showing the original captions."); }}
+              untranslated={stillOriginal.length}
+              onTranslateMissing={() => void translate(stillOriginal)}
+            />
+          )}
+          {gaps.length > 0 && !working && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl bg-secondary/40 px-3.5 py-2 hairline">
+              <p className="min-w-0 flex-1 text-[13px]">
+                Missing: <span className="tabular-nums">{gaps.map((g) => `${fmt(g.from)} to ${fmt(g.to)}`).join(", ")}</span>
+              </p>
+              <Button type="button" variant="outline" onClick={() => void transcribe(gaps.map((g) => g.index))}>
+                <RotateCcw className="h-4 w-4" aria-hidden /> {gaps.length === 1 ? "Retry this part" : "Retry these parts"}
+              </Button>
+            </div>
+          )}
           {aiReady === false && (
             <p className="mt-2 text-[13px] text-muted-foreground">AI transcription is not set up on this workspace. Type or paste your lines, or add them one at a time.</p>
           )}
@@ -380,7 +593,7 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
           {cues.length > 0 && (
             <>
               <div className="mt-5 flex items-baseline justify-between gap-3">
-                <h3 className="text-[13px] font-semibold">Lines <span className="font-normal text-muted-foreground tabular">({cues.length})</span></h3>
+                <h3 className="text-[13px] font-semibold">{showing === "en" ? "English lines" : "Lines"} <span className="font-normal text-muted-foreground tabular">({cues.length})</span></h3>
                 <p className="text-[12px] text-muted-foreground">Press a time to jump there. The clock sets timing.</p>
               </div>
               <ol ref={list} className="relative mt-2 max-h-[min(52dvh,460px)] space-y-2 overflow-y-auto overscroll-contain rounded-2xl p-1 pr-1.5" aria-label="Captions">
@@ -388,9 +601,10 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
                   const live = i === active;
                   const open = timing === i;
                   const b = open ? cueBounds(cues, i, duration) : null;
+                  const issue = issueAt.get(i);
                   return (
-                    <li key={i} aria-current={live ? "true" : undefined} className={cn("flex flex-wrap items-center gap-1.5 rounded-2xl p-1.5 transition-colors motion-reduce:transition-none sm:flex-nowrap sm:gap-2", open && "sm:flex-wrap", live ? "bg-lime/10 ring-1 ring-lime/60" : "bg-secondary/30 hairline")}>
-                      <input data-cue value={c.text} maxLength={MAX_CUE_TEXT} onChange={(e) => edit(i, { text: e.target.value })} onFocus={() => { const v = video.current; if (v && v.paused) jump(c); }} aria-label={`Caption ${i + 1} text, ${fmt(c.start)} to ${fmt(c.end)}`} aria-invalid={!c.text.trim() || undefined} className="order-first h-11 min-w-0 basis-full rounded-xl bg-background/70 px-3 text-[14px] hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 sm:order-none sm:basis-0 sm:flex-1" />
+                    <li key={i} aria-current={live ? "true" : undefined} className={cn("flex flex-wrap items-center gap-1.5 rounded-2xl p-1.5 transition-colors motion-reduce:transition-none sm:flex-nowrap sm:gap-2", (open || issue) && "sm:flex-wrap", live ? "bg-lime/10 ring-1 ring-lime/60" : "bg-secondary/30 hairline")}>
+                      <input data-cue value={c.text} maxLength={MAX_CUE_TEXT} onChange={(e) => edit(i, { text: e.target.value })} onFocus={() => { const v = video.current; if (v && v.paused) jump(c); }} aria-label={`Caption ${i + 1} text, ${fmt(c.start)} to ${fmt(c.end)}`} aria-invalid={(!!issue && issue.level !== "warn") || undefined} aria-describedby={issue ? `cap-issue-${i}` : undefined} className="order-first h-11 min-w-0 basis-full rounded-xl bg-background/70 px-3 text-[14px] hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 sm:order-none sm:basis-0 sm:flex-1" />
                       <button type="button" onClick={() => jump(c)} className={cn("flex min-h-[44px] shrink-0 flex-col items-start justify-center rounded-xl px-2 text-left tabular [@media(hover:hover)]:hover:bg-secondary sm:order-first sm:w-[92px]", live ? "text-foreground" : "text-muted-foreground")} aria-label={`Jump to ${fmt(c.start)}, caption ${i + 1}`}>
                         <span className="text-[13px] font-semibold leading-tight">{fmt(c.start)}</span>
                         <span className="text-[12px] leading-tight">to {fmt(c.end)}</span>
@@ -404,6 +618,9 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
                           <Trash2 className="h-4 w-4" aria-hidden />
                         </button>
                       </div>
+                      {issue && (
+                        <p id={`cap-issue-${i}`} className={cn("basis-full px-1.5 text-[12px]", issue.level === "warn" ? "text-muted-foreground" : "text-[hsl(0_72%_38%)] dark:text-[hsl(0_90%_72%)]")}>{issue.message}</p>
+                      )}
                       {open && b && (
                         <div id={`cap-timing-${i}`} role="group" aria-label={`Timing of caption ${i + 1}`} className="basis-full space-y-2 px-0.5 pb-1 pt-1">
                           <div className="grid gap-2 min-[400px]:grid-cols-2">
@@ -463,7 +680,7 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
                   filename={filename}
                   duration={duration}
                   cues={cues}
-                  words={words.length ? words : wordsFromCues(cues)}
+                  words={cutWords}
                   style={style}
                   pos={pos}
                   preview={video}
@@ -480,7 +697,7 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
         open={!!ask}
         onOpenChange={(o) => !o && setAsk(null)}
         title="Replace your caption lines?"
-        body={`This swaps the ${cues.length} line${cues.length === 1 ? "" : "s"} you have, edits included, for new ones.`}
+        body={`This swaps the ${tracks.orig.length} line${tracks.orig.length === 1 ? "" : "s"} you have, edits included, for new ones.${tracks.en ? " The English translation goes too." : ""} If a part fails, its old lines stay.`}
         confirmLabel={ask === "transcribe" ? "Transcribe again" : "Use the new lines"}
         cancelLabel="Keep my lines"
         onConfirm={() => {

@@ -71,6 +71,8 @@ model User {
 
   socialAccounts SocialAccount[]
   aiUsage        AiUsage[]
+  aiEntitlements AiEntitlement[]
+  aiFeatureUsage AiFeatureUsage[]
   media          Media[]
   posts          Post[]
   subscriptions  Subscription[]
@@ -1438,4 +1440,39 @@ model SubscriberMonth {
 
   @@unique([userId, month])
   @@index([month])
+}
+
+/// Phase 3 (A4): an admin's "Unlimited AI Access" for one person. features is "all" or a comma list of AiFeature
+/// ids (captions,transcription,translation,rewrite,content,other). Live while revokedAt is null and (expiresAt is
+/// null or in the future). Never written by the user it belongs to; every change also lands in AuditLog.
+model AiEntitlement {
+  id          String    @id @default(cuid())
+  userId      String
+  features    String // "all" | comma list of AiFeature ids
+  expiresAt   DateTime? // null = permanent
+  note        String    @default("") // internal: why it was granted
+  grantedBy   String // admin login
+  revokedAt   DateTime?
+  revokedBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+/// Phase 3 (A5): AI calls per person, per UTC day, per feature, for admin monitoring. Counted for every AI call,
+/// including calls covered by an AiEntitlement (unlimited = counted here, not charged against quota in AiUsage).
+model AiFeatureUsage {
+  userId    String
+  day       String // YYYY-MM-DD in UTC
+  feature   String // AiFeature id
+  count     Int      @default(0)
+  unlimited Int      @default(0) // how many of `count` were covered by an AiEntitlement
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, day, feature])
+  @@index([day, feature])
 }

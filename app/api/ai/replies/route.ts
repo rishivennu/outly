@@ -9,7 +9,7 @@ export const POST = route(
   async (req, { user }) => {
     const body = replySuggestRequestSchema.parse(await req.json());
     await assertPerk(realUserId(user), "ai-replies");
-    await chargeAi(realUserId(user));
+    await chargeAi(realUserId(user), "ai", undefined, undefined, "other");
     return json(await suggestReplies(body));
   },
   { limit: [30, 60_000] },

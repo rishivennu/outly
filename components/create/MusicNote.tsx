@@ -1,40 +1,72 @@
 "use client";
-import { Music2, Replace } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, Music2, Replace } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-interface Props {
-  /** "Instagram and YouTube": where this exact video, with its sound, is going. */
-  list: string;
-  /** Back to step 1, where the creator swaps in the version that has the music. */
-  onReplace: () => void;
-}
+import { PlatformOrb } from "@/components/shared/PlatformIcon";
+import { PLATFORMS, type Platform } from "@/lib/domain";
 
 /**
- * Outlly never adds music. Instagram's and YouTube's APIs give other apps no way to use their music
- * libraries or trending sounds, so the creator adds the sound in their own editor, exports, and uploads
- * that file. Whatever sound is in the file is what every platform gets.
+ * What each place does with music it didn't add itself. Plain facts only: no app can promise a song
+ * is cleared, so nothing here does. Outlly never adds music; the sound in the file is what every place gets.
  */
-export function MusicNote({ list, onReplace }: Props) {
+export const MUSIC_RULES: Record<Platform, string> = {
+  instagram: "Instagram doesn't let apps add songs from its library. A popular song already in your video can get muted.",
+  youtube: "YouTube can put a copyright claim on a song in your video. The owner can then block it or earn from it.",
+  x: "X can take a post down if a rights holder reports the music.",
+  tiktok: "TikTok doesn't let apps add sounds from its library. A song already in your video can get muted.",
+  threads: "Threads can mute a song in your video, the same way Instagram does.",
+  facebook: "Facebook can mute or block a video when its rights check finds a song.",
+  linkedin: "LinkedIn can remove a post with music you don't have the rights to.",
+};
+
+/** Only the places this post is going to, in the usual order. */
+export function musicLines(platforms: Platform[]): { platform: Platform; text: string }[] {
+  return PLATFORMS.filter((p) => platforms.includes(p)).map((platform) => ({ platform, text: MUSIC_RULES[platform] }));
+}
+
+export const MUSIC_HELP = "/help?q=music";
+
+interface Props {
+  platforms: Platform[];
+  /** Back to step 1, where the creator swaps in the version that has the music. Left out, no Replace button. */
+  onReplace?: () => void;
+}
+
+/** Closed by default: one line until the creator asks for more. */
+export function MusicNote({ platforms, onReplace }: Props) {
+  const lines = musicLines(platforms);
+  if (!lines.length) return null;
   return (
-    <section aria-labelledby="music-note" className="mt-8 rounded-[24px] p-4 text-left hairline sm:p-5">
-      <h3 id="music-note" className="flex items-center gap-2 text-sm font-semibold">
-        <Music2 className="h-4 w-4 text-accent" aria-hidden="true" /> Want trending music on it?
-      </h3>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-        Outlly posts your video exactly as you uploaded it, with its own sound. It can&apos;t add music for you: Instagram and YouTube don&apos;t let other apps use their music libraries.
-      </p>
-      <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm leading-relaxed">
-        <li>Open your video in the Instagram app, the YouTube app or an editor like CapCut, and add the sound you want. Burned captions in Outlly? Download that version in step 1 first, so the music goes on top of it.</li>
-        <li>Export or save the video to your device without posting it.</li>
-        <li>Upload that video here with Replace video. Your copy, hashtags and settings stay as they are.</li>
-        <li>Outlly sends the same video, with the same sound, to {list}.</li>
-      </ol>
-      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-        Popular songs can get muted or claimed when they&apos;re posted from outside the app they came from, and some apps save the video without the song. Play the exported file before you upload it. Royalty-free sounds are the safest choice.
-      </p>
-      <Button variant="subtle" size="md" className="mt-4 w-full sm:w-auto" onClick={onReplace}>
-        <Replace className="h-4 w-4" aria-hidden="true" /> Replace video
-      </Button>
-    </section>
+    <details className="group rounded-[20px] text-left hairline">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-[20px] px-4 py-2.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+        <Music2 className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+        <span className="min-w-0 flex-1">Music and copyright</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+      </summary>
+      <div className="px-4 pb-4">
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Outlly posts your video with the sound already in it. It can&apos;t add music for you. Use music you have the rights to.
+        </p>
+        {onReplace && <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Want a song on it? Add it in your editor, export the video, then use Replace video. Your words stay as they are.</p>}
+        <ul className="mt-3 space-y-2" aria-label="What each place does with music">
+          {lines.map((l) => (
+            <li key={l.platform} className="flex items-start gap-2.5 text-[13px] leading-snug">
+              <PlatformOrb platform={l.platform} size={20} />
+              <span>{l.text}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {onReplace && (
+            <Button variant="subtle" size="sm" onClick={onReplace}>
+              <Replace className="h-4 w-4" aria-hidden="true" /> Replace video
+            </Button>
+          )}
+          <Link href={MUSIC_HELP} className="inline-flex min-h-11 items-center px-2 text-[13px] font-medium underline underline-offset-4">
+            More in the Help centre
+          </Link>
+        </div>
+      </div>
+    </details>
   );
 }

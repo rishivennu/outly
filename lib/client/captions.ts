@@ -1,13 +1,18 @@
 "use client";
 /**
- * In-browser caption pipeline. No ffmpeg: audio is decoded with Web Audio and sent in 60 s WAV chunks for
- * transcription; burning-in plays the clip into a canvas, draws the cue on each frame and records the canvas
- * plus the original audio with MediaRecorder as MP4 (Chrome / Edge 126+, Safari).
+ * In-browser caption pipeline. No ffmpeg: audio is decoded with Web Audio and sent in ~60 s WAV chunks that
+ * overlap by a couple of seconds (lib/captions/timing.ts), so no word is cut at a seam; burning-in plays the
+ * clip into a canvas, draws the cue on each frame and records the canvas plus the original audio with
+ * MediaRecorder as MP4 (Chrome / Edge 126+, Safari).
  */
 import { cueAt, wrapLines, type CaptionPos, type CaptionStyle, type Cue } from "@/lib/captions/cues";
+import { CHUNK_STEP, planChunks, type ChunkPlan } from "@/lib/captions/timing";
+import { ChunkFailure } from "@/lib/captions/run";
+import type { Word } from "@/lib/captions/subtitle-engine";
+import type { LineRules } from "@/lib/ai/transcribe";
 
 const RATE = 16_000;
-export const CHUNK_SECONDS = 60;
+export const CHUNK_SECONDS = CHUNK_STEP;
 
 function wav(samples: Float32Array, rate = RATE): Blob {
   const buf = new ArrayBuffer(44 + samples.length * 2);
@@ -33,8 +38,10 @@ function wav(samples: Float32Array, rate = RATE): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
-/** Decode the video's soundtrack to 16 kHz mono and cut it into ~60 s WAV chunks. */
-export async function audioChunks(src: string | Blob, signal?: AbortSignal): Promise<{ blob: Blob; offset: number; duration: number }[]> {
+export type AudioChunk = ChunkPlan & { blob: Blob };
+
+/** Decode the video's soundtrack to 16 kHz mono and cut it into overlapping ~60 s WAV chunks. */
+export async function audioChunks(src: string | Blob, signal?: AbortSignal): Promise<AudioChunk[]> {
   // 1151: a raw "Failed to fetch" (the browser refused to read the video back, or the network dropped) told the
   // creator nothing. Say what happened and what to do instead.
   const unreadable = "We couldn't read this video back to transcribe it. Reload the page and try again, or type your captions instead.";
@@ -63,13 +70,23 @@ export async function audioChunks(src: string | Blob, signal?: AbortSignal): Pro
   node.connect(off.destination);
   node.start();
   const mono = (await off.startRendering()).getChannelData(0);
-  const per = CHUNK_SECONDS * RATE;
-  const out: { blob: Blob; offset: number; duration: number }[] = [];
-  for (let i = 0; i < mono.length; i += per) {
-    const slice = mono.subarray(i, Math.min(mono.length, i + per));
-    out.push({ blob: wav(slice), offset: i / RATE, duration: slice.length / RATE });
-  }
-  return out;
+  return planChunks(mono.length / RATE).map((p) => {
+    const a = Math.round(p.offset * RATE);
+    const slice = mono.subarray(a, Math.min(mono.length, a + Math.round(p.duration * RATE)));
+    return { ...p, duration: slice.length / RATE, blob: wav(slice) };
+  });
+}
+
+export type ChunkAnswer = { words: Word[]; language: string; lines?: LineRules };
+
+/** One chunk to /api/ai/transcribe. `run` ties the chunks of one press together, so the run is charged once. */
+export async function postChunk(c: AudioChunk, q: { ref: string; run: string; lang?: string }, signal: AbortSignal): Promise<ChunkAnswer> {
+  const qs = new URLSearchParams({ offset: String(c.offset), duration: String(c.duration), ref: q.ref, run: q.run, chunk: String(c.index) });
+  if (q.lang && q.lang !== "auto") qs.set("lang", q.lang);
+  const r = await fetch(`/api/ai/transcribe?${qs}`, { method: "POST", body: c.blob, headers: { "content-type": "audio/wav" }, credentials: "same-origin", signal });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new ChunkFailure(j.error ?? "Transcription didn't come back.", r.status, j.code ?? "", { ...j, retryAfter: Number(r.headers.get("retry-after")) || 0 });
+  return { words: Array.isArray(j.words) ? j.words : [], language: typeof j.language === "string" ? j.language : "", lines: j.lines };
 }
 
 /** MP4 only: Reels and the upload checks need MP4, so a WebM-only browser gets the .srt download instead. */

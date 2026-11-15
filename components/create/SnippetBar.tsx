@@ -59,21 +59,34 @@ export function SnippetBar({ caption, hashtags, showTags, onCaption, onTags }: {
   const usable = (list ?? []).filter((s) => s.kind === "caption" || s.kind === "template" || (showTags && s.kind === "hashtags"));
   return (
     <div className="rounded-2xl bg-secondary/40 hairline">
-      <button type="button" aria-expanded={open} aria-controls={`${id}-p`} onClick={() => setOpen((v) => !v)} className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-2xl px-4 text-left text-sm font-medium">
-        <span className="flex items-center gap-2"><BookmarkPlus className="h-4 w-4 text-muted-foreground" aria-hidden="true" /> Saved snippets</span>
-        <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden="true" />
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={`${id}-p`}
+        onClick={() => setOpen((v) => !v)}
+        className="flex min-h-11 w-full items-center justify-between gap-2 rounded-2xl px-4 text-left text-sm font-medium transition-[background-color] duration-hover ease-out motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground [@media(hover:hover)]:hover:bg-secondary/60"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <BookmarkPlus className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span>Snippets</span>
+          <span className="truncate text-[13px] font-normal text-muted-foreground">{showTags ? "Sign-offs and hashtag sets" : "Sign-offs you reuse"}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2">
+          {list && usable.length > 0 && <span className="tabular-nums text-xs text-muted-foreground">{usable.length}</span>}
+          <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-menu ease-out motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
+        </span>
       </button>
       {open && (
         <div id={`${id}-p`} className="space-y-3 px-4 pb-4">
           {list === null ? (
-            <p className="text-sm text-muted-foreground">Loading</p>
+            <p className="text-sm text-muted-foreground" role="status">Loading your snippets</p>
           ) : usable.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing saved yet. Save a sign-off you always use, or a hashtag set, and add it in one click next time.</p>
           ) : (
             <ul className="flex flex-wrap gap-2" aria-label="Insert a snippet">
               {usable.map((s) => (
                 <li key={s.id}>
-                  <button type="button" onClick={() => insert(s)} title={s.body} className="inline-flex min-h-[44px] max-w-[240px] items-center gap-1.5 rounded-full bg-background/70 px-3.5 text-[13px] font-medium hairline hover:bg-background">
+                  <button type="button" onClick={() => insert(s)} title={s.body} className="inline-flex min-h-11 max-w-[240px] items-center gap-1.5 rounded-full bg-background/70 px-3.5 text-[13px] font-medium hairline transition-[background-color,transform] duration-press ease-out active:scale-[0.96] motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground [@media(hover:hover)]:hover:bg-background">
                     {s.kind === "hashtags" ? <Hash className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : <Quote className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
                     <span className="truncate">{s.name}</span>
                     <span className="sr-only">, {s.kind === "hashtags" ? "hashtag set" : "caption preset"}. Add it.</span>
@@ -91,8 +104,8 @@ export function SnippetBar({ caption, hashtags, showTags, onCaption, onTags }: {
             </form>
           ) : (
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="ghost" onClick={() => setSaving("caption")} className="-ml-2">Save this caption</Button>
-              {showTags && <Button type="button" variant="ghost" onClick={() => setSaving("hashtags")}>Save these hashtags</Button>}
+              <Button type="button" variant="ghost" size="md" onClick={() => setSaving("caption")} className="-ml-2">Save this caption</Button>
+              {showTags && <Button type="button" variant="ghost" size="md" onClick={() => setSaving("hashtags")}>Save these hashtags</Button>}
             </div>
           )}
         </div>

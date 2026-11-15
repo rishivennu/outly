@@ -64,14 +64,14 @@ export function CoverPicker({ targets, coverUrl, ensurePost, onChange }: Props) 
 
   if (!targets.length) return null;
   return (
-    <section aria-labelledby="cover-pick" className="mt-8 rounded-[24px] p-4 text-left hairline sm:p-5">
+    <section aria-labelledby="cover-pick" className="rounded-[24px] p-4 text-left hairline sm:p-5">
       <div className="flex gap-4">
         <button
           type="button"
           onClick={() => input.current?.click()}
           disabled={busy !== null || !takes.length}
           aria-label={coverUrl ? "Change the cover image" : "Add a cover image"}
-          className="relative grid aspect-[9/16] w-20 shrink-0 place-items-center overflow-hidden rounded-2xl bg-secondary/70 text-muted-foreground outline-none transition hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 hairline"
+          className="relative grid aspect-[9/16] w-20 shrink-0 place-items-center overflow-hidden rounded-2xl bg-secondary/70 text-muted-foreground outline-none transition-[background-color] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none [@media(hover:hover)]:hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 hairline"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {coverUrl ? <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <ImagePlus className="h-5 w-5" aria-hidden="true" />}

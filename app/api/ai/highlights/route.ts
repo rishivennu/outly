@@ -2,6 +2,7 @@ import { z } from "zod";
 import { json, route, HttpError } from "@/lib/http";
 import { assertAiCaptions } from "@/lib/billing/entitlements";
 import { chargeAi } from "@/lib/ai-quota";
+import { activeAiGrant } from "@/lib/ai/entitlements";
 import { realUserId } from "@/lib/auth";
 import { gemini } from "@/lib/ai/creative";
 import { subtitleRules } from "@/lib/ai/engine-store";
@@ -22,8 +23,10 @@ export const POST = route(
   async (req, { user }) => {
     if (!env.GEMINI_API_KEY) throw new HttpError(503, "Finding highlights needs a Gemini API key on the server. You can still cut by text.", "NO_AI");
     const { cues: raw, duration } = Body.parse(await req.json());
-    await assertAiCaptions(user.id);
-    await chargeAi(realUserId(user));
+    // Highlights are metered as "other", so an Unlimited AI Access grant on "other" (or all) opens them like the
+    // plan feature does; the gate and the meter read the same feature.
+    if (!(await activeAiGrant(user.id, "other"))) await assertAiCaptions(user.id);
+    await chargeAi(realUserId(user), "ai", undefined, undefined, "other");
     const cues = normalizeCues(raw, duration);
     const rules = await subtitleRules();
     const { system, prompt } = highlightPrompt(cues, rules);

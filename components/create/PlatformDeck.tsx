@@ -1,20 +1,23 @@
 "use client";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import * as Switch from "@radix-ui/react-switch";
-import { AlertCircle, ArrowRight, Check, ChevronLeft, ChevronRight, CircleAlert, Link2, MinusCircle, RefreshCw, Sparkles } from "lucide-react";
+import { AlertCircle, Check, CircleAlert, ImageIcon, Link2, MessageSquarePlus, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Counter, Input, Label, Textarea } from "@/components/ui/field";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
-import { blocking, checksFor, composedCopy } from "@/lib/client/checks";
-import { FIRST_COMMENT_LIMIT, PLATFORM_META, PLATFORMS, supportsFirstComment, type Platform } from "@/lib/domain";
+import { blocking, checksFor, composedCopy, countHashtags, HASHTAG_CAP, type Check as DeckCheck, type CheckField } from "@/lib/client/checks";
+import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { cn } from "@/lib/utils";
-import { InstagramReel, XPost, YouTubeShort } from "./Previews";
 import { SnippetBar } from "./SnippetBar";
+import { PlatformPreview } from "./PlatformPreview";
+import { SuggestionCard } from "./SuggestionCard";
+import { bodyKey, bodyRoom, clipTo, fieldsFor, isCustom, mainCaption, nextIndex, normalizeTags, propagateMain, type FieldKey } from "./deck-logic";
 import { enabledPlatforms, launchGate } from "./publish";
+import type { Proposal, Undo } from "./proposal";
 import type { AccountView, Draft } from "./types";
-import { T, ease } from "@/lib/motion/tokens";
+import { ease } from "@/lib/motion/tokens";
 
 interface Props {
   drafts: Record<Platform, Draft>;
@@ -26,75 +29,44 @@ interface Props {
   rewriting: Platform | null;
   onRewrite: (p: Platform) => void;
   onConnect: (p: Platform) => void;
-  onContinue: () => void;
   hook: string;
   onHook: (h: string) => void;
-  /** The page's action bar is pinned below: this footer then stays in the flow instead of stacking a second sticky bar. */
-  docked?: boolean;
   /** Rewrites and connecting need the network; off with a reason while offline. */
   online?: boolean;
+  proposals: Partial<Record<Platform, Proposal>>;
+  undo: Partial<Record<Platform, Undo>>;
+  onAccept: (p: Platform) => void;
+  onReject: (p: Platform) => void;
+  onRevert: (p: Platform) => void;
 }
 
 const READY_LABEL: Record<Platform, string> = { instagram: "Ready to go", youtube: "Wants a stronger title", x: "Make it impossible to ignore", tiktok: "Hook in the first second", threads: "Keep it conversational", facebook: "Ready for the feed", linkedin: "Lead with the lesson" };
 
 const SURFACE: Record<Platform, string> = {
-  instagram: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(330_85%_62%/0.16),transparent_60%),radial-gradient(100%_80%_at_100%_100%,hsl(30_95%_60%/0.10),transparent_60%)]",
-  youtube: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(0_88%_60%/0.16),transparent_60%)]",
-  x: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(var(--foreground)/0.07),transparent_60%)]",
-  tiktok: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(178_85%_45%/0.14),transparent_60%),radial-gradient(100%_80%_at_100%_100%,hsl(348_95%_58%/0.10),transparent_60%)]",
-  threads: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(var(--foreground)/0.07),transparent_60%)]",
-  facebook: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(214_89%_55%/0.15),transparent_60%)]",
-  linkedin: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(201_100%_40%/0.15),transparent_60%)]",
+  instagram: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(330_85%_62%/0.12),transparent_60%)]",
+  youtube: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(0_88%_60%/0.12),transparent_60%)]",
+  x: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(var(--foreground)/0.05),transparent_60%)]",
+  tiktok: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(178_85%_45%/0.10),transparent_60%)]",
+  threads: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(var(--foreground)/0.05),transparent_60%)]",
+  facebook: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(214_89%_55%/0.11),transparent_60%)]",
+  linkedin: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(201_100%_40%/0.11),transparent_60%)]",
 };
+
+const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
+const fieldDom = (id: string, k: FieldKey) => `${id}-${k}`;
 
 export function PlatformDeck(p: Props) {
   const enabled = enabledPlatforms(p.drafts);
-  const [active, setActive] = useState<Platform>(enabled[0] ?? "instagram");
-  const hookId = useId();
   const live = useLivePlatforms();
+  const [picked, setActive] = useState<Platform>(enabled[0] ?? "instagram");
+  const active = live.includes(picked) ? picked : (live[0] ?? picked);
+  const hookId = useId();
+  const mainId = useId();
   const reduce = useReducedMotion();
-
-  // The destination rail scrolls sideways once there are more places than fit. Arrows and edge fades show
-  // there is more, a vertical wheel scrolls it on desktop, and the active tab is kept in view.
-  const rail = useRef<HTMLDivElement>(null);
-  const [edge, setEdge] = useState({ l: false, r: false });
-  const measure = useCallback(() => {
-    const el = rail.current;
-    if (!el) return;
-    setEdge({ l: el.scrollLeft > 4, r: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
-  }, []);
-  useEffect(() => {
-    const el = rail.current;
-    if (!el) return;
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    const onWheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-      const room = e.deltaY > 0 ? el.scrollLeft + el.clientWidth < el.scrollWidth - 1 : el.scrollLeft > 0;
-      if (!room) return; // at the end: let the page scroll on
-      e.preventDefault();
-      el.scrollLeft += e.deltaY;
-    };
-    el.addEventListener("scroll", measure, { passive: true });
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => {
-      ro.disconnect();
-      el.removeEventListener("scroll", measure);
-      el.removeEventListener("wheel", onWheel);
-    };
-  }, [measure, live.length]);
-  const nudge = (dir: 1 | -1) => {
-    const el = rail.current;
-    if (el) el.scrollBy({ left: dir * Math.max(220, el.clientWidth * 0.7), behavior: reduce ? "auto" : "smooth" });
-  };
-  useEffect(() => {
-    const tab = document.getElementById(`tab-${active}`)?.parentElement;
-    tab?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: reduce ? "auto" : "smooth" });
-  }, [active, reduce]);
+  const cards = useRef<Partial<Record<Platform, HTMLButtonElement | null>>>({});
 
   const status = useMemo(() => {
-    const out = {} as Record<Platform, { checks: ReturnType<typeof checksFor>; blocked: boolean; label: string; tone: "ok" | "warn" | "off" | "done" }>;
+    const out = {} as Record<Platform, { checks: DeckCheck[]; blocked: boolean; label: string; tone: "ok" | "warn" | "off" | "done" }>;
     for (const pl of PLATFORMS) {
       const d = p.drafts[pl];
       const acct = p.accounts[pl];
@@ -104,7 +76,7 @@ export function PlatformDeck(p: Props) {
       out[pl] = {
         checks,
         blocked: blocked || !connected,
-        label: !d.enabled ? "Skipping this one" : !connected ? (acct ? "Needs a reconnect" : "Not connected yet") : d.reviewed && !blocked ? "Looks good" : blocked ? "Needs a hand" : READY_LABEL[pl],
+        label: !d.enabled ? "Not sending" : !connected ? (acct ? "Needs a reconnect" : "Not connected yet") : d.reviewed && !blocked ? "Looks good" : blocked ? "Needs a hand" : READY_LABEL[pl],
         tone: !d.enabled ? "off" : !connected || blocked ? "warn" : d.reviewed ? "done" : "ok",
       };
     }
@@ -112,7 +84,29 @@ export function PlatformDeck(p: Props) {
   }, [p.drafts, p.accounts, p.media]);
 
   // Skipped platforms are not in the gate at all, so switching one off can never hold up the launch.
-  const { pending, ready } = launchGate(p.drafts, p.accounts, p.media);
+  const { pending, ready } = launchGate(p.drafts, p.accounts, p.media, Object.keys(p.proposals) as Platform[]);
+
+  /* Main caption: one text for every place that follows it. A place with its own words is never touched. */
+  const shared = mainCaption(p.drafts);
+  const [typed, setTyped] = useState<string | null>(null);
+  const main = typed ?? shared;
+  const showMain = enabled.length >= 2;
+  const followers = enabled.filter((pl) => !isCustom(pl, p.drafts[pl], main));
+  const trimmedFor = followers.filter((pl) => clipTo(main, bodyRoom(pl, p.drafts[pl])).length < main.length);
+
+  const editMain = (v: string) => {
+    setTyped(v);
+    for (const { platform, patch } of propagateMain(p.drafts, v, main)) p.onDraft(platform, patch);
+  };
+  const follow = (pl: Platform, on: boolean) => {
+    if (!on) return p.onDraft(pl, { custom: true });
+    const own = p.drafts[pl][bodyKey(pl)];
+    if (!main.trim()) {
+      setTyped(own);
+      return p.onDraft(pl, { custom: false });
+    }
+    p.onDraft(pl, { custom: false, [bodyKey(pl)]: clipTo(main, bodyRoom(pl, p.drafts[pl])) });
+  };
 
   const markReviewed = (pl: Platform) => {
     p.onDraft(pl, { reviewed: true });
@@ -120,16 +114,24 @@ export function PlatformDeck(p: Props) {
     if (next) setTimeout(() => setActive(next), 350);
   };
 
+  const onCardKeys = (e: KeyboardEvent<HTMLDivElement>) => {
+    const i = live.indexOf(active);
+    const n = nextIndex(e.key, i, live.length);
+    if (n < 0 || !(e.target instanceof HTMLButtonElement) || !e.target.dataset.card) return;
+    e.preventDefault();
+    const pl = live[n];
+    setActive(pl);
+    cards.current[pl]?.focus();
+  };
+
   return (
-    <div className="w-full">
-      <header className="mb-8">
-        <p className="eyebrow mb-3">03 · Everywhere</p>
-        <h2 className="display text-[clamp(2.2rem,5vw,3.8rem)]">
-          Now let&apos;s make it
-          <br />
-          <span className="energy-text">fit everywhere.</span>
+    <div className="w-full min-w-0">
+      <header className="mb-6">
+        <p className="eyebrow mb-2">03 · Everywhere</p>
+        <h2 className="display text-[clamp(1.9rem,3.6vw,2.8rem)]">
+          Now let&apos;s make it <span className="energy-text">fit everywhere.</span>
         </h2>
-        <div className="mt-6 max-w-xl">
+        <div className="mt-5 max-w-2xl">
           <Label htmlFor={hookId}>
             Your hook <Counter value={p.hook.length} max={500} />
           </Label>
@@ -137,106 +139,167 @@ export function PlatformDeck(p: Props) {
         </div>
       </header>
 
-      {/* Destination picker. The on/off control is a sibling of the tab, never nested inside it. */}
-      <div className="relative mb-6">
-      <div ref={rail} className={cn("deck-rail -mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-3", edge.l && "deck-fade-l", edge.r && "deck-fade-r")}>
-        <div role="group" aria-label="Destinations" className="contents">
+      <section aria-labelledby={`${mainId}-dest`} className="mb-6">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h3 id={`${mainId}-dest`} className="text-base font-semibold">Where it goes</h3>
+          <p className="tabular-nums text-[13px] text-muted-foreground">{enabled.length === 0 ? "Pick at least one" : `${enabled.length} selected`}</p>
+        </div>
+        {/* Selecting a card picks what you edit; the checkbox under it decides if it is sent. Siblings, never nested. */}
+        <div role="group" aria-label="Destinations" onKeyDown={onCardKeys} className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr))]">
           {live.map((pl) => {
             const s = status[pl];
             const on = active === pl;
             const d = p.drafts[pl];
+            const acct = p.accounts[pl];
+            const connected = acct?.status === "connected";
+            const who = acct ? `${acct.username}${acct.mock ? " (practice)" : ""}` : "No account yet";
             return (
-              <div key={pl} role="presentation" className={cn("relative flex min-w-[200px] flex-1 snap-start flex-col rounded-3xl transition", on ? "glass shadow-[0_20px_60px_-30px_var(--halo)]" : "bg-secondary/40", !d.enabled && "opacity-80")} style={{ ["--halo" as string]: PLATFORM_HALO[pl] }}>
-                {on && <motion.span layoutId="deck-tab" className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-foreground/25" transition={T.glide} />}
+              <div
+                key={pl}
+                className={cn(
+                  "relative flex min-w-0 flex-col rounded-3xl border transition-[background-color,border-color,box-shadow] duration-nav ease-out motion-reduce:transition-none",
+                  on ? "border-foreground/35 bg-card shadow-[0_18px_50px_-30px_var(--halo)]" : "border-border/70 bg-secondary/30",
+                )}
+                style={{ ["--halo" as string]: PLATFORM_HALO[pl] }}
+              >
                 <button
                   type="button"
                   id={`tab-${pl}`}
+                  data-card="1"
+                  ref={(el) => {
+                    cards.current[pl] = el;
+                  }}
+                  tabIndex={on ? 0 : -1}
                   aria-pressed={on}
                   aria-controls={on ? `panel-${pl}` : undefined}
+                  aria-label={`Edit ${PLATFORM_META[pl].name}. ${who}. ${p.writing.includes(pl) && d.enabled ? "Writing" : s.label}.`}
                   onClick={() => setActive(pl)}
-                  className={cn("relative flex items-center gap-3 rounded-3xl p-3.5 pr-4 text-left transition", !on && "hover:bg-secondary/60")}
+                  className={cn("relative flex min-h-[72px] min-w-0 items-center gap-3 rounded-t-3xl p-3.5 text-left", on && "pr-[76px]", " transition-[background-color] duration-hover ease-out motion-reduce:transition-none", FOCUS, !on && "[@media(hover:hover)]:hover:bg-secondary/60")}
                 >
-                  <PlatformOrb platform={pl} size={40} />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold">
-                      {PLATFORM_META[pl].name} <span className="font-normal text-muted-foreground">{PLATFORM_META[pl].format}</span>
+                  <PlatformOrb platform={pl} size={36} />
+                  <span className="min-w-0 flex-1" aria-hidden="true">
+                    <span className="flex min-w-0 items-baseline gap-1.5 text-sm font-semibold">
+                      <span className="truncate">{PLATFORM_META[pl].name}</span>
+                      <span className="shrink-0 text-[13px] font-normal text-muted-foreground">{PLATFORM_META[pl].format}</span>
                     </span>
-                    <span className={cn("block truncate text-xs", s.tone === "done" ? "text-success-ink" : s.tone === "warn" ? "text-warning-ink" : "text-muted-foreground")}>{p.writing.includes(pl) && d.enabled ? "Writing…" : s.label}</span>
+                    <span className="block truncate text-[13px] text-muted-foreground" title={who}>{who}</span>
+                    <span className={cn("block truncate text-xs", s.tone === "done" ? "text-success-ink" : s.tone === "warn" ? "text-warning-ink" : "text-muted-foreground")}>
+                      {p.writing.includes(pl) && d.enabled ? "Writing" : s.label}
+                    </span>
                   </span>
+                  {on && <span className="absolute right-3 top-3 rounded-full bg-foreground px-2 py-0.5 text-xs font-semibold text-background" aria-hidden="true">Editing</span>}
                 </button>
-                <label htmlFor={`send-${pl}`} className="relative flex min-h-[44px] cursor-pointer items-center gap-2 rounded-b-3xl border-t border-border/60 px-3.5 text-xs font-semibold">
-                  <input
-                    id={`send-${pl}`}
-                    type="checkbox"
-                    checked={d.enabled}
-                    onChange={(e) => p.onDraft(pl, { enabled: e.target.checked })}
-                    className="h-5 w-5 shrink-0 cursor-pointer accent-lime focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
-                  />
-                  {d.enabled ? <Check className="h-4 w-4 text-success-ink" aria-hidden="true" /> : <MinusCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}
-                  <span className={d.enabled ? "text-foreground" : "text-muted-foreground"}>
-                    {d.enabled ? "Sending" : "Skipping"} <span className="sr-only">{PLATFORM_META[pl].name}</span>
-                  </span>
-                </label>
+                <div className="flex min-h-11 items-center justify-between gap-2 border-t border-border/60 pl-3.5 pr-1.5">
+                  <label htmlFor={`send-${pl}`} className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 text-[13px] font-semibold">
+                    <input
+                      id={`send-${pl}`}
+                      type="checkbox"
+                      checked={d.enabled}
+                      onChange={(e) => p.onDraft(pl, { enabled: e.target.checked })}
+                      className={cn("h-5 w-5 shrink-0 cursor-pointer accent-lime", FOCUS)}
+                    />
+                    <span className={d.enabled ? "text-foreground" : "text-muted-foreground"}>
+                      {d.enabled ? "Sending" : "Not sending"} <span className="sr-only">to {PLATFORM_META[pl].name}</span>
+                    </span>
+                  </label>
+                  {!connected && (
+                    <Button size="sm" variant="ghost" className="h-11 shrink-0 px-3" onClick={() => p.onConnect(pl)} disabled={p.online === false} title={p.online === false ? "Connecting needs a connection." : undefined}>
+                      <Link2 className="h-4 w-4" aria-hidden="true" /> {acct ? "Reconnect" : "Connect"} <span className="sr-only">{PLATFORM_META[pl].name}</span>
+                    </Button>
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
-      </div>
-        {edge.l && (
-          <button type="button" onClick={() => nudge(-1)} aria-label="Show earlier destinations" className="deck-arrow left-0 -translate-x-1/3">
-            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-          </button>
-        )}
-        {edge.r && (
-          <button type="button" onClick={() => nudge(1)} aria-label="Show more destinations" className="deck-arrow right-0 translate-x-1/3">
-            <ChevronRight className="h-5 w-5" aria-hidden="true" />
-          </button>
-        )}
-      </div>
+      </section>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={active}
-          role="region"
-          id={`panel-${active}`}
-          aria-labelledby={`tab-${active}`}
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.25, ease: ease("out") }}
-          className="glass relative overflow-hidden rounded-[32px] p-5 sm:p-7"
-        >
-          {/* Platform tint sits on its own layer: .glass owns the panel background. */}
-          <span className={cn("pointer-events-none absolute inset-0", SURFACE[active])} aria-hidden="true" />
-          <div className="relative">
-            <PlatformStage {...p} platform={active} checks={status[active].checks} onReviewed={() => markReviewed(active)} />
+      {showMain && (
+        <section aria-labelledby={`${mainId}-mainl`} className="mb-6 rounded-3xl bg-secondary/30 p-4 hairline sm:p-5">
+          <Label htmlFor={`${mainId}-main`} id={`${mainId}-mainl`} className="text-sm text-foreground">
+            Main caption
+            <span className="tabular-nums text-xs text-muted-foreground">{main.length}</span>
+          </Label>
+          <Textarea id={`${mainId}-main`} rows={3} value={main} onChange={(e) => editMain(e.target.value)} aria-describedby={`${mainId}-mainh`} placeholder="Write it once. Every place set to use the main caption gets it." />
+          <p id={`${mainId}-mainh`} className="mt-2 text-[13px] text-muted-foreground" aria-live="polite">
+            {followers.length === 0
+              ? "Every place has its own caption now. Pick Use main caption on one to bring it back."
+              : `Used by ${followers.map((x) => PLATFORM_META[x].name).join(", ")}.`}
+            {trimmedFor.length > 0 && ` Trimmed to fit ${trimmedFor.map((x) => PLATFORM_META[x].name).join(", ")}.`}
+          </p>
+        </section>
+      )}
+
+      <motion.div
+        key={active}
+        role="region"
+        id={`panel-${active}`}
+        aria-labelledby={`tab-${active}`}
+        initial={reduce ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: ease("out") }}
+        className="glass relative overflow-hidden rounded-[32px] p-4 sm:p-6"
+      >
+        <span className={cn("pointer-events-none absolute inset-0", SURFACE[active])} aria-hidden="true" />
+        <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_clamp(260px,36%,380px)] lg:items-start lg:gap-8">
+          <div className="min-w-0 lg:order-2">
+            <PlatformPreview platform={active} draft={p.drafts[active]} media={p.media} account={p.accounts[active]} writing={p.writing.includes(active)} />
           </div>
-        </motion.div>
-      </AnimatePresence>
+          <div className="min-w-0 lg:order-1">
+            <PlatformStage
+              {...p}
+              platform={active}
+              checks={status[active].checks}
+              onReviewed={() => markReviewed(active)}
+              showMain={showMain}
+              follows={followers.includes(active)}
+              onFollow={(on) => follow(active, on)}
+            />
+          </div>
+        </div>
+      </motion.div>
 
-      <div className={cn(p.docked ? "mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-between" : "sticky bottom-[calc(env(safe-area-inset-bottom)+72px)] z-20 -mx-4 mt-6 lg:bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-background via-background/95 to-transparent px-4 pb-4 pt-8 sm:flex-row sm:justify-between")}>
-        <p className="text-sm text-muted-foreground" aria-live="polite">
-          {enabled.length === 0 ? "Pick at least one place to send it." : ready ? "All set. Nothing goes out until you hit send." : `${pending.length} to look over: ${pending.map((x) => PLATFORM_META[x].name).join(", ")}`}
-        </p>
-        <Button variant={ready ? "lime" : "subtle"} size="lg" disabled={!ready} onClick={p.onContinue}>
-          On to launch <ArrowRight className="h-5 w-5" />
-        </Button>
-      </div>
+      <p className="mt-4 text-sm text-muted-foreground" aria-live="polite">
+        {enabled.length === 0 ? "Pick at least one place to send it." : ready ? "All set. Nothing goes out until you publish." : `${pending.length} to look over: ${pending.map((x) => PLATFORM_META[x].name).join(", ")}`}
+      </p>
     </div>
   );
 }
 
-function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeof checksFor>; onReviewed: () => void }) {
+function FieldChecks({ checks, field, id }: { checks: DeckCheck[]; field: CheckField; id: string }) {
+  const list = checks.filter((c) => c.field === field && c.level !== "ok");
+  if (!list.length) return null;
+  return (
+    <ul id={id} className="mt-1.5 space-y-1">
+      {list.map((c) => (
+        <li key={c.text} className={cn("flex items-start gap-1.5 text-[13px]", c.level === "error" ? "text-destructive" : "text-warning-ink")}>
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className="sr-only">{c.level === "warning" ? "Heads up: " : "Fix: "}</span>
+          {c.text}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+type StageProps = Props & { platform: Platform; checks: DeckCheck[]; onReviewed: () => void; showMain: boolean; follows: boolean; onFollow: (on: boolean) => void };
+
+function PlatformStage(p: StageProps) {
   const pl = p.platform;
   const d = p.drafts[pl];
   const meta = PLATFORM_META[pl];
+  const f = fieldsFor(pl);
   const acct = p.accounts[pl];
   const connected = acct?.status === "connected";
   const id = useId();
   const blocked = blocking(p.checks);
   const set = (patch: Partial<Draft>) => p.onDraft(pl, patch);
   const offline = p.online === false;
+  const busy = p.writing.includes(pl);
   const [flash, setFlash] = useState(false);
+  const [fcOpen, setFcOpen] = useState(!!d.firstComment.trim());
+  const has = (field: CheckField) => p.checks.some((c) => c.field === field && c.level !== "ok");
+  const bad = (field: CheckField) => p.checks.some((c) => c.field === field && c.level === "error");
 
   useEffect(() => {
     if (!d.reviewed) return;
@@ -245,162 +308,257 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
     return () => clearTimeout(t);
   }, [d.reviewed]);
 
-  const preview = { draft: d, src: p.media.src, poster: p.media.poster, handle: acct?.username ?? `your${pl}`, name: acct?.displayName ?? acct?.username ?? "You", avatar: acct?.avatar };
   const bodyLen = composedCopy(pl, d).length; // the gate counts caption plus hashtags, so the counter has to as well
+  const tagCount = countHashtags(d.hashtags);
+  const cap = HASHTAG_CAP[pl];
+  const general = p.checks.filter((c) => !c.field || c.field === "media" || c.field === "account");
+
+  const editBody = (v: string) => set(p.showMain && p.follows ? { [f.body.key]: v, custom: true } : { [f.body.key]: v });
+
+  const acceptThen = (field: FieldKey | null) => {
+    const proposal = p.proposals[pl];
+    p.onAccept(pl);
+    // An accepted caption is this place's own now, so the main caption leaves it alone.
+    if (proposal && typeof proposal.patch[f.body.key] === "string" && proposal.patch[f.body.key] !== d[f.body.key]) set({ custom: true });
+    if (!field) return;
+    if (field === "firstComment") setFcOpen(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(fieldDom(id, field))?.focus()));
+  };
 
   return (
-    <div className="grid gap-8 sm:grid-cols-[minmax(0,240px)_minmax(0,1fr)] sm:items-start">
-      <div className={cn("transition", !d.enabled && "opacity-40 grayscale")}>
-        {p.writing.includes(pl) ? (
-          <div className={cn("skeleton mx-auto w-full max-w-[280px] rounded-[26px]", pl === "x" ? "aspect-[4/5]" : "aspect-[9/16]")} />
-        ) : pl === "instagram" ? (
-          <InstagramReel {...preview} />
-        ) : pl === "youtube" ? (
-          <YouTubeShort {...preview} />
-        ) : (
-          <XPost {...preview} />
-        )}
-      </div>
-
-      <div className="min-w-0 space-y-5">
-        <div className="flex items-center justify-between gap-4">
+    <div className="min-w-0 space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <PlatformOrb platform={pl} size={32} />
           <div className="min-w-0">
-            <h3 className="text-xl font-semibold tracking-tight">
+            <h3 className="truncate text-lg font-semibold tracking-tight">
               {meta.name} {meta.format}
             </h3>
-            <p className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-              <span className="min-w-0 truncate" title={acct ? acct.username : undefined}>{acct ? `as ${acct.username}` : "No account connected"}</span>
+            <p className="truncate text-[13px] text-muted-foreground" title={acct?.username}>
+              {acct ? `as ${acct.username}` : "No account connected"}
             </p>
           </div>
-          <label className="flex min-h-[44px] items-center gap-3 text-sm text-muted-foreground">
-            <span>{d.enabled ? "Sending here" : "Skipping"}</span>
-            <Switch.Root checked={d.enabled} onCheckedChange={(v) => set({ enabled: v })} aria-label={`Send to ${meta.name}`} className="relative h-7 w-12 shrink-0 rounded-full bg-secondary transition-colors hairline data-[state=checked]:bg-lime data-[state=checked]:shadow-[0_0_0_1px_hsl(var(--lime)/0.5)]">
-              <Switch.Thumb className="block h-5 w-5 translate-x-1 rounded-full bg-muted-foreground shadow transition-transform data-[state=checked]:translate-x-6 data-[state=checked]:bg-[hsl(var(--lime-foreground))]" />
-            </Switch.Root>
-          </label>
+        </div>
+        <label className="flex min-h-11 items-center gap-3 text-sm text-muted-foreground">
+          <span>{d.enabled ? "Sending here" : "Not sending"}</span>
+          <Switch.Root
+            checked={d.enabled}
+            onCheckedChange={(v) => set({ enabled: v })}
+            aria-label={`Send to ${meta.name}`}
+            className={cn("relative h-7 w-12 shrink-0 rounded-full bg-secondary transition-colors duration-press hairline motion-reduce:transition-none data-[state=checked]:bg-lime data-[state=checked]:shadow-[0_0_0_1px_hsl(var(--lime)/0.5)]", FOCUS)}
+          >
+            <Switch.Thumb className="block h-5 w-5 translate-x-1 rounded-full bg-muted-foreground shadow transition-transform duration-press motion-reduce:transition-none data-[state=checked]:translate-x-6 data-[state=checked]:bg-[hsl(var(--lime-foreground))]" />
+          </Switch.Root>
+        </label>
+      </div>
+
+      {d.note && d.enabled && (
+        <div className="flex items-start gap-2.5 rounded-2xl bg-accent/10 px-4 py-3 text-[15px]">
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+          <span>
+            {pl === "youtube" ? "YouTube wants a stronger title. I wrote one that people actually search for." : pl === "x" ? "Let's make this impossible to ignore. Short, sharp, no hashtags." : pl === "instagram" ? "Instagram is ready. A hook up front, one ask, and tags that travel." : `${d.note.replace(/\.$/, "")}. Written to its rules.`}
+            {d.why && <span className="mt-1 block text-[13px] text-muted-foreground">{d.why}</span>}
+          </span>
+        </div>
+      )}
+
+      {!connected && d.enabled && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-warning/10 px-4 py-3">
+          <span className="flex items-center gap-2 text-sm">
+            <CircleAlert className="h-4 w-4 shrink-0 text-warning-ink" aria-hidden="true" />
+            {acct ? `${meta.name} needs you to reconnect.` : `Connect ${meta.name} to send it here.`}
+          </span>
+          <Button size="md" variant="primary" onClick={() => p.onConnect(pl)} disabled={offline} title={offline ? "Connecting needs a connection." : undefined}>
+            <Link2 className="h-4 w-4" /> {acct ? "Reconnect" : "Connect account"}
+          </Button>
+        </div>
+      )}
+
+      <SuggestionCard
+        platform={pl}
+        draft={d}
+        proposal={p.proposals[pl]}
+        undo={p.undo[pl]}
+        onAccept={() => acceptThen(null)}
+        onEdit={acceptThen}
+        onReject={() => p.onReject(pl)}
+        onRevert={() => p.onRevert(pl)}
+        disabled={!d.enabled}
+      />
+
+      <fieldset disabled={!d.enabled || busy} className="min-w-0 space-y-5 disabled:opacity-50">
+        <legend className="sr-only">{meta.name} copy</legend>
+
+        {f.title && (
+          <div>
+            <Label htmlFor={fieldDom(id, "title")}>
+              {f.title.label} {f.title.limit ? <Counter value={d.title.length} max={f.title.limit} /> : <span className="tabular-nums text-xs text-muted-foreground">{d.title.length}</span>}
+            </Label>
+            <Input
+              id={fieldDom(id, "title")}
+              value={d.title}
+              onChange={(e) => set({ title: e.target.value })}
+              placeholder={f.title.placeholder}
+              aria-invalid={bad("title") || undefined}
+              aria-describedby={has("title") ? `${id}-title-c` : undefined}
+            />
+            <FieldChecks checks={p.checks} field="title" id={`${id}-title-c`} />
+          </div>
+        )}
+
+        <div>
+          {p.showMain && (
+            <div role="radiogroup" aria-label={`${f.body.label} source`} className="mb-3 inline-flex rounded-full bg-secondary/60 p-1 hairline">
+              {[
+                { on: true, label: "Use main caption" },
+                { on: false, label: "Customise" },
+              ].map((o) => (
+                <button
+                  key={o.label}
+                  type="button"
+                  role="radio"
+                  aria-checked={p.follows === o.on}
+                  onClick={() => p.follows !== o.on && p.onFollow(o.on)}
+                  className={cn(
+                    "min-h-11 rounded-full px-4 text-[13px] font-semibold transition-[background-color,color,transform] duration-press ease-out active:scale-[0.96] motion-reduce:transition-none",
+                    FOCUS,
+                    p.follows === o.on ? "bg-foreground text-background" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground",
+                  )}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <Label htmlFor={fieldDom(id, f.body.key)}>
+            {f.body.label} <Counter value={bodyLen} max={f.body.limit} />
+          </Label>
+          <Textarea
+            id={fieldDom(id, f.body.key)}
+            rows={pl === "x" ? 4 : 7}
+            value={d[f.body.key]}
+            onChange={(e) => editBody(e.target.value)}
+            placeholder={pl === "x" ? "Say it in one breath." : pl === "youtube" ? "What is it about, and why watch to the end?" : "Tell them why it matters."}
+            aria-invalid={bad("body") || undefined}
+            aria-describedby={`${id}-body-h${has("body") ? ` ${id}-body-c` : ""}`}
+          />
+          <p id={`${id}-body-h`} className="mt-1.5 text-[13px] text-muted-foreground">
+            {p.showMain && p.follows ? "Follows the main caption. Typing here gives this place its own." : f.hashtags && d.hashtags.trim() ? "The count includes your hashtags." : pl === "x" ? "X has no hashtag field. Put any tags in the post." : "Only this place gets these words."}
+          </p>
+          <FieldChecks checks={p.checks} field="body" id={`${id}-body-c`} />
         </div>
 
-        {d.note && d.enabled && (
-          <div className="flex items-start gap-2.5 rounded-2xl bg-accent/10 px-4 py-3 text-[15px]">
-            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
-            <span>
-              {pl === "youtube" ? "YouTube wants a stronger title. I wrote one that people actually search for." : pl === "x" ? "Let's make this impossible to ignore. Short, sharp, no hashtags." : pl === "instagram" ? "Instagram is ready. A hook up front, one ask, and tags that travel." : `${d.note.replace(/\.$/, "")}. Written to its rules.`}
-              {d.why && <span className="mt-1 block text-[13px] text-muted-foreground">{d.why}</span>}
-            </span>
+        {f.hashtags && (
+          <div>
+            <Label htmlFor={fieldDom(id, "hashtags")}>
+              Hashtags
+              <span className={cn("tabular-nums text-xs", cap && tagCount > cap.max ? "text-destructive" : "text-muted-foreground")}>
+                {tagCount}
+                {cap ? `/${cap.max}` : ""} <span className="sr-only">hashtags</span>
+              </span>
+            </Label>
+            <Input
+              id={fieldDom(id, "hashtags")}
+              value={d.hashtags}
+              onChange={(e) => set({ hashtags: e.target.value })}
+              onBlur={(e) => {
+                const clean = normalizeTags(e.target.value);
+                if (clean !== d.hashtags) set({ hashtags: clean });
+              }}
+              placeholder="#oneidea #anotherone"
+              aria-invalid={bad("hashtags") || undefined}
+              aria-describedby={`${id}-tags-h${has("hashtags") ? ` ${id}-tags-c` : ""}`}
+            />
+            <p id={`${id}-tags-h`} className="mt-1.5 text-[13px] text-muted-foreground">
+              Space between tags. We add the # and drop repeats{meta.hashtagStyle === "few" ? ". A few focused tags work best." : "."}
+            </p>
+            <FieldChecks checks={p.checks} field="hashtags" id={`${id}-tags-c`} />
           </div>
         )}
 
-        {!connected && d.enabled && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-warning/10 px-4 py-3">
-            <span className="flex items-center gap-2 text-sm">
-              <CircleAlert className="h-4 w-4 text-warning-ink" aria-hidden="true" />
-              {acct ? `${meta.name} needs you to reconnect.` : `Connect ${meta.name} to send it here.`}
-            </span>
-            <Button size="sm" variant="primary" onClick={() => p.onConnect(pl)} disabled={offline} title={offline ? "Connecting needs a connection." : undefined}>
-              <Link2 className="h-4 w-4" /> {acct ? "Reconnect" : "Connect account"}
-            </Button>
-          </div>
-        )}
-
-        <fieldset disabled={!d.enabled || p.writing.includes(pl)} className="space-y-4 disabled:opacity-50">
-          <legend className="sr-only">{meta.name} copy</legend>
-          {pl === "youtube" && (
+        {f.firstComment &&
+          (fcOpen ? (
             <div>
-              <Label htmlFor={`${id}-title`}>
-                Title <Counter value={d.title.length} max={100} />
-              </Label>
-              <Input id={`${id}-title`} value={d.title} onChange={(e) => set({ title: e.target.value })} placeholder="What would someone search to find this?" />
-            </div>
-          )}
-          {pl === "youtube" ? (
-            <div>
-              <Label htmlFor={`${id}-desc`}>
-                Description <Counter value={bodyLen} max={meta.captionLimit} />
-              </Label>
-              <Textarea id={`${id}-desc`} rows={4} value={d.description} onChange={(e) => set({ description: e.target.value })} />
-            </div>
-          ) : (
-            <div>
-              <Label htmlFor={`${id}-cap`}>
-                {pl === "x" ? "Post" : "Caption"} <Counter value={bodyLen} max={meta.captionLimit} />
-              </Label>
-              <Textarea id={`${id}-cap`} rows={pl === "x" ? 4 : 6} value={d.caption} onChange={(e) => set({ caption: e.target.value })} placeholder={pl === "x" ? "Say it in one breath." : "Tell them why it matters."} />
-            </div>
-          )}
-          {meta.hashtagStyle !== "none" && (
-            <div>
-              <Label htmlFor={`${id}-tags`}>Hashtags</Label>
-              <Input id={`${id}-tags`} value={d.hashtags} onChange={(e) => set({ hashtags: e.target.value })} placeholder="#oneidea #anotherone" />
-            </div>
-          )}
-          {supportsFirstComment(pl) && (
-            <div>
-              <Label htmlFor={`${id}-fc`}>
-                {pl === "x" ? "First reply" : "First comment"} <Counter value={d.firstComment.length} max={FIRST_COMMENT_LIMIT[pl] ?? 2200} />
+              <Label htmlFor={fieldDom(id, "firstComment")}>
+                {f.firstComment.label} (optional) <Counter value={d.firstComment.length} max={f.firstComment.limit} />
               </Label>
               <Textarea
-                id={`${id}-fc`}
+                id={fieldDom(id, "firstComment")}
                 rows={2}
                 value={d.firstComment}
                 onChange={(e) => set({ firstComment: e.target.value })}
-                aria-describedby={`${id}-fc-hint`}
-                placeholder={pl === "x" ? "A link, a source, or the next thought. Optional." : "Hashtags, a link, or a question. Optional."}
+                aria-invalid={bad("firstComment") || undefined}
+                aria-describedby={`${id}-fc-h${has("firstComment") ? ` ${id}-fc-c` : ""}`}
+                placeholder={pl === "x" ? "A link, a source, or the next thought." : "Hashtags, a link, or a question."}
               />
+              <FieldChecks checks={p.checks} field="firstComment" id={`${id}-fc-c`} />
               <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
-                <p id={`${id}-fc-hint`} className="text-[13px] text-muted-foreground">
-                  {pl === "x" ? "Posted as a reply to your post a few seconds after it goes live." : "Posted as your first comment a few seconds after it goes live."}
-                </p>
-                {meta.hashtagStyle !== "none" && d.hashtags.trim() && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="subtle"
-                    className="min-h-[44px]"
-                    onClick={() => set({ firstComment: [d.firstComment.trim(), d.hashtags.trim()].filter(Boolean).join("\n\n"), hashtags: "" })}
-                  >
+                <p id={`${id}-fc-h`} className="text-[13px] text-muted-foreground">{f.firstComment.hint}</p>
+                {f.hashtags && d.hashtags.trim() && (
+                  <Button type="button" size="md" variant="subtle" onClick={() => set({ firstComment: [d.firstComment.trim(), d.hashtags.trim()].filter(Boolean).join("\n\n"), hashtags: "" })}>
                     Move hashtags here
                   </Button>
                 )}
               </div>
             </div>
-          )}
-          <SnippetBar
-            caption={pl === "youtube" ? d.description : d.caption}
-            hashtags={d.hashtags}
-            showTags={meta.hashtagStyle !== "none"}
-            onCaption={(v) => set(pl === "youtube" ? { description: v } : { caption: v })}
-            onTags={(v) => set({ hashtags: v })}
-          />
-        </fieldset>
-
-        <ul className="space-y-1.5" aria-label="Checks">
-          {p.checks.map((c) => (
-            <li key={c.text} className={cn("flex items-center gap-2 text-[14px]", c.level === "error" ? "text-destructive" : c.level === "warning" ? "text-warning-ink" : "text-success-ink")}>
-              {c.level === "ok" ? <Check className="h-4 w-4" aria-hidden="true" /> : <AlertCircle className="h-4 w-4" aria-hidden="true" />}
-              <span className="sr-only">{c.level === "ok" ? "Good: " : c.level === "warning" ? "Heads up: " : "Fix: "}</span>
-              {c.text}
-            </li>
+          ) : (
+            <Button type="button" variant="ghost" size="md" className="-ml-2" onClick={() => {
+              setFcOpen(true);
+              requestAnimationFrame(() => document.getElementById(fieldDom(id, "firstComment"))?.focus());
+            }}>
+              <MessageSquarePlus className="h-4 w-4" aria-hidden="true" /> Add a {f.firstComment.label.toLowerCase()}
+            </Button>
           ))}
-        </ul>
 
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button
-            variant={d.reviewed && !blocked ? "outline" : "primary"}
-            onClick={() => (d.reviewed ? set({ reviewed: false }) : p.onReviewed())}
-            disabled={!d.enabled || blocked || p.writing.includes(pl) || !connected}
-            aria-pressed={d.reviewed}
-          >
-            <motion.span animate={flash ? { scale: [1, 1.35, 1], rotate: [0, -12, 0] } : {}} className="inline-flex">
-              <Check className="h-4 w-4" />
-            </motion.span>
-            {d.reviewed ? "Looks good" : "This looks good"}
-          </Button>
-          <Button variant="ghost" onClick={() => p.onRewrite(pl)} disabled={!d.enabled || p.rewriting === pl || p.writing.includes(pl) || offline}>
-            <RefreshCw className={cn("h-4 w-4", p.rewriting === pl && "animate-spin")} /> Rewrite this one
-          </Button>
-        </div>
-        {offline && <p className="text-[13px] text-muted-foreground">You&apos;re offline. Rewrites and connecting come back when you reconnect. Your edits are kept on this device.</p>}
+        {f.cover !== "none" && (
+          <p className="flex items-start gap-2 text-[13px] text-muted-foreground">
+            <ImageIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            {f.cover === "upload" ? `You can add a cover for ${meta.name} on the Launch step.` : `${meta.name} uses a frame from your video as the cover.`}
+          </p>
+        )}
+
+        <SnippetBar
+          caption={d[f.body.key]}
+          hashtags={d.hashtags}
+          showTags={f.hashtags}
+          onCaption={(v) => editBody(v)}
+          onTags={(v) => set({ hashtags: v })}
+        />
+      </fieldset>
+
+      <ul className="space-y-1.5" aria-label="Checks">
+        {general.map((c) => (
+          <li key={c.text} className={cn("flex items-center gap-2 text-[14px]", c.level === "error" ? "text-destructive" : c.level === "warning" ? "text-warning-ink" : "text-success-ink")}>
+            {c.level === "ok" ? <Check className="h-4 w-4 shrink-0" aria-hidden="true" /> : <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />}
+            <span className="sr-only">{c.level === "ok" ? "Good: " : c.level === "warning" ? "Heads up: " : "Fix: "}</span>
+            {c.text}
+          </li>
+        ))}
+        {blocked && !general.some((c) => c.level === "error") && (
+          <li className="flex items-center gap-2 text-[14px] text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" /> Fix the notes above to send it here.
+          </li>
+        )}
+      </ul>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant={d.reviewed && !blocked ? "outline" : "primary"}
+          onClick={() => (d.reviewed ? set({ reviewed: false }) : p.onReviewed())}
+          disabled={!d.enabled || blocked || busy || !connected}
+          aria-pressed={d.reviewed}
+        >
+          <motion.span animate={flash ? { scale: [1, 1.2, 1] } : {}} transition={{ duration: 0.45, ease: ease("out") }} className="inline-flex motion-reduce:transform-none">
+            <Check className="h-4 w-4" />
+          </motion.span>
+          {d.reviewed ? "Looks good" : "This looks good"}
+        </Button>
+        <Button variant="ghost" onClick={() => p.onRewrite(pl)} disabled={!d.enabled || p.rewriting === pl || busy || offline} aria-describedby={`${id}-rw`}>
+          <RefreshCw className={cn("h-4 w-4", p.rewriting === pl && "animate-spin motion-reduce:animate-none")} /> Rewrite this one
+        </Button>
+        <span id={`${id}-rw`} className="sr-only">Pip suggests new words. Nothing changes until you accept.</span>
       </div>
+      {offline && <p className="text-[13px] text-muted-foreground">You&apos;re offline. Rewrites and connecting come back when you reconnect. Your edits are kept on this device.</p>}
     </div>
   );
 }

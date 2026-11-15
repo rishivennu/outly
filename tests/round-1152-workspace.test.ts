@@ -69,7 +69,8 @@ describe("1152 layout and assistant", () => {
   test("Step 2 is preview + editor side by side", () => {
     expect(ws).toContain("const stage = showVideo && hasMedia;");
     expect(ws).toContain("md:grid md:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]");
-    expect(rail).toContain('roomy ? "min-[1800px]:flex" : "xl:flex"');
+    // Phase 3 B: the rail shows from 1280px on every step, roomy or not.
+    expect(rail).toContain('RAIL_SHOW = "xl:flex"');
   });
   test("below 1280px the one assistant opens as a modal drawer", () => {
     expect(ws).toContain('role={sheet ? "dialog" : undefined}');

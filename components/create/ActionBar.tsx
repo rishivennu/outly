@@ -1,13 +1,14 @@
 "use client";
 import { useState } from "react";
-import { CalendarClock, Eye, Loader2, Save, Send } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarClock, Eye, Loader2, Save, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/shared/Sheet";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
-import { InstagramReel, XPost, YouTubeShort } from "./Previews";
-import type { AccountView, Draft } from "./types";
+import { PreviewFor } from "./Previews";
+import { publishLabel } from "./publish";
+import type { AccountView, Draft, Step } from "./types";
 
 export interface BarInput {
   online: boolean;
@@ -19,11 +20,27 @@ export interface BarInput {
   enabledCount: number;
   launching: boolean;
   saving: boolean;
+  /** Phase 3: the bar changes with the step. Left out, it is the Steps 1 and 2 bar. */
+  step?: Step;
+  mode?: "now" | "schedule";
+  /** The places that will really get it (connected, checked, looked over). Names the Publish button. */
+  targets?: Platform[];
+  /** Names of the places still to look over on Everywhere, for the reason under the bar. */
+  pending?: string[];
+  /** Why the time picked can't be booked (past, a clash, a platform rule), or null. */
+  scheduleIssue?: string | null;
 }
 export interface BarAction {
   disabled: boolean;
   /** Why it is off, in plain words. */
   hint: string | null;
+}
+export type BarId = "save" | "preview" | "schedule" | "publish" | "continue" | "back" | "mode";
+export interface BarButton extends BarAction {
+  id: BarId;
+  label: string;
+  /** Exactly one button is lit on Everywhere and Launch. */
+  primary: boolean;
 }
 export interface BarState {
   save: BarAction;
@@ -32,80 +49,112 @@ export interface BarState {
   publish: BarAction;
   /** The one line shown above the buttons. */
   note: string | null;
+  /** What the bar shows, left to right, for this step. */
+  buttons: BarButton[];
 }
 
 export const OFFLINE_SEND = "You're offline. Publishing and scheduling come back when you reconnect.";
 
+const list = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : (xs[0] ?? ""));
+
 /** Pure, so the rules are tested apart from the screen. */
 export function barState(i: BarInput): BarState {
-  const sendBlock = !i.online
-    ? OFFLINE_SEND
-    : !i.hasMedia
-      ? "Add a video first."
-      : i.uploadFailed
-        ? "Your video didn't upload. Try it again first."
-        : i.enabledCount === 0
-          ? "Pick at least one place to send it."
-          : !i.hasHook
-            ? "Pick a hook with Pip first."
-            : !i.ready
-              ? "Look over each place on the Everywhere step first."
-              : null;
+  const step = i.step ?? "video";
+  const mode = i.mode ?? "now";
+  const base = !i.hasMedia
+    ? "Add a video first."
+    : i.uploadFailed
+      ? "Your video didn't upload. Try it again first."
+      : i.enabledCount === 0
+        ? "Pick at least one place to send it."
+        : !i.hasHook
+          ? "Pick a hook with Pip first."
+          : null;
+  const notReady = step === "launch" ? "Some places aren't ready yet. Leave them out or fix them in Everywhere." : i.pending?.length ? `Look over ${list(i.pending)} first.` : "Look over each place on the Everywhere step first.";
+  const sendBlock = !i.online ? OFFLINE_SEND : (base ?? (!i.ready ? notReady : null));
   const send: BarAction = { disabled: !!sendBlock || i.launching, hint: sendBlock };
+  const save: BarAction = { disabled: !i.hasMedia || i.saving, hint: null };
+  const preview: BarAction = { disabled: !i.hasMedia, hint: null };
+  const flat = { save, preview, schedule: send, publish: send };
+
+  if (step === "everywhere") {
+    // Moving on works offline: nothing is sent from here.
+    const goBlock = base ?? (!i.ready ? notReady : null);
+    return {
+      ...flat,
+      note: goBlock ?? (!i.online ? OFFLINE_SEND : null),
+      buttons: [
+        { id: "save", label: "Save draft", primary: false, ...save },
+        { id: "preview", label: "Preview", primary: false, ...preview },
+        { id: "continue", label: "Continue to Launch", primary: true, disabled: !!goBlock, hint: goBlock },
+      ],
+    };
+  }
+  if (step === "launch") {
+    const block = sendBlock ?? (mode === "schedule" ? (i.scheduleIssue ?? null) : null);
+    const go: BarAction = { disabled: !!block || i.launching, hint: block };
+    const label = i.launching ? (mode === "schedule" ? "Scheduling" : "Publishing") : publishLabel(i.targets ?? [], mode, PLATFORM_META);
+    return {
+      ...flat,
+      publish: go,
+      note: block,
+      buttons: [
+        { id: "back", label: "Back to editing", primary: false, disabled: i.launching, hint: null },
+        { id: "mode", label: mode === "schedule" ? "Publish now" : "Schedule", primary: false, disabled: i.launching, hint: null },
+        { id: "publish", label, primary: true, ...go },
+      ],
+    };
+  }
   return {
-    save: { disabled: !i.hasMedia || i.saving, hint: null },
-    preview: { disabled: !i.hasMedia, hint: null },
-    schedule: send,
-    publish: send,
+    ...flat,
     note: sendBlock,
+    buttons: [
+      { id: "save", label: "Save draft", primary: false, ...save },
+      { id: "preview", label: "Preview", primary: false, ...preview },
+      { id: "schedule", label: "Schedule", primary: false, ...send },
+      { id: "publish", label: "Publish", primary: true, ...send },
+    ],
   };
 }
 
 interface Props {
   state: BarState;
   saveLabel: string;
-  /** Which of Schedule / Publish is the lit one. */
-  primary: "now" | "schedule";
-  launching: boolean;
-  onSave: () => void;
-  onPreview: () => void;
-  onSchedule: () => void;
-  onPublish: () => void;
+  /** Launch only: picks the icon on the button that switches between Publish now and Schedule for later. */
+  mode?: "now" | "schedule";
+  onAction: (id: BarId) => void;
   className?: string;
 }
 
+const ICON: Record<BarId, typeof Save> = { save: Save, preview: Eye, schedule: CalendarClock, publish: Send, continue: ArrowRight, back: ArrowLeft, mode: CalendarClock };
+
 /**
- * The four things you can do with a post from any step, in one compact bar. Sticky in the page flow (not
- * fixed), so the end of the page always scrolls clear of it; on phones it sits above the tab bar and the
- * home indicator, and the assistant drawer opens over it.
+ * The one set of post actions on every step, in one compact bar. Sticky in the page flow (not fixed), so the
+ * end of the page always scrolls clear of it; on phones it sits above the tab bar and the home indicator,
+ * and the assistant drawer opens over it.
  */
-export function ActionBar({ state, saveLabel, primary, launching, onSave, onPreview, onSchedule, onPublish, className }: Props) {
+export function ActionBar({ state, saveLabel, mode, onAction, className }: Props) {
   const btn = "h-auto min-h-[52px] min-w-0 flex-col gap-0.5 px-1 text-xs font-semibold sm:min-h-11 sm:flex-row sm:gap-2 sm:px-4 sm:text-sm";
   return (
     <div role="region" aria-label="Post actions" className={cn("sticky bottom-[calc(env(safe-area-inset-bottom)+76px)] z-30 mt-6 lg:bottom-4", className)}>
       <div className="glass-strong mx-auto w-full max-w-3xl rounded-[22px] p-1.5 shadow-[0_18px_40px_-24px_hsl(var(--foreground)/0.45)] hairline">
         {state.note && (
-          <p className="px-2.5 pb-1.5 pt-1 text-xs leading-snug text-muted-foreground" aria-live="polite">
+          <p id="bar-note" className="px-2.5 pb-1.5 pt-1 text-xs leading-snug text-muted-foreground" aria-live="polite">
             {state.note}
           </p>
         )}
-        <div className="grid grid-cols-4 gap-1.5">
-          <Button variant="subtle" className={btn} onClick={onSave} disabled={state.save.disabled}>
-            {saveLabel === "Saving" ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
-            <span className="max-w-full truncate">{saveLabel}</span>
-          </Button>
-          <Button variant="subtle" className={btn} onClick={onPreview} disabled={state.preview.disabled} aria-haspopup="dialog">
-            <Eye className="h-4 w-4" aria-hidden="true" />
-            <span className="max-w-full truncate">Preview</span>
-          </Button>
-          <Button variant={primary === "schedule" ? "lime" : "subtle"} className={btn} onClick={onSchedule} disabled={state.schedule.disabled}>
-            <CalendarClock className="h-4 w-4" aria-hidden="true" />
-            <span className="max-w-full truncate">{launching && primary === "schedule" ? "Booking" : "Schedule"}</span>
-          </Button>
-          <Button variant={primary === "now" ? "lime" : "subtle"} className={btn} onClick={onPublish} disabled={state.publish.disabled}>
-            <Send className="h-4 w-4" aria-hidden="true" />
-            <span className="max-w-full truncate">{launching && primary === "now" ? "Sending" : "Publish"}</span>
-          </Button>
+        <div className={cn("grid gap-1.5", state.buttons.length === 3 ? "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)]" : "grid-cols-4")}>
+          {state.buttons.map((b) => {
+            const on = b.primary;
+            const Icon = b.id === "mode" && mode === "schedule" ? Send : b.id === "save" && saveLabel === "Saving" ? Loader2 : ICON[b.id];
+            const text = b.id === "save" ? saveLabel : b.label;
+            return (
+              <Button key={b.id} variant={on ? "lime" : "subtle"} className={btn} onClick={() => onAction(b.id)} disabled={b.disabled} aria-haspopup={b.id === "preview" ? "dialog" : undefined} aria-describedby={b.hint && on ? "bar-note" : undefined}>
+                <Icon className={cn("h-4 w-4", Icon === Loader2 && "animate-spin motion-reduce:animate-none")} aria-hidden="true" />
+                <span className="max-w-full truncate">{text}</span>
+              </Button>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -145,7 +194,7 @@ export function PreviewSheet({ open, onOpenChange, platforms, drafts, accounts, 
       )}
       {props && pl ? (
         <div key={pl} className="mx-auto w-full max-w-[300px]">
-          {pl === "instagram" ? <InstagramReel {...props} /> : pl === "youtube" ? <YouTubeShort {...props} /> : <XPost {...props} />}
+          <PreviewFor platform={pl} {...props} />
         </div>
       ) : (
         <p className="py-8 text-center text-sm text-muted-foreground">Nothing is switched on yet. Pick a place under Publish to.</p>

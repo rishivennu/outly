@@ -20,7 +20,7 @@ import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { Assistant } from "./Assistant";
-import { captionSource, PANEL_OPEN, panelReducer } from "./assistant-state";
+import { captionSource, NO_SUGGESTIONS, PANEL_OPEN, panelReducer, routeCopy, suggest, type SuggestAction, type Suggestions } from "./assistant-state";
 import { JourneyBar, JourneyRail } from "./JourneyRail";
 import { createFont } from "./font";
 import { LaunchPanel, ScheduledView, scheduleCheckLine, type ScheduleCheck } from "./LaunchPanel";
@@ -29,12 +29,12 @@ import { PublishingView } from "./PublishingView";
 import { VideoStage } from "./VideoStage";
 import { PublishTo } from "./PublishTo";
 import { SaveDraft } from "./SaveDraft";
-import { draftTitle, enabledPlatforms, launchGate, targetPayload } from "./publish";
+import { autosaveLine, draftTitle, enabledPlatforms, launchGate, launchPlan, scheduleProblem, targetPayload } from "./publish";
 import { CaptionBurner } from "./CaptionBurner";
 import { readVideo } from "./frame";
 import { primeGroove } from "./Groove";
 import { DeviceDrafts } from "./DeviceDrafts";
-import { ActionBar, barState, PreviewSheet } from "./ActionBar";
+import { ActionBar, barState, PreviewSheet, type BarId } from "./ActionBar";
 import { UploadLimits } from "./UploadLimits";
 import { legacyDraftCount, newDeviceId, openDrafts, type DeviceTarget } from "@/lib/client/device-drafts";
 import { useDraftSync, type ServerDraft } from "@/lib/client/draft-sync";
@@ -139,6 +139,11 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   });
   const [copyLoading, setCopyLoading] = useState(false);
   const [rewriting, setRewriting] = useState<Platform | null>(null);
+  /** Phase 3 (B2F): Pip's suggestions wait here for Accept or Skip; what Accept replaced is kept for Revert. */
+  const [sugg, setSugg] = useState<Suggestions>(NO_SUGGESTIONS);
+  /** The drafts as last rendered, so copy that arrives mid-stream knows whether a draft already has words. */
+  const draftsRef = useRef(drafts);
+  draftsRef.current = drafts;
 
   /* ---------------- persistence ---------------- */
   const [postId, setPostId] = useState<string | null>(initialPost?.id ?? null);
@@ -157,11 +162,12 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const [when, setWhen] = useState<Date>(() => (initialPost?.scheduledAt ? new Date(initialPost.scheduledAt) : defaultSchedule(tz)));
   const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
+  /** Why the time picked can't be booked, from Launch's live check; the bar's Schedule post waits on it. */
+  const [scheduleIssue, setScheduleIssue] = useState<string | null>(null);
   const [phase, setPhase] = useState<"edit" | "publishing" | "scheduled">(initialPost && LIVE.includes(initialPost.status) ? "publishing" : "edit");
   const [livePost, setLivePost] = useState<PostView | null>(initialPost && LIVE.includes(initialPost.status) ? initialPost : null);
   const [scheduledFor, setScheduledFor] = useState<string | null>(null);
-  /** Launch needs the width, so the assistant folds away when you get there and comes back when you leave. */
-  // A post that opens straight on Launch starts folded, so the panel never flashes open first.
+  /** Phase 3: open or folded is the creator's choice and carries across every step, Launch included. */
   const [panel, panelDispatch] = useReducer(panelReducer, step, (s0: Step) => panelReducer(PANEL_OPEN, { t: "step", step: s0 }));
   useEffect(() => {
     panelDispatch({ t: "step", step });
@@ -173,6 +179,10 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const capCanvas = useRef<HTMLCanvasElement>(null);
   const [capLive, setCapLive] = useState(false);
   const onCapLive = useCallback((on: boolean) => setCapLive(on), []);
+  /* A caption run lives in the editor on Steps 1 and 2; leaving those steps unmounts it and stops the run. */
+  const [capBusy, setCapBusy] = useState(false);
+  const onCapBusy = useCallback((b: boolean) => setCapBusy(b), []);
+  const [leaveAsk, setLeaveAsk] = useState<null | ((ok: boolean) => void)>(null);
 
   /* 1152: the assistant is a side panel from 1280px; below that the same element opens as a drawer (one instance,
      so the conversation survives a resize, a close and a reopen). */
@@ -597,15 +607,19 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   };
 
   /* ================= platform copy ================= */
-  const applyCopy = (items: PlatformCopy[]) =>
-    setDrafts((d) => {
-      const next = { ...d };
-      for (const c of items) next[c.platform] = { ...next[c.platform], title: c.title ?? "", caption: c.caption ?? "", description: c.description ?? "", hashtags: c.hashtags ?? "", note: c.note, why: whyLine(c.why), reviewed: false };
-      return next;
-    });
+  /** An empty draft is filled; one with words in it gets a suggestion to accept or skip, never an overwrite. */
+  const applyCopy = (items: PlatformCopy[]) => {
+    for (const c of items) {
+      const r = routeCopy(draftsRef.current[c.platform], c, whyLine(c.why));
+      if (r.kind === "fill") {
+        draftsRef.current = { ...draftsRef.current, [c.platform]: { ...draftsRef.current[c.platform], ...r.patch } };
+        setDrafts((d) => ({ ...d, [c.platform]: { ...d[c.platform], ...r.patch } }));
+      } else if (r.kind === "propose") setSugg((s) => suggest(s, { t: "propose", p: c.platform, proposal: r.proposal }).state);
+    }
+  };
 
   const fetchCopy = useCallback(
-    async (platforms: Platform[], h: string) => {
+    async (platforms: Platform[], h: string, intent: "write" | "rewrite" = "write") => {
       if (!platforms.length) return;
       if (!navigator.onLine) return toast("You're offline. Pip can write the copy when you reconnect, or type your own.", "info");
       const key = [...platforms].sort().join(",");
@@ -622,7 +636,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
         // Each place's copy is shown the moment it is written, so the first card is ready in a second or two.
         const r = await streamApi<{ items: PlatformCopy[] }>(
           "/api/ai/platform",
-          { story: captionSource({ edited: editedOriginal, submittedStory, story }), hook: h, platforms },
+          { story: captionSource({ edited: editedOriginal, submittedStory, story }), hook: h, platforms, intent },
           (ev) => {
             const item = ev.item as PlatformCopy | undefined;
             if (ev.t !== "item" || !item || ctrl.signal.aborted || !left.has(item.platform)) return;
@@ -649,6 +663,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   );
 
   const chooseHook = async (text: string) => {
+    if (!(await leaveOk("everywhere"))) return;
     setHook(text);
     setStep("everywhere");
     setCopyLoading(true);
@@ -659,7 +674,9 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const rewrite = async (p: Platform) => {
     if (!hook) return;
     setRewriting(p);
-    await fetchCopy([p], hook);
+    // Rewriting words already there is caption rewriting; filling an empty place is writing captions.
+    const d = draftsRef.current[p];
+    await fetchCopy([p], hook, d.caption || d.title || d.description ? "rewrite" : "write");
     setRewriting(null);
   };
 
@@ -677,6 +694,12 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const onDraft = (p: Platform, patch: Partial<Draft>) => {
     setDrafts((d) => ({ ...d, [p]: { ...d[p], ...patch } }));
     if (patch.enabled && hook && !drafts[p].caption && !drafts[p].title) rewrite(p);
+  };
+
+  const onSuggest = (a: SuggestAction) => {
+    const r = suggest(sugg, a);
+    setSugg(r.state);
+    if (r.apply) onDraft(a.p, r.apply);
   };
 
   /* ================= saving ================= */
@@ -770,10 +793,19 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   };
 
   /* ================= launch ================= */
-  const { enabled, ready: allReviewed } = launchGate(drafts, accounts, meta);
+  // A place with a Pip suggestion still waiting is not settled, so it holds until accepted or rejected.
+  const proposed = Object.keys(sugg.proposals) as Platform[];
+  const { enabled, pending, ready: allReviewed } = launchGate(drafts, accounts, meta, proposed);
+  // Who really gets it: a held place (not connected, not looked over, failing a check) is never sent.
+  const plan = launchPlan(drafts, accounts, meta, proposed);
 
   const launch = async (how: "now" | "schedule" = mode) => {
     if (!navigator.onLine) return setLaunchError("You're offline. Publishing and scheduling come back when you reconnect.");
+    if (plan.hold.length || !plan.send.length) return setLaunchError("Some places aren't ready yet. Leave them out or fix them in Everywhere.");
+    if (how === "schedule") {
+      const bad = scheduleProblem(when);
+      if (bad) return setLaunchError(bad);
+    }
     // Still inside the click: unlock the publishing screen's music before the save + launch round trips.
     if (how === "now") primeGroove();
     setLaunching(true);
@@ -809,16 +841,37 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const another = () => window.location.assign("/create");
 
   const syncLine = <SyncStatus status={sync.status} lastSyncedAt={sync.lastSyncedAt} error={sync.error} needsMedia={sync.needsMedia} storedHere={sync.storedHere} onRetry={sync.retry} onResolve={conflict ? () => setComparing(true) : undefined} />;
-  const bar = barState({ online, hasMedia, uploadFailed: upload.kind === "failed", hasHook: !!hook, ready: allReviewed, enabledCount: enabled.length, launching, saving: saved === "saving" });
-  const toLaunch = (how: "now" | "schedule") => {
-    setMode(how);
-    if (step === "launch") {
-      // Schedule from "Send it now" first shows the time to check; a second press books it.
-      if (how === "now" || mode === "schedule") void launch(how);
-      return;
+  const bar = barState({ online, hasMedia, uploadFailed: upload.kind === "failed", hasHook: !!hook, ready: allReviewed, enabledCount: enabled.length, launching, saving: saved === "saving", step, mode, targets: plan.send, pending: pending.map((p) => PLATFORM_META[p].name), scheduleIssue });
+  /** Resolves false when the creator would rather stay while captions are still being made. */
+  const leaveOk = (to: Step) =>
+    !capBusy || to === "video" || to === "story" || (step !== "video" && step !== "story") ? Promise.resolve(true) : new Promise<boolean>((r) => setLeaveAsk(() => r));
+  const answerLeave = (ok: boolean) => {
+    leaveAsk?.(ok);
+    setLeaveAsk(null);
+  };
+  const onGo = (s: Step) => void leaveOk(s).then((ok) => ok && setStep(s));
+  const goTo = (s: Step, before?: () => void) =>
+    void leaveOk(s).then((ok) => {
+      if (!ok) return;
+      before?.();
+      setStep(s);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  /** Steps 1 and 2: Schedule and Publish take you to Launch with that choice made. Nothing is sent from there. */
+  const toLaunch = (how: "now" | "schedule") => goTo("launch", () => setMode(how));
+  const onBar = (id: BarId) => {
+    if (id === "save") return void saveDraftNow();
+    if (id === "preview") {
+      capVideo.current?.pause();
+      return setPreviewing(true);
     }
-    setStep("launch");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (id === "continue") return goTo("launch");
+    if (id === "back") return goTo("everywhere");
+    if (id === "mode") return setMode((m) => (m === "now" ? "schedule" : "now"));
+    if (id === "schedule") return toLaunch("schedule");
+    // Publish: on Launch this is the one button that sends or books; before that it only moves you there.
+    if (step === "launch") return void launch(mode);
+    toLaunch("now");
   };
 
   const reachable: Record<Step, boolean> = { video: true, story: hasMedia, everywhere: !!hook, launch: !!hook && allReviewed };
@@ -866,24 +919,48 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
       copyLoading={copyLoading}
       drafts={drafts}
       platforms={[...live]}
+      proposed={proposed}
+      hold={plan.hold}
+      sending={plan.send}
+      mode={mode}
     />
   );
 
   const showVideo = step === "video" || step === "story";
   /** Step 2 with a video: preview, editor and assistant side by side. */
   const stage = showVideo && hasMedia;
+  /** Phase 3 (B1): Everywhere and Launch get the same wide workspace as Step 2, wider again when Pip folds. */
+  const roomy = stage || step === "everywhere" || step === "launch";
   const pipShown = wide ? panel.open : drawer;
+  const railStatus = hasMedia ? (
+    <div className="space-y-1">
+      {syncLine}
+      {savedAt && (
+        <Link href="/content?filter=draft" className="inline-flex min-h-11 items-center px-1 text-xs font-semibold underline underline-offset-4">
+          View drafts
+        </Link>
+      )}
+    </div>
+  ) : null;
+  /** Below 1280px Pip is a drawer; on Everywhere and Launch this is the way in. */
+  const pipButton = (
+    <div className="mb-4 flex justify-end xl:hidden">
+      <Button variant="subtle" size="sm" className="min-h-11" onClick={openDrawer} aria-haspopup="dialog" aria-expanded={drawer} aria-controls={ASSISTANT_PANEL}>
+        <Sparkles className="h-4 w-4" aria-hidden="true" /> {step === "launch" ? "Pip's checklist" : "Pip's notes"}
+      </Button>
+    </div>
+  );
 
   return (
     <div className="relative flex gap-0 lg:min-h-dvh">
       <Glow />
-      <JourneyRail step={step} reachable={reachable} onGo={setStep} thumb={poster} title={hook?.split("\n")[0]} saved={saved} roomy={stage} />
+      <JourneyRail step={step} reachable={reachable} onGo={onGo} status={railStatus} />
 
       <div className="relative min-w-0 flex-1" inert={sheet || undefined}>
-        <JourneyBar step={step} reachable={reachable} onGo={setStep} roomy={stage} />
+        <JourneyBar step={step} reachable={reachable} onGo={onGo} />
         {/* The editor is the one studio surface off the page frame on purpose (1104): a narrow, animated writing
             column between the journey rail and the side panel, with its own tighter gutter. */}
-        <div className={cn("mx-auto flex w-full flex-col px-4 pb-4 pt-6 transition-[max-width] duration-500 [transition-timing-function:var(--ease-liquid)] motion-reduce:transition-none sm:px-6 lg:pb-16 lg:pt-8", stage ? (pipShown ? "max-w-[1120px]" : "max-w-[1240px]") : cn("max-w-3xl sm:px-8", panel.open ? "lg:max-w-4xl" : "lg:max-w-5xl"))}>
+        <div className={cn("mx-auto flex w-full flex-col px-4 pb-4 pt-6 transition-[max-width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none sm:px-6 lg:pb-16 lg:pt-8", roomy ? (pipShown ? "max-w-[1100px]" : "max-w-[1240px]") : cn("max-w-3xl sm:px-8", panel.open ? "lg:max-w-4xl" : "lg:max-w-5xl"))}>
           {/* Steps animate in on mount. No exit choreography: a nested exit that never settles must not strand the next step. */}
             {showVideo && !hasMedia && (
               <motion.section key="drop" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} aria-labelledby="drop-title" className={`${createFont.variable} font-create flex flex-col items-center pt-2 sm:pt-4 lg:pt-10`}>
@@ -976,6 +1053,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                     duration={meta?.duration ?? 0}
                     initialTrack={restoredTrack ?? undefined}
                     onTrackChange={onTrackChange}
+                    onBusy={onCapBusy}
                     onBurned={(f, kind) => {
                       setPreCaption((p) => p ?? (media ? { media, file: fileRef.current } : null));
                       startUpload(f);
@@ -1001,15 +1079,16 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                   />
                 )}
                 <PublishTo className="" platforms={live} drafts={drafts} accounts={accounts} onToggle={(pl, on) => onDraft(pl, { enabled: on })} />
-                <SaveDraft className="px-1" state={saved} at={savedAt} onSave={saveDraftNow} busy={saved === "saving"} hideButton sync={syncLine} />
+                <SaveDraft className="px-1 xl:hidden" state={saved} at={savedAt} onSave={saveDraftNow} busy={saved === "saving"} hideButton sync={syncLine} />
                 </div>
                 </div>
               </motion.section>
             )}
 
             {step === "everywhere" && (
-              <motion.section key="deck" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={T.card}>
+              <motion.section key="deck" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={T.page}>
                 <h1 className="sr-only">Make it fit everywhere</h1>
+                {pipButton}
                 <PlatformDeck
                   drafts={drafts}
                   onDraft={onDraft}
@@ -1019,59 +1098,41 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                   rewriting={rewriting}
                   onRewrite={rewrite}
                   onConnect={connect}
-                  onContinue={() => {
-                    setStep("launch");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
                   hook={hook ?? ""}
                   onHook={(h) => setHook(h)}
-                  docked
                   online={online}
+                  proposals={sugg.proposals}
+                  undo={sugg.undo}
+                  onAccept={(p) => onSuggest({ t: "accept", p, draft: drafts[p] })}
+                  onReject={(p) => onSuggest({ t: "reject", p })}
+                  onRevert={(p) => onSuggest({ t: "revert", p })}
                 />
               </motion.section>
             )}
 
             {step === "launch" && (
-              <motion.section key="launch" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={T.card}>
+              <motion.section key="launch" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={T.page}>
                 <h1 className="sr-only">Launch</h1>
-                {allReviewed ? (
-                  <LaunchPanel drafts={drafts} accounts={accounts} poster={poster} hook={hook ?? ""} tz={tz} when={when} onWhen={setWhen} mode={mode} onMode={setMode} busy={launching} error={launchError} onLaunch={() => void launch()} online={online}
-                    onEdit={() => setStep("everywhere")}
-                    onReplaceVideo={() => {
-                      setStep("video");
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                      toast("Use Replace under your video to upload the version with music. Your copy stays.", "info");
-                    }}
-                    coverUrl={coverUrl}
-                    onCover={setCoverUrl}
-                    ensurePost={() => save({ force: true, strict: true })}
-                  />
-                ) : (
-                  <div className="py-20 text-center">
-                    <p className="text-lg">A couple of things still need a look first.</p>
-                    <button type="button" onClick={() => setStep("everywhere")} className="mt-4 min-h-[44px] font-semibold underline underline-offset-4">
-                      Back to the platforms
-                    </button>
-                  </div>
-                )}
+                {pipButton}
+                {/* Held places are listed with their reason and never sent; the bar's Publish waits until none are left. */}
+                <LaunchPanel drafts={drafts} accounts={accounts} media={meta} poster={poster} hook={hook ?? ""} title={draftTitle({ drafts, hook, filename: media?.filename ?? fileRef.current?.name })} status={autosaveLine(saved, savedAt)} tz={tz} when={when} onWhen={setWhen} mode={mode} onMode={setMode} busy={launching} error={launchError} online={online}
+                  onEdit={() => goTo("everywhere")}
+                  onLeaveOut={(p) => onDraft(p, { enabled: false })}
+                  onReplaceVideo={() => {
+                    goTo("video");
+                    toast("Use Replace under your video to upload the version with music. Your copy stays.", "info");
+                  }}
+                  coverUrl={coverUrl}
+                  onCover={setCoverUrl}
+                  ensurePost={() => save({ force: true, strict: true })}
+                  postId={postId}
+                  onScheduleIssue={setScheduleIssue}
+                  proposed={proposed}
+                />
               </motion.section>
             )}
-          {hasMedia && !stage && <SaveDraft state={saved} at={savedAt} onSave={saveDraftNow} busy={saved === "saving"} hideButton sync={syncLine} />}
-          {hasMedia && (
-            <ActionBar
-              state={bar}
-              saveLabel={saved === "saving" ? "Saving" : "Save draft"}
-              primary={step === "launch" ? mode : "now"}
-              launching={launching}
-              onSave={() => void saveDraftNow()}
-              onPreview={() => {
-                capVideo.current?.pause();
-                setPreviewing(true);
-              }}
-              onSchedule={() => toLaunch("schedule")}
-              onPublish={() => toLaunch("now")}
-            />
-          )}
+          {hasMedia && !stage && <SaveDraft className="mt-6 xl:hidden" state={saved} at={savedAt} onSave={saveDraftNow} busy={saved === "saving"} hideButton sync={syncLine} />}
+          {hasMedia && <ActionBar state={bar} saveLabel={saved === "saving" ? "Saving" : "Save draft"} mode={mode} onAction={onBar} />}
         </div>
         <ConflictDialog
           open={comparing && !!conflict}
@@ -1102,6 +1163,15 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
             setReplacing(null);
             if (f) void pickFile(f);
           }}
+        />
+        <ConfirmDialog
+          open={!!leaveAsk}
+          onOpenChange={(o) => !o && answerLeave(false)}
+          title="Captions are still being made. Leave and stop them?"
+          body="Leaving this step stops them. Stay here to let them finish."
+          confirmLabel="Leave and stop"
+          cancelLabel="Stay here"
+          onConfirm={() => answerLeave(true)}
         />
         <ConfirmDialog
           open={stopAsk}
@@ -1148,7 +1218,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
           className={cn(
             "relative overflow-hidden",
             sheet ? "glass-strong" : "glass",
-            "xl:h-full xl:rounded-[28px] xl:transition-[width,opacity] xl:duration-500 xl:[transition-timing-function:var(--ease-liquid)] motion-reduce:transition-none",
+            "xl:h-full xl:rounded-[28px] xl:transition-[width,opacity] xl:duration-300 xl:ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
             panel.open ? "xl:w-[300px] xl:opacity-100 2xl:w-[340px]" : "xl:w-0 xl:opacity-0",
             "max-xl:h-[min(88dvh,760px)] max-xl:w-full max-xl:rounded-t-[28px] max-xl:pb-[env(safe-area-inset-bottom)] md:max-xl:m-3 md:max-xl:h-auto md:max-xl:w-[400px] md:max-xl:rounded-[28px] md:max-xl:pb-0",
           )}

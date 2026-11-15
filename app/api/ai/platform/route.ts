@@ -8,9 +8,9 @@ import { voiceFor } from "@/lib/ai/voice";
 // Streams each platform's copy the moment it is written when asked (Accept: application/x-ndjson).
 export const POST = route(
   async (req, { user }) => {
-    const { story, hook, platforms } = platformCopyRequestSchema.parse(await req.json());
+    const { story, hook, platforms, intent } = platformCopyRequestSchema.parse(await req.json());
     const uid = realUserId(user);
-    await chargeAi(uid);
+    await chargeAi(uid, "ai", undefined, undefined, intent === "rewrite" ? "rewrite" : "captions");
     const opts = { cacheKey: uid, signal: req.signal, voice: await voiceFor(uid) };
     if (!wantsStream(req)) return json({ items: await generatePlatformCopy(story, hook, platforms, opts) });
     return ndjson(async (send) => ({ items: await generatePlatformCopy(story, hook, platforms, { ...opts, onItem: (item) => send({ t: "item", item }) }) }));

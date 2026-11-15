@@ -8,6 +8,7 @@ import { cn, formatDuration } from "@/lib/utils";
 import { canSaveCaption } from "./assistant-state";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import type { Draft, HooksState, Step, Tone, UploadState } from "./types";
+import type { Hold } from "./publish";
 import { T } from "@/lib/motion/tokens";
 
 const EXAMPLES = ["How a ₹5 shampoo sachet changed Indian retail", "My 5 AM routine that actually stuck", "Why Blockbuster said no to Netflix"];
@@ -40,6 +41,37 @@ interface Props {
   copyLoading: boolean;
   drafts: Record<Platform, Draft>;
   platforms: Platform[];
+  /** Places with a Pip suggestion waiting for Accept or Skip. */
+  proposed?: Platform[];
+  /** Launch: places switched on that won't be sent, with why. */
+  hold?: Hold[];
+  /** Launch: places that will really get it. */
+  sending?: Platform[];
+  mode?: "now" | "schedule";
+}
+
+const names = (ps: Platform[]) => {
+  const n = ps.map((p) => PLATFORM_META[p].name);
+  return n.length > 1 ? `${n.slice(0, -1).join(", ")} and ${n.at(-1)}` : (n[0] ?? "");
+};
+
+/**
+ * What Pip says about a place on Everywhere. Pure, so it is tested. It talks about the words on the card and
+ * never says anything has been published or scheduled: only the server can say that, on the publishing screen.
+ */
+export function deckLine(p: Platform, d: Draft, proposed: boolean): string {
+  const name = PLATFORM_META[p].name;
+  if (proposed) return `I have new words for ${name}. Accept, edit or skip them on its card.`;
+  if (d.reviewed) return `${name} looks good to you.`;
+  return d.note || `Have a look at ${name}.`;
+}
+
+/** What Pip says on Launch: what is held back first, then what to press. Never a claim that it went out. */
+export function launchLine(x: { hold: Hold[]; sending: Platform[]; mode: "now" | "schedule" }): { lead: string; items: string[] } {
+  if (x.hold.length) return { lead: x.hold.length === 1 ? "One place won't go yet:" : `${x.hold.length} places won't go yet:`, items: x.hold.map((h) => `${PLATFORM_META[h.platform].name}: ${h.reason}`) };
+  if (!x.sending.length) return { lead: "Switch on at least one place in Everywhere first.", items: [] };
+  const where = names(x.sending);
+  return x.mode === "schedule" ? { lead: `All set for ${where}. Pick a time, then press Schedule post below.`, items: [] } : { lead: `All set for ${where}. Press Publish below when you're ready.`, items: [] };
 }
 
 function Bubble({ from, children, className }: { from: "outly" | "you"; children: React.ReactNode; className?: string }) {
@@ -85,7 +117,7 @@ export function Assistant(p: Props) {
     setTweak(current?.text ?? "");
   }, [current?.text]);
 
-  const key = [p.step, p.upload.kind, !!p.submittedStory, p.hooks.loading, result?.hooks.length, p.hooks.index, p.chosenHook, p.copyLoading].join("|");
+  const key = [p.step, p.upload.kind, !!p.submittedStory, p.hooks.loading, result?.hooks.length, p.hooks.index, p.chosenHook, p.copyLoading, p.hold?.length, p.proposed?.join(","), p.mode].join("|");
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "end" });
   }, [key, reduce]);
@@ -311,23 +343,39 @@ export function Assistant(p: Props) {
 
         <AnimatePresence>{p.copyLoading && <Typing label="Writing something different for each place…" />}</AnimatePresence>
 
-        {(p.step === "everywhere" || p.step === "launch") && !p.copyLoading && (
-          <motion.ul initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2.5">
+        {p.step === "everywhere" && !p.copyLoading && (
+          <motion.ul initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={T.nav} className="space-y-2.5" aria-label="What to look at">
             {p.platforms
-              .filter((pl) => p.drafts[pl].enabled && p.drafts[pl].note)
+              .filter((pl) => p.drafts[pl].enabled)
               .map((pl) => (
-                <li key={pl} className="flex items-center gap-3 text-[15px]">
+                <li key={pl} className="flex items-start gap-3 text-[15px] leading-snug">
                   <PlatformOrb platform={pl} size={28} />
-                  <span>
+                  <span className="min-w-0 pt-0.5">
                     <span className="sr-only">{PLATFORM_META[pl].name}: </span>
-                    {p.drafts[pl].reviewed ? `${PLATFORM_META[pl].name} looks good to you. ✓` : p.drafts[pl].note}
+                    {deckLine(pl, p.drafts[pl], !!p.proposed?.includes(pl))}
                   </span>
+                  {p.drafts[pl].reviewed && <Check className="ml-auto mt-1 h-4 w-4 shrink-0 text-success-ink" aria-hidden="true" />}
                 </li>
               ))}
           </motion.ul>
         )}
 
-        {p.step === "launch" && <Bubble from="outly">Everything looks ready. When should it go live?</Bubble>}
+        {p.step === "launch" &&
+          (() => {
+            const l = launchLine({ hold: p.hold ?? [], sending: p.sending ?? [], mode: p.mode ?? "now" });
+            return (
+              <Bubble from="outly">
+                {l.lead}
+                {l.items.length > 0 && (
+                  <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                    {l.items.map((t) => (
+                      <li key={t}>{t}</li>
+                    ))}
+                  </ul>
+                )}
+              </Bubble>
+            );
+          })()}
         <div ref={end} />
       </div>
 

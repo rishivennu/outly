@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { CalendarClock, CalendarDays, Flame, Pencil, Plus, Rocket, Send } from "lucide-react";
+import { AlertTriangle, CalendarClock, CalendarDays, Check, Flame, Loader2, Pencil, Plus, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { Sheet } from "@/components/shared/Sheet";
@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { api } from "@/lib/client/api";
 import { MIN_SAMPLES, type BestTimes } from "@/lib/schedule/best-time";
 import type { AccountView, Draft } from "./types";
-import { enabledPlatforms } from "./publish";
+import { confirmRows, enabledPlatforms, scheduleProblem } from "./publish";
 import { MusicNote } from "./MusicNote";
 import { CoverPicker } from "./CoverPicker";
 import { OFFLINE_SEND } from "./ActionBar";
@@ -24,8 +24,13 @@ import { T } from "@/lib/motion/tokens";
 interface Props {
   drafts: Record<Platform, Draft>;
   accounts: Partial<Record<Platform, AccountView>>;
+  media: { duration?: number | null; width?: number | null; height?: number | null } | null;
   poster: string | null;
   hook: string;
+  /** The draft's name, the same one Content lists it under. */
+  title: string;
+  /** Where the draft stands right now, e.g. "Draft saved 5:45 PM". */
+  status: string;
   tz: string;
   when: Date;
   onWhen: (d: Date) => void;
@@ -33,8 +38,10 @@ interface Props {
   onMode: (m: "now" | "schedule") => void;
   busy: boolean;
   error: string | null;
-  onLaunch: () => void;
+  /** The one way back to Everywhere. */
   onEdit: () => void;
+  /** Switches a held place off, so the rest can go. */
+  onLeaveOut: (p: Platform) => void;
   /** Back to step 1 to swap in a version of the video that has music on it. */
   onReplaceVideo: () => void;
   /** 1083: the post's own cover image, if any; it also stands in for the poster in the summary. */
@@ -42,20 +49,27 @@ interface Props {
   onCover: (url: string | null) => void;
   /** Saves the draft if needed and returns its id: a cover belongs to a saved post. */
   ensurePost: () => Promise<string | null>;
+  /** The saved post, for the booking dry run while a time is picked. */
+  postId: string | null;
+  /** What stops this time from being booked, or null; the action bar reads it. */
+  onScheduleIssue: (line: string | null) => void;
   /** Off while the device is offline: nothing can be sent or booked without a connection. */
   online?: boolean;
+  /** Places with a Pip suggestion still waiting: held back until it is accepted or rejected. */
+  proposed?: Platform[];
 }
 
 /** /api/best-time: slots only ever come from the creator's own posts; "none" says how many more are needed. */
 export type BestAnswer = Omit<BestTimes, "source"> & { source: string; samples?: number; needed?: number };
 
-/** The line shown instead of best times while there is not enough of the creator's own data. */
 /** GET /api/posts/[id]/check: the booking checks for a time, run before anything is booked. */
 export interface ScheduleCheck {
   ok: boolean;
   issues?: { code: string; message: string; platform?: string }[];
   conflicts?: { postId: string; title: string; scheduledAt: string; platform: string }[];
 }
+
+export const SCHEDULE_CHECKING = "Checking that time.";
 
 /** What stops this booking, in one line for the launch error, or null when nothing does. */
 export function scheduleCheckLine(r: ScheduleCheck | null): string | null {
@@ -69,6 +83,7 @@ export function scheduleCheckLine(r: ScheduleCheck | null): string | null {
   return lines.length ? lines.join(" ") : "That time doesn't work for this post. Pick another one.";
 }
 
+/** The line shown instead of best times while there is not enough of the creator's own data. */
 export function bestTimesWaitLine(b: Pick<BestAnswer, "samples" | "needed">) {
   const needed = b.needed ?? MIN_SAMPLES;
   return typeof b.samples === "number" ? `Best times appear after ${needed} posts with views (${b.samples} so far).` : `Best times appear after ${needed} posts with views.`;
@@ -76,16 +91,25 @@ export function bestTimesWaitLine(b: Pick<BestAnswer, "samples" | "needed">) {
 
 export const realSlots = (b: BestAnswer | null) => (b && b.source === "yours" ? b.slots : []);
 
+export const MULTI_LINE = "One video, with each place's own words. Each place posts on its own, so one that fails never stops the others.";
+
+const ease = "ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none";
+
+/**
+ * Step 4. The same shape as Everywhere: the summary and the choices on the left, cover and music on the right.
+ * It has no send button of its own: the action bar below carries the one Publish or Schedule button.
+ */
 export function LaunchPanel(p: Props) {
   const [picking, setPicking] = useState(false);
-  // Only the destinations the user left switched on. Nothing else is ever listed or sent.
+  // Only the destinations the user left switched on. Nothing else is ever listed, and held ones are never sent.
   const targets = enabledPlatforms(p.drafts);
-  const names = targets.map((t) => PLATFORM_META[t].name);
-  const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
+  const rows = confirmRows(p.drafts, p.accounts, p.media, p.proposed);
+  const sending = rows.filter((r) => r.sending);
   const [best, setBest] = useState<BestAnswer | null>(null);
   const slots = realSlots(best);
   const peaks = best?.source === "yours" ? best.peakHours : [];
   const online = p.online ?? true;
+  const [check, setCheck] = useState<{ busy: boolean; line: string | null; ok: boolean }>({ busy: false, line: null, ok: false });
   // The device's own zone, read after mount (the server render has none): a phone abroad still books in the profile's zone.
   const [deviceTz, setDeviceTz] = useState<string | null>(null);
   useEffect(() => {
@@ -106,129 +130,238 @@ export function LaunchPanel(p: Props) {
     };
   }, [key]);
 
+  // A time is checked as it is picked: in the future first, then the server's dry run (clashes, platform limits).
+  // A check that can't be reached says nothing: the launch route enforces the same rules when the post is booked.
+  const at = p.when.getTime();
+  const { onScheduleIssue } = p;
+  useEffect(() => {
+    if (p.mode !== "schedule") {
+      setCheck({ busy: false, line: null, ok: false });
+      onScheduleIssue(null);
+      return;
+    }
+    const local = scheduleProblem(new Date(at));
+    if (local || !p.postId || !online) {
+      setCheck({ busy: false, line: local, ok: false });
+      onScheduleIssue(local);
+      return;
+    }
+    let live = true;
+    setCheck((c) => ({ ...c, busy: true }));
+    // Schedule post waits until the dry run has answered for this time.
+    onScheduleIssue(SCHEDULE_CHECKING);
+    const t = setTimeout(() => {
+      api<ScheduleCheck>(`/api/posts/${p.postId}/check?at=${encodeURIComponent(new Date(at).toISOString())}`)
+        .then((r) => {
+          if (!live) return;
+          const line = scheduleCheckLine(r);
+          setCheck({ busy: false, line, ok: !line });
+          onScheduleIssue(line);
+        })
+        .catch(() => {
+          if (!live) return;
+          setCheck({ busy: false, line: null, ok: false });
+          onScheduleIssue(null);
+        });
+    }, 450);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [p.mode, at, p.postId, online, key, onScheduleIssue]);
+
+  const thumb = p.coverUrl ?? p.poster;
+  const lead = p.mode === "now" ? "Publishing to" : "Scheduling for";
+
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div className="w-full">
       <p className="eyebrow mb-3">04 · Launch</p>
-      <h2 className="display text-[clamp(2.4rem,6vw,4.2rem)]">
-        Ready when
-        <br />
-        <span className="energy-text">you are.</span>
+      <h2 className="display text-[clamp(2.2rem,5vw,3.6rem)]">
+        Ready when <span className="energy-text">you are.</span>
       </h2>
 
-      <div className="glass mt-8 flex gap-4 rounded-[28px] p-4">
-        <div className="relative aspect-[9/16] w-20 shrink-0 overflow-hidden rounded-2xl bg-secondary sm:w-24">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {(p.coverUrl ?? p.poster) && <img src={(p.coverUrl ?? p.poster)!} alt="" className="h-full w-full object-cover" />}
-        </div>
-        <div className="min-w-0 flex-1 py-1">
-          <p className="line-clamp-2 text-lg font-semibold leading-snug">{p.hook}</p>
-          <ul className="mt-3 space-y-2">
-            {targets.map((pl) => (
-              <li key={pl} className="flex items-center gap-2.5 text-sm">
-                <PlatformOrb platform={pl} size={24} />
-                <span className="font-medium">{PLATFORM_META[pl].format}</span>
-                <span className="truncate text-muted-foreground">
-                  {p.accounts[pl]?.username} · {(pl === "youtube" ? p.drafts[pl].title : p.drafts[pl].caption).split("\n")[0]}
+      <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] lg:items-start">
+        <div className="min-w-0 space-y-5">
+          <section aria-labelledby="launch-summary" className="glass flex gap-4 rounded-[28px] p-4">
+            <div className="relative aspect-[9/16] w-20 shrink-0 overflow-hidden rounded-2xl bg-secondary sm:w-24">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {thumb && <img src={thumb} alt="" className="h-full w-full object-cover" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <h3 id="launch-summary" className="line-clamp-2 text-base font-semibold leading-snug sm:text-lg">
+                    {p.title}
+                  </h3>
+                  {p.hook && p.hook !== p.title && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{p.hook}</p>}
+                </div>
+                <Button variant="subtle" size="sm" onClick={p.onEdit} className="shrink-0" aria-label="Edit the post in Everywhere">
+                  <Pencil className="h-4 w-4" aria-hidden="true" /> Edit
+                </Button>
+              </div>
+              <ul className="mt-3 space-y-1.5" aria-label="Where it's going">
+                {rows.map((r) => (
+                  <li key={r.platform} className="flex min-w-0 items-center gap-2 text-sm">
+                    <PlatformOrb platform={r.platform} size={22} />
+                    <span className="shrink-0 font-medium">{PLATFORM_META[r.platform].name}</span>
+                    <span className="min-w-0 truncate text-muted-foreground">
+                      {[PLATFORM_META[r.platform].format, r.handle ?? "Not connected"].join(" · ")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
+                {p.status}
+              </p>
+            </div>
+          </section>
+
+          <div role="radiogroup" aria-label="When should this go live?" className="grid grid-cols-2 gap-1.5 rounded-full bg-secondary/60 p-1.5 hairline">
+            {(["now", "schedule"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={p.mode === m}
+                disabled={p.busy}
+                onClick={() => p.onMode(m)}
+                className={cn("relative min-h-11 rounded-full px-2 text-sm font-semibold outline-none transition-[color] duration-200 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.96]", ease, p.mode === m ? "text-background" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}
+              >
+                {p.mode === m && <motion.span layoutId="launch-mode" className="absolute inset-0 rounded-full bg-foreground" transition={T.nav} />}
+                <span className="relative inline-flex items-center gap-2">
+                  {m === "now" ? <Send className="h-4 w-4" aria-hidden="true" /> : <CalendarClock className="h-4 w-4" aria-hidden="true" />}
+                  {m === "now" ? "Publish now" : "Schedule for later"}
                 </span>
-              </li>
+              </button>
             ))}
-          </ul>
-        </div>
-        <Button variant="ghost" size="icon" onClick={p.onEdit} aria-label="Edit the copy" className="shrink-0">
-          <Pencil className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <div role="radiogroup" aria-label="When should this go live?" className="mt-8 grid grid-cols-2 gap-2 rounded-full bg-secondary/60 p-1.5 hairline">
-        {(["now", "schedule"] as const).map((m) => (
-          <button key={m} type="button" role="radio" aria-checked={p.mode === m} onClick={() => p.onMode(m)} className={cn("relative h-12 rounded-full text-sm font-semibold transition", p.mode === m ? "text-background" : "text-muted-foreground hover:text-foreground")}>
-            {p.mode === m && <motion.span layoutId="launch-mode" className="absolute inset-0 rounded-full bg-foreground" transition={T.glide} />}
-            <span className="relative inline-flex items-center gap-2">
-              {m === "now" ? <Send className="h-4 w-4" /> : <CalendarClock className="h-4 w-4" />}
-              {m === "now" ? "Send it now" : "Schedule it"}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {p.mode === "schedule" && (
-        <motion.button
-          type="button"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          onClick={() => setPicking(true)}
-          className="glass mt-4 flex w-full items-center gap-4 rounded-[24px] p-4 text-left transition hover:bg-secondary/60"
-        >
-          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-warning/15 text-warning-ink">
-            <CalendarDays className="h-5 w-5" />
-          </span>
-          <span className="flex-1">
-            <span className="block text-xs text-muted-foreground">When should this go live?</span>
-            <span className="block text-lg font-semibold">
-              {fmt(p.when, p.tz, { weekday: "long", month: "short", day: "numeric" })} · {fmt(p.when, p.tz, { hour: "numeric", minute: "2-digit" })}{" "}
-              <span className="text-sm font-normal text-muted-foreground">{tzShort(p.tz)}</span>
-            </span>
-          </span>
-          <span className="text-sm text-muted-foreground">Change</span>
-        </motion.button>
-      )}
-
-      {p.mode === "schedule" && deviceTz && deviceTz !== p.tz && tzShort(deviceTz) !== tzShort(p.tz) && (
-        <p className="mt-2 px-1 text-xs leading-relaxed text-muted-foreground">
-          Times are in {tzShort(p.tz)}, the time zone on your Outlly profile. This device is on {tzShort(deviceTz)}.
-        </p>
-      )}
-
-      {p.mode === "schedule" && best && slots.length === 0 && (
-        <p className="mt-3 flex items-start gap-2 rounded-[20px] px-4 py-3 text-xs leading-relaxed text-muted-foreground hairline">
-          <Flame className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span className="tabular-nums">{bestTimesWaitLine(best)}</span>
-        </p>
-      )}
-
-      {p.mode === "schedule" && best && slots.length > 0 && (
-        <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} aria-labelledby="best-times" className="mt-3 rounded-[24px] p-4 hairline">
-          <h3 id="best-times" className="flex items-center gap-2 text-sm font-semibold">
-            <Flame className="h-4 w-4 text-accent" aria-hidden="true" /> Best times to post
-            <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">From your posts</span>
-          </h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {slots.map((s) => {
-              const on = Math.abs(new Date(s.at).getTime() - p.when.getTime()) < 60_000;
-              return (
-                <button key={s.at} type="button" aria-pressed={on} onClick={() => p.onWhen(new Date(s.at))} className={cn("h-11 rounded-full px-4 text-sm font-semibold transition hairline", on ? "bg-foreground text-background" : "hover:bg-secondary/70")}>
-                  {s.label}
-                </button>
-              );
-            })}
           </div>
-          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{best.reason}</p>
-        </motion.section>
-      )}
 
-      <CoverPicker targets={targets} coverUrl={p.coverUrl} ensurePost={p.ensurePost} onChange={p.onCover} />
-      {targets.length > 0 && <MusicNote list={list} onReplace={p.onReplaceVideo} />}
+          {p.mode === "schedule" && (
+            <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={T.nav} aria-label="Pick a time" className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setPicking(true)}
+                className={cn("glass flex min-h-11 w-full items-center gap-4 rounded-[24px] p-4 text-left outline-none transition-[background-color] duration-200 focus-visible:ring-2 focus-visible:ring-ring [@media(hover:hover)]:hover:bg-secondary/60", ease)}
+              >
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-warning/15 text-warning-ink">
+                  <CalendarDays className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs text-muted-foreground">Goes live</span>
+                  <span className="block text-base font-semibold tabular-nums sm:text-lg">
+                    {fmt(p.when, p.tz, { weekday: "long", month: "short", day: "numeric" })}, {fmt(p.when, p.tz, { hour: "numeric", minute: "2-digit" })}{" "}
+                    <span className="text-sm font-normal text-muted-foreground">{tzShort(p.tz)}</span>
+                  </span>
+                </span>
+                <span className="text-sm font-medium text-muted-foreground">Change</span>
+              </button>
 
-      <div className="mt-8 flex flex-col items-center gap-3">
-        <Button variant="lime" size="xl" className="w-full sm:w-auto sm:min-w-[320px]" disabled={p.busy || targets.length === 0 || !online} onClick={p.onLaunch}>
-          {p.mode === "now" ? (
-            <>
-              <Rocket className="h-5 w-5" /> {p.busy ? "Sending it out…" : "Send it everywhere"}
-            </>
-          ) : (
-            <>
-              <CalendarClock className="h-5 w-5" /> {p.busy ? "Putting it on the calendar…" : "Schedule it"}
-            </>
+              {deviceTz && deviceTz !== p.tz && tzShort(deviceTz) !== tzShort(p.tz) && (
+                <p className="px-1 text-xs leading-relaxed text-muted-foreground">
+                  Times are in {tzShort(p.tz)}, the time zone on your Outlly profile. This device is on {tzShort(deviceTz)}.
+                </p>
+              )}
+
+              <p className={cn("flex items-start gap-2 px-1 text-[13px] leading-snug", check.line ? "text-[hsl(0_72%_42%)] dark:text-destructive" : "text-muted-foreground")} role="status" aria-live="polite">
+                {check.busy ? (
+                  <>
+                    <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden="true" /> Checking that time for {sending.length === 1 ? PLATFORM_META[sending[0].platform].name : "each place"}
+                  </>
+                ) : check.line ? (
+                  <>
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> {check.line}
+                  </>
+                ) : check.ok ? (
+                  <>
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-success-ink" aria-hidden="true" /> That time works for every place it&apos;s going.
+                  </>
+                ) : null}
+              </p>
+
+              {best && slots.length === 0 && (
+                <p className="flex items-start gap-2 rounded-[20px] px-4 py-3 text-xs leading-relaxed text-muted-foreground hairline">
+                  <Flame className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="tabular-nums">{bestTimesWaitLine(best)}</span>
+                </p>
+              )}
+
+              {best && slots.length > 0 && (
+                <section aria-labelledby="best-times" className="rounded-[24px] p-4 hairline">
+                  <h3 id="best-times" className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                    <Flame className="h-4 w-4 text-accent" aria-hidden="true" /> Best times to post
+                    <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">From your posts</span>
+                  </h3>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {slots.map((s) => {
+                      const on = Math.abs(new Date(s.at).getTime() - p.when.getTime()) < 60_000;
+                      return (
+                        <button key={s.at} type="button" aria-pressed={on} onClick={() => p.onWhen(new Date(s.at))} className={cn("h-11 rounded-full px-4 text-sm font-semibold tabular-nums outline-none transition-[background-color,color] duration-200 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.96] hairline", ease, on ? "bg-foreground text-background" : "[@media(hover:hover)]:hover:bg-secondary/70")}>
+                          {s.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{best.reason}</p>
+                </section>
+              )}
+            </motion.section>
           )}
-        </Button>
-        <p className="text-center text-sm text-muted-foreground">
-          {!online ? OFFLINE_SEND : targets.length === 0 ? "Pick at least one place to send it." : p.mode === "now" ? `Goes to ${list} right away.` : `Goes to ${list} at that time. You can change it until then.`}
-        </p>
-        {p.error && (
-          <p role="alert" className="text-center text-sm text-destructive">
-            {p.error}
-          </p>
-        )}
+
+          <section aria-labelledby="launch-confirm" className="rounded-[24px] p-4 hairline sm:p-5">
+            <h3 id="launch-confirm" className="text-sm font-semibold">
+              {lead}:
+            </h3>
+            {rows.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">Nothing is switched on. Pick at least one place in Everywhere.</p>
+            ) : (
+              <ul className="mt-3 space-y-2.5">
+                {rows.map((r) => (
+                  <li key={r.platform} className="flex flex-wrap items-start gap-x-3 gap-y-2">
+                    <PlatformOrb platform={r.platform} size={28} className={cn(!r.sending && "opacity-60")} />
+                    <div className="min-w-0 flex-1">
+                      <p className="flex min-w-0 flex-wrap items-center gap-x-2 text-sm">
+                        <span className="font-semibold">{PLATFORM_META[r.platform].name}</span>
+                        {r.handle && <span className="min-w-0 truncate text-muted-foreground">{r.handle}</span>}
+                        {r.practice && <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">Practice account</span>}
+                      </p>
+                      {r.sending ? (
+                        <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                          <Check className="h-3.5 w-3.5 text-success-ink" aria-hidden="true" /> {p.mode === "now" ? "Goes out when you publish" : "Goes out at that time"}
+                        </p>
+                      ) : (
+                        <p className="mt-0.5 flex items-start gap-1.5 text-[13px] text-[hsl(0_72%_42%)] dark:text-destructive">
+                          <X className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Not sending. {r.reason}
+                        </p>
+                      )}
+                      {r.warnings.map((w) => (
+                        <p key={w} className="mt-0.5 flex items-start gap-1.5 text-[13px] text-warning-ink">
+                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {w}
+                        </p>
+                      ))}
+                    </div>
+                    {!r.sending && (
+                      <Button variant="ghost" size="sm" className="min-h-11" onClick={() => p.onLeaveOut(r.platform)} disabled={p.busy}>
+                        Leave it out
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {sending.length > 1 && <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{MULTI_LINE}</p>}
+            {!online && <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{OFFLINE_SEND}</p>}
+            {p.error && (
+              <p role="alert" className="mt-3 text-sm text-[hsl(0_72%_42%)] dark:text-destructive">
+                {p.error}
+              </p>
+            )}
+          </section>
+        </div>
+
+        <div className="min-w-0 space-y-4 lg:sticky lg:top-6">
+          <CoverPicker targets={targets} coverUrl={p.coverUrl} ensurePost={p.ensurePost} onChange={p.onCover} />
+          <MusicNote platforms={targets} onReplace={p.onReplaceVideo} />
+        </div>
       </div>
 
       <Sheet open={picking} onOpenChange={setPicking} title="When should this go live?" description={`Times are in ${tzShort(p.tz)}.${peaks.length ? " Dots mark your best times to post." : ""}`} side="center">

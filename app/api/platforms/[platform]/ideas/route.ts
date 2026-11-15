@@ -13,7 +13,7 @@ export const GET = route(
   async (_req, { user, params }) => {
     const p = params.platform ?? "";
     if (!isPlatform(p)) throw new HttpError(404, "We don't support that platform yet.");
-    await chargeAi(realUserId(user));
+    await chargeAi(realUserId(user), "ai", undefined, undefined, "content");
     return json({ suggestions: await platformIdeas(user.id, p) });
   },
   { limit: [20, 60_000] },

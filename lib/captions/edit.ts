@@ -73,35 +73,58 @@ export function restoreCue(cues: Cue[], cue: Cue): { cues: Cue[]; index: number 
   return { cues: [...cues.slice(0, index), { ...cue, start, end }, ...cues.slice(index)], index };
 }
 
-export type CueIssue = { index: number; message: string };
+export type CueIssue = { index: number; message: string; level?: "error" | "warn" };
 
-/** What would make a burn or an .srt wrong. Empty list = good to go. */
-export function cueIssues(cues: Cue[], duration: number): CueIssue[] {
+/** A line up longer than this is probably holding a pause, or its words drifted. */
+export const LONG_CUE = 7;
+/** Under this many characters a second, a long line is mostly silence on screen. */
+const SLOW_CPS = 2;
+
+/**
+ * What would make a burn or an .srt wrong ("error"), and what looks off but may be meant ("warn"). Empty list =
+ * good to go. Nothing here changes a line: the editor shows the issue and the creator decides.
+ * `source` = the original track when `cues` is its translation: every line must sit on a source line's time.
+ */
+export function cueIssues(cues: Cue[], duration: number, source?: Cue[]): CueIssue[] {
   const out: CueIssue[] = [];
   const clipEnd = duration > 0 && Number.isFinite(duration) ? duration + EPS : Infinity;
   cues.forEach((c, i) => {
     const n = i + 1;
     if (!c.text.trim()) out.push({ index: i, message: `Line ${n} has no words. Type them or delete the line.` });
+    if (!Number.isFinite(c.start) || !Number.isFinite(c.end)) {
+      out.push({ index: i, message: `Line ${n} has a time we can't read. Set its start and end again.` });
+      return;
+    }
     if (!(c.end > c.start)) out.push({ index: i, message: `Line ${n} ends before it starts.` });
     if (c.start < 0 || c.end > clipEnd) out.push({ index: i, message: `Line ${n} runs past the end of the video.` });
     if (i > 0 && c.start < cues[i - 1].end - EPS) out.push({ index: i, message: `Line ${n} overlaps line ${i}.` });
+    const len = c.end - c.start;
+    if (len > LONG_CUE) out.push({ index: i, level: "warn", message: `Line ${n} stays up for ${len.toFixed(1)} seconds. Check it still matches the speech.` });
+    else if (len > 3 && c.text.trim().length / len < SLOW_CPS) out.push({ index: i, level: "warn", message: `Line ${n} is up much longer than it takes to read. Check its timing.` });
+    if (source && !source.some((s) => Math.abs(s.start - c.start) <= EPS * 2 && Math.abs(s.end - c.end) <= EPS * 2))
+      out.push({ index: i, message: `Translated line ${n} has no matching original line. Translate again or delete it.` });
   });
+  if (source && cues.length !== source.length) out.push({ index: Math.max(0, cues.length - 1), level: "warn", message: `The translation has ${cues.length} lines and the original has ${source.length}.` });
   return out;
 }
 
-/** The editor's whole caption state, as a device draft keeps it. */
-export type CaptionTrack = { v: 1; cues: Cue[]; style: CaptionStyle; pos: CaptionPos };
+/** Only the issues that stop a burn or an .srt. */
+export const blockingIssues = (issues: CueIssue[]) => issues.filter((i) => i.level !== "warn");
+
+export type CaptionView = "original" | "english";
+
+/**
+ * The editor's whole caption state, as a device draft keeps it. `cues` is the track on show (what preview,
+ * burn and .srt use). With a translation, `original` and `translated` keep both tracks, line for line.
+ */
+export type CaptionTrack = { v: 1; cues: Cue[]; style: CaptionStyle; pos: CaptionPos; lang?: string; original?: Cue[]; translated?: Cue[]; view?: CaptionView };
 
 const POS: CaptionPos[] = ["top", "middle", "bottom"];
 
-/** Reads a stored track back defensively: anything malformed is dropped, the rest re-sorted without overlaps. */
-export function readTrack(raw: unknown, duration = Infinity): CaptionTrack | null {
-  if (!raw || typeof raw !== "object") return null;
-  const r = raw as Record<string, unknown>;
-  if (!Array.isArray(r.cues)) return null;
-  const clipEnd = duration > 0 && Number.isFinite(duration) ? duration : Infinity;
+function cleanList(list: unknown, clipEnd: number): Cue[] {
+  if (!Array.isArray(list)) return [];
   const cues: Cue[] = [];
-  for (const c of r.cues as unknown[]) {
+  for (const c of list as unknown[]) {
     const o = (c ?? {}) as Record<string, unknown>;
     const start = Number(o.start);
     const end = Math.min(Number(o.end), clipEnd);
@@ -115,7 +138,32 @@ export function readTrack(raw: unknown, duration = Infinity): CaptionTrack | nul
     const start = prev ? Math.max(c.start, prev.end) : c.start;
     if (c.end - start >= 0.05) clean.push({ ...c, start });
   }
+  return clean;
+}
+
+const sameTimes = (a: Cue[], b: Cue[]) => a.length === b.length && a.every((c, i) => c.start === b[i].start && c.end === b[i].end);
+
+/** Reads a stored track back defensively: anything malformed is dropped, the rest re-sorted without overlaps. */
+export function readTrack(raw: unknown, duration = Infinity): CaptionTrack | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (!Array.isArray(r.cues)) return null;
+  const clipEnd = duration > 0 && Number.isFinite(duration) ? duration : Infinity;
+  const clean = cleanList(r.cues, clipEnd);
   const style = CAPTION_STYLES.some((s) => s.id === r.style) ? (r.style as CaptionStyle) : "pop";
   const pos = POS.includes(r.pos as CaptionPos) ? (r.pos as CaptionPos) : "bottom";
-  return { v: 1, cues: clean, style, pos };
+  const track: CaptionTrack = { v: 1, cues: clean, style, pos };
+  if (typeof r.lang === "string" && /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(r.lang)) track.lang = r.lang;
+  if (Array.isArray(r.original) && Array.isArray(r.translated)) {
+    const original = cleanList(r.original, clipEnd);
+    const translated = cleanList(r.translated, clipEnd);
+    // A translation is kept only while it still sits line for line on the original's times.
+    if (original.length && sameTimes(original, translated)) {
+      track.original = original;
+      track.translated = translated;
+      track.view = r.view === "english" ? "english" : "original";
+      track.cues = track.view === "english" ? translated : original;
+    }
+  }
+  return track;
 }

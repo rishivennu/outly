@@ -106,7 +106,7 @@ describe("workspace wiring", () => {
     const bar = src("components/create/ActionBar.tsx");
     expect(bar).toContain("sticky bottom-[calc(env(safe-area-inset-bottom)+76px)]");
     expect(bar).not.toContain("transition-all");
-    expect(ws).toMatch(/\n\s+docked\r?\n/);
+    // Phase 3 CONTRACT-B: the deck no longer docks its own bar, so the one ActionBar is the only bar.
     expect(ws.match(/<ActionBar/g)?.length).toBe(1);
   });
   test("picks go through the server limits, uploads resume by draft id", () => {
@@ -118,7 +118,7 @@ describe("workspace wiring", () => {
     expect(ws).toContain("Pip can write hooks again when you reconnect.");
     expect(ws).toContain("Pip can write the copy when you reconnect");
     expect(ws).toContain("Connect it when you're back online.");
-    expect(ws).toContain("onLaunch={() => void launch()} online={online}");
+    expect(ws).toContain("busy={launching} error={launchError} online={online}");
   });
   test("drafts sync through one writer, per account, with conflicts shown", () => {
     expect(ws).toContain("useDraftSync({");
