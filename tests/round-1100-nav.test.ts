@@ -78,7 +78,9 @@ describe("1100 phone drawer", () => {
   test("drawer: Radix dialog with title, closes on pick and route change, logout after it has gone", () => {
     expect(drawer).toContain("<Dialog.Title");
     expect(drawer).toContain("useEffect(() => setOpen(false), [path]);");
-    expect(drawer).toContain("onPick={() => setOpen(false)}");
+    // 1154: every row (and the profile card) closes it through one `close`.
+    expect(drawer).toContain("const close = () => setOpen(false);");
+    expect(drawer).toContain("onClick={close}");
     expect(drawer).toMatch(/onCloseAutoFocus[\s\S]*ask\(trigger\.current\)/);
     expect(drawer).toContain("overscroll-contain");
   });

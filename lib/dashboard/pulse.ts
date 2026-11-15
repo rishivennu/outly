@@ -4,6 +4,7 @@ import { cachedStale } from "../cache";
 import { storage } from "../storage";
 import { PLATFORMS } from "../domain";
 import { bucket, type Pulse, type PulseRange, type TopPost } from "./pulse-core";
+import type { Coverage } from "../analytics/trend";
 
 /**
  * Same 60 s per-creator copy as Analytics: metrics only change when the sync job writes them. 1142: a copy up to
@@ -30,7 +31,7 @@ async function compute(userId: string, days: PulseRange, accountIds: string[] | 
       where: { publishedAt: { gte: since }, platformStatus: "published", practice: false, post: { userId }, ...acct },
       select: { publishedAt: true, platform: true },
     }),
-    db.socialAccount.findMany({ where: { userId, status: { not: "disconnected" }, ...(accountIds ? { id: { in: accountIds } } : {}) }, select: { platform: true } }),
+    db.socialAccount.findMany({ where: { userId, status: { not: "disconnected" }, ...(accountIds ? { id: { in: accountIds } } : {}) }, select: { platform: true, syncState: { select: { lastSyncAt: true } } } }),
   ]);
   const seen = new Set<string>([...accounts.map((a) => a.platform), ...metrics.map((m) => m.target.platform)]);
   const platforms = PLATFORMS.filter((p) => seen.has(p));
@@ -41,6 +42,31 @@ async function compute(userId: string, days: PulseRange, accountIds: string[] | 
     metrics.map((m) => ({ at: m.capturedAt.getTime(), platform: m.target.platform, postId: m.target.postId, views: m.views, likes: m.likes, comments: m.comments, shares: m.shares })),
     sent.map((s) => ({ at: s.publishedAt!.getTime(), platform: s.platform })),
   );
+
+  // 1154: coverage per scope. When Outlly started counting (the oldest row ever, not just in this window), how many
+  // rows landed in the current period, and the newest sync that confirmed numbers. One indexed lookup per platform.
+  const curStart = Date.parse(`${b.dates[0]}T00:00:00Z`);
+  const prevStart = curStart - days * 864e5;
+  const firstRow = (platform?: string) =>
+    db.targetMetric
+      .findFirst({ where: { target: { post: { userId }, practice: false, ...acct, ...(platform ? { platform } : {}) } }, orderBy: { capturedAt: "asc" }, select: { capturedAt: true } })
+      .then((r) => r?.capturedAt.getTime() ?? null)
+      .catch(() => null);
+  const firsts = await Promise.all([firstRow(), ...platforms.map((p) => firstRow(p))]);
+  const cov: Record<string, Coverage> = {};
+  // "All" is only as old as its youngest platform with numbers in either period: a platform that started counting
+  // recently would otherwise inflate the current period while the oldest platform claims a full history.
+  const withRows = platforms.map((p, i) => (metrics.some((m) => m.target.platform === p) ? firsts[i + 1] : undefined)).filter((t) => t !== undefined);
+  const allSince = withRows.length ? (withRows.some((t) => t === null) ? null : Math.max(...(withRows as number[]))) : firsts[0];
+  ["all", ...platforms].forEach((k, i) => {
+    const inScope = (pl: string) => k === "all" || pl === k;
+    const syncs = accounts.filter((a) => inScope(a.platform)).map((a) => a.syncState?.lastSyncAt?.getTime() ?? 0).filter(Boolean);
+    cov[k] = {
+      trackedSince: k === "all" ? allSince : firsts[i],
+      rows: metrics.filter((m) => inScope(m.target.platform) && m.capturedAt.getTime() >= curStart).length,
+      lastSync: syncs.length ? Math.max(...syncs) : null,
+    };
+  });
 
   // Top five overall and per platform; one query and one signing batch for every post that made a list.
   const lists: Record<string, typeof b.ranked> = { all: b.ranked.slice(0, 5) };
@@ -63,5 +89,5 @@ async function compute(userId: string, days: PulseRange, accountIds: string[] | 
   for (const [k, rs] of Object.entries(lists))
     top[k] = rs.filter((r) => byId.has(r.postId)).map((r) => ({ postId: r.postId, platform: r.platform, views: r.views, title: byId.get(r.postId)!.title ?? byId.get(r.postId)!.hook ?? "Untitled", thumbnailUrl: thumbs.get(r.postId) ?? null }));
 
-  return { days, dates: b.dates, platforms, cur: b.cur, prev: b.prev, top, hasData: metrics.length > 0 || sent.length > 0 };
+  return { days, dates: b.dates, platforms, cur: b.cur, prev: b.prev, top, hasData: metrics.length > 0 || sent.length > 0, cov, periods: { curStart, prevStart } };
 }

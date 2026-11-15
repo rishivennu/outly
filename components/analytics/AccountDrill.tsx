@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, FileDown, FileSpreadsheet } from "lucide-react";
+import { ChevronDown, FileDown, FileSpreadsheet, Loader2 } from "lucide-react";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
@@ -13,10 +13,17 @@ type Acct = AnalyticsSummary["byAccount"][number];
  * Download the numbers on screen as a client-ready PDF or CSV (same range and account). One quiet "Download"
  * button that opens the two formats, so the header doesn't offer two equal buttons before you've read anything.
  */
+type Job = { format: "pdf" | "csv"; pct: number | null } | { format: "pdf" | "csv"; error: string } | { format: "pdf" | "csv"; done: true };
+
 export function ReportButtons({ days, account, from = null, to = null, csv = true, pdf = true }: { days: number; account: string | null; from?: string | null; to?: string | null; csv?: boolean; pdf?: boolean }) {
   // 1140: a custom range travels into the export, so the file covers exactly the window on screen.
   const q = `days=${days}${from && to ? `&from=${from}&to=${to}` : ""}${account ? `&account=${encodeURIComponent(account)}` : ""}`;
   const [open, setOpen] = useState(false);
+  // 1154: the file is fetched here, so the button can say what is happening (preparing, how far along, saved)
+  // and an error from the server is shown in words instead of a broken download.
+  const [job, setJob] = useState<Job | null>(null);
+  const pct = job && "pct" in job ? job.pct : undefined;
+  const busy = pct !== undefined;
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -33,27 +40,102 @@ export function ReportButtons({ days, account, from = null, to = null, csv = tru
       document.removeEventListener("keydown", esc);
     };
   }, [open]);
+  useEffect(() => {
+    if (!job || !("done" in job)) return;
+    const t = setTimeout(() => setJob(null), 4000);
+    return () => clearTimeout(t);
+  }, [job]);
+
+  const trigger = useRef<HTMLButtonElement>(null);
+  async function get(format: "pdf" | "csv") {
+    setOpen(false);
+    // The menu item unmounts; keep focus on the trigger so a keyboard user does not land on the page body.
+    trigger.current?.focus();
+    setJob({ format, pct: null });
+    try {
+      const res = await fetch(`/api/reports?format=${format}&${q}`, { credentials: "same-origin", cache: "no-store" });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error || (res.status === 429 ? "Too many downloads in a row. Wait a minute and try again." : "The report could not be made. Try again."));
+      }
+      const total = Number(res.headers.get("content-length")) || 0;
+      const parts: BlobPart[] = [];
+      if (res.body && total) {
+        const reader = res.body.getReader();
+        let got = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          parts.push(value);
+          got += value.length;
+          setJob({ format, pct: Math.min(99, Math.round((got / total) * 100)) });
+        }
+      } else parts.push(await res.blob());
+      const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? `outlly-report.${format}`;
+      const href = URL.createObjectURL(new Blob(parts, { type: res.headers.get("content-type") ?? undefined }));
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 10_000);
+      setJob({ format, done: true });
+    } catch (e) {
+      // fetch rejects with a TypeError when the network fails, worded differently by every browser ("Failed to fetch",
+      // "Load failed", "NetworkError ..."); only messages thrown above are shown as they are.
+      setJob({ format, error: e instanceof TypeError || !(e instanceof Error) ? "You look offline. Check your connection and try again." : e.message });
+    }
+  }
+
   const ring = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
-  const item = cn("flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium hover:bg-secondary", ring);
+  const item = cn("flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors duration-150 [@media(hover:hover)]:hover:bg-secondary", ring);
+  const label = job?.format === "pdf" ? "PDF" : "CSV";
+  const status = !job ? "" : "error" in job ? job.error : "done" in job ? `${label} saved to your downloads.` : job.pct === null ? `Preparing your ${label}...` : `Downloading your ${label}, ${job.pct}%`;
   return (
     <div ref={box} className="relative shrink-0">
-      <button type="button" aria-expanded={open} aria-controls="report-menu" onClick={() => setOpen((o) => !o)} className={cn("inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-medium hairline hover:bg-secondary/70", ring)}>
-        <FileDown className="h-4 w-4" aria-hidden="true" /> Download
-        <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
+      <button ref={trigger} type="button" aria-expanded={open} aria-controls="report-menu" aria-disabled={busy || undefined} onClick={() => !busy && setOpen((o) => !o)} className={cn("inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-medium transition-[background-color,transform] duration-150 hairline active:scale-[0.96] aria-disabled:cursor-progress [@media(hover:hover)]:hover:bg-secondary/70", ring)}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <FileDown className="h-4 w-4" aria-hidden="true" />}
+        <span className="tabular-nums">{busy ? (pct === null ? "Preparing" : `${pct}%`) : "Download"}</span>
+        {!busy && <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />}
       </button>
       {open && (
-        <div id="report-menu" className="absolute left-0 top-full z-30 mt-2 w-60 rounded-2xl bg-background p-1.5 shadow-xl hairline">
+        <div id="report-menu" className="absolute right-0 top-full z-30 mt-2 w-60 max-w-[calc(100vw-2rem)] rounded-2xl bg-background p-1.5 shadow-xl hairline sm:left-0 sm:right-auto">
           {/* 1096: a format the plan doesn't include links to Billing instead of downloading an error. */}
-          <a href={pdf ? `/api/reports?format=pdf&${q}` : "/billing"} {...(pdf ? { download: true } : {})} onClick={() => setOpen(false)} className={item}>
-            <FileDown className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span><span className="block">PDF report</span><span className="block text-xs font-normal text-muted-foreground">{pdf ? "Ready to send a client" : "On Agency. Upgrade to send clients PDFs"}</span></span>
-          </a>
-          <a href={csv ? `/api/reports?format=csv&${q}` : "/billing"} {...(csv ? { download: true } : {})} onClick={() => setOpen(false)} className={item}>
-            <FileSpreadsheet className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span><span className="block">CSV spreadsheet</span><span className="block text-xs font-normal text-muted-foreground">{csv ? "Every number, for Excel or Sheets" : "On Creator and up. Upgrade to export"}</span></span>
-          </a>
+          {pdf ? (
+            <button type="button" onClick={() => get("pdf")} className={item}>
+              <FileDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span><span className="block">PDF report</span><span className="block text-xs font-normal text-muted-foreground">Ready to send a client</span></span>
+            </button>
+          ) : (
+            <a href="/billing" onClick={() => setOpen(false)} className={item}>
+              <FileDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span><span className="block">PDF report</span><span className="block text-xs font-normal text-muted-foreground">On Agency. Upgrade to send clients PDFs</span></span>
+            </a>
+          )}
+          {csv ? (
+            <button type="button" onClick={() => get("csv")} className={item}>
+              <FileSpreadsheet className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span><span className="block">CSV spreadsheet</span><span className="block text-xs font-normal text-muted-foreground">Every number, for Excel or Sheets</span></span>
+            </button>
+          ) : (
+            <a href="/billing" onClick={() => setOpen(false)} className={item}>
+              <FileSpreadsheet className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span><span className="block">CSV spreadsheet</span><span className="block text-xs font-normal text-muted-foreground">On Creator and up. Upgrade to export</span></span>
+            </a>
+          )}
         </div>
       )}
+      {/* Said aloud as it changes; an error stays until you try again or close it. */}
+      <p role={job && "error" in job ? "alert" : "status"} aria-live="polite" className={cn("absolute right-0 top-full z-20 mt-2 w-max max-w-[min(18rem,calc(100vw-2rem))] text-xs sm:left-0 sm:right-auto", !status && "sr-only", "rounded-xl bg-background p-2 shadow-lg hairline", job && "error" in job ? "text-destructive" : "text-muted-foreground", open && "invisible")}>
+        {status}
+        {job && "error" in job && (
+          <span className="mt-1 flex gap-3">
+            <button type="button" onClick={() => get(job.format)} className={cn("min-h-11 font-semibold text-foreground underline underline-offset-2", ring)}>Try again</button>
+            <button type="button" onClick={() => setJob(null)} className={cn("min-h-11 text-muted-foreground underline underline-offset-2", ring)}>Dismiss</button>
+          </span>
+        )}
+      </p>
     </div>
   );
 }

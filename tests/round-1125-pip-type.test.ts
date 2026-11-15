@@ -20,7 +20,7 @@ describe("1125 Pip typography: Poppins inside Pip only", () => {
     expect(font).toContain('"devanagari"');
   });
   test("the font is scoped to the Pip panel; the site keeps its own font", () => {
-    expect(widget).toContain('cn(pipFont.variable, "pc fixed');
+    expect(widget).toMatch(/cn\(pipFont\.variable, "pc (pc-dock )?fixed/);
     expect(css).toMatch(/\.pc, \.pc :is\([^)]*\) \{ font-family: var\(--font-pip\), var\(--font-body\)/);
     expect(read("app/layout.tsx")).not.toMatch(/Poppins/);
     expect(css).not.toMatch(/(^|\n)(body|html|:root)[^{]*\{[^}]*--font-pip/);

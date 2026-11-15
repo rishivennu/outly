@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { api, ApiError } from "@/lib/client/api";
 import { useToast } from "@/components/shared/Toast";
 import type { DashboardStyle } from "@/lib/dashboard-config";
@@ -10,32 +10,44 @@ import { cn } from "@/lib/utils";
 export function DashboardSwitch({ current, className }: { current: DashboardStyle; className?: string }) {
   const router = useRouter();
   const toast = useToast();
-  const [busy, setBusy] = useState<DashboardStyle | null>(null);
+  // 1154: the pick shows the moment you tap it, and the new dashboard is swapped in place (a server refresh,
+  // no page load, scroll and the shell kept). A failed save puts the pick back and says why.
+  const [picked, setPicked] = useState<DashboardStyle>(current);
+  const [saving, setSaving] = useState(false);
+  const [swapping, start] = useTransition();
+  const [seen, setSeen] = useState(current);
+  if (seen !== current) {
+    setSeen(current);
+    setPicked(current);
+  }
+  const busy = saving || swapping;
   const go = async (style: DashboardStyle) => {
-    if (style === current || busy) return;
-    setBusy(style);
+    if (style === picked || busy) return;
+    setPicked(style);
+    setSaving(true);
     try {
       await api("/api/me/dashboard", { method: "POST", json: { style } });
-      router.refresh();
+      start(() => router.refresh());
     } catch (e) {
+      setPicked(current);
       toast(e instanceof ApiError ? e.message : "Couldn't switch the dashboard. Try again.", "error");
     } finally {
-      setBusy(null);
+      setSaving(false);
     }
   };
   return (
-    <div role="radiogroup" aria-label="Dashboard style" className={cn("inline-flex h-11 items-center gap-0.5 rounded-2xl bg-secondary/60 p-1 hairline", className)}>
+    <div role="radiogroup" aria-label="Dashboard style" aria-busy={busy} className={cn("inline-flex h-11 items-center gap-0.5 rounded-2xl bg-secondary/60 p-1 hairline", className)}>
       {(["classic", "pulse"] as const).map((s) => (
         <button
           key={s}
           type="button"
           role="radio"
-          aria-checked={s === current}
-          disabled={busy !== null}
+          aria-checked={s === picked}
+          aria-disabled={busy || undefined}
           onClick={() => void go(s)}
-          className={cn("relative h-9 rounded-xl px-3 text-[13px] font-semibold outline-none before:absolute before:-inset-y-1 before:inset-x-0 before:content-[''] transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring", s === current ? "lime-bg shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_6px_16px_-8px_hsl(var(--lime)/0.75)]" : "text-muted-foreground hover:text-foreground")}
+          className={cn("relative h-9 flex-1 whitespace-nowrap rounded-xl px-3 text-[13px] font-semibold outline-none before:absolute before:-inset-y-1 before:inset-x-0 before:content-[''] transition-[color,background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring", s === picked ? "lime-bg shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_6px_16px_-8px_hsl(var(--lime)/0.75)]" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground", busy && s === picked && "animate-pulse motion-reduce:animate-none")}
         >
-          {busy === s ? "Switching…" : s === "classic" ? "Classic" : "Analytics"}
+          {s === "classic" ? "Classic" : "Analytics"}
         </button>
       ))}
     </div>

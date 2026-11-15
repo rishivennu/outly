@@ -7,6 +7,8 @@
  *  - numbers are only added across platforms when they mean the same thing on each of them.
  */
 
+import type { Trend } from "./trend";
+
 export type StoredMetric = "views" | "likes" | "comments" | "shares" | "saves";
 export const STORED_METRICS: StoredMetric[] = ["views", "likes", "comments", "shares", "saves"];
 
@@ -116,14 +118,33 @@ export function rangeLabel(w: Pick<RangeWindow, "from" | "to">) {
   return `${fmt(a, { month: !(sameYear && a.getUTCMonth() === b.getUTCMonth()), year: !sameYear })} to ${fmt(b, { year: true })}`;
 }
 
+/**
+ * 1154: what a range is called in a sentence, from the window the numbers really cover (a plan-trimmed range says
+ * its trimmed length). Never "this week" or "this month": a 30-day window is not the calendar month.
+ */
+export function rangePhrase(w: Pick<RangeWindow, "from" | "to" | "days" | "custom">): string {
+  if (w.custom) return `${w.days === 1 ? "on" : "from"} ${rangeLabel(w)}`;
+  const d = w.days;
+  if (d === 1) return "today";
+  if (d === 365) return "in the last year";
+  if (d % 365 === 0) return `in the last ${d / 365} years`;
+  if (d === 180) return "in the last 6 months";
+  return `in the last ${d} days`;
+}
+
 /* ------------------------------------------------------------------ headline */
 
 export interface HeadlineFacts {
   views: number;
   previousViews: number;
   followerGain: { platform: string; name: string; metric: string; gain: number } | null;
-  bestPlatform: { platform: string; name: string } | null;
+  /** 1154: only from leadPlatform (lib/analytics/trend.ts); `share` is its percent of the views. */
+  bestPlatform: { platform: string; name: string; share?: number } | null;
+  /** 1154: only from bestWeekday; `bestDayLift` is how many times a usual day's views it gets. */
   bestDay: string | null;
+  bestDayLift?: number | null;
+  /** 1154: the fair-comparison verdict for views. When given it replaces the plain previousViews comparison. */
+  viewsTrend?: Trend;
   posts: number;
   rangePhrase: string;
   accountName: string | null;
@@ -148,10 +169,15 @@ export interface HeadlineOut {
 export function headline(f: HeadlineFacts): HeadlineOut {
   const who = f.accountName ? `${f.accountName} ` : "";
   const notes: string[] = [];
-  const c = changePct(f.views, f.previousViews);
-  if (c !== null) notes.push(Math.abs(c) < 1 ? "About the same as the period before." : `${Math.round(Math.abs(c))}% ${c >= 0 ? "more" : "fewer"} than the period before.`);
-  if (f.bestPlatform && f.views > 0) notes.push(`${f.bestPlatform.name} is where you are landing hardest.`);
-  if (f.bestDay) notes.push(`${f.bestDay}s are your day.`);
+  const c = f.viewsTrend ? (f.viewsTrend.kind === "change" ? f.viewsTrend.pct : null) : changePct(f.views, f.previousViews);
+  if (c !== null) notes.push(Math.abs(c) < 1 ? "About the same views as the period before." : `${Math.round(Math.abs(c))}% ${c >= 0 ? "more" : "fewer"} views than the period before.`);
+  // 1154: say why there is no comparison, rather than showing a drop that is only missing history.
+  else if (f.viewsTrend?.kind === "history" && f.views > 0) notes.push("No comparison yet: Outlly started counting recently.");
+  else if (f.viewsTrend?.kind === "pending") notes.push("No numbers have synced for this range yet.");
+  else if (f.viewsTrend?.kind === "stale") notes.push("The last sync was over a day ago, so this range is not complete yet.");
+  // 1154: every insight names its metric and its size, so it can be checked against the cards below it.
+  if (f.bestPlatform && f.views > 0) notes.push(f.bestPlatform.share !== undefined ? `${f.bestPlatform.name} brought ${f.bestPlatform.share}% of your views.` : `${f.bestPlatform.name} brought the most views.`);
+  if (f.bestDay) notes.push(f.bestDayLift ? `${f.bestDay}s bring you the most views, ${f.bestDayLift.toFixed(1)} times a usual day.` : `${f.bestDay}s bring you the most views.`);
   if (f.followerGain && f.followerGain.gain > 0) {
     return { variant: "followers", before: `Your ${f.followerGain.name} ${f.followerGain.metric === "subscribers" ? "channel" : "profile"} gained `, value: f.followerGain.gain, after: ` ${f.followerGain.metric} ${f.rangePhrase}.`, notes };
   }

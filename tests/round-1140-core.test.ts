@@ -119,8 +119,9 @@ describe("headlines", () => {
     const h = headline({ ...base, views: 1200, previousViews: 1000, bestDay: "Tuesday" });
     expect(h.variant).toBe("views");
     expect(h.value).toBe(1200);
-    expect(h.notes[0]).toBe("20% more than the period before.");
-    expect(h.notes).toContain("Tuesdays are your day.");
+    // 1154: every note names its metric.
+    expect(h.notes[0]).toBe("20% more views than the period before.");
+    expect(h.notes).toContain("Tuesdays bring you the most views.");
   });
 
   test("posts with no numbers back yet say exactly that", () => {

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
-import { ArrowUpRight, LogOut } from "lucide-react";
+import { ArrowUpRight, ChevronRight, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -79,17 +79,28 @@ export function AccountRows({ onPick, onLogout, extra, rowClass }: { onPick: () 
   );
 }
 
-/** Avatar, name and email at the top of the menu and the drawer. */
-export function WhoCard({ size = 40, className }: { size?: number; className?: string }) {
+/**
+ * Avatar, name and email at the top of the menu and the drawer. 1154: with `href` the whole card is the way to
+ * My profile (the phone drawer), a 56px row with a chevron; the full name truncates, its title shows it whole.
+ */
+export function WhoCard({ size = 40, className, href, onPick }: { size?: number; className?: string; href?: string; onPick?: () => void }) {
   const who = useWho();
-  return (
-    <div className={cn("flex min-w-0 items-center gap-3", className)}>
+  const inner = (
+    <>
       <OrbAvatar avatar={who.avatar} seed={who.email} size={size} />
-      <span className="min-w-0">
-        <span className="block truncate text-[15px] font-semibold text-foreground">{who.name}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] font-semibold text-foreground" title={who.name}>{who.name}</span>
         <span className="block truncate text-[13px] text-muted-foreground">{who.sub}</span>
       </span>
-    </div>
+    </>
+  );
+  if (!href) return <div className={cn("flex min-w-0 items-center gap-3", className)}>{inner}</div>;
+  return (
+    <HoverLink href={href} data-mi="" onClick={onPick} className={cn("group flex min-h-14 min-w-0 items-center gap-3 rounded-2xl px-2 outline-none transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:scale-[0.96] active:bg-foreground/[0.09] motion-reduce:transition-none [@media(hover:hover)]:hover:bg-foreground/[0.06]", className)}>
+      {inner}
+      <span className="sr-only">, open My profile</span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    </HoverLink>
   );
 }
 

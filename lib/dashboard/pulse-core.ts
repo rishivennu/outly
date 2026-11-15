@@ -6,6 +6,8 @@ export const PULSE_RANGES = [7, 30, 90] as const;
 export type PulseRange = (typeof PULSE_RANGES)[number];
 export const isPulseRange = (n: number): n is PulseRange => (PULSE_RANGES as readonly number[]).includes(n);
 
+import type { Coverage, Periods } from "../analytics/trend";
+
 export type Series = { views: number[]; interactions: number[]; posts: number[] };
 export type TopPost = { postId: string; title: string; thumbnailUrl: string | null; platform: string; views: number };
 export interface Pulse {
@@ -20,6 +22,9 @@ export interface Pulse {
   /** Top five posts by views in this period, "all" and per platform. */
   top: Record<string, TopPost[]>;
   hasData: boolean;
+  /** 1154: how much of each period the sync covered, "all" and per platform, so a change is only shown when fair. */
+  cov?: Record<string, Coverage>;
+  periods?: Periods;
 }
 
 export const dayKey = (t: number) => new Date(t).toISOString().slice(0, 10);

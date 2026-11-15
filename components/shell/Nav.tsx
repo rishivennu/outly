@@ -86,6 +86,11 @@ export function MobileNav() {
   const path = usePathname();
   const tabs = TABS.map((h) => MAIN.find((m) => m.href === h)!);
   const hidden = useTuckOnScroll(path);
+  // 1154: Pip (ChatWidget .pc-dock) tucks away with the bar, so it never floats alone over the content.
+  useEffect(() => {
+    document.documentElement.toggleAttribute("data-tabs-tucked", hidden);
+    return () => document.documentElement.removeAttribute("data-tabs-tucked");
+  }, [hidden]);
   return (
     <nav aria-label="Primary" data-hidden={hidden ? "" : undefined} inert={hidden} className="mtab web-only fixed inset-x-0 bottom-0 z-40 flex items-stretch lg:hidden">
       {tabs.map(({ href, label, icon: Icon }) => {

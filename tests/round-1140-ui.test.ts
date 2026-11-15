@@ -170,7 +170,7 @@ describe("accessibility and house style", () => {
       const buttons = f.split("<button").slice(1).map((s) => s.slice(0, 700));
       expect(buttons.length).toBeGreaterThan(0);
       // Either a height class on the tag, or a shared pill class that carries one.
-      for (const b of buttons) expect(b).toMatch(/h-11|min-h-11|h-9|h-10|cn\(pill/);
+      for (const b of buttons) expect(b).toMatch(/h-11|min-h-11|h-9|h-10|cn\(pill|cn\(opt/);
       expect(f).toContain("focus-visible:outline");
       expect(f).not.toContain("outline:none");
     }

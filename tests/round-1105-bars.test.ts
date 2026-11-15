@@ -105,7 +105,8 @@ describe("1105 phone top bar", () => {
   });
   test("the drawer keeps search (moved off the bar) and opens it after it has gone", () => {
     const drawer = src("components/shell/MobileDrawer.tsx");
-    expect(drawer).toContain("Search or jump");
+    // 1154: the Workspace section opens with a plain "Search" row.
+    expect(drawer).toMatch(/<Search [^>]*\/>\s*<span className="min-w-0 flex-1 truncate">Search<\/span>/);
     expect(drawer).toMatch(/if \(searching\.current\) \{\s*e\.preventDefault\(\);\s*searching\.current = false;\s*openPalette\(\);/);
   });
   test("the notices panel never runs past a short phone", () => {

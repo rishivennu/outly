@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "../db";
 import { getAnalytics } from "../analytics";
+import { fairPrevious } from "../analytics/trend";
 import { analyticsScope, listProfiles } from "../profiles";
 import { platformName, type ClientReport } from "./client-report";
 import type { SessionUser } from "../auth";
@@ -61,7 +62,7 @@ export async function buildClientReport(user: Pick<SessionUser, "id" | "scope" |
     generatedAt: now.toLocaleString("en-GB", { timeZone: user.timezone || "UTC", dateStyle: "medium", timeStyle: "short" }),
     tz: user.timezone || "UTC",
     totals: a.totals,
-    previousViews: a.previous.views,
+    ...fairPrevious(a.totals.views, a.previous.views, a.periods, a.coverage),
     byPlatform: a.byPlatform.filter((p) => p.views > 0),
     byAccount: a.byAccount.map((x) => ({ platform: x.platform, username: `@${x.username}`, views: x.views, engagement: x.engagement, posts: x.posts })),
     daily: a.series.map((s) => ({ date: s.date, views: Object.entries(s).reduce((n, [k, v]) => (k === "date" ? n : n + (v as number)), 0) })),

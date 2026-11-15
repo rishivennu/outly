@@ -23,16 +23,19 @@ import { ProfileReview } from "./ProfileReview";
 import { AccountDrill, ReportButtons } from "./AccountDrill";
 import { Standouts } from "./Standouts";
 import { Compare } from "./Compare";
-import { combinedNote, DAY_MS, dayKey, headline as buildHeadline, kpiMetrics, METRIC_TITLE, rangeLabel } from "@/lib/analytics/core";
+import { combinedNote, DAY_MS, dayKey, headline as buildHeadline, kpiMetrics, METRIC_TITLE, rangeLabel, rangePhrase } from "@/lib/analytics/core";
+import { leadPlatform, trend } from "@/lib/analytics/trend";
+import { useEdgeFade } from "@/lib/client/edge-fade";
 
+// 1154: the sentence words come from rangePhrase(window), never from here, so a 30-day range is never called a calendar month.
 const RANGES = [
-  { d: 7, label: "7 days", phrase: "this week" },
-  { d: 30, label: "30 days", phrase: "this month" },
-  { d: 90, label: "90 days", phrase: "these last three months" },
+  { d: 7, label: "7 days", short: "7D" },
+  { d: 30, label: "30 days", short: "30D" },
+  { d: 90, label: "90 days", short: "90D" },
   // 1096: longer history on the plans that include it (Creator 1 year, Agency 2 years).
-  { d: 180, label: "6 months", phrase: "these last six months" },
-  { d: 365, label: "1 year", phrase: "this past year" },
-  { d: 730, label: "2 years", phrase: "these last two years" },
+  { d: 180, label: "6 months", short: "6M" },
+  { d: 365, label: "1 year", short: "1Y" },
+  { d: 730, label: "2 years", short: "2Y" },
 ];
 
 /** Page frame: one readable width, so a 1760px screen doesn't stretch every row edge to edge. The top padding
@@ -84,21 +87,26 @@ function CustomRange({ value, maxDays, onApply, onClear }: { value: Custom | nul
 
 function RangePicker({ value, onPick, maxDays, custom, onCustom }: { value: number; onPick: (d: number) => void; maxDays: number; custom: boolean; onCustom: () => void }) {
   const shown = RANGES.filter((r) => r.d <= maxDays);
+  const rail = useEdgeFade<HTMLDivElement>(custom ? -1 : value);
+  // 1154: on a phone the options stay on one row (short labels, the row scrolls with its edges fading),
+  // instead of wrapping into a second line that pushes the numbers down.
+  const opt = "relative h-11 shrink-0 whitespace-nowrap rounded-full px-3 text-sm font-medium tabular-nums transition-[color,transform] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] motion-reduce:transition-none sm:px-4 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring";
   return (
-    <div role="radiogroup" aria-label="Time range" className="flex shrink-0 flex-wrap gap-1 rounded-full bg-secondary/60 p-1 hairline">
+    <div ref={rail} role="radiogroup" aria-label="Time range" className="edge-fade scrollbar-none flex min-w-0 max-w-full gap-1 overflow-x-auto rounded-full bg-secondary/60 p-1 hairline">
       {shown.map((r) => (
-        <button key={r.d} type="button" role="radio" aria-checked={!custom && value === r.d} onClick={() => onPick(r.d)} className={cn("relative h-11 rounded-full px-3 text-sm font-medium focus-visible:outline sm:px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", !custom && value === r.d ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+        <button key={r.d} type="button" role="radio" aria-checked={!custom && value === r.d} aria-label={r.label} onClick={() => onPick(r.d)} className={cn(opt, !custom && value === r.d ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
           {!custom && value === r.d && <motion.span layoutId="range" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
-          <span className="relative">{r.label}</span>
+          <span className="relative sm:hidden" aria-hidden="true">{r.short}</span>
+          <span className="relative hidden sm:inline" aria-hidden="true">{r.label}</span>
         </button>
       ))}
       {/* 1140: your own two dates, inside the same plan window as the presets. */}
-      <button type="button" role="radio" aria-checked={custom} onClick={onCustom} className={cn("relative h-11 rounded-full px-3 text-sm font-medium focus-visible:outline sm:px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", custom ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+      <button type="button" role="radio" aria-checked={custom} onClick={onCustom} className={cn(opt, custom ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
         {custom && <motion.span layoutId="range" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
         <span className="relative">Custom</span>
       </button>
       {maxDays < 365 && (
-        <Link href="/billing" aria-label="More history" className="inline-flex h-11 items-center rounded-full px-3 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:px-4">
+        <Link href="/billing" aria-label="More history" className="inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-full px-3 text-sm font-medium text-muted-foreground [@media(hover:hover)]:hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring sm:px-4">
           {/* 1099: the short label keeps the four options on one row on a 360px phone */}
           <span className="sm:hidden">More</span>
           <span className="hidden sm:inline">More history</span>
@@ -124,7 +132,8 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
   const [loading, setLoading] = useState(false);
   const preset = RANGES.find((r) => r.d === data.rangeDays) ?? RANGES[1];
   // 1140: a custom range names its own dates, so the headline and the chart label say exactly what they cover.
-  const range = data.window.custom ? { ...preset, phrase: `from ${rangeLabel(data.window)}` } : preset;
+  // 1154: the sentence follows the window the numbers really cover ("in the last 30 days", or the exact dates).
+  const range = { ...preset, label: data.window.custom ? rangeLabel(data.window) : preset.label, phrase: rangePhrase(data.window) };
 
   // 1037 drilldown: the combined list is remembered so picking one account never hides the others.
   const [drill, setDrill] = useState<string | null>(null);
@@ -226,8 +235,10 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
     );
   }
 
-  const change = data.previous.views ? ((data.totals.views - data.previous.views) / data.previous.views) * 100 : null;
-  const best = [...data.byPlatform].sort((a, b) => b.views - a.views)[0];
+  // 1154: a comparison is only drawn when the period before was tracked too (lib/analytics/trend.ts).
+  const viewsTrend = trend(data.totals.views, data.previous.views, data.periods, data.coverage);
+  const change = viewsTrend.kind === "change" ? viewsTrend.pct : null;
+  const lead = leadPlatform(data.byPlatform);
   const landed = data.byPlatform.filter((b) => b.views > 0);
   const shownP = landed.length ? landed : data.byPlatform.filter((b) => b.connected);
   const quiet = landed.length ? data.byPlatform.filter((b) => b.views <= 0 && b.connected) : [];
@@ -264,8 +275,10 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
         .sort((a, b) => b.gain - a.gain)[0];
       return best2 && best2.gain > 0 ? { platform: best2.h.platform, name: PLATFORM_META[best2.h.platform].name, metric: best2.h.metric, gain: best2.gain } : null;
     })(),
-    bestPlatform: best && best.views > 0 ? { platform: best.platform, name: PLATFORM_META[best.platform].name } : null,
+    bestPlatform: lead ? { platform: lead.row.platform, name: PLATFORM_META[lead.row.platform].name, share: lead.share } : null,
     bestDay: data.bestDay,
+    bestDayLift: data.bestDayLift,
+    viewsTrend,
     posts: data.byPlatform.reduce((n, b) => n + b.posts, 0),
     rangePhrase: range.phrase,
     accountName: drilled ? `@${drilled.username.replace(/^@/, "")}` : null,
@@ -312,7 +325,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
           <ul className="mt-4 flex flex-wrap gap-x-7 gap-y-2 text-base text-muted-foreground">
             {head.notes.map((n, i) => (
               <li key={n} className="flex items-center gap-1.5">
-                {i === 0 && change !== null && (change >= 0 ? <ArrowUpRight className="h-5 w-5 text-success" aria-hidden="true" /> : <ArrowDownRight className="h-5 w-5 text-warning" aria-hidden="true" />)}
+                {i === 0 && change !== null && Math.abs(change) >= 1 && (change >= 0 ? <ArrowUpRight className="h-5 w-5 text-success" aria-hidden="true" /> : <ArrowDownRight className="h-5 w-5 text-warning" aria-hidden="true" />)}
                 {n}
               </li>
             ))}
@@ -321,7 +334,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
             Covering {rangeLabel(data.window)}.{data.window.clamped ? ` Your plan keeps ${maxDays} days of history, so the range was trimmed to fit.` : ""}
           </p>
         </section>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-wrap sm:gap-3">
           <RangePicker value={data.rangeDays} onPick={pick} maxDays={maxDays} custom={!!custom} onCustom={() => setOpenCustom((v) => !v)} />
           <ReportButtons days={data.rangeDays} from={custom?.from ?? null} to={custom?.to ?? null} account={drill} csv={reports.csv} pdf={reports.pdf} />
         </div>

@@ -4184,6 +4184,29 @@ html:not(.dark) .la-themed:not(.dark *) .la-thumb { box-shadow: inset 0 0 0 1px 
   .nf-hist-link::before { content: ""; position: absolute; inset: -8px -4px; }
 }
 
+/* ---------- 1154: sideways rows on a phone (useEdgeFade, lib/client/edge-fade.ts) ----------
+   Only the side with more behind it fades, so a row that fits is never dimmed. */
+.edge-fade { --fade-w: 28px; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scroll-padding-inline: var(--fade-w); }
+.edge-fade[data-fade="end"] { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - var(--fade-w)), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - var(--fade-w)), transparent); }
+.edge-fade[data-fade="start"] { -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--fade-w)); mask-image: linear-gradient(90deg, transparent, #000 var(--fade-w)); }
+.edge-fade[data-fade="both"] { -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--fade-w), #000 calc(100% - var(--fade-w)), transparent); mask-image: linear-gradient(90deg, transparent, #000 var(--fade-w), #000 calc(100% - var(--fade-w)), transparent); }
+
+/* ---------- 1154: Pip on a phone (ChatWidget .pc-dock) ----------
+   It steps off to the right while the tab bar is tucked (Nav.tsx sets html[data-tabs-tucked]), turning invisible
+   once out of sight so it takes no taps or focus, and the page keeps 64px more room at its foot so the last card
+   scrolls clear of the bubble. An open chat never moves. */
+@media (max-width: 1023.98px) {
+  html:has(.pc-dock[data-lift]:not(.hidden)) .mmain { padding-bottom: calc(env(safe-area-inset-bottom) + 152px); }
+  .pc-dock { transition: transform .3s var(--ease-liquid), opacity .3s var(--ease-liquid), visibility 0s; }
+  html[data-tabs-tucked] .pc-dock:not([data-open]) {
+    transform: translateX(calc(100% + 24px)); opacity: 0; pointer-events: none; visibility: hidden;
+    transition: transform .3s var(--ease-liquid), opacity .3s var(--ease-liquid), visibility 0s .3s;
+  }
+  /* The dock also holds the full-screen chat; a transform on it would trap that fixed sheet while it slid back. */
+  .pc-dock[data-open] { transition: none; }
+}
+@media (prefers-reduced-motion: reduce) { .pc-dock, html[data-tabs-tucked] .pc-dock:not([data-open]) { transition: none; } }
+
 /* ---------- 1100: Liquid glass on every studio card ----------
    The studio's screen cards wear the same liquid glass as the rail: a cool-to-deep tint, a lit rim on the top-left
    edge with a softer far edge, and a sheen across the top. Cards: .glass panels, the Analytics dashboard's

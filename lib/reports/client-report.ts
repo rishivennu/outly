@@ -13,7 +13,9 @@ export type ClientReport = {
   generatedAt: string;
   tz: string;
   totals: { views: number; likes: number; comments: number; shares: number; engagement: number };
-  previousViews: number;
+  /** 1154: null when the period before is not a fair comparison (see lib/analytics/trend.ts); compareNote says why. */
+  previousViews: number | null;
+  compareNote?: string | null;
   byPlatform: { platform: string; views: number; engagement: number }[];
   byAccount: { platform: string; username: string; views: number; engagement: number; posts: number }[];
   daily: { date: string; views: number }[];
@@ -97,6 +99,7 @@ export function reportPdf(r: ClientReport): Buffer {
   });
   d.y -= 8;
   if (change !== null) d.para(`${Math.abs(change)}% ${change >= 0 ? "more" : "fewer"} views than the ${r.rangeDays} days before.`, { size: 10, rgb: SOFT });
+  else if (r.compareNote) d.para(pdfSafe(r.compareNote), { size: 10, rgb: SOFT });
 
   const table = (head: string[], cols: number[], rows: string[][]) => {
     const lh = 16;

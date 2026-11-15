@@ -114,11 +114,28 @@ describe("audit: Pip never invents a number", () => {
 
 describe("audit: analytics numbers trace to their source", () => {
   test("the day-of-week claim counts every platform, not just the first three", async () => {
+    // 1154: a best day needs a pattern (two weeks, the day busy on two dates besides its biggest, a clear lift),
+    // so the TikTok-only history is three weeks of posts with one weekday well ahead.
     const u = await mkUser("bestday");
+    let sum = 0;
+    for (let k = 1; k <= 21; k++) {
+      const v = k % 7 === 0 ? 2000 : 100;
+      sum += v;
+      await published(u, `TikTok ${k}`, v, "tiktok", { daysAgo: k });
+    }
+    const s = await getAnalytics(u, 30, null);
+    expect(s.totals.views).toBe(sum);
+    const day = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date(Date.now() - 7 * 864e5).getUTCDay()];
+    expect(s.bestDay).toBe(day);
+    expect(s.bestDayLift).toBeGreaterThan(1.25);
+  });
+
+  test("one big post is not a best day (1154)", async () => {
+    const u = await mkUser("bestday1");
     await published(u, "TikTok one", 4000, "tiktok", { daysAgo: 2 });
     const s = await getAnalytics(u, 30, null);
     expect(s.totals.views).toBe(4000);
-    expect(s.bestDay).not.toBeNull();
+    expect(s.bestDay).toBeNull();
   });
 
   test("practice (rehearsal) numbers never count as real on the analytics page", async () => {

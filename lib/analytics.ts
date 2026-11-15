@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { PLATFORMS, type Platform } from "./domain";
 import { engagementPct, hasStoredReader, resolveRange, type RangeWindow, type StandoutPost } from "./analytics/core";
 import { accountHistory, syncTimes, type SyncTimes } from "./analytics/sync";
+import { bestWeekday, type Coverage, type Periods } from "./analytics/trend";
 
 export interface AnalyticsSummary {
   rangeDays: number;
@@ -26,7 +27,13 @@ export interface AnalyticsSummary {
   standouts: StandoutPost[];
   /** Mean views per published destination in this window, for the "vs your average" comparison. */
   avgViews: number;
+  /** 1154: only when the range shows a real weekday pattern (lib/analytics/trend bestWeekday). */
   bestDay: string | null;
+  /** How many times a usual day's views the best day gets. */
+  bestDayLift: number | null;
+  /** 1154: sync coverage of this scope and the two periods, so the page only compares what is fair to compare. */
+  coverage: Coverage;
+  periods: Periods;
   hasData: boolean;
   /** 1037: the same numbers per connected account, for the combined view's drilldown. Biggest first. */
   byAccount: { accountId: string; platform: Platform; username: string; avatar: string | null; views: number; engagement: number; posts: number; saves: number; lastSyncAt: string | null }[];
@@ -100,12 +107,8 @@ async function computeAnalytics(userId: string, w: RangeWindow, accountIds: stri
   const ranked = [...perTarget].sort((a, b) => b[1].views - a[1].views);
   const topIds = ranked.slice(0, STANDOUT_ROWS).map(([id]) => id);
 
-  const weekday = new Map<number, number>();
-  for (const s of series) {
-    const wd = new Date(s.date).getDay();
-    weekday.set(wd, (weekday.get(wd) ?? 0) + PLATFORMS.reduce((a, p) => a + s[p], 0));
-  }
-  const bestWd = [...weekday].sort((a, b) => b[1] - a[1])[0];
+  // 1154: a weekday claim needs a pattern, judged on UTC days like the rest of the page (it used local getDay()).
+  const bestWd = bestWeekday(series.map((s) => ({ date: s.date, views: PLATFORMS.reduce((a, p) => a + s[p], 0) })));
 
   // One query for the standouts' titles, links and thumbnails (1140: a list, not just the single best).
   const targets = topIds.length
@@ -189,7 +192,19 @@ async function computeAnalytics(userId: string, w: RangeWindow, accountIds: stri
     return [{ accountId: id, platform: a.platform as Platform, username: a.username, metric: (a.platform === "youtube" ? "subscribers" : "followers") as "followers" | "subscribers", points }];
   });
 
-  const connectedRows = await db.socialAccount.findMany({ where: { userId, status: "connected", ...(accountIds ? { id: { in: accountIds } } : {}) }, select: { platform: true } });
+  const scope = { post: { userId }, practice: false, ...(accountIds ? { socialAccountId: { in: accountIds } } : {}) };
+  // 1154: the combined scope is only as old as its youngest platform with numbers in either period (see pulse.ts).
+  const live = [...new Set([...cur, ...prev].map((r) => r.target.platform))];
+  const firstOf = (platform?: string) =>
+    db.targetMetric
+      .findFirst({ where: { target: { ...scope, ...(platform ? { platform } : {}) } }, orderBy: { capturedAt: "asc" }, select: { capturedAt: true } })
+      .then((r) => r?.capturedAt.getTime() ?? null)
+      .catch(() => null);
+  const [connectedRows, firsts, synced] = await Promise.all([
+    db.socialAccount.findMany({ where: { userId, status: "connected", ...(accountIds ? { id: { in: accountIds } } : {}) }, select: { platform: true } }),
+    Promise.all(live.length ? live.map((p) => firstOf(p)) : [firstOf()]),
+    db.accountSyncState.aggregate({ where: { account: { userId, ...(accountIds ? { id: { in: accountIds } } : {}) } }, _max: { lastSyncAt: true } }).catch(() => null),
+  ]);
   const connectedSet = new Set(connectedRows.map((r) => r.platform));
 
   return {
@@ -217,7 +232,10 @@ async function computeAnalytics(userId: string, w: RangeWindow, accountIds: stri
       : null,
     standouts,
     avgViews: perTarget.size ? sum(cur, "views") / perTarget.size : 0,
-    bestDay: bestWd && bestWd[1] > 0 ? ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][bestWd[0]] : null,
+    bestDay: bestWd?.day ?? null,
+    bestDayLift: bestWd ? Math.round(bestWd.lift * 10) / 10 : null,
+    coverage: { trackedSince: firsts.some((t) => t === null) ? null : Math.max(...(firsts as number[])), rows: cur.length, lastSync: synced?._max.lastSyncAt?.getTime() ?? null },
+    periods: { curStart: since.getTime(), prevStart: prevSince.getTime(), curEnd: until.getTime() },
     hasData: cur.length > 0,
   };
 }
