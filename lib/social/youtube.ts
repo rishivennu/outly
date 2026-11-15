@@ -1,3 +1,4 @@
+import { collectPages, COMMENT_PAGES } from "./paging";
 import { creds } from "./keys";
 import { commonMediaChecks, httpFailure, PublisherError, type AccountContext, type CommentTarget, type PlatformComment, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { formPost, newState } from "./oauth";
@@ -172,13 +173,19 @@ export class YouTubePublisher implements SocialPublisher {
   }
 
   async listComments(target: CommentTarget, account: AccountContext): Promise<PlatformComment[]> {
-    const q = new URLSearchParams({ part: "snippet,replies", videoId: target.platformPostId, maxResults: "50", order: "time" });
-    const r = await fetch(`https://www.googleapis.com/youtube/v3/commentThreads?${q}`, {
-      headers: { authorization: `Bearer ${account.accessToken}` },
-    });
-    if (!r.ok) throw await httpFailure(r, "youtube commentThreads");
-    const j = (await r.json()) as { items?: YtThread[] };
-    return (j.items ?? []).map((t) => ({
+    // P2: 100 is the most commentThreads gives per call; nextPageToken carries on (1 quota unit a page).
+    const { items } = await collectPages<YtThread>(async (pageToken) => {
+      const q = new URLSearchParams({ part: "snippet,replies", videoId: target.platformPostId, maxResults: "100", order: "time", ...(pageToken ? { pageToken } : {}) });
+      const r = await fetch(`https://www.googleapis.com/youtube/v3/commentThreads?${q}`, {
+        headers: { authorization: `Bearer ${account.accessToken}` },
+        signal: AbortSignal.timeout(12_000),
+        cache: "no-store",
+      });
+      if (!r.ok) throw await httpFailure(r, "youtube commentThreads");
+      const j = (await r.json()) as { items?: YtThread[]; nextPageToken?: string };
+      return { items: j.items ?? [], next: j.nextPageToken || null };
+    }, COMMENT_PAGES.youtube);
+    return items.map((t) => ({
       ...ytComment(t.snippet.topLevelComment),
       replies: (t.replies?.comments ?? []).map(ytComment),
     }));

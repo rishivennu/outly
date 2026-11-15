@@ -215,9 +215,11 @@ describe("1099 phone top bar and touch targets", () => {
     expect(css).toMatch(/prefers-reduced-motion: reduce\) \{\s*\.mtop, \.mtop-btn \{ transition: none; \}/);
     expect(bar).toContain("min-w-11");
   });
-  test("segmented controls get a 44px hit area; the analytics range fits a 360px phone", () => {
-    expect(src("components/home/DashboardSwitch.tsx")).toContain("before:-inset-y-1");
-    expect(src("components/dashboard/PulseHome.tsx")).toContain("before:-inset-y-1");
+  test("segmented controls are 44px tall (not just a 44px hit area); the analytics range fits a 360px phone", () => {
+    // P2 follow-up: the Home Classic/Analytics and 7D/30D/90D buttons were 36px with a stretched hit area; now they are a real 44px.
+    expect(src("components/home/DashboardSwitch.tsx")).toContain('"relative h-11 flex-1');
+    expect(src("components/home/DashboardSwitch.tsx")).not.toContain("h-9");
+    expect(src("components/dashboard/PulseHome.tsx")).toContain('"relative z-[1] h-11 min-w-[48px]');
     const a = src("components/analytics/AnalyticsView.tsx");
     expect(a).toContain('<span className="sm:hidden">More</span>');
     expect(a).toContain('aria-label="More history"');

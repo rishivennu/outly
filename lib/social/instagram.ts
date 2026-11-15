@@ -1,3 +1,4 @@
+import { collectPages, COMMENT_PAGES } from "./paging";
 import { creds, dmsOn } from "./keys";
 import { commonMediaChecks, httpFailure, PublisherError, type AccountContext, type CommentTarget, type PlatformComment, type ConnectOptions, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { formPost, newState } from "./oauth";
@@ -265,10 +266,15 @@ export class InstagramPublisher implements SocialPublisher {
 
   async listComments(target: CommentTarget, account: AccountContext): Promise<PlatformComment[]> {
     const fields = "id,text,username,timestamp,like_count,replies{id,text,username,timestamp,like_count}";
-    const r = await fetch(`${GRAPH}/${target.platformPostId}/comments?fields=${encodeURIComponent(fields)}&access_token=${account.accessToken}`);
-    if (!r.ok) throw await httpFailure(r, "instagram comments");
-    const j = (await r.json()) as { data?: IgComment[] };
-    return (j.data ?? []).map((c) => ({ ...igComment(c), replies: (c.replies?.data ?? []).map((x) => ({ ...igComment(x), parentId: c.id })) }));
+    const base = `${GRAPH}/${target.platformPostId}/comments?fields=${encodeURIComponent(fields)}&limit=50&access_token=${encodeURIComponent(account.accessToken)}`;
+    // P2: Graph pages comments (cursor in paging.cursors.after, present only while paging.next is), so follow it.
+    const { items } = await collectPages<IgComment>(async (after) => {
+      const r = await fetch(after ? `${base}&after=${encodeURIComponent(after)}` : base, { signal: AbortSignal.timeout(12_000), cache: "no-store" });
+      if (!r.ok) throw await httpFailure(r, "instagram comments");
+      const j = (await r.json()) as { data?: IgComment[]; paging?: { next?: string; cursors?: { after?: string } } };
+      return { items: j.data ?? [], next: (j.paging?.next && j.paging.cursors?.after) || null };
+    }, COMMENT_PAGES.instagram);
+    return items.map((c) => ({ ...igComment(c), replies: (c.replies?.data ?? []).map((x) => ({ ...igComment(x), parentId: c.id })) }));
   }
 
   async replyToComment(account: AccountContext, commentId: string, text: string): Promise<PlatformComment> {

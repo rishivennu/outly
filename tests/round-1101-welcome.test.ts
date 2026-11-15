@@ -19,6 +19,9 @@ describe("1101 headline", () => {
     expect("Let's get to it.".length).toBeLessThanOrEqual(HEADLINE_NOWRAP);
     expect(w).toContain('t.length <= HEADLINE_NOWRAP && "pw-nowrap"');
     expect(block).toContain(".pw-nowrap { white-space: nowrap; }");
+    // P2: on a narrow phone a long name must wrap, never widen the page past the close button.
+    expect(block).toContain("@media (max-width: 420px) { .pw-nowrap { white-space: normal; overflow-wrap: anywhere; } }");
+    expect(block).toContain("display: grid; grid-template-columns: minmax(0, 1fr);");
   });
   test("a saved copy of the old default follows the new one; a custom title stays", () => {
     expect(normalizeWelcome({ title: WELCOME_OLD_TITLE }).title).toBe(WELCOME_DEFAULT.title);

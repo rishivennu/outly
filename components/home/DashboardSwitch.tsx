@@ -36,7 +36,7 @@ export function DashboardSwitch({ current, className }: { current: DashboardStyl
     }
   };
   return (
-    <div role="radiogroup" aria-label="Dashboard style" aria-busy={busy} className={cn("inline-flex h-11 items-center gap-0.5 rounded-2xl bg-secondary/60 p-1 hairline", className)}>
+    <div role="radiogroup" aria-label="Dashboard style" aria-busy={busy} className={cn("inline-flex items-center gap-0.5 rounded-2xl bg-secondary/60 p-[3px] hairline", className)}>
       {(["classic", "pulse"] as const).map((s) => (
         <button
           key={s}
@@ -45,7 +45,7 @@ export function DashboardSwitch({ current, className }: { current: DashboardStyl
           aria-checked={s === picked}
           aria-disabled={busy || undefined}
           onClick={() => void go(s)}
-          className={cn("relative h-9 flex-1 whitespace-nowrap rounded-xl px-3 text-[13px] font-semibold outline-none before:absolute before:-inset-y-1 before:inset-x-0 before:content-[''] transition-[color,background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring", s === picked ? "lime-bg shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_6px_16px_-8px_hsl(var(--lime)/0.75)]" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground", busy && s === picked && "animate-pulse motion-reduce:animate-none")}
+          className={cn("relative h-11 flex-1 whitespace-nowrap rounded-[13px] px-3.5 text-[13px] font-semibold outline-none transition-[color,background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring", s === picked ? "lime-bg shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_6px_16px_-8px_hsl(var(--lime)/0.75)]" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground", busy && s === picked && "animate-pulse motion-reduce:animate-none")}
         >
           {s === "classic" ? "Classic" : "Analytics"}
         </button>

@@ -1,3 +1,4 @@
+import { collectPages, COMMENT_PAGES } from "./paging";
 import { creds } from "./keys";
 import { commonMediaChecks, httpFailure, PublisherError, type AccountContext, type CommentTarget, type PlatformComment, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { formPost, newState, pkce } from "./oauth";
@@ -135,20 +136,24 @@ export class XPublisher implements SocialPublisher {
    * (Basic+) tier, so a 403 here means "your X plan doesn't include this", not "reconnect".
    */
   async listComments(target: CommentTarget, account: AccountContext): Promise<PlatformComment[]> {
-    const q = new URLSearchParams({
-      query: `conversation_id:${target.platformPostId}`,
-      max_results: "50",
-      "tweet.fields": "created_at,author_id,in_reply_to_user_id,conversation_id,public_metrics",
-      expansions: "author_id",
-    });
-    const r = await fetch(`${API}/tweets/search/recent?${q}`, { headers: { authorization: `Bearer ${account.accessToken}` } });
-    if (!r.ok) throw await httpFailure(r, "x conversation search");
-    const j = (await r.json()) as {
-      data?: { id: string; text: string; created_at?: string; author_id?: string; public_metrics?: { like_count?: number } }[];
-      includes?: { users?: { id: string; username: string; name?: string }[] };
-    };
-    const names = new Map((j.includes?.users ?? []).map((u) => [u.id, `@${u.username}`]));
-    return (j.data ?? [])
+    type Tweet = { id: string; text: string; created_at?: string; author_id?: string; public_metrics?: { like_count?: number } };
+    const names = new Map<string, string>();
+    // P2: 100 a page (X's max) and follow meta.next_token, capped low because paid tiers bill every tweet read.
+    const { items } = await collectPages<Tweet>(async (nextToken) => {
+      const q = new URLSearchParams({
+        query: `conversation_id:${target.platformPostId}`,
+        max_results: "100",
+        "tweet.fields": "created_at,author_id,in_reply_to_user_id,conversation_id,public_metrics",
+        expansions: "author_id",
+        ...(nextToken ? { next_token: nextToken } : {}),
+      });
+      const r = await fetch(`${API}/tweets/search/recent?${q}`, { headers: { authorization: `Bearer ${account.accessToken}` }, signal: AbortSignal.timeout(12_000), cache: "no-store" });
+      if (!r.ok) throw await httpFailure(r, "x conversation search");
+      const j = (await r.json()) as { data?: Tweet[]; includes?: { users?: { id: string; username: string; name?: string }[] }; meta?: { next_token?: string } };
+      for (const u of j.includes?.users ?? []) names.set(u.id, `@${u.username}`);
+      return { items: j.data ?? [], next: j.meta?.next_token || null };
+    }, COMMENT_PAGES.x);
+    return items
       .filter((t) => t.id !== target.platformPostId)
       .map((t) => ({
         id: t.id,

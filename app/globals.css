@@ -3244,8 +3244,8 @@ html[data-contrast="more"] .fw-ring:has(:is(input, textarea):focus) { box-shadow
 /* sliding indicators: JS sets --x / --w (left offset + width) */
 .pulse-underline { position: absolute; left: 0; bottom: 0; height: 2px; width: var(--w, 0px); transform: translateX(var(--x, 0px)); border-radius: 2px; background: hsl(var(--lime-ink)); }
 .dark .pulse-underline { background: hsl(var(--lime)); }
-.pulse-seg { display: inline-flex; gap: 2px; padding: 4px; border-radius: 16px; background: hsl(var(--secondary) / .6); box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .08); }
-.pulse-seg-pill { position: absolute; top: 4px; bottom: 4px; left: 0; width: var(--w, 0px); transform: translateX(var(--x, 0px)); border-radius: 12px; background: hsl(var(--background));
+.pulse-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 15px; background: hsl(var(--secondary) / .6); box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .08); }
+.pulse-seg-pill { position: absolute; top: 3px; bottom: 3px; left: 0; width: var(--w, 0px); transform: translateX(var(--x, 0px)); border-radius: 12px; background: hsl(var(--background));
   box-shadow: 0 1px 2px rgba(0, 0, 0, .12), 0 0 0 1px hsl(var(--foreground) / .08); }
 .dark .pulse-seg-pill { background: hsl(240 4% 18%); }
 @media (prefers-reduced-motion: no-preference) { .pulse-underline, .pulse-seg-pill { transition: transform .35s var(--ease-liquid), width .35s var(--ease-liquid); } }
@@ -3660,10 +3660,10 @@ html.dark[data-welcome] .pwa-welcome {
 }
 html[data-welcome]:has([data-pwa-welcome]), html[data-welcome]:has([data-pwa-welcome]) body { overflow: hidden; }
 .pw-wrap {
-  flex: 1 0 auto; width: 100%; max-width: 480px; margin: 0 auto; display: grid;
+  flex: 1 0 auto; width: 100%; max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "top" "title" "art" "act";
 }
-.pw-top { grid-area: top; display: flex; align-items: center; justify-content: space-between; min-height: 52px; }
+.pw-top { grid-area: top; min-width: 0; display: flex; align-items: center; justify-content: space-between; min-height: 52px; }
 .pw-brand { display: inline-flex; align-items: center; gap: 9px; font-family: var(--font-display), var(--font-body), system-ui, sans-serif; font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
 .pw-x {
   display: grid; place-items: center; width: 44px; height: 44px; margin-right: -10px; border-radius: 9999px; color: inherit;
@@ -3677,6 +3677,9 @@ html[data-welcome]:has([data-pwa-welcome]), html[data-welcome]:has([data-pwa-wel
 }
 .pw-line { display: block; }
 .pw-nowrap { white-space: nowrap; }
+/* P2: a long first name ("Good evening, Alexandria") made the nowrap line wider than a 320px phone, which widened the
+   whole grid and pushed the close button off screen. The line keeps one line when it fits and wraps when it does not. */
+@media (max-width: 420px) { .pw-nowrap { white-space: normal; overflow-wrap: anywhere; } }
 .pw-hl { color: var(--pw-hl); }
 /* Light: the lime-ink word (5.4:1 on the paper) sits on a bright lime marker, so the signature lime is still there. */
 html:not(.dark) .pw-hl { background: linear-gradient(hsl(78 92% 50% / .55), hsl(78 92% 50% / .55)) 0 88% / 100% .22em no-repeat; }

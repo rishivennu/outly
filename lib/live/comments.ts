@@ -1,6 +1,7 @@
 import "server-only";
 import { httpFailure, type AccountContext, type PlatformComment } from "../social/types";
 import { instagramMedia, youtubeEmbed, youtubeThumb, type CommentMedia } from "../inbox-media";
+import { collectPages, COMMENT_PAGES } from "../social/paging";
 
 /** A post on the creator's own account that has comments, whether or not it went out through Outlly. */
 export interface AccountThread {
@@ -39,9 +40,14 @@ export async function instagramThreads(acct: AccountContext, skip: Set<string>, 
   const fields = encodeURIComponent("id,text,username,timestamp,like_count,replies{id,text,username,timestamp,like_count}");
   const threads = await Promise.all(
     withComments.map(async (m) => {
-      const c = await fetch(`${IG}/${m.id}/comments?fields=${fields}&limit=50&access_token=${t}`, { signal: AbortSignal.timeout(12_000), cache: "no-store" });
-      if (!c.ok) throw await httpFailure(c, "instagram comments");
-      const data = ((await c.json()) as { data?: IgC[] }).data ?? [];
+      // P2: follow Graph's cursor past the first 50, so a busy post shows more than its newest page.
+      const base = `${IG}/${m.id}/comments?fields=${fields}&limit=50&access_token=${t}`;
+      const { items: data } = await collectPages<IgC>(async (after) => {
+        const c = await fetch(after ? `${base}&after=${encodeURIComponent(after)}` : base, { signal: AbortSignal.timeout(12_000), cache: "no-store" });
+        if (!c.ok) throw await httpFailure(c, "instagram comments");
+        const j = (await c.json()) as { data?: IgC[]; paging?: { next?: string; cursors?: { after?: string } } };
+        return { items: j.data ?? [], next: (j.paging?.next && j.paging.cursors?.after) || null };
+      }, COMMENT_PAGES.instagramAccount);
       return {
         mediaId: m.id,
         title: (m.caption ?? "").split("\n")[0].trim() || "Untitled post",
@@ -68,10 +74,15 @@ const ytC = (c: YtC): PlatformComment => ({
 /** Every recent comment across the channel in one call, grouped back into videos. */
 export async function youtubeThreads(acct: AccountContext, skip: Set<string>): Promise<AccountThread[]> {
   const h = { authorization: `Bearer ${acct.accessToken}` };
-  const q = new URLSearchParams({ part: "snippet,replies", allThreadsRelatedToChannelId: acct.platformUserId, maxResults: "50", order: "time" });
-  const r = await fetch(`${YT}/commentThreads?${q}`, { headers: h, signal: AbortSignal.timeout(12_000), cache: "no-store" });
-  if (!r.ok) throw await httpFailure(r, "youtube channel comments");
-  const items = ((await r.json()) as { items?: { snippet: { videoId: string; topLevelComment: YtC }; replies?: { comments?: YtC[] } }[] }).items ?? [];
+  type YtT = { snippet: { videoId: string; topLevelComment: YtC }; replies?: { comments?: YtC[] } };
+  // P2: 100 a page and follow nextPageToken, so a channel with a busy week is not cut at the newest 50.
+  const { items } = await collectPages<YtT>(async (pageToken) => {
+    const q = new URLSearchParams({ part: "snippet,replies", allThreadsRelatedToChannelId: acct.platformUserId, maxResults: "100", order: "time", ...(pageToken ? { pageToken } : {}) });
+    const r = await fetch(`${YT}/commentThreads?${q}`, { headers: h, signal: AbortSignal.timeout(12_000), cache: "no-store" });
+    if (!r.ok) throw await httpFailure(r, "youtube channel comments");
+    const j = (await r.json()) as { items?: YtT[]; nextPageToken?: string };
+    return { items: j.items ?? [], next: j.nextPageToken || null };
+  }, COMMENT_PAGES.youtubeChannel);
   const byVideo = new Map<string, PlatformComment[]>();
   for (const it of items) {
     if (skip.has(it.snippet.videoId)) continue;

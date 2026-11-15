@@ -232,7 +232,7 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
           <div ref={rangeS.box} role="radiogroup" aria-label="Date range" onKeyDown={onRangeKey} className="pulse-seg relative">
             <span ref={rangeS.bar} aria-hidden="true" className="pulse-seg-pill" />
             {RANGES.map((r) => (
-              <button key={r} type="button" role="radio" aria-checked={r === range} tabIndex={r === range ? 0 : -1} onClick={() => void pickRange(r)} className={cn("relative z-[1] h-9 min-w-[48px] rounded-[10px] px-2.5 text-[14px] tabular-nums before:absolute before:-inset-y-1 before:inset-x-0 before:content-[''] font-semibold outline-none transition-[color,transform] duration-150 active:scale-[0.96] motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring sm:min-w-[52px] sm:px-3", r === range ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
+              <button key={r} type="button" role="radio" aria-checked={r === range} tabIndex={r === range ? 0 : -1} onClick={() => void pickRange(r)} className={cn("relative z-[1] h-11 min-w-[48px] rounded-[12px] px-2.5 text-[14px] tabular-nums font-semibold outline-none transition-[color,transform] duration-150 active:scale-[0.96] motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring sm:min-w-[52px] sm:px-3", r === range ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
                 {r}D
               </button>
             ))}
