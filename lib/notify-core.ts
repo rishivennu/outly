@@ -48,7 +48,7 @@ export const EVENT_INFO: Record<EventKey, EventInfo> = {
   token_expiring: { label: "Reconnection needed soon", hint: "A platform's access ends within a week. Reconnect before then and nothing fails." },
   account_connected: { label: "Account connected", hint: "Confirms a new account is ready to post to." },
   new_message: { label: "New direct messages", hint: "Instagram and Facebook messages to accounts you connected. At most one alert an hour per conversation. Reply from the notification where your device allows it." },
-  new_comment: { label: "New comments", hint: "Instagram and Facebook comments on your posts, as they arrive. A busy post buzzes at most once every 2 minutes; the rest wait in Inbox." },
+  new_comment: { label: "New comments", hint: "Instagram comments on your posts, as they arrive. A busy post buzzes at most once every 2 minutes; the rest wait in Inbox." },
   engagement_spike: { label: "Engagement spikes", hint: "When an account's views in a day jump well past its usual." },
   milestone: { label: "View milestones", hint: "When a post passes 1K, 10K, 100K or 1M views on a platform." },
   payment_ok: { label: "Payment successful", hint: "When a payment or renewal goes through. The invoice is in Billing." },

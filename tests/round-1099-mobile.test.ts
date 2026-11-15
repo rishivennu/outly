@@ -221,7 +221,9 @@ describe("1099 phone top bar and touch targets", () => {
     const a = src("components/analytics/AnalyticsView.tsx");
     expect(a).toContain('<span className="sm:hidden">More</span>');
     expect(a).toContain('aria-label="More history"');
-    expect(src("components/calendar/CalendarView.tsx").match(/max-lg:h-11/g)?.length).toBe(2);
+    // P2: "Plan a batch" moved from the calendar header into the quick actions bar (components/calendar/QuickActions.tsx, min-h-11), so Today is the one left here.
+    expect(src("components/calendar/CalendarView.tsx").match(/max-lg:h-11/g)?.length).toBe(1);
+    expect(src("components/calendar/QuickActions.tsx")).toContain("min-h-11");
   });
 });
 

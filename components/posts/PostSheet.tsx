@@ -4,11 +4,11 @@ import { firstCommentLine } from "@/lib/client/first-comment";
 import { coverLine } from "@/lib/client/cover";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarClock, Check, Copy, Eye, EyeOff, ExternalLink, Link as LinkIcon, MessageSquareWarning, PenLine, ShieldCheck, Trash2, Wrench } from "lucide-react";
+import { AlertTriangle, CalendarClock, CalendarX, Check, Copy, Eye, EyeOff, ExternalLink, Link as LinkIcon, MessageSquareWarning, PenLine, RotateCcw, ShieldCheck, Trash2, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/shared/Sheet";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { DateTimePicker, defaultSchedule } from "@/components/shared/DateTimePicker";
+import { defaultSchedule } from "@/components/shared/DateTimePicker";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { useToast } from "@/components/shared/Toast";
 import { useUndoDelete } from "@/components/shared/useUndoDelete";
@@ -19,6 +19,9 @@ import { PLATFORM_META, TARGET_COPY, type Platform, type TargetStatus } from "@/
 import { targetErrorCopy } from "@/components/shared/errorCopy";
 import type { PostView, TargetView } from "@/lib/services";
 import { TeamNotes } from "./TeamNotes";
+import { MovePanel } from "@/components/calendar/MoveDialog";
+import { displayStatus, type AttentionReason } from "@/lib/posts/attention";
+import { recoveryActions, type RecoveryAction } from "@/lib/posts/recovery";
 
 /** Live on the platform right now (hidden YouTube videos count: they still exist there). */
 const isLive = (t: TargetView) => t.status === "published" && !!t.platformPostId && t.removeMode !== "deleted";
@@ -40,20 +43,21 @@ interface Props {
   onDuplicate: (p: PostView) => void;
   /** 1148: puts a deleted post back (Undo). Without it, deleting goes through at once, as before. */
   onRestore?: (p: PostView) => void;
+  /** P2: what needs a hand before this goes out (the calendar works it out); shows "Requires attention". */
+  attention?: AttentionReason[];
 }
 
 
 /** Floating detail panel shared by Content and Calendar. Edit / Reschedule / Duplicate / Delete. */
-export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRestore }: Props) {
+export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRestore, attention }: Props) {
   const { timezone: tz } = useUser();
   const toast = useToast();
   const later = useUndoDelete();
   const router = useRouter();
-  const [view, setView] = useState<"detail" | "reschedule" | "remove" | "takedown">("detail");
+  const [view, setView] = useState<"detail" | "reschedule" | "unschedule" | "remove" | "takedown">("detail");
   /** 1142: the second step of a delete. Nothing is deleted until the creator says yes on this one. */
   const [confirm, setConfirm] = useState<"everywhere" | "studio" | null>(null);
   const [takedownId, setTakedownId] = useState<string | null>(null);
-  const [when, setWhen] = useState<Date>(() => defaultSchedule(tz));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,8 +66,7 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRe
     setConfirm(null);
     setTakedownId(null);
     setError(null);
-    setWhen(post?.scheduledAt ? new Date(post.scheduledAt) : defaultSchedule(tz));
-  }, [post?.id, post?.scheduledAt, tz]);
+  }, [post?.id, post?.scheduledAt]);
 
   if (!post) return <Sheet open={false} onOpenChange={() => {}} title="">{null}</Sheet>;
 
@@ -82,13 +85,24 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRe
     }
   };
 
-  const reschedule = () =>
+  /** P2: off the schedule, back to a draft (the cancel route); nothing is deleted. */
+  const unschedule = () =>
     run(async () => {
-      const r = await api<{ post: PostView }>(`/api/posts/${post.id}`, { method: "PATCH", json: { scheduledAt: when.toISOString() } });
+      const r = await api<{ post: PostView }>(`/api/posts/${post.id}/cancel`, { method: "POST" });
       onChange(r.post);
       setView("detail");
-      toast("It's on the calendar.");
+      toast(r.post.status === "draft" ? "Taken off the schedule. It's a draft again." : "Taken off the schedule.", "info");
     });
+
+  const recover = (t: TargetView, a: RecoveryAction) => {
+    if (a.kind === "reschedule") return setView("reschedule");
+    if (a.kind !== "retry") return;
+    return run(async () => {
+      const r = await api<{ post: PostView }>(`/api/targets/${t.id}/retry`, { method: "POST" });
+      onChange(r.post);
+      toast(`Sending it to ${PLATFORM_META[t.platform].name} again.`);
+    });
+  };
 
   const duplicate = () =>
     run(async () => {
@@ -161,6 +175,8 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRe
     <Sheet open={!!post} onOpenChange={(o) => !o && onClose()} title={
         view === "reschedule"
           ? "When should this go live?"
+          : view === "unschedule"
+            ? "Cancel schedule"
           : view === "remove"
             ? `Delete \u201c${title}\u201d?`
             : view === "takedown" && takedownTarget
@@ -175,7 +191,7 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRe
               {post.media.thumbnailUrl && <img src={post.media.thumbnailUrl} alt="" className="h-full w-full object-cover" />}
             </div>
             <div className="min-w-0 space-y-2 py-1">
-              <StatusBadge status={post.status} />
+              <StatusBadge status={attention ? displayStatus(post, attention) : post.status} />
               {post.scheduledAt && post.status === "scheduled" && (
                 <p className="text-sm">
                   Goes live <span className="font-semibold">{fmt(post.scheduledAt, tz, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
@@ -203,6 +219,21 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRe
                     <p className={h ? "text-xs text-destructive" : "truncate text-xs text-muted-foreground"}>{h ? h.title : targetLine(t, post.status === "scheduled")}</p>
                     {fc && <p className={fc.tone === "bad" ? "mt-0.5 text-xs text-destructive" : "mt-0.5 text-xs text-muted-foreground"}>{fc.text}</p>}
                     {cv && <p className={cv.tone === "bad" ? "mt-0.5 text-xs text-destructive" : "mt-0.5 text-xs text-muted-foreground"}>{cv.text}</p>}
+                    {h && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {recoveryActions({ platform: t.platform, status: t.status, errorCode: t.errorCode, postId: post.id }).map((a) =>
+                          a.href ? (
+                            <Button key={a.kind} asChild variant="subtle" size="sm">
+                              <Link href={a.href}>{a.label}</Link>
+                            </Button>
+                          ) : (
+                            <Button key={a.kind} variant="subtle" size="sm" onClick={() => recover(t, a)} disabled={busy}>
+                              {a.kind === "retry" && <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />} {a.label}
+                            </Button>
+                          ),
+                        )}
+                      </div>
+                    )}
                   </div>
                   {t.url && (
                     <a href={t.url} target="_blank" rel="noopener noreferrer" aria-label={`Open on ${PLATFORM_META[t.platform].name} (new tab)`} className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground">
@@ -229,6 +260,28 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRe
             })}
           </ul>
 
+          {attention && attention.some((r) => r.code !== "target_failed") && (
+            <section aria-labelledby="attn-h" className="rounded-2xl bg-warning/10 p-4 hairline">
+              <h3 id="attn-h" className="flex items-center gap-2 text-sm font-semibold">
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" /> Needs a hand before it goes out
+              </h3>
+              <ul className="mt-2 space-y-1 text-sm">
+                {attention
+                  .filter((r) => r.code !== "target_failed")
+                  .map((r, i) => (
+                    <li key={i} className="flex flex-wrap items-center justify-between gap-x-3">
+                      <span>{r.message}</span>
+                      {r.code.startsWith("account_") && (
+                        <Link href="/accounts" className="inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4">
+                          Reconnect
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+              </ul>
+            </section>
+          )}
+
           <ReviewBlock post={post} onChange={onChange} />
           <TeamNotes post={post} onChange={onChange} />
 
@@ -252,6 +305,11 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRe
                 <CalendarClock className="h-4 w-4" /> {post.status === "scheduled" ? "Reschedule" : "Set a time"}
               </Button>
             )}
+            {post.status === "scheduled" && (
+              <Button variant="subtle" onClick={() => setView("unschedule")}>
+                <CalendarX className="h-4 w-4" /> Cancel schedule
+              </Button>
+            )}
             <Button variant="subtle" onClick={duplicate} disabled={busy}>
               <Copy className="h-4 w-4" /> Duplicate
             </Button>
@@ -264,14 +322,32 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRe
       )}
 
       {view === "reschedule" && (
-        <div>
-          <DateTimePicker value={when} onChange={setWhen} tz={tz} />
-          <div className="mt-6 flex gap-2">
-            <Button variant="ghost" onClick={() => setView("detail")}>
-              Back
+        <MovePanel
+          post={post}
+          initial={post.scheduledAt && +new Date(post.scheduledAt) > Date.now() + 60_000 ? new Date(post.scheduledAt) : defaultSchedule(tz)}
+          onCancel={() => setView("detail")}
+          onSaved={(np) => {
+            onChange(np);
+            setView("detail");
+            toast("It's on the calendar.");
+          }}
+        />
+      )}
+
+      {view === "unschedule" && (
+        <div role="alertdialog" aria-labelledby="unsched-h" aria-describedby="unsched-more" className="space-y-4">
+          <p id="unsched-h" className="font-semibold">
+            Take it off the schedule?
+          </p>
+          <p id="unsched-more" className="text-sm text-muted-foreground">
+            It won&rsquo;t go out{post.scheduledAt ? ` ${fmt(post.scheduledAt, tz, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}. It goes back to your drafts with all its copy, so you can book it again any time.
+          </p>
+          <div className="grid gap-2">
+            <Button variant="danger" onClick={unschedule} disabled={busy}>
+              <CalendarX className="h-4 w-4" /> {busy ? "Cancelling…" : "Cancel schedule"}
             </Button>
-            <Button variant="lime" className="flex-1" onClick={reschedule} disabled={busy}>
-              {busy ? "Saving…" : "Schedule it"}
+            <Button variant="ghost" onClick={() => setView("detail")} disabled={busy}>
+              Keep it booked
             </Button>
           </div>
         </div>

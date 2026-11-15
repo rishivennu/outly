@@ -1,25 +1,52 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { WifiOff, Wifi } from "lucide-react";
+import { useOnline } from "@/lib/client/use-online";
+import { draftSyncSignal, type DraftSyncSignal } from "@/lib/client/draft-sync-core";
+
+const NONE: DraftSyncSignal = { status: null, pending: false };
+
+/** The banner's words: offline, back, and whether an open draft still has changes to send. */
+export function connectivityLine(state: "offline" | "back", d: DraftSyncSignal) {
+  if (state === "offline") return d.pending ? "You're offline. Your draft is saved on this device and syncs when you're back. Publishing waits until then." : "You're offline. Saved pages and invoices still open; changes wait until you're back.";
+  if (d.status === "conflict") return "Back online. Your draft changed on another device too: pick the version to keep.";
+  if (d.status === "failed") return "Back online, but your draft didn't sync. Retry from the draft.";
+  if (d.pending) return "Back online. Syncing your draft.";
+  if (d.status === "synced") return "Back online. Draft synced.";
+  return "Back online.";
+}
 
 /** Offline banner + service-worker registration (production only, so dev HMR is never cached). */
 export function Connectivity() {
+  const online = useOnline();
+  const draft = useSyncExternalStore(draftSyncSignal.subscribe, draftSyncSignal.get, () => NONE);
   const [state, setState] = useState<"online" | "offline" | "back">("online");
+  const was = useRef(true);
   useEffect(() => {
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
-    let t: ReturnType<typeof setTimeout>;
-    const off = () => setState("offline");
-    const on = () => { setState("back"); clearTimeout(t); t = setTimeout(() => setState("online"), 2600); };
-    if (!navigator.onLine) off();
-    window.addEventListener("offline", off);
-    window.addEventListener("online", on);
-    return () => { window.removeEventListener("offline", off); window.removeEventListener("online", on); clearTimeout(t); };
   }, []);
+  useEffect(() => {
+    if (!online) setState("offline");
+    else if (!was.current) setState("back");
+    was.current = online;
+  }, [online]);
+  // "Back online" stays up while a draft is still going up, then a moment after it lands or fails.
+  const busy = state === "back" && draft.pending && draft.status !== "failed" && draft.status !== "conflict";
+  useEffect(() => {
+    if (state !== "back") return;
+    const cap = setTimeout(() => setState("online"), 10_000);
+    return () => clearTimeout(cap);
+  }, [state]);
+  useEffect(() => {
+    if (state !== "back" || busy) return;
+    const t = setTimeout(() => setState("online"), draft.status === "failed" || draft.status === "conflict" ? 6000 : 2600);
+    return () => clearTimeout(t);
+  }, [state, busy, draft.status]);
   if (state === "online") return null;
   return (
-    <div role="status" className="offline-bar fixed inset-x-0 top-[max(10px,env(safe-area-inset-top))] z-[80] mx-auto flex w-max max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full bg-foreground px-4 py-2 text-[13px] font-medium text-background shadow-lg">
+    <div role="status" className="offline-bar fixed inset-x-0 top-[max(10px,env(safe-area-inset-top))] z-[96] mx-auto flex w-max max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-[20px] bg-foreground px-4 py-2 text-balance text-[13px] font-medium leading-snug text-background shadow-lg">
       {state === "offline" ? <WifiOff className="h-4 w-4 shrink-0" aria-hidden /> : <Wifi className="h-4 w-4 shrink-0" aria-hidden />}
-      {state === "offline" ? "You're offline. Saved pages and invoices still open; changes wait until you're back." : "Back online."}
+      {connectivityLine(state, draft)}
     </div>
   );
 }

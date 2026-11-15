@@ -5,13 +5,14 @@ import { HttpError } from "../http";
 import { isImageMime } from "../formats";
 import { PLATFORM_META, type Platform } from "../domain";
 import type { bulkScheduleSchema } from "../validation";
-import { connectedAccounts, launchPost, ownedMedia, ownedPost, postView, type PostView } from "../services";
+import { accountForTarget, connectedAccounts, launchPost, ownedMedia, ownedPost, postView, type PostView } from "../services";
 import { postUsage } from "../billing/entitlements";
 import { getBestTimes } from "../schedule/best-time-server";
 import { spreadSlots } from "../schedule/spread";
 import { BULK_MAX, accountRounds, bulkTargets } from "./bulk";
 import { requestScope } from "../profiles";
 import { inScope, pickAccount } from "../profiles-core";
+import { bookingIssues, throwGuard } from "./guard-server";
 
 /** Suggested times for a batch: best hours, spread over the days ahead, clear of what is already booked. */
 export async function planBatch(userId: string, platforms: Platform[], count: number, tz: string) {
@@ -75,6 +76,19 @@ export async function bookBatch(userId: string, body: z.infer<typeof bulkSchedul
   owned.forEach((m, i) => {
     if (isImageMime(m.mimeType)) throw new HttpError(400, `Video ${i + 1} is a photo. Post photos from Create, as a photo, carousel or Story.`);
   });
+
+  // Phase 2: the same booking checks as one post (same media on the same account within 10 minutes, platform
+  // rules, Instagram's publishing cap counting the rest of the batch), before anything is created.
+  const batch: { accountId: string; at: Date }[] = [];
+  for (const [index, it] of body.items.entries()) {
+    const at = new Date(it.scheduledAt);
+    for (const round of rounds) {
+      const copy = bulkTargets(it, round.map((r) => r.platform));
+      const targets = round.map((r, i) => ({ ...copy[i], platform: r.platform, account: accountForTarget({ platform: r.platform, socialAccountId: r.accountId }, accounts.all, scope) }));
+      throwGuard(await bookingIssues({ userId, postId: null, mediaId: it.mediaId, media: owned[index], format: "video", at, targets, alsoBooked: batch }), `Video ${index + 1}: `);
+      for (const t of targets) if (t.account) batch.push({ accountId: t.account.id, at });
+    }
+  }
 
   const posts: PostView[] = [];
   const failed: { index: number; postId: string; message: string }[] = [];

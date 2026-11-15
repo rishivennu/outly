@@ -138,32 +138,76 @@ export function InboxTabs({ tab, onPick, counts }: { tab: InboxTab; onPick: (t: 
   );
 }
 
-/** "Needs reply" / "All" plus one icon per platform. The hit area is 44px even where the pill looks smaller. */
+/** Phase 2: one entry in the filter row ("Needs reply", "Unread", "All", "Archived"). The count is spoken, never colour only. */
+export type ScopeView = { id: string; label: string; count?: number };
+
+const seg =
+  "relative inline-flex h-8 touch:h-11 items-center justify-center whitespace-nowrap rounded-full px-2.5 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.96]";
+
+/**
+ * The one filter row both tabs share: which items (a segmented control) and, under it, which platform.
+ * `views` + `chips` is the Phase 2 form; `needsOnly` (Needs reply / All with a platform menu) stays for callers that use it.
+ * The hit area is 44px even where the pill looks smaller.
+ */
 export function ScopeBar({
   needsOnly,
   onNeedsOnly,
+  views,
+  view,
+  onView,
   platforms,
   platform,
   onPlatform,
+  chips = false,
 }: {
-  needsOnly: boolean;
-  onNeedsOnly: (v: boolean) => void;
+  needsOnly?: boolean;
+  onNeedsOnly?: (v: boolean) => void;
+  views?: readonly ScopeView[];
+  view?: string;
+  onView?: (id: string) => void;
   platforms: readonly Platform[];
   platform: Platform | "all";
   onPlatform: (p: Platform | "all") => void;
+  chips?: boolean;
 }) {
-  // 44px tap height from the pseudo-element; the pill itself stays compact.
-  const seg = "relative inline-flex h-8 items-center whitespace-nowrap rounded-full px-3.5 text-[13px] font-medium transition before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  const list: readonly ScopeView[] = views ?? [
+    { id: "needs", label: "Needs reply" },
+    { id: "all", label: "All" },
+  ];
+  const current = views ? view : needsOnly ? "needs" : "all";
+  const pick = (id: string) => (views ? onView?.(id) : onNeedsOnly?.(id === "needs"));
+  const segmented = (
+    <div role="group" aria-label="Which to show" className={cn("rounded-full bg-secondary p-0.5", views ? "grid min-w-0 grid-flow-col auto-cols-fr" : "flex shrink-0")}>
+      {list.map((v) => (
+        <button
+          key={v.id}
+          type="button"
+          aria-pressed={current === v.id}
+          aria-label={v.count ? `${v.label}, ${v.count}` : undefined}
+          onClick={() => pick(v.id)}
+          className={cn(seg, "min-w-0", !views && "px-3.5", current === v.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}
+        >
+          <span className="truncate">{v.label}</span>
+          {!!v.count && (
+            <span aria-hidden="true" className={cn("ml-1 hidden rounded-full px-1.5 text-xs font-bold tabular-nums leading-[17px] min-[400px]:inline", current === v.id ? "bg-lime text-lime-foreground" : "bg-foreground/10 text-foreground/80")}>
+              {v.count}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+  if (chips) {
+    return (
+      <div className="mt-2.5 flex flex-col gap-2">
+        {segmented}
+        {platforms.length > 1 && <PlatformChips platforms={platforms} platform={platform} onPlatform={onPlatform} />}
+      </div>
+    );
+  }
   return (
     <div className="mt-2.5 flex items-center gap-2">
-      <div role="group" aria-label="Which to show" className="flex shrink-0 rounded-full bg-secondary p-0.5">
-        <button type="button" aria-pressed={needsOnly} onClick={() => onNeedsOnly(true)} className={cn(seg, needsOnly ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-          Needs reply
-        </button>
-        <button type="button" aria-pressed={!needsOnly} onClick={() => onNeedsOnly(false)} className={cn(seg, !needsOnly ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-          All
-        </button>
-      </div>
+      {segmented}
       <span className="flex-1" />
       {platforms.length > 1 && (
         <label className="relative flex min-w-0 items-center">
@@ -191,6 +235,30 @@ export function ScopeBar({
   );
 }
 
+/** Phase 2: "All" plus one chip per platform. Below 400px a chip is the platform's mark only, still named for a screen reader. */
+export function PlatformChips({ platforms, platform, onPlatform }: { platforms: readonly Platform[]; platform: Platform | "all"; onPlatform: (p: Platform | "all") => void }) {
+  const chip = (on: boolean) =>
+    cn(
+      "relative inline-flex h-8 touch:h-11 touch:min-w-11 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.96]",
+      on ? "bg-foreground text-background" : "bg-card text-foreground hairline [@media(hover:hover)]:hover:bg-secondary",
+    );
+  return (
+    <div role="group" aria-label="Platform" className="flex flex-wrap items-center gap-1.5">
+      <button type="button" aria-pressed={platform === "all"} onClick={() => onPlatform("all")} className={chip(platform === "all")}>
+        All platforms
+      </button>
+      {platforms.map((p) => (
+        <button key={p} type="button" aria-pressed={platform === p} aria-label={PLATFORM_META[p].name} title={PLATFORM_META[p].name} onClick={() => onPlatform(p)} className={chip(platform === p)}>
+          <PlatformOrb platform={p} size={16} />
+          <span aria-hidden="true" className="hidden min-[400px]:inline">
+            {PLATFORM_META[p].name}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export type RowProps = {
   id: string;
   selected: boolean;
@@ -203,10 +271,13 @@ export type RowProps = {
   tag?: ReactNode;
   label: string;
   onOpen: () => void;
+  /** Phase 2: when given, the dot and the bold text mean "unread" instead of "needs a reply". */
+  unread?: boolean;
 };
 
 /** One dense row. Waiting rows carry a lime dot AND bold text AND a spoken "needs a reply", never colour alone. */
-export const InboxRow = forwardRef<HTMLButtonElement, RowProps>(function InboxRow({ id, selected, needsReply, name, avatar, time, preview, context, tag, label, onOpen }, ref) {
+export const InboxRow = forwardRef<HTMLButtonElement, RowProps>(function InboxRow({ id, selected, needsReply, name, avatar, time, preview, context, tag, label, onOpen, unread }, ref) {
+  const strong = unread ?? needsReply;
   return (
     <li>
       <button
@@ -224,12 +295,12 @@ export const InboxRow = forwardRef<HTMLButtonElement, RowProps>(function InboxRo
         {avatar}
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
-            <span className={cn("truncate text-[14px]", needsReply ? "font-semibold text-foreground" : "font-medium text-foreground/90")}>{name}</span>
+            <span className={cn("truncate text-[14px]", strong ? "font-semibold text-foreground" : "font-medium text-foreground/90")}>{name}</span>
             {tag}
-            <span className="ml-auto shrink-0 text-[12px] text-muted-foreground">{time}</span>
-            {needsReply && <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-lime" />}
+            <span className="ml-auto shrink-0 text-[12px] tabular-nums text-muted-foreground">{time}</span>
+            {strong && <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-lime" />}
           </span>
-          <span className={cn("mt-0.5 block truncate text-[14px]", needsReply ? "text-foreground" : "text-muted-foreground")}>{preview}</span>
+          <span className={cn("mt-0.5 block truncate text-[14px]", strong ? "text-foreground" : "text-muted-foreground")}>{preview}</span>
           <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[12px] text-muted-foreground">{context}</span>
         </span>
       </button>
@@ -260,7 +331,7 @@ export function ConnectionStrip({ title, body, actions, details }: { title: Reac
   );
 }
 
-export const stripButton = "inline-flex min-h-[36px] items-center gap-1.5 rounded-xl bg-card px-3 text-[13px] font-medium text-foreground hairline transition hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring relative before:absolute before:-inset-y-1 before:inset-x-0 before:content-['']";
+export const stripButton = "inline-flex min-h-[36px] touch:min-h-11 items-center gap-1.5 rounded-xl bg-card px-3 text-[13px] font-medium text-foreground hairline transition hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring relative before:absolute before:-inset-y-1 before:inset-x-0 before:content-['']";
 
 export function joinNames(names: string[]) {
   if (names.length <= 1) return names[0] ?? "";

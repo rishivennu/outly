@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BarChart2, Bookmark, Camera, Heart, MessageCircle, MoreHorizontal, Music2, Repeat2, Search, Send, Share, ThumbsDown, ThumbsUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Draft } from "./types";
+import { FIRST_FRAME, needsFirstFrame, playback, usePlayback } from "./player-state";
 
 export interface PreviewProps {
   draft: Draft;
@@ -29,8 +30,53 @@ function Rich({ text, tagClass }: { text: string; tagClass: string }) {
   );
 }
 
+/**
+ * A muted loop of the creator's video. It never competes with the editor's player: it plays only while on
+ * screen and while that player is paused, and holds still (first frame) for reduced motion.
+ */
+function LoopVideo({ src, poster, className }: { src: string; poster: string | null; className?: string }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  usePlayback(ref, "ambient", src);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    let seen = false;
+    const sync = () => {
+      if (still || !seen || playback.mainPlaying()) v.pause();
+      else v.play().catch(() => {});
+    };
+    const io = typeof IntersectionObserver === "undefined" ? null : new IntersectionObserver(([e]) => ((seen = e.isIntersecting), sync()), { threshold: 0.4 });
+    if (io) io.observe(v);
+    else {
+      seen = true;
+      sync();
+    }
+    const off = playback.subscribe(sync);
+    return () => {
+      io?.disconnect();
+      off();
+    };
+  }, [src]);
+  return (
+    <video
+      ref={ref}
+      src={src}
+      poster={poster ?? undefined}
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      aria-hidden="true"
+      tabIndex={-1}
+      onLoadedMetadata={(e) => needsFirstFrame(e.currentTarget, !!poster) && (e.currentTarget.currentTime = FIRST_FRAME)}
+      className={cn("h-full w-full bg-black object-contain", className)}
+    />
+  );
+}
+
 function Media({ src, poster, className }: { src: string | null; poster: string | null; className?: string }) {
-  if (src) return <video src={src} poster={poster ?? undefined} muted loop autoPlay playsInline preload="metadata" aria-hidden="true" className={cn("h-full w-full object-cover", className)} />;
+  if (src) return <LoopVideo src={src} poster={poster} className={className} />;
   if (poster)
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={poster} alt="" className={cn("h-full w-full object-cover", className)} />;
@@ -42,7 +88,7 @@ function Avatar({ name, src, className }: { name: string; src?: string | null; c
     // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt="" className={cn("rounded-full object-cover", className)} />
   ) : (
-    <span className={cn("grid place-items-center rounded-full energy-bg text-[11px] font-bold text-black", className)} aria-hidden="true">
+    <span className={cn("grid place-items-center rounded-full energy-bg text-xs font-bold text-black", className)} aria-hidden="true">
       {name.slice(0, 1).toUpperCase()}
     </span>
   );
@@ -72,7 +118,7 @@ export function InstagramReel({ draft, src, poster, handle, avatar }: PreviewPro
       <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4 pt-3 text-[15px] font-bold" aria-hidden="true">
         Reels <Camera className="h-5 w-5" />
       </div>
-      <Rail items={[{ icon: Heart, label: "12.4K" }, { icon: MessageCircle, label: "318" }, { icon: Send, label: "1.1K" }, { icon: MoreHorizontal }]} />
+      <Rail items={[{ icon: Heart }, { icon: MessageCircle }, { icon: Send }, { icon: MoreHorizontal }]} />
       <div className="absolute inset-x-0 bottom-0 space-y-2 p-3 pr-12">
         <div className="flex items-center gap-2" aria-hidden="true">
           <Avatar name={handle} src={avatar} className="h-7 w-7 ring-1 ring-white/40" />
@@ -105,7 +151,7 @@ export function YouTubeShort({ draft, src, poster, handle, avatar }: PreviewProp
         <Search className="h-5 w-5" />
         <MoreHorizontal className="h-5 w-5 rotate-90" />
       </div>
-      <Rail items={[{ icon: ThumbsUp, label: "8.9K", fill: true }, { icon: ThumbsDown, label: "Dislike", fill: true }, { icon: MessageCircle, label: "204", fill: true }, { icon: Share, label: "Share" }]} />
+      <Rail items={[{ icon: ThumbsUp, fill: true }, { icon: ThumbsDown, label: "Dislike", fill: true }, { icon: MessageCircle, fill: true }, { icon: Share, label: "Share" }]} />
       <div className="absolute inset-x-0 bottom-0 space-y-2 p-3 pr-12">
         <p className="line-clamp-2 text-[14px] font-semibold leading-snug" aria-hidden="true">
           {draft.title || <span className="text-white/60">Your title shows here</span>}
@@ -140,10 +186,10 @@ export function XPost({ draft, src, poster, handle, name, avatar }: PreviewProps
             <Media src={src} poster={poster} />
           </div>
           <div className="mt-3 flex justify-between pr-2 text-[13px] text-[#71767b]" aria-hidden="true">
-            <span className="flex items-center gap-1.5"><MessageCircle className="h-4 w-4" /> 48</span>
-            <span className="flex items-center gap-1.5"><Repeat2 className="h-4 w-4" /> 212</span>
-            <span className="flex items-center gap-1.5"><Heart className="h-4 w-4" /> 1.6K</span>
-            <span className="flex items-center gap-1.5"><BarChart2 className="h-4 w-4" /> 41K</span>
+            <MessageCircle className="h-4 w-4" />
+            <Repeat2 className="h-4 w-4" />
+            <Heart className="h-4 w-4" />
+            <BarChart2 className="h-4 w-4" />
             <span className="flex items-center gap-3"><Bookmark className="h-4 w-4" /><Share className="h-4 w-4" /></span>
           </div>
         </div>

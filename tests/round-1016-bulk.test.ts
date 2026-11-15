@@ -189,7 +189,7 @@ describe("bookBatch", () => {
     const booked = await db.post.create({ data: { userId: u.id, mediaId: media[0].id, status: "scheduled", scheduledAt: new Date(Date.now() + 5 * 3600e3) } });
     const p = await bulk.planBatch(u.id, ["instagram"], 5, TZ);
     expect(p.slots).toHaveLength(5);
-    expect(p.source).toBe("typical");
+    expect(p.source).toBe("none"); // Phase 2: no "typical" hours without the creator's own data
     expect(p.slots.every((s) => Math.abs(+new Date(s) - +booked.scheduledAt!) >= 2 * 3600e3)).toBe(true);
     expect((await bulk.planBatch(u.id, ["instagram"], 99, TZ)).slots).toHaveLength(10);
   });

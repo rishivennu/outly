@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * The real technical state, always spelled out. Friendly copy lives next to a
- * badge, never instead of it — so "You're live." never hides "failed".
+ * badge, never instead of it, so "You're live." never hides "failed".
  */
 const MAP: Record<string, { label: string; dot: string; text: string }> = {
   draft: { label: "Draft", dot: "bg-muted-foreground", text: "text-muted-foreground" },
@@ -15,6 +15,7 @@ const MAP: Record<string, { label: string; dot: string; text: string }> = {
   published: { label: "Published", dot: "bg-success", text: "text-success-ink" },
   partial: { label: "Partly published", dot: "bg-warning", text: "text-warning-ink" },
   failed: { label: "Failed", dot: "bg-destructive", text: "text-destructive" },
+  attention: { label: "Requires attention", dot: "bg-warning", text: "text-warning-ink" },
   needs_reconnect: { label: "Needs reconnection", dot: "bg-warning", text: "text-warning-ink" },
   disconnected: { label: "Disconnected", dot: "bg-muted-foreground", text: "text-muted-foreground" },
   connected: { label: "Connected", dot: "bg-success", text: "text-success-ink" },

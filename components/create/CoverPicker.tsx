@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { api, ApiError } from "@/lib/client/api";
 import { COVER_MAX_BYTES, COVER_SUPPORT, PLATFORM_META, type Platform } from "@/lib/domain";
@@ -25,6 +26,7 @@ export function CoverPicker({ targets, coverUrl, ensurePost, onChange }: Props) 
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<"up" | "rm" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
   const takes = targets.filter((t) => COVER_SUPPORT[t] === "upload");
 
   const pick = async (file: File | undefined) => {
@@ -46,6 +48,7 @@ export function CoverPicker({ targets, coverUrl, ensurePost, onChange }: Props) 
   };
 
   const remove = async () => {
+    setAsking(false);
     setError(null);
     setBusy("rm");
     try {
@@ -95,7 +98,7 @@ export function CoverPicker({ targets, coverUrl, ensurePost, onChange }: Props) 
                 <ImagePlus className="h-4 w-4" aria-hidden="true" /> {coverUrl ? "Change" : "Add a cover"}
               </Button>
               {coverUrl && (
-                <Button variant="ghost" size="sm" onClick={() => void remove()} disabled={busy !== null}>
+                <Button variant="ghost" size="sm" onClick={() => setAsking(true)} disabled={busy !== null}>
                   {busy === "rm" ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Trash2 className="h-4 w-4" aria-hidden="true" />} Remove
                 </Button>
               )}
@@ -131,6 +134,14 @@ export function CoverPicker({ targets, coverUrl, ensurePost, onChange }: Props) 
           {error}
         </p>
       )}
+      <ConfirmDialog
+        open={asking}
+        onOpenChange={setAsking}
+        title="Remove the cover?"
+        body="Each platform goes back to a frame from your video. You can add a cover again any time."
+        confirmLabel="Remove cover"
+        onConfirm={() => void remove()}
+      />
       <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => void pick(e.target.files?.[0])} />
     </section>
   );

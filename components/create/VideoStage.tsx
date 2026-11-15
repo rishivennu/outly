@@ -1,13 +1,14 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Maximize2, Minimize2, Pause, Play, RefreshCw, Replace, Volume2, VolumeX, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { aspectLabel, cn, formatBytes, formatDuration } from "@/lib/utils";
-import { validateVideoFile } from "@/lib/client/handoff";
+import { acceptAttr, formatProblem, useUploadLimits } from "@/lib/client/upload";
 import type { UploadState } from "./types";
 import { OutlyMark } from "@/components/brand/Logo";
 import { DancingPip } from "./Groove";
+import { audible, canSetVolume, clampVolume, DEFAULT_PREFS, FIRST_FRAME, needsFirstFrame, PLAYER_PREFS_KEY, readPrefs, setVolume, toggleMute, usePlayback, VOLUME_STEP, writePrefs, type PlayerPrefs } from "./player-state";
 
 interface Props {
   src: string | null;
@@ -38,8 +39,18 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
   const own = useRef<HTMLVideoElement>(null);
   const video = videoRef ?? own;
   const picker = useRef<HTMLInputElement>(null);
+  const limits = useUploadLimits();
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(false);
+  /* Volume and mute follow the creator from video to video on this device. */
+  const [prefs, setPrefs] = useState<PlayerPrefs>(DEFAULT_PREFS);
+  const muted = !audible(prefs);
+  /* iOS has no programmatic volume: mute only there. Known once the element exists. */
+  const [volCtl, setVolCtl] = useState(false);
+  const [volOpen, setVolOpen] = useState(false);
+  /* The picture's own shape once decoded: probe data can miss the rotation of phone footage. */
+  const [natural, setNatural] = useState<number | null>(null);
+  const [roomy, setRoomy] = useState(true);
+  const volId = useId();
   const [t, setT] = useState(0);
   const [d, setD] = useState(meta?.duration ?? 0);
   const [full, setFull] = useState(false);
@@ -56,6 +67,34 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
   }, [upload.kind]);
 
   useEffect(() => {
+    try {
+      setPrefs(readPrefs(localStorage.getItem(PLAYER_PREFS_KEY)));
+    } catch {}
+  }, []);
+  const changePrefs = useCallback((next: PlayerPrefs) => {
+    setPrefs(next);
+    try {
+      localStorage.setItem(PLAYER_PREFS_KEY, writePrefs(next));
+    } catch {}
+  }, []);
+  useEffect(() => {
+    const v = video.current;
+    if (!v) return;
+    v.muted = muted;
+    if (volCtl) v.volume = clampVolume(prefs.volume);
+  }, [muted, prefs.volume, volCtl, video, src]);
+
+  usePlayback(video, "main", src);
+
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => setRoomy(e.contentRect.width >= 300));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
     const f = () => setFull(document.fullscreenElement === wrap.current);
     document.addEventListener("fullscreenchange", f);
     return () => document.removeEventListener("fullscreenchange", f);
@@ -64,6 +103,7 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
   useEffect(() => {
     setPlaying(false);
     setT(0);
+    setNatural(null);
     const v = video.current;
     // A cached source can be ready before React attaches the listeners.
     setLoad(v && v.readyState >= 2 ? "ready" : "loading");
@@ -98,7 +138,8 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
     if (e.key === " " || e.key === "k") (e.preventDefault(), toggle());
     else if (e.key === "ArrowRight") (e.preventDefault(), seek(t + 5));
     else if (e.key === "ArrowLeft") (e.preventDefault(), seek(t - 5));
-    else if (e.key === "m") setMuted((m) => !m);
+    else if (e.key === "m") changePrefs(toggleMute(prefs));
+    else if (volCtl && (e.key === "ArrowUp" || e.key === "ArrowDown")) (e.preventDefault(), changePrefs(setVolume((muted ? 0 : prefs.volume) + (e.key === "ArrowUp" ? VOLUME_STEP : -VOLUME_STEP))));
     else if (e.key === "f") fullscreen();
   };
 
@@ -110,7 +151,7 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
     return `about ${Math.round(s / 60)}m left`;
   })();
 
-  const ratio = meta?.width && meta?.height ? meta.width / meta.height : 9 / 16;
+  const ratio = natural ?? (meta?.width && meta?.height ? meta.width / meta.height : 9 / 16);
   const vertical = ratio < 1;
   const p = d ? (t / d) * 100 : 0;
   const facts: { k: string; v: string }[] = [
@@ -135,7 +176,7 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
         ref={wrap}
         tabIndex={0}
         role="region"
-        aria-label={`Video player${filename ? `: ${filename}` : ""}. Space to play or pause, arrows to seek, M to mute, F for fullscreen.`}
+        aria-label={`Video player${filename ? `: ${filename}` : ""}. Space to play or pause, left and right arrows to seek,${volCtl ? " up and down arrows for volume," : ""} M to mute, F for fullscreen.`}
         aria-busy={showLoading || undefined}
         onKeyDown={onKey}
         className={cn(
@@ -159,7 +200,14 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
               onPlay={() => (setPlaying(true), setLoad("ready"))}
               onPause={() => setPlaying(false)}
               onTimeUpdate={(e) => setT(e.currentTarget.currentTime)}
-              onLoadedMetadata={(e) => setD(e.currentTarget.duration)}
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget;
+                setD(v.duration);
+                if (v.videoWidth && v.videoHeight) setNatural(v.videoWidth / v.videoHeight);
+                setVolCtl(canSetVolume(v));
+                // No poster: ask for the first frame now, so the box never sits black until play.
+                if (needsFirstFrame(v, !!poster)) v.currentTime = FIRST_FRAME;
+              }}
               onLoadedData={() => setLoad("ready")}
               onCanPlay={() => setLoad("ready")}
               onError={() => setLoad("error")}
@@ -270,7 +318,7 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
               <motion.div key="fail" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex max-w-full items-center gap-3 rounded-full bg-[hsl(240_10%_8%/0.62)] py-1.5 pl-4 pr-1.5 backdrop-blur-xl text-[13px] text-white hairline">
                 <span>{upload.message}</span>
                 {onRetry && (
-                  <Button size="sm" variant="primary" onClick={onRetry} className="h-8">
+                  <Button size="sm" variant="primary" onClick={onRetry} className="h-8 touch:h-11">
                     <RefreshCw className="h-3.5 w-3.5" /> Let&apos;s try again
                   </Button>
                 )}
@@ -282,6 +330,14 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
         {/* Controls */}
         {src && load !== "error" && (
           <div className={cn("absolute inset-x-0 bottom-0 flex flex-col gap-1 px-3 pb-2.5 pt-10 text-white transition-opacity duration-300", playing ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" : "opacity-100")}>
+            {volCtl && !roomy && volOpen && (
+              <div className="flex items-center gap-1 rounded-full bg-black/55 py-0.5 pl-0.5 pr-3 backdrop-blur-md">
+                <button type="button" onClick={() => changePrefs(toggleMute(prefs))} aria-label={muted ? "Unmute" : "Mute"} aria-pressed={muted} className="grid h-11 w-11 shrink-0 place-items-center rounded-full active:scale-[0.96] [@media(hover:hover)]:hover:bg-white/15">
+                  {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                </button>
+                <VolumeSlider id={volId} className="min-w-0 flex-1" prefs={prefs} onChange={changePrefs} />
+              </div>
+            )}
             <input
               type="range"
               className="timeline w-full"
@@ -297,9 +353,16 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
               <button type="button" onClick={toggle} aria-label={playing ? "Pause" : "Play"} className="grid h-11 w-11 place-items-center rounded-full hover:bg-white/15">
                 {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current" />}
               </button>
-              <button type="button" onClick={() => setMuted((m) => !m)} aria-label={muted ? "Unmute" : "Mute"} aria-pressed={muted} className="grid h-11 w-11 place-items-center rounded-full hover:bg-white/15">
-                {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-              </button>
+              {volCtl && !roomy ? (
+                <button type="button" onClick={() => setVolOpen((o) => !o)} aria-label={`Volume, ${muted ? "muted" : `${Math.round(prefs.volume * 100)}%`}`} aria-expanded={volOpen} aria-controls={volId} className="grid h-11 w-11 place-items-center rounded-full active:scale-[0.96] [@media(hover:hover)]:hover:bg-white/15">
+                  {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                </button>
+              ) : (
+                <button type="button" onClick={() => changePrefs(toggleMute(prefs))} aria-label={muted ? "Unmute" : "Mute"} aria-pressed={muted} className="grid h-11 w-11 place-items-center rounded-full hover:bg-white/15">
+                  {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                </button>
+              )}
+              {volCtl && roomy && <VolumeSlider id={volId} className="w-[72px]" prefs={prefs} onChange={changePrefs} />}
               <span className="tabular ml-1 whitespace-nowrap text-xs text-white/85">
                 {formatDuration(t)} / {formatDuration(d)}
               </span>
@@ -328,7 +391,7 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
         <input
           ref={picker}
           type="file"
-          accept="video/mp4,video/quicktime,.mp4,.mov"
+          accept={acceptAttr(limits)}
           className="sr-only"
           tabIndex={-1}
           aria-hidden="true"
@@ -336,12 +399,31 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
             const f = e.target.files?.[0];
             e.target.value = "";
             if (!f) return;
-            const err = validateVideoFile(f);
+            const err = formatProblem(f, limits);
             if (err) onError?.(err);
             else onReplace(f);
           }}
         />
       </div>
     </div>
+  );
+}
+
+function VolumeSlider({ id, prefs, onChange, className }: { id: string; prefs: PlayerPrefs; onChange: (p: PlayerPrefs) => void; className?: string }) {
+  const level = audible(prefs) ? prefs.volume : 0;
+  return (
+    <input
+      id={id}
+      type="range"
+      min={0}
+      max={100}
+      step={5}
+      value={Math.round(level * 100)}
+      onChange={(e) => onChange(setVolume(Number(e.target.value) / 100))}
+      aria-label="Volume"
+      aria-valuetext={level ? `${Math.round(level * 100)}%` : "Muted"}
+      className={cn("timeline h-11", className)}
+      style={{ ["--p" as string]: `${level * 100}%` }}
+    />
   );
 }

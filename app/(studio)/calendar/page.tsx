@@ -1,27 +1,25 @@
-import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { postFilter } from "@/lib/profiles";
-import { postView } from "@/lib/services";
+import { accountStates, loadRangePage, loadUnscheduled } from "@/lib/calendar/load";
+import { rangeOf, visibleDays } from "@/lib/calendar/range";
+import { dayKey } from "@/lib/client/tz";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { PageFresh } from "@/components/shell/PageFresh";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Calendar" };
 
+/** P2: only the week on screen (and the first undated drafts); other views and pages load their own range. */
 export default async function CalendarPage() {
   const user = (await getCurrentUser())!;
-  const since = new Date(Date.now() - 90 * 864e5);
-  const posts = await db.post.findMany({
-    where: { userId: user.id, ...(await postFilter(user)).where, OR: [{ scheduledAt: { gte: since } }, { publishedAt: { gte: since } }] },
-    include: { targets: true, media: true, reviews: { orderBy: { createdAt: "desc" } } },
-    orderBy: { scheduledAt: "asc" },
-    take: 300,
-  });
+  const today = dayKey(new Date(), user.timezone);
+  const days = visibleDays("week", today);
+  const { from, to } = rangeOf(days, user.timezone);
+  const [{ posts, truncated }, drafts, accounts] = await Promise.all([loadRangePage(user, from, to), loadUnscheduled(user), accountStates(user.id, user.scope)]);
   // 1114: may open from the background preload; brings itself up to date when that copy is 2 minutes old.
   return (
     <>
       <PageFresh renderedAt={Date.now()} maxAge={120_000} />
-      <CalendarView initial={await Promise.all(posts.map(postView))} />
+      <CalendarView initial={posts} loaded={[+from, +to]} drafts={drafts} accounts={accounts} truncated={truncated} />
     </>
   );
 }

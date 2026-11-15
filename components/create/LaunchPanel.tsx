@@ -13,11 +13,12 @@ import { fmt, tzShort } from "@/components/shell/UserContext";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/client/api";
-import type { BestTimes } from "@/lib/schedule/best-time";
+import { MIN_SAMPLES, type BestTimes } from "@/lib/schedule/best-time";
 import type { AccountView, Draft } from "./types";
 import { enabledPlatforms } from "./publish";
 import { MusicNote } from "./MusicNote";
 import { CoverPicker } from "./CoverPicker";
+import { OFFLINE_SEND } from "./ActionBar";
 import { T } from "@/lib/motion/tokens";
 
 interface Props {
@@ -41,7 +42,39 @@ interface Props {
   onCover: (url: string | null) => void;
   /** Saves the draft if needed and returns its id: a cover belongs to a saved post. */
   ensurePost: () => Promise<string | null>;
+  /** Off while the device is offline: nothing can be sent or booked without a connection. */
+  online?: boolean;
 }
+
+/** /api/best-time: slots only ever come from the creator's own posts; "none" says how many more are needed. */
+export type BestAnswer = Omit<BestTimes, "source"> & { source: string; samples?: number; needed?: number };
+
+/** The line shown instead of best times while there is not enough of the creator's own data. */
+/** GET /api/posts/[id]/check: the booking checks for a time, run before anything is booked. */
+export interface ScheduleCheck {
+  ok: boolean;
+  issues?: { code: string; message: string; platform?: string }[];
+  conflicts?: { postId: string; title: string; scheduledAt: string; platform: string }[];
+}
+
+/** What stops this booking, in one line for the launch error, or null when nothing does. */
+export function scheduleCheckLine(r: ScheduleCheck | null): string | null {
+  if (!r || r.ok) return null;
+  const lines = (r.issues ?? []).map((i) => {
+    const where = i.platform ? PLATFORM_META[i.platform as Platform]?.name : null;
+    return where && !i.message.startsWith(where) ? `${where}: ${i.message}` : i.message;
+  });
+  const near = [...new Set((r.conflicts ?? []).map((c) => c.title).filter(Boolean))];
+  if (near.length) lines.push(`Booked close to it: ${near.slice(0, 3).join(", ")}${near.length > 3 ? ` and ${near.length - 3} more` : ""}.`);
+  return lines.length ? lines.join(" ") : "That time doesn't work for this post. Pick another one.";
+}
+
+export function bestTimesWaitLine(b: Pick<BestAnswer, "samples" | "needed">) {
+  const needed = b.needed ?? MIN_SAMPLES;
+  return typeof b.samples === "number" ? `Best times appear after ${needed} posts with views (${b.samples} so far).` : `Best times appear after ${needed} posts with views.`;
+}
+
+export const realSlots = (b: BestAnswer | null) => (b && b.source === "yours" ? b.slots : []);
 
 export function LaunchPanel(p: Props) {
   const [picking, setPicking] = useState(false);
@@ -49,11 +82,23 @@ export function LaunchPanel(p: Props) {
   const targets = enabledPlatforms(p.drafts);
   const names = targets.map((t) => PLATFORM_META[t].name);
   const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
-  const [best, setBest] = useState<BestTimes | null>(null);
+  const [best, setBest] = useState<BestAnswer | null>(null);
+  const slots = realSlots(best);
+  const peaks = best?.source === "yours" ? best.peakHours : [];
+  const online = p.online ?? true;
+  // The device's own zone, read after mount (the server render has none): a phone abroad still books in the profile's zone.
+  const [deviceTz, setDeviceTz] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      setDeviceTz(Intl.DateTimeFormat().resolvedOptions().timeZone || null);
+    } catch {
+      setDeviceTz(null);
+    }
+  }, []);
   const key = targets.join(",");
   useEffect(() => {
     let live = true;
-    api<BestTimes>(`/api/best-time?platforms=${key}`)
+    api<BestAnswer>(`/api/best-time?platforms=${key}`)
       .then((b) => live && setBest(b))
       .catch(() => live && setBest(null));
     return () => {
@@ -128,14 +173,27 @@ export function LaunchPanel(p: Props) {
         </motion.button>
       )}
 
-      {p.mode === "schedule" && best && best.slots.length > 0 && (
+      {p.mode === "schedule" && deviceTz && deviceTz !== p.tz && tzShort(deviceTz) !== tzShort(p.tz) && (
+        <p className="mt-2 px-1 text-xs leading-relaxed text-muted-foreground">
+          Times are in {tzShort(p.tz)}, the time zone on your Outlly profile. This device is on {tzShort(deviceTz)}.
+        </p>
+      )}
+
+      {p.mode === "schedule" && best && slots.length === 0 && (
+        <p className="mt-3 flex items-start gap-2 rounded-[20px] px-4 py-3 text-xs leading-relaxed text-muted-foreground hairline">
+          <Flame className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="tabular-nums">{bestTimesWaitLine(best)}</span>
+        </p>
+      )}
+
+      {p.mode === "schedule" && best && slots.length > 0 && (
         <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} aria-labelledby="best-times" className="mt-3 rounded-[24px] p-4 hairline">
           <h3 id="best-times" className="flex items-center gap-2 text-sm font-semibold">
             <Flame className="h-4 w-4 text-accent" aria-hidden="true" /> Best times to post
-            <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">{best.source === "yours" ? "From your posts" : "Typical"}</span>
+            <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">From your posts</span>
           </h3>
           <div className="mt-3 flex flex-wrap gap-2">
-            {best.slots.map((s) => {
+            {slots.map((s) => {
               const on = Math.abs(new Date(s.at).getTime() - p.when.getTime()) < 60_000;
               return (
                 <button key={s.at} type="button" aria-pressed={on} onClick={() => p.onWhen(new Date(s.at))} className={cn("h-11 rounded-full px-4 text-sm font-semibold transition hairline", on ? "bg-foreground text-background" : "hover:bg-secondary/70")}>
@@ -152,7 +210,7 @@ export function LaunchPanel(p: Props) {
       {targets.length > 0 && <MusicNote list={list} onReplace={p.onReplaceVideo} />}
 
       <div className="mt-8 flex flex-col items-center gap-3">
-        <Button variant="lime" size="xl" className="w-full sm:w-auto sm:min-w-[320px]" disabled={p.busy || targets.length === 0} onClick={p.onLaunch}>
+        <Button variant="lime" size="xl" className="w-full sm:w-auto sm:min-w-[320px]" disabled={p.busy || targets.length === 0 || !online} onClick={p.onLaunch}>
           {p.mode === "now" ? (
             <>
               <Rocket className="h-5 w-5" /> {p.busy ? "Sending it out…" : "Send it everywhere"}
@@ -164,7 +222,7 @@ export function LaunchPanel(p: Props) {
           )}
         </Button>
         <p className="text-center text-sm text-muted-foreground">
-          {targets.length === 0 ? "Pick at least one place to send it." : p.mode === "now" ? `Goes to ${list} right away.` : `Goes to ${list} at that time. You can change it until then.`}
+          {!online ? OFFLINE_SEND : targets.length === 0 ? "Pick at least one place to send it." : p.mode === "now" ? `Goes to ${list} right away.` : `Goes to ${list} at that time. You can change it until then.`}
         </p>
         {p.error && (
           <p role="alert" className="text-center text-sm text-destructive">
@@ -173,8 +231,8 @@ export function LaunchPanel(p: Props) {
         )}
       </div>
 
-      <Sheet open={picking} onOpenChange={setPicking} title="When should this go live?" description={`Times are in ${tzShort(p.tz)}.${best?.peakHours.length ? " Dots mark the best times to post." : ""}`} side="center">
-        <DateTimePicker value={p.when} onChange={p.onWhen} tz={p.tz} peakHours={best?.peakHours ?? []} />
+      <Sheet open={picking} onOpenChange={setPicking} title="When should this go live?" description={`Times are in ${tzShort(p.tz)}.${peaks.length ? " Dots mark your best times to post." : ""}`} side="center">
+        <DateTimePicker value={p.when} onChange={p.onWhen} tz={p.tz} peakHours={peaks} />
         <Button variant="primary" size="lg" className="mt-6 w-full" onClick={() => setPicking(false)}>
           That works
         </Button>

@@ -10,6 +10,7 @@ import { isPracticeAccount, publisherForAccount } from "./social/registry";
 import { asPublisherError, type AccountContext, type PlatformComment, type SocialPublisher } from "./social/types";
 import { mediaView } from "./services";
 import { youtubeEmbed, type CommentMedia } from "./inbox-media";
+import { commentCapable, loadCommentStates, NO_STATE, stateKey, type ReadMark } from "./inbox-state";
 import type { Media } from "@prisma/client";
 
 /** Inbox ids for comments on the creator's own account (not published through Outlly): a:<accountId>:<mediaId>. */
@@ -29,6 +30,13 @@ export interface InboxComment extends PlatformComment {
   postUrl: string | null;
   /** The reel or short this comment is on, for the 9:16 tile and the preview (1052). Only on top-level comments. */
   media?: CommentMedia | null;
+  /** Phase 2: the connected account it came in on (read/archive state is stored per account). */
+  accountId: string;
+  /** False where the platform's API has no reply call: the composer is hidden instead of failing. */
+  canReply: boolean;
+  /** Phase 2: what the creator did with it in Outlly (lib/inbox-state.ts). */
+  read: ReadMark;
+  archived: boolean;
 }
 
 export interface InboxProblem {
@@ -69,7 +77,7 @@ async function cachedComments(targetId: string, load: () => Promise<PlatformComm
 }
 
 type LoadedTarget = {
-  target: { id: string; postId: string; platform: Platform; platformPostId: string; platformUrl: string | null; postTitle: string | null; practice: boolean };
+  target: { id: string; postId: string; accountId: string; platform: Platform; platformPostId: string; platformUrl: string | null; postTitle: string | null; practice: boolean };
   account: AccountContext;
   publisher: SocialPublisher;
   /** Raw pieces for the preview; only signed when the post actually has comments. */
@@ -112,7 +120,7 @@ async function publishedTargets(userId: string, platform?: Platform, scope: Scop
       continue;
     }
     out.push({
-      target: { id: t.id, postId: t.postId, platform: t.platform, platformPostId: t.platformPostId, platformUrl: t.platformUrl, postTitle: title, practice: isPracticeAccount(acct) },
+      target: { id: t.id, postId: t.postId, accountId: acct.id, platform: t.platform, platformPostId: t.platformPostId, platformUrl: t.platformUrl, postTitle: title, practice: isPracticeAccount(acct) },
       account,
       publisher,
       source: {
@@ -153,13 +161,16 @@ function flatten(l: LoadedTarget, comments: PlatformComment[], media: CommentMed
     platform: l.target.platform,
     postTitle: l.target.postTitle,
     postUrl: l.target.platformUrl,
+    accountId: l.target.accountId,
+    canReply: !!l.publisher.replyToComment,
+    ...NO_STATE,
   });
   return comments.map((c) => ({ ...decorate(c), media, replies: (c.replies ?? []).map(decorate) }));
 }
 
 /**
  * One inbox across every published destination. A platform that refuses is reported as a problem,
- * never as an empty thread — a real account must never be shown invented comments.
+ * never as an empty thread: a real account must never be shown invented comments.
  */
 export async function inbox(userId: string, platform?: Platform, scope: Scope = null) {
   const { targets, problems } = await publishedTargets(userId, platform, scope);
@@ -178,11 +189,8 @@ export async function inbox(userId: string, platform?: Platform, scope: Scope = 
   results.forEach((r, i) => {
     const l = targets[i];
     if (r.status === "fulfilled") {
-      if (r.value === null) {
-        errors.push({ targetId: l.target.id, platform: l.target.platform, postTitle: l.target.postTitle, code: "FORBIDDEN", detail: `${l.target.platform} comments are not wired up yet.` });
-      } else {
-        comments.push(...flatten(l, r.value, media[i]));
-      }
+      // Phase 2: a platform whose API has no comment listing (Facebook) is simply not shown, never reported as broken.
+      if (r.value !== null) comments.push(...flatten(l, r.value, media[i]));
     } else {
       const pe = asPublisherError(r.reason);
       errors.push({ targetId: l.target.id, platform: l.target.platform, postTitle: l.target.postTitle, code: pe.code, detail: pe.technical ?? pe.message });
@@ -194,7 +202,18 @@ export async function inbox(userId: string, platform?: Platform, scope: Scope = 
   comments.push(...own.comments);
   errors.push(...own.errors);
   comments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  return { comments, errors, targets: targets.length + own.threads };
+  const [states, platforms] = await Promise.all([loadCommentStates(userId, comments.map((c) => c.accountId)), commentPlatforms(userId, scope)]);
+  for (const c of comments) Object.assign(c, states.get(stateKey(c.accountId, c.id)) ?? NO_STATE);
+  for (const c of comments) if (!platforms.includes(c.platform)) platforms.push(c.platform);
+  return { comments, errors, targets: targets.length + own.threads, platforms };
+}
+
+/** Phase 2: the filter chips. Connected accounts on a platform whose API lists comments, whatever filter is on. */
+async function commentPlatforms(userId: string, scope: Scope = null): Promise<Platform[]> {
+  const accts = await db.socialAccount.findMany({ where: { userId, status: "connected", ...(scope ? { id: { in: scope } } : {}) }, select: { platform: true } });
+  const out: Platform[] = [];
+  for (const a of accts) if (isPlatform(a.platform) && commentCapable(a.platform) && !out.includes(a.platform)) out.push(a.platform);
+  return out;
 }
 
 const og = globalThis as unknown as { __ownCache?: Map<string, { at: number; threads: AccountThread[] }> };
@@ -236,7 +255,8 @@ async function accountComments(userId: string, skip: Set<string>, platform?: Pla
         for (const th of list) {
           if (!th.comments.length) continue;
           threads++;
-          const decorate = (c: PlatformComment): InboxComment => ({ ...c, practice: false, targetId: accountTargetId(a.id, th.mediaId), postId: "", platform: p, postTitle: th.title, postUrl: th.url });
+          const canReply = !!publisherForAccount(p, a).replyToComment;
+          const decorate = (c: PlatformComment): InboxComment => ({ ...c, practice: false, targetId: accountTargetId(a.id, th.mediaId), postId: "", platform: p, postTitle: th.title, postUrl: th.url, accountId: a.id, canReply, ...NO_STATE });
           comments.push(...th.comments.map((c) => ({ ...decorate(c), media: th.media ?? null, replies: (c.replies ?? []).map(decorate) })));
         }
       } catch (e) {
@@ -259,7 +279,7 @@ export async function replyToComment(userId: string, targetId: string, commentId
     if (!publisher.replyToComment) throw new HttpError(409, "Replying isn't available for this platform yet.", "FORBIDDEN");
     const reply = await publisher.replyToComment(await liveAccount(acct), commentId, text);
     ownCache.delete(`own:${acct.id}`);
-    return { ...reply, practice: false };
+    return { ...reply, practice: false, accountId: acct.id };
   }
   const t = await db.postTarget.findFirst({ where: { id: targetId, post: { userId } }, include: { socialAccount: true } });
   if (!t || !isPlatform(t.platform) || !inScope(scope, t.socialAccountId)) throw new HttpError(404, "We couldn't find that post.");
@@ -270,5 +290,5 @@ export async function replyToComment(userId: string, targetId: string, commentId
   const reply = await publisher.replyToComment(await liveAccount(acct), commentId, text);
   // The thread changed, so the cached copy is stale.
   invalidateComments(targetId);
-  return { ...reply, practice: reply.practice ?? isPracticeAccount(acct) };
+  return { ...reply, practice: reply.practice ?? isPracticeAccount(acct), accountId: acct.id };
 }

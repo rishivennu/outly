@@ -1,9 +1,10 @@
-import { PLATFORM_META, type Platform } from "../domain";
+import type { Platform } from "../domain";
 
 /**
  * Best time to post. Pure (no I/O) so it is unit-tested with fixtures.
  * With enough of the creator's own published posts we rank hours (and weekdays) by the views those posts
- * earned, in the creator's timezone. Below that we fall back to typical peaks per platform and say so.
+ * earned, in the creator's timezone. Below that there is no suggestion at all (Phase 2: only real data, never
+ * industry "typical" hours): source "none", no slots, and how many posts are still needed.
  */
 export interface PostedSample {
   platform: Platform;
@@ -15,23 +16,16 @@ export interface BestSlot {
   label: string;
 }
 export interface BestTimes {
-  source: "yours" | "typical";
+  source: "yours" | "none";
   /** Local hours (0-23), strongest first. Drives the dots in the time picker. */
   peakHours: number[];
   slots: BestSlot[];
   reason: string;
+  /** The creator's published posts with views on these platforms (what the suggestion is built from). */
+  samples: number;
+  /** How many it takes before there is a suggestion. */
+  needed: number;
 }
-
-/** Typical peaks (local time). Days: 0 = Sunday. Broad industry guidance, used only until we have the creator's own data. */
-export const TYPICAL: Record<Platform, { days: number[]; hours: number[] }> = {
-  instagram: { days: [2, 3, 4, 5], hours: [11, 19, 12, 20] },
-  youtube: { days: [5, 6, 0], hours: [18, 15, 12, 19] },
-  x: { days: [1, 2, 3, 4, 5], hours: [9, 12, 10, 17] },
-  tiktok: { days: [2, 4, 5], hours: [19, 20, 18, 21] },
-  threads: { days: [1, 2, 3, 4, 5], hours: [9, 12, 19, 8] },
-  facebook: { days: [1, 2, 3, 4, 5], hours: [12, 9, 13, 15] },
-  linkedin: { days: [2, 3, 4], hours: [9, 8, 12, 10] },
-};
 
 export const MIN_SAMPLES = 6;
 
@@ -62,7 +56,6 @@ export function zoned(y: number, m: number, d: number, h: number, tz: string) {
 
 export const hourLabel = (h: number) => `${h % 12 || 12} ${h < 12 ? "AM" : "PM"}`;
 const DAY_NAME = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const list = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : xs[0] ?? "");
 
 export function bestTimes(input: { samples: PostedSample[]; platforms: Platform[]; tz: string; now?: Date; count?: number }): BestTimes {
   const now = input.now ?? new Date();
@@ -72,7 +65,7 @@ export function bestTimes(input: { samples: PostedSample[]; platforms: Platform[
 
   const hourW = new Array(24).fill(0) as number[];
   const dayW = new Array(7).fill(0) as number[];
-  let source: BestTimes["source"] = "typical";
+  let source: BestTimes["source"] = "none";
   let reason = "";
 
   if (samples.length >= MIN_SAMPLES) {
@@ -97,14 +90,12 @@ export function bestTimes(input: { samples: PostedSample[]; platforms: Platform[
     }
   }
 
-  if (source === "typical") {
-    for (const p of platforms) {
-      const t = TYPICAL[p];
-      t.hours.forEach((h, i) => (hourW[h] += 4 - i));
-      for (const d of t.days) dayW[d] += 1;
-    }
-    for (let d = 0; d < 7; d++) dayW[d] = 1 + dayW[d] / platforms.length;
-    reason = `Typical peak times for ${list(platforms.map((p) => PLATFORM_META[p].name))}. After ${MIN_SAMPLES} published posts we switch to what works for your audience.`;
+  if (source === "none") {
+    reason =
+      samples.length < MIN_SAMPLES
+        ? `Not enough of your own posts yet (${samples.length} of ${MIN_SAMPLES} with views). Best times come from your audience once there are ${MIN_SAMPLES}.`
+        : "Your posts so far are too spread out to show a best time yet. A few more at similar times will tell.";
+    return { source, peakHours: [], slots: [], reason, samples: samples.length, needed: MIN_SAMPLES };
   }
 
   const peakHours = hourW.map((w, h) => ({ w, h })).filter((x) => x.w > 0).sort((a, b) => b.w - a.w).slice(0, 3).map((x) => x.h);
@@ -128,5 +119,5 @@ export function bestTimes(input: { samples: PostedSample[]; platforms: Platform[
     const day = ahead === 0 ? "Today" : ahead === 1 ? "Tomorrow" : DAY_NAME[c.wd];
     return { at: c.at.toISOString(), label: `${day} ${hourLabel(c.h)}` };
   });
-  return { source, peakHours, slots, reason };
+  return { source, peakHours, slots, reason, samples: samples.length, needed: MIN_SAMPLES };
 }

@@ -13,18 +13,26 @@ interface Props {
   onSave: () => void;
   busy: boolean;
   className?: string;
+  /** The action bar carries the Save button; this then shows only where the draft stands. */
+  hideButton?: boolean;
+  /** Where the draft stands on the server (components/create/SyncStatus); replaces the plain autosave line. */
+  sync?: React.ReactNode;
 }
 
 /** Explicit saving, on every step once a video exists, with the autosave line always on screen. */
-export function SaveDraft({ state, at, onSave, busy, className }: Props) {
+export function SaveDraft({ state, at, onSave, busy, className, hideButton, sync }: Props) {
   return (
     <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-2", className ?? "mt-6")}>
-      <Button variant="subtle" onClick={onSave} disabled={busy}>
-        <Save className="h-4 w-4" /> {busy ? "Saving" : "Save draft"}
-      </Button>
-      <p className="text-xs text-muted-foreground" aria-live="polite">
-        {autosaveLine(state, at)}
-      </p>
+      {!hideButton && (
+        <Button variant="subtle" onClick={onSave} disabled={busy}>
+          <Save className="h-4 w-4" /> {busy ? "Saving" : "Save draft"}
+        </Button>
+      )}
+      {sync ?? (
+        <p className="text-xs text-muted-foreground" aria-live="polite">
+          {autosaveLine(state, at)}
+        </p>
+      )}
       {state === "error" && (
         <Button variant="ghost" size="sm" onClick={onSave}>
           <RotateCcw className="h-4 w-4" /> Retry

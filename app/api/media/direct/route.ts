@@ -19,19 +19,21 @@ const body = z.object({
 
 /**
  * Tells the client how to upload: straight to the bucket when the driver allows it (Supabase TUS,
- * or R2/S3 presigned PUT / multipart), else stream through /api/media.
+ * or R2/S3 presigned PUT / multipart), else stream through /api/media. Also the formats and size this
+ * account may upload, shown before a file is picked.
  */
 export const GET = route(async (_req, { user }) => {
   const [lim, st] = await Promise.all([uploadLimitBytes(user.id), storageUsage(user.id)]);
   return json({
     storage: { usedBytes: st.usedBytes, limitBytes: st.limitBytes, remainingBytes: st.remainingBytes, over: st.over, label: st.label },
     direct: Boolean(storage.createDirectUpload),
-    driver: storage.name,
     maxBytes: lim.bytes,
     maxMb: lim.mb,
     planLimited: lim.planLimited,
     planName: lim.planName,
     chunkSize: storage.multipart?.partSize ?? 6 * 1024 * 1024,
+    // The same lists POST checks, so the picker can say up front what will be taken.
+    formats: { extensions: [...ALLOWED_EXT], mimeTypes: [...ALLOWED_VIDEO_MIME], label: "MP4 or MOV" },
   });
 });
 

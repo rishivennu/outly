@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { pollable } from "@/lib/client/idle";
-import { AlertCircle, ArrowLeft, Check, Clock, ExternalLink, Inbox as InboxIcon, Loader2, Paperclip, Send, Sparkles } from "lucide-react";
+import { AlertCircle, Archive, ArrowLeft, Check, Clock, ExternalLink, Inbox as InboxIcon, Loader2, Mail, Paperclip, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
@@ -10,16 +10,34 @@ import { takeDeepLink } from "@/lib/client/deep-link";
 import { PLATFORM_META } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import type { MessageView, ReplyBlock, ThreadView } from "@/lib/messages/service";
-import { ago, ConnectionStrip, InboxRow, isTyping, isWide, joinNames, Kbd, PersonAvatar, ScopeBar, stripButton, Tag, useMobileLock, type PaneProps } from "./InboxList";
+import type { DmPlatform } from "@/lib/messages/meta";
+import { appendPage, mergeHead, mergeLatest, prependOlder, THREAD_PAGE, THREAD_PAGE_MAX } from "@/lib/messages/paging";
+import { ago, ConnectionStrip, isTyping, isWide, joinNames, Kbd, PersonAvatar, stripButton, Tag, useMobileLock, type PaneProps } from "./InboxList";
+import { listQuery, secondsUntil, serverView, threadStatus, threadsWaiting, visibleThreads, type DmFilter } from "./messages/status";
+import { ThreadActions } from "./messages/ThreadActions";
+import { ThreadFilters } from "./messages/ThreadFilters";
+import { ThreadRow } from "./messages/ThreadRow";
 
-/** 1090: a reply the server has not confirmed yet. It is never drawn as sent until Meta accepted it. */
-type Pending = { clientId: string; text: string; state: "sending" | "failed"; error?: string; at: string };
+export { threadNeedsReply, threadsWaiting } from "./messages/status";
+
+/**
+ * 1090: a reply the server has not confirmed yet. It is never drawn as sent until Meta accepted it.
+ * Phase 2 (1155): a rate-limited one carries Meta's "try again at", and Retry waits for it.
+ */
+type Pending = { clientId: string; text: string; state: "sending" | "failed"; error?: string; code?: string; retryAt?: string | null; at: string };
 const newClientId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`);
 
-type Problem = { platform: "instagram" | "facebook"; code: string; message: string; detail?: string };
-/** dmsOff (1031f): platforms where the admin switched direct messages off, e.g. while Meta reviews the permission. */
-export type DmData = { threads: ThreadView[]; accounts: number; problems?: Problem[]; readOnly?: boolean; dmsOff?: ("instagram" | "facebook")[] };
-type Filter = "all" | "instagram" | "facebook";
+type Problem = { platform: "instagram" | "facebook"; code: string; message: string; detail?: string; retryAt?: string | null };
+/**
+ * dmsOff (1031f): platforms where the admin switched direct messages off, e.g. while Meta reviews the permission.
+ * Phase 2 (1155): platforms = connected DM-capable platforms (the filter chips), archived = how many are hidden,
+ * nextCursor = the next page of older conversations.
+ */
+export type DmData = { threads: ThreadView[]; accounts: number; problems?: Problem[]; readOnly?: boolean; dmsOff?: ("instagram" | "facebook")[]; platforms?: DmPlatform[]; archived?: number; nextCursor?: string | null };
+type Filter = DmFilter;
+const filterKey = (f: Filter) => `${f.view}:${f.platform}`;
+const fullTime = (iso: string) => new Date(iso).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+const clock = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
 const MAX = 1000;
 const LIST_POLL_MS = 30_000;
@@ -30,10 +48,6 @@ function hoursLeft(iso: string | null) {
   return Math.max(0, (new Date(iso).getTime() - Date.now()) / 3600_000);
 }
 
-/** 1093: waiting = they wrote last (or it is unread) and Meta still lets us answer here. */
-export const threadNeedsReply = (t: Pick<ThreadView, "unread" | "snippet" | "canReply">) => t.unread > 0 || (t.canReply && !t.snippet.startsWith("You:"));
-export const threadsWaiting = (threads: ThreadView[]) => threads.filter(threadNeedsReply).length;
-
 function ThreadAvatar({ t, size = 40, badge = true }: { t: Pick<ThreadView, "participantAvatar" | "participantName" | "platform">; size?: number; badge?: boolean }) {
   const [broken, setBroken] = useState(false);
   return <PersonAvatar name={t.participantName} src={broken ? null : t.participantAvatar} platform={badge ? t.platform : undefined} size={size} onBroken={() => setBroken(true)} />;
@@ -43,13 +57,17 @@ function ThreadAvatar({ t, size = 40, badge = true }: { t: Pick<ThreadView, "par
 export function MessagesView({ initial, tabs, query, refreshTick, refreshQuiet, onBusy, onWaiting }: { initial: DmData } & PaneProps) {
   const toast = useToast();
   const [data, setData] = useState<DmData>(initial);
-  const [filter, setFilter] = useState<Filter>("all");
-  const [needsOnly, setNeedsOnly] = useState(true);
+  const [filter, setFilter] = useState<Filter>({ view: "needs", platform: "all" });
   const [openId, setOpenId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [more, setMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const synced = useRef(false);
   const rows = useRef(new Map<string, HTMLButtonElement>());
+  // Which filter the threads in `data` belong to, and how many are shown, so a reload keeps the pages already loaded.
+  const dataKey = useRef(filterKey(filter));
+  const shown = useRef(initial.threads.length);
+  shown.current = data.threads.length;
 
   const seq = useRef(0);
   // 1114: when the last load started and whether it is still out, so the freshness pass never repeats one.
@@ -61,11 +79,17 @@ export function MessagesView({ initial, tabs, query, refreshTick, refreshQuiet, 
     if (sync) setSyncing(true);
     setError(null);
     try {
-      const q = new URLSearchParams();
-      if (f !== "all") q.set("platform", f);
-      if (sync) q.set("sync", "1");
-      const next = await api<DmData>(`/api/messages${q.size ? `?${q}` : ""}`);
-      if (mineSeq === seq.current) setData(next); // a slower, older answer never overwrites a newer one
+      const key = filterKey(f);
+      const same = key === dataKey.current;
+      const take = same ? Math.min(THREAD_PAGE_MAX, Math.max(THREAD_PAGE, shown.current)) : undefined;
+      const next = await api<DmData>(`/api/messages${listQuery(f, { sync, take })}`);
+      if (mineSeq !== seq.current) return; // a slower, older answer never overwrites a newer one
+      setData((d) => {
+        if (!same || dataKey.current !== key) return next;
+        const merged = mergeHead(d.threads, d.nextCursor ?? null, next.threads, next.nextCursor ?? null);
+        return { ...next, threads: merged.threads, nextCursor: merged.nextCursor };
+      });
+      dataKey.current = key;
     } catch (e) {
       if (mineSeq === seq.current) setError(e instanceof ApiError ? e.message : "We couldn't reach your messages just now.");
     } finally {
@@ -85,7 +109,7 @@ export function MessagesView({ initial, tabs, query, refreshTick, refreshQuiet, 
   useEffect(() => {
     if (synced.current || initial.threads.length || !initial.accounts) return;
     synced.current = true;
-    void load("all", true);
+    void load({ view: "needs", platform: "all" }, true);
   }, [initial, load]);
 
   // New messages arrive by webhook; check our copy now and then while the tab is visible.
@@ -112,17 +136,73 @@ export function MessagesView({ initial, tabs, query, refreshTick, refreshQuiet, 
   useEffect(() => onBusy(syncing), [syncing, onBusy]);
 
   const waiting = threadsWaiting(data.threads);
-  useEffect(() => onWaiting(waiting), [waiting, onWaiting]);
+  // Only the inbox list knows who is waiting; the unread and archived lists would undercount.
+  const counts = serverView(filter.view) === "inbox" && filter.platform === "all";
+  useEffect(() => {
+    if (counts) onWaiting(waiting);
+  }, [counts, waiting, onWaiting]);
 
   const pickFilter = (f: Filter) => {
+    const serverSame = serverView(f.view) === serverView(filter.view) && f.platform === filter.platform;
     setFilter(f);
     setOpenId(null);
-    void load(f);
+    // Needs reply and All read the same list: switching between them only filters what is loaded.
+    if (serverSame) dataKey.current = filterKey(f);
+    else void load(f);
+  };
+
+  /** Older conversations, from our copy. Kept only if the filter did not change meanwhile. */
+  const loadMore = async () => {
+    const cursor = data.nextCursor;
+    if (!cursor || more) return;
+    const f = filterRef.current;
+    const key = filterKey(f);
+    setMore(true);
+    setError(null);
+    try {
+      const next = await api<DmData>(`/api/messages${listQuery(f, { cursor })}`);
+      if (dataKey.current === key) setData((d) => ({ ...d, threads: appendPage(d.threads, next.threads), nextCursor: next.nextCursor ?? null, archived: next.archived ?? d.archived }));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "We couldn't load older conversations just now.");
+    } finally {
+      setMore(false);
+    }
+  };
+
+  /**
+   * Phase 2 (1155): read, unread, archive and restore change Outlly's copy only. The list updates at once;
+   * if the server refuses, a reload puts back the truth.
+   */
+  const changeState = async (t: ThreadView, patch: { read?: boolean; archived?: boolean }, quiet = false) => {
+    const f = filterRef.current;
+    if (patch.archived !== undefined) {
+      const leaves = f.view === "archived" ? !patch.archived : patch.archived;
+      if (leaves) {
+        setData((d) => ({ ...d, threads: d.threads.filter((x) => x.id !== t.id), archived: Math.max(0, (d.archived ?? 0) + (patch.archived ? 1 : -1)) }));
+        if (openId === t.id) setOpenId(null);
+      }
+    }
+    if (patch.read !== undefined) {
+      setData((d) => ({ ...d, threads: d.threads.map((x) => (x.id === t.id ? { ...x, unread: patch.read ? 0 : Math.max(1, x.unread) } : x)) }));
+      // An open conversation reads itself again on its next refresh: close it so "unread" sticks.
+      if (!patch.read && openId === t.id) setOpenId(null);
+    }
+    try {
+      const r = await api<{ thread: ThreadView }>(`/api/messages/${t.id}/state`, { method: "PATCH", json: patch });
+      if (patch.read !== undefined) setData((d) => ({ ...d, threads: d.threads.map((x) => (x.id === t.id ? { ...x, unread: r.thread.unread } : x)) }));
+      if (quiet) return void load(filterRef.current);
+      if (patch.archived === true)
+        toast(`Archived in Outlly. It stays in ${PLATFORM_META[t.platform].name}.`, "ok", { action: { label: "Undo", onClick: () => void changeState(t, { archived: false }, true) } });
+      else if (patch.archived === false) toast("Moved back to your conversations.");
+      else if (patch.read === false) toast(`Marked as unread. ${t.participantName} isn't told.`);
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "That didn't save. Check your connection and try again.", "error");
+      void load(filterRef.current);
+    }
   };
 
   const q = query.trim().toLowerCase();
-  // An open conversation stays listed after you answer it, so it doesn't jump away mid-thought.
-  const visible = data.threads.filter((t) => (!needsOnly || threadNeedsReply(t) || t.id === openId) && (!q || `${t.participantName} ${t.participantHandle ?? ""} ${t.snippet}`.toLowerCase().includes(q)));
+  const visible = visibleThreads(data.threads, filter, query, openId);
   const open = data.threads.find((t) => t.id === openId) ?? null;
   const onRead = useCallback((id: string) => setData((d) => ({ ...d, threads: d.threads.map((t) => (t.id === id ? { ...t, unread: 0 } : t)) })), []);
   const onSent = (id: string, m: MessageView) =>
@@ -179,10 +259,10 @@ export function MessagesView({ initial, tabs, query, refreshTick, refreshQuiet, 
         <section aria-label="Conversations" className="flex min-h-0 flex-col lg:border-r lg:border-border">
           <div className="px-4 pb-2 sm:px-6 lg:px-3 lg:pt-3">
             {tabs}
-            <ScopeBar needsOnly={needsOnly} onNeedsOnly={setNeedsOnly} platforms={["instagram", "facebook"]} platform={filter} onPlatform={(p) => pickFilter(p as Filter)} />
+            <ThreadFilters filter={filter} onChange={pickFilter} platforms={data.platforms ?? []} archived={data.archived ?? 0} />
           </div>
           <div role="tabpanel" id="inbox-panel-messages" aria-labelledby="inbox-tab-messages" aria-busy={syncing} className="min-h-0 flex-1 border-t border-border/70 lg:overflow-y-auto lg:overscroll-contain">
-            {data.threads.length === 0 ? (
+            {data.threads.length === 0 && filter.view !== "archived" && filter.view !== "unread" ? (
               <div className="p-10 text-center">
                 <InboxIcon className="mx-auto h-8 w-8 text-muted-foreground" strokeWidth={1.6} aria-hidden="true" />
                 <p className="mt-3 font-medium">{data.accounts ? "No messages yet." : "Connect Instagram or a Facebook Page to see messages."}</p>
@@ -192,57 +272,82 @@ export function MessagesView({ initial, tabs, query, refreshTick, refreshQuiet, 
                     : "Go to Accounts and connect Instagram or Facebook. If you connected before messages were added, reconnect once so Outlly can ask for the messaging permission."}
                 </p>
               </div>
-            ) : visible.length === 0 ? (
+            ) : visible.length === 0 && !data.nextCursor ? (
               <div className="p-10 text-center">
-                <Check className="mx-auto h-7 w-7 text-lime-ink" aria-hidden="true" />
-                <p className="mt-3 font-medium">{q ? "Nothing matches that search." : "Nobody is waiting on you."}</p>
-                {!q && needsOnly && (
-                  <button type="button" onClick={() => setNeedsOnly(false)} className="mt-2 min-h-[44px] rounded-full px-4 text-sm font-medium underline hover:bg-secondary">
+                {filter.view === "archived" ? (
+                  <Archive className="mx-auto h-7 w-7 text-muted-foreground" aria-hidden="true" />
+                ) : filter.view === "unread" ? (
+                  <Mail className="mx-auto h-7 w-7 text-muted-foreground" aria-hidden="true" />
+                ) : (
+                  <Check className="mx-auto h-7 w-7 text-lime-ink" aria-hidden="true" />
+                )}
+                <p className="mt-3 font-medium">{q ? "Nothing matches that search." : filter.view === "archived" ? "Nothing archived." : filter.view === "unread" ? "No unread conversations." : "Nobody is waiting on you."}</p>
+                {!q && filter.view === "archived" && <p className="mx-auto mt-1 max-w-xs text-sm text-muted-foreground">Archiving hides a conversation in Outlly only. It stays in Instagram or Facebook, and a new message brings it back here.</p>}
+                {!q && filter.view === "needs" && (
+                  <button type="button" onClick={() => pickFilter({ ...filter, view: "all" })} className="mt-2 min-h-11 rounded-full px-4 text-sm font-medium underline [@media(hover:hover)]:hover:bg-secondary">
                     Show all conversations
                   </button>
                 )}
               </div>
             ) : (
-              <ul aria-label={needsOnly ? "Conversations waiting for you" : "All conversations"}>
-                {visible.map((t) => {
-                  const needs = threadNeedsReply(t);
-                  const hrs = Math.floor(hoursLeft(t.windowEndsAt));
-                  return (
-                    <InboxRow
-                      key={t.id}
-                      id={`row-${t.id}`}
-                      ref={(el) => {
-                        if (el) rows.current.set(t.id, el);
-                        else rows.current.delete(t.id);
-                      }}
-                      selected={t.id === openId}
-                      needsReply={needs}
-                      name={t.participantName}
-                      avatar={<ThreadAvatar t={t} />}
-                      tag={t.practice ? <Tag>Practice</Tag> : null}
-                      time={ago(t.lastMessageAt)}
-                      preview={t.snippet || "No text"}
-                      context={
-                        !t.canReply ? (
-                          <span className="truncate">Reply window closed · answer in the app</span>
-                        ) : needs ? (
-                          <>
-                            <Clock className="h-3.5 w-3.5 shrink-0 text-lime-ink" aria-hidden="true" />
-                            <span className="truncate font-medium text-lime-ink">{hrs >= 1 ? `${hrs} h left to reply` : "Under an hour left to reply"}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                            <span>Replied</span>
-                          </>
-                        )
-                      }
-                      label={`${t.participantName} on ${PLATFORM_META[t.platform].name}${t.unread ? `, ${t.unread} unread` : ""}${needs ? ", waiting for your reply" : ""}`}
-                      onOpen={() => setOpenId(t.id)}
-                    />
-                  );
-                })}
-              </ul>
+              <>
+                {q && data.nextCursor && (
+                  <p role="status" className="px-4 pt-2 text-xs text-muted-foreground">
+                    Searching the {data.threads.length} conversations loaded so far. Load older ones to search further back.
+                  </p>
+                )}
+                <ul aria-label={filter.view === "needs" ? "Conversations waiting for you" : filter.view === "unread" ? "Unread conversations" : filter.view === "archived" ? "Archived conversations" : "All conversations"}>
+                  {visible.map((t) => {
+                    const status = threadStatus(t);
+                    const hrs = Math.floor(hoursLeft(t.windowEndsAt));
+                    const archived = !!t.archivedAt;
+                    return (
+                      <ThreadRow
+                        key={t.id}
+                        id={`row-${t.id}`}
+                        ref={(el) => {
+                          if (el) rows.current.set(t.id, el);
+                          else rows.current.delete(t.id);
+                        }}
+                        selected={t.id === openId}
+                        unread={t.unread > 0}
+                        name={t.participantName}
+                        avatar={<ThreadAvatar t={t} />}
+                        tag={t.practice ? <Tag>Practice</Tag> : archived ? <Tag>Archived</Tag> : null}
+                        time={ago(t.lastMessageAt)}
+                        timeTitle={fullTime(t.lastMessageAt)}
+                        preview={t.snippet || "No text"}
+                        status={
+                          status === "window_closed" ? (
+                            <span className="truncate">Window closed. Answer in the app</span>
+                          ) : status === "needs_reply" ? (
+                            <>
+                              <Clock className="h-3.5 w-3.5 shrink-0 text-lime-ink" aria-hidden="true" />
+                              <span className="truncate font-medium text-lime-ink">Needs reply. {hrs >= 1 ? `${hrs} h left` : "Under an hour left"}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                              <span>Replied</span>
+                            </>
+                          )
+                        }
+                        label={`${t.participantName} on ${PLATFORM_META[t.platform].name}, last message ${fullTime(t.lastMessageAt)}${t.unread ? `, ${t.unread} unread` : ""}, ${status === "needs_reply" ? "waiting for your reply" : status === "replied" ? "replied" : "reply window closed"}${archived ? ", archived in Outlly" : ""}`}
+                        onOpen={() => setOpenId(t.id)}
+                        actions={<ThreadActions name={t.participantName} unread={t.unread > 0} archived={archived} onRead={(read) => void changeState(t, { read })} onArchive={(a) => void changeState(t, { archived: a })} />}
+                      />
+                    );
+                  })}
+                </ul>
+                {data.nextCursor && (
+                  <div className="flex justify-center p-3">
+                    <Button type="button" variant="outline" size="md" onClick={() => void loadMore()} disabled={more} aria-busy={more}>
+                      {more && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
+                      {more ? "Loading" : "Load older conversations"}
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
           <footer className="hidden items-center gap-3 border-t border-border px-4 py-2 text-xs text-muted-foreground lg:flex">
@@ -253,8 +358,9 @@ export function MessagesView({ initial, tabs, query, refreshTick, refreshQuiet, 
             <span>
               <Kbd>/</Kbd> search
             </span>
-            <span className="ml-auto">
-              {waiting} of {data.threads.length} need a reply
+            <span className="ml-auto tabular-nums">
+              {waiting} of {data.threads.length}
+              {data.nextCursor ? " loaded" : ""} need a reply
             </span>
           </footer>
         </section>
@@ -274,6 +380,7 @@ export function MessagesView({ initial, tabs, query, refreshTick, refreshQuiet, 
               onClosed={onClosed}
               toast={toast}
               readOnly={!!initial.readOnly}
+              actions={<ThreadActions name={open.participantName} unread={open.unread > 0} archived={!!open.archivedAt} onRead={(read) => void changeState(open, { read })} onArchive={(a) => void changeState(open, { archived: a })} />}
             />
           ) : (
             <div className="grid h-full place-items-center p-10 text-center text-sm text-muted-foreground">Pick a conversation to read it.</div>
@@ -337,6 +444,7 @@ function ThreadPane({
   onClosed,
   toast,
   readOnly,
+  actions,
 }: {
   thread: ThreadView;
   onBack: () => void;
@@ -345,8 +453,16 @@ function ThreadPane({
   onClosed: (id: string, block: ReplyBlock) => void;
   toast: ReturnType<typeof useToast>;
   readOnly: boolean;
+  actions: React.ReactNode;
 }) {
   const [messages, setMessages] = useState<MessageView[] | null>(null);
+  // Phase 2 (1155): history pages. Once older messages are loaded, refreshes keep the deeper cursor.
+  const [olderCursor, setOlderCursor] = useState<string | null>(null);
+  const [older, setOlder] = useState<"idle" | "loading" | "failed">("idle");
+  const pagedBack = useRef(false);
+  const keepScroll = useRef<{ height: number; top: number } | null>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -361,8 +477,9 @@ function ThreadPane({
 
   const fetchThread = useCallback(async () => {
     try {
-      const r = await api<{ thread: ThreadView; messages: MessageView[] }>(`/api/messages/${thread.id}`);
-      setMessages(r.messages);
+      const r = await api<{ thread: ThreadView; messages: MessageView[]; olderCursor?: string | null }>(`/api/messages/${thread.id}`);
+      setMessages((m) => mergeLatest(m, r.messages));
+      if (!pagedBack.current) setOlderCursor(r.olderCursor ?? null);
       setBlock(r.thread.replyBlock ?? null);
       setLoadErr(null);
       onRead(thread.id);
@@ -377,14 +494,50 @@ function ThreadPane({
     return () => clearInterval(id);
   }, [fetchThread]);
 
+  const loadOlder = async () => {
+    if (!olderCursor || older === "loading") return;
+    setOlder("loading");
+    try {
+      const r = await api<{ messages: MessageView[]; olderCursor?: string | null }>(`/api/messages/${thread.id}?before=${encodeURIComponent(olderCursor)}`);
+      const el = list.current;
+      if (el) keepScroll.current = { height: el.scrollHeight, top: el.scrollTop };
+      pagedBack.current = true;
+      setMessages((m) => prependOlder(m, r.messages));
+      setOlderCursor(r.olderCursor ?? null);
+      setOlder("idle");
+    } catch {
+      setOlder("failed");
+    }
+  };
+
+  // Earlier history lands above: keep the message you were reading where it was.
+  useLayoutEffect(() => {
+    const k = keepScroll.current;
+    const el = list.current;
+    if (!k || !el) return;
+    keepScroll.current = null;
+    el.scrollTop = el.scrollHeight - k.height + k.top;
+  }, [messages]);
+
   // Braces matter: newer Chromium returns a Promise from scrollIntoView, and React would call it as a cleanup (crash).
   // 1090: scroll the message list itself, not the page; scrolling the page parked the composer below the fold.
+  // 1155: only a new newest message (or a pending one) scrolls down; earlier history must not.
+  const newestId = messages?.[messages.length - 1]?.id;
   useEffect(() => {
     const el = bottom.current?.parentElement;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages?.length, pending.length]);
+  }, [newestId, pending.length]);
+
+  // A rate-limited reply counts down to Meta's retry time; the clock only ticks while one is waiting.
+  const waitingRetry = pending.some((p) => p.state === "failed" && secondsUntil(p.retryAt, now) > 0);
+  useEffect(() => {
+    if (!waitingRetry) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [waitingRetry]);
 
   const lastIn = [...(messages ?? [])].reverse().find((m) => m.direction === "in");
+  const lastOutId = [...(messages ?? [])].reverse().find((m) => m.direction === "out")?.id;
 
   const suggest = async () => {
     if (!lastIn?.text) return;
@@ -417,12 +570,14 @@ function ThreadPane({
     } catch (e2) {
       const code = e2 instanceof ApiError ? e2.code : undefined;
       const msg = e2 instanceof ApiError ? e2.message : "The message didn't go through. Check your connection and try again.";
+      const retryAt = e2 instanceof ApiError && typeof e2.data?.retryAt === "string" ? e2.data.retryAt : null;
+      setNow(Date.now());
       if (code === "WINDOW_CLOSED" || code === "NOT_CONNECTED" || code === "DMS_OFF") {
         const b: ReplyBlock = { code, message: msg };
         setBlock(b);
         onClosed(thread.id, b);
       }
-      setPending((list) => list.map((x) => (x.clientId === p.clientId ? { ...x, state: "failed", error: msg } : x)));
+      setPending((list) => list.map((x) => (x.clientId === p.clientId ? { ...x, state: "failed", error: msg, code, retryAt } : x)));
     }
   };
 
@@ -458,19 +613,33 @@ function ThreadPane({
           </p>
         </div>
         {!locked ? (
-          <span className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-lime/20 px-3 text-[13px] font-semibold text-lime-ink" title="Meta lets you reply here for 24 hours after their last message">
+          <span className="hidden h-8 shrink-0 items-center gap-1.5 rounded-full bg-lime/20 px-3 text-[13px] font-semibold text-lime-ink sm:inline-flex" title="Meta lets you reply here for 24 hours after their last message">
             <Clock className="h-3.5 w-3.5" aria-hidden="true" />
             <span suppressHydrationWarning>{hrs >= 1 ? `${Math.floor(hrs)} h left` : "Under 1 h left"}</span>
           </span>
         ) : block?.code === "WINDOW_CLOSED" ? (
-          <span className="inline-flex h-8 shrink-0 items-center rounded-full bg-secondary px-3 text-[13px] font-medium text-muted-foreground">Window closed</span>
+          <span className="hidden h-8 shrink-0 items-center rounded-full bg-secondary px-3 text-[13px] font-medium text-muted-foreground sm:inline-flex">Window closed</span>
         ) : null}
+        {actions}
         <a href={appLink} target="_blank" rel="noopener noreferrer" aria-label={`Open in ${name}`} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-foreground hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring lg:flex lg:h-10 lg:w-auto lg:items-center lg:gap-1.5 lg:rounded-xl lg:px-3.5 lg:text-[13px] lg:font-medium lg:hairline">
           <span className="hidden lg:inline">Open in {name}</span> <ExternalLink className="h-4 w-4" aria-hidden="true" />
         </a>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 lg:px-6" aria-live="polite">
+      <div ref={list} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 lg:px-6" aria-live="polite">
+        {olderCursor && messages && (
+          <div className="mb-3 flex flex-col items-center gap-1">
+            <Button type="button" variant="outline" size="sm" onClick={() => void loadOlder()} disabled={older === "loading"} aria-busy={older === "loading"}>
+              {older === "loading" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
+              {older === "loading" ? "Loading" : "Show earlier messages"}
+            </Button>
+            {older === "failed" && (
+              <p role="alert" className="text-xs text-destructive">
+                Earlier messages didn&apos;t load. Try again.
+              </p>
+            )}
+          </div>
+        )}
         {loadErr && (
           <p role="alert" className="text-sm text-destructive">
             {loadErr}
@@ -490,7 +659,7 @@ function ThreadPane({
                 {m.text && <p className="whitespace-pre-wrap break-words">{m.text}</p>}
                 {m.attachments.map((a, i) =>
                   a.url && /^https:\/\//i.test(a.url) ? (
-                    <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-[32px] items-center gap-1 text-xs underline">
+                    <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-11 items-center gap-1 text-xs underline">
                       <Paperclip className="h-3 w-3" aria-hidden="true" /> {a.type === "image" ? "Photo" : a.type === "video" ? "Video" : "Attachment"}
                     </a>
                   ) : (
@@ -499,9 +668,15 @@ function ThreadPane({
                     </p>
                   ),
                 )}
-                <p className="mt-0.5 text-right text-xs text-muted-foreground">
+                <p className="mt-0.5 flex items-center justify-end gap-1 text-right text-xs text-muted-foreground">
                   <span className="sr-only">{m.direction === "out" ? "You, " : `${thread.participantName}, `}</span>
                   {new Date(m.sentAt).toLocaleString(undefined, { hour: "numeric", minute: "2-digit", day: "numeric", month: "short" })}
+                  {m.id === lastOutId && (thread.practice ? <span>, practice only</span> : (
+                    <>
+                      <Check className="ml-0.5 h-3 w-3" aria-hidden="true" />
+                      <span>Sent</span>
+                    </>
+                  ))}
                 </p>
               </div>
             </li>
@@ -525,18 +700,23 @@ function ThreadPane({
               {p.state === "failed" && (
                 <div className="mt-1 flex max-w-[80%] flex-wrap items-center justify-end gap-2 text-xs">
                   {p.error && <span className="text-destructive">{p.error}</span>}
-                  {!block && (
-                    <button type="button" onClick={() => void deliver(p)} className="min-h-[32px] rounded-full px-2.5 font-medium underline hover:bg-secondary">
-                      Retry
-                    </button>
-                  )}
+                  {!block &&
+                    (secondsUntil(p.retryAt, now) > 0 ? (
+                      <span className="tabular-nums text-muted-foreground" suppressHydrationWarning>
+                        Retry after {clock(p.retryAt!)}
+                      </span>
+                    ) : (
+                      <button type="button" onClick={() => void deliver(p)} className="min-h-11 rounded-full px-2.5 font-medium underline [@media(hover:hover)]:hover:bg-secondary">
+                        Retry
+                      </button>
+                    ))}
                   <button
                     type="button"
                     onClick={() => {
                       setPending((list) => list.filter((x) => x.clientId !== p.clientId));
                       if (!text.trim()) setText(p.text);
                     }}
-                    className="min-h-[32px] rounded-full px-2.5 font-medium text-muted-foreground underline hover:bg-secondary"
+                    className="min-h-11 rounded-full px-2.5 font-medium text-muted-foreground underline hover:bg-secondary"
                   >
                     Edit
                   </button>
@@ -569,11 +749,11 @@ function ThreadPane({
           <div id={`dm-lock-${thread.id}`} role="note" className="mb-2 rounded-2xl bg-secondary/60 p-3.5 text-sm">
             <p className="font-medium">{block.message}</p>
             {block.code === "NOT_CONNECTED" ? (
-              <a href="/accounts" className="mt-1 inline-flex min-h-[32px] items-center text-sm underline">
+              <a href="/accounts" className="mt-1 inline-flex min-h-11 items-center text-sm underline">
                 Go to Accounts
               </a>
             ) : (
-              <a href={appLink} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-[32px] items-center gap-1 text-sm underline">
+              <a href={appLink} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-11 items-center gap-1 text-sm underline">
                 Open {name} <ExternalLink className="h-3 w-3" aria-hidden="true" />
               </a>
             )}

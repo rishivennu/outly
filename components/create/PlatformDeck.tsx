@@ -29,6 +29,10 @@ interface Props {
   onContinue: () => void;
   hook: string;
   onHook: (h: string) => void;
+  /** The page's action bar is pinned below: this footer then stays in the flow instead of stacking a second sticky bar. */
+  docked?: boolean;
+  /** Rewrites and connecting need the network; off with a reason while offline. */
+  online?: boolean;
 }
 
 const READY_LABEL: Record<Platform, string> = { instagram: "Ready to go", youtube: "Wants a stronger title", x: "Make it impossible to ignore", tiktok: "Hook in the first second", threads: "Keep it conversational", facebook: "Ready for the feed", linkedin: "Lead with the lesson" };
@@ -210,7 +214,7 @@ export function PlatformDeck(p: Props) {
         </motion.div>
       </AnimatePresence>
 
-      <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+72px)] z-20 -mx-4 mt-6 lg:bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-background via-background/95 to-transparent px-4 pb-4 pt-8 sm:flex-row sm:justify-between">
+      <div className={cn(p.docked ? "mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-between" : "sticky bottom-[calc(env(safe-area-inset-bottom)+72px)] z-20 -mx-4 mt-6 lg:bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-background via-background/95 to-transparent px-4 pb-4 pt-8 sm:flex-row sm:justify-between")}>
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {enabled.length === 0 ? "Pick at least one place to send it." : ready ? "All set. Nothing goes out until you hit send." : `${pending.length} to look over: ${pending.map((x) => PLATFORM_META[x].name).join(", ")}`}
         </p>
@@ -231,6 +235,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
   const id = useId();
   const blocked = blocking(p.checks);
   const set = (patch: Partial<Draft>) => p.onDraft(pl, patch);
+  const offline = p.online === false;
   const [flash, setFlash] = useState(false);
 
   useEffect(() => {
@@ -291,7 +296,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
               <CircleAlert className="h-4 w-4 text-warning-ink" aria-hidden="true" />
               {acct ? `${meta.name} needs you to reconnect.` : `Connect ${meta.name} to send it here.`}
             </span>
-            <Button size="sm" variant="primary" onClick={() => p.onConnect(pl)}>
+            <Button size="sm" variant="primary" onClick={() => p.onConnect(pl)} disabled={offline} title={offline ? "Connecting needs a connection." : undefined}>
               <Link2 className="h-4 w-4" /> {acct ? "Reconnect" : "Connect account"}
             </Button>
           </div>
@@ -322,7 +327,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
               <Textarea id={`${id}-cap`} rows={pl === "x" ? 4 : 6} value={d.caption} onChange={(e) => set({ caption: e.target.value })} placeholder={pl === "x" ? "Say it in one breath." : "Tell them why it matters."} />
             </div>
           )}
-          {pl !== "x" && (
+          {meta.hashtagStyle !== "none" && (
             <div>
               <Label htmlFor={`${id}-tags`}>Hashtags</Label>
               <Input id={`${id}-tags`} value={d.hashtags} onChange={(e) => set({ hashtags: e.target.value })} placeholder="#oneidea #anotherone" />
@@ -345,7 +350,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
                 <p id={`${id}-fc-hint`} className="text-[13px] text-muted-foreground">
                   {pl === "x" ? "Posted as a reply to your post a few seconds after it goes live." : "Posted as your first comment a few seconds after it goes live."}
                 </p>
-                {pl !== "x" && d.hashtags.trim() && (
+                {meta.hashtagStyle !== "none" && d.hashtags.trim() && (
                   <Button
                     type="button"
                     size="sm"
@@ -362,7 +367,7 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
           <SnippetBar
             caption={pl === "youtube" ? d.description : d.caption}
             hashtags={d.hashtags}
-            showTags={pl !== "x"}
+            showTags={meta.hashtagStyle !== "none"}
             onCaption={(v) => set(pl === "youtube" ? { description: v } : { caption: v })}
             onTags={(v) => set({ hashtags: v })}
           />
@@ -390,10 +395,11 @@ function PlatformStage(p: Props & { platform: Platform; checks: ReturnType<typeo
             </motion.span>
             {d.reviewed ? "Looks good" : "This looks good"}
           </Button>
-          <Button variant="ghost" onClick={() => p.onRewrite(pl)} disabled={!d.enabled || p.rewriting === pl || p.writing.includes(pl)}>
+          <Button variant="ghost" onClick={() => p.onRewrite(pl)} disabled={!d.enabled || p.rewriting === pl || p.writing.includes(pl) || offline}>
             <RefreshCw className={cn("h-4 w-4", p.rewriting === pl && "animate-spin")} /> Rewrite this one
           </Button>
         </div>
+        {offline && <p className="text-[13px] text-muted-foreground">You&apos;re offline. Rewrites and connecting come back when you reconnect. Your edits are kept on this device.</p>}
       </div>
     </div>
   );

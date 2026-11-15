@@ -5,6 +5,7 @@ import { PipConversations } from "@/components/support/PipConversations";
 import { db } from "@/lib/db";
 import { HelpCenter } from "@/components/support/HelpCenter";
 import { MyRequests } from "@/components/support/MyRequests";
+import { onboardingFor } from "@/lib/onboarding";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Help" };
@@ -14,7 +15,7 @@ export default async function StudioHelp(props: { searchParams: Promise<{ topic?
   const searchParams = await props.searchParams;
   const user = (await getCurrentUser())!;
   const email = user.actor?.email ?? user.email;
-  const [faq, tickets, chats] = await Promise.all([
+  const [faq, tickets, chats, onboarding] = await Promise.all([
     listFaq(),
     db.ticket.findMany({
       // Only this person's own requests: a teammate inside someone else's workspace sees theirs, not the owner's.
@@ -32,6 +33,8 @@ export default async function StudioHelp(props: { searchParams: Promise<{ topic?
     }),
     // 1151: this person's own saved Pip chats (the real signed-in person, never the workspace owner's).
     listConversations(realUserId(user)).catch(() => []),
+    // Phase 2: the guided setup, to revisit any step from here.
+    onboardingFor(user).catch(() => null),
   ]);
   const items = faq.map((f) => ({ id: f.id, category: f.category, q: f.question, a: f.answer }));
   const cats = FAQ_CATEGORIES.filter((c) => items.some((i) => i.category === c));
@@ -54,6 +57,7 @@ export default async function StudioHelp(props: { searchParams: Promise<{ topic?
             updatedAt: t.updatedAt.toISOString(),
             reply: t.messages[0] ? { body: t.messages[0].body, by: t.messages[0].authorName ?? "Outlly support" } : null,
           }))}
+          onboarding={onboarding}
         />
         <PipConversations items={chats} />
         </>

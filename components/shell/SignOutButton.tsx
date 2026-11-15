@@ -2,8 +2,12 @@
 import { forwardRef, useRef, useState } from "react";
 import { LogOut } from "lucide-react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { api } from "@/lib/client/api";
-import { forgetBillingCopies } from "@/lib/client/forget-billing";
+import { api, ApiError } from "@/lib/client/api";
+import { legacyDraftCount, openDrafts } from "@/lib/client/device-drafts";
+import { forgetLocalCopies } from "@/lib/client/forget-billing";
+import { useOnline } from "@/lib/client/use-online";
+import { useToast } from "@/components/shared/Toast";
+import { useMaybeUser } from "./UserContext";
 import { cn } from "@/lib/utils";
 
 /**
@@ -13,10 +17,18 @@ import { cn } from "@/lib/utils";
 export function useSignOut() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [unsynced, setUnsynced] = useState(0);
   const back = useRef<HTMLElement | null>(null);
+  const userId = useMaybeUser()?.id;
+  const online = useOnline();
+  const toast = useToast();
   const ask = (returnTo?: HTMLElement | null) => {
     back.current = returnTo ?? null;
+    setUnsynced(0);
     setOpen(true);
+    // Signing out deletes the drafts kept on this device (an older version's too), so say so when some never reached Outlly.
+    if (userId)
+      void Promise.all([openDrafts(userId).list(), legacyDraftCount()]).then(([all, older]) => setUnsynced(all.filter((d) => d.syncState !== "synced").length + older));
   };
   const onOpenChange = (o: boolean) => {
     setOpen(o);
@@ -26,21 +38,35 @@ export function useSignOut() {
     setBusy(true);
     try {
       await api("/api/auth/logout", { method: "POST" });
-    } finally {
-      await forgetBillingCopies();
-      window.location.href = "/login";
+    } catch (e) {
+      // Still signed in (offline, server error, rate limit): the drafts on this device stay. A 401 means the session already ended.
+      if (!(e instanceof ApiError && e.status === 401)) {
+        setBusy(false);
+        toast("Couldn't sign out. Check your connection and try again. Your drafts are still on this device.", "error");
+        return;
+      }
     }
+    await forgetLocalCopies();
+    window.location.href = "/login";
   };
+  const stuck = !online && unsynced > 0;
   const dialog = (
     <ConfirmDialog
       open={open}
       onOpenChange={onOpenChange}
       title="Sign out of Outlly?"
-      body="You'll need your password or an email code to sign back in on this device. Scheduled posts still go out."
+      body={
+        stuck
+          ? `You're offline, and ${unsynced === 1 ? "1 draft on this device hasn't" : `${unsynced} drafts on this device haven't`} synced to Outlly yet. Sign out once you're back online, so ${unsynced === 1 ? "it isn't" : "they aren't"} lost.`
+          : unsynced
+          ? `${unsynced === 1 ? "1 draft on this device hasn't" : `${unsynced} drafts on this device haven't`} synced to Outlly yet, and signing out removes ${unsynced === 1 ? "it" : "them"} from this browser. Scheduled posts still go out.`
+          : "You'll need your password or an email code to sign back in on this device. Scheduled posts still go out."
+      }
       confirmLabel={busy ? "Signing out…" : "Sign out"}
       cancelLabel="Stay signed in"
       tone="primary"
       busy={busy}
+      disabled={stuck}
       onConfirm={out}
     />
   );

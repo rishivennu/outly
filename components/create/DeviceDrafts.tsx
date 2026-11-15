@@ -1,8 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Film, HardDrive, X } from "lucide-react";
-import { ago, DRAFT_TTL_DAYS, listDeviceDrafts, removeDeviceDraft, type DeviceDraft } from "@/lib/client/device-drafts";
+import { ago, DRAFT_TTL_DAYS, openDrafts, type DeviceDraft } from "@/lib/client/device-drafts";
+import { useUser } from "@/components/shell/UserContext";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,10 +14,13 @@ import { cn } from "@/lib/utils";
 export function DeviceDrafts({ className, limit = 3, heading = "Saved on this device", grid = "grid-cols-1" }: { className?: string; limit?: number; heading?: string; grid?: string }) {
   const [items, setItems] = useState<DeviceDraft[] | null>(null);
   const [urls, setUrls] = useState<Record<string, string>>({});
+  const [asking, setAsking] = useState<DeviceDraft | null>(null);
+  const user = useUser();
+  const store = useMemo(() => openDrafts(user.id), [user.id]);
 
   useEffect(() => {
     let alive = true;
-    void listDeviceDrafts().then((all) => {
+    void store.list().then((all) => {
       if (!alive) return;
       setItems(all);
       const u: Record<string, string> = {};
@@ -25,14 +30,14 @@ export function DeviceDrafts({ className, limit = 3, heading = "Saved on this de
     return () => {
       alive = false;
     };
-  }, []);
+  }, [store]);
   useEffect(() => () => Object.values(urls).forEach((u) => URL.revokeObjectURL(u)), [urls]);
 
   if (!items?.length) return null;
   const shown = items.slice(0, limit);
 
   const remove = async (id: string) => {
-    await removeDeviceDraft(id);
+    await store.remove(id);
     setItems((xs) => (xs ?? []).filter((x) => x.id !== id));
     const u = urls[id];
     if (u) {
@@ -68,12 +73,24 @@ export function DeviceDrafts({ className, limit = 3, heading = "Saved on this de
                 Pick it up
               </Link>
             </div>
-            <button type="button" onClick={() => remove(d.id)} aria-label={`Remove "${d.title || "Untitled draft"}" from this device`} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground">
+            <button type="button" onClick={() => setAsking(d)} aria-label={`Remove "${d.title || "Untitled draft"}" from this device`} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground">
               <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </li>
         ))}
       </ul>
+      <ConfirmDialog
+        open={!!asking}
+        onOpenChange={(o) => !o && setAsking(null)}
+        title="Remove this draft from this device?"
+        body={asking?.postId ? "The copy on Outlly stays in your drafts. Only this browser's copy goes." : "This copy is only on this device, so its words and video go for good."}
+        confirmLabel="Remove"
+        onConfirm={() => {
+          const d = asking;
+          setAsking(null);
+          if (d) void remove(d.id);
+        }}
+      />
       <p className="mt-3 text-xs text-muted-foreground">
         Drafts you don&apos;t touch for {DRAFT_TTL_DAYS} days are removed from Outlly. The copy in this browser stays until you remove it.
       </p>

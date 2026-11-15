@@ -8,8 +8,10 @@ import { Thumb } from "@/components/shared/Thumb";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import type { Platform } from "@/lib/domain";
 import { connectedPlatforms } from "@/lib/live/connected";
-import { canConnectWithToken, hasCredentials, loadKeys } from "@/lib/social/registry";
+import { loadKeys } from "@/lib/social/registry";
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
+import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
+import { onboardingFor } from "@/lib/onboarding";
 import { WelcomeSubscribe, type WelcomeOffer } from "@/components/onboarding/WelcomeSubscribe";
 import { entitlements, storageUsage } from "@/lib/billing/entitlements";
 import { hasPerk } from "@/lib/billing/plan-rules";
@@ -100,32 +102,15 @@ type HomeUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
  */
 async function pulseView(user: HomeUser, canSwitch: boolean) {
   const [scope, accountIds] = await Promise.all([postFilter(user), analyticsScope(user)]);
-  const [, data, next, live, published, welcome, founding, firstWin] = await Promise.all([
+  const [, data, next, welcome, founding, onboarding] = await Promise.all([
     loadKeys(),
     soft(getPulse(user.id, 7, accountIds), PULSE_MS, null, "home analytics"),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() }, ...scope.where }, select: { title: true, scheduledAt: true }, orderBy: { scheduledAt: "asc" } }),
-    connectedPlatforms(user.id),
-    db.post.count({ where: { userId: user.id, status: { in: ["published", "partial"] } } }),
     soft(welcomeOffer(user), CARD_MS, null, "home welcome"),
     user.actor ? null : soft(myFounding(user.id), CARD_MS, null, "home founding"),
-    soft(
-      Promise.all([
-        db.media.findFirst({ where: { userId: user.id }, select: { id: true } }),
-        db.post.findFirst({ where: { userId: user.id, launchedAt: { not: null } }, select: { id: true } }),
-      ]),
-      CARD_MS,
-      [null, null] as const,
-      "home first win",
-    ),
+    soft(onboardingFor(user), CARD_MS, null, "home onboarding"),
   ]);
   if (!data) return null;
-  const setup = {
-    connected: { instagram: !!live.instagram, youtube: !!live.youtube },
-    instagram: { oauth: hasCredentials("instagram"), token: canConnectWithToken("instagram") },
-    youtube: { oauth: hasCredentials("youtube") },
-    uploaded: !!firstWin[0],
-    scheduled: !!firstWin[1] || published > 0,
-  };
   const promo: FoundingPromo | null =
     founding?.kind === "offer" && !founding.seen ? { kind: "offer", left: founding.left, limit: founding.limit, pct: founding.pct, proven: founding.proven }
     : founding?.kind === "reserved" && !founding.seen ? { kind: "reserved", no: founding.no, pct: founding.pct }
@@ -137,7 +122,8 @@ async function pulseView(user: HomeUser, canSwitch: boolean) {
   return (
     <div className="relative">
       <div className="pt-4">
-        <SetupChecklist state={setup} />
+        {onboarding && <OnboardingFlow initial={onboarding} auto />}
+        {onboarding && <SetupChecklist onboarding={onboarding} />}
         {promo ? (
           <FoundingWelcome promo={promo} />
         ) : (
@@ -174,7 +160,7 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
   const recapAt = process.env.NODE_ENV !== "production" && searchParams?.recapAt ? new Date(searchParams.recapAt) : new Date();
   // 1037: the picked profile (or a member's accounts) narrows the drafts and the next post too.
   const [profiles, scope, badges] = await Promise.all([listProfiles(user.id, user.scope), postFilter(user), trustBadges(user.id)]);
-  const [, drafts, next, live, welcome, published, ret, pulse, recap, founding, saved, storage, firstWin] = await Promise.all([
+  const [, drafts, next, live, welcome, published, ret, pulse, recap, founding, saved, storage, onboarding] = await Promise.all([
     loadKeys(),
     db.post.findMany({ where: { userId: user.id, status: "draft", ...scope.where }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() }, ...scope.where }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),
@@ -201,29 +187,14 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
     user.actor ? null : soft(myFounding(user.id), CARD_MS, null, "home founding"),
     soft(savedTime(user.id, Date.now(), scope.where), CARD_MS, null, "home saved"),
     soft(storageUsage(user.id), CARD_MS, null, "home storage"),
-    // 1076: the checklist runs to a first win, so it needs to know about the first upload and the first post sent or booked
-    soft(
-      Promise.all([
-        db.media.findFirst({ where: { userId: user.id }, select: { id: true } }),
-        db.post.findFirst({ where: { userId: user.id, launchedAt: { not: null } }, select: { id: true } }),
-      ]),
-      CARD_MS,
-      [null, null] as const,
-      "home first win",
-    ),
+    // Phase 2: the guided setup, saved on the account and merged with the studio's own data (lib/onboarding.ts)
+    soft(onboardingFor(user), CARD_MS, null, "home onboarding"),
   ]);
   const started = Object.values(live).some(Boolean) || published > 0;
   const steps = ret?.steps ?? [];
   const recycle = ret?.recycle ?? [];
   // Ideas fill a whole row when nothing sits beside them; with no steps they pair with the streak card.
   const ideasWide = ret ? steps.length > 0 && recycle.length === 0 : true;
-  const setup = {
-    connected: { instagram: !!live.instagram, youtube: !!live.youtube },
-    instagram: { oauth: hasCredentials("instagram"), token: canConnectWithToken("instagram") },
-    youtube: { oauth: hasCredentials("youtube") },
-    uploaded: !!firstWin[0],
-    scheduled: !!firstWin[1] || published > 0,
-  };
   // one tick, so every signed URL on the page goes out as a single batch
   const [dv, nv] = await Promise.all([Promise.all(drafts.map(postView)), next ? postView(next) : null]);
   // 1067: the founding invitation is a one-time popup, only for accounts the server says can still earn a seat
@@ -248,7 +219,8 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
       ) : (
         (badges.verifiedManager || badges.foundingNo) && <div className="page-frame pb-4"><TrustBadges b={badges} /></div>
       )}
-      <SetupChecklist state={setup} />
+      {onboarding && <OnboardingFlow initial={onboarding} auto />}
+      {onboarding && <SetupChecklist onboarding={onboarding} />}
       {promo ? (
         <FoundingWelcome promo={promo} />
       ) : (

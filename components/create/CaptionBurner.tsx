@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Captions, Download, Loader2, Lock, Plus, Sparkles, Trash2, Type, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Captions, Clock, Download, Loader2, Lock, Plus, Sparkles, Trash2, Type, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { api, ApiError, offerUpgrade } from "@/lib/client/api";
@@ -9,6 +9,10 @@ import { CAPTION_STYLES, cueAt, cuesFromScript, normalizeCues, toSrt, type Capti
 import { cn } from "@/lib/utils";
 import { wordsFromCues, type Word } from "@/lib/captions/subtitle-engine";
 import { insertCue } from "@/lib/captions/insert";
+import { cueBounds, cueIssues, MAX_CUE_TEXT, nudgeCue, readTrack, restoreCue, retimeCue, swapText, type CaptionTrack, type Edge } from "@/lib/captions/edit";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { useToast } from "@/components/shared/Toast";
+import { TimeStepper } from "./captions/TimeStepper";
 import { ClipCutter } from "./ClipCutter";
 import { saveBlob } from "@/lib/client/native";
 
@@ -31,6 +35,10 @@ interface Props {
   canvas: React.RefObject<HTMLCanvasElement | null>;
   /** Captions switched on or off: the parent shows the clean video with the live overlay while they are on. */
   onLive?: (on: boolean) => void;
+  /** A caption track kept with a device draft (CaptionTrack). Read defensively; anything malformed is dropped. */
+  initialTrack?: unknown;
+  /** Every edit, so the draft can keep the captions. null = captions off or no lines. */
+  onTrackChange?: (track: CaptionTrack | null) => void;
 }
 
 type Busy = null | { kind: "transcribe"; done: number; total: number } | { kind: "burn"; p: number };
@@ -48,13 +56,16 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart
  * Off by default. Turning the switch on reveals transcribe / type, an editable cue list, a live preview
  * and "Burn into video", which makes a new MP4 in the browser and swaps it in as the post's video.
  */
-export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo, onError, video, canvas, onLive }: Props) {
-  const [on, setOn] = useState(false);
-  const [cues, setCues] = useState<Cue[]>([]);
+export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo, onError, video, canvas, onLive, initialTrack, onTrackChange }: Props) {
+  const [init] = useState(() => readTrack(initialTrack, duration || Infinity));
+  const [on, setOn] = useState(!!init?.cues.length);
+  const [cues, setCues] = useState<Cue[]>(init?.cues ?? []);
+  const cuesRef = useRef(cues);
+  cuesRef.current = cues;
   /* Word timings from the engine: what "cut by text" searches. Typed captions fall back to rough ones. */
   const [words, setWords] = useState<Word[]>([]);
-  const [style, setStyle] = useState<CaptionStyle>("pop");
-  const [pos, setPos] = useState<CaptionPos>("bottom");
+  const [style, setStyle] = useState<CaptionStyle>(init?.style ?? "pop");
+  const [pos, setPos] = useState<CaptionPos>(init?.pos ?? "bottom");
   const [busy, setBusy] = useState<Busy>(null);
   const [typing, setTyping] = useState(false);
   const [script, setScript] = useState("");
@@ -66,15 +77,34 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
   const activeRef = useRef(-1);
   const list = useRef<HTMLOListElement>(null);
   const [moved, setMoved] = useState("");
+  /* The row whose timing panel is open, and a visible word when a typed time had to be pulled in. */
+  const [timing, setTiming] = useState<number | null>(null);
+  const [hint, setHint] = useState<{ i: number; text: string } | null>(null);
+  /* Replacing lines the creator may have edited asks first. */
+  const [ask, setAsk] = useState<null | "transcribe" | "script">(null);
+  /* Whether the server has a transcription engine. null = not known yet; false = typing only, never a fake transcript. */
+  const [aiReady, setAiReady] = useState<boolean | null>(null);
+  const toast = useToast();
   const canRecord = typeof window !== "undefined" && !!recorderType();
   /* Plan gates: burning is paid-only; Free gets AI captions on a few videos a month. null = not loaded yet. */
   const [plan, setPlan] = useState<null | { burn: boolean; left: number | null; limit: number | null; name: string }>(null);
   useEffect(() => {
     if (!on || plan) return;
-    api<{ plan: { name: string }; captions: { burn: boolean; left: number | null; limit: number | null } }>("/api/plan/limits")
-      .then((l) => setPlan({ burn: l.captions.burn, left: l.captions.left, limit: l.captions.limit, name: l.plan.name }))
+    api<{ plan: { name: string }; captions: { burn: boolean; left: number | null; limit: number | null; transcribe?: boolean } }>("/api/plan/limits")
+      .then((l) => {
+        setPlan({ burn: l.captions.burn, left: l.captions.left, limit: l.captions.limit, name: l.plan.name });
+        if (typeof l.captions.transcribe === "boolean") setAiReady(l.captions.transcribe);
+      })
       .catch(() => {});
   }, [on, plan]);
+  useEffect(() => {
+    if (on && aiReady === false) setTyping(true);
+  }, [on, aiReady]);
+  const trackCb = useRef(onTrackChange);
+  trackCb.current = onTrackChange;
+  useEffect(() => {
+    trackCb.current?.(on && cues.length ? { v: 1, cues, style, pos } : null);
+  }, [on, cues, style, pos]);
   // One video = one caption allowance, however many chunks or re-runs. Same file + length = same ref.
   const ref = `${filename}:${Math.round(duration * 10)}`;
 
@@ -151,6 +181,7 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
       }
       const clean = normalizeCues(all, duration || Infinity);
       setCues(clean);
+      setTiming(null);
       setWords(ws.length ? ws : wordsFromCues(clean));
       setPlan(null); // re-read what's left this month
       setNote(clean.length ? `${clean.length} captions${lang ? ` in ${lang}` : ""}. Fix any word by clicking it.` : "We didn't hear any speech. Type your captions instead.");
@@ -159,6 +190,7 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
       if ((e as Error).name === "AbortError") return;
       const msg = (e as Error).message;
       setNote(msg);
+      if (e instanceof ApiError && e.code === "NO_AI") setAiReady(false);
       if (e instanceof ApiError && (e.code === "NO_AI" || e.code === "PLAN_LIMIT")) setTyping(true);
     } finally {
       setBusy(null);
@@ -170,12 +202,22 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
     if (!c.length) return setNote("Type a line or two first.");
     setCues(c);
     setWords([]);
+    setTiming(null);
     setTyping(false);
     setNote(`Spread ${c.length} captions across the clip. Nudge the times if a line lands early or late.`);
   }
 
+  /** The first thing that would make the burn or the .srt wrong, said plainly, with that line in focus. */
+  function blocked() {
+    const issue = cueIssues(cues, duration)[0];
+    if (!issue) return false;
+    setNote(issue.message);
+    focusRow(issue.index);
+    return true;
+  }
+
   async function burn() {
-    if (!cues.length) return;
+    if (!cues.length || blocked()) return;
     try {
       await api("/api/plan/limits", { method: "POST", json: { feature: "burn" } });
     } catch (e) {
@@ -199,6 +241,7 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
   }
 
   function downloadSrt() {
+    if (blocked()) return;
     void saveBlob(new Blob([toSrt(cues)], { type: "application/x-subrip" }), `${filename.replace(/\.[^.]+$/, "") || "captions"}.srt`).catch(() => {});
   }
 
@@ -211,15 +254,32 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
   };
   /* Reorder = the lines swap places, the timing slots stay where the speech is. */
   const move = (i: number, dir: -1 | 1) => {
+    const next = swapText(cues, i, dir);
+    if (!next) return;
     const j = i + dir;
-    if (j < 0 || j >= cues.length) return;
-    setCues((cs) => cs.map((c, k) => (k === i ? { ...c, text: cs[j].text } : k === j ? { ...c, text: cs[i].text } : c)));
+    setCues(next);
     setMoved(`Caption moved to ${fmt(cues[j].start)}.`);
+    if (timing === i) setTiming(j);
     focusRow(j);
   };
   const remove = (i: number) => {
+    const cue = cues[i];
     setCues((cs) => cs.filter((_, j) => j !== i));
+    setTiming(null);
+    setHint(null);
     setMoved(`Caption ${i + 1} deleted.`);
+    toast(`Caption ${i + 1} deleted.`, "info", {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          const r = restoreCue(cuesRef.current, cue);
+          if (!r) return setNote("Another line uses that time now, so the deleted one could not go back. Add it again.");
+          setCues(r.cues);
+          setMoved(`Caption ${r.index + 1} is back.`);
+          focusRow(r.index);
+        },
+      },
+    });
     if (cues.length > 1) focusRow(Math.max(0, Math.min(i, cues.length - 2)));
     else requestAnimationFrame(() => addBtn.current?.focus());
   };
@@ -228,13 +288,33 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
     const r = insertCue(cues, video.current?.currentTime ?? 0, duration);
     if (!r) { setMoved("There is no room for another caption. Shorten a line first."); return; }
     setCues(r.cues);
+    setTiming(r.index);
+    setHint(null);
     setMoved(`Caption added at ${fmt(r.cues[r.index].start)}.`);
     focusRow(r.index);
   };
+  /* Retiming moves the preview to the edge being set, so the change shows on the picture at once. */
+  const showEdge = (c: Cue, edge: Edge) => {
+    const v = video.current;
+    if (!v) return;
+    if (!v.paused) v.pause();
+    v.currentTime = edge === "start" ? Math.min(c.start + 0.01, c.end) : Math.max(c.start, c.end - 0.05);
+  };
+  const applyRetime = (i: number, edge: Edge, r: ReturnType<typeof retimeCue>): string | null => {
+    if (!r.ok) return r.error;
+    setCues(r.cues);
+    showEdge(r.cues[i], edge);
+    const where = edge === "start" ? "starts" : "ends";
+    setHint(r.clamped ? { i, text: `Line ${i + 1} ${where} at ${r.value.toFixed(2)} s, the nearest time that keeps it clear of the lines around it.` } : null);
+    setMoved(`Caption ${i + 1} ${where} at ${r.value.toFixed(2)} seconds.`);
+    return null;
+  };
+  const retime = (i: number, edge: Edge, value: number) => applyRetime(i, edge, retimeCue(cues, i, edge, value, duration));
+  const nudge = (i: number, edge: Edge, delta: number) => void applyRetime(i, edge, nudgeCue(cues, i, edge, delta, duration));
   const working = !!busy;
 
   return (
-    <section aria-labelledby="cap-title" className="glass rounded-[28px] p-5 sm:p-6">
+    <section aria-labelledby="cap-title" className="glass rounded-[28px] p-4 sm:p-6">
       <div className="flex items-center gap-3">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-secondary/70 hairline" aria-hidden>
           <Captions className="h-5 w-5" />
@@ -260,16 +340,21 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
       {on && (
         <div className="mt-5 min-w-0">
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="lime" onClick={transcribe} disabled={working}>
-              {busy?.kind === "transcribe" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="h-4 w-4" aria-hidden />}
-              {busy?.kind === "transcribe" ? `Listening${busy.total > 1 ? ` ${busy.done}/${busy.total}` : ""}…` : cues.length ? "Transcribe again" : "Transcribe with AI"}
-            </Button>
+            {aiReady !== false && (
+              <Button type="button" variant="lime" onClick={() => (cues.length ? setAsk("transcribe") : transcribe())} disabled={working}>
+                {busy?.kind === "transcribe" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="h-4 w-4" aria-hidden />}
+                {busy?.kind === "transcribe" ? `Listening${busy.total > 1 ? ` ${busy.done}/${busy.total}` : ""}…` : cues.length ? "Transcribe again" : "Transcribe with AI"}
+              </Button>
+            )}
             <Button type="button" variant="outline" onClick={() => setTyping((t) => !t)} disabled={working} aria-expanded={typing}>
               <Type className="h-4 w-4" aria-hidden /> Type or paste
             </Button>
             {busy?.kind === "transcribe" && <Button type="button" variant="ghost" onClick={() => abort.current?.abort()}><X className="h-4 w-4" aria-hidden />Stop</Button>}
           </div>
-          {plan?.limit != null && (
+          {aiReady === false && (
+            <p className="mt-2 text-[13px] text-muted-foreground">AI transcription is not set up on this workspace. Type or paste your lines, or add them one at a time.</p>
+          )}
+          {aiReady !== false && plan?.limit != null && (
             <p className="mt-2 text-[13px] text-muted-foreground">
               {plan.left ? `AI captions: ${plan.left} of ${plan.limit} videos left this month on ${plan.name}.` : `You've used this month's ${plan.limit} AI-captioned videos on ${plan.name}. You can still type captions.`}
             </p>
@@ -279,44 +364,68 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
             <div className="mt-4">
               <label htmlFor="cap-script" className="mb-1.5 block text-[13px] font-medium text-muted-foreground">Your script, one line per caption</label>
               <Textarea id="cap-script" rows={4} value={script} onChange={(e) => setScript(e.target.value)} placeholder={"I quit my job to bake bread.\nSix months later…"} />
-              <Button type="button" variant="subtle" className="mt-2" onClick={applyScript}>Use these lines</Button>
+              <Button type="button" variant="subtle" className="mt-2" onClick={() => (cues.length ? setAsk("script") : applyScript())}>Use these lines</Button>
             </div>
           )}
 
           {note && <p role="status" className="mt-4 rounded-2xl bg-secondary/60 px-3.5 py-2.5 text-[13px]">{note}</p>}
 
+          <p className="sr-only" aria-live="polite">{moved}</p>
+          {cues.length === 0 && (
+            <Button ref={addBtn} type="button" variant="subtle" size="sm" className="mt-4" onClick={add} disabled={working}>
+              <Plus className="h-4 w-4" aria-hidden /> Add caption
+            </Button>
+          )}
+
           {cues.length > 0 && (
             <>
               <div className="mt-5 flex items-baseline justify-between gap-3">
                 <h3 className="text-[13px] font-semibold">Lines <span className="font-normal text-muted-foreground tabular">({cues.length})</span></h3>
-                <p className="text-[12px] text-muted-foreground">Press a time to jump the preview there.</p>
+                <p className="text-[12px] text-muted-foreground">Press a time to jump there. The clock sets timing.</p>
               </div>
               <ol ref={list} className="relative mt-2 max-h-[min(52dvh,460px)] space-y-2 overflow-y-auto overscroll-contain rounded-2xl p-1 pr-1.5" aria-label="Captions">
                 {cues.map((c, i) => {
                   const live = i === active;
+                  const open = timing === i;
+                  const b = open ? cueBounds(cues, i, duration) : null;
                   return (
-                    <li key={i} aria-current={live ? "true" : undefined} className={cn("flex items-center gap-1.5 rounded-2xl p-1.5 transition-colors motion-reduce:transition-none sm:gap-2", live ? "bg-lime/10 ring-1 ring-lime/60" : "bg-secondary/30 hairline")}>
-                      <button type="button" onClick={() => jump(c)} className={cn("flex min-h-[44px] shrink-0 flex-col items-start justify-center rounded-xl px-2 text-left tabular hover:bg-secondary sm:w-[92px]", live ? "text-foreground" : "text-muted-foreground")} aria-label={`Jump to ${fmt(c.start)}, caption ${i + 1}`}>
+                    <li key={i} aria-current={live ? "true" : undefined} className={cn("flex flex-wrap items-center gap-1.5 rounded-2xl p-1.5 transition-colors motion-reduce:transition-none sm:flex-nowrap sm:gap-2", open && "sm:flex-wrap", live ? "bg-lime/10 ring-1 ring-lime/60" : "bg-secondary/30 hairline")}>
+                      <input data-cue value={c.text} maxLength={MAX_CUE_TEXT} onChange={(e) => edit(i, { text: e.target.value })} onFocus={() => { const v = video.current; if (v && v.paused) jump(c); }} aria-label={`Caption ${i + 1} text, ${fmt(c.start)} to ${fmt(c.end)}`} aria-invalid={!c.text.trim() || undefined} className="order-first h-11 min-w-0 basis-full rounded-xl bg-background/70 px-3 text-[14px] hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 sm:order-none sm:basis-0 sm:flex-1" />
+                      <button type="button" onClick={() => jump(c)} className={cn("flex min-h-[44px] shrink-0 flex-col items-start justify-center rounded-xl px-2 text-left tabular [@media(hover:hover)]:hover:bg-secondary sm:order-first sm:w-[92px]", live ? "text-foreground" : "text-muted-foreground")} aria-label={`Jump to ${fmt(c.start)}, caption ${i + 1}`}>
                         <span className="text-[13px] font-semibold leading-tight">{fmt(c.start)}</span>
                         <span className="text-[12px] leading-tight">to {fmt(c.end)}</span>
                       </button>
-                      <input data-cue value={c.text} onChange={(e) => edit(i, { text: e.target.value })} onFocus={() => { const v = video.current; if (v && v.paused) jump(c); }} aria-label={`Caption ${i + 1} text, ${fmt(c.start)} to ${fmt(c.end)}`} className="h-11 min-w-0 flex-1 rounded-xl bg-background/70 px-3 text-[14px] hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1" />
+                      <span className="flex-1 sm:hidden" aria-hidden />
                       <div className="flex shrink-0 items-center">
-                        <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="hidden h-11 w-11 place-items-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent sm:grid" aria-label={`Move caption ${i + 1} up`}>
-                          <ArrowUp className="h-4 w-4" aria-hidden />
+                        <button type="button" onClick={() => { setTiming(open ? null : i); setHint(null); }} aria-expanded={open} aria-controls={`cap-timing-${i}`} className={cn("grid h-11 w-11 place-items-center rounded-xl text-muted-foreground active:scale-[0.96] [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground", open && "bg-secondary text-foreground")} aria-label={`Edit timing of caption ${i + 1}`}>
+                          <Clock className="h-4 w-4" aria-hidden />
                         </button>
-                        <button type="button" onClick={() => move(i, 1)} disabled={i === cues.length - 1} className="hidden h-11 w-11 place-items-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent sm:grid" aria-label={`Move caption ${i + 1} down`}>
-                          <ArrowDown className="h-4 w-4" aria-hidden />
-                        </button>
-                        <button type="button" onClick={() => remove(i)} className="grid h-11 w-11 place-items-center rounded-xl text-muted-foreground hover:bg-destructive/15 hover:text-[hsl(0_72%_38%)] dark:hover:text-destructive" aria-label={`Delete caption ${i + 1}`}>
+                        <button type="button" onClick={() => remove(i)} className="grid h-11 w-11 place-items-center rounded-xl text-muted-foreground active:scale-[0.96] [@media(hover:hover)]:hover:bg-destructive/15 [@media(hover:hover)]:hover:text-[hsl(0_72%_38%)] dark:[@media(hover:hover)]:hover:text-destructive" aria-label={`Delete caption ${i + 1}`}>
                           <Trash2 className="h-4 w-4" aria-hidden />
                         </button>
                       </div>
+                      {open && b && (
+                        <div id={`cap-timing-${i}`} role="group" aria-label={`Timing of caption ${i + 1}`} className="basis-full space-y-2 px-0.5 pb-1 pt-1">
+                          <div className="grid gap-2 min-[400px]:grid-cols-2">
+                            <TimeStepper label="Starts" name={`Caption ${i + 1} start`} value={c.start} min={b.startMin} max={b.startMax} onCommit={(v) => retime(i, "start", v)} onNudge={(d) => nudge(i, "start", d)} />
+                            <TimeStepper label="Ends" name={`Caption ${i + 1} end`} value={c.end} min={b.endMin} max={b.endMax} onCommit={(v) => retime(i, "end", v)} onNudge={(d) => nudge(i, "end", d)} />
+                          </div>
+                          {hint?.i === i && <p className="text-[12px] text-muted-foreground">{hint.text}</p>}
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className="mr-1 text-[12px] text-muted-foreground">Swap words with the line</span>
+                            <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="flex h-11 items-center gap-1 rounded-xl px-2.5 text-[13px] font-medium text-muted-foreground active:scale-[0.96] [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground disabled:opacity-40" aria-label={`Move caption ${i + 1} up`}>
+                              <ArrowUp className="h-4 w-4" aria-hidden /> Before
+                            </button>
+                            <button type="button" onClick={() => move(i, 1)} disabled={i === cues.length - 1} className="flex h-11 items-center gap-1 rounded-xl px-2.5 text-[13px] font-medium text-muted-foreground active:scale-[0.96] [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground disabled:opacity-40" aria-label={`Move caption ${i + 1} down`}>
+                              <ArrowDown className="h-4 w-4" aria-hidden /> After
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </li>
                   );
                 })}
               </ol>
-              <p className="sr-only" aria-live="polite">{moved}</p>
               <Button ref={addBtn} type="button" variant="subtle" size="sm" className="mt-3" onClick={add} disabled={working}>
                 <Plus className="h-4 w-4" aria-hidden /> Add caption
               </Button>
@@ -367,6 +476,20 @@ export function CaptionBurner({ src, file, filename, duration, onBurned, onUndo,
           )}
         </div>
       )}
+      <ConfirmDialog
+        open={!!ask}
+        onOpenChange={(o) => !o && setAsk(null)}
+        title="Replace your caption lines?"
+        body={`This swaps the ${cues.length} line${cues.length === 1 ? "" : "s"} you have, edits included, for new ones.`}
+        confirmLabel={ask === "transcribe" ? "Transcribe again" : "Use the new lines"}
+        cancelLabel="Keep my lines"
+        onConfirm={() => {
+          const a = ask;
+          setAsk(null);
+          if (a === "transcribe") void transcribe();
+          else if (a === "script") applyScript();
+        }}
+      />
     </section>
   );
 }

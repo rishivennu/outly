@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 
 type Ctx = { params: { id: string } };
 
-/** One conversation with its messages. Opening it marks it read. */
-export const GET = route<Ctx>(async (_req, { user, params }) => json(await getThread(user.id, params.id, user.scope)), { limit: [120, 60_000] });
+/** One conversation with its newest messages. Opening it marks it read; ?before=<cursor> pages back through the history. */
+export const GET = route<Ctx>(async (req, { user, params }) => json(await getThread(user.id, params.id, user.scope, { before: req.nextUrl.searchParams.get("before") })), { limit: [120, 60_000] });
 
 /**
  * Reply. Counts against the same weekly reply allowance as comment replies.

@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Clapperboard, Rocket, Sparkles, UploadCloud } from "lucide-react";
 import { Collectible } from "./Collectible";
 import { MAX_MB, validateVideoFile } from "@/lib/client/handoff";
+import { acceptAttr, acceptedFormats, formatProblem, useUploadLimits } from "@/lib/client/upload";
 import { cn } from "@/lib/utils";
 import { T } from "@/lib/motion/tokens";
 
@@ -12,6 +13,11 @@ interface Props {
   compact?: boolean;
   /** Shows the "Your video is in" moment inside the zone. */
   accepted?: boolean;
+  /**
+   * Signed-in Create: the server's limits decide. The hint names the accepted formats only (the plan's size and
+   * storage line sits under the zone), and only the format is checked here; the upload checks size against the plan.
+   */
+  serverLimits?: boolean;
 }
 
 const ORBS = [
@@ -25,7 +31,8 @@ const STICKERS = [
   { icon: Rocket, label: "Publish Everywhere", x: "-10%", y: "52%", rot: 3, delay: 2 },
 ];
 
-export function UploadZone({ onFile, compact, accepted }: Props) {
+export function UploadZone({ onFile, compact, accepted, serverLimits }: Props) {
+  const lim = useUploadLimits(!!serverLimits);
   const [over, setOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const depth = useRef(0);
@@ -35,11 +42,11 @@ export function UploadZone({ onFile, compact, accepted }: Props) {
   const take = useCallback(
     (f?: File | null) => {
       if (!f) return;
-      const e = validateVideoFile(f);
+      const e = serverLimits ? formatProblem(f, lim) : validateVideoFile(f);
       setError(e);
       if (!e) onFile(f);
     },
-    [onFile],
+    [onFile, serverLimits, lim],
   );
 
   // Whole-window drag awareness: the zone wakes up as soon as a file enters the page.
@@ -121,7 +128,7 @@ export function UploadZone({ onFile, compact, accepted }: Props) {
                 {over ? "Drop it. Let’s make something." : "Drop your video here"}
               </span>
               {!over && <span className="mt-3 text-[15px] text-foreground/80 underline decoration-foreground/30 underline-offset-4 group-hover:decoration-foreground">or click to browse</span>}
-              <span id={hintId} className="mt-5 text-[13px] text-muted-foreground">MP4 or MOV · Up to {MAX_MB} MB</span>
+              <span id={hintId} className="mt-5 text-[13px] text-muted-foreground">{serverLimits ? acceptedFormats(lim).label : `MP4 or MOV · Up to ${MAX_MB} MB`}</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -155,7 +162,7 @@ export function UploadZone({ onFile, compact, accepted }: Props) {
       <input
         ref={input}
         type="file"
-        accept="video/mp4,video/quicktime,.mp4,.mov"
+        accept={serverLimits ? acceptAttr(lim) : "video/mp4,video/quicktime,.mp4,.mov"}
         className="sr-only"
         tabIndex={-1}
         aria-hidden="true"

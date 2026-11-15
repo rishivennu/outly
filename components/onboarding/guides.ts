@@ -46,8 +46,8 @@ export const GUIDES: Record<string, Guide> = {
     name: "Calendar",
     intro: "Calendar shows what goes out when.",
     stops: [
-      { target: '[data-guide="cal-weeks"]', title: "Move between weeks", body: "Use the arrows, or Today to jump back to this week." },
-      { target: '[data-guide="cal-grid"]', title: "Drag to reschedule", body: "Drag a scheduled post onto another day to move it." },
+      { target: '[data-guide="cal-weeks"]', title: "Move through time", body: "Use the arrows, or Today to jump back. Switch between Day, Week, Month and Upcoming at the top." },
+      { target: '[data-guide="cal-grid"]', title: "Drag to reschedule", body: "Drag a booked post onto another day, or use Move. You confirm before it saves." },
       { target: 'a[href="/create/bulk"]', title: "Plan a batch", body: "Drop up to 10 videos and Outlly spreads them over the coming days at good times." },
     ],
   },

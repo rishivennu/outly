@@ -9,8 +9,10 @@ import { liveAccount } from "../live/account";
 import { isPracticeAccount } from "../social/registry";
 import { dmsOn } from "../social/keys";
 import { asPublisherError, type AccountContext } from "../social/types";
-import { DM_MAX_CHARS, fetchProfile, isDmPlatform, listConversations, REPLY_WINDOW_MS, sendText, WindowClosedError, type DmPlatform, type RemoteThread } from "./meta";
+import { DM_MAX_CHARS, DM_PLATFORMS, fetchProfile, isDmPlatform, listConversations, REPLY_WINDOW_MS, sendText, WindowClosedError, type DmPlatform, type RemoteThread } from "./meta";
 import type { DmEvent } from "./webhook";
+import { dmFailure } from "./errors";
+import { clampTake, decodeCursor, encodeCursor, MESSAGE_PAGE, olderThan, THREAD_PAGE, THREAD_PAGE_MAX } from "./paging";
 import { noticeNewMessage } from "../notify-events";
 
 /**
@@ -86,6 +88,8 @@ async function touchThread(t: DmThread, m: StoreMsg, countUnread: boolean) {
   }
   if (m.direction === "in" && (!t.lastInboundAt || m.sentAt > t.lastInboundAt)) data.lastInboundAt = m.sentAt;
   if (m.direction === "in" && countUnread) data.unread = { increment: 1 };
+  // Archive only hides a thread in Outlly: the person writing again brings it back.
+  if (m.direction === "in" && t.archivedAt && m.sentAt > t.archivedAt) data.archivedAt = null;
   // The creator answered from the Instagram or Messenger app: they have seen it.
   if (m.direction === "out" && newer) data.unread = 0;
   if (Object.keys(data).length) await db.dmThread.update({ where: { id: t.id }, data });
@@ -269,6 +273,8 @@ export interface ThreadView {
   snippet: string;
   lastMessageAt: string;
   unread: number;
+  /** Phase 2 (1155): hidden in Outlly (not on Instagram or Facebook) since this time. */
+  archivedAt: string | null;
   practice: boolean;
   canReply: boolean;
   windowEndsAt: string | null;
@@ -294,7 +300,7 @@ export function replyBlockFor(t: Pick<DmThread, "platform" | "practice" | "lastI
 
 type ThreadRow = DmThread & { account: Pick<SocialAccount, "username" | "displayName" | "status"> };
 
-function view(t: ThreadRow, now = Date.now()): ThreadView {
+function toView(t: ThreadRow, now = Date.now()): ThreadView {
   return {
     id: t.id,
     platform: t.platform as DmPlatform,
@@ -306,23 +312,70 @@ function view(t: ThreadRow, now = Date.now()): ThreadView {
     snippet: safeDecrypt(t.snippet),
     lastMessageAt: t.lastMessageAt.toISOString(),
     unread: t.unread,
+    archivedAt: t.archivedAt ? t.archivedAt.toISOString() : null,
     practice: t.practice,
     ...windowState(t, now),
     replyBlock: replyBlockFor(t, now),
   };
 }
 
+/**
+ * Phase 2 (1155): which threads a list shows. "inbox" = everything not archived, "unread" = not archived and
+ * unread, "archived" = only the ones hidden in Outlly.
+ */
+export type ThreadListView = "inbox" | "unread" | "archived";
+export const isThreadListView = (v: string | null | undefined): v is ThreadListView => v === "inbox" || v === "unread" || v === "archived";
+export interface ListOptions {
+  view?: ThreadListView;
+  cursor?: string | null;
+  take?: number;
+}
+
 /** scope (1037): a member limited to some accounts only sees conversations on theirs. */
-export async function listThreads(userId: string, platform?: DmPlatform, scope: Scope = null) {
+export async function listThreads(userId: string, platform?: DmPlatform, scope: Scope = null, opts: ListOptions = {}) {
   await seedPractice(userId).catch((e) => console.warn("[dm] practice seed", e));
-  const rows = await db.dmThread.findMany({
-    where: { userId, account: { status: "connected" }, ...(platform ? { platform } : {}), ...(scope ? { accountId: { in: scope } } : {}) },
-    include: { account: { select: { username: true, displayName: true, status: true } } },
-    orderBy: { lastMessageAt: "desc" },
-    take: 100,
-  });
-  const connected = await db.socialAccount.count({ where: { userId, status: "connected", platform: { in: platform ? [platform] : ["instagram", "facebook"] }, ...(scope ? { id: { in: scope } } : {}) } });
-  return { threads: rows.map((t) => view(t)), accounts: connected };
+  const view = opts.view ?? "inbox";
+  const take = clampTake(opts.take, THREAD_PAGE, THREAD_PAGE_MAX);
+  const after = decodeCursor(opts.cursor);
+  const base = { userId, account: { status: "connected" }, ...(platform ? { platform } : {}), ...(scope ? { accountId: { in: scope } } : {}) };
+  const where = {
+    ...base,
+    ...(view === "archived" ? { archivedAt: { not: null } } : { archivedAt: null }),
+    ...(view === "unread" ? { unread: { gt: 0 } } : {}),
+    ...(after ? olderThan("lastMessageAt", after) : {}),
+  };
+  const [rows, accts, archived] = await Promise.all([
+    db.dmThread.findMany({
+      where,
+      include: { account: { select: { username: true, displayName: true, status: true } } },
+      orderBy: [{ lastMessageAt: "desc" }, { id: "desc" }],
+      take: take + 1,
+    }),
+    db.socialAccount.findMany({ where: { userId, status: "connected", platform: { in: DM_PLATFORMS }, ...(scope ? { id: { in: scope } } : {}) }, select: { platform: true } }),
+    db.dmThread.count({ where: { ...base, archivedAt: { not: null } } }),
+  ]);
+  const page = rows.slice(0, take);
+  const last = page[page.length - 1];
+  // Filter chips only for platforms that are connected and can hold conversations.
+  const platforms = DM_PLATFORMS.filter((p) => accts.some((a) => a.platform === p));
+  const accounts = platform ? accts.filter((a) => a.platform === platform).length : accts.length;
+  return { threads: page.map((t) => toView(t)), accounts, platforms, archived, nextCursor: rows.length > take && last ? encodeCursor(last.lastMessageAt, last.id) : null };
+}
+
+/**
+ * Phase 2 (1155): mark read or unread, archive or restore. Outlly-side only: Meta's APIs have no read or archive
+ * call for these conversations, so nothing changes on Instagram or Facebook and nothing is sent to the person.
+ */
+export async function setThreadState(userId: string, id: string, patch: { read?: boolean; archived?: boolean }, scope: Scope = null) {
+  const t = await db.dmThread.findFirst({ where: { id, userId }, select: { id: true, accountId: true, unread: true } });
+  if (!t || !inScope(scope, t.accountId)) throw new HttpError(404, "We couldn't find that conversation.");
+  const data: Record<string, unknown> = {};
+  if (patch.read === true) data.unread = 0;
+  if (patch.read === false && t.unread === 0) data.unread = 1;
+  if (patch.archived === true) data.archivedAt = new Date();
+  if (patch.archived === false) data.archivedAt = null;
+  const row = await db.dmThread.update({ where: { id: t.id }, data, include: { account: { select: { username: true, displayName: true, status: true } } } });
+  return { thread: toView(row) };
 }
 
 /** Platforms whose DMs the admin switched off (1031f). Needs the keys snapshot loaded (route() and liveNow() do). */
@@ -338,19 +391,32 @@ export interface MessageView {
   sentAt: string;
 }
 
-export async function getThread(userId: string, id: string, scope: Scope = null) {
+/**
+ * One conversation, newest MESSAGE_PAGE messages, oldest first. Opening it marks it read.
+ * `before` (Phase 2, 1155) pages back through the history and leaves the read state alone.
+ */
+export async function getThread(userId: string, id: string, scope: Scope = null, opts: { before?: string | null } = {}) {
   const t = await db.dmThread.findFirst({ where: { id, userId }, include: { account: { select: { username: true, displayName: true, status: true } } } });
   if (!t || !inScope(scope, t.accountId)) throw new HttpError(404, "We couldn't find that conversation.");
-  const rows = await db.dmMessage.findMany({ where: { threadId: t.id }, orderBy: { sentAt: "desc" }, take: 200 });
-  if (t.unread) await db.dmThread.update({ where: { id: t.id }, data: { unread: 0 } });
-  const messages: MessageView[] = rows.reverse().map((m) => {
+  const before = decodeCursor(opts.before);
+  if (opts.before && !before) throw new HttpError(400, "That page of the conversation couldn't be read. Refresh and try again.", "VALIDATION");
+  const rows = await db.dmMessage.findMany({
+    where: { threadId: t.id, ...(before ? olderThan("sentAt", before) : {}) },
+    orderBy: [{ sentAt: "desc" }, { id: "desc" }],
+    take: MESSAGE_PAGE + 1,
+  });
+  const page = rows.slice(0, MESSAGE_PAGE);
+  const oldest = page[page.length - 1];
+  const olderCursor = rows.length > MESSAGE_PAGE && oldest ? encodeCursor(oldest.sentAt, oldest.id) : null;
+  if (!before && t.unread) await db.dmThread.update({ where: { id: t.id }, data: { unread: 0 } });
+  const messages: MessageView[] = page.reverse().map((m) => {
     let attachments: Att[] = [];
     try {
       attachments = m.attachments ? (JSON.parse(m.attachments) as Att[]) : [];
     } catch {}
     return { id: m.id, direction: m.direction === "out" ? "out" : "in", text: safeDecrypt(m.text), attachments, sentAt: m.sentAt.toISOString() };
   });
-  return { thread: { ...view(t), unread: 0 }, messages };
+  return { thread: before ? toView(t) : { ...toView(t), unread: 0 }, messages, olderCursor };
 }
 
 /* ------------------------------------------------------------------ write */
@@ -407,13 +473,8 @@ export async function replyToThread(userId: string, actorId: string, threadId: s
         throw new HttpError(409, closedCopy(platform), "WINDOW_CLOSED", { detail: e.technical });
       }
       const pe = asPublisherError(e);
-      const name = PLATFORM_META[platform].name;
-      if (pe.code === "AUTH_EXPIRED") throw new HttpError(409, `${name} needs you to reconnect.`, "NOT_CONNECTED", { detail: pe.technical });
-      if (pe.code === "FORBIDDEN")
-        throw new HttpError(403, `${name} didn't let Outlly send this. The app may still be waiting for Meta to approve messaging, or this person can't be messaged by apps.`, "FORBIDDEN", { detail: pe.technical });
-      if (pe.code === "RATE_LIMITED") throw new HttpError(429, `${name} asked us to slow down for a minute.`, "RATE_LIMITED", { detail: pe.technical });
-      if (pe.code === "MEDIA_REJECTED") throw new HttpError(422, `${name} didn't accept that message. Try shorter text without unusual characters.`, "REJECTED", { detail: pe.technical });
-      throw new HttpError(502, `We couldn't reach ${name} just now. Try again in a moment.`, pe.code, { detail: pe.technical });
+      const f = dmFailure(platform, pe, "send");
+      throw new HttpError(f.status, f.message, f.code, { detail: pe.technical, ...(f.code === "RATE_LIMITED" ? { retryAfterSec: f.retryAfterSec, retryAt: f.retryAt } : {}) });
     }
   }
   const sentAt = new Date();
@@ -430,7 +491,7 @@ export async function replyToThread(userId: string, actorId: string, threadId: s
 /** Refresh every connected Instagram / Facebook account of the workspace. Problems are reported, never thrown. */
 export async function syncAll(userId: string, platform?: DmPlatform, scope: Scope = null) {
   const accts = await db.socialAccount.findMany({ where: { userId, status: "connected", platform: { in: platform ? [platform] : ["instagram", "facebook"] }, ...(scope ? { id: { in: scope } } : {}) } });
-  const problems: { platform: DmPlatform; code: string; message: string; detail?: string }[] = [];
+  const problems: { platform: DmPlatform; code: string; message: string; detail?: string; retryAt?: string | null }[] = [];
   for (const a of accts) {
     // DMs switched off (1031f): the token has no messaging permission, so asking Meta would only fail.
     if (!isDmPlatform(a.platform) || isPracticeAccount(a) || !dmsOn(a.platform)) continue;
@@ -438,16 +499,10 @@ export async function syncAll(userId: string, platform?: DmPlatform, scope: Scop
       await syncAccount(a);
     } catch (e) {
       const pe = asPublisherError(e);
-      const name = PLATFORM_META[a.platform].name;
-      const message =
-        pe.code === "AUTH_EXPIRED"
-          ? `${name} needs you to reconnect.`
-          : pe.code === "FORBIDDEN"
-            ? `${name} didn't share messages yet. Reconnect ${name} so Outlly can ask for the messaging permission. While the Meta app is in Development mode, only people with a role on the app show up.`
-            : `We couldn't reach ${name} just now.`;
+      const f = dmFailure(a.platform, pe, "sync");
       // The platform's raw error body stays in the server log; the browser gets the code only.
       console.warn("[messages] sync failed", { accountId: a.id, platform: a.platform, code: pe.code, detail: pe.technical ?? pe.message });
-      problems.push({ platform: a.platform, code: pe.code, message, detail: `Error code: ${pe.code}` });
+      problems.push({ platform: a.platform, code: pe.code, message: f.message, detail: `Error code: ${pe.code}`, ...(f.retryAt ? { retryAt: f.retryAt } : {}) });
     }
   }
   return problems;

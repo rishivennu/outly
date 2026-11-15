@@ -36,7 +36,7 @@ interface Row {
 interface Plan {
   slots: string[];
   peakHours: number[];
-  source: "yours" | "typical";
+  source: "yours" | "none";
   reason: string;
   left: number | null;
   planName: string;

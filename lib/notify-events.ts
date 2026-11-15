@@ -7,6 +7,7 @@ import { formatMoney, type Currency } from "./billing/money";
 import { notify } from "./retention/notices";
 import { crossed, milestoneLabel } from "./notify-core";
 import { dayStamp } from "./alerts-core";
+import { commentCapable } from "./inbox-state";
 
 /*
  * 1118: the notices that came with the notification settings. Each one is raised only where the server has
@@ -162,9 +163,14 @@ export function noticeNewComment(
   c: { accountId: string; platform: string; commentId: string; replyTo: string; mediaId: string; targetId: string; postTitle: string | null; from: string; text: string },
   now = new Date(),
 ) {
+  // Phase 2: only where Inbox can show the comment it links to. Facebook's API has no comment listing in Outlly,
+  // so a Facebook comment notice would open on nothing.
+  if (!commentCapable(c.platform)) return Promise.resolve(null);
   return quiet(
     (async () => {
       const base = `cm:${c.accountId}:${c.mediaId}:`;
+      // Once per comment, ever: a late retry from Meta must not bring an old notice back as new.
+      if (await db.notice.findUnique({ where: { key: base + c.commentId }, select: { id: true } })) return;
       const last = await db.notice.findFirst({ where: { userId, kind: "new_comment", key: { startsWith: base } }, orderBy: { createdAt: "desc" }, select: { createdAt: true, key: true } });
       if (last?.key === base + c.commentId) return;
       if (last && now.getTime() - last.createdAt.getTime() < COMMENT_GAP_MS) return;

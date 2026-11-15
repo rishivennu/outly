@@ -47,7 +47,7 @@ export function WeekPulse({ p }: { p: Pulse }) {
             {p.best ? (
               <>
                 <span className="display block text-2xl">{p.best.label}</span>
-                <span className="text-xs text-muted-foreground">{p.best.source === "yours" ? "From when your posts did best" : "Typical peak for your platforms"}</span>
+                <span className="text-xs text-muted-foreground">From when your posts did best</span>
                 <Link href="/create" className="mt-1 flex min-h-[44px] items-center gap-1 text-sm font-semibold hover:underline">
                   Plan one for then <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </Link>

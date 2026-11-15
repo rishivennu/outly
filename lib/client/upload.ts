@@ -1,6 +1,7 @@
 "use client";
 
-import { api, ApiError, offerUpgrade, uploadWithProgress } from "./api";
+import { useEffect, useState } from "react";
+import { api, ApiError, cachedApi, offerUpgrade, uploadWithProgress } from "./api";
 import { track } from "@/lib/analytics/track";
 
 /**
@@ -16,6 +17,93 @@ import { track } from "@/lib/analytics/track";
  */
 export type UploadProgress = (fraction: number, etaSec: number | null) => void;
 export interface UploadedMedia<M> { media: M }
+
+/** What GET /api/media/direct says about this account's uploads. */
+export interface UploadLimits {
+  direct: boolean;
+  maxBytes: number;
+  maxMb?: number;
+  planLimited?: boolean;
+  planName?: string;
+  storage?: { usedBytes?: number; limitBytes: number; remainingBytes: number; over: boolean; label: string };
+  /** Missing on a server older than Phase 2: MP4 and MOV were the only formats then too. */
+  formats?: { extensions: string[]; mimeTypes: string[]; label: string };
+}
+
+const LIMITS_URL = "/api/media/direct";
+const FALLBACK_FORMATS = { extensions: [".mp4", ".mov"], mimeTypes: ["video/mp4", "video/quicktime"], label: "MP4 or MOV" };
+
+/** One request shared by the limits line on the drop zone and the upload that follows it. Any POST forgets it. */
+export const loadUploadLimits = () => cachedApi<UploadLimits>(LIMITS_URL, 30_000);
+
+export const formatBytes = (b: number) => (b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(1).replace(/\.0$/, "")} GB` : `${Math.max(1, Math.round(b / 1048576))} MB`);
+
+export const acceptedFormats = (lim: UploadLimits | null | undefined) => lim?.formats ?? FALLBACK_FORMATS;
+
+/** The value for a file input's accept attribute, from the server's list (MP4 and MOV until it answers). */
+export const acceptAttr = (lim: UploadLimits | null | undefined) => {
+  const f = acceptedFormats(lim);
+  return [...f.mimeTypes, ...f.extensions].join(",");
+};
+
+/** Only the format half of limitsProblem: the size and storage checks wait for the upload, which has the plan's numbers. */
+export function formatProblem(file: { name: string; type: string }, lim: UploadLimits | null | undefined): string | null {
+  const f = acceptedFormats(lim);
+  const ext = /\.[^.]+$/.exec(file.name)?.[0]?.toLowerCase() ?? "";
+  const ok = (!!file.type && f.mimeTypes.includes(file.type)) || f.extensions.includes(ext);
+  return ok ? null : `That one isn't a video we can use yet. Try an ${f.label}.`;
+}
+
+/** The shared limits request as React state. Null while loading or when it failed (callers fall back to MP4 or MOV). */
+export function useUploadLimits(enabled = true): UploadLimits | null {
+  const [lim, setLim] = useState<UploadLimits | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    loadUploadLimits().then(
+      (l) => alive && setLim(l),
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+  }, [enabled]);
+  return lim;
+}
+
+/** "MP4 or MOV, up to 500 MB per file" plus the storage that is left when the plan has a cap. */
+export function limitsLine(lim: UploadLimits) {
+  const f = acceptedFormats(lim);
+  const mb = lim.maxMb ?? Math.round(lim.maxBytes / 1048576);
+  const size = `${f.label}, up to ${mb >= 1024 ? formatBytes(mb * 1048576) : `${mb} MB`} per file`;
+  const st = lim.storage;
+  if (!st || st.limitBytes <= 0) return size;
+  return st.over ? `${size}. Storage is full (${st.label}).` : `${size}. ${formatBytes(st.remainingBytes)} of storage left.`;
+}
+
+/**
+ * Why this file can't go up, checked against the server's own limits before a byte moves. Null = fine.
+ * "storage" and "upload" are plan limits, so the caller can offer a bigger plan. The server checks again.
+ */
+export type LimitProblem = { kind: "type" | "storage" | "upload" | "size"; message: string };
+export function limitsProblem(file: { name: string; type: string; size: number }, lim: UploadLimits): LimitProblem | null {
+  const f = acceptedFormats(lim);
+  const ext = /\.[^.]+$/.exec(file.name)?.[0]?.toLowerCase() ?? "";
+  const typeOk = (!!file.type && f.mimeTypes.includes(file.type)) || f.extensions.includes(ext);
+  if (!typeOk) return { kind: "type", message: `That one isn't a video we can use yet. Try an ${f.label}.` };
+  const st = lim.storage;
+  const plan = lim.planName ?? "Your plan";
+  if (st && st.limitBytes > 0 && st.over) return { kind: "storage", message: `${plan} storage is full (${st.label}), so new uploads are paused. Your files are safe. Delete some, or upgrade for more room.` };
+  if (st && st.limitBytes > 0 && file.size > st.remainingBytes)
+    return { kind: "storage", message: `This file needs ${formatBytes(file.size)} and ${plan} has ${formatBytes(st.remainingBytes)} of storage left. Delete some files, or upgrade for more room.` };
+  if (file.size > lim.maxBytes) {
+    const mb = lim.maxMb ?? Math.round(lim.maxBytes / 1048576);
+    return lim.planLimited
+      ? { kind: "upload", message: `${plan} uploads are limited to ${mb} MB per file. Upgrade to upload bigger videos, or compress this one.` }
+      : { kind: "size", message: `That's a big one. Keep it under ${mb} MB for now.` };
+  }
+  return null;
+}
 
 interface DirectInit {
   mediaId: string;
@@ -35,7 +123,11 @@ interface DirectInit {
 interface Saved extends DirectInit { location?: string; at: number }
 
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-const fp = (f: File) => `outly-up:${f.name}:${f.size}:${f.lastModified}`;
+/**
+ * Where an unfinished upload is remembered. A File rebuilt from this browser's draft copy gets a new
+ * lastModified, so the caller can pass a stable key (the draft's id) to resume it after a reload.
+ */
+export const resumeSlot = (f: Pick<File, "name" | "size" | "lastModified">, key?: string) => (key ? `outly-up:k:${key}:${f.name}:${f.size}` : `outly-up:${f.name}:${f.size}:${f.lastModified}`);
 const b64 = (s: string) => btoa(unescape(encodeURIComponent(s)));
 
 function eta() {
@@ -81,29 +173,19 @@ function xhr(method: string, url: string, body: Blob | null, headers: Record<str
 }
 
 const STALL_MS = 60_000;
-const fmtMb = (b: number) => (b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(1).replace(/\.0$/, "")} GB` : `${Math.max(1, Math.round(b / 1048576))} MB`);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function uploadVideo<M>(file: File, onProgress: UploadProgress, signal?: AbortSignal): Promise<UploadedMedia<M>> {
-  const cfg = await api<{ direct: boolean; maxBytes: number; maxMb?: number; planLimited?: boolean; planName?: string; storage?: { limitBytes: number; remainingBytes: number; over: boolean; label: string } }>("/api/media/direct");
-  // Total storage: checked here so nobody waits through an upload the server will refuse anyway.
-  const st = cfg.storage;
-  if (st && st.limitBytes > 0 && (st.over || file.size > st.remainingBytes)) {
-    const plan = cfg.planName ?? "Your plan";
-    const msg = st.over
-      ? `${plan} storage is full (${st.label}), so new uploads are paused. Your files are safe. Delete some, or upgrade for more room.`
-      : `This file needs ${fmtMb(file.size)} and ${plan} has ${fmtMb(st.remainingBytes)} of storage left. Delete some files, or upgrade for more room.`;
-    offerUpgrade(msg, "storage");
-    throw new ApiError(402, msg, "PLAN_LIMIT");
-  }
-  if (file.size > cfg.maxBytes) {
-    const mb = cfg.maxMb ?? Math.round(cfg.maxBytes / 1048576);
-    if (cfg.planLimited) {
-      const msg = `${cfg.planName ?? "Your plan"} uploads are limited to ${mb} MB per file. Upgrade to upload bigger videos, or compress this one.`;
-      offerUpgrade(msg, "upload");
-      throw new ApiError(402, msg, "PLAN_LIMIT");
+export async function uploadVideo<M>(file: File, onProgress: UploadProgress, signal?: AbortSignal, opts?: { resumeKey?: string }): Promise<UploadedMedia<M>> {
+  const cfg = await loadUploadLimits();
+  const slot = resumeSlot(file, opts?.resumeKey);
+  // Checked here so nobody waits through an upload the server will refuse anyway.
+  const bad = limitsProblem(file, cfg);
+  if (bad) {
+    if (bad.kind === "storage" || bad.kind === "upload") {
+      offerUpgrade(bad.message, bad.kind);
+      throw new ApiError(402, bad.message, "PLAN_LIMIT");
     }
-    throw new ApiError(413, `That's a big one. Keep it under ${mb} MB for now.`, "TOO_LARGE");
+    throw new ApiError(bad.kind === "size" ? 413 : 415, bad.message, bad.kind === "size" ? "TOO_LARGE" : "BAD_TYPE");
   }
   if (!cfg.direct) {
     const done = await uploadWithProgress<UploadedMedia<M>>(`/api/media?name=${encodeURIComponent(file.name)}`, file, (p) => onProgress(p, null), signal);
@@ -117,7 +199,7 @@ export async function uploadVideo<M>(file: File, onProgress: UploadProgress, sig
   // Resume a recent unfinished upload of this exact file.
   let saved: Saved | null = null;
   try {
-    const raw = localStorage.getItem(fp(file));
+    const raw = localStorage.getItem(slot);
     if (raw) {
       const s = JSON.parse(raw) as Saved;
       // Supabase tokens live ~2h; an R2 presigned PUT only 1h and cannot be re-signed, so start fresh sooner.
@@ -130,15 +212,15 @@ export async function uploadVideo<M>(file: File, onProgress: UploadProgress, sig
   };
   const remember = () => {
     try {
-      localStorage.setItem(fp(file), JSON.stringify(init));
+      localStorage.setItem(slot, JSON.stringify(init));
     } catch {}
   };
   remember();
 
   if (init.mode === "put" || init.mode === "multipart") {
-    await (init.mode === "put" ? putWhole(file, init, report, signal) : multipart(file, init, report, signal, !!saved));
+    await (init.mode === "put" ? putWhole(file, init, report, signal) : multipart(file, init, report, signal, !!saved, slot));
     const done = await api<UploadedMedia<M>>("/api/media/direct/complete", { method: "POST", json: { mediaId: init.mediaId, uploadId: init.uploadId }, signal });
-    localStorage.removeItem(fp(file));
+    localStorage.removeItem(slot);
     onProgress(1, 0);
     track("library_upload", { kind: file.type.split("/")[0] || "file" });
     return done;
@@ -167,7 +249,7 @@ export async function uploadVideo<M>(file: File, onProgress: UploadProgress, sig
     const head = await xhr("HEAD", init.location, null, auth, () => {}, signal);
     if (head.status === 200) offset = Number(head.getResponseHeader("Upload-Offset") ?? 0);
     else if (head.status === 404 || head.status === 410) {
-      localStorage.removeItem(fp(file));
+      localStorage.removeItem(slot);
       throw new ApiError(410, "That upload expired. Drop the video again and we'll start fresh.");
     }
     report(offset);
@@ -197,7 +279,7 @@ export async function uploadVideo<M>(file: File, onProgress: UploadProgress, sig
   }
 
   const done = await api<UploadedMedia<M>>("/api/media/direct/complete", { method: "POST", json: { mediaId: init.mediaId }, signal });
-  localStorage.removeItem(fp(file));
+  localStorage.removeItem(slot);
   onProgress(1, 0);
   track("library_upload", { kind: file.type.split("/")[0] || "file" });
   return done;
@@ -221,7 +303,7 @@ async function putWhole(file: File, init: DirectInit, report: (b: number) => voi
 }
 
 /** R2/S3, big file: presigned multipart, a few parts in parallel, resumable across reloads. */
-async function multipart(file: File, init: DirectInit, report: (b: number) => void, signal: AbortSignal | undefined, resuming: boolean) {
+async function multipart(file: File, init: DirectInit, report: (b: number) => void, signal: AbortSignal | undefined, resuming: boolean, slot: string) {
   const size = init.partSize!;
   const total = Math.ceil(file.size / size);
   const bytes = (n: number) => (n < total ? size : file.size - size * (total - 1));
@@ -241,7 +323,7 @@ async function multipart(file: File, init: DirectInit, report: (b: number) => vo
     for (const p of r.uploaded ?? []) if (p.size === bytes(p.n)) done.add(p.n);
   };
   if (resuming) await sign([], true).catch((e) => {
-    if (e instanceof ApiError && e.status === 410) localStorage.removeItem(`outly-up:${file.name}:${file.size}:${file.lastModified}`);
+    if (e instanceof ApiError && e.status === 410) localStorage.removeItem(slot);
     throw e;
   });
   progress();

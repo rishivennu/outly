@@ -61,14 +61,21 @@ export function PageGuide() {
 
   useEffect(() => {
     if (!guide) return;
+    // Phase 2: the guided setup links here with ?tips=1 to show this page's tips now, seen before or not.
+    const q = new URLSearchParams(location.search);
+    const asked = q.get("tips") === "1";
+    if (asked) {
+      q.delete("tips");
+      history.replaceState(history.state, "", location.pathname + (q.toString() ? `?${q}` : ""));
+    }
     let seen = true;
     try {
       seen = !!localStorage.getItem(guidesOffKey(user.id)) || !!localStorage.getItem(guideKey(guide.page, user.id)) || !localStorage.getItem(tourKey(user.id));
     } catch {
-      return; // storage blocked: never nag on every visit
+      if (!asked) return; // storage blocked: never nag on every visit
     }
     // The welcome tour ran on this page this visit: that was enough for one sitting.
-    if (seen || tourState.ranOn === path) return;
+    if (!asked && (seen || tourState.ranOn === path)) return;
     let tries = 0;
     // Give the page a moment to render its content, then wait for a quiet moment: another popup
     // (the update notice, a dialog the person opened) may take a while. Leaving the page stops the wait.

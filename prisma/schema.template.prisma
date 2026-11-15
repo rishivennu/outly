@@ -18,8 +18,11 @@ model User {
   email        String   @unique
   passwordHash String? // only for AUTH_PROVIDER=local; Supabase Auth owns passwords otherwise
   authId       String?  @unique // Supabase auth.users.id
+  appleSub     String?  @unique // Sign in with Apple: the ID token's stable `sub` (1153)
   avatar       String?
   timezone     String   @default("Asia/Kolkata")
+  /// Phase 2 (1155): guided onboarding progress, JSON {v:1, steps:{welcome|connect|profile|create|schedule|analytics: "done"|"skipped"}, finishedAt?, updatedAt}. Null = never started.
+  onboarding   String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -102,6 +105,7 @@ model User {
   cancelFeedback  CancelFeedback[]
   campaignEvents  CampaignEvent[] // 1122
   trial           Trial? // 1147
+  inboxStates     InboxItemState[] // Phase 2 (1155)
 
   @@index([lastSeenAt])
 }
@@ -221,6 +225,8 @@ model Post {
   editedAt    DateTime? // last change to the copy (1037); an approval older than this no longer counts
   editedBy    String? // who made that change (name), shown in the draft's activity
   editedById  String? // their user id: nobody but the owner approves their own change
+  /// Phase 2 (1155): idempotency key from the device that created the draft, so an offline sync that retries never makes a second draft.
+  clientKey   String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -235,6 +241,7 @@ model Post {
   @@index([userId, scheduledAt])
   // 1091: the Content library lists newest edit first, page by page.
   @@index([userId, updatedAt])
+  @@unique([userId, clientKey])
 }
 
 /// 1131: the ordered media of a photo, carousel or story post (position 0 is also Post.mediaId).
@@ -946,6 +953,8 @@ model DmThread {
   /// When the person last wrote. Replies are only allowed for 24 hours after it.
   lastInboundAt     DateTime?
   unread            Int       @default(0)
+  /// Phase 2 (1155): hidden from the inbox in Outlly only (Meta has no archive API). A new inbound message clears it.
+  archivedAt        DateTime?
   practice          Boolean   @default(false)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -956,6 +965,25 @@ model DmThread {
 
   @@unique([accountId, participantId])
   @@index([userId, lastMessageAt])
+}
+
+/// Phase 2 (1155): Outlly-side read and archive state of a live-fetched inbox item (a comment). Comments are read
+/// from the platforms on demand and never stored, so only this small marker is kept, keyed by the platform's id.
+model InboxItemState {
+  id         String    @id @default(cuid())
+  userId     String
+  accountId  String
+  kind       String    @default("comment") // comment
+  itemId     String // the platform's comment id
+  readAt     DateTime?
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, accountId, kind, itemId])
+  @@index([userId, updatedAt])
 }
 
 model DmMessage {

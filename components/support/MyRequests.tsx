@@ -1,6 +1,8 @@
 "use client";
 import { Compass, Inbox, MessageCircle, PenLine } from "lucide-react";
 import { startTour } from "@/components/onboarding/Tour";
+import { SetupGuide } from "@/components/onboarding/SetupGuide";
+import type { OnboardingPayload } from "@/lib/onboarding-core";
 import { cn } from "@/lib/utils";
 
 export type MyTicket = { ref: string; subject: string; status: string; updatedAt: string; reply: { body: string; by: string } | null };
@@ -13,14 +15,14 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
-/** Dashboard-only strip above the answers: ask Pip, write to a person, replay the tour, and the requests already sent. */
-export function MyRequests({ tickets }: { tickets: MyTicket[] }) {
-  const tile = "ap-tile flex flex-col p-5";
+/** Dashboard-only strip above the answers: ask Pip, write to a person, the setup guide (and tour), and the requests already sent. */
+export function MyRequests({ tickets, onboarding = null }: { tickets: MyTicket[]; onboarding?: OnboardingPayload | null }) {
+  const tile = "ap-tile flex min-w-0 flex-col p-5";
   const action = "mt-auto inline-flex min-h-11 items-center gap-2 self-start rounded-full bg-foreground/[0.06] px-4 text-sm font-semibold transition-colors hover:bg-foreground/[0.1]";
   return (
     <section aria-labelledby="help-quick" className="mt-8">
       <h2 id="help-quick" className="sr-only">Quick help</h2>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className={cn(tile, "xl:col-span-2 xl:row-span-2")}>
           <p className="flex items-center gap-2 text-[13px] font-semibold text-muted-foreground">
             <Inbox className="h-4 w-4" aria-hidden="true" /> Your requests
@@ -42,7 +44,7 @@ export function MyRequests({ tickets }: { tickets: MyTicket[] }) {
                     </div>
                     {t.reply && (
                       <details className="group mt-2">
-                        <summary className="inline-flex min-h-9 cursor-pointer list-none items-center text-[13px] font-semibold text-foreground/80 underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden">
+                        <summary className="inline-flex min-h-11 cursor-pointer list-none items-center text-[13px] font-semibold text-foreground/80 underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden">
                           <span className="group-open:hidden">Read the latest reply</span>
                           <span className="hidden group-open:inline">Hide the reply</span>
                         </summary>
@@ -75,6 +77,9 @@ export function MyRequests({ tickets }: { tickets: MyTicket[] }) {
           <a href="#stuck" className={cn(action, "mt-4")}>Send a message</a>
         </div>
 
+        {onboarding ? (
+          <SetupGuide onboarding={onboarding} action={action} className={cn(tile, "sm:col-span-2")} />
+        ) : (
         <div className={cn(tile, "sm:col-span-2")}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="flex items-center gap-2 font-display text-[17px] font-bold tracking-[-0.01em]">
@@ -85,6 +90,7 @@ export function MyRequests({ tickets }: { tickets: MyTicket[] }) {
             </button>
           </div>
         </div>
+        )}
       </div>
     </section>
   );

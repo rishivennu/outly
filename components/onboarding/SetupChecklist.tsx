@@ -1,26 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BellRing, CalendarPlus, Check, Compass, Share, SquarePlus, Upload, X } from "lucide-react";
+import { ArrowRight, BellRing, Check, Share, SquarePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/components/shell/UserContext";
 import { useToast } from "@/components/shared/Toast";
-import { startTour, tourKey } from "./Tour";
+import { ONBOARDING_CHANGED, openOnboarding, saveOnboarding } from "./onboarding-client";
 import { installMode, provenInstalled, type InstallMode } from "@/lib/pwa-core";
 import { permission } from "@/lib/client/push";
-import { readConsent } from "@/components/shared/CookieConsent";
-import { afterPrivacy, privacyPending } from "@/components/shared/PrivacyNotice";
+import type { OnboardingPayload, OnboardingStepId } from "@/lib/onboarding-core";
 import { cn } from "@/lib/utils";
-
-export type SetupState = {
-  connected: { instagram: boolean; youtube: boolean };
-  instagram: { oauth: boolean; token: boolean };
-  youtube: { oauth: boolean };
-  /** 1076: at least one file in the media library */
-  uploaded: boolean;
-  /** 1076: at least one post has left draft (published or scheduled) */
-  scheduled: boolean;
-};
 
 const COUNT = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
 
@@ -50,12 +39,26 @@ const NOTICES: Record<string, { text: string; tone: "ok" | "info" | "error" }> =
   channel_later: { text: "You're signed in. YouTube didn't link this time; try Sign in with Google again from the checklist.", tone: "info" },
 };
 
-/** First-run checklist on Home: sign-up to a first post on the calendar, connected and toured on the way. */
-export function SetupChecklist({ state }: { state: SetupState }) {
+/** What each guided step is for, under its title while it is still open. */
+const NOTES: Record<OnboardingStepId, string> = {
+  welcome: "A one-minute hello, and the tour if you want it.",
+  connect: "You log in on each platform's own page. Outlly never sees your password.",
+  profile: "Your name, what you make, a picture and your links.",
+  create: "Upload a video, add captions, and get it ready for each platform.",
+  schedule: "Pick a time and Outlly sends it for you, even with this tab closed.",
+  analytics: "Views, engagement and audience, by platform and date range.",
+};
+
+/**
+ * First-run checklist on Home. Phase 2: the six guided steps come from the account (OnboardingFlow saves them),
+ * so the list reads the same on every device; each row opens the flow at that step. The install and
+ * notification rows stay facts about this device.
+ */
+export function SetupChecklist({ onboarding }: { onboarding: OnboardingPayload }) {
   const user = useUser();
   const toast = useToast();
   const [ready, setReady] = useState(false);
-  const [toured, setToured] = useState(false);
+  const [view, setView] = useState(onboarding);
   const [hidden, setHidden] = useState(false);
   const [device, setDevice] = useState<{ installed: boolean; mode: InstallMode; perm: string } | null>(null);
   const [installing, setInstalling] = useState(false);
@@ -75,9 +78,14 @@ export function SetupChecklist({ state }: { state: SetupState }) {
     };
   }, []);
 
+  useEffect(() => setView(onboarding), [onboarding]);
   useEffect(() => {
-    const key = tourKey(user.id);
-    setToured(!!localStorage.getItem(key));
+    const on = (e: Event) => setView((e as CustomEvent<OnboardingPayload>).detail);
+    window.addEventListener(ONBOARDING_CHANGED, on);
+    return () => window.removeEventListener(ONBOARDING_CHANGED, on);
+  }, []);
+
+  useEffect(() => {
     setHidden(!!localStorage.getItem(hiddenKey(user.id)));
     setReady(true);
 
@@ -91,92 +99,31 @@ export function SetupChecklist({ state }: { state: SetupState }) {
       ["welcome", "notice", "connected"].forEach((k) => q.delete(k));
       history.replaceState(null, "", location.pathname + (q.toString() ? `?${q}` : ""));
     }
-
-    // First visit ever on this device: open the tour once. Closing it counts as done.
-    // One thing at a time: the cookie question comes first, the tour after it is answered.
-    // Then the privacy notice, then the tour.
-    let t: ReturnType<typeof setTimeout> | undefined;
-    let unPrivacy = () => {};
-    // Straight away when nothing is in front of it; a beat for the privacy notice's exit when it was.
-    const begin = () => {
-      const waited = privacyPending(user.id);
-      unPrivacy = afterPrivacy(user.id, () => { t = setTimeout(() => startTour(), waited ? 160 : 0); });
-    };
-    const wantsTour = (welcome || !localStorage.getItem(key)) && q.get("tour") !== "1";
-    const consented = !!readConsent();
-    if (wantsTour && consented) begin();
-    else if (wantsTour) window.addEventListener("outly:consent", begin, { once: true });
-    const onClosed = () => setToured(!!localStorage.getItem(key));
-    window.addEventListener("outly:tour-closed", onClosed);
-    return () => {
-      if (t) clearTimeout(t);
-      unPrivacy();
-      window.removeEventListener("outly:consent", begin);
-      window.removeEventListener("outly:tour-closed", onClosed);
-    };
+    // The first-run walk-through itself (and the tour) is OnboardingFlow's now, in the same order as before.
   }, [user.id, toast]);
 
-  const { connected } = state;
+  const guided = view.finished ? [] : view.steps;
   const steps = [
-    { id: "account", title: "Create your Outlly account", done: true, body: "Done. You're in." },
-    { id: "instagram", title: "Connect Instagram", done: connected.instagram },
-    { id: "youtube", title: "Sign in with Google to link YouTube", done: connected.youtube },
-    { id: "upload", title: "Upload your first video or photo", done: state.uploaded },
-    { id: "schedule", title: "Schedule your first post", done: state.scheduled },
-    { id: "tour", title: "Take the guided tour", done: toured },
-    ...(device && (device.mode || device.installed) ? [{ id: "install", title: "Add Outlly to your home screen", done: device.installed }] : []),
-    ...(device && device.perm !== "unsupported" ? [{ id: "notify", title: "Turn on notifications", done: device.perm === "granted" }] : []),
+    ...guided.map((g) => ({ id: g.id as string, title: g.title, done: g.status === "done", skipped: g.status === "skipped" })),
+    ...(device && (device.mode || device.installed) ? [{ id: "install", title: "Add Outlly to your home screen", done: device.installed, skipped: false }] : []),
+    ...(device && device.perm !== "unsupported" ? [{ id: "notify", title: "Turn on notifications", done: device.perm === "granted", skipped: false }] : []),
   ];
   const doneCount = steps.filter((s) => s.done).length;
 
-  if (!ready || hidden || doneCount === steps.length) return null;
+  if (!ready || hidden || steps.every((s) => s.done || s.skipped)) return null;
 
   const dismiss = () => {
     localStorage.setItem(hiddenKey(user.id), "1");
     setHidden(true);
+    // Hiding the list ends the guided setup on the account too, so no other device brings it back.
+    if (!view.finished) saveOnboarding({ action: "dismiss" }).catch(() => {});
   };
 
-  const action = (id: string) => {
-    if (id === "instagram") {
-      if (state.instagram.oauth)
-        return (
-          <Button asChild size="sm" variant="primary">
-            <a href="/api/accounts/instagram/connect?returnTo=/home">Log in with Instagram <ArrowRight className="h-4 w-4" aria-hidden="true" /></a>
-          </Button>
-        );
-      if (state.instagram.token)
-        return (
-          <Button asChild size="sm" variant="outline">
-            <Link href="/accounts">Connect with an access token <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
-          </Button>
-        );
-      return <p className="text-sm text-muted-foreground">Instagram login isn&apos;t set up on this server yet. The owner needs to add the Instagram app keys.</p>;
-    }
-    if (id === "youtube") {
-      if (state.youtube.oauth)
-        return (
-          <Button asChild size="sm" variant="primary">
-            <a href="/api/accounts/youtube/connect?returnTo=/home">Sign in with Google <ArrowRight className="h-4 w-4" aria-hidden="true" /></a>
-          </Button>
-        );
-      return <p className="text-sm text-muted-foreground">Google sign-in isn&apos;t set up on this server yet.</p>;
-    }
-    if (id === "upload")
+  const action = (id: string, skipped: boolean) => {
+    if (guided.some((g) => g.id === id))
       return (
-        <Button asChild size="sm" variant={connected.instagram || connected.youtube ? "primary" : "outline"}>
-          <Link href="/create"><Upload className="h-4 w-4" aria-hidden="true" /> Upload a file</Link>
-        </Button>
-      );
-    if (id === "schedule")
-      return (
-        <Button asChild size="sm" variant={state.uploaded ? "primary" : "outline"}>
-          <Link href="/create"><CalendarPlus className="h-4 w-4" aria-hidden="true" /> Write and schedule a post</Link>
-        </Button>
-      );
-    if (id === "tour")
-      return (
-        <Button size="sm" variant="outline" onClick={() => startTour()}>
-          <Compass className="h-4 w-4" aria-hidden="true" /> Start the tour
+        <Button size="sm" variant={skipped ? "outline" : "primary"} onClick={() => openOnboarding(id as OnboardingStepId)}>
+          {skipped ? "Pick it up again" : id === "welcome" ? "Start" : "Open this step"} <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Button>
       );
     if (id === "install") {
@@ -224,11 +171,7 @@ export function SetupChecklist({ state }: { state: SetupState }) {
   };
 
   const notes: Record<string, string> = {
-    instagram: "You log in on Instagram's own page and pick the account. Outlly never sees your password. Needs a professional (Business or Creator) account.",
-    youtube: "Pick your Gmail on Google's page; the channel on that account links automatically.",
-    upload: "Drag a video or photo into the composer. It stays in your media library for later posts too.",
-    schedule: "Pick a time on the composer, or post now. Outlly sends it for you, even with this tab closed.",
-    tour: "One minute: posting, the calendar, live analytics, the inbox and approvals.",
+    ...NOTES,
     install: "Outlly opens like an app, full screen, and on an iPhone this is what lets notifications reach you at all.",
     notify: device?.perm === "denied" ? "Your browser is blocking notifications. Only you can undo that, and the settings page shows where." : "A comment, a reply, a post going out or failing: you hear about it while it still matters.",
   };
@@ -239,7 +182,7 @@ export function SetupChecklist({ state }: { state: SetupState }) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="eyebrow mb-1.5">Getting started</p>
-            <h2 id="setup-h" className="text-xl font-semibold tracking-tight">Set up Outlly in {COUNT[steps.length] ?? steps.length} steps</h2>
+            <h2 id="setup-h" className="text-xl font-semibold tracking-tight">{guided.length ? `Set up Outlly in ${COUNT[steps.length] ?? steps.length} steps` : "Finish setting up this device"}</h2>
           </div>
           <Button size="icon-sm" variant="ghost" onClick={dismiss} aria-label="Hide the setup checklist" className="h-11 w-11 shrink-0">
             <X className="h-4 w-4" aria-hidden="true" />
@@ -266,12 +209,13 @@ export function SetupChecklist({ state }: { state: SetupState }) {
               <div className="min-w-0 flex-1">
                 <p className={cn("font-medium", s.done && "text-muted-foreground")}>
                   {s.title}
-                  <span className="sr-only">{s.done ? " (done)" : " (to do)"}</span>
+                  <span className="sr-only">{s.done ? " (done)" : s.skipped ? " (skipped)" : " (to do)"}</span>
+                  {s.skipped && <span aria-hidden="true" className="ml-2 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">Skipped</span>}
                 </p>
                 {!s.done && (
                   <>
                     {notes[s.id] && <p className="mt-0.5 text-sm text-muted-foreground">{notes[s.id]}</p>}
-                    <div className="mt-2.5">{action(s.id)}</div>
+                    <div className="mt-2.5">{action(s.id, s.skipped)}</div>
                   </>
                 )}
               </div>

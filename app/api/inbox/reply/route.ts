@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 import { json, route } from "@/lib/http";
 import { inboxReplySchema } from "@/lib/validation";
 import { replyToComment } from "@/lib/inbox";
+import { replyFailure, setCommentStates } from "@/lib/inbox-state";
 import { reserveReply } from "@/lib/billing/entitlements";
+import { PublisherError } from "@/lib/social/types";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +18,11 @@ export const POST = route(
       reply = await replyToComment(user.id, body.targetId, body.commentId, body.text, user.scope);
     } catch (err) {
       await slot.release();
+      if (err instanceof PublisherError) throw replyFailure(err);
       throw err;
     }
+    // Answered means seen: the comment stops showing as unread.
+    await setCommentStates(user.id, { items: [{ accountId: reply.accountId, itemId: body.commentId }], read: true }, user.scope).catch((e) => console.error("[inbox] mark read", e));
     // Practice accounts are for trying things out, so their replies don't use the weekly allowance.
     if (reply.practice) await slot.release();
     const left = slot.replyLimit > 0 ? (reply.practice ? Math.min(slot.replyLimit, slot.left + 1) : slot.left) : null;

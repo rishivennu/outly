@@ -17,7 +17,7 @@ export interface Pulse {
   viewsChange: number | null;
   postsOut: number;
   top: { postId: string; title: string; views: number } | null;
-  best: { label: string; at: string; source: "yours" | "typical" } | null;
+  best: { label: string; at: string; source: "yours" | "none" } | null;
   strip: StripDay[];
 }
 

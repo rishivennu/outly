@@ -185,10 +185,13 @@ describe("LinkedIn little text", () => {
 });
 
 describe("best time to post", () => {
-  test("few posts: typical peaks, labelled as such", () => {
+  // Phase 2 brief: only real data. Too few posts means no suggestion (was: industry "typical" peaks).
+  test("few posts: no suggestion, and how many are still needed", () => {
     const b = bestTimes({ samples: [], platforms: ["instagram"], tz: "Asia/Kolkata", now: new Date("2026-10-12T04:30:00Z") });
-    expect(b.source).toBe("typical");
-    expect(b.peakHours.length).toBeGreaterThan(0);
+    expect(b.source).toBe("none");
+    expect(b.peakHours).toEqual([]);
+    expect(b.slots).toEqual([]);
+    expect(b).toMatchObject({ samples: 0, needed: MIN_SAMPLES });
   });
   test("enough of your own posts: your strongest hour leads", () => {
     const samples = Array.from({ length: MIN_SAMPLES + 4 }, (_, i) => ({ platform: "instagram" as const, publishedAt: new Date(Date.UTC(2026, 8, 1 + i, i % 2 ? 14 : 3, 30)), views: i % 2 ? 5000 : 10 }));

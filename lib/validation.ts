@@ -41,8 +41,15 @@ export const targetDraftSchema = z.object({
   accountId: z.string().cuid().optional().nullable(),
 });
 
+/** Phase 2: the post's updatedAt the device's edit was made on top of (a newer stored edit is a conflict). */
+const baseUpdatedAt = z.string().datetime({ offset: true }).optional();
+/** Phase 2: the device's id for a draft it created, so a sync that retries never makes a second draft. */
+export const clientKeySchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, "Bad draft id.");
+
 export const savePostSchema = z.object({
   postId: z.string().cuid().optional(),
+  clientKey: clientKeySchema.optional(),
+  baseUpdatedAt,
   mediaId: z.string().cuid(),
   title: z.string().max(200).optional().nullable(),
   story: z.string().max(4000).optional().nullable(),
@@ -75,7 +82,10 @@ export const updatePostSchema = z.object({
   scheduledAt: z.string().datetime().optional(),
   targets: z.array(targetDraftSchema).optional(),
   title: z.string().max(200).optional(),
+  story: z.string().max(4000).optional().nullable(),
+  hook: z.string().max(500).optional().nullable(),
   requireApproval: z.boolean().optional(),
+  baseUpdatedAt,
 });
 
 /** Bulk scheduling: up to 10 videos, the same destinations, each with its own time. */
