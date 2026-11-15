@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import type Lenis from "lenis";
+import { whenSettled } from "@/lib/client/when-idle";
 
 let lenis: Lenis | null = null;
 let popped = false; // back/forward: let the browser restore the old position
@@ -65,8 +66,10 @@ export function whenLenis(cb: (l: Lenis) => void): () => void {
  * Panels that scroll on their own (sidebars, chat, dialogs, tables) keep native scroll: they are
  * marked data-lenis-prevent, and allowNestedScroll covers any we missed. While a dialog locks the
  * page (Radix sets data-scroll-locked on body) Lenis pauses so the page behind cannot drift.
+ * `lazy` (a visit that starts in the studio): Lenis waits until the page has loaded and the browser is idle, so it
+ * never competes with the dashboard's first paint and hydration.
  */
-export function SmoothScroll() {
+export function SmoothScroll({ lazy = false }: { lazy?: boolean }) {
   const path = usePathname();
 
   useEffect(() => {
@@ -74,7 +77,7 @@ export function SmoothScroll() {
     if (window.matchMedia("(pointer: coarse)").matches) return;
     let stop = () => {};
     let cancelled = false;
-    import("lenis").then(({ default: L }) => {
+    const load = () => import("lenis").then(({ default: L }) => {
       if (cancelled) return;
       const l = new L({ lerp: 0.075, wheelMultiplier: 0.8, anchors: true, autoRaf: true, allowNestedScroll: true });
       lenis = l;
@@ -95,8 +98,10 @@ export function SmoothScroll() {
         document.documentElement.classList.remove("lenis");
       };
     });
+    const unwait = lazy ? whenSettled(() => void load()) : (void load(), () => {});
     return () => {
       cancelled = true;
+      unwait();
       stop();
     };
   }, []);

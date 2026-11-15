@@ -1,6 +1,6 @@
 "use client";
-import gsap from "gsap";
-import { reduced, simple } from "./reveal";
+import { gsapNow, loadGsap, type GsapApi } from "./gsap-lazy";
+import { reduced, simple } from "./prefs";
 import { GSAP_EASE, sec } from "./tokens";
 
 /**
@@ -24,6 +24,9 @@ import { GSAP_EASE, sec } from "./tokens";
  * transition is cut short by the next click), so hover lifts, sticky headers and fixed bars work as before.
  * Reduced motion: a 160ms fade of the stage, nothing moves. Phones and low-power devices: no mask.
  * Nothing here blocks a click: pointer events and layout are never touched.
+ *
+ * GSAP is not in the first page load (lib/motion/gsap-lazy.ts): RouteStage loads it once the browser is idle. A move
+ * made before it has landed shows the new page plainly, and asks for it so the next one plays.
  */
 export type RouteKind = "page" | "detail" | "tab";
 export type RouteDir = 1 | -1;
@@ -35,6 +38,15 @@ const SKELETON = "[data-route-skeleton]";
 // re-anchor or cut that overlay while the entrance runs.
 const PINNED = ".fixed,[data-fixed]";
 const pinned = (el: HTMLElement) => !!el.querySelector(PINNED);
+
+let gsap: GsapApi;
+/** GSAP is here: true. Not yet: ask for it and answer false, so the caller leaves the page as it is. */
+function ready() {
+  const g = gsapNow();
+  if (g) gsap = g;
+  else void loadGsap().catch(() => {});
+  return !!g;
+}
 
 /** Timings in seconds, inside the brief's ranges: page 300 to 450ms, tab 250 to 400ms. */
 export const ROUTE_TIMING = {
@@ -191,7 +203,7 @@ const OPEN = "inset(-30% 0% -30% 0%)";
 export function enterRoute(root: HTMLElement | null, kind: RouteKind, dir: RouteDir): () => void {
   const run = newRun();
   const stop = () => halt(run);
-  if (!root || typeof window === "undefined") return () => {};
+  if (!root || typeof window === "undefined" || !ready()) return () => {};
 
   if (reduced()) {
     run.touched.add(root);
@@ -233,7 +245,7 @@ export function enterRoute(root: HTMLElement | null, kind: RouteKind, dir: Route
  * that changed, nothing else on the page moves. Reduced motion: nothing.
  */
 export function settleRegion(el: HTMLElement | null): () => void {
-  if (!el || reduced()) return () => {};
+  if (!el || reduced() || !ready()) return () => {};
   gsap.set(el, { transition: "none" });
   const tw = gsap.fromTo(el, { opacity: 0.4, y: 4 }, { opacity: 1, y: 0, duration: 0.22, ease: "power2.out", clearProps: CLEAR, onInterrupt: () => gsap.set(el, { clearProps: CLEAR }) });
   return () => {
@@ -244,7 +256,7 @@ export function settleRegion(el: HTMLElement | null): () => void {
 
 /** An in-page tab panel took over (Settings categories): it slides in from the side of the tab picked. */
 export function tabIn(panel: HTMLElement | null, dir: RouteDir): () => void {
-  if (!panel) return () => {};
+  if (!panel || !ready()) return () => {};
   const run = newRun();
   if (reduced()) {
     run.touched.add(panel);

@@ -4,8 +4,7 @@ import { useGSAP } from "@gsap/react";
 
 gsap.registerPlugin(useGSAP);
 
-/** Animations only run inside this query; reduced-motion users get the final state, no tweening. */
-export const MOTION_OK = "(prefers-reduced-motion: no-preference)";
+export { MOTION_OK } from "./prefs";
 
 const NUM = /^(\d[\d,]*)(\.\d+)?(%?)$/;
 

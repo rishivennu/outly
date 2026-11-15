@@ -2,6 +2,8 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { classify, enterRoute, readHints } from "@/lib/motion/route";
+import { loadGsap } from "@/lib/motion/gsap-lazy";
+import { onIdle } from "@/lib/client/when-idle";
 import { visitOf } from "@/lib/motion/visit";
 
 const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -26,6 +28,8 @@ export function RouteStage({ children, base = "" }: { children: React.ReactNode;
   // Written only once a path has committed (never during render, which React may throw away), and held in a
   // ref so React's development double effects replay the same move instead of seeing prev === path.
   const seen = useRef<{ path: string; prev: string | null } | null>(null);
+  // The entrances need GSAP only from the second page on: fetch it while the first one sits idle.
+  useEffect(() => onIdle(() => void loadGsap().catch(() => {})), []);
   useIso(() => {
     if (seen.current?.path !== path) seen.current = { path, prev: seen.current ? seen.current.path : lastPath };
     const prev = seen.current.prev;

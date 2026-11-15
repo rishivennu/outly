@@ -8,12 +8,17 @@ import { useToast } from "@/components/shared/Toast";
 import { ONBOARDING_CHANGED, openOnboarding, saveOnboarding } from "./onboarding-client";
 import { installMode, provenInstalled, type InstallMode } from "@/lib/pwa-core";
 import { permission } from "@/lib/client/push";
-import type { OnboardingPayload, OnboardingStepId } from "@/lib/onboarding-core";
+import { SETUP_COOKIE_DAYS, SETUP_DEVICE_COOKIE, SETUP_HIDDEN_COOKIE, setupHiddenFor, withSetupHidden, type OnboardingPayload, type OnboardingStepId } from "@/lib/onboarding-core";
 import { cn } from "@/lib/utils";
 
 const COUNT = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
 
 const hiddenKey = (id: string) => `outly:setup-hidden:${id}`;
+
+const readCookie = (name: string) => document.cookie.split("; ").find((c) => c.startsWith(`${name}=`))?.slice(name.length + 1) ?? null;
+const writeCookie = (name: string, value: string) => {
+  document.cookie = `${name}=${value}; Path=/; Max-Age=${SETUP_COOKIE_DAYS * 86_400}; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+};
 
 /**
  * 1136: the last two steps of setting up, and the two that decide whether anything Outlly sends is ever
@@ -53,20 +58,32 @@ const NOTES: Record<OnboardingStepId, string> = {
  * First-run checklist on Home. Phase 2: the six guided steps come from the account (OnboardingFlow saves them),
  * so the list reads the same on every device; each row opens the flow at that step. The install and
  * notification rows stay facts about this device.
+ * Perf (CLS): rendered by the server with the account's steps. `hidden` and `deviceOpen` come from the cookies in
+ * lib/onboarding-core.ts. The device rows join inside the card after hydration, into a reserved row, so the card
+ * grows or shrinks by one row at most and never drops in from nothing above the dashboard.
  */
-export function SetupChecklist({ onboarding }: { onboarding: OnboardingPayload }) {
+export function SetupChecklist({ onboarding, hidden: hiddenOnServer = false, deviceOpen = null }: { onboarding: OnboardingPayload; hidden?: boolean; deviceOpen?: boolean | null }) {
   const user = useUser();
   const toast = useToast();
-  const [ready, setReady] = useState(false);
   const [view, setView] = useState(onboarding);
-  const [hidden, setHidden] = useState(false);
+  const [hidden, setHidden] = useState(hiddenOnServer);
   const [device, setDevice] = useState<{ installed: boolean; mode: InstallMode; perm: string } | null>(null);
   const [installing, setInstalling] = useState(false);
 
   // This device's own two facts, kept fresh: the browser may offer the install prompt a moment after load,
   // and the notification permission can change in another tab or in the browser's own settings.
   useEffect(() => {
-    const read = () => setDevice(deviceSetup());
+    const read = () => {
+      const d = deviceSetup();
+      setDevice(d);
+      // Remembered for the server, so the next Home reserves the row only when it will be used.
+      const open = (!!(d.mode || d.installed) && !d.installed) || (d.perm !== "unsupported" && d.perm !== "granted");
+      try {
+        if (readCookie(SETUP_DEVICE_COOKIE) !== (open ? "1" : "0")) writeCookie(SETUP_DEVICE_COOKIE, open ? "1" : "0");
+      } catch {
+        /* cookies blocked: the row is simply reserved each time */
+      }
+    };
     read();
     window.addEventListener("outly:installable", read);
     window.addEventListener("outly:installed", read);
@@ -86,8 +103,15 @@ export function SetupChecklist({ onboarding }: { onboarding: OnboardingPayload }
   }, []);
 
   useEffect(() => {
-    setHidden(!!localStorage.getItem(hiddenKey(user.id)));
-    setReady(true);
+    try {
+      // Hidden before the cookie existed: carry it over, so from the next visit the server already knows.
+      if (localStorage.getItem(hiddenKey(user.id)) && !setupHiddenFor(readCookie(SETUP_HIDDEN_COOKIE), user.id)) {
+        writeCookie(SETUP_HIDDEN_COOKIE, withSetupHidden(readCookie(SETUP_HIDDEN_COOKIE), user.id));
+        setHidden(true);
+      }
+    } catch {
+      /* storage blocked: the server's answer stands */
+    }
 
     const q = new URLSearchParams(location.search);
     const welcome = q.get("welcome") === "1";
@@ -109,11 +133,20 @@ export function SetupChecklist({ onboarding }: { onboarding: OnboardingPayload }
     ...(device && device.perm !== "unsupported" ? [{ id: "notify", title: "Turn on notifications", done: device.perm === "granted", skipped: false }] : []),
   ];
   const doneCount = steps.filter((s) => s.done).length;
+  const open = (s: { done: boolean; skipped: boolean }) => !s.done && !s.skipped;
+  // Before hydration nobody knows this device's two rows: keep one row's room unless last visit said there were none.
+  // Only when a past visit said a device row will show: a first visit reserves nothing, so nothing has to shrink.
+  const reserve = device === null && deviceOpen === true;
 
-  if (!ready || hidden || steps.every((s) => s.done || s.skipped)) return null;
+  if (hidden || !(steps.some(open) || (device === null && deviceOpen === true))) return null;
 
   const dismiss = () => {
-    localStorage.setItem(hiddenKey(user.id), "1");
+    try {
+      localStorage.setItem(hiddenKey(user.id), "1");
+      writeCookie(SETUP_HIDDEN_COOKIE, withSetupHidden(readCookie(SETUP_HIDDEN_COOKIE), user.id));
+    } catch {
+      /* storage blocked: hidden for this visit */
+    }
     setHidden(true);
     // Hiding the list ends the guided setup on the account too, so no other device brings it back.
     if (!view.finished) saveOnboarding({ action: "dismiss" }).catch(() => {});
@@ -191,9 +224,9 @@ export function SetupChecklist({ onboarding }: { onboarding: OnboardingPayload }
         </div>
         <div className="mt-4 flex items-center gap-3">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary" role="progressbar" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={doneCount} aria-label="Setup progress">
-            <div className="lime-bg h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
+            <div className="lime-bg h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${steps.length ? (doneCount / steps.length) * 100 : 0}%` }} />
           </div>
-          <span className="text-sm tabular-nums text-muted-foreground">{doneCount} of {steps.length}</span>
+          <span className="text-sm tabular-nums text-muted-foreground">{steps.length > 0 ? `${doneCount} of ${steps.length}` : "\u00a0"}</span>
         </div>
         <ol className="mt-5 flex flex-col gap-2">
           {steps.map((s, i) => (
@@ -222,6 +255,8 @@ export function SetupChecklist({ onboarding }: { onboarding: OnboardingPayload }
               </div>
             </li>
           ))}
+          {/* The height of one open device row (title, note, button), filled in by the real rows after hydration. */}
+          {reserve && <li aria-hidden="true" data-setup-reserve="" className="min-h-[124px] rounded-2xl bg-secondary/40" />}
         </ol>
       </div>
     </section>

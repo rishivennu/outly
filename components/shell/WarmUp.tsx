@@ -3,18 +3,19 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useLivePlatforms } from "./LivePlatforms";
 import { useUserKey } from "./UserContext";
-import { coolPages, onRouterRefresh, warmAnalytics, warmPage, whenIdle } from "@/lib/client/warm";
+import { coolPages, onRouterRefresh, warmAnalytics, warmPage } from "@/lib/client/warm";
+import { whenIdle, whenSettled } from "@/lib/client/when-idle";
 import { FIRST_MS, GAP_MS, canPreload, noteServerClock, preloadOrder, takeQuiet } from "@/lib/client/preload";
 
 /**
  * 1114: every primary tab (Home, Analytics, Calendar, Inbox, Content) loaded in the background, so opening one shows
  * it at once. Replaces 1039's Analytics-only idle warm-up. See lib/client/preload.ts for the whole picture.
  *
- * - The open page comes first: nothing starts until it has painted and the browser is idle (FIRST_MS), then one tab
- *   per idle moment (GAP_MS apart), so a slow phone never has the warm-up fighting the page in front of it.
+ * - The open page comes first: nothing starts until it has fully loaded (readyState "complete"), FIRST_MS more have
+ *   passed and the browser is idle, then one tab per idle moment (GAP_MS apart), so a slow phone never has the warm-up fighting the page in front of it.
  * - Runs again on every navigation, when the browser tab comes back, and after any router.refresh() (which empties
  *   the router's cache). Already-held tabs cost nothing: Next never fetches a prefetch it still holds.
- * - Never with Save-Data or on 2G, never in a hidden tab, never while composing a post. Errors are swallowed: a
+ * - Never with Save-Data or on 2G/3G, never in a hidden tab, never while composing a post. Errors are swallowed: a
  *   prefetch is only a head start, a tab that wasn't warmed loads the normal way.
  * - Per account: a different sign-in, workspace or profile in this tab drops everything kept for the one before
  *   (components/shell/UserContext.tsx does it, above every page).
@@ -69,7 +70,7 @@ export function WarmUp({ serverNow }: { serverNow?: number }) {
     let cancel = () => {};
     const next = () => {
       if (i >= order.length) return;
-      cancel = whenIdle(() => {
+      cancel = (i === 0 ? whenSettled : whenIdle)(() => {
         // Gone to the background: stop; coming back starts a new round.
         if (document.visibilityState === "hidden") return;
         const href = order[i++];

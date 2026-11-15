@@ -94,16 +94,4 @@ export function warmOn(fn: () => void) {
   return { onPointerEnter: go, onFocus: go, onTouchStart: go };
 }
 
-/** Run `fn` once the browser is idle (or after `ms` where requestIdleCallback is missing). Returns a cleanup. */
-export function whenIdle(fn: () => void, ms = 2500) {
-  const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
-  let idle = 0;
-  const t = window.setTimeout(() => {
-    if (w.requestIdleCallback) idle = w.requestIdleCallback(fn, { timeout: 4000 });
-    else fn();
-  }, ms);
-  return () => {
-    window.clearTimeout(t);
-    if (idle && w.cancelIdleCallback) w.cancelIdleCallback(idle);
-  };
-}
+export { whenIdle } from "./when-idle";

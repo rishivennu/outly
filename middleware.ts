@@ -4,6 +4,7 @@ import { SRC_COOKIE, SRC_DAYS, sourceFromParams } from "./lib/growth/core";
 import { APP_SOURCE } from "./lib/app-mode";
 import { buildCsp, CSP_REPORT_PATH, newNonce } from "./lib/csp";
 import { REF_COOKIE, REF_DAYS, REF_VISITOR, isCode } from "./lib/referral-core";
+import { middlewareTiming, type FlagSource } from "./lib/server-timing";
 
 const AUTH_PAGES = ["/login", "/signup"];
 // Marketing pages anyone can read.
@@ -45,11 +46,15 @@ function sync(req: NextRequest, res: NextResponse, name: string, on: boolean, ma
   if (!on && has) res.cookies.delete(name);
 }
 
-/** Keep the readable hints (not credentials) in step with the real session and the waitlist switch, so public pages can stay cached. */
-function hint(req: NextRequest, res: NextResponse, authed: boolean) {
+/**
+ * Keep the readable hints (not credentials) in step with the real session and the waitlist switch, so public pages can stay cached.
+ * `flags` null: this request answered without knowing the switches (the status API was slow), so the switch hints stay as they are.
+ */
+function syncHints(req: NextRequest, res: NextResponse, authed: boolean, flags: Flags | null) {
   sync(req, res, HINT, authed, 60 * 60 * 24 * 30);
-  sync(req, res, WL_HINT, !!status?.waitlist, 60 * 60 * 24);
-  const want = status?.hide ?? "";
+  if (!flags) return res;
+  sync(req, res, WL_HINT, !!flags.waitlist, 60 * 60 * 24);
+  const want = flags.hide ?? "";
   const has = req.cookies.get(LH_HINT)?.value ?? "";
   if (want && want !== has) res.cookies.set(LH_HINT, want, { path: "/", sameSite: "lax", secure: req.nextUrl.protocol === "https:", maxAge: 60 * 60 * 24 });
   if (!want && has) res.cookies.delete(LH_HINT);
@@ -58,29 +63,63 @@ function hint(req: NextRequest, res: NextResponse, authed: boolean) {
 
 // Maintenance and waitlist flags, read through the public status API (edge middleware can't open the
 // database). Cached per instance for a few seconds so a busy site doesn't call it on every page view.
-let status: { at: number; maintenance: boolean; waitlist: boolean; hide: string } | null = null;
+type Flags = { at: number; maintenance: boolean; waitlist: boolean; hide: string };
+let status: Flags | null = null;
 let warned = false;
-let refreshing: Promise<unknown> | null = null;
+let refreshing: Promise<Flags> | null = null;
+/** Perf (startup): the longest a page ever waits on the status API. */
+export const FLAG_WAIT_MS = 250;
 /**
  * 1113: stale-while-revalidate. Within a minute of the last read, answer from memory at once and refresh in the
  * background (waitUntil), so a page no longer waits on a second trip to the function region before it renders.
  * Only a cold instance (or one idle for over a minute) waits. A maintenance switch reaches every instance within
  * about 105 s (60 s here + 15 s CDN + 30 s stale on /api/maintenance). 1150: fresh window 5 s -> 15 s, so a quiet
  * site no longer pays a second function call for most page views.
+ *
+ * Perf (startup): a cold edge instance (or one idle for over a minute) used to wait up to 1.5 s on that trip to the
+ * function region before any page. Now it waits at most FLAG_WAIT_MS. Past that the page answers with the last known
+ * switches, or on a brand new instance with maintenance off and the waitlist as the visitor's own readable hint
+ * cookie last said, and the read finishes in the background (waitUntil) for the next request. Trade-off: a cold
+ * instance may show one ordinary page during a maintenance window. Signed-in members are still sent to the
+ * maintenance page by the studio layout (its own site check), and /api/maintenance is edge cached (s-maxage=15),
+ * so the read that follows is quick. `use` decides routing; `sure` is the same switches when they were actually
+ * read, null when `use` is a guess (the hint cookies are then left alone).
  */
-async function siteFlags(req: NextRequest, ev?: NextFetchEvent) {
-  if (status && Date.now() - status.at < 15_000) return status;
+async function siteFlags(req: NextRequest, ev?: NextFetchEvent): Promise<{ use: Flags; sure: Flags | null; src: FlagSource }> {
+  if (status && Date.now() - status.at < 15_000) return { use: status, sure: status, src: "hit" };
   if (status && ev && Date.now() - status.at < 60_000) {
-    if (!refreshing) {
-      refreshing = readFlags(req).finally(() => (refreshing = null));
-      ev.waitUntil(refreshing);
-    }
-    return status;
+    ev.waitUntil(refresh(req));
+    return { use: status, sure: status, src: "stale" };
   }
-  return readFlags(req);
+  const read = refresh(req);
+  ev?.waitUntil(read);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<null>((r) => (timer = setTimeout(() => r(null), FLAG_WAIT_MS)));
+  const got = await Promise.race([read, late]);
+  clearTimeout(timer);
+  if (got) return { use: got, sure: got, src: "miss" };
+  if (status) return { use: status, sure: status, src: "timeout" };
+  // A brand new instance with nothing to go on: a member's page may answer with a guess (the studio layout still
+  // enforces maintenance for them, and the waitlist never applies to them), but a stranger waits for the real
+  // switches, so a cold edge never lets anyone past maintenance or the waitlist.
+  if (!req.cookies.has("studio_session")) {
+    const sure = await read;
+    return { use: sure, sure, src: "miss" };
+  }
+  return { use: guessFlags(req), sure: null, src: "timeout" };
 }
 
-async function readFlags(req: NextRequest) {
+/** One status read at a time per instance; every request that needs it shares it. */
+function refresh(req: NextRequest) {
+  return (refreshing ??= readFlags(req).finally(() => (refreshing = null)));
+}
+
+/** A brand new instance that could not read the switches in time: maintenance off, waitlist as the hint cookie says. */
+export function guessFlags(req: NextRequest): Flags {
+  return { at: 0, maintenance: false, waitlist: req.cookies.get(WL_HINT)?.value === "1", hide: "" };
+}
+
+async function readFlags(req: NextRequest): Promise<Flags> {
   let maintenance = status?.maintenance ?? false;
   let waitlist = status?.waitlist ?? false;
   let hide = status?.hide ?? "";
@@ -147,7 +186,11 @@ export async function middleware(req: NextRequest, ev?: NextFetchEvent) {
   headers.set("x-nonce", nonce);
   headers.set("x-path", req.nextUrl.pathname + req.nextUrl.search); // where a stale session should return to after signing in (1042)
   headers.set("content-security-policy", csp);
-  const res = await route(req, headers, ev);
+  const t0 = Date.now();
+  const seen: { flags: FlagSource } = { flags: "skip" };
+  const res = await route(req, headers, ev, seen);
+  // Perf: measurable live (devtools, curl -I): time spent here and how the site switches were read.
+  res.headers.set("Server-Timing", middlewareTiming(Date.now() - t0, seen.flags));
   res.headers.set("Content-Security-Policy", csp);
   res.headers.set("Reporting-Endpoints", `csp="${req.nextUrl.origin}${CSP_REPORT_PATH}"`); // must be absolute
   if (noIndex(req.nextUrl.pathname)) res.headers.set("X-Robots-Tag", "noindex, nofollow");
@@ -186,7 +229,7 @@ export function appBounce(req: NextRequest) {
   return NextResponse.redirect(u);
 }
 
-async function route(req: NextRequest, headers: Headers, ev?: NextFetchEvent) {
+async function route(req: NextRequest, headers: Headers, ev: NextFetchEvent | undefined, seen: { flags: FlagSource }) {
   const { pathname } = req.nextUrl;
   const pass = () => NextResponse.next({ request: { headers } });
   const bounce = appBounce(req);
@@ -194,7 +237,10 @@ async function route(req: NextRequest, headers: Headers, ev?: NextFetchEvent) {
   const alias = SECTION_ALIASES[pathname];
   if (alias) return NextResponse.redirect(new URL(alias, req.url), 308);
   const adminArea = pathname === "/admin" || pathname.startsWith("/admin/");
-  const flags = adminArea ? null : await siteFlags(req, ev);
+  const read = adminArea ? null : await siteFlags(req, ev);
+  if (read) seen.flags = read.src;
+  const flags = read?.use ?? null;
+  const hint = (q: NextRequest, res: NextResponse, a: boolean) => syncHints(q, res, a, read ? read.sure : status);
   const token = req.cookies.get("studio_session")?.value;
   let authed = false;
   if (token) {

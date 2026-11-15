@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
-import { getCurrentUser } from "@/lib/auth";
+import { after } from "next/server";
+import { currentSessionId, getCurrentUser } from "@/lib/auth";
 import { ACCT_COOKIE } from "@/lib/profiles";
 import { UserProvider } from "@/components/shell/UserContext";
 import { AvatarCursor } from "@/components/shell/AvatarCursor";
@@ -9,15 +10,14 @@ import { MobileNav, MobileTopBar, Sidebar } from "@/components/shell/Nav";
 import { Tour } from "@/components/onboarding/Tour";
 import { PageGuide } from "@/components/onboarding/PageGuide";
 import { CommandPalette } from "@/components/shell/CommandPalette";
-import { touchActivity, touchPlace } from "@/lib/activity";
-import { touchPresence } from "@/lib/presence";
-import { touchSession } from "@/lib/sessions";
-import { liveNow } from "@/lib/social/registry";
+import { touchAll } from "@/lib/activity";
+import { studioSettings } from "@/lib/startup-config";
+import { loadKeys } from "@/lib/social/keys";
+import { timingContent } from "@/lib/server-timing";
 import { LivePlatformsProvider } from "@/components/shell/LivePlatforms";
 import { WorkspaceBar } from "@/components/shell/WorkspaceBar";
-import { siteStatus, joinedBeforeMaintenance } from "@/lib/site";
+import { joinedBeforeMaintenance } from "@/lib/maintenance";
 import { Countdown } from "@/components/maintenance/Countdown";
-import { getConfig } from "@/lib/settings";
 import { WhatsNew } from "@/components/shell/WhatsNew";
 import { SendingPill } from "@/components/shell/SendingPill";
 import { PrivacyNotice } from "@/components/shared/PrivacyNotice";
@@ -26,6 +26,7 @@ import { AppEffects, AppMoreSheet, AppNavBar, AppTabBar } from "@/components/she
 import { NativeBridge } from "@/components/shell/NativeBridge";
 import { PushBridge } from "@/components/shell/PushBridge";
 import { WarmUp } from "@/components/shell/WarmUp";
+import { PerfBeacon } from "@/components/shell/PerfBeacon";
 import { InstallPrompt } from "@/components/shell/InstallPrompt";
 import { normalizeInstall } from "@/lib/pwa-core";
 import { PwaWelcome } from "@/components/shell/PwaWelcome";
@@ -34,20 +35,36 @@ import { PromoSheet } from "@/components/promo/PromoSheet";
 import { PostHogIdentify } from "@/components/analytics/PostHogIdentify";
 
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
+  const t0 = performance.now();
+  // Perf (startup): the only per-person read that may hold the first byte.
   const user = await getCurrentUser();
+  const tUser = performance.now();
   // Signed cookie the database refuses: clear it on the way to sign-in, or middleware bounces /login back here (1042).
   if (!user) redirect(`/api/auth/expired?next=${encodeURIComponent((await headers()).get("x-path") ?? "/home")}`);
-  const [live, site, notice, install, welcome] = await Promise.all([liveNow(), siteStatus(), getConfig("updates"), getConfig("install"), getConfig("welcome")]);
+  // Site-wide admin settings (live platforms, maintenance, the notice, install and welcome cards) come from the shared
+  // cache (lib/startup-config.ts), expired the moment an admin saves one, so a cold instance does not wait on them.
+  const [{ live, site, notice, install, welcome }, h, jar, sid] = await Promise.all([
+    studioSettings(),
+    headers(),
+    cookies(),
+    currentSessionId().catch(() => null),
+    // Platform app keys (Admin > Social platforms) into this instance's snapshot, so every studio page can read
+    // creds() as before; a shared-cache hit above would otherwise skip it. 15 s cached, runs alongside the others.
+    loadKeys().catch(() => null),
+  ]);
+  const tCfg = performance.now();
   const welcomeCfg = normalizeWelcome(welcome);
   // Maintenance: members who joined before it started carry on; anyone newer waits on the maintenance page.
   if (site.maintenance && !joinedBeforeMaintenance({ createdAt: user.joinedAt }, site.since)) redirect("/maintenance?preview");
-  void touchActivity(user.id); // daily-active tracking for the admin console; never blocks or throws
-  const h = (await headers());
-  void touchPlace(user.actor?.id ?? user.id, (n) => h.get(n)); // approximate network location for the admin console (1053)
-  void touchPresence(user.actor?.id ?? user.id); // online now (1037); the LiveCount poll keeps it fresh
-  void touchSession(); // Active sessions "last active" (1080), at most every 5 minutes
+  // Daily active, network place (1053), online now (1037) and the session's last active (1080): after the page is
+  // sent, never during the render. cookies() and headers() are off limits inside after(), so they are read above.
+  const actorId = user.actor?.id ?? user.id;
+  const seen = new Headers(h);
+  after(() => touchAll({ userId: user.id, actorId, sid, header: (n) => seen.get(n) }));
   return (
-    <UserProvider user={{ id: user.id, name: user.name, email: user.email, avatar: user.avatar, timezone: user.timezone, workspace: user.actor ? { ownerName: user.name, role: user.role === "manager" ? "manager" : "editor", me: { name: user.actor.name, email: user.actor.email } } : null, view: (await cookies()).get(ACCT_COOKIE)?.value ?? null }}>
+    <UserProvider user={{ id: user.id, name: user.name, email: user.email, avatar: user.avatar, timezone: user.timezone, workspace: user.actor ? { ownerName: user.name, role: user.role === "manager" ? "manager" : "editor", me: { name: user.actor.name, email: user.actor.email } } : null, view: jar.get(ACCT_COOKIE)?.value ?? null }}>
+      {/* Perf: how long this layout waited on the account and on the settings, read by the perf collector. No personal data. */}
+      <meta name="x-timing" content={timingContent({ user: tUser - t0, cfg: tCfg - tUser })} />
       <LivePlatformsProvider value={live}>
       <ToastProvider>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground">
@@ -95,6 +112,8 @@ export default async function StudioLayout({ children }: { children: React.React
       <PostHogIdentify id={user.actor?.id ?? user.id} joinedAt={new Date(user.joinedAt).toISOString()} />
       {/* 1114: preloads every primary tab in the background; the server's clock lets pages judge their age. */}
       <WarmUp serverNow={Date.now()} />
+      {/* Perf: one startup timing beacon per load (no PII); read-out in Admin > Startup speed. */}
+      <PerfBeacon />
       <InstallPrompt config={normalizeInstall(install)} />
       </ToastProvider>
       </LivePlatformsProvider>

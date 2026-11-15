@@ -68,10 +68,11 @@ describe("1101 look and motion", () => {
     expect(w).toContain("<WelcomeArt />");
   });
   test("timings from the brief", () => {
-    expect(block).toContain(".pw-a { animation: pw-fade .4s var(--pw-ease) both; }");
-    expect(block).toContain(".pw-b { animation: pw-rise .6s var(--pw-ease) .08s both; }");
-    expect(block).toContain(".pw-c { animation: pw-grow .8s var(--pw-ease) .18s both; }");
-    expect(block).toContain("calc(340ms + var(--i, 0) * 100ms)");
+    // perf A8: shorter stagger, the greeting is readable on the first frame, nothing starts after .24s
+    expect(block).toContain(".pw-a { animation: pw-fade .3s var(--pw-ease) both; }");
+    expect(block).toContain(".pw-b { animation: pw-lift .45s var(--pw-ease) both; }");
+    expect(block).toContain(".pw-c { animation: pw-grow .6s var(--pw-ease) .1s both; }");
+    expect(block).toContain("calc(120ms + var(--i, 0) * 40ms)");
     expect(block).toContain("--pw-ease: var(--m-ease-out);"); // 1119: the shared token, same curve
     expect(block).toMatch(/\.pw-cta:not\(:disabled\):active, \.pw-x:not\(:disabled\):active, \.pw-link:not\(:disabled\):active \{ transform: scale\(\.96\); \}/);
     expect(block).toMatch(/transition: transform \.15s var\(--pw-ease\)/);

@@ -10,6 +10,8 @@ import { ONBOARDING_CACHE_PREFIX } from "@/components/onboarding/onboarding-clie
  * the guided setup's cached progress (components/onboarding/onboarding-client).
  */
 const SW_CACHE_PREFIX = "outly-offline-";
+// The service worker's copies of studio pages (public/sw.js PAGES): the signed-in person's own screens, all dropped.
+const SW_PAGES_CACHE = "outly-pages-v1";
 const INVOICE_LIST_KEY = "outly-invoices-v1";
 const BILLING_PATH = /^\/(billing\/?|api\/billing\/invoices\/[\w-]+)$/;
 
@@ -26,6 +28,7 @@ export async function forgetLocalCopies() {
   }
   const work = (async () => {
     if (typeof caches === "undefined") return;
+    await caches.delete(SW_PAGES_CACHE);
     for (const name of await caches.keys()) {
       if (!name.startsWith(SW_CACHE_PREFIX)) continue;
       const c = await caches.open(name);

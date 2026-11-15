@@ -2,6 +2,7 @@
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { GSAP_EASE, sec } from "./tokens";
+import { reduced, simple } from "./prefs";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -42,18 +43,8 @@ const pending = new Map<HTMLElement, gsap.core.Tween>(); // section heads waitin
 const queue = new Set<HTMLElement>();
 let raf = 0;
 
-export const reduced = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-// Phones: a short lift and fade only. Big slides while the finger is still scrolling cost frames on low-end devices.
-const coarse = () => typeof matchMedia !== "undefined" && matchMedia("(hover: none) and (pointer: coarse)").matches;
-let weak: boolean | null = null;
-/** Low-power hint: Save-Data, or a small machine (few cores and little memory). Cached, it never changes mid-visit. */
-const lowPower = () => {
-  if (weak !== null) return weak;
-  const n = (typeof navigator !== "undefined" ? navigator : {}) as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } };
-  weak = !!n.connection?.saveData || ((n.hardwareConcurrency ?? 8) <= 4 && (n.deviceMemory ?? 8) <= 4);
-  return weak;
-};
-export const simple = () => coarse() || lowPower();
+// Reduced motion, phones and low-power devices (Save-Data, few cores): lib/motion/prefs.ts, shared with route.ts.
+export { reduced, simple };
 const num = (el: HTMLElement, v: string, d: number) => {
   const n = parseFloat(el.style.getPropertyValue(v));
   return Number.isFinite(n) ? n : d;

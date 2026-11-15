@@ -696,6 +696,33 @@ model BehaviorAnalysis {
   @@index([createdAt])
 }
 
+/// Startup timings, one row per studio page load (perf workstream C). No user, IP or user agent: only timings
+/// (whole ms since navigation start, CLS x1000), coarse device/network buckets when analytics consent allows, the
+/// app version and the page path with ids folded. Rows older than 30 days are pruned by /api/perf.
+model PerfSample {
+  id        String   @id
+  at        DateTime @default(now())
+  path      String
+  cold      Boolean
+  installed Boolean
+  version   String
+  flags     String?
+  device    String?
+  net       String?
+  ttfb      Int?
+  fcp       Int?
+  lcp       Int?
+  cls       Int?
+  inp       Int?
+  hydrate   Int?
+  content   Int?
+  mwMs      Int?
+  userMs    Int?
+  cfgMs     Int?
+
+  @@index([at])
+}
+
 /// Someone the owner invited into their workspace. Members act on the owner's posts, media and accounts.
 /// The invite link is the credential, so only its SHA-256 hash is stored.
 model TeamMember {

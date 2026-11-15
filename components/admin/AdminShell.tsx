@@ -41,6 +41,7 @@ const NAV: { href: string; label: string; icon: typeof Users; area: AdminArea; g
   { href: "/admin/notifications", label: "Notifications", icon: BellRing, area: "site", group: "Setup" },
   { href: "/admin/updates", label: "Update notice", icon: Megaphone, area: "site", group: "Setup" },
   { href: "/admin/maintenance", label: "Maintenance", icon: Construction, area: "site", group: "Setup" },
+  { href: "/admin/perf", label: "Startup speed", icon: Activity, area: "site", group: "Setup" },
   { href: "/admin/waitlist", label: "Waitlist", icon: Hourglass, area: "site", group: "Setup" },
   { href: "/admin/beta", label: "Beta program", icon: FlaskConical, area: "site", group: "Setup" },
   { href: "/admin/founding", label: "Founding members", icon: Award, area: "site", group: "Setup" },

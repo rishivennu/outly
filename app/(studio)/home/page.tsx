@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { ArrowUpRight, CalendarClock, PenLine } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -12,6 +13,7 @@ import { loadKeys } from "@/lib/social/registry";
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
 import { onboardingFor } from "@/lib/onboarding";
+import { SETUP_DEVICE_COOKIE, SETUP_HIDDEN_COOKIE, deviceHint, setupHiddenFor } from "@/lib/onboarding-core";
 import { WelcomeSubscribe, type WelcomeOffer } from "@/components/onboarding/WelcomeSubscribe";
 import { entitlements, storageUsage } from "@/lib/billing/entitlements";
 import { hasPerk } from "@/lib/billing/plan-rules";
@@ -33,7 +35,7 @@ import { PageFresh } from "@/components/shell/PageFresh";
 import { WeekRecap } from "@/components/home/WeekRecap";
 import { RECAP_COOKIE } from "@/lib/reports/weekly-core";
 import { lastWeekRecap } from "@/lib/reports/weekly";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { homePulse } from "@/lib/retention/pulse";
 import { isPlatform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
@@ -50,7 +52,11 @@ import { dashboardFor } from "@/lib/dashboard-style";
 import { getPulse } from "@/lib/dashboard/pulse";
 import { analyticsScope } from "@/lib/profiles";
 import { PulseHome } from "@/components/dashboard/PulseHome";
+import { PulseSkeleton } from "@/components/dashboard/PulseSkeleton";
 import { DashboardSwitch } from "@/components/home/DashboardSwitch";
+import { HomeContentMark } from "@/components/home/HomeContentMark";
+import { timingContent } from "@/lib/server-timing";
+import type { Pulse } from "@/lib/dashboard/pulse-core";
 
 const NEW_FOR_DAYS = 14;
 /**
@@ -58,7 +64,10 @@ const NEW_FOR_DAYS = 14;
  * 1142: 1.5 s (was 5 s): one slow greeting card held the whole Home for up to five seconds.
  */
 const CARD_MS = 1500;
-/** The dashboard numbers are the page itself (without them Home falls back to the classic cards), so they get longer. */
+/**
+ * The dashboard numbers are the page itself (without them Home falls back to the classic cards), so they get longer.
+ * Perf: they stream in their own Suspense boundary behind PulseSkeleton, so this no longer holds the page's HTML.
+ */
 const PULSE_MS = 5000;
 
 /** Free, owner-level accounts that are new or haven't published yet get the subscribe greeting once. */
@@ -95,22 +104,46 @@ async function welcomeOffer(user: { id: string; createdAt: Date; actor: unknown 
 }
 
 type HomeUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
+/** Perf (CLS): what the setup checklist cookies say, so it renders in the first HTML (lib/onboarding-core.ts). */
+type Setup = { hidden: boolean; deviceOpen: boolean | null };
+
+/** Perf: the dashboard numbers, streamed after the first cards. Out of time or failed: the classic cards, as before. */
+async function PulseBlock(p: { data: Promise<{ d: Pulse | null; ms: number }>; firstName: string; canSwitch: boolean; nextPost: { when: string; title: string } | null; nonce?: string; fallback: () => Promise<React.ReactNode> }) {
+  const { d, ms } = await p.data;
+  if (!d) {
+    try {
+      return await p.fallback();
+    } catch {
+      return null;
+    }
+  }
+  return (
+    <>
+      <meta name="x-timing" content={timingContent({ pulse: ms })} />
+      <PulseHome initial={d} firstName={p.firstName} canSwitch={p.canSwitch} nextPost={p.nextPost} />
+      <HomeContentMark nonce={p.nonce} />
+    </>
+  );
+}
 
 /**
  * 1080: the analytics Home ("pulse"). Keeps the first-run pieces (checklist, founding / subscribe greeting) above
- * the dashboard and drops the classic cards. Null when the numbers can't be read in time, so Home falls back to classic.
+ * the dashboard and drops the classic cards. When the numbers can't be read in time, Home falls back to classic.
+ * Perf: the first-run pieces render first (CARD_MS each); the numbers stream into the same place behind a
+ * skeleton of the same shape, so the first byte no longer waits up to PULSE_MS on them.
  */
-async function pulseView(user: HomeUser, canSwitch: boolean) {
+async function pulseView(user: HomeUser, canSwitch: boolean, setup: Setup, nonce: string | undefined, classic: () => Promise<React.ReactNode>) {
+  const t0 = performance.now();
   const [scope, accountIds] = await Promise.all([postFilter(user), analyticsScope(user)]);
-  const [, data, next, welcome, founding, onboarding] = await Promise.all([
+  const data = soft(getPulse(user.id, 7, accountIds), PULSE_MS, null, "home analytics").then((d) => ({ d, ms: performance.now() - t0 }));
+  const [, next, welcome, founding, onboarding] = await Promise.all([
     loadKeys(),
-    soft(getPulse(user.id, 7, accountIds), PULSE_MS, null, "home analytics"),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() }, ...scope.where }, select: { title: true, scheduledAt: true }, orderBy: { scheduledAt: "asc" } }),
     soft(welcomeOffer(user), CARD_MS, null, "home welcome"),
     user.actor ? null : soft(myFounding(user.id), CARD_MS, null, "home founding"),
     soft(onboardingFor(user), CARD_MS, null, "home onboarding"),
   ]);
-  if (!data) return null;
+  const tCards = performance.now();
   const promo: FoundingPromo | null =
     founding?.kind === "offer" && !founding.seen ? { kind: "offer", left: founding.left, limit: founding.limit, pct: founding.pct, proven: founding.proven }
     : founding?.kind === "reserved" && !founding.seen ? { kind: "reserved", no: founding.no, pct: founding.pct }
@@ -121,16 +154,19 @@ async function pulseView(user: HomeUser, canSwitch: boolean) {
   const firstName = user.name.split(" ")[0];
   return (
     <div className="relative">
+      <meta name="x-timing" content={timingContent({ home: tCards - t0 })} />
       <div className="pt-4">
         {onboarding && <OnboardingFlow initial={onboarding} auto />}
-        {onboarding && <SetupChecklist onboarding={onboarding} />}
+        {onboarding && <SetupChecklist onboarding={onboarding} hidden={setup.hidden} deviceOpen={setup.deviceOpen} />}
         {promo ? (
           <FoundingWelcome promo={promo} />
         ) : (
           welcome && <WelcomeSubscribe firstName={firstName} offer={welcome.offer} freeLimit={welcome.freeLimit} freePeriod={welcome.freePeriod} foundingFull={founding?.kind === "full" ? founding.limit : null} trial={welcome.trial} />
         )}
       </div>
-      <PulseHome initial={data} firstName={firstName} canSwitch={canSwitch} nextPost={nextPost} />
+      <Suspense fallback={<PulseSkeleton firstName={firstName} nextPost={nextPost} />}>
+        <PulseBlock data={data} firstName={firstName} canSwitch={canSwitch} nextPost={nextPost} nonce={nonce} fallback={classic} />
+      </Suspense>
       {/* 1114: may open from the background preload; brings itself up to date when that copy is 90 s old. */}
       <PageFresh renderedAt={Date.now()} maxAge={90_000} />
     </div>
@@ -143,11 +179,19 @@ export const metadata = { title: "Home" };
 export default async function HomePage(props: { searchParams?: Promise<{ recapAt?: string }> }) {
   const searchParams = await props.searchParams;
   const user = (await getCurrentUser())!;
-  const dash = await dashboardFor();
+  const [dash, jar, h] = await Promise.all([dashboardFor(), cookies(), headers()]);
+  const setup: Setup = { hidden: setupHiddenFor(jar.get(SETUP_HIDDEN_COOKIE)?.value, user.id), deviceOpen: deviceHint(jar.get(SETUP_DEVICE_COOKIE)?.value) };
+  const nonce = h.get("x-nonce") ?? undefined;
   if (dash.style === "pulse") {
-    const view = await pulseView(user, dash.canSwitch).catch(() => null);
+    // Inside the numbers' boundary the first-run pieces are already on the page above, so the fallback leaves them out.
+    const view = await pulseView(user, dash.canSwitch, setup, nonce, () => classicView(user, dash.canSwitch, searchParams?.recapAt, setup, nonce, false)).catch(() => null);
     if (view) return view;
   }
+  return classicView(user, dash.canSwitch, searchParams?.recapAt, setup, nonce, true);
+}
+
+/** The classic Home. `firstRun` false: drawn inside the pulse view, which already shows the checklist and greetings. */
+async function classicView(user: HomeUser, canSwitch: boolean, recapAtParam: string | undefined, setup: Setup, nonce: string | undefined, firstRun: boolean) {
   // One parallel wave: every query below is independent, so the page pays one database round trip, not four.
   // Pulse only needs the connections and the published count, so it chains on those two instead of waiting for all.
   const liveP = connectedPlatforms(user.id);
@@ -157,7 +201,7 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
   const digestP = user.actor ? Promise.resolve(false) : entitlements(user.id).then((e) => hasPerk(e, "weekly-digest")).catch(() => true);
   const recapHidden = (await cookies()).get(RECAP_COOKIE)?.value;
   // Dev only: preview the Monday card on any day (?recapAt=2026-10-19T05:00:00Z).
-  const recapAt = process.env.NODE_ENV !== "production" && searchParams?.recapAt ? new Date(searchParams.recapAt) : new Date();
+  const recapAt = process.env.NODE_ENV !== "production" && recapAtParam ? new Date(recapAtParam) : new Date();
   // 1037: the picked profile (or a member's accounts) narrows the drafts and the next post too.
   const [profiles, scope, badges] = await Promise.all([listProfiles(user.id, user.scope), postFilter(user), trustBadges(user.id)]);
   const [, drafts, next, live, welcome, published, ret, pulse, recap, founding, saved, storage, onboarding] = await Promise.all([
@@ -165,7 +209,7 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
     db.post.findMany({ where: { userId: user.id, status: "draft", ...scope.where }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() }, ...scope.where }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),
     liveP,
-    soft(welcomeOffer(user), CARD_MS, null, "home welcome"),
+    firstRun ? soft(welcomeOffer(user), CARD_MS, null, "home welcome") : null,
     publishedP,
     soft(meP.then((me) => homeRetention({ id: user.id, postingGoal: me?.postingGoal ?? 3, timezone: user.timezone })), CARD_MS, null, "home retention"),
     soft(
@@ -184,11 +228,11 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
       null,
       "home recap",
     ),
-    user.actor ? null : soft(myFounding(user.id), CARD_MS, null, "home founding"),
+    user.actor || !firstRun ? null : soft(myFounding(user.id), CARD_MS, null, "home founding"),
     soft(savedTime(user.id, Date.now(), scope.where), CARD_MS, null, "home saved"),
     soft(storageUsage(user.id), CARD_MS, null, "home storage"),
     // Phase 2: the guided setup, saved on the account and merged with the studio's own data (lib/onboarding.ts)
-    soft(onboardingFor(user), CARD_MS, null, "home onboarding"),
+    firstRun ? soft(onboardingFor(user), CARD_MS, null, "home onboarding") : null,
   ]);
   const started = Object.values(live).some(Boolean) || published > 0;
   const steps = ret?.steps ?? [];
@@ -209,9 +253,10 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
 
   return (
     <div className="relative overflow-hidden">
-      <PageFresh renderedAt={Date.now()} maxAge={90_000} />
-      {dash.canSwitch && <div className="page-frame flex justify-end pt-4"><DashboardSwitch current="classic" /></div>}
+      {firstRun && <PageFresh renderedAt={Date.now()} maxAge={90_000} />}
+      {canSwitch && <div className="page-frame flex justify-end pt-4"><DashboardSwitch current="classic" /></div>}
       <HomeHero firstName={user.name.split(" ")[0]} />
+      <HomeContentMark nonce={nonce} />
       {profiles.length >= 2 ? (
         <ProfileSwitcher profiles={profiles} activeId={scope.active?.id ?? null}>
           <TrustBadges b={badges} className="mt-3" />
@@ -220,7 +265,7 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
         (badges.verifiedManager || badges.foundingNo) && <div className="page-frame pb-4"><TrustBadges b={badges} /></div>
       )}
       {onboarding && <OnboardingFlow initial={onboarding} auto />}
-      {onboarding && <SetupChecklist onboarding={onboarding} />}
+      {onboarding && <SetupChecklist onboarding={onboarding} hidden={setup.hidden} deviceOpen={setup.deviceOpen} />}
       {promo ? (
         <FoundingWelcome promo={promo} />
       ) : (

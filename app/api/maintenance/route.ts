@@ -1,18 +1,16 @@
 import { z } from "zod";
 import { json, route } from "@/lib/http";
-import { siteStatus, subscribe } from "@/lib/site";
-import { getConfig } from "@/lib/settings";
-import { hiddenAnchors } from "@/lib/landing";
+import { subscribe } from "@/lib/site";
+import { publicStatus } from "@/lib/startup-config";
 
 /**
  * Public. Middleware polls this (cached a few seconds per instance) to decide whether to show /maintenance.
  * 1113: the same answer for everyone, so Vercel's edge keeps it 5 s (and serves it stale for up to 30 s while
  * refreshing). Middleware then reads it from the nearest edge instead of the function region. Browsers don't cache it.
+ * Perf: a cold function answers from the shared data cache (expired when an admin saves the switch), not the database.
  */
 export async function GET() {
-  const [s, landing] = await Promise.all([siteStatus(), getConfig("landing")]);
-  // `hide`: landing anchors the admin switched off, so the nav and footer can drop those links.
-  return json({ ...s, hide: hiddenAnchors(landing) }, {
+  return json(await publicStatus(), {
     // Not "no-store": Vercel's edge refuses to keep a no-store answer even with cdn-cache-control set (checked live
     // 1113: always MISS). max-age=0 + must-revalidate still makes browsers ask every time.
     headers: { "cache-control": "public, max-age=0, must-revalidate", "cdn-cache-control": "public, s-maxage=15, stale-while-revalidate=30" },

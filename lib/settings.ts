@@ -1,5 +1,6 @@
 import { WELCOME_DEFAULT, type WelcomeConfig } from "./pwa-welcome";
 import "server-only";
+import { revalidateTag } from "next/cache";
 import { REFERRAL_DEFAULT, type ReferralConfig } from "./referral-core";
 import { db } from "./db";
 import { LANDING_DEFAULT } from "./landing";
@@ -139,6 +140,14 @@ const cache = (g.__cfg ??= new Map());
 export async function getConfig<K extends Key>(key: K): Promise<Cfg<K>> {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < 15_000) return hit.v as Cfg<K>;
+  return readConfig(key);
+}
+
+/**
+ * Perf: straight from the database, refreshing the 15 s memory copy. The shared caches (lib/settings-cache.ts) fill
+ * through this, so an instance that read a setting just before an admin saved it never re-stores the old copy.
+ */
+export async function readConfig<K extends Key>(key: K): Promise<Cfg<K>> {
   const row = await db.setting.findUnique({ where: { key } });
   let v: any = structuredClone(DEFAULTS[key]);
   if (row) {
@@ -182,7 +191,19 @@ export async function saveConfig<K extends Key>(key: K, patch: any): Promise<Cfg
   }
   await db.setting.upsert({ where: { key }, create: { key, value: JSON.stringify(stored) }, update: { value: JSON.stringify(stored) } });
   cache.delete(key);
+  expireShared(key);
   return next;
+}
+
+/** Tag on every shared cache entry built from a setting, so saving it reaches every instance at once. */
+export const settingTag = (key: string) => `setting:${key}`;
+
+function expireShared(key: string) {
+  try {
+    revalidateTag(settingTag(key));
+  } catch {
+    /* outside a Next request (tests, workers, scripts) there is no shared cache to expire */
+  }
 }
 
 /** Browser-safe view: secrets become { set, last4 }. */

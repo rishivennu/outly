@@ -1,6 +1,8 @@
 import "server-only";
 import { db } from "./db";
 import { ipPlace, placeKey } from "./geo";
+import { touchPresence } from "./presence";
+import { touchSession } from "./sessions";
 
 const g = globalThis as unknown as { __seen?: Map<string, string> };
 const seen = (g.__seen ??= new Map());
@@ -37,4 +39,13 @@ export async function touchPlace(userId: string, get: (name: string) => string |
   } catch {
     placeSeen.delete(userId);
   }
+}
+
+/**
+ * Perf (startup): the studio layout's bookkeeping writes in one go, for after(), so they run once the page has been
+ * sent instead of competing with it for the database. Daily active, network place, online now and the session's
+ * last active each keep their own throttle. Never throws.
+ */
+export async function touchAll(o: { userId: string; actorId: string; sid: string | null; header: (name: string) => string | null | undefined }) {
+  await Promise.allSettled([touchActivity(o.userId), touchPlace(o.actorId, o.header), touchPresence(o.actorId), touchSession(o.sid)]);
 }

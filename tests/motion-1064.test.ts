@@ -17,8 +17,11 @@ describe("motion pass (1064)", () => {
     for (const fx of ["rise", "depth", "wipe", "stagger", "cards", "tiles", "rows", "footer"]) expect(reveal).toContain(`"${fx}"`);
     expect(reveal).toContain("clipPath");
     expect(reveal).toMatch(/const CLEAR = "[^"]*clipPath[^"]*"/);
-    expect(reveal).toContain("prefers-reduced-motion: reduce");
-    expect(reveal).toContain("saveData");
+    // perf (B2): the preferences moved to lib/motion/prefs.ts, so route.ts reads them without loading GSAP.
+    const prefs = readFileSync("lib/motion/prefs.ts", "utf8");
+    expect(reveal).toContain('import { reduced, simple } from "./prefs";');
+    expect(prefs).toContain("prefers-reduced-motion: reduce");
+    expect(prefs).toContain("saveData");
     // Only the ease values matter (prose may say "bounce"): none of them springs past its target.
     expect(reveal).not.toMatch(/ease: "[^"]*(elastic|back|bounce)/);
   });

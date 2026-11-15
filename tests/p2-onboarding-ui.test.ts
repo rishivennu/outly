@@ -38,7 +38,8 @@ describe("one system", () => {
   test("Home mounts the flow before the checklist and the greetings, on both dashboards", () => {
     const s = src("app/(studio)/home/page.tsx");
     expect(s.match(/<OnboardingFlow initial=\{onboarding\} auto \/>/g)?.length).toBe(2);
-    expect(s.match(/<SetupChecklist onboarding=\{onboarding\} \/>/g)?.length).toBe(2);
+    // perf A6: the server passes what the cookies say, so the card is there on the first paint
+    expect(s.match(/<SetupChecklist onboarding=\{onboarding\} hidden=\{setup\.hidden\} deviceOpen=\{setup\.deviceOpen\} \/>/g)?.length).toBe(2);
     expect(s.indexOf("<OnboardingFlow")).toBeLessThan(s.indexOf("<FoundingWelcome"));
   });
   test("the checklist reads the saved steps, keeps the device rows, and hiding it dismisses on the server", () => {

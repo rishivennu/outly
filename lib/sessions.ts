@@ -57,12 +57,21 @@ export async function revokeOtherSessions(userId: string): Promise<number> {
   return gone.count;
 }
 
-/** Last active, at most one write per 5 minutes per device. Never throws. */
-export async function touchSession(): Promise<void> {
+const touched = ((globalThis as unknown as { __sessTouch?: Map<string, number> }).__sessTouch ??= new Map());
+
+/**
+ * Last active, at most one write per 5 minutes per device. Never throws. Perf: `sid` can be read before the page
+ * is sent (the studio layout passes it into after(), where cookies() is off limits); this process also skips the
+ * query entirely inside the 5 minutes.
+ */
+export async function touchSession(given?: string | null, now = Date.now()): Promise<void> {
   try {
-    const sid = await currentSessionId();
+    const sid = given === undefined ? await currentSessionId() : given;
     if (!sid) return;
-    await db.userSession.updateMany({ where: { id: sid, lastSeenAt: { lt: new Date(Date.now() - TOUCH_EVERY) } }, data: { lastSeenAt: new Date() } });
+    if (now - (touched.get(sid) ?? 0) < TOUCH_EVERY) return;
+    touched.set(sid, now);
+    if (touched.size > 50_000) touched.clear();
+    await db.userSession.updateMany({ where: { id: sid, lastSeenAt: { lt: new Date(now - TOUCH_EVERY) } }, data: { lastSeenAt: new Date(now) } }).catch(() => touched.delete(sid));
   } catch {
     /* presence only */
   }

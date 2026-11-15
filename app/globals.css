@@ -3739,10 +3739,11 @@ html[data-contrast="more"] .pw-ghost { box-shadow: inset 0 0 0 2px var(--pw-fg);
   .pw-art svg { width: min(100%, 620px); max-height: 72dvh; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .pwa-welcome .pw-a { animation: pw-fade .4s var(--pw-ease) both; }
-  .pwa-welcome .pw-b { animation: pw-rise .6s var(--pw-ease) .08s both; }
-  .pwa-welcome .pw-c { animation: pw-grow .8s var(--pw-ease) .18s both; }
-  .pwa-welcome .pw-d { animation: pw-rise .6s var(--pw-ease) both; animation-delay: calc(340ms + var(--i, 0) * 100ms); }
+  /* perf A8: the greeting is readable on the first frame (pw-lift starts at .5 opacity, no delay) and nothing starts later than .24s */
+  .pwa-welcome .pw-a { animation: pw-fade .3s var(--pw-ease) both; }
+  .pwa-welcome .pw-b { animation: pw-lift .45s var(--pw-ease) both; }
+  .pwa-welcome .pw-c { animation: pw-grow .6s var(--pw-ease) .1s both; }
+  .pwa-welcome .pw-d { animation: pw-rise .45s var(--pw-ease) both; animation-delay: calc(120ms + var(--i, 0) * 40ms); }
   /* after the entrance the rocket floats a few pixels and the clouds drift: slow, time-based, never bouncy */
   .pwa-welcome .wa-float { transform-box: fill-box; animation: wa-float 4.8s ease-in-out 1s infinite alternate; }
   .pwa-welcome .wa-cloud { transform-box: fill-box; animation: wa-drift 9s ease-in-out 1s infinite alternate; }
@@ -3757,6 +3758,7 @@ html[data-contrast="more"] .pw-ghost { box-shadow: inset 0 0 0 2px var(--pw-fg);
 }
 @keyframes pw-fade { from { opacity: 0; } }
 @keyframes pw-rise { from { opacity: 0; transform: translateY(14px); } }
+@keyframes pw-lift { from { opacity: .5; transform: translateY(10px); } }
 @keyframes pw-grow { from { opacity: 0; transform: scale(.92); } }
 @keyframes pw-leave { to { opacity: 0; transform: translateY(24px); } }
 @keyframes wa-float { to { transform: translate(3px, -6px); } }

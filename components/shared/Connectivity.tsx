@@ -16,7 +16,8 @@ export function connectivityLine(state: "offline" | "back", d: DraftSyncSignal) 
   return "Back online.";
 }
 
-/** Offline banner + service-worker registration (production only, so dev HMR is never cached). */
+/** Offline banner. The service worker is registered from the head (lib/sw-script.ts); registering again here is a
+ *  no-op that covers a page where that script was blocked (production only, so dev HMR is never cached). */
 export function Connectivity() {
   const online = useOnline();
   const draft = useSyncExternalStore(draftSyncSignal.subscribe, draftSyncSignal.get, () => NONE);

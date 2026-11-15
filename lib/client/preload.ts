@@ -27,15 +27,16 @@ export function preloadOrder(path: string): string[] {
 }
 
 type Conn = { saveData?: boolean; effectiveType?: string };
-/** Background loading only on a connection that can spare it: never with Save-Data, never on 2G. */
+/** Background loading only on a connection that can spare it: never with Save-Data, never on 2G or 3G (there the
+ *  four extra server renders would compete with the page being opened). */
 export function canPreload(nav: { connection?: Conn } | undefined = typeof navigator === "undefined" ? undefined : (navigator as unknown as { connection?: Conn })) {
   if (!nav) return false;
   const c = nav.connection;
   if (!c) return true;
-  return !c.saveData && c.effectiveType !== "2g" && c.effectiveType !== "slow-2g";
+  return !c.saveData && c.effectiveType !== "2g" && c.effectiveType !== "slow-2g" && c.effectiveType !== "3g";
 }
 
-/** First warm-up this long after the page settles, then one tab per idle moment this far apart. */
+/** First warm-up this long after the page has fully loaded (and then an idle moment), then one tab per idle moment this far apart. */
 export const FIRST_MS = 1500;
 export const GAP_MS = 600;
 

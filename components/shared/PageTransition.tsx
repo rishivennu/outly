@@ -1,12 +1,18 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { pageStagger } from "@/lib/motion/reveal";
+import type { pageStagger as PageStagger } from "@/lib/motion/reveal";
 import { RouteStage } from "./RouteStage";
 import { appNavKind, isApp, type AppNav } from "@/lib/app-mode";
 import { consumeBack } from "@/lib/client/app-mode";
+import { onIdle } from "@/lib/client/when-idle";
 
 const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+// The site's stagger lives with GSAP in lib/motion/reveal.ts. Loaded once the first page is idle, so the studio (which
+// never uses it) does not ship it, and a site page navigated to before it lands simply shows without the stagger.
+let stagger: typeof PageStagger | null = null;
+const loadStagger = () => import("@/lib/motion/reveal").then((m) => void (stagger = m.pageStagger));
 
 let seen = false; // module scope: survives route changes, resets on a full reload
 let lastPath: string | null = null;
@@ -33,9 +39,13 @@ export function PageTransition({ children, variant = "site" }: { children: React
   const [wave, setWave] = useState(!first && kind === null && variant === "site");
   const ref = useRef<HTMLDivElement>(null);
   useIso(() => {
-    if (first || kind !== null || variant === "app") return undefined;
-    return pageStagger(ref.current, { delay: 0.12, duration: 0.5, y: 12 });
+    if (first || kind !== null || variant === "app" || !stagger) return undefined;
+    return stagger(ref.current, { delay: 0.12, duration: 0.5, y: 12 });
   }, []);
+  useEffect(() => {
+    if (variant !== "site" || stagger) return;
+    return onIdle(() => void loadStagger().catch(() => {}));
+  }, [variant]);
   useEffect(() => {
     lastPath = path;
   }, [path]);

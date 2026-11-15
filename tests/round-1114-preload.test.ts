@@ -206,7 +206,8 @@ describe("1114 review fixes", () => {
   test("kept data is dropped during render, above every page, browser only", () => {
     const s = src("components/shell/UserContext.tsx");
     expect(s).toMatch(/typeof window !== "undefined" && claimFor\(userKey\(user\)\)\) \{\s*forgetCached\(\);\s*coolPages\(\);\s*forgetVisits\(\);/);
-    expect(src("app/(studio)/layout.tsx")).toContain("view: (await cookies()).get(ACCT_COOKIE)?.value ?? null");
+    // perf A2: cookies() is read once, alongside the shared settings
+    expect(src("app/(studio)/layout.tsx")).toContain("view: jar.get(ACCT_COOKIE)?.value ?? null");
     expect(src("components/shell/WarmUp.tsx")).not.toContain("claimFor(");
   });
   test("a new account's numbers never move on from the last one's", () => {

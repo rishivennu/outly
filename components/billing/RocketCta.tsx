@@ -7,8 +7,10 @@ import { BounceText } from "@/components/marketing/Split";
 import { useWaitlist } from "@/components/marketing/useWaitlist";
 import { cn } from "@/lib/utils";
 
+import { LAUNCH_EVENT } from "@/lib/client/launch-event";
+
 /** Window event a CTA fires to raise the veil; LaunchHost (root layout) owns it across the navigation. */
-export const LAUNCH_EVENT = "outlly:launch";
+export { LAUNCH_EVENT };
 
 /** Timings (ms). The fill slides the rocket across, it takes off, the veil sweeps in, then we navigate. */
 const SLIDE = 700;
@@ -107,9 +109,10 @@ export function LaunchVeil({ say, phase }: { say: string; phase: "in" | "out" })
  * Mounted once in the root layout, which survives client navigation: it owns the veil, so the sheet
  * that covers the pricing page is the same element that slides off the next one. No gap, no flash.
  */
-export function LaunchHost() {
+/** `initial`: the launch that fired before this lazily loaded host was mounted (components/shared/RootClient.tsx). */
+export function LaunchHost({ initial }: { initial?: string }) {
   const pathname = usePathname();
-  const [veil, setVeil] = useState<{ say: string; phase: "in" | "out"; from: string } | null>(null);
+  const [veil, setVeil] = useState<{ say: string; phase: "in" | "out"; from: string } | null>(() => (initial === undefined ? null : { say: initial, phase: "in", from: window.location.pathname }));
   useEffect(() => {
     const on = (e: Event) => setVeil({ say: (e as CustomEvent<string>).detail ?? "", phase: "in", from: window.location.pathname });
     window.addEventListener(LAUNCH_EVENT, on);

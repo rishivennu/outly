@@ -1,18 +1,62 @@
-/* Outlly offline helper. Keeps copies of Billing, Help and invoice PDFs so they still open without a
-   connection, and receives the share sheet. Never caches API writes, admin pages or other users' data.
-   1041: every other page load goes straight to the browser. Proxying them turned any brief network
-   failure into "This site can't be reached / ERR_FAILED" on iPhone (no saved copy of /home, and iOS
-   drops the offline page from storage), where the browser on its own would simply have loaded it. */
-const CACHE = "outly-offline-v4";
+/* Outlly service worker: the app shell, the offline helper and the share sheet.
+   - Build files under /_next/static (fingerprinted, never change, fonts included) come from this device first, so a
+     second launch paints without waiting on the network. At most 150 are kept, oldest dropped first.
+   - Opening a studio page asks the network first. When it has not answered within 2.5 s, or fails, the last copy of
+     that same page answers instead; with no copy yet a slow network is still waited for, and only a real failure
+     shows the offline page. 1041: every answer is a real Response, never undefined or a rejected promise, which is
+     what showed as "ERR_FAILED" on iPhone.
+   - Those page copies hold the signed-in person's own data (that is why they are kept although the server says
+     no-store): only this origin's worker reads them, at most 12, keyed by path without the query, and every one is
+     dropped the moment a session ends (/login, /api/auth/expired, a sign-out) and by the sign-out button
+     (lib/client/forget-billing.ts).
+   - Billing, Help and invoice PDFs keep their offline copies as before.
+   Never touched: /api (except an invoice PDF its owner opened), /admin, anything sent with Authorization, range
+   requests, other origins. */
+const CACHE = "outly-offline-v5";
+const STATIC = "outly-static-v1";
+const PAGES = "outly-pages-v1";
+const SHARE = "outly-share";
+const CURRENT = [CACHE, STATIC, PAGES, SHARE];
+const STATIC_MAX = 150;
+const PAGES_MAX = 12;
+const NAV_WAIT = 2500;
+const PRECACHE = ["/offline.html", "/manifest.webmanifest"];
 const KEEP = [/^\/billing\/?$/, /^\/help\/?$/, /^\/api\/billing\/invoices\/[\w-]+$/];
+const STUDIO = /^\/(home|create|analytics|calendar|inbox|content|approvals|settings|accounts|support|mascot)(\/|$)/;
+/* Signing out, or switching to another workspace (its pages differ at the same paths): forget every kept page. */
+const SIGN_OUT = /^\/api\/(auth\/logout(-all)?|profiles\/active)$/;
+
+/* What the worker does with a request: "keep" (Billing, Help, invoice copies), "static", "page", or null: the
+   browser loads it exactly as with no worker. Pure (tests/perf-sw.test.ts). */
+function routeOf(req, url, origin) {
+  if (req.method !== "GET" || url.origin !== origin) return null;
+  if (req.headers.has("range") || req.headers.has("authorization")) return null;
+  if (req.cache === "only-if-cached" && req.mode !== "same-origin") return null;
+  const p = url.pathname;
+  if (url.pathname.startsWith("/admin") || p.startsWith("/_next/webpack-hmr")) return null;
+  if (KEEP.some((r) => r.test(p))) return "keep";
+  if (p.startsWith("/api/")) return null;
+  if (p.startsWith("/_next/static/")) return "static";
+  if (req.mode === "navigate" && STUDIO.test(p)) return "page";
+  return null;
+}
+const noStore = (res) => /no-store/i.test(res.headers.get("cache-control") || "");
+/* Only a plain 200 answer from our own origin is kept: never a redirect (signed out, maintenance) or an error page. */
+const keepStatic = (res) => res.status === 200 && res.type === "basic" && !noStore(res);
+const keepPage = (res) => res.status === 200 && res.type === "basic" && !res.redirected && /^text\/html/i.test(res.headers.get("content-type") || "");
+/* Cache.keys() lists in insertion order: drop the oldest until at most `max` remain. */
+async function trim(c, max) {
+  const keys = await c.keys();
+  for (let i = 0; i < keys.length - max; i++) await c.delete(keys[i]);
+}
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/offline.html"])).catch(() => {}).then(() => self.skipWaiting()));
+  // No skipWaiting: an update waits until every Outlly window has closed, so no page ever changes worker mid-visit.
+  e.waitUntil(caches.open(CACHE).then((c) => Promise.all(PRECACHE.map((u) => c.add(u).catch(() => {})))).catch(() => {}));
 });
 self.addEventListener("activate", (e) => {
-  e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE && k !== "outly-share").map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => !CURRENT.includes(k)).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
-const SHARE = "outly-share";
 /** Share sheet (manifest share_target): keep the video for Create to pick up, then open Create. */
 async function takeShare(req) {
   const form = await req.formData();
@@ -34,15 +78,71 @@ function offline() {
     { status: 503, headers: { "content-type": "text/html; charset=utf-8" } },
   );
 }
+const offlinePage = async () => (await caches.match("/offline.html").catch(() => undefined)) || offline();
 
 /* Signed out here, or a session the server no longer accepts (signed out everywhere, password changed):
    drop the offline copies of Billing and its invoice PDFs at once. The browser does this on the sign-out
    button too (lib/client/forget-billing.ts), but a revoked session only ever lands on /login, and the next
-   person on a shared device must not be able to open them with the network off. */
+   person on a shared device must not be able to open them with the network off. The studio page copies go too. */
 const PRIVATE = /^\/(billing\/?|api\/billing\/invoices\/[\w-]+)$/;
 async function forgetPrivate() {
+  await caches.delete(PAGES);
   const c = await caches.open(CACHE);
   for (const req of await c.keys()) if (PRIVATE.test(new URL(req.url).pathname)) await c.delete(req);
+}
+
+/* Billing, Help, invoice PDFs: the network, else the copy kept from the last visit. */
+function fromKeep(req, url) {
+  return fetch(req)
+    .then((res) => {
+      // A page only from a navigation: a client-router (RSC) request for the same path must not replace the HTML
+      // copy. Invoice PDFs are plain fetches and are kept as before.
+      const page = !url.pathname.startsWith("/api/");
+      if (res.ok && (!page || (req.mode === "navigate" && !req.headers.has("rsc")))) {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(url.pathname, copy));
+      }
+      return res;
+    })
+    .catch(async () => (await caches.match(url.pathname)) || offlinePage());
+}
+
+async function fromStatic(e, req) {
+  const c = await caches.open(STATIC);
+  const hit = await c.match(req);
+  if (hit) return hit;
+  const res = await fetch(req);
+  if (keepStatic(res)) {
+    const copy = res.clone();
+    e.waitUntil(c.put(req, copy).then(() => trim(c, STATIC_MAX)).catch(() => {}));
+  }
+  return res;
+}
+
+async function fromPage(e, req, url) {
+  const key = url.pathname;
+  let store = Promise.resolve();
+  const net = fetch(req).then((res) => {
+    if (keepPage(res)) {
+      const copy = res.clone();
+      store = caches.open(PAGES).then((c) => c.put(key, copy).then(() => trim(c, PAGES_MAX)));
+    }
+    return res;
+  });
+  e.waitUntil(net.then(() => store).catch(() => {}));
+  let timer = 0;
+  const late = new Promise((r) => (timer = setTimeout(r, NAV_WAIT, "late")));
+  const first = await Promise.race([net, late]).catch(() => "failed");
+  clearTimeout(timer);
+  if (first !== "late" && first !== "failed") return first;
+  const copy = await caches.open(PAGES).then((c) => c.match(key)).catch(() => undefined);
+  if (copy) return copy;
+  if (first === "late") {
+    try {
+      return await net;
+    } catch (_) {}
+  }
+  return offlinePage();
 }
 
 self.addEventListener("fetch", (e) => {
@@ -51,23 +151,16 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(takeShare(req).catch(() => Response.redirect("/create?shared=missed", 303)));
     return;
   }
+  if (req.method === "POST" && SIGN_OUT.test(new URL(req.url).pathname)) return void e.waitUntil(forgetPrivate().catch(() => {}));
   if (req.method !== "GET") return;
   const url = new URL(req.url);
-  if (url.origin !== location.origin || url.pathname.startsWith("/admin") || url.pathname.startsWith("/_next/webpack-hmr")) return;
+  if (url.origin !== location.origin) return;
   if (url.pathname === "/login" || url.pathname === "/api/auth/expired") e.waitUntil(forgetPrivate().catch(() => {}));
-  if (!KEEP.some((r) => r.test(url.pathname))) return; // the browser loads it, exactly as with no worker
-  e.respondWith(
-    fetch(req)
-      .then((res) => {
-        if (res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(url.pathname, copy));
-        }
-        return res;
-      })
-      // Always answer with a real response: an empty answer is what shows as ERR_FAILED.
-      .catch(async () => (await caches.match(url.pathname)) || (await caches.match("/offline.html")) || offline()),
-  );
+  const kind = routeOf(req, url, location.origin);
+  // null: the browser loads it, exactly as with no worker. Every other branch always answers with a real response.
+  if (kind === "keep") e.respondWith(fromKeep(req, url));
+  else if (kind === "static") e.respondWith(fromStatic(e, req).catch(() => fetch(req)).catch(() => new Response("", { status: 504, statusText: "Offline" })));
+  else if (kind === "page") e.respondWith(fromPage(e, req, url).catch(offlinePage));
 });
 
 /* 1118: Web Push. The server sends a short JSON (lib/push/webpush.ts payloadOf): t title, b body, h path to

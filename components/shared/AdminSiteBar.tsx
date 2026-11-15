@@ -29,8 +29,8 @@ export function AdminSiteBar() {
         {m && w && " "}
         {w && <><strong className="font-semibold">Waitlist is on.</strong> New visitors who press sign up go to the waitlist.</>}
       </span>
-      {m && <Link href="/maintenance" className="inline-flex min-h-[32px] items-center rounded-full bg-lime px-3 font-semibold text-lime-foreground">Preview it</Link>}
-      {!m && w && <Link href="/waitlist" className="inline-flex min-h-[32px] items-center rounded-full bg-lime px-3 font-semibold text-lime-foreground">See the waitlist</Link>}
+      {m && <Link href="/maintenance" prefetch={false} className="inline-flex min-h-[32px] items-center rounded-full bg-lime px-3 font-semibold text-lime-foreground">Preview it</Link>}
+      {!m && w && <Link href="/waitlist" prefetch={false} className="inline-flex min-h-[32px] items-center rounded-full bg-lime px-3 font-semibold text-lime-foreground">See the waitlist</Link>}
       <Link href={m ? "/admin/maintenance" : "/admin/waitlist"} className="inline-flex min-h-[32px] items-center rounded-full px-3 underline underline-offset-4">Change in admin</Link>
       <button type="button" onClick={() => setHidden(true)} aria-label="Hide this notice" className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-background/15">
         <X className="h-4 w-4" aria-hidden />

@@ -17,7 +17,7 @@ export function ErrorScreen({ code, title, body, mood = "sad", actions }: { code
         <p className="err-muted mt-3 text-base leading-relaxed">{body}</p>
         <div className="mt-8 flex flex-wrap justify-center gap-2">{actions}</div>
         <p className="err-muted mt-8 text-[13px]">
-          Still stuck? <Link href="/help" className="err-link font-medium underline underline-offset-4">Visit the help centre</Link> or ask Pip, bottom right.
+          Still stuck? <Link href="/help" prefetch={false} className="err-link font-medium underline underline-offset-4">Visit the help centre</Link> or ask Pip, bottom right.
         </p>
       </div>
     </main>

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { useUser } from "@/components/shell/UserContext";
 import { tourKey } from "./Tour";
 import { afterPrivacy } from "@/components/shared/PrivacyNotice";
-import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
+import { MOTION_OK } from "@/lib/motion/prefs";
+import { gsapNow, loadGsap } from "@/lib/motion/gsap-lazy";
 import { APP_SELLS_PLANS, isApp } from "@/lib/app-mode";
 import { T, FX } from "@/lib/motion/tokens";
 import { TrialCard } from "@/components/billing/OfferCards";
@@ -26,6 +27,8 @@ export function welcomePitch(freeLimit: number, offer: WelcomeOffer | null, free
 
 export const welcomeKey = (id: string) => `outly:welcome-subscribe:${id}`;
 
+const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 /**
  * First-time greeting that invites a free user to subscribe. Shown once per account per device.
  * It never stacks on the guided tour: if the tour hasn't been done yet it waits for it to close.
@@ -38,8 +41,10 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
   // GSAP choreography inside the card: glow blooms, copy lines rise in order, the offer lifts in,
   // each check mark pops as its feature slides in, then the buttons settle. The card itself keeps
   // its framer-motion spring and exit so the two never fight over the same transform.
-  useGSAP(() => {
-    if (!card) return;
+  // GSAP is fetched only for someone about to see this card (below); if it has not landed, the card just springs in.
+  useIso(() => {
+    const gsap = gsapNow();
+    if (!card || !gsap) return;
     const mm = gsap.matchMedia();
     mm.add(MOTION_OK, () => {
       const tl = gsap.timeline({ defaults: { ease: "power3.out", duration: 0.5 }, delay: 0.06 });
@@ -50,11 +55,13 @@ export function WelcomeSubscribe({ firstName, offer, freeLimit, freePeriod = "mo
         .from("[data-w=check]", { scale: 0, rotation: -60, transformOrigin: "50% 50%", duration: 0.45, ease: "expo.out", stagger: 0.07 }, "<0.05")
         .from("[data-w=cta]", { opacity: 0, y: 10, stagger: 0.06 }, "-=0.3");
     }, card);
-  }, { dependencies: [card], revertOnUpdate: true });
+    return () => mm.revert();
+  }, [card]);
 
   useEffect(() => {
     if (localStorage.getItem(welcomeKey(user.id))) return;
     if (isApp() && !APP_SELLS_PLANS) return; // no plan offers inside the Android app (Google Play billing rules)
+    void loadGsap().catch(() => {});
     // Claim this visit so the "What's new" card waits for the next one instead of stacking on top.
     document.documentElement.dataset.onboarding = "welcome";
     let t: ReturnType<typeof setTimeout> | undefined;

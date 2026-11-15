@@ -2,18 +2,11 @@ import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
 import { Archivo, Bricolage_Grotesque, DM_Sans, Fraunces, Inter, Instrument_Serif, Manrope, Plus_Jakarta_Sans, Rubik, Space_Mono, Tinos } from "next/font/google";
 import localFont from "next/font/local";
-import { MotionRoot } from "@/components/shared/MotionRoot";
 import { themeScript } from "@/lib/theme/script";
 import { THEME_COOKIE, themeColorFor } from "@/lib/theme/colors";
 import { StatusBarSync } from "@/components/shared/StatusBarSync";
-import { CookieBanner } from "@/components/shared/CookieConsent";
-import { PostHogProvider } from "@/components/analytics/PostHogProvider";
-import { DeviceHint } from "@/components/shared/DeviceHint";
-import { Connectivity, Ripples } from "@/components/shared/Connectivity";
-import { LazyChat } from "@/components/support/LazyChat";
-import { SmoothScroll } from "@/components/marketing/SmoothScroll";
-import { ScrollProgress } from "@/components/shared/ScrollProgress";
-import { PageScrollbar } from "@/components/marketing/PageScrollbar";
+import { RootClient } from "@/components/shared/RootClient";
+import { swScript } from "@/lib/sw-script";
 import "./globals.css";
 import "./mobile-app.css";
 import { appScript } from "@/lib/app-mode";
@@ -66,8 +59,6 @@ const tinos = Tinos({ subsets: ["latin"], weight: ["400", "700"], style: ["norma
 const rubik = Rubik({ subsets: ["latin"], variable: "--font-rubik", display: "swap", preload: false });
 const spaceMono = Space_Mono({ subsets: ["latin"], weight: ["400", "700"], style: ["normal", "italic"], variable: "--font-spacemono", display: "swap", preload: false });
 
-import { LaunchHost } from "@/components/billing/RocketCta";
-import { LiquidGlass } from "@/components/shared/LiquidGlass";
 import { themeCss } from "@/lib/theme-css";
 
 export const metadata: Metadata = {
@@ -104,7 +95,8 @@ export async function generateViewport(): Promise<Viewport> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // The Content Security Policy only runs scripts carrying this request's nonce (set by middleware.ts).
-  const [nonce, theme] = await Promise.all([headers().then((h) => h.get("x-nonce") ?? undefined), themeCss().catch(() => "")]);
+  // Perf: themeCss comes from the shared data cache and answers the defaults on any failure, so the first byte never waits on the database.
+  const [nonce, theme] = await Promise.all([headers().then((h) => h.get("x-nonce") ?? undefined), themeCss()]);
   return (
     <html lang="en" className={`dark ${display.variable} ${body.variable} ${classicDisplay.variable} ${classicBody.variable} ${serif.variable} ${gopher.variable} ${jakarta.variable} ${fraunces.variable} ${archivo.variable} ${tinos.variable} ${rubik.variable} ${spaceMono.variable}`} suppressHydrationWarning>
       <head>
@@ -119,6 +111,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: welcomeScript }} />
         {/* 1099: keep the browser's one-time install prompt for the studio's "Add to Home Screen" card. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: installCaptureScript }} />
+        {/* Perf: register the service worker on load (production only), so the second launch already has the app shell. */}
+        {swScript && <script nonce={nonce} dangerouslySetInnerHTML={{ __html: swScript }} />}
         {/* Landing sections the admin hid (readable hint cookie set by middleware): mark <html> before the
             first paint so CSS drops their nav and footer links at once, instead of a link flashing in and out. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `try{var m=document.cookie.match(/(?:^|; )outlly_lh=([^;]*)/);if(m)document.documentElement.setAttribute("data-lh",decodeURIComponent(m[1]).split(".").join(" "))}catch(e){}` }} />
@@ -128,21 +122,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <style id="pip-theme" dangerouslySetInnerHTML={{ __html: theme }} />
       </head>
       <body className="font-sans antialiased">
-        <MotionRoot>
-          <SmoothScroll />
-          <ScrollProgress />
-          <PageScrollbar />
-          {children}
-          <LazyChat />
-          <CookieBanner />
-          <PostHogProvider />
-          <DeviceHint />
-          <Connectivity />
-          <Ripples />
-          <LaunchHost />
-          <LiquidGlass />
-          <StatusBarSync />
-        </MotionRoot>
+        {/* Perf: the client providers live in RootClient; the heavy ones mount after the page has settled. */}
+        <RootClient>{children}</RootClient>
+        <StatusBarSync />
       </body>
     </html>
   );

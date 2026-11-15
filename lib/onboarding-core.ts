@@ -164,3 +164,35 @@ export interface OnboardingPayload extends OnboardingView {
   connect: ConnectOption[] | null;
   profile: OnboardingProfile | null;
 }
+
+/*
+ * Perf (CLS): Home renders the setup checklist in its first HTML instead of after hydration, where it pushed the
+ * whole dashboard down (CLS 0.9). Two readable cookies tell the server what only the browser knew: who on this
+ * browser hid the list, and whether this device still had an install or notification step open last time.
+ */
+export const SETUP_HIDDEN_COOKIE = "outly-setup-hidden";
+export const SETUP_DEVICE_COOKIE = "outly-setup-device";
+export const SETUP_COOKIE_DAYS = 180;
+
+/** A short stable tag of an account id (FNV-1a, 32 bit), so hiding the list on one account does not hide it on another. */
+export function setupTag(userId: string) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < userId.length; i++) {
+    h ^= userId.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
+}
+
+const tags = (cookie: string | null | undefined) => (cookie ?? "").split(".").filter((t) => /^[0-9a-z]{1,8}$/.test(t));
+
+export const setupHiddenFor = (cookie: string | null | undefined, userId: string) => tags(cookie).includes(setupTag(userId));
+
+/** The cookie value once this account has hidden the list too (newest kept, at most 8 accounts). */
+export function withSetupHidden(cookie: string | null | undefined, userId: string) {
+  const t = setupTag(userId);
+  return [...tags(cookie).filter((x) => x !== t), t].slice(-8).join(".");
+}
+
+/** "1": an install or notification step was open on this device last visit; "0": none; anything else: unknown. */
+export const deviceHint = (cookie: string | null | undefined): boolean | null => (cookie === "1" ? true : cookie === "0" ? false : null);

@@ -15,7 +15,8 @@ export const HoverLink = forwardRef<HTMLAnchorElement, ComponentProps<typeof Nex
   const router = useRouter();
   const live = useLivePlatforms();
   const warm = () => {
-    if (typeof href !== "string" || !href.startsWith("/")) return;
+    // A link that opens a new tab (the Outlly website) never uses this tab's router: warming it only downloads the site's code.
+    if (typeof href !== "string" || !href.startsWith("/") || rest.target === "_blank") return;
     // Analytics (1039): the whole page and the numbers it loads after, so it opens filled in.
     if (href === "/analytics") return warmAnalytics(router, live);
     // A platform's dashboard renders its numbers on the server: fetch the full page, not just its loader.
