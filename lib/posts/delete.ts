@@ -47,9 +47,14 @@ export function deletePost(user: { id: string; role?: string | null }, postId: s
 /**
  * 1142: deleting a post gives its post slot back for the current period (week or month, whichever the plan
  * counts), and a slot paid from a top-up pack goes back to the pack. Earlier periods are history and stay.
+ * Phase 2, `booked`: a booked post taken off the schedule before anything went out gives back the slot its
+ * booking was charged to, which is the period it was booked in (spendPost), even when that has ended.
  */
-export async function releasePostSlot(userId: string, postId: string, now = new Date()) {
-  const rows = await db.featureUse.findMany({ where: { userId, feature: "post", ref: postId.slice(0, 120), period: { in: [periodKey("week", now), periodKey("month", now)] } }, select: { id: true, topUpId: true } });
+export async function releasePostSlot(userId: string, postId: string, now = new Date(), opts: { booked?: boolean } = {}) {
+  const where = { userId, feature: "post", ref: postId.slice(0, 120) };
+  const rows = opts.booked
+    ? await db.featureUse.findMany({ where, orderBy: { createdAt: "desc" }, take: 1, select: { id: true, topUpId: true } })
+    : await db.featureUse.findMany({ where: { ...where, period: { in: [periodKey("week", now), periodKey("month", now)] } }, select: { id: true, topUpId: true } });
   let freed = 0;
   for (const r of rows) {
     const gone = await db.featureUse.deleteMany({ where: { id: r.id } });
