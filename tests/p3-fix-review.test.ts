@@ -211,7 +211,8 @@ describe("3 retry keeps the English track", () => {
     expect(keepEnglish(orig, en, [2], next)).toEqual({ en: [en[0], { ...orig[1], text: "ఈ రోజు మనం" }, en[2]], untranslated: [1, 2] });
   });
   test("the retry path uses it and reads the latest lines", async () => {
-    const src = await Bun.file("components/create/CaptionBurner.tsx").text();
+    // Phase 4: the run moved out of the editor into the workspace caption store.
+    const src = await Bun.file("components/create/captions/run-store.ts").text();
     expect(src).toContain("keepEnglish(cur.tracks.orig, cur.tracks.en, cur.untranslated, next)");
     expect(src).toContain("next = cur.tracks.orig;");
   });

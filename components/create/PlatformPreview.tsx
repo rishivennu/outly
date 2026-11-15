@@ -14,6 +14,8 @@ interface Props {
   media: { src: string | null; poster: string | null; width?: number | null; height?: number | null };
   account?: AccountView;
   writing: boolean;
+  /** Set for a place that is not connected yet: the line under the card saying nothing is sent there. */
+  previewOnly?: string;
 }
 
 const FULL_SCREEN: Platform[] = ["instagram", "youtube", "tiktok"];
@@ -22,8 +24,9 @@ const FULL_SCREEN: Platform[] = ["instagram", "youtube", "tiktok"];
  * The live preview beside the form. One player only, poster until play. On phones it folds away behind a
  * button so the fields come first; from lg up it is always open and sticks while the form scrolls.
  */
-export function PlatformPreview({ platform, draft, media, account, writing }: Props) {
-  const [open, setOpen] = useState(false);
+export function PlatformPreview({ platform, draft, media, account, writing, previewOnly }: Props) {
+  // A preview-only place has no fields to come first, so its preview starts open on phones too.
+  const [open, setOpen] = useState(!!previewOnly);
   const id = useId();
   const aspect = aspectOf(media);
   const meta = PLATFORM_META[platform];
@@ -50,7 +53,7 @@ export function PlatformPreview({ platform, draft, media, account, writing }: Pr
         <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-nav ease-out motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
       </button>
       <div id={id} className={cn("mt-3 lg:mt-0 lg:block", open ? "block" : "hidden")}>
-        <p className="mb-3 hidden text-[13px] font-medium text-muted-foreground lg:block">How it looks on {meta.name}</p>
+        <p className="mb-3 hidden text-[13px] font-medium text-muted-foreground lg:block">{previewOnly ? `How it would look on ${meta.name}` : `How it looks on ${meta.name}`}</p>
         {writing ? (
           <div
             className={cn("skeleton mx-auto w-full rounded-[26px]", FULL_SCREEN.includes(platform) ? "aspect-[9/16] max-w-[320px]" : "aspect-[4/5] max-w-[440px]")}
@@ -58,9 +61,20 @@ export function PlatformPreview({ platform, draft, media, account, writing }: Pr
             role="status"
           />
         ) : (
-          <PreviewFor platform={platform} {...props} className={FULL_SCREEN.includes(platform) ? "max-w-[320px]" : undefined} />
+          <>
+            {previewOnly && (
+              <p className="mb-2 flex justify-center">
+                <span className="rounded-full bg-secondary/70 px-3 py-1 text-xs font-semibold text-muted-foreground hairline">Connect to send</span>
+              </p>
+            )}
+            <PreviewFor platform={platform} {...props} className={FULL_SCREEN.includes(platform) ? "max-w-[320px]" : undefined} />
+          </>
         )}
-        {draft.enabled ? null : <p className="mt-3 text-center text-[13px] text-muted-foreground">Skipped. Turn it on to send it here.</p>}
+        {previewOnly ? (
+          <p className="mt-3 text-center text-[13px] text-muted-foreground">{previewOnly}</p>
+        ) : draft.enabled ? null : (
+          <p className="mt-3 text-center text-[13px] text-muted-foreground">Skipped. Turn it on to send it here.</p>
+        )}
       </div>
     </div>
   );

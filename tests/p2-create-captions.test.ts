@@ -138,7 +138,10 @@ describe("p2 caption editor wiring", () => {
   });
   test("no fake transcript: without an engine only the manual path shows", () => {
     expect(b).toContain("{aiReady !== false && (");
-    expect(b).toContain('e.code === "NO_AI") setAiReady(false)');
+    // Phase 4: the run moved to the workspace caption store; it still flips to typing-only on NO_AI.
+    const store = readFileSync(new URL("../components/create/captions/run-store.ts", import.meta.url), "utf8");
+    expect(store).toContain('e.code === "NO_AI"');
+    expect(store).toContain("aiReady: false");
     expect(b).toContain("AI transcription is not set up on this workspace.");
   });
   test("deletes can be undone and replacing lines asks first", () => {

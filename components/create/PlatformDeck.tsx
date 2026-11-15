@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { SnippetBar } from "./SnippetBar";
 import { PlatformPreview } from "./PlatformPreview";
 import { SuggestionCard } from "./SuggestionCard";
-import { bodyKey, bodyRoom, clipTo, fieldsFor, isCustom, mainCaption, nextIndex, normalizeTags, propagateMain, type FieldKey } from "./deck-logic";
+import { bodyKey, bodyRoom, clipTo, fieldsFor, isCustom, mainCaption, nextIndex, normalizeTags, previewDraft, previewNote, propagateMain, type FieldKey } from "./deck-logic";
 import { enabledPlatforms, launchGate } from "./publish";
 import type { Proposal, Undo } from "./proposal";
 import type { AccountView, Draft } from "./types";
@@ -76,7 +76,7 @@ export function PlatformDeck(p: Props) {
       out[pl] = {
         checks,
         blocked: blocked || !connected,
-        label: !d.enabled ? "Not sending" : !connected ? (acct ? "Needs a reconnect" : "Not connected yet") : d.reviewed && !blocked ? "Looks good" : blocked ? "Needs a hand" : READY_LABEL[pl],
+        label: !d.enabled ? (connected ? "Not sending" : "Preview only") : !connected ? (acct ? "Needs a reconnect" : "Not connected yet") : d.reviewed && !blocked ? "Looks good" : blocked ? "Needs a hand" : READY_LABEL[pl],
         tone: !d.enabled ? "off" : !connected || blocked ? "warn" : d.reviewed ? "done" : "ok",
       };
     }
@@ -113,6 +113,10 @@ export function PlatformDeck(p: Props) {
     const next = enabled.find((x) => x !== pl && !p.drafts[x].reviewed);
     if (next) setTimeout(() => setActive(next), 350);
   };
+
+  // A place with no live account can still be judged: its preview shows the copy it would get, and nothing more.
+  const previewOnly = p.accounts[active]?.status !== "connected" && !p.drafts[active].enabled;
+  const look = previewOnly ? previewDraft(active, p.drafts, p.hook) : { draft: p.drafts[active], source: "own" as const };
 
   const onCardKeys = (e: KeyboardEvent<HTMLDivElement>) => {
     const i = live.indexOf(active);
@@ -190,6 +194,9 @@ export function PlatformDeck(p: Props) {
                   {on && <span className="absolute right-3 top-3 rounded-full bg-foreground px-2 py-0.5 text-xs font-semibold text-background" aria-hidden="true">Editing</span>}
                 </button>
                 <div className="flex min-h-11 items-center justify-between gap-2 border-t border-border/60 pl-3.5 pr-1.5">
+                  {!connected && !d.enabled ? (
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">Connect to send</span>
+                  ) : (
                   <label htmlFor={`send-${pl}`} className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 text-[13px] font-semibold">
                     <input
                       id={`send-${pl}`}
@@ -202,6 +209,7 @@ export function PlatformDeck(p: Props) {
                       {d.enabled ? "Sending" : "Not sending"} <span className="sr-only">to {PLATFORM_META[pl].name}</span>
                     </span>
                   </label>
+                  )}
                   {!connected && (
                     <Button size="sm" variant="ghost" className="h-11 shrink-0 px-3" onClick={() => p.onConnect(pl)} disabled={p.online === false} title={p.online === false ? "Connecting needs a connection." : undefined}>
                       <Link2 className="h-4 w-4" aria-hidden="true" /> {acct ? "Reconnect" : "Connect"} <span className="sr-only">{PLATFORM_META[pl].name}</span>
@@ -243,7 +251,7 @@ export function PlatformDeck(p: Props) {
         <span className={cn("pointer-events-none absolute inset-0", SURFACE[active])} aria-hidden="true" />
         <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_clamp(260px,36%,380px)] lg:items-start lg:gap-8">
           <div className="min-w-0 lg:order-2">
-            <PlatformPreview platform={active} draft={p.drafts[active]} media={p.media} account={p.accounts[active]} writing={p.writing.includes(active)} />
+            <PlatformPreview platform={active} draft={look.draft} media={p.media} account={p.accounts[active]} writing={p.writing.includes(active)} previewOnly={previewOnly ? previewNote(active, look.source) : undefined} />
           </div>
           <div className="min-w-0 lg:order-1">
             <PlatformStage
@@ -296,6 +304,8 @@ function PlatformStage(p: StageProps) {
   const set = (patch: Partial<Draft>) => p.onDraft(pl, patch);
   const offline = p.online === false;
   const busy = p.writing.includes(pl);
+  // Not connected and not switched on: only the preview and a way to connect. No fields, no review, nothing to send.
+  const previewOnly = !connected && !d.enabled;
   const [flash, setFlash] = useState(false);
   const [fcOpen, setFcOpen] = useState(!!d.firstComment.trim());
   const has = (field: CheckField) => p.checks.some((c) => c.field === field && c.level !== "ok");
@@ -339,6 +349,9 @@ function PlatformStage(p: StageProps) {
             </p>
           </div>
         </div>
+        {previewOnly ? (
+          <span className="inline-flex min-h-11 items-center rounded-full bg-secondary/60 px-3 text-[13px] font-medium text-muted-foreground hairline">Preview only</span>
+        ) : (
         <label className="flex min-h-11 items-center gap-3 text-sm text-muted-foreground">
           <span>{d.enabled ? "Sending here" : "Not sending"}</span>
           <Switch.Root
@@ -350,6 +363,7 @@ function PlatformStage(p: StageProps) {
             <Switch.Thumb className="block h-5 w-5 translate-x-1 rounded-full bg-muted-foreground shadow transition-transform duration-press motion-reduce:transition-none data-[state=checked]:translate-x-6 data-[state=checked]:bg-[hsl(var(--lime-foreground))]" />
           </Switch.Root>
         </label>
+        )}
       </div>
 
       {d.note && d.enabled && (
@@ -362,11 +376,11 @@ function PlatformStage(p: StageProps) {
         </div>
       )}
 
-      {!connected && d.enabled && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-warning/10 px-4 py-3">
+      {!connected && (
+        <div className={cn("flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3", d.enabled ? "bg-warning/10" : "bg-secondary/50 hairline")}>
           <span className="flex items-center gap-2 text-sm">
-            <CircleAlert className="h-4 w-4 shrink-0 text-warning-ink" aria-hidden="true" />
-            {acct ? `${meta.name} needs you to reconnect.` : `Connect ${meta.name} to send it here.`}
+            <CircleAlert className={cn("h-4 w-4 shrink-0", d.enabled ? "text-warning-ink" : "text-muted-foreground")} aria-hidden="true" />
+            {acct ? `${meta.name} needs you to reconnect.` : d.enabled ? `Connect ${meta.name} to send it here.` : `Connect ${meta.name} to send. Until then the preview shows how it would look.`}
           </span>
           <Button size="md" variant="primary" onClick={() => p.onConnect(pl)} disabled={offline} title={offline ? "Connecting needs a connection." : undefined}>
             <Link2 className="h-4 w-4" /> {acct ? "Reconnect" : "Connect account"}
@@ -374,6 +388,8 @@ function PlatformStage(p: StageProps) {
         </div>
       )}
 
+      {previewOnly ? null : (
+      <>
       <SuggestionCard
         platform={pl}
         draft={d}
@@ -558,6 +574,8 @@ function PlatformStage(p: StageProps) {
         </Button>
         <span id={`${id}-rw`} className="sr-only">Pip suggests new words. Nothing changes until you accept.</span>
       </div>
+      </>
+      )}
       {offline && <p className="text-[13px] text-muted-foreground">You&apos;re offline. Rewrites and connecting come back when you reconnect. Your edits are kept on this device.</p>}
     </div>
   );

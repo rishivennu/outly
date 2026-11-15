@@ -121,7 +121,7 @@ export function InboxTabs({ tab, onPick, counts }: { tab: InboxTab; onPick: (t: 
             }
           }}
           className={cn(
-            "inline-flex h-10 items-center justify-center gap-2 rounded-[9px] text-[14px] touch:h-11 font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
+            "inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] text-[14px] touch:h-11 font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
             tab === t ? "bg-card text-foreground shadow-sm dark:bg-foreground/10" : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -142,7 +142,7 @@ export function InboxTabs({ tab, onPick, counts }: { tab: InboxTab; onPick: (t: 
 export type ScopeView = { id: string; label: string; count?: number };
 
 const seg =
-  "relative inline-flex h-8 touch:h-11 items-center justify-center whitespace-nowrap rounded-full px-2.5 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.96]";
+  "relative inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full px-2.5 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.96]";
 
 /**
  * The one filter row both tabs share: which items (a segmented control) and, under it, which platform.
@@ -217,7 +217,7 @@ export function ScopeBar({
             value={platform}
             onChange={(e) => onPlatform(e.target.value as Platform | "all")}
             className={cn(
-              "h-11 min-w-0 max-w-[11rem] cursor-pointer appearance-none truncate rounded-full bg-card pr-8 text-[13px] font-medium text-foreground hairline transition hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring lg:h-9",
+              "h-11 min-w-0 max-w-[11rem] cursor-pointer appearance-none truncate rounded-full bg-card pr-8 text-[13px] font-medium text-foreground hairline transition [@media(hover:hover)]:hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
               platform === "all" ? "pl-3.5" : "pl-8",
             )}
           >
@@ -239,7 +239,7 @@ export function ScopeBar({
 export function PlatformChips({ platforms, platform, onPlatform }: { platforms: readonly Platform[]; platform: Platform | "all"; onPlatform: (p: Platform | "all") => void }) {
   const chip = (on: boolean) =>
     cn(
-      "relative inline-flex h-8 touch:h-11 touch:min-w-11 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.96]",
+      "relative inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.96]",
       on ? "bg-foreground text-background" : "bg-card text-foreground hairline [@media(hover:hover)]:hover:bg-secondary",
     );
   return (

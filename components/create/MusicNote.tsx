@@ -24,7 +24,7 @@ export function musicLines(platforms: Platform[]): { platform: Platform; text: s
   return PLATFORMS.filter((p) => platforms.includes(p)).map((platform) => ({ platform, text: MUSIC_RULES[platform] }));
 }
 
-export const MUSIC_HELP = "/help?q=music";
+export const MUSIC_HELP = "/help?faq=music";
 
 interface Props {
   platforms: Platform[];
@@ -58,7 +58,7 @@ export function MusicNote({ platforms, onReplace }: Props) {
         </ul>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {onReplace && (
-            <Button variant="subtle" size="sm" onClick={onReplace}>
+            <Button variant="subtle" size="sm" className="min-h-11" onClick={onReplace}>
               <Replace className="h-4 w-4" aria-hidden="true" /> Replace video
             </Button>
           )}

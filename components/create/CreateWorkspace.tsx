@@ -31,10 +31,11 @@ import { PublishTo } from "./PublishTo";
 import { SaveDraft } from "./SaveDraft";
 import { autosaveLine, draftTitle, enabledPlatforms, launchGate, launchPlan, scheduleProblem, targetPayload } from "./publish";
 import { CaptionBurner } from "./CaptionBurner";
+import { CaptionRunProvider, useCaptionBurning, useCaptionRunLine, useCaptionWorkspace } from "./captions/CaptionRun";
 import { readVideo } from "./frame";
 import { primeGroove } from "./Groove";
 import { DeviceDrafts } from "./DeviceDrafts";
-import { ActionBar, barState, PreviewSheet, type BarId } from "./ActionBar";
+import { ActionBar, barState, BURN_SEND, PreviewSheet, type BarId } from "./ActionBar";
 import { UploadLimits } from "./UploadLimits";
 import { legacyDraftCount, newDeviceId, openDrafts, type DeviceTarget } from "@/lib/client/device-drafts";
 import { useDraftSync, type ServerDraft } from "@/lib/client/draft-sync";
@@ -167,6 +168,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const [phase, setPhase] = useState<"edit" | "publishing" | "scheduled">(initialPost && LIVE.includes(initialPost.status) ? "publishing" : "edit");
   const [livePost, setLivePost] = useState<PostView | null>(initialPost && LIVE.includes(initialPost.status) ? initialPost : null);
   const [scheduledFor, setScheduledFor] = useState<string | null>(null);
+  const [scheduledPost, setScheduledPost] = useState<PostView | null>(null);
   /** Phase 3: open or folded is the creator's choice and carries across every step, Launch included. */
   const [panel, panelDispatch] = useReducer(panelReducer, step, (s0: Step) => panelReducer(PANEL_OPEN, { t: "step", step: s0 }));
   useEffect(() => {
@@ -179,10 +181,12 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const capCanvas = useRef<HTMLCanvasElement>(null);
   const [capLive, setCapLive] = useState(false);
   const onCapLive = useCallback((on: boolean) => setCapLive(on), []);
-  /* A caption run lives in the editor on Steps 1 and 2; leaving those steps unmounts it and stops the run. */
-  const [capBusy, setCapBusy] = useState(false);
-  const onCapBusy = useCallback((b: boolean) => setCapBusy(b), []);
-  const [leaveAsk, setLeaveAsk] = useState<null | ((ok: boolean) => void)>(null);
+  /* Phase 4: one caption store for the whole of /create. A transcribe, translate or burn keeps going when the
+     editor unmounts on a step change; it stops on Stop, a new video, leaving /create, or a reload (the store asks
+     before the tab closes). Its lines still land in the draft through onTrackChange. */
+  const capStore = useCaptionWorkspace();
+  const capLine = useCaptionRunLine(capStore);
+  const capBurning = useCaptionBurning(capStore);
 
   /* 1152: the assistant is a side panel from 1280px; below that the same element opens as a drawer (one instance,
      so the conversation survives a resize, a close and a reopen). */
@@ -663,7 +667,6 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   );
 
   const chooseHook = async (text: string) => {
-    if (!(await leaveOk("everywhere"))) return;
     setHook(text);
     setStep("everywhere");
     setCopyLoading(true);
@@ -802,6 +805,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const launch = async (how: "now" | "schedule" = mode) => {
     if (!navigator.onLine) return setLaunchError("You're offline. Publishing and scheduling come back when you reconnect.");
     if (plan.hold.length || !plan.send.length) return setLaunchError("Some places aren't ready yet. Leave them out or fix them in Everywhere.");
+    if (capStore.getState().busy?.kind === "burn") return setLaunchError(BURN_SEND);
     if (how === "schedule") {
       const bad = scheduleProblem(when);
       if (bad) return setLaunchError(bad);
@@ -828,6 +832,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
         setPhase("publishing");
       } else {
         setScheduledFor(r.post.scheduledAt ?? when.toISOString());
+        setScheduledPost(r.post);
         setPhase("scheduled");
       }
       window.scrollTo({ top: 0 });
@@ -841,22 +846,13 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const another = () => window.location.assign("/create");
 
   const syncLine = <SyncStatus status={sync.status} lastSyncedAt={sync.lastSyncedAt} error={sync.error} needsMedia={sync.needsMedia} storedHere={sync.storedHere} onRetry={sync.retry} onResolve={conflict ? () => setComparing(true) : undefined} />;
-  const bar = barState({ online, hasMedia, uploadFailed: upload.kind === "failed", hasHook: !!hook, ready: allReviewed, enabledCount: enabled.length, launching, saving: saved === "saving", step, mode, targets: plan.send, pending: pending.map((p) => PLATFORM_META[p].name), scheduleIssue });
-  /** Resolves false when the creator would rather stay while captions are still being made. */
-  const leaveOk = (to: Step) =>
-    !capBusy || to === "video" || to === "story" || (step !== "video" && step !== "story") ? Promise.resolve(true) : new Promise<boolean>((r) => setLeaveAsk(() => r));
-  const answerLeave = (ok: boolean) => {
-    leaveAsk?.(ok);
-    setLeaveAsk(null);
+  const bar = barState({ online, hasMedia, uploadFailed: upload.kind === "failed", hasHook: !!hook, ready: allReviewed, enabledCount: enabled.length, launching, saving: saved === "saving", step, mode, targets: plan.send, pending: pending.map((p) => PLATFORM_META[p].name), scheduleIssue, hasDraft: !!(postId || savedAt), activity: capLine, burning: capBurning });
+  const onGo = (s: Step) => setStep(s);
+  const goTo = (s: Step, before?: () => void) => {
+    before?.();
+    setStep(s);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const onGo = (s: Step) => void leaveOk(s).then((ok) => ok && setStep(s));
-  const goTo = (s: Step, before?: () => void) =>
-    void leaveOk(s).then((ok) => {
-      if (!ok) return;
-      before?.();
-      setStep(s);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
   /** Steps 1 and 2: Schedule and Publish take you to Launch with that choice made. Nothing is sent from there. */
   const toLaunch = (how: "now" | "schedule") => goTo("launch", () => setMode(how));
   const onBar = (id: BarId) => {
@@ -865,7 +861,8 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
       capVideo.current?.pause();
       return setPreviewing(true);
     }
-    if (id === "continue") return goTo("launch");
+    // Phase 4: one Continue on every step, to the step after this one.
+    if (id === "continue") return goTo(step === "video" ? "story" : step === "story" ? "everywhere" : "launch");
     if (id === "back") return goTo("everywhere");
     if (id === "mode") return setMode((m) => (m === "now" ? "schedule" : "now"));
     if (id === "schedule") return toLaunch("schedule");
@@ -878,13 +875,19 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
 
   /* ================= render ================= */
   if (phase !== "edit") {
+    // Same root and rail position as the editor below, so React keeps the rail mounted (no remount, no flash).
     return (
-      <div className="relative overflow-hidden px-[var(--frame-gutter)] py-12 lg:min-h-dvh">
+      <CaptionRunProvider value={capStore}>
+      <div className="relative flex gap-0 lg:min-h-dvh">
         <Glow />
-        <div className="page-frame relative px-0">
-          {phase === "publishing" && livePost ? <PublishingView initial={livePost} onAnother={another} /> : <ScheduledView when={scheduledFor ?? when.toISOString()} tz={tz} poster={poster} onAnother={another} />}
+        <JourneyRail step="launch" complete reachable={SENT_REACHABLE} onGo={noGo} />
+        <div className="relative min-w-0 flex-1 overflow-hidden px-[var(--frame-gutter)] py-12">
+          <div className="page-frame relative px-0">
+            {phase === "publishing" && livePost ? <PublishingView initial={livePost} onAnother={another} /> : <ScheduledView post={scheduledPost} when={scheduledFor ?? when.toISOString()} tz={tz} poster={poster} onAnother={another} />}
+          </div>
         </div>
       </div>
+      </CaptionRunProvider>
     );
   }
 
@@ -952,6 +955,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   );
 
   return (
+    <CaptionRunProvider value={capStore}>
     <div className="relative flex gap-0 lg:min-h-dvh">
       <Glow />
       <JourneyRail step={step} reachable={reachable} onGo={onGo} status={railStatus} />
@@ -1007,7 +1011,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
             )}
 
             {showVideo && hasMedia && (
-              <motion.section key="stage" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, x: -30 }} transition={T.card} aria-label="Your video">
+              <motion.section key="stage" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, x: -30 }} transition={T.card} aria-label="Your video" data-tips-ready={upload.kind === "done" ? "" : undefined}>
                 <h1 className="sr-only">Create</h1>
                 {/* Below 1280px the assistant lives in a drawer: this is the way in, first, since Step 2 starts there. */}
                 <div className="glass mb-5 flex items-center gap-3 rounded-[22px] p-3 pl-4 xl:hidden">
@@ -1018,7 +1022,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                     <span className="block font-semibold">{hook ? "Your hook is set" : submittedStory ? "Pip has ideas for your hook" : "What's this video about?"}</span>
                     <span className="block text-muted-foreground">{hook ? "Ask the assistant to change it any time." : submittedStory ? "Open the assistant to pick one." : "Tell the assistant in a sentence or two."}</span>
                   </p>
-                  <Button variant="primary" size="sm" className="shrink-0" onClick={openDrawer} aria-haspopup="dialog" aria-expanded={drawer} aria-controls={ASSISTANT_PANEL}>
+                  <Button variant="primary" size="sm" className="min-h-11 shrink-0" onClick={openDrawer} aria-haspopup="dialog" aria-expanded={drawer} aria-controls={ASSISTANT_PANEL}>
                     Open Pip
                   </Button>
                 </div>
@@ -1053,7 +1057,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                     duration={meta?.duration ?? 0}
                     initialTrack={restoredTrack ?? undefined}
                     onTrackChange={onTrackChange}
-                    onBusy={onCapBusy}
+                    session={(preCaption?.media ?? media)?.id}
                     onBurned={(f, kind) => {
                       setPreCaption((p) => p ?? (media ? { media, file: fileRef.current } : null));
                       startUpload(f);
@@ -1132,7 +1136,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
               </motion.section>
             )}
           {hasMedia && !stage && <SaveDraft className="mt-6 xl:hidden" state={saved} at={savedAt} onSave={saveDraftNow} busy={saved === "saving"} hideButton sync={syncLine} />}
-          {hasMedia && <ActionBar state={bar} saveLabel={saved === "saving" ? "Saving" : "Save draft"} mode={mode} onAction={onBar} />}
+          <ActionBar state={bar} saveLabel={saved === "saving" ? "Saving" : "Save draft"} mode={mode} onAction={onBar} />
         </div>
         <ConflictDialog
           open={comparing && !!conflict}
@@ -1163,15 +1167,6 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
             setReplacing(null);
             if (f) void pickFile(f);
           }}
-        />
-        <ConfirmDialog
-          open={!!leaveAsk}
-          onOpenChange={(o) => !o && answerLeave(false)}
-          title="Captions are still being made. Leave and stop them?"
-          body="Leaving this step stops them. Stay here to let them finish."
-          confirmLabel="Leave and stop"
-          cancelLabel="Stay here"
-          onConfirm={() => answerLeave(true)}
         />
         <ConfirmDialog
           open={stopAsk}
@@ -1230,8 +1225,12 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
         </div>
       </aside>
     </div>
+    </CaptionRunProvider>
   );
 }
+
+const SENT_REACHABLE: Record<Step, boolean> = { video: false, story: false, everywhere: false, launch: false };
+const noGo = () => {};
 
 function Glow() {
   return (

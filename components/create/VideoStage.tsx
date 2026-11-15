@@ -238,7 +238,7 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
             <div>
               <p className="text-sm font-semibold">This preview didn&apos;t load.</p>
               <p className="mt-1 text-[13px] text-white/80">Your video is still saved. Try loading it again, or replace it.</p>
-              <Button size="sm" variant="subtle" className="mt-3" onClick={reload}>
+              <Button size="sm" variant="subtle" className="mt-3 min-h-11" onClick={reload}>
                 <RefreshCw className="h-4 w-4" aria-hidden="true" /> Load it again
               </Button>
             </div>
@@ -318,7 +318,7 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
               <motion.div key="fail" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex max-w-full items-center gap-3 rounded-full bg-[hsl(240_10%_8%/0.62)] py-1.5 pl-4 pr-1.5 backdrop-blur-xl text-[13px] text-white hairline">
                 <span>{upload.message}</span>
                 {onRetry && (
-                  <Button size="sm" variant="primary" onClick={onRetry} className="h-8 touch:h-11">
+                  <Button size="sm" variant="primary" onClick={onRetry} className="min-h-11">
                     <RefreshCw className="h-3.5 w-3.5" /> Let&apos;s try again
                   </Button>
                 )}
@@ -385,7 +385,7 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
             </div>
           ))}
         </dl>
-        <Button variant="ghost" size="sm" className={cn("shrink-0", column && "-ml-2.5 self-start")} onClick={() => picker.current?.click()} disabled={upload.kind === "uploading"} aria-label="Replace video">
+        <Button variant="ghost" size="sm" className={cn("min-h-11 shrink-0", column && "-ml-2.5 self-start")} onClick={() => picker.current?.click()} disabled={upload.kind === "uploading"} aria-label="Replace video">
           <Replace className="h-4 w-4" aria-hidden="true" /> Replace
         </Button>
         <input

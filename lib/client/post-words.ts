@@ -1,4 +1,5 @@
 import { FORMAT_LABEL, type PostFormat } from "@/lib/formats";
+import { dayKey } from "@/lib/client/tz";
 
 /**
  * 1135: the words the sending screen uses for a post, by what it is made of. The screen was written for videos,
@@ -26,4 +27,26 @@ export const platformFormatLabel = (platformFormat: string, format: PostFormat |
 export function liveSummary(live: number, total: number, onlyName?: string) {
   if (total === 1) return live === 1 ? `Live on ${onlyName ?? "1 place"}` : `Not live on ${onlyName ?? "1 place"} yet`;
   return live === total ? `Live in all ${total} places` : `Live in ${live} of ${total}`;
+}
+
+/** P4: the calendar opened on the day a booked post goes out, with that post open. Day is in the creator's time zone. */
+export function calendarHref(postId: string, at: string | null | undefined, tz: string) {
+  const q = new URLSearchParams({ post: postId });
+  const d = at ? new Date(at) : null;
+  if (d && !Number.isNaN(+d)) q.set("day", dayKey(d, tz));
+  return `/calendar?${q.toString()}`;
+}
+
+type Sent = { status: string; practice?: boolean | null };
+
+/**
+ * P4: what the sending screen may claim, from the statuses the server returned and nothing else.
+ * Practice accounts never post for real, so a practice "published" is a rehearsal, never "You're live".
+ * allDone: every destination finished; allLive: and all of them for real; allPractice: and none for real.
+ */
+export function sendOutcome(targets: Sent[], active: boolean) {
+  const real = targets.filter((t) => t.status === "published" && !t.practice).length;
+  const rehearsed = targets.filter((t) => t.status === "published" && t.practice).length;
+  const allDone = !active && targets.length > 0 && real + rehearsed === targets.length;
+  return { real, rehearsed, allDone, allLive: allDone && rehearsed === 0, allPractice: allDone && real === 0 };
 }

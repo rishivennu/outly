@@ -1,11 +1,11 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowUp, Check, Pencil, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, Pencil, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { cn, formatDuration } from "@/lib/utils";
-import { canSaveCaption } from "./assistant-state";
+import { canSaveCaption, foldsConversation } from "./assistant-state";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import type { Draft, HooksState, Step, Tone, UploadState } from "./types";
 import type { Hold } from "./publish";
@@ -111,6 +111,13 @@ export function Assistant(p: Props) {
   const [capEdit, setCapEdit] = useState<string | null>(null);
   const result = p.hooks.result;
   const current = result?.hooks[p.hooks.index];
+  const folds = foldsConversation(p.step) && !!p.chosenHook;
+  const [unfolded, setUnfolded] = useState(false);
+  const showHistory = !folds || unfolded;
+  const historyId = `${inputId}-history`;
+
+  // Each visit to Everywhere or Launch starts folded, so the hook is on screen once, in its own field.
+  useEffect(() => setUnfolded(false), [p.step]);
 
   useEffect(() => {
     setEditing(false);
@@ -139,6 +146,20 @@ export function Assistant(p: Props) {
       </header>
 
       <div className="scrollbar-none min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-4 pt-2 [mask-image:linear-gradient(to_bottom,transparent_0,#000_28px)]" aria-live="polite">
+        {folds && (
+          <button
+            type="button"
+            aria-expanded={unfolded}
+            aria-controls={historyId}
+            onClick={() => setUnfolded((v) => !v)}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-muted-foreground hairline transition-[background-color,color] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground"
+          >
+            {unfolded ? "Hide conversation" : "Show conversation"}
+            <ChevronDown className={cn("h-4 w-4 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none", unfolded && "rotate-180")} aria-hidden="true" />
+          </button>
+        )}
+        {showHistory && (
+        <div id={historyId} className="space-y-4">
         {!p.hasMedia && <Bubble from="outly">Hey! Drop a video in and I&apos;ll help it land everywhere it needs to go.</Bubble>}
         {p.hasMedia && p.upload.kind === "uploading" && <Bubble from="outly">Bringing it in. You can start telling me about it while it uploads.</Bubble>}
         {p.hasMedia && p.upload.kind === "failed" && (
@@ -310,7 +331,7 @@ export function Assistant(p: Props) {
                             disabled={p.hooks.loading}
                             aria-pressed={p.hooks.tone === t.id}
                             onClick={() => p.onTone(p.hooks.tone === t.id ? "default" : t.id)}
-                            className={cn("min-h-[36px] rounded-full px-3 text-[13px] font-medium transition disabled:opacity-50", p.hooks.tone === t.id ? "bg-foreground text-background" : "text-muted-foreground hairline hover:bg-secondary hover:text-foreground")}
+                            className={cn("min-h-11 rounded-full px-3 text-[13px] font-medium transition disabled:opacity-50", p.hooks.tone === t.id ? "bg-foreground text-background" : "text-muted-foreground hairline [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground")}
                           >
                             {t.label}
                           </button>
@@ -325,15 +346,20 @@ export function Assistant(p: Props) {
         )}
 
         {p.chosenHook && (
+          <div className="flex flex-col items-end gap-1">
+            <Bubble from="you">Let&apos;s go with that one.</Bubble>
+            {p.step === "story" && (
+              <button type="button" onClick={p.onRepick} className="min-h-[44px] px-2 text-xs text-muted-foreground [@media(hover:hover)]:hover:text-foreground">
+                Actually, let&apos;s rethink the hook
+              </button>
+            )}
+          </div>
+        )}
+        </div>
+        )}
+
+        {p.chosenHook && (showHistory || p.step === "everywhere") && (
           <>
-            <div className="flex flex-col items-end gap-1">
-              <Bubble from="you">Let&apos;s go with that one.</Bubble>
-              {p.step === "story" && (
-                <button type="button" onClick={p.onRepick} className="min-h-[44px] px-2 text-xs text-muted-foreground hover:text-foreground">
-                  Actually, let&apos;s rethink the hook
-                </button>
-              )}
-            </div>
             <Bubble from="outly">
               <span className="display block text-[24px] leading-[1.05] tracking-[-0.035em]">Now let&apos;s make it fit everywhere.</span>
               <span className="mt-2 block text-sm text-muted-foreground">Each place gets its own words. Nothing goes out until you say so.</span>

@@ -8,14 +8,17 @@ import { readConsent } from "@/components/shared/CookieConsent";
 import { useUser } from "@/components/shell/UserContext";
 import { afterWelcome, welcomePending } from "@/lib/pwa-welcome";
 import { T, FX } from "@/lib/motion/tokens";
+import { PRIVACY_VERSION, summaryAnsweredThisSession } from "@/lib/client/privacy-summary";
 
 /**
  * "How we handle your data", shown once per person per version on their first studio visit (10-18).
  * Order of first-run popups: cookie choice, then this, then the tour, then the welcome offer. Anything
  * that would open after it calls afterPrivacy(). Bump PRIVACY_VERSION when what we collect, who receives
  * it or how long we keep it changes, and everyone sees the new version once. Keep it in step with /privacy.
+ * Phase 4: the cookie banner carries the short summary. Answered in this tab, it counts as seen, so this
+ * notice never opens on its own after it; Settings and Your data can still open it any time.
  */
-export const PRIVACY_VERSION = "2026-10-18b";
+export { PRIVACY_VERSION };
 const UPDATED = "18 Oct 2026";
 export const privacyKey = (userId: string) => `outlly:privacy-seen:${userId}`;
 const OPEN = "outlly:privacy-open";
@@ -23,8 +26,22 @@ const CLOSED = "outlly:privacy-closed";
 // Also remembered in memory, so a browser that refuses localStorage writes never wedges the popups waiting on it.
 let seenThisSession = false;
 
+/** Record the version as seen for this person, quietly (no dialog). */
+function markSeen(userId: string) {
+  seenThisSession = true;
+  try {
+    localStorage.setItem(privacyKey(userId), PRIVACY_VERSION);
+  } catch {
+    /* private mode: memory covers this visit */
+  }
+}
+
 export function privacyPending(userId: string) {
   if (seenThisSession) return false;
+  if (summaryAnsweredThisSession()) {
+    markSeen(userId);
+    return false;
+  }
   try {
     return localStorage.getItem(privacyKey(userId)) !== PRIVACY_VERSION;
   } catch {
@@ -92,7 +109,12 @@ export function PrivacyNotice() {
     let tries = 0;
     let t = 0;
     const tick = () => {
-      if (!privacyPending(userId)) return window.clearInterval(t); // already seen, e.g. opened from Settings
+      if (!privacyPending(userId)) {
+        // Already seen (opened from Settings), or the cookie banner just showed the summary: let the waiters go.
+        window.clearInterval(t);
+        window.dispatchEvent(new Event(CLOSED));
+        return;
+      }
       if (welcomePending()) return; // 1100: the Home Screen welcome is up; its time does not count
       if (++tries > 340) {
         // About 1.5 minutes: try again next visit, but let the tour and welcome offer go ahead now.
@@ -116,12 +138,7 @@ export function PrivacyNotice() {
   }, [userId]);
 
   const close = () => {
-    seenThisSession = true;
-    try {
-      localStorage.setItem(privacyKey(userId), PRIVACY_VERSION);
-    } catch {
-      /* private mode: it shows again next visit */
-    }
+    markSeen(userId);
     setOpen(false);
     window.dispatchEvent(new Event(CLOSED));
   };

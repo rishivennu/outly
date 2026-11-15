@@ -9,11 +9,17 @@ import { HoverLink } from "./HoverLink";
 import { WhoCard, menuKeys, useWho } from "./AccountMenu";
 import { useSignOut } from "./SignOutButton";
 import { openPalette } from "./CommandPalette";
-import { TOUR, accountItems, isActive, type NavItem } from "./nav-items";
+import { MAIN, TOUR, accountItems, isActive, type NavItem } from "./nav-items";
+import { TAB_PAGES, hidesTabBar } from "@/lib/client/tab-bar";
 
-/** Studio pages that are not phone tabs (1100). The tab bar holds Home, Create, Calendar, Inbox and Analytics. */
-export function drawerItems(teammate: boolean): NavItem[] {
+/**
+ * Studio pages that are not phone tabs (1100). The tab bar holds Home, Create, Calendar, Inbox and Analytics.
+ * Phase 4: on a page that hides the tab bar (/create), the tab pages come first, so every page stays one tap away.
+ */
+export function drawerItems(teammate: boolean, tabsHidden = false): NavItem[] {
+  const tabs = tabsHidden ? TAB_PAGES.map((h) => MAIN.find((m) => m.href === h)!).filter(Boolean) : [];
   return [
+    ...tabs,
     { href: "/content", label: "Content", icon: LayoutGrid },
     { href: "/approvals", label: "Approvals", icon: ClipboardCheck },
     ...(teammate ? [] : [{ href: "/accounts", label: "Connected accounts", icon: Link2 }]),
@@ -151,7 +157,7 @@ export function MobileDrawer({ className }: { className?: string }) {
                     <Search className={ICON} strokeWidth={1.9} aria-hidden="true" />
                     <span className="min-w-0 flex-1 truncate">Search</span>
                   </button>
-                  {drawerItems(who.teammate).map(link)}
+                  {drawerItems(who.teammate, hidesTabBar(path)).map(link)}
                 </Section>
                 <Section id="dr-me" title="My account">{account.map(link)}</Section>
                 <Section id="dr-help" title={who.teammate ? "Support" : "Support & billing"}>

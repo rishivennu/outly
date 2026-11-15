@@ -112,6 +112,35 @@ export function propagateMain(drafts: Drafts, main: string, prevMain = mainCapti
   return patches;
 }
 
+export type PreviewSource = "own" | "main" | "hook" | Platform;
+
+/**
+ * The copy a not yet connected place would get, for its preview only. Its own words win; with none, it borrows
+ * the main caption (else the first place with words) trimmed to its room, and YouTube takes the hook as its title.
+ * `source` says whose words it shows, so the preview can say so. Nothing here is ever sent.
+ */
+export function previewDraft(p: Platform, drafts: Drafts, hook: string): { draft: Draft; source: PreviewSource } {
+  const d = drafts[p];
+  if (d.title.trim() || d.caption.trim() || d.description.trim()) return { draft: d, source: "own" };
+  const main = mainCaption(drafts);
+  const src = PLATFORMS.find((x) => x !== p && drafts[x].enabled && drafts[x][bodyKey(x)].trim());
+  const words = main || (src ? drafts[src][bodyKey(src)].trim() : "");
+  const f = fieldsFor(p);
+  const tags = f.hashtags && src ? drafts[src].hashtags : "";
+  const firstLine = hook.split("\n")[0].trim();
+  const title = f.title?.required && firstLine ? clipTo(firstLine, f.title.limit ?? firstLine.length) : "";
+  if (!words && !title) return { draft: d, source: "own" };
+  const source: PreviewSource = !words ? "hook" : main ? "main" : (src as Platform);
+  return { draft: { ...d, title, hashtags: tags, [bodyKey(p)]: clipTo(words, bodyRoom(p, { hashtags: tags })) }, source };
+}
+
+/** The line under a preview-only card: whose words it shows, and that nothing is sent until it is connected. */
+export function previewNote(p: Platform, source: PreviewSource) {
+  const name = PLATFORM_META[p].name;
+  const lead = source === "own" ? "" : source === "main" ? "Shown with your main caption. " : source === "hook" ? "Shown with your hook as the title. " : `Shown with your ${PLATFORM_META[source].name} caption. `;
+  return `${lead}Nothing is sent to ${name} until you connect it and switch it on.`;
+}
+
 const LABEL: Record<FieldKey, string> = { title: "Title", caption: "Caption", description: "Description", hashtags: "Hashtags", firstComment: "First comment" };
 const FIELDS: FieldKey[] = ["title", "description", "caption", "hashtags", "firstComment"];
 

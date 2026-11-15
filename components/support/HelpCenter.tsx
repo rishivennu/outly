@@ -36,6 +36,7 @@ export function HelpCenter({
   categories,
   initialTopic,
   initialQuery,
+  initialOpen,
   me,
   variant = "site",
   extra,
@@ -44,6 +45,8 @@ export function HelpCenter({
   categories: string[];
   initialTopic: string;
   initialQuery: string;
+  /** An entry to open and scroll to on arrival (/help?faq=music). */
+  initialOpen?: string;
   me: { name: string; email: string } | null;
   /** "studio" sits inside the dashboard shell: left-aligned page header, no mascot, a link out to the public page. */
   variant?: "site" | "studio";
@@ -54,7 +57,7 @@ export function HelpCenter({
   const t = HELP_T[lang];
   const [q, setQ] = useState(initialQuery);
   const [cat, setCat] = useState(initialTopic);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(initialOpen ?? null);
   const [sugOpen, setSugOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -67,6 +70,14 @@ export function HelpCenter({
     window.addEventListener("outly:lang", on);
     return () => window.removeEventListener("outly:lang", on);
   }, []);
+
+  useEffect(() => {
+    if (!initialOpen) return;
+    const id = requestAnimationFrame(() =>
+      document.getElementById(`faq-${initialOpen}`)?.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }),
+    );
+    return () => cancelAnimationFrame(id);
+  }, [initialOpen]);
 
   const tabs = ["", ...categories];
   useEffect(() => {

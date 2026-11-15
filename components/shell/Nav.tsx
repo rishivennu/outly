@@ -7,6 +7,7 @@ import { NoticesBell } from "./NoticesBell";
 import { PulseRail } from "./PulseRail";
 import { MobileDrawer } from "./MobileDrawer";
 import { MAIN, TOUR, isActive, pageTitle } from "./nav-items";
+import { hidesTabBar } from "@/lib/client/tab-bar";
 
 /**
  * Desktop sidebar: the collapsible rail for every dashboard style (1103). Classic and Analytics used to have
@@ -85,12 +86,17 @@ function useTuckOnScroll(path: string | null) {
 export function MobileNav() {
   const path = usePathname();
   const tabs = TABS.map((h) => MAIN.find((m) => m.href === h)!);
-  const hidden = useTuckOnScroll(path);
+  const tucked = useTuckOnScroll(path);
+  // Phase 4: /create has its own bottom bar (the post actions), so the tab bar steps aside there. The studio
+  // layout drops the room it keeps for the bar (data-tabbar-off below), and the top bar's menu still has every page.
+  const off = hidesTabBar(path);
+  const hidden = tucked && !off;
   // 1154: Pip (ChatWidget .pc-dock) tucks away with the bar, so it never floats alone over the content.
   useEffect(() => {
     document.documentElement.toggleAttribute("data-tabs-tucked", hidden);
     return () => document.documentElement.removeAttribute("data-tabs-tucked");
   }, [hidden]);
+  if (off) return <span hidden data-tabbar-off="" />;
   return (
     <nav aria-label="Primary" data-hidden={hidden ? "" : undefined} inert={hidden} className="mtab web-only fixed inset-x-0 bottom-0 z-40 flex items-stretch lg:hidden">
       {tabs.map(({ href, label, icon: Icon }) => {

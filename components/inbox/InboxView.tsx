@@ -121,7 +121,7 @@ export function InboxView({ initial, dms, initialTab = "comments", renderedAt, r
         <Button variant="ghost" size="icon" onClick={() => setSearchOpen((v) => !v)} aria-label={searchOpen ? "Close search" : "Search the inbox"} aria-expanded={searchOpen} className="text-foreground lg:hidden">
           {searchOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Search className="h-5 w-5" aria-hidden="true" />}
         </Button>
-        <Button variant="outline" onClick={() => setRefreshTick((n) => n + 1)} disabled={busy} aria-label={busy ? "Checking for new comments and messages" : "Refresh"} className="h-11 w-11 px-0 lg:h-10 lg:w-auto lg:rounded-xl lg:px-4">
+        <Button variant="outline" onClick={() => setRefreshTick((n) => n + 1)} disabled={busy} aria-label={busy ? "Checking for new comments and messages" : "Refresh"} className="h-11 w-11 px-0 lg:w-auto lg:rounded-xl lg:px-4">
           <RefreshCw className={cn("h-4 w-4", busy && "animate-spin")} aria-hidden="true" />
           <span className="hidden lg:inline">{busy ? "Checking…" : "Refresh"}</span>
         </Button>
@@ -838,7 +838,7 @@ function CommentDetail({
   };
 
   const iconBtn = "grid h-11 w-11 shrink-0 place-items-center rounded-full text-foreground hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
-  const wideBtn = "lg:flex lg:h-10 lg:w-auto lg:items-center lg:gap-1.5 lg:rounded-xl lg:px-3.5 lg:text-[13px] lg:font-medium lg:hairline";
+  const wideBtn = "lg:flex lg:h-11 lg:w-auto lg:items-center lg:gap-1.5 lg:rounded-xl lg:px-3.5 lg:text-[13px] lg:font-medium lg:hairline";
   const actBtn = "inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-foreground transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none [@media(hover:hover)]:hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.96]";
 
   return (

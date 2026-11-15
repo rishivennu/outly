@@ -148,6 +148,7 @@ export function FormatComposer({ accounts, choices, initialPost, initialFormat, 
   const [phase, setPhase] = useState<"edit" | "publishing" | "scheduled">(initialPost && LIVE.includes(initialPost.status) ? "publishing" : "edit");
   const [livePost, setLivePost] = useState<PostView | null>(initialPost && LIVE.includes(initialPost.status) ? initialPost : null);
   const [scheduledFor, setScheduledFor] = useState<string | null>(null);
+  const [scheduledPost, setScheduledPost] = useState<PostView | null>(null);
 
   useEffect(() => {
     if (connected === "instagram") toast("Instagram is connected.");
@@ -424,6 +425,7 @@ export function FormatComposer({ accounts, choices, initialPost, initialFormat, 
         setPhase("publishing");
       } else {
         setScheduledFor(r.post.scheduledAt ?? when.toISOString());
+        setScheduledPost(r.post);
         setPhase("scheduled");
       }
       window.scrollTo({ top: 0 });
@@ -441,7 +443,7 @@ export function FormatComposer({ accounts, choices, initialPost, initialFormat, 
     return (
       <div className="relative overflow-hidden px-[var(--frame-gutter)] py-12 lg:min-h-dvh">
         <div className="page-frame relative px-0">
-          {phase === "publishing" && livePost ? <PublishingView initial={livePost} onAnother={another} /> : <ScheduledView when={scheduledFor ?? when.toISOString()} tz={tz} poster={cover} onAnother={another} />}
+          {phase === "publishing" && livePost ? <PublishingView initial={livePost} onAnother={another} /> : <ScheduledView post={scheduledPost} when={scheduledFor ?? when.toISOString()} tz={tz} poster={cover} onAnother={another} />}
         </div>
       </div>
     );

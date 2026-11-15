@@ -29,6 +29,12 @@ export interface BarInput {
   pending?: string[];
   /** Why the time picked can't be booked (past, a clash, a platform rule), or null. */
   scheduleIssue?: string | null;
+  /** Phase 4: a draft is saved (on the server or in this browser), so Step 1 offers Save draft. */
+  hasDraft?: boolean;
+  /** Phase 4: work still running in the background (captions), shown in the note when nothing blocks. */
+  activity?: string | null;
+  /** Captions are being burned in: the video is about to change, so nothing is sent until it has. */
+  burning?: boolean;
 }
 export interface BarAction {
   disabled: boolean;
@@ -39,7 +45,7 @@ export type BarId = "save" | "preview" | "schedule" | "publish" | "continue" | "
 export interface BarButton extends BarAction {
   id: BarId;
   label: string;
-  /** Exactly one button is lit on Everywhere and Launch. */
+  /** Exactly one button is lit on every step. */
   primary: boolean;
 }
 export interface BarState {
@@ -54,6 +60,7 @@ export interface BarState {
 }
 
 export const OFFLINE_SEND = "You're offline. Publishing and scheduling come back when you reconnect.";
+export const BURN_SEND = "Captions are still being burned in.";
 
 const list = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : (xs[0] ?? ""));
 
@@ -71,18 +78,45 @@ export function barState(i: BarInput): BarState {
           ? "Pick a hook with Pip first."
           : null;
   const notReady = step === "launch" ? "Some places aren't ready yet. Leave them out or fix them in Everywhere." : i.pending?.length ? `Look over ${list(i.pending)} first.` : "Look over each place on the Everywhere step first.";
-  const sendBlock = !i.online ? OFFLINE_SEND : (base ?? (!i.ready ? notReady : null));
+  const sendBlock = !i.online ? OFFLINE_SEND : (base ?? (!i.ready ? notReady : i.burning ? BURN_SEND : null));
   const send: BarAction = { disabled: !!sendBlock || i.launching, hint: sendBlock };
   const save: BarAction = { disabled: !i.hasMedia || i.saving, hint: null };
   const preview: BarAction = { disabled: !i.hasMedia, hint: null };
   const flat = { save, preview, schedule: send, publish: send };
+  const activity = i.activity || null;
+
+  // Phase 4: Steps 1 and 2 use the same one-lit-button bar as Everywhere and Launch. Nothing is sent from here.
+  if (step === "video") {
+    const goBlock = !i.hasMedia ? "Add a video to continue to your story." : null;
+    return {
+      ...flat,
+      note: goBlock ?? activity,
+      buttons: [
+        ...(i.hasDraft ? [{ id: "save" as const, label: "Save draft", primary: false, ...save }] : []),
+        { id: "continue", label: "Continue to story", primary: true, disabled: !!goBlock, hint: goBlock },
+      ],
+    };
+  }
+  if (step === "story") {
+    const goBlock = !i.hasMedia ? "Add a video first." : !i.hasHook ? "Pick a hook with Pip to continue to Everywhere." : null;
+    const failed = i.hasMedia && i.uploadFailed ? "Your video didn't upload. Try it again first." : null;
+    return {
+      ...flat,
+      note: goBlock ?? failed ?? activity ?? (!i.online ? OFFLINE_SEND : null),
+      buttons: [
+        { id: "save", label: "Save draft", primary: false, ...save },
+        { id: "preview", label: "Preview", primary: false, ...preview },
+        { id: "continue", label: "Continue to Everywhere", primary: true, disabled: !!goBlock, hint: goBlock },
+      ],
+    };
+  }
 
   if (step === "everywhere") {
     // Moving on works offline: nothing is sent from here.
     const goBlock = base ?? (!i.ready ? notReady : null);
     return {
       ...flat,
-      note: goBlock ?? (!i.online ? OFFLINE_SEND : null),
+      note: goBlock ?? activity ?? (!i.online ? OFFLINE_SEND : null),
       buttons: [
         { id: "save", label: "Save draft", primary: false, ...save },
         { id: "preview", label: "Preview", primary: false, ...preview },
@@ -97,7 +131,7 @@ export function barState(i: BarInput): BarState {
     return {
       ...flat,
       publish: go,
-      note: block,
+      note: block ?? activity,
       buttons: [
         { id: "back", label: "Back to editing", primary: false, disabled: i.launching, hint: null },
         { id: "mode", label: mode === "schedule" ? "Publish now" : "Schedule", primary: false, disabled: i.launching, hint: null },
@@ -105,17 +139,14 @@ export function barState(i: BarInput): BarState {
       ],
     };
   }
-  return {
-    ...flat,
-    note: sendBlock,
-    buttons: [
-      { id: "save", label: "Save draft", primary: false, ...save },
-      { id: "preview", label: "Preview", primary: false, ...preview },
-      { id: "schedule", label: "Schedule", primary: false, ...send },
-      { id: "publish", label: "Publish", primary: true, ...send },
-    ],
-  };
+  return { ...flat, note: sendBlock, buttons: [] };
 }
+
+const GRID: Record<number, string> = {
+  1: "grid-cols-1",
+  2: "grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]",
+  3: "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)]",
+};
 
 interface Props {
   state: BarState;
@@ -130,20 +161,20 @@ const ICON: Record<BarId, typeof Save> = { save: Save, preview: Eye, schedule: C
 
 /**
  * The one set of post actions on every step, in one compact bar. Sticky in the page flow (not fixed), so the
- * end of the page always scrolls clear of it; on phones it sits above the tab bar and the home indicator,
- * and the assistant drawer opens over it.
+ * end of the page always scrolls clear of it. Phase 4: the shell hides its tab bar on /create, so on phones the
+ * bar sits at the bottom edge over the home indicator, and the assistant drawer opens over it.
  */
 export function ActionBar({ state, saveLabel, mode, onAction, className }: Props) {
   const btn = "h-auto min-h-[52px] min-w-0 flex-col gap-0.5 px-1 text-xs font-semibold sm:min-h-11 sm:flex-row sm:gap-2 sm:px-4 sm:text-sm";
   return (
-    <div role="region" aria-label="Post actions" className={cn("sticky bottom-[calc(env(safe-area-inset-bottom)+76px)] z-30 mt-6 lg:bottom-4", className)}>
+    <div role="region" aria-label="Post actions" className={cn("sticky bottom-[calc(env(safe-area-inset-bottom)+12px)] z-30 mt-6 lg:bottom-4", className)}>
       <div className="glass-strong mx-auto w-full max-w-3xl rounded-[22px] p-1.5 shadow-[0_18px_40px_-24px_hsl(var(--foreground)/0.45)] hairline">
         {state.note && (
           <p id="bar-note" className="px-2.5 pb-1.5 pt-1 text-xs leading-snug text-muted-foreground" aria-live="polite">
             {state.note}
           </p>
         )}
-        <div className={cn("grid gap-1.5", state.buttons.length === 3 ? "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)]" : "grid-cols-4")}>
+        <div className={cn("grid gap-1.5", GRID[state.buttons.length] ?? GRID[3])}>
           {state.buttons.map((b) => {
             const on = b.primary;
             const Icon = b.id === "mode" && mode === "schedule" ? Send : b.id === "save" && saveLabel === "Saving" ? Loader2 : ICON[b.id];

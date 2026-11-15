@@ -65,9 +65,9 @@ describe("B4 one action bar", () => {
     expect(barState({ ...base, step: "launch", launching: true, targets: ["youtube"] }).buttons[2].label).toBe("Publishing");
     expect(barState({ ...base, step: "launch", mode: "schedule", launching: true, targets: ["youtube"] }).buttons[2].label).toBe("Scheduling");
   });
-  test("Steps 1 and 2 keep their four buttons", () => {
-    expect(barState(base).buttons.map((b) => b.id)).toEqual(["save", "preview", "schedule", "publish"]);
-    expect(barState({ ...base, step: "story" }).buttons.filter((b) => b.primary).map((b) => b.id)).toEqual(["publish"]);
+  test("Phase 4: Steps 1 and 2 use the same one-Continue bar", () => {
+    expect(barState(base).buttons.map((b) => b.id)).toEqual(["continue"]);
+    expect(barState({ ...base, step: "story" }).buttons.filter((b) => b.primary).map((b) => b.id)).toEqual(["continue"]);
   });
   test("publishLabel and the schedule time rule", () => {
     expect(publishLabel([], "now", PLATFORM_META)).toBe("Publish");

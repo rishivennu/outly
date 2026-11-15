@@ -629,7 +629,7 @@ function ThreadPane({
       <div ref={list} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 lg:px-6" aria-live="polite">
         {olderCursor && messages && (
           <div className="mb-3 flex flex-col items-center gap-1">
-            <Button type="button" variant="outline" size="sm" onClick={() => void loadOlder()} disabled={older === "loading"} aria-busy={older === "loading"}>
+            <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => void loadOlder()} disabled={older === "loading"} aria-busy={older === "loading"}>
               {older === "loading" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
               {older === "loading" ? "Loading" : "Show earlier messages"}
             </Button>

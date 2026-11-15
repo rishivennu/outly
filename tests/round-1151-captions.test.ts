@@ -19,7 +19,9 @@ describe("1151 captions transcribe", () => {
   test("CaptionBurner transcribes the local file when it has one", () => {
     const b = src("components/create/CaptionBurner.tsx");
     expect(b).toContain("file?: Blob | null;");
-    expect(b).toContain("audioChunks(file ?? src, ctrl.signal)");
+    // Phase 4: the run lives in the workspace caption store, fed the same file by the editor.
+    expect(src("components/create/captions/run-store.ts")).toContain("audioChunks(file ?? src, ctrl.signal)");
+    expect(b).toContain("store.attach({ key, src, file, filename, duration, initialTrack })");
     const w = src("components/create/CreateWorkspace.tsx");
     expect(w).toContain("file={preCaption ? preCaption.file : fileRef.current}");
   });

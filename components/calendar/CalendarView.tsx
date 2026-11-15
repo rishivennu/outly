@@ -98,6 +98,27 @@ export function CalendarView({ initial, loaded, drafts: firstDrafts, accounts: f
 
   const [dir, setDir] = useState(0);
   const [open, setOpen] = useState<CalendarPost | null>(null);
+  // P4: "Open in Calendar" after Schedule lands here as ?post=<id>&day=<YYYY-MM-DD>: that day, with the post open.
+  const deepPost = useRef<string | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    const day = q.get("day");
+    deepPost.current = q.get("post");
+    if (!deepPost.current && !day) return;
+    if (day && isDayKey(day)) {
+      restored.current = true; // the saved view must not replace the day view asked for
+      setAnchor(day);
+      setView("day");
+    }
+    history.replaceState(history.state, "", location.pathname);
+  }, []);
+  useEffect(() => {
+    if (!deepPost.current) return;
+    const hit = posts.find((p) => p.id === deepPost.current);
+    if (!hit) return;
+    deepPost.current = null;
+    setOpen(hit);
+  }, [posts]);
   const [moving, setMoving] = useState<{ post: CalendarPost; at: Date | null } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropKey, setDropKey] = useState<string | null>(null);

@@ -94,11 +94,11 @@ export function CoverPicker({ targets, coverUrl, ensurePost, onChange }: Props) 
           )}
           {takes.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button variant="subtle" size="sm" onClick={() => input.current?.click()} disabled={busy !== null}>
+              <Button variant="subtle" size="sm" className="min-h-11" onClick={() => input.current?.click()} disabled={busy !== null}>
                 <ImagePlus className="h-4 w-4" aria-hidden="true" /> {coverUrl ? "Change" : "Add a cover"}
               </Button>
               {coverUrl && (
-                <Button variant="ghost" size="sm" onClick={() => setAsking(true)} disabled={busy !== null}>
+                <Button variant="ghost" size="sm" className="min-h-11" onClick={() => setAsking(true)} disabled={busy !== null}>
                   {busy === "rm" ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Trash2 className="h-4 w-4" aria-hidden="true" />} Remove
                 </Button>
               )}

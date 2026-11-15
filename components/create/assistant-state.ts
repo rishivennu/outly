@@ -18,6 +18,12 @@ export function panelReducer(s: PanelState, a: PanelAction): PanelState {
   return s.restore === null ? s : { open: s.restore, restore: null };
 }
 
+/**
+ * Phase 4 (4): on Everywhere and Launch the hook already sits in its own field, so Pip shows only its latest
+ * message there and the conversation (with the suggested hook) folds behind "Show conversation".
+ */
+export const foldsConversation = (step: Step) => step === "everywhere" || step === "launch";
+
 /** Nothing but spaces is not a caption. */
 export const canSaveCaption = (text: string) => text.trim().length > 0;
 

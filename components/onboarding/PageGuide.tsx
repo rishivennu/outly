@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useUser } from "@/components/shell/UserContext";
 import { Spotlight, findTarget, type Stop } from "./Spotlight";
-import { GUIDES, guideKey, guidesOffKey, presentStops, tourState } from "./guides";
+import { CALM_TICKS, GUIDES, calmTick, guideKey, guidesOffKey, guideReady, presentStops, tourState } from "./guides";
 import { tourKey } from "./Tour";
 
 /*
@@ -11,6 +11,7 @@ import { tourKey } from "./Tour";
  * Once per page per person (stored on this device). It waits its turn: after the welcome tour, the
  * cookie choice and the privacy notice, and never on top of another dialog (it waits for it to close). "Turn off tips" stops them
  * all; replaying the tour from Settings brings them back. The command palette can show them again.
+ * Phase 4: a page can hold its tips until something is on screen (Create: the first upload has landed).
  */
 
 const OPEN = "outly:guide-open";
@@ -32,6 +33,8 @@ export function PageGuide() {
   const path = usePathname();
   const guide = GUIDES[path];
   const [stops, setStops] = useState<Stop[] | null>(null);
+
+  const ready = useCallback(() => !!guide && guideReady(guide, (s) => !!document.querySelector(s)), [guide]);
 
   const open = useCallback(() => {
     if (!guide) return;
@@ -76,25 +79,28 @@ export function PageGuide() {
     }
     // The welcome tour ran on this page this visit: that was enough for one sitting.
     if (!asked && (seen || tourState.ranOn === path)) return;
-    let tries = 0;
-    // Give the page a moment to render its content, then wait for a quiet moment: another popup
+    let calm = 0;
+    // Give the page a moment to render its content, then wait for two quiet seconds in a row: another popup
     // (the update notice, a dialog the person opened) may take a while. Leaving the page stops the wait.
     const t = window.setInterval(() => {
-      if (++tries < 2 || busy()) return;
+      calm = calmTick(calm, busy(), ready());
+      if (calm < CALM_TICKS) return;
       window.clearInterval(t);
       open();
     }, 1000);
     return () => window.clearInterval(t);
-  }, [guide, path, user.id, open]);
+  }, [guide, path, user.id, open, ready]);
 
   useEffect(() => {
     // Asked for from the command palette: wait for the palette (or any other dialog) to close first,
-    // so two modal cards never stack. Give up after about 3 s.
+    // so two modal cards never stack. Give up after about 3 s, unless the page is still getting ready
+    // (Create before the first upload): then they show once it is.
     let t = 0;
     const again = () => {
       window.clearInterval(t);
       let n = 0;
       t = window.setInterval(() => {
+        if (!ready()) return;
         if (++n > 15) return window.clearInterval(t);
         if (busy()) return;
         window.clearInterval(t);
@@ -109,7 +115,7 @@ export function PageGuide() {
       window.removeEventListener(OPEN, again);
       window.removeEventListener("outly:tour", stop);
     };
-  }, [open]);
+  }, [open, ready]);
 
   if (!guide || !stops) return null;
   const finish = (how: "done" | "skip") => {

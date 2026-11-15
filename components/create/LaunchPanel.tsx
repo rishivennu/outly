@@ -2,9 +2,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { AlertTriangle, CalendarClock, CalendarDays, Check, Flame, Loader2, Pencil, Plus, Send, X } from "lucide-react";
+import { AlertTriangle, CalendarClock, CalendarDays, Check, Flame, LayoutGrid, Loader2, Pencil, Plus, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Icon3D } from "@/components/brand/Icon3D";
+import { Pip } from "@/components/brand/Pip";
 import { Sheet } from "@/components/shared/Sheet";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DateTimePicker } from "@/components/shared/DateTimePicker";
@@ -14,8 +15,9 @@ import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/client/api";
 import { MIN_SAMPLES, type BestTimes } from "@/lib/schedule/best-time";
-import type { AccountView, Draft } from "./types";
-import { confirmRows, enabledPlatforms, scheduleProblem } from "./publish";
+import type { AccountView, Draft, PostView } from "./types";
+import { calendarHref } from "@/lib/client/post-words";
+import { confirmRows, diffRows, enabledPlatforms, scheduleProblem } from "./publish";
 import { MusicNote } from "./MusicNote";
 import { CoverPicker } from "./CoverPicker";
 import { OFFLINE_SEND } from "./ActionBar";
@@ -105,6 +107,7 @@ export function LaunchPanel(p: Props) {
   const targets = enabledPlatforms(p.drafts);
   const rows = confirmRows(p.drafts, p.accounts, p.media, p.proposed);
   const sending = rows.filter((r) => r.sending);
+  const diffs = diffRows(p.drafts, rows.map((r) => r.platform));
   const [best, setBest] = useState<BestAnswer | null>(null);
   const slots = realSlots(best);
   const peaks = best?.source === "yours" ? best.peakHours : [];
@@ -195,21 +198,47 @@ export function LaunchPanel(p: Props) {
                   </h3>
                   {p.hook && p.hook !== p.title && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{p.hook}</p>}
                 </div>
-                <Button variant="subtle" size="sm" onClick={p.onEdit} className="shrink-0" aria-label="Edit the post in Everywhere">
+                <Button variant="subtle" size="sm" onClick={p.onEdit} className="min-h-11 shrink-0" aria-label="Edit the post in Everywhere">
                   <Pencil className="h-4 w-4" aria-hidden="true" /> Edit
                 </Button>
               </div>
-              <ul className="mt-3 space-y-1.5" aria-label="Where it's going">
-                {rows.map((r) => (
-                  <li key={r.platform} className="flex min-w-0 items-center gap-2 text-sm">
-                    <PlatformOrb platform={r.platform} size={22} />
-                    <span className="shrink-0 font-medium">{PLATFORM_META[r.platform].name}</span>
-                    <span className="min-w-0 truncate text-muted-foreground">
-                      {[PLATFORM_META[r.platform].format, r.handle ?? "Not connected"].join(" · ")}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              {diffs.length > 0 ? (
+                <ul className="mt-3 divide-y divide-border/60" aria-label="What each place gets">
+                  {diffs.map((r) => {
+                    const handle = rows.find((x) => x.platform === r.platform)?.handle;
+                    return (
+                      <li key={r.platform} className="flex min-w-0 items-start gap-2 py-2 text-sm first:pt-0 last:pb-0">
+                        <PlatformOrb platform={r.platform} size={22} className="mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <p className="flex min-w-0 items-baseline gap-2">
+                            <span className="shrink-0 font-medium">{PLATFORM_META[r.platform].name}</span>
+                            <span className="min-w-0 truncate text-[13px] text-muted-foreground">{handle ?? "Not connected"}</span>
+                          </p>
+                          <p className="truncate text-[13px] text-foreground/90" title={r.firstLine || undefined}>
+                            <span className="sr-only">First line: </span>
+                            {r.firstLine || <span className="text-muted-foreground">No words yet</span>}
+                          </p>
+                          <p className="text-xs tabular-nums text-muted-foreground">
+                            {r.format} · {r.hashtags === 0 ? "No hashtags" : r.hashtags === 1 ? "1 hashtag" : `${r.hashtags} hashtags`}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <ul className="mt-3 space-y-1.5" aria-label="Where it's going">
+                  {rows.map((r) => (
+                    <li key={r.platform} className="flex min-w-0 items-center gap-2 text-sm">
+                      <PlatformOrb platform={r.platform} size={22} />
+                      <span className="shrink-0 font-medium">{PLATFORM_META[r.platform].name}</span>
+                      <span className="min-w-0 truncate text-muted-foreground">
+                        {[PLATFORM_META[r.platform].format, r.handle ?? "Not connected"].join(" · ")}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
                 {p.status}
               </p>
@@ -374,17 +403,45 @@ export function LaunchPanel(p: Props) {
   );
 }
 
-export function ScheduledView({ when, tz, poster, onAnother }: { when: string; tz: string; poster: string | null; onAnother: () => void }) {
+/**
+ * P4: the booked screen after Schedule. It only says "on the calendar" when the server returned the post as
+ * scheduled with a time. It shows the time in the creator's own time zone, where it is going, a link that opens
+ * the calendar on that day with this post open, and the way back to Create for the next one.
+ */
+export function ScheduledView({ post, when, tz, poster, onAnother }: { post?: PostView | null; when: string; tz: string; poster: string | null; onAnother: () => void }) {
+  // `when` alone is the pre-P4 call (the launch reply's time); pass `post` and only a confirmed booking counts.
+  const at = post ? (post.status === "scheduled" ? post.scheduledAt : null) : when;
+  const where = (post?.targets ?? []).map((t) => PLATFORM_META[t.platform].name);
+  const whereText = where.length > 1 ? `${where.slice(0, -1).join(", ")} and ${where[where.length - 1]}` : (where[0] ?? "");
+  if (!at)
+    return (
+      <div className="mx-auto flex max-w-xl flex-col items-center py-10 text-center">
+        <Pip size={84} mood="sad" />
+        <h2 className="display mt-6 text-[clamp(2rem,5vw,3rem)]">We couldn&apos;t confirm the booking.</h2>
+        <p className="mt-4 text-lg text-muted-foreground">Nothing is booked until the calendar shows it. Open Content to see where this post stands.</p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <Button asChild variant="primary" size="lg">
+            <Link href="/content">
+              <LayoutGrid className="h-5 w-5" aria-hidden="true" /> Open Content
+            </Link>
+          </Button>
+          <Button variant="subtle" size="lg" onClick={onAnother}>
+            <Plus className="h-5 w-5" aria-hidden="true" /> Create another
+          </Button>
+        </div>
+      </div>
+    );
+  const zone = tzShort(tz);
   return (
-    <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="mx-auto flex max-w-xl flex-col items-center py-10 text-center">
-      <motion.div initial={{ rotate: -8, y: 20 }} animate={{ rotate: -4, y: 0 }} transition={T.card} className="glass-strong relative mb-10 w-52 rounded-[28px] p-3 shadow-[0_40px_80px_-30px_hsl(var(--warning)/0.4)]">
-        <div className="rounded-t-2xl bg-warning px-4 py-2 text-left text-sm font-bold uppercase tracking-wider text-[hsl(var(--lime-foreground))]">{fmt(when, tz, { month: "long" })}</div>
+    <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={T.card} className="mx-auto flex max-w-xl flex-col items-center py-10 text-center">
+      <motion.div initial={{ rotate: -8, y: 20 }} animate={{ rotate: -4, y: 0 }} transition={T.card} className="glass-strong relative mb-10 w-52 rounded-[28px] p-3 shadow-[0_40px_80px_-30px_hsl(var(--warning)/0.4)]" aria-hidden="true">
+        <div className="rounded-t-2xl bg-warning px-4 py-2 text-left text-sm font-bold uppercase tracking-wider text-[hsl(var(--lime-foreground))]">{fmt(at, tz, { month: "long" })}</div>
         <div className="flex items-center gap-3 p-4">
-          <span className="display text-6xl tabular">{fmt(when, tz, { day: "numeric" })}</span>
-          <span className="text-left text-sm text-muted-foreground">
-            {fmt(when, tz, { weekday: "long" })}
+          <span className="display text-6xl tabular-nums">{fmt(at, tz, { day: "numeric" })}</span>
+          <span className="text-left text-sm text-muted-foreground tabular-nums">
+            {fmt(at, tz, { weekday: "long" })}
             <br />
-            {fmt(when, tz, { hour: "numeric", minute: "2-digit" })}
+            {fmt(at, tz, { hour: "numeric", minute: "2-digit" })} {zone}
           </span>
         </div>
         {poster && (
@@ -395,15 +452,17 @@ export function ScheduledView({ when, tz, poster, onAnother }: { when: string; t
       <Icon3D name="schedule" size={88} className="mb-6" />
       <h2 className="display text-[clamp(2.4rem,6vw,4rem)]">It&apos;s on the calendar.</h2>
       <StatusBadge status="scheduled" className="mt-4" />
-      <p className="mt-4 text-lg text-muted-foreground">We&apos;ll send it out {fmt(when, tz, { weekday: "long", hour: "numeric", minute: "2-digit" })} {tzShort(tz)}. Change it any time before then.</p>
+      <p className="mt-4 text-lg text-muted-foreground">
+        We&apos;ll send it{whereText ? ` to ${whereText}` : ""} on <span className="tabular-nums">{fmt(at, tz, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span> {zone}. Change it any time before then.
+      </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Button asChild variant="primary" size="lg">
-          <Link href="/calendar">
-            <CalendarDays className="h-5 w-5" /> See the calendar
+          <Link href={post ? calendarHref(post.id, at, tz) : "/calendar"}>
+            <CalendarDays className="h-5 w-5" aria-hidden="true" /> Open in Calendar
           </Link>
         </Button>
         <Button variant="subtle" size="lg" onClick={onAnother}>
-          <Plus className="h-5 w-5" /> Create another
+          <Plus className="h-5 w-5" aria-hidden="true" /> Create another
         </Button>
       </div>
     </motion.div>

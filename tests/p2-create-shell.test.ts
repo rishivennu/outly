@@ -51,7 +51,8 @@ describe("upload limits from the server", () => {
 });
 
 describe("action bar rules", () => {
-  const base: BarInput = { online: true, hasMedia: true, uploadFailed: false, hasHook: true, ready: true, enabledCount: 2, launching: false, saving: false };
+  // Phase 4: sending lives on Launch only (Steps 1 and 2 have a single Continue), so the send rules are checked there.
+  const base: BarInput = { online: true, hasMedia: true, uploadFailed: false, hasHook: true, ready: true, enabledCount: 2, launching: false, saving: false, step: "launch", targets: ["youtube", "x"] };
   test("all four work when the post is ready", () => {
     const s = barState(base);
     expect([s.save, s.preview, s.schedule, s.publish].every((a) => !a.disabled)).toBe(true);
@@ -104,7 +105,8 @@ describe("workspace wiring", () => {
   });
   test("the bar is one sticky element above the tab bar and the deck does not stack a second", () => {
     const bar = src("components/create/ActionBar.tsx");
-    expect(bar).toContain("sticky bottom-[calc(env(safe-area-inset-bottom)+76px)]");
+    // Phase 4: no tab bar on /create, so the bar sits at the bottom edge over the home indicator.
+    expect(bar).toContain("sticky bottom-[calc(env(safe-area-inset-bottom)+12px)]");
     expect(bar).not.toContain("transition-all");
     // Phase 3 CONTRACT-B: the deck no longer docks its own bar, so the one ActionBar is the only bar.
     expect(ws.match(/<ActionBar/g)?.length).toBe(1);

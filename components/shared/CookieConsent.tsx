@@ -7,6 +7,7 @@ import { Cookie } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { afterWelcome } from "@/lib/pwa-welcome";
+import { markSummaryAnswered, PRIVACY_SUMMARY } from "@/lib/client/privacy-summary";
 
 export const CONSENT_KEY = "outly-consent";
 export type Consent = { v: 1; necessary: true; analytics: boolean; marketing: boolean; at: string };
@@ -50,7 +51,11 @@ const ROWS = [
   { id: "marketing", title: "Marketing", body: "Lets us measure whether our ads work. We never sell your data." },
 ] as const;
 
-/** GDPR/DPDP-style banner: equal-weight Accept and Reject, granular Customize, re-openable from the footer. */
+/**
+ * GDPR/DPDP-style banner: equal-weight Accept and Reject, granular Customize, re-openable from the footer.
+ * Phase 4: it also carries the short data summary, so a first visit meets one surface. Answering it counts as
+ * having seen the summary, and the studio's privacy notice stays away (PrivacyNotice reads markSummaryAnswered).
+ */
 export function CookieBanner() {
   const path = usePathname();
   const [show, setShow] = useState(false);
@@ -75,17 +80,28 @@ export function CookieBanner() {
   }, []);
 
   if (!show || path.startsWith("/admin")) return null;
-  const done = (c: { analytics: boolean; marketing: boolean }) => { save(c); setShow(false); setCustom(false); };
+  const done = (c: { analytics: boolean; marketing: boolean }) => { markSummaryAnswered(); save(c); setShow(false); setCustom(false); };
 
   return (
     <section role="dialog" aria-modal="false" aria-labelledby="cc-title" aria-describedby="cc-body" className={cn("consent-in glass-strong !bg-[hsl(var(--background)/0.96)] fixed inset-x-2 bottom-[max(8px,env(safe-area-inset-bottom))] z-[60] max-h-[calc(100dvh-24px)] overflow-y-auto rounded-[24px] p-4 shadow-2xl sm:inset-x-auto sm:left-5 sm:w-[min(520px,calc(100vw-40px))] sm:p-5", lift && "max-lg:bottom-[calc(env(safe-area-inset-bottom)+74px)]")}>
       <div className="flex items-start gap-3">
         <span className="lime-bg hidden h-10 w-10 shrink-0 place-items-center rounded-2xl sm:grid" aria-hidden><Cookie className="h-5 w-5" /></span>
         <div className="min-w-0">
-          <h2 id="cc-title" className="font-semibold tracking-tight">Cookies, your call</h2>
-          <p id="cc-body" className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
-            We use necessary cookies to run Outlly, including a device id that stops repeat free trials (fraud prevention). With your OK we'd also use analytics to improve it. <Link href="/privacy" className="font-medium text-foreground underline underline-offset-4">Privacy policy</Link>
-          </p>
+          <h2 id="cc-title" className="font-semibold tracking-tight">Your data, your call</h2>
+          <div id="cc-body" className="mt-1 text-[13px] leading-snug text-muted-foreground">
+            <ul className="space-y-1" aria-label="How Outlly handles your data">
+              {PRIVACY_SUMMARY.map((line) => (
+                <li key={line} className="flex gap-2">
+                  <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[hsl(var(--lime))]" />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2">
+              We use necessary cookies to run Outlly, including a device id that stops repeat free trials (fraud prevention). With your OK we&apos;d also use analytics to improve it.
+            </p>
+          </div>
+          <Link href="/privacy" className="mt-1 inline-flex min-h-11 items-center text-[13px] font-medium text-foreground underline underline-offset-4">Read the full policy</Link>
         </div>
       </div>
 
@@ -124,16 +140,16 @@ export function CookieBanner() {
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         {custom ? (
-          <Button size="sm" variant="lime" onClick={() => done(prefs)}>Save choices</Button>
+          <Button size="sm" variant="lime" className="min-h-11" onClick={() => done(prefs)}>Save choices</Button>
         ) : (
           <>
-            <Button size="sm" variant="primary" onClick={() => done({ analytics: true, marketing: true })}>Accept all</Button>
-            <Button size="sm" variant="primary" onClick={() => done({ analytics: false, marketing: false })}>Reject all</Button>
+            <Button size="sm" variant="primary" className="min-h-11" onClick={() => done({ analytics: true, marketing: true })}>Accept all</Button>
+            <Button size="sm" variant="primary" className="min-h-11" onClick={() => done({ analytics: false, marketing: false })}>Reject all</Button>
           </>
         )}
-        <Button size="sm" variant="ghost" aria-expanded={custom} onClick={() => setCustom((c) => !c)}>{custom ? "Back" : "Customize"}</Button>
+        <Button size="sm" variant="ghost" className="min-h-11" aria-expanded={custom} onClick={() => setCustom((c) => !c)}>{custom ? "Back" : "Customize"}</Button>
       </div>
     </section>
   );

@@ -5,6 +5,13 @@ import { FAQS } from "../marketing/content";
 
 export const FAQ_CATEGORIES = ["Payments", "Account", "Publishing", "Technical"] as const;
 
+/** P4: the Music and copyright note on Create links here. Ships by default; also the fallback when the row is missing. */
+export const MUSIC_FAQ = {
+  category: "Publishing",
+  q: "Will music in my video get it muted or flagged?",
+  a: "It can. Instagram and YouTube check the sound in every video against songs that labels and artists own. On Instagram a match can mute the sound, limit who sees the post, or take it down. On YouTube it can bring a copyright claim, which lets the owner block the video or earn from it. Outlly posts the sound already in your file. It can't add music or clear a song for you. Original audio is safest: your own voice, sounds you recorded, or music you made or have a licence for. If a platform mutes a post, it usually stays up without sound. On YouTube you can often remove the claimed song in YouTube Studio. Anywhere else, delete the post and send a version with audio you own. Outlly never mutes or removes anything itself.",
+};
+
 const EXTRA: { category: string; q: string; a: string }[] = [
   { category: "Payments", q: "Which payment methods do you accept?", a: "Cards, UPI and net banking through our payment partner. The exact options appear on the checkout screen and depend on your country." },
   { category: "Payments", q: "Where can I download my invoices?", a: "Open Billing from the sidebar. Every successful payment has a PDF invoice you can download any time, and a copy is emailed to you the moment the payment goes through." },
@@ -15,7 +22,11 @@ const EXTRA: { category: string; q: string; a: string }[] = [
   { category: "Account", q: "How do I change the email on my account?", a: "Email changes need a quick identity check, so ask from this chat and our team will handle it." },
   { category: "Account", q: "How do I delete my account?", a: "Open Settings and find Your data. Choose Delete account and type your account email to confirm. Your uploads, posts and connected accounts are removed and any active plan is cancelled. This can't be undone. To only stop Outlly posting somewhere, disconnect that platform in Accounts instead. You can also download a copy of your data from the same place first." },
   { category: "Technical", q: "My upload is stuck. What can I do?", a: "Check the file is MP4 or MOV and under the size limit of your plan, then retry. Big uploads resume where they left off, so a dropped connection doesn't mean starting over." },
+  MUSIC_FAQ,
 ];
+
+/** Short names a link can use to open one entry (/help?faq=music). Matched on the question, so an admin can edit the answer freely. */
+export const FAQ_ANCHORS: Record<string, string> = { music: MUSIC_FAQ.q };
 
 /** First run: copy the marketing FAQ plus billing/account answers into the editable table. */
 /** One-time, idempotent: FAQ rows seeded before the Outly -> Outlly rename get the new name. */
@@ -57,11 +68,21 @@ async function fixRefundAnswer() {
   if (answer) await db.faqItem.updateMany({ where: { answer: OLD_REFUND }, data: { answer } });
 }
 
+/** P4: tables seeded before the music entry existed get it once. If an admin deletes it later, it stays deleted. */
+async function addMusicFaq() {
+  if (await db.setting.findUnique({ where: { key: "migrate:faq-music-p4" }, select: { key: true } })) return;
+  const won = await db.setting.create({ data: { key: "migrate:faq-music-p4", value: new Date().toISOString() } }).then(() => true, () => false);
+  if (!won) return;
+  if (await db.faqItem.findFirst({ where: { question: MUSIC_FAQ.q }, select: { id: true } })) return;
+  await db.faqItem.create({ data: { category: MUSIC_FAQ.category, question: MUSIC_FAQ.q, answer: MUSIC_FAQ.a, sortOrder: 200 } });
+}
+
 export async function ensureFaq() {
   if ((await db.faqItem.count()) > 0) {
     await renameBrandInFaq();
     await fixDeleteAnswer();
     await fixRefundAnswer();
+    await addMusicFaq();
     return fixDeleteAnswer1016();
   }
   // a unique-key lock row: if two processes race (parallel build workers), only one seeds

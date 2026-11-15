@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/Toast";
-import { deleteCopy, isFailedPost } from "@/lib/client/failed-posts";
+import { deleteCopy, isFailedPost, platformReason } from "@/lib/client/failed-posts";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, BarChart3, Bell, BellOff, Check, ChevronDown, ExternalLink, LayoutGrid, Link2, Plus, RefreshCw, Square, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,7 @@ import {
 import { DancingPip, MusicToggle, useGroove } from "./Groove";
 import type { PostView, TargetView } from "./types";
 import { T, ease } from "@/lib/motion/tokens";
-import { liveSummary, platformFormatLabel, postWords } from "@/lib/client/post-words";
+import { liveSummary, platformFormatLabel, postWords, sendOutcome } from "@/lib/client/post-words";
 
 /**
  * "Sending it out", styled as a Live Activity (10-16f: columns, side by side; a lone card sits in the middle).
@@ -228,21 +228,28 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
   };
 
   const published = post.targets.filter((t) => t.status === "published");
+  const realLive = published.filter((t) => !t.practice);
+  const rehearsed = published.filter((t) => t.practice);
   const failed = post.targets.filter((t) => t.status === "failed");
   const stopped = failed.filter((t) => t.errorCode === "CANCELED");
-  const allLive = !active && published.length === post.targets.length;
-  const allStopped = !active && stopped.length === post.targets.length;
-  const headline = active ? "Sending it out" : allLive ? "You're live." : allStopped ? "Stopped. Nothing went out." : published.length ? "Almost everywhere." : "Something got in the way.";
+  // P4: the headline is only ever what the server confirmed, and a practice account never counts as live.
+  const out = sendOutcome(post.targets, active);
+  const allLive = out.allLive;
+  const allStopped = !active && post.targets.length > 0 && stopped.length === post.targets.length;
+  const names = (ts: TargetView[]) => ts.map((t) => PLATFORM_META[t.platform].name).join(" and ");
+  const headline = active ? "Sending it out" : out.allPractice ? "Practice run done." : out.allDone ? "You're live." : allStopped ? "Stopped. Nothing went out." : realLive.length ? "Almost everywhere." : "Something got in the way.";
   const sub = active
     ? "Each platform moves at its own pace. You can leave this page; we'll keep going."
-    : allLive
-      ? `Out on ${published.map((t) => PLATFORM_META[t.platform].name).join(" and ")}. ${post.format === "story" ? "It's up for the next 24 hours." : "Go say hi in the comments."}`
+    : out.allPractice
+      ? `${names(rehearsed)} ${rehearsed.length === 1 ? "is a practice account" : "are practice accounts"}, so nothing was posted for real.`
+      : out.allDone
+      ? `Out on ${names(realLive)}. ${rehearsed.length ? `${names(rehearsed)} was a practice run, so nothing was posted there.` : post.format === "story" ? "It's up for the next 24 hours." : "Go say hi in the comments."}`
       : allStopped
         ? "You stopped every upload. Send any of them again whenever you're ready."
         : published.length
           ? `${failed.length === 1 ? "One place needs" : "A couple of places need"} a hand. Everything else is live.`
           : "Nothing went out yet. Each card says what happened and how to fix it.";
-  const summary = allLive || active ? `${published.length} of ${post.targets.length} live` : `${published.length} live, ${failed.length} to fix`;
+  const summary = `${out.allDone || active ? `${realLive.length} of ${post.targets.length} live` : `${realLive.length} live, ${failed.length} to fix`}${rehearsed.length ? `, ${rehearsed.length} practice` : ""}`;
 
   const act = async (key: string, path: string) => {
     setBusy(key);
@@ -290,8 +297,13 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
             We can&apos;t reach Outlly right now to check on this. The send keeps going on our side, and this page catches up once we&apos;re back.
           </p>
         )}
+        {pollDead && active && (
+          <p role="status" className="mx-auto mb-4 max-w-md rounded-2xl px-4 py-2.5 text-[13px] leading-snug text-muted-foreground glass hairline">
+            This page can&apos;t check on the send any more. Open <Link href="/content" className="font-semibold text-foreground underline underline-offset-4">Content</Link> to see where it stands.
+          </p>
+        )}
         <div className="mb-3 flex h-[104px] items-end justify-center">
-          {active ? <DancingPip size={92} /> : <Pip size={92} mood={allLive ? "happy" : "sad"} />}
+          {active ? <DancingPip size={92} /> : <Pip size={92} mood={out.allDone ? "happy" : "sad"} />}
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2">
           <p className="pub-eyebrow inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]">
@@ -400,8 +412,10 @@ function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, can
   /** The bar is the steps really finished, or the measured upload figure on the step that has one. */
   const fill = pct !== null && step.state === "uploading" ? Math.round(((step.index + pct / 100) / step.total) * 100) : Math.round(step.fraction * 100);
   const canStop = STOPPABLE.includes(t.status as TargetStatus);
-  const live = t.status === "published";
+  const practice = t.status === "published" && !!t.practice;
+  const live = t.status === "published" && !practice;
   const bad = t.status === "failed";
+  const reason = bad && !canceled ? platformReason(t.errorDetail) : null;
   const fc = firstCommentLine(t);
   const cv = coverLine(t, !!post.coverUrl);
   const returnTo = encodeURIComponent(`/create?post=${post.id}`);
@@ -411,8 +425,10 @@ function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, can
   const kindLabel = platformFormatLabel(meta.format, post.format);
   // A video post shows its frame here; slide posts already fan their own photos above.
   const thumb = slideish ? null : post.media.thumbnailUrl;
-  const title = canceled ? "Stopped" : liveLabel(t, post.status);
-  const statusLine = canceled
+  const title = canceled ? "Stopped" : practice ? "Practice run" : liveLabel(t, post.status);
+  const statusLine = practice
+    ? `A practice account. Nothing was posted on ${meta.name}.`
+    : canceled
     ? `You stopped this one before it reached ${meta.name}.`
     : h
       ? h.title
@@ -421,7 +437,9 @@ function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, can
         : live && words.format === "story"
           ? "It's up. Stories stay for 24 hours."
           : (ROW_COPY[t.status] ?? TARGET_COPY[t.status as TargetStatus] ?? t.status);
-  const accent = live
+  const accent = practice
+    ? "Not posted for real"
+    : live
     ? "Live now"
     : canceled
       ? "Send it again anytime"
@@ -488,6 +506,7 @@ function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, can
       <div className="la-box relative mt-4 flex min-h-[7.75rem] flex-col justify-center rounded-[1.25rem] p-4 pr-16">
         <p className="text-lg font-semibold leading-tight">{title}</p>
         <p className="mt-1 text-sm leading-snug text-white/65">{statusLine}</p>
+        {reason && reason !== statusLine && <p className="mt-1 break-words text-[13px] leading-snug text-white/80">Reason: {reason}</p>}
         <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
           <span className={cn("text-xs font-bold uppercase tracking-[0.1em]", bad && !canceled ? "text-[#ff8a80]" : "text-[hsl(var(--lime))]")}>{accent}</span>
           {seen && <span className="text-xs font-semibold text-white/45">{seen}</span>}
@@ -503,11 +522,7 @@ function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, can
           </p>
         )}
         <span className="absolute right-3 top-3">
-          {live && t.url ? (
-            <a href={t.url} target="_blank" rel="noopener noreferrer" className="la-round" aria-label={`See it on ${meta.name} (opens in a new tab)`}>
-              <ExternalLink className="h-4 w-4" aria-hidden="true" />
-            </a>
-          ) : bad && h?.kind !== "reconnect" && canRetry ? (
+          {bad && h?.kind !== "reconnect" && canRetry ? (
             <button type="button" onClick={onRetry} disabled={busy} className="la-round" aria-label={`${canceled ? "Send it again" : (h?.action ?? "Try again")} on ${meta.name}`}>
               <RefreshCw className={cn("h-4 w-4", busy && "animate-spin")} aria-hidden="true" />
             </button>
@@ -531,14 +546,14 @@ function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, can
         aria-valuetext={`${meta.name}: ${canceled ? "stopped by you" : step.stalled ? "stopped, needs a hand" : pct === null ? stepText(step) : `${pct} percent uploaded, ${stepText(step)}`}`}
       >
         <div className={cn("la-fill absolute inset-0 rounded-full", isActive && !reduce && "la-fill-anim")} style={{ ["--p" as string]: `max(3.5rem, ${fill}%)` }}>
-          {live && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-[hsl(var(--lime-foreground))]">Landed</span>}
+          {t.status === "published" && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-[hsl(var(--lime-foreground))]">{practice ? "Practice" : "Landed"}</span>}
         </div>
         <span className="la-rider" style={{ ["--p" as string]: `max(3.5rem, ${fill}%)` }} aria-hidden="true">
           <span className="absolute right-1.5 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center">
             <OutlyMark variant="ink" size={26} className={cn("la-rocket", isActive && !reduce && "la-rocket-anim")} />
           </span>
         </span>
-        {!live && (
+        {t.status !== "published" && (
           <span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold tabular-nums text-white/60">
             {bad ? "STOPPED" : pct === null ? `STEP ${step.stepNumber}/${step.total}` : `${pct}%`}
           </span>
@@ -554,8 +569,17 @@ function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, can
         ))}
       </ol>
 
-      {(canStop || h?.kind === "reconnect" || (bad && !canceled)) && (
+      {(canStop || live || h?.kind === "reconnect" || (bad && !canceled)) && (
         <div className="relative mt-4 space-y-1">
+          {live &&
+            (t.url ? (
+              <a href={t.url} target="_blank" rel="noopener noreferrer" className="la-pill">
+                See it on {meta.name} <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            ) : (
+              <p className="text-xs leading-snug text-white/65">{meta.name} didn&apos;t send us a link to it. It&apos;s on your {meta.name} profile.</p>
+            ))}
           {canStop && (
             <button type="button" onClick={onStop} disabled={busy} className="la-pill la-pill-ghost">
               <Square className="h-3.5 w-3.5 fill-current" aria-hidden="true" /> {busy ? "Stopping" : "Stop this upload"}
@@ -617,11 +641,11 @@ function WhatHappened({ post }: { post: PostView }) {
   const rows = post.targets.map((t) => {
     const meta = PLATFORM_META[t.platform];
     const canceled = t.status === "failed" && t.errorCode === "CANCELED";
-    const result = t.status === "published" ? "Live" : canceled ? "Stopped by you" : t.status === "failed" ? "Needs a hand" : "Not sent";
+    const result = t.status === "published" ? (t.practice ? "Practice run, not posted" : "Live") : canceled ? "Stopped by you" : t.status === "failed" ? "Needs a hand" : "Not sent";
     const why = t.status === "failed" && !canceled ? targetErrorCopy(t.platform, t.errorCode).title : null;
     return { t, meta, result, why };
   });
-  const live = rows.filter((r) => r.t.status === "published");
+  const live = rows.filter((r) => r.t.status === "published" && !r.t.practice);
   return (
     <section aria-labelledby="what-happened" className="la-card la-themed relative mx-auto mt-8 max-w-[56rem] overflow-hidden rounded-[2rem] p-5 sm:p-6">
       <span className="la-grid" aria-hidden="true" />
@@ -646,14 +670,14 @@ function WhatHappened({ post }: { post: PostView }) {
               <p className="font-semibold leading-tight">
                 {meta.name} <span className="la-mute text-xs font-medium">{platformFormatLabel(meta.format, post.format)}</span>
               </p>
-              <p className={cn("mt-0.5 text-sm leading-snug", t.status === "published" ? "la-accent" : t.status === "failed" && t.errorCode !== "CANCELED" ? "la-warn" : "la-mute")}>
+              <p className={cn("mt-0.5 text-sm leading-snug", t.status === "published" && !t.practice ? "la-accent" : t.status === "failed" && t.errorCode !== "CANCELED" ? "la-warn" : "la-mute")}>
                 {result}
                 {why && <span className="la-mute">. {why}</span>}
               </p>
               {t.status === "published" && firstCommentLine(t) && <p className="la-mute mt-0.5 text-[13px] leading-snug">{firstCommentLine(t)!.text}</p>}
               {coverLine(t, !!post.coverUrl) && <p className="la-mute mt-0.5 text-[13px] leading-snug">{coverLine(t, !!post.coverUrl)!.text}</p>}
             </div>
-            {t.status === "published" && t.url && (
+            {t.status === "published" && !t.practice && t.url && (
               <a href={t.url} target="_blank" rel="noopener noreferrer" className="la-round" aria-label={`Open the post on ${meta.name} (opens in a new tab)`}>
                 <ExternalLink className="h-4 w-4" aria-hidden="true" />
               </a>

@@ -1,5 +1,5 @@
-import { blocking, checksFor, type Draft } from "@/lib/client/checks";
-import { PLATFORMS, type Platform } from "@/lib/domain";
+import { blocking, checksFor, composedCopy, countHashtags, type Draft } from "@/lib/client/checks";
+import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
 
 type Drafts = Record<Platform, Draft>;
 type Media = { duration?: number | null; width?: number | null; height?: number | null } | null;
@@ -100,5 +100,22 @@ export function confirmRows(drafts: Drafts, accounts: RowAccounts, media: Media,
     const held = hold.find((h) => h.platform === p);
     const warnings = checksFor(p, drafts[p], media).filter((c) => c.level === "warning").map((c) => c.text);
     return { platform: p, handle: a?.username ? `@${a.username.replace(/^@/, "")}` : null, sending: !held, reason: held?.reason ?? null, warnings, practice: !!a?.mock };
+  });
+}
+
+export type DiffRow = { platform: Platform; format: string; firstLine: string; hashtags: number };
+
+/**
+ * Phase 4 (11): what each place really gets, side by side, so "Publish to 2 platforms" is never blind. The first
+ * line is what a scroller sees first: YouTube's title, every other place's caption. Hashtags count what the
+ * publisher sends (the field joined to the words; X has no field). Empty for one place: nothing to compare.
+ */
+export function diffRows(drafts: Drafts, platforms: readonly Platform[]): DiffRow[] {
+  if (platforms.length < 2) return [];
+  return platforms.map((p) => {
+    const d = drafts[p];
+    const words = p === "youtube" ? d.title.trim() || d.description : d.caption;
+    const firstLine = words.split("\n").map((l) => l.trim()).find(Boolean) ?? "";
+    return { platform: p, format: PLATFORM_META[p].format, firstLine, hashtags: countHashtags(composedCopy(p, d)) };
   });
 }

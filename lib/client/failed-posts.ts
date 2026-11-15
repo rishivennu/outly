@@ -32,3 +32,19 @@ export async function deletePosts(ids: string[], del: (id: string) => Promise<un
   }
   return { done, failed };
 }
+
+/**
+ * P4: the platform's own words for a failure, short enough for a card. The publishers store the raw reply
+ * (sometimes JSON, sometimes "HTTP 400: ..."); this keeps the human sentence and drops the noise. Null when
+ * there is nothing a person could use, so the card shows only our plain explanation.
+ */
+export function platformReason(detail: string | null | undefined, max = 160): string | null {
+  let s = (detail ?? "").trim();
+  if (!s) return null;
+  const msg = s.match(/"(?:message|error_description|error_user_msg|error_message|detail|title)"\s*:\s*"((?:[^"\\]|\\.)+)"/);
+  if (msg) s = msg[1].replace(/\\(["\\/])/g, "$1").replace(/\\n/g, " ");
+  s = s.replace(/^(?:HTTP\s*)?\d{3}\s*[:\-]\s*/i, "").split("\n").find((l) => l.trim()) ?? "";
+  s = s.replace(/\s+/g, " ").trim();
+  if (!/[a-z]{3}/i.test(s) || /^[{[<]/.test(s) || /\bat\s+\S+\s*\(.*:\d+:\d+\)/.test(s)) return null;
+  return s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s;
+}

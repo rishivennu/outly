@@ -355,7 +355,7 @@ Spaced over the days ahead, one a day where they fit. {plan.reason}
                         <Label htmlFor={`c-${r.key}`} className="sr-only">Caption for video {i + 1}</Label>
                         <Textarea id={`c-${r.key}`} rows={2} value={r.caption} maxLength={5000} onChange={(e) => patch(r.key, { caption: e.target.value })} placeholder="Caption (optional)" />
                         <div className="flex flex-wrap items-center gap-2">
-                          <Button variant={editing === r.key ? "primary" : "subtle"} size="sm" onClick={() => setEditing(editing === r.key ? null : r.key)} aria-expanded={editing === r.key} disabled={!r.at}>
+                          <Button variant={editing === r.key ? "primary" : "subtle"} size="sm" className="min-h-11" onClick={() => setEditing(editing === r.key ? null : r.key)} aria-expanded={editing === r.key} disabled={!r.at}>
                             <CalendarClock className="h-4 w-4" /> {r.at ? when(r.at) : "Finding a time…"}
                           </Button>
                           {r.pinned && (
@@ -365,7 +365,7 @@ Spaced over the days ahead, one a day where they fit. {plan.reason}
                           )}
                           {r.state === "uploading" && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Uploading" />}
                           {r.state === "failed" && (
-                            <Button variant="danger" size="sm" onClick={() => patch(r.key, { state: "waiting" })}>
+                            <Button variant="danger" size="sm" className="min-h-11" onClick={() => patch(r.key, { state: "waiting" })}>
                               <RotateCcw className="h-4 w-4" /> Try again
                             </Button>
                           )}

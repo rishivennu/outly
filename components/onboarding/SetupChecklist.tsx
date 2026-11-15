@@ -122,7 +122,7 @@ export function SetupChecklist({ onboarding }: { onboarding: OnboardingPayload }
   const action = (id: string, skipped: boolean) => {
     if (guided.some((g) => g.id === id))
       return (
-        <Button size="sm" variant={skipped ? "outline" : "primary"} onClick={() => openOnboarding(id as OnboardingStepId)}>
+        <Button size="sm" variant={skipped ? "outline" : "primary"} className="min-h-11" onClick={() => openOnboarding(id as OnboardingStepId)}>
           {skipped ? "Pick it up again" : id === "welcome" ? "Start" : "Open this step"} <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Button>
       );
@@ -132,6 +132,7 @@ export function SetupChecklist({ onboarding }: { onboarding: OnboardingPayload }
           <Button
             size="sm"
             variant="outline"
+            className="min-h-11"
             disabled={installing}
             onClick={async () => {
               const w = window as Window & { __outllyInstall?: { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> } | null };
@@ -161,7 +162,7 @@ export function SetupChecklist({ onboarding }: { onboarding: OnboardingPayload }
     }
     if (id === "notify")
       return (
-        <Button asChild size="sm" variant={device?.perm === "denied" ? "outline" : "primary"}>
+        <Button asChild size="sm" variant={device?.perm === "denied" ? "outline" : "primary"} className="min-h-11">
           <Link href="/settings/notifications#nf-device">
             <BellRing className="h-4 w-4" aria-hidden="true" /> {device?.perm === "denied" ? "See how to unblock them" : "Turn on notifications"}
           </Link>

@@ -34,7 +34,7 @@ export function SaveDraft({ state, at, onSave, busy, className, hideButton, sync
         </p>
       )}
       {state === "error" && (
-        <Button variant="ghost" size="sm" onClick={onSave}>
+        <Button variant="ghost" size="sm" className="min-h-11" onClick={onSave}>
           <RotateCcw className="h-4 w-4" /> Retry
         </Button>
       )}

@@ -7,7 +7,8 @@ import type { Stop } from "./Spotlight";
  * intro shows as a single centred card instead.
  */
 
-export type Guide = { page: string; name: string; intro: string; stops: Stop[] };
+/** `after`: a selector that must be on screen before the tips may start (Phase 4: Create waits for the first upload). */
+export type Guide = { page: string; name: string; intro: string; stops: Stop[]; after?: string };
 
 export const GUIDES: Record<string, Guide> = {
   "/home": {
@@ -26,10 +27,12 @@ export const GUIDES: Record<string, Guide> = {
     page: "create",
     name: "Create",
     intro: "Create turns one video into a post for every platform, in four steps.",
+    // Never over Step 1: the tips wait until the first upload has landed on Step 2.
+    after: "[data-tips-ready]",
     stops: [
       { target: 'nav[aria-label="Your journey"]', title: "Four steps", body: "Video, story, everywhere, launch. You can jump back to any step you've reached." },
-      { target: '[data-guide="create-upload"]', title: "Drop your video", body: "MP4 or MOV, up to 50 MB. Your work saves as you go." },
       { target: 'aside[aria-label="AI assistant"]', title: "Your assistant", body: "Ask it for a hook, a caption or hashtags while you work." },
+      { target: '[aria-label="Post actions"]', title: "One next step", body: "The lit button moves you on. Your work saves as you go." },
     ],
   },
   "/content": {
@@ -143,6 +146,20 @@ export function resetGuides(userId: string) {
 }
 
 /** The stops that can point at something right now, at most four; else one centred intro card. */
+/** The page is ready for its tips: nothing to wait for, or the `after` element is on screen. */
+export function guideReady(g: Guide, has: (selector: string) => boolean) {
+  return !g.after || has(g.after);
+}
+
+/**
+ * Seconds of calm so far: reset by anything else on screen or a page not ready yet. Tips start at 2, so they
+ * never open in the same moment another overlay closes.
+ */
+export const CALM_TICKS = 2;
+export function calmTick(calm: number, busy: boolean, ready: boolean) {
+  return busy || !ready ? 0 : calm + 1;
+}
+
 export function presentStops(g: Guide, has: (target: string) => boolean): Stop[] {
   const found = g.stops.filter((s) => !s.target || has(s.target)).slice(0, MAX_STOPS);
   return found.length ? found : [{ title: g.name, body: g.intro }];
