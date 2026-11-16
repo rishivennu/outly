@@ -32,7 +32,7 @@ import { SaveDraft } from "./SaveDraft";
 import { autosaveLine, draftTitle, enabledPlatforms, launchGate, launchPlan, scheduleProblem, targetPayload } from "./publish";
 import { CaptionBurner } from "./CaptionBurner";
 import { CaptionRunProvider, useCaptionBurning, useCaptionRunLine, useCaptionWorkspace } from "./captions/CaptionRun";
-import { readVideo } from "./frame";
+import { readFrames, readVideo } from "./frame";
 import { primeGroove } from "./Groove";
 import { DeviceDrafts } from "./DeviceDrafts";
 import { ActionBar, barState, BURN_SEND, PreviewSheet, type BarId } from "./ActionBar";
@@ -43,7 +43,7 @@ import { classifySyncError } from "@/lib/client/draft-sync-core";
 import { useUser } from "@/components/shell/UserContext";
 import { SyncStatus } from "./SyncStatus";
 import { ConflictDialog } from "./ConflictDialog";
-import { emptyDraft, NOTES, type AccountView, type Draft, type Hook, type HookResult, type HooksState, NO_HOOKS, type MediaView, type PlatformCopy, type PostView, type Step, type Tone, type UploadState } from "./types";
+import { emptyDraft, NOTES, type AccountView, type Draft, type Hook, type HookResult, type HooksState, NO_HOOKS, NO_WATCH, type MediaView, type PlatformCopy, type PostView, type Step, type Tone, type UploadState, type WatchState } from "./types";
 import { T } from "@/lib/motion/tokens";
 
 interface Props {
@@ -119,6 +119,13 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const seen = useRef<string[]>([]);
   // One writer at a time: asking again cancels the answer still coming (no stale hooks landing late).
   const hooksAbort = useRef<AbortController | null>(null);
+  /* 1160: Pip watches the video as soon as it is added (frames read here from the file, so it does not wait on the
+     upload) and offers the story; the creator uses it, edits it, or just types their own. Nothing is ever put in
+     the box without a tap. */
+  const [watch, setWatch] = useState<WatchState>(NO_WATCH);
+  const watchAbort = useRef<AbortController | null>(null);
+  const submittedRef = useRef<string | null>(null);
+  submittedRef.current = submittedStory;
   const copyAbort = useRef(new Map<string, AbortController>());
   const [copyWriting, setCopyWriting] = useState<Platform[]>([]);
   const [hook, setHook] = useState<string | null>(initialPost?.hook ?? null);
@@ -247,6 +254,33 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const poster = localPoster ?? media?.thumbnailUrl ?? null;
   const hasMedia = !!(media || localUrl);
 
+  /* ================= Pip watches the video (1160) ================= */
+  const watchVideo = useCallback(async (url: string) => {
+    watchAbort.current?.abort();
+    const ctrl = new AbortController();
+    watchAbort.current = ctrl;
+    setWatch({ kind: "watching" });
+    try {
+      const { frames, duration } = await readFrames(url, 4, ctrl.signal);
+      if (ctrl.signal.aborted) return;
+      if (!frames.length) return setWatch(NO_WATCH);
+      const heard = captionsRef.current?.cues.map((c) => c.text.trim()).filter(Boolean).join("\n") || undefined;
+      const r = await api<{ story?: string; skipped?: string }>("/api/ai/video-caption", { method: "POST", json: { frames, duration, transcript: heard, auto: true }, signal: ctrl.signal });
+      if (ctrl.signal.aborted) return;
+      if (r.skipped || !r.story?.trim()) return setWatch(NO_WATCH);
+      setWatch({ kind: "ready", story: r.story.trim() });
+    } catch {
+      if (!ctrl.signal.aborted) setWatch(NO_WATCH); // the creator can always tell the story themselves
+    } finally {
+      if (watchAbort.current === ctrl) watchAbort.current = null;
+    }
+  }, []);
+  const stopWatching = useCallback(() => {
+    watchAbort.current?.abort();
+    watchAbort.current = null;
+    setWatch(NO_WATCH);
+  }, []);
+
   /* ================= upload ================= */
   const startUpload = useCallback(
     async (file: File, objectUrl?: string) => {
@@ -263,6 +297,9 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
       setLocalUrl((old) => (old && old !== url && URL.revokeObjectURL(old), url));
       setUpload({ kind: "uploading", progress: 0 });
       setStep((s) => (s === "video" ? "story" : s));
+      // A story already sent stays the creator's; Pip only watches when the story is still to be told.
+      if (submittedRef.current === null) void watchVideo(url);
+      else stopWatching();
 
       readVideo(url)
         .then((m) => {
@@ -326,6 +363,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   const cancelUpload = useCallback(() => {
     uploadAbort.current?.abort();
     uploadAbort.current = null;
+    stopWatching();
     mediaReady.current = null;
     uploadFail.current = null;
     fileRef.current = null;
@@ -596,12 +634,21 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
     [story, submittedStory, editedOriginal],
   );
 
-  const submitStory = () => {
-    const s = story.trim();
+  const submitText = (s: string) => {
+    stopWatching(); // the creator told it themselves; Pip's take is no longer needed
     setSubmittedStory(s);
     setEditedOriginal(null); // a new story gets a new Original to read
     seen.current = [];
     fetchHooks("default", [], s);
+  };
+  const submitStory = () => submitText(story.trim());
+  /** 1160: Pip's story, taken as is (and sent on to the hook writer) or put in the box to edit first. */
+  const useWatched = (edit: boolean) => {
+    if (watch.kind !== "ready") return;
+    const s = watch.story;
+    setStory(s);
+    setWatch(NO_WATCH);
+    if (!edit) submitText(s);
   };
 
   const tryAnother = () => {
@@ -901,6 +948,8 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
       onStory={setStory}
       submittedStory={submittedStory}
       onSubmitStory={submitStory}
+      watch={watch}
+      onUseWatched={useWatched}
       onEditStory={() => {
         setSubmittedStory(null);
         setEditedOriginal(null);

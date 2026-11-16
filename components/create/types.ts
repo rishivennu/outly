@@ -34,6 +34,10 @@ export interface PlatformCopy {
 }
 export type Tone = "default" | "punchier" | "professional" | "genz";
 
+/** 1160: the assistant watching the video and writing the story for the creator to use or edit. */
+export type WatchState = { kind: "idle" } | { kind: "watching" } | { kind: "ready"; story: string };
+export const NO_WATCH: WatchState = { kind: "idle" };
+
 /** The hook writer's state. `more` = hooks are still arriving; `status` = what it is doing right now. */
 export type HooksState = { loading: boolean; more: boolean; status: string; result: HookResult | null; index: number; tone: Tone; error: string | null };
 export const NO_HOOKS: HooksState = { loading: false, more: false, status: "", result: null, index: 0, tone: "default", error: null };

@@ -87,8 +87,8 @@ export function MobileNav() {
   const path = usePathname();
   const tabs = TABS.map((h) => MAIN.find((m) => m.href === h)!);
   const tucked = useTuckOnScroll(path);
-  // Phase 4: /create has its own bottom bar (the post actions), so the tab bar steps aside there. The studio
-  // layout drops the room it keeps for the bar (data-tabbar-off below), and the top bar's menu still has every page.
+  // A page may opt out of the tab bar (lib/client/tab-bar.ts; none does since 11-16, /create's post actions bar
+  // now sits above the tabs). The studio layout then drops the room it keeps for the bar (data-tabbar-off below).
   const off = hidesTabBar(path);
   const hidden = tucked && !off;
   // 1154: Pip (ChatWidget .pc-dock) tucks away with the bar, so it never floats alone over the content.

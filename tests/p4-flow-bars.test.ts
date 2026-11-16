@@ -124,12 +124,15 @@ describe("item 1: one first-visit surface", () => {
   });
 });
 
-describe("item 5: no tab bar under the Create bar on phones", () => {
-  test("only /create hides it", () => {
-    expect(hidesTabBar("/create")).toBe(true);
-    expect(hidesTabBar("/create/")).toBe(true);
-    expect(hidesTabBar("/create?draft=1")).toBe(true);
-    for (const p of ["/create/bulk", "/home", "/inbox", "/creator", null, undefined, ""]) expect(hidesTabBar(p)).toBe(false);
+describe("item 5 (changed 11-16): the tab bar shows on /create too, the Create bar sits above it", () => {
+  test("no page hides the tab bar", () => {
+    for (const p of ["/create", "/create/", "/create?draft=1", "/create/bulk", "/home", "/inbox", "/creator", null, undefined, ""]) expect(hidesTabBar(p)).toBe(false);
+  });
+  test("the post actions bar clears the tab bar on phones and follows it when it tucks", () => {
+    const bar = src("components/create/ActionBar.tsx");
+    expect(bar).toContain("sticky bottom-[calc(env(safe-area-inset-bottom)+74px)]");
+    expect(bar).toContain("[html[data-tabs-tucked]_&]:bottom-[calc(env(safe-area-inset-bottom)+12px)]");
+    expect(bar).toContain("lg:bottom-4");
   });
   test("the drawer lists the tab pages where the bar is hidden", async () => {
     const { drawerItems } = await import("../components/shell/MobileDrawer");
@@ -137,7 +140,7 @@ describe("item 5: no tab bar under the Create bar on phones", () => {
     for (const h of TAB_PAGES) expect(hrefs).toContain(h);
     expect(drawerItems(false).map((i) => i.href).some((h) => (TAB_PAGES as readonly string[]).includes(h))).toBe(false);
   });
-  test("the shell drops the tab bar room on /create and the bar sits on the safe area", () => {
+  test("the opt-out path is still wired for a page that needs it", () => {
     const nav = src("components/shell/Nav.tsx");
     expect(nav).toContain("const off = hidesTabBar(path);");
     expect(nav).toContain('if (off) return <span hidden data-tabbar-off="" />;');

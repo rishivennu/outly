@@ -161,13 +161,14 @@ const ICON: Record<BarId, typeof Save> = { save: Save, preview: Eye, schedule: C
 
 /**
  * The one set of post actions on every step, in one compact bar. Sticky in the page flow (not fixed), so the
- * end of the page always scrolls clear of it. Phase 4: the shell hides its tab bar on /create, so on phones the
- * bar sits at the bottom edge over the home indicator, and the assistant drawer opens over it.
+ * end of the page always scrolls clear of it. 11-16: on phones it sits 12px above the shell's tab bar (62px plus the
+ * safe area) and follows the bar down when that tucks away on a long scroll (html[data-tabs-tucked], Nav.tsx), so the
+ * two never stack and never leave a gap. The assistant drawer opens over both.
  */
 export function ActionBar({ state, saveLabel, mode, onAction, className }: Props) {
   const btn = "h-auto min-h-[52px] min-w-0 flex-col gap-0.5 px-1 text-xs font-semibold sm:min-h-11 sm:flex-row sm:gap-2 sm:px-4 sm:text-sm";
   return (
-    <div role="region" aria-label="Post actions" className={cn("sticky bottom-[calc(env(safe-area-inset-bottom)+12px)] z-30 mt-6 lg:bottom-4", className)}>
+    <div role="region" aria-label="Post actions" className={cn("sticky bottom-[calc(env(safe-area-inset-bottom)+74px)] z-30 mt-6 transition-[bottom] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none [html[data-tabs-tucked]_&]:bottom-[calc(env(safe-area-inset-bottom)+12px)] lg:bottom-4", className)}>
       <div className="glass-strong mx-auto w-full max-w-3xl rounded-[22px] p-1.5 shadow-[0_18px_40px_-24px_hsl(var(--foreground)/0.45)] hairline">
         {state.note && (
           <p id="bar-note" className="px-2.5 pb-1.5 pt-1 text-xs leading-snug text-muted-foreground" aria-live="polite">
