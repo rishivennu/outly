@@ -135,6 +135,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
      the box without a tap. */
   const [watch, setWatch] = useState<WatchState>(NO_WATCH);
   const watchAbort = useRef<AbortController | null>(null);
+  /** The video Pip last watched (or tried to), so a failed watch can be asked again. */
+  const watchUrl = useRef<string | null>(null);
   const submittedRef = useRef<string | null>(null);
   submittedRef.current = submittedStory;
   const copyAbort = useRef(new Map<string, AbortController>());
@@ -315,6 +317,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     watchAbort.current?.abort();
     const ctrl = new AbortController();
     watchAbort.current = ctrl;
+    watchUrl.current = url;
     setWatch({ kind: "watching" });
     try {
       const { frames, duration } = await readFrames(url, 4, ctrl.signal);
@@ -323,10 +326,13 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       const heard = captionsRef.current?.cues.map((c) => c.text.trim()).filter(Boolean).join("\n") || undefined;
       const r = await api<{ story?: string; skipped?: string }>("/api/ai/video-caption", { method: "POST", json: { frames, duration, transcript: heard, auto: true }, signal: ctrl.signal });
       if (ctrl.signal.aborted) return;
-      if (r.skipped || !r.story?.trim()) return setWatch(NO_WATCH);
-      setWatch({ kind: "ready", story: r.story.trim() });
+      // A plan or quota stop stays quiet (the plan says so elsewhere); a busy AI is said out loud, with a retry (1174).
+      const story = r.story?.trim();
+      if (r.skipped === "busy" || (!r.skipped && !story)) return setWatch({ kind: "failed" });
+      if (r.skipped || !story) return setWatch(NO_WATCH);
+      setWatch({ kind: "ready", story });
     } catch {
-      if (!ctrl.signal.aborted) setWatch(NO_WATCH); // the creator can always tell the story themselves
+      if (!ctrl.signal.aborted) setWatch({ kind: "failed" }); // the creator can always tell the story themselves
     } finally {
       if (watchAbort.current === ctrl) watchAbort.current = null;
     }
@@ -336,6 +342,9 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     watchAbort.current = null;
     setWatch(NO_WATCH);
   }, []);
+  const rewatch = useCallback(() => {
+    if (watchUrl.current) void watchVideo(watchUrl.current);
+  }, [watchVideo]);
 
   /* ================= upload ================= */
   const startUpload = useCallback(
@@ -1104,6 +1113,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       onSubmitStory={submitStory}
       watch={watch}
       onUseWatched={useWatched}
+      onRewatch={rewatch}
       onEditStory={() => {
         setSubmittedStory(null);
         setEditedOriginal(null);

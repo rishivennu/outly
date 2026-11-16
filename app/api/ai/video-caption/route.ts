@@ -53,6 +53,8 @@ export const POST = route(
     const heard = transcript?.trim() ? transcript.trim().slice(0, TRANSCRIPT_MAX) : null;
     const out = await generateVideoStory(picked, heard, { signal: req.signal, voice: await voiceFor(uid), cacheKey: uid, duration });
     if (!out) {
+      // Each model's refusal is already in the [llm] lines above this one; this says what was asked.
+      console.warn(`[video-caption] no model watched the video: ${picked.length} frame(s), ${Math.round(total / 1024)} KB${heard ? ", with transcript" : ""}${auto ? ", auto" : ""}`);
       if (auto) return json({ skipped: "busy" });
       throw new HttpError(503, "The assistant couldn't watch your video just now. Try again in a moment, or tell me about it yourself.", "AI_BUSY");
     }

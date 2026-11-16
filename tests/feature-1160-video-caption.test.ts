@@ -66,15 +66,14 @@ function keys(kimi = "") {
 }
 
 describe("1160 frames reach Gemini", () => {
-  test("every frame goes in as inline_data in order, the prompt last, and Kimi (text only) sits out", async () => {
+  test("every frame goes in as inline_data in order, the prompt last (Kimi, when ranked first, gets the same frames: 1174)", async () => {
     const { generateVideoStory } = await import("../lib/ai/video-caption");
     keys("kimi-key");
     answer = JSON.stringify({ story: "I open the shop at 5 AM and show what the first hour really looks like." });
     stub();
     const out = await generateVideoStory([{ mime: "image/jpeg", data: "QQ==" }, { mime: "image/jpeg", data: "Qg==" }, { mime: "image/jpeg", data: "Qw==" }], "First hour at the shop.", { timeoutMs: 5000, duration: 31 });
     expect(out).toEqual({ story: "I open the shop at 5 AM and show what the first hour really looks like." });
-    expect(sent.every((s) => s.url.includes("generativelanguage"))).toBe(true);
-    const parts = sent[0].body.contents[0].parts;
+    const parts = sent.find((s) => s.url.includes("generativelanguage"))!.body.contents[0].parts;
     expect(parts.slice(0, 3)).toEqual([{ inline_data: { mime_type: "image/jpeg", data: "QQ==" } }, { inline_data: { mime_type: "image/jpeg", data: "Qg==" } }, { inline_data: { mime_type: "image/jpeg", data: "Qw==" } }]);
     expect(parts.at(-1).text).toContain("These are 3 frames");
     expect(parts.at(-1).text).toContain("First hour at the shop.");

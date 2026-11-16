@@ -32,15 +32,22 @@ export type LlmOpts = {
   cacheKey?: string;
   /** The caller went away (closed the tab, asked again): stop every model at once. */
   signal?: AbortSignal;
-  /** 1133: pictures the model looks at before the prompt (base64, JPEG). Only Gemini reads them, so Kimi sits out. */
+  /** 1133: pictures the model looks at before the prompt (base64, JPEG). Gemini takes them inline; Kimi (K2.6 reads
+   * images) as OpenAI content parts, so a throttled Gemini no longer leaves a video unwatched (1174). */
   images?: { mime: string; data: string }[];
 };
 
 function candidates(opts: LlmOpts): ModelId[] {
   const g = (opts.models?.length ? opts.models : GEMINI_DEFAULT).map((m) => ALIAS[m] ?? m);
   const list: ModelId[] = env.GEMINI_API_KEY ? [...new Set(g)].map((model) => ({ provider: "gemini" as const, model })) : [];
-  if (env.KIMI_API_KEY && !opts.images?.length) list.push({ provider: "kimi", model: KIMI_MODEL });
+  if (env.KIMI_API_KEY) list.push({ provider: "kimi", model: KIMI_MODEL });
   return list;
+}
+
+/** Kimi's user turn: plain text, or the pictures first (as data URLs) and the prompt last, like Gemini's parts. */
+export function kimiUser(prompt: string, images: LlmOpts["images"] = []) {
+  if (!images.length) return prompt;
+  return [...images.map((i) => ({ type: "image_url" as const, image_url: { url: `data:${i.mime};base64,${i.data}` } })), { type: "text" as const, text: prompt }];
 }
 
 class CallError extends Error {
@@ -68,7 +75,7 @@ async function call(m: ModelId, system: string, prompt: string, opts: LlmOpts, s
             model: m.model,
             stream: true,
             ...(opts.json !== false ? { response_format: { type: "json_object" } } : {}),
-            messages: [{ role: "system", content: system }, { role: "user", content: prompt }],
+            messages: [{ role: "system", content: system }, { role: "user", content: kimiUser(prompt, opts.images) }],
           },
         };
   const r = await fetch(req.url, { method: "POST", headers: { "content-type": "application/json", ...req.headers }, body: JSON.stringify(req.body), signal });

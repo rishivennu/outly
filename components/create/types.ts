@@ -34,8 +34,9 @@ export interface PlatformCopy {
 }
 export type Tone = "default" | "punchier" | "professional" | "genz";
 
-/** 1160: the assistant watching the video and writing the story for the creator to use or edit. */
-export type WatchState = { kind: "idle" } | { kind: "watching" } | { kind: "ready"; story: string };
+/** 1160: the assistant watching the video and writing the story for the creator to use or edit.
+ * 1174: `failed` = every model was busy or down; the creator is told and can ask again, instead of a silent blank. */
+export type WatchState = { kind: "idle" } | { kind: "watching" } | { kind: "ready"; story: string } | { kind: "failed" };
 export const NO_WATCH: WatchState = { kind: "idle" };
 
 /** The hook writer's state. `more` = hooks are still arriving; `status` = what it is doing right now. */

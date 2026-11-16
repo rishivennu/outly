@@ -31,6 +31,8 @@ interface Props {
   /** 1160: Pip watching the video and the story it wrote; `onUseWatched(true)` puts it in the box to edit first. */
   watch?: WatchState;
   onUseWatched?: (edit: boolean) => void;
+  /** 1174: ask Pip to watch the video again after every model was busy. */
+  onRewatch?: () => void;
   onEditStory: () => void;
   hooks: HooksState;
   /** The plain caption the assistant works from: the creator's edit if they made one, else what the writer heard. */
@@ -224,7 +226,21 @@ export function Assistant(p: Props) {
           </motion.div>
         )}
 
-        {askStory && !p.story && (!p.watch || p.watch.kind === "idle") && (
+        {askStory && p.watch?.kind === "failed" && (
+          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={T.card} className="space-y-2">
+            <Bubble from="outly">
+              I couldn&apos;t watch it just now, the AI is busy. <span className="text-muted-foreground">Tell me about it yourself, or I can try again.</span>
+            </Bubble>
+            <div className="pl-1">
+              <Button type="button" variant="subtle" className="min-h-11 rounded-full px-4" onClick={() => p.onRewatch?.()}>
+                <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                Watch it again
+              </Button>
+            </div>
+          </motion.div>
+        )}
+
+        {askStory && !p.story && (!p.watch || p.watch.kind === "idle" || p.watch.kind === "failed") && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="flex flex-col items-start gap-1.5" role="group" aria-label="Story ideas">
             {EXAMPLES.map((e) => (
               <button key={e} type="button" onClick={() => p.onStory(e)} className="min-h-[44px] max-w-full rounded-2xl px-3.5 py-2 text-left text-[13px] leading-snug text-muted-foreground hairline transition hover:bg-secondary hover:text-foreground motion-reduce:transition-none">

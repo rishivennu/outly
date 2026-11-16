@@ -59,15 +59,14 @@ function keys(kimi = "") {
 }
 
 describe("1133 images reach Gemini", () => {
-  test("images go in as inline_data before the prompt, and Kimi (text only) sits out", async () => {
+  test("images go in as inline_data before the prompt (Kimi, when ranked first, gets the same pictures: 1174)", async () => {
     const { llmText } = await import("../lib/ai/llm");
     keys("kimi-key");
     answer = '{"ok":1}';
     stub();
     const r = await llmText("sys", "look", { images: [{ mime: "image/jpeg", data: "QUJD" }], json: true, timeoutMs: 5000 });
     expect(r?.text).toBe('{"ok":1}');
-    expect(sent.every((s) => s.url.includes("generativelanguage"))).toBe(true);
-    const parts = sent[0].body.contents[0].parts;
+    const parts = sent.find((s) => s.url.includes("generativelanguage"))!.body.contents[0].parts;
     expect(parts[0]).toEqual({ inline_data: { mime_type: "image/jpeg", data: "QUJD" } });
     expect(parts.at(-1)).toEqual({ text: "look" });
   });
