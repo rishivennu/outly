@@ -114,6 +114,12 @@ function refresh(req: NextRequest) {
   return (refreshing ??= readFlags(req).finally(() => (refreshing = null)));
 }
 
+/** Tests only: back to a brand new instance. */
+export function __resetFlags() {
+  status = null;
+  refreshing = null;
+}
+
 /** A brand new instance that could not read the switches in time: maintenance off, waitlist as the hint cookie says. */
 export function guessFlags(req: NextRequest): Flags {
   return { at: 0, maintenance: false, waitlist: req.cookies.get(WL_HINT)?.value === "1", hide: "" };

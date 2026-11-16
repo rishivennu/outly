@@ -54,7 +54,7 @@ describe("A2 studio layout: only the user blocks, site settings are shared", () 
   });
   test("getCurrentUser is the only await before the settings", () => {
     // the no-user branch only reads headers() on its way to a redirect
-    const head = l.slice(l.indexOf("export default async function"), l.indexOf("await Promise.all([studioSettings()")).split("\n").filter((x) => !x.includes("redirect(")).join("\n");
+    const head = l.slice(l.indexOf("export default async function"), l.indexOf("await Promise.all([")).split("\n").filter((x) => !x.includes("redirect(")).join("\n");
     expect(head.match(/await /g)?.length).toBe(1);
     expect(head).toContain("await getCurrentUser()");
   });
