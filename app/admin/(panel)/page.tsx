@@ -51,22 +51,20 @@ export default async function Overview(props: { searchParams: Promise<{ denied?:
           <p className="text-[14px]"><b>Not much data yet.</b> Load sample data to see the charts filled in. It's flagged, never emailed, and clears with one click.</p>
         </Card>
       )}
-      <EnterRoot className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi i={at()} spark={sp((r) => r.active)} label="Active today" value={String(k.dau)} sub={`${k.wau} this week · ${k.mau} this month`} />
-        <Kpi i={at()} spark={sp((r) => r.users)} label="Total users" value={k.totalUsers.toLocaleString("en-IN")} change={delta(k.signups30, k.signupsPrev)} sub={`+${k.signups30} in 30 days`} />
+      <EnterRoot className="grid grid-cols-1 gap-3 min-[440px]:grid-cols-2 lg:grid-cols-4">
+        <Kpi i={at()} spark={sp((r) => r.active)} label="Active today" value={String(k.dau)} sub={`${k.wau} this week · ${k.mau} this month`} hint="Distinct users who opened the studio since midnight UTC. This week and this month count the last 7 and 30 days the same way." />
+        <Kpi i={at()} spark={sp((r) => r.users)} label="Total users" value={k.totalUsers.toLocaleString("en-IN")} change={delta(k.signups30, k.signupsPrev)} compare="the 30 days before" sub={`+${k.signups30} in 30 days`} hint="Every account in the database. The change compares sign-ups in the last 30 days with the 30 days before that." />
         {money ? (
           <>
-            <Kpi i={at()} spark={sp((r) => r.activeSubs)} label="Monthly recurring revenue" value={formatMoney(k.mrr, o.currency, { compact: true })} sub={`${k.activeSubs} paying`} />
-            <Kpi i={at()} spark={sp((r) => r.revenue)} label="Revenue, 30 days" value={formatMoney(k.rev30, o.currency, { compact: true })} change={delta(k.rev30, k.revPrev)} />
-            <Kpi i={at()} spark={sp((r) => r.cancels)} invert label="Churn, 30 days" value={`${(k.churn * 100).toFixed(1)}%`} sub="subscriptions cancelled" tone={k.churn > 0.08 ? "bad" : undefined} />
-            <Kpi i={at()} label="Failed payments, 7 days" value={String(k.failed7)} sub="customers were told why" tone={k.failed7 > 0 ? "bad" : undefined} />
+            <Kpi i={at()} spark={sp((r) => r.activeSubs)} label="Monthly recurring revenue" value={formatMoney(k.mrr, o.currency, { compact: true })} sub={`${k.activeSubs} paying`} hint={`Sum of active subscription prices, with yearly plans divided by 12 and everything converted to ${o.currency}. Trials and cancelled plans are not included.`} />
+            <Kpi i={at()} spark={sp((r) => r.revenue)} label="Revenue, 30 days" value={formatMoney(k.rev30, o.currency, { compact: true })} change={delta(k.rev30, k.revPrev)} compare="the 30 days before" hint="Successful payments received in the last 30 days, compared with the 30 days before that. Refunds are not subtracted." />
+            <Kpi i={at()} spark={sp((r) => r.cancels)} invert label="Churn, 30 days" value={`${(k.churn * 100).toFixed(1)}%`} sub={`${k.canceled30} of ${k.churnBase} subscriptions cancelled`} tone={k.churn > 0.08 ? "bad" : undefined} unavailable={k.churnBase ? undefined : "No paid subscriptions were live in the last 30 days, so there is no rate to show."} hint="Subscriptions cancelled in the last 30 days, divided by every subscription that was live at any point in those 30 days (active at the start, or started since). Small bases swing a lot: read the count beneath." />
+            <Kpi i={at()} label="Failed payments, 7 days" value={String(k.failed7)} sub="customers were told why" tone={k.failed7 > 0 ? "bad" : undefined} hint="Payment attempts the provider reported as failed in the last 7 days. One customer can appear more than once if several attempts failed." />
+            <Kpi i={at()} spark={sp((r) => r.activeSubs)} label="Active subscriptions" value={String(k.activeSubs)} hint="Paid subscriptions that are active right now. Free plans and trials are not counted." />
           </>
         ) : null}
         {can(admin.role, "tickets") && (
-          <>
-            <Kpi i={at()} label="Open tickets" value={String(k.openTickets)} sub={k.urgentTickets ? `${k.urgentTickets} urgent` : "none urgent"} tone={k.urgentTickets ? "bad" : undefined} />
-            <Kpi i={at()} spark={sp((r) => r.activeSubs)} label="Active subscriptions" value={String(k.activeSubs)} />
-          </>
+          <Kpi i={at()} label="Open tickets" value={String(k.openTickets)} sub={k.urgentTickets ? `${k.urgentTickets} urgent` : "none urgent"} tone={k.urgentTickets ? "bad" : undefined} hint="Support tickets not yet marked resolved, whatever their age." />
         )}
       </EnterRoot>
       {live && <LiveGlobeCard initial={live} />}

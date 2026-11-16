@@ -33,6 +33,8 @@ export interface DeviceTarget {
   hashtags: string;
   /** Missing on drafts saved before first comments existed. */
   firstComment?: string;
+  /** 1162: the account picked for this place, when the creator has several there. */
+  accountId?: string | null;
 }
 
 export interface DeviceDraft {

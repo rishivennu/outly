@@ -48,8 +48,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         {weak && (
           <div role="alert" className="mb-6 flex flex-wrap items-center gap-3 rounded-[20px] bg-warning/12 px-4 py-3 text-[13.5px] hairline">
             <AlertTriangle className="h-4 w-4 shrink-0 text-warning" aria-hidden />
-            <span className="flex-1">You're still on the starter password. Anyone who guesses 4 digits gets in, so change it before going live.</span>
-            <Link href="/admin/account" className="rounded-full bg-foreground px-3.5 py-1.5 text-[12.5px] font-semibold text-background">Change password</Link>
+            <span className="min-w-[12rem] flex-1">You're still on the starter password. Anyone who guesses 4 digits gets in, so change it before going live.</span>
+            <Link href="/admin/account" className="inline-flex min-h-11 items-center rounded-full bg-foreground px-3.5 py-1.5 text-[12.5px] font-semibold text-background">Change password</Link>
           </div>
         )}
         {sweep?.stale && (

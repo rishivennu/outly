@@ -267,7 +267,7 @@ export function BehaviorBreakdown({ s, active = true }: { s: BehaviorStats; acti
               {s.topUsers.map((u) => (
                 <tr key={u.id}>
                   <td>
-                    <a href={`/admin/users?q=${encodeURIComponent(u.email)}`} className="font-medium underline-offset-2 hover:underline">{u.name}</a>
+                    <a href={`/admin/users?q=${encodeURIComponent(u.email.includes("****") ? u.name : u.email)}`} className="font-medium underline-offset-2 [@media(hover:hover)]:hover:underline">{u.name}</a>
                     <span className="block max-w-[200px] truncate text-[12px] text-muted-foreground">{u.email}</span>
                   </td>
                   <td className="tabular">{u.activeDays}</td>

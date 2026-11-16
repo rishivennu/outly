@@ -2,7 +2,8 @@ import { requireAdmin } from "@/lib/admin/guard";
 import { getAdmin } from "@/lib/admin/auth";
 import { notifyConfig } from "@/lib/notify-config";
 import { deadLetters, failedDeliveries, notifyOverview, pendingQueue, recentDeliveries } from "@/lib/admin/notifications";
-import { Card, CardTitle, Empty, PageHead, Pill, Table, ago, fmtDate, type Tone } from "@/components/admin/ui";
+import { Card, CardTitle, Empty, PageHead, Pill, StatusBadge, Table, ago, fmtDate } from "@/components/admin/ui";
+import { adminEmail, canSeeEmail } from "@/lib/admin/privacy";
 import { EnterRoot } from "@/components/admin/motion/EnterRoot";
 import { RollingNumber } from "@/components/dashboard/RollingNumber";
 import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
@@ -10,7 +11,6 @@ import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
 export const metadata = { title: "Notifications" };
 export const dynamic = "force-dynamic";
 
-const STATUS: Record<string, Tone> = { sent: "ok", queued: "info", skipped: "muted", failed: "bad" };
 const REASON: Record<string, string> = {
   event_off: "the creator switched that event off",
   inapp_off: "the creator switched the bell off",
@@ -29,6 +29,7 @@ const reason = (r: string | null) => (r ? REASON[r] ?? r : "");
 export default async function AdminNotificationsPage() {
   await requireAdmin("site");
   const admin = await getAdmin();
+  const role = admin?.role ?? "support";
   const [cfg, over, failed, dead, queue, log] = await Promise.all([notifyConfig(), notifyOverview(), failedDeliveries(), deadLetters(), pendingQueue(), recentDeliveries(40)]);
   const sent = over.channels.reduce((s, c) => s + c.sent, 0);
   const held = over.channels.reduce((s, c) => s + c.skipped, 0);
@@ -45,8 +46,8 @@ export default async function AdminNotificationsPage() {
       <EnterRoot>
         <div className="mb-3 grid gap-3 sm:grid-cols-4">
           {[
-            { label: "Delivered", v: sent, hint: `Last ${over.days} days, every channel` },
-            { label: "Held back", v: held, hint: "Quiet hours, cooldowns, switched off" },
+            { label: "Accepted", v: sent, hint: `Last ${over.days} days, one row per channel attempt. Accepted by the channel, not necessarily seen.` },
+            { label: "Held back", v: held, hint: "Channel attempts skipped: quiet hours, cooldowns, switched off" },
             { label: "Failed", v: broke, hint: "A service refused it" },
             { label: "Waiting", v: over.queue.pending, hint: over.queue.retrying ? `${over.queue.retrying} being retried` : "Nothing stuck" },
           ].map((s) => (
@@ -64,7 +65,7 @@ export default async function AdminNotificationsPage() {
             {over.channels.length === 0 ? (
               <Empty title="Nothing sent yet" body="Once notifications go out, every attempt and every skip is counted here." />
             ) : (
-              <Table label="Deliveries by channel" head={["Channel", "Delivered", "Held back", "Failed", "Waiting"]}>
+              <Table label="Deliveries by channel" head={["Channel", "Accepted", "Held back", "Failed", "Waiting"]}>
                 {over.channels.map((c) => (
                   <tr key={c.channel}>
                     <td className="font-medium">{c.channel === "inapp" ? "Bell" : c.channel === "fcm" ? "App (Android)" : c.channel === "push" ? "Web push" : "Email"}</td>
@@ -97,7 +98,8 @@ export default async function AdminNotificationsPage() {
               </Table>
             )}
             {over.categories.length > 0 && (
-              <p className="mt-3 flex flex-wrap gap-1.5">
+              <p className="mt-3 flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-[12px] text-muted-foreground">All attempts by group (accepted, held back and failed together, so these exceed the held-back count):</span>
                 {over.categories.map((c) => (
                   <Pill key={c.id} tone="muted">
                     {c.title}: <span className="tabular">{c.count}</span>
@@ -161,7 +163,7 @@ export default async function AdminNotificationsPage() {
                 <tr key={f.id}>
                   <td>
                     <span className="block font-medium">{f.user.name}</span>
-                    <span className="block truncate text-[12px] text-muted-foreground">{f.user.email}</span>
+                    <span className="block truncate text-[12px] text-muted-foreground">{adminEmail(f.user.email, role)}</span>
                   </td>
                   <td>{f.kind}</td>
                   <td>{f.channel}</td>
@@ -174,20 +176,22 @@ export default async function AdminNotificationsPage() {
         </Card>
 
         <Card data-enter className="mt-4">
-          <CardTitle hint="The last 40 attempts, newest first, exactly as the engine recorded them.">Delivery log</CardTitle>
+          <CardTitle hint={`The last 40 attempts, newest first, exactly as the engine recorded them. "Accepted" means the channel took the message; it does not mean the creator has seen it.${canSeeEmail(role) ? "" : " Addresses are masked for your role."}`}>Delivery log</CardTitle>
           {log.length === 0 ? (
             <Empty title="Nothing logged yet" body="Every notification writes one row per channel, including the ones that were held back." />
           ) : (
             <Table label="Delivery log" head={["Creator", "What", "Group", "Channel", "Result", "When"]}>
               {log.map((r) => (
                 <tr key={r.id}>
-                  <td className="truncate text-[12.5px] text-muted-foreground">{r.user.email}</td>
+                  <td className="truncate text-[12.5px] text-muted-foreground">{adminEmail(r.user.email, role)}</td>
                   <td>{r.kind}</td>
                   <td className="text-[12.5px]">{r.category}</td>
                   <td>{r.channel}</td>
                   <td>
-                    <Pill tone={STATUS[r.status] ?? "muted"}>{r.status}</Pill>
-                    {r.reason && <span className="ml-2 text-[12px] text-muted-foreground">{reason(r.reason)}</span>}
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <StatusBadge status={r.status} />
+                      {r.reason && <span className="text-[12px] text-muted-foreground">{reason(r.reason)}</span>}
+                    </span>
                   </td>
                   <td className="whitespace-nowrap">{ago(r.createdAt)}</td>
                 </tr>

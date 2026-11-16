@@ -2,7 +2,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import * as Switch from "@radix-ui/react-switch";
-import { AlertCircle, Check, CircleAlert, ImageIcon, Link2, MessageSquarePlus, RefreshCw, Sparkles } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, CircleAlert, ImageIcon, Link2, MessageSquarePlus, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Counter, Input, Label, Textarea } from "@/components/ui/field";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
@@ -23,6 +23,8 @@ interface Props {
   drafts: Record<Platform, Draft>;
   onDraft: (p: Platform, patch: Partial<Draft>) => void;
   accounts: Partial<Record<Platform, AccountView>>;
+  /** 1162: platforms with more than one connected account to choose from (the pick is kept on the draft as accountId). */
+  options?: Partial<Record<Platform, AccountView[]>>;
   media: { src: string | null; poster: string | null; duration?: number | null; width?: number | null; height?: number | null };
   /** Places whose copy is still being written (each one unlocks as soon as its own copy lands). */
   writing: Platform[];
@@ -157,6 +159,7 @@ export function PlatformDeck(p: Props) {
             const acct = p.accounts[pl];
             const connected = acct?.status === "connected";
             const who = acct ? `${acct.username}${acct.mock ? " (practice)" : ""}` : "No account yet";
+            const choice = connected && acct ? p.options?.[pl] : undefined;
             return (
               <div
                 key={pl}
@@ -214,6 +217,24 @@ export function PlatformDeck(p: Props) {
                     <Button size="sm" variant="ghost" className="h-11 shrink-0 px-3" onClick={() => p.onConnect(pl)} disabled={p.online === false} title={p.online === false ? "Connecting needs a connection." : undefined}>
                       <Link2 className="h-4 w-4" aria-hidden="true" /> {acct ? "Reconnect" : "Connect"} <span className="sr-only">{PLATFORM_META[pl].name}</span>
                     </Button>
+                  )}
+                  {/* 1162: several accounts on this platform: which one. A native select, so it works the same on a phone. */}
+                  {choice && acct && (
+                    <span className="relative flex h-11 max-w-[46%] shrink-0 items-center">
+                      <select
+                        aria-label={`Which ${PLATFORM_META[pl].name} account`}
+                        value={acct.id}
+                        onChange={(e) => p.onDraft(pl, { accountId: e.target.value })}
+                        className={cn("h-9 w-full cursor-pointer appearance-none truncate rounded-full bg-secondary pl-3 pr-7 text-[13px] font-semibold text-foreground hairline", FOCUS, "[@media(hover:hover)]:hover:bg-secondary/70")}
+                      >
+                        {choice.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.username}{a.mock ? " (practice)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-2.5 h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                    </span>
                   )}
                 </div>
               </div>

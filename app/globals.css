@@ -4080,6 +4080,29 @@ html.js .usp [data-reveal]:not([data-shown]) .usp-scatter i, html.js .usp [data-
   .usp-card, .usp-card:hover { transform: none; transition: box-shadow .3s, border-color .3s; }
 }
 
+/* ---------- 1163: admin tooltip + slim sidebar ----------
+   A plain CSS tooltip for the admin panel (components/admin/ui.tsx Tooltip). Visible on hover for pointer devices
+   and on focus-within for keyboards. Fades only; it never moves, so reduced motion needs no override. */
+.admin-tipwrap { position: relative; }
+.admin-tip {
+  position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 70; pointer-events: none;
+  width: max-content; max-width: 260px; padding: 6px 10px; border-radius: 10px;
+  background: hsl(var(--foreground)); color: hsl(var(--background));
+  font-size: 12px; line-height: 1.35; font-weight: 500; letter-spacing: 0; text-align: left; white-space: normal;
+  opacity: 0; transition: opacity .15s ease; translate: -50% 0;
+  /* Out of layout until shown: a hidden tooltip near the right edge was widening the page at 320px (21px of
+     horizontal scroll). display:none still leaves aria-describedby text readable to assistive tech. */
+  display: none;
+}
+.admin-tip[data-side="bottom"] { bottom: auto; top: calc(100% + 8px); }
+.admin-tip[data-side="right"] { left: calc(100% + 10px); bottom: auto; top: 50%; translate: 0 -50%; white-space: nowrap; }
+.admin-tipwrap:focus-within > .admin-tip { display: block; opacity: 1; }
+@media (hover: hover) { .admin-tipwrap:hover > .admin-tip { display: block; opacity: 1; } }
+/* Belt and braces: nothing inside the panel may widen the page sideways. */
+.admin-root { overflow-x: clip; }
+/* Slim sidebar: the nav scroller would clip a tooltip, so AdminShell draws one fixed tooltip outside it. */
+.admin-tip--fixed { display: block; position: fixed; left: auto; bottom: auto; opacity: 1; translate: 0 -50%; white-space: nowrap; }
+
 /* ---------- 1120: creator profile card (components/profile) ----------
    Light: white surface, grey hairlines, lime accents. Dark: deep teal surface, off-white ink, muted teal lines.
    Hover 200ms, edit actions 180ms, all on the token ease. Transforms and opacity only. */

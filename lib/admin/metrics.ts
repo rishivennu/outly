@@ -44,7 +44,12 @@ async function computeOverview(days: number) {
   const d30 = subDays(now, 30);
   const activeAtStart = subs.filter((s) => s.createdAt < d30 && (!s.canceledAt || s.canceledAt >= d30)).length;
   const canceled30 = subs.filter((s) => s.canceledAt && s.canceledAt >= d30).length;
-  const churn = activeAtStart ? canceled30 / activeAtStart : 0;
+  // 1163: everything that was live at some point in the window is the base (active at the start, plus started
+  // inside it). Dividing by the start count alone let a cancelled plan that began inside the window push the
+  // rate past 100% (the panel once read 200%). churnBase 0 means "no subscriptions to judge", not 0% churn.
+  const startedIn30 = subs.filter((s) => s.createdAt >= d30).length;
+  const churnBase = activeAtStart + startedIn30;
+  const churn = churnBase ? canceled30 / churnBase : 0;
 
   const ok = pays.filter((p) => p.status === "succeeded").map((p) => ({ ...p, amountMinor: convert(p.amountMinor, p.currency, ccy), currency: ccy }));
   const rev30 = ok.filter((p) => p.createdAt >= d30).reduce((t, p) => t + p.amountMinor, 0);
@@ -82,7 +87,7 @@ async function computeOverview(days: number) {
 
   return {
     currency: ccy,
-    kpi: { dau, wau, mau, totalUsers: users.length, signups30, signupsPrev, mrr, rev30, revPrev: revPrev._sum.amountMinor ?? 0, failed7, churn, activeSubs: active.length, openTickets, urgentTickets },
+    kpi: { dau, wau, mau, totalUsers: users.length, signups30, signupsPrev, mrr, rev30, revPrev: revPrev._sum.amountMinor ?? 0, failed7, churn, churnBase, canceled30, activeSubs: active.length, openTickets, urgentTickets },
     series,
     revenueByPlan: [...byPlan.entries()].map(([name, v]) => ({ name, value: v / 100 })).sort((a, b) => b.value - a.value),
     sample,

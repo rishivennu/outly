@@ -14,6 +14,8 @@ export interface Draft {
   reviewed: boolean;
   /** Client only, never saved: this platform has its own caption instead of following the main caption. */
   custom?: boolean;
+  /** 1162: the account this place goes to when the creator has more than one there. Unset = the pinned or default one. */
+  accountId?: string | null;
 }
 
 /** Which field a check is about, so the deck can show it right under that field. */

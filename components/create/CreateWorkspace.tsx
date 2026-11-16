@@ -3,7 +3,7 @@ import { whyLine } from "@/lib/ai/caption-engine";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { PanelRightClose, PanelRightOpen, Sparkles, X } from "lucide-react";
+import { PanelRightClose, PanelRightOpen, RotateCcw, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UploadZone } from "@/components/shared/UploadZone";
 import { PostKindSwitch } from "./PostKindSwitch";
@@ -29,7 +29,7 @@ import { PublishingView } from "./PublishingView";
 import { VideoStage } from "./VideoStage";
 import { PublishTo } from "./PublishTo";
 import { SaveDraft } from "./SaveDraft";
-import { autosaveLine, draftTitle, enabledPlatforms, launchGate, launchPlan, scheduleProblem, targetPayload } from "./publish";
+import { autosaveLine, draftTitle, enabledPlatforms, launchGate, launchPlan, pickedAccount, scheduleProblem, targetPayload } from "./publish";
 import { CaptionBurner } from "./CaptionBurner";
 import { CaptionRunProvider, useCaptionBurning, useCaptionRunLine, useCaptionWorkspace } from "./captions/CaptionRun";
 import { readFrames, readVideo } from "./frame";
@@ -48,6 +48,8 @@ import { T } from "@/lib/motion/tokens";
 
 interface Props {
   accounts: AccountView[];
+  /** 1162: every account this person may post to; where a platform has several, Everywhere offers the choice. */
+  choices?: AccountView[];
   initialPost: PostView | null;
   tz: string;
   connected: string | null;
@@ -68,9 +70,11 @@ const LIVE = ["publishing", "published", "partial", "failed"];
 /** The older version's drafts are offered once per tab, not on every visit to Create. */
 let legacyOffered = false;
 
-export function CreateWorkspace({ accounts: accountList, initialPost, tz, connected, connectError, initialStory, shared, restoreLocal, missingPostId }: Props) {
+export function CreateWorkspace({ accounts: accountList, choices: choiceList, initialPost, tz, connected, connectError, initialStory, shared, restoreLocal, missingPostId }: Props) {
   const toast = useToast();
-  const accounts = useMemo(() => Object.fromEntries(accountList.map((a) => [a.platform, a])) as Partial<Record<Platform, AccountView>>, [accountList]);
+  /** The account each platform falls back to: the one the post is pinned to, else the picked profile, else the default (1037). */
+  const defaults = useMemo(() => Object.fromEntries(accountList.map((a) => [a.platform, a])) as Partial<Record<Platform, AccountView>>, [accountList]);
+  const choices = useMemo(() => choiceList ?? accountList, [choiceList, accountList]);
 
   /* ---------------- video ---------------- */
   const [media, setMedia] = useState<MediaView | null>(initialPost?.media ?? null);
@@ -140,11 +144,32 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
       const t = initialPost?.targets.find((x) => x.platform === p);
       out[p] = t
         ? { enabled: true, title: t.title ?? "", caption: t.caption ?? "", description: t.description ?? "", hashtags: t.hashtags ?? "", firstComment: t.firstComment ?? "", note: NOTES[p], reviewed: false }
-        : emptyDraft(initialPost ? false : !!accounts[p] && live.includes(p));
+        : emptyDraft(initialPost ? false : !!defaults[p] && live.includes(p));
     }
     if (initialPost && connected && (PLATFORMS as readonly string[]).includes(connected)) out[connected as Platform].enabled = true;
     return out;
   });
+  /* 1162: where a platform has several accounts, the one the creator picked on Everywhere (kept on the draft) stands in
+     for the default everywhere the account is shown: the deck, the preview, the launch list. A pick that is no longer
+     one of the choices (disconnected, or shared no more) falls back to the default, and is never sent. */
+  const accounts = useMemo(() => {
+    const out = { ...defaults };
+    for (const p of PLATFORMS) {
+      const a = pickedAccount(p, drafts[p].accountId, choices);
+      if (a) out[p] = a;
+    }
+    return out;
+  }, [defaults, choices, drafts]);
+  const options = useMemo(() => {
+    const out: Partial<Record<Platform, AccountView[]>> = {};
+    for (const a of choices) {
+      if (a.status !== "connected") continue;
+      const p = a.platform as Platform;
+      (out[p] ??= []).push(a);
+    }
+    for (const p of PLATFORMS) if ((out[p]?.length ?? 0) < 2) delete out[p];
+    return out;
+  }, [choices]);
   const [copyLoading, setCopyLoading] = useState(false);
   const [rewriting, setRewriting] = useState<Platform | null>(null);
   /** Phase 3 (B2F): Pip's suggestions wait here for Accept or Skip; what Accept replaced is kept for Revert. */
@@ -500,7 +525,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
     baseUpdatedAt: initialPost?.updatedAt ?? null,
     getPayload: () =>
       media && phase === "edit"
-        ? { mediaId: media.id, title: draftTitle({ drafts, hook, filename: media.filename ?? fileRef.current?.name }), story: submittedStory ?? story, hook, targets: targetPayload(drafts) }
+        ? { mediaId: media.id, title: draftTitle({ drafts, hook, filename: media.filename ?? fileRef.current?.name }), story: submittedStory ?? story, hook, targets: targetPayload(drafts, choices) }
         : null,
     onSynced: (p) => {
       baseRef.current = p.updatedAt;
@@ -559,7 +584,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
       const targets: Record<string, DeviceTarget> = {};
       for (const p of PLATFORMS) {
         const x = drafts[p];
-        targets[p] = { enabled: x.enabled, title: x.title, caption: x.caption, description: x.description, hashtags: x.hashtags, firstComment: x.firstComment };
+        targets[p] = { enabled: x.enabled, title: x.title, caption: x.caption, description: x.description, hashtags: x.hashtags, firstComment: x.firstComment, accountId: x.accountId ?? null };
       }
       const schedule = { at: mode === "schedule" ? when.toISOString() : null, tz };
       const written = store
@@ -790,7 +815,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                 title,
                 story: submittedStory ?? story,
                 hook,
-                targets: targetPayload(drafts),
+                targets: targetPayload(drafts, choices),
                 baseUpdatedAt: postIdRef.current ? baseRef.current ?? undefined : undefined,
               },
             });
@@ -891,6 +916,28 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   };
 
   const another = () => window.location.assign("/create");
+  /* 1162: Start over from any step. What is here is kept as a draft first (this browser, then Outlly when the video
+     is up and we are online), and a clean Create opens. With no video there is nothing to keep, so it just opens. */
+  const [overAsk, setOverAsk] = useState(false);
+  const [overBusy, setOverBusy] = useState(false);
+  const startOver = async () => {
+    setOverBusy(true);
+    try {
+      if (hasMedia) {
+        if (upload.kind === "uploading" && mediaReady.current) await mediaReady.current;
+        writeLocal.current();
+        await sync.syncNow();
+      }
+    } catch {
+      /* the local copy is already written; the server copy follows next time */
+    }
+    another();
+  };
+  const startOverButton = (
+    <Button variant="ghost" size="sm" className="min-h-11 px-2 text-xs font-semibold" onClick={() => (hasMedia ? setOverAsk(true) : another())} disabled={overBusy || phase !== "edit"}>
+      <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Start over
+    </Button>
+  );
 
   const syncLine = <SyncStatus status={sync.status} lastSyncedAt={sync.lastSyncedAt} error={sync.error} needsMedia={sync.needsMedia} storedHere={sync.storedHere} onRetry={sync.retry} onResolve={conflict ? () => setComparing(true) : undefined} />;
   const bar = barState({ online, hasMedia, uploadFailed: upload.kind === "failed", hasHook: !!hook, ready: allReviewed, enabledCount: enabled.length, launching, saving: saved === "saving", step, mode, targets: plan.send, pending: pending.map((p) => PLATFORM_META[p].name), scheduleIssue, hasDraft: !!(postId || savedAt), activity: capLine, burning: capBurning });
@@ -984,19 +1031,23 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
   /** Phase 3 (B1): Everywhere and Launch get the same wide workspace as Step 2, wider again when Pip folds. */
   const roomy = stage || step === "everywhere" || step === "launch";
   const pipShown = wide ? panel.open : drawer;
-  const railStatus = hasMedia ? (
+  const railStatus = (
     <div className="space-y-1">
-      {syncLine}
-      {savedAt && (
-        <Link href="/content?filter=draft" className="inline-flex min-h-11 items-center px-1 text-xs font-semibold underline underline-offset-4">
-          View drafts
-        </Link>
-      )}
+      {hasMedia && syncLine}
+      <div className="flex flex-wrap items-center gap-x-2">
+        {hasMedia && savedAt && (
+          <Link href="/content?filter=draft" className="inline-flex min-h-11 items-center px-1 text-xs font-semibold underline underline-offset-4">
+            View drafts
+          </Link>
+        )}
+        {startOverButton}
+      </div>
     </div>
-  ) : null;
+  );
   /** Below 1280px Pip is a drawer; on Everywhere and Launch this is the way in. */
   const pipButton = (
-    <div className="mb-4 flex justify-end xl:hidden">
+    <div className="mb-4 flex items-center justify-between gap-2 xl:hidden">
+      {startOverButton}
       <Button variant="subtle" size="sm" className="min-h-11" onClick={openDrawer} aria-haspopup="dialog" aria-expanded={drawer} aria-controls={ASSISTANT_PANEL}>
         <Sparkles className="h-4 w-4" aria-hidden="true" /> {step === "launch" ? "Pip's checklist" : "Pip's notes"}
       </Button>
@@ -1062,6 +1113,8 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
             {showVideo && hasMedia && (
               <motion.section key="stage" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, x: -30 }} transition={T.card} aria-label="Your video" data-tips-ready={upload.kind === "done" ? "" : undefined}>
                 <h1 className="sr-only">Create</h1>
+                {/* Below 1280px the journey rail is hidden, so Start over (1162) sits above the Pip card. */}
+                <div className="mb-2 flex justify-end xl:hidden">{startOverButton}</div>
                 {/* Below 1280px the assistant lives in a drawer: this is the way in, first, since Step 2 starts there. */}
                 <div className="glass mb-5 flex items-center gap-3 rounded-[22px] p-3 pl-4 xl:hidden">
                   <span className="lime-bg grid h-9 w-9 shrink-0 place-items-center rounded-full" aria-hidden="true">
@@ -1146,6 +1199,7 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
                   drafts={drafts}
                   onDraft={onDraft}
                   accounts={accounts}
+                  options={options}
                   media={{ src, poster, ...meta }}
                   writing={copyWriting}
                   rewriting={rewriting}
@@ -1216,6 +1270,17 @@ export function CreateWorkspace({ accounts: accountList, initialPost, tz, connec
             setReplacing(null);
             if (f) void pickFile(f);
           }}
+        />
+        <ConfirmDialog
+          open={overAsk}
+          onOpenChange={(o) => !overBusy && setOverAsk(o)}
+          title="Start over?"
+          body={upload.kind === "uploading" ? "This one is kept in your drafts once the video finishes uploading, then a fresh Create opens at step 1." : "This one is kept in your drafts, and a fresh Create opens at step 1."}
+          confirmLabel={overBusy ? "Saving…" : "Save and start over"}
+          cancelLabel="Keep going"
+          tone="primary"
+          busy={overBusy}
+          onConfirm={() => void startOver()}
         />
         <ConfirmDialog
           open={stopAsk}

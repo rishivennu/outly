@@ -10,16 +10,31 @@ export function enabledPlatforms(drafts: Drafts): Platform[] {
   return PLATFORMS.filter((p) => drafts[p].enabled);
 }
 
-/** The targets array sent to /api/posts. Platforms left out are deleted server side. */
-export function targetPayload(drafts: Drafts) {
+type Choice = { id: string; platform: string; status: string };
+
+/**
+ * The targets array sent to /api/posts. Platforms left out are deleted server side. 1162: a place names its account
+ * only when the creator picked one of several (a connected one they can post to); otherwise the server keeps the
+ * pinned or default account exactly as before, so a stale pick never turns a save into a 403.
+ */
+export function targetPayload(drafts: Drafts, choices: readonly Choice[] = []) {
   return enabledPlatforms(drafts).map((p) => ({
     platform: p,
+    ...(pickedAccount(p, drafts[p].accountId, choices) ? { accountId: drafts[p].accountId! } : {}),
     title: drafts[p].title || null,
     caption: drafts[p].caption || null,
     description: drafts[p].description || null,
     hashtags: drafts[p].hashtags || null,
     firstComment: drafts[p].firstComment?.trim() || null,
   }));
+}
+
+/** The chosen account for a place, when it is one of the connected accounts offered for that platform. */
+export function pickedAccount<C extends Choice>(platform: Platform, accountId: string | null | undefined, choices: readonly C[]): C | null {
+  if (!accountId) return null;
+  const same = choices.filter((c) => c.platform === platform);
+  if (same.length < 2) return null;
+  return same.find((c) => c.id === accountId && c.status === "connected") ?? null;
 }
 
 /**

@@ -140,6 +140,11 @@ export async function platformAccounts(user: Pick<SessionUser, "id" | "scope">, 
   return (await ownAccounts(user.id)).filter((a) => a.platform === platform && inScope(user.scope, a.id));
 }
 
+/** 1162: every account this person may post to, on every platform, so the composer can offer a choice where there are several. */
+export async function composerChoices(user: Pick<SessionUser, "id" | "scope">) {
+  return (await ownAccounts(user.id)).filter((a) => inScope(user.scope, a.id));
+}
+
 export async function composerAccounts(user: Pick<SessionUser, "id" | "scope">, pinned: Record<string, string | null> = {}) {
   const [all, active] = await Promise.all([ownAccounts(user.id), activeProfile(user)]);
   const out = [];

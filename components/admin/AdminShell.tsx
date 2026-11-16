@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Award, BarChart3, BadgePercent, BellRing, Gift, BadgeCheck, BookOpen, Construction, FlaskConical, HeartPulse, Hourglass, Rocket, PanelsTopLeft, CreditCard, Globe, Share2, KeyRound, Sparkles, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, Repeat, ShieldCheck, Tag, Type, Users, X } from "lucide-react";
+import { Activity, Award, BarChart3, BadgePercent, BellRing, Gift, BadgeCheck, BookOpen, ChevronRight, Construction, FlaskConical, HeartPulse, Hourglass, Rocket, PanelsTopLeft, PanelLeftClose, PanelLeftOpen, CreditCard, Globe, Share2, Sparkles, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, Repeat, ShieldCheck, Tag, Type, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
@@ -13,15 +13,16 @@ import { ContrastToggle } from "@/components/shared/ContrastToggle";
 import { can, ROLE_LABEL, type AdminArea, type AdminRole } from "@/lib/admin/perms";
 import { Bell } from "./Bell";
 import { ScrollArea } from "./ScrollArea";
+import { Tooltip } from "./ui";
 import { T } from "@/lib/motion/tokens";
 
-const NAV: { href: string; label: string; icon: typeof Users; area: AdminArea; group: "Run" | "Support" | "Setup" }[] = [
+/** 1163: five groups. Run is the daily console, Insights is read-only analysis, Setup is configuration, Administration is who may do what. */
+export type NavGroup = "Run" | "Insights" | "Support" | "Setup" | "Administration";
+export const NAV_GROUPS: readonly NavGroup[] = ["Run", "Insights", "Support", "Setup", "Administration"];
+
+export const NAV: { href: string; label: string; icon: typeof Users; area: AdminArea; group: NavGroup }[] = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, area: "overview", group: "Run" },
   { href: "/admin/users", label: "Users", icon: Users, area: "users", group: "Run" },
-  { href: "/admin/behavior", label: "User behavior", icon: Activity, area: "insights", group: "Run" },
-  { href: "/admin/retention", label: "At risk", icon: HeartPulse, area: "retention", group: "Run" },
-  { href: "/admin/growth", label: "Growth", icon: Rocket, area: "growth", group: "Run" },
-  { href: "/admin/analytics", label: "Analytics", icon: BarChart3, area: "growth", group: "Run" },
   { href: "/admin/payments", label: "Payments", icon: CreditCard, area: "payments", group: "Run" },
   { href: "/admin/pricing", label: "Pricing", icon: Tag, area: "pricing", group: "Run" },
   { href: "/admin/campaigns", label: "Offers", icon: BadgePercent, area: "pricing", group: "Run" },
@@ -29,6 +30,10 @@ const NAV: { href: string; label: string; icon: typeof Users; area: AdminArea; g
   { href: "/admin/plans", label: "Plan grants", icon: BadgeCheck, area: "plans", group: "Run" },
   { href: "/admin/ai-usage", label: "AI usage", icon: Sparkles, area: "users", group: "Run" },
   { href: "/admin/referrals", label: "Refer & Earn", icon: Gift, area: "referrals", group: "Run" },
+  { href: "/admin/behavior", label: "User behavior", icon: Activity, area: "insights", group: "Insights" },
+  { href: "/admin/retention", label: "At risk", icon: HeartPulse, area: "retention", group: "Insights" },
+  { href: "/admin/growth", label: "Growth", icon: Rocket, area: "growth", group: "Insights" },
+  { href: "/admin/analytics", label: "Analytics", icon: BarChart3, area: "growth", group: "Insights" },
   { href: "/admin/tickets", label: "Tickets", icon: LifeBuoy, area: "tickets", group: "Support" },
   { href: "/admin/faq", label: "FAQ", icon: BookOpen, area: "faq", group: "Support" },
   { href: "/admin/outbox", label: "Email outbox", icon: Mail, area: "outbox", group: "Support" },
@@ -45,43 +50,80 @@ const NAV: { href: string; label: string; icon: typeof Users; area: AdminArea; g
   { href: "/admin/waitlist", label: "Waitlist", icon: Hourglass, area: "site", group: "Setup" },
   { href: "/admin/beta", label: "Beta program", icon: FlaskConical, area: "site", group: "Setup" },
   { href: "/admin/founding", label: "Founding members", icon: Award, area: "site", group: "Setup" },
-  { href: "/admin/team", label: "Team & roles", icon: ShieldCheck, area: "team", group: "Setup" },
+  { href: "/admin/team", label: "Team & roles", icon: ShieldCheck, area: "team", group: "Administration" },
 ];
+
+/** Remembered per browser: the icon-only sidebar is a preference, not a page state. */
+export const SLIM_KEY = "admin:nav:slim";
 
 const active = (path: string, href: string) => (href === "/admin" ? path === "/admin" : path.startsWith(href));
 
-function NavList({ role, path, badges, onNavigate, layoutId }: { role: AdminRole; path: string; badges: Partial<Record<AdminArea, number>>; onNavigate?: () => void; layoutId: string }) {
-  const items = NAV.filter((n) => can(role, n.area));
-  const groups = ["Run", "Support", "Setup"] as const;
+/**
+ * Slim-mode tooltips. The nav sits in a scroller, which would clip a CSS tooltip popping out to its right, so the
+ * hovered or focused item reports where it is and one fixed-position tooltip is drawn outside the scroller.
+ */
+type SlimTip = { show: (el: HTMLElement, text: string) => void; hide: () => void };
+function useSlimTip() {
+  const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null);
+  const api: SlimTip = {
+    show: (el, text) => {
+      const r = el.getBoundingClientRect();
+      setTip({ text, x: r.right + 10, y: r.top + r.height / 2 });
+    },
+    hide: () => setTip(null),
+  };
+  const node = tip ? (
+    <span role="tooltip" aria-hidden className="admin-tip admin-tip--fixed" style={{ left: tip.x, top: tip.y }}>
+      {tip.text}
+    </span>
+  ) : null;
+  return { api, node };
+}
+
+/** One row of the sidebar. In slim mode the label becomes a tooltip to the right and a badge becomes a lime dot. */
+function NavItem({ href, label, icon: Icon, on, n, slim, onNavigate, layoutId, tip }: { href: string; label: string; icon: typeof Users; on: boolean; n: number; slim: boolean; onNavigate?: () => void; layoutId: string; tip?: SlimTip }) {
+  const text = n > 0 ? `${label} (${n} open)` : label;
+  const hover = slim && tip ? { onPointerEnter: (e: React.PointerEvent<HTMLElement>) => tip.show(e.currentTarget, text), onPointerLeave: tip.hide, onFocus: (e: React.FocusEvent<HTMLElement>) => tip.show(e.currentTarget, text), onBlur: tip.hide } : {};
   return (
-    <nav aria-label="Admin" className="flex flex-col gap-4">
-      {groups.map((g) => {
+    <Link
+      href={href}
+      onClick={onNavigate}
+      aria-current={on ? "page" : undefined}
+      aria-label={slim && n > 0 ? `${label}, ${n} open` : undefined}
+      {...hover}
+      className={cn("group relative flex h-11 items-center rounded-2xl text-[14px] font-medium transition-colors duration-200 lg:h-10", slim ? "w-11 justify-center lg:w-10" : "gap-3 px-3", on ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:bg-foreground/[0.04] [@media(hover:hover)]:hover:text-foreground")}
+    >
+      {on && (
+        <motion.span layoutId={layoutId} className="absolute inset-0 rounded-2xl bg-secondary" transition={T.glide}>
+          <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-lime" />
+        </motion.span>
+      )}
+      <Icon className={cn("relative h-[17px] w-[17px] shrink-0 transition-transform duration-200 motion-reduce:transition-none [@media(hover:hover)]:group-hover:scale-110", on && "text-lime-ink")} strokeWidth={on ? 2.2 : 1.8} aria-hidden />
+      <span className={cn("relative truncate", slim && "sr-only")}>{label}</span>
+      {n > 0 && !slim && (
+        <span className="relative ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-lime px-1.5 text-[11px] font-bold text-[hsl(var(--lime-foreground))]" aria-label={`${n} open`}>
+          {n > 99 ? "99+" : n}
+        </span>
+      )}
+      {n > 0 && slim && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-lime ring-2 ring-card" aria-hidden />}
+    </Link>
+  );
+}
+
+function NavList({ role, path, badges, onNavigate, layoutId, slim = false, tip }: { role: AdminRole; path: string; badges: Partial<Record<AdminArea, number>>; onNavigate?: () => void; layoutId: string; slim?: boolean; tip?: SlimTip }) {
+  const items = NAV.filter((n) => can(role, n.area));
+  return (
+    <nav aria-label="Admin" className={cn("flex flex-col", slim ? "items-center gap-3" : "gap-4")}>
+      {NAV_GROUPS.map((g) => {
         const list = items.filter((i) => i.group === g);
         if (!list.length) return null;
         return (
-          <div key={g}>
-            <p className="eyebrow mb-1.5 px-3 text-[10.5px]">{g}</p>
+          <div key={g} className={cn(slim && "flex flex-col items-center gap-0.5 border-t border-border/60 pt-3 first:border-0 first:pt-0")}>
+            <p className={cn("eyebrow mb-1.5 px-3 text-[10.5px]", slim && "sr-only")}>{g}</p>
             <div className="flex flex-col gap-0.5">
-              {list.map(({ href, label, icon: Icon, area }) => {
-                const on = active(path, href);
-                const n = badges[area] ?? 0;
-                return (
-                  <Link key={href} href={href} onClick={onNavigate} aria-current={on ? "page" : undefined} className={cn("group relative flex h-10 items-center gap-3 rounded-2xl px-3 text-[14px] font-medium transition-colors duration-200", on ? "text-foreground" : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground")}>
-                    {on && (
-                      <motion.span layoutId={layoutId} className="absolute inset-0 rounded-2xl bg-secondary" transition={T.glide}>
-                        <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-lime" />
-                      </motion.span>
-                    )}
-                    <Icon className={cn("relative h-[17px] w-[17px] transition-transform duration-200 group-hover:scale-110", on && "text-lime-ink")} strokeWidth={on ? 2.2 : 1.8} aria-hidden />
-                    <span className="relative">{label}</span>
-                    {n > 0 && (
-                      <span className="relative ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-lime px-1.5 text-[11px] font-bold text-[hsl(var(--lime-foreground))]" aria-label={`${n} open`}>
-                        {n > 99 ? "99+" : n}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
+              {list.map(({ href, label, icon, area }) => (
+                <NavItem key={href} href={href} label={label} icon={icon} on={active(path, href)} n={badges[area] ?? 0} slim={slim} onNavigate={onNavigate} layoutId={layoutId} tip={tip} />
+              ))}
             </div>
           </div>
         );
@@ -90,38 +132,51 @@ function NavList({ role, path, badges, onNavigate, layoutId }: { role: AdminRole
   );
 }
 
-function Footer({ admin, path, onNavigate, layoutId }: { admin: { name: string; role: AdminRole }; path: string; onNavigate?: () => void; layoutId: string }) {
+/** Account controls, always at the bottom of the sidebar and never inside the scrolling list (1163). */
+function Footer({ admin, path, onNavigate, slim = false }: { admin: { name: string; role: AdminRole }; path: string; onNavigate?: () => void; slim?: boolean }) {
   const mine = path === "/admin/account";
+  const signOut = (
+    <form action="/api/admin/logout" method="post" className="shrink-0">
+      <button type="submit" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground lg:h-10 lg:w-10" aria-label="Sign out">
+        <LogOut className="h-4 w-4" aria-hidden />
+      </button>
+    </form>
+  );
+  if (slim) {
+    return (
+      <div className="flex flex-col items-center gap-1 border-t border-border/60 px-3 pb-3 pt-3">
+        <Tooltip text="My account" side="right" className="flex">
+          <Link href="/admin/account" onClick={onNavigate} aria-current={mine ? "page" : undefined} aria-label={`My account, ${admin.name}`} className={cn("grid h-11 w-11 place-items-center rounded-full lg:h-10 lg:w-10", mine && "bg-secondary")}>
+            <OrbAvatar seed={admin.name} size={28} />
+          </Link>
+        </Tooltip>
+        <Tooltip text="Sign out" side="right" className="flex">
+          {signOut}
+        </Tooltip>
+      </div>
+    );
+  }
   return (
-    <div className="mt-auto flex flex-col gap-1 pt-4">
-      {/* 1065: the same pill as the list above (shared layoutId), so it glides down here too. */}
-      <Link href="/admin/account" onClick={onNavigate} aria-current={mine ? "page" : undefined} className={cn("group relative flex h-10 items-center gap-3 rounded-2xl px-3 text-[13.5px] transition-colors duration-200", mine ? "text-foreground" : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground")}>
-        {mine && (
-          <motion.span layoutId={layoutId} className="absolute inset-0 rounded-2xl bg-secondary" transition={T.glide}>
-            <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-lime" />
-          </motion.span>
-        )}
-        <KeyRound className={cn("relative h-4 w-4 transition-transform duration-200 group-hover:scale-110", mine && "text-lime-ink")} aria-hidden />
-        <span className="relative">My password</span>
-      </Link>
-      <Link href="/" className="flex h-10 items-center gap-3 rounded-2xl px-3 text-[13.5px] text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground">
-        <Globe className="h-4 w-4" aria-hidden /> View the site
-      </Link>
-      <div className="mt-1 flex flex-wrap items-center gap-1">
+    <div className="flex flex-col gap-2 border-t border-border/60 px-3 pb-3 pt-3">
+      <div className="flex items-center gap-1">
         <ThemeToggle compact plain />
         <ContrastToggle label={false} />
+        <Tooltip text="View the site" side="top" className="ml-auto flex">
+          <Link href="/" aria-label="View the site" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground">
+            <Globe className="h-4 w-4" aria-hidden />
+          </Link>
+        </Tooltip>
       </div>
-      <div className="mt-2 flex items-center gap-2.5 rounded-2xl p-2 hairline">
-        <OrbAvatar seed={admin.name} size={36} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-semibold">{admin.name}</span>
-          <span className="block truncate text-[11.5px] text-muted-foreground">{ROLE_LABEL[admin.role]}</span>
-        </span>
-        <form action="/api/admin/logout" method="post">
-          <button type="submit" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="Sign out" title="Sign out">
-            <LogOut className="h-4 w-4" />
-          </button>
-        </form>
+      <div className="flex items-center gap-1 rounded-2xl p-1.5 hairline">
+        <Link href="/admin/account" onClick={onNavigate} aria-current={mine ? "page" : undefined} className={cn("group flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1.5 text-left", mine ? "bg-secondary" : "[@media(hover:hover)]:hover:bg-secondary")}>
+          <OrbAvatar seed={admin.name} size={34} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-semibold">{admin.name}</span>
+            <span className="block truncate text-[11.5px] text-muted-foreground">{ROLE_LABEL[admin.role]} · My account</span>
+          </span>
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        </Link>
+        {signOut}
       </div>
     </div>
   );
@@ -130,7 +185,22 @@ function Footer({ admin, path, onNavigate, layoutId }: { admin: { name: string; 
 export function AdminShell({ admin, badges, children }: { admin: { name: string; role: AdminRole }; badges: Partial<Record<AdminArea, number>>; children: React.ReactNode }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
+  // Slim starts false on both server and client (no hydration mismatch), then reads the saved preference.
+  const [slim, setSlim] = useState(false);
+  const slimTip = useSlimTip();
   useEffect(() => setOpen(false), [path]);
+  useEffect(() => {
+    try {
+      setSlim(localStorage.getItem(SLIM_KEY) === "1");
+    } catch {}
+  }, []);
+  const toggleSlim = () => {
+    const next = !slim;
+    setSlim(next);
+    try {
+      localStorage.setItem(SLIM_KEY, next ? "1" : "0");
+    } catch {}
+  };
   useEffect(() => {
     if (!open) return;
     const k = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
@@ -139,28 +209,37 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
   }, [open]);
 
   return (
-    <div className="admin-root sky-host relative isolate flex min-h-dvh">
+    <div className="admin-root sky-host relative isolate flex min-h-dvh" data-nav={slim ? "slim" : "full"}>
       <StarField nebula />
       <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
-        <aside data-route-order="" className="glass hairline flex h-full w-[248px] flex-col overflow-hidden rounded-[28px]" aria-label="Admin sidebar">
-          <ScrollArea className="px-3 pb-3 pt-5">
-            <div className="mb-6 flex items-center justify-between gap-2 px-2">
-              <Link href="/admin" className="text-[17px]" aria-label="Admin overview">
-                <OutlyLogo size={28} />
-              </Link>
-              <span className="rounded-full bg-lime/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-lime-ink">Admin</span>
-            </div>
-            <NavList role={admin.role} path={path} badges={badges} layoutId="admin-pill" />
-            <Footer admin={admin} path={path} layoutId="admin-pill" />
-          </ScrollArea>
+        <aside data-route-order="" className={cn("glass hairline flex h-full flex-col overflow-hidden rounded-[28px] transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none", slim ? "w-[72px]" : "w-[248px]")} aria-label="Admin sidebar">
+          <div className={cn("flex items-center gap-2 pb-4 pt-5", slim ? "flex-col px-3" : "justify-between px-5")}>
+            <Link href="/admin" aria-label="Admin overview" className="flex h-10 items-center">
+              {slim ? <OutlyMark size={26} /> : <OutlyLogo size={28} />}
+            </Link>
+            {!slim && <span className="rounded-full bg-lime/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-lime-ink">Admin</span>}
+            {/* Slim: the rail clips its own overflow, so the toggle uses the same fixed tooltip as the nav items. */}
+            <Tooltip text={slim ? "Expand sidebar" : "Collapse sidebar"} side="bottom" className={cn("flex", slim && "[&>.admin-tip]:!hidden")}>
+              <button type="button" onClick={toggleSlim} aria-pressed={slim} aria-label={slim ? "Expand sidebar" : "Collapse sidebar"} {...(slim ? { onPointerEnter: (e: React.PointerEvent<HTMLElement>) => slimTip.api.show(e.currentTarget, "Expand sidebar"), onPointerLeave: slimTip.api.hide, onFocus: (e: React.FocusEvent<HTMLElement>) => slimTip.api.show(e.currentTarget, "Expand sidebar"), onBlur: slimTip.api.hide } : {})} className="grid h-10 w-10 place-items-center rounded-full text-muted-foreground [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground">
+                {slim ? <PanelLeftOpen className="h-4 w-4" aria-hidden /> : <PanelLeftClose className="h-4 w-4" aria-hidden />}
+              </button>
+            </Tooltip>
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col" onScrollCapture={slimTip.api.hide}>
+            <ScrollArea className="px-3 pb-3">
+              <NavList role={admin.role} path={path} badges={badges} layoutId="admin-pill" slim={slim} tip={slim ? slimTip.api : undefined} />
+            </ScrollArea>
+          </div>
+          <Footer admin={admin} path={path} slim={slim} />
         </aside>
+        {slim && slimTip.node}
       </div>
 
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border/50 bg-background/75 px-4 py-2.5 backdrop-blur-xl lg:border-0 lg:bg-transparent lg:px-8 lg:pt-5 lg:backdrop-blur-0">
           <div className="flex items-center gap-2 lg:hidden">
-            <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" aria-expanded={open} className="grid h-11 w-11 place-items-center rounded-full hover:bg-secondary">
-              <Menu className="h-5 w-5" />
+            <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" aria-expanded={open} className="grid h-11 w-11 place-items-center rounded-full [@media(hover:hover)]:hover:bg-secondary">
+              <Menu className="h-5 w-5" aria-hidden />
             </button>
             <OutlyMark size={26} />
             <span className="font-display text-[15px] font-bold tracking-tight">Admin</span>
@@ -169,7 +248,9 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
             <Bell role={admin.role} />
           </div>
         </header>
-        <main id="main" className="mx-auto w-full max-w-[1240px] px-4 pb-24 pt-2 sm:px-6 lg:px-8">
+        {/* 1163: one content column for every admin page. Wide enough to use a 1920 screen (four metric columns, two
+            charts side by side) and capped so ultrawide monitors do not stretch tables across the whole desk. */}
+        <main id="main" className="admin-main mx-auto w-full max-w-[1480px] px-4 pb-24 pt-2 sm:px-6 lg:px-8">
           {children}
         </main>
       </div>
@@ -189,16 +270,16 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
               exit={{ x: "-110%" }}
               transition={T.card}
             >
-              <ScrollArea className="px-3 pb-3 pt-4">
-                <div className="mb-5 flex items-center justify-between px-2">
-                  <OutlyLogo size={26} />
-                  <button type="button" onClick={() => setOpen(false)} aria-label="Close menu" className="grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" autoFocus>
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
+              <div className="flex items-center justify-between px-5 pb-3 pt-4">
+                <OutlyLogo size={26} />
+                <button type="button" onClick={() => setOpen(false)} aria-label="Close menu" className="grid h-11 w-11 place-items-center rounded-full [@media(hover:hover)]:hover:bg-secondary" autoFocus>
+                  <X className="h-5 w-5" aria-hidden />
+                </button>
+              </div>
+              <ScrollArea className="px-3 pb-3">
                 <NavList role={admin.role} path={path} badges={badges} onNavigate={() => setOpen(false)} layoutId="admin-pill-m" />
-                <Footer admin={admin} path={path} onNavigate={() => setOpen(false)} layoutId="admin-pill-m" />
               </ScrollArea>
+              <Footer admin={admin} path={path} onNavigate={() => setOpen(false)} />
             </motion.aside>
           </>
         )}

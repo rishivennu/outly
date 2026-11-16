@@ -1,0 +1,23 @@
+/**
+ * 1163: the admin component kit under one roof. The names match the brief for the panel overhaul; the files behind
+ * them are the primitives the pages already used, so nothing was duplicated. Import from here in new admin code.
+ *
+ *   AdminPageHeader   title, lead, actions at the top of every page           (ui.tsx PageHead)
+ *   AdminSidebar      the shell: nav groups, slim mode, drawer, account        (AdminShell.tsx)
+ *   AdminMetricCard   a KPI with comparison period, definition and states      (motion/AdminKpi.tsx)
+ *   AdminSection      titled region with a responsive grid                     (ui.tsx Section)
+ *   AdminFilterBar    filters left, source/range/timezone/updated right        (FilterBar.tsx)
+ *   AdminDateRangePicker  7/30/90 chips plus optional custom from/to           (FilterBar.tsx)
+ *   AdminChartCard    chart with table view and a real empty state             (ChartCard.tsx)
+ *   AdminDataTable    the table that becomes labelled cards on phones          (ui.tsx Table)
+ *   AdminStatusBadge  one status vocabulary                                    (ui.tsx StatusBadge)
+ *   AdminEmptyState / AdminLoadingState / AdminErrorState                      (ui.tsx)
+ *   AdminConfirmDialog  the shared Radix confirm                               (components/shared/ConfirmDialog)
+ *   AdminTooltip / AdminHint                                                   (ui.tsx)
+ */
+export { PageHead as AdminPageHeader, Card as AdminCard, CardTitle as AdminCardTitle, Section as AdminSection, Table as AdminDataTable, StatusBadge as AdminStatusBadge, STATUS_LABEL, Empty as AdminEmptyState, LoadingState as AdminLoadingState, ErrorState as AdminErrorState, Unavailable as AdminUnavailable, Tooltip as AdminTooltip, Hint as AdminHint, Pill, tableMinWidth, fmtDate, ago } from "./ui";
+export { AdminShell as AdminSidebar, NAV, NAV_GROUPS } from "./AdminShell";
+export { AdminKpi as AdminMetricCard } from "./motion/AdminKpi";
+export { AdminFilterBar, AdminDateRangePicker, ReportMeta, RANGE_OPTIONS } from "./FilterBar";
+export { AdminChartCard } from "./ChartCard";
+export { ConfirmDialog as AdminConfirmDialog } from "@/components/shared/ConfirmDialog";

@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { accountView, ownedPost, postView, type PostView } from "@/lib/services";
-import { composerAccounts, platformAccounts } from "@/lib/profiles";
+import { composerAccounts, composerChoices, platformAccounts } from "@/lib/profiles";
 import { CreateWorkspace } from "@/components/create/CreateWorkspace";
 import { FormatComposer } from "@/components/create/FormatComposer";
 import { isSlideFormat, type SlideFormat } from "@/lib/formats";
@@ -25,7 +25,7 @@ export default async function CreatePage(props: { searchParams: Promise<Record<s
       post = null;
     }
   }
-  const accounts = await composerAccounts(user, pinned);
+  const [accounts, choices] = await Promise.all([composerAccounts(user, pinned), composerChoices(user)]);
   // 1131: Instagram Stories, photos and carousels have their own composer (no story, hooks or per-platform copy).
   const asked = isSlideFormat(searchParams.format) ? searchParams.format : null;
   const slideFormat = post ? (post.format !== "video" ? (post.format as SlideFormat) : null) : asked;
@@ -43,6 +43,7 @@ export default async function CreatePage(props: { searchParams: Promise<Record<s
     <CreateWorkspace
       key={post?.id ?? searchParams.local ?? searchParams.idea ?? "new"}
       accounts={accounts.map(accountView)}
+      choices={choices.map(accountView)}
       initialPost={post}
       tz={user.timezone}
       connected={searchParams.connected ?? null}

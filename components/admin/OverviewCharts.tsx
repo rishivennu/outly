@@ -6,13 +6,14 @@ import { prefersReduced, useEnter, useSeen } from "@/components/dashboard/motion
 import { useSlider } from "@/components/dashboard/useSlider";
 import { RollingNumber } from "@/components/dashboard/RollingNumber";
 import { Card, CardTitle } from "./ui";
+import { AdminChartCard, type ChartTable } from "./ChartCard";
 import { cn } from "@/lib/utils";
 
 type Row = { day: string; label: string; users: number; signups: number; active: number; revenue: number; newSubs: number; cancels: number; activeSubs: number };
 const RANGES = [7, 30, 90] as const;
 const LIME = "hsl(var(--lime-ink))";
 const PIE = ["#22f04a", "#a3e635", "#dcfa18", "#14b8a6", "#64748b"];
-const axis = { fontSize: 11, fill: "hsl(var(--muted-foreground))" };
+const axis = { fontSize: 12, fill: "hsl(var(--muted-foreground))" };
 const CROSS = { stroke: "hsl(var(--foreground) / 0.28)", strokeWidth: 1, strokeDasharray: "3 4" };
 const DOT = { r: 5, strokeWidth: 2.5, stroke: LIME, fill: "hsl(var(--card))" };
 
@@ -34,16 +35,21 @@ function GlassTip({ active, payload, label, fmt }: { active?: boolean; payload?:
   );
 }
 
-/** A chart card: it rises in with the section, and its chart only mounts (and so draws in) once it is on screen. */
-function ChartCard({ title, hint, className, h = 220, children }: { title: string; hint: string; className?: string; h?: number; children: React.ReactNode }) {
+/**
+ * A chart card: it rises in with the section, and its chart only mounts (and so draws in) once it is on screen.
+ * 1163: the same data is one click away as a table, and a range where every value is zero says so instead of
+ * drawing a flat line.
+ */
+function ChartCard({ title, hint, className, h = 220, table, allZero, children }: { title: string; hint: string; className?: string; h?: number; table?: ChartTable; allZero?: boolean; children: React.ReactNode }) {
   const { ref, seen } = useSeen<HTMLDivElement>(0.3);
   return (
-    <Card data-enter className={className}>
-      <CardTitle hint={hint}>{title}</CardTitle>
+    <AdminChartCard title={title} hint={hint} className={className} table={table} allZero={allZero} empty={{ title: "Nothing in this range yet", body: "Every day in the range is zero, so there is no trend to draw. Try a longer range, or come back once there is activity." }}>
       <div ref={ref} style={{ height: h }}>{seen && children}</div>
-    </Card>
+    </AdminChartCard>
   );
 }
+
+const zero = (rows: Row[], keys: (keyof Row)[]) => rows.every((r) => keys.every((k) => !Number(r[k])));
 
 /**
  * Admin Overview trends (1081, the 1080 analytics motion): the cards stagger in, each line draws left to
@@ -73,6 +79,7 @@ export function OverviewCharts({ series, revenueByPlan, currency, showMoney }: {
     requestAnimationFrame(() => seg.box.current?.querySelector<HTMLElement>(`[data-r="${r}"]`)?.focus());
   };
   const total = revenueByPlan.reduce((t, r) => t + r.value, 0) || 1;
+  const tbl = (head: string[], cells: (r: Row) => (string | number)[]): ChartTable => ({ head: ["Day", ...head], rows: data.map((r) => [r.label, ...cells(r)]) });
 
   return (
     <div ref={root} data-enter-root className="mt-6">
@@ -89,7 +96,7 @@ export function OverviewCharts({ series, revenueByPlan, currency, showMoney }: {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Active users" hint="Distinct users who opened the studio each day">
+        <ChartCard title="Active users" hint="Distinct users who opened the studio each day" table={tbl(["Active"], (r) => [r.active])} allZero={zero(data, ["active"])}>
           <ResponsiveContainer>
             <AreaChart data={data} margin={{ left: -18, right: 6, top: 6 }}>
               <defs><linearGradient id="g-act" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7cf52a" stopOpacity={0.45} /><stop offset="1" stopColor="#7cf52a" stopOpacity={0} /></linearGradient></defs>
@@ -102,7 +109,7 @@ export function OverviewCharts({ series, revenueByPlan, currency, showMoney }: {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="User growth" hint="Total accounts, and new sign-ups per day">
+        <ChartCard title="User growth" hint="Total accounts, and new sign-ups per day" table={tbl(["Sign-ups", "Total users"], (r) => [r.signups, r.users])} allZero={zero(data, ["signups", "users"])}>
           <ResponsiveContainer>
             <ComposedChart data={data} margin={{ left: -18, right: -10, top: 6 }}>
               <CartesianGrid vertical={false} stroke="hsl(var(--foreground) / 0.06)" />
@@ -118,7 +125,7 @@ export function OverviewCharts({ series, revenueByPlan, currency, showMoney }: {
 
         {showMoney && (
           <>
-            <ChartCard title="Revenue" hint={`Successful payments per day, ${currency}`}>
+            <ChartCard title="Revenue" hint={`Successful payments per day, ${currency}`} table={tbl([`Revenue (${currency})`], (r) => [money(r.revenue)])} allZero={zero(data, ["revenue"])}>
               <ResponsiveContainer>
                 <AreaChart data={data} margin={{ left: 0, right: 6, top: 6 }}>
                   <defs><linearGradient id="g-rev" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#22f04a" stopOpacity={0.4} /><stop offset="1" stopColor="#22f04a" stopOpacity={0} /></linearGradient></defs>
@@ -131,7 +138,7 @@ export function OverviewCharts({ series, revenueByPlan, currency, showMoney }: {
               </ResponsiveContainer>
             </ChartCard>
 
-            <ChartCard title="Subscriptions & churn" hint="Active paid subscriptions, with new and cancelled per day">
+            <ChartCard title="Subscriptions & churn" hint="Active paid subscriptions, with new and cancelled per day" table={tbl(["Active", "New", "Cancelled"], (r) => [r.activeSubs, r.newSubs, r.cancels])} allZero={zero(data, ["activeSubs", "newSubs", "cancels"])}>
               <ResponsiveContainer>
                 <LineChart data={data} margin={{ left: -18, right: 6, top: 6 }}>
                   <CartesianGrid vertical={false} stroke="hsl(var(--foreground) / 0.06)" />
