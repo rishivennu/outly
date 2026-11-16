@@ -6,6 +6,7 @@
  * MediaRecorder as MP4 (Chrome / Edge 126+, Safari).
  */
 import { cueAt, wrapLines, type CaptionPos, type CaptionStyle, type Cue } from "@/lib/captions/cues";
+import { captionFont, captionTracking, clampSize } from "@/lib/captions/size";
 import { CHUNK_STEP, planChunks, type ChunkPlan } from "@/lib/captions/timing";
 import { ChunkFailure } from "@/lib/captions/run";
 import type { Word } from "@/lib/captions/subtitle-engine";
@@ -38,7 +39,20 @@ function wav(samples: Float32Array, rate = RATE): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
-export type AudioChunk = ChunkPlan & { blob: Blob };
+/** `silent`: the part is digital silence (peak under about -54 dBFS), so there is nothing to send. */
+export type AudioChunk = ChunkPlan & { blob: Blob; silent?: boolean };
+
+/** Below this peak a part holds no sound anyone could caption; the model only invents words for it. */
+export const SILENT_PEAK = 0.002;
+
+export function peakOf(s: Float32Array) {
+  let m = 0;
+  for (let i = 0; i < s.length; i++) {
+    const v = s[i] < 0 ? -s[i] : s[i];
+    if (v > m) m = v;
+  }
+  return m;
+}
 
 /** Decode the video's soundtrack to 16 kHz mono and cut it into overlapping ~60 s WAV chunks. */
 export async function audioChunks(src: string | Blob, signal?: AbortSignal): Promise<AudioChunk[]> {
@@ -73,7 +87,7 @@ export async function audioChunks(src: string | Blob, signal?: AbortSignal): Pro
   return planChunks(mono.length / RATE).map((p) => {
     const a = Math.round(p.offset * RATE);
     const slice = mono.subarray(a, Math.min(mono.length, a + Math.round(p.duration * RATE)));
-    return { ...p, duration: slice.length / RATE, blob: wav(slice) };
+    return { ...p, duration: slice.length / RATE, blob: wav(slice), silent: peakOf(slice) < SILENT_PEAK };
   });
 }
 
@@ -85,7 +99,7 @@ export async function postChunk(c: AudioChunk, q: { ref: string; run: string; la
   if (q.lang && q.lang !== "auto") qs.set("lang", q.lang);
   const r = await fetch(`/api/ai/transcribe?${qs}`, { method: "POST", body: c.blob, headers: { "content-type": "audio/wav" }, credentials: "same-origin", signal });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new ChunkFailure(j.error ?? "Transcription didn't come back.", r.status, j.code ?? "", { ...j, retryAfter: Number(r.headers.get("retry-after")) || 0 });
+  if (!r.ok) throw new ChunkFailure(j.error ?? "Transcription didn't come back.", r.status, j.code ?? "", { ...j, retryAfter: Number(r.headers.get("retry-after")) || Number(j.retryAfter) || 0 });
   return { words: Array.isArray(j.words) ? j.words : [], language: typeof j.language === "string" ? j.language : "", lines: j.lines };
 }
 
@@ -101,10 +115,14 @@ export function recorderType(): { mime: string; ext: "mp4" } | null {
   return null;
 }
 
-/** Draw one cue on a frame. Shared by the live preview canvas and the recorder. */
-export function drawCue(ctx: CanvasRenderingContext2D, text: string, w: number, h: number, style: CaptionStyle, pos: CaptionPos) {
-  const size = Math.round(Math.min(w, h) * (style === "pop" ? 0.072 : 0.058));
-  ctx.font = `${style === "clean" ? 600 : 800} ${size}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+/** How the lines look: size in percent of the style's base (lib/captions/size.ts) and the loaded Poppins family name. */
+export type CaptionLook = { size?: number; font?: string };
+
+/** Draw one cue on a frame. Shared by the live preview canvas and the recorder. Poppins Bold, tracking -2% of the size. */
+export function drawCue(ctx: CanvasRenderingContext2D, text: string, w: number, h: number, style: CaptionStyle, pos: CaptionPos, look: CaptionLook = {}) {
+  const size = Math.round(Math.min(w, h) * (style === "pop" ? 0.072 : 0.058) * (clampSize(look.size) / 100));
+  ctx.font = captionFont(size, look.font);
+  if ("letterSpacing" in ctx) ctx.letterSpacing = captionTracking(size);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   const words = style === "pop" ? text.toUpperCase() : text;
@@ -137,16 +155,31 @@ export function drawCue(ctx: CanvasRenderingContext2D, text: string, w: number, 
 }
 
 /**
+ * A canvas does not wait for a web font: have the face in memory before the first captioned frame is recorded.
+ * `text` is what will be drawn: Poppins is split into Latin, Latin Extended and Devanagari files, and only the
+ * ones the text needs are fetched (without it only the Latin file loads, and an accented or Hindi line would
+ * record in the fallback face).
+ */
+async function readyFont(family?: string, text?: string) {
+  if (typeof document === "undefined" || !("fonts" in document)) return;
+  await document.fonts.load(captionFont(32, family), text || undefined).catch(() => {});
+}
+
+/** The distinct characters of a track, for readyFont: short, and every script it uses is in it. */
+export const sampleText = (cues: Cue[]) => [...new Set(cues.map((c) => c.text).join(""))].join("");
+
+/**
  * Real-time render: the clip plays once (muted to the user) while the canvas records, so a 45 s clip takes ~45 s.
  * Returns a File ready to upload.
  */
 export async function burnCaptions(
   src: string,
   cues: Cue[],
-  opts: { style: CaptionStyle; pos: CaptionPos; name: string; onProgress?: (p: number) => void; signal?: AbortSignal },
+  opts: { style: CaptionStyle; pos: CaptionPos; name: string; onProgress?: (p: number) => void; signal?: AbortSignal } & CaptionLook,
 ): Promise<File> {
   const type = recorderType();
   if (!type) throw new Error("This browser can't record MP4 video. Use the latest Chrome, Edge or Safari, or download the .srt file instead.");
+  await readyFont(opts.font, sampleText(cues));
   const video = document.createElement("video");
   video.src = src;
   video.crossOrigin = "anonymous";
@@ -183,7 +216,7 @@ export async function burnCaptions(
   const draw = () => {
     ctx.drawImage(video, 0, 0, w, h);
     const c = cueAt(cues, video.currentTime);
-    if (c) drawCue(ctx, c.text, w, h, opts.style, opts.pos);
+    if (c) drawCue(ctx, c.text, w, h, opts.style, opts.pos, opts);
     opts.onProgress?.(Math.min(0.99, video.currentTime / (video.duration || 1)));
     if (!video.ended && !video.paused) raf = "requestVideoFrameCallback" in video ? (video as any).requestVideoFrameCallback(draw) : requestAnimationFrame(draw);
   };
@@ -226,10 +259,11 @@ export async function burnCaptions(
 export async function cutClips(
   src: string,
   ranges: { start: number; end: number }[],
-  opts: { cues?: Cue[]; style: CaptionStyle; pos: CaptionPos; name: string; onProgress?: (p: number) => void; signal?: AbortSignal },
+  opts: { cues?: Cue[]; style: CaptionStyle; pos: CaptionPos; name: string; onProgress?: (p: number) => void; signal?: AbortSignal } & CaptionLook,
 ): Promise<File> {
   const type = recorderType();
   if (!type) throw new Error("This browser can't record MP4 video. Use the latest Chrome, Edge or Safari.");
+  if (opts.cues) await readyFont(opts.font, sampleText(opts.cues));
   const keep = [...ranges].filter((r) => r.end - r.start > 0.1).sort((a, b) => a.start - b.start);
   if (!keep.length) throw new Error("Pick at least one part of the video to keep.");
   const total = keep.reduce((t, r) => t + r.end - r.start, 0);
@@ -271,7 +305,7 @@ export async function cutClips(
   const paint = () => {
     ctx.drawImage(video, 0, 0, w, h);
     const c = opts.cues ? cueAt(opts.cues, video.currentTime) : null;
-    if (c) drawCue(ctx, c.text, w, h, opts.style, opts.pos);
+    if (c) drawCue(ctx, c.text, w, h, opts.style, opts.pos, opts);
   };
   const seek = (t: number) =>
     new Promise<void>((res) => {

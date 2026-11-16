@@ -36,7 +36,7 @@ export type RunResult<T> = { results: Map<number, T>; failed: { index: number; e
 export async function runChunks<T>(
   indices: number[],
   work: (index: number, signal: AbortSignal) => Promise<T>,
-  o: { concurrency?: number; retries?: number; backoffMs?: number; signal?: AbortSignal; onDone?: (index: number, done: number, total: number) => void } = {},
+  o: { concurrency?: number; retries?: number; backoffMs?: number; signal?: AbortSignal; onDone?: (index: number, done: number, total: number) => void; onResult?: (index: number, value: T) => void } = {},
 ): Promise<RunResult<T>> {
   const concurrency = Math.max(1, Math.min(3, o.concurrency ?? 3));
   const retries = Math.max(0, o.retries ?? 2);
@@ -54,7 +54,10 @@ export async function runChunks<T>(
     for (let attempt = 0; ; attempt++) {
       if (inner.signal.aborted) return;
       try {
-        results.set(index, await work(index, inner.signal));
+        const value = await work(index, inner.signal);
+        results.set(index, value);
+        // Progressive: the caller shows this part's lines now, not when the whole run ends.
+        if (!inner.signal.aborted) o.onResult?.(index, value);
         o.onDone?.(index, ++done, indices.length);
         return;
       } catch (err) {

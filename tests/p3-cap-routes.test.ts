@@ -210,14 +210,14 @@ describe("p3 transcribe charges once per run", () => {
     expect(sent[0].body.generationConfig.responseSchema.required).toEqual(["language", "words"]);
     expect(sent[0].body.contents[0].parts[1].text).toContain("mainly in Telugu (te)");
   });
-  test("route: garbage timings from both tries are refused as BAD_TIMING, never stretched", async () => {
+  test("route: garbage timings from every try (lite, flash, lite again) are refused as BAD_TIMING, never stretched", async () => {
     await who();
     answer = () => ({ language: "en", words: Array.from({ length: 12 }, (_, i) => ({ w: `w${i}`, s: 0, e: 0 })) });
     stub();
     const r = await chunk("offset=0&duration=1&ref=g.mp4:10&run=run-ffffffff&chunk=0");
     expect(r.status).toBe(502);
     expect((await r.json()).code).toBe("BAD_TIMING");
-    expect(sent.length).toBe(2);
+    expect(sent.map((s) => s.url.match(/models\/([^:]+)/)?.[1])).toEqual(["gemini-3.1-flash-lite", "gemini-3.6-flash", "gemini-3.1-flash-lite"]);
   });
   test("route: a language hint that is not a tag is refused before anything is spent", async () => {
     const u = await who();

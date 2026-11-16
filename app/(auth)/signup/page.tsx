@@ -9,6 +9,8 @@ import { isCode } from "@/lib/referral-core";
 import { referralConfig } from "@/lib/referral";
 import { db } from "@/lib/db";
 import { whatsappAvailable } from "@/lib/whatsapp";
+import { appleConfigured } from "@/lib/apple-auth";
+import { oneTapClientId } from "@/lib/google-one-tap";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Create your account" };
@@ -33,7 +35,7 @@ export default async function SignupPage(props: { searchParams: Promise<{ ref?: 
   const banner = seats || inv ? <>{inv && <ReferralInvite plan={inv.plan} days={inv.days} />}{seats && <FoundingSeats initial={seats} />}</> : null;
   return (
     <Suspense fallback={<AuthFormSkeleton fields={3} />}>
-      <AuthForm mode="signup" google={hasCredentials("youtube")} whatsapp={whatsapp} title="Create an account" subtitle="Upload once, post everywhere. Takes ten seconds." banner={banner} />
+      <AuthForm mode="signup" google={hasCredentials("youtube")} googleClientId={hasCredentials("youtube") ? oneTapClientId() : ""} whatsapp={whatsapp} apple={appleConfigured()} title="Create an account" subtitle="Upload once, post everywhere. Takes ten seconds." banner={banner} />
     </Suspense>
   );
 }

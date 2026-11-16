@@ -184,3 +184,35 @@ export async function signInWithGoogle(who: { email: string; name?: string; pict
   const u = await joined(await db.user.create({ data: { email, name: who.name?.trim() || email.split("@")[0], avatar: who.picture ?? null, emailVerifiedAt: new Date(), emailVerifiedFor: email, ...tzData(await cookieTimezone()) }, select: { id: true } }), true);
   return { id: u.id, created: true };
 }
+
+/**
+ * Sign in with Apple (1153). Apple's `sub` is the stable key: a studio that has used Apple before is found by it
+ * even if the Apple ID's email changed. The first time, a studio with the same verified email is linked rather
+ * than duplicated (as Google does); otherwise a new studio is made, with the 18+ tick and the waitlist applying.
+ * Hide My Email addresses are real inboxes (Apple forwards them), so they are stored like any other.
+ */
+export async function signInWithApple(who: { sub: string; email: string | null; emailVerified: boolean; name?: string }, opts: { adult?: boolean } = {}) {
+  const known = await db.user.findUnique({ where: { appleSub: who.sub }, select: { id: true } });
+  if (known) return { id: known.id, created: false };
+  if (!who.email) throw new HttpError(422, "Apple didn't share an email address for this Apple ID.", "no_email");
+  const email = who.email.toLowerCase();
+  const existing = await db.user.findUnique({ where: { email }, select: { id: true, appleSub: true, emailVerifiedAt: true, foundingNo: true } });
+  if (existing) {
+    if (!who.emailVerified) throw new HttpError(403, "That Apple ID's email isn't verified.", "unverified");
+    if (existing.appleSub && existing.appleSub !== who.sub) throw new HttpError(409, "That account is linked to a different Apple ID.", "apple_other");
+    await db.user.update({ where: { id: existing.id }, data: { appleSub: who.sub } });
+    if (!existing.emailVerifiedAt || !existing.foundingNo) await markEmailVerified(existing.id);
+    return { id: existing.id, created: false };
+  }
+  await assertMayCreateAccount(email);
+  // Like Google (1058): the callback has no form, so the signup page's ticked 18+ box arrives as a cookie.
+  if (!opts.adult) throw new HttpError(403, "Please confirm you're 18 or older to create an account.", "age");
+  const verified = who.emailVerified ? { emailVerifiedAt: new Date(), emailVerifiedFor: email } : {};
+  try {
+    const u = await joined(await db.user.create({ data: { email, appleSub: who.sub, name: who.name?.trim() || email.split("@")[0], ...verified, ...tzData(await cookieTimezone()) }, select: { id: true } }), who.emailVerified);
+    return { id: u.id, created: true };
+  } catch (e) {
+    if ((e as { code?: string }).code === "P2002") throw new HttpError(409, "That Apple ID was just used for another account. Start again.", "apple_other");
+    throw e;
+  }
+}

@@ -17,7 +17,7 @@ const t = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4
  * FunClip-style cutting inside the caption editor: type words from the transcript (several with #) or let
  * Gemini suggest highlights, preview each part, then record only the kept parts as the post's video.
  */
-export function ClipCutter({ src, filename, duration, cues, words, style, pos, preview, disabled, onCut, onError }: {
+export function ClipCutter({ src, filename, duration, cues, words, style, pos, size, font, preview, disabled, onCut, onError }: {
   src: string;
   filename: string;
   duration: number;
@@ -25,6 +25,9 @@ export function ClipCutter({ src, filename, duration, cues, words, style, pos, p
   words: Word[];
   style: CaptionStyle;
   pos: CaptionPos;
+  /** Caption size in percent and the loaded caption font family, as the burner draws them. */
+  size?: number;
+  font?: string;
   preview: React.RefObject<HTMLVideoElement | null>;
   disabled?: boolean;
   onCut: (file: File) => void;
@@ -97,7 +100,7 @@ export function ClipCutter({ src, filename, duration, cues, words, style, pos, p
     abort.current = ctrl;
     setBusy({ p: 0 });
     try {
-      const file = await cutClips(src, chosen, { cues: withCaps ? cues : undefined, style, pos, name: filename, signal: ctrl.signal, onProgress: (p) => setBusy({ p }) });
+      const file = await cutClips(src, chosen, { cues: withCaps ? cues : undefined, style, pos, size, font, name: filename, signal: ctrl.signal, onProgress: (p) => setBusy({ p }) });
       onCut(file);
       setNote(`Cut done: ${length.toFixed(1)} s kept. It is now the post's video.`);
     } catch (e) {
@@ -138,7 +141,7 @@ export function ClipCutter({ src, filename, duration, cues, words, style, pos, p
                 <label className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-start gap-3 px-1 py-1.5">
                   <input type="checkbox" checked={p.on} onChange={(e) => setPicks((ps) => ps.map((x, j) => (j === i ? { ...x, on: e.target.checked } : x)))} className="mt-1 h-4 w-4 shrink-0 accent-[hsl(var(--lime))]" />
                   <span className="min-w-0">
-                    <span className="block text-[14px] font-medium">{p.title ?? cues.find((c) => c.end > p.start)?.text ?? "Part"}</span>
+                    <span className="block text-[14px] font-medium">{p.title ?? cues.reduce<{ ov: number; c?: Cue }>((b, c) => { const ov = Math.min(c.end, p.end) - Math.max(c.start, p.start); return ov > b.ov ? { ov, c } : b; }, { ov: 0 }).c?.text ?? "Part"}</span>
                     <span className="block text-[13px] tabular text-muted-foreground">
                       {t(p.start)} to {t(p.end)}, {(p.end - p.start).toFixed(1)} s{p.from === "ai" ? ", picked by Gemini" : ""}
                     </span>

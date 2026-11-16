@@ -16,14 +16,15 @@ const chunk = (index: number, from: number, to: number): AudioChunk => ({ index,
 const words = (from: number, list: string[]) => list.map((w, i) => ({ w, s: from + i * 0.5, e: from + i * 0.5 + 0.4 }));
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
-function rig(opts: { gate?: Promise<void>; fail?: number[] } = {}) {
+function rig(opts: { gate?: Promise<void>; fail?: number[]; hold?: { index: number; until: Promise<void> }; silent?: number[] } = {}) {
   const calls: { lang?: string; ref: string }[] = [];
   let burned: { cues: Cue[] } | null = null;
   const deps: Partial<Deps> = {
-    audioChunks: async () => [chunk(0, 0, 5), chunk(1, 5, 10)],
+    audioChunks: async () => [chunk(0, 0, 5), chunk(1, 5, 10)].map((c) => ({ ...c, silent: opts.silent?.includes(c.index) })),
     postChunk: async (c, q, signal) => {
       calls.push(q);
       if (opts.gate) await opts.gate;
+      if (opts.hold?.index === c.index) await opts.hold.until;
       if (signal.aborted) throw Object.assign(new Error("stopped"), { name: "AbortError" });
       if (opts.fail?.includes(c.index)) throw new Error("no answer");
       return { words: words(c.from, ["one", "two", "three"]), language: "te" } satisfies ChunkAnswer;
@@ -56,7 +57,7 @@ describe("p4 caption run store", () => {
       if (p && seen[seen.length - 1] !== p) seen.push(p);
     });
     await store.transcribe();
-    expect(seen).toContain("Captions 1 of 2 parts");
+    expect(seen).toContain("Transcribing, 1 of 2 parts");
     expect(seen[seen.length - 1]).toBe("Done");
     const s = store.getState();
     expect(s.busy).toBeNull();
@@ -65,6 +66,85 @@ describe("p4 caption run store", () => {
     const last = tracks[tracks.length - 1]!;
     expect(last.cues).toEqual(s.tracks.orig);
     expect(last.lang).toBe("te");
+  });
+
+  test("progressive: a part's lines show as soon as it lands, and a line edited mid-run survives the end", async () => {
+    let open!: () => void;
+    const until = new Promise<void>((r) => (open = r));
+    const { store, tracks } = rig({ hold: { index: 1, until } });
+    const p = store.transcribe();
+    for (let i = 0; i < 20 && !store.getState().tracks.orig.length; i++) await tick();
+    const mid = store.getState();
+    expect(mid.busy).not.toBeNull();
+    expect(mid.tracks.orig.length).toBeGreaterThan(0);
+    expect(mid.tracks.orig.every((c) => c.end <= 5.5)).toBe(true);
+    expect(mid.heard).toBe("te");
+    expect(runPill(mid)).toBe("Transcribing, 1 of 2 parts");
+    expect(tracks.length).toBeGreaterThan(0);
+    store.setCues((cs) => cs.map((c, i) => (i === 0 ? { ...c, text: "fixed while waiting" } : c)));
+    open();
+    await p;
+    const s = store.getState();
+    expect(s.busy).toBeNull();
+    expect(s.tracks.orig[0].text).toBe("fixed while waiting");
+    expect(s.tracks.orig.some((c) => c.start >= 5)).toBe(true);
+  });
+
+  test("Stop mid-run keeps the parts that landed and lists the rest to retry", async () => {
+    let open!: () => void;
+    const until = new Promise<void>((r) => (open = r));
+    const { store } = rig({ hold: { index: 1, until } });
+    const p = store.transcribe();
+    for (let i = 0; i < 20 && !store.getState().tracks.orig.length; i++) await tick();
+    store.stop();
+    open();
+    await p;
+    const s = store.getState();
+    expect(s.outcome).toBe("stopped");
+    expect(s.tracks.orig.length).toBeGreaterThan(0);
+    expect(s.tracks.orig.every((c) => c.end <= 5.5)).toBe(true);
+    expect(s.gaps.map((g) => g.index)).toEqual([1]);
+    expect(s.note).toBe("Stopped with 1 of 2 parts back. Retry the rest below.");
+    await store.transcribe([1]);
+    const r = store.getState();
+    expect(r.gaps).toEqual([]);
+    expect(r.tracks.orig.some((c) => c.start >= 5)).toBe(true);
+    expect(r.tracks.orig.some((c) => c.end <= 5)).toBe(true);
+  });
+
+  test("a re-run keeps the English track in step while parts land", async () => {
+    const hold = { index: -1, until: Promise.resolve() };
+    const { store } = rig({ hold });
+    await store.transcribe();
+    await store.translate();
+    expect(store.getState().tracks.view).toBe("english");
+    let open!: () => void;
+    hold.until = new Promise<void>((r) => (open = r));
+    hold.index = 1;
+    const p = store.transcribe();
+    for (let i = 0; i < 20 && store.getState().busy?.kind !== "transcribe"; i++) await tick();
+    for (let i = 0; i < 20 && store.getState().busy?.kind === "transcribe" && (store.getState().busy as { done: number }).done < 1; i++) await tick();
+    const mid = store.getState();
+    expect(mid.busy).toEqual({ kind: "transcribe", done: 1, total: 2 });
+    expect(mid.tracks.view).toBe("english");
+    expect(mid.tracks.en!.length).toBe(mid.tracks.orig.length);
+    expect(mid.tracks.en!.map((c) => [c.start, c.end])).toEqual(mid.tracks.orig.map((c) => [c.start, c.end]));
+    expect(mid.tracks.en!.every((c) => c.text.startsWith("EN "))).toBe(true);
+    open();
+    await p;
+    expect(store.getState().busy).toBeNull();
+  });
+
+  test("a silent part is never sent to the AI; a video that is all silence says no speech was heard", async () => {
+    const one = rig({ silent: [1] });
+    await one.store.transcribe();
+    expect(one.calls.length).toBe(1);
+    expect(one.store.getState().tracks.orig.every((c) => c.end <= 5.5)).toBe(true);
+    const none = rig({ silent: [0, 1] });
+    await none.store.transcribe();
+    expect(none.calls.length).toBe(0);
+    expect(none.store.getState().tracks.orig).toEqual([]);
+    expect(none.store.getState().note).toContain("We didn't hear any speech");
   });
 
   test("Stop ends the run as Stopped and keeps the lines you had", async () => {

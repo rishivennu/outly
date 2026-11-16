@@ -40,7 +40,10 @@ async function join(job: Job, signal: AbortSignal) {
 /** POST raw audio/wav (one chunk). ?offset=seconds into the video, &duration=chunk length, &ref=video, &run=this run, &chunk=index, &lang=spoken language hint. */
 export const POST = route(
   async (req, { user }) => {
+    // The model's tries get what is left of maxDuration after the body, the checks and the charge.
+    const deadline = Date.now() + 55_000;
     const type = req.headers.get("content-type") ?? "";
+
     if (!type.startsWith("audio/wav")) throw new HttpError(415, "Send the audio as WAV.", "BAD_TYPE");
     const len = Number(req.headers.get("content-length") ?? 0);
     if (len > MAX) throw new HttpError(413, "That audio chunk is too big. Send 60 seconds at a time.", "TOO_LARGE");
@@ -73,7 +76,7 @@ export const POST = route(
         // 1147: billed to the monthly cost budget as transcription minutes; Phase 3: one AI request per run,
         // plus one per CHUNKS_PER_CAPTION_VIDEO distinct chunks of audio.
         await chargeRun(uid, ref, run, duration, new Date(), h);
-        return await transcribeWav(buf, offset, duration, { lang, signal: ctl.signal });
+        return await transcribeWav(buf, offset, duration, { lang, signal: ctl.signal, deadline });
       } catch (e) {
         // Over the daily AI cap, or the model failed: the creator got no captions, so the slot goes back (1027).
         await slot.release().catch((err) => console.error("[transcribe] release", err));

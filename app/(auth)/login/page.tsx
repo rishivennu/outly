@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { AuthFormSkeleton } from "@/components/auth/AuthFormSkeleton";
 import { whatsappAvailable } from "@/lib/whatsapp";
+import { appleConfigured } from "@/lib/apple-auth";
+import { oneTapClientId } from "@/lib/google-one-tap";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Sign in" };
@@ -14,7 +16,9 @@ export default async function LoginPage() {
       <AuthForm
         mode="login"
         google={hasCredentials("youtube")}
+        googleClientId={hasCredentials("youtube") ? oneTapClientId() : ""}
         whatsapp={whatsapp}
+        apple={appleConfigured()}
         title="Welcome back"
         subtitle={`Sign in to pick up where you left off. Your drafts and schedule are waiting.${process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_LOGIN === "true" ? " The demo account is filled in for you." : ""}`}
       />

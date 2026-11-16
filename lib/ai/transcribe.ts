@@ -11,12 +11,21 @@ import { db } from "../db";
 import { chargeAi } from "../ai-quota";
 import { recordCost } from "../subscriptions/costs";
 import { CHUNKS_PER_CAPTION_VIDEO } from "../billing/entitlements";
+import { hedgeAfterMs, hedged, type TryResult } from "../captions/hedge";
 
-// gemini-flash-latest stopped answering (30 s+ timeouts, 10-30 benchmark), so it no longer goes first.
-const MODELS = ["gemini-3.6-flash", "gemini-flash-lite-latest"];
-/** Both tries together must fit the route's 60 s maxDuration. */
+/**
+ * Benchmark 11-16 (en, hi, te, ta, kn, bn and mixed te-en, TTS with known word times): 3.1-flash-lite answers a
+ * 50 s part in 7-14 s with WER and word timing as good as or better than 3.6-flash, which spends 3-4k thinking
+ * tokens and takes 25-34 s. flash-lite-latest and 3.5-flash-lite now return times that jump or bunch up, and
+ * 3.7/3.8-flash time out at 45 s. gemini-flash-latest is never used (30 s+ timeouts, 10-30 benchmark).
+ */
+const PRIMARY = "gemini-3.1-flash-lite";
+/** After a failed try (an error, or times that can't be trusted), a different model gets the audio. */
+const FALLBACKS = ["gemini-3.6-flash", PRIMARY];
+/** Every try together must fit the route's 60 s maxDuration, counted from when the request came in. */
 const BUDGET_MS = 52_000;
-const FIRST_TRY_MS = 30_000;
+/** 3.6-flash thinks for 25-34 s on a 60 s part, so it is only worth starting with this much time left. */
+const minLeftFor = (model: string) => (model === PRIMARY ? 8_000 : 30_000);
 
 const RESPONSE_SCHEMA = {
   type: "OBJECT",
@@ -30,7 +39,7 @@ const RESPONSE_SCHEMA = {
 export const transcribePrompt = (rules: SubtitleRules, duration: number, lang = "") => `Transcribe the speech in this audio word by word, for on-screen video subtitles.
 Return JSON {"language": BCP-47 code of the main spoken language, "words": [{"w": "word", "s": start seconds, "e": end seconds}]}.
 Rules: keep the speaker's exact words and language (do not translate); write each language in its own script (Telugu in Telugu script, Tamil in Tamil script, Hindi in Devanagari), and English words the speaker mixes in stay in English; write punctuation as people would read it and attach it to the word before it (so "Hello," and "today."); drop only filler like "um"; one entry per spoken word (for Chinese or Japanese, one per character); nothing for music or silence.
-Timing: this audio is ${duration.toFixed(2)} seconds long. s and e are seconds (not milliseconds) from the start of THIS audio, as numbers with two decimals, between 0 and ${duration.toFixed(2)}, in the order spoken. s is when the word starts being heard, e when it stops; leave pauses as gaps between words.${lang ? ` The speaker talks mainly in ${languageName(lang)} (${lang}).` : ""}${rules.hotwords.length ? ` These names may come up, spell them exactly: ${rules.hotwords.join(", ")}.` : ""} If nobody speaks, return {"language":"", "words": []}.`;
+Timing: this audio is ${duration.toFixed(2)} seconds long. s and e are seconds (not milliseconds) from the start of THIS audio, as numbers with two decimals, between 0 and ${duration.toFixed(2)}, in the order spoken. s is when the word starts being heard, e when it stops; leave pauses as gaps between words.${lang ? ` The speaker talks mainly in ${languageName(lang)} (${lang}).` : ""}${rules.hotwords.length ? ` These names may come up, spell them exactly: ${rules.hotwords.join(", ")}.` : ""} If nobody speaks, return {"language":"", "words": []}. A word the speaker says in English is written in English letters, whatever language the rest of the speech is in ("video", not "వీడియో", "ビデオ" or "видео"); the same goes for any other language mixed into the speech: write each word in its own script, never transliterated into the main language's script.`;
 
 /** The line rules the editor needs to rebuild whole-video lines from the stitched words. */
 export type LineRules = Pick<SubtitleRules, "maxChars" | "maxWords" | "minCue" | "maxCue" | "pause">;
@@ -70,58 +79,62 @@ export function readGeminiAnswer(parsed: unknown, offset: number, duration: numb
   return { ok: false, reason: "no words in the answer" };
 }
 
-async function viaGemini(wav: ArrayBuffer, offset: number, duration: number, rules: SubtitleRules, lang: string, signal?: AbortSignal): Promise<Transcript> {
+type Answer = { words: Word[]; language: string };
+
+/** One try at one model: a usable answer, or why not (an HTTP error, an empty reply, times that don't line up). */
+async function askGemini(model: string, data: string, prompt: string, offset: number, duration: number, signal: AbortSignal, timeoutMs: number): Promise<TryResult<Answer>> {
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY! },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ inline_data: { mime_type: "audio/wav", data } }, { text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json", responseSchema: RESPONSE_SCHEMA, temperature: 0.1 },
+    }),
+    signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),
+  });
+  if (!r.ok) return { ok: false, reason: `${model} ${r.status}`, status: r.status };
+  const j = await r.json();
+  const txt: string | undefined = j.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("");
+  if (!txt) return { ok: false, reason: `${model} empty` };
+  const got = readGeminiAnswer(JSON.parse(txt.replace(/^```(?:json)?|```$/g, "").trim()), offset, duration);
+  if (!got.ok) {
+    console.warn(`[transcribe] ${model} at ${offset}s: ${got.reason}`);
+    return { ok: false, reason: got.reason, badTiming: true };
+  }
+  return { ok: true, value: { words: got.words, language: got.language } };
+}
+
+async function viaGemini(wav: ArrayBuffer, offset: number, duration: number, rules: SubtitleRules, lang: string, signal?: AbortSignal, deadline?: number): Promise<Transcript> {
   if (!env.GEMINI_API_KEY) throw new HttpError(503, "AI transcription needs a Gemini API key on the server. You can still type or paste your captions.", "NO_AI");
   const data = Buffer.from(wav).toString("base64");
-  const stopAt = Date.now() + BUDGET_MS;
-  let lastErr = "";
-  let badTiming = false;
-  // Two tries at most: the second goes to the other model when the first fails or its times are garbage.
-  for (let i = 0; i < MODELS.length; i++) {
-    const left = stopAt - Date.now();
-    if (left < 8_000 || signal?.aborted) break;
-    const model = MODELS[i];
-    try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ inline_data: { mime_type: "audio/wav", data } }, { text: transcribePrompt(rules, duration, lang) }] }],
-          generationConfig: { responseMimeType: "application/json", responseSchema: RESPONSE_SCHEMA, temperature: 0.1 },
-        }),
-        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(i === 0 ? Math.min(FIRST_TRY_MS, left) : left)]) : AbortSignal.timeout(i === 0 ? Math.min(FIRST_TRY_MS, left) : left),
-      });
-      if (!r.ok) {
-        lastErr = `${model} ${r.status}`;
-        continue;
-      }
-      const j = await r.json();
-      const txt: string | undefined = j.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("");
-      if (!txt) {
-        lastErr = `${model} empty`;
-        continue;
-      }
-      const got = readGeminiAnswer(JSON.parse(txt.replace(/^```(?:json)?|```$/g, "").trim()), offset, duration);
-      if (!got.ok) {
-        badTiming = true;
-        lastErr = got.reason;
-        console.warn(`[transcribe] ${model} at ${offset}s: ${got.reason}`);
-        continue;
-      }
-      const language = got.language || lang;
-      return { words: got.words, cues: buildCues(got.words, rules, offset + duration), language, engine: "gemini", lines: lineRules(rules) };
-    } catch (e) {
-      lastErr = (e as Error).message;
-    }
+  const prompt = transcribePrompt(rules, duration, lang);
+  // The fast model first; a second try of it when the first is a straggler; another model when a try fails.
+  const out = await hedged({
+    primary: PRIMARY,
+    fallbacks: FALLBACKS,
+    hedgeMs: hedgeAfterMs(duration),
+    budgetMs: Math.min(BUDGET_MS, (deadline ?? Infinity) - Date.now()),
+    minLeftMs: minLeftFor,
+    signal,
+    attempt: (model, s, timeoutMs) => askGemini(model, data, prompt, offset, duration, s, timeoutMs),
+  });
+  if (out.ok) {
+    // Stage timing for the logs: which model answered, after how many tries, how fast per audio second.
+    console.info(`[transcribe] ${out.model} ${duration.toFixed(1)}s audio in ${out.ms} ms, ${out.tries} ${out.tries === 1 ? "try" : "tries"}`);
+    return { words: out.value.words, cues: buildCues(out.value.words, rules, offset + duration), language: out.value.language || lang, engine: "gemini", lines: lineRules(rules) };
   }
-  if (badTiming) throw new HttpError(502, "The timings for this part didn't line up, so we left it out rather than guess. Try this part again.", "BAD_TIMING");
-  throw new HttpError(502, `Transcription didn't come back (${lastErr || "no answer"}). Try again, or type your captions.`, "AI_FAILED");
+  console.warn(`[transcribe] failed at ${offset}s after ${out.tries} tries, ${out.ms} ms: ${out.reason}`);
+  if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+  // The browser's runner waits and tries a 429 again by itself (Retry-After), so a busy model is not a failed part.
+  if (out.rateLimited) throw new HttpError(429, "The transcription service is busy right now. Try again in a minute.", "RATE_LIMITED", { retryAfter: 8 });
+  if (out.badTiming) throw new HttpError(502, "The timings for this part didn't line up, so we left it out rather than guess. Try this part again.", "BAD_TIMING");
+  throw new HttpError(502, "This part didn't come back from transcription. Try it again, or type your captions.", "AI_FAILED");
 }
 
 /** One chunk of 16 kHz mono WAV -> word timings and subtitle lines, offset to where the chunk sits in the video.
  * The FunASR worker is used when it is switched on (off by default); if it is down, Gemini answers instead.
  * `lang` is the creator's pick for the spoken language, sent to Gemini as a hint; empty = detect it. */
-export async function transcribeWav(wav: ArrayBuffer, offset: number, duration: number, opts: { lang?: string; signal?: AbortSignal } = {}): Promise<Transcript> {
+export async function transcribeWav(wav: ArrayBuffer, offset: number, duration: number, opts: { lang?: string; signal?: AbortSignal; deadline?: number } = {}): Promise<Transcript> {
   const rules = await subtitleRules();
   const url = rules.workerUrl || env.FUNASR_URL;
   if (rules.provider === "funasr" && url) {
@@ -134,7 +147,7 @@ export async function transcribeWav(wav: ArrayBuffer, offset: number, duration: 
       console.warn("[transcribe] FunASR worker failed, using Gemini:", (e as Error).message);
     }
   }
-  return viaGemini(wav, offset, duration, rules, normalizeLang(opts.lang), opts.signal);
+  return viaGemini(wav, offset, duration, rules, normalizeLang(opts.lang), opts.signal, opts.deadline);
 }
 
 /** A transcription run: one per "Transcribe" press, shared by its chunks and its retries for half an hour. */

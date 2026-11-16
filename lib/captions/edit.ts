@@ -1,5 +1,6 @@
 import { CAPTION_STYLES, toSeconds, type CaptionPos, type CaptionStyle, type Cue } from "./cues";
 import { clampOffset } from "./offset";
+import { clampSize, SIZE_BASE } from "./size";
 
 /** Shortest line the editor lets you make by hand. Shorter than this and nobody can read it. */
 export const MIN_EDIT_CUE = 0.2;
@@ -119,7 +120,7 @@ export type CaptionView = "original" | "english";
  * burn and .srt use). With a translation, `original` and `translated` keep both tracks, line for line.
  * `offset` (Phase 4) shifts every line on both tracks when shown, burned or exported; the times here stay as typed.
  */
-export type CaptionTrack = { v: 1; cues: Cue[]; style: CaptionStyle; pos: CaptionPos; lang?: string; offset?: number; original?: Cue[]; translated?: Cue[]; view?: CaptionView };
+export type CaptionTrack = { v: 1; cues: Cue[]; style: CaptionStyle; pos: CaptionPos; lang?: string; offset?: number; size?: number; original?: Cue[]; translated?: Cue[]; view?: CaptionView };
 
 const POS: CaptionPos[] = ["top", "middle", "bottom"];
 
@@ -158,6 +159,8 @@ export function readTrack(raw: unknown, duration = Infinity): CaptionTrack | nul
   if (typeof r.lang === "string" && /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(r.lang)) track.lang = r.lang;
   const offset = clampOffset(r.offset);
   if (offset) track.offset = offset;
+  const size = clampSize(r.size);
+  if (size !== SIZE_BASE) track.size = size;
   if (Array.isArray(r.original) && Array.isArray(r.translated)) {
     const original = cleanList(r.original, clipEnd);
     const translated = cleanList(r.translated, clipEnd);

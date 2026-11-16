@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { api, ApiError } from "@/lib/client/api";
 import { GoogleButton } from "./GoogleButton";
+import { GoogleOneTap } from "./GoogleOneTap";
+import { AppleButton } from "./AppleButton";
 import { OtpBoxes, type OtpBoxesHandle } from "./OtpBoxes";
 import { PhoneInput, WhatsAppAuth, WhatsAppGlyph } from "./WhatsAppAuth";
 import { OutlyMark } from "@/components/brand/Logo";
@@ -31,6 +33,21 @@ const GOOGLE_ERRORS: Record<string, string> = {
   maintenance: "Outlly is in a short maintenance window, so new accounts are paused. If you already have an account, sign in with the email it uses.",
 };
 
+/** Sign in with Apple (1153): ?apple_error= reasons from app/api/auth/apple/callback. */
+const APPLE_ERRORS: Record<string, string> = {
+  denied: "Apple sign-in was cancelled. Nothing changed.",
+  state: "That sign-in took too long or came from another tab. Let's start it again.",
+  exchange: "Apple signed you in, but we couldn't finish the handshake. Try once more.",
+  not_configured: "Sign in with Apple isn't set up on this server yet. Use another way to sign in for now.",
+  config: "Apple refused this site's keys (Services ID, Team ID, Key ID or private key). An admin needs to check the APPLE_ settings.",
+  server: "Apple signed you in, but our database didn't answer. Try again in a minute.",
+  age: "To create an account with Apple, first tick \"I'm 18 or older\", then press Sign up with Apple again.",
+  maintenance: "Outlly is in a short maintenance window, so new accounts are paused. If you already have an account, sign in with the email it uses.",
+  no_email: "Apple didn't share an email address, so we can't make your account. Try again and pick Share My Email or Hide My Email.",
+  unverified: "That Apple ID's email isn't verified, so we can't link it to your Outlly account. Sign in with your email instead.",
+  apple_other: "The Outlly account with that email is already linked to a different Apple ID. Sign in with that Apple ID or with your email.",
+};
+
 type Step = "password" | "code" | "reset" | "2fa";
 
 /**
@@ -44,7 +61,7 @@ type Step = "password" | "code" | "reset" | "2fa";
  * then back to sign in with the new one. With WhatsApp switched on (1060), "Continue with WhatsApp" opens
  * its own screen (WhatsAppAuth) that signs in, or signs up, with a code sent there.
  */
-export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { mode: "login" | "signup"; google?: boolean; whatsapp?: boolean; title: string; subtitle: string; banner?: React.ReactNode }) {
+export function AuthForm({ mode, whatsapp = false, apple = false, googleClientId = "", title, subtitle, banner }: { mode: "login" | "signup"; google?: boolean; whatsapp?: boolean; apple?: boolean; /** Google One Tap shows when the client ID is known (lib/google-one-tap.ts). */ googleClientId?: string; title: string; subtitle: string; banner?: React.ReactNode }) {
   const router = useRouter();
   const params = useSearchParams();
   // Only a path on this site: "/%09/evil.com" used to slip past and land people on another site after sign-in.
@@ -53,7 +70,8 @@ export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { 
   const [showPw, setShowPw] = useState(false);
   const [caps, setCaps] = useState(false);
   const googleError = params.get("google_error");
-  const [error, setError] = useState<string | null>(googleError ? (GOOGLE_ERRORS[googleError] ?? GOOGLE_ERRORS.exchange) : null);
+  const appleError = params.get("apple_error");
+  const [error, setError] = useState<string | null>(googleError ? (GOOGLE_ERRORS[googleError] ?? GOOGLE_ERRORS.exchange) : appleError ? (APPLE_ERRORS[appleError] ?? APPLE_ERRORS.exchange) : null);
   // Demo credentials are prefilled only when explicitly enabled (local/dev seeds), and never in a production
   // build: a stray NEXT_PUBLIC_DEMO_LOGIN in the live environment must not ship working credentials.
   const demo = mode === "login" && process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_LOGIN === "true";
@@ -157,6 +175,13 @@ export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { 
     inFlight.current = false;
     lastSent.current = null;
     setBusy(false);
+    setTries((n) => n + 1);
+  };
+  // Google One Tap (GoogleOneTap.tsx): on sign-in while the first step is showing; on sign-up once the 18+ box is
+  // ticked, so the prompt never makes an account the server then refuses. Never on top of a Google error.
+  const oneTap = !!googleClientId && !googleError && (mode === "login" ? step === "password" : adult);
+  const oneTapError = (code: string | undefined, message: string) => {
+    setError((code && GOOGLE_ERRORS[code]) || message);
     setTries((n) => n + 1);
   };
   /** First step done: in, or on to the authenticator step. */
@@ -393,6 +418,7 @@ export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { 
       <h1 className="gs-in font-display text-[clamp(2rem,3.4vw,2.5rem)] font-bold leading-[1.05] tracking-[-0.035em]">{heading}</h1>
       <p className="gs-in mb-6 mt-2.5 max-w-[40ch] text-[15px] leading-relaxed text-muted-foreground">{sub}</p>
       {step !== "2fa" && banner}
+      {!!googleClientId && <GoogleOneTap clientId={googleClientId} mode={mode} active={oneTap} remember={mode === "login" ? remember : undefined} adult={adult} blocked={() => busy || inFlight.current} onBusy={setBusy} onDone={after} onError={oneTapError} />}
       <PipWatch mode={mode} step={step} focus={focused} name={form.name} email={form.email} password={form.password} busy={busy} error={error} success={success} sent={sent} adult={adult} />
       {success && (
         <p role="status" className="mb-4 flex items-start gap-2.5 rounded-xl bg-lime/15 px-4 py-3 text-sm font-medium text-foreground">
@@ -584,7 +610,7 @@ export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { 
               ref={ageRef}
               type="checkbox"
               checked={adult}
-              onChange={(e) => { setAdult(e.target.checked); document.cookie = `outlly_adult=${e.target.checked ? "1; max-age=1800" : "; max-age=0"}; path=/; samesite=lax`; if (e.target.checked && (error === AGE_ERROR || error === GOOGLE_ERRORS.age)) setError(null); }}
+              onChange={(e) => { setAdult(e.target.checked); document.cookie = `outlly_adult=${e.target.checked ? "1; max-age=1800" : "; max-age=0"}; path=/; samesite=lax`; if (e.target.checked && (error === AGE_ERROR || error === GOOGLE_ERRORS.age || error === APPLE_ERRORS.age)) setError(null); }}
               aria-describedby={error === AGE_ERROR ? "auth-error" : undefined}
               className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-lime-ink"
             />
@@ -655,6 +681,7 @@ export function AuthForm({ mode, whatsapp = false, title, subtitle, banner }: { 
               {mode === "login" ? "Continue with WhatsApp" : "Sign up with WhatsApp"}
             </button>
           )}
+          {apple && <AppleButton from={mode} next={next} remember={mode === "login" ? remember : undefined} label={mode === "login" ? "Sign in with Apple" : "Sign up with Apple"} onClick={mode === "signup" ? (e) => { if (!adult) { e.preventDefault(); askAge(); } } : undefined} />}
           <GoogleButton from={mode} next={next} remember={mode === "login" ? remember : undefined} label={mode === "login" ? "Sign in with Google" : "Sign up with Google"} onClick={mode === "signup" ? (e) => { if (!adult) { e.preventDefault(); askAge(); } } : undefined} />
         </div>
         <p className="gs-in text-center text-sm text-muted-foreground">

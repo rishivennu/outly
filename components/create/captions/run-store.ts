@@ -3,6 +3,7 @@ import { audioChunks, burnCaptions, postChunk, type AudioChunk, type ChunkAnswer
 import { cuesFromScript, type CaptionPos, type CaptionStyle, type Cue } from "@/lib/captions/cues";
 import { readTrack, type CaptionTrack, type CaptionView } from "@/lib/captions/edit";
 import { exportCues, clampOffset } from "@/lib/captions/offset";
+import { clampSize, SIZE_BASE } from "@/lib/captions/size";
 import { runChunks } from "@/lib/captions/run";
 import { mergeSubtitleRules, type Word } from "@/lib/captions/subtitle-engine";
 import { buildCues, followTrack, keepEnglish, spliceSpan, spliceWords, stitchWords } from "@/lib/captions/timing";
@@ -33,6 +34,8 @@ export type CaptionState = {
   pos: CaptionPos;
   /** Shift of every line on both tracks, seconds, applied when shown, burned or exported. */
   offset: number;
+  /** Caption size, percent of the style's base (lib/captions/size.ts). */
+  size: number;
   heard: string;
   langPick: string;
   untranslated: number[];
@@ -70,6 +73,11 @@ export type Deps = {
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 const sameTimes = (a: Cue[], b: Cue[]) => a.length === b.length && a.every((c, i) => c.start === b[i].start && c.end === b[i].end);
+/** The lines whose middle sits in [from, to). */
+const within = (cs: Cue[], from: number, to: number) => cs.filter((c) => (c.start + c.end) / 2 >= from && (c.start + c.end) / 2 < to);
+/** Same lines: start, end and words. */
+const sameLines = (x: Cue[], y: Cue[]) => x.length === y.length && x.every((c, i) => c.start === y[i].start && c.end === y[i].end && c.text === y[i].text);
+const QUIET: ChunkAnswer = { words: [], language: "" };
 const newRunId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`);
 const DEPS: Deps = { audioChunks, postChunk, api, burnCaptions, offerUpgrade, runId: newRunId };
 
@@ -83,6 +91,7 @@ function fresh(key: string | null, initialTrack: unknown, duration: number): Cap
     style: init?.style ?? "pop",
     pos: init?.pos ?? "bottom",
     offset: init?.offset ?? 0,
+    size: init?.size ?? SIZE_BASE,
     heard: init?.lang ?? "",
     langPick: "auto",
     untranslated: [],
@@ -104,13 +113,13 @@ export function trackOf(s: CaptionState): CaptionTrack | null {
   const showing = s.tracks.view === "english" && s.tracks.en ? s.tracks.en : s.tracks.orig;
   if (!s.on || !showing.length) return null;
   const both = s.tracks.en ? { original: s.tracks.orig, translated: s.tracks.en, view: s.tracks.view } : {};
-  return { v: 1, cues: showing, style: s.style, pos: s.pos, ...(s.heard ? { lang: s.heard } : {}), ...(s.offset ? { offset: s.offset } : {}), ...both };
+  return { v: 1, cues: showing, style: s.style, pos: s.pos, ...(s.heard ? { lang: s.heard } : {}), ...(s.offset ? { offset: s.offset } : {}), ...(s.size !== SIZE_BASE ? { size: s.size } : {}), ...both };
 }
 
 /** The journey pill: what the run is doing, or how it ended. null = nothing to say. */
 export function runPill(s: Pick<CaptionState, "busy" | "outcome"> & { pendingBurn?: File | null }): string | null {
   const b = s.busy;
-  if (b?.kind === "transcribe") return b.total > 1 ? `Captions ${b.done} of ${b.total} parts` : b.total === 1 ? "Listening" : "Reading the audio";
+  if (b?.kind === "transcribe") return b.total > 1 ? `Transcribing, ${b.done} of ${b.total} parts` : b.total === 1 ? "Transcribing" : "Extracting audio";
   if (b?.kind === "translate") return "Translating";
   if (b?.kind === "burn") return `Adding captions ${Math.round(b.p * 100)}%`;
   if (s.pendingBurn) return "Captions ready";
@@ -124,7 +133,7 @@ export function runPill(s: Pick<CaptionState, "busy" | "outcome"> & { pendingBur
 export function runLine(s: Pick<CaptionState, "busy">): string | null {
   const b = s.busy;
   if (!b) return null;
-  const what = b.kind === "transcribe" ? (b.total > 1 ? `Captions ${b.done} of ${b.total} parts` : "Captions are being made") : b.kind === "translate" ? "Translating your captions" : `Adding captions ${Math.round(b.p * 100)}%`;
+  const what = b.kind === "transcribe" ? (b.total > 1 ? `Transcribing, ${b.done} of ${b.total} parts ready` : b.total === 1 ? "Transcribing" : "Extracting audio") : b.kind === "translate" ? "Translating your captions" : `Adding captions ${Math.round(b.p * 100)}%`;
   return `${what}. They keep going on every step; a reload stops them.`;
 }
 
@@ -243,6 +252,9 @@ export function createCaptionStore(deps: Partial<Deps> = {}) {
     setOffset(v: number) {
       set({ offset: clampOffset(v) });
     },
+    setSize(v: number) {
+      set({ size: clampSize(v) });
+    },
     /** Stop whatever is running. */
     stop() {
       abort?.abort();
@@ -284,6 +296,8 @@ export function createCaptionStore(deps: Partial<Deps> = {}) {
       const lang = state.langPick;
       const ctrl = start({ kind: "transcribe", done: 0, total: 0 });
       let outcome: Outcome = "failed";
+      /** Stop or a plan stop mid-run: keeps the parts that landed as real answers, with the rest listed to retry. */
+      let keepLanded: ((why: "stopped" | "fatal") => void) | null = null;
       try {
         const key = file ?? src;
         let got = chunks?.key === key ? chunks.chunks : null;
@@ -297,13 +311,63 @@ export function createCaptionStore(deps: Partial<Deps> = {}) {
         const again = !!retry && !!lastRun;
         const run: Run = again ? lastRun! : { run: d.runId(), lang, parts: new Map() };
         const todo = again ? retry!.filter((i) => all[i]) : all.map((c) => c.index);
-        set({ busy: { kind: "transcribe", done: 0, total: todo.length } });
-        const out = await runChunks(todo, (i, signal) => d.postChunk(all[i], { ref: ref(), run: run.run, lang: run.lang }, signal), {
+        // A silent part is not sent (no AI call, no charge, no words made up for nothing). It is left out of the
+        // runner, so the first part that is sent still goes alone and carries the run's one charge. Its span is
+        // only cleared at the final commit, so lines typed over a quiet intro survive a Stop.
+        const quiet = todo.filter((i) => all[i].silent);
+        const send = todo.filter((i) => !all[i].silent);
+        set({ busy: { kind: "transcribe", done: quiet.length, total: todo.length } });
+        const span = (i: number) => ({ from: all[i].from, to: Math.min(all[i].to, duration || Infinity) });
+        // Progressive (caption perf): a whole-video run shows each part's lines the moment that part lands, so the
+        // first lines can be read and fixed while the rest are still out. Only the landed part's span changes, and
+        // English lines whose original did not change stay until the run ends. A line you fix in a part that has
+        // landed stays; a part that has not landed yet is replaced when it does, as before.
+        const landed = new Map<number, ChunkAnswer>();
+        /** Per landed part, the lines this run last put in its span; `edited` = parts someone changed since. */
+        const mine = new Map<number, Cue[]>();
+        const edited = new Set<number>();
+        const touched = (i: number, cs: Cue[]) => edited.has(i) || (mine.has(i) && !sameLines(within(cs, span(i).from, span(i).to), mine.get(i)!));
+        const showPart = (i: number, a: ChunkAnswer) => {
+          if (again || abort !== ctrl) return;
+          const cur = state;
+          for (const k of mine.keys()) if (touched(k, cur.tracks.orig)) edited.add(k);
+          landed.set(i, a);
+          const order = [...landed.keys()].sort((x, y) => x - y);
+          const sw = stitchWords(order.map((k) => ({ from: all[k].from, to: all[k].to, words: landed.get(k)!.words })));
+          const lines = order.map((k) => landed.get(k)!.lines).find(Boolean);
+          const built = buildCues(sw, mergeSubtitleRules(lines ?? {}), duration || Infinity);
+          const orig = spliceSpan(cur.tracks.orig, built, span(i).from, span(i).to);
+          const w = spliceWords(cur.words, sw, span(i).from, span(i).to);
+          // Re-read every untouched part: this splice may have trimmed a neighbour's edge, which is not an edit.
+          for (const k of order) if (!edited.has(k)) mine.set(k, within(orig, span(k).from, span(k).to));
+          const en = cur.tracks.en ? keepEnglish(cur.tracks.orig, cur.tracks.en, cur.untranslated, orig) : null;
+          const language = order.map((k) => landed.get(k)!.language).find(Boolean) ?? "";
+          set({
+            tracks: { ...cur.tracks, orig, ...(en ? { en: en.en } : {}) },
+            ...(en ? { untranslated: en.untranslated } : {}),
+            words: w,
+            ...(language ? { heard: language } : {}),
+          });
+        };
+        keepLanded = (why) => {
+          if (again || !landed.size) return;
+          for (const [i, a] of landed) run.parts.set(i, a);
+          lastRun = run;
+          const rest: Gap[] = todo.filter((i) => !landed.has(i)).map((i) => ({ index: i, ...span(i) }));
+          set({ gaps: rest, ...(why === "stopped" && rest.length ? { note: `Stopped with ${landed.size} of ${todo.length} parts back. Retry the rest below.` } : {}) });
+        };
+        const out = await runChunks(send, (i, signal) => d.postChunk(all[i], { ref: ref(), run: run.run, lang: run.lang }, signal), {
           signal: ctrl.signal,
-          onDone: (_, done, total) => abort === ctrl && set({ busy: { kind: "transcribe", done, total } }),
+          onResult: showPart,
+          onDone: (_, done) => abort === ctrl && set({ busy: { kind: "transcribe", done: quiet.length + done, total: todo.length } }),
         });
-        if (ctrl.signal.aborted) return;
+        for (const i of quiet) out.results.set(i, QUIET);
+        if (ctrl.signal.aborted) {
+          if (abort === ctrl) keepLanded("stopped");
+          return;
+        }
         if (out.fatal) {
+          keepLanded("fatal");
           if (out.fatal.status === 402 && out.fatal.code === "PLAN_LIMIT") d.offerUpgrade(out.fatal.message, out.fatal.data.feature as string | undefined);
           throw new ApiError(out.fatal.status, out.fatal.message, out.fatal.code);
         }
@@ -315,7 +379,6 @@ export function createCaptionStore(deps: Partial<Deps> = {}) {
         const lines = order.map((i) => run.parts.get(i)!.lines).find(Boolean);
         const built = buildCues(stitched, mergeSubtitleRules(lines ?? {}), duration || Infinity);
         const language = order.map((i) => run.parts.get(i)!.language).find(Boolean) ?? "";
-        const span = (i: number) => ({ from: all[i].from, to: Math.min(all[i].to, duration || Infinity) });
         const missing: Gap[] = out.failed.map((f) => ({ index: f.index, ...span(f.index) }));
         // Latest lines, read as the answers land, so lines edited while chunks were out are kept.
         const cur = state;
@@ -331,8 +394,20 @@ export function createCaptionStore(deps: Partial<Deps> = {}) {
             nextWords = spliceWords(nextWords, stitched, span(i).from, span(i).to);
           }
           gaps = [...cur.gaps.filter((x) => !out.results.has(x.index) && !missing.some((m) => m.index === x.index)), ...missing].sort((a, b) => a.index - b.index);
+        } else if ([...mine.keys()].some((i) => touched(i, cur.tracks.orig))) {
+          // Lines were fixed while the run was out: every part nobody touched gets the whole-video lines (so a
+          // line across a seam is built from both parts' words); a part someone edited keeps their edits.
+          next = cur.tracks.orig;
+          nextWords = cur.words;
+          for (const i of out.results.keys()) {
+            if (touched(i, cur.tracks.orig)) continue;
+            next = spliceSpan(next, built, span(i).from, span(i).to);
+            nextWords = spliceWords(nextWords, stitched, span(i).from, span(i).to);
+          }
+          gaps = missing;
         } else {
           // A part that failed this time keeps the lines it had before, so a re-run never loses captions.
+          // (Progressive display only touched the parts that landed, so `cur` still has the old lines there.)
           next = built;
           nextWords = stitched;
           for (const m of missing) {
@@ -356,7 +431,10 @@ export function createCaptionStore(deps: Partial<Deps> = {}) {
         });
         outcome = missing.length || !next.length ? "failed" : "done";
       } catch (e) {
-        if ((e as Error).name === "AbortError" || ctrl.signal.aborted) return;
+        if ((e as Error).name === "AbortError" || ctrl.signal.aborted) {
+          if (abort === ctrl) keepLanded?.("stopped");
+          return;
+        }
         const noAi = e instanceof ApiError && e.code === "NO_AI";
         set({ note: (e as Error).message, ...(noAi ? { aiReady: false } : {}), ...(e instanceof ApiError && (e.code === "NO_AI" || e.code === "PLAN_LIMIT") ? { typing: true } : {}) });
       } finally {
@@ -431,8 +509,8 @@ export function createCaptionStore(deps: Partial<Deps> = {}) {
       }
     },
 
-    /** The captioned MP4, made in the browser from the clean video, shifted lines and all. Handed to the workspace. */
-    async burn(cues: Cue[]) {
+    /** The captioned MP4, made in the browser from the clean video, shifted lines and all. Handed to the workspace. `font` is the loaded caption family name. */
+    async burn(cues: Cue[], font?: string) {
       if (!cues.length) return;
       try {
         await d.api("/api/plan/limits", { method: "POST", json: { feature: "burn" } });
@@ -446,7 +524,7 @@ export function createCaptionStore(deps: Partial<Deps> = {}) {
       const ctrl = start({ kind: "burn", p: 0 });
       let outcome: Outcome = "failed";
       try {
-        const file = await d.burnCaptions(src, exportCues(cues, s0.offset, duration), { style: s0.style, pos: s0.pos, name: filename, signal: ctrl.signal, onProgress: (p) => abort === ctrl && set({ busy: { kind: "burn", p } }) });
+        const file = await d.burnCaptions(src, exportCues(cues, s0.offset, duration), { style: s0.style, pos: s0.pos, size: s0.size, font, name: filename, signal: ctrl.signal, onProgress: (p) => abort === ctrl && set({ busy: { kind: "burn", p } }) });
         if (ctrl.signal.aborted) return;
         if (handlers.onBurned) {
           set({ burned: true });

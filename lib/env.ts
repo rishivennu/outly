@@ -47,6 +47,12 @@ const schema = z.object({
   META_WEBHOOK_VERIFY_TOKEN: z.string().optional().default(""),
   YOUTUBE_CLIENT_ID: z.string().optional().default(""),
   YOUTUBE_CLIENT_SECRET: z.string().optional().default(""),
+  /** Sign in with Apple (1153). All four or the button stays hidden. CLIENT_ID is the Services ID (e.g. com.outlly.web), not the App ID. */
+  APPLE_CLIENT_ID: z.string().optional().default(""),
+  APPLE_TEAM_ID: z.string().optional().default(""),
+  APPLE_KEY_ID: z.string().optional().default(""),
+  /** The AuthKey_XXXX.p8 file's contents (as is, one line with \\n, or base64). Server only. */
+  APPLE_PRIVATE_KEY: z.string().optional().default(""),
   // Fallbacks for the other platforms; Admin > Social platforms wins field by field.
   FACEBOOK_CLIENT_ID: z.string().optional().default(""), // Meta App ID
   FACEBOOK_CLIENT_SECRET: z.string().optional().default(""),

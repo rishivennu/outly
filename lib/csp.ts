@@ -26,7 +26,8 @@ export function buildCsp(nonce: string, dev = process.env.NODE_ENV !== "producti
     // Direct uploads go to the storage bucket, sign-in to Supabase, live updates over wss. blob: because the caption
     // transcriber reads the just-uploaded video back from its local object URL (fetch(blob:)) before the CDN copy exists.
     "connect-src 'self' https: wss: blob:",
-    "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com https://www.youtube.com https://www.youtube-nocookie.com",
+    // accounts.google.com: Google One Tap draws its prompt in an iframe (components/auth/GoogleOneTap.tsx).
+    "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com https://www.youtube.com https://www.youtube-nocookie.com https://accounts.google.com",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "object-src 'none'",

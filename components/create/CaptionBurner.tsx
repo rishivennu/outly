@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Captions, Clock, Download, Loader2, Lock, Plus, RotateCcw, Sparkles, Trash2, Type, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
-import { drawCue, recorderType } from "@/lib/client/captions";
+import { drawCue, recorderType, sampleText } from "@/lib/client/captions";
 import { CAPTION_STYLES, cueAt, toSrt, type CaptionPos, type Cue } from "@/lib/captions/cues";
 import { cn } from "@/lib/utils";
 import { insertCue } from "@/lib/captions/insert";
@@ -16,6 +16,8 @@ import { useToast } from "@/components/shared/Toast";
 import { TimeStepper } from "./captions/TimeStepper";
 import { CaptionLanguage } from "./captions/CaptionLanguage";
 import { CaptionShift } from "./captions/CaptionShift";
+import { CaptionSize } from "./captions/CaptionSize";
+import { captionFontFamily, readyCaptionFont } from "./caption-font";
 import { useCaptionState, useCaptionStore } from "./captions/CaptionRun";
 import { ClipCutter } from "./ClipCutter";
 import { saveBlob } from "@/lib/client/native";
@@ -76,7 +78,7 @@ export function CaptionBurner({ src, file, filename, duration, session, onBurned
   useEffect(() => store.flush(), [store, key]);
   useEffect(() => store.update({ key, src, file, filename, duration }), [store, key, src, file, filename, duration]);
 
-  const { on, tracks, words, style, pos, offset, busy, typing, note, burned, aiReady, plan, langPick, heard, untranslated, gaps, outcome, rev, pendingBurn } = useCaptionState(store);
+  const { on, tracks, words, style, pos, offset, size, busy, typing, note, burned, aiReady, plan, langPick, heard, untranslated, gaps, outcome, rev, pendingBurn } = useCaptionState(store);
   /* Original words and, once translated, English: one timeline, line for line. `cues` is the track on show. */
   const showing: "orig" | "en" = tracks.view === "english" && tracks.en ? "en" : "orig";
   const cues = showing === "en" && tracks.en ? tracks.en : tracks.orig;
@@ -125,9 +127,15 @@ export function CaptionBurner({ src, file, filename, duration, session, onBurned
   // Live preview: the same drawCue the recorder uses, on a transparent canvas over the one player. The player's
   // clock is the only clock: play moves the highlight, pause keeps it, a seek shows the line at the new time, and
   // every edit (text, timing, shift, style, position, track) shows on the next frame.
+  // The caption face is only fetched once captions are on; the preview loop picks it up on the next frame. The
+  // track's text goes along so the right Poppins files load (Latin Extended, Devanagari) as lines land or change.
+  useEffect(() => {
+    if (on) void readyCaptionFont(sampleText(cues));
+  }, [on, cues]);
   useEffect(() => {
     if (!on) return;
     let raf = 0;
+    const look = { size, font: captionFontFamily };
     const tick = () => {
       const v = video.current;
       const c = canvas.current;
@@ -136,7 +144,7 @@ export function CaptionBurner({ src, file, filename, duration, session, onBurned
         if (c.width !== v.videoWidth) { c.width = v.videoWidth; c.height = v.videoHeight; }
         const ctx = c.getContext("2d")!;
         ctx.clearRect(0, 0, c.width, c.height);
-        if (cue) drawCue(ctx, cue.text, c.width, c.height, style, pos);
+        if (cue) drawCue(ctx, cue.text, c.width, c.height, style, pos, look);
       } else if (c && c.width) {
         // A new source is loading (burn, undo, replace): no stale line over the poster.
         c.getContext("2d")!.clearRect(0, 0, c.width, c.height);
@@ -162,7 +170,7 @@ export function CaptionBurner({ src, file, filename, duration, session, onBurned
       const c = canvas.current;
       c?.getContext("2d")?.clearRect(0, 0, c.width, c.height);
     };
-  }, [on, played, style, pos, video, canvas]);
+  }, [on, played, style, pos, size, video, canvas]);
 
   /* The run itself lives in the store: it keeps going if this editor unmounts. */
   const transcribe = (retry?: number[]) => store.transcribe(retry);
@@ -190,7 +198,7 @@ export function CaptionBurner({ src, file, filename, duration, session, onBurned
 
   async function burn() {
     if (!cues.length || blocked()) return;
-    await store.burn(cues);
+    await store.burn(cues, captionFontFamily);
   }
 
   function downloadSrt() {
@@ -317,7 +325,7 @@ export function CaptionBurner({ src, file, filename, duration, session, onBurned
             {aiReady !== false && (
               <Button type="button" variant="lime" onClick={() => (cues.length ? setAsk("transcribe") : transcribe())} disabled={working}>
                 {busy?.kind === "transcribe" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="h-4 w-4" aria-hidden />}
-                {busy?.kind === "transcribe" ? (busy.total ? `Listening${busy.total > 1 ? ` ${busy.done}/${busy.total}` : ""}…` : "Reading the audio…") : cues.length ? "Transcribe again" : "Transcribe with AI"}
+                {busy?.kind === "transcribe" ? (busy.total ? `Transcribing${busy.total > 1 ? ` ${busy.done}/${busy.total}` : ""}…` : "Extracting audio…") : cues.length ? "Transcribe again" : "Transcribe with AI"}
               </Button>
             )}
             <Button type="button" variant="outline" onClick={() => store.set((s) => ({ typing: !s.typing }))} disabled={working} aria-expanded={typing}>
@@ -326,7 +334,7 @@ export function CaptionBurner({ src, file, filename, duration, session, onBurned
             {(busy?.kind === "transcribe" || busy?.kind === "translate") && <Button type="button" variant="ghost" onClick={() => store.stop()}><X className="h-4 w-4" aria-hidden />Stop</Button>}
           </div>
           {busy?.kind === "transcribe" && busy.total > 1 && (
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary" role="progressbar" aria-label="Transcribing" aria-valuemin={0} aria-valuemax={busy.total} aria-valuenow={busy.done} aria-valuetext={`${busy.done} of ${busy.total} parts done`}>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary" role="progressbar" aria-label="Transcribing" aria-valuemin={0} aria-valuemax={busy.total} aria-valuenow={busy.done} aria-valuetext={`${busy.done} of ${busy.total} parts ready`}>
               <div className="h-full rounded-full bg-lime transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${(busy.done / busy.total) * 100}%` }} />
             </div>
           )}
@@ -444,6 +452,7 @@ export function CaptionBurner({ src, file, filename, duration, session, onBurned
                 <Seg label="Position" value={pos} onChange={(p) => store.set({ pos: p })} options={POSITIONS} />
               </div>
 
+              <CaptionSize value={size} onChange={store.setSize} disabled={busy?.kind === "burn"} />
               <CaptionShift value={offset} onChange={store.setOffset} disabled={busy?.kind === "burn"} />
 
               <div className="mt-6 rounded-2xl bg-secondary/40 p-3 hairline sm:p-4">
@@ -477,6 +486,8 @@ export function CaptionBurner({ src, file, filename, duration, session, onBurned
                   words={cutWords}
                   style={style}
                   pos={pos}
+                  size={size}
+                  font={captionFontFamily}
                   preview={video}
                   disabled={working}
                   onCut={(f) => { store.set({ burned: true }); onBurned(f, "cut"); }}
