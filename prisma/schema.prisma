@@ -1503,3 +1503,116 @@ model AiFeatureUsage {
   @@id([userId, day, feature])
   @@index([day, feature])
 }
+
+/// R1175 Content Studio: one article the blog agent wrote. Never auto-published: `status` only reaches
+/// "published" through Approve & Publish. Lists are stored as JSON strings (no Json type: sqlite + postgres).
+model BlogPost {
+  id                String    @id @default(cuid())
+  slug              String    @unique
+  title             String
+  seoTitle          String    @default("")
+  metaDescription   String    @default("")
+  excerpt           String    @default("")
+  bodyMd            String    @default("") // Markdown, sections A-J
+  category          String    @default("")
+  tags              String    @default("[]") // JSON string[]
+  primaryKeyword    String    @default("")
+  secondaryKeywords String    @default("[]") // JSON string[]
+  searchIntent      String    @default("") // informational | commercial | navigational | transactional
+  relatedQuestions  String    @default("[]") // JSON string[]
+  internalLinks     String    @default("[]") // JSON {href,label}[]
+  painPoint         String    @default("") // the creator problem this article answers
+  author            String    @default("Outlly Team")
+  status            String    @default("pending") // generating | pending | approved | published | rejected
+  wordCount         Int       @default(0)
+  readingMin        Int       @default(0)
+  qualityReport     String    @default("{}") // JSON BlogQuality
+  qualityOk         Boolean   @default(false)
+  featureTieIn      String    @default("") // "" when no Outlly feature fitted naturally
+  publishedAt       DateTime?
+  publishedBy       String? // admin login
+  reviewedBy        String?
+  rejectReason      String    @default("")
+  jobId             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  sources           BlogSource[]
+
+  @@index([status, createdAt])
+  @@index([category, publishedAt])
+}
+
+/// A reference the research stage recorded for a post. `verified` is false until something fetched the URL;
+/// we never show a reader a source we only guessed at (unverified ones stay in the review desk).
+model BlogSource {
+  id         String   @id @default(cuid())
+  postId     String
+  url        String
+  title      String   @default("")
+  publisher  String   @default("")
+  kind       String   @default("official") // official | study | publication | discussion
+  supports   String   @default("") // the claim in the article this source backs
+  verified   Boolean  @default(false)
+  accessedAt DateTime @default(now())
+  post       BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+}
+
+/// Topic memory: every pain point the agent has considered, so it never writes the same article twice.
+/// Scores are the model's own ranking with its reasoning in `basis`; there are no invented search volumes.
+model BlogTopic {
+  id             String    @id @default(cuid())
+  topic          String
+  problem        String    @default("")
+  primaryKeyword String    @default("")
+  searchIntent   String    @default("")
+  category       String    @default("")
+  score          Int       @default(0) // 0-100, model ranking
+  basis          String    @default("") // why it ranked there, in words
+  status         String    @default("candidate") // candidate | chosen | written | skipped
+  postId         String?
+  chosenAt       DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([status, createdAt])
+  @@index([primaryKeyword])
+}
+
+/// One generation run. `forDate` is the local (settings timezone) day; the unique pair with `kind` is the
+/// duplicate-click guard: a second "Generate Today's Blog" joins the running job instead of starting another.
+model BlogJob {
+  id         String    @id @default(cuid())
+  forDate    String // YYYY-MM-DD in the blog timezone
+  kind       String    @default("manual") // manual | scheduled
+  seq        Int       @default(1) // nth run of that day (regenerate bumps it)
+  stage      String    @default("topic") // topic | research | outline | write | seo | quality | done | failed
+  status     String    @default("running") // running | done | failed | cancelled
+  stageData  String    @default("{}") // JSON: output of each finished stage, keyed by stage name
+  error      String    @default("")
+  attempts   Int       @default(0)
+  startedBy  String    @default("schedule") // admin login or "schedule"
+  topicHint  String    @default("") // optional admin-provided angle
+  postId     String?
+  startedAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  finishedAt DateTime?
+  events     BlogJobEvent[]
+
+  @@unique([forDate, kind, seq])
+  @@index([status, startedAt])
+}
+
+/// Stage log for a job: what ran, how long it took, what it said. This is what the real stage display reads.
+model BlogJobEvent {
+  id        String   @id @default(cuid())
+  jobId     String
+  stage     String
+  status    String // started | done | failed
+  ms        Int      @default(0)
+  message   String   @default("")
+  createdAt DateTime @default(now())
+  job       BlogJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, createdAt])
+}

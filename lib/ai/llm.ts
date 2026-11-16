@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { env } from "../env";
-import { HEDGE_MS, deltaText, wholeText, freshStat, isHardFailure, keyOf, rank, recordFail, recordOk, sseEvents, type ModelId, type ModelStat } from "./llm-core";
+import { HEDGE_MS, deltaText, wholeText, freshStat, isHardFailure, keyOf, rank, recordFail, recordOk, sseEvents, type ModelId, type ModelStat, type Provider } from "./llm-core";
 
 /**
  * Every text model call goes through here (1053). Before, one fixed order was tried one after another, and
@@ -26,12 +26,14 @@ const KIMI_URL = "https://api.moonshot.ai/v1/chat/completions";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODEL = "moonshotai/kimi-k2.6";
 export const isOpenRouterKey = (key: string) => key.startsWith("sk-or-");
-export function kimiRequest(key: string, body: Record<string, unknown>, opts: Pick<LlmOpts, "maxTokens" | "reasoning">): { url: string; headers: Record<string, string>; body: unknown } {
+export function kimiRequest(key: string, body: Record<string, unknown>, opts: Pick<LlmOpts, "maxTokens" | "reasoning" | "web">): { url: string; headers: Record<string, string>; body: unknown } {
   if (!isOpenRouterKey(key)) return { url: KIMI_URL, headers: { authorization: `Bearer ${key}` }, body };
   return {
     url: OPENROUTER_URL,
     headers: { authorization: `Bearer ${key}`, "HTTP-Referer": "https://outlly.com", "X-Title": "Outlly" },
-    body: { ...body, model: OPENROUTER_MODEL, max_tokens: opts.maxTokens ?? 4096, reasoning: { enabled: opts.reasoning === true } },
+    // ":online" is OpenRouter's web plugin (R1175 blog research): the model sees live search results and the
+    // reply carries url_citation annotations, so recorded sources are pages that were actually found.
+    body: { ...body, model: opts.web ? `${OPENROUTER_MODEL}:online` : OPENROUTER_MODEL, max_tokens: opts.maxTokens ?? 4096, reasoning: { enabled: opts.reasoning === true } },
   };
 }
 
@@ -57,13 +59,17 @@ export type LlmOpts = {
   maxTokens?: number;
   /** Let a thinking model think (slower, dearer): only for long-form work such as the blog writer. */
   reasoning?: boolean;
+  /** Web search alongside the prompt (OpenRouter keys only; ignored elsewhere). */
+  web?: boolean;
+  /** Only these providers may answer (R1175: the blog is Kimi-only, by the owner's choice). Default: all with a key. */
+  providers?: Provider[];
 };
 
 function candidates(opts: LlmOpts): ModelId[] {
   const g = (opts.models?.length ? opts.models : GEMINI_DEFAULT).map((m) => ALIAS[m] ?? m);
   const list: ModelId[] = env.GEMINI_API_KEY ? [...new Set(g)].map((model) => ({ provider: "gemini" as const, model })) : [];
   if (env.KIMI_API_KEY) list.push({ provider: "kimi", model: KIMI_MODEL });
-  return list;
+  return opts.providers ? list.filter((m) => opts.providers!.includes(m.provider)) : list;
 }
 
 /** Kimi's user turn: plain text, or the pictures first (as data URLs) and the prompt last, like Gemini's parts. */

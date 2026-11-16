@@ -11,6 +11,9 @@ import { Greeting } from "@/components/shared/Greeting";
 import { LiveGlobeCard } from "@/components/admin/live/LiveGlobeCard";
 import { liveMap } from "@/lib/admin/live-map";
 import { LIVE_DEFAULT_MIN } from "@/lib/live-map-core";
+import { todayBlog } from "@/lib/blog/posts";
+import { blogReady } from "@/lib/blog/llm";
+import { TodayBlogCard } from "@/components/admin/blog/TodayBlogCard";
 
 export const metadata = { title: "Overview" };
 
@@ -24,7 +27,9 @@ export default async function Overview(props: { searchParams: Promise<{ denied?:
   const admin = await requireAdmin("overview");
   // Live globe (1062): people and places are Users-area data, so only roles that can open Users see it.
   const showLive = can(admin.role, "users");
-  const [o, live] = await Promise.all([overview(90), showLive ? liveMap(LIVE_DEFAULT_MIN, Date.now(), admin.role).catch(() => null) : Promise.resolve(null)]);
+  // Morning card (1175): "Your Today's Blog Is Ready!" for roles that can open Content Studio.
+  const showBlog = can(admin.role, "content");
+  const [o, live, blog] = await Promise.all([overview(90), showLive ? liveMap(LIVE_DEFAULT_MIN, Date.now(), admin.role).catch(() => null) : Promise.resolve(null), showBlog ? todayBlog() : Promise.resolve(null)]);
   const k = o.kpi;
   const money = can(admin.role, "payments");
   const empty = k.totalUsers < 3 && !o.sample;
@@ -45,6 +50,11 @@ export default async function Overview(props: { searchParams: Promise<{ denied?:
         <p role="status" className="mb-5 rounded-2xl bg-secondary px-4 py-3 text-[13.5px]">
           Your role doesn't include <b>{searchParams.denied}</b>. A super admin can change that under Team & roles.
         </p>
+      )}
+      {blog && (blog.post || blog.job?.status === "running") && (
+        <div className="mb-5">
+          <TodayBlogCard post={blog.post} job={blog.job} ready={blogReady()} compact />
+        </div>
       )}
       {empty && admin.role === "super" && (
         <Card className="mb-5 border-dashed bg-lime/[0.05]">

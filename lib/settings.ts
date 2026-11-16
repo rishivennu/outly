@@ -16,6 +16,7 @@ import { DASHBOARD_DEFAULT, type DashboardConfig } from "./dashboard-config";
 import { TOPUP_DEFAULT, type TopUpConfig } from "./billing/topups-core";
 import { EXPERIMENTS_DEFAULT, type ExperimentsConfig } from "./billing/experiments-core";
 import { INSTALL_DEFAULT, type InstallConfig } from "./pwa-core";
+import { BLOG_DEFAULT, type BlogConfig } from "./blog/config";
 
 /**
  * Integration config lives in the DB so the admin can switch providers without a deploy.
@@ -111,6 +112,7 @@ export const DEFAULTS = {
   experiments: EXPERIMENTS_DEFAULT as ExperimentsConfig, // 1096
   install: INSTALL_DEFAULT as InstallConfig, // 1099 Add to Home Screen banner
   welcome: WELCOME_DEFAULT as WelcomeConfig, // 1100 first launch from the Home Screen
+  blog: BLOG_DEFAULT as BlogConfig, // R1175 Content Studio
   platforms: Object.fromEntries(["instagram", "youtube", "x", "tiktok", "facebook", "threads", "linkedin"].map((p) => [p, { clientId: "", clientSecret: "" }])) as PlatformKeys,
 };
 type Key = keyof typeof DEFAULTS;

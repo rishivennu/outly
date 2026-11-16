@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Award, BarChart3, BadgePercent, BellRing, Gift, BadgeCheck, BookOpen, ChevronRight, Construction, FlaskConical, HeartPulse, Hourglass, Rocket, PanelsTopLeft, PanelLeftClose, PanelLeftOpen, CreditCard, Globe, Share2, Sparkles, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, Repeat, ShieldCheck, Tag, Type, Users, X } from "lucide-react";
+import { Activity, Award, BarChart3, BadgePercent, BellRing, CalendarDays, Gift, BadgeCheck, BookOpen, ChevronRight, Construction, FlaskConical, HeartPulse, Hourglass, Library, Newspaper, Rocket, PanelsTopLeft, PanelLeftClose, PanelLeftOpen, CreditCard, Globe, Share2, SlidersHorizontal, Sparkles, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, Repeat, ShieldCheck, Tag, TrendingUp, Type, Users, Wand2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
@@ -17,8 +17,8 @@ import { Tooltip } from "./ui";
 import { T } from "@/lib/motion/tokens";
 
 /** 1163: five groups. Run is the daily console, Insights is read-only analysis, Setup is configuration, Administration is who may do what. */
-export type NavGroup = "Run" | "Insights" | "Support" | "Setup" | "Administration";
-export const NAV_GROUPS: readonly NavGroup[] = ["Run", "Insights", "Support", "Setup", "Administration"];
+export type NavGroup = "Run" | "Insights" | "Content Studio" | "Support" | "Setup" | "Administration";
+export const NAV_GROUPS: readonly NavGroup[] = ["Run", "Insights", "Content Studio", "Support", "Setup", "Administration"];
 
 export const NAV: { href: string; label: string; icon: typeof Users; area: AdminArea; group: NavGroup }[] = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, area: "overview", group: "Run" },
@@ -34,6 +34,12 @@ export const NAV: { href: string; label: string; icon: typeof Users; area: Admin
   { href: "/admin/retention", label: "At risk", icon: HeartPulse, area: "retention", group: "Insights" },
   { href: "/admin/growth", label: "Growth", icon: Rocket, area: "growth", group: "Insights" },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3, area: "growth", group: "Insights" },
+  { href: "/admin/blog", label: "Blog dashboard", icon: Newspaper, area: "content", group: "Content Studio" },
+  { href: "/admin/blog/generate", label: "Generate blog", icon: Wand2, area: "content", group: "Content Studio" },
+  { href: "/admin/blog/library", label: "Blog library", icon: Library, area: "content", group: "Content Studio" },
+  { href: "/admin/blog/calendar", label: "Content calendar", icon: CalendarDays, area: "content", group: "Content Studio" },
+  { href: "/admin/blog/seo", label: "SEO performance", icon: TrendingUp, area: "content", group: "Content Studio" },
+  { href: "/admin/blog/settings", label: "Blog settings", icon: SlidersHorizontal, area: "content", group: "Content Studio" },
   { href: "/admin/tickets", label: "Tickets", icon: LifeBuoy, area: "tickets", group: "Support" },
   { href: "/admin/faq", label: "FAQ", icon: BookOpen, area: "faq", group: "Support" },
   { href: "/admin/outbox", label: "Email outbox", icon: Mail, area: "outbox", group: "Support" },
@@ -56,7 +62,12 @@ export const NAV: { href: string; label: string; icon: typeof Users; area: Admin
 /** Remembered per browser: the icon-only sidebar is a preference, not a page state. */
 export const SLIM_KEY = "admin:nav:slim";
 
-const active = (path: string, href: string) => (href === "/admin" ? path === "/admin" : path.startsWith(href));
+/** Longest matching entry wins, so /admin/blog/library lights "Blog library" and not "Blog dashboard" as well. */
+const active = (path: string, href: string) => {
+  if (href === "/admin") return path === "/admin";
+  if (path !== href && !path.startsWith(href + "/")) return false;
+  return !NAV.some((n) => n.href !== href && n.href.length > href.length && (path === n.href || path.startsWith(n.href + "/")));
+};
 
 /**
  * Slim-mode tooltips. The nav sits in a scroller, which would clip a CSS tooltip popping out to its right, so the

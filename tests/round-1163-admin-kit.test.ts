@@ -24,14 +24,17 @@ const ROUTES = [
 ];
 
 describe("1163 sidebar", () => {
-  test("groups are ordered Run, Insights, Support, Setup, Administration", () => {
-    expect(shell).toContain('NAV_GROUPS: readonly NavGroup[] = ["Run", "Insights", "Support", "Setup", "Administration"]');
+  test("groups are ordered Run, Insights, Content Studio, Support, Setup, Administration", () => {
+    // 1175 added Content Studio (the blog agent) between Insights and Support.
+    expect(shell).toContain('NAV_GROUPS: readonly NavGroup[] = ["Run", "Insights", "Content Studio", "Support", "Setup", "Administration"]');
   });
   test("every admin destination is still in the nav", () => {
     const hrefs = [...shell.matchAll(/href: "(\/admin[^"]*)"/g)].map((m) => m[1]);
     for (const r of ROUTES) expect(hrefs).toContain(r);
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    expect(hrefs.length).toBe(30);
+    // 30 from 1163 plus the six Content Studio pages (1175).
+    expect(hrefs.length).toBe(36);
+    for (const r of ["/admin/blog", "/admin/blog/generate", "/admin/blog/library", "/admin/blog/calendar", "/admin/blog/seo", "/admin/blog/settings"]) expect(hrefs).toContain(r);
   });
   test("insight pages moved out of Run", () => {
     for (const h of ["/admin/behavior", "/admin/retention", "/admin/growth", "/admin/analytics"]) {
