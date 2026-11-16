@@ -44,7 +44,7 @@ export function appNavKind(from: string | null, to: string, back: boolean): AppN
 }
 
 const TITLES: Record<string, string> = {
-  home: "Home", calendar: "Calendar", inbox: "Inbox", analytics: "Analytics", content: "Content",
+  home: "Home", calendar: "Calendar", inbox: "Inbox", analytics: "Analytics", "profile-review": "Profile Review", content: "Content",
   approvals: "Approvals", accounts: "Accounts", settings: "Settings", support: "Help", billing: "Plan", mascot: "Pip", create: "New post",
 };
 

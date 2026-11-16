@@ -22,9 +22,10 @@ export interface ProfileExtras extends PlatformDashboard {
  * The account switcher for a platform someone manages several accounts on. One account is one dashboard:
  * nothing is ever merged, because two profiles on the same platform are two different audiences.
  */
-export function ProfileAccounts({ platform, accounts, active, onPick, busy, lastSyncAt }: { platform: Platform; accounts: ProfileExtras["accounts"]; active: string | null; onPick: (id: string) => void; busy: boolean; lastSyncAt: string | null }) {
+// 1172: lastSyncAt is optional; the dashboard header already says when Outlly last synced, so it leaves it out.
+export function ProfileAccounts({ platform, accounts, active, onPick, busy, lastSyncAt }: { platform: Platform; accounts: ProfileExtras["accounts"]; active: string | null; onPick: (id: string) => void; busy: boolean; lastSyncAt?: string | null }) {
   if (accounts.length < 2) return null;
-  const fresh = freshness(lastSyncAt);
+  const fresh = lastSyncAt === undefined ? null : freshness(lastSyncAt);
   return (
     <section aria-labelledby="accts" className="mt-6">
       <h2 id="accts" className="sr-only">
@@ -60,11 +61,14 @@ export function ProfileAccounts({ platform, accounts, active, onPick, busy, last
             </button>
           ))}
         </div>
-        <p className="text-sm text-muted-foreground">{fresh.label}</p>
+        {fresh && <p className="text-sm text-muted-foreground">{fresh.label}</p>}
       </div>
     </section>
   );
 }
+
+// 1172: format labels from the platform already read "Reels", "Carousels"; never add a second s.
+const plural = (label: string) => (/s$/i.test(label) ? label : `${label}s`);
 
 function Rows({ rows, unit }: { rows: Bucket[]; unit: string }) {
   const reduce = useReducedMotion();
@@ -96,6 +100,7 @@ function Rows({ rows, unit }: { rows: Bucket[]; unit: string }) {
  * such as age or country are not shown at all: the permissions these platforms grant Outlly do not
  * include them, so there is nothing honest to put there.
  */
+// 1172: rendered straight into the dashboard's 12-column grid (two tiles side by side, or one across).
 export function ProfileBreakdowns({ x }: { x: ProfileExtras }) {
   const formats = x.formats.filter((f) => f.posts > 0);
   const days = x.days.filter((d) => d.posts > 0);
@@ -103,21 +108,28 @@ export function ProfileBreakdowns({ x }: { x: ProfileExtras }) {
   if (!formats.length && !days.length && !hours.length) return null;
   const bestFormat = bestBucket(formats);
   const bestDay = bestBucket(days);
+  const both = formats.length > 0 && (days.length > 0 || hours.length > 0);
+  const span = both ? "xl:col-span-6" : "md:col-span-2 xl:col-span-12";
+  const card = "glass flex flex-col rounded-[24px] p-5 sm:p-6";
+  const h2 = "text-base font-semibold sm:text-lg";
   return (
-    <div className="mt-3 grid gap-3 lg:grid-cols-2">
+    <>
       {formats.length > 0 && (
-        <section aria-labelledby="formats" className="glass rounded-[28px] p-5 sm:p-6">
-          <h2 id="formats" className="mb-1 text-lg font-semibold">What you post here</h2>
-          <p className="mb-4 text-sm text-muted-foreground">
-            {bestFormat ? `${bestFormat.label}s average the most views of your formats.` : "From the posts this account returned."}
+        <section aria-labelledby="formats" className={cn(card, span)}>
+          <h2 id="formats" className={h2}>What you post here</h2>
+          <p className="mb-4 mt-1 text-sm text-muted-foreground">
+            {bestFormat ? `${plural(bestFormat.label)} average the most views of your formats.` : "From the posts this account returned."}
           </p>
           <Rows rows={formats} unit="post" />
+          <p className="mt-auto pt-4 text-xs text-muted-foreground">
+            {formats.reduce((a, f) => a + f.posts, 0)} posts returned by the platform, grouped by format. Views are the platform&apos;s own per-post counts.
+          </p>
         </section>
       )}
       {(days.length > 0 || hours.length > 0) && (
-        <section aria-labelledby="when" className="glass rounded-[28px] p-5 sm:p-6">
-          <h2 id="when" className="mb-1 text-lg font-semibold">When you post</h2>
-          <p className="mb-4 text-sm text-muted-foreground">
+        <section aria-labelledby="when" className={cn(card, span)}>
+          <h2 id="when" className={h2}>When you post</h2>
+          <p className="mb-4 mt-1 text-sm text-muted-foreground">
             Your own times ({x.timezone}).{bestDay ? ` ${bestDay.label} posts average the most views.` : ""}
           </p>
           {days.length > 0 && <Rows rows={days} unit="post" />}
@@ -140,6 +152,6 @@ export function ProfileBreakdowns({ x }: { x: ProfileExtras }) {
           )}
         </section>
       )}
-    </div>
+    </>
   );
 }

@@ -3,7 +3,7 @@ import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { forwardRef, type ComponentProps } from "react";
 import { useLivePlatforms } from "./LivePlatforms";
-import { warmAnalytics, warmPage } from "@/lib/client/warm";
+import { warmAnalytics, warmPage, warmReview } from "@/lib/client/warm";
 import { PRELOAD_TABS } from "@/lib/client/preload";
 
 /**
@@ -19,6 +19,7 @@ export const HoverLink = forwardRef<HTMLAnchorElement, ComponentProps<typeof Nex
     if (typeof href !== "string" || !href.startsWith("/") || rest.target === "_blank") return;
     // Analytics (1039): the whole page and the numbers it loads after, so it opens filled in.
     if (href === "/analytics") return warmAnalytics(router, live);
+    if (href === "/profile-review") return warmReview(router);
     // A platform's dashboard renders its numbers on the server: fetch the full page, not just its loader.
     if (href.startsWith("/analytics/")) return warmPage(router, href);
     // 1114: the primary tabs the background preload keeps (usually already held, so this costs nothing).

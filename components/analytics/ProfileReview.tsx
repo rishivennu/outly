@@ -12,7 +12,6 @@ import { PLATFORM_META } from "@/lib/domain";
 import { cn, compact } from "@/lib/utils";
 import type { ProfileReview as Review, ReviewStat } from "@/lib/live/review-core";
 import type { LiveTotals } from "@/lib/live/review";
-import { SectionHead } from "./SectionHead";
 import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
 import { cssTiming } from "@/lib/motion/numbers";
 
@@ -267,7 +266,32 @@ function Bullets({ items, dot }: { items: string[]; dot: string }) {
   );
 }
 
-export function ProfileReview({ compactMode = false }: { compactMode?: boolean }) {
+/* ------------------------------------------------------------------ */
+/* The page                                                             */
+/* ------------------------------------------------------------------ */
+
+/** The method in plain words, so a score is never a black box (1140). */
+function Method({ sample }: { sample: number }) {
+  return (
+    <div className="mt-3 space-y-2 text-[15px] leading-relaxed text-muted-foreground">
+      <p>Every number here comes from your connected accounts and from the posts you published through Outlly. Nothing is estimated and nothing is compared with other people.</p>
+      <p>The score is the average of its parts, each marked out of 100 from your own numbers: how far your posts reach, how many people interact per view, how regularly you publish, and how your last {sample} posts moved against the period before.</p>
+      <p>A part with no data is left out of the average rather than counted as zero. Followers and reach are never added together across platforms, because each platform counts them its own way.</p>
+      <p>The written review is Pip AI reading exactly these numbers. It is told to use nothing else, so if a number is missing it says so instead of filling the gap.</p>
+    </div>
+  );
+}
+
+/**
+ * The Profile Review workspace at /profile-review (1171; until then the last section of Analytics). The same
+ * review, live counter and tiles as before, laid out as a page: score and live numbers first, then what the
+ * score is made of and how each platform does, then what to do about it.
+ *
+ * The scope line says what the numbers cover. The review is worked out server side over every connected
+ * account and the last 30 days (lib/live/review collectFacts); the page never pretends to filter what the
+ * server has not filtered.
+ */
+export function ProfileReview() {
   const toast = useToast();
   const [state, setState] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -298,10 +322,9 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
   const thinking = busy || !state;
   const aiOn = !!state?.ai;
   const label = r?.source === "ai" ? `Written by Pip AI ${ago(r.generatedAt, Date.now())}` : "Worked out from your numbers";
-  const stats = (r?.stats ?? []).filter((s) => s.key !== "views").slice(0, compactMode ? 2 : 4);
+  const stats = (r?.stats ?? []).filter((s) => s.key !== "views");
   const hasAudience = !!r && (!!r.audience || !!r.bestTimes || !!r.contentMix || r.source === "rules");
-  /* Strengths, weaknesses and audience share one row: three cards in thirds, or two in halves. */
-  const third = hasAudience ? "lg:col-span-4" : "lg:col-span-6";
+  const scopeNames = r?.platforms.map((p) => PLATFORM_META[p].name) ?? [];
 
   const action = (
     <button
@@ -318,22 +341,36 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
   );
 
   const head = (
-    <SectionHead
-      id="pr-title"
-      kicker="Profile review"
-      title="How your profile is really doing"
-      desc={!aiOn && state ? "Worked out from your real numbers. The in-depth Pip AI review needs an AI key on the server." : "A score out of 100 from your reach, engagement and how often you post, with what to do next."}
-    >
-      {r && <span className="text-sm text-muted-foreground">{label}</span>}
-      {!error && action}
-    </SectionHead>
+    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+      <div className="min-w-0 max-w-2xl">
+        <p className="ai-kicker text-sm font-semibold">Profile review</p>
+        <h1 id="pr-title" className="display mt-1 text-[clamp(1.8rem,3.2vw,2.5rem)]">Profile Review</h1>
+        <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">Understand what&apos;s working, what&apos;s holding you back, and what to improve next.</p>
+        {!aiOn && state && <p className="mt-1 text-sm text-muted-foreground">Worked out from your real numbers. The in-depth Pip AI review needs an AI key on the server.</p>}
+        {/* What the numbers cover, said once: every tile below shares this scope. */}
+        <dl className="mt-4 flex flex-wrap gap-2 text-[13px]" aria-label="What this review covers" data-testid="review-scope">
+          <div className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-secondary/70 px-3 hairline">
+            <dt className="text-muted-foreground">Accounts</dt>
+            <dd className="font-semibold">{r ? (scopeNames.length ? `All connected: ${scopeNames.join(", ")}` : "Posts published through Outlly") : "Loading"}</dd>
+          </div>
+          <div className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-secondary/70 px-3 hairline">
+            <dt className="text-muted-foreground">Period</dt>
+            <dd className="font-semibold">Last 30 days</dd>
+          </div>
+        </dl>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        {r && <span className="text-sm text-muted-foreground">{label}</span>}
+        {!error && action}
+      </div>
+    </header>
   );
 
   if (error)
     return (
-      <section aria-labelledby="pr-title" className={cn("ai-type", compactMode ? "" : "mt-16")}>
+      <section aria-labelledby="pr-title" className="ai-type">
         {head}
-        <div className="glass mt-5 flex flex-col gap-4 rounded-[24px] p-5 sm:flex-row sm:items-center sm:p-6" role="alert">
+        <div className="glass mt-6 flex flex-col gap-4 rounded-[24px] p-5 sm:flex-row sm:items-center sm:p-6" role="alert">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary" aria-hidden="true">
             <CircleAlert className="h-5 w-5" />
           </span>
@@ -348,13 +385,14 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
       </section>
     );
 
+  const showNext = !!r && !r.empty;
   return (
-    <section aria-labelledby="pr-title" className={cn("ai-type", compactMode ? "" : "mt-16")} aria-busy={thinking}>
+    <section aria-labelledby="pr-title" className="ai-type" aria-busy={thinking}>
       {head}
 
-      <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-12">
-        {/* Score */}
-        <Tile label="Overall score" className="lg:col-span-7">
+      <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-12">
+        {/* Row 1: the score, the live counter, and the key numbers. */}
+        <Tile label="Overall score" className="lg:col-span-6">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
             <ScoreRing score={r?.score ?? null} />
             <div className="min-w-0">
@@ -368,73 +406,83 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
               <Pip size={44} mood="think" /> Reading {r?.sample ?? 0} posts and your stats…
             </div>
           )}
-          {r && !compactMode && r.pillars.length > 0 && (
-            <div className="mt-6 border-t border-[hsl(var(--glass-border))] pt-5">
-              <h3 className="text-[15px] font-semibold">What the score is made of</h3>
-              <ul className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2">
-                {r.pillars.map((p, i) => (
-                  <li key={p.key} className="min-w-0">
-                    <div className="flex items-baseline justify-between gap-3 text-[15px]">
-                      <span className="font-medium">{p.label}</span>
-                      <span className="tabular font-semibold">{p.score}<span className="font-normal text-muted-foreground">/100</span></span>
-                    </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.score} aria-label={`${p.label} ${p.score} out of 100`}>
-                      <motion.div className="pr-meter h-full rounded-full" initial={{ width: reduce ? `${p.score}%` : 0 }} whileInView={{ width: `${p.score}%` }} viewport={{ once: true }} transition={{ duration: reduce ? 0 : 1, ease: EASE, delay: reduce ? 0 : 0.1 * i }} />
-                    </div>
-                    <p className="mt-1.5 text-sm leading-snug text-muted-foreground">{p.note}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
           {r && !busy && r.sample > 0 && <p className="mt-5 text-sm text-muted-foreground">Based on {r.sample} posts{r.platforms.length ? ` across ${r.platforms.map((p) => PLATFORM_META[p].name).join(", ")}` : ""}.</p>}
-          {/* 1140: the method in plain words, so a score is never a black box. */}
-          {r && (
-          <details className="mt-4 text-sm">
-            <summary className="inline-flex min-h-11 cursor-pointer items-center font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]">How this is worked out</summary>
-            <div className="mt-2 space-y-2 leading-relaxed text-muted-foreground">
-              <p>Every number here comes from your connected accounts and from the posts you published through Outlly. Nothing is estimated and nothing is compared with other people.</p>
-              <p>The score is the average of its parts above, each marked out of 100 from your own numbers: how far your posts reach, how many people interact per view, how regularly you publish, and how your last {r.sample} posts moved against the period before.</p>
-              <p>A part with no data is left out of the average rather than counted as zero. Followers and reach are never added together across platforms, because each platform counts them its own way.</p>
-              <p>The written review is Pip AI reading exactly these numbers. It is told to use nothing else, so if a number is missing it says so instead of filling the gap.</p>
-            </div>
-          </details>
-          )}
         </Tile>
 
-        {/* Right column: live views, then the key numbers as a 2 x 2 grid under it. */}
-        <div className="flex min-w-0 flex-col gap-3 lg:col-span-5">
-          <LiveViews delay={0.05} className="lg:flex-1" />
-          {(stats.length > 0 || !r) && (
-            <Tile label="Key numbers" delay={0.08}>
-              {!r ? (
-                <div className="grid grid-cols-2 gap-6">{Array.from({ length: 2 }, (_, i) => <Shimmer key={i} lines={3} />)}</div>
-              ) : (
-                <dl className="grid grid-cols-2 gap-x-6 gap-y-5">
-                  {stats.map((s) => (
-                    <div key={s.key} className="min-w-0">
-                      <dt className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-                        <span className="truncate">{s.label}</span>
-                        <Delta value={s.delta} />
-                      </dt>
-                      <dd className="mt-1.5">
-                        <span className="block text-[clamp(1.6rem,2.2vw,2rem)] font-semibold leading-none tracking-tight">
-                          <AnimatedNumber value={s.value} format={fmtStat(s)} tier={s.format === "pct" ? "pct" : "secondary"} />
-                        </span>
-                        <span className="mt-1.5 block text-sm text-muted-foreground">{s.hint}</span>
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-            </Tile>
-          )}
-        </div>
+        <LiveViews delay={0.05} className="lg:col-span-6 xl:col-span-3" />
 
-        {!compactMode && r && !r.empty && (
+        {(stats.length > 0 || !r) && (
+          <Tile label="Followers and engagement" delay={0.08} className="lg:col-span-12 xl:col-span-3">
+            <CardHead title="Key numbers" />
+            {!r ? (
+              <div className="mt-4 grid grid-cols-2 gap-6 xl:grid-cols-1">{Array.from({ length: 2 }, (_, i) => <Shimmer key={i} lines={3} />)}</div>
+            ) : (
+              <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-1">
+                {stats.map((s) => (
+                  <div key={s.key} className="min-w-0">
+                    <dt className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                      <span className="truncate">{s.label}</span>
+                      <Delta value={s.delta} />
+                    </dt>
+                    <dd className="mt-1.5">
+                      <span className="block text-[clamp(1.5rem,2vw,1.85rem)] font-semibold leading-none tracking-tight">
+                        <AnimatedNumber value={s.value} format={fmtStat(s)} tier={s.format === "pct" ? "pct" : "secondary"} />
+                      </span>
+                      <span className="mt-1.5 block text-sm text-muted-foreground">{s.hint}</span>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </Tile>
+        )}
+
+        {/* Row 2: what the score is made of, and how each platform does. */}
+        {r && r.pillars.length > 0 && (
+          <Tile label="What the score is made of" className={r.perPlatform.length > 0 ? "lg:col-span-7" : "lg:col-span-12"} delay={0.1}>
+            <CardHead title="What the score is made of" />
+            <ul className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
+              {r.pillars.map((p, i) => (
+                <li key={p.key} className="min-w-0">
+                  <div className="flex items-baseline justify-between gap-3 text-[15px]">
+                    <span className="font-medium">{p.label}</span>
+                    <span className="tabular font-semibold">{p.score}<span className="font-normal text-muted-foreground">/100</span></span>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.score} aria-label={`${p.label} ${p.score} out of 100`}>
+                    <motion.div className="pr-meter h-full rounded-full" initial={{ width: reduce ? `${p.score}%` : 0 }} whileInView={{ width: `${p.score}%` }} viewport={{ once: true }} transition={{ duration: reduce ? 0 : 1, ease: EASE, delay: reduce ? 0 : 0.1 * i }} />
+                  </div>
+                  <p className="mt-1.5 text-sm leading-snug text-muted-foreground">{p.note}</p>
+                </li>
+              ))}
+            </ul>
+          </Tile>
+        )}
+
+        {r && r.perPlatform.length > 0 && (
+          <Tile label="By platform" className={r.pillars.length > 0 ? "lg:col-span-5" : "lg:col-span-12"} delay={0.12}>
+            <CardHead title="By platform" icon={<LayoutGrid className="h-4 w-4" />} />
+            <p className="mt-1 text-sm text-muted-foreground">Each platform is scored on its own numbers. They are never added together.</p>
+            <ul className="mt-4 flex flex-col gap-2.5">
+              {r.perPlatform.map((p) => (
+                <li key={p.platform} className="flex gap-3 rounded-2xl bg-secondary/50 p-3.5">
+                  <PlatformOrb platform={p.platform} size={36} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2 text-[15px]">
+                      <span className="font-semibold">{PLATFORM_META[p.platform].name}</span>
+                      {p.score !== null && <span className="tabular font-semibold">{p.score}<span className="font-normal text-muted-foreground">/100</span></span>}
+                    </div>
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{busy ? <span className="pr-shimmer inline-block h-3 w-40 rounded-full" /> : p.verdict}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Tile>
+        )}
+
+        {showNext && (
           <>
-            {/* Actions first: this is what the review is for. */}
-            <Tile label="Do this next" className={r.perPlatform.length > 0 ? "lg:col-span-7" : "lg:col-span-12"} delay={0.12}>
+            {/* Row 3: what to do about it. Actions first: this is what the review is for. */}
+            <Tile label="Do this next" className="lg:col-span-12 xl:col-span-6" delay={0.14}>
               <CardHead title="Do this next" icon={<Sparkles className="h-4 w-4" />} />
               <ol className="mt-3 flex flex-col gap-1">
                 {r.actions.map((a, i) => (
@@ -456,37 +504,18 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
               </ol>
             </Tile>
 
-            {r.perPlatform.length > 0 && (
-              <Tile label="By platform" className="lg:col-span-5" delay={0.14}>
-                <CardHead title="By platform" icon={<LayoutGrid className="h-4 w-4" />} />
-                <ul className="mt-4 flex flex-col gap-2.5">
-                  {r.perPlatform.map((p) => (
-                    <li key={p.platform} className="flex gap-3 rounded-2xl bg-secondary/50 p-3.5">
-                      <PlatformOrb platform={p.platform} size={36} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2 text-[15px]">
-                          <span className="font-semibold">{PLATFORM_META[p.platform].name}</span>
-                          {p.score !== null && <span className="tabular font-semibold">{p.score}<span className="font-normal text-muted-foreground">/100</span></span>}
-                        </div>
-                        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{busy ? <span className="pr-shimmer inline-block h-3 w-40 rounded-full" /> : p.verdict}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </Tile>
-            )}
-
-            <Tile label="Working for you" className={third} delay={0.16}>
+            <Tile label="Working for you" className="lg:col-span-6 xl:col-span-3" delay={0.16}>
               <CardHead title="Working for you" icon={<Check className="h-4 w-4" />} tone="text-success-ink" />
               {busy ? <div className="mt-4"><Shimmer /></div> : r.strengths.length ? <Bullets items={r.strengths} dot="bg-success" /> : <p className="mt-4 text-[15px] text-muted-foreground">Nothing scores above 60 yet. The steps above are the fastest way to get there.</p>}
             </Tile>
-            <Tile label="Holding you back" className={third} delay={0.18}>
+            <Tile label="Holding you back" className="lg:col-span-6 xl:col-span-3" delay={0.18}>
               <CardHead title="Holding you back" icon={<TriangleAlert className="h-4 w-4" />} tone="text-warning-ink" />
               {busy ? <div className="mt-4"><Shimmer /></div> : r.weaknesses.length ? <Bullets items={r.weaknesses} dot="bg-warning" /> : <p className="mt-4 text-[15px] text-muted-foreground">No pillar is below 45. Keep the rhythm going.</p>}
             </Tile>
 
+            {/* Last: who watches and when, and how all of this is worked out. */}
             {hasAudience && (
-              <Tile label="Audience and timing" className="lg:col-span-4" delay={0.2}>
+              <Tile label="Audience and timing" className="lg:col-span-6" delay={0.2}>
                 <CardHead title="Audience and timing" icon={<Users className="h-4 w-4" />} />
                 <dl className="mt-4 flex flex-col gap-4 text-[15px]">
                   <div>
@@ -508,15 +537,20 @@ export function ProfileReview({ compactMode = false }: { compactMode?: boolean }
                 </dl>
               </Tile>
             )}
+            <Tile label="How this is worked out" className={hasAudience ? "lg:col-span-6" : "lg:col-span-12"} delay={0.22}>
+              <CardHead title="How this is worked out" />
+              <Method sample={r.sample} />
+            </Tile>
           </>
         )}
 
-        {compactMode && r && (
-          <Tile className="flex items-center lg:col-span-12">
-            <Link href="/analytics#pr-title" className="flex min-h-11 w-full items-center justify-between gap-3 rounded-2xl text-[15px] font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[hsl(var(--ring))]">
-              <span>{r.actions[0] ? `Next: ${r.actions[0].title}` : "See the full review"}</span>
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
+        {r?.empty && (
+          <Tile label="Nothing to review yet" className="lg:col-span-12" delay={0.1}>
+            <p className="text-[15px] leading-relaxed text-muted-foreground">There is not enough to review yet. Connect an account or publish a few posts through Outlly, and the score, the numbers and what to do next fill in here.</p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link href="/accounts" className="inline-flex min-h-11 items-center rounded-full px-5 text-sm font-semibold hairline transition hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]">Connect an account</Link>
+              <Link href="/create" className="inline-flex min-h-11 items-center rounded-full px-5 text-sm font-semibold hairline transition hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]">Make your first one</Link>
+            </div>
           </Tile>
         )}
       </div>

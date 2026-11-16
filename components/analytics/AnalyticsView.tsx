@@ -19,7 +19,6 @@ import type { Platform } from "@/lib/domain";
 import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
 import { chartMotion, riseIndex } from "@/lib/motion/numbers";
 import { LiveStrip } from "./LiveStrip";
-import { ProfileReview } from "./ProfileReview";
 import { AccountDrill, ReportButtons } from "./AccountDrill";
 import { Standouts } from "./Standouts";
 import { Compare } from "./Compare";
@@ -230,7 +229,6 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
           </Button>
         </section>
         <LiveStrip connected={connected} />
-        <ProfileReview />
       </div>
     );
   }
@@ -520,7 +518,6 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
       <Standouts posts={data.standouts} avgViews={data.avgViews} />
       {!drill && <Compare accounts={accounts} />}
       <LiveStrip connected={connected} />
-      <ProfileReview />
     </div>
   );
 }

@@ -66,12 +66,20 @@ export function warmApi(url: string, maxAge?: number) {
 
 type Account = { platform: string; status: string; mock?: boolean };
 
-/** Everything the Analytics overview shows: the page, the review, live views, and each connected platform. */
+/** 1171: the Profile Review page and the two requests it makes once open. Both are cached, so Analytics and
+ * Profile Review opened one after the other share them instead of asking twice. */
+export function warmReview(router: Prefetcher, page = true) {
+  if (saveData()) return;
+  if (page) warmPage(router, "/profile-review");
+  warmApi("/api/analytics/review");
+  warmApi("/api/analytics/live", 20_000);
+}
+
+/** Everything the Analytics overview shows: the page, live views, and each connected platform. */
 export function warmAnalytics(router: Prefetcher, live?: readonly string[], page = true) {
   if (saveData()) return;
   // The full page render is the heavy part on the server: only on intent (hover/focus), not on idle (1040).
   if (page) warmPage(router, "/analytics");
-  warmApi("/api/analytics/review");
   warmApi("/api/analytics/live", 20_000);
   // The live tiles: only for platforms really connected (practice accounts have no live numbers).
   cachedApi<{ accounts: Account[] }>("/api/accounts", 60_000)

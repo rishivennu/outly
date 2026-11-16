@@ -2,6 +2,7 @@ import { HttpError, json, route } from "@/lib/http";
 import { db } from "@/lib/db";
 import { isPlatform } from "@/lib/domain";
 import { platformDashboard } from "@/lib/live";
+import { pickRangeDays } from "@/lib/live/ranges";
 import { dashboardAccount, listProfiles } from "@/lib/profiles";
 import { syncTimes, type SyncTimes } from "@/lib/analytics/sync";
 import { activeDays, activeHours, formatBreakdown } from "@/lib/analytics/profile-core";
@@ -24,7 +25,8 @@ export const GET = route(
     // An id this person cannot see falls back to their own default, never to somebody else's account.
     const picked = (asked && profiles.find((p) => p.id === asked)?.id) || (await dashboardAccount(user, platform));
     const accountId = picked === "none" ? null : picked;
-    const dash = await platformDashboard(user.id, platform, { accountId, fresh: q.get("fresh") === "1" });
+    // 1172: the whole page shares one reporting window; ?days= picks it from what the platform offers.
+    const dash = await platformDashboard(user.id, platform, { accountId, fresh: q.get("fresh") === "1", days: pickRangeDays(platform, q.get("days")) });
     const tz = (await db.user.findUnique({ where: { id: user.id }, select: { timezone: true } }))?.timezone || "UTC";
     const posts = dash.status === "ok" ? dash.posts.map((p) => ({ format: p.format, publishedAt: p.publishedAt, views: p.views, likes: p.likes, comments: p.comments, shares: p.shares, saves: p.saves })) : [];
     const times: SyncTimes = accountId ? await syncTimes([accountId]).catch((): SyncTimes => ({})) : {};

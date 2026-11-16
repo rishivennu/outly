@@ -93,6 +93,7 @@ export function CommandPalette() {
       { id: "content", group: "Go to", label: "Content", keywords: "library posts drafts", href: "/content" },
       { id: "calendar", group: "Go to", label: "Calendar", keywords: "schedule plan week", href: "/calendar" },
       { id: "analytics", group: "Go to", label: "Analytics", keywords: "views stats numbers", href: "/analytics" },
+      { id: "profile-review", group: "Go to", label: "Profile Review", keywords: "score review pip growth strengths", href: "/profile-review" },
       { id: "inbox", group: "Go to", label: "Inbox", keywords: "comments messages replies", href: "/inbox" },
       { id: "approvals", group: "Go to", label: "Approvals", keywords: "review client", href: "/approvals" },
       ...(own ? [

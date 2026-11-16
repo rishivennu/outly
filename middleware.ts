@@ -14,7 +14,7 @@ const OPEN = ["/", "/privacy", "/terms", "/contact", "/help", "/changelog", "/st
 const OPEN_PREFIX = ["/review/", "/r/", "/team/accept"];
 // Pages that need a session. Anything not listed here and not public is either a real public file
 // (og image, icons) or a typo, and a typo deserves the 404 page, not a sign-in wall.
-const STUDIO = ["/home", "/create", "/content", "/calendar", "/analytics", "/inbox", "/approvals", "/accounts", "/billing", "/settings", "/support", "/mascot", "/share-target", "/app-share"];
+const STUDIO = ["/home", "/create", "/content", "/calendar", "/analytics", "/profile-review", "/inbox", "/approvals", "/accounts", "/billing", "/settings", "/support", "/mascot", "/share-target", "/app-share"];
 const needsSession = (p: string) => STUDIO.some((s) => p === s || p.startsWith(s + "/"));
 // 1143: pages that must never show up in Google. robots.txt used to block them, but a blocked URL can still be
 // indexed from a link ("Indexed, though blocked by robots.txt", /home, Search Console 11-06) and Google never sees a

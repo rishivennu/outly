@@ -133,7 +133,7 @@ export function runningInstalled(o: { standalone: boolean; iosStandalone?: boole
 export const provenInstalled = (o: Parameters<typeof runningInstalled>[0]) => runningInstalled({ ...o, search: "" });
 
 /** Studio routes (not marketing). Only here, on a phone-width screen, do we hold back Chrome's own install bar. */
-export const STUDIO_RE = /^\/(home|calendar|content|analytics|inbox|create|accounts|approvals|billing|settings|support|mascot)(\/|$)/;
+export const STUDIO_RE = /^\/(home|calendar|content|analytics|profile-review|inbox|create|accounts|approvals|billing|settings|support|mascot)(\/|$)/;
 
 /**
  * Runs in <head> before React: the browser fires `beforeinstallprompt` once, often before hydration, so it

@@ -15,6 +15,7 @@ import { facebookDashboard } from "./facebook";
 import { outllyDashboard } from "./outlly";
 import { suggest } from "./suggest";
 import type { PlatformDashboard, Suggestion } from "./types";
+import { DEFAULT_RANGE_DAYS, pickRangeDays } from "./ranges";
 
 export type { PlatformDashboard } from "./types";
 
@@ -42,9 +43,9 @@ export function invalidateDashboards(userId: string) {
  * cold start or on another route (the home strip vs the dashboard page) reads it instead of calling
  * the platform again. Stale entries are served at once and refreshed in the background.
  */
-function sharedRemote(userId: string, platform: Platform, tz: string, load: () => Promise<PlatformDashboard>, accountId: string | null = null) {
+function sharedRemote(userId: string, platform: Platform, tz: string, load: () => Promise<PlatformDashboard>, accountId: string | null = null, days = DEFAULT_RANGE_DAYS) {
   // tz is part of the key: the hours chart and the coaching depend on it, and a settings change must not reuse the old copy.
-  return unstable_cache(load, ["live-dash-v2", userId, platform, tz, accountId ?? "default"], { revalidate: LIVE_CACHE_MS / 1000, tags: [`live:${userId}`, `live:${userId}:${platform}`] })().catch(noDataCache(load));
+  return unstable_cache(load, ["live-dash-v3", userId, platform, tz, accountId ?? "default", String(days)], { revalidate: LIVE_CACHE_MS / 1000, tags: [`live:${userId}`, `live:${userId}:${platform}`] })().catch(noDataCache(load));
 }
 
 /** Outside a Next request (tests, scripts) there is no data cache: just run the loader. Real failures pass through. */
@@ -53,14 +54,16 @@ const noDataCache = <T,>(load: () => Promise<T>) => (e: unknown) => {
   throw e;
 };
 
-function empty(platform: Platform, status: PlatformDashboard["status"], message: string, connect?: PlatformDashboard["connect"]): PlatformDashboard {
-  return { platform, status, message, connect, fetchedAt: new Date().toISOString(), rangeDays: 28, headline: [], series: [], posts: [], notes: [], suggestions: [] };
+function empty(platform: Platform, status: PlatformDashboard["status"], message: string, connect?: PlatformDashboard["connect"], rangeDays = DEFAULT_RANGE_DAYS): PlatformDashboard {
+  return { platform, status, message, connect, fetchedAt: new Date().toISOString(), rangeDays, headline: [], series: [], posts: [], notes: [], suggestions: [] };
 }
 
-export async function platformDashboard(userId: string, platform: Platform, opts: { fresh?: boolean; accountId?: string | null } = {}): Promise<PlatformDashboard> {
+export async function platformDashboard(userId: string, platform: Platform, opts: { fresh?: boolean; accountId?: string | null; days?: number } = {}): Promise<PlatformDashboard> {
   // 1037: a manager with several accounts on one platform sees the picked one's numbers.
   const acctId = opts.accountId ?? null;
-  const key = `${userId}:${platform}${acctId ? `:${acctId}` : ""}`;
+  // 1172: one reporting window for the whole page; only a window the platform offers, else the default.
+  const days = pickRangeDays(platform, opts.days);
+  const key = `${userId}:${platform}${acctId ? `:${acctId}` : ""}${days === DEFAULT_RANGE_DAYS ? "" : `:${days}d`}`;
   const hit = cache.get(key);
   if (!opts.fresh && hit && Date.now() - hit.at < LIVE_CACHE_MS) return hit.data;
 
@@ -75,21 +78,21 @@ export async function platformDashboard(userId: string, platform: Platform, opts
 
   if (!acct || isPracticeAccount(acct)) {
     if (!connect.oauth && !connect.token)
-      return empty(platform, "not_configured", `${name} needs developer keys before anyone can connect. Add ${platform.toUpperCase()}_CLIENT_ID and ${platform.toUpperCase()}_CLIENT_SECRET to the server's .env.`, connect);
-    return empty(platform, "not_connected", `Connect your ${name} account to see live numbers here.`, connect);
+      return empty(platform, "not_configured", `${name} needs developer keys before anyone can connect. Add ${platform.toUpperCase()}_CLIENT_ID and ${platform.toUpperCase()}_CLIENT_SECRET to the server's .env.`, connect, days);
+    return empty(platform, "not_connected", `Connect your ${name} account to see live numbers here.`, connect, days);
   }
-  if (acct.status === "needs_reconnect") return empty(platform, "needs_reconnect", `${name} asked you to sign in again before it shares more numbers.`, connect);
+  if (acct.status === "needs_reconnect") return empty(platform, "needs_reconnect", `${name} asked you to sign in again before it shares more numbers.`, connect, days);
 
   const load = async (): Promise<PlatformDashboard> => {
     // Each platform's token only works on its own API. Platforms without a reader get Outlly's own record,
     // never another platform's endpoint (a Facebook token on X's API answered 401: "connection expired").
     if (platform === "threads" || platform === "linkedin" || platform === "tiktok") {
-      const base = await outllyDashboard(userId, platform, acct);
+      const base = await outllyDashboard(userId, platform, acct, days);
       return { ...base, suggestions: [] };
     }
     const ctx = await liveAccount(acct);
     const base =
-      platform === "instagram" ? await instagramDashboard(ctx, tz) : platform === "youtube" ? await youtubeDashboard(ctx) : platform === "facebook" ? await facebookDashboard(ctx) : await xDashboard(ctx);
+      platform === "instagram" ? await instagramDashboard(ctx, tz, days) : platform === "youtube" ? await youtubeDashboard(ctx, days) : platform === "facebook" ? await facebookDashboard(ctx, days) : await xDashboard(ctx, days);
     // Rule-based coaching only: the Gemini ideas are fetched separately (platformIdeas) so a slow model
     // never holds the numbers back. Throwing here keeps a failure out of every cache.
     return { ...base, suggestions: suggest({ platform, posts: base.posts, series: base.series, hours: base.hours, timezone: tz }) };
@@ -97,12 +100,12 @@ export async function platformDashboard(userId: string, platform: Platform, opts
 
   let data: PlatformDashboard;
   try {
-    data = opts.fresh ? await load() : await sharedRemote(userId, platform, tz, load, acctId);
+    data = opts.fresh ? await load() : await sharedRemote(userId, platform, tz, load, acctId, days);
     if (!opts.fresh && Date.now() - new Date(data.fetchedAt).getTime() > SHARED_MAX_AGE_MS) data = await load();
   } catch (e) {
     const pe = asPublisherError(e);
-    if (pe.code === "AUTH_EXPIRED") return empty(platform, "needs_reconnect", `${name} says the connection expired. Reconnect to keep the numbers live.`, connect);
-    data = { ...empty(platform, "error", `${name} didn't answer just now. We'll try again on the next refresh.`, connect), notes: [{ level: "warning", text: pe.message, detail: pe.technical }] };
+    if (pe.code === "AUTH_EXPIRED") return empty(platform, "needs_reconnect", `${name} says the connection expired. Reconnect to keep the numbers live.`, connect, days);
+    data = { ...empty(platform, "error", `${name} didn't answer just now. We'll try again on the next refresh.`, connect, days), notes: [{ level: "warning", text: pe.message, detail: pe.technical }] };
     return data; // never cache a failure
   }
   cache.set(key, { at: Date.now(), data });
@@ -114,17 +117,18 @@ export async function platformDashboard(userId: string, platform: Platform, opts
  * Up to three Gemini ideas on top of the rule-based ones, asked for after the dashboard has rendered.
  * Remembered per creator until their posts' numbers move, so the model is called a few times a day, not per view.
  */
-export async function platformIdeas(userId: string, platform: Platform): Promise<Suggestion[]> {
-  const d = await platformDashboard(userId, platform);
+// 1172: accountId = the account on screen, so the ideas are about the same numbers as the page (never another profile's).
+export async function platformIdeas(userId: string, platform: Platform, accountId: string | null = null): Promise<Suggestion[]> {
+  const d = await platformDashboard(userId, platform, { accountId });
   if (d.status !== "ok") return [];
   const sig = createHash("sha256").update(JSON.stringify(d.posts.slice(0, 12).map((p) => [p.id, p.views, p.likes, p.comments]))).digest("base64url").slice(0, 16);
-  const key = `${userId}:${platform}`;
+  const key = `${userId}:${platform}${accountId ? `:${accountId}` : ""}`;
   const hit = ideaCache.get(key);
   if (hit && hit.sig === sig && Date.now() - hit.at < IDEAS_MS) return hit.ideas;
   const load = () => aiSuggestions(platform, d, d.suggestions);
   let ideas: Suggestion[];
   try {
-    ideas = await unstable_cache(load, ["live-ideas-v1", userId, platform, sig], { revalidate: IDEAS_MS / 1000, tags: [`live:${userId}`] })().catch(noDataCache(load));
+    ideas = await unstable_cache(load, ["live-ideas-v2", userId, platform, accountId ?? "default", sig], { revalidate: IDEAS_MS / 1000, tags: [`live:${userId}`] })().catch(noDataCache(load));
   } catch {
     return []; // the model was unreachable: show the rule-based ideas and try again next time
   }

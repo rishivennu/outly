@@ -35,6 +35,8 @@ export const ANIMATED = {
   content: LayoutGridIcon,
   calendar: CalendarDaysIcon,
   analytics: ChartLineIcon,
+  /** 1171: Profile Review, a score out of 100. */
+  review: GaugeIcon,
   inbox: MessageCircleIcon,
   approvals: ClipboardCheckIcon,
   accounts: Link2Icon,
