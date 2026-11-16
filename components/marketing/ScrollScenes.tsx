@@ -249,7 +249,7 @@ export function ScrollScenes() {
       // a. Section heads drift in a little behind their section, for a layer of depth. The head wrapper moves as a
       //    block (the reveal engine only sets data-shown on it), so the title never slides over its own body text.
       //    In two-column sections the whole copy column moves instead (scene d, f).
-      for (const id of ["#how", "#features", "#compare", "#pricing"]) {
+      for (const id of ["#why-outlly", "#how", "#features", "#compare", "#pricing"]) {
         const s = sec(id);
         if (s) enter(q(s, ".rv-head").slice(0, 1), s, { y: 48 * k }, "top 88%");
       }
@@ -276,6 +276,17 @@ export function ScrollScenes() {
             if (col > 0) enter([a], grid, { y: 40 * col }, "top 80%", 0, 0.1 * col);
           }
         }
+      }
+
+      // d2. Why Outlly (1161): the bento rises as one; on lg the lead panel lands first and each panel after it
+      //     settles a beat later and from a little lower, so the asymmetric grid reads left to right, top to bottom.
+      //     The with/without pair comes up together, the "with" side a step behind.
+      const usp = sec("#why-outlly");
+      if (usp) {
+        const grid = usp.querySelector(".usp-grid");
+        enter([grid], usp, { y: 60 * k }, "top 88%");
+        if (lg && grid) (q(grid, "article") as HTMLElement[]).forEach((a, i) => i && enter([a], grid, { y: 30 + 16 * i }, "top 80%", 0, 0.07 * i));
+        enter(q(usp, ".usp-cmp"), usp, { y: 44 * k }, "top 85%", 0.12);
       }
 
       // e. Demo: the whole player comes forward like a screen. On lg it is done before the section pins.

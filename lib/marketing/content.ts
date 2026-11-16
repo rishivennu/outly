@@ -261,3 +261,84 @@ export const SOCIALS = [
   { label: "Outlly on Instagram", href: "#", handle: "Instagram" },
   { label: "Outlly on YouTube", href: "#", handle: "YouTube" },
 ] as const;
+
+/* Why Outlly (1161): the six strengths, straight after the hero. Every line here is checked against what the
+   product does today (comparison.ts, lib/captions, lib/inbox, lib/pip): nothing is promised that is not built. */
+export type UspId = "captions" | "publish" | "calendar" | "analytics" | "inbox" | "pip";
+export interface Usp {
+  id: UspId;
+  kicker: string;
+  title: string;
+  body: string;
+  points: readonly string[];
+  /** The one honest limit worth saying out loud, shown under the preview. */
+  note?: string;
+}
+export const USP = {
+  eyebrow: "Why creators choose Outlly",
+  title: "Your entire creator workflow. One powerful platform.",
+  body: "Stop switching between multiple tools. Plan, create, schedule, publish and analyse your content from one unified creator workspace.",
+  cards: [
+    {
+      id: "captions",
+      kicker: "AI caption and subtitle engine",
+      title: "Your videos. Captions in seconds.",
+      body: "Pip listens to your video and writes the words down, timed to your speech. Regional languages are recognised, English is one tap away, and every word stays yours to fix before you pick a style.",
+      points: ["Word-level AI transcription", "Telugu, Tamil, Hindi and more", "Translate to English", "Edit words and timing", "Bold pop, Boxed and Clean styles"],
+      note: "Burned-in captions come with paid plans.",
+    },
+    {
+      id: "publish",
+      kicker: "Multi-platform publishing",
+      title: "Create once. Customize for every platform.",
+      body: "Connect your accounts, write the post once, then give each destination its own title, description and caption. Publish now or schedule it, from one screen.",
+      points: ["Connected accounts in one list", "A title and caption per platform", "Publish now or schedule"],
+      note: "More destinations switch on as their integrations open.",
+    },
+    {
+      id: "calendar",
+      kicker: "Smart content calendar",
+      title: "Your entire content schedule. Under control.",
+      body: "Drafts, scheduled posts and what already went out, in one calendar. Every destination shows its own status, and a failed one can be retried from the same place.",
+      points: ["Drafts and scheduled posts together", "Status per destination", "Retry a failed post in place"],
+    },
+    {
+      id: "analytics",
+      kicker: "Unified analytics",
+      title: "Know what is working across every platform.",
+      body: "Views and engagement for every post, side by side across platforms, with the trend over time. When a platform does not share a number, Outlly says so instead of showing a zero.",
+      points: ["Views and engagement per post", "Platform next to platform", "Trends over time"],
+      note: "Longer history on paid plans. Gaps are labelled, never filled in.",
+    },
+    {
+      id: "inbox",
+      kicker: "Unified inbox",
+      title: "Your creator conversations in one place.",
+      body: "Comments on your Reels, Shorts and X posts land in one inbox, each tagged with its platform, unread first. Reply inline, with a suggested reply from Pip when you want one.",
+      points: ["Comments from every connected platform", "Unread first, platform tagged", "Inline and AI-suggested replies"],
+      note: "Replies go where the platform API allows. Direct messages are not included yet.",
+    },
+    {
+      id: "pip",
+      kicker: "Pip AI assistant",
+      title: "Meet Pip. Your AI-powered creator companion.",
+      body: "Ask what is working, compare platforms, get recommendations drawn from your own numbers, and get help with any part of Outlly, in plain words.",
+      points: ["Explains your analytics", "Compares platforms fairly", "Recommends from your data"],
+    },
+  ] as const satisfies readonly Usp[],
+  compare: {
+    without: {
+      title: "Without Outlly",
+      items: ["A separate caption tool", "A separate scheduling tool", "A separate analytics dashboard", "A separate planning system", "Workflows that never connect"],
+    },
+    with: {
+      title: "With Outlly",
+      items: ["One creator workspace", "One publishing workflow", "One content calendar", "One analytics dashboard", "One AI assistant"],
+    },
+  },
+  cta: {
+    title: "Everything your creator workflow needs. In one place.",
+    body: "Spend less time managing tools and more time creating.",
+    label: "Explore Outlly",
+  },
+} as const;

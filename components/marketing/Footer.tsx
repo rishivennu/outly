@@ -20,6 +20,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   {
     title: "Product",
     links: [
+      { href: "/#why-outlly", label: "Why Outlly" },
       { href: "/#how", label: "How it works" },
       { href: "/#features", label: "Features" },
       { href: "/#platforms", label: "Platforms" },

@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { Hero } from "@/components/marketing/Hero";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { Features } from "@/components/marketing/Features";
+import { WhyOutlly } from "@/components/marketing/WhyOutlly";
 import { Difference } from "@/components/marketing/Difference";
 import { Platforms } from "@/components/marketing/Platforms";
 import { LogoTicker } from "@/components/marketing/LogoTicker";
@@ -93,6 +94,8 @@ export default async function LandingPage() {
       )}
       {on("hero") && <Hero showHow={on("how")} beta={beta} live={live} />}
       {on("hero") && <LogoTicker live={live} />}
+      {/* Why Outlly (1161): the six strengths straight after the hero, its own switch in Admin > Landing page. */}
+      {on("usp") && <WhyOutlly live={live} showHow={on("how")} />}
       {/* Try it (10-28): its own switch in Admin > Landing page. Off also closes /api/try. */}
       {on("try") && <TryIt />}
       {on("hero") && on("how") && (
