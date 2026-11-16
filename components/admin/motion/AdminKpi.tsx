@@ -22,7 +22,7 @@ export function trendTone(data: number[], invert = false): "up" | "down" | "flat
  * series is given a small trend line draws in beside it. Same data and wording as before; the line is
  * decorative (the number, change and caption carry the meaning).
  */
-export function AdminKpi({ label, value, sub, change, invert, tone, spark, i = 0, compare = "the previous 30 days", hint, unavailable }: { label: string; value: string; sub?: string; change?: number | null; invert?: boolean; tone?: "bad"; spark?: number[]; i?: number; /** 1163: what `change` compares against, printed beside it. */ compare?: string; /** 1163: how the number is counted, behind an "i". */ hint?: string; /** 1163: the value cannot be known (integration off, role cannot see it): say why instead of showing 0. */ unavailable?: string }) {
+export function AdminKpi({ label, value, sub, change, invert, tone, spark, i = 0, compare = "the previous 30 days", hint, unavailable, compareNote }: { label: string; value: string; sub?: string; change?: number | null; invert?: boolean; tone?: "bad"; spark?: number[]; i?: number; /** 1163: what `change` compares against, printed beside it. */ compare?: string; /** 1163: how the number is counted, behind an "i". */ hint?: string; /** 1163: the value cannot be known (integration off, role cannot see it): say why instead of showing 0. */ unavailable?: string; /** 1165: what to print when `change` is null (no earlier period); defaults to a sentence built from `compare`. */ compareNote?: string }) {
   const up = (change ?? 0) >= 0;
   const good = invert ? !up : up;
   return (
@@ -48,6 +48,7 @@ export function AdminKpi({ label, value, sub, change, invert, tone, spark, i = 0
         )}
         {!unavailable && change === 0 && <span className="rounded-full bg-secondary px-1.5 py-0.5 font-semibold text-muted-foreground" title={`vs ${compare}`}>No change</span>}
         {!unavailable && change !== undefined && change !== null && <span className="text-muted-foreground" aria-hidden>vs {compare}</span>}
+        {!unavailable && change === null && <span className="text-muted-foreground">{compareNote ?? `Nothing in ${compare} to compare with`}</span>}
         {!unavailable && sub && <span className={cn("text-muted-foreground", change !== undefined && change !== null && "basis-full")}>{sub}</span>}
       </div>
     </div>

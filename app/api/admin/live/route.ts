@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
  */
 export const GET = adminRoute(
   "users",
-  async (req) => {
-    const data = await liveMap(clampTimeout(req.nextUrl.searchParams.get("timeout")));
+  async (req, { admin }) => {
+    const data = await liveMap(clampTimeout(req.nextUrl.searchParams.get("timeout")), Date.now(), admin.role);
     return json(data, { headers: { "cache-control": "no-store, private" } });
   },
   [40, 60_000],

@@ -50,12 +50,27 @@ async function computeOverview(days: number) {
   const startedIn30 = subs.filter((s) => s.createdAt >= d30).length;
   const churnBase = activeAtStart + startedIn30;
   const churn = churnBase ? canceled30 / churnBase : 0;
+  // 1165: the same rate for the 30 days before, so the card can say whether churn is moving. A base of 0 in
+  // either window means there is nothing to compare, which the card shows as such rather than as 0%.
+  const d60 = subDays(now, 60);
+  const activeAtPrevStart = subs.filter((s) => s.createdAt < d60 && (!s.canceledAt || s.canceledAt >= d60)).length;
+  const startedPrev = subs.filter((s) => s.createdAt >= d60 && s.createdAt < d30).length;
+  const canceledPrev = subs.filter((s) => s.canceledAt && s.canceledAt >= d60 && s.canceledAt < d30).length;
+  const churnPrevBase = activeAtPrevStart + startedPrev;
+  const churnPrev = churnPrevBase ? canceledPrev / churnPrevBase : null;
+  // 1165: recurring revenue 30 days ago, from the subscriptions that were live then (status is only known for
+  // today, so a plan that was past due at the time counts as live here; the hint says so).
+  const mrrPrev = subs.filter((s) => s.createdAt < d30 && (!s.canceledAt || s.canceledAt >= d30)).reduce((t, s) => t + convert(s.interval === "year" ? s.priceMinor / 12 : s.priceMinor, s.currency, ccy), 0);
 
   const ok = pays.filter((p) => p.status === "succeeded").map((p) => ({ ...p, amountMinor: convert(p.amountMinor, p.currency, ccy), currency: ccy }));
   const rev30 = ok.filter((p) => p.createdAt >= d30).reduce((t, p) => t + p.amountMinor, 0);
   const prevRows = await db.payment.groupBy({ by: ["currency"], _sum: { amountMinor: true }, where: { status: "succeeded", createdAt: { gte: subDays(now, 60), lt: d30 } } });
   const revPrev = { _sum: { amountMinor: prevRows.reduce((t, r) => t + convert(r._sum.amountMinor ?? 0, r.currency, ccy), 0) } };
   const failed7 = pays.filter((p) => p.status === "failed" && p.createdAt >= subDays(now, 7)).length;
+  const failedPrev7 = pays.filter((p) => p.status === "failed" && p.createdAt >= subDays(now, 14) && p.createdAt < subDays(now, 7)).length;
+  // 1165: yesterday as a whole day. Today is still filling in, so the card labels the comparison honestly.
+  const yesterday = dayKey(subDays(now, 1));
+  const dauPrev = new Set(activity.filter((a) => a.day === yesterday).map((a) => a.userId)).size;
   const signups30 = users.filter((u) => u.createdAt >= d30).length;
   const signupsPrev = users.filter((u) => u.createdAt >= subDays(now, 60) && u.createdAt < d30).length;
 
@@ -87,7 +102,8 @@ async function computeOverview(days: number) {
 
   return {
     currency: ccy,
-    kpi: { dau, wau, mau, totalUsers: users.length, signups30, signupsPrev, mrr, rev30, revPrev: revPrev._sum.amountMinor ?? 0, failed7, churn, churnBase, canceled30, activeSubs: active.length, openTickets, urgentTickets },
+    at: now.toISOString(),
+    kpi: { dau, dauPrev, wau, mau, totalUsers: users.length, signups30, signupsPrev, mrr, mrrPrev, rev30, revPrev: revPrev._sum.amountMinor ?? 0, failed7, failedPrev7, churn, churnBase, canceled30, churnPrev, activeSubs: active.length, activeSubsPrev: activeAtStart, openTickets, urgentTickets },
     series,
     revenueByPlan: [...byPlan.entries()].map(([name, v]) => ({ name, value: v / 100 })).sort((a, b) => b.value - a.value),
     sample,

@@ -13,7 +13,7 @@ type Row = { day: string; label: string; users: number; signups: number; active:
 const RANGES = [7, 30, 90] as const;
 const LIME = "hsl(var(--lime-ink))";
 const PIE = ["#22f04a", "#a3e635", "#dcfa18", "#14b8a6", "#64748b"];
-const axis = { fontSize: 12, fill: "hsl(var(--muted-foreground))" };
+const axis = { fontSize: 13, fill: "hsl(var(--muted-foreground))" };
 const CROSS = { stroke: "hsl(var(--foreground) / 0.28)", strokeWidth: 1, strokeDasharray: "3 4" };
 const DOT = { r: 5, strokeWidth: 2.5, stroke: LIME, fill: "hsl(var(--card))" };
 
@@ -88,7 +88,7 @@ export function OverviewCharts({ series, revenueByPlan, currency, showMoney }: {
         <div ref={seg.box} role="radiogroup" aria-label="Date range" onKeyDown={onRangeKey} className="pulse-seg relative">
           <span ref={seg.bar} aria-hidden="true" className="pulse-seg-pill" />
           {RANGES.map((r) => (
-            <button key={r} data-r={r} type="button" role="radio" aria-checked={range === r} tabIndex={range === r ? 0 : -1} onClick={() => setRange(r)} className={cn("relative z-[1] h-9 min-w-[64px] rounded-[10px] px-3 text-[12.5px] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring", range === r ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+            <button key={r} data-r={r} type="button" role="radio" aria-checked={range === r} tabIndex={range === r ? 0 : -1} onClick={() => setRange(r)} className={cn("relative z-[1] h-11 min-w-[64px] rounded-[12px] px-3 text-[12.5px] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring", range === r ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
               {r} days
             </button>
           ))}
@@ -131,7 +131,7 @@ export function OverviewCharts({ series, revenueByPlan, currency, showMoney }: {
                   <defs><linearGradient id="g-rev" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#22f04a" stopOpacity={0.4} /><stop offset="1" stopColor="#22f04a" stopOpacity={0} /></linearGradient></defs>
                   <CartesianGrid vertical={false} stroke="hsl(var(--foreground) / 0.06)" />
                   <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} interval={tick} />
-                  <YAxis tick={axis} tickLine={false} axisLine={false} tickFormatter={money} width={56} />
+                  <YAxis tick={axis} tickLine={false} axisLine={false} tickFormatter={money} width={64} />
                   <Tooltip {...tipMotion} wrapperStyle={tipWrap} cursor={CROSS} content={(p) => <GlassTip active={p.active} payload={p.payload} label={p.label} fmt={money} />} />
                   <Area {...anim(0)} type="monotone" dataKey="revenue" name="Revenue" stroke="#16a34a" strokeWidth={2.2} fill="url(#g-rev)" activeDot={{ ...DOT, stroke: "#16a34a" }} />
                 </AreaChart>
@@ -145,7 +145,7 @@ export function OverviewCharts({ series, revenueByPlan, currency, showMoney }: {
                   <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} interval={tick} />
                   <YAxis tick={axis} tickLine={false} axisLine={false} allowDecimals={false} />
                   <Tooltip {...tipMotion} wrapperStyle={tipWrap} cursor={CROSS} content={(p) => <GlassTip active={p.active} payload={p.payload} label={p.label} />} />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: 13 }} />
                   <Line {...anim(0)} type="monotone" dataKey="activeSubs" name="Active" stroke={LIME} strokeWidth={2.4} dot={false} activeDot={DOT} />
                   <Line {...anim(1)} type="monotone" dataKey="newSubs" name="New" stroke="#14b8a6" strokeWidth={1.8} dot={false} />
                   <Line {...anim(2)} type="monotone" dataKey="cancels" name="Cancelled" stroke="hsl(var(--destructive))" strokeWidth={1.8} strokeDasharray="4 3" dot={false} />

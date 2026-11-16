@@ -177,11 +177,11 @@ export function LiveGlobeCard({ initial }: { initial: LiveMap }) {
         </div>
         <p className="lg-upd">
           {err ? (
-            <span role="alert" className="inline-flex items-center gap-1.5 text-[#ffd27a]">
-              <TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden /> {err}
+            <span role="alert" className="inline-flex flex-wrap items-center gap-1.5 text-[#ffd27a]">
+              <TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden /> {err} <span className="text-white/60">Showing figures from {hhmmss(updated)}, not live.</span>
             </span>
           ) : (
-            <>Updated {hhmmss(updated)} · every 15 s</>
+            <>Live: updated {hhmmss(updated)} · refreshes every 15 s while this tab is open · active means seen in the last {data.timeoutMin} min</>
           )}
         </p>
         <span className="sr-only" aria-live="polite">
@@ -300,7 +300,7 @@ function PlacePanel({ place, now, timeout, onBack }: { place: LivePlace; now: nu
           <li key={u.id}>
             <span className={u.status === "active" ? "lg-dot" : "lg-dot lg-dot-idle"} aria-hidden="true" />
             <span className="min-w-0 flex-1">
-              <a href={`/admin/users?q=${encodeURIComponent(u.email)}`} className="block truncate text-[13.5px] font-semibold text-white underline-offset-2 hover:underline">
+              <a href={`/admin/users?q=${encodeURIComponent(u.email.includes("****") ? u.name : u.email)}`} className="block truncate text-[13.5px] font-semibold text-white underline-offset-2 hover:underline">
                 {u.name || u.email}
               </a>
               <span className="block text-[12px] text-white/60">
