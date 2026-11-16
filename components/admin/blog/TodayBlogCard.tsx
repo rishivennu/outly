@@ -38,7 +38,7 @@ export function TodayBlogCard({ post, job, ready, compact = false }: { post: Blo
     if (compact) return null;
     return (
       <Card className="border-dashed">
-        <CardTitle hint={ready ? "One click writes, researches and checks an article. You review it before anything goes live." : "Add KIMI_API_KEY in the deployment settings to turn the writer on."}>No article waiting for review</CardTitle>
+        <CardTitle hint={ready ? "One click writes, researches and checks an article. You review it before anything goes live." : "Add NVIDIA_API_KEY (or KIMI_API_KEY) in the deployment settings to turn the writer on."}>No article waiting for review</CardTitle>
         {ready ? (
           <Button asChild variant="lime"><Link href="/admin/blog/generate"><Wand2 className="size-4" aria-hidden /> Generate Today's Blog</Link></Button>
         ) : (

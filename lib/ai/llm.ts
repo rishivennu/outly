@@ -9,6 +9,13 @@ import { HEDGE_MS, deltaText, wholeText, freshStat, isHardFailure, keyOf, rank, 
  * Now: the fastest working model goes first (measured, per instance); if it shows no text within HEDGE_MS the
  * next starts alongside it and whichever writes first wins, the other is cancelled. Kimi (Moonshot) joins
  * when KIMI_API_KEY is set. A model out of credit, unauthorised or gone sits out for a while.
+ *
+ * R1177: NVIDIA NIM is the default (owner's choice, 11-16) and is tried first whenever NVIDIA_API_KEY is set,
+ * even when a Gemini model has measured faster: Gemini is on the throttled free tier and Kimi needs OpenRouter
+ * credit, so both now stand behind it. Measured 11-16 with thinking off: Nemotron 3 Ultra 1.9 s on a short JSON
+ * answer, Nemotron 3.5 Lightning 0.5 s, Nemotron 3.5 Super VL 0.5 s (vision). DeepSeek V4.1 Flash timed out at
+ * 90 s three times. The hedge and bench rules below still cover a slow or down NIM. Model ids come from env
+ * (NVIDIA_MODEL, NVIDIA_FAST_MODEL, NVIDIA_VISION_MODEL) so a swap needs no code change.
  */
 
 const GEMINI_DEFAULT = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.6-flash"];
@@ -37,13 +44,30 @@ export function kimiRequest(key: string, body: Record<string, unknown>, opts: Pi
   };
 }
 
+const NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
+/**
+ * R1177: NIM takes the OpenAI shape. Thinking is switched per model family through chat_template_kwargs (the
+ * `reasoning` field is OpenRouter's and NIM does not read it); off by default, since a thinking Nemotron spends
+ * its whole token budget before the first word of a caption.
+ */
+export function nvidiaRequest(key: string, body: Record<string, unknown>, opts: Pick<LlmOpts, "maxTokens" | "reasoning" | "temperature" | "json">): { url: string; headers: Record<string, string>; body: unknown } {
+  const model = String(body.model ?? "");
+  const think = opts.reasoning === true;
+  const kwargs = model.startsWith("nvidia/") ? { chat_template_kwargs: { enable_thinking: think } } : model.startsWith("deepseek-ai/") ? { chat_template_kwargs: { thinking: think } } : {};
+  return {
+    url: NVIDIA_URL,
+    headers: { authorization: `Bearer ${key}` },
+    body: { ...body, ...(opts.json !== false ? { response_format: { type: "json_object" } } : {}), max_tokens: opts.maxTokens ?? 4096, temperature: opts.temperature ?? 0.6, ...kwargs },
+  };
+}
+
 const stats = new Map<string, ModelStat>();
 export const modelStats = () => Object.fromEntries(stats);
 
 export type LlmOpts = {
   temperature?: number;
   timeoutMs?: number;
-  /** Gemini models to use, best first. Kimi is always added last when it has a key. */
+  /** Gemini models to use, best first. NVIDIA goes ahead of them and Kimi last, each when it has a key. */
   models?: string[];
   json?: boolean;
   /** The whole text so far from the model currently writing (it can restart shorter if that model fails). */
@@ -61,13 +85,15 @@ export type LlmOpts = {
   reasoning?: boolean;
   /** Web search alongside the prompt (OpenRouter keys only; ignored elsewhere). */
   web?: boolean;
-  /** Only these providers may answer (R1175: the blog is Kimi-only, by the owner's choice). Default: all with a key. */
+  /** Only these providers may answer (R1175 blog: Kimi only; R1177: NVIDIA then Kimi, never Gemini). Default: all with a key. */
   providers?: Provider[];
 };
 
 function candidates(opts: LlmOpts): ModelId[] {
   const g = (opts.models?.length ? opts.models : GEMINI_DEFAULT).map((m) => ALIAS[m] ?? m);
-  const list: ModelId[] = env.GEMINI_API_KEY ? [...new Set(g)].map((model) => ({ provider: "gemini" as const, model })) : [];
+  const nv = opts.images?.length ? [env.NVIDIA_VISION_MODEL] : [env.NVIDIA_MODEL, env.NVIDIA_FAST_MODEL];
+  const list: ModelId[] = env.NVIDIA_API_KEY ? [...new Set(nv.filter(Boolean))].map((model) => ({ provider: "nvidia" as const, model })) : [];
+  if (env.GEMINI_API_KEY) list.push(...[...new Set(g)].map((model) => ({ provider: "gemini" as const, model })));
   if (env.KIMI_API_KEY) list.push({ provider: "kimi", model: KIMI_MODEL });
   return opts.providers ? list.filter((m) => opts.providers!.includes(m.provider)) : list;
 }
@@ -96,6 +122,12 @@ async function call(m: ModelId, system: string, prompt: string, opts: LlmOpts, s
             generationConfig: { ...(opts.json !== false ? { responseMimeType: "application/json" } : {}), temperature: opts.temperature ?? 0.9 },
           },
         }
+      : m.provider === "nvidia"
+      ? nvidiaRequest(
+          env.NVIDIA_API_KEY,
+          { model: m.model, stream: true, messages: [{ role: "system", content: system }, { role: "user", content: kimiUser(prompt, opts.images) }] },
+          opts,
+        )
       : kimiRequest(
           env.KIMI_API_KEY,
           {
@@ -153,7 +185,7 @@ export async function llmText(system: string, prompt: string, opts: LlmOpts = {}
     opts.onText?.(hit.text);
     return { text: hit.text, model: hit.model };
   }
-  const order = rank(candidates(opts), stats, Date.now());
+  const order = rank(candidates(opts), stats, Date.now(), env.NVIDIA_API_KEY ? "nvidia" : undefined);
   if (!order.length || opts.signal?.aborted) return null;
 
   const out = await new Promise<{ text: string; model: string } | null>((resolve) => {

@@ -3,7 +3,7 @@
  * working), how to read each provider's stream, and how to pull finished items out of half-written JSON.
  */
 
-export type Provider = "gemini" | "kimi";
+export type Provider = "gemini" | "kimi" | "nvidia";
 export type ModelId = { provider: Provider; model: string };
 
 /** Rolling speed and health of one model, kept in memory per server instance. */
@@ -14,7 +14,16 @@ export const BENCH_MS = 10 * 60_000; // a model out of credit or broken sits out
 export const SLOW_BENCH_MS = 90_000; // a timeout or 5xx sits out less: usually a passing blip
 
 /** Default speed guesses before anything is measured (from the 10-30 benchmark). */
-const PRIOR_MS: Record<string, number> = { "gemini-flash-lite-latest": 1_700, "gemini-3.5-flash-lite": 2_000, "kimi-k2.6": 3_000, "gemini-3.6-flash": 3_500 };
+const PRIOR_MS: Record<string, number> = {
+  "gemini-flash-lite-latest": 1_700,
+  "gemini-3.5-flash-lite": 2_000,
+  "kimi-k2.6": 3_000,
+  "gemini-3.6-flash": 3_500,
+  // R1177: NVIDIA NIM with thinking off, measured 11-16 on a short JSON answer.
+  "nvidia/nemotron-3-ultra-550b-a55b": 1_900,
+  "nvidia/nemotron-3.5-lightning-30b-a3b": 500,
+  "nvidia/nemotron-3.5-super-vl-120b-a12b": 600,
+};
 
 export const keyOf = (m: ModelId) => `${m.provider}:${m.model}`;
 
@@ -40,15 +49,17 @@ export const isHardFailure = (status: number, body = "") => status === 401 || st
 
 /**
  * The order to try models in: working ones fastest first, benched ones last (still tried if nothing
- * else answers). A model that already exists in `stats` keeps its measured speed.
+ * else answers). A model that already exists in `stats` keeps its measured speed. `prefer` (R1177: the
+ * owner made NVIDIA the default) puts that provider's working models ahead of a faster-measured Gemini;
+ * once benched they fall back into the normal order, so the preference never costs a dead model's wait.
+ * Among themselves the preferred models keep the order they were listed in: NVIDIA_MODEL is the writer the
+ * owner chose and NVIDIA_FAST_MODEL its hedge, so a 0.5 s prior on the small model must not jump the queue.
  */
-export function rank(models: ModelId[], stats: Map<string, ModelStat>, now: number): ModelId[] {
+export function rank(models: ModelId[], stats: Map<string, ModelStat>, now: number, prefer?: Provider): ModelId[] {
   const s = (m: ModelId) => stats.get(keyOf(m)) ?? freshStat(m);
-  return [...models].sort((a, b) => {
-    const ba = s(a).benchedUntil > now ? 1 : 0;
-    const bb = s(b).benchedUntil > now ? 1 : 0;
-    return ba - bb || s(a).ewmaMs - s(b).ewmaMs;
-  });
+  const benched = (m: ModelId) => (s(m).benchedUntil > now ? 1 : 0);
+  const first = (m: ModelId) => (prefer && m.provider === prefer && !benched(m) ? 0 : 1);
+  return [...models].sort((a, b) => first(a) - first(b) || (first(a) === 0 ? 0 : benched(a) - benched(b) || s(a).ewmaMs - s(b).ewmaMs));
 }
 
 /** Splits an SSE body into its `data:` payloads (both providers stream SSE). Returns the payloads and the unfinished tail. */
@@ -64,6 +75,7 @@ export function deltaText(provider: Provider, data: string): string {
   try {
     const j = JSON.parse(data);
     if (provider === "gemini") return (j.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string; thought?: boolean }) => (p.thought ? "" : p.text ?? "")).join("");
+    // OpenAI shape (Kimi, NVIDIA). Nemotron can still stream reasoning_content with thinking off (R1177): never shown.
     return j.choices?.[0]?.delta?.content ?? "";
   } catch {
     return "";

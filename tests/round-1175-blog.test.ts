@@ -6,7 +6,7 @@ mock.module("next/cache", () => ({ ...realCache, revalidatePath: () => {}, reval
 
 // The blog's two model calls are replaced with canned stage outputs. Pin the real module first so BlogLlmError stays real.
 const realLlm = require("../lib/blog/llm");
-const g = globalThis as unknown as { __blogCalls: string[]; __blogFail?: (prompt: string) => void; __blogQuality?: Record<string, { ok: boolean; note: string }> };
+const g = globalThis as unknown as { __blogCalls: string[]; __blogFail?: (prompt: string) => void; __blogQuality?: Record<string, { ok: boolean; note: string }>; __blogLlmReal?: boolean };
 g.__blogCalls = [];
 
 const KW = "instagram reach drop";
@@ -24,11 +24,18 @@ function draft(sections: { key: string; heading: string }[], keys: string[]) {
 }
 const SECTIONS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"].map((k, i) => ({ key: k, heading: ["Why your reach dropped", "What is actually happening", "Why it happens", "The mistakes that make it worse", "What the evidence says", "What to do this week", "What to measure", "Where this will not work", "How platforms differ", "Where Outlly fits"][i], points: ["one", "two"] }));
 
+// mock.module is run-wide: once this file has run, every later test file that imports lib/blog/llm gets this fake.
+// Another round's test (R1177) sets g.__blogLlmReal = true to reach the real functions through it.
+// (The real functions are pinned here because mock.module also rewrites realLlm's own bindings: calling
+// realLlm.blogJson after the mock would call the fake again, forever.)
+const passThrough = () => !!g.__blogLlmReal;
+const real = { blogReady: realLlm.blogReady, blogWebReady: realLlm.blogWebReady, blogJson: realLlm.blogJson, blogWebJson: realLlm.blogWebJson };
 mock.module("../lib/blog/llm", () => ({
   ...realLlm,
-  blogReady: () => true,
-  blogWebReady: () => true,
-  blogJson: async (_system: string, prompt: string) => {
+  blogReady: () => (passThrough() ? real.blogReady() : true),
+  blogWebReady: () => (passThrough() ? real.blogWebReady() : true),
+  blogJson: async (_system: string, prompt: string, opts?: unknown) => {
+    if (passThrough()) return real.blogJson(_system, prompt, opts as never);
     g.__blogCalls.push(prompt.slice(0, 60));
     g.__blogFail?.(prompt);
     if (prompt.includes('"candidates"')) {
@@ -46,7 +53,8 @@ mock.module("../lib/blog/llm", () => ({
     if (prompt.includes('{"markdown":string}')) return { model: "kimi", data: { markdown: `## What to measure\n\n${paragraph(2)} Rewritten.` } };
     throw new Error(`unexpected prompt: ${prompt.slice(0, 80)}`);
   },
-  blogWebJson: async (_system: string, prompt: string) => {
+  blogWebJson: async (_system: string, prompt: string, opts?: unknown) => {
+    if (passThrough()) return real.blogWebJson(_system, prompt, opts as never);
     g.__blogCalls.push("web:" + prompt.slice(0, 40));
     return {
       webUsed: true,

@@ -12,11 +12,14 @@ import { Card, CardTitle, Pill } from "./ui";
 const ease = "ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none";
 
 /**
- * Subtitle engine switch (Phase 3) on the existing GET/PUT /api/admin/engines. Gemini is the default and stays
- * selected unless an admin explicitly picks the self-hosted worker. The whole rules object is sent back, because
- * the server fills anything missing from the code defaults.
+ * Subtitle engine switch (Phase 3) on the existing GET/PUT /api/admin/engines. The cloud engine is the default and
+ * stays selected unless an admin explicitly picks the self-hosted worker. The whole rules object is sent back,
+ * because the server fills anything missing from the code defaults. R1177: provider "gemini" now means "cloud":
+ * Whisper on Groq when GROQ_API_KEY is set, Gemini otherwise, so the pill names the engine that really answers.
  */
-export function AiEngineCard({ initial, funasrEnv }: { initial: SubtitleRules; funasrEnv: boolean }) {
+const activeName = (provider: SubtitleRules["provider"], groqEnv: boolean) => (provider === "funasr" ? "Self-hosted worker" : groqEnv ? "Whisper (Groq)" : "Gemini");
+
+export function AiEngineCard({ initial, funasrEnv, groqEnv }: { initial: SubtitleRules; funasrEnv: boolean; groqEnv: boolean }) {
   const toast = useToast();
   const [saved, setSaved] = useState(initial);
   const [provider, setProvider] = useState<SubtitleRules["provider"]>(initial.provider);
@@ -41,7 +44,7 @@ export function AiEngineCard({ initial, funasrEnv }: { initial: SubtitleRules; f
       setProvider(r.subtitles.provider);
       setWorkerUrl(r.subtitles.workerUrl);
       setModel(r.subtitles.model);
-      toast(r.subtitles.provider === "gemini" ? "Transcription runs on Gemini." : "Transcription runs on your self-hosted worker.");
+      toast(r.subtitles.provider === "gemini" ? `Transcription runs on ${activeName("gemini", groqEnv)}.` : "Transcription runs on your self-hosted worker.");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -61,11 +64,11 @@ export function AiEngineCard({ initial, funasrEnv }: { initial: SubtitleRules; f
 
   return (
     <Card>
-      <CardTitle hint="Used for AI captions on videos and for translating them." action={<Pill tone={saved.provider === "gemini" ? "lime" : "info"}>{saved.provider === "gemini" ? "Gemini" : "Self-hosted worker"}</Pill>}>
+      <CardTitle hint="Used for AI captions on videos and for translating them." action={<Pill tone={saved.provider === "gemini" ? "lime" : "info"}>{activeName(saved.provider, groqEnv)}</Pill>}>
         <span className="inline-flex items-center gap-2"><AudioLines className="h-4 w-4" aria-hidden /> Transcription engine</span>
       </CardTitle>
       <div role="radiogroup" aria-label="Transcription engine" className="grid gap-2">
-        {option("gemini", "Gemini (default)", "Uses the server's Gemini key. Detects the spoken language. Recommended.")}
+        {option("gemini", "Cloud (default)", "Whisper on Groq when GROQ_API_KEY is set (fastest, word timings built in), Gemini otherwise or as the fallback. Detects the spoken language.")}
         <div className="rounded-2xl hairline">
           <button type="button" aria-expanded={open} aria-controls="engine-worker" onClick={() => setOpen((o) => !o)} className="flex min-h-11 w-full items-center justify-between gap-2 rounded-2xl px-3 text-left text-[13.5px] font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(hover:hover)]:hover:text-foreground">
             Self-hosted worker (FunASR / Whisper), optional
@@ -97,7 +100,7 @@ export function AiEngineCard({ initial, funasrEnv }: { initial: SubtitleRules; f
         </Button>
         {provider !== "gemini" && (
           <Button type="button" variant="ghost" disabled={busy} onClick={() => setProvider("gemini")}>
-            Back to Gemini
+            Back to cloud
           </Button>
         )}
       </div>

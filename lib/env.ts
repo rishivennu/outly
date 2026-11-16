@@ -67,6 +67,15 @@ const schema = z.object({
   GEMINI_API_KEY: z.string().optional().default(""),
   /** Moonshot (Kimi) key: a second AI provider, raced against Gemini when Gemini is slow or failing. Empty = Gemini only. */
   KIMI_API_KEY: z.string().optional().default(""),
+  /** NVIDIA NIM key (R1177): the default text and vision provider for captions, hooks, highlights and the blog. Gemini and Kimi run behind it. */
+  NVIDIA_API_KEY: z.string().optional().default(""),
+  /** NIM model ids; change here or in the deployment, never in the callers. */
+  NVIDIA_MODEL: z.string().optional().default("nvidia/nemotron-3-ultra-550b-a55b"),
+  NVIDIA_FAST_MODEL: z.string().optional().default("nvidia/nemotron-3.5-lightning-30b-a3b"),
+  NVIDIA_VISION_MODEL: z.string().optional().default("nvidia/nemotron-3.5-super-vl-120b-a12b"),
+  /** Groq key (R1177): Whisper large-v3 transcription for video captions, 15-20x faster than Gemini on the same chunk. Gemini stays as the fallback. */
+  GROQ_API_KEY: z.string().optional().default(""),
+  GROQ_WHISPER_MODEL: z.string().optional().default("whisper-large-v3-turbo"),
   /** Firebase service account (JSON, or the same JSON base64-encoded) for Android app push. Empty = no push. */
   FCM_SERVICE_ACCOUNT: z.string().optional().default(""),
   /** Web Push (1118). Optional: without them the server makes a VAPID pair once and keeps it encrypted in Settings. */

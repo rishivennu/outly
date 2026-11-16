@@ -10,7 +10,7 @@ import { BLOG_TONES, blogConfigIssues, type BlogConfig, type BlogFeatureRef } fr
 import { Card, CardTitle, Pill } from "../ui";
 
 /** R1175 Blog settings: who the agent writes for, what it may say, and when it runs. Publishing stays manual. */
-export function BlogSettingsForm({ initial, ready, web }: { initial: BlogConfig; ready: boolean; web: boolean }) {
+export function BlogSettingsForm({ initial, ready, web, modelLabel }: { initial: BlogConfig; ready: boolean; web: boolean; modelLabel: string }) {
   const [c, setC] = useState<BlogConfig>(initial);
   const [saved, setSaved] = useState<BlogConfig>(initial);
   const [busy, setBusy] = useState(false);
@@ -48,7 +48,7 @@ export function BlogSettingsForm({ initial, ready, web }: { initial: BlogConfig;
           <Pill tone={c.paused ? "warn" : "ok"}>{c.paused ? "Agent paused" : "Agent active"}</Pill>
           <Pill tone={ready ? "ok" : "bad"}>{ready ? "AI key set" : "No AI key"}</Pill>
           <Pill tone={web ? "ok" : "warn"}>{web ? "Web research on" : "No web research"}</Pill>
-          <Pill tone="muted">Model: Kimi K2.6</Pill>
+          <Pill tone="muted">Model: {modelLabel}</Pill>
         </div>
         <div className="flex gap-2">
           <Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={() => save({ paused: !saved.paused })}>

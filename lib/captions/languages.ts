@@ -45,6 +45,22 @@ export function normalizeLang(v: unknown): string {
   return LANG_RE.test(tag) ? tag : "";
 }
 
+/** R1177: Whisper names the language in lower-case English ("english", "hindi"); these are the ones it knows
+ * beyond CAPTION_LANGUAGES. Names only, so a code passes through normalizeLang unchanged. */
+const MORE_NAMES: Record<string, string> = {
+  dutch: "nl", polish: "pl", ukrainian: "uk", vietnamese: "vi", thai: "th", malay: "ms", tagalog: "tl", filipino: "tl",
+  swahili: "sw", persian: "fa", hebrew: "he", greek: "el", czech: "cs", romanian: "ro", hungarian: "hu", swedish: "sv",
+  danish: "da", norwegian: "no", finnish: "fi", catalan: "ca", sindhi: "sd", sanskrit: "sa", burmese: "my", khmer: "km",
+  lao: "lo", sinhalese: "si", mandarin: "zh", cantonese: "yue", castilian: "es", panjabi: "pa", bangla: "bn",
+};
+
+/** "Hindi" / "hindi" -> "hi"; a code is returned as it came; anything unknown -> "". */
+export function langCodeFromName(name: unknown): string {
+  const s = String(name ?? "").trim().toLowerCase();
+  if (!s) return "";
+  return CAPTION_LANGUAGES.find((l) => l.name.toLowerCase() === s)?.code ?? MORE_NAMES[s] ?? (LANG_RE.test(s) ? s : "");
+}
+
 /** "te" -> "Telugu"; an unknown tag is shown as it is. */
 export function languageName(code: string): string {
   if (!code) return "";

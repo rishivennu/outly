@@ -25,7 +25,7 @@ export default async function Integrations() {
         <WhatsAppCard initial={redact("whatsapp", w)} />
       </div>
       <div className="mt-5">
-        <AiEngineCard initial={subtitles} funasrEnv={!!env.FUNASR_URL} />
+        <AiEngineCard initial={subtitles} funasrEnv={!!env.FUNASR_URL} groqEnv={!!env.GROQ_API_KEY} />
       </div>
     </>
   );

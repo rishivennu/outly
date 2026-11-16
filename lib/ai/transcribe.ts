@@ -4,7 +4,7 @@ import { HttpError } from "../http";
 import { normalizeCues, type Cue } from "../captions/cues";
 import { cleanWords, cuesFromWords, wordsFromCues, wordsFromFunasr, type SubtitleRules, type Word } from "../captions/subtitle-engine";
 import { buildCues, checkChunkWords } from "../captions/timing";
-import { languageName, normalizeLang } from "../captions/languages";
+import { langCodeFromName, languageName, normalizeLang } from "../captions/languages";
 import { subtitleRules } from "./engine-store";
 import { assertPublicUrl } from "../net/assert-public";
 import { db } from "../db";
@@ -43,7 +43,7 @@ Timing: this audio is ${duration.toFixed(2)} seconds long. s and e are seconds (
 
 /** The line rules the editor needs to rebuild whole-video lines from the stitched words. */
 export type LineRules = Pick<SubtitleRules, "maxChars" | "maxWords" | "minCue" | "maxCue" | "pause">;
-export type Transcript = { cues: Cue[]; words: Word[]; language: string; engine: "gemini" | "funasr"; lines: LineRules };
+export type Transcript = { cues: Cue[]; words: Word[]; language: string; engine: "gemini" | "funasr" | "whisper"; lines: LineRules };
 
 const lineRules = (r: SubtitleRules): LineRules => ({ maxChars: r.maxChars, maxWords: r.maxWords, minCue: r.minCue, maxCue: r.maxCue, pause: r.pause });
 
@@ -60,6 +60,80 @@ async function viaFunasr(url: string, wav: ArrayBuffer, offset: number, duration
   const j = await r.json();
   const words = wordsFromFunasr(j, offset, offset + duration);
   return { words, cues: cuesFromWords(words, rules), language: normalizeLang(j?.language ?? j?.[0]?.language ?? ""), engine: "funasr", lines: lineRules(rules) };
+}
+
+const WHISPER_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
+/** Whisper answers a 30 s part in about half a second, so a slow one is a stuck one: Gemini gets the rest of the time. */
+const WHISPER_TIMEOUT_MS = 20_000;
+/** R1177: after a 429 or a 5xx, Groq is skipped until then. Parts arrive every few seconds, and each one
+ * should not pay a round trip to a service that just said no. */
+let whisperBenchedUntil = 0;
+
+export const whisperBenched = (now = Date.now()) => now < whisperBenchedUntil;
+/** Tests only: forget a bench left by an earlier case. */
+export const resetWhisperBench = () => void (whisperBenchedUntil = 0);
+
+/**
+ * R1177: Whisper on Groq (whisper-large-v3-turbo), the default when GROQ_API_KEY is set. Measured 11-16: a 30 s
+ * part in 0.55 s with word timings from the model's own decoder, against 9.6 s on Gemini. Without a language hint
+ * Hindi came back in Urdu script, so the creator's pick is always passed on. null = let Gemini answer this part.
+ */
+async function viaWhisper(wav: ArrayBuffer, offset: number, duration: number, rules: SubtitleRules, lang: string, signal?: AbortSignal, deadline?: number): Promise<Transcript | null> {
+  const left = Math.min(WHISPER_TIMEOUT_MS, (deadline ?? Infinity) - Date.now() - 1_000);
+  if (!(left > 1_000)) return null;
+  const form = new FormData();
+  form.append("file", new Blob([wav], { type: "audio/wav" }), "chunk.wav");
+  form.append("model", env.GROQ_WHISPER_MODEL || "whisper-large-v3-turbo");
+  form.append("response_format", "verbose_json");
+  form.append("timestamp_granularities[]", "word");
+  form.append("temperature", "0");
+  if (lang) form.append("language", lang.split("-")[0]);
+  // Whisper reads the prompt as text said before this audio, which nudges it to spell these names the same way.
+  if (rules.hotwords.length) form.append("prompt", rules.hotwords.join(", ").slice(0, 200));
+  let r: Response;
+  try {
+    r = await fetch(WHISPER_URL, {
+      method: "POST",
+      headers: { authorization: `Bearer ${env.GROQ_API_KEY}` },
+      body: form,
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(left)]) : AbortSignal.timeout(left),
+    });
+  } catch (e) {
+    if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+    console.warn(`[transcribe] whisper at ${offset}s: ${(e as Error).message}`);
+    return null;
+  }
+  if (!r.ok) {
+    console.warn(`[transcribe] whisper ${r.status}`);
+    if (r.status === 429 || r.status >= 500) {
+      const after = Number(r.headers.get("retry-after"));
+      whisperBenchedUntil = Date.now() + (Number.isFinite(after) && after > 0 ? after * 1000 : 60_000);
+    }
+    return null;
+  }
+  let j: { text?: unknown; language?: unknown; words?: unknown };
+  try {
+    j = await r.json();
+  } catch {
+    if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+    console.warn(`[transcribe] whisper at ${offset}s: unreadable answer`);
+    return null;
+  }
+  const language = normalizeLang(langCodeFromName(j?.language)) || lang;
+  const raw = Array.isArray(j?.words) ? j.words : [];
+  // Silence (nothing said in this part) is a real answer, the same empty part Gemini gives back.
+  if (!raw.length && !String(j?.text ?? "").trim()) return { words: [], cues: [], language, engine: "whisper", lines: lineRules(rules) };
+  const t = checkChunkWords(raw, duration, offset);
+  if (!t.ok) {
+    console.warn(`[transcribe] whisper at ${offset}s: ${t.reason}`);
+    return null;
+  }
+  const words = cleanWords(t.words, offset, offset + duration);
+  if (!words.length) {
+    console.warn(`[transcribe] whisper at ${offset}s: text but no word timings`);
+    return null;
+  }
+  return { words, cues: buildCues(words, rules, offset + duration), language, engine: "whisper", lines: lineRules(rules) };
 }
 
 /** One model answer -> words on the video timeline, or the reason its times can't be trusted. */
@@ -105,7 +179,7 @@ async function askGemini(model: string, data: string, prompt: string, offset: nu
 }
 
 async function viaGemini(wav: ArrayBuffer, offset: number, duration: number, rules: SubtitleRules, lang: string, signal?: AbortSignal, deadline?: number): Promise<Transcript> {
-  if (!env.GEMINI_API_KEY) throw new HttpError(503, "AI transcription needs a Gemini API key on the server. You can still type or paste your captions.", "NO_AI");
+  if (!env.GEMINI_API_KEY) throw new HttpError(503, "AI transcription is not set up on this server. You can still type or paste your captions.", "NO_AI");
   const data = Buffer.from(wav).toString("base64");
   const prompt = transcribePrompt(rules, duration, lang);
   // The fast model first; a second try of it when the first is a straggler; another model when a try fails.
@@ -132,8 +206,9 @@ async function viaGemini(wav: ArrayBuffer, offset: number, duration: number, rul
 }
 
 /** One chunk of 16 kHz mono WAV -> word timings and subtitle lines, offset to where the chunk sits in the video.
- * The FunASR worker is used when it is switched on (off by default); if it is down, Gemini answers instead.
- * `lang` is the creator's pick for the spoken language, sent to Gemini as a hint; empty = detect it. */
+ * The FunASR worker is used when it is switched on (off by default). Otherwise Whisper on Groq answers when
+ * GROQ_API_KEY is set (R1177), and Gemini takes any part Whisper could not, or every part without a Groq key.
+ * `lang` is the creator's pick for the spoken language, sent as a hint; empty = detect it. */
 export async function transcribeWav(wav: ArrayBuffer, offset: number, duration: number, opts: { lang?: string; signal?: AbortSignal; deadline?: number } = {}): Promise<Transcript> {
   const rules = await subtitleRules();
   const url = rules.workerUrl || env.FUNASR_URL;
@@ -147,7 +222,17 @@ export async function transcribeWav(wav: ArrayBuffer, offset: number, duration: 
       console.warn("[transcribe] FunASR worker failed, using Gemini:", (e as Error).message);
     }
   }
-  return viaGemini(wav, offset, duration, rules, normalizeLang(opts.lang), opts.signal, opts.deadline);
+  const lang = normalizeLang(opts.lang);
+  if (env.GROQ_API_KEY && !whisperBenched()) {
+    const t = await viaWhisper(wav, offset, duration, rules, lang, opts.signal, opts.deadline);
+    if (t) return t;
+  }
+  if (env.GROQ_API_KEY && !env.GEMINI_API_KEY) {
+    // Whisper is the only engine and it said no: the browser retries a 429 by itself, so a benched Groq is "busy".
+    if (whisperBenched()) throw new HttpError(429, "The transcription service is busy right now. Try again in a minute.", "RATE_LIMITED", { retryAfter: 8 });
+    throw new HttpError(502, "This part didn't come back from transcription. Try it again, or type your captions.", "AI_FAILED");
+  }
+  return viaGemini(wav, offset, duration, rules, lang, opts.signal, opts.deadline);
 }
 
 /** A transcription run: one per "Transcribe" press, shared by its chunks and its retries for half an hour. */

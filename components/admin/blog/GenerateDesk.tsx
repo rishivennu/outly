@@ -97,7 +97,7 @@ export function GenerateDesk({ initial }: { initial: JobsRes }) {
         <CardTitle hint={state.web ? "Research uses live web search; recorded sources are pages the search actually returned." : "No web search on this AI key: the article will lean on qualified statements and name no verified sources."}>Generate Today's Blog</CardTitle>
         {!state.ready && (
           <p className="mt-3 rounded-2xl bg-warning/10 p-3 text-[13.5px]">
-            <AlertTriangle className="mr-1.5 inline h-4 w-4" aria-hidden /> No AI key is set for the blog (KIMI_API_KEY). Add it in the deployment settings, then reload.
+            <AlertTriangle className="mr-1.5 inline h-4 w-4" aria-hidden /> No AI key is set for the blog. Add NVIDIA_API_KEY (or KIMI_API_KEY) in the deployment settings, then reload.
           </p>
         )}
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
