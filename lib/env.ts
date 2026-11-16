@@ -79,6 +79,8 @@ const schema = z.object({
   FUNASR_TOKEN: z.string().optional().default(""),
   /** Bearer secret for /api/cron/* (Vercel Cron sends it automatically when set). */
   CRON_SECRET: z.string().optional().default(""),
+  /** IndexNow key (8-128 letters, digits, dashes). Set = publishing an article pings Bing and friends; the key is served at /api/indexnow-key. */
+  INDEXNOW_KEY: z.string().optional().default(""),
   /** Upstash Redis REST, so rate limits are shared across serverless instances instead of per-process. */
   UPSTASH_REDIS_REST_URL: z.string().optional().default(""),
   UPSTASH_REDIS_REST_TOKEN: z.string().optional().default(""),

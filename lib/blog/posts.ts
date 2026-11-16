@@ -4,6 +4,8 @@ import { db } from "../db";
 import { getConfig } from "../settings";
 import type { AdminSession } from "../admin/auth";
 import { allowedLinks, JobError, localDay, toView } from "./job";
+import { pingIndexNow, siteBase } from "./indexnow";
+import { categorySlug } from "./public";
 import { blogJson } from "./llm";
 import { qualityChecks } from "./stages";
 import { countWords, parseJson, parseList, readingMinutes, SLUG_RE, slugify, type BlogJobView, type BlogPostPatch, type BlogPostView, type OutlineStageOut, type QualityReport, type SeoStageOut, type TopicCandidate } from "./types";
@@ -115,7 +117,10 @@ export async function updatePost(admin: AdminSession, id: string, patch: BlogPos
   const report = await refreshQuality(merged);
   const saved = await db.blogPost.update({ where: { id }, data: { ...data, title, qualityReport: JSON.stringify(report), qualityOk: report.ok, reviewedBy: admin.login }, include: { sources: true } });
   await audit(admin, "blog.edit", id, pick(cur, Object.keys(data)), pick(saved, Object.keys(data)));
-  if (saved.status === "published") revalidateBlog(saved.slug);
+  if (saved.status === "published") {
+    revalidateBlog(saved.slug, saved.category);
+    if (cur.category !== saved.category) revalidateBlog(undefined, cur.category);
+  }
   return postView(saved);
 }
 const pick = (o: any, keys: string[]) => Object.fromEntries(keys.map((k) => [k, o[k]]));
@@ -186,7 +191,9 @@ export async function publishPost(admin: AdminSession, id: string): Promise<Blog
   const now = new Date();
   const saved = await db.blogPost.update({ where: { id }, data: { status: "published", publishedAt: cur.publishedAt ?? now, publishedBy: admin.login, reviewedBy: admin.login, qualityReport: JSON.stringify(report), qualityOk: true }, include: { sources: true } });
   await audit(admin, "blog.publish", id, { status: cur.status }, { status: "published", slug: saved.slug });
-  revalidateBlog(saved.slug);
+  revalidateBlog(saved.slug, saved.category);
+  const base = siteBase();
+  void pingIndexNow([`${base}/blog/${saved.slug}`, `${base}/blog`]).catch((e) => console.warn("[indexnow]", e));
   return postView(saved);
 }
 
@@ -196,15 +203,18 @@ export async function unpublishPost(admin: AdminSession, id: string): Promise<Bl
   if (cur.status !== "published") return getPost(id);
   const saved = await db.blogPost.update({ where: { id }, data: { status: "approved", reviewedBy: admin.login }, include: { sources: true } });
   await audit(admin, "blog.unpublish", id, { status: "published" }, { status: "approved" });
-  revalidateBlog(cur.slug);
+  revalidateBlog(cur.slug, cur.category);
   return postView(saved);
 }
 
-export function revalidateBlog(slug?: string) {
+export function revalidateBlog(slug?: string, category?: string) {
   try {
     revalidatePath("/blog");
     revalidatePath("/sitemap.xml");
+    revalidatePath("/blog/feed.xml");
     if (slug) revalidatePath(`/blog/${slug}`);
+    const cat = category ? categorySlug(category) : "";
+    if (cat) revalidatePath(`/blog/category/${cat}`);
   } catch {
     /* outside a request (tests) there is nothing to refresh */
   }
