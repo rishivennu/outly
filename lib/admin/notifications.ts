@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "../db";
 import { CENTRE_TABS, type CentreTab } from "../notify-core";
+import { countNotifications, type NotificationCounts } from "./notifications-core";
 
 /**
  * 1141: what the admin's Notifications screen reads. Every number here is a count of rows that exist:
@@ -10,18 +11,39 @@ import { CENTRE_TABS, type CentreTab } from "../notify-core";
 export const WINDOW_DAYS = 7;
 const since = (days: number) => new Date(Date.now() - days * 864e5);
 
-export type ChannelStat = { channel: string; sent: number; skipped: number; failed: number; queued: number; total: number };
+export type ChannelStat = { channel: string; sent: number; skipped: number; failed: number; queued: number; total: number; lastSentAt: Date | null };
 
 export async function deliverySummary(days = WINDOW_DAYS): Promise<ChannelStat[]> {
   const rows = await db.notifyDelivery.groupBy({ by: ["channel", "status"], where: { createdAt: { gte: since(days) } }, _count: { _all: true } });
   const by = new Map<string, ChannelStat>();
   for (const r of rows) {
-    const s = by.get(r.channel) ?? { channel: r.channel, sent: 0, skipped: 0, failed: 0, queued: 0, total: 0 };
+    const s = by.get(r.channel) ?? { channel: r.channel, sent: 0, skipped: 0, failed: 0, queued: 0, total: 0, lastSentAt: null };
     if (r.status === "sent" || r.status === "skipped" || r.status === "failed" || r.status === "queued") s[r.status] += r._count._all;
     s.total += r._count._all;
     by.set(r.channel, s);
   }
+  // 1164: when each channel last accepted something, in the window or before it.
+  const last = await db.notifyDelivery.groupBy({ by: ["channel"], where: { status: "sent" }, _max: { createdAt: true } });
+  for (const l of last) {
+    const s = by.get(l.channel);
+    if (s) s.lastSentAt = l._max.createdAt ?? null;
+  }
   return [...by.values()].sort((a, b) => b.total - a.total);
+}
+
+/**
+ * 1164: the same window counted in notifications (one decision for one creator), not channel attempts.
+ * The screen used to show 170 accepted attempts, 124 held-back attempts and "Growth: 286" (every attempt in
+ * that group, whatever happened to it) side by side as if they were the same unit. They never were.
+ */
+export async function notificationCounts(days = WINDOW_DAYS): Promise<NotificationCounts & { titles: Record<string, string> }> {
+  const rows = await db.notifyDelivery.findMany({
+    where: { createdAt: { gte: since(days) } },
+    select: { userId: true, kind: true, category: true, channel: true, status: true, eventId: true, noticeId: true, createdAt: true },
+  });
+  const counts = countNotifications(rows);
+  const titles = Object.fromEntries(counts.byCategory.map((c) => [c.id, CENTRE_TABS.find((t) => t.id === c.id)?.title ?? (c.id || "Other")]));
+  return { ...counts, titles };
 }
 
 /** Why pushes were held back, in the admin's own words: the reasons the engine recorded, most common first. */
@@ -88,7 +110,18 @@ export async function recentDeliveries(limit = 50) {
   });
 }
 
+/**
+ * 1164: who last touched the brake or sent a test, from the admin audit log. Nothing here is a schema
+ * change: the PATCH and POST routes already write these two kinds of AdminEvent.
+ */
+export type NotifyAuditEntry = { id: string; kind: "notify_pause" | "notify_test"; title: string; body: string | null; at: string };
+
+export async function notifyAudit(limit = 8): Promise<NotifyAuditEntry[]> {
+  const rows = await db.adminEvent.findMany({ where: { kind: { in: ["notify_pause", "notify_test"] } }, orderBy: { createdAt: "desc" }, take: limit, select: { id: true, kind: true, title: true, body: true, createdAt: true } });
+  return rows.map((r) => ({ id: r.id, kind: r.kind as NotifyAuditEntry["kind"], title: r.title, body: r.body, at: r.createdAt.toISOString() }));
+}
+
 export async function notifyOverview() {
-  const [channels, reasons, categories, queue, subs] = await Promise.all([deliverySummary(), skipReasons(), categoryCounts(), queueState(), subscriptionCounts()]);
-  return { channels, reasons, categories, queue, subs, days: WINDOW_DAYS };
+  const [channels, reasons, categories, queue, subs, counts] = await Promise.all([deliverySummary(), skipReasons(), categoryCounts(), queueState(), subscriptionCounts(), notificationCounts()]);
+  return { channels, reasons, categories, queue, subs, counts, days: WINDOW_DAYS };
 }

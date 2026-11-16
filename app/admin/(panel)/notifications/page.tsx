@@ -1,8 +1,8 @@
 import { requireAdmin } from "@/lib/admin/guard";
 import { getAdmin } from "@/lib/admin/auth";
 import { notifyConfig } from "@/lib/notify-config";
-import { deadLetters, failedDeliveries, notifyOverview, pendingQueue, recentDeliveries } from "@/lib/admin/notifications";
-import { Card, CardTitle, Empty, PageHead, Pill, StatusBadge, Table, ago, fmtDate } from "@/components/admin/ui";
+import { deadLetters, failedDeliveries, notifyAudit, notifyOverview, pendingQueue, recentDeliveries } from "@/lib/admin/notifications";
+import { Card, CardTitle, Empty, Hint, PageHead, StatusBadge, Table, ago, fmtDate } from "@/components/admin/ui";
 import { adminEmail, canSeeEmail } from "@/lib/admin/privacy";
 import { EnterRoot } from "@/components/admin/motion/EnterRoot";
 import { RollingNumber } from "@/components/dashboard/RollingNumber";
@@ -30,31 +30,37 @@ export default async function AdminNotificationsPage() {
   await requireAdmin("site");
   const admin = await getAdmin();
   const role = admin?.role ?? "support";
-  const [cfg, over, failed, dead, queue, log] = await Promise.all([notifyConfig(), notifyOverview(), failedDeliveries(), deadLetters(), pendingQueue(), recentDeliveries(40)]);
+  const [cfg, over, failed, dead, queue, log, audit] = await Promise.all([notifyConfig(), notifyOverview(), failedDeliveries(), deadLetters(), pendingQueue(), recentDeliveries(40), notifyAudit()]);
   const sent = over.channels.reduce((s, c) => s + c.sent, 0);
   const held = over.channels.reduce((s, c) => s + c.skipped, 0);
   const broke = over.channels.reduce((s, c) => s + c.failed, 0);
+  const n = over.counts;
+  const plural = (v: number, one: string, many = `${one}s`) => `${v.toLocaleString("en-IN")} ${v === 1 ? one : many}`;
+  const channelName = (c: string) => (c === "inapp" ? "Bell" : c === "fcm" ? "App (Android)" : c === "push" ? "Web push" : c === "email" ? "Email" : c);
 
   return (
     <>
       <PageHead
         eyebrow="Setup"
         title="Notifications"
-        body="Everything Outlly says to creators, and why. The numbers are counts of rows that exist: deliveries attempted, skips with the reason recorded, events waiting their turn, events given up on. Creators keep their own switches; nothing here overrides what somebody asked for, it only decides when and how loudly Outlly speaks."
+        body={`Everything Outlly says to creators, and why. Two units appear on this page and they are never mixed: a notification is one decision for one creator; a channel attempt is one channel's outcome for it (the bell, web push, the Android app or email). The last ${over.days} days unless a card says otherwise. Creators keep their own switches; nothing here overrides what somebody asked for, it only decides when and how loudly Outlly speaks.`}
       />
 
       <EnterRoot>
-        <div className="mb-3 grid gap-3 sm:grid-cols-4">
+        <div className="mb-3 grid grid-cols-1 gap-3 min-[440px]:grid-cols-2 lg:grid-cols-4">
           {[
-            { label: "Accepted", v: sent, hint: `Last ${over.days} days, one row per channel attempt. Accepted by the channel, not necessarily seen.` },
-            { label: "Held back", v: held, hint: "Channel attempts skipped: quiet hours, cooldowns, switched off" },
-            { label: "Failed", v: broke, hint: "A service refused it" },
-            { label: "Waiting", v: over.queue.pending, hint: over.queue.retrying ? `${over.queue.retrying} being retried` : "Nothing stuck" },
+            { label: "Notifications", v: n.notifications, sub: `to ${plural(n.recipients, "creator")}, ${plural(n.attempts, "channel attempt")}`, hint: "One decision for one creator, however many channels it was tried on. A notification a creator already had is not counted again." },
+            { label: "Reached someone", v: n.reached, sub: `${plural(sent, "attempt")} accepted by a channel`, hint: "Notifications where at least one channel accepted the message. Accepted means the bell row was written or the push or email provider said yes. It never means seen or opened." },
+            { label: "Held back entirely", v: n.held, sub: `${plural(held, "attempt")} held back in all`, hint: "Notifications where every channel was held back: the creator's own switch, quiet hours, a cooldown, the global pause, or no device to send to. Not a fault." },
+            { label: "Failed or waiting", v: n.failed + n.waiting, sub: `${plural(broke, "failed attempt")}, ${plural(over.queue.pending, "event")} in the queue${over.queue.retrying ? ` (${over.queue.retrying} retrying)` : ""}`, hint: "Notifications nothing accepted because a provider refused (failed) or because the push is still queued (waiting). Queue events are counted separately below." },
           ].map((s) => (
             <Card key={s.label} data-enter className="!p-5">
-              <p className="text-[12.5px] font-semibold text-muted-foreground">{s.label}</p>
+              <p className="flex items-center gap-1 text-[12.5px] font-semibold text-muted-foreground">
+                {s.label}
+                <Hint text={s.hint} label={`How ${s.label} is counted`} />
+              </p>
               <RollingNumber value={s.v.toLocaleString("en-IN")} className="mt-1 block font-display text-[2rem] font-bold leading-none tabular" />
-              <p className="mt-2 text-[12.5px] text-muted-foreground">{s.hint}</p>
+              <p className="mt-2 text-[12.5px] text-muted-foreground">{s.sub}</p>
             </Card>
           ))}
         </div>
@@ -65,30 +71,32 @@ export default async function AdminNotificationsPage() {
             {over.channels.length === 0 ? (
               <Empty title="Nothing sent yet" body="Once notifications go out, every attempt and every skip is counted here." />
             ) : (
-              <Table label="Deliveries by channel" head={["Channel", "Accepted", "Held back", "Failed", "Waiting"]}>
+              <Table label="Channel attempts by channel" head={["Channel", "Attempts", "Accepted", "Held back", "Failed", "Waiting", "Last accepted"]}>
                 {over.channels.map((c) => (
                   <tr key={c.channel}>
-                    <td className="font-medium">{c.channel === "inapp" ? "Bell" : c.channel === "fcm" ? "App (Android)" : c.channel === "push" ? "Web push" : "Email"}</td>
+                    <td className="font-medium">{channelName(c.channel)}</td>
+                    <td className="tabular">{c.total}</td>
                     <td className="tabular">{c.sent}</td>
                     <td className="tabular">{c.skipped}</td>
                     <td className="tabular">{c.failed}</td>
                     <td className="tabular">{c.queued}</td>
+                    <td className="whitespace-nowrap text-[12.5px] text-muted-foreground">{c.lastSentAt ? ago(c.lastSentAt) : "never"}</td>
                   </tr>
                 ))}
               </Table>
             )}
             <p className="mt-3 text-[12.5px] text-muted-foreground">
-              Reachable right now: {over.subs.web.toLocaleString("en-IN")} browser subscription{over.subs.web === 1 ? "" : "s"} across {over.subs.people.toLocaleString("en-IN")} creator{over.subs.people === 1 ? "" : "s"}, {over.subs.fcm.toLocaleString("en-IN")} app device{over.subs.fcm === 1 ? "" : "s"}
+              Every number is a channel attempt. Reachable right now: {over.subs.web.toLocaleString("en-IN")} browser subscription{over.subs.web === 1 ? "" : "s"} across {over.subs.people.toLocaleString("en-IN")} creator{over.subs.people === 1 ? "" : "s"}, {over.subs.fcm.toLocaleString("en-IN")} app device{over.subs.fcm === 1 ? "" : "s"}
               {over.subs.unhealthy > 0 ? `, ${over.subs.unhealthy} subscription${over.subs.unhealthy === 1 ? "" : "s"} failing` : ""}.
             </p>
           </Card>
 
           <Card data-enter>
-            <CardTitle hint="Why a push was not sent, most common first. A long list of one reason is usually a setting worth rethinking rather than a bug.">Why things were held back</CardTitle>
+            <CardTitle hint="Held-back channel attempts by the reason the engine recorded, most common first. These add up to the held-back attempts in the channel table. A long list of one reason is usually a setting worth rethinking rather than a bug.">Why things were held back</CardTitle>
             {over.reasons.length === 0 ? (
               <Empty title="Nothing held back" body="Every notification that was wanted went out." />
             ) : (
-              <Table label="Skip reasons" head={["Reason", "Count"]}>
+              <Table label="Skip reasons" head={["Reason", "Attempts"]}>
                 {over.reasons.map((r) => (
                   <tr key={r.reason}>
                     <td>{reason(r.reason)}</td>
@@ -97,21 +105,30 @@ export default async function AdminNotificationsPage() {
                 ))}
               </Table>
             )}
-            {over.categories.length > 0 && (
-              <p className="mt-3 flex flex-wrap items-center gap-1.5">
-                <span className="mr-1 text-[12px] text-muted-foreground">All attempts by group (accepted, held back and failed together, so these exceed the held-back count):</span>
-                {over.categories.map((c) => (
-                  <Pill key={c.id} tone="muted">
-                    {c.title}: <span className="tabular">{c.count}</span>
-                  </Pill>
-                ))}
-              </p>
-            )}
           </Card>
         </div>
 
+        {n.byCategory.length > 0 && (
+          <Card data-enter className="mb-4">
+            <CardTitle hint="Notifications are decisions per creator; the attempt columns split each group's channel attempts by what happened. The attempt columns add up to the group's attempts, never to its notifications.">By group</CardTitle>
+            <Table label="Notifications by group" head={["Group", "Notifications", "Attempts", "Accepted", "Held back", "Failed", "Waiting"]}>
+              {n.byCategory.map((c) => (
+                <tr key={c.id || "other"}>
+                  <td className="font-medium">{n.titles[c.id] ?? c.id}</td>
+                  <td className="tabular">{c.notifications}</td>
+                  <td className="tabular">{c.attempts}</td>
+                  <td className="tabular">{c.sent}</td>
+                  <td className="tabular">{c.skipped}</td>
+                  <td className="tabular">{c.failed}</td>
+                  <td className="tabular">{c.queued}</td>
+                </tr>
+              ))}
+            </Table>
+          </Card>
+        )}
+
         <div data-enter>
-          <NotificationsPanel initial={cfg} adminLogin={admin?.login ?? ""} />
+          <NotificationsPanel initial={cfg} adminLogin={admin?.login ?? ""} adminName={admin?.name ?? ""} audit={audit} />
         </div>
 
         <div className="mt-4 grid gap-3 lg:grid-cols-2">

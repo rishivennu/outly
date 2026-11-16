@@ -165,9 +165,9 @@ describe("1163 pages", () => {
   test("Notifications: results use the shared badge and the counting unit is named", () => {
     const n = read("app/admin/(panel)/notifications/page.tsx");
     expect(n).toContain("<StatusBadge status={r.status} />");
-    expect(n).toContain('label: "Accepted"');
-    expect(n).toContain("one row per channel attempt");
-    expect(n).toContain("so these exceed the held-back count");
+    expect(n).toContain('label: "Reached someone"');
+    expect(n).toContain("a channel attempt is one channel's outcome for it");
+    expect(n).toContain("Every number is a channel attempt.");
     expect(n).not.toContain('"Delivered"');
   });
 });

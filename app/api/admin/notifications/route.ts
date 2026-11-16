@@ -14,9 +14,9 @@ import { notify } from "@/lib/retention/notices";
  * that can push a message to every creator by accident, so this route refuses any address but the one the
  * admin is signed in with, and the notification says plainly that it is a test.
  */
-const Cooldown = z.record(z.enum(["publishing", "schedule", "account", "engagement", "billing", "assist"]), z.number().min(0).max(1440)).optional();
-const Idle = z.record(z.enum(IDLE_TIERS as unknown as [string, ...string[]]), z.object({ on: z.boolean().optional(), minutes: z.number().min(5).max(86_400).optional(), title: z.string().trim().max(80).optional(), body: z.string().trim().max(200).optional() })).optional();
-const Greet = z.record(z.enum(GREET_SLOTS as unknown as [string, ...string[]]), z.object({ on: z.boolean().optional(), lines: z.array(z.string().trim().min(1).max(140)).max(12).optional() })).optional();
+const Cooldown = z.partialRecord(z.enum(["publishing", "schedule", "account", "engagement", "billing", "assist"]), z.number().min(0).max(1440)).optional();
+const Idle = z.partialRecord(z.enum(IDLE_TIERS as unknown as [string, ...string[]]), z.object({ on: z.boolean().optional(), minutes: z.number().min(5).max(86_400).optional(), title: z.string().trim().max(80).optional(), body: z.string().trim().max(200).optional() })).optional();
+const Greet = z.partialRecord(z.enum(GREET_SLOTS as unknown as [string, ...string[]]), z.object({ on: z.boolean().optional(), lines: z.array(z.string().trim().min(1).max(140)).max(12).optional() })).optional();
 const Patch = z.object({
   paused: z.boolean().optional(),
   cooldown: Cooldown,
@@ -51,6 +51,7 @@ export const POST = adminRoute(
     if (email.toLowerCase() !== admin.login.toLowerCase()) throw new HttpError(403, "A test can only be sent to your own account, so nobody else is messaged by accident.", "SELF_ONLY");
     const u = await db.user.findUnique({ where: { email: email.toLowerCase() }, select: { id: true, name: true } });
     if (!u) throw new HttpError(404, "There is no creator account on that address. Sign up with it first, then test.", "NO_USER");
+    const startedAt = new Date();
     const r = await notify(
       u.id,
       {
@@ -64,7 +65,16 @@ export const POST = adminRoute(
       },
       { push: { keepOpen: false } },
     );
-    return json({ sent: r.created, id: r.id, to: u.name });
+    // 1164: the real outcome per channel, read back from the delivery log this very send wrote, so the admin
+    // sees what the bell, push and email providers actually said instead of a generic "sent".
+    const channels = await db.notifyDelivery.findMany({
+      where: r.id ? { noticeId: r.id } : { userId: u.id, kind: "account_connected", createdAt: { gte: startedAt } },
+      orderBy: { createdAt: "asc" },
+      select: { channel: true, status: true, reason: true, detail: true },
+    });
+    const devices = await db.webPushSub.count({ where: { userId: u.id } });
+    await adminEvent("notify_test", "Test notification sent", `${admin.name} sent a test notification to their own account (${u.name}).`, "/admin/notifications");
+    return json({ sent: r.created, id: r.id, to: u.name, skipped: r.skipped ?? false, reason: r.reason ?? null, devices, channels });
   },
   [10, 60_000],
 );
