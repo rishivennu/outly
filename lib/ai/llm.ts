@@ -16,6 +16,24 @@ const GEMINI_DEFAULT = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "ge
 const ALIAS: Record<string, string> = { "gemini-flash-latest": "gemini-3.6-flash" };
 const KIMI_MODEL = "kimi-k2.6";
 const KIMI_URL = "https://api.moonshot.ai/v1/chat/completions";
+/**
+ * 1174: KIMI_API_KEY may be an OpenRouter key (sk-or-...), which reaches the same Kimi K2.6 through
+ * openrouter.ai with the same OpenAI-shaped request and stream. Measured 11-16: with reasoning left on, K2.6
+ * there spent ~600 thinking tokens and 8 s on a one-line caption; off, 61 tokens and 2 s. So reasoning is off
+ * unless a caller asks for it, and max_tokens is always sent (OpenRouter refuses an unbounded request when the
+ * balance is low).
+ */
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_MODEL = "moonshotai/kimi-k2.6";
+export const isOpenRouterKey = (key: string) => key.startsWith("sk-or-");
+export function kimiRequest(key: string, body: Record<string, unknown>, opts: Pick<LlmOpts, "maxTokens" | "reasoning">): { url: string; headers: Record<string, string>; body: unknown } {
+  if (!isOpenRouterKey(key)) return { url: KIMI_URL, headers: { authorization: `Bearer ${key}` }, body };
+  return {
+    url: OPENROUTER_URL,
+    headers: { authorization: `Bearer ${key}`, "HTTP-Referer": "https://outlly.com", "X-Title": "Outlly" },
+    body: { ...body, model: OPENROUTER_MODEL, max_tokens: opts.maxTokens ?? 4096, reasoning: { enabled: opts.reasoning === true } },
+  };
+}
 
 const stats = new Map<string, ModelStat>();
 export const modelStats = () => Object.fromEntries(stats);
@@ -35,6 +53,10 @@ export type LlmOpts = {
   /** 1133: pictures the model looks at before the prompt (base64, JPEG). Gemini takes them inline; Kimi (K2.6 reads
    * images) as OpenAI content parts, so a throttled Gemini no longer leaves a video unwatched (1174). */
   images?: { mime: string; data: string }[];
+  /** Longest answer wanted, in tokens (sent to OpenRouter; default 4096, enough for a 2,500-word article). */
+  maxTokens?: number;
+  /** Let a thinking model think (slower, dearer): only for long-form work such as the blog writer. */
+  reasoning?: boolean;
 };
 
 function candidates(opts: LlmOpts): ModelId[] {
@@ -68,16 +90,16 @@ async function call(m: ModelId, system: string, prompt: string, opts: LlmOpts, s
             generationConfig: { ...(opts.json !== false ? { responseMimeType: "application/json" } : {}), temperature: opts.temperature ?? 0.9 },
           },
         }
-      : {
-          url: KIMI_URL,
-          headers: { authorization: `Bearer ${env.KIMI_API_KEY}` },
-          body: {
+      : kimiRequest(
+          env.KIMI_API_KEY,
+          {
             model: m.model,
             stream: true,
             ...(opts.json !== false ? { response_format: { type: "json_object" } } : {}),
             messages: [{ role: "system", content: system }, { role: "user", content: kimiUser(prompt, opts.images) }],
           },
-        };
+          opts,
+        );
   const r = await fetch(req.url, { method: "POST", headers: { "content-type": "application/json", ...req.headers }, body: JSON.stringify(req.body), signal });
   if (!r.ok || !r.body) throw new CallError(r.status, (await r.text().catch(() => "")).slice(0, 400));
   const reader = r.body.getReader();
