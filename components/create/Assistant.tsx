@@ -163,14 +163,27 @@ export function Assistant(p: Props) {
         )}
         {showHistory && (
         <div id={historyId} className="space-y-4">
-        {!p.hasMedia && <Bubble from="outly">Hey! Drop a video in and I&apos;ll help it land everywhere it needs to go.</Bubble>}
-        {p.hasMedia && p.upload.kind === "uploading" && <Bubble from="outly">Bringing it in. You can start telling me about it while it uploads.</Bubble>}
+        {!p.hasMedia && <Bubble from="outly">Hey! Upload your video and I&apos;ll help you prepare it for every platform.</Bubble>}
+        {/* 1170: Step 1 tips, short and only what is true of Outlly today. */}
+        {!p.hasMedia && p.step === "video" && (
+          <ul className="space-y-1.5 pl-1 text-[13px] leading-snug text-muted-foreground" aria-label="Before you upload">
+            <li>Vertical 9:16 fits Reels, Shorts and TikTok without bars.</li>
+            <li>Want music? Add it in your editor first. Outlly posts the sound that&apos;s in your video.</li>
+            <li>After this you tell me what it&apos;s about, and I suggest hooks and copy for each place. You approve every word.</li>
+          </ul>
+        )}
+        {p.hasMedia && p.upload.kind === "uploading" && (
+          <Bubble from="outly">
+            {p.step === "video" ? "Bringing it in. Continue opens as soon as it's uploaded." : "Bringing it in. You can start telling me about it while it uploads."}
+          </Bubble>
+        )}
+        {p.hasMedia && p.upload.kind === "paused" && <Bubble from="outly">Upload paused. Resume when you&apos;re ready.</Bubble>}
         {p.hasMedia && p.upload.kind === "failed" && (
           <Bubble from="outly">
             That upload didn&apos;t make it. <span className="text-muted-foreground">{p.upload.message} Try it again when you&apos;re ready.</span>
           </Bubble>
         )}
-        {p.hasMedia && p.upload.kind !== "uploading" && p.upload.kind !== "failed" && p.meta?.duration ? (
+        {p.hasMedia && p.upload.kind === "done" && p.meta?.duration ? (
           <Bubble from="outly">
             Your video is in. <span className="text-muted-foreground">{formatDuration(p.meta.duration)}{vertical === null ? "" : vertical ? ", vertical. Perfect for Reels and Shorts." : ", horizontal. It'll sit with bars on vertical feeds."}</span>
           </Bubble>

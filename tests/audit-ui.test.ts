@@ -124,6 +124,7 @@ describe("an upload that failed says so", () => {
     const src = read("components/create/Assistant.tsx");
     expect(src).toContain('{p.hasMedia && p.upload.kind === "failed" && (');
     expect(src).toContain("That upload didn&apos;t make it.");
-    expect(src).toContain('p.upload.kind !== "uploading" && p.upload.kind !== "failed" && p.meta?.duration');
+    // 1170: the length only shows once the server has the whole file (paused counts as not in yet).
+    expect(src).toContain('p.hasMedia && p.upload.kind === "done" && p.meta?.duration');
   });
 });

@@ -6,10 +6,10 @@ export type { AccountView, MediaView, PostView, TargetView, Draft };
 
 export type Step = "video" | "story" | "everywhere" | "launch";
 export const STEPS: { id: Step; n: string; label: string; hint: string }[] = [
-  { id: "video", n: "01", label: "Your video", hint: "Drop it in" },
-  { id: "story", n: "02", label: "Your story", hint: "Find the hook" },
-  { id: "everywhere", n: "03", label: "Everywhere", hint: "Make it fit" },
-  { id: "launch", n: "04", label: "Launch", hint: "Send it out" },
+  { id: "video", n: "01", label: "Your Video", hint: "Upload your clip" },
+  { id: "story", n: "02", label: "Your Story", hint: "Find the hook" },
+  { id: "everywhere", n: "03", label: "Everywhere", hint: "Fit each platform" },
+  { id: "launch", n: "04", label: "Launch", hint: "Publish or schedule" },
 ];
 
 export interface Hook {
@@ -45,6 +45,8 @@ export const NO_HOOKS: HooksState = { loading: false, more: false, status: "", r
 export type UploadState =
   | { kind: "idle" }
   | { kind: "uploading"; progress: number; eta?: number | null }
+  /** 1170: stopped by the creator on Step 1; Resume sends the same file again and picks up what already landed. */
+  | { kind: "paused"; progress: number }
   | { kind: "done" }
   | { kind: "failed"; message: string };
 

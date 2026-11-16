@@ -3,25 +3,28 @@ import { whyLine } from "@/lib/ai/caption-engine";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { PanelRightClose, PanelRightOpen, RotateCcw, Sparkles, X } from "lucide-react";
+import { ChevronDown, PanelRightClose, PanelRightOpen, RotateCcw, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { UploadZone } from "@/components/shared/UploadZone";
 import { PostKindSwitch } from "./PostKindSwitch";
 import { useToast } from "@/components/shared/Toast";
 import { defaultSchedule } from "@/components/shared/DateTimePicker";
 import { api, ApiError, offerUpgrade, streamApi } from "@/lib/client/api";
 import { track } from "@/lib/analytics/track";
-import { limitsProblem, loadUploadLimits, uploadVideo } from "@/lib/client/upload";
+import { limitsProblem, loadUploadLimits, uploadVideo, type UploadLimits } from "@/lib/client/upload";
 import { useOnline } from "@/lib/client/use-online";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { CaptionTrack } from "@/lib/captions/edit";
-import { takeHandoff, takeSharedFile, validateVideoFile } from "@/lib/client/handoff";
+import { handoffBatch, takeHandoff, takeSharedFile, validateVideoFile } from "@/lib/client/handoff";
+import { useRouter } from "next/navigation";
+import { BULK_MAX } from "@/lib/posts/bulk";
 import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { Assistant } from "./Assistant";
-import { captionSource, NO_SUGGESTIONS, PANEL_OPEN, panelReducer, routeCopy, suggest, type SuggestAction, type Suggestions } from "./assistant-state";
-import { JourneyBar, JourneyRail } from "./JourneyRail";
+import { captionSource, NO_SUGGESTIONS, PANEL_OPEN, panelReducer, PIP_PANEL_KEY, routeCopy, suggest, type SuggestAction, type Suggestions } from "./assistant-state";
+import { StepProgress, stepIndex } from "./StepProgress";
+import { UploadCard, UploadFileCard, uniqueFiles } from "./UploadCard";
+import { SavedDrafts } from "./SavedDrafts";
 import { createFont } from "./font";
 import { LaunchPanel, ScheduledView, scheduleCheckLine, type ScheduleCheck } from "./LaunchPanel";
 import { PlatformDeck } from "./PlatformDeck";
@@ -34,9 +37,7 @@ import { CaptionBurner } from "./CaptionBurner";
 import { CaptionRunProvider, useCaptionBurning, useCaptionRunLine, useCaptionWorkspace } from "./captions/CaptionRun";
 import { readFrames, readVideo } from "./frame";
 import { primeGroove } from "./Groove";
-import { DeviceDrafts } from "./DeviceDrafts";
 import { ActionBar, barState, BURN_SEND, PreviewSheet, type BarId } from "./ActionBar";
-import { UploadLimits } from "./UploadLimits";
 import { legacyDraftCount, newDeviceId, openDrafts, type DeviceTarget } from "@/lib/client/device-drafts";
 import { useDraftSync, type ServerDraft } from "@/lib/client/draft-sync";
 import { classifySyncError } from "@/lib/client/draft-sync-core";
@@ -83,6 +84,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   const [localMeta, setLocalMeta] = useState<Meta | null>(null);
   const [upload, setUpload] = useState<UploadState>(initialPost ? { kind: "done" } : { kind: "idle" });
   const fileRef = useRef<File | null>(null);
+  /** 1170: the upload was paused by the creator (so a save can say so rather than "add a video"). */
+  const pausedRef = useRef(false);
   const justUploaded = useRef(false);
   const posterBlob = useRef<Blob | null>(null);
   const synced = useRef<string | null>(null);
@@ -96,6 +99,10 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   const [pickError, setPickError] = useState<string | null>(null);
   /** A replacement file waiting for "Replace video?" to be confirmed. */
   const [replacing, setReplacing] = useState<File | null>(null);
+  /** 1170: the server's upload facts (formats, per-file cap, storage left) for Step 1's card; never made up. */
+  const [limits, setLimits] = useState<UploadLimits | null>(null);
+  const [limitsFailed, setLimitsFailed] = useState(false);
+  const router = useRouter();
   const [stopAsk, setStopAsk] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const online = useOnline();
@@ -206,6 +213,30 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   useEffect(() => {
     panelDispatch({ t: "step", step });
   }, [step]);
+  // 1170: Pip stays open or folded the way the creator left it, in this browser.
+  useEffect(() => {
+    try {
+      const v = window.localStorage.getItem(PIP_PANEL_KEY);
+      if (v === "closed" || v === "open") panelDispatch({ t: "set", open: v === "open" });
+    } catch {
+      /* private mode: Pip just starts open */
+    }
+  }, []);
+  const togglePanel = () => {
+    const open = !panel.open;
+    panelDispatch({ t: "toggle" });
+    try {
+      window.localStorage.setItem(PIP_PANEL_KEY, open ? "open" : "closed");
+    } catch {
+      /* not remembered, still toggles */
+    }
+  };
+  /** 1170: the furthest step reached this session, so going back never un-does a step, and whether Your Story has been open. */
+  const [furthest, setFurthest] = useState<Step>(step);
+  const storySeen = stepIndex(furthest) >= stepIndex("story");
+  useEffect(() => {
+    setFurthest((f) => (stepIndex(step) > stepIndex(f) ? step : f));
+  }, [step]);
 
   /* 1152: one player for the page. The caption editor seeks it, reads its time and draws its live preview on the
      canvas laid over it; while captions are on it shows the clean video so the overlay never doubles a burned copy. */
@@ -308,25 +339,29 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
 
   /* ================= upload ================= */
   const startUpload = useCallback(
-    async (file: File, objectUrl?: string) => {
+    async (file: File, objectUrl?: string, resume?: { progress: number }) => {
       uploadAbort.current?.abort();
       const ctrl = new AbortController();
       uploadAbort.current = ctrl;
       fileRef.current = file;
+      pausedRef.current = false;
       synced.current = null;
-      posterBlob.current = null;
       setMedia(null);
-      setLocalMeta(null);
-      setLocalPoster((old) => (old && URL.revokeObjectURL(old), null));
       const url = objectUrl ?? URL.createObjectURL(file);
       setLocalUrl((old) => (old && old !== url && URL.revokeObjectURL(old), url));
-      setUpload({ kind: "uploading", progress: 0 });
-      setStep((s) => (s === "video" ? "story" : s));
-      // A story already sent stays the creator's; Pip only watches when the story is still to be told.
-      if (submittedRef.current === null) void watchVideo(url);
-      else stopWatching();
+      setUpload({ kind: "uploading", progress: resume?.progress ?? 0 });
+      // 1170: Step 1 stays put while it uploads, with its own progress; Continue opens once the server has it.
+      // Resuming the same file keeps its poster, length and Pip's read of it; only the transfer starts again.
+      if (!resume) {
+        posterBlob.current = null;
+        setLocalMeta(null);
+        setLocalPoster((old) => (old && URL.revokeObjectURL(old), null));
+        // A story already sent stays the creator's; Pip only watches when the story is still to be told.
+        if (submittedRef.current === null) void watchVideo(url);
+        else stopWatching();
+      }
 
-      readVideo(url)
+      if (!resume) readVideo(url)
         .then((m) => {
           setLocalMeta({ duration: m.duration, width: m.width, height: m.height });
           if (m.poster) {
@@ -350,7 +385,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
           const message = !navigator.onLine ? "You're offline. It picks up again when you reconnect." : e instanceof ApiError ? e.message : "Something got in the way.";
           uploadFail.current = message;
           setUpload({ kind: "failed", message });
-          // The stage may be off screen by now (we move on to the story while it uploads), so say it out loud too.
+          // The card may be off screen by now (the creator can be on Your Story while it uploads), so say it out loud too.
           if (navigator.onLine) toast(`Your video didn't upload. ${message}`, "error");
           return null;
         }
@@ -379,6 +414,40 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     [startUpload, toast],
   );
 
+  /** 1170: Pause stops the transfer but keeps the file; Resume (retryUpload) sends it again from what already landed. */
+  const pauseUpload = useCallback(() => {
+    if (upload.kind !== "uploading") return;
+    const at = upload.progress;
+    uploadAbort.current?.abort();
+    uploadAbort.current = null;
+    mediaReady.current = null;
+    pausedRef.current = true;
+    setUpload({ kind: "paused", progress: at });
+  }, [upload]);
+
+  /** Resume the paused file. TUS and multipart pick up what already landed; a plain upload starts again and the bar shows it. */
+  const resumeUpload = useCallback(() => {
+    if (fileRef.current && upload.kind === "paused") void startUpload(fileRef.current, localUrl ?? undefined, { progress: upload.progress });
+  }, [startUpload, localUrl, upload]);
+
+  /** 1170: what Step 1's card hands over. One video uploads here; several go to the batch planner. */
+  const takeFiles = useCallback(
+    (files: File[]) => {
+      const { files: list, dropped } = uniqueFiles(files);
+      if (dropped) toast(dropped === 1 ? "That video was in there twice, so it's added once." : `${dropped} videos were in there twice, so each is added once.`, "info");
+      if (list.length === 1) return void pickFile(list[0]);
+      // A batch goes to connected places; with none yet, the first video still starts here.
+      if (!accountList.some((a) => a.status === "connected")) {
+        toast("Planning a batch needs a connected account. Starting with your first video for now.", "info");
+        return void pickFile(list[0]);
+      }
+      if (list.length > BULK_MAX) toast(`A batch holds up to ${BULK_MAX} videos, so the first ${BULK_MAX} are in.`, "info");
+      handoffBatch(list.slice(0, BULK_MAX)); // read once by the planner; a stale batch expires on its own
+      router.push("/create/bulk");
+    },
+    [pickFile, router, toast, accountList],
+  );
+
   /** Same file again; TUS and multipart pick up from what already landed. */
   const retryUpload = useCallback(() => {
     if (fileRef.current) void startUpload(fileRef.current, localUrl ?? undefined);
@@ -391,6 +460,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     stopWatching();
     mediaReady.current = null;
     uploadFail.current = null;
+    pausedRef.current = false;
     fileRef.current = null;
     posterBlob.current = null;
     setMedia(null);
@@ -440,6 +510,17 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     if (connected && (PLATFORMS as readonly string[]).includes(connected)) toast(`${PLATFORM_META[connected as Platform].name} is connected.`);
     if (connectError) toast("That connection didn't go through. Let's try again.", "info");
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    loadUploadLimits().then(
+      (l) => alive && setLimits(l),
+      () => alive && setLimitsFailed(true),
+    );
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // The copy in this browser: adopt it for a server draft, or bring a draft back from it.
@@ -608,12 +689,27 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     capTimer.current = setTimeout(() => writeLocal.current(), 700);
   }, []);
 
+  // A paused upload is lost on reload too (the file lives only in this tab), so it warns as well.
   useEffect(() => {
-    if (upload.kind !== "uploading") return;
+    if (upload.kind !== "uploading" && upload.kind !== "paused") return;
     const warn = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [upload.kind]);
+
+  // 1170: a video let go anywhere on Create is never opened by the browser in place of the page (the upload card
+  // takes drops itself while it shows; this covers the file card, a full storage card and the later steps).
+  useEffect(() => {
+    const guard = (e: DragEvent) => {
+      if (e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files")) e.preventDefault();
+    };
+    window.addEventListener("dragover", guard);
+    window.addEventListener("drop", guard);
+    return () => {
+      window.removeEventListener("dragover", guard);
+      window.removeEventListener("drop", guard);
+    };
+  }, []);
 
   /* ================= hooks ================= */
   const fetchHooks = useCallback(
@@ -795,7 +891,9 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
           setSaved("error");
           const why = uploadFail.current
             ? `Your video didn't upload (${uploadFail.current.replace(/\.$/, "")}). Tap "Let's try again" on the video, then save.`
-            : "Add a video first, then save.";
+            : pausedRef.current
+              ? "Your upload is paused. Resume it, then save."
+              : "Add a video first, then save.";
           if (opts?.strict) throw new ApiError(400, why);
           toast(why, "error");
           return postIdRef.current;
@@ -940,7 +1038,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   );
 
   const syncLine = <SyncStatus status={sync.status} lastSyncedAt={sync.lastSyncedAt} error={sync.error} needsMedia={sync.needsMedia} storedHere={sync.storedHere} onRetry={sync.retry} onResolve={conflict ? () => setComparing(true) : undefined} />;
-  const bar = barState({ online, hasMedia, uploadFailed: upload.kind === "failed", hasHook: !!hook, ready: allReviewed, enabledCount: enabled.length, launching, saving: saved === "saving", step, mode, targets: plan.send, pending: pending.map((p) => PLATFORM_META[p].name), scheduleIssue, hasDraft: !!(postId || savedAt), activity: capLine, burning: capBurning });
+  const bar = barState({ online, hasMedia, uploadFailed: upload.kind === "failed", hasHook: !!hook, ready: allReviewed, enabledCount: enabled.length, launching, saving: saved === "saving", step, mode, targets: plan.send, pending: pending.map((p) => PLATFORM_META[p].name), scheduleIssue, hasDraft: !!(postId || savedAt), activity: capLine, burning: capBurning, upload: upload.kind, progress: upload.kind === "uploading" || upload.kind === "paused" ? upload.progress : undefined, storySeen });
   const onGo = (s: Step) => setStep(s);
   const goTo = (s: Step, before?: () => void) => {
     before?.();
@@ -965,7 +1063,16 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     toLaunch("now");
   };
 
-  const reachable: Record<Step, boolean> = { video: true, story: hasMedia, everywhere: !!hook, launch: !!hook && allReviewed };
+  /** 1170: Your Story opens once the server has the video (or it was open before and a new one is coming in). */
+  const storyOpen = hasMedia && (upload.kind === "done" || (storySeen && upload.kind === "uploading"));
+  // A paused or failed upload closes every later step, not just Your Story: nothing can be sent without the video.
+  const reachable: Record<Step, boolean> = { video: true, story: storyOpen, everywhere: storyOpen && !!hook, launch: storyOpen && !!hook && allReviewed };
+  const mediaWhy = !hasMedia ? "Add a video first." : upload.kind === "failed" ? "Your video didn't upload. Try it again first." : upload.kind === "paused" ? "Your upload is paused. Resume it first." : upload.kind === "uploading" && !storyOpen ? "Your video is still uploading. Your Story opens once it's in." : undefined;
+  const blocked: Partial<Record<Step, string>> = {
+    story: mediaWhy,
+    everywhere: mediaWhy ?? (!hook ? "Pick a hook on Your Story first." : undefined),
+    launch: mediaWhy ?? (!hook ? "Pick a hook on Your Story first." : !allReviewed ? "Look over each place on Everywhere first." : undefined),
+  };
 
   /* ================= render ================= */
   if (phase !== "edit") {
@@ -974,8 +1081,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       <CaptionRunProvider value={capStore}>
       <div className="relative flex gap-0 lg:min-h-dvh">
         <Glow />
-        <JourneyRail step="launch" complete reachable={SENT_REACHABLE} onGo={noGo} />
-        <div className="relative min-w-0 flex-1 overflow-hidden px-[var(--frame-gutter)] py-12">
+        <div className="relative min-w-0 flex-1 overflow-hidden px-[var(--frame-gutter)] pb-12 pt-4">
+          <StepProgress step="launch" complete reachable={SENT_REACHABLE} onGo={noGo} className="page-frame relative mb-8 px-0" />
           <div className="page-frame relative px-0">
             {phase === "publishing" && livePost ? <PublishingView initial={livePost} onAnother={another} /> : <ScheduledView post={scheduledPost} when={scheduledFor ?? when.toISOString()} tz={tz} poster={poster} onAnother={another} />}
           </div>
@@ -1025,16 +1132,15 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     />
   );
 
-  const showVideo = step === "video" || step === "story";
+  /** 1170: Step 1 is its own screen (the card, then the picked file with its progress), never the Step 2 stage. */
+  const stepOne = step === "video" || (step === "story" && !hasMedia);
   /** Step 2 with a video: preview, editor and assistant side by side. */
-  const stage = showVideo && hasMedia;
-  /** Phase 3 (B1): Everywhere and Launch get the same wide workspace as Step 2, wider again when Pip folds. */
-  const roomy = stage || step === "everywhere" || step === "launch";
+  const stage = step === "story" && hasMedia;
   const pipShown = wide ? panel.open : drawer;
   const railStatus = (
-    <div className="space-y-1">
+    <div className="flex items-center gap-x-1">
       {hasMedia && syncLine}
-      <div className="flex flex-wrap items-center gap-x-2">
+      <div className="flex items-center gap-x-1">
         {hasMedia && savedAt && (
           <Link href="/content?filter=draft" className="inline-flex min-h-11 items-center px-1 text-xs font-semibold underline underline-offset-4">
             View drafts
@@ -1058,59 +1164,67 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     <CaptionRunProvider value={capStore}>
     <div className="relative flex gap-0 lg:min-h-dvh">
       <Glow />
-      <JourneyRail step={step} reachable={reachable} onGo={onGo} status={railStatus} />
-
       <div className="relative min-w-0 flex-1" inert={sheet || undefined}>
-        <JourneyBar step={step} reachable={reachable} onGo={onGo} />
-        {/* The editor is the one studio surface off the page frame on purpose (1104): a narrow, animated writing
-            column between the journey rail and the side panel, with its own tighter gutter. */}
-        <div className={cn("mx-auto flex w-full flex-col px-4 pb-4 pt-6 transition-[max-width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none sm:px-6 lg:pb-16 lg:pt-8", roomy ? (pipShown ? "max-w-[1100px]" : "max-w-[1240px]") : cn("max-w-3xl sm:px-8", panel.open ? "lg:max-w-4xl" : "lg:max-w-5xl"))}>
+        {/* The editor is the one studio surface off the page frame on purpose (1104), with its own tighter gutter.
+            1170: one column for every step, about 900 to 1100px beside Pip and wider when Pip folds; the four steps
+            sit at its top, aligned with the heading, the card and the action bar. */}
+        <div className={cn("mx-auto flex w-full flex-col px-4 pb-4 pt-3 transition-[max-width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none sm:px-6 lg:px-8 lg:pb-16 lg:pt-5", pipShown ? "max-w-[1100px]" : "max-w-[1240px]")}>
+          <StepProgress step={step} furthest={furthest} reachable={reachable} blocked={blocked} onGo={onGo} trailing={railStatus} className="mb-5 lg:mb-7" />
           {/* Steps animate in on mount. No exit choreography: a nested exit that never settles must not strand the next step. */}
-            {showVideo && !hasMedia && (
-              <motion.section key="drop" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} aria-labelledby="drop-title" className={`${createFont.variable} font-create flex flex-col items-center pt-2 sm:pt-4 lg:pt-10`}>
-                {!initialPost && <PostKindSwitch value="video" className="mb-7" />}
-                <p className="step-pill mb-5">
-                  <span className="step-pill-dot" aria-hidden="true" />
-                  Step 1 of 4 <span className="text-muted-foreground/60" aria-hidden="true">·</span> <span className="text-muted-foreground">Your video</span>
-                </p>
-                <h1 id="drop-title" className="create-title text-balance text-center">
-                  Let&apos;s start with{" "}
-                  <span className="create-title-accent">
-                    <span className="accent-serif energy-text">your video</span>
-                    <svg className="create-swoosh" viewBox="0 0 300 24" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-                      <path d="M4 17 C 70 5, 150 4, 296 13" pathLength="1" />
-                    </svg>
-                  </span>
+            {stepOne && (
+              <motion.section key="drop" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={T.page} aria-labelledby="drop-title" data-testid="step-one" className={`${createFont.variable} font-create`}>
+                {/* 1170: a compact heading, the kind switch under it, then the card. Nothing competes with the upload. */}
+                <h1 id="drop-title" className="text-balance text-[clamp(1.6rem,1.25rem+1.1vw,2.25rem)] font-semibold leading-[1.1] tracking-[-0.03em]">
+                  Let&apos;s start with <span className="accent-serif energy-text">your video</span>
                 </h1>
-                <p className="mt-5 max-w-md text-balance text-center text-[clamp(.98rem,.9rem+.35vw,1.12rem)] leading-relaxed text-muted-foreground">
-                  Drop one clip. We&apos;ll shape it for Reels, Shorts and X, and you approve every word.
+                <p className="mt-2 max-w-[62ch] text-pretty text-[15px] leading-relaxed text-muted-foreground">
+                  Upload a clip. Outlly will help prepare it for Reels, Shorts, and other supported platforms. You&apos;ll review and approve everything before publishing.
                 </p>
-                <ul className="mt-5 flex flex-wrap justify-center gap-2" aria-label="What works best">
-                  {["Vertical 9:16 looks best", "Saves as you go"].map((t) => (
-                    <li key={t} className="pf-chip">{t}</li>
-                  ))}
-                </ul>
+                {!initialPost && <PostKindSwitch inline value="video" className="mt-4" />}
                 {!accountList.some((a) => a.status === "connected") && (
-                  <div className="mt-6 flex w-full max-w-md flex-col items-center gap-1 rounded-2xl px-4 pb-1.5 pt-3 text-center glass hairline">
-                    <p className="text-balance text-sm leading-snug text-muted-foreground">No accounts connected yet. You can still upload and save a draft.</p>
-                    <Link href="/accounts" className="inline-flex min-h-[44px] items-center text-sm font-medium text-foreground underline underline-offset-4">Connect an account</Link>
-                  </div>
+                  <p className="mt-3 text-[13px] text-muted-foreground">
+                    No accounts connected yet. You can still upload and save a draft.{" "}
+                    <Link href="/accounts" className="inline-flex min-h-11 items-center font-medium text-foreground underline underline-offset-4">Connect an account</Link>
+                  </p>
                 )}
-                <div className="mt-8 w-full sm:mt-10">
-                  <UploadZone compact serverLimits onFile={(f) => void pickFile(f)} />
+                <div className="mt-5 sm:mt-6">
+                  {hasMedia ? (
+                    <UploadFileCard
+                      name={media?.filename ?? fileRef.current?.name ?? "Your video"}
+                      size={meta.size}
+                      poster={poster}
+                      duration={meta.duration}
+                      width={meta.width}
+                      height={meta.height}
+                      upload={upload}
+                      online={online}
+                      onPause={upload.kind === "uploading" ? pauseUpload : undefined}
+                      onResume={upload.kind === "paused" && fileRef.current ? resumeUpload : undefined}
+                      onRetry={upload.kind === "failed" && fileRef.current ? retryUpload : undefined}
+                      onRemove={() => setStopAsk(true)}
+                      onReplace={(f) => setReplacing(f)}
+                      limits={limits}
+                    />
+                  ) : (
+                    <UploadCard limits={limits} limitsFailed={limitsFailed} onFiles={takeFiles} error={pickError} batchMax={BULK_MAX} />
+                  )}
                 </div>
-                <UploadLimits error={pickError} className="mt-4" />
-                <p className="mt-4 max-w-md text-center text-sm leading-relaxed text-muted-foreground">
-                  Want trending music? Add it in Instagram, YouTube or your editor, export the video, then upload it here. Outlly posts the sound that&apos;s in your video to every platform.
-                </p>
-                <Link href="/create/bulk" className="mt-4 inline-flex min-h-[44px] items-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
-                  Several videos? Plan a batch of up to 10
-                </Link>
-                {!initialPost && !restoreLocal && deviceReady && <DeviceDrafts key={adopted} className="mx-auto mt-10 max-w-md text-left" />}
+                <details className="group mt-4 rounded-2xl text-sm">
+                  <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-full font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(hover:hover)]:hover:text-foreground [&::-webkit-details-marker]:hidden">
+                    <ChevronDown className="h-4 w-4 transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+                    Tips for a smooth upload
+                  </summary>
+                  <ul className="mt-1 max-w-[70ch] list-disc space-y-1.5 pl-6 text-[13px] leading-relaxed text-muted-foreground">
+                    <li>Vertical 9:16 fits Reels, Shorts and TikTok without bars.</li>
+                    <li>Want trending music? Add it in Instagram, YouTube or your editor, export the video, then upload it here. Outlly posts the sound that&apos;s in your video to every platform.</li>
+                    <li>Your work saves as you go: to this browser straight away, and to Outlly once the video is in.</li>
+                  </ul>
+                </details>
+                {!hasMedia && !initialPost && !restoreLocal && deviceReady && <SavedDrafts key={adopted} className="mt-8 border-t pt-8" />}
               </motion.section>
             )}
 
-            {showVideo && hasMedia && (
+            {stage && (
               <motion.section key="stage" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, x: -30 }} transition={T.card} aria-label="Your video" data-tips-ready={upload.kind === "done" ? "" : undefined}>
                 <h1 className="sr-only">Create</h1>
                 {/* Below 1280px the journey rail is hidden, so Start over (1162) sits above the Pip card. */}
@@ -1239,7 +1353,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
               </motion.section>
             )}
           {hasMedia && !stage && <SaveDraft className="mt-6 xl:hidden" state={saved} at={savedAt} onSave={saveDraftNow} busy={saved === "saving"} hideButton sync={syncLine} />}
-          <ActionBar state={bar} saveLabel={saved === "saving" ? "Saving" : "Save draft"} mode={mode} onAction={onBar} />
+          <ActionBar state={bar} saveLabel={saved === "saving" ? "Saving" : "Save draft"} mode={mode} onAction={onBar} fill={stepOne} />
         </div>
         <ConflictDialog
           open={comparing && !!conflict}
@@ -1285,10 +1399,10 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
         <ConfirmDialog
           open={stopAsk}
           onOpenChange={setStopAsk}
-          title="Stop this upload?"
+          title={upload.kind === "uploading" ? "Stop this upload?" : "Remove this video?"}
           body="The video comes off this draft and you can pick another one. What you have written stays on this screen."
-          confirmLabel="Stop upload"
-          cancelLabel="Keep uploading"
+          confirmLabel={upload.kind === "uploading" ? "Stop upload" : "Remove video"}
+          cancelLabel={upload.kind === "uploading" ? "Keep uploading" : "Keep it"}
           onConfirm={() => {
             setStopAsk(false);
             cancelUpload();
@@ -1312,7 +1426,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
           variant="subtle"
           size="icon"
           className={cn("hidden shrink-0 xl:inline-flex", panel.open && "xl:absolute xl:right-6 xl:top-[26px] xl:z-[2]")}
-          onClick={() => panelDispatch({ t: "toggle" })}
+          onClick={togglePanel}
           aria-expanded={panel.open}
           aria-controls={ASSISTANT_PANEL}
           aria-label={panel.open ? "Hide the Outlly assistant" : "Show the Outlly assistant"}
@@ -1328,7 +1442,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
             "relative overflow-hidden",
             sheet ? "glass-strong" : "glass",
             "xl:h-full xl:rounded-[28px] xl:transition-[width,opacity] xl:duration-300 xl:ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
-            panel.open ? "xl:w-[300px] xl:opacity-100 2xl:w-[340px]" : "xl:w-0 xl:opacity-0",
+            panel.open ? "xl:w-[300px] xl:opacity-100 2xl:w-[320px]" : "xl:w-0 xl:opacity-0",
             "max-xl:h-[min(88dvh,760px)] max-xl:w-full max-xl:rounded-t-[28px] max-xl:pb-[env(safe-area-inset-bottom)] md:max-xl:m-3 md:max-xl:h-auto md:max-xl:w-[400px] md:max-xl:rounded-[28px] md:max-xl:pb-0",
           )}
         >

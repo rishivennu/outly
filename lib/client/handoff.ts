@@ -6,6 +6,18 @@ export function handoffFile(file: File) {
   if (pending) URL.revokeObjectURL(pending.objectUrl);
   pending = { file, objectUrl: URL.createObjectURL(file) };
 }
+/** 1170: several videos dropped on Step 1 go to the batch planner (/create/bulk), which reads them once on mount. */
+let batch: { files: File[]; at: number } | null = null;
+/** A batch nobody picked up (the move to the planner was cut short) is dropped rather than shown on a later visit. */
+const BATCH_TTL_MS = 60_000;
+export function handoffBatch(files: File[]) {
+  batch = { files: files.slice(), at: Date.now() };
+}
+export function takeBatch(now = Date.now()) {
+  const b = batch && now - batch.at <= BATCH_TTL_MS ? batch.files : [];
+  batch = null;
+  return b;
+}
 export function takeHandoff() {
   const p = pending;
   pending = null;

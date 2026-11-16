@@ -217,17 +217,14 @@ describe("B1 layout and B2G rail", () => {
   const ws = src("components/create/CreateWorkspace.tsx");
   const rail = src("components/create/JourneyRail.tsx");
   const lp = src("components/create/LaunchPanel.tsx");
-  test("the rail shows from 1280px at 200px, with no preview card", () => {
-    expect(rail).toContain('export const RAIL_SHOW = "xl:flex";');
-    expect(rail).toContain("w-[200px]");
-    expect(rail).not.toContain("min-[1800px]");
+  test("1170: one horizontal step progress on top replaces the side rail", () => {
+    expect(ws).toContain("<StepProgress step={step} furthest={furthest} reachable={reachable} blocked={blocked} onGo={onGo} trailing={railStatus}");
+    expect(ws).not.toContain("<JourneyRail");
     expect(rail).not.toContain("<img");
-    expect(rail).not.toContain("Draft saved");
-    expect(ws).toContain("status={railStatus}");
   });
   test("Everywhere and Launch get the wide workspace that grows when Pip folds", () => {
-    expect(ws).toContain('const roomy = stage || step === "everywhere" || step === "launch";');
-    expect(ws).toContain('roomy ? (pipShown ? "max-w-[1100px]" : "max-w-[1240px]")');
+    // 1170: every step shares the one wide column, so the progress bar never jumps in width.
+    expect(ws).toContain('pipShown ? "max-w-[1100px]" : "max-w-[1240px]"');
     expect(lp).not.toContain("max-w-2xl");
     expect(lp).toContain("lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)]");
   });

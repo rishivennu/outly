@@ -11,7 +11,8 @@ import { useToast } from "@/components/shared/Toast";
 import { fmt, tzShort } from "@/components/shell/UserContext";
 import { api, ApiError } from "@/lib/client/api";
 import { uploadVideo } from "@/lib/client/upload";
-import { validateVideoFile } from "@/lib/client/handoff";
+import { takeBatch, validateVideoFile } from "@/lib/client/handoff";
+import { fileKey } from "./UploadCard";
 import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
 import { BULK_ACCOUNTS_MAX, BULK_MAX, accountRounds, titleFromFilename, tooLongFor } from "@/lib/posts/bulk";
 import { cn } from "@/lib/utils";
@@ -73,7 +74,17 @@ export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: str
   /* ---------- adding files ---------- */
   const add = useCallback(
     (files: FileList | File[]) => {
-      const list = Array.from(files);
+      // 1170: the same video twice (name, size, modified time) is added once, and never twice to one batch.
+      const have = new Set(rows.map((r) => fileKey(r.file)));
+      const all = Array.from(files);
+      const list = all.filter((f) => {
+        const k = fileKey(f);
+        if (have.has(k)) return false;
+        have.add(k);
+        return true;
+      });
+      if (list.length < all.length) toast(all.length - list.length === 1 ? "That video is already in this batch, so it's in once." : `${all.length - list.length} videos were already in this batch, so each is in once.`, "info");
+      if (!list.length) return;
       const room = BULK_MAX - rows.length;
       if (room <= 0) return toast(`That's ${BULK_MAX} already. Book these first, then start another batch.`, "info");
       const bad = list.map((f) => validateVideoFile(f)).find(Boolean);
@@ -90,8 +101,15 @@ export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: str
           .finally(() => URL.revokeObjectURL(url));
       }
     },
-    [rows.length, toast, patch],
+    [rows, toast, patch],
   );
+
+  // 1170: videos dropped together on Create's first step arrive here, once.
+  useEffect(() => {
+    const b = takeBatch();
+    if (b.length) add(b);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* ---------- uploads, two at a time ---------- */
   useEffect(() => {
@@ -325,6 +343,8 @@ Spaced over the days ahead, one a day where they fit. {plan.reason}
             </p>
           )}
 
+          {rows.length > 1 && <BatchProgress rows={rows} />}
+
           <ol className="mt-6 space-y-3" aria-label="Videos in this batch">
             <AnimatePresence initial={false}>
               {rows.map((r, i) => {
@@ -449,6 +469,32 @@ function Booked({ done, rows, when }: { done: Done; rows: Row[]; when: (iso: str
           <a href="/create/bulk">Plan another batch</a>
         </Button>
       </div>
+    </div>
+  );
+}
+
+/** 1170: the whole batch at a glance: how many are in, and the share of all the bytes sent so far. */
+export function batchProgress(rows: Pick<Row, "state" | "progress" | "file">[]) {
+  const total = rows.reduce((n, r) => n + (r.file.size || 1), 0) || 1;
+  const sent = rows.reduce((n, r) => n + (r.file.size || 1) * (r.state === "ready" ? 1 : r.state === "uploading" ? Math.max(0, Math.min(1, r.progress)) : 0), 0);
+  return { ready: rows.filter((r) => r.state === "ready").length, failed: rows.filter((r) => r.state === "failed").length, total: rows.length, pct: Math.round((sent / total) * 100) };
+}
+
+function BatchProgress({ rows }: { rows: Row[] }) {
+  const b = batchProgress(rows);
+  const all = b.ready === b.total;
+  return (
+    <div className="mt-6" data-testid="batch-progress">
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <p className="font-medium tabular-nums" aria-live="polite">
+          {all ? `All ${b.total} videos are in` : `${b.ready} of ${b.total} uploaded`}
+          {b.failed > 0 && <span className="text-muted-foreground">, {b.failed} need{b.failed === 1 ? "s" : ""} another try</span>}
+        </p>
+        <span className="text-xs tabular-nums text-muted-foreground">{b.pct}%</span>
+      </div>
+      <span className="mt-2 block h-1.5 w-full overflow-hidden rounded-full bg-secondary" role="progressbar" aria-label="Batch upload progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={b.pct}>
+        <span className="block h-full rounded-full bg-lime transition-[width] duration-300 ease-out motion-reduce:transition-none" style={{ width: `${Math.max(b.pct, 2)}%` }} />
+      </span>
     </div>
   );
 }

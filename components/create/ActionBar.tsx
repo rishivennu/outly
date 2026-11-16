@@ -35,6 +35,14 @@ export interface BarInput {
   activity?: string | null;
   /** Captions are being burned in: the video is about to change, so nothing is sent until it has. */
   burning?: boolean;
+  /** 1170: where the Step 1 upload stands. Continue waits until the server has the video. */
+  upload?: "idle" | "uploading" | "paused" | "failed" | "done";
+  /** 0..1 while uploading, for the note. */
+  progress?: number;
+  /** The creator has already been on Your Story this session, so going forward again doesn't wait for the upload. */
+  storySeen?: boolean;
+  /** Continue was pressed and Your Story is opening. */
+  moving?: boolean;
 }
 export interface BarAction {
   disabled: boolean;
@@ -47,6 +55,8 @@ export interface BarButton extends BarAction {
   label: string;
   /** Exactly one button is lit on every step. */
   primary: boolean;
+  /** Working: the button shows a spinner. */
+  loading?: boolean;
 }
 export interface BarState {
   save: BarAction;
@@ -72,6 +82,8 @@ export function barState(i: BarInput): BarState {
     ? "Add a video first."
     : i.uploadFailed
       ? "Your video didn't upload. Try it again first."
+      : i.upload === "paused"
+        ? "Your upload is paused. Resume it on Your Video first."
       : i.enabledCount === 0
         ? "Pick at least one place to send it."
         : !i.hasHook
@@ -80,20 +92,31 @@ export function barState(i: BarInput): BarState {
   const notReady = step === "launch" ? "Some places aren't ready yet. Leave them out or fix them in Everywhere." : i.pending?.length ? `Look over ${list(i.pending)} first.` : "Look over each place on the Everywhere step first.";
   const sendBlock = !i.online ? OFFLINE_SEND : (base ?? (!i.ready ? notReady : i.burning ? BURN_SEND : null));
   const send: BarAction = { disabled: !!sendBlock || i.launching, hint: sendBlock };
-  const save: BarAction = { disabled: !i.hasMedia || i.saving, hint: null };
+  // 1170: a paused upload has no video on the server yet, so there is nothing to save until it resumes.
+  const save: BarAction = { disabled: !i.hasMedia || i.saving || i.upload === "paused", hint: i.upload === "paused" ? "Resume your upload first." : null };
   const preview: BarAction = { disabled: !i.hasMedia, hint: null };
   const flat = { save, preview, schedule: send, publish: send };
   const activity = i.activity || null;
 
   // Phase 4: Steps 1 and 2 use the same one-lit-button bar as Everywhere and Launch. Nothing is sent from here.
   if (step === "video") {
-    const goBlock = !i.hasMedia ? "Add a video to continue to your story." : null;
+    const up = i.upload ?? (i.uploadFailed ? "failed" : "done");
+    const pct = i.progress != null ? ` (${Math.round(Math.max(0, Math.min(1, i.progress)) * 100)}%)` : "";
+    const goBlock = !i.hasMedia
+      ? "Add a video to continue to your story."
+      : up === "failed"
+        ? "Your video didn't upload. Try it again, or pick another, to continue."
+        : up === "paused"
+          ? "Your upload is paused. Resume it to continue."
+          : up === "uploading" && !i.storySeen
+            ? `Your video is uploading${pct}. Continue opens as soon as it's in.`
+            : null;
     return {
       ...flat,
       note: goBlock ?? activity,
       buttons: [
         ...(i.hasDraft ? [{ id: "save" as const, label: "Save draft", primary: false, ...save }] : []),
-        { id: "continue", label: "Continue to story", primary: true, disabled: !!goBlock, hint: goBlock },
+        { id: "continue", label: i.moving ? "Opening your story" : "Continue to Your Story", primary: true, disabled: !!goBlock || !!i.moving, hint: goBlock, loading: !!i.moving },
       ],
     };
   }
@@ -155,6 +178,8 @@ interface Props {
   mode?: "now" | "schedule";
   onAction: (id: BarId) => void;
   className?: string;
+  /** 1170: as wide as the workspace column it sits in (Step 1), instead of the centred 768px bar. */
+  fill?: boolean;
 }
 
 const ICON: Record<BarId, typeof Save> = { save: Save, preview: Eye, schedule: CalendarClock, publish: Send, continue: ArrowRight, back: ArrowLeft, mode: CalendarClock };
@@ -165,23 +190,23 @@ const ICON: Record<BarId, typeof Save> = { save: Save, preview: Eye, schedule: C
  * safe area) and follows the bar down when that tucks away on a long scroll (html[data-tabs-tucked], Nav.tsx), so the
  * two never stack and never leave a gap. The assistant drawer opens over both.
  */
-export function ActionBar({ state, saveLabel, mode, onAction, className }: Props) {
+export function ActionBar({ state, saveLabel, mode, onAction, className, fill }: Props) {
   const btn = "h-auto min-h-[52px] min-w-0 flex-col gap-0.5 px-1 text-xs font-semibold sm:min-h-11 sm:flex-row sm:gap-2 sm:px-4 sm:text-sm";
   return (
     <div role="region" aria-label="Post actions" className={cn("sticky bottom-[calc(env(safe-area-inset-bottom)+74px)] z-30 mt-6 transition-[bottom] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none [html[data-tabs-tucked]_&]:bottom-[calc(env(safe-area-inset-bottom)+12px)] lg:bottom-4", className)}>
-      <div className="glass-strong mx-auto w-full max-w-3xl rounded-[22px] p-1.5 shadow-[0_18px_40px_-24px_hsl(var(--foreground)/0.45)] hairline">
+      <div className={cn("glass-strong mx-auto w-full rounded-[22px] p-1.5 shadow-[0_18px_40px_-24px_hsl(var(--foreground)/0.45)] hairline", fill ? "max-w-none sm:flex sm:items-center sm:gap-3 sm:pl-4" : "max-w-3xl")}>
         {state.note && (
-          <p id="bar-note" className="px-2.5 pb-1.5 pt-1 text-xs leading-snug text-muted-foreground" aria-live="polite">
+          <p id="bar-note" className={cn("px-2.5 pb-1.5 pt-1 text-xs leading-snug text-muted-foreground", fill && "sm:min-w-0 sm:flex-1 sm:p-0 sm:text-[13px]")} aria-live="polite">
             {state.note}
           </p>
         )}
-        <div className={cn("grid gap-1.5", GRID[state.buttons.length] ?? GRID[3])}>
+        <div className={cn("grid gap-1.5", GRID[state.buttons.length] ?? GRID[3], fill && "sm:ml-auto sm:flex sm:shrink-0")}>
           {state.buttons.map((b) => {
             const on = b.primary;
-            const Icon = b.id === "mode" && mode === "schedule" ? Send : b.id === "save" && saveLabel === "Saving" ? Loader2 : ICON[b.id];
+            const Icon = b.loading ? Loader2 : b.id === "mode" && mode === "schedule" ? Send : b.id === "save" && saveLabel === "Saving" ? Loader2 : ICON[b.id];
             const text = b.id === "save" ? saveLabel : b.label;
             return (
-              <Button key={b.id} variant={on ? "lime" : "subtle"} className={btn} onClick={() => onAction(b.id)} disabled={b.disabled} aria-haspopup={b.id === "preview" ? "dialog" : undefined} aria-describedby={b.hint && on ? "bar-note" : undefined}>
+              <Button key={b.id} variant={on ? "lime" : "subtle"} className={cn(btn, fill && "sm:px-5")} onClick={() => onAction(b.id)} disabled={b.disabled} aria-busy={b.loading || undefined} aria-haspopup={b.id === "preview" ? "dialog" : undefined} aria-describedby={b.hint && on ? "bar-note" : undefined}>
                 <Icon className={cn("h-4 w-4", Icon === Loader2 && "animate-spin motion-reduce:animate-none")} aria-hidden="true" />
                 <span className="max-w-full truncate">{text}</span>
               </Button>

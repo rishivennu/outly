@@ -99,7 +99,8 @@ describe("workspace wiring", () => {
     expect(ws).toContain("onReplace={(f) => setReplacing(f)}");
     expect(ws).toContain("onCancel={() => setStopAsk(true)}");
     expect(ws).toContain('title="Replace your video?"');
-    expect(ws).toContain('title="Stop this upload?"');
+    // 1170: the same dialog stops a running upload or removes a finished one.
+    expect(ws).toContain('title={upload.kind === "uploading" ? "Stop this upload?" : "Remove this video?"}');
     expect(src("components/create/CoverPicker.tsx")).toContain('title="Remove the cover?"');
     expect(src("components/create/DeviceDrafts.tsx")).toContain("Remove this draft from this device?");
   });
@@ -113,8 +114,10 @@ describe("workspace wiring", () => {
     expect(ws.match(/<ActionBar/g)?.length).toBe(1);
   });
   test("picks go through the server limits, uploads resume by draft id", () => {
-    expect(ws).toContain("onFile={(f) => void pickFile(f)}");
-    expect(ws).toContain("<UploadLimits error={pickError}");
+    // 1170: the Step 1 card takes one file or several; limits come from the server, never guessed.
+    expect(ws).toContain("onFiles={takeFiles}");
+    expect(ws).toContain("<UploadCard limits={limits} limitsFailed={limitsFailed}");
+    expect(ws).toContain("void pickFile(list[0])");
     expect(ws).toContain("resumeKey: deviceId.current ?? undefined");
   });
   test("offline: AI writing, connecting and launch refuse with a reason", () => {

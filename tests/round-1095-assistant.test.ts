@@ -31,7 +31,7 @@ describe("1095 launch collapse", () => {
   test("the panel is folded by width, not unmounted", () => {
     expect(workspace).toContain('id={ASSISTANT_PANEL}');
     // 1152: a 320/340px side panel from 1280px; below that the same element is the drawer
-    expect(workspace).toContain('panel.open ? "xl:w-[300px] xl:opacity-100 2xl:w-[340px]" : "xl:w-0 xl:opacity-0"');
+    expect(workspace).toContain('panel.open ? "xl:w-[300px] xl:opacity-100 2xl:w-[320px]" : "xl:w-0 xl:opacity-0"');
     expect(workspace).toContain("const pipShown = wide ? panel.open : drawer;");
     expect(workspace).toContain("inert={!pipShown}");
     expect(workspace).toContain("aria-hidden={!pipShown}");
@@ -46,10 +46,12 @@ describe("1095 launch collapse", () => {
     expect(workspace).toContain('size="icon"'); // h-11 w-11 = a 44px target
   });
   test("the workspace takes the freed width, smoothly and only when motion is welcome", () => {
-    expect(workspace).toContain('panel.open ? "lg:max-w-4xl" : "lg:max-w-5xl"');
+    // 1170: one wide column on every step, wider still when Pip folds away.
+    expect(workspace).toContain('pipShown ? "max-w-[1100px]" : "max-w-[1240px]"');
     expect(workspace).toContain("transition-[max-width]");
     expect(workspace).toContain("transition-[width,opacity]");
-    expect(workspace.match(/motion-reduce:transition-none/g)?.length).toBe(2);
+    // column width, Pip width and the upload tips chevron
+    expect(workspace.match(/motion-reduce:transition-none/g)?.length).toBe(3);
   });
   test("the step drives it from one place", () => {
     expect(workspace).toContain('panelDispatch({ t: "step", step });');

@@ -11,16 +11,16 @@ const ids = (s: ReturnType<typeof barState>) => s.buttons.map((b) => b.id);
 const primary = (s: ReturnType<typeof barState>) => s.buttons.filter((b) => b.primary);
 
 describe("item 2: one action bar on Steps 1 and 2", () => {
-  test("Step 1 without a video: only Continue to story, disabled, and the note says what unlocks it", () => {
+  test("Step 1 without a video: only Continue to Your Story, disabled, and the note says what unlocks it", () => {
     const s = barState({ ...base, step: "video", hasMedia: false });
-    expect(s.buttons.map((b) => b.label)).toEqual(["Continue to story"]);
+    expect(s.buttons.map((b) => b.label)).toEqual(["Continue to Your Story"]);
     expect(s.buttons[0].disabled).toBe(true);
     expect(s.note).toBe("Add a video to continue to your story.");
     expect(s.buttons[0].hint).toBe(s.note);
   });
   test("Step 1 with a video and a saved draft: Save draft and an enabled Continue", () => {
     const s = barState({ ...base, step: "video", hasDraft: true });
-    expect(s.buttons.map((b) => b.label)).toEqual(["Save draft", "Continue to story"]);
+    expect(s.buttons.map((b) => b.label)).toEqual(["Save draft", "Continue to Your Story"]);
     expect(s.buttons.every((b) => !b.disabled)).toBe(true);
     expect(s.note).toBeNull();
     expect(ids(barState({ ...base, step: "video", hasDraft: false }))).toEqual(["continue"]);

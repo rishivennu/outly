@@ -67,10 +67,10 @@ describe("1152 caption editor", () => {
 
 describe("1152 layout and assistant", () => {
   test("Step 2 is preview + editor side by side", () => {
-    expect(ws).toContain("const stage = showVideo && hasMedia;");
+    expect(ws).toContain('const stage = step === "story" && hasMedia;');
     expect(ws).toContain("md:grid md:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]");
-    // Phase 3 B: the rail shows from 1280px on every step, roomy or not.
-    expect(rail).toContain('RAIL_SHOW = "xl:flex"');
+    // 1170: the side rail gave way to the step progress on top of every step.
+    expect(ws).toContain("<StepProgress step={step}");
   });
   test("below 1280px the one assistant opens as a modal drawer", () => {
     expect(ws).toContain('role={sheet ? "dialog" : undefined}');
@@ -88,7 +88,7 @@ describe("1152 layout and assistant", () => {
 describe("1152 fits at 1280", () => {
   test("xl gives the editor room: a slimmer preview column and a 300px Pip", () => {
     expect(ws).toContain("xl:grid-cols-[minmax(240px,272px)_minmax(0,1fr)]");
-    expect(ws).toContain('"xl:w-[300px] xl:opacity-100 2xl:w-[340px]"');
+    expect(ws).toContain('"xl:w-[300px] xl:opacity-100 2xl:w-[320px]"');
     expect(burner).toContain("sm:grid-cols-2 xl:group-data-[pip=open]/edit:grid-cols-1 2xl:group-data-[pip=open]/edit:grid-cols-2");
     expect(ws).toContain('data-pip={pipShown ? "open" : "closed"} className="group/edit');
   });

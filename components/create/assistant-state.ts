@@ -8,12 +8,16 @@ import type { Platform } from "@/lib/domain";
  * folds the panel on Launch, since Launch now has the same three regions as Everywhere and Pip reviews it.
  */
 export type PanelState = { open: boolean; restore: boolean | null };
-export type PanelAction = { t: "step"; step: Step } | { t: "toggle" };
+export type PanelAction = { t: "step"; step: Step } | { t: "toggle" } | { t: "set"; open: boolean };
 
 export const PANEL_OPEN: PanelState = { open: true, restore: null };
+/** 1170: open or folded is remembered in this browser ("closed" or "open"), so Pip stays the way it was left. */
+export const PIP_PANEL_KEY = "outlly:pip-panel";
 
 export function panelReducer(s: PanelState, a: PanelAction): PanelState {
   if (a.t === "toggle") return { open: !s.open, restore: null };
+  // 1170: the creator's last choice, read back from this browser when Create opens.
+  if (a.t === "set") return s.open === a.open && s.restore === null ? s : { open: a.open, restore: null };
   // A step change never opens or closes the panel: the creator's own choice carries across every step.
   return s.restore === null ? s : { open: s.restore, restore: null };
 }
