@@ -78,7 +78,7 @@ describe("Play Store readiness", () => {
   });
   test("middleware never redirects /.well-known (maintenance or waitlist would break app verification)", () => {
     const src = readFileSync("middleware.ts", "utf8");
-    const m = src.match(/matcher:\s*\["([^"]+)"\]/)![1].replace(/\\\\/g, "\\");
+    const m = src.match(/matcher:\s*\[\s*"([^"]+)"/)![1].replace(/\\\\/g, "\\");
     const re = new RegExp(`^${m}$`);
     expect(re.test("/.well-known/assetlinks.json")).toBe(false);
     expect(re.test("/home")).toBe(true);

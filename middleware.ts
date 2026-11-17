@@ -5,6 +5,7 @@ import { APP_SOURCE } from "./lib/app-mode";
 import { buildCsp, CSP_REPORT_PATH, newNonce } from "./lib/csp";
 import { REF_COOKIE, REF_DAYS, REF_VISITOR, isCode } from "./lib/referral-core";
 import { middlewareTiming, type FlagSource } from "./lib/server-timing";
+import { hostOf, routeHost } from "./lib/hosts";
 
 const AUTH_PAGES = ["/login", "/signup"];
 // Marketing pages anyone can read.
@@ -181,6 +182,42 @@ export function keepAppSource(req: NextRequest, to: URL) {
   return to;
 }
 
+const NOINDEX_HEADER = "noindex, nofollow";
+
+/**
+ * 1185: subdomain entry points (lib/hosts.ts). Redirect hosts, api, webhooks and the static hosts answer here, before
+ * any site switch is read (API routes and files skip the page pipeline on www too, by the matcher). null: carry on with the normal pipeline (www, apex, previews, localhost, admin pages).
+ */
+export function hostResponse(req: NextRequest, headers: Headers = req.headers): NextResponse | null {
+  const r = routeHost(hostOf(req.headers.get("host") ?? req.nextUrl.host), req.nextUrl.pathname, req.nextUrl.search, {
+    APP_URL: process.env.APP_URL,
+    ADMIN_HOST: process.env.ADMIN_HOST,
+  });
+  const noindex = { "x-robots-tag": NOINDEX_HEADER };
+  switch (r.kind) {
+    case "pass":
+    case "serve":
+      return null;
+    case "redirect":
+      return NextResponse.redirect(r.to, 307);
+    case "json":
+      return NextResponse.json(r.body, { headers: noindex });
+    case "notFound":
+      return new NextResponse(null, { status: 404, headers: { ...noindex, "cache-control": "public, max-age=300" } });
+    case "next": {
+      const res = NextResponse.next({ request: { headers } });
+      res.headers.set("X-Robots-Tag", NOINDEX_HEADER);
+      return res;
+    }
+    case "rewrite": {
+      // r.path always starts with "/api/" (fixed table), so this stays on this deployment.
+      const res = NextResponse.rewrite(new URL(r.path + req.nextUrl.search, req.url), { request: { headers } });
+      res.headers.set("X-Robots-Tag", NOINDEX_HEADER);
+      return res;
+    }
+  }
+}
+
 export async function middleware(req: NextRequest, ev?: NextFetchEvent) {
   // 1150: bots probing for WordPress, PHP and dotfiles get a bare 404 here, before any function (and its CPU) runs.
   if (isScannerPath(req.nextUrl.pathname)) return new NextResponse(null, { status: 404, headers: { "cache-control": "public, max-age=3600" } });
@@ -192,6 +229,8 @@ export async function middleware(req: NextRequest, ev?: NextFetchEvent) {
   headers.set("x-nonce", nonce);
   headers.set("x-path", req.nextUrl.pathname + req.nextUrl.search); // where a stale session should return to after signing in (1042)
   headers.set("content-security-policy", csp);
+  const hosted = hostResponse(req, headers);
+  if (hosted) return hosted;
   const t0 = Date.now();
   const seen: { flags: FlagSource } = { flags: "skip" };
   const res = await route(req, headers, ev, seen);
@@ -199,7 +238,7 @@ export async function middleware(req: NextRequest, ev?: NextFetchEvent) {
   res.headers.set("Server-Timing", middlewareTiming(Date.now() - t0, seen.flags));
   res.headers.set("Content-Security-Policy", csp);
   res.headers.set("Reporting-Endpoints", `csp="${req.nextUrl.origin}${CSP_REPORT_PATH}"`); // must be absolute
-  if (noIndex(req.nextUrl.pathname)) res.headers.set("X-Robots-Tag", "noindex, nofollow");
+  if (noIndex(req.nextUrl.pathname)) res.headers.set("X-Robots-Tag", NOINDEX_HEADER);
   // The old admin-only notice bar is gone; clear its cookie from browsers that still have it.
   if (req.cookies.get("outlly_af")) res.cookies.delete("outlly_af");
   // Campaign links (Growth page): remember the FIRST utm link a visitor arrived on, for 30 days,
@@ -303,5 +342,10 @@ export const config = {
   // Pages only. API routes do their own auth and return JSON 401s.
   // 1143: opengraph-image / twitter-image are generated share images with no file extension. Waitlist mode sent
   // them to /waitlist, so shared links had no preview picture and Search Console listed the image as a page.
-  matcher: ["/((?!api|ingest|_next/static|_next/image|favicon.ico|opengraph-image|twitter-image|\\.well-known|.*\\.(?:svg|png|jpg|gif|webp|ico|txt|xml|js|css|woff2?|html|webmanifest)$).*)"],
+  // 1185: on the api, webhooks and static hosts every path runs the middleware (lib/hosts.ts ALL_PATH_HOSTS), so
+  // cdn.outlly.com/api/files is a 404 and webhooks.outlly.com/meta reaches its route. Literals only: Next reads this statically.
+  matcher: [
+    "/((?!api|ingest|_next/static|_next/image|favicon.ico|opengraph-image|twitter-image|\\.well-known|.*\\.(?:svg|png|jpg|gif|webp|ico|txt|xml|js|css|woff2?|html|webmanifest)$).*)",
+    { source: "/:path*", has: [{ type: "host", value: "(?:api|webhooks|media|cdn)\\.outlly\\.com" }] },
+  ],
 };
