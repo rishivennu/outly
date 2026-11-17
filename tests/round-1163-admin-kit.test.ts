@@ -18,7 +18,7 @@ const css = read("app/globals.css");
 const ROUTES = [
   "/admin", "/admin/users", "/admin/payments", "/admin/pricing", "/admin/campaigns", "/admin/subscriptions", "/admin/plans",
   "/admin/ai-usage", "/admin/referrals", "/admin/behavior", "/admin/retention", "/admin/growth", "/admin/analytics",
-  "/admin/tickets", "/admin/faq", "/admin/outbox", "/admin/integrations", "/admin/platforms", "/admin/landing", "/admin/mascot",
+  "/admin/tickets", "/admin/live-assist", "/admin/faq", "/admin/outbox", "/admin/integrations", "/admin/platforms", "/admin/landing", "/admin/mascot",
   "/admin/fonts", "/admin/dashboard", "/admin/notifications", "/admin/updates", "/admin/maintenance", "/admin/perf",
   "/admin/waitlist", "/admin/beta", "/admin/founding", "/admin/team",
 ];
@@ -32,8 +32,8 @@ describe("1163 sidebar", () => {
     const hrefs = [...shell.matchAll(/href: "(\/admin[^"]*)"/g)].map((m) => m[1]);
     for (const r of ROUTES) expect(hrefs).toContain(r);
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    // 30 from 1163 plus the six Content Studio pages (1175).
-    expect(hrefs.length).toBe(36);
+    // 30 from 1163, the six Content Studio pages (1175) and Live Assist (R1184).
+    expect(hrefs.length).toBe(37);
     for (const r of ["/admin/blog", "/admin/blog/generate", "/admin/blog/library", "/admin/blog/calendar", "/admin/blog/seo", "/admin/blog/settings"]) expect(hrefs).toContain(r);
   });
   test("insight pages moved out of Run", () => {

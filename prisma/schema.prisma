@@ -554,26 +554,113 @@ model PipConversation {
   sendingAt  DateTime? // a transcript email is on its way: a second send waits (no duplicate emails)
   sentAt     DateTime? // the last transcript that was delivered
   sentTo     String?
+  // R1184 Live Assist. Who answers right now: ai (Pip) | waiting (asked for a person, in the queue) |
+  // human (a specialist is in the chat, Pip stays silent) | resolved (a specialist closed it).
+  mode       String    @default("ai")
+  liveId     String? // the SupportSession that is waiting or active right now
+  seq        Int       @default(0) // last message number handed out, so both sides read messages in one order
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages PipMessage[]
+  sessions SupportSession[]
 
   @@index([userId, updatedAt])
   @@index([updatedAt])
+  @@index([mode, updatedAt])
 }
 
 model PipMessage {
   id             String   @id @default(cuid())
   conversationId String
-  role           String // user | pip
+  role           String // user | pip | agent (R1184: a support specialist) | system (R1184: a status line, text is a code)
   text           String
+  seq            Int? // R1184: position in the conversation (null on rows written before Live Assist)
+  clientId       String? // R1184: the sender's own id for the message, so a resend after a dropped connection is saved once
+  authorId       String? // R1184: AdminUser.id on agent messages
+  authorName     String?
   createdAt      DateTime @default(now())
 
   conversation PipConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
+  @@unique([conversationId, clientId])
   @@index([conversationId, createdAt])
+  @@index([conversationId, seq])
+}
+
+/// R1184 Live Assist: one request for a person, from "Connect to a human" until it is resolved, cancelled or
+/// handed back to Pip. Ending one changes its status; rows are never deleted on resolve, so reports count real rows.
+/// Read receipts are message numbers (PipConversation.seq): "delivered" = that browser fetched it, "read" = it was on screen.
+model SupportSession {
+  id                String    @id @default(cuid())
+  conversationId    String
+  userId            String
+  status            String    @default("waiting") // waiting | active | resolved | cancelled | returned | ticket
+  priority          String    @default("normal") // normal | high | urgent
+  category          String    @default("other") // billing | account | publishing | technical | other
+  agentId           String? // AdminUser.id of the specialist who has it
+  agentName         String?
+  ticketId          String? // the ticket it became ("leave a message") or was linked to
+  requestedAt       DateTime  @default(now())
+  acceptedAt        DateTime?
+  firstResponseAt   DateTime? // the specialist's first reply
+  endedAt           DateTime?
+  endedBy           String? // AdminUser.id | customer | system
+  custDeliveredSeq  Int       @default(0)
+  custReadSeq       Int       @default(0)
+  agentDeliveredSeq Int       @default(0)
+  agentReadSeq      Int       @default(0)
+  unreadAgent       Int       @default(0) // customer messages the specialist has not had on screen yet
+  customerTypingAt  DateTime?
+  agentTypingAt     DateTime?
+  customerSeenAt    DateTime? // the customer's browser last checked in
+  lastMessageAt     DateTime  @default(now())
+  preview           String    @default("") // the latest customer or specialist words, for the queue row (no extra query per row)
+  csat              Int? // 1 = helpful, 0 = not helpful: asked once after a specialist resolves
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  conversation PipConversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  notes        SupportNote[]
+  history      SupportAssignment[]
+
+  @@index([status, requestedAt])
+  @@index([agentId, status])
+  @@index([conversationId, requestedAt])
+  @@index([userId, requestedAt])
+  @@index([requestedAt])
+}
+
+/// R1184: internal notes on a live conversation. Staff only: never sent to the customer, never in a transcript.
+model SupportNote {
+  id         String   @id @default(cuid())
+  sessionId  String
+  authorId   String
+  authorName String
+  body       String
+  createdAt  DateTime @default(now())
+
+  session SupportSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+/// R1184: who had a live conversation and why it changed. Append-only.
+model SupportAssignment {
+  id        String   @id @default(cuid())
+  sessionId String
+  action    String // request | accept | assign | transfer | takeover | return_pip | resolve | reopen | cancel | ticket | priority
+  fromId    String? // AdminUser.id it moved from
+  toId      String? // AdminUser.id it moved to
+  byId      String? // AdminUser.id who did it; null = the customer or the system
+  byName    String
+  note      String   @default("")
+  createdAt DateTime @default(now())
+
+  session SupportSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
 }
 
 model Ticket {
@@ -663,6 +750,8 @@ model AdminUser {
   passwordHash String
   active       Boolean   @default(true)
   lastLoginAt  DateTime?
+  liveSeenAt   DateTime? // R1184: the Live Assist console last checked in ("online" = the last 90 seconds)
+  liveAway     Boolean   @default(false) // R1184: marked themselves away, so customers aren't told someone is there
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }

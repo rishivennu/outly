@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Award, BarChart3, BadgePercent, BellRing, CalendarDays, Gift, BadgeCheck, BookOpen, ChevronRight, Construction, FlaskConical, HeartPulse, Hourglass, Library, Newspaper, Rocket, PanelsTopLeft, PanelLeftClose, PanelLeftOpen, CreditCard, Globe, Share2, SlidersHorizontal, Sparkles, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, Repeat, ShieldCheck, Tag, TrendingUp, Type, Users, Wand2, X } from "lucide-react";
+import { Activity, Award, BarChart3, BadgePercent, BellRing, CalendarDays, Gift, BadgeCheck, BookOpen, ChevronRight, Construction, FlaskConical, HeartPulse, Headset, Hourglass, Library, Newspaper, Rocket, PanelsTopLeft, PanelLeftClose, PanelLeftOpen, CreditCard, Globe, Share2, SlidersHorizontal, Sparkles, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, Repeat, ShieldCheck, Tag, TrendingUp, Type, Users, Wand2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
@@ -41,6 +41,7 @@ export const NAV: { href: string; label: string; icon: typeof Users; area: Admin
   { href: "/admin/blog/seo", label: "SEO performance", icon: TrendingUp, area: "content", group: "Content Studio" },
   { href: "/admin/blog/settings", label: "Blog settings", icon: SlidersHorizontal, area: "content", group: "Content Studio" },
   { href: "/admin/tickets", label: "Tickets", icon: LifeBuoy, area: "tickets", group: "Support" },
+  { href: "/admin/live-assist", label: "Live Assist", icon: Headset, area: "live", group: "Support" },
   { href: "/admin/faq", label: "FAQ", icon: BookOpen, area: "faq", group: "Support" },
   { href: "/admin/outbox", label: "Email outbox", icon: Mail, area: "outbox", group: "Support" },
   { href: "/admin/integrations", label: "Integrations", icon: Plug, area: "integrations", group: "Setup" },

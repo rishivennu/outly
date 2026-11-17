@@ -3,7 +3,7 @@ import { json } from "@/lib/http";
 import { adminRoute } from "@/lib/admin/route";
 import { can } from "@/lib/admin/perms";
 
-const AREA: Record<string, Parameters<typeof can>[1]> = { payment_failed: "payments", subscription_new: "payments", ticket_new: "tickets", ticket_urgent: "tickets", plan_changed: "pricing", integration: "integrations" };
+const AREA: Record<string, Parameters<typeof can>[1]> = { payment_failed: "payments", subscription_new: "payments", ticket_new: "tickets", ticket_urgent: "tickets", live_request: "live", live_urgent: "live", plan_changed: "pricing", integration: "integrations" };
 
 /** Polled every 15 s by the bell. Each role only sees events for areas it can open. */
 export const GET = adminRoute("overview", async (req, { admin }) => {

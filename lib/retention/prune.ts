@@ -85,7 +85,8 @@ export async function pruneOldData(now: Date = new Date()) {
     // Pip's access log (1049): a year is enough to answer "who looked at my invoices?"
     db.pipAccessLog.deleteMany({ where: { createdAt: { lt: before(365) } } }),
     // Pip conversations (1126): 90 days after the last message; their messages go with them (cascade).
-    db.pipConversation.deleteMany({ where: { updatedAt: { lt: before(PIP_CHAT_KEEP_DAYS) } } }),
+    // R1184: never one that had a Live Assist chat. Support chats are kept on record, never deleted.
+    db.pipConversation.deleteMany({ where: { updatedAt: { lt: before(PIP_CHAT_KEEP_DAYS) }, sessions: { none: {} } } }),
     // Phase 3: transcription run claims and their chunk hashes only matter while the run can still be reused.
     db.featureUse.deleteMany({ where: { feature: { in: [RUN_FEATURE, RUN_CHUNK_FEATURE] }, period: "run", createdAt: { lt: new Date(now.getTime() - RUN_TTL_MS) } } }),
   ]);

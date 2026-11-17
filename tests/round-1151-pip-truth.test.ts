@@ -305,7 +305,8 @@ describe("12 past conversations", () => {
     expect(g.items.map((x: { id: string }) => x.id)).toEqual([ida]);
     expect(g.items[0]).toMatchObject({ subject: "How do I connect YouTube?", status: "open", messages: 2 });
     const one = await (await get(`/api/support/conversation?id=${ida}`)).json();
-    expect(one.messages).toEqual([{ role: "user", text: "How do I connect YouTube?" }, { role: "bot", text: "Open Connected accounts." }]);
+    // R1184 adds id, seq and author (Live Assist rows); the words and who said them are unchanged.
+    expect(one.messages.map(({ role, text }: { role: string; text: string }) => ({ role, text }))).toEqual([{ role: "user", text: "How do I connect YouTube?" }, { role: "bot", text: "Open Connected accounts." }]);
     const idb = (await db.pipConversation.findFirst({ where: { userId: b.id } }))!.id;
     expect((await get(`/api/support/conversation?id=${idb}`)).status).toBe(404);
   });

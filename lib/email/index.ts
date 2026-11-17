@@ -385,16 +385,21 @@ export const templates = {
    * reads the same on a phone), labelled "You" or "Pip" with its time, and told apart by colour AND label:
    * yours on peach with a tomato edge, Pip's on white with a cobalt edge. Only the words that were on screen.
    */
-  pipTranscript: (o: { name: string; ref: string; subject: string; date: string; tz: string; messages: { who: "you" | "pip"; time: string; text: string }[]; earlier: number; url: string }) => {
+  // R1184: "agent" = a support specialist (first name only), "status" = a plain line like "Pip is back".
+  pipTranscript: (o: { name: string; ref: string; subject: string; date: string; tz: string; messages: { who: "you" | "pip" | "agent" | "status"; name?: string; time: string; text: string }[]; earlier: number; url: string }) => {
+    const human = o.messages.some((m) => m.who === "agent");
     const block = (m: (typeof o.messages)[number]) => {
+      if (m.who === "status")
+        return `<p style="margin:0 0 14px;font-family:${BODY};font-size:13px;line-height:1.5;color:${C.muted};text-align:center"><i>${esc(m.text)}</i> &nbsp;&middot;&nbsp; ${esc(m.time)}</p>`;
       const you = m.who === "you";
       const edge = you ? C.tomato : TONE.ink.bg;
-      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px"><tr><td style="padding:0 0 6px;font-family:${BODY};font-size:13px;line-height:1.4;color:${C.muted};text-align:left"><b style="color:${C.ink};font-family:${BODY}">${you ? "You" : "Pip"}</b> &nbsp;&middot;&nbsp; ${esc(m.time)}</td></tr>
+      const label = you ? "You" : m.who === "agent" ? `${esc(m.name || "Outlly")}, Outlly support` : "Pip";
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px"><tr><td style="padding:0 0 6px;font-family:${BODY};font-size:13px;line-height:1.4;color:${C.muted};text-align:left"><b style="color:${C.ink};font-family:${BODY}">${label}</b> &nbsp;&middot;&nbsp; ${esc(m.time)}</td></tr>
 <tr><td bgcolor="${you ? TONE.cream.bg : C.white}" style="background:${you ? TONE.cream.bg : C.white};border:2px solid ${C.ink};border-left:6px solid ${edge};border-radius:14px;padding:12px 16px;font-family:${BODY};font-size:15px;line-height:1.6;color:${C.text};text-align:left;word-break:break-word">${transcriptText(m.text)}</td></tr></table>`;
     };
     return wrap(
       "Your support conversation",
-      `${p(`Hi ${esc(o.name || "there")}, here is the full conversation you had with Pip, the Outlly support assistant. Times are shown in ${esc(o.tz)}.`)}${o.earlier ? p(`<i>${o.earlier} earlier message${o.earlier === 1 ? " is" : "s are"} not shown here.</i>`) : ""}${o.messages.map(block).join("")}${small("This conversation is marked as resolved. Need more help? Open Pip and choose Reopen Conversation, or reply to this email.")}${btn(o.url, "Get more help")}`,
+      `${p(`Hi ${esc(o.name || "there")}, here is the full conversation you had with ${human ? "Pip and our support team" : "Pip, the Outlly support assistant"}. Times are shown in ${esc(o.tz)}.`)}${o.earlier ? p(`<i>${o.earlier} earlier message${o.earlier === 1 ? " is" : "s are"} not shown here.</i>`) : ""}${o.messages.map(block).join("")}${small("This conversation is marked as resolved. Need more help? Open Pip and choose Reopen Conversation, or reply to this email.")}${btn(o.url, "Get more help")}`,
       {
         kicker: "Support",
         tone: "cream",

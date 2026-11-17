@@ -4239,6 +4239,26 @@ html.theme-anim *::after {
 @keyframes pc-fade { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .pc-offer, .pc-fade, .pc-resolved { animation: none; } }
 
+/* ---------- R1184: Live Assist inside Pip ----------
+   A support specialist's messages read as a person (a teal-tinted bubble under their name); status lines sit
+   centred and quiet; the banner above the composer says where the request stands. Never colour alone: every
+   state also has its words and an icon. Pip's own tokens, so dark mode follows. */
+.pc { --pc-agent: hsl(174 62% 24%); --pc-agent-fill: hsl(174 45% 93%); }
+.dark .pc { --pc-agent: hsl(172 55% 64%); --pc-agent-fill: hsl(176 30% 15%); }
+.pc-bubble-agent { background: var(--pc-agent-fill); border: 1px solid color-mix(in srgb, var(--pc-agent) 24%, transparent); }
+.pc-agent-name { display: flex; align-items: center; gap: 5px; margin: 0 0 4px 4px; font-size: 12px; font-weight: 600; color: var(--pc-agent); }
+.pc-sys { display: flex; align-items: center; justify-content: center; gap: 6px; width: fit-content; max-width: 92%; margin-inline: auto; padding: 6px 12px; border-radius: 999px; font-size: 12.5px; line-height: 1.45; text-align: center; color: var(--pc-muted); background: var(--pc-fill); }
+.pc-receipt { margin: 2px 4px 0 0; text-align: end; font-size: 12px; color: var(--pc-muted); }
+.pc-receipt.pc-error { color: var(--pc-err); }
+.pc-bubble-failed { opacity: .75; }
+.pc-live { background: var(--pc-tint); border: 1px solid color-mix(in srgb, var(--pc-accent) 28%, var(--pc-line)); border-radius: 18px; }
+.pc-live-on { background: var(--pc-agent-fill); border-color: color-mix(in srgb, var(--pc-agent) 30%, var(--pc-line)); }
+.pc-live-on > p:first-child svg, .pc-live-ok { color: var(--pc-agent); }
+.pc-live-warn { background: color-mix(in srgb, var(--pc-warn) 9%, var(--pc-solid)); border-color: color-mix(in srgb, var(--pc-warn) 34%, var(--pc-line)); }
+.pc-live-warn > p:first-child svg { color: var(--pc-warn); }
+.pc-unread { position: absolute; top: -2px; inset-inline-end: -2px; display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1; background: var(--pc-err); color: #fff; box-shadow: 0 0 0 2px var(--pc-solid); }
+.dark .pc-unread { color: #1a0505; }
+
 /* ===== LIVE round 1139 =====
    The publishing tracker's honest step progress. Four named steps per destination: finished ones are lit,
    the one it is on breathes, the rest wait. Nothing here encodes a percentage, because no platform reports one.

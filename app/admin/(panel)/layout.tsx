@@ -10,6 +10,7 @@ import { sweeperHealth, type SweeperHealth } from "@/lib/queue/health";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ToastProvider } from "@/components/shared/Toast";
 import { adminAppMeta } from "@/lib/admin/app-meta";
+import { waitingCount } from "@/lib/support/live";
 
 export const metadata: Metadata = { title: { default: "Admin", template: "%s · Outlly admin" }, robots: { index: false, follow: false }, ...adminAppMeta };
 export const dynamic = "force-dynamic";
@@ -31,12 +32,14 @@ function ago(ms: number) {
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const admin = await requireAdmin();
-  const [weak, openTickets, sweep] = await Promise.all([
+  const [weak, openTickets, sweep, liveWaiting] = await Promise.all([
     usingDefaultPassword(admin.id),
     // The sidebar badge can lag a few seconds; it should not cost a database trip on every click.
     can(admin.role, "tickets") ? cached("admin:open-tickets", 15_000, () => db.ticket.count({ where: { status: { not: "resolved" } } })) : Promise.resolve(0),
     // Only the people who can fix it (integrations) see it. A failed check never blocks the panel.
     can(admin.role, "integrations") ? cached("admin:sweeper-health", 30_000, () => sweeperHealth()).catch(() => null) : Promise.resolve(null),
+    // R1184: customers waiting for a specialist right now (cached 10 s in lib/support/live.ts).
+    can(admin.role, "live") ? waitingCount().catch(() => 0) : Promise.resolve(0),
   ]);
   const late = sweep?.latePosts ?? 0;
   return (
@@ -44,7 +47,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground">
         Skip to main content
       </a>
-      <AdminShell admin={{ name: admin.name, role: admin.role }} badges={{ tickets: openTickets }}>
+      <AdminShell admin={{ name: admin.name, role: admin.role }} badges={{ tickets: openTickets, live: liveWaiting }}>
         {weak && (
           <div role="alert" className="mb-6 flex flex-wrap items-center gap-3 rounded-[20px] bg-warning/12 px-4 py-3 text-[13.5px] hairline">
             <AlertTriangle className="h-4 w-4 shrink-0 text-warning" aria-hidden />

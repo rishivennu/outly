@@ -5,16 +5,18 @@ import { pollable } from "@/lib/client/idle";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, BellRing, Bell as BellIcon, CreditCard, LifeBuoy, Plug, Tag, Sparkles, X } from "lucide-react";
+import { AlertTriangle, BellRing, Bell as BellIcon, CreditCard, Headset, LifeBuoy, Plug, Tag, Sparkles, Volume2, VolumeX, X } from "lucide-react";
 import { useToast } from "@/components/shared/Toast";
-import type { AdminRole } from "@/lib/admin/perms";
+import { can, type AdminRole } from "@/lib/admin/perms";
 import { cn } from "@/lib/utils";
 import { T } from "@/lib/motion/tokens";
+import { chime, setSound, soundOn, SOUND_EVENT } from "@/lib/client/live-sound";
 
 type Ev = { id: string; kind: string; title: string; body?: string | null; href?: string | null; createdAt: string };
 const SEEN = "outly-admin-seen";
-const ICON: Record<string, typeof Tag> = { payment_failed: AlertTriangle, subscription_new: CreditCard, ticket_new: LifeBuoy, ticket_urgent: LifeBuoy, plan_changed: Tag, integration: Plug, behavior_analysis: Sparkles };
-const LOUD = new Set(["payment_failed", "ticket_urgent", "ticket_new", "subscription_new"]);
+const ICON: Record<string, typeof Tag> = { payment_failed: AlertTriangle, subscription_new: CreditCard, ticket_new: LifeBuoy, ticket_urgent: LifeBuoy, live_request: Headset, live_urgent: Headset, plan_changed: Tag, integration: Plug, behavior_analysis: Sparkles };
+const LOUD = new Set(["payment_failed", "ticket_urgent", "ticket_new", "subscription_new", "live_request", "live_urgent"]);
+const BAD = new Set(["payment_failed", "ticket_urgent", "live_urgent"]);
 
 function ago(iso: string) {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -50,6 +52,13 @@ export function Bell({ role }: { role: AdminRole }) {
   // Portals need <body>, which the server render does not have.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  const [sound, setSoundState] = useState(true);
+  useEffect(() => {
+    setSoundState(soundOn());
+    const on = (e: Event) => setSoundState(!!(e as CustomEvent<boolean>).detail);
+    window.addEventListener(SOUND_EVENT, on);
+    return () => window.removeEventListener(SOUND_EVENT, on);
+  }, []);
 
   const poll = useCallback(async () => {
     if (document.visibilityState !== "visible") return;
@@ -61,7 +70,10 @@ export function Bell({ role }: { role: AdminRole }) {
       since.current = j.now;
       if (!j.events.length) return;
       setEvents((x) => [...j.events, ...x.filter((e) => !j.events.some((n) => n.id === e.id))].slice(0, 30));
-      if (!first) for (const e of j.events.filter((e) => LOUD.has(e.kind)).slice(0, 2)) toast(e.title, e.kind === "payment_failed" || e.kind === "ticket_urgent" ? "error" : "info");
+      if (!first) for (const e of j.events.filter((e) => LOUD.has(e.kind)).slice(0, 2)) toast(e.title, BAD.has(e.kind) ? "error" : "info");
+      // R1184: a new Live Assist request also chimes (when sound is on), wherever in the admin panel the specialist is.
+      const live = first ? [] : j.events.filter((e) => e.kind === "live_request" || e.kind === "live_urgent");
+      if (live.length) chime(live.some((e) => e.kind === "live_urgent"), live.map((e) => /[?&]s=([A-Za-z0-9_-]+)/.exec(e.href ?? "")?.[1] ?? e.id));
     } catch {}
   }, [toast]);
 
@@ -175,15 +187,20 @@ export function Bell({ role }: { role: AdminRole }) {
                     <h2 id={`${id}-h`} className="font-display text-[15px] font-semibold">Alerts</h2>
                     <p className="text-[11.5px] text-muted-foreground">Live · checks every 15 s</p>
                   </div>
+                  {can(role, "live") && (
+                    <button type="button" aria-pressed={sound} aria-label={sound ? "Live chat sound on. Turn it off" : "Live chat sound off. Turn it on"} title={sound ? "Sound on for new live chats" : "Sound off for new live chats"} onClick={() => setSound(!sound)} className="ml-auto grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground">
+                      {sound ? <Volume2 className="h-4 w-4" aria-hidden /> : <VolumeX className="h-4 w-4" aria-hidden />}
+                    </button>
+                  )}
                   <button type="button" aria-label="Close notifications" onClick={() => { setOpen(false); btn.current?.focus(); }} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground">
                     <X className="h-4 w-4" aria-hidden />
                   </button>
                 </div>
                 <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
-                  {events.length === 0 && <li className="px-3 py-8 text-center text-[13px] text-muted-foreground">Nothing yet. Failed payments, new subscriptions and tickets show up here{role === "support" ? " (tickets for your role)" : ""}.</li>}
+                  {events.length === 0 && <li className="px-3 py-8 text-center text-[13px] text-muted-foreground">Nothing yet. Failed payments, new subscriptions, tickets and live chat requests show up here{role === "support" ? " (tickets for your role)" : ""}.</li>}
                   {events.map((e) => {
                     const Icon = ICON[e.kind] ?? BellIcon;
-                    const bad = e.kind === "payment_failed" || e.kind === "ticket_urgent";
+                    const bad = BAD.has(e.kind);
                     const inner = (
                       <span className={cn("flex gap-3 rounded-2xl px-2.5 py-2.5 transition-colors hover:bg-foreground/[0.05]", e.createdAt > seen && "bg-lime/[0.07]")}>
                         <span className={cn("mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full", bad ? "bg-destructive/15 text-destructive" : "bg-lime/15 text-lime-ink")}>

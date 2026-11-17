@@ -7,6 +7,8 @@ import { sendEmail, templates } from "../email";
 import { isProven } from "../founding";
 import { limitShared } from "../rate-limit";
 import { getConfig } from "../settings";
+import { firstName } from "./live-core";
+import { liveSysLine, LIVE_EN } from "../i18n/live";
 
 /**
  * Pip conversations (1126). A signed-in person's chat is written down as it happens, so "Resolve & Send
@@ -18,6 +20,9 @@ import { getConfig } from "../settings";
  * - One email per resolve: a claim on the row (sendingAt) blocks a second send while the first is on its way,
  *   and a conversation that is already resolved and sent just answers "done" again.
  * - Kept PIP_CHAT_KEEP_DAYS after the last message (lib/retention/prune.ts), deleted with the account.
+ *   R1184: a chat that ever reached the support team (a SupportSession) is kept, so resolved chats stay on record.
+ * - R1184: roles are user | pip | agent (a support specialist) | system (a status code, lib/support/live-core.ts SYS).
+ *   Every message gets the next number (seq) inside a transaction, so both sides read one order.
  */
 
 export const PIP_CHAT_KEEP_DAYS = 90;
@@ -86,12 +91,43 @@ export async function listConversations(userId: string, take = 20): Promise<Conv
 }
 
 /** 1151: one saved chat with its messages, to reopen it in the widget. Someone else's id is simply "not found". */
+export type ConvRole = "user" | "bot" | "agent" | "system";
+/** R1184: Pip's rows are "bot" on the wire (as before); a specialist shows by first name only; system rows stay codes. */
+export const wireRole = (role: string): ConvRole => (role === "user" ? "user" : role === "agent" ? "agent" : role === "system" ? "system" : "bot");
 export async function getConversation(userId: string, id: string) {
-  const c = await db.pipConversation.findFirst({ where: { id, userId }, select: { id: true, ref: true, subject: true, status: true, sendingAt: true, sentTo: true } });
+  const c = await db.pipConversation.findFirst({ where: { id, userId }, select: { id: true, ref: true, subject: true, status: true, sendingAt: true, sentTo: true, mode: true, liveId: true, seq: true } });
   if (!c) throw new HttpError(404, "We couldn't find that conversation.", "NOT_FOUND");
-  const rows = await db.pipMessage.findMany({ where: { conversationId: c.id }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 80, select: { role: true, text: true } });
+  const rows = await db.pipMessage.findMany({ where: { conversationId: c.id }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 80, select: { id: true, role: true, text: true, seq: true, authorName: true } });
   rows.reverse();
-  return { id: c.id, ref: c.ref, subject: c.subject, status: convStatus(c), sentTo: c.status === "resolved" ? (c.sentTo ?? "") : null, messages: rows.map((m) => ({ role: m.role === "user" ? ("user" as const) : ("bot" as const), text: m.text })) };
+  return {
+    id: c.id,
+    ref: c.ref,
+    subject: c.subject,
+    status: convStatus(c),
+    sentTo: c.status === "resolved" ? (c.sentTo ?? "") : null,
+    mode: c.mode,
+    live: !!c.liveId,
+    seq: c.seq,
+    messages: rows.map((m) => ({ id: m.id, seq: m.seq, role: wireRole(m.role), text: m.text, author: m.role === "agent" ? firstName(m.authorName) : null })),
+  };
+}
+
+/** R1184: hands out the next n message numbers. Inside a transaction the row stays locked until commit, so numbers commit in order. */
+export async function nextSeqs(tx: Pick<typeof db, "pipConversation">, conversationId: string, n = 1, data: Record<string, unknown> = {}) {
+  const c = await tx.pipConversation.update({ where: { id: conversationId }, data: { ...data, seq: { increment: n } }, select: { seq: true } });
+  return Array.from({ length: n }, (_, i) => c.seq - n + 1 + i);
+}
+
+/** R1184: a conversation to hang a request for a person on, when Pip hasn't written one down yet. */
+export async function startConversation(userId: string, subject: string) {
+  for (let i = 0; i < 5; i++) {
+    try {
+      return await db.pipConversation.create({ data: { ref: newRef(), userId, subject: subjectOf(subject) }, select: { id: true } });
+    } catch (e: any) {
+      if (e?.code !== "P2002") throw e;
+    }
+  }
+  throw new Error("Could not start a conversation");
 }
 
 /**
@@ -99,12 +135,13 @@ export async function getConversation(userId: string, id: string) {
  * starts a new one instead of failing, so nothing about other people's chats leaks. A resolved one refuses
  * new messages until it is reopened: the lock holds on the server, not just in the browser.
  */
-export async function openConversation(userId: string, id?: string | null): Promise<{ id: string } | null> {
+export async function openConversation(userId: string, id?: string | null): Promise<{ id: string; mode: string } | null> {
   if (!id) return null;
-  const c = await db.pipConversation.findFirst({ where: { id, userId }, select: { id: true, status: true } });
+  const c = await db.pipConversation.findFirst({ where: { id, userId }, select: { id: true, status: true, mode: true } });
   if (!c) return null;
   if (c.status === "resolved") throw new HttpError(409, "This conversation is resolved. Reopen it to keep chatting.", "RESOLVED");
-  return { id: c.id };
+  // R1184: waiting or human comes back as is; the chat route then hands the words to the support team, not Pip.
+  return { id: c.id, mode: c.mode };
 }
 
 /** Writes one question and Pip's answer. Creates the conversation on its first message. */
@@ -113,16 +150,28 @@ export async function recordTurn(o: { userId: string; conversation: { id: string
   // Same instant on both rows would make the order depend on ids: keep the answer at least 1 ms after.
   const answeredAt = at.getTime() > o.askedAt.getTime() ? at : new Date(o.askedAt.getTime() + 1);
   const messages = [
-    { role: "user", text: o.question.slice(0, MAX_TEXT), createdAt: o.askedAt },
-    { role: "pip", text: o.answer.slice(0, MAX_TEXT), createdAt: answeredAt },
+    { role: "user", text: o.question.slice(0, MAX_TEXT), createdAt: o.askedAt, seq: 1 },
+    { role: "pip", text: o.answer.slice(0, MAX_TEXT), createdAt: answeredAt, seq: 2 },
   ];
   if (o.conversation) {
-    await db.pipConversation.update({ where: { id: o.conversation.id }, data: { updatedAt: new Date(), messages: { create: messages } } });
-    return o.conversation.id;
+    const id = o.conversation.id;
+    await db.$transaction(async (tx) => {
+      // R1184: the customer asked for a person while Pip was still answering. Keep their words for the team,
+      // drop Pip's reply: Pip stays silent once a request is open.
+      const now = await tx.pipConversation.findUnique({ where: { id }, select: { mode: true } });
+      if (now && (now.mode === "waiting" || now.mode === "human")) {
+        const [a] = await nextSeqs(tx, id, 1, { updatedAt: new Date() });
+        await tx.pipMessage.create({ data: { ...messages[0], seq: a, conversationId: id } });
+        return;
+      }
+      const [a, b] = await nextSeqs(tx, id, 2, { updatedAt: new Date() });
+      await tx.pipMessage.createMany({ data: [{ ...messages[0], seq: a, conversationId: id }, { ...messages[1], seq: b, conversationId: id }] });
+    });
+    return id;
   }
   for (let i = 0; i < 5; i++) {
     try {
-      const c = await db.pipConversation.create({ data: { ref: newRef(), userId: o.userId, subject: subjectOf(o.question), messages: { create: messages } }, select: { id: true } });
+      const c = await db.pipConversation.create({ data: { ref: newRef(), userId: o.userId, subject: subjectOf(o.question), seq: 2, messages: { create: messages } }, select: { id: true } });
       return c.id;
     } catch (e: any) {
       if (e?.code !== "P2002") throw e;
@@ -141,6 +190,9 @@ const when = (tz: string) => {
 };
 
 /** `to` is the account's own address, shown back to its owner only ("sent to you@example.com"). */
+/** R1184: shown when "Resolve & Send Transcript" is pressed while a support specialist has the chat. */
+export const LIVE_OPEN_TEXT = "You're chatting with our support team right now. End that chat first, then you can resolve it and get the transcript.";
+
 export type ResolveResult = { ok: true; status: "resolved"; to: string; already: boolean };
 
 /**
@@ -148,10 +200,12 @@ export type ResolveResult = { ok: true; status: "resolved"; to: string; already:
  * provider accepted the message. A failure leaves it open, says so, and can be retried.
  */
 export async function resolveAndSend(userId: string, conversationId: string): Promise<ResolveResult> {
-  const conv = await db.pipConversation.findFirst({ where: { id: conversationId, userId }, select: { id: true, ref: true, subject: true, status: true, sentAt: true, sentTo: true, createdAt: true } });
+  const conv = await db.pipConversation.findFirst({ where: { id: conversationId, userId }, select: { id: true, ref: true, subject: true, status: true, sentAt: true, sentTo: true, createdAt: true, mode: true } });
   if (!conv) throw new HttpError(404, "We couldn't find that conversation.", "NOT_FOUND");
   // Pressed twice, or a second tab: the transcript already went out for this resolve. Don't send another.
   if (conv.status === "resolved" && conv.sentAt) return { ok: true, status: "resolved", to: conv.sentTo ?? "", already: true };
+  // R1184: a person is on this chat (or about to be). Resolving it from the Pip side would strand their session.
+  if (conv.mode === "waiting" || conv.mode === "human") throw new HttpError(409, LIVE_OPEN_TEXT, "LIVE_OPEN");
 
   const user = await db.user.findUnique({ where: { id: userId }, select: { name: true, email: true, timezone: true, emailVerifiedAt: true, emailVerifiedFor: true } });
   if (!user) throw new HttpError(404, "We couldn't find that conversation.", "NOT_FOUND");
@@ -166,7 +220,7 @@ export async function resolveAndSend(userId: string, conversationId: string): Pr
   // The claim: only one request at a time may send for this conversation. A crashed send frees itself after a minute.
   const now = new Date();
   const claim = await db.pipConversation.updateMany({
-    where: { id: conv.id, userId, OR: [{ sendingAt: null }, { sendingAt: { lt: new Date(now.getTime() - SEND_LOCK_MS) } }], NOT: { status: "resolved", sentAt: { not: null } } },
+    where: { id: conv.id, userId, OR: [{ sendingAt: null }, { sendingAt: { lt: new Date(now.getTime() - SEND_LOCK_MS) } }], NOT: { status: "resolved", sentAt: { not: null } }, mode: { notIn: ["waiting", "human"] } },
     data: { sendingAt: now },
   });
   if (!claim.count) {
@@ -181,7 +235,7 @@ export async function resolveAndSend(userId: string, conversationId: string): Pr
       where: { conversationId: conv.id },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: TRANSCRIPT_MAX_MESSAGES,
-      select: { role: true, text: true, createdAt: true },
+      select: { role: true, text: true, createdAt: true, authorName: true },
     });
     rows.reverse();
     const tz = user.timezone || "UTC";
@@ -192,7 +246,16 @@ export async function resolveAndSend(userId: string, conversationId: string): Pr
       subject: conv.subject,
       date: f.format(conv.createdAt),
       tz,
-      messages: rows.map((m) => ({ who: m.role === "user" ? "you" : "pip", time: f.format(m.createdAt), text: m.text })),
+      // R1184: specialists by first name; status codes in plain English, and a code nobody knows is left out.
+      messages: rows.flatMap((m): { who: "you" | "pip" | "agent" | "status"; name?: string; time: string; text: string }[] => {
+        const time = f.format(m.createdAt);
+        if (m.role === "system") {
+          const line = liveSysLine(LIVE_EN, m.text);
+          return line ? [{ who: "status" as const, time, text: line }] : [];
+        }
+        if (m.role === "agent") return [{ who: "agent" as const, name: firstName(m.authorName), time, text: m.text }];
+        return [{ who: m.role === "user" ? ("you" as const) : ("pip" as const), time, text: m.text }];
+      }),
       earlier: Math.max(0, total - rows.length),
       url: `${env.APP_URL}/help`,
     });
@@ -225,5 +288,7 @@ export async function resolveAndSend(userId: string, conversationId: string): Pr
 export async function reopen(userId: string, conversationId: string): Promise<ConvState> {
   const r = await db.pipConversation.updateMany({ where: { id: conversationId, userId }, data: { status: "open", resolvedAt: null, sendingAt: null } });
   if (!r.count) throw new HttpError(404, "We couldn't find that conversation.", "NOT_FOUND");
+  // R1184: a chat the support team resolved goes back to Pip when its owner reopens it (asking for a person again is one tap).
+  await db.pipConversation.updateMany({ where: { id: conversationId, userId, mode: "resolved" }, data: { mode: "ai", liveId: null } });
   return { id: conversationId, status: "open" };
 }

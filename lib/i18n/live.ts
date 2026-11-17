@@ -1,0 +1,488 @@
+import type { Lang } from "./support";
+import { parseSys, SYS } from "../support/live-core";
+
+/**
+ * R1184 Live Assist words in the Pip widget. English is the source (the state lines are the exact wording
+ * agreed for the product); every other language is a translation of it. Missing keys fall back to English.
+ */
+export type LiveT = {
+  offer: string;
+  connect: string;
+  keepPip: string;
+  connecting: string;
+  waiting: string;
+  position: (n: number) => string;
+  connected: string;
+  unavailable: string;
+  reconnecting: string;
+  resolved: string;
+  cancel: string;
+  leave: string;
+  leaving: string;
+  left: (ref: string) => string;
+  endChat: string;
+  pipBack: string;
+  cancelled: string;
+  customerLeft: string;
+  transferred: (name: string) => string;
+  reopened: string;
+  agentLabel: (name: string) => string;
+  saidAgent: string;
+  typing: (name: string) => string;
+  placeholder: string;
+  sending: string;
+  sent: string;
+  delivered: string;
+  seen: string;
+  failed: string;
+  retry: string;
+  helpful: string;
+  yes: string;
+  no: string;
+  thanks: string;
+  newChat: string;
+  error: string;
+  statusWaiting: string;
+  statusConnected: string;
+  statusUnavailable: string;
+  statusReconnecting: string;
+  unread: (n: number) => string;
+};
+
+const en: LiveT = {
+  offer: "I'd like to get a human expert to help you with this. Would you like me to connect you with our support team?",
+  connect: "Connect to a human",
+  keepPip: "Continue with Pip",
+  connecting: "Connecting you with an Outlly support specialist. Please wait...",
+  waiting: "Our support team has received your request. You're in the queue.",
+  position: (n) => (n <= 1 ? "You're next in line." : `You're number ${n} in line.`),
+  connected: "You're now connected with an Outlly support specialist.",
+  unavailable: "Our support team is currently unavailable. You can continue with Pip or leave your message and we'll follow up.",
+  reconnecting: "Connection interrupted. We're trying to reconnect you...",
+  resolved: "Your conversation with our support team has been marked as resolved. If you need anything else, you can start another conversation.",
+  cancel: "Cancel request",
+  leave: "Leave a message",
+  leaving: "Saving your message...",
+  left: (ref) => `Got it. Your message is saved as ticket ${ref} and we'll follow up by email.`,
+  endChat: "End chat",
+  pipBack: "Pip is back. Our support team handed this chat back to Pip, so ask away.",
+  cancelled: "Request cancelled. Pip is here to help.",
+  customerLeft: "You left the chat with our support team. Pip is here to help.",
+  transferred: (name) => `${name} from Outlly support has joined the chat.`,
+  reopened: "Our support team reopened this conversation.",
+  agentLabel: (name) => `${name}, Outlly support`,
+  saidAgent: "Support specialist said",
+  typing: (name) => `${name} is typing`,
+  placeholder: "Message our support team",
+  sending: "Sending",
+  sent: "Sent",
+  delivered: "Delivered",
+  seen: "Seen",
+  failed: "Not sent",
+  retry: "Retry",
+  helpful: "Was our support team helpful?",
+  yes: "Yes",
+  no: "No",
+  thanks: "Thanks for telling us.",
+  newChat: "Start a new conversation",
+  error: "We couldn't reach our support team just now. Try again in a moment.",
+  statusWaiting: "In the queue",
+  statusConnected: "Support specialist",
+  statusUnavailable: "Team unavailable",
+  statusReconnecting: "Reconnecting",
+  unread: (n) => (n === 1 ? "1 new message from support" : `${n} new messages from support`),
+};
+
+const hi: Partial<LiveT> = {
+  offer: "मैं चाहूँगा कि इसमें कोई इंसानी विशेषज्ञ आपकी मदद करे। क्या मैं आपको हमारी सपोर्ट टीम से जोड़ दूँ?",
+  connect: "किसी इंसान से जुड़ें",
+  keepPip: "Pip के साथ जारी रखें",
+  connecting: "आपको Outlly सपोर्ट विशेषज्ञ से जोड़ा जा रहा है। कृपया प्रतीक्षा करें...",
+  waiting: "हमारी सपोर्ट टीम को आपका अनुरोध मिल गया है। आप कतार में हैं।",
+  position: (n) => (n <= 1 ? "अगली बारी आपकी है।" : `कतार में आपका नंबर ${n} है।`),
+  connected: "अब आप Outlly सपोर्ट विशेषज्ञ से जुड़ गए हैं।",
+  unavailable: "हमारी सपोर्ट टीम अभी उपलब्ध नहीं है। आप Pip के साथ जारी रख सकते हैं या अपना संदेश छोड़ सकते हैं, हम आपसे संपर्क करेंगे।",
+  reconnecting: "कनेक्शन टूट गया। हम आपको फिर से जोड़ने की कोशिश कर रहे हैं...",
+  resolved: "हमारी सपोर्ट टीम के साथ आपकी बातचीत हल के रूप में चिह्नित कर दी गई है। कुछ और चाहिए तो आप नई बातचीत शुरू कर सकते हैं।",
+  cancel: "अनुरोध रद्द करें",
+  leave: "संदेश छोड़ें",
+  leaving: "आपका संदेश सहेजा जा रहा है...",
+  left: (ref) => `ठीक है। आपका संदेश टिकट ${ref} के रूप में सहेज लिया गया है, हम ईमेल से संपर्क करेंगे।`,
+  endChat: "चैट खत्म करें",
+  pipBack: "Pip वापस आ गया है। हमारी सपोर्ट टीम ने यह चैट Pip को लौटा दी है, बेझिझक पूछें।",
+  cancelled: "अनुरोध रद्द हो गया। Pip मदद के लिए यहाँ है।",
+  customerLeft: "आपने सपोर्ट टीम के साथ चैट छोड़ दी। Pip मदद के लिए यहाँ है।",
+  transferred: (name) => `Outlly सपोर्ट से ${name} चैट में जुड़ गए हैं।`,
+  reopened: "हमारी सपोर्ट टीम ने यह बातचीत फिर से खोल दी है।",
+  agentLabel: (name) => `${name}, Outlly सपोर्ट`,
+  saidAgent: "सपोर्ट विशेषज्ञ ने कहा",
+  typing: (name) => `${name} लिख रहे हैं`,
+  placeholder: "हमारी सपोर्ट टीम को संदेश लिखें",
+  sending: "भेजा जा रहा है", sent: "भेजा गया", delivered: "पहुँच गया", seen: "देखा गया", failed: "नहीं भेजा गया", retry: "फिर से कोशिश करें",
+  helpful: "क्या हमारी सपोर्ट टीम मददगार थी?", yes: "हाँ", no: "नहीं", thanks: "बताने के लिए धन्यवाद।",
+  newChat: "नई बातचीत शुरू करें",
+  error: "अभी हम सपोर्ट टीम तक नहीं पहुँच पाए। थोड़ी देर में फिर कोशिश करें।",
+  statusWaiting: "कतार में", statusConnected: "सपोर्ट विशेषज्ञ", statusUnavailable: "टीम उपलब्ध नहीं", statusReconnecting: "फिर से जोड़ रहे हैं",
+  unread: (n) => `सपोर्ट से ${n} नए संदेश`,
+};
+
+const es: Partial<LiveT> = {
+  offer: "Me gustaría que una persona experta te ayude con esto. ¿Quieres que te conecte con nuestro equipo de soporte?",
+  connect: "Hablar con una persona",
+  keepPip: "Seguir con Pip",
+  connecting: "Te estamos conectando con un especialista de soporte de Outlly. Espera un momento...",
+  waiting: "Nuestro equipo de soporte recibió tu solicitud. Estás en la cola.",
+  position: (n) => (n <= 1 ? "Eres el siguiente." : `Eres el número ${n} en la cola.`),
+  connected: "Ya estás conectado con un especialista de soporte de Outlly.",
+  unavailable: "Nuestro equipo de soporte no está disponible ahora. Puedes seguir con Pip o dejar tu mensaje y te responderemos.",
+  reconnecting: "Se interrumpió la conexión. Estamos intentando reconectarte...",
+  resolved: "Tu conversación con nuestro equipo de soporte se marcó como resuelta. Si necesitas algo más, puedes iniciar otra conversación.",
+  cancel: "Cancelar solicitud",
+  leave: "Dejar un mensaje",
+  leaving: "Guardando tu mensaje...",
+  left: (ref) => `Listo. Tu mensaje quedó guardado como el ticket ${ref} y te responderemos por correo.`,
+  endChat: "Terminar chat",
+  pipBack: "Pip ha vuelto. Nuestro equipo de soporte le devolvió este chat a Pip, así que pregunta lo que quieras.",
+  cancelled: "Solicitud cancelada. Pip está aquí para ayudarte.",
+  customerLeft: "Saliste del chat con nuestro equipo de soporte. Pip está aquí para ayudarte.",
+  transferred: (name) => `${name}, de soporte de Outlly, se unió al chat.`,
+  reopened: "Nuestro equipo de soporte reabrió esta conversación.",
+  agentLabel: (name) => `${name}, soporte de Outlly`,
+  saidAgent: "El especialista de soporte dijo",
+  typing: (name) => `${name} está escribiendo`,
+  placeholder: "Escribe a nuestro equipo de soporte",
+  sending: "Enviando", sent: "Enviado", delivered: "Entregado", seen: "Visto", failed: "No enviado", retry: "Reintentar",
+  helpful: "¿Te ayudó nuestro equipo de soporte?", yes: "Sí", no: "No", thanks: "Gracias por contárnoslo.",
+  newChat: "Iniciar otra conversación",
+  error: "No pudimos contactar a nuestro equipo de soporte ahora. Inténtalo de nuevo en un momento.",
+  statusWaiting: "En la cola", statusConnected: "Especialista de soporte", statusUnavailable: "Equipo no disponible", statusReconnecting: "Reconectando",
+  unread: (n) => (n === 1 ? "1 mensaje nuevo de soporte" : `${n} mensajes nuevos de soporte`),
+};
+
+const fr: Partial<LiveT> = {
+  offer: "J'aimerais qu'un expert vous aide sur ce point. Voulez-vous que je vous mette en contact avec notre équipe d'assistance ?",
+  connect: "Parler à une personne",
+  keepPip: "Continuer avec Pip",
+  connecting: "Nous vous mettons en relation avec un spécialiste de l'assistance Outlly. Merci de patienter...",
+  waiting: "Notre équipe d'assistance a bien reçu votre demande. Vous êtes dans la file d'attente.",
+  position: (n) => (n <= 1 ? "Vous êtes le prochain." : `Vous êtes numéro ${n} dans la file.`),
+  connected: "Vous êtes maintenant en contact avec un spécialiste de l'assistance Outlly.",
+  unavailable: "Notre équipe d'assistance n'est pas disponible pour le moment. Vous pouvez continuer avec Pip ou laisser un message, nous reviendrons vers vous.",
+  reconnecting: "Connexion interrompue. Nous essayons de vous reconnecter...",
+  resolved: "Votre conversation avec notre équipe d'assistance a été marquée comme résolue. Si vous avez besoin d'autre chose, vous pouvez démarrer une nouvelle conversation.",
+  cancel: "Annuler la demande",
+  leave: "Laisser un message",
+  leaving: "Enregistrement de votre message...",
+  left: (ref) => `C'est noté. Votre message est enregistré sous le ticket ${ref} et nous vous répondrons par e-mail.`,
+  endChat: "Terminer le chat",
+  pipBack: "Pip est de retour. Notre équipe d'assistance a rendu ce chat à Pip, posez vos questions.",
+  cancelled: "Demande annulée. Pip est là pour vous aider.",
+  customerLeft: "Vous avez quitté le chat avec notre équipe d'assistance. Pip est là pour vous aider.",
+  transferred: (name) => `${name}, de l'assistance Outlly, a rejoint le chat.`,
+  reopened: "Notre équipe d'assistance a rouvert cette conversation.",
+  agentLabel: (name) => `${name}, assistance Outlly`,
+  saidAgent: "Le spécialiste de l'assistance a dit",
+  typing: (name) => `${name} écrit`,
+  placeholder: "Écrire à notre équipe d'assistance",
+  sending: "Envoi", sent: "Envoyé", delivered: "Distribué", seen: "Vu", failed: "Non envoyé", retry: "Réessayer",
+  helpful: "Notre équipe d'assistance vous a-t-elle aidé ?", yes: "Oui", no: "Non", thanks: "Merci pour votre retour.",
+  newChat: "Démarrer une nouvelle conversation",
+  error: "Impossible de joindre notre équipe d'assistance pour le moment. Réessayez dans un instant.",
+  statusWaiting: "Dans la file", statusConnected: "Spécialiste de l'assistance", statusUnavailable: "Équipe indisponible", statusReconnecting: "Reconnexion",
+  unread: (n) => (n === 1 ? "1 nouveau message de l'assistance" : `${n} nouveaux messages de l'assistance`),
+};
+
+const de: Partial<LiveT> = {
+  offer: "Ich würde dir dafür gern eine echte Fachperson holen. Soll ich dich mit unserem Support-Team verbinden?",
+  connect: "Mit einem Menschen verbinden",
+  keepPip: "Mit Pip weitermachen",
+  connecting: "Wir verbinden dich mit einer Outlly Support-Fachkraft. Bitte warte kurz...",
+  waiting: "Unser Support-Team hat deine Anfrage erhalten. Du bist in der Warteschlange.",
+  position: (n) => (n <= 1 ? "Du bist als Nächstes dran." : `Du bist Nummer ${n} in der Warteschlange.`),
+  connected: "Du bist jetzt mit einer Outlly Support-Fachkraft verbunden.",
+  unavailable: "Unser Support-Team ist gerade nicht erreichbar. Du kannst mit Pip weitermachen oder eine Nachricht hinterlassen, wir melden uns.",
+  reconnecting: "Verbindung unterbrochen. Wir versuchen, dich wieder zu verbinden...",
+  resolved: "Deine Unterhaltung mit unserem Support-Team wurde als gelöst markiert. Wenn du noch etwas brauchst, kannst du eine neue Unterhaltung starten.",
+  cancel: "Anfrage abbrechen",
+  leave: "Nachricht hinterlassen",
+  leaving: "Deine Nachricht wird gespeichert...",
+  left: (ref) => `Erledigt. Deine Nachricht ist als Ticket ${ref} gespeichert und wir melden uns per E-Mail.`,
+  endChat: "Chat beenden",
+  pipBack: "Pip ist zurück. Unser Support-Team hat den Chat an Pip zurückgegeben, frag einfach weiter.",
+  cancelled: "Anfrage abgebrochen. Pip hilft dir gern weiter.",
+  customerLeft: "Du hast den Chat mit unserem Support-Team verlassen. Pip hilft dir gern weiter.",
+  transferred: (name) => `${name} vom Outlly Support ist dem Chat beigetreten.`,
+  reopened: "Unser Support-Team hat diese Unterhaltung wieder geöffnet.",
+  agentLabel: (name) => `${name}, Outlly Support`,
+  saidAgent: "Die Support-Fachkraft schrieb",
+  typing: (name) => `${name} schreibt`,
+  placeholder: "Nachricht an unser Support-Team",
+  sending: "Wird gesendet", sent: "Gesendet", delivered: "Zugestellt", seen: "Gelesen", failed: "Nicht gesendet", retry: "Erneut versuchen",
+  helpful: "Hat dir unser Support-Team geholfen?", yes: "Ja", no: "Nein", thanks: "Danke für deine Rückmeldung.",
+  newChat: "Neue Unterhaltung starten",
+  error: "Wir konnten unser Support-Team gerade nicht erreichen. Versuch es gleich noch einmal.",
+  statusWaiting: "In der Warteschlange", statusConnected: "Support-Fachkraft", statusUnavailable: "Team nicht erreichbar", statusReconnecting: "Verbindet neu",
+  unread: (n) => (n === 1 ? "1 neue Nachricht vom Support" : `${n} neue Nachrichten vom Support`),
+};
+
+const pt: Partial<LiveT> = {
+  offer: "Gostaria que um especialista humano te ajudasse com isso. Quer que eu te conecte com nossa equipe de suporte?",
+  connect: "Falar com uma pessoa",
+  keepPip: "Continuar com o Pip",
+  connecting: "Conectando você a um especialista de suporte da Outlly. Aguarde...",
+  waiting: "Nossa equipe de suporte recebeu seu pedido. Você está na fila.",
+  position: (n) => (n <= 1 ? "Você é o próximo da fila." : `Você é o número ${n} da fila.`),
+  connected: "Agora você está conectado a um especialista de suporte da Outlly.",
+  unavailable: "Nossa equipe de suporte não está disponível no momento. Você pode continuar com o Pip ou deixar sua mensagem e retornaremos.",
+  reconnecting: "Conexão interrompida. Estamos tentando reconectar você...",
+  resolved: "Sua conversa com nossa equipe de suporte foi marcada como resolvida. Se precisar de mais alguma coisa, pode iniciar outra conversa.",
+  cancel: "Cancelar pedido",
+  leave: "Deixar uma mensagem",
+  leaving: "Salvando sua mensagem...",
+  left: (ref) => `Pronto. Sua mensagem foi salva como o ticket ${ref} e responderemos por e-mail.`,
+  endChat: "Encerrar chat",
+  pipBack: "O Pip voltou. Nossa equipe de suporte devolveu este chat ao Pip, pode perguntar.",
+  cancelled: "Pedido cancelado. O Pip está aqui para ajudar.",
+  customerLeft: "Você saiu do chat com nossa equipe de suporte. O Pip está aqui para ajudar.",
+  transferred: (name) => `${name}, do suporte da Outlly, entrou no chat.`,
+  reopened: "Nossa equipe de suporte reabriu esta conversa.",
+  agentLabel: (name) => `${name}, suporte da Outlly`,
+  saidAgent: "O especialista de suporte disse",
+  typing: (name) => `${name} está digitando`,
+  placeholder: "Escreva para nossa equipe de suporte",
+  sending: "Enviando", sent: "Enviada", delivered: "Entregue", seen: "Vista", failed: "Não enviada", retry: "Tentar de novo",
+  helpful: "Nossa equipe de suporte ajudou?", yes: "Sim", no: "Não", thanks: "Obrigado por nos contar.",
+  newChat: "Iniciar outra conversa",
+  error: "Não conseguimos falar com nossa equipe de suporte agora. Tente de novo em instantes.",
+  statusWaiting: "Na fila", statusConnected: "Especialista de suporte", statusUnavailable: "Equipe indisponível", statusReconnecting: "Reconectando",
+  unread: (n) => (n === 1 ? "1 nova mensagem do suporte" : `${n} novas mensagens do suporte`),
+};
+
+const ar: Partial<LiveT> = {
+  offer: "أود أن يساعدك خبير بشري في هذا. هل تريد أن أوصلك بفريق الدعم لدينا؟",
+  connect: "التحدث مع شخص",
+  keepPip: "المتابعة مع Pip",
+  connecting: "جارٍ توصيلك بأحد مختصي الدعم في Outlly. يُرجى الانتظار...",
+  waiting: "استلم فريق الدعم طلبك. أنت الآن في قائمة الانتظار.",
+  position: (n) => (n <= 1 ? "أنت التالي في الدور." : `ترتيبك في قائمة الانتظار هو ${n}.`),
+  connected: "أنت الآن متصل بأحد مختصي الدعم في Outlly.",
+  unavailable: "فريق الدعم غير متاح حاليًا. يمكنك المتابعة مع Pip أو ترك رسالتك وسنتواصل معك.",
+  reconnecting: "انقطع الاتصال. نحاول إعادة توصيلك...",
+  resolved: "تم وضع علامة \"تم الحل\" على محادثتك مع فريق الدعم. إذا احتجت إلى أي شيء آخر، يمكنك بدء محادثة جديدة.",
+  cancel: "إلغاء الطلب",
+  leave: "ترك رسالة",
+  leaving: "جارٍ حفظ رسالتك...",
+  left: (ref) => `تم. حُفظت رسالتك كتذكرة ${ref} وسنتواصل معك عبر البريد الإلكتروني.`,
+  endChat: "إنهاء المحادثة",
+  pipBack: "عاد Pip. أعاد فريق الدعم هذه المحادثة إلى Pip، اسأل ما تشاء.",
+  cancelled: "أُلغي الطلب. Pip هنا للمساعدة.",
+  customerLeft: "غادرت المحادثة مع فريق الدعم. Pip هنا للمساعدة.",
+  transferred: (name) => `انضم ${name} من دعم Outlly إلى المحادثة.`,
+  reopened: "أعاد فريق الدعم فتح هذه المحادثة.",
+  agentLabel: (name) => `${name}، دعم Outlly`,
+  saidAgent: "قال مختص الدعم",
+  typing: (name) => `${name} يكتب`,
+  placeholder: "اكتب رسالة إلى فريق الدعم",
+  sending: "جارٍ الإرسال", sent: "أُرسلت", delivered: "وصلت", seen: "قُرئت", failed: "لم تُرسل", retry: "إعادة المحاولة",
+  helpful: "هل كان فريق الدعم مفيدًا؟", yes: "نعم", no: "لا", thanks: "شكرًا لإخبارنا.",
+  newChat: "بدء محادثة جديدة",
+  error: "تعذّر الوصول إلى فريق الدعم الآن. حاول مرة أخرى بعد قليل.",
+  statusWaiting: "في قائمة الانتظار", statusConnected: "مختص الدعم", statusUnavailable: "الفريق غير متاح", statusReconnecting: "جارٍ إعادة الاتصال",
+  unread: (n) => `${n} رسائل جديدة من الدعم`,
+};
+
+const zh: Partial<LiveT> = {
+  offer: "我想请一位人工专家来帮你处理这个问题。要我为你联系我们的支持团队吗？",
+  connect: "联系人工客服",
+  keepPip: "继续使用 Pip",
+  connecting: "正在为你联系 Outlly 支持专员，请稍候...",
+  waiting: "我们的支持团队已收到你的请求。你正在排队。",
+  position: (n) => (n <= 1 ? "下一个就是你。" : `你排在第 ${n} 位。`),
+  connected: "你已接通 Outlly 支持专员。",
+  unavailable: "我们的支持团队目前无法接待。你可以继续使用 Pip，或留言，我们会跟进。",
+  reconnecting: "连接中断，正在尝试重新连接...",
+  resolved: "你与我们支持团队的对话已标记为已解决。如果还需要帮助，可以开始新的对话。",
+  cancel: "取消请求",
+  leave: "留言",
+  leaving: "正在保存你的留言...",
+  left: (ref) => `收到。你的留言已保存为工单 ${ref}，我们会通过邮件跟进。`,
+  endChat: "结束对话",
+  pipBack: "Pip 回来了。支持团队已将此对话交还给 Pip，请随时提问。",
+  cancelled: "请求已取消。Pip 会继续为你服务。",
+  customerLeft: "你已离开与支持团队的对话。Pip 会继续为你服务。",
+  transferred: (name) => `Outlly 支持的 ${name} 已加入对话。`,
+  reopened: "我们的支持团队已重新打开此对话。",
+  agentLabel: (name) => `${name}，Outlly 支持`,
+  saidAgent: "支持专员说",
+  typing: (name) => `${name} 正在输入`,
+  placeholder: "给支持团队发消息",
+  sending: "发送中", sent: "已发送", delivered: "已送达", seen: "已读", failed: "未发送", retry: "重试",
+  helpful: "我们的支持团队有帮助吗？", yes: "有", no: "没有", thanks: "感谢你的反馈。",
+  newChat: "开始新的对话",
+  error: "暂时无法联系支持团队，请稍后再试。",
+  statusWaiting: "排队中", statusConnected: "支持专员", statusUnavailable: "团队暂不可用", statusReconnecting: "正在重新连接",
+  unread: (n) => `${n} 条来自支持团队的新消息`,
+};
+
+const ja: Partial<LiveT> = {
+  offer: "この件は担当者がお手伝いするのがよさそうです。サポートチームにおつなぎしましょうか？",
+  connect: "担当者につなぐ",
+  keepPip: "Pip で続ける",
+  connecting: "Outlly のサポート担当者におつなぎしています。少々お待ちください...",
+  waiting: "サポートチームがリクエストを受け付けました。順番をお待ちください。",
+  position: (n) => (n <= 1 ? "次はあなたの番です。" : `あなたは ${n} 番目です。`),
+  connected: "Outlly のサポート担当者につながりました。",
+  unavailable: "現在サポートチームは対応できません。Pip で続けるか、メッセージを残していただければ折り返しご連絡します。",
+  reconnecting: "接続が切れました。再接続しています...",
+  resolved: "サポートチームとの会話は解決済みになりました。ほかにご用件があれば、新しい会話を始めてください。",
+  cancel: "リクエストを取り消す",
+  leave: "メッセージを残す",
+  leaving: "メッセージを保存しています...",
+  left: (ref) => `承りました。メッセージはチケット ${ref} として保存されました。メールでご連絡します。`,
+  endChat: "チャットを終了",
+  pipBack: "Pip が戻りました。サポートチームがこのチャットを Pip に戻しました。何でも聞いてください。",
+  cancelled: "リクエストを取り消しました。Pip がお手伝いします。",
+  customerLeft: "サポートチームとのチャットを終了しました。Pip がお手伝いします。",
+  transferred: (name) => `Outlly サポートの ${name} がチャットに参加しました。`,
+  reopened: "サポートチームがこの会話を再開しました。",
+  agentLabel: (name) => `${name}（Outlly サポート）`,
+  saidAgent: "サポート担当者のメッセージ",
+  typing: (name) => `${name} が入力中`,
+  placeholder: "サポートチームにメッセージ",
+  sending: "送信中", sent: "送信済み", delivered: "配信済み", seen: "既読", failed: "未送信", retry: "再試行",
+  helpful: "サポートチームはお役に立てましたか？", yes: "はい", no: "いいえ", thanks: "ご回答ありがとうございます。",
+  newChat: "新しい会話を始める",
+  error: "現在サポートチームに接続できません。しばらくしてからもう一度お試しください。",
+  statusWaiting: "順番待ち", statusConnected: "サポート担当者", statusUnavailable: "対応できません", statusReconnecting: "再接続中",
+  unread: (n) => `サポートから新着メッセージ ${n} 件`,
+};
+
+const ru: Partial<LiveT> = {
+  offer: "Я бы хотел подключить к этому живого специалиста. Соединить вас с нашей службой поддержки?",
+  connect: "Связаться с человеком",
+  keepPip: "Продолжить с Pip",
+  connecting: "Соединяем вас со специалистом поддержки Outlly. Пожалуйста, подождите...",
+  waiting: "Наша служба поддержки получила ваш запрос. Вы в очереди.",
+  position: (n) => (n <= 1 ? "Вы следующий в очереди." : `Вы ${n}-й в очереди.`),
+  connected: "Вы на связи со специалистом поддержки Outlly.",
+  unavailable: "Сейчас наша служба поддержки недоступна. Вы можете продолжить с Pip или оставить сообщение, и мы ответим.",
+  reconnecting: "Соединение прервалось. Пытаемся переподключить вас...",
+  resolved: "Ваш разговор со службой поддержки отмечен как решённый. Если нужно что-то ещё, начните новый разговор.",
+  cancel: "Отменить запрос",
+  leave: "Оставить сообщение",
+  leaving: "Сохраняем ваше сообщение...",
+  left: (ref) => `Готово. Ваше сообщение сохранено как обращение ${ref}, мы ответим по почте.`,
+  endChat: "Завершить чат",
+  pipBack: "Pip снова здесь. Служба поддержки вернула этот чат Pip, спрашивайте.",
+  cancelled: "Запрос отменён. Pip готов помочь.",
+  customerLeft: "Вы вышли из чата со службой поддержки. Pip готов помочь.",
+  transferred: (name) => `${name} из поддержки Outlly присоединился к чату.`,
+  reopened: "Служба поддержки снова открыла этот разговор.",
+  agentLabel: (name) => `${name}, поддержка Outlly`,
+  saidAgent: "Специалист поддержки написал",
+  typing: (name) => `${name} печатает`,
+  placeholder: "Напишите в службу поддержки",
+  sending: "Отправляется", sent: "Отправлено", delivered: "Доставлено", seen: "Прочитано", failed: "Не отправлено", retry: "Повторить",
+  helpful: "Служба поддержки вам помогла?", yes: "Да", no: "Нет", thanks: "Спасибо за отзыв.",
+  newChat: "Начать новый разговор",
+  error: "Сейчас не удалось связаться со службой поддержки. Попробуйте чуть позже.",
+  statusWaiting: "В очереди", statusConnected: "Специалист поддержки", statusUnavailable: "Команда недоступна", statusReconnecting: "Переподключение",
+  unread: (n) => `Новых сообщений от поддержки: ${n}`,
+};
+
+const id: Partial<LiveT> = {
+  offer: "Sebaiknya ahli dari tim kami yang membantu soal ini. Mau saya hubungkan dengan tim dukungan kami?",
+  connect: "Hubungkan ke manusia",
+  keepPip: "Lanjut dengan Pip",
+  connecting: "Menghubungkan kamu dengan spesialis dukungan Outlly. Mohon tunggu...",
+  waiting: "Tim dukungan kami sudah menerima permintaanmu. Kamu sedang dalam antrean.",
+  position: (n) => (n <= 1 ? "Kamu berikutnya." : `Kamu nomor ${n} dalam antrean.`),
+  connected: "Kamu sekarang terhubung dengan spesialis dukungan Outlly.",
+  unavailable: "Tim dukungan kami sedang tidak tersedia. Kamu bisa lanjut dengan Pip atau tinggalkan pesan dan kami akan menindaklanjuti.",
+  reconnecting: "Koneksi terputus. Kami mencoba menghubungkanmu kembali...",
+  resolved: "Percakapanmu dengan tim dukungan kami telah ditandai selesai. Jika butuh hal lain, kamu bisa memulai percakapan baru.",
+  cancel: "Batalkan permintaan",
+  leave: "Tinggalkan pesan",
+  leaving: "Menyimpan pesanmu...",
+  left: (ref) => `Siap. Pesanmu disimpan sebagai tiket ${ref} dan kami akan membalas lewat email.`,
+  endChat: "Akhiri chat",
+  pipBack: "Pip kembali. Tim dukungan menyerahkan chat ini ke Pip, silakan bertanya.",
+  cancelled: "Permintaan dibatalkan. Pip siap membantu.",
+  customerLeft: "Kamu keluar dari chat dengan tim dukungan. Pip siap membantu.",
+  transferred: (name) => `${name} dari dukungan Outlly bergabung ke chat.`,
+  reopened: "Tim dukungan kami membuka kembali percakapan ini.",
+  agentLabel: (name) => `${name}, dukungan Outlly`,
+  saidAgent: "Spesialis dukungan menulis",
+  typing: (name) => `${name} sedang mengetik`,
+  placeholder: "Kirim pesan ke tim dukungan",
+  sending: "Mengirim", sent: "Terkirim", delivered: "Tersampaikan", seen: "Dibaca", failed: "Gagal terkirim", retry: "Coba lagi",
+  helpful: "Apakah tim dukungan kami membantu?", yes: "Ya", no: "Tidak", thanks: "Terima kasih atas masukannya.",
+  newChat: "Mulai percakapan baru",
+  error: "Kami belum bisa menghubungi tim dukungan. Coba lagi sebentar lagi.",
+  statusWaiting: "Dalam antrean", statusConnected: "Spesialis dukungan", statusUnavailable: "Tim tidak tersedia", statusReconnecting: "Menghubungkan ulang",
+  unread: (n) => `${n} pesan baru dari dukungan`,
+};
+
+const bn: Partial<LiveT> = {
+  offer: "আমি চাই এ বিষয়ে একজন মানুষ বিশেষজ্ঞ আপনাকে সাহায্য করুক। আপনাকে কি আমাদের সাপোর্ট টিমের সঙ্গে যুক্ত করব?",
+  connect: "একজন মানুষের সঙ্গে যুক্ত হন",
+  keepPip: "Pip-এর সঙ্গে চালিয়ে যান",
+  connecting: "আপনাকে Outlly সাপোর্ট বিশেষজ্ঞের সঙ্গে যুক্ত করা হচ্ছে। অনুগ্রহ করে অপেক্ষা করুন...",
+  waiting: "আমাদের সাপোর্ট টিম আপনার অনুরোধ পেয়েছে। আপনি সারিতে আছেন।",
+  position: (n) => (n <= 1 ? "পরের পালা আপনার।" : `সারিতে আপনার নম্বর ${n}।`),
+  connected: "আপনি এখন Outlly সাপোর্ট বিশেষজ্ঞের সঙ্গে যুক্ত।",
+  unavailable: "আমাদের সাপোর্ট টিম এখন উপলব্ধ নয়। আপনি Pip-এর সঙ্গে চালিয়ে যেতে পারেন বা বার্তা রেখে যেতে পারেন, আমরা যোগাযোগ করব।",
+  reconnecting: "সংযোগ বিচ্ছিন্ন হয়েছে। আমরা আবার যুক্ত করার চেষ্টা করছি...",
+  resolved: "আমাদের সাপোর্ট টিমের সঙ্গে আপনার কথোপকথন সমাধান হিসেবে চিহ্নিত হয়েছে। আর কিছু দরকার হলে নতুন কথোপকথন শুরু করতে পারেন।",
+  cancel: "অনুরোধ বাতিল করুন",
+  leave: "বার্তা রেখে যান",
+  leaving: "আপনার বার্তা সংরক্ষণ করা হচ্ছে...",
+  left: (ref) => `ঠিক আছে। আপনার বার্তা টিকিট ${ref} হিসেবে সংরক্ষিত হয়েছে, আমরা ইমেলে যোগাযোগ করব।`,
+  endChat: "চ্যাট শেষ করুন",
+  pipBack: "Pip ফিরে এসেছে। সাপোর্ট টিম এই চ্যাট Pip-কে ফিরিয়ে দিয়েছে, নির্দ্বিধায় জিজ্ঞাসা করুন।",
+  cancelled: "অনুরোধ বাতিল হয়েছে। Pip সাহায্যের জন্য আছে।",
+  customerLeft: "আপনি সাপোর্ট টিমের চ্যাট ছেড়ে দিয়েছেন। Pip সাহায্যের জন্য আছে।",
+  transferred: (name) => `Outlly সাপোর্টের ${name} চ্যাটে যোগ দিয়েছেন।`,
+  reopened: "আমাদের সাপোর্ট টিম এই কথোপকথন আবার খুলেছে।",
+  agentLabel: (name) => `${name}, Outlly সাপোর্ট`,
+  saidAgent: "সাপোর্ট বিশেষজ্ঞ বললেন",
+  typing: (name) => `${name} লিখছেন`,
+  placeholder: "সাপোর্ট টিমকে বার্তা লিখুন",
+  sending: "পাঠানো হচ্ছে", sent: "পাঠানো হয়েছে", delivered: "পৌঁছেছে", seen: "দেখা হয়েছে", failed: "পাঠানো যায়নি", retry: "আবার চেষ্টা করুন",
+  helpful: "আমাদের সাপোর্ট টিম কি সাহায্য করেছে?", yes: "হ্যাঁ", no: "না", thanks: "জানানোর জন্য ধন্যবাদ।",
+  newChat: "নতুন কথোপকথন শুরু করুন",
+  error: "এই মুহূর্তে সাপোর্ট টিমের সঙ্গে যোগাযোগ করা গেল না। একটু পরে আবার চেষ্টা করুন।",
+  statusWaiting: "সারিতে", statusConnected: "সাপোর্ট বিশেষজ্ঞ", statusUnavailable: "টিম উপলব্ধ নয়", statusReconnecting: "আবার যুক্ত হচ্ছে",
+  unread: (n) => `সাপোর্ট থেকে ${n}টি নতুন বার্তা`,
+};
+
+const BY: Record<Lang, Partial<LiveT>> = { en, hi, es, fr, de, pt, ar, zh, ja, ru, id, bn };
+export const LIVE_EN = en;
+export const liveT = (l: Lang): LiveT => ({ ...en, ...(BY[l] ?? {}) });
+
+/** A stored status code (PipMessage role "system") in the reader's words. Unknown codes return null and are not shown. */
+export function liveSysLine(t: LiveT, raw: string): string | null {
+  const { code, arg } = parseSys(raw);
+  switch (code) {
+    case SYS.requested:
+      return t.waiting;
+    case SYS.connected:
+      return t.connected;
+    case SYS.transferred:
+      return t.transferred(arg || "Outlly");
+    case SYS.pipBack:
+      return t.pipBack;
+    case SYS.resolved:
+      return t.resolved;
+    case SYS.reopened:
+      return t.reopened;
+    case SYS.cancelled:
+      return t.cancelled;
+    case SYS.customerLeft:
+      return t.customerLeft;
+    case SYS.ticket:
+      return t.left(arg || "");
+    default:
+      return null;
+  }
+}

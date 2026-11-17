@@ -11,6 +11,7 @@ import { planFor, runPip } from "@/lib/pip/run";
 import { PIP_TOOLS } from "@/lib/pip/types";
 import { asksForPastChats, asksForTranscript, wantsToResolve } from "@/lib/support/resolve";
 import { openConversation, PAST_CHATS_TEXT, PAST_CHATS_VISITOR, recordTurn, transcriptAvailable, transcriptUnavailableText } from "@/lib/support/conversations";
+import { customerSend } from "@/lib/support/live";
 
 const Body = z.object({
   message: z.string().trim().min(1).max(800),
@@ -31,6 +32,8 @@ const Body = z.object({
     .optional(),
   /** 1126: the conversation this message belongs to (signed in only). Ownership is checked on every message. */
   conversationId: z.string().max(40).optional(),
+  /** R1184: the browser's own id for this message, so a retry after a dropped connection is never written twice. */
+  cid: z.string().max(40).optional(),
 });
 
 const DAY = 24 * 3600_000;
@@ -57,6 +60,12 @@ export const POST = route(async (req) => {
   // is theirs). A resolved conversation refuses new messages here too, not only in the browser.
   const who = me ? realUserId(me) : null;
   const conv = who ? await openConversation(who, b.conversationId) : null;
+  // R1184 Live Assist: while the person waits for, or talks with, a support specialist, Pip stays silent.
+  // The words go to the support team through the same conversation (and the same idempotent write), never the model.
+  if (who && conv && (conv.mode === "waiting" || conv.mode === "human")) {
+    const sent = await customerSend(who, { conversationId: conv.id, text: b.message, cid: b.cid });
+    return json({ live: true, answer: "", confident: true, sources: [], wantsHuman: false, message: sent.message, duplicate: sent.duplicate, conversationId: conv.id });
+  }
   // Writes the turn and hands back the conversation id. Records cards (r.data) are never written down.
   // `shown` is the full text the person saw, when it differs from `answer` (the resolve offer adds its question).
   const reply = async <T extends { answer: string }>(out: T, shown?: string) => {
