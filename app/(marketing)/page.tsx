@@ -76,8 +76,8 @@ const faqJsonLd = {
 };
 
 /**
- * 1181: one sheet of the landing's pinned-panel stack (lib/motion/panels.ts, built by ScrollScenes on screens 768px and
- * up with motion allowed). Until then, and everywhere else, it is a plain block. `flow`: slides over the sheet before it
+ * 1181: one sheet of the landing's pinned-panel stack (lib/motion/panels.ts, built by ScrollScenes whenever motion is
+ * allowed, phones included since 1183). Until then, and under reduced motion, it is a plain block. `flow`: slides over the sheet before it
  * but is never pinned itself (Comparison pins its own header row).
  */
 function Panel({ children, flow = false }: { children: React.ReactNode; flow?: boolean }) {

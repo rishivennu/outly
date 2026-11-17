@@ -52,6 +52,9 @@ export const useCaptionBurning = (store: CaptionStore) => useSyncExternalStore(s
 /** The action bar line while captions are being made on any step. null when nothing is running. */
 export const useCaptionRunLine = (store?: CaptionStore | null) => useRunText(runLine, store);
 
+/** 1182: a short string picked from the run (Pip's caption notes), so its reader re-renders only when that string changes. */
+export const useCaptionPick = (pick: (s: CaptionState) => string | null) => useRunText(pick);
+
 /** The journey rail pill: progress, then how it ended. Renders nothing outside /create or with no run. */
 export function CaptionRunPill({ className }: { className?: string }) {
   const text = useRunText(runPill);

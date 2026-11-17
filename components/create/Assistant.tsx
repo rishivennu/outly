@@ -1,11 +1,15 @@
 "use client";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowUp, Check, ChevronDown, Eye, Pencil, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowRight, ArrowUp, Check, ChevronDown, Eye, Pencil, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { cn, formatDuration } from "@/lib/utils";
-import { canSaveCaption, foldsConversation } from "./assistant-state";
+import { canSaveCaption, captionFactsKey, captionTips, foldsConversation, hookNote, pipFooter, type CaptionFacts, type PipFooterId } from "./assistant-state";
+import { useCaptionPick } from "./captions/CaptionRun";
+import { limitFacts } from "./UploadCard";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import type { UploadLimits } from "@/lib/client/upload";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import type { Draft, HooksState, Step, Tone, UploadState, WatchState } from "./types";
 import type { Hold } from "./publish";
@@ -53,6 +57,21 @@ interface Props {
   /** Launch: places that will really get it. */
   sending?: Platform[];
   mode?: "now" | "schedule";
+  /** 1182: the server's upload limits for Step 1 (null while loading or when the request failed). */
+  limits?: UploadLimits | null;
+  limitsFailed?: boolean;
+  online?: boolean;
+  /** 1182: the caption editor is on the page (the video is in), so Pip can talk about it. */
+  captions?: boolean;
+  /** The hook picked on Your Story, saved with the draft. The caption is final once there is one. */
+  finalHook?: string | null;
+  /** Your Story is open (the server has the video), and why not when it isn't. */
+  storyOpen?: boolean;
+  storyWhy?: string | null;
+  /** The footer's lit button. Finalize runs onUse, the same move as the page; the rest are the page's own moves. */
+  onFooter?: (id: PipFooterId) => void;
+  /** Close only folds Pip: nothing is saved, finalized or sent, and everything typed stays for next time. */
+  onClose?: () => void;
 }
 
 const names = (ps: Platform[]) => {
@@ -114,6 +133,8 @@ export function Assistant(p: Props) {
   const [tweak, setTweak] = useState("");
   /** null while the Original card is reading; a string while it is being edited. */
   const [capEdit, setCapEdit] = useState<string | null>(null);
+  /** 1182: "Change what I said" with an unsaved edit asks first, since new hooks replace it. */
+  const [askDiscard, setAskDiscard] = useState(false);
   const result = p.hooks.result;
   const current = result?.hooks[p.hooks.index];
   const folds = foldsConversation(p.step) && !!p.chosenHook;
@@ -137,16 +158,53 @@ export function Assistant(p: Props) {
   const vertical = p.meta?.width && p.meta?.height ? p.meta.height > p.meta.width : null;
   const askStory = p.step !== "video" && !p.submittedStory;
 
+  /* 1182: Step 1 facts from the server, caption notes from the real run, and the footer's one lit button. */
+  const facts = limitFacts(p.limits ?? null);
+  const capKey = useCaptionPick(captionFactsKey);
+  const capNotes = useMemo(() => (capKey && p.captions ? captionTips(JSON.parse(capKey) as CaptionFacts) : []), [capKey, p.captions]);
+  const pick = (tweak || current?.text || "").trim();
+  const capDirty = capEdit !== null && capEdit.trim() !== p.original.trim();
+  const tweakDirty = editing && !!current && tweak.trim() !== current.text.trim();
+  const capBlank = capEdit !== null && !canSaveCaption(capEdit);
+  const canFinalize = p.step === "story" && !p.chosenHook && !!current && !!pick && !capBlank;
+  const footer = p.onFooter ? pipFooter({ step: p.step, storyOpen: !!p.storyOpen, storyWhy: p.storyWhy, finalized: !!p.finalHook?.trim(), canFinalize, busy: p.hooks.loading }) : null;
+  const footNote = footer?.id === "finalize" && capBlank ? "Your Original caption is empty. Write it, or press Cancel." : (footer?.hint ?? (footer?.id === "finalize" ? "Uses the hook on show and your Original caption." : null));
+  const footNoteId = `${inputId}-foot`;
+  /** Saves an open Original edit first, then picks the hook on show: the same onUse as the page, so nothing is skipped. */
+  const finalize = () => {
+    if (!canFinalize) return;
+    if (capEdit !== null) {
+      if (capDirty) p.onOriginal(capEdit.trim());
+      setCapEdit(null);
+    }
+    setEditing(false);
+    p.onUse(pick);
+  };
+  const busyNow = p.hooks.loading || p.hooks.more || p.copyLoading;
+  const status = p.online === false ? "Offline. I'm back when you reconnect." : busyNow ? "Writing…" : askStory && p.watch?.kind === "watching" ? "Watching your video…" : "Available";
+  const next =
+    p.step !== "video"
+      ? null
+      : !p.hasMedia
+        ? "Next: pick your video."
+        : p.upload.kind === "uploading"
+          ? "Next: let it finish, then Continue to Your Story."
+          : p.upload.kind === "paused"
+            ? "Next: resume the upload."
+            : p.upload.kind === "failed"
+              ? "Next: try the upload again, or pick another video."
+              : "Next: Continue to Your Story and tell me what it's about.";
+
   return (
     <section aria-label="Creative partner" className="flex h-full min-h-0 flex-col">
-      <header className="flex min-h-[76px] items-center gap-3 py-3 pl-5 pr-16">
-        <span className="lime-bg relative grid h-9 w-9 place-items-center rounded-full">
+      <header className="flex min-h-[64px] shrink-0 items-center gap-3 py-2.5 pl-5 pr-16 xl:min-h-[76px] xl:py-3">
+        <span className="lime-bg relative grid h-9 w-9 shrink-0 place-items-center rounded-full">
           <Sparkles className="h-4 w-4" aria-hidden="true" />
-          <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-success" aria-hidden="true" />
+          <span className={cn("absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card", p.online === false ? "bg-muted-foreground" : "bg-success")} aria-hidden="true" />
         </span>
-        <div>
-          <h2 className="text-sm font-semibold">Outlly assistant</h2>
-          <p className="text-xs text-muted-foreground">{p.hooks.loading || p.hooks.more || p.copyLoading ? "Writing…" : askStory && p.watch?.kind === "watching" ? "Watching your video…" : "Here with you"}</p>
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold">Outlly Assistant</h2>
+          <p className="truncate text-xs text-muted-foreground" role="status">{status}</p>
         </div>
       </header>
 
@@ -165,7 +223,23 @@ export function Assistant(p: Props) {
         )}
         {showHistory && (
         <div id={historyId} className="space-y-4">
-        {!p.hasMedia && <Bubble from="outly">Hey! Upload your video and I&apos;ll help you prepare it for every platform.</Bubble>}
+        {!p.hasMedia && (
+          <Bubble from="outly">
+            <span className="font-semibold">Hi, I&apos;m Pip.</span> Upload your video and I&apos;ll help you prepare it for every platform. You approve every word before anything goes out.
+          </Bubble>
+        )}
+        {/* 1182: how to upload and what fits, from the server's own limits (the same line the card shows). */}
+        {!p.hasMedia && p.step === "video" && (
+          <div role="group" aria-label="How to upload" className="rounded-2xl bg-secondary/50 p-3.5 hairline">
+            <p className="text-[13px] font-semibold">How to upload</p>
+            <p className="mt-1 text-[13px] leading-snug text-muted-foreground">Press Browse files on the card, or drop a video onto it. One video makes one post; several at once go to a batch.</p>
+            <ul className="mt-2.5 flex flex-wrap gap-1.5 text-xs font-medium" aria-label="What you can upload">
+              <li className="rounded-full bg-card px-2.5 py-1 hairline">{facts.formats}</li>
+              <li className="rounded-full bg-card px-2.5 py-1 tabular-nums hairline">{facts.size ?? (p.limitsFailed ? "Size checked when the upload starts" : "Checking your limits…")}</li>
+              {facts.storage && <li className="rounded-full bg-card px-2.5 py-1 tabular-nums hairline">{facts.storage}</li>}
+            </ul>
+          </div>
+        )}
         {/* 1170: Step 1 tips, short and only what is true of Outlly today. */}
         {!p.hasMedia && p.step === "video" && (
           <ul className="space-y-1.5 pl-1 text-[13px] leading-snug text-muted-foreground" aria-label="Before you upload">
@@ -183,6 +257,10 @@ export function Assistant(p: Props) {
         {p.hasMedia && p.upload.kind === "failed" && (
           <Bubble from="outly">
             That upload didn&apos;t make it. <span className="text-muted-foreground">{p.upload.message} Try it again when you&apos;re ready.</span>
+            <span className="mt-2 block text-sm text-muted-foreground">
+              If it fails again, check your connection first. The video has to be an {facts.formats}
+              {facts.size ? `, ${facts.size.replace(/^Up to/, "up to")}` : ""}. Your story and copy stay while you retry.
+            </span>
           </Bubble>
         )}
         {p.hasMedia && p.upload.kind === "done" && p.meta?.duration ? (
@@ -190,6 +268,7 @@ export function Assistant(p: Props) {
             Your video is in. <span className="text-muted-foreground">{formatDuration(p.meta.duration)}{vertical === null ? "" : vertical ? ", vertical. Perfect for Reels and Shorts." : ", horizontal. It'll sit with bars on vertical feeds."}</span>
           </Bubble>
         ) : null}
+        {next && <p className="pl-1 text-[13px] font-medium text-foreground">{next}</p>}
 
         {p.step !== "video" && (
           <Bubble from="outly">
@@ -261,7 +340,7 @@ export function Assistant(p: Props) {
           <div className="flex flex-col items-end gap-1">
             <Bubble from="you">{p.submittedStory}</Bubble>
             {!p.chosenHook && !p.hooks.loading && (
-              <button type="button" onClick={p.onEditStory} className="min-h-[44px] px-2 text-xs text-muted-foreground hover:text-foreground">
+              <button type="button" onClick={() => (capDirty || tweakDirty ? setAskDiscard(true) : p.onEditStory())} className="min-h-[44px] px-2 text-xs text-muted-foreground [@media(hover:hover)]:hover:text-foreground">
                 Change what I said
               </button>
             )}
@@ -375,13 +454,17 @@ export function Assistant(p: Props) {
                       </motion.p>
                     )}
                   </AnimatePresence>
+                  {!p.chosenHook && current && !p.hooks.loading && hookNote(pick) && <p className="mt-2 text-xs text-muted-foreground">{hookNote(pick)}</p>}
 
                   {!p.chosenHook && (
                     <>
+                      {/* 1182: the hook on show is picked with Finalize caption at the foot of Pip, the one lit button. */}
                       <div className="mt-5 flex flex-wrap items-center gap-2">
-                        <Button variant="lime" onClick={() => p.onUse((tweak || current?.text || "").trim())} disabled={p.hooks.loading || !(tweak || current?.text)}>
-                          <Check className="h-4 w-4" /> Use this
-                        </Button>
+                        {!footer && (
+                          <Button variant="lime" onClick={() => p.onUse((tweak || current?.text || "").trim())} disabled={p.hooks.loading || !(tweak || current?.text)}>
+                            <Check className="h-4 w-4" /> Use this
+                          </Button>
+                        )}
                         <Button variant="subtle" onClick={p.onTryAnother} disabled={p.hooks.loading || (p.hooks.more && p.hooks.index >= result.hooks.length - 1)}>
                           <RefreshCw className={cn("h-4 w-4", (p.hooks.loading || (p.hooks.more && p.hooks.index >= result.hooks.length - 1)) && "animate-spin")} />
                           {p.hooks.more && p.hooks.index >= result.hooks.length - 1 ? "Writing the next…" : "Try another"}
@@ -410,6 +493,18 @@ export function Assistant(p: Props) {
               </div>
             </motion.div>
           </>
+        )}
+
+        {/* 1182: caption notes from the real run (language, translation, what failed), only once the editor is there. */}
+        {p.step === "story" && capNotes.length > 0 && (
+          <div role="group" aria-label="Captions on the video" className="rounded-2xl bg-secondary/50 p-3.5 hairline">
+            <p className="text-[13px] font-semibold">Captions on the video</p>
+            <ul className="mt-1 space-y-1.5 text-[13px] leading-snug text-muted-foreground">
+              {capNotes.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {p.chosenHook && (
@@ -505,6 +600,41 @@ export function Assistant(p: Props) {
           </div>
         </form>
       )}
+
+      {/* 1182: always a way forward besides the X. Close only folds Pip; the lit button is this step's next move. */}
+      {footer && (
+        <footer className="shrink-0 border-t border-border/60 px-4 pb-3 pt-2.5">
+          {footNote && (
+            <p id={footNoteId} className="mb-2 text-xs leading-snug text-muted-foreground" aria-live="polite">
+              {footNote}
+            </p>
+          )}
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="ghost" className="min-h-11 shrink-0 px-3.5" onClick={p.onClose}>
+              Close
+            </Button>
+            <Button type="button" variant="lime" className="h-auto min-h-11 min-w-0 flex-1 whitespace-normal py-2 leading-tight" disabled={footer.disabled} aria-describedby={footNote ? footNoteId : undefined} onClick={() => (footer.id === "finalize" ? finalize() : p.onFooter?.(footer.id))}>
+              {footer.id === "finalize" || footer.id === "done" ? <Check className="h-4 w-4" aria-hidden="true" /> : <ArrowRight className="h-4 w-4" aria-hidden="true" />}
+              <span className="text-balance text-center">{footer.label}</span>
+            </Button>
+          </div>
+        </footer>
+      )}
+
+      <ConfirmDialog
+        open={askDiscard}
+        onOpenChange={setAskDiscard}
+        title="Discard your edit?"
+        body="Changing what you said writes new hooks, so the edit you haven't saved goes with the old ones."
+        confirmLabel="Discard and change it"
+        cancelLabel="Keep editing"
+        onConfirm={() => {
+          setAskDiscard(false);
+          setCapEdit(null);
+          setEditing(false);
+          p.onEditStory();
+        }}
+      />
     </section>
   );
 }

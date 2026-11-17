@@ -6,6 +6,7 @@ import type { AnalysisFull, AnalysisSummary, BehaviorStats } from "@/lib/admin/b
 import { cn } from "@/lib/utils";
 import { BehaviorBreakdown } from "./BehaviorBreakdown";
 import { BehaviorAnalyses } from "./BehaviorAnalyses";
+import { ReportMeta } from "./FilterBar";
 
 const RANGES = [7, 30, 90] as const;
 export type History = { items: AnalysisSummary[]; more: boolean; total: number };
@@ -36,7 +37,7 @@ export function BehaviorView({ stats, history, selected, tab, aiReady }: { stats
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div role="tablist" aria-label="User behavior views" className="inline-flex rounded-full bg-secondary/70 p-1 hairline">
           {([["breakdown", "Breakdown", TrendingUp], ["ai", "Gemini analyses", Sparkles]] as const).map(([k, label, Icon]) => (
-            <button key={k} id={`tab-${k}`} type="button" role="tab" aria-selected={t === k} aria-controls={`panel-${k}`} onClick={() => chooseTab(k)} className={cn("inline-flex h-9 items-center gap-2 rounded-full px-4 text-[13px] font-semibold transition-colors", t === k ? "lime-bg" : "text-muted-foreground hover:text-foreground")}>
+            <button key={k} id={`tab-${k}`} type="button" role="tab" aria-selected={t === k} aria-controls={`panel-${k}`} onClick={() => chooseTab(k)} className={cn("inline-flex h-11 items-center gap-2 rounded-full px-4 text-[13px] font-semibold transition-colors sm:h-9", t === k ? "lime-bg" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
               <Icon className="h-4 w-4" aria-hidden />
               {label}
               {k === "ai" && count > 0 && <span className={cn("grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold tabular", t === k ? "bg-[hsl(var(--lime-foreground)/0.14)]" : "bg-foreground/[0.07]")}>{count}</span>}
@@ -47,13 +48,16 @@ export function BehaviorView({ stats, history, selected, tab, aiReady }: { stats
           {pending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground motion-reduce:animate-none" aria-label="Loading" />}
           <div role="radiogroup" aria-label="Date range" className="inline-flex rounded-full bg-secondary/70 p-1 hairline">
             {RANGES.map((r) => (
-              <button key={r} type="button" role="radio" aria-checked={stats.rangeDays === r} onClick={() => setParam((q) => (r === 30 ? q.delete("range") : q.set("range", String(r))), "push")} className={cn("h-8 rounded-full px-3.5 text-[12.5px] font-semibold transition-colors", stats.rangeDays === r ? "lime-bg" : "text-muted-foreground hover:text-foreground")}>
+              <button key={r} type="button" role="radio" aria-checked={stats.rangeDays === r} onClick={() => setParam((q) => (r === 30 ? q.delete("range") : q.set("range", String(r))), "push")} className={cn("h-11 rounded-full px-3.5 text-[12.5px] font-semibold transition-colors sm:h-8", stats.rangeDays === r ? "lime-bg" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
                 {r} days
               </button>
             ))}
           </div>
         </div>
       </div>
+      <p className="-mt-2 mb-5 text-[12.5px] text-muted-foreground" suppressHydrationWarning>
+        <ReportMeta source="Outlly data" range={`Last ${stats.rangeDays} days`} tz={stats.timezone} updatedAt={stats.generatedAt} />
+      </p>
 
       <div id="panel-breakdown" role="tabpanel" aria-labelledby="tab-breakdown" hidden={t !== "breakdown"} className={cn(pending && "opacity-60 transition-opacity")}>
         <BehaviorBreakdown s={stats} active={t === "breakdown"} />

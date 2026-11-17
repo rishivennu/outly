@@ -21,7 +21,7 @@ import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { Assistant } from "./Assistant";
-import { captionSource, NO_SUGGESTIONS, PANEL_OPEN, panelReducer, PIP_PANEL_KEY, routeCopy, suggest, type SuggestAction, type Suggestions } from "./assistant-state";
+import { captionFinal, captionSource, NO_SUGGESTIONS, PANEL_OPEN, panelReducer, PIP_PANEL_KEY, pipOpensOn, routeCopy, suggest, type PipFooterId, type SuggestAction, type Suggestions } from "./assistant-state";
 import { StepProgress, stepIndex } from "./StepProgress";
 import { UploadCard, UploadFileCard, uniqueFiles } from "./UploadCard";
 import { SavedDrafts } from "./SavedDrafts";
@@ -272,13 +272,33 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     drawerFrom.current = document.activeElement as HTMLElement | null;
     setDrawer(true);
   }, []);
+  /** 1182: the floating Pip button, where focus lands when Pip closes after opening by itself. */
+  const pipFab = useRef<HTMLButtonElement>(null);
   const closeDrawer = useCallback(() => {
     setDrawer(false);
-    requestAnimationFrame(() => drawerFrom.current?.focus?.());
+    requestAnimationFrame(() => (drawerFrom.current?.isConnected ? drawerFrom.current : pipFab.current)?.focus?.());
   }, []);
   useEffect(() => {
     if (wide) setDrawer(false);
   }, [wide]);
+  /* 1182: entering Your Video or Your Story opens Pip until the caption is final. Only on entering a step, so a
+     keystroke, an edit or a tab switch never opens or folds it; a draft being restored is waited for first. This
+     is not the creator's own choice, so it is not written to this browser. */
+  const pipStep = useRef<Step | null>(null);
+  useEffect(() => {
+    if (phase !== "edit") {
+      pipStep.current = null;
+      return;
+    }
+    if (!deviceReady || pipStep.current === step) return;
+    pipStep.current = step;
+    if (!pipOpensOn(step, captionFinal(hook))) return;
+    if (window.matchMedia("(min-width: 1280px)").matches) panelDispatch({ t: "set", open: true });
+    else {
+      drawerFrom.current = null;
+      setDrawer(true);
+    }
+  }, [step, phase, hook, deviceReady]);
   useEffect(() => {
     if (!sheet) return;
     const prev = document.body.style.overflow;
@@ -850,6 +870,31 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     await fetchCopy(enabledPlatforms(drafts), text);
     setCopyLoading(false);
   };
+  /** 1182: Pip open or folded on wide screens, remembered in this browser like the panel's own button. */
+  const setPip = (open: boolean) => {
+    panelDispatch({ t: "set", open });
+    try {
+      window.localStorage.setItem(PIP_PANEL_KEY, open ? "open" : "closed");
+    } catch {
+      /* not remembered, still folds */
+    }
+  };
+  /** 1182: Close and the X only fold Pip. Nothing is finalized, saved over or sent. */
+  const closePip = () => (wide ? setPip(false) : closeDrawer());
+  /**
+   * 1182: Finalize caption picks the hook through the same chooseHook as the page (Everywhere opens with it and
+   * the draft saves it), then folds Pip. The floating Pip button, or the panel button on wide screens, brings it back.
+   */
+  const finalizeCaption = async (text: string) => {
+    if (!text.trim()) return;
+    if (wide) setPip(false);
+    else {
+      drawerFrom.current = null;
+      closeDrawer();
+    }
+    toast("Caption finalized. Pip is folded away; open it again any time.", "ok");
+    await chooseHook(text);
+  };
 
   const rewrite = async (p: Platform) => {
     if (!hook) return;
@@ -1082,6 +1127,14 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     everywhere: mediaWhy ?? (!hook ? "Pick a hook on Your Story first." : undefined),
     launch: mediaWhy ?? (!hook ? "Pick a hook on Your Story first." : !allReviewed ? "Look over each place on Everywhere first." : undefined),
   };
+  /** 1182: the lit button at the foot of Pip runs the page's own move for this step, behind the page's own checks. */
+  const onPipFooter = (id: PipFooterId) => {
+    if (id === "story") return void (reachable.story && goTo("story"));
+    if (id === "done") return closePip();
+    if (id === "everywhere" && !reachable.everywhere) return;
+    if (!wide) closeDrawer();
+    goTo("everywhere");
+  };
 
   /* ================= render ================= */
   if (phase !== "edit") {
@@ -1125,7 +1178,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       onOriginal={setEditedOriginal}
       onTryAnother={tryAnother}
       onTone={(t) => fetchHooks(t, [])}
-      onUse={chooseHook}
+      onUse={finalizeCaption}
       onRepick={() => {
         setHook(null);
         setStep("story");
@@ -1139,6 +1192,15 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       hold={plan.hold}
       sending={plan.send}
       mode={mode}
+      limits={limits}
+      limitsFailed={limitsFailed}
+      online={online}
+      captions={!!(media && upload.kind === "done")}
+      finalHook={hook}
+      storyOpen={storyOpen}
+      storyWhy={blocked.story}
+      onFooter={onPipFooter}
+      onClose={closePip}
     />
   );
 
@@ -1168,6 +1230,12 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
         <Sparkles className="h-4 w-4" aria-hidden="true" /> {step === "launch" ? "Pip's checklist" : "Pip's notes"}
       </Button>
     </div>
+  );
+  /** 1182: below 1280px a folded Pip is this small button, floating just over the action bar's right end. */
+  const pipFabButton = drawer ? null : (
+    <Button ref={pipFab} variant="lime" size="icon" className="h-12 w-12 rounded-full shadow-[0_12px_28px_-10px_hsl(var(--lime)/0.75)]" onClick={openDrawer} aria-haspopup="dialog" aria-expanded={false} aria-controls={ASSISTANT_PANEL} aria-label="Open the Outlly assistant">
+      <Sparkles className="h-5 w-5" aria-hidden="true" />
+    </Button>
   );
 
   return (
@@ -1363,7 +1431,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
               </motion.section>
             )}
           {hasMedia && !stage && <SaveDraft className="mt-6 xl:hidden" state={saved} at={savedAt} onSave={saveDraftNow} busy={saved === "saving"} hideButton sync={syncLine} />}
-          <ActionBar state={bar} saveLabel={saved === "saving" ? "Saving" : "Save draft"} mode={mode} onAction={onBar} fill={stepOne} />
+          <ActionBar state={bar} saveLabel={saved === "saving" ? "Saving" : "Save draft"} mode={mode} onAction={onBar} fill={stepOne} pip={pipFabButton} />
         </div>
         <ConflictDialog
           open={comparing && !!conflict}
@@ -1453,7 +1521,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
             sheet ? "glass-strong" : "glass",
             "xl:h-full xl:rounded-[28px] xl:transition-[width,opacity] xl:duration-300 xl:ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
             panel.open ? "xl:w-[300px] xl:opacity-100 2xl:w-[320px]" : "xl:w-0 xl:opacity-0",
-            "max-xl:h-[min(88dvh,760px)] max-xl:w-full max-xl:rounded-t-[28px] max-xl:pb-[env(safe-area-inset-bottom)] md:max-xl:m-3 md:max-xl:h-auto md:max-xl:w-[400px] md:max-xl:rounded-[28px] md:max-xl:pb-0",
+            // 1182: a phone sheet as tall as what it holds, up to 86dvh; header and footer stay put while the middle scrolls.
+            "max-xl:flex max-xl:max-h-[min(86dvh,720px)] max-xl:w-full max-xl:flex-col max-xl:rounded-t-[28px] max-xl:pb-[env(safe-area-inset-bottom)] md:max-xl:m-3 md:max-xl:max-h-none md:max-xl:w-[400px] md:max-xl:rounded-[28px] md:max-xl:pb-0",
           )}
         >
           <Button ref={drawerClose} variant="ghost" size="icon" className="absolute right-3 top-4 z-[2] xl:hidden" onClick={closeDrawer} aria-label="Close Pip">

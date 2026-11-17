@@ -112,11 +112,13 @@ describe("pinned panels with overscroll (1181)", () => {
     expect(scenes).toContain("holds.set(sheet, { screens: 1.3");
     expect(scenes).toContain("holds.set(sheet, { screens: 1.6");
     expect(scenes).toContain("undo.push(stackPanels(panels, holds))");
-    expect(panels).toContain("panel.style.marginBottom = `${k * 100}vh`");
+    // 1183: the hold's room is px of the same innerHeight the pin's end uses (a phone's 100vh is taller than that).
+    expect(panels).toContain("panel.style.marginBottom = `${Math.round(k * innerHeight)}px`");
   });
 
-  test("the stack is for wide screens only: a phone just scrolls", () => {
-    expect(scenes).toContain('const panels = wide ? Array.from(main.querySelectorAll<HTMLElement>(".lp-panel")) : []');
+  test("1183: the stack runs on phones too, on native scroll, and the address bar never re-measures it", () => {
+    expect(scenes).toContain('const panels = Array.from(main.querySelectorAll<HTMLElement>(".lp-panel"))');
+    expect(panels).toContain("ScrollTrigger.config({ ignoreMobileResize: true })");
   });
 
   test("it cleans up after itself", () => {

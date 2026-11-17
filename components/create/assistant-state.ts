@@ -2,6 +2,8 @@ import { acceptProposal } from "./deck-logic";
 import type { Proposal, Undo } from "./proposal";
 import type { Draft, PlatformCopy, Step } from "./types";
 import type { Platform } from "@/lib/domain";
+import type { CaptionState } from "./captions/run-store";
+import { CAPTION_LANGUAGES, isEnglish, languageName } from "@/lib/captions/languages";
 
 /**
  * The assistant panel on wide screens. `restore` is kept for older saved states; Phase 3 (B1, B5) no longer
@@ -27,6 +29,69 @@ export function panelReducer(s: PanelState, a: PanelAction): PanelState {
  * message there and the conversation (with the suggested hook) folds behind "Show conversation".
  */
 export const foldsConversation = (step: Step) => step === "everywhere" || step === "launch";
+
+/* ---------------- 1182: Pip opens by itself on Steps 1 and 2 and folds once the caption is final ---------------- */
+
+/** The caption is final once a hook is picked on Your Story. The hook is saved with the draft, so a reload keeps it. */
+export const captionFinal = (hook: string | null | undefined) => !!hook?.trim();
+
+/**
+ * Entering Your Video or Your Story opens Pip until the caption is final. Any other step, or a final caption,
+ * leaves Pip the way it is. Called only when a step is entered, never on a keystroke.
+ */
+export const pipOpensOn = (step: Step, finalized: boolean) => !finalized && (step === "video" || step === "story");
+
+export type PipFooterId = "story" | "finalize" | "everywhere" | "done" | "edit";
+export type PipFooter = { id: PipFooterId; label: string; disabled: boolean; hint: string | null };
+
+/**
+ * The one lit button at the foot of Pip, by step. Each runs the same move as the page (Continue, Use this,
+ * Back to editing), so Pip never skips a check the page makes. Closing Pip is a separate button and never
+ * finalizes, saves or sends anything.
+ */
+export function pipFooter(x: { step: Step; storyOpen: boolean; storyWhy?: string | null; finalized: boolean; canFinalize: boolean; busy?: boolean }): PipFooter {
+  if (x.step === "video") return { id: "story", label: "Continue to Your Story", disabled: !x.storyOpen, hint: x.storyOpen ? null : (x.storyWhy ?? "Add a video first.") };
+  if (x.step === "story") {
+    if (x.finalized && !x.canFinalize) return { id: "everywhere", label: "Continue to Everywhere", disabled: false, hint: null };
+    const why = x.busy ? "Writing your hook…" : "Tell me what it's about, then pick a hook.";
+    return { id: "finalize", label: "Finalize caption", disabled: !x.canFinalize || !!x.busy, hint: x.canFinalize && !x.busy ? null : why };
+  }
+  if (x.step === "everywhere") return { id: "done", label: "Done", disabled: false, hint: null };
+  return { id: "edit", label: "Back to editing", disabled: false, hint: null };
+}
+
+/** What Pip knows about the caption run, as a short string so a reader re-renders only when one of these changes. */
+export type CaptionFacts = { lines: number; busy: "transcribe" | "translate" | "burn" | null; failed: boolean; gaps: number; spoken: string; english: boolean; ai: boolean | null };
+export const captionFactsKey = (s: CaptionState) =>
+  JSON.stringify({ lines: s.tracks.orig.length, busy: s.busy?.kind ?? null, failed: s.outcome === "failed", gaps: s.gaps.length, spoken: s.langPick !== "auto" ? s.langPick : s.heard, english: !!s.tracks.en, ai: s.aiReady } satisfies CaptionFacts);
+
+/**
+ * Pip's caption notes on Your Story, from the real run: what to press next, what went wrong, and the
+ * translation only when the editor really offers it (AI on, lines made, not already English).
+ */
+export function captionTips(f: CaptionFacts): string[] {
+  if (f.ai === false) return [];
+  const out: string[] = [];
+  if (f.busy === "transcribe") out.push("Transcribing your video now. It keeps going if you move on to the next step.");
+  else if (f.busy === "translate") out.push("Translating your captions to English now.");
+  else if (f.failed) out.push("The last caption run didn't finish. Press Transcribe with AI again under Captions on the video, or pick the spoken language yourself first.");
+  else if (f.lines === 0 && !f.busy)
+    out.push(`Want words on the video? Under Captions on the video, pick the spoken language (${CAPTION_LANGUAGES.length} to choose from, Telugu, Tamil and Hindi among them) or Detect it for me, then press Transcribe with AI.`);
+  if (f.gaps > 0) out.push(f.gaps === 1 ? "One part of the video came back without words. Retry it in the caption editor." : `${f.gaps} parts of the video came back without words. Retry them in the caption editor.`);
+  const foreign = !!f.spoken && !isEnglish(f.spoken);
+  if (f.lines > 0 && !f.busy && foreign) {
+    const name = languageName(f.spoken);
+    out.push(f.english ? `Your captions are in ${name} with an English track too. Switch between Original and English in the caption editor; both keep the same timing.` : `Your captions are in ${name}. Translate to English adds an English track with the same timing, and you can switch between them.`);
+  }
+  return out;
+}
+
+/** A plain fact about the hook on show: its length, and a nudge only when it runs long for a first line. */
+export function hookNote(text: string): string | null {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  if (!words) return null;
+  return words > 16 ? `${words} words. That's long for a first line; Make it punchier trims it.` : `${words} words, short enough to read in one glance.`;
+}
 
 /** Nothing but spaces is not a caption. */
 export const canSaveCaption = (text: string) => text.trim().length > 0;

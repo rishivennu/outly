@@ -77,7 +77,10 @@ describe("p4 preview for a place that is not connected", () => {
     const deck = src("components/create/PlatformDeck.tsx");
     const pane = src("components/create/PlatformPreview.tsx");
     expect(deck).toContain("previewDraft(active, p.drafts, p.hook)");
-    expect(deck).toContain("Connect to send");
+    // 1182: a place with no live account is a compact Not connected row with Connect, never a card with a send box.
+    expect(deck).toContain('{acct ? "Needs a reconnect" : "Not connected"}');
+    expect(deck).toContain('<span className="sr-only">{name} to send</span>');
+    expect(deck).toContain('const linked = live.filter((pl) => p.accounts[pl]?.status === "connected");');
     expect(deck).toContain("const previewOnly = !connected && !d.enabled;");
     expect(deck).toContain("{previewOnly ? null : (");
     expect(pane).toContain("Connect to send");

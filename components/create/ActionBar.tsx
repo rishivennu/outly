@@ -180,6 +180,8 @@ interface Props {
   className?: string;
   /** 1170: as wide as the workspace column it sits in (Step 1), instead of the centred 768px bar. */
   fill?: boolean;
+  /** 1182: the folded Pip button on phones and tablets. It floats over the bar's right end, with room kept above. */
+  pip?: React.ReactNode;
 }
 
 const ICON: Record<BarId, typeof Save> = { save: Save, preview: Eye, schedule: CalendarClock, publish: Send, continue: ArrowRight, back: ArrowLeft, mode: CalendarClock };
@@ -190,10 +192,12 @@ const ICON: Record<BarId, typeof Save> = { save: Save, preview: Eye, schedule: C
  * safe area) and follows the bar down when that tucks away on a long scroll (html[data-tabs-tucked], Nav.tsx), so the
  * two never stack and never leave a gap. The assistant drawer opens over both.
  */
-export function ActionBar({ state, saveLabel, mode, onAction, className, fill }: Props) {
+export function ActionBar({ state, saveLabel, mode, onAction, className, fill, pip }: Props) {
   const btn = "h-auto min-h-[52px] min-w-0 flex-col gap-0.5 px-1 text-xs font-semibold sm:min-h-11 sm:flex-row sm:gap-2 sm:px-4 sm:text-sm";
   return (
-    <div role="region" aria-label="Post actions" className={cn("sticky bottom-[calc(env(safe-area-inset-bottom)+74px)] z-30 mt-6 transition-[bottom] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none [html[data-tabs-tucked]_&]:bottom-[calc(env(safe-area-inset-bottom)+12px)] lg:bottom-4", className)}>
+    <div role="region" aria-label="Post actions" className={cn("sticky bottom-[calc(env(safe-area-inset-bottom)+74px)] z-30 mt-6 transition-[bottom] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none [html[data-tabs-tucked]_&]:bottom-[calc(env(safe-area-inset-bottom)+12px)] [html[data-app]_&]:bottom-[calc(env(safe-area-inset-bottom)+12px)] max-lg:[html:has(&)]:scroll-pb-[calc(env(safe-area-inset-bottom)+210px)] lg:bottom-4", pip && "max-xl:mt-[70px]", className)}>
+      {/* 1182: in the app Create has no tab bar, so the bar sits 12px off the bottom; focus scrolls fields clear of it. */}
+      {pip && <div className="absolute bottom-full right-1 mb-2.5 xl:hidden">{pip}</div>}
       <div className={cn("glass-strong mx-auto w-full rounded-[22px] p-1.5 shadow-[0_18px_40px_-24px_hsl(var(--foreground)/0.45)] hairline", fill ? "max-w-none sm:flex sm:items-center sm:gap-3 sm:pl-4" : "max-w-3xl")}>
         {state.note && (
           <p id="bar-note" className={cn("px-2.5 pb-1.5 pt-1 text-xs leading-snug text-muted-foreground", fill && "sm:min-w-0 sm:flex-1 sm:p-0 sm:text-[13px]")} aria-live="polite">

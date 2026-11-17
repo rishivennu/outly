@@ -6,6 +6,7 @@ import { env } from "../env";
 import { HttpError } from "../http";
 import { gemini } from "../ai/creative";
 import { SAMPLE_DOMAIN } from "./sample";
+import { TZ, cohortFunnel, retentionRows, segmentUsers, waitlistStage, weekdayRhythm, weeklyCohorts, PEOPLE_LIMIT, type Activation, type CohortRow, type RetentionRow, type SegmentRow } from "./activation";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                                */
@@ -18,14 +19,19 @@ export const isRange = (n: number): n is Range => (RANGES as readonly number[]).
 export type BehaviorStats = {
   generatedAt: string;
   rangeDays: number;
+  /** first UTC day of the range; the range ends today */
+  rangeStart: string;
+  timezone: typeof TZ;
   sample: boolean;
   totals: { users: number; newUsers: number; prevNewUsers: number; dau: number; wau: number; mau: number; stickiness: number; activeInRange: number; paying: number; weeklyReportOptIn: number };
   funnel: { key: string; label: string; count: number; pct: number; stepPct: number }[];
-  retention: { key: "d1" | "w1" | "d30"; label: string; eligible: number; retained: number; rate: number }[];
-  cohorts: { label: string; start: string; size: number; weeks: (number | null)[] }[];
+  /** 1166: the sign-up funnel per cohort, with the waitlist as its own stage; see lib/admin/activation.ts */
+  activation: Activation;
+  retention: RetentionRow[];
+  cohorts: CohortRow[];
   frequency: { bucket: string; users: number }[];
-  segments: { key: string; label: string; users: number; share: number; description: string }[];
-  weekday: { day: string; active: number }[];
+  segments: SegmentRow[];
+  weekday: { day: string; active: number; days: number; avg: number }[];
   series: { day: string; label: string; active: number; signups: number; posts: number; published: number }[];
   platforms: { platform: string; connected: number; needsReconnect: number; targets: number; published: number; failed: number; successRate: number | null }[];
   posts: { total: number; inRange: number; byStatus: Record<string, number>; publishRate: number; scheduledShare: number; approvalShare: number; avgPerCreator: number; creators: number; medianHoursToFirstPublish: number | null; practiceTargets: number };
@@ -64,6 +70,10 @@ export type BehaviorInput = {
   posts: { userId: string; status: string; createdAt: Date; publishedAt: Date | null; scheduledAt: Date | null; requireApproval: boolean }[];
   targets: { platform: string; platformStatus: string; practice: boolean; errorCode: string | null; userId: string }[];
   paid: { userId: string; plan: string }[];
+  /** 1166: users with at least one real (not practice) published target; falls back to post status when absent */
+  publishers?: string[];
+  /** 1166: waitlist entries created in the range */
+  waitlist?: { email: string; createdAt: Date }[];
 };
 
 const DAY = 86_400_000;
@@ -72,7 +82,6 @@ const addDays = (k: string, n: number) => dayKey(new Date(Date.parse(k + "T00:00
 const ratio = (a: number, b: number) => (b ? a / b : 0);
 const round = (n: number, p = 3) => Math.round(n * 10 ** p) / 10 ** p;
 const PUBLISHED = new Set(["published", "partial"]);
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function computeBehavior(input: BehaviorInput, days: number, now = new Date()): BehaviorStats {
   const today = dayKey(now);
@@ -101,7 +110,8 @@ export function computeBehavior(input: BehaviorInput, days: number, now = new Da
   const connected = new Set(input.accounts.map((a) => a.userId));
   const uploaded = new Set(input.mediaUsers);
   const created = new Set(input.postCounts.filter((p) => p.count > 0).map((p) => p.userId));
-  const published = new Set(input.postCounts.filter((p) => p.count > 0 && PUBLISHED.has(p.status)).map((p) => p.userId));
+  // 1166: "published" means a real post went live; post status alone also counted practice runs.
+  const published = input.publishers ? new Set(input.publishers) : new Set(input.postCounts.filter((p) => p.count > 0 && PUBLISHED.has(p.status)).map((p) => p.userId));
   const steps: [string, string, Set<string> | null][] = [
     ["signup", "Signed up", null],
     ["connect", "Connected a platform", connected],
@@ -119,33 +129,24 @@ export function computeBehavior(input: BehaviorInput, days: number, now = new Da
     return row;
   });
 
-  // ---- retention, measured on users who signed up in the last 120 days
-  const recent = users.filter((u) => now.getTime() - u.createdAt.getTime() <= 120 * DAY);
-  const ret = (key: "d1" | "w1" | "d30", label: string, minAge: number, from: number, to: number) => {
-    const eligible = recent.filter((u) => addDays(dayKey(u.createdAt), minAge) <= today);
-    const retained = eligible.filter((u) => {
-      const s = dayKey(u.createdAt);
-      return activeDaysIn(u.id, addDays(s, from), addDays(s, to)) > 0;
-    }).length;
-    return { key, label, eligible: eligible.length, retained, rate: round(ratio(retained, eligible.length)) };
-  };
-  const retention = [ret("d1", "Came back the next day", 1, 1, 1), ret("w1", "Came back in week one", 7, 1, 7), ret("d30", "Still active days 8 to 30", 30, 8, 30)];
+  const activeIn = (uid: string, from: string, to: string) => activeDaysIn(uid, from, to) > 0;
 
-  // ---- weekly sign-up cohorts (Monday starts), last 8 weeks
-  const dow = (now.getUTCDay() + 6) % 7;
-  const thisMonday = addDays(today, -dow);
-  const cohorts = Array.from({ length: 8 }, (_, i) => {
-    const start = addDays(thisMonday, -7 * (7 - i));
-    const end = addDays(start, 6);
-    const members = users.filter((u) => dayKey(u.createdAt) >= start && dayKey(u.createdAt) <= end);
-    const weeks = Array.from({ length: 8 }, (_, w) => {
-      const ws = addDays(start, 7 * w);
-      if (ws > today || !members.length) return null;
-      return round(ratio(members.filter((u) => activeDaysIn(u.id, ws, addDays(ws, 6)) > 0).length, members.length));
-    });
-    const d = new Date(start + "T00:00:00Z");
-    return { label: d.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }), start, size: members.length, weeks };
-  });
+  // ---- 1166 activation: one cohort per view, nested steps, waitlist kept apart
+  const events = { connected, uploaded, created, published, paid: new Set(paidSet.keys()) };
+  const inRange = users.filter((u) => dayKey(u.createdAt) >= rangeStart && dayKey(u.createdAt) <= today);
+  const activation: Activation = {
+    range: cohortFunnel(inRange, events, { cohort: "range", label: `Signed up in the last ${days} days`, from: rangeStart, to: today }),
+    all: cohortFunnel(users, events, { cohort: "all", label: "Every account", from: null, to: today }),
+    waitlist: waitlistStage(input.waitlist ?? [], users.map((u) => u.email), inRange.map((u) => u.email)),
+    peopleShown: true,
+    peopleLimit: PEOPLE_LIMIT,
+  };
+
+  // ---- retention, measured on users who signed up in the last 120 days (complete windows only)
+  const retention = retentionRows(users, activeIn, today, 120);
+
+  // ---- weekly sign-up cohorts (Monday starts, UTC), last 8 weeks
+  const cohorts = weeklyCohorts(users, activeIn, now, 8);
 
   // ---- how often people come back inside the range
   const existing = users.filter((u) => dayKey(u.createdAt) <= today);
@@ -153,32 +154,16 @@ export function computeBehavior(input: BehaviorInput, days: number, now = new Da
   const act = new Map(existing.map((u) => [u.id, activeDaysIn(u.id, rangeStart)]));
   const frequency = freqBuckets.map(([bucket, f]) => ({ bucket, users: [...act.values()].filter(f).length }));
 
-  // ---- segments (mutually exclusive, first match wins)
-  const powerAt = Math.max(4, Math.round(days * 0.27));
-  const segDefs: { key: string; label: string; description: string; test: (u: BehaviorInput["users"][number], n: number) => boolean }[] = [
-    { key: "new", label: "New this week", description: "Signed up in the last 7 days", test: (u) => now.getTime() - u.createdAt.getTime() < 7 * DAY },
-    { key: "power", label: "Power creators", description: `Active on ${powerAt}+ days in the range`, test: (_, n) => n >= powerAt },
-    { key: "regular", label: "Regulars", description: `Active on 3 to ${powerAt - 1} days`, test: (_, n) => n >= 3 },
-    { key: "casual", label: "Casual", description: "Active on 1 or 2 days", test: (_, n) => n >= 1 },
-    { key: "dormant", label: "Dormant", description: "No activity in the range", test: () => true },
-  ];
-  const segCount = new Map(segDefs.map((s) => [s.key, 0]));
-  for (const u of existing) {
-    const n = act.get(u.id) ?? 0;
-    const s = segDefs.find((d) => d.test(u, n))!;
-    segCount.set(s.key, (segCount.get(s.key) ?? 0) + 1);
-  }
-  const segments = segDefs.map((s) => ({ key: s.key, label: s.label, description: s.description, users: segCount.get(s.key) ?? 0, share: round(ratio(segCount.get(s.key) ?? 0, existing.length)) }));
+  // ---- segments (mutually exclusive, first match wins, every account counted once)
+  const segments = segmentUsers(existing.map((u) => ({ createdAt: u.createdAt, activeDays: act.get(u.id) ?? 0 })), days, today);
 
   // ---- weekday rhythm and daily series
-  const weekdayCount = new Array(7).fill(0);
   const actByDay = new Map<string, Set<string>>();
   for (const a of input.activity) {
     if (a.day < rangeStart || a.day > today) continue;
     (actByDay.get(a.day) ?? actByDay.set(a.day, new Set()).get(a.day)!).add(a.userId);
   }
-  for (const [d, s] of actByDay) weekdayCount[new Date(d + "T00:00:00Z").getUTCDay()] += s.size;
-  const weekday = [1, 2, 3, 4, 5, 6, 0].map((i) => ({ day: WEEKDAYS[i], active: weekdayCount[i] }));
+  const weekday = weekdayRhythm(new Map([...actByDay].map(([d, set]) => [d, set.size])), rangeStart, today);
 
   const rangePosts = input.posts.filter((p) => dayKey(p.createdAt) >= rangeStart);
   const series = Array.from({ length: days }, (_, i) => {
@@ -256,9 +241,12 @@ export function computeBehavior(input: BehaviorInput, days: number, now = new Da
   return {
     generatedAt: now.toISOString(),
     rangeDays: days,
+    rangeStart,
+    timezone: TZ,
     sample: users.some((u) => u.email.endsWith("@" + SAMPLE_DOMAIN)),
     totals: { users: users.length, newUsers, prevNewUsers, dau, wau, mau, stickiness: round(ratio(dau, mau)), activeInRange, paying: paidSet.size, weeklyReportOptIn: users.filter((u) => u.weeklyReport).length },
     funnel,
+    activation,
     retention,
     cohorts,
     frequency,
@@ -280,10 +268,12 @@ export function anonymise(s: BehaviorStats) {
     const chunk = s.series.slice(i, i + 7);
     weekly.push({ weekOf: chunk[0].day, active: Math.max(...chunk.map((c) => c.active)), signups: chunk.reduce((t, c) => t + c.signups, 0), posts: chunk.reduce((t, c) => t + c.posts, 0), published: chunk.reduce((t, c) => t + c.published, 0) });
   }
-  const { topUsers, series, ...rest } = s;
+  const { topUsers, series, activation, ...rest } = s;
   void series;
+  const counts = (f: Activation["range"]) => ({ ...f, steps: f.steps.map(({ reached, stopped, ...st }) => (void reached, void stopped, st)) });
   return {
     ...rest,
+    activation: { range: counts(activation.range), all: counts(activation.all), waitlist: activation.waitlist },
     weekly,
     topUsersShape: topUsers.map((u) => ({ activeDays: u.activeDays, posts: u.posts, published: u.published, platforms: u.platforms.length, paid: u.plan !== "Free" })),
   };
@@ -298,7 +288,9 @@ async function load(days: number): Promise<BehaviorInput> {
   const now = new Date();
   const since = subDays(now, Math.max(days * 2, 130));
   const rangeStart = subDays(now, days);
-  const [users, activity, accounts, media, postCounts, firstPublish, posts, targets, subs] = await Promise.all([
+  // 1166: the waitlist stage and the funnel's range cohort start at midnight UTC of the range's first day.
+  const rangeDay0 = new Date(dayKey(subDays(now, days - 1)) + "T00:00:00Z");
+  const [users, activity, accounts, media, postCounts, firstPublish, posts, targets, subs, publishers, waitlist] = await Promise.all([
     db.user.findMany({ select: { id: true, name: true, email: true, createdAt: true, lastActiveAt: true, weeklyReport: true } }),
     db.userActivityDay.findMany({ where: { day: { gte: dayKey(since) } }, select: { userId: true, day: true } }),
     db.socialAccount.findMany({ select: { userId: true, platform: true, status: true } }),
@@ -308,6 +300,8 @@ async function load(days: number): Promise<BehaviorInput> {
     db.post.findMany({ where: { OR: [{ createdAt: { gte: rangeStart } }, { publishedAt: { gte: rangeStart } }] }, select: { userId: true, status: true, createdAt: true, publishedAt: true, scheduledAt: true, requireApproval: true } }),
     db.postTarget.findMany({ where: { createdAt: { gte: rangeStart } }, select: { platform: true, platformStatus: true, practice: true, errorCode: true, post: { select: { userId: true } } } }),
     db.subscription.findMany({ where: { status: { in: ["active", "past_due"] } }, select: { userId: true, plan: { select: { name: true } } } }),
+    db.post.findMany({ where: { targets: { some: { practice: false, platformStatus: "published" } } }, select: { userId: true }, distinct: ["userId"] }),
+    db.waitlistEntry.findMany({ where: { createdAt: { gte: rangeDay0 } }, select: { email: true, createdAt: true } }),
   ]);
   return {
     users,
@@ -319,6 +313,8 @@ async function load(days: number): Promise<BehaviorInput> {
     posts,
     targets: targets.map((t) => ({ platform: t.platform, platformStatus: t.platformStatus, practice: t.practice, errorCode: t.errorCode, userId: t.post.userId })),
     paid: subs.map((s) => ({ userId: s.userId, plan: s.plan?.name ?? "Paid" })),
+    publishers: publishers.map((p) => p.userId),
+    waitlist,
   };
 }
 

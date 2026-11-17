@@ -8,6 +8,7 @@ import { whenLenis } from "./SmoothScroll";
 import { whenScrollReady } from "@/lib/motion/smooth";
 import { GSAP_EASE, sec as secs } from "@/lib/motion/tokens";
 import { stackPanels, type PanelHold } from "@/lib/motion/panels";
+import { hscroll } from "@/lib/motion/hscroll";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -22,10 +23,12 @@ gsap.registerPlugin(ScrollTrigger);
  *   4. Demo (lg): the section pins and scrolling walks through the four beats; past it, the clock takes over.
  *   5. Comparison: opening a group (or Expand all) brings its rows in, in threes; opening a row deals its cards.
  *   6. Final call to action: the side walls close in on the phone and the tiles settle, once.
- *   9. Pinned panels (1181, user 11-17, the GSAP "pinned panels with overscroll" demo): on screens 768px and up each
+ *   9. Pinned panels (1181, user 11-17, the GSAP "pinned panels with overscroll" demo; phones too since 1183): each
  *      section group is a full-screen sheet; when one ends it stays put and the next slides up over it while it sinks
  *      away (lib/motion/panels.ts). How it works and Demo then hold their sheet on screen while their steps play
  *      (the hold replaces their own pin: ScrollTrigger cannot nest pins).
+ *  10. Horizontal galleries (1183, user 11-17, the GSAP "horizontal scrolling gallery" demo): What you get and Try it
+ *      hold their sheet while the scroll drives the card row sideways (lib/motion/hscroll.ts), then sink like the rest.
  *   8. Parallax (1064): decorative layers marked data-parallax="px" drift against the scroll, a few dozen px at
  *      most. The one scroll-linked effect left (parallax is position by definition), smoothed so it never jerks.
  *      Below lg, How it works fills a thin line along each step once it comes up.
@@ -49,7 +52,7 @@ const EASE = GSAP_EASE.out; // 1119: the token ease-out (lib/motion/tokens.ts)
 
 // Elements another engine already moves: the reveal engine (wrappers other than section heads, which it never
 // moves), bento tiles and comparison groups, and the cursor/hero effects in MotionFx and LandingFx.
-const BUSY = "[data-reveal]:not(.rv-head),.bx-tile,details,.flick,.pop-in,.hf-in,.hf-cta,.hf-aura,.hf-slot,.lt-half,.lt-track,[data-parallax]";
+const BUSY = "[data-reveal]:not(.rv-head),.bx-tile,details,.flick,.pop-in,.hf-in,.hf-cta,.hf-aura,.hf-slot,.lt-half,.lt-track,[data-parallax],[data-hscroll],.hs-item";
 const free = (list: Array<Element | null | undefined>) =>
   list.filter((el): el is HTMLElement => el instanceof HTMLElement && !el.matches(BUSY) && !el.parentElement?.matches("[data-stagger]"));
 
@@ -71,8 +74,9 @@ export function ScrollScenes() {
       // Teardown for the non-GSAP side effects below (inline styles, attributes, listeners, events). Runs when this
       // media set reverts. (ctx.add(fn) would run fn right away, not on revert.)
       const undo: Array<() => void> = [];
-      // 9. The panel stack: holds are collected by scenes 3 and 4, the stack is built right after them.
-      const panels = wide ? Array.from(main.querySelectorAll<HTMLElement>(".lp-panel")) : [];
+      // 9. The panel stack: holds are collected by scenes 3, 4 and 10, the stack is built right after them. Phones too
+      //    (1183): their scroll stays native (no ScrollSmoother on touch), the pins run on it.
+      const panels = Array.from(main.querySelectorAll<HTMLElement>(".lp-panel"));
       const stack = panels.length > 1;
       const holds = new Map<HTMLElement, PanelHold>();
       const panelOf = (el: HTMLElement) => el.closest<HTMLElement>(".lp-panel");
@@ -237,8 +241,24 @@ export function ScrollScenes() {
         });
       }
 
+      // 10. Horizontal galleries. A gallery in a pinned sheet rides that sheet's hold (pins cannot nest); one in a sheet
+      //     that never pins (the last, a flow sheet, no stack) pins its own section, after the stack, in page order.
+      const pinned = new Set(stack ? panels.slice(0, -1).filter((p) => p.dataset.panel !== "flow") : []);
+      const ownPins: Array<() => void> = [];
+      for (const el of Array.from(main.querySelectorAll<HTMLElement>("[data-hscroll]"))) {
+        const g = hscroll(el);
+        if (!g) continue;
+        undo.push(g.kill);
+        const sheet = panelOf(el);
+        const k = g.screens();
+        if (k < 0.05) continue; // every card already fits
+        if (sheet && pinned.has(sheet) && !holds.has(sheet)) holds.set(sheet, { screens: k, onHold: g.drive, bind: g.bind });
+        else ownPins.push(g.pin);
+      }
+
       // 9. Pinned panels, in page order, after the holds above and before every entrance below.
       if (stack) undo.push(stackPanels(panels, holds));
+      ownPins.forEach((pin) => pin());
 
       // 8. Parallax: the one scroll-linked effect (it IS the scroll position, both ways), smoothed by a short lag
       //    so a flick glides instead of jerking. Decorative only; nothing readable depends on where it is.
@@ -295,21 +315,7 @@ export function ScrollScenes() {
       const howS = sec("#how");
       if (howS) enter(q(howS, ".how-rail, ol"), howS, { y: 64 * k, scale: 0.97 }, "top 88%", 0.04);
 
-      // d. Features: the grid rises, then on wide screens each column settles at its own speed (left first).
-      const feat = sec("#features");
-      if (feat) {
-        const grid = feat.querySelector(".grid");
-        enter([grid], feat, { y: 60 * k }, "top 88%");
-        if (lg && grid) {
-          const arts = q(grid, "article") as HTMLElement[];
-          const x0 = grid.getBoundingClientRect().left;
-          const colW = grid.getBoundingClientRect().width / 3;
-          for (const a of arts) {
-            const col = Math.round((a.getBoundingClientRect().left - x0) / colW);
-            if (col > 0) enter([a], grid, { y: 40 * col }, "top 80%", 0, 0.1 * col);
-          }
-        }
-      }
+      // d. Features (1183): its cards are a horizontal gallery (scene 10), which brings each one in as it arrives.
 
       // d2. Why Outlly (R1180): the five cards rise once, together. Nothing else moves in this section.
       const usp = sec("#why-outlly");

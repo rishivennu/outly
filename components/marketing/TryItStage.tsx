@@ -7,6 +7,7 @@ import { Icon3D, type IconName } from "@/components/brand/Icon3D";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SignupCta } from "./SignupCta";
+import { HScroll } from "./HScroll";
 import { cn } from "@/lib/utils";
 
 /*
@@ -17,6 +18,9 @@ import { cn } from "@/lib/utils";
  * Look (user reference, 10-28): a staggered wall of tall rounded colour cards, each with a white tag pill, a bold
  * short title and a big 3D object, columns set at different heights. (10-28: edge cards and a 4th idea removed.)
  * Colours are the brand's own range, not a rainbow (user, 10-28: no blue).
+ *
+ * 1183 (user, 11-17): the cards are one horizontal gallery (HScroll, lib/motion/hscroll.ts): your idea, the three
+ * sample ideas, the three drafts, then Keep these drafts. Every draft has its own card, so phones no longer need tabs.
  */
 
 type Tone = "lime" | "mint" | "cream" | "sage" | "forest" | "ink";
@@ -117,7 +121,6 @@ export function TryItStage() {
   // 1 = fully written. Server render shows the first sample in full, so the section reads without JS.
   const [progress, setProgress] = useState<Record<Key, number>>({ instagram: 1, youtube: 1, x: 1 });
   const [writing, setWriting] = useState(false);
-  const [tab, setTab] = useState<Key>("instagram");
   const [status, setStatus] = useState("");
   const [pending, setPending] = useState(false);
   const [note, setNote] = useState("");
@@ -272,18 +275,31 @@ export function TryItStage() {
     };
   }, []);
 
+  // A run the visitor started: bring the first draft into view (the gallery scrolls the page there). On a phone the
+  // keyboard closes first, so the drafts are not hidden behind it.
+  const bring = () => {
+    const el = root.current;
+    if (!el) return;
+    const field = el.querySelector<HTMLInputElement>("#try-topic");
+    if (field && document.activeElement === field && window.matchMedia("(pointer: coarse)").matches) field.blur();
+    el.querySelector(".try-out-instagram")?.dispatchEvent(new CustomEvent("hs:show", { bubbles: true }));
+  };
+
   return (
     <div ref={root} className="try-wall mt-10 sm:mt-12">
-      <div className="try-cols">
+      <p className="sr-only" id="try-ideas-label">Or pick a sample idea</p>
+      <HScroll label="Try it cards">
         {/* 1. Your idea */}
-        <div className="try-col">
+        <div className="hs-item try-item-in">
           <form
             className="try-card try-input"
             data-tone="ink"
             data-tc=""
             onSubmit={(e) => {
               e.preventDefault();
-              if (!writing) run(topic);
+              if (writing) return;
+              run(topic);
+              bring();
             }}
           >
             <span className="try-pill">Your idea</span>
@@ -300,34 +316,24 @@ export function TryItStage() {
               placeholder="desk setup tour"
               autoComplete="off"
               dir="auto"
+              enterKeyHint="go"
               className="try-field mt-5 h-14 w-full rounded-2xl px-5 text-[16px]"
             />
             <button type="submit" className="try-go mt-4" aria-disabled={writing || !topic.trim()}>
               <span>{writing ? "Writing your posts" : "Write my posts"}</span>
               <PaperPlane />
             </button>
-            {/* Desktop: the card is as tall as its column, so it says what every draft gets. */}
-            <ul className="try-checks">
-              {["A hook in the first line", "Hashtags sized for each place", "Always inside each limit"].map((t) => (
-                <li key={t} className="flex items-start gap-2">
-                  <svg viewBox="0 0 24 24" className="mt-px h-4 w-4 flex-none text-[hsl(var(--lime))]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
-                  {t}
-                </li>
-              ))}
-            </ul>
-            <Icon3D name="generate-ideas" size={140} className="try-obj pop-in h-[140px] w-[140px]" />
+            <Icon3D name="generate-ideas" size={140} className="try-obj pop-in h-[104px] w-[104px]" />
           </form>
         </div>
 
         {/* 2. Sample ideas */}
-        <div className="try-col try-col-ideas">
-          <p className="sr-only" id="try-ideas-label">Or pick a sample idea</p>
-          {SAMPLES.map((s) => {
-            const m = IDEA_META[s.topic];
-            const on = forTopic === s.topic && !pending;
-            return (
+        {SAMPLES.map((s) => {
+          const m = IDEA_META[s.topic];
+          const on = forTopic === s.topic && !pending;
+          return (
+            <div key={s.topic} className="hs-item try-item-idea">
               <button
-                key={s.topic}
                 type="button"
                 className="try-card try-idea"
                 data-tone={m.tone}
@@ -338,6 +344,7 @@ export function TryItStage() {
                 onClick={() => {
                   setTopic(s.topic);
                   run(s.topic);
+                  bring();
                 }}
               >
                 <span className="try-pill">
@@ -347,26 +354,19 @@ export function TryItStage() {
                 <span className="try-title try-idea-title mt-3 block text-left">{m.title}</span>
                 <Icon3D name={m.icon} size={96} className="try-obj pop-in h-[96px] w-[96px]" />
               </button>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
 
-        {/* 3 + 4. What Outlly wrote */}
-        <div className="try-col try-col-a">
-          <div className="try-tabs md:hidden" data-tc="" role="group" aria-label="Choose a draft to show">
-            {ORDER.map((k) => (
-              <button key={k} type="button" aria-pressed={tab === k} onClick={() => { root.current?.querySelectorAll(".try-out").forEach((e) => e.setAttribute("data-in", "")); setTab(k); }} className="try-tab">
-                <PlatformGlyph platform={k} className="h-[18px] w-[18px]" />
-                {PLATFORM_META[k].name}
-              </button>
-            ))}
+        {/* 3. What Outlly wrote, one card per place */}
+        {ORDER.map((k) => (
+          <div key={k} className="hs-item try-item-out">
+            <OutCard k={k} text={drafts[k]} p={progress[k]} rm={rm} pending={pending} />
           </div>
-          {(["instagram", "x"] as const).map((k) => (
-            <OutCard key={k} k={k} text={drafts[k]} p={progress[k]} rm={rm} pending={pending} className={cn(tab !== k && "max-md:hidden")} />
-          ))}
-        </div>
-        <div className="try-col try-col-b">
-          <OutCard k="youtube" text={drafts.youtube} p={progress.youtube} rm={rm} pending={pending} className={cn(tab !== "youtube" && "max-md:hidden")} />
+        ))}
+
+        {/* 4. Keep them */}
+        <div className="hs-item try-item-keep">
           <div className="try-card try-keepcard" data-tone="forest" data-tc="">
             <span className="try-pill">Next</span>
             <p className="try-title mt-3">Keep these drafts</p>
@@ -379,20 +379,20 @@ export function TryItStage() {
             <Icon3D name="drafts" size={110} className="try-obj pop-in h-[110px] w-[110px]" />
           </div>
         </div>
-      </div>
+      </HScroll>
       <p className="sr-only" role="status" aria-live="polite">{status}</p>
     </div>
   );
 }
 
-function OutCard({ k, text, p, rm, pending, className }: { k: Key; text: string; p: number; rm: boolean; pending: boolean; className?: string }) {
+function OutCard({ k, text, p, rm, pending }: { k: Key; text: string; p: number; rm: boolean; pending: boolean }) {
   // While the writer works, the old draft only reserves the card's height; nothing old shows.
   const shown = pending ? "" : p >= 1 || rm ? text : text.slice(0, Math.round(text.length * p));
   const limit = LIMIT[k];
   const typing = pending || (p > 0 && p < 1 && !rm);
   const o = OUT[k];
   return (
-    <article className={cn("try-card try-out", `try-out-${k}`, className)} data-tone={o.tone} data-tc="" aria-label={`${PLATFORM_META[k].name} ${KIND[k]}`}>
+    <article className={cn("try-card try-out", `try-out-${k}`)} data-tone={o.tone} data-tc="" aria-label={`${PLATFORM_META[k].name} ${KIND[k]}`}>
       <div className="flex items-start justify-between gap-3">
         <span className="try-pill">
           <PlatformGlyph platform={k} className="h-3.5 w-3.5" />

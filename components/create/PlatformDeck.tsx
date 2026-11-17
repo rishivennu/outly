@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import * as Switch from "@radix-ui/react-switch";
 import { AlertCircle, Check, ChevronDown, CircleAlert, ImageIcon, Link2, MessageSquarePlus, RefreshCw, Sparkles } from "lucide-react";
@@ -60,11 +60,31 @@ const fieldDom = (id: string, k: FieldKey) => `${id}-${k}`;
 export function PlatformDeck(p: Props) {
   const enabled = enabledPlatforms(p.drafts);
   const live = useLivePlatforms();
-  const [picked, setActive] = useState<Platform>(enabled[0] ?? "instagram");
-  const active = live.includes(picked) ? picked : (live[0] ?? picked);
+  /** 1182: connected accounts first, as cards you can open to edit; everything else is a compact Not connected row. */
+  const linked = live.filter((pl) => p.accounts[pl]?.status === "connected");
+  const off = live.filter((pl) => p.accounts[pl]?.status !== "connected");
+  const [picked, setActive] = useState<Platform>(() => enabled.find((pl) => p.accounts[pl]?.status === "connected") ?? enabled[0] ?? "instagram");
+  const active = linked.includes(picked) ? picked : (linked[0] ?? picked);
+  /** A second tap on the open card folds its editor; picking another card opens that one. */
+  const [shut, setShut] = useState(false);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const f = () => setNarrow(mq.matches);
+    f();
+    mq.addEventListener("change", f);
+    return () => mq.removeEventListener("change", f);
+  }, []);
+  const offRef = useRef<HTMLElement>(null);
+  const reduce = useReducedMotion();
+  const toOff = () => {
+    const el = offRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    el.querySelector<HTMLButtonElement>("button[data-connect]:not([disabled])")?.focus({ preventScroll: true });
+  };
   const hookId = useId();
   const mainId = useId();
-  const reduce = useReducedMotion();
   const cards = useRef<Partial<Record<Platform, HTMLButtonElement | null>>>({});
 
   const status = useMemo(() => {
@@ -78,7 +98,7 @@ export function PlatformDeck(p: Props) {
       out[pl] = {
         checks,
         blocked: blocked || !connected,
-        label: !d.enabled ? (connected ? "Not sending" : "Preview only") : !connected ? (acct ? "Needs a reconnect" : "Not connected yet") : d.reviewed && !blocked ? "Looks good" : blocked ? "Needs a hand" : READY_LABEL[pl],
+        label: !d.enabled ? (connected ? "Not sending" : acct ? "Needs a reconnect" : "Not connected") : !connected ? (acct ? "Needs a reconnect" : "Not connected yet") : d.reviewed && !blocked ? "Looks good" : blocked ? "Needs a hand" : READY_LABEL[pl],
         tone: !d.enabled ? "off" : !connected || blocked ? "warn" : d.reviewed ? "done" : "ok",
       };
     }
@@ -112,8 +132,8 @@ export function PlatformDeck(p: Props) {
 
   const markReviewed = (pl: Platform) => {
     p.onDraft(pl, { reviewed: true });
-    const next = enabled.find((x) => x !== pl && !p.drafts[x].reviewed);
-    if (next) setTimeout(() => setActive(next), 350);
+    const next = enabled.find((x) => x !== pl && !p.drafts[x].reviewed && linked.includes(x));
+    if (next) setTimeout(() => (setActive(next), setShut(false)), 350);
   };
 
   // A place with no live account can still be judged: its preview shows the copy it would get, and nothing more.
@@ -121,144 +141,17 @@ export function PlatformDeck(p: Props) {
   const look = previewOnly ? previewDraft(active, p.drafts, p.hook) : { draft: p.drafts[active], source: "own" as const };
 
   const onCardKeys = (e: KeyboardEvent<HTMLDivElement>) => {
-    const i = live.indexOf(active);
-    const n = nextIndex(e.key, i, live.length);
+    const i = linked.indexOf(active);
+    const n = nextIndex(e.key, i, linked.length);
     if (n < 0 || !(e.target instanceof HTMLButtonElement) || !e.target.dataset.card) return;
     e.preventDefault();
-    const pl = live[n];
+    const pl = linked[n];
     setActive(pl);
     cards.current[pl]?.focus();
   };
 
-  return (
-    <div className="w-full min-w-0">
-      <header className="mb-6">
-        <p className="eyebrow mb-2">03 · Everywhere</p>
-        <h2 className="display text-[clamp(1.9rem,3.6vw,2.8rem)]">
-          Now let&apos;s make it <span className="energy-text">fit everywhere.</span>
-        </h2>
-        <div className="mt-5 max-w-2xl">
-          <Label htmlFor={hookId}>
-            Your hook <Counter value={p.hook.length} max={500} />
-          </Label>
-          <Input id={hookId} value={p.hook.replace(/\n/g, " ")} maxLength={500} onChange={(e) => p.onHook(e.target.value)} className="font-semibold" />
-        </div>
-      </header>
-
-      <section aria-labelledby={`${mainId}-dest`} className="mb-6">
-        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          <h3 id={`${mainId}-dest`} className="text-base font-semibold">Where it goes</h3>
-          <p className="tabular-nums text-[13px] text-muted-foreground">{enabled.length === 0 ? "Pick at least one" : `${enabled.length} selected`}</p>
-        </div>
-        {/* Selecting a card picks what you edit; the checkbox under it decides if it is sent. Siblings, never nested. */}
-        <div role="group" aria-label="Destinations" onKeyDown={onCardKeys} className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr))]">
-          {live.map((pl) => {
-            const s = status[pl];
-            const on = active === pl;
-            const d = p.drafts[pl];
-            const acct = p.accounts[pl];
-            const connected = acct?.status === "connected";
-            const who = acct ? `${acct.username}${acct.mock ? " (practice)" : ""}` : "No account yet";
-            const choice = connected && acct ? p.options?.[pl] : undefined;
-            return (
-              <div
-                key={pl}
-                className={cn(
-                  "relative flex min-w-0 flex-col rounded-3xl border transition-[background-color,border-color,box-shadow] duration-nav ease-out motion-reduce:transition-none",
-                  on ? "border-foreground/35 bg-card shadow-[0_18px_50px_-30px_var(--halo)]" : "border-border/70 bg-secondary/30",
-                )}
-                style={{ ["--halo" as string]: PLATFORM_HALO[pl] }}
-              >
-                <button
-                  type="button"
-                  id={`tab-${pl}`}
-                  data-card="1"
-                  ref={(el) => {
-                    cards.current[pl] = el;
-                  }}
-                  tabIndex={on ? 0 : -1}
-                  aria-pressed={on}
-                  aria-controls={on ? `panel-${pl}` : undefined}
-                  aria-label={`Edit ${PLATFORM_META[pl].name}. ${who}. ${p.writing.includes(pl) && d.enabled ? "Writing" : s.label}.`}
-                  onClick={() => setActive(pl)}
-                  className={cn("relative flex min-h-[72px] min-w-0 items-center gap-3 rounded-t-3xl p-3.5 text-left", on && "pr-[76px]", " transition-[background-color] duration-hover ease-out motion-reduce:transition-none", FOCUS, !on && "[@media(hover:hover)]:hover:bg-secondary/60")}
-                >
-                  <PlatformOrb platform={pl} size={36} />
-                  <span className="min-w-0 flex-1" aria-hidden="true">
-                    <span className="flex min-w-0 items-baseline gap-1.5 text-sm font-semibold">
-                      <span className="truncate">{PLATFORM_META[pl].name}</span>
-                      <span className="shrink-0 text-[13px] font-normal text-muted-foreground">{PLATFORM_META[pl].format}</span>
-                    </span>
-                    <span className="block truncate text-[13px] text-muted-foreground" title={who}>{who}</span>
-                    <span className={cn("block truncate text-xs", s.tone === "done" ? "text-success-ink" : s.tone === "warn" ? "text-warning-ink" : "text-muted-foreground")}>
-                      {p.writing.includes(pl) && d.enabled ? "Writing" : s.label}
-                    </span>
-                  </span>
-                  {on && <span className="absolute right-3 top-3 rounded-full bg-foreground px-2 py-0.5 text-xs font-semibold text-background" aria-hidden="true">Editing</span>}
-                </button>
-                <div className="flex min-h-11 items-center justify-between gap-2 border-t border-border/60 pl-3.5 pr-1.5">
-                  {!connected && !d.enabled ? (
-                    <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">Connect to send</span>
-                  ) : (
-                  <label htmlFor={`send-${pl}`} className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 text-[13px] font-semibold">
-                    <input
-                      id={`send-${pl}`}
-                      type="checkbox"
-                      checked={d.enabled}
-                      onChange={(e) => p.onDraft(pl, { enabled: e.target.checked })}
-                      className={cn("h-5 w-5 shrink-0 cursor-pointer accent-lime", FOCUS)}
-                    />
-                    <span className={d.enabled ? "text-foreground" : "text-muted-foreground"}>
-                      {d.enabled ? "Sending" : "Not sending"} <span className="sr-only">to {PLATFORM_META[pl].name}</span>
-                    </span>
-                  </label>
-                  )}
-                  {!connected && (
-                    <Button size="sm" variant="ghost" className="h-11 shrink-0 px-3" onClick={() => p.onConnect(pl)} disabled={p.online === false} title={p.online === false ? "Connecting needs a connection." : undefined}>
-                      <Link2 className="h-4 w-4" aria-hidden="true" /> {acct ? "Reconnect" : "Connect"} <span className="sr-only">{PLATFORM_META[pl].name}</span>
-                    </Button>
-                  )}
-                  {/* 1162: several accounts on this platform: which one. A native select, so it works the same on a phone. */}
-                  {choice && acct && (
-                    <span className="relative flex h-11 max-w-[46%] shrink-0 items-center">
-                      <select
-                        aria-label={`Which ${PLATFORM_META[pl].name} account`}
-                        value={acct.id}
-                        onChange={(e) => p.onDraft(pl, { accountId: e.target.value })}
-                        className={cn("h-9 w-full cursor-pointer appearance-none truncate rounded-full bg-secondary pl-3 pr-7 text-[13px] font-semibold text-foreground hairline", FOCUS, "[@media(hover:hover)]:hover:bg-secondary/70")}
-                      >
-                        {choice.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.username}{a.mock ? " (practice)" : ""}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-2.5 h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {showMain && (
-        <section aria-labelledby={`${mainId}-mainl`} className="mb-6 rounded-3xl bg-secondary/30 p-4 hairline sm:p-5">
-          <Label htmlFor={`${mainId}-main`} id={`${mainId}-mainl`} className="text-sm text-foreground">
-            Main caption
-            <span className="tabular-nums text-xs text-muted-foreground">{main.length}</span>
-          </Label>
-          <Textarea id={`${mainId}-main`} rows={3} value={main} onChange={(e) => editMain(e.target.value)} aria-describedby={`${mainId}-mainh`} placeholder="Write it once. Every place set to use the main caption gets it." />
-          <p id={`${mainId}-mainh`} className="mt-2 text-[13px] text-muted-foreground" aria-live="polite">
-            {followers.length === 0
-              ? "Every place has its own caption now. Pick Use main caption on one to bring it back."
-              : `Used by ${followers.map((x) => PLATFORM_META[x].name).join(", ")}.`}
-            {trimmedFor.length > 0 && ` Trimmed to fit ${trimmedFor.map((x) => PLATFORM_META[x].name).join(", ")}.`}
-          </p>
-        </section>
-      )}
-
+  /* 1182: one editor for the picked connected account. Under 640px it opens right under its card; wider, under the cards. */
+  const editor = linked.length ? (
       <motion.div
         key={active}
         role="region"
@@ -267,7 +160,7 @@ export function PlatformDeck(p: Props) {
         initial={reduce ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25, ease: ease("out") }}
-        className="glass relative overflow-hidden rounded-[32px] p-4 sm:p-6"
+        className={cn("glass relative overflow-hidden rounded-[32px] p-4 sm:p-6", narrow && "col-span-full")}
       >
         <span className={cn("pointer-events-none absolute inset-0", SURFACE[active])} aria-hidden="true" />
         <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_clamp(260px,36%,380px)] lg:items-start lg:gap-8">
@@ -287,12 +180,202 @@ export function PlatformDeck(p: Props) {
           </div>
         </div>
       </motion.div>
+  ) : null;
+
+  return (
+    <div className="w-full min-w-0">
+      <header className="mb-6">
+        <p className="eyebrow mb-2">03 · Everywhere</p>
+        <h2 className="display text-[clamp(1.9rem,3.6vw,2.8rem)]">
+          Now let&apos;s make it <span className="energy-text">fit everywhere.</span>
+        </h2>
+        <div className="mt-5 max-w-2xl">
+          <Label htmlFor={hookId}>
+            Your hook <Counter value={p.hook.length} max={500} />
+          </Label>
+          <Input id={hookId} value={p.hook.replace(/\n/g, " ")} maxLength={500} onChange={(e) => p.onHook(e.target.value)} className="font-semibold" />
+        </div>
+      </header>
+
+      <section aria-labelledby={`${mainId}-dest`} className="mb-6">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h3 id={`${mainId}-dest`} className="text-base font-semibold">Connected accounts</h3>
+          <p className="tabular-nums text-[13px] text-muted-foreground">{linked.length === 0 ? "None yet" : enabled.length === 0 ? "Pick at least one" : `${enabled.length} selected`}</p>
+        </div>
+        {linked.length === 0 ? (
+          <p className="rounded-2xl bg-secondary/30 px-4 py-3 text-[13px] leading-relaxed text-muted-foreground hairline">
+            No accounts connected yet, so there is nowhere to send this post. Connect one under Not connected; your draft and its copy stay as they are.
+          </p>
+        ) : (
+          /* Selecting a card picks what you edit (on a phone its editor opens right under it, and a second tap folds it);
+             the checkbox under it decides if it is sent. Siblings, never nested. 1182: only connected accounts get a card. */
+          <div role="group" aria-label="Destinations" onKeyDown={onCardKeys} className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr))] max-sm:grid-cols-1">
+            {linked.map((pl) => {
+              const s = status[pl];
+              const on = active === pl;
+              const open = on && !shut;
+              const d = p.drafts[pl];
+              const acct = p.accounts[pl];
+              const connected = acct?.status === "connected";
+              const who = acct ? `${acct.username}${acct.mock ? " (practice)" : ""}` : "No account yet";
+              const choice = connected && acct ? p.options?.[pl] : undefined;
+              return (
+                <Fragment key={pl}>
+                  <div
+                    className={cn(
+                      "relative flex min-w-0 flex-col rounded-3xl border transition-[background-color,border-color,box-shadow] duration-nav ease-out motion-reduce:transition-none",
+                      on ? "border-foreground/35 bg-card shadow-[0_18px_50px_-30px_var(--halo)]" : "border-border/70 bg-secondary/30",
+                    )}
+                    style={{ ["--halo" as string]: PLATFORM_HALO[pl] }}
+                  >
+                    <button
+                      type="button"
+                      id={`tab-${pl}`}
+                      data-card="1"
+                      ref={(el) => {
+                        cards.current[pl] = el;
+                      }}
+                      tabIndex={on ? 0 : -1}
+                      aria-expanded={open}
+                      aria-controls={open ? `panel-${pl}` : undefined}
+                      aria-label={`Edit ${PLATFORM_META[pl].name}. ${who}. ${p.writing.includes(pl) && d.enabled ? "Writing" : s.label}.`}
+                      onClick={() => (on ? setShut((v) => !v) : (setActive(pl), setShut(false)))}
+                      className={cn("relative flex min-h-[72px] min-w-0 items-center gap-3 rounded-t-3xl p-3.5 pr-10 text-left", open && "pr-[76px]", " transition-[background-color] duration-hover ease-out motion-reduce:transition-none", FOCUS, !on && "[@media(hover:hover)]:hover:bg-secondary/60")}
+                    >
+                      <PlatformOrb platform={pl} size={36} />
+                      <span className="min-w-0 flex-1" aria-hidden="true">
+                        <span className="flex min-w-0 items-baseline gap-1.5 text-sm font-semibold">
+                          <span className="truncate">{PLATFORM_META[pl].name}</span>
+                          <span className="shrink-0 text-[13px] font-normal text-muted-foreground">{PLATFORM_META[pl].format}</span>
+                        </span>
+                        <span className="block truncate text-[13px] text-muted-foreground" title={who}>{who}</span>
+                        <span className={cn("block truncate text-xs", s.tone === "done" ? "text-success-ink" : s.tone === "warn" ? "text-warning-ink" : "text-muted-foreground")}>
+                          {p.writing.includes(pl) && d.enabled ? "Writing" : s.label}
+                        </span>
+                      </span>
+                      {open && <span className="absolute right-3 top-3 rounded-full bg-foreground px-2 py-0.5 text-xs font-semibold text-background" aria-hidden="true">Editing</span>}
+                      <ChevronDown className={cn("absolute bottom-3.5 right-3 h-4 w-4 text-muted-foreground transition-transform duration-200 ease-out motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
+                    </button>
+                    <div className="flex min-h-11 items-center justify-between gap-2 border-t border-border/60 pl-3.5 pr-1.5">
+                      <label htmlFor={`send-${pl}`} className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 text-[13px] font-semibold">
+                        <input
+                          id={`send-${pl}`}
+                          type="checkbox"
+                          checked={d.enabled}
+                          onChange={(e) => p.onDraft(pl, { enabled: e.target.checked })}
+                          className={cn("h-5 w-5 shrink-0 cursor-pointer accent-lime", FOCUS)}
+                        />
+                        <span className={d.enabled ? "text-foreground" : "text-muted-foreground"}>
+                          {d.enabled ? "Sending" : "Not sending"} <span className="sr-only">to {PLATFORM_META[pl].name}</span>
+                        </span>
+                      </label>
+                      {/* 1162: several accounts on this platform: which one. A native select, so it works the same on a phone. */}
+                      {choice && acct && (
+                        <span className="relative flex h-11 max-w-[46%] shrink-0 items-center">
+                          <select
+                            aria-label={`Which ${PLATFORM_META[pl].name} account`}
+                            value={acct.id}
+                            onChange={(e) => p.onDraft(pl, { accountId: e.target.value })}
+                            className={cn("h-9 w-full cursor-pointer appearance-none truncate rounded-full bg-secondary pl-3 pr-7 text-[13px] font-semibold text-foreground hairline", FOCUS, "[@media(hover:hover)]:hover:bg-secondary/70")}
+                          >
+                            {choice.map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {a.username}{a.mock ? " (practice)" : ""}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="pointer-events-none absolute right-2.5 h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {narrow && open && editor}
+                </Fragment>
+              );
+            })}
+          </div>
+        )}
+        {off.length > 0 && (
+          <button type="button" onClick={toOff} className={cn("mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full px-1 text-[13px] font-semibold text-muted-foreground underline-offset-4 transition-[color] duration-hover ease-out motion-reduce:transition-none [@media(hover:hover)]:hover:text-foreground [@media(hover:hover)]:hover:underline", FOCUS)}>
+            <Link2 className="h-4 w-4" aria-hidden="true" /> Connect more platforms
+          </button>
+        )}
+      </section>
+
+      {showMain && (
+        <section aria-labelledby={`${mainId}-mainl`} className="mb-6 rounded-3xl bg-secondary/30 p-4 hairline sm:p-5">
+          <Label htmlFor={`${mainId}-main`} id={`${mainId}-mainl`} className="text-sm text-foreground">
+            Main caption
+            <span className="tabular-nums text-xs text-muted-foreground">{main.length}</span>
+          </Label>
+          <Textarea id={`${mainId}-main`} rows={3} value={main} onChange={(e) => editMain(e.target.value)} aria-describedby={`${mainId}-mainh`} placeholder="Write it once. Every place set to use the main caption gets it." />
+          <p id={`${mainId}-mainh`} className="mt-2 text-[13px] text-muted-foreground" aria-live="polite">
+            {followers.length === 0
+              ? "Every place has its own caption now. Pick Use main caption on one to bring it back."
+              : `Used by ${followers.map((x) => PLATFORM_META[x].name).join(", ")}.`}
+            {trimmedFor.length > 0 && ` Trimmed to fit ${trimmedFor.map((x) => PLATFORM_META[x].name).join(", ")}.`}
+          </p>
+        </section>
+      )}
+
+      {!narrow && !shut && editor}
 
       <p className="mt-4 text-sm text-muted-foreground" aria-live="polite">
-        {enabled.length === 0 ? "Pick at least one place to send it." : ready ? "All set. Nothing goes out until you publish." : `${pending.length} to look over: ${pending.map((x) => PLATFORM_META[x].name).join(", ")}`}
+        {enabled.length === 0 ? "Pick at least one place to send it." : ready ? "All set. Nothing goes out until you publish." : pendingLine(pending, linked)}
       </p>
+
+      {/* 1182: places with no live account are one compact row each: what it is, that it is not connected, and Connect.
+          No card, no empty preview. A place still switched on from an older draft can be left out right here. */}
+      {off.length > 0 && (
+        <section ref={offRef} aria-labelledby={`${mainId}-off`} className="mt-8 scroll-mt-24">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <h3 id={`${mainId}-off`} className="text-base font-semibold">Not connected</h3>
+            <p className="text-[13px] text-muted-foreground">Connect one to send there too.</p>
+          </div>
+          <ul className="grid gap-2 md:grid-cols-2">
+            {off.map((pl) => {
+              const d = p.drafts[pl];
+              const acct = p.accounts[pl];
+              const name = PLATFORM_META[pl].name;
+              const format = PLATFORM_META[pl].format;
+              return (
+                <li key={pl} className="flex min-h-16 max-h-[76px] min-w-0 items-center gap-3 rounded-2xl border border-border/60 bg-secondary/20 py-2 pl-3 pr-1.5">
+                  <PlatformOrb platform={pl} size={36} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">
+                      {name}
+                      {format && <span className="font-normal text-muted-foreground"> · {format}</span>}
+                    </span>
+                    <span className={cn("block truncate text-[13px]", d.enabled ? "text-warning-ink" : "text-muted-foreground")}>
+                      {acct ? "Needs a reconnect" : "Not connected"}
+                      {d.enabled ? ", still switched on" : ""}
+                    </span>
+                  </span>
+                  {d.enabled && (
+                    <Button size="sm" variant="ghost" className="h-11 shrink-0 px-2.5" onClick={() => p.onDraft(pl, { enabled: false })}>
+                      Leave out <span className="sr-only">{name}</span>
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" data-connect="" className="h-11 shrink-0 rounded-full px-3 hairline" onClick={() => p.onConnect(pl)} disabled={p.online === false} title={p.online === false ? "Connecting needs a connection." : undefined}>
+                    <Link2 className="h-4 w-4" aria-hidden="true" /> {acct ? "Reconnect" : "Connect"} <span className="sr-only">{name} to send</span>
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
     </div>
   );
+}
+
+/** 1182: connected places to look over first; places still switched on without an account get one short clause. */
+function pendingLine(pending: readonly Platform[], linked: readonly Platform[]) {
+  const names = (xs: readonly Platform[]) => xs.map((x) => PLATFORM_META[x].name).join(", ");
+  const on = pending.filter((x) => linked.includes(x));
+  const off = pending.filter((x) => !linked.includes(x));
+  const parts = [on.length ? `${on.length} to look over: ${names(on)}` : "", off.length ? `Switched on but not connected: ${names(off)}. Connect or leave out` : ""];
+  return parts.filter(Boolean).join(". ");
 }
 
 function FieldChecks({ checks, field, id }: { checks: DeckCheck[]; field: CheckField; id: string }) {
@@ -370,9 +453,8 @@ function PlatformStage(p: StageProps) {
             </p>
           </div>
         </div>
-        {previewOnly ? (
-          <span className="inline-flex min-h-11 items-center rounded-full bg-secondary/60 px-3 text-[13px] font-medium text-muted-foreground hairline">Preview only</span>
-        ) : (
+        {/* 1182: no Preview only pill; the Connect line below already says why nothing is sent. */}
+        {previewOnly ? null : (
         <label className="flex min-h-11 items-center gap-3 text-sm text-muted-foreground">
           <span>{d.enabled ? "Sending here" : "Not sending"}</span>
           <Switch.Root
