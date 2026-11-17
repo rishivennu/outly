@@ -22,7 +22,7 @@ const PAGES_MAX = 12;
 const NAV_WAIT = 2500;
 const PRECACHE = ["/offline.html", "/manifest.webmanifest"];
 const KEEP = [/^\/billing\/?$/, /^\/help\/?$/, /^\/api\/billing\/invoices\/[\w-]+$/];
-const STUDIO = /^\/(home|create|analytics|calendar|inbox|content|approvals|settings|accounts|support|mascot)(\/|$)/;
+const STUDIO = /^\/(home|create|analytics|profile-review|calendar|inbox|content|approvals|settings|accounts|support|mascot)(\/|$)/;
 /* Signing out, or switching to another workspace (its pages differ at the same paths): forget every kept page. */
 const SIGN_OUT = /^\/api\/(auth\/logout(-all)?|profiles\/active)$/;
 

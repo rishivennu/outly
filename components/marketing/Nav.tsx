@@ -7,12 +7,14 @@ import { joinHref, useWaitlist } from "./useWaitlist";
 import { useHiddenSections } from "./useHiddenSections";
 import { FlipText } from "@/components/ui/text-fx";
 import { usePathname } from "next/navigation";
-import { ArrowRight, ChevronDown, LayoutDashboard, Menu, X } from "lucide-react";
+import { ArrowRight, ChevronDown, LayoutDashboard } from "lucide-react";
 import { PRODUCT_ITEMS, ProductPanel, ProductTilesCompact } from "./NavProduct";
 import { OutlyLogo } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { LiveCount } from "@/components/shared/LiveCount";
 import { cn } from "@/lib/utils";
+import { loadGsap } from "@/lib/motion/gsap-lazy";
+import { BURGER, CROSS, islandMenu, stackMenu, type MenuMotion } from "@/lib/motion/navMotion";
 
 const LINKS = [
   { id: "how", label: "How it works" },
@@ -33,6 +35,11 @@ const LINKS = [
  * padding scale with the viewport (globals.css), and when the row gets tight the live count gives way first: the
  * creators half goes, then the whole count (data-fit on the bar), so the links never crowd. Below lg the phone menu
  * takes over.
+ *
+ * 1181: both menus animate with GSAP demos the user picked (lib/motion/navMotion.ts). The Product menu is the
+ * "orchestrated easeReverse" island: it springs open from the trigger and settles shut on its own reverse eases. The
+ * phone menu is the "interruptible single timeline": three stacked cards slide in and, on close, fall away at random
+ * tilts. Each menu stays mounted until its exit has played; reduced motion opens and closes them at once.
  */
 const FIT_STEPS = ["full", "online", "none"] as const;
 const MIN_ROOM = 20; // px kept clear on each side of the links before the live count steps down
@@ -60,6 +67,17 @@ export function MarketingNav() {
   const logoRef = useRef<HTMLAnchorElement>(null);
   const navRef = useRef<HTMLElement>(null);
   const clusterRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const chevRef = useRef<SVGSVGElement>(null);
+  const barTop = useRef<SVGLineElement>(null);
+  const barBot = useRef<SVGLineElement>(null);
+  const [npShown, setNpShown] = useState(false); // the Product panel stays mounted while its reverse plays
+  const [sheetShown, setSheetShown] = useState(false); // same for the phone menu's exit
+  const [animated, setAnimated] = useState(false); // GSAP drives the menu icon; until then (or with reduced motion) it swaps at once
+  const npMotion = useRef<MenuMotion | null>(null);
+  const sheetMotion = useRef<MenuMotion | null>(null);
+  const menuNow = useRef(false);
+  const openNow = useRef(false);
 
   // Fit (1117): try the full live count, then the "online" half, then none, and keep the first that leaves the links
   // MIN_ROOM clear on both sides. Re-checked when the bar resizes (the viewport) and when the right-hand group's
@@ -150,6 +168,88 @@ export function MarketingNav() {
     setMenu(false);
   }, [pathname]);
 
+  // 1181: the menus' GSAP timelines, built once GSAP is in (loaded lazily) and rebuilt when what the menus hold changes.
+  const shape = `${signedIn}|${waitlist}|${products.length}|${links.length}|${hidden.has("demo")}`;
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let dead = false;
+    const made: MenuMotion[] = [];
+    void loadGsap()
+      .then((gsap) => {
+        if (dead) return;
+        const panel = menuWrap.current;
+        if (panel) {
+          npMotion.current = islandMenu(gsap, {
+            panel,
+            chev: chevRef.current,
+            items: Array.from(panel.querySelectorAll(".np-tile, .np-feature")),
+            onHidden: () => setNpShown(false),
+          });
+          made.push(npMotion.current);
+        }
+        const sheet = panelRef.current;
+        const bg = sheet?.querySelector<HTMLElement>(".mnav-sheet-bg");
+        const cards = sheet ? Array.from(sheet.querySelectorAll<HTMLElement>(".mnav-card")) : [];
+        if (sheet && bg && cards.length) {
+          sheetMotion.current = stackMenu(gsap, {
+            bg,
+            cards,
+            items: Array.from(sheet.querySelectorAll(".mnav-card-top .np-tile, .mnav-card-top [data-mi]")),
+            foot: sheet.querySelector(".mnav-foot"),
+            bars: barTop.current && barBot.current ? [barTop.current, barBot.current] : null,
+            onHidden: () => setSheetShown(false),
+          });
+          made.push(sheetMotion.current);
+          setAnimated(true);
+        }
+        headerRef.current?.setAttribute("data-gsap", "");
+        // A menu opened before GSAP landed plays in now.
+        if (menuNow.current) npMotion.current?.open();
+        if (openNow.current) sheetMotion.current?.open();
+      })
+      .catch(() => {});
+    return () => {
+      dead = true;
+      made.forEach((m) => m.kill());
+      npMotion.current = null;
+      sheetMotion.current = null;
+      setAnimated(false);
+      headerRef.current?.removeAttribute("data-gsap");
+    };
+  }, [shape]);
+
+  // Open: mount, then play the entrance. Close: play the exit; the menu unmounts when it has finished (onHidden).
+  useEffect(() => {
+    menuNow.current = menu;
+    const m = npMotion.current;
+    if (menu) {
+      setNpShown(true);
+      m?.open();
+    } else if (m) m.close();
+    else setNpShown(false);
+  }, [menu]);
+  useEffect(() => {
+    openNow.current = open;
+    const m = sheetMotion.current;
+    if (open) {
+      setSheetShown(true);
+      m?.open();
+    } else if (m) m.close();
+    else setSheetShown(false);
+  }, [open]);
+
+  // The phone menu covers the screen: the page behind it goes inert and stops scrolling while it is open.
+  useEffect(() => {
+    if (!open) return;
+    const page = document.getElementById("smooth-wrapper");
+    page?.setAttribute("inert", "");
+    document.documentElement.classList.add("mnav-lock");
+    return () => {
+      page?.removeAttribute("inert");
+      document.documentElement.classList.remove("mnav-lock");
+    };
+  }, [open]);
+
   // Product menu: hover opens it for a mouse (with a short grace period so the pointer can travel
   // from the trigger down into the panel), click / Enter / Space toggles it for everyone else.
   // Esc closes and returns focus to the trigger; focus or a tap leaving the menu closes it.
@@ -231,7 +331,7 @@ export function MarketingNav() {
   const ctaLabel = waitlist ? "Join Waitlist" : "Start creating";
 
   return (
-    <header className="mnav sticky top-0 z-50 px-3 pt-3 sm:px-6" data-scrolled={scrolled || open}>
+    <header ref={headerRef} className="mnav sticky top-0 z-50 px-3 pt-3 sm:px-6" data-scrolled={scrolled || open}>
       <div ref={barRef} data-lens="" data-lg-shine="" className="mnav-bar mx-auto flex h-14 max-w-[1180px] items-center gap-2 rounded-full pl-3 pr-1.5 sm:h-[60px] sm:pl-4 sm:pr-2">
         <span className="lg-shine" aria-hidden="true" />
         <Link ref={logoRef} href="/" data-mag="" className="flex h-11 shrink-0 items-center gap-2 rounded-full pr-1" aria-label="Outlly home">
@@ -272,7 +372,7 @@ export function MarketingNav() {
                     className={cn("mnav-link gap-1", (active === l.id || active === "compare") && "is-active", menu && "is-open")}
                   >
                     <FlipText text={l.label} />
-                    <ChevronDown className="np-chev h-3.5 w-3.5" aria-hidden="true" />
+                    <ChevronDown ref={chevRef} className="np-chev h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </li>
               ) : (
@@ -296,7 +396,7 @@ export function MarketingNav() {
         <div
           ref={menuWrap}
           id="mnav-product"
-          hidden={!menu}
+          hidden={!npShown}
           onPointerEnter={hoverOpen}
           onPointerLeave={hoverClose}
           className="np-panel hidden lg:block"
@@ -343,42 +443,69 @@ export function MarketingNav() {
             aria-controls="mnav-panel"
             onClick={() => setOpen((v) => !v)}
           >
-            {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
+            <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true">
+              <line ref={barTop} {...(!animated && open ? CROSS[0] : BURGER[0])} />
+              <line ref={barBot} {...(!animated && open ? CROSS[1] : BURGER[1])} />
+            </svg>
           </button>
         </div>
       </div>
 
-      <div ref={panelRef} id="mnav-panel" hidden={!open} className="mnav-panel mx-auto mt-2 max-w-[1180px] overflow-hidden rounded-[28px] p-2 lg:hidden">
-        <nav aria-label="Sections" className="flex flex-col">
-          <p className="px-4 pb-1 pt-2 text-xs font-semibold text-muted-foreground">Product</p>
-          <ProductTilesCompact items={products} onPick={pickProduct} />
-          <div className="mx-4 my-2 h-px bg-border" aria-hidden="true" />
-          {links.filter((l) => l.id !== "features").map((l) => (
-            <Link
-              key={l.id}
-              data-sec={l.id}
-              href={`/#${l.id}`}
-              onClick={() => pick(l.id)}
-              aria-current={active === l.id ? "true" : undefined}
-              className={cn(
-                "flex h-12 items-center justify-between rounded-2xl px-4 font-display text-[19px] font-semibold tracking-tight hover:bg-foreground/[0.05]",
-                active === l.id && "bg-foreground/[0.06]",
-              )}
-            >
-              {l.label}
-              <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            </Link>
-          ))}
+      {/* 1181: the phone menu, three stacked cards over a dimmed page (GSAP demo "interruptible single timeline"). It sits
+          under the bar (z -1 inside the header), so the bar and its morphing menu button stay on top. */}
+      <div ref={panelRef} id="mnav-panel" hidden={!sheetShown} data-open={open} data-lenis-prevent="" className="mnav-sheet">
+        <div className="mnav-sheet-bg" aria-hidden="true" onClick={() => setOpen(false)} />
+        <div className="mnav-card mnav-card-top">
+          <nav aria-label="Sections" className="flex flex-col">
+            <p data-mi="" className="px-4 pb-1 pt-2 text-xs font-semibold text-muted-foreground">Product</p>
+            <ProductTilesCompact items={products} onPick={pickProduct} />
+            <div className="mx-4 my-2 h-px bg-border" aria-hidden="true" />
+            {links.filter((l) => l.id !== "features").map((l) => (
+              <Link
+                key={l.id}
+                data-mi=""
+                data-sec={l.id}
+                href={`/#${l.id}`}
+                onClick={() => pick(l.id)}
+                aria-current={active === l.id ? "true" : undefined}
+                className={cn(
+                  "flex h-12 items-center justify-between rounded-2xl px-4 font-display text-[22px] font-semibold tracking-tight hover:bg-foreground/[0.05]",
+                  active === l.id && "bg-foreground/[0.06]",
+                )}
+              >
+                {l.label}
+                <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              </Link>
+            ))}
+          </nav>
           {!signedIn && (
-            <Link href="/login" onClick={() => setOpen(false)} className="mt-1 flex h-12 items-center rounded-2xl px-4 text-[16px] font-semibold text-foreground/80 hover:bg-foreground/[0.05] sm:hidden">
-              Sign in
-            </Link>
+            <div className="mnav-foot">
+              <Link href="/login" onClick={() => setOpen(false)} className="flex h-12 items-center rounded-2xl px-4 text-[16px] font-semibold text-foreground/80 hover:bg-foreground/[0.05]">
+                Sign in
+              </Link>
+            </div>
           )}
-          <div className="mt-1 flex items-center justify-between rounded-2xl px-4 py-2 sm:hidden">
-            <span className="text-[15px] text-muted-foreground">Theme</span>
-            <ThemeToggle compact />
+        </div>
+        <div className="mnav-card mnav-card-mid">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] opacity-75">One upload, three destinations</p>
+          <p className="mt-1.5 font-display text-[21px] font-semibold leading-tight tracking-tight">
+            {hidden.has("demo") ? "Post once, everywhere" : "See it in 60 seconds"}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {!hidden.has("demo") && (
+              <Link href="/#demo" onClick={() => pickProduct("demo")} className="mnav-chip mnav-chip-ink">
+                Watch the demo
+              </Link>
+            )}
+            <Link href={signedIn ? "/home" : ctaHref} onClick={() => setOpen(false)} className="mnav-chip">
+              {signedIn ? "Dashboard" : ctaLabel}
+            </Link>
           </div>
-        </nav>
+        </div>
+        <div className="dark mnav-card mnav-card-end">
+          <span className="text-[15px] text-muted-foreground">Theme</span>
+          <ThemeToggle compact />
+        </div>
       </div>
     </header>
   );

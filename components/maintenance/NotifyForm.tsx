@@ -2,12 +2,15 @@
 import { useState } from "react";
 import { CheckCircle2, Mail } from "lucide-react";
 import { Input } from "@/components/ui/field";
+import { useSendText } from "@/lib/motion/sendText";
 
 /** "Email me when it's back": one address, stored once, emailed when the admin turns maintenance off. */
 export function NotifyForm() {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "busy" | "done">("idle");
   const [err, setErr] = useState("");
+  // 1181: the button types its own progress (lib/motion/sendText.ts).
+  const label = useSendText(state, { idle: "Notify me", busy: "Saving\u2026", pulse: "Saving", done: "Saved!" });
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr("");
@@ -30,7 +33,7 @@ export function NotifyForm() {
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input id="notify-email" type="email" required autoComplete="email" inputMode="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={!!err} aria-describedby={err ? "notify-err" : undefined} />
         <button type="submit" disabled={state === "busy" || !email} className="lime-bg lime-glow inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold transition-transform active:scale-[0.97] disabled:opacity-60">
-          <Mail className="h-4 w-4" aria-hidden /> {state === "busy" ? "Saving…" : "Notify me"}
+          <Mail className="h-4 w-4" aria-hidden /> <span ref={label.ref}>{label.text}</span>
         </button>
       </div>
       {err && <p id="notify-err" role="alert" className="mt-2 text-left text-[13px] text-destructive">{err}</p>}

@@ -714,6 +714,54 @@ html.lenis, html.lenis body { height: auto; }
 html.lenis { scroll-behavior: auto !important; }
 .lenis.lenis-stopped { overflow: hidden; }
 
+/* 1181: GSAP ScrollSmoother on public pages (components/marketing/Smoother.tsx). The wrapper is fixed and the content
+   glides inside it, so the nav leaves the flow too (fixed at the top) and the content keeps its room as padding. */
+html.smoother { scroll-behavior: auto !important; }
+html.smoother .mnav { position: fixed; inset-inline: 0; top: 0; }
+html.smoother #smooth-content { padding-top: var(--smooth-top, 0px); will-change: transform; }
+
+/* 1181: the landing's pinned-panel stack (lib/motion/panels.ts marks each panel data-sheet="first" or "next"; 768px
+   and up, motion allowed; attributes, not sibling selectors, because every pinned panel gets its own pin-spacer). Each section group is a full-screen sheet, its content centred. From the second sheet on they are
+   opaque with a rounded top and a soft upward shadow, so a sheet sliding up covers the one sinking behind it; the
+   first (the hero) stays on the sky. Without data-sheet a panel is an ordinary block. */
+.lp-panel[data-sheet] { position: relative; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; }
+.lp-panel[data-sheet] > * { width: 100%; }
+.lp-panel[data-sheet="next"] { z-index: 1; border-radius: 44px 44px 0 0;
+  background:
+    radial-gradient(55% 38% at 100% 0%, hsl(78 100% 50% / .07), transparent 70%),
+    radial-gradient(50% 40% at 0% 100%, hsl(228 100% 70% / .07), transparent 70%),
+    hsl(var(--background));
+  box-shadow: 0 -1px 0 hsl(var(--foreground) / .07), 0 -28px 60px -36px hsl(232 30% 10% / .45); }
+.dark .lp-panel[data-sheet="next"] { box-shadow: 0 -1px 0 hsl(0 0% 100% / .09), 0 -28px 60px -30px hsl(0 0% 0% / .8); }
+@media (prefers-contrast: more), (forced-colors: active) { .lp-panel[data-sheet="next"] { background: hsl(var(--background)); } }
+
+/* 1181: the nav's GSAP menus (lib/motion/navMotion.ts). With data-gsap on the header the timelines own the motion,
+   so the old CSS entrances and the chevron's transition stand down. */
+.mnav[data-gsap] .np-panel { animation: none; }
+.mnav[data-gsap] .np-chev { transition: none; }
+/* The phone menu: three stacked cards over a dimmed page, right-aligned, under the bar (z -1 inside the header). */
+.mnav-sheet { position: fixed; inset: 0; z-index: -1; display: flex; flex-direction: column; align-items: flex-end; gap: .5rem;
+  padding: .75rem; overflow: hidden; overscroll-behavior: contain; }
+.mnav-sheet[hidden] { display: none !important; }
+@media (min-width: 1024px) { .mnav-sheet { display: none !important; } }
+.mnav-sheet-bg { position: absolute; inset: 0; background: hsl(var(--background) / .6); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.mnav-card { position: relative; width: 100%; max-width: 560px; border-radius: 28px; flex: none; }
+.mnav-card-top { z-index: 3; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain;
+  padding: 64px .5rem .5rem; background: hsl(var(--card));
+  box-shadow: 0 0 0 1px hsl(var(--foreground) / .1), 0 24px 60px -24px rgba(0, 0, 0, .6); }
+.mnav-foot { margin-top: auto; padding-top: .5rem; }
+.mnav-card-mid { z-index: 2; padding: 1.1rem 1.25rem 1.2rem; color: hsl(var(--lime-foreground));
+  background: linear-gradient(135deg, hsl(var(--lime)) 0%, hsl(84 100% 74%) 40%, hsl(140 60% 64%) 70%, hsl(var(--lime)) 100%);
+  box-shadow: inset 0 0 0 1px hsl(var(--lime-foreground) / .12), 0 24px 60px -30px rgba(0, 0, 0, .55); }
+.mnav-card-end { z-index: 1; display: flex; align-items: center; justify-content: space-between; min-height: 72px; padding: .75rem 1.25rem;
+  background: hsl(var(--background)); color: hsl(var(--foreground)); box-shadow: 0 0 0 1px hsl(var(--foreground) / .12); }
+.mnav-chip { display: inline-flex; align-items: center; min-height: 44px; padding: 0 1.15rem; border-radius: 9999px; font-size: 14px; font-weight: 600;
+  color: hsl(var(--lime-foreground)); background: hsl(var(--lime-foreground) / .08); box-shadow: inset 0 0 0 1px hsl(var(--lime-foreground) / .2); }
+.mnav-chip-ink { color: hsl(var(--lime)); background: hsl(var(--lime-foreground)); box-shadow: none; }
+.mnav-chip:focus-visible { outline: 2px solid hsl(var(--lime-foreground)); outline-offset: 2px; }
+html.mnav-lock { overflow: hidden; }
+@media (prefers-reduced-transparency: reduce) { .mnav-sheet-bg { background: hsl(var(--background) / .92); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+
 /* Live indicator: a calm pulse, still under reduced motion. */
 .live-dot { position: relative; width: 8px; height: 8px; border-radius: 9999px; background: hsl(var(--success)); }
 .live-dot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: inherit; animation: live-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite; }

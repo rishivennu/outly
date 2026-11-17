@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import type { pageStagger as PageStagger } from "@/lib/motion/reveal";
 import { RouteStage } from "./RouteStage";
@@ -59,12 +60,15 @@ export function PageTransition({ children, variant = "site" }: { children: React
   return (
     <>
       <div ref={ref} className={kind === "push" || kind === "pop" || kind === "fade" ? `app-enter-${kind}` : undefined}>{children}</div>
-      {wave && (
+      {/* 1181: portalled to body. Public pages scroll inside ScrollSmoother's moving content, where position: fixed
+          would ride along with the page instead of covering the screen. */}
+      {wave && typeof document !== "undefined" && createPortal(
         <div className="page-wave" aria-hidden="true">
           <div className="pw-sheet"><span className="pw-crest" /></div>
           <div className="pw-sheet"><span className="pw-crest" /></div>
           <div className="pw-sheet"><span className="pw-crest" /></div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

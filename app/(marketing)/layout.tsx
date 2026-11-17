@@ -4,6 +4,7 @@ import { MotionFx } from "@/components/marketing/MotionFx";
 import { CursorFx } from "@/components/shared/CursorFx";
 import { TextFx } from "@/components/shared/TextFx";
 import { StarField } from "@/components/marketing/StarField";
+import { Smoother } from "@/components/marketing/Smoother";
 import { BetaProvider } from "@/components/marketing/BetaContext";
 import { isBeta } from "@/lib/beta";
 import { cookies } from "next/headers";
@@ -36,8 +37,11 @@ export default async function MarketingLayout({ children }: { children: React.Re
         Skip to content
       </a>
       <MarketingNav />
-      <main id="main">{children}</main>
-      <MarketingFooter />
+      {/* 1181: ScrollSmoother moves main and the footer; the nav, sky and effects stay fixed outside it. */}
+      <Smoother>
+        <main id="main" tabIndex={-1} className="outline-none">{children}</main>
+        <MarketingFooter />
+      </Smoother>
       <MotionFx />
       <TextFx />
       <CursorFx />

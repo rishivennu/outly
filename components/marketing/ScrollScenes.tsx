@@ -5,7 +5,9 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { MOTION_OK } from "@/lib/motion/gsap";
 import { rowsIn } from "@/lib/motion/reveal";
 import { whenLenis } from "./SmoothScroll";
+import { whenScrollReady } from "@/lib/motion/smooth";
 import { GSAP_EASE, sec as secs } from "@/lib/motion/tokens";
+import { stackPanels, type PanelHold } from "@/lib/motion/panels";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -20,6 +22,10 @@ gsap.registerPlugin(ScrollTrigger);
  *   4. Demo (lg): the section pins and scrolling walks through the four beats; past it, the clock takes over.
  *   5. Comparison: opening a group (or Expand all) brings its rows in, in threes; opening a row deals its cards.
  *   6. Final call to action: the side walls close in on the phone and the tiles settle, once.
+ *   9. Pinned panels (1181, user 11-17, the GSAP "pinned panels with overscroll" demo): on screens 768px and up each
+ *      section group is a full-screen sheet; when one ends it stays put and the next slides up over it while it sinks
+ *      away (lib/motion/panels.ts). How it works and Demo then hold their sheet on screen while their steps play
+ *      (the hold replaces their own pin: ScrollTrigger cannot nest pins).
  *   8. Parallax (1064): decorative layers marked data-parallax="px" drift against the scroll, a few dozen px at
  *      most. The one scroll-linked effect left (parallax is position by definition), smoothed so it never jerks.
  *      Below lg, How it works fills a thin line along each step once it comes up.
@@ -53,7 +59,9 @@ export function ScrollScenes() {
     if (!main) return;
     const mm = gsap.matchMedia();
 
-    // Built when the main thread is free (or within 700ms), so it does not lengthen the hydration task.
+    // Built when the main thread is free (or within 700ms), so it does not lengthen the hydration task, and never
+    // before the page's smooth scroller exists: a pin made outside ScrollSmoother would hold its element to the
+    // window while the content glides under it (1181, whenScrollReady in lib/motion/smooth.ts).
     const build = () => mm.add({ motion: MOTION_OK, wide: "(min-width: 768px)", lg: "(min-width: 1024px)" }, (ctx) => {
       const { motion, wide, lg } = ctx.conditions as { motion: boolean; wide: boolean; lg: boolean };
       if (!motion) return;
@@ -63,6 +71,11 @@ export function ScrollScenes() {
       // Teardown for the non-GSAP side effects below (inline styles, attributes, listeners, events). Runs when this
       // media set reverts. (ctx.add(fn) would run fn right away, not on revert.)
       const undo: Array<() => void> = [];
+      // 9. The panel stack: holds are collected by scenes 3 and 4, the stack is built right after them.
+      const panels = wide ? Array.from(main.querySelectorAll<HTMLElement>(".lp-panel")) : [];
+      const stack = panels.length > 1;
+      const holds = new Map<HTMLElement, PanelHold>();
+      const panelOf = (el: HTMLElement) => el.closest<HTMLElement>(".lp-panel");
 
       // 1. Hero leave.
       const hero = main.querySelector<HTMLElement>("section[aria-labelledby=hero-title]");
@@ -144,21 +157,25 @@ export function ScrollScenes() {
           go?.kill();
           go = tl.tweenTo(n, { duration: secs("section"), ease: out });
         };
-        ScrollTrigger.create({
+        const step = (p: number) => {
+          const n = Math.min(2, Math.floor(p * 2.4 + 0.25));
+          if (n !== at) {
+            light((at = n));
+            to(n);
+          }
+        };
+        const sheet = stack ? panelOf(how) : null;
+        if (sheet) holds.set(sheet, { screens: 1.3, onHold: step }); // the sheet holds while the steps light
+        else
+          ScrollTrigger.create({
             trigger: howBox,
             start: "center center",
             end: () => `+=${Math.round(innerHeight * 1.3)}`,
             pin: true,
             anticipatePin: 1,
             invalidateOnRefresh: true,
-            onUpdate: (st) => {
-              const n = Math.min(2, Math.floor(st.progress * 2.4 + 0.25));
-              if (n !== at) {
-                light((at = n));
-                to(n);
-              }
-            },
-        });
+            onUpdate: (st) => step(st.progress),
+          });
         // Step n is fully lit at time n; the late steps leave a short hold before the page moves on.
         tl.to(fill, { scaleX: 2 / 3, duration: 1 }, 0)
           .fromTo(d2, { opacity: 0.3, y: 14 }, { opacity: 1, y: 0, duration: 0.6 }, 0.4)
@@ -182,7 +199,20 @@ export function ScrollScenes() {
         let active = false;
         const send = () => stage.dispatchEvent(new CustomEvent("demo:scrub", { detail: { beat: Math.max(0, beat), active } }));
         const pin = fits(demo);
-        ScrollTrigger.create({
+        const sheet = stack && pin ? panelOf(demo) : null;
+        const walk = (p: number, on: boolean) => {
+          const b = Math.min(3, Math.floor(p * 4));
+          if (on !== active) {
+            active = on;
+            beat = b;
+            send();
+          } else if (b !== beat) {
+            beat = b;
+            if (active) send();
+          }
+        };
+        if (sheet) holds.set(sheet, { screens: 1.6, onHold: walk }); // the sheet holds while the four beats play
+        else ScrollTrigger.create({
           trigger: demo,
           start: pin ? "center center" : "top 55%",
           end: pin ? () => `+=${Math.round(innerHeight * 1.6)}` : "bottom 45%",
@@ -206,6 +236,9 @@ export function ScrollScenes() {
           send();
         });
       }
+
+      // 9. Pinned panels, in page order, after the holds above and before every entrance below.
+      if (stack) undo.push(stackPanels(panels, holds));
 
       // 8. Parallax: the one scroll-linked effect (it IS the scroll position, both ways), smoothed by a short lag
       //    so a flick glides instead of jerking. Decorative only; nothing readable depends on where it is.
@@ -379,10 +412,13 @@ export function ScrollScenes() {
     });
 
     const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
-    const id = w.requestIdleCallback ? w.requestIdleCallback(build, { timeout: 700 }) : window.setTimeout(build, 1);
+    let stopWaitingForScroll = () => {};
+    const queue = () => (stopWaitingForScroll = whenScrollReady(build));
+    const id = w.requestIdleCallback ? w.requestIdleCallback(queue, { timeout: 700 }) : window.setTimeout(queue, 1);
     return () => {
       if (w.cancelIdleCallback) w.cancelIdleCallback(id);
       else window.clearTimeout(id);
+      stopWaitingForScroll();
       mm.revert();
     };
   }, []);

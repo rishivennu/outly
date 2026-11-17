@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, Loader2, RotateCcw } from "lucide-react";
 import { api, ApiError } from "@/lib/client/api";
+import { useSendText } from "@/lib/motion/sendText";
+import { MOTION_OK } from "@/lib/motion/gsap";
 
 type Joined = { already: boolean; position?: number; waiting?: number };
 type Done = Joined & { email: string; name: string | null; at: string };
@@ -15,6 +17,8 @@ const KEY = "outlly.waitlist.receipt";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const BAD_EMAIL = "That email doesn't look quite right. Check it for a typo.";
 const KEEP_MS = 30 * 86_400_000;
+/** How long the button holds its "You're in!" before the receipt prints. */
+const SENT_MS = 620;
 
 function load(): Done | null {
   try {
@@ -50,6 +54,8 @@ export function WaitlistForm({ fromGoogle = false, beta = false }: { fromGoogle?
   const [badEmail, setBadEmail] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
   const [play, setPlay] = useState(0); // 0 = show printed (restored), n > 0 = print run n
+  const [sent, setSent] = useState(false); // the beat between "it worked" and the receipt feeding out
+  const label = useSendText(sent ? "done" : busy ? "busy" : "idle", { idle: "Join the waitlist", busy: "Joining…", pulse: "Joining", done: "You're in!" });
   const doneRef = useRef<HTMLHeadingElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const focusNext = useRef(false);
@@ -102,7 +108,7 @@ export function WaitlistForm({ fromGoogle = false, beta = false }: { fromGoogle?
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (busy) return; // a double tap sends one request
+    if (busy || sent) return; // a double tap sends one request
     if (!EMAIL_RE.test(form.email.trim())) {
       setError(form.email.trim() ? BAD_EMAIL : "Add the email you want the invite sent to.");
       setBadEmail(true);
@@ -120,6 +126,10 @@ export function WaitlistForm({ fromGoogle = false, beta = false }: { fromGoogle?
       } catch {
         /* private mode: the receipt just won't survive a reload */
       }
+      // 1181: the button says it landed ("You're in!") before the receipt feeds out, so the print follows the word.
+      setSent(true);
+      setBusy(false);
+      if (window.matchMedia(MOTION_OK).matches) await new Promise((go) => window.setTimeout(go, SENT_MS));
       focusNext.current = true;
       setPlay((n) => n + 1);
       setDone(d);
@@ -304,16 +314,11 @@ export function WaitlistForm({ fromGoogle = false, beta = false }: { fromGoogle?
             {error}
           </p>
         )}
-        <button type="submit" disabled={busy} className="wl-cta lime-glow mt-5 w-full disabled:opacity-70">
+        <button type="submit" disabled={busy || sent} className="wl-cta lime-glow mt-5 w-full disabled:opacity-70">
           {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-          {busy ? (
-            "Joining…"
-          ) : (
-            <>
-              Join the waitlist
-              <ArrowRight className="h-[18px] w-[18px]" aria-hidden="true" />
-            </>
-          )}
+          {/* 1181: the label types itself while the request is in the air (lib/motion/sendText.ts). */}
+          <span ref={label.ref}>{label.text}</span>
+          {!busy && !sent && <ArrowRight className="h-[18px] w-[18px]" aria-hidden="true" />}
         </button>
         <p className="mt-3.5 text-center text-[13px] leading-snug text-[hsl(var(--ap-ink2))]">{beta ? "Free during beta · No credit card required" : "Free plan to start · No credit card required"}</p>
         <div className="wl-slot" aria-hidden="true">

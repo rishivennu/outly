@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { getLenis } from "./SmoothScroll";
+import { scrollPageTo } from "@/lib/motion/smooth";
 
 /**
  * The page scrollbar on every page (root layout): the same 4px pill as the admin sidebar (components/admin/ScrollArea.tsx), so it
@@ -8,7 +8,7 @@ import { getLenis } from "./SmoothScroll";
  * Windows). The native page bar is hidden in CSS (html:has(.pb-rail), so there is no layout jump on hydration). The pill
  * rests soft, turns lime with a faint glow while scrolling, widens to 6px under the pointer, can be dragged, and a click
  * on the rail jumps there. Wheel, keyboard and touch scrolling are untouched. Touch screens keep their own overlay bar.
- * When Lenis smooth scroll is running, drags and jumps go through it so the two never fight.
+ * When smooth scroll is running (ScrollSmoother on public pages, Lenis elsewhere), drags and jumps go through it so the two never fight.
  */
 export function PageScrollbar() {
   const rail = useRef<HTMLDivElement>(null);
@@ -46,11 +46,7 @@ export function PageScrollbar() {
       idle = window.setTimeout(() => { if (!drag) rl.dataset.live = "0"; }, 900);
     };
     const onScroll = () => { sy = window.scrollY; queue(); wake(); };
-    const go = (y: number, smooth: boolean) => {
-      const l = getLenis();
-      if (l) l.scrollTo(y, { immediate: !smooth, force: true });
-      else window.scrollTo({ top: y, behavior: smooth ? "smooth" : "auto" });
-    };
+    const go = (y: number, smooth: boolean) => scrollPageTo(y, !smooth);
 
     const down = (e: PointerEvent) => {
       if (e.button !== 0) return;

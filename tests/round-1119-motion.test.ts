@@ -71,9 +71,15 @@ describe("nothing bounces (1119)", () => {
     expect(bouncy).toEqual([]);
   });
 
-  test("no GSAP back/elastic/bounce eases", () => {
-    const bad = src.filter((f) => /["'](back|elastic|bounce)\.(in|out|inOut)\b/.test(f.text)).map((f) => f.file);
+  // 1181: the menus are the one exception, and they are deliberate. The two GSAP menu demos the brief asks for
+  // (orchestrated ease-reverse, interruptible enter/exit) ARE a back.out open: a back ease on the way in with a
+  // plain power ease on the way out (easeReverse) is how an interruption stays smooth. Nothing else overshoots.
+  test("no GSAP back/elastic/bounce eases outside the menus", () => {
+    const bad = src.filter((f) => f.file !== "lib/motion/navMotion.ts" && /["'](back|elastic|bounce)\.(in|out|inOut)\b/.test(f.text)).map((f) => f.file);
     expect(bad).toEqual([]);
+    const menus = read("lib/motion/navMotion.ts");
+    expect(menus).toMatch(/easeReverse/); // every back ease there reverses on a plain ease
+    expect(menus).not.toMatch(/["'](elastic|bounce)\./);
   });
 
   test("no cubic-bezier or framer ease array leaves 0..1 on the y axis", () => {
@@ -102,8 +108,12 @@ describe("time-based, never scrubbed (1119)", () => {
   test("only the decorative parallax still follows the scroll position, anywhere in the app", () => {
     const scrubs = [...ss.matchAll(/scrub:\s*([^,}\s]+)/g)].map((m) => m[1]);
     expect(scrubs).toEqual(["0.6"]);
-    const elsewhere = src.filter((f) => f.file !== "components/marketing/ScrollScenes.tsx" && /scrub:\s*[^,}\s]/.test(f.text)).map((f) => f.file);
+    // 1181: the panel stack is the second one, and it is also position by definition: a sheet sinks and the next
+    // slides over it exactly as far as the page has scrolled past it (lib/motion/panels.ts, the GSAP pinned-panels
+    // demo). Nothing readable moves with it; the steps inside a held sheet still play at the token pace.
+    const elsewhere = src.filter((f) => !["components/marketing/ScrollScenes.tsx", "lib/motion/panels.ts"].includes(f.file) && /scrub:\s*[^,}\s]/.test(f.text)).map((f) => f.file);
     expect(elsewhere).toEqual([]);
+    expect([...read("lib/motion/panels.ts").matchAll(/scrub:\s*([^,}\s]+)/g)].map((m) => m[1])).toEqual(["true"]);
     expect(ss).toMatch(/\[data-parallax\][\s\S]*scrub: 0\.6/);
   });
 

@@ -4,6 +4,8 @@ import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { api, ApiError } from "@/lib/client/api";
+import { MOTION_OK } from "@/lib/motion/gsap";
+import { useSendText } from "@/lib/motion/sendText";
 
 const TOPICS = ["A question", "Something is broken", "A feature idea", "Billing", "Privacy or legal"] as const;
 
@@ -16,10 +18,13 @@ export function ContactForm() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [sent, setSent] = useState(false); // the beat between "it sent" and the thank-you card
+  // 1181: the button types its own progress (lib/motion/sendText.ts).
+  const label = useSendText(sent ? "done" : busy ? "busy" : "idle", { idle: "Send message", busy: "Sending\u2026", pulse: "Sending", done: "Sent!" });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (busy) return;
+    if (busy || sent) return;
     if (f.website) return setDone("received"); // bot
     if (f.message.trim().length < 10) return setErr("Tell us a little more (at least 10 characters).");
     setBusy(true);
@@ -29,6 +34,9 @@ export function ContactForm() {
         method: "POST",
         json: { email: f.email, name: f.name || undefined, reason: "form", website: f.website || undefined, transcript: [{ role: "user", text: `[${f.topic}] ${f.message.trim()}`.slice(0, 2000) }] },
       });
+      setSent(true);
+      setBusy(false);
+      if (window.matchMedia(MOTION_OK).matches) await new Promise((go) => window.setTimeout(go, 620));
       setDone(r.ref);
     } catch (e2) {
       setErr(e2 instanceof ApiError ? e2.message : "That didn't send. Check your connection and try again.");
@@ -82,9 +90,9 @@ export function ContactForm() {
         </p>
       )}
       <div className="sm:col-span-2">
-        <Button type="submit" variant="lime" className="h-12 px-6 text-[15px]" disabled={busy} aria-busy={busy}>
-          {busy ? "Sending…" : "Send message"}
-          {!busy && <ArrowRight className="h-[18px] w-[18px]" aria-hidden="true" />}
+        <Button type="submit" variant="lime" className="h-12 px-6 text-[15px]" disabled={busy || sent} aria-busy={busy}>
+          <span ref={label.ref}>{label.text}</span>
+          {!busy && !sent && <ArrowRight className="h-[18px] w-[18px]" aria-hidden="true" />}
         </Button>
       </div>
     </form>

@@ -3,6 +3,8 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import type Lenis from "lenis";
 import { whenSettled } from "@/lib/client/when-idle";
+import { SMOOTH, smoothEase } from "@/lib/motion/tokens";
+import { clearSmoothEngine, onSmoothClaim, scrollPageTo, setSmoothEngine, smoothClaimed } from "@/lib/motion/smooth";
 
 let lenis: Lenis | null = null;
 let popped = false; // back/forward: let the browser restore the old position
@@ -32,9 +34,7 @@ function holdAnchor(id: string) {
     if (done) return;
     const off = target.getBoundingClientRect().top - (parseFloat(getComputedStyle(target).scrollMarginTop) || 0);
     if (Math.abs(off) < 2) return;
-    const y = window.scrollY + off;
-    if (lenis) lenis.scrollTo(y, { immediate: true, force: true });
-    else window.scrollTo({ top: y, behavior: "instant" as ScrollBehavior });
+    scrollPageTo(window.scrollY + off, true); // Lenis, ScrollSmoother or native: a jump, never a glide
   };
   const ro = new ResizeObserver(align);
   const quit = () => {
@@ -61,6 +61,8 @@ export function whenLenis(cb: (l: Lenis) => void): () => void {
 
 /**
  * Inertial "liquid" scroll for every page: landing, studio and admin (mounted once in the root layout).
+ * 1181: public pages hand the page to GSAP ScrollSmoother (Smoother.tsx claims it); Lenis stands down while that claim
+ * is held and comes back when it is released (leaving the site for the studio). Both glide on SMOOTH (one curve).
  * Loaded after hydration so it never delays first paint, skipped for reduced motion and touch devices
  * (their native scroll is already fluid). In-page anchor links glide to their section.
  * Panels that scroll on their own (sidebars, chat, dialogs, tables) keep native scroll: they are
@@ -77,30 +79,42 @@ export function SmoothScroll({ lazy = false }: { lazy?: boolean }) {
     if (window.matchMedia("(pointer: coarse)").matches) return;
     let stop = () => {};
     let cancelled = false;
-    const load = () => import("lenis").then(({ default: L }) => {
-      if (cancelled) return;
-      const l = new L({ lerp: 0.075, wheelMultiplier: 0.8, anchors: true, autoRaf: true, allowNestedScroll: true });
-      lenis = l;
-      waiting.forEach((cb) => cb(l));
-      waiting.clear();
-      document.documentElement.classList.add("lenis");
-      const body = document.body;
-      const sync = () => (body.hasAttribute("data-scroll-locked") ? l.stop() : l.start());
-      const onPop = () => (popped = true);
-      window.addEventListener("popstate", onPop);
-      const mo = new MutationObserver(sync);
-      mo.observe(body, { attributes: true, attributeFilter: ["data-scroll-locked"] });
-      stop = () => {
-        mo.disconnect();
-        window.removeEventListener("popstate", onPop);
-        l.destroy();
-        lenis = null;
-        document.documentElement.classList.remove("lenis");
-      };
-    });
+    let loading = false;
+    const load = () => {
+      if (cancelled || lenis || loading || smoothClaimed()) return;
+      loading = true;
+      void import("lenis").then(({ default: L }) => {
+        loading = false;
+        if (cancelled || lenis || smoothClaimed()) return;
+        const l = new L({ duration: SMOOTH.duration, easing: smoothEase, wheelMultiplier: SMOOTH.wheel, anchors: true, autoRaf: true, allowNestedScroll: true });
+        lenis = l;
+        setSmoothEngine({ kind: "lenis", to: (y, now) => l.scrollTo(y, { immediate: !!now, force: true }) });
+        waiting.forEach((cb) => cb(l));
+        waiting.clear();
+        document.documentElement.classList.add("lenis");
+        const body = document.body;
+        const sync = () => (body.hasAttribute("data-scroll-locked") ? l.stop() : l.start());
+        const onPop = () => (popped = true);
+        window.addEventListener("popstate", onPop);
+        const mo = new MutationObserver(sync);
+        mo.observe(body, { attributes: true, attributeFilter: ["data-scroll-locked"] });
+        stop = () => {
+          mo.disconnect();
+          window.removeEventListener("popstate", onPop);
+          l.destroy();
+          lenis = null;
+          clearSmoothEngine("lenis");
+          document.documentElement.classList.remove("lenis");
+          stop = () => {};
+        };
+      }, () => void (loading = false));
+    };
+    // ScrollSmoother claimed the page (a public page mounted): stand down. Released: come back.
+    const unclaim = onSmoothClaim(() => (smoothClaimed() ? stop() : load()));
     const unwait = lazy ? whenSettled(() => void load()) : (void load(), () => {});
     return () => {
       cancelled = true;
+      unclaim();
       unwait();
       stop();
     };

@@ -77,6 +77,17 @@ export const GSAP_EASE = { out: "expo.out", swap: "expo.inOut", in: "power3.in",
 /** GSAP takes seconds. */
 export const sec = (name: DurName) => DUR[name] / 1000;
 
+/**
+ * 1181: one smooth scroll for the whole app (user, 11-17: "smooth scroll for the entire web app, from entry to exit,
+ * the same"). Public pages ride GSAP ScrollSmoother (components/marketing/Smoother.tsx); the studio, admin and auth
+ * pages ride Lenis (components/marketing/SmoothScroll.tsx). Both catch up on this one curve: the page glides to where
+ * the wheel sent it in `duration` seconds on expo.out, ScrollSmoother's own default, so the two feel identical.
+ * Touch screens and reduced motion keep the native scroll (it is already smooth there).
+ */
+export const SMOOTH = { duration: 1, gsap: "expo.out", wheel: 1 } as const;
+/** expo.out as a plain function, for Lenis. */
+export const smoothEase = (t: number) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));
+
 /** framer-motion transitions (seconds). */
 const tween = (dur: DurName, ease: EaseName = "out", delay = 0) => ({ type: "tween" as const, duration: sec(dur), ease: EASE[ease] as unknown as number[], ...(delay ? { delay } : {}) });
 export const T = {

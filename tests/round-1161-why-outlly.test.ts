@@ -25,7 +25,7 @@ describe("1161 registry", () => {
   test("the page renders it after the ticker and before Try it, behind its switch", () => {
     const page = read("app/(marketing)/page.tsx");
     const a = page.indexOf("<LogoTicker");
-    const b = page.indexOf('{on("usp") && <WhyOutlly');
+    const b = page.search(/\{on\("usp"\) && <(Panel><)?WhyOutlly/); // 1181: each section is wrapped in a <Panel> sheet
     const c = page.indexOf("<TryIt");
     expect(a).toBeGreaterThan(0);
     expect(b).toBeGreaterThan(a);

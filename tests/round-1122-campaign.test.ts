@@ -115,7 +115,9 @@ describe("parsing and links (1122)", () => {
 
 describe("popup motion (1122)", () => {
   const css = read("app/globals.css");
-  const block = css.slice(css.indexOf("/* ---------- 1122"), css.indexOf("/* ---------- 1100: Liquid glass on every studio card"));
+  // Just this block: the next banner comment ends it, wherever a later round puts its own CSS.
+  const at = css.indexOf("/* ---------- 1122");
+  const block = css.slice(at, css.indexOf("/* ---------- 11", at + 20));
   const sheet = read("components/promo/PromoSheet.tsx");
   test("sheet 650ms, overlay 300ms, from translateY(100%) scale .97 opacity 0", () => {
     expect(block).toContain(".promo-sheet { animation: promo-rise 650ms var(--m-ease-out)");

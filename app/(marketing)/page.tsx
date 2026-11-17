@@ -75,6 +75,19 @@ const faqJsonLd = {
   })),
 };
 
+/**
+ * 1181: one sheet of the landing's pinned-panel stack (lib/motion/panels.ts, built by ScrollScenes on screens 768px and
+ * up with motion allowed). Until then, and everywhere else, it is a plain block. `flow`: slides over the sheet before it
+ * but is never pinned itself (Comparison pins its own header row).
+ */
+function Panel({ children, flow = false }: { children: React.ReactNode; flow?: boolean }) {
+  return (
+    <div className="lp-panel" data-panel={flow ? "flow" : "pin"}>
+      {children}
+    </div>
+  );
+}
+
 export default async function LandingPage() {
   // Both reads are cached in-process for 15 s, so this costs nothing on a busy page.
   const [cfg, site, beta, live] = await Promise.all([getConfig("landing"), siteStatus(), isBeta(), liveNow()]);
@@ -92,31 +105,45 @@ export default async function LandingPage() {
           <Countdown endsAt={site.endsAt} since={site.since} variant="bar" />
         </div>
       )}
-      {on("hero") && <Hero showHow={on("how")} beta={beta} live={live} />}
-      {on("hero") && <LogoTicker live={live} />}
+      {/* 1181: the sections as sheets of the pinned-panel stack (Panel above). The ticker rides with the hero, the route
+          line with Try it, and the waitlist form with the final call to action, so no sheet is a thin strip. */}
+      {on("hero") && (
+        <Panel>
+          <Hero showHow={on("how")} beta={beta} live={live} />
+          <LogoTicker live={live} />
+        </Panel>
+      )}
       {/* Why Outlly (1161): the six strengths straight after the hero, its own switch in Admin > Landing page. */}
-      {on("usp") && <WhyOutlly live={live} />}
+      {on("usp") && <Panel><WhyOutlly live={live} /></Panel>}
       {/* Try it (10-28): its own switch in Admin > Landing page. Off also closes /api/try. */}
-      {on("try") && <TryIt />}
-      {on("hero") && on("how") && (
-        // Same box as the framed fan stage (HeroFan: w-full max-w-[1180px]) so the dotted line runs edge to edge with it.
-        <div className="mx-auto w-full max-w-[1180px]">
-          <RouteRule />
-        </div>
+      {(on("try") || (on("hero") && on("how"))) && (
+        <Panel>
+          {on("try") && <TryIt />}
+          {on("hero") && on("how") && (
+            // Same box as the framed fan stage (HeroFan: w-full max-w-[1180px]) so the dotted line runs edge to edge with it.
+            <div className="mx-auto w-full max-w-[1180px]">
+              <RouteRule />
+            </div>
+          )}
+        </Panel>
       )}
       {!on("hero") && <div className="h-6" aria-hidden="true" />}
-      {on("how") && <HowItWorks />}
-      {on("features") && <Features />}
-      {on("time") && <TimeSaved />}
-      {on("demo") && <Demo />}
-      {on("why") && <Difference beta={beta} />}
-      {on("platforms") && <Platforms showCompare={on("compare")} />}
-      {on("compare") && <Comparison competitors={cfg.competitors} groups={cfg.groups} beta={beta} />}
-      {on("trust") && <Trust />}
-      {on("pricing") && <Pricing />}
-      {on("faq") && <Faq />}
-      {on("cta") && <FinalCta beta={beta} />}
-      {joinOpen && <WaitlistJoin beta={beta} total={joined} />}
+      {on("how") && <Panel><HowItWorks /></Panel>}
+      {on("features") && <Panel><Features /></Panel>}
+      {on("time") && <Panel><TimeSaved /></Panel>}
+      {on("demo") && <Panel><Demo /></Panel>}
+      {on("why") && <Panel><Difference beta={beta} /></Panel>}
+      {on("platforms") && <Panel><Platforms showCompare={on("compare")} /></Panel>}
+      {on("compare") && <Panel flow><Comparison competitors={cfg.competitors} groups={cfg.groups} beta={beta} /></Panel>}
+      {on("trust") && <Panel><Trust /></Panel>}
+      {on("pricing") && <Panel><Pricing /></Panel>}
+      {on("faq") && <Panel><Faq /></Panel>}
+      {(on("cta") || joinOpen) && (
+        <Panel>
+          {on("cta") && <FinalCta beta={beta} />}
+          {joinOpen && <WaitlistJoin beta={beta} total={joined} />}
+        </Panel>
+      )}
       {/* A page with every section off still needs a heading for screen readers and a way in. */}
       {!on("hero") && <h1 className="sr-only">Outlly</h1>}
       <ScrollScenes />
