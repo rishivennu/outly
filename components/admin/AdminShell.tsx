@@ -196,6 +196,9 @@ function Footer({ admin, path, onNavigate, slim = false }: { admin: { name: stri
 
 export function AdminShell({ admin, badges, children }: { admin: { name: string; role: AdminRole }; badges: Partial<Record<AdminArea, number>>; children: React.ReactNode }) {
   const path = usePathname();
+  // 1191: the live console is a dense working screen, so the brand stars stay off it; the panel's own
+  // palette and corner glow (.sky-host) are unchanged, so it still matches every other admin page.
+  const quiet = path === "/admin/live-assist";
   const [open, setOpen] = useState(false);
   // Slim starts false on both server and client (no hydration mismatch), then reads the saved preference.
   const [slim, setSlim] = useState(false);
@@ -222,7 +225,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
 
   return (
     <div className="admin-root sky-host relative isolate flex min-h-dvh" data-nav={slim ? "slim" : "full"}>
-      <StarField nebula />
+      {!quiet && <StarField nebula />}
       <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
         <aside data-route-order="" className={cn("glass hairline flex h-full flex-col overflow-hidden rounded-[28px] transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none", slim ? "w-[72px]" : "w-[248px]")} aria-label="Admin sidebar">
           <div className={cn("flex items-center gap-2 pb-4 pt-5", slim ? "flex-col px-3" : "justify-between px-5")}>
@@ -248,21 +251,25 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
       </div>
 
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border/50 bg-background/75 px-4 py-2.5 backdrop-blur-xl lg:border-0 lg:bg-transparent lg:px-8 lg:pt-5 lg:backdrop-blur-0">
-          <div className="flex items-center gap-2 lg:hidden">
-            <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" aria-expanded={open} className="grid h-11 w-11 place-items-center rounded-full [@media(hover:hover)]:hover:bg-secondary">
+        {/* 1191: one bar, one hairline, one height. The phone bar is 56px tall plus the status-bar inset, and
+            the menu, mark, title and bell all sit on its centre line, so nothing shifts between admin pages. */}
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border/50 bg-background/75 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-[env(safe-area-inset-top)] backdrop-blur-xl lg:h-auto lg:border-0 lg:bg-transparent lg:pl-8 lg:pr-8 lg:pt-5 lg:backdrop-blur-0">
+          <div className="flex min-w-0 items-center gap-1.5 lg:hidden">
+            <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" aria-expanded={open} className="-ml-2 grid h-11 w-11 shrink-0 place-items-center rounded-full [@media(hover:hover)]:hover:bg-secondary">
               <Menu className="h-5 w-5" aria-hidden />
             </button>
-            <OutlyMark size={26} />
-            <span className="font-display text-[15px] font-bold tracking-tight">Admin</span>
+            <OutlyMark size={24} />
+            <span className="truncate font-display text-[15px] font-bold leading-none tracking-tight">Admin</span>
           </div>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex shrink-0 items-center">
             <Bell role={admin.role} />
           </div>
         </header>
         {/* 1163: one content column for every admin page. Wide enough to use a 1920 screen (four metric columns, two
             charts side by side) and capped so ultrawide monitors do not stretch tables across the whole desk. */}
-        <main id="main" className="admin-main mx-auto w-full max-w-[1480px] px-4 pb-24 pt-2 sm:px-6 lg:px-8">
+        {/* 1191: the console is sized to the window, so the panel's usual deep bottom padding would leave
+            a dead strip under it and make the page scroll for nothing. */}
+        <main id="main" className={cn("admin-main mx-auto w-full max-w-[1480px] px-4 pt-2 sm:px-6 lg:px-8", quiet ? "pb-4" : "pb-24")}>
           {children}
         </main>
       </div>

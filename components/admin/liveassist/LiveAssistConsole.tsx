@@ -1,10 +1,11 @@
 "use client";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowLeft, BarChart3, BellRing, Check, CheckCheck, Clock, Headset, Loader2, PanelRight, RotateCcw, Send, StickyNote, UserRound, Volume2, VolumeX, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowLeft, BarChart3, BellRing, Check, CheckCheck, Clock, Headset, Loader2, Maximize2, Minimize2, PanelRight, Plug, RotateCcw, Send, StickyNote, UserRound, Volume2, VolumeX, X } from "lucide-react";
 import { useToast } from "@/components/shared/Toast";
-import { Pill, ago, fmtDate, type Tone } from "@/components/admin/ui";
+import { Pill, STATUS_LABEL, ago, fmtDate, type Tone } from "@/components/admin/ui";
+import { BRAND_PATH, BrandGlyph } from "@/components/brand/brands";
 import { chime, setSound, soundOn, SOUND_EVENT } from "@/lib/client/live-sound";
 import type { AdminRole } from "@/lib/admin/perms";
 import { CATEGORY_LABEL, HISTORY_WORD, LIVE_CATEGORIES, LIVE_MAX_TEXT, LIVE_PRIORITIES, NOTE_MAX, STATUS_WORD, fmtDuration, mergeLive, receipt, staffSysLine, type LiveCategory, type Receipt, type SessionStatus, type WireMsg } from "@/lib/support/live-core";
@@ -19,6 +20,12 @@ import { cn } from "@/lib/utils";
  * Checking in: the queue every 6 s and the open chat every 3 s while someone is at the screen, slower for a
  * finished chat, and the queue every 20 s while the tab is in the background (so a new request can still chime
  * and raise a desktop alert). Nothing at all once nobody has touched the console for 30 minutes.
+ *
+ * 1191 rebuilt the screen on top of that, without touching a route, a payload or a rule: the counts are an even
+ * grid, every control on the bar is the same height, the chat header splits into what-this-is / what-I-can-do /
+ * how-it-is-filed so nothing overflows, the message column keeps day markers and a Latest button, the composer
+ * is one growing line pinned above the home bar, and the details drawer is a proper phone dialog (full width,
+ * focus kept inside, system back closes it, the page behind it does not scroll, quiet scrollbars).
  */
 
 type QueueData = Awaited<ReturnType<typeof queue>> & { away: boolean; analytics: Awaited<ReturnType<typeof analytics>> | null };
@@ -61,6 +68,15 @@ const btnPrimary = cn(btn, "bg-foreground text-background hover:bg-foreground/90
 const btnQuiet = cn(btn, "bg-secondary text-foreground hover:bg-secondary/70");
 const btnDanger = cn(btn, "bg-destructive text-destructive-foreground hover:bg-destructive/90");
 const field = cn("min-h-11 rounded-2xl border border-border bg-background px-3 text-[13px]", ring);
+// One shape for every control on the bar and in the chat header, so a row of them lines up at any width.
+const btnChip = cn(btn, "px-3.5");
+const iconBtn = "w-11 shrink-0 px-0";
+const pickField = cn(field, "w-full min-w-0");
+const pickLabel = "flex min-w-0 flex-col gap-1 text-[11px] font-medium text-muted-foreground";
+const H3 = "mb-2 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground";
+const DL = "grid grid-cols-[minmax(5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-[12.5px]";
+const wrapAny = "break-words [overflow-wrap:anywhere]";
+const reduceMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 class CallError extends Error {
   constructor(public status: number, message: string, public code?: string) {
@@ -151,13 +167,13 @@ function Counter({ label, n, on, onClick, tone }: { label: string; n: number; on
       aria-pressed={on}
       onClick={onClick}
       className={cn(
-        "flex min-h-11 min-w-[7.5rem] flex-1 flex-col items-start rounded-2xl border px-3.5 py-2 text-left transition-colors",
+        "flex h-full min-h-[4.5rem] flex-col items-start justify-between gap-1 rounded-2xl border px-3.5 py-2.5 text-left transition-colors",
         on ? "border-foreground/40 bg-foreground/[0.06]" : "border-border hover:bg-secondary/60",
         ring,
       )}
     >
-      <span className="text-[11.5px] font-medium text-muted-foreground">{label}</span>
-      <span className={cn("font-display text-[1.35rem] font-semibold tabular-nums leading-tight", tone === "warn" && n > 0 && "pill-ink-warn")}>{n}</span>
+      <span className="text-[11.5px] font-medium leading-tight text-muted-foreground">{label}</span>
+      <span className={cn("font-display text-[1.4rem] font-semibold leading-none tabular-nums", tone === "warn" && n > 0 && "pill-ink-warn")}>{n}</span>
     </button>
   );
 }
@@ -218,24 +234,24 @@ function QueueList({ rows, sel, onPick, now, meId, loading }: { rows: QueueRow[]
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-2xl border border-border px-3.5 py-2.5">
-      <p className="text-[11.5px] text-muted-foreground">{label}</p>
-      <p className="font-display text-[1.2rem] font-semibold tabular-nums">{value}</p>
-      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    <div className="flex h-full flex-col gap-0.5 rounded-2xl border border-border px-3.5 py-2.5">
+      <p className="text-[11.5px] leading-tight text-muted-foreground">{label}</p>
+      <p className="font-display text-[1.2rem] font-semibold leading-none tabular-nums">{value}</p>
+      {hint && <p className="mt-auto text-[11px] leading-tight text-muted-foreground">{hint}</p>}
     </div>
   );
 }
 
 function Reports({ data, days, setDays }: { data: QueueData["analytics"]; days: number; setDays: (d: number) => void }) {
   return (
-    <section aria-labelledby="la-reports" className="rounded-[22px] border border-border p-4">
+    <section aria-labelledby="la-reports" className="rounded-[22px] border border-border bg-card p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 id="la-reports" className="font-display text-[15px] font-semibold">
           Reports
         </h2>
         <div className="flex gap-1" role="group" aria-label="Period">
           {[1, 7, 30, 90].map((d) => (
-            <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d)} className={cn(btn, "min-h-11 px-3 text-[12px]", days === d ? "bg-foreground text-background" : "bg-secondary")}>
+            <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d)} className={cn(btn, "px-3 text-[12px]", days === d ? "bg-foreground text-background" : "bg-secondary text-foreground hover:bg-secondary/70")}>
               {d === 1 ? "Today" : `${d} days`}
             </button>
           ))}
@@ -245,7 +261,7 @@ function Reports({ data, days, setDays }: { data: QueueData["analytics"]; days: 
         <p className="text-[13px] text-muted-foreground">Loading</p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+          <div className="grid grid-cols-2 items-stretch gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
             <Stat label="Requests" value={String(data.totals.total)} hint={data.truncated ? "First 5,000 counted" : undefined} />
             <Stat label="Resolved" value={String(data.totals.resolved)} />
             <Stat label="Still open" value={String(data.totals.unresolved)} hint={`${data.totals.waiting} waiting`} />
@@ -258,7 +274,7 @@ function Reports({ data, days, setDays }: { data: QueueData["analytics"]; days: 
             Ended early: {data.totals.cancelled} cancelled, {data.totals.returned} handed back to Pip, {data.totals.ticket} left a message.
           </p>
           {data.agents.length > 0 && (
-            <div className="mt-3 overflow-x-auto">
+            <div className="la-scroll mt-3 overflow-x-auto">
               <table className="w-full min-w-[520px] text-left text-[12.5px]">
                 <caption className="sr-only">By specialist</caption>
                 <thead className="text-[11.5px] text-muted-foreground">
@@ -333,13 +349,24 @@ const RECEIPT: Record<Receipt, { word: string; Icon: typeof Check }> = {
   read: { word: "Seen", Icon: CheckCheck },
 };
 
+/** The day a message belongs to, in the console's own clock, so a marker only appears when the date really turns. */
+const dayOf = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+function dayWord(iso: string) {
+  const d = dayOf(iso);
+  if (d === dayOf(new Date().toISOString())) return "Today";
+  if (d === dayOf(new Date(Date.now() - 86_400_000).toISOString())) return "Yesterday";
+  return fmtDate(iso);
+}
+
 /** One message. Text is always rendered as text (React escapes it), never as HTML. */
 function Line({ m, r, customer, onRetry }: { m: Msg; r: Receipt | null; customer: string; onRetry: (m: Msg) => void }) {
+  // Automated lines (joined, handed back, transferred) are the console talking, so they read as a quiet
+  // centred note with a dashed edge, never as anybody's message.
   if (m.role === "system")
     return (
       <li className="my-1 flex justify-center">
-        <span className="rounded-full bg-secondary px-3 py-1 text-center text-[11.5px] text-muted-foreground">
-          {staffSysLine(m.text) ?? m.text} <span aria-hidden>·</span> <time dateTime={m.at}>{time(m.at)}</time>
+        <span className={cn("max-w-[90%] rounded-full border border-dashed border-border bg-secondary/60 px-3 py-1 text-center text-[11.5px] text-muted-foreground", wrapAny)}>
+          {staffSysLine(m.text) ?? m.text} <span aria-hidden>&middot;</span> <time dateTime={m.at}>{time(m.at)}</time>
         </span>
       </li>
     );
@@ -349,11 +376,12 @@ function Line({ m, r, customer, onRetry }: { m: Msg; r: Receipt | null; customer
   return (
     <li className={cn("flex flex-col gap-1", ours ? "items-end" : "items-start")}>
       <span className="px-1 text-[11px] text-muted-foreground">
-        {who} <span aria-hidden>·</span> <time dateTime={m.at}>{time(m.at)}</time>
+        {who} <span aria-hidden>&middot;</span> <time dateTime={m.at}>{time(m.at)}</time>
       </span>
       <div
         className={cn(
-          "max-w-[85%] whitespace-pre-wrap break-words rounded-[18px] px-3.5 py-2 text-[13.5px] leading-relaxed",
+          "max-w-[min(85%,38rem)] whitespace-pre-wrap rounded-[18px] px-3.5 py-2 text-[13.5px] leading-relaxed",
+          wrapAny,
           m.role === "agent" ? "bg-foreground text-background" : m.role === "pip" ? "border border-border bg-lime/10" : "bg-secondary",
           (m.pending || m.failed) && "opacity-70",
         )}
@@ -374,44 +402,80 @@ function Line({ m, r, customer, onRetry }: { m: Msg; r: Receipt | null; customer
   );
 }
 
-const H3 = "mb-2 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground";
 type Info = NonNullable<Detail["customer"]>;
+
+const isBrand = (p: string): p is keyof typeof BRAND_PATH => p in BRAND_PATH;
+/** Each platform spelled the way it spells itself: a capitalised column value reads as "Youtube". */
+const PLAT_LABEL: Record<string, string> = { instagram: "Instagram", youtube: "YouTube", tiktok: "TikTok", x: "X", threads: "Threads", facebook: "Facebook", linkedin: "LinkedIn", buffer: "Buffer", hootsuite: "Hootsuite" };
+
+/**
+ * A connected platform's state. The three the drawer has to be unmistakable about are spelled out here, because a
+ * specialist reads them mid-chat: connected is green, waiting is neutral, a broken link is amber. Anything else
+ * falls back to the panel's shared vocabulary (1163), so one stored word never reads two ways across admin screens.
+ */
+function accountState(status: string): { label: string; tone: Tone } {
+  const s = status.toLowerCase();
+  if (s === "connected" || s === "active") return { label: "Connected", tone: "ok" };
+  if (s === "pending" || s === "pending_approval") return { label: "Waiting", tone: "muted" };
+  if (s === "disconnected" || s === "revoked" || s === "expired") return { label: "Disconnected", tone: "warn" };
+  if (s === "needs_reconnect" || s === "requires_reconnect") return { label: "Requires reconnect", tone: "warn" };
+  return STATUS_LABEL[s] ?? { label: status, tone: "muted" };
+}
+
+/** One label and value in a details list. The value wraps; a long id or email never pushes the drawer sideways. */
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className={cn("min-w-0 font-medium", wrapAny)}>{children}</dd>
+    </>
+  );
+}
 
 /** Who the customer is, this chat's facts, staff notes and the assignment history. */
 function Details({ d, info, onOpen, onNote }: { d: Detail; info: Info | null; onOpen: (id: string) => void; onNote: (body: string) => Promise<boolean> }) {
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const savedT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(savedT.current), []);
   const s = d.session;
   const u = info?.user;
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!note.trim() || saving) return;
     setSaving(true);
-    if (await onNote(note)) setNote("");
+    if (await onNote(note)) {
+      setNote("");
+      setSaved(true);
+      clearTimeout(savedT.current);
+      savedT.current = setTimeout(() => setSaved(false), 3000);
+    }
     setSaving(false);
   };
+  const firstReply = s.firstResponseAt ? fmtDuration(new Date(s.firstResponseAt).getTime() - new Date(s.acceptedAt ?? s.requestedAt).getTime()) : "None yet";
   return (
-    <div className="flex flex-col gap-5 p-4">
+    <div className="flex flex-col gap-5 px-4 pb-6 pt-4">
       <section aria-labelledby="la-who">
         <h3 id="la-who" className={H3}>Customer</h3>
         {u ? (
-          <div className="flex items-start gap-3">
-            <Avatar name={u.name || u.email} src={u.avatar} size={44} />
-            <div className="min-w-0 text-[12.5px]">
-              <p className="truncate text-[14px] font-semibold">{u.name || "No name"}</p>
-              <p className="truncate text-muted-foreground">{u.email}</p>
-              <p className="mt-1 text-muted-foreground">
-                Joined {fmtDate(u.createdAt)}
-                {u.country ? `, ${u.country}` : ""}
-              </p>
-              <p className="text-muted-foreground">
-                {d.online ? "On the chat now" : `Last seen ${ago(u.lastSeenAt)}`}, {u.timezone}
-              </p>
-              <Link href={`/admin/users?q=${encodeURIComponent(u.email)}`} className={cn("mt-1 inline-flex min-h-11 items-center font-semibold underline-offset-2 hover:underline", ring)}>
-                Open in Users
-              </Link>
+          <>
+            <div className="flex items-center gap-3">
+              <Avatar name={u.name || u.email} src={u.avatar} size={44} />
+              <div className="min-w-0">
+                <p className={cn("text-[14.5px] font-semibold leading-tight", wrapAny)}>{u.name || "No name"}</p>
+                <p className={cn("text-[12.5px] leading-snug text-muted-foreground", wrapAny)}>{u.email}</p>
+              </div>
             </div>
-          </div>
+            <dl className={cn(DL, "mt-3")}>
+              <Row label="Joined">{fmtDate(u.createdAt)}{u.country ? `, ${u.country}` : ""}</Row>
+              <Row label="Last seen">{d.online ? "On the chat now" : ago(u.lastSeenAt)}</Row>
+              <Row label="Time zone">{u.timezone}</Row>
+            </dl>
+            <Link href={`/admin/users?q=${encodeURIComponent(u.email)}`} className={cn(btnQuiet, "mt-3 w-full")}>
+              Open in Users
+            </Link>
+          </>
         ) : (
           <p className="text-[12.5px] text-muted-foreground">{info ? "This account was removed." : "Loading"}</p>
         )}
@@ -420,7 +484,7 @@ function Details({ d, info, onOpen, onNote }: { d: Detail; info: Info | null; on
       {info && (
         <section aria-labelledby="la-plan">
           <h3 id="la-plan" className={H3}>Plan and platforms</h3>
-          <p className="text-[12.5px]">
+          <p className={cn("text-[12.5px]", wrapAny)}>
             {info.plan ? (
               <>
                 <span className="font-semibold">{info.plan.name}</span>, {info.plan.interval === "year" ? "yearly" : "monthly"}
@@ -431,53 +495,44 @@ function Details({ d, info, onOpen, onNote }: { d: Detail; info: Info | null; on
             )}
           </p>
           {info.accounts.length ? (
-            <ul className="mt-2 flex flex-col gap-1 text-[12.5px]">
-              {info.accounts.map((a, i) => (
-                <li key={`${a.platform}-${i}`} className="flex items-center justify-between gap-2">
-                  <span className="truncate">
-                    <span className="font-medium capitalize">{a.platform}</span> <span className="text-muted-foreground">@{a.username}</span>
-                  </span>
-                  <Pill tone={a.status === "connected" || a.status === "active" ? "ok" : "warn"}>{a.status}</Pill>
-                </li>
-              ))}
+            <ul className="mt-2.5 flex flex-col gap-1.5">
+              {info.accounts.map((a, i) => {
+                const st = accountState(a.status);
+                return (
+                  <li key={`${a.platform}-${i}`} className="flex items-center gap-2.5">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-secondary text-foreground/70">
+                      {isBrand(a.platform) ? <BrandGlyph brand={a.platform} className="h-4 w-4" /> : <Plug className="h-4 w-4" aria-hidden />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12.5px] font-medium">{PLAT_LABEL[a.platform] ?? a.platform}</span>
+                      <span className="block truncate text-[11.5px] text-muted-foreground">@{a.username}</span>
+                    </span>
+                    <Pill tone={st.tone} className="shrink-0">{st.label}</Pill>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
-            <p className="mt-1 text-[12.5px] text-muted-foreground">No platforms connected</p>
+            <p className="mt-1.5 text-[12.5px] text-muted-foreground">No platforms connected</p>
           )}
         </section>
       )}
 
       <section aria-labelledby="la-this">
         <h3 id="la-this" className={H3}>This chat</h3>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12.5px]">
-          <dt className="text-muted-foreground">Asked</dt>
-          <dd>{fmtDate(s.requestedAt, true)}</dd>
-          <dt className="text-muted-foreground">Waited</dt>
-          <dd>{fmtDuration(s.waitMs)}</dd>
-          <dt className="text-muted-foreground">First reply</dt>
-          <dd>{s.firstResponseAt ? fmtDuration(new Date(s.firstResponseAt).getTime() - new Date(s.acceptedAt ?? s.requestedAt).getTime()) : "None yet"}</dd>
-          {s.endedAt && (
-            <>
-              <dt className="text-muted-foreground">Ended</dt>
-              <dd>
-                {fmtDate(s.endedAt, true)}
-                {s.endedBy ? ` by ${s.endedBy}` : ""}
-              </dd>
-            </>
-          )}
-          <dt className="text-muted-foreground">Rating</dt>
-          <dd>{s.csat == null ? "Not rated" : s.csat > 0 ? "Helpful" : "Not helpful"}</dd>
-          <dt className="text-muted-foreground">Conversation</dt>
-          <dd>{d.conversation.ref}</dd>
+        <dl className={DL}>
+          <Row label="Asked">{fmtDate(s.requestedAt, true)}</Row>
+          <Row label="Waited">{fmtDuration(s.waitMs)}</Row>
+          <Row label="First reply">{firstReply}</Row>
+          {s.endedAt && <Row label="Ended">{fmtDate(s.endedAt, true)}{s.endedBy ? ` by ${s.endedBy}` : ""}</Row>}
+          <Row label="Rating">{s.csat == null ? "Not rated" : s.csat > 0 ? "Helpful" : "Not helpful"}</Row>
+          <Row label="Conversation">{d.conversation.ref}</Row>
           {s.ticketId && (
-            <>
-              <dt className="text-muted-foreground">Ticket</dt>
-              <dd>
-                <Link href={`/admin/tickets/${s.ticketId}`} className={cn("font-semibold underline-offset-2 hover:underline", ring)}>
-                  Open the ticket
-                </Link>
-              </dd>
-            </>
+            <Row label="Ticket">
+              <Link href={`/admin/tickets/${s.ticketId}`} className={cn("font-semibold underline-offset-2 hover:underline", ring)}>
+                Open the ticket
+              </Link>
+            </Row>
           )}
         </dl>
       </section>
@@ -485,13 +540,13 @@ function Details({ d, info, onOpen, onNote }: { d: Detail; info: Info | null; on
       <section aria-labelledby="la-notes">
         <h3 id="la-notes" className={H3}>
           <StickyNote className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden />
-          Notes, only your team sees these
+          Notes, visible only to the team
         </h3>
         {d.notes.length > 0 && (
-          <ul className="mb-2 flex flex-col gap-2">
+          <ul className="mb-2.5 flex flex-col gap-2">
             {d.notes.map((n) => (
               <li key={n.id} className="rounded-2xl bg-warning/10 px-3 py-2 text-[12.5px]">
-                <p className="whitespace-pre-wrap break-words">{n.body}</p>
+                <p className={cn("whitespace-pre-wrap", wrapAny)}>{n.body}</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   {n.author}, {ago(n.at)}
                 </p>
@@ -501,37 +556,60 @@ function Details({ d, info, onOpen, onNote }: { d: Detail; info: Info | null; on
         )}
         <form onSubmit={save} className="flex flex-col gap-2">
           <label htmlFor="la-note" className="sr-only">
-            New note
+            New note, only your team can see it
           </label>
-          <textarea id="la-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={NOTE_MAX} rows={2} placeholder="Add a note for your team" className={cn(field, "min-h-[4.5rem] py-2")} />
-          <button type="submit" disabled={!note.trim() || saving} className={cn(btnQuiet, "self-end")}>
-            {saving && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}
-            Add note
-          </button>
+          <textarea
+            id="la-note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={NOTE_MAX}
+            rows={3}
+            placeholder="What should the next person on this chat know? The customer never sees this."
+            className={cn(field, "la-scroll min-h-[5rem] w-full resize-y py-2")}
+          />
+          <div className="flex items-center gap-2">
+            <span role="status" className="min-w-0 flex-1 text-[11.5px] text-muted-foreground">
+              {saved ? "Note saved." : note.length > NOTE_MAX - 100 ? `${note.length} of ${NOTE_MAX}` : ""}
+            </span>
+            <button type="submit" disabled={!note.trim() || saving} className={btnQuiet}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}
+              {saving ? "Saving" : "Add note"}
+            </button>
+          </div>
         </form>
       </section>
 
       {info && (info.tickets.length > 0 || info.past.length > 0) && (
         <section aria-labelledby="la-past">
           <h3 id="la-past" className={H3}>Before this</h3>
-          <ul className="flex flex-col gap-1 text-[12.5px]">
+          <ul className="flex flex-col gap-1 border-l border-border/70 pl-3 text-[12.5px]">
             {info.tickets.map((t) => (
-              <li key={t.id}>
-                <Link href={`/admin/tickets/${t.id}`} className={cn("flex min-h-11 items-center gap-2 rounded-xl px-2 hover:bg-secondary/60", ring)}>
-                  <span className="shrink-0 font-mono text-[11.5px] text-muted-foreground">{t.ref}</span>
-                  <span className="min-w-0 flex-1 truncate">{t.subject}</span>
-                  <Pill tone={t.status === "resolved" ? "muted" : "warn"}>{t.status}</Pill>
+              <li key={t.id} className="relative">
+                <span className="absolute -left-[1.03rem] top-[1.15rem] h-1.5 w-1.5 rounded-full bg-muted-foreground/50" aria-hidden />
+                <Link href={`/admin/tickets/${t.id}`} className={cn("flex min-h-11 flex-col justify-center gap-0.5 rounded-xl px-2 py-1.5 hover:bg-secondary/60", ring)}>
+                  <span className="flex items-center gap-2">
+                    <span className={cn("min-w-0 flex-1 truncate font-medium", wrapAny)}>{t.subject}</span>
+                    <Pill tone={t.status === "resolved" ? "muted" : "warn"} className="shrink-0">{t.status}</Pill>
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    Ticket {t.ref} <span aria-hidden>&middot;</span> {fmtDate(t.createdAt)}
+                  </span>
                 </Link>
               </li>
             ))}
             {info.past.map((p) => (
-              <li key={p.id}>
-                <button type="button" onClick={() => onOpen(p.id)} className={cn("flex min-h-11 w-full items-center gap-2 rounded-xl px-2 text-left hover:bg-secondary/60", ring)}>
-                  <span className="min-w-0 flex-1 truncate">
-                    Live chat, {catWord(p.category).toLowerCase()}, {fmtDate(p.requestedAt)}
-                    {p.agentName ? ` with ${p.agentName}` : ""}
+              <li key={p.id} className="relative">
+                <span className="absolute -left-[1.03rem] top-[1.15rem] h-1.5 w-1.5 rounded-full bg-muted-foreground/50" aria-hidden />
+                <button type="button" onClick={() => onOpen(p.id)} className={cn("flex min-h-11 w-full flex-col justify-center gap-0.5 rounded-xl px-2 py-1.5 text-left hover:bg-secondary/60", ring)}>
+                  <span className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate font-medium">Live chat, {catWord(p.category).toLowerCase()}</span>
+                    <Pill tone={STATUS_TONE[p.status] ?? "muted"} className="shrink-0">{statusWord(p.status)}</Pill>
                   </span>
-                  <Pill tone={STATUS_TONE[p.status] ?? "muted"}>{statusWord(p.status)}</Pill>
+                  <span className="text-[11px] text-muted-foreground">
+                    {fmtDate(p.requestedAt)}
+                    {p.agentName ? ` with ${p.agentName}` : ""}
+                    {p.csat == null ? "" : p.csat > 0 ? ", rated helpful" : ", rated not helpful"}
+                  </span>
                 </button>
               </li>
             ))}
@@ -546,7 +624,7 @@ function Details({ d, info, onOpen, onNote }: { d: Detail; info: Info | null; on
             {d.history.map((h) => (
               <li key={h.id} className="flex gap-2">
                 <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
-                <span>
+                <span className={wrapAny}>
                   {HISTORY_WORD[h.action] ?? h.action}
                   {h.by ? ` by ${h.by}` : ""}
                   {h.note ? `: ${h.note}` : ""} <span className="text-muted-foreground">{ago(h.at)}</span>
@@ -591,6 +669,10 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
   const [confirm, setConfirm] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [text, setText] = useState("");
+  // The chat can take the whole desk when the queue is not needed; the queue comes back with the same button.
+  const [wide, setWide] = useState(false);
+  const [atEnd, setAtEnd] = useState(true);
+  const [sending, setSending] = useState(false);
 
   const selRef = useRef<string | null>(null);
   const cursor = useRef<number | null>(null);
@@ -610,6 +692,9 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const baseTitle = useRef<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const drawerBack = useRef(false);
+  const painted = useRef(false);
 
   const pick = useCallback((id: string | null) => {
     setSel(id);
@@ -741,6 +826,9 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
     selRef.current = sel;
     cursor.current = null;
     stick.current = true;
+    painted.current = false;
+    drawerBack.current = false;
+    setAtEnd(true);
     setD(null);
     setInfo(null);
     setMsgs([]);
@@ -781,12 +869,37 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
   const mineActive = !!s && s.status === "active" && mine;
   const canManage = !!s && open && (s.status === "waiting" || mine || isSuper);
   const name = info?.user?.name || q?.items.find((r) => r.id === sel)?.customer?.name || "Customer";
+  // "Wide" only means anything with a chat open: the queue steps aside and the chat takes its width.
+  const wideNow = wide && !!sel;
 
-  // Keep the newest message in view unless the specialist scrolled up to read.
+  // Keep the newest message in view unless the specialist scrolled up to read: the chat lands at the bottom on
+  // the first paint, glides for later messages, and jumps without animating for anyone who asked for less motion.
   useEffect(() => {
     const el = logRef.current;
-    if (el && stick.current) el.scrollTop = el.scrollHeight;
+    if (!el || !stick.current) return;
+    const glide = painted.current && !reduceMotion();
+    el.scrollTo({ top: el.scrollHeight, behavior: glide ? "smooth" : "auto" });
+    painted.current = true;
   }, [msgs, d?.typing]);
+  const onLogScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const end = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    stick.current = end;
+    setAtEnd((x) => (x === end ? x : end));
+  };
+  const toLatest = () => {
+    stick.current = true;
+    setAtEnd(true);
+    const el = logRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: reduceMotion() ? "auto" : "smooth" });
+  };
+  // The composer grows with the reply up to a few lines, so the box and the send button stay on one line.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [text, sel]);
 
   // Waiting count in the tab title, so a background tab still shows the queue.
   useEffect(() => {
@@ -801,13 +914,62 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
     [],
   );
 
+  /**
+   * The details drawer is a dialog on a phone: the close button, Escape, the backdrop and the system back button
+   * all shut it, Tab stays inside it, and the console behind it does not scroll while it is open.
+   */
+  const closeDrawer = useCallback(() => {
+    setDrawer(false);
+    if (!drawerBack.current) return;
+    drawerBack.current = false;
+    try {
+      window.history.back();
+    } catch {}
+  }, []);
+  const openDrawer = () => {
+    setDrawer(true);
+    try {
+      window.history.pushState({ ...window.history.state, laDrawer: true }, "", window.location.href);
+      drawerBack.current = true;
+    } catch {
+      drawerBack.current = false;
+    }
+  };
+  const trapTab = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Tab") return;
+    const root = panelRef.current;
+    if (!root) return;
+    const able = Array.from(root.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), textarea, select, input, [tabindex]:not([tabindex="-1"])')).filter((el) => el.offsetParent !== null);
+    if (!able.length) return;
+    const first = able[0];
+    const last = able[able.length - 1];
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === root)) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
   useEffect(() => {
     if (!drawer) return;
-    closeRef.current?.focus();
-    const k = (e: KeyboardEvent) => e.key === "Escape" && setDrawer(false);
+    panelRef.current?.focus();
+    const root = document.documentElement;
+    const was = root.style.overflow;
+    root.style.overflow = "hidden";
+    const k = (e: KeyboardEvent) => e.key === "Escape" && closeDrawer();
+    const pop = () => {
+      drawerBack.current = false;
+      setDrawer(false);
+    };
     document.addEventListener("keydown", k);
-    return () => document.removeEventListener("keydown", k);
-  }, [drawer]);
+    window.addEventListener("popstate", pop);
+    return () => {
+      document.removeEventListener("keydown", k);
+      window.removeEventListener("popstate", pop);
+      root.style.overflow = was;
+    };
+  }, [drawer, closeDrawer]);
 
   const refresh = useCallback(async () => {
     const id = selRef.current;
@@ -859,6 +1021,7 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
       stick.current = true;
     }
     typedAt.current = 0;
+    setSending(true);
     try {
       const r = await call<{ message: WireMsg; duplicate: boolean }>(`/api/admin/live-assist/${encodeURIComponent(id)}`, { action: "send", text: body, cid });
       if (selRef.current === id) setMsgs((m) => mergeLive(m, [r.message], toMsg));
@@ -866,6 +1029,8 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
       if (selRef.current === id) setMsgs((m) => m.map((x) => (x.cid === cid ? { ...x, pending: false, failed: true } : x)));
       toast(e instanceof Error ? e.message : "Not sent. Try again.", "error");
       if (e instanceof CallError && (e.status === 403 || e.status === 409)) void refresh();
+    } finally {
+      setSending(false);
     }
   };
 
@@ -938,8 +1103,10 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-1 flex-wrap gap-2" role="group" aria-label="Queue counts, pick one to filter">
+      {/* The overview. On a phone an open chat owns the whole screen, so these step aside until the back arrow
+          brings them back; on a desk they stay above the three columns. */}
+      <section aria-label="Queue overview" className={cn("flex flex-col gap-2.5", sel && "hidden lg:flex")}>
+        <div className="grid grid-cols-2 items-stretch gap-2 sm:grid-cols-3 lg:grid-cols-5" role="group" aria-label="Queue counts, pick one to filter">
           <Counter label="Waiting" n={c?.waiting ?? 0} on={filter === "waiting"} onClick={counter("waiting")} tone="warn" />
           <Counter label="Active" n={c?.active ?? 0} on={filter === "active"} onClick={counter("active")} />
           <Counter label="Assigned to me" n={c?.mine ?? 0} on={filter === "mine"} onClick={counter("mine")} />
@@ -947,68 +1114,80 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
           <Counter label="Resolved today" n={c?.resolvedToday ?? 0} on={filter === "resolved"} onClick={counter("resolved")} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[12px] text-muted-foreground" aria-live="polite">
-            {q ? `${online} of ${q.agents.length} ${q.agents.length === 1 ? "specialist" : "specialists"} online` : ""}
-          </span>
-          <button type="button" aria-pressed={!!q?.away} disabled={!q || busy === "away"} onClick={toggleAway} className={q?.away ? cn(btn, "bg-warning/20 text-foreground") : btnQuiet}>
-            <UserRound className="h-4 w-4" aria-hidden />
-            {q?.away ? "Away" : "Available"}
-          </button>
-          <button type="button" aria-pressed={sound} onClick={toggleSound} className={btnQuiet} aria-label={sound ? "Sound on for new chats, turn off" : "Sound off for new chats, turn on"}>
-            {sound ? <Volume2 className="h-4 w-4" aria-hidden /> : <VolumeX className="h-4 w-4" aria-hidden />}
-            {sound ? "Sound on" : "Sound off"}
-          </button>
-          {perm === "default" && (
-            <button type="button" onClick={askAlerts} className={btnQuiet}>
-              <BellRing className="h-4 w-4" aria-hidden />
-              Desktop alerts
+          <p className="inline-flex min-h-11 min-w-0 items-center gap-2 rounded-full bg-secondary px-3.5 text-[12px] text-muted-foreground" aria-live="polite">
+            <span className={cn("h-2 w-2 shrink-0 rounded-full", online > 0 ? "bg-success" : "bg-muted-foreground/50")} aria-hidden />
+            <span className="truncate">{q ? `${online} of ${q.agents.length} ${q.agents.length === 1 ? "specialist" : "specialists"} online` : "Checking who is online"}</span>
+          </p>
+          <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+            <button type="button" aria-pressed={!!q?.away} disabled={!q || busy === "away"} onClick={toggleAway} className={q?.away ? cn(btnChip, "bg-warning/20 text-foreground hover:bg-warning/30") : btnChip + " bg-secondary text-foreground hover:bg-secondary/70"}>
+              <UserRound className="h-4 w-4" aria-hidden />
+              {q?.away ? "Away" : "Available"}
             </button>
-          )}
-          <button type="button" aria-pressed={reports} onClick={() => setReports((x) => !x)} className={reports ? btnPrimary : btnQuiet}>
-            <BarChart3 className="h-4 w-4" aria-hidden />
-            Reports
-          </button>
+            <button type="button" aria-pressed={sound} onClick={toggleSound} className={cn(btnChip, "bg-secondary text-foreground hover:bg-secondary/70")} aria-label={sound ? "Sound on for new chats, turn off" : "Sound off for new chats, turn on"}>
+              {sound ? <Volume2 className="h-4 w-4" aria-hidden /> : <VolumeX className="h-4 w-4" aria-hidden />}
+              {sound ? "Sound on" : "Sound off"}
+            </button>
+            {perm === "default" && (
+              <button type="button" onClick={askAlerts} className={cn(btnChip, "bg-secondary text-foreground hover:bg-secondary/70")}>
+                <BellRing className="h-4 w-4" aria-hidden />
+                Desktop alerts
+              </button>
+            )}
+            <button type="button" aria-pressed={reports} onClick={() => setReports((x) => !x)} className={reports ? cn(btnChip, "bg-foreground text-background hover:bg-foreground/90") : cn(btnChip, "bg-secondary text-foreground hover:bg-secondary/70")}>
+              <BarChart3 className="h-4 w-4" aria-hidden />
+              Reports
+            </button>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {reports && <Reports data={q?.analytics ?? null} days={days} setDays={setDays} />}
+      {reports && (
+        <div className={cn(sel && "hidden lg:block")}>
+          <Reports data={q?.analytics ?? null} days={days} setDays={setDays} />
+        </div>
+      )}
       {paused && (
-        <p role="status" className="rounded-2xl border border-border px-4 py-2.5 text-[12.5px]">
+        <p role="status" className="rounded-2xl border border-border bg-card px-4 py-2.5 text-[12.5px]">
           Updates paused while nobody was at the console. Move the mouse or press a key and they pick up again.
         </p>
       )}
 
-      <div className="grid gap-3 lg:h-[calc(100dvh-15rem)] lg:min-h-[560px] lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)] xl:grid-cols-[minmax(290px,350px)_minmax(0,1fr)_minmax(270px,320px)]">
-        <section aria-label="Queue" className={cn("flex min-h-[420px] flex-col overflow-hidden rounded-[22px] border border-border bg-card lg:min-h-0", sel && "hidden lg:flex")}>
+      <div
+        className={cn(
+          "grid gap-3 lg:h-[calc(100dvh-21rem)] lg:min-h-[28rem]",
+          wideNow ? "lg:grid-cols-[minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]" : "lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)] xl:grid-cols-[minmax(290px,350px)_minmax(0,1fr)_minmax(280px,340px)]",
+        )}
+      >
+        <section aria-label="Queue" className={cn("flex min-h-[26rem] flex-col overflow-hidden rounded-[22px] border border-border bg-card lg:min-h-0", sel && "hidden lg:flex", wideNow && "lg:hidden")}>
           <div className="grid grid-cols-2 gap-2 border-b border-border p-3">
-            <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
+            <label className={pickLabel}>
               Show
-              <select value={filter} onChange={(e) => setFilter(e.target.value as QueueFilter)} className={field}>
+              <select value={filter} onChange={(e) => setFilter(e.target.value as QueueFilter)} className={pickField}>
                 {FILTERS.map((f) => (
                   <option key={f.value} value={f.value}>{f.label}</option>
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
+            <label className={pickLabel}>
               Order
-              <select value={sort} onChange={(e) => setSort(e.target.value as QueueSort)} className={field}>
+              <select value={sort} onChange={(e) => setSort(e.target.value as QueueSort)} className={pickField}>
                 {SORTS.map((f) => (
                   <option key={f.value} value={f.value}>{f.label}</option>
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
+            <label className={pickLabel}>
               Category
-              <select value={cat} onChange={(e) => setCat(e.target.value)} className={field}>
+              <select value={cat} onChange={(e) => setCat(e.target.value)} className={pickField}>
                 <option value="">Any</option>
                 {LIVE_CATEGORIES.map((k) => (
                   <option key={k} value={k}>{CATEGORY_LABEL[k]}</option>
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
+            <label className={pickLabel}>
               Priority
-              <select value={prio} onChange={(e) => setPrio(e.target.value)} className={field}>
+              <select value={prio} onChange={(e) => setPrio(e.target.value)} className={pickField}>
                 <option value="">Any</option>
                 {LIVE_PRIORITIES.map((k) => (
                   <option key={k} value={k}>{PRIORITY_LABEL[k]}</option>
@@ -1018,15 +1197,15 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
           </div>
           {qErr && (
             <p role="status" className="flex items-center gap-2 border-b border-border px-4 py-2 text-[12px] text-muted-foreground">
-              <AlertTriangle className="h-3.5 w-3.5" aria-hidden /> Can't reach the queue right now. Trying again.
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden /> Can&apos;t reach the queue right now. Trying again.
             </p>
           )}
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="la-scroll min-h-0 flex-1 overflow-y-auto">
             <QueueList rows={q?.items ?? []} sel={sel} onPick={pick} now={now} meId={me.id} loading={!q && !qErr} />
           </div>
         </section>
 
-        <section aria-label="Chat" className={cn("flex h-[calc(100dvh-9rem)] min-h-[440px] flex-col overflow-hidden rounded-[22px] border border-border bg-card lg:h-auto lg:min-h-0", !sel && "hidden lg:flex")}>
+        <section aria-label="Chat" className={cn("flex h-[calc(100dvh-13.5rem)] min-h-[24rem] flex-col overflow-hidden rounded-[22px] border border-border bg-card lg:h-auto lg:min-h-0", !sel && "hidden lg:flex")}>
           {!sel ? (
             <div className="grid flex-1 place-items-center p-8 text-center">
               <div>
@@ -1050,20 +1229,24 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
             </div>
           ) : (
             <>
-              <header className="flex flex-col gap-2 border-b border-border p-3">
+              {/* Three rows, in the order a specialist reads them: who this is, what I can do, how it is filed. */}
+              <header className="flex shrink-0 flex-col gap-2.5 border-b border-border p-3">
                 <div className="flex items-center gap-2.5">
-                  <button type="button" onClick={() => pick(null)} aria-label="Back to the queue" className={cn(btnQuiet, "w-11 px-0 lg:hidden")}>
+                  <button type="button" onClick={() => pick(null)} aria-label="Back to the queue" className={cn(btnQuiet, iconBtn, "lg:hidden")}>
                     <ArrowLeft className="h-4 w-4" aria-hidden />
                   </button>
                   <Avatar name={name} src={info?.user?.avatar} />
                   <div className="min-w-0 flex-1">
-                    <h2 className="truncate font-display text-[15px] font-semibold">{name}</h2>
-                    <p className="truncate text-[11.5px] text-muted-foreground">
-                      {d.online ? "On the chat now" : "Not on the chat"} <span aria-hidden>·</span> {d.conversation.subject || catWord(s.category)}
+                    <h2 className="truncate font-display text-[15px] font-semibold leading-tight">{name}</h2>
+                    <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-muted-foreground">
+                      <span className={d.online ? "text-success-ink" : undefined}>{d.online ? "On the chat now" : "Not on the chat"}</span> <span aria-hidden>&middot;</span> {d.conversation.subject || catWord(s.category)}
                     </p>
                   </div>
-                  <Pill tone={STATUS_TONE[s.status] ?? "muted"}>{statusWord(s.status)}</Pill>
-                  <button type="button" onClick={() => setDrawer(true)} aria-label="Customer details" aria-expanded={drawer} className={cn(btnQuiet, "w-11 px-0 xl:hidden")}>
+                  <Pill tone={STATUS_TONE[s.status] ?? "muted"} className="shrink-0">{statusWord(s.status)}</Pill>
+                  <button type="button" onClick={() => setWide((x) => !x)} aria-pressed={wide} aria-label={wide ? "Show the queue" : "Hide the queue and use the full width"} className={cn(btnQuiet, iconBtn, "hidden lg:inline-flex")}>
+                    {wide ? <Minimize2 className="h-4 w-4" aria-hidden /> : <Maximize2 className="h-4 w-4" aria-hidden />}
+                  </button>
+                  <button type="button" onClick={openDrawer} aria-label="Customer details" aria-expanded={drawer} className={cn(btnQuiet, iconBtn, "xl:hidden")}>
                     <PanelRight className="h-4 w-4" aria-hidden />
                   </button>
                 </div>
@@ -1097,7 +1280,8 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
                     </button>
                   )}
                   {!open && !d.conversation.openSessionId && (
-                    <button type="button" onClick={reopen} disabled={!!busy} className={btnQuiet}>
+                    <button type="button" onClick={reopen} disabled={!!busy} className={btnPrimary}>
+                      <RotateCcw className="h-4 w-4" aria-hidden />
                       Reopen
                     </button>
                   )}
@@ -1106,65 +1290,89 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
                       Open the current chat
                     </button>
                   )}
-                  <span className="ml-auto flex flex-wrap items-center gap-2">
-                    {canManage && q && (
-                      <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                        {s.status === "active" ? "Transfer to" : "Assign to"}
-                        <select
-                          value=""
-                          disabled={!!busy}
-                          onChange={(e) => e.target.value && void act({ action: s.status === "active" ? "transfer" : "assign", to: e.target.value }, s.status === "active" ? "Transferred. The customer was told who joined." : "Assigned.")}
-                          className={field}
-                        >
-                          <option value="">Pick a teammate</option>
-                          {q.agents
-                            .filter((a) => a.id !== s.agentId)
-                            .map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.me ? `${a.name} (me)` : a.name}
-                                {a.online ? "" : a.away ? ", away" : ", offline"}
-                              </option>
-                            ))}
-                        </select>
-                      </label>
-                    )}
-                    <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                      Priority
-                      <select value={s.priority} disabled={!!busy} onChange={(e) => setField("priority", e.target.value, "Priority updated.")} className={field}>
-                        {LIVE_PRIORITIES.map((k) => (
-                          <option key={k} value={k}>{PRIORITY_LABEL[k]}</option>
-                        ))}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {canManage && q && (
+                    <label className={pickLabel}>
+                      {s.status === "active" ? "Transfer to" : "Assign to"}
+                      <select
+                        value=""
+                        disabled={!!busy}
+                        onChange={(e) => e.target.value && void act({ action: s.status === "active" ? "transfer" : "assign", to: e.target.value }, s.status === "active" ? "Transferred. The customer was told who joined." : "Assigned.")}
+                        className={pickField}
+                      >
+                        <option value="">Pick a teammate</option>
+                        {q.agents
+                          .filter((a) => a.id !== s.agentId)
+                          .map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.me ? `${a.name} (me)` : a.name}
+                              {a.online ? "" : a.away ? ", away" : ", offline"}
+                            </option>
+                          ))}
                       </select>
                     </label>
-                    <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                      Category
-                      <select value={s.category} disabled={!!busy} onChange={(e) => setField("category", e.target.value, "Category updated.")} className={field}>
-                        {LIVE_CATEGORIES.map((k) => (
-                          <option key={k} value={k}>{CATEGORY_LABEL[k]}</option>
-                        ))}
-                      </select>
-                    </label>
-                  </span>
+                  )}
+                  <label className={pickLabel}>
+                    Priority
+                    <select value={s.priority} disabled={!!busy} onChange={(e) => setField("priority", e.target.value, "Priority updated.")} className={pickField}>
+                      {LIVE_PRIORITIES.map((k) => (
+                        <option key={k} value={k}>{PRIORITY_LABEL[k]}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className={pickLabel}>
+                    Category
+                    <select value={s.category} disabled={!!busy} onChange={(e) => setField("category", e.target.value, "Category updated.")} className={pickField}>
+                      {LIVE_CATEGORIES.map((k) => (
+                        <option key={k} value={k}>{CATEGORY_LABEL[k]}</option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
               </header>
 
-              <div ref={logRef} onScroll={(e) => {
-                const el = e.currentTarget;
-                stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-              }} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-                <ol role="log" aria-live="polite" aria-relevant="additions" aria-label="Messages" className="flex flex-col gap-3">
-                  {msgs.map((m, i) => (
-                    <Line key={m.key} m={m} customer={name} onRetry={(x) => void send(x)} r={m.role === "agent" && (m.pending || m.failed || i === lastAgent) ? receipt(m, d.receipts) : null} />
-                  ))}
-                </ol>
-                {d.typing && (
-                  <p className="mt-3 text-[12px] text-muted-foreground" role="status">
-                    {name} is typing
-                  </p>
+              {/* The messages. Day markers only appear when the date really turns, and scrolling up to read puts a
+                  Latest button in reach instead of yanking the view down under the specialist's eyes. */}
+              <div className="relative min-h-0 flex-1">
+                {/* The live region is the scrolling box, not the list: a list that carries role="log" stops being
+                    a list for a screen reader, and a box that scrolls has to be reachable by keyboard. */}
+                <div ref={logRef} onScroll={onLogScroll} tabIndex={0} role="log" aria-live="polite" aria-relevant="additions" aria-label={`Messages with ${name}`} className="la-scroll h-full overflow-y-auto px-3 py-4 sm:px-4">
+                  <ol className="flex flex-col gap-3">
+                    {msgs.map((m, i) => (
+                      <Fragment key={m.key}>
+                        {(i === 0 || dayOf(m.at) !== dayOf(msgs[i - 1].at)) && (
+                          <li className="mt-1 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                            <span className="h-px flex-1 bg-border" aria-hidden />
+                            <time dateTime={m.at}>{dayWord(m.at)}</time>
+                            <span className="h-px flex-1 bg-border" aria-hidden />
+                          </li>
+                        )}
+                        <Line m={m} customer={name} onRetry={(x) => void send(x)} r={m.role === "agent" && (m.pending || m.failed || i === lastAgent) ? receipt(m, d.receipts) : null} />
+                      </Fragment>
+                    ))}
+                  </ol>
+                  {d.typing && (
+                    <p className="mt-3 flex items-center gap-2 px-1 text-[12px] text-muted-foreground" role="status">
+                      <span className="flex items-center gap-1" aria-hidden>
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground motion-reduce:animate-none" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:120ms] motion-reduce:animate-none" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:240ms] motion-reduce:animate-none" />
+                      </span>
+                      {name} is typing
+                    </p>
+                  )}
+                </div>
+                {!atEnd && (
+                  <button type="button" onClick={toLatest} className={cn(btn, "absolute bottom-3 left-1/2 -translate-x-1/2 border border-border bg-card px-4 shadow-xl hover:bg-secondary")}>
+                    <ArrowDown className="h-4 w-4" aria-hidden />
+                    Latest
+                  </button>
                 )}
               </div>
 
-              <footer className="border-t border-border p-3">
+              {/* The composer stays one line until the reply needs more, and clears the phone's home bar. */}
+              <footer className="shrink-0 border-t border-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 {mineActive ? (
                   <form
                     onSubmit={(e) => {
@@ -1188,14 +1396,20 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
                         }
                       }}
                       maxLength={LIVE_MAX_TEXT}
-                      rows={2}
-                      placeholder="Write a reply. Enter sends, Shift and Enter adds a line."
-                      className={cn(field, "max-h-40 min-h-[3rem] flex-1 resize-none py-2.5")}
+                      rows={1}
+                      placeholder="Write a reply"
+                      aria-describedby="la-reply-hint"
+                      className={cn(field, "max-h-40 min-h-11 flex-1 resize-none py-3 leading-snug")}
                     />
-                    <button type="submit" disabled={!text.trim()} aria-label="Send" className={cn(btnPrimary, "w-11 px-0")}>
-                      <Send className="h-4 w-4" aria-hidden />
+                    <button type="submit" disabled={!text.trim() || sending} aria-label="Send the reply" className={cn(btnPrimary, "h-11 w-11 shrink-0 px-0")}>
+                      {sending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
                     </button>
                   </form>
+                ) : null}
+                {mineActive ? (
+                  <p id="la-reply-hint" className="mt-1 hidden text-[11px] text-muted-foreground sm:block">
+                    Enter sends. Shift and Enter adds a line.
+                  </p>
                 ) : (
                   <p className="text-[12.5px] text-muted-foreground">
                     {s.status === "waiting"
@@ -1208,7 +1422,7 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
                   </p>
                 )}
                 {mineActive && text.length > LIVE_MAX_TEXT - 200 && (
-                  <p className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">
+                  <p className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground" aria-live="polite">
                     {text.length} of {LIVE_MAX_TEXT}
                   </p>
                 )}
@@ -1217,24 +1431,27 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
           )}
         </section>
 
-        <aside aria-label="Customer details" className="hidden min-h-0 overflow-y-auto rounded-[22px] border border-border bg-card xl:block">
+        <aside aria-label="Customer details" className="la-scroll hidden min-h-0 overflow-y-auto rounded-[22px] border border-border bg-card xl:block">
           {d ? <Details d={d} info={info} onOpen={pick} onNote={addNote} /> : <p className="p-5 text-[12.5px] text-muted-foreground">Who the customer is, their plan, platforms and past tickets show here.</p>}
         </aside>
       </div>
 
+      {/* Under xl the same details are a dialog: full width on a phone, a card on a tablet, focus kept inside. */}
       {drawer && d && (
         <div className="fixed inset-0 z-[70] xl:hidden" role="dialog" aria-modal="true" aria-labelledby="la-drawer-t">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setDrawer(false)} aria-hidden />
-          <div className="glass-strong absolute inset-y-0 right-0 flex w-[min(92vw,380px)] flex-col overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border p-3">
-              <h2 id="la-drawer-t" className="font-display text-[15px] font-semibold">
+          <div className="absolute inset-0 bg-foreground/35 backdrop-blur-[2px]" onClick={closeDrawer} aria-hidden />
+          <div ref={panelRef} tabIndex={-1} onKeyDown={trapTab} className="absolute inset-y-0 right-0 flex w-full flex-col border-l border-border bg-card shadow-2xl outline-none sm:w-[min(94vw,26rem)] sm:rounded-l-[22px]">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+              <h2 id="la-drawer-t" className="truncate font-display text-[15px] font-semibold">
                 Details
               </h2>
-              <button ref={closeRef} type="button" onClick={() => setDrawer(false)} aria-label="Close details" className={cn(btnQuiet, "w-11 px-0")}>
+              <button ref={closeRef} type="button" onClick={closeDrawer} aria-label="Close details" className={cn(btnQuiet, iconBtn)}>
                 <X className="h-4 w-4" aria-hidden />
               </button>
             </div>
-            <Details d={d} info={info} onOpen={pick} onNote={addNote} />
+            <div className="la-scroll min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+              <Details d={d} info={info} onOpen={pick} onNote={addNote} />
+            </div>
           </div>
         </div>
       )}

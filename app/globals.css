@@ -4579,3 +4579,14 @@ html[data-contrast="more"]:not([data-app]) .mmain :is(.glass, .pulse-card, .card
 .blog-article .blog-prose h2 { font-size: clamp(1.5rem, 0.6vw + 1.25rem, 1.75rem); }
 .blog-prose--mobile { font-size: 16px; }
 .blog-article .blog-prose--mobile h2 { font-size: 1.35em; }
+/* R1191 Live Assist console. The panel paints every scrollbar lime (see .admin-root above), which on a
+   right-hand drawer or the message column reads as a green line down the edge, not as a scrollbar. Inside the
+   console the bar is a quiet neutral instead, and it keeps the same thin pill shape as the rest of the panel. */
+.la-scroll { scrollbar-width: thin; scrollbar-color: hsl(var(--foreground) / 0.2) transparent; overscroll-behavior: contain; }
+.la-scroll:hover { scrollbar-color: hsl(var(--foreground) / 0.32) transparent; }
+@supports not (scrollbar-width: thin) {
+  .la-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .la-scroll::-webkit-scrollbar-track, .la-scroll::-webkit-scrollbar-corner { background: transparent; }
+  .la-scroll::-webkit-scrollbar-thumb { background-color: hsl(var(--foreground) / 0.2); border: 2px solid transparent; background-clip: padding-box; border-radius: 999px; }
+  .la-scroll::-webkit-scrollbar-thumb:hover { background-color: hsl(var(--foreground) / 0.34); }
+}

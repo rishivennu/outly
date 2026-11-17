@@ -161,7 +161,7 @@ export function Bell({ role }: { role: AdminRole }) {
         className={cn("relative grid h-11 w-11 place-items-center rounded-full hover:bg-secondary", open && "bg-secondary")}
       >
         {unread ? <BellRing className="bell-ring h-[19px] w-[19px]" /> : <BellIcon className="h-[19px] w-[19px]" />}
-        {unread > 0 && <span className="absolute right-1.5 top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-lime px-1 text-[10.5px] font-bold text-[hsl(var(--lime-foreground))]">{unread > 9 ? "9+" : unread}</span>}
+        {unread > 0 && <span className="absolute right-[5px] top-[5px] grid h-[17px] min-w-[17px] place-items-center rounded-full bg-lime px-[3px] text-[10px] font-bold leading-none text-[hsl(var(--lime-foreground))] ring-2 ring-background">{unread > 9 ? "9+" : unread}</span>}
       </button>
       {mounted &&
         createPortal(

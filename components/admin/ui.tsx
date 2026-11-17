@@ -4,9 +4,10 @@ import { cn } from "@/lib/utils";
 import { ScrollX } from "@/components/ui/scroll-x";
 
 /** Server-safe building blocks for admin pages. */
-export function PageHead({ eyebrow, greet, title, body, actions }: { eyebrow?: string; greet?: React.ReactNode; title: string; body?: React.ReactNode; actions?: React.ReactNode }) {
+/** `tight` is for working consoles (1191: Live Assist), where the screen below needs the height more than the title does. */
+export function PageHead({ eyebrow, greet, title, body, actions, tight }: { eyebrow?: string; greet?: React.ReactNode; title: string; body?: React.ReactNode; actions?: React.ReactNode; tight?: boolean }) {
   return (
-    <header className="mb-7 flex flex-wrap items-end justify-between gap-4">
+    <header className={cn("flex flex-wrap items-end justify-between gap-4", tight ? "mb-4" : "mb-7")}>
       <div className="min-w-0">
         {greet && <div className="mb-3">{greet}</div>}
         {eyebrow && <p className="eyebrow mb-2 text-[11px]">{eyebrow}</p>}
