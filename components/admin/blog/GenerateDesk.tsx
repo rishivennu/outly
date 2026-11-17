@@ -7,8 +7,11 @@ import { Input, Label } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { adminApi } from "@/lib/client/admin-api";
 import { cn } from "@/lib/utils";
-import { BLOG_STAGES, STAGE_LABEL, type BlogJobView } from "@/lib/blog/types";
-import { Card, CardTitle, Empty, Pill, Table, fmtDate } from "../ui";
+import { BLOG_STAGES, STAGE_LABEL, type BlogHistoryRow, type BlogJobView } from "@/lib/blog/types";
+import { Card, CardTitle, Pill } from "../ui";
+import { BlogHistory } from "./BlogHistory";
+import { delayedEvent } from "./calendar-grid";
+import { addDays, fmtYmd } from "./zoned";
 
 type JobsRes = { running: BlogJobView | null; jobs: BlogJobView[]; ready: boolean; web: boolean };
 
@@ -17,10 +20,12 @@ type JobsRes = { running: BlogJobView | null; jobs: BlogJobView[]; ready: boolea
  * and shows each stage as it really finishes (the server's own timings). A second click while a run is going
  * simply re-attaches to it. Reloading the page re-attaches too: the run lives in the database, not in this tab.
  */
-export function GenerateDesk({ initial }: { initial: JobsRes }) {
+export function GenerateDesk({ initial, history, timezone, today }: { initial: JobsRes; history: BlogHistoryRow[]; timezone: string; today: string }) {
   const [state, setState] = useState<JobsRes>(initial);
   const [job, setJob] = useState<BlogJobView | null>(initial.running);
   const [hint, setHint] = useState("");
+  const [forDate, setForDate] = useState(today);
+  const [historyKey, setHistoryKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const toast = useToast();
@@ -29,6 +34,7 @@ export function GenerateDesk({ initial }: { initial: JobsRes }) {
   const refresh = useCallback(async () => {
     const r = await adminApi<JobsRes>("/api/admin/blog/jobs");
     setState(r);
+    setHistoryKey((k) => k + 1);
     return r;
   }, []);
 
@@ -57,7 +63,7 @@ export function GenerateDesk({ initial }: { initial: JobsRes }) {
         }
       }
       stepping.current = false;
-      if (cur.status === "done") toast("Today's blog draft is ready for review");
+      if (cur.status === "done") toast(cur.forDate === today ? "Today's blog draft is ready for review" : `The draft for ${fmtYmd(cur.forDate)} is ready for review`);
       refresh().catch(() => {});
     })();
     return () => {
@@ -70,13 +76,27 @@ export function GenerateDesk({ initial }: { initial: JobsRes }) {
     setBusy(true);
     setErr(null);
     try {
-      const r = await adminApi<{ job: BlogJobView; existed: boolean }>("/api/admin/blog/jobs", { method: "POST", json: hint.trim() ? { hint: hint.trim() } : {} });
+      // R1178: a future date starts the run now and the draft counts as that date's scheduled article.
+      const body: Record<string, string> = {};
+      if (hint.trim()) body.hint = hint.trim();
+      if (forDate && forDate !== today) body.forDate = forDate;
+      const r = await adminApi<{ job: BlogJobView; existed: boolean }>("/api/admin/blog/jobs", { method: "POST", json: body });
       setJob(r.job);
+      setHistoryKey((k) => k + 1);
       if (r.existed) toast("A run is already going; showing it");
     } catch (e: any) {
       setErr(e.message);
     } finally {
       setBusy(false);
+    }
+  }
+  async function attach(id: string) {
+    const known = state.jobs.find((j) => j.id === id);
+    if (known) return setJob(known);
+    try {
+      setJob((await adminApi<{ job: BlogJobView }>(`/api/admin/blog/jobs/${id}`)).job);
+    } catch (e: any) {
+      setErr(e.message);
     }
   }
   async function cancel() {
@@ -100,14 +120,18 @@ export function GenerateDesk({ initial }: { initial: JobsRes }) {
             <AlertTriangle className="mr-1.5 inline h-4 w-4" aria-hidden /> No AI key is set for the blog. Add NVIDIA_API_KEY (or KIMI_API_KEY) in the deployment settings, then reload.
           </p>
         )}
-        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
           <div className="grid gap-1.5">
             <Label htmlFor="blog-hint">Angle for today (optional)</Label>
             <Input id="blog-hint" value={hint} onChange={(e) => setHint(e.target.value)} placeholder="e.g. creators who film on a phone and lose quality on upload" maxLength={300} disabled={running} />
           </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="blog-for">For date</Label>
+            <Input id="blog-for" type="date" value={forDate} min={today} max={addDays(today, 60)} onChange={(e) => setForDate(e.target.value || today)} disabled={running} className="min-h-11" />
+          </div>
           <Button type="button" variant="lime" size="lg" onClick={start} disabled={busy || running || !state.ready} className="min-h-11">
             {running ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Wand2 className="h-4 w-4" aria-hidden />}
-            {running ? "Generating" : "Generate Today's Blog"}
+            {running ? "Generating" : forDate && forDate !== today ? `Generate for ${fmtYmd(forDate, { day: "numeric", month: "short" })}` : "Generate Today's Blog"}
           </Button>
         </div>
         {err && (
@@ -119,49 +143,14 @@ export function GenerateDesk({ initial }: { initial: JobsRes }) {
 
       {job && <StageList job={job} onCancel={running ? cancel : undefined} />}
 
-      <Card>
-        <CardTitle hint="Every run, whoever or whatever started it. Times are the server's own.">Generation history</CardTitle>
-        <div className="mt-3">
-          {state.jobs.length ? (
-            <Table head={["Day", "Started", "By", "Topic", "Result", "Draft"]} label="Generation history" lead={3}>
-              {state.jobs.map((j) => (
-                <tr key={j.id}>
-                  <td>{j.forDate}</td>
-                  <td>{fmtDate(j.startedAt, true)}</td>
-                  <td>{j.startedBy === "schedule" ? "Schedule" : j.startedBy}</td>
-                  <td className="max-w-[28ch] truncate" title={j.topic}>
-                    {j.topic || (j.topicHint ? `Angle: ${j.topicHint}` : "")}
-                  </td>
-                  <td>
-                    <JobPill j={j} />
-                    {j.status === "failed" && j.error && <span className="ml-2 text-[12px] text-muted-foreground">{j.error}</span>}
-                  </td>
-                  <td>
-                    {j.postId ? (
-                      <Link href={`/admin/blog/review/${j.postId}`} className="underline underline-offset-4">
-                        Review
-                      </Link>
-                    ) : j.status === "running" && j.id !== job?.id ? (
-                      <button type="button" className="underline underline-offset-4" onClick={() => setJob(j)}>
-                        Attach
-                      </button>
-                    ) : (
-                      ""
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </Table>
-          ) : (
-            <Empty title="No runs yet" body="The first click above starts one. The schedule in Blog settings will start one every morning." />
-          )}
-        </div>
-      </Card>
+      <BlogHistory timezone={timezone} initial={history} refreshKey={historyKey} onRetried={setJob} onAttach={attach} attachedId={running ? job?.id : null} />
     </div>
   );
 }
 
 export function JobPill({ j }: { j: BlogJobView }) {
+  // R1178: past readyBy the runner adds a "delayed" event; say so plainly instead of the normal running label.
+  if (delayedEvent(j)) return <Pill tone="warn">Running late: {STAGE_LABEL[j.stage as keyof typeof STAGE_LABEL] ?? j.stage}</Pill>;
   const tone = j.status === "done" ? "ok" : j.status === "failed" ? "bad" : j.status === "cancelled" ? "muted" : "lime";
   const label = j.status === "done" ? "Draft ready" : j.status === "failed" ? "Failed" : j.status === "cancelled" ? "Stopped" : `Running: ${STAGE_LABEL[j.stage as keyof typeof STAGE_LABEL] ?? j.stage}`;
   return <Pill tone={tone}>{label}</Pill>;
@@ -171,6 +160,7 @@ export function JobPill({ j }: { j: BlogJobView }) {
 export function StageList({ job, onCancel, compact = false }: { job: BlogJobView; onCancel?: () => void; compact?: boolean }) {
   const idx = BLOG_STAGES.indexOf(job.stage as (typeof BLOG_STAGES)[number]);
   const done = job.status === "done";
+  const late = delayedEvent(job);
   return (
     <Card as="div" className={cn(compact && "p-4")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -187,6 +177,11 @@ export function StageList({ job, onCancel, compact = false }: { job: BlogJobView
           )}
         </div>
       </div>
+      {late && !BLOG_STAGES.includes(late.stage as (typeof BLOG_STAGES)[number]) && (
+        <p className="mt-3 rounded-xl bg-warning/10 px-3 py-2 text-[13px]">
+          <AlertTriangle className="mr-1.5 inline h-4 w-4" aria-hidden /> Running late{late.message ? `: ${late.message}` : ""}
+        </p>
+      )}
       <ol className="mt-4 grid gap-1.5" aria-label="Generation stages">
         {BLOG_STAGES.map((s, i) => {
           const ev = job.events.filter((e) => e.stage === s);
@@ -196,6 +191,7 @@ export function StageList({ job, onCancel, compact = false }: { job: BlogJobView
           const active = job.status === "running" && i === idx;
           const pending = !finished && !active && !failed;
           const doneEv = ev.find((e) => e.status === "done");
+          const lateEv = !finished && job.status === "running" ? ev.filter((e) => e.status === "delayed").pop() : undefined;
           return (
             <li key={s} className={cn("flex items-start gap-3 rounded-xl px-3 py-2", active && "bg-lime/10", pending && "opacity-60")}>
               <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center" aria-hidden>
@@ -213,6 +209,11 @@ export function StageList({ job, onCancel, compact = false }: { job: BlogJobView
                   </p>
                 )}
                 {!finished && last?.status === "failed" && <p className="text-[12.5px] text-destructive">{last.message}</p>}
+                {lateEv && (
+                  <p className="text-[12.5px] pill-ink-warn">
+                    <AlertTriangle className="mr-1 inline h-3.5 w-3.5" aria-hidden /> Running late{lateEv.message ? `: ${lateEv.message}` : ""}
+                  </p>
+                )}
                 {active && job.attempts > 1 && <p className="text-[12.5px] text-muted-foreground">Attempt {job.attempts} of 3</p>}
               </div>
             </li>

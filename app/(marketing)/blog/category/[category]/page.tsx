@@ -52,13 +52,17 @@ export default async function CategoryPage(props: Props) {
       <JsonLd data={breadcrumbJsonLd(base, [{ name: "Home", path: "/" }, { name: "Blog", path: "/blog" }, { name: cat.name, path }])} />
       <Shell>
         <Breadcrumbs trail={[{ name: "Blog", href: "/blog" }, { name: cat.name }]} />
-        <div className="mt-6 max-w-2xl">
-          <h1 className="display text-balance text-[clamp(2.4rem,6.5vw,4rem)]">{cat.name}</h1>
-          <p className="mt-6 text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-lg">
+        <div className="mt-6 rounded-[1.75rem] border border-border bg-card p-6 sm:p-10">
+          <p className="inline-flex min-h-8 items-center gap-2 rounded-full border border-border px-3.5 text-[13px] font-medium leading-none text-muted-foreground">
+            <span aria-hidden="true" className="h-1.5 w-1.5 rotate-45 bg-lime" />
+            Topic
+          </p>
+          <h1 className="display mt-6 max-w-2xl text-balance text-[clamp(2.4rem,5.2vw,4rem)]">{cat.name}</h1>
+          <p className="mt-6 max-w-2xl text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-lg">
             {lead(cat.name)} {cat.count} {cat.count === 1 ? "article" : "articles"}.
           </p>
         </div>
-        <div className="mt-10">
+        <div className="mt-8">
           <CategoryNav categories={all} current={cat.slug} />
         </div>
         <div className="mt-12">

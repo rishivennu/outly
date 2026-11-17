@@ -309,6 +309,7 @@ export function MarketingNav() {
           {/* 1040: live creator count lives in the bar (moved from the hero). 1117: one short line, steps down via data-fit. */}
           <LiveCount nav className="mnav-live hidden px-1.5 md:inline-flex" />
           <ThemeToggle compact dense className="hidden sm:inline-flex" />
+          <span aria-hidden="true" className="mnav-sep mx-1 hidden sm:block" />
           {signedIn ? (
             <Link
               href="/home"

@@ -41,6 +41,7 @@ async function sweep(req: NextRequest) {
   const subs = await sweepSubscriptions(new Date()); // 1147: trials, old signals, offer ledger + month rollover (never fatal)
   await import("@/lib/accounts").then((m) => m.resubscribeCommentsOnce()).catch((e) => console.error("[sweep] comment subs", e)); // 1141b, runs once
   await import("@/lib/analytics/sync").then((m) => m.syncMetrics({ budgetMs: 8_000 })).catch((e) => console.error("[sweep] metrics", e)); // 1140 analytics background sync
+  await import("@/lib/blog/schedule").then((m) => m.kickBlogTick(req.nextUrl.origin)).catch((e) => console.error("[sweep] blog", e)); // R1178: due blog work runs in its own /api/cron/blog invocation
   // Without Redis the jobs above are timers in this invocation: let them run before the response ends it
   // (1027). Budget = what is left of maxDuration minus 10 s of headroom; whatever is still running then is
   // held by waitUntil or picked up by the next sweep.

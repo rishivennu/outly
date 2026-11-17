@@ -7,7 +7,7 @@ export type BlogStage = (typeof BLOG_STAGES)[number];
 export type JobStage = BlogStage | "done" | "failed";
 export type JobStatus = "running" | "done" | "failed" | "cancelled";
 export type PostStatus = "pending" | "approved" | "published" | "rejected";
-export type TopicStatus = "candidate" | "chosen" | "written" | "skipped";
+export type TopicStatus = "candidate" | "chosen" | "written" | "skipped" | "backlog" | "used";
 
 /** What the admin sees while a run is going. Written as the work, not as a promise. */
 export const STAGE_LABEL: Record<BlogStage, string> = {
@@ -181,9 +181,70 @@ export interface BlogPostView {
   reviewedBy: string | null;
   rejectReason: string;
   jobId: string | null;
+  /** R1178: the moment a person approved this article to go live; null when it waits for a manual publish. */
+  scheduledFor: string | null;
   createdAt: string;
   updatedAt: string;
   sources: BlogSourceView[];
+}
+
+/** R1178 calendar and history: what the admin calendar page reads (contract shared with the UI). */
+export type BlogCalendarStatus = "running" | "delayed" | "failed" | "cancelled" | "pending" | "approved" | "scheduled" | "published" | "rejected";
+export interface BlogCalendarItem {
+  kind: "job" | "post";
+  id: string;
+  title: string;
+  status: BlogCalendarStatus;
+  href: string;
+  /** ISO time the item sits on that day (publishedAt, scheduledFor, job startedAt, post createdAt). */
+  at: string;
+  /** Error text for failed, stage for running/delayed, "" otherwise. */
+  note: string;
+}
+export interface BlogCalendarDay {
+  /** YYYY-MM-DD in the blog timezone. */
+  date: string;
+  skipped: boolean;
+  /** The daily run will start at startTime that day. */
+  scheduledRun: boolean;
+  items: BlogCalendarItem[];
+}
+export interface BlogCalendarMonth {
+  month: string;
+  today: string;
+  timezone: string;
+  startTime: string;
+  readyBy: string;
+  enabled: boolean;
+  paused: boolean;
+  days: BlogCalendarDay[];
+}
+export type BlogHistoryStatus = "running" | "retrying" | "delayed" | "done" | "failed" | "cancelled";
+export interface BlogHistoryRow {
+  jobId: string;
+  date: string;
+  kind: string;
+  startedBy: string;
+  startedAt: string;
+  finishedAt: string | null;
+  topic: string;
+  /** retrying = running after a stage failed once; delayed = running past readyBy on its own date. */
+  status: BlogHistoryStatus;
+  stage: string;
+  error: string;
+  postId: string | null;
+  canRetry: boolean;
+}
+export interface BlogBacklogTopic {
+  id: string;
+  topic: string;
+  problem: string;
+  primaryKeyword: string;
+  category: string;
+  /** backlog = queued by an admin for the next scheduled run; candidate = runner-up from an earlier topic stage. */
+  status: "backlog" | "candidate";
+  score: number;
+  createdAt: string;
 }
 
 /** Fields the review desk may change. */

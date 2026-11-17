@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { json, HttpError } from "@/lib/http";
 import { adminRoute, adminEvent } from "@/lib/admin/route";
+import { getConfig } from "@/lib/settings";
 import { JobError } from "@/lib/blog/job";
-import { getPost, publishPost, regenerateSection, rejectPost, restorePost, unpublishPost, updatePost } from "@/lib/blog/posts";
+import { getPost, publishPost, regenerateSection, rejectPost, restorePost, schedulePost, unpublishPost, unschedulePost, updatePost } from "@/lib/blog/posts";
 
 export const dynamic = "force-dynamic";
 /** Regenerating a section is one model call, budgeted at 55 s. */
@@ -45,6 +46,8 @@ const Act = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reject"), reason: z.string().trim().max(500).default("") }),
   z.object({ action: z.literal("restore") }),
   z.object({ action: z.literal("regenerate"), heading: z.string().trim().min(1).max(200), note: z.string().trim().max(600).default("") }),
+  z.object({ action: z.literal("schedule"), at: z.string().trim().min(1).max(40) }),
+  z.object({ action: z.literal("unschedule") }),
 ]);
 
 export const POST = adminRoute<{ params: { id: string } }>("content", async (req, { params, admin }) => {
@@ -61,8 +64,17 @@ export const POST = adminRoute<{ params: { id: string } }>("content", async (req
         return restorePost(admin, params.id);
       case "regenerate":
         return regenerateSection(admin, params.id, a.heading, a.note);
+      case "schedule":
+        return schedulePost(admin, params.id, a.at);
+      case "unschedule":
+        return unschedulePost(admin, params.id);
     }
   });
+  if (a.action === "schedule" && post.scheduledFor) {
+    const tz = (await getConfig("blog")).timezone;
+    const when = new Intl.DateTimeFormat("en-GB", { timeZone: tz, dateStyle: "medium", timeStyle: "short" }).format(new Date(post.scheduledFor));
+    await adminEvent("blog.scheduled", `${admin.name} set "${post.title}" to publish on ${when}`, `Timezone: ${tz}`, `/admin/blog/review/${post.id}`);
+  }
   if (a.action === "publish") await adminEvent("blog.published", `${admin.name} published "${post.title}"`, undefined, `/blog/${post.slug}`);
   if (a.action === "reject") await adminEvent("blog.rejected", `${admin.name} rejected "${post.title}"`, a.reason || undefined, `/admin/blog/review/${post.id}`);
   return json({ post });

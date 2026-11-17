@@ -1534,12 +1534,14 @@ model BlogPost {
   reviewedBy        String?
   rejectReason      String    @default("")
   jobId             String?
+  scheduledFor      DateTime? // set only when a person approves an article for a date (R1178); the blog tick publishes it then
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   sources           BlogSource[]
 
   @@index([status, createdAt])
   @@index([category, publishedAt])
+  @@index([status, scheduledFor])
 }
 
 /// A reference the research stage recorded for a post. `verified` is false until something fetched the URL;
@@ -1570,7 +1572,7 @@ model BlogTopic {
   category       String    @default("")
   score          Int       @default(0) // 0-100, model ranking
   basis          String    @default("") // why it ranked there, in words
-  status         String    @default("candidate") // candidate | chosen | written | skipped
+  status         String    @default("candidate") // candidate | chosen | written | skipped | backlog | used (R1178: backlog = queued by an admin, used = taken by a scheduled run)
   postId         String?
   chosenAt       DateTime?
   createdAt      DateTime  @default(now())

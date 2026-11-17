@@ -7,20 +7,37 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { adminApi } from "@/lib/client/admin-api";
-import type { BlogJobView, BlogPostView } from "@/lib/blog/types";
+import { STAGE_LABEL, type BlogJobView, type BlogPostView } from "@/lib/blog/types";
 import { Card, CardTitle, Pill } from "../ui";
 import { StageList } from "./GenerateDesk";
+import { delayedEvent } from "./calendar-grid";
 
 /**
  * R1175 morning card. Shown on the Blog dashboard and on Overview when there is a pending article from today,
  * or a run still going. Approve here does the same server-side checks as the review desk: nothing skips them.
  */
-export function TodayBlogCard({ post, job, ready, compact = false }: { post: BlogPostView | null; job: BlogJobView | null; ready: boolean; compact?: boolean }) {
+export function TodayBlogCard({ post, job, ready, compact = false, skippedToday = false }: { post: BlogPostView | null; job: BlogJobView | null; ready: boolean; compact?: boolean; skippedToday?: boolean }) {
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState<"publish" | "rewrite" | null>(null);
   const [confirm, setConfirm] = useState<"publish" | "rewrite" | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  // R1178: past the ready-by time the runner records a "delayed" event. The card then says the run is late,
+  // at which stage and why, and makes no promise about when it will be ready.
+  const late = delayedEvent(job);
+  if (job && job.status === "running" && late) {
+    const stage = STAGE_LABEL[job.stage as keyof typeof STAGE_LABEL] ?? job.stage;
+    return (
+      <Card className="border-warning/40 bg-warning/[0.05]">
+        <CardTitle hint={`Still at: ${stage}.${late.message ? ` ${late.message}` : ""}`} action={<Pill tone="warn">Running late</Pill>}>Today's blog is running late</CardTitle>
+        <StageList job={job} compact />
+        <div className="mt-3">
+          <Button asChild variant="subtle"><Link href="/admin/blog/generate">Follow the run</Link></Button>
+        </div>
+      </Card>
+    );
+  }
 
   if (job && job.status === "running") {
     return (
@@ -36,6 +53,14 @@ export function TodayBlogCard({ post, job, ready, compact = false }: { post: Blo
 
   if (!post) {
     if (compact) return null;
+    if (skippedToday) {
+      return (
+        <Card className="border-dashed">
+          <CardTitle hint="Today is a skip date, so the daily run does not start. Generate still works if you want an article anyway." action={<Pill tone="muted">Skipped today</Pill>}>Skipped today</CardTitle>
+          <Button asChild variant="subtle"><Link href="/admin/blog/calendar">Open the calendar</Link></Button>
+        </Card>
+      );
+    }
     return (
       <Card className="border-dashed">
         <CardTitle hint={ready ? "One click writes, researches and checks an article. You review it before anything goes live." : "Add NVIDIA_API_KEY (or KIMI_API_KEY) in the deployment settings to turn the writer on."}>No article waiting for review</CardTitle>

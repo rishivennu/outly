@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "../db";
 import { getConfig } from "../settings";
 import { adminEvent } from "../admin/route";
-import type { BlogConfig } from "./config";
+import { dayDiff, isDay, type BlogConfig } from "./config";
 import { BlogLlmError } from "./llm";
 import { stageDraft, stageOutline, stageQuality, stageResearch, stageSeo, stageTopic, type TopicMemory } from "./stages";
 import { BLOG_STAGES, countWords, readingMinutes, type BlogJobView, type BlogStage, type StageData, type TopicCandidate } from "./types";
@@ -66,15 +66,18 @@ export class JobError extends Error {
  * Starts today's run, or returns the one already running for that day (the duplicate-click guard). `rewriteOf`
  * reuses a post's topic and skips topic discovery; the old post is replaced when the new one lands.
  */
-export async function startJob(input: { kind: "manual" | "scheduled"; by: string; hint?: string; rewriteOf?: string; now?: Date }): Promise<{ job: BlogJobView; existed: boolean }> {
+export async function startJob(input: { kind: "manual" | "scheduled"; by: string; hint?: string; rewriteOf?: string; now?: Date; forDate?: string }): Promise<{ job: BlogJobView; existed: boolean }> {
   const cfg = await getConfig("blog");
   if (cfg.paused) throw new JobError("The blog agent is paused in Blog settings.", 409);
-  const forDate = localDay(cfg.timezone, input.now);
+  const today = localDay(cfg.timezone, input.now);
+  // R1178: an admin may prepare a later day's draft now; it counts as that day's scheduled run.
+  if (input.forDate !== undefined && !(isDay(input.forDate) && dayDiff(today, input.forDate) >= 0 && dayDiff(today, input.forDate) <= 60)) throw new JobError("Pick a day from today to 60 days ahead (YYYY-MM-DD).");
+  const forDate = input.forDate ?? today;
   const running = await db.blogJob.findFirst({ where: { forDate, status: "running" }, orderBy: { startedAt: "desc" } });
   if (running) return { job: await jobView(running.id), existed: true };
   if (input.kind === "scheduled") {
-    const today = await db.blogJob.count({ where: { forDate, kind: "scheduled" } });
-    if (today >= Math.max(1, cfg.schedule.perDay)) throw new JobError("Today's scheduled run already happened.", 409);
+    const done = await db.blogJob.count({ where: { forDate, kind: "scheduled" } });
+    if (done >= Math.max(1, cfg.schedule.perDay)) throw new JobError(forDate === today ? "Today's scheduled run already happened." : `The run for ${forDate} already happened.`, 409);
   }
   let stageData: StageData = {};
   let stage: BlogStage = "topic";
@@ -99,6 +102,33 @@ export async function cancelJob(id: string, by: string) {
   await db.blogJob.update({ where: { id }, data: { status: "cancelled", finishedAt: new Date(), error: `Stopped by ${by}` } });
   await db.blogJobEvent.create({ data: { jobId: id, stage: job.stage, status: "failed", message: `Stopped by ${by}` } });
   return jobView(id);
+}
+
+/**
+ * R1178: resumes a failed or stopped run from the first stage with no saved output. fail() sets stage "failed",
+ * so the stage comes from stageData, never from job.stage. Completed stages (and a rewrite's seeded topic) are kept.
+ */
+export async function retryJob(id: string, by: string): Promise<BlogJobView> {
+  const job = await db.blogJob.findUnique({ where: { id } });
+  if (!job) throw new JobError("Run not found.", 404);
+  if (job.status !== "failed" && job.status !== "cancelled") throw new JobError("Only a failed or stopped run can be retried.", 409);
+  const cfg = await getConfig("blog");
+  if (cfg.paused) throw new JobError("The blog agent is paused in Blog settings.", 409);
+  const other = await db.blogJob.findFirst({ where: { forDate: job.forDate, status: "running", id: { not: id } }, select: { id: true } });
+  if (other) throw new JobError(`Another run is going for ${job.forDate}. Wait for it to finish.`, 409);
+  const data = parseStageData(job.stageData);
+  const stage = BLOG_STAGES.find((s) => !data[s]) ?? "quality";
+  const claimed = await db.blogJob.updateMany({ where: { id, status: job.status }, data: { status: "running", stage, attempts: 0, error: "", finishedAt: null } });
+  if (!claimed.count) return jobView(id);
+  await db.blogJobEvent.create({ data: { jobId: id, stage, status: "started", message: `Retry by ${by}`.slice(0, 200) } });
+  return jobView(id);
+}
+function parseStageData(s: string): StageData {
+  try {
+    return (JSON.parse(s || "{}") ?? {}) as StageData;
+  } catch {
+    return {};
+  }
 }
 
 /** Runs the job's current stage once. Safe to call when the job is finished (returns it unchanged). */

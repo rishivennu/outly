@@ -45,6 +45,8 @@ export interface BlogConfig {
   model: BlogModel;
   /** Research: ask the model for cited web sources through OpenRouter's web plugin (costs a little per call). */
   webResearch: boolean;
+  /** R1178: YYYY-MM-DD days (blog timezone) the daily run sits out. Pruned of old days on every save. */
+  skipDates: string[];
 }
 
 export const BLOG_CATEGORIES_DEFAULT = ["Content Strategy", "Growth", "Scheduling & Workflow", "Captions & Copy", "Analytics", "Monetisation", "Creator Life"];
@@ -73,7 +75,22 @@ export const BLOG_DEFAULT: BlogConfig = {
   paused: false,
   model: "kimi-k2.6",
   webResearch: true,
+  skipDates: [],
 };
+
+export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** A real calendar day as YYYY-MM-DD (2026-02-30 is not). */
+export const isDay = (s: string) => {
+  const t = DATE_RE.test(s) ? Date.parse(`${s}T00:00:00Z`) : NaN;
+  return Number.isFinite(t) && new Date(t).toISOString().slice(0, 10) === s;
+};
+/** Whole days from `a` to `b`, both YYYY-MM-DD. */
+export const dayDiff = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+
+/** R1178: unique, sorted, and without days more than 30 days before `today`, so the list cannot grow forever. */
+export function pruneSkipDates(dates: string[], today: string): string[] {
+  return [...new Set(dates.filter((d) => typeof d === "string" && (!isDay(d) || dayDiff(d, today) <= 30)))].sort();
+}
 
 /** Admin form validation that lives next to the shape so the API and the UI agree. */
 export function blogConfigIssues(c: BlogConfig): string[] {
@@ -86,6 +103,9 @@ export function blogConfigIssues(c: BlogConfig): string[] {
   if (!c.categories.length) out.push("Keep at least one category.");
   if ((c.schedule as { autoPublish: boolean }).autoPublish) out.push("Auto-publish is not available: a person approves every article.");
   if (!c.author.trim()) out.push("Author cannot be empty.");
+  const skip = c.skipDates ?? [];
+  if (!Array.isArray(skip) || skip.some((d) => typeof d !== "string" || !isDay(d))) out.push("Skipped days must be dates as YYYY-MM-DD.");
+  else if (skip.length > 120) out.push("At most 120 skipped days.");
   try {
     new Intl.DateTimeFormat("en", { timeZone: c.timezone });
   } catch {

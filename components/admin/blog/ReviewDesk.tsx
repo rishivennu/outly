@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, ExternalLink, Loader2, Monitor, RefreshCw, Smartphone } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, ExternalLink, Loader2, Monitor, RefreshCw, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
@@ -13,6 +13,8 @@ import { countWords, type BlogJobView, type BlogPostPatch, type BlogPostView } f
 import { renderMarkdown } from "@/lib/blog/markdown";
 import { Card, CardTitle, Pill, fmtDate } from "../ui";
 import { ArticleBody } from "./ArticleBody";
+import { PublishLaterForm } from "./BlogCalendar";
+import { fmtZoned } from "./zoned";
 
 type Tab = "write" | "preview" | "seo" | "sources";
 const STATUS: Record<string, { label: string; tone: "ok" | "warn" | "bad" | "muted" | "lime" | "info" }> = {
@@ -26,7 +28,7 @@ const STATUS: Record<string, { label: string; tone: "ok" | "warn" | "bad" | "mut
  * R1175 review desk. The admin reads, edits and decides. Nothing here is automatic: Save writes the edits,
  * Approve & Publish is the only way an article goes live, and the server re-checks quality on both.
  */
-export function ReviewDesk({ initial, categories, allowedLinks, siteUrl }: { initial: BlogPostView; categories: string[]; allowedLinks: { href: string; label: string }[]; siteUrl: string }) {
+export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezone }: { initial: BlogPostView; categories: string[]; allowedLinks: { href: string; label: string }[]; siteUrl: string; timezone: string }) {
   const [post, setPost] = useState(initial);
   const [d, setD] = useState<BlogPostPatch>(toPatch(initial));
   const [tab, setTab] = useState<Tab>("write");
@@ -35,6 +37,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl }: { ini
   const [err, setErr] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<"publish" | "reject" | "rewrite" | null>(null);
   const [reason, setReason] = useState("");
+  const [later, setLater] = useState(false);
   const [regen, setRegen] = useState<{ heading: string; note: string }>({ heading: "", note: "" });
   const toast = useToast();
   const router = useRouter();
@@ -69,7 +72,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl }: { ini
       const r = await adminApi<{ post: BlogPostView }>(`/api/admin/blog/posts/${post.id}`, { method: "POST", json: { action, ...extra } });
       setPost(r.post);
       setD(toPatch(r.post));
-      toast(action === "publish" ? "Published. It is live now." : action === "unpublish" ? "Taken offline" : action === "reject" ? "Article rejected" : action === "restore" ? "Back in the review queue" : "Section rewritten");
+      toast(action === "publish" ? "Published. It is live now." : action === "unschedule" ? "Schedule cancelled. Still approved, not live." : action === "unpublish" ? "Taken offline" : action === "reject" ? "Article rejected" : action === "restore" ? "Back in the review queue" : "Section rewritten");
       router.refresh();
     } catch (e: any) {
       setErr(e.message);
@@ -77,6 +80,16 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl }: { ini
       setBusy(null);
       setConfirm(null);
     }
+  }
+  // R1178: approving for a moment. Throws so the form shows the server's reason (a failing check, a bad date) inline.
+  async function schedule(at: string) {
+    if (dirty && !(await save())) throw new Error("Save the edits first.");
+    const r = await adminApi<{ post: BlogPostView }>(`/api/admin/blog/posts/${post.id}`, { method: "POST", json: { action: "schedule", at } });
+    setPost(r.post);
+    setD(toPatch(r.post));
+    setLater(false);
+    toast(`Approved. It goes live on ${fmtZoned(r.post.scheduledFor ?? at, timezone)}.`);
+    router.refresh();
   }
   async function rewrite() {
     setBusy("rewrite");
@@ -95,7 +108,8 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl }: { ini
 
   const q = post.quality;
   const blocking = q?.checks.filter((c) => c.critical && !c.ok) ?? [];
-  const st = STATUS[post.status] ?? { label: post.status, tone: "muted" as const };
+  const scheduled = post.status === "approved" && !!post.scheduledFor;
+  const st = scheduled ? { label: "Scheduled", tone: "info" as const } : (STATUS[post.status] ?? { label: post.status, tone: "muted" as const });
 
   return (
     <div className="grid gap-5">
@@ -136,12 +150,41 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl }: { ini
               <Button type="button" variant="danger" onClick={() => setConfirm("reject")} disabled={!!busy} className="min-h-11">
                 Reject
               </Button>
+              {!scheduled && (
+                <Button type="button" variant="outline" onClick={() => setLater((v) => !v)} aria-expanded={later} disabled={!!busy || blocking.length > 0} className="min-h-11" title={blocking.length ? "Fix the blocking quality checks first" : undefined}>
+                  <CalendarClock className="h-4 w-4" aria-hidden /> Publish later
+                </Button>
+              )}
               <Button type="button" variant="lime" onClick={() => setConfirm("publish")} disabled={!!busy || blocking.length > 0} className="min-h-11" title={blocking.length ? "Fix the blocking quality checks first" : undefined}>
-                <Check className="h-4 w-4" aria-hidden /> Approve &amp; Publish
+                <Check className="h-4 w-4" aria-hidden /> {post.status === "approved" ? "Publish now" : <>Approve &amp; Publish</>}
               </Button>
             </>
           )}
         </div>
+        {scheduled && (
+          <div className="basis-full rounded-2xl bg-accent/10 p-3 text-[13.5px]">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p>
+                <CalendarClock className="mr-1.5 inline h-4 w-4" aria-hidden /> Scheduled for {fmtZoned(post.scheduledFor, timezone)} ({timezone}). Approved by {post.reviewedBy || "an admin"}; it goes live then.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setLater((v) => !v)} aria-expanded={later} disabled={!!busy}>
+                  Reschedule
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="min-h-11" onClick={() => act("unschedule")} disabled={!!busy}>
+                  {busy === "unschedule" && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />} Cancel schedule
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        {later && !live && post.status !== "rejected" && (
+          <div className="basis-full rounded-2xl bg-secondary/60 p-4">
+            <p className="mb-2 text-[13.5px] font-semibold">{scheduled ? "Move the publication" : "Approve and publish on a date"}</p>
+            <p className="mb-3 text-[12.5px] text-muted-foreground">You are approving this article now; it goes live on its own at the moment you pick. The quality checks run again before it is accepted.</p>
+            <PublishLaterForm idPrefix="rv-later" timezone={timezone} initialAt={post.scheduledFor} submit={schedule} submitLabel={scheduled ? "Reschedule" : undefined} onCancel={() => setLater(false)} />
+          </div>
+        )}
         {err && (
           <p role="alert" className="basis-full text-[13.5px] text-destructive">
             {err}
@@ -354,6 +397,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl }: { ini
               <Row k="Author" v={post.author} />
               <Row k="Outlly tie-in" v={post.featureTieIn || "None (nothing fitted naturally)"} />
               <Row k="Reviewed by" v={post.reviewedBy || "Nobody yet"} />
+              {scheduled && <Row k="Scheduled" v={fmtZoned(post.scheduledFor, timezone)} />}
               <Row k="Published" v={post.publishedAt ? `${fmtDate(post.publishedAt, true)} by ${post.publishedBy}` : "Not yet"} />
               {post.rejectReason && <Row k="Rejected" v={post.rejectReason} />}
               {post.jobId && (

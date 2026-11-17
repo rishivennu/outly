@@ -142,7 +142,7 @@ export function ThemeToggle({ compact = false, plain = false, dense = false, cla
     pick(to);
   };
   return (
-    <div ref={group} role="radiogroup" aria-label="Theme" onKeyDown={onKeyDown} className={cn("inline-flex items-center gap-0.5 rounded-full", dense ? "p-0.5" : "p-1", plain ? "bg-secondary/60" : "glass", className)}>
+    <div ref={group} role="radiogroup" aria-label="Theme" onKeyDown={onKeyDown} className={cn("inline-flex items-center gap-0.5 rounded-full", dense ? "p-0.5 ring-1 ring-inset ring-border" : "p-1", plain ? "bg-secondary/60" : dense ? "bg-transparent" : "glass", className)}>
       {THEME_OPTIONS.map(({ value, label, Icon }) => {
         const on = choice === value;
         return (

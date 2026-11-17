@@ -53,7 +53,8 @@ export function Library({ posts }: { posts: BlogPostView[] }) {
                 <td>{p.category}</td>
                 <td className="max-w-[20ch] truncate">{p.primaryKeyword}</td>
                 <td>
-                  <Pill tone={TONE[p.status] ?? "muted"}>{LABEL[p.status] ?? p.status}</Pill>
+                  {/* R1178: an approved article with a date is waiting for that moment; without one it waits for a person. */}
+                  {p.status === "approved" && p.scheduledFor ? <Pill tone="info">Scheduled {fmtDate(p.scheduledFor, true)}</Pill> : <Pill tone={TONE[p.status] ?? "muted"}>{LABEL[p.status] ?? p.status}</Pill>}
                 </td>
                 <td>
                   <Pill tone={p.qualityOk ? "ok" : "warn"}>{p.qualityOk ? "Passes" : "Needs attention"}</Pill>

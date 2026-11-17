@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "../db";
 import { getConfig } from "../settings";
 import type { AdminSession } from "../admin/auth";
+import { adminEvent } from "../admin/route";
 import { allowedLinks, JobError, localDay, toView } from "./job";
 import { pingIndexNow, siteBase } from "./indexnow";
 import { categorySlug } from "./public";
@@ -47,6 +48,7 @@ export function postView(p: PostRow): BlogPostView {
     reviewedBy: p.reviewedBy,
     rejectReason: p.rejectReason,
     jobId: p.jobId,
+    scheduledFor: p.scheduledFor?.toISOString() ?? null,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
     sources: (p.sources ?? []).map((s) => ({ id: s.id, url: s.url, title: s.title, publisher: s.publisher, kind: s.kind, supports: s.supports, verified: s.verified, accessedAt: s.accessedAt.toISOString() })),
@@ -144,7 +146,7 @@ export async function rejectPost(admin: AdminSession, id: string, reason: string
   const cur = await db.blogPost.findUnique({ where: { id } });
   if (!cur) throw new JobError("Article not found.", 404);
   if (cur.status === "published") throw new JobError("Unpublish a live article instead of rejecting it.", 409);
-  const saved = await db.blogPost.update({ where: { id }, data: { status: "rejected", rejectReason: str(reason, 500), reviewedBy: admin.login }, include: { sources: true } });
+  const saved = await db.blogPost.update({ where: { id }, data: { status: "rejected", rejectReason: str(reason, 500), reviewedBy: admin.login, scheduledFor: null }, include: { sources: true } });
   await db.blogTopic.updateMany({ where: { postId: id }, data: { status: "skipped" } });
   await audit(admin, "blog.reject", id, { status: cur.status }, { status: "rejected" }, reason);
   return postView(saved);
@@ -171,30 +173,95 @@ export async function publishPost(admin: AdminSession, id: string): Promise<Blog
   if (!cur) throw new JobError("Article not found.", 404);
   if (cur.status === "published") throw new JobError("This article is already live.", 409);
   if (cur.status === "rejected") throw new JobError("Restore the article before publishing it.", 409);
+  const { problems, report } = await publishProblems(cur);
+  if (problems.length) throw new JobError(problems.join(" "), 422);
+  const now = new Date();
+  // R1178: a scheduled article published by hand (or by the tick) no longer has a pending date.
+  const saved = await db.blogPost.update({ where: { id }, data: { status: "published", publishedAt: cur.publishedAt ?? now, publishedBy: admin.login, reviewedBy: admin.login, qualityReport: JSON.stringify(report), qualityOk: true, scheduledFor: null }, include: { sources: true } });
+  await audit(admin, "blog.publish", id, { status: cur.status }, { status: "published", slug: saved.slug });
+  revalidateBlog(saved.slug, saved.category);
+  const base = siteBase();
+  void pingIndexNow([`${base}/blog/${saved.slug}`, `${base}/blog`]).catch((e) => console.warn("[indexnow]", e));
+  return postView(saved);
+}
+
+/**
+ * R1178: the checks Approve & Publish runs, shared with "Approve and publish on ..." so an article that could not go
+ * live now is never booked for later. Saves the refreshed report when something blocks, so the desk shows why.
+ */
+export async function publishProblems(cur: PostRow): Promise<{ problems: string[]; report: QualityReport }> {
   const problems: string[] = [];
   if (!cur.title.trim()) problems.push("Title is empty.");
   if (countWords(cur.bodyMd) < 200) problems.push("The body is too short to publish.");
   if (!SLUG_RE.test(cur.slug)) problems.push("The slug is not valid.");
   if (!cur.metaDescription.trim()) problems.push("Meta description is empty.");
   if (!cur.category.trim()) problems.push("Pick a category.");
-  const clash = await db.blogPost.findFirst({ where: { slug: cur.slug, id: { not: id } }, select: { id: true } });
+  const clash = await db.blogPost.findFirst({ where: { slug: cur.slug, id: { not: cur.id } }, select: { id: true } });
   if (clash) problems.push("Another article already uses this slug.");
-  const dup = await db.blogPost.findFirst({ where: { id: { not: id }, status: "published", OR: [{ title: cur.title }, { primaryKeyword: cur.primaryKeyword || "\u0000" }] }, select: { title: true } });
+  const dup = await db.blogPost.findFirst({ where: { id: { not: cur.id }, status: "published", OR: [{ title: cur.title }, { primaryKeyword: cur.primaryKeyword || "\u0000" }] }, select: { title: true } });
   if (dup) problems.push(`A live article already covers this ("${dup.title}").`);
   const report = await refreshQuality(cur);
   const blocking = report.checks.filter((c) => c.critical && !c.ok);
   if (blocking.length) problems.push(...blocking.map((c) => c.label + (c.note ? `: ${c.note}` : "")));
-  if (problems.length) {
-    await db.blogPost.update({ where: { id }, data: { qualityReport: JSON.stringify(report), qualityOk: report.ok } });
-    throw new JobError(problems.join(" "), 422);
-  }
-  const now = new Date();
-  const saved = await db.blogPost.update({ where: { id }, data: { status: "published", publishedAt: cur.publishedAt ?? now, publishedBy: admin.login, reviewedBy: admin.login, qualityReport: JSON.stringify(report), qualityOk: true }, include: { sources: true } });
-  await audit(admin, "blog.publish", id, { status: cur.status }, { status: "published", slug: saved.slug });
-  revalidateBlog(saved.slug, saved.category);
-  const base = siteBase();
-  void pingIndexNow([`${base}/blog/${saved.slug}`, `${base}/blog`]).catch((e) => console.warn("[indexnow]", e));
+  if (problems.length) await db.blogPost.update({ where: { id: cur.id }, data: { qualityReport: JSON.stringify(report), qualityOk: report.ok } });
+  return { problems, report };
+}
+
+const SCHEDULE_MAX_MS = 90 * 86_400_000;
+
+/**
+ * R1178 "Approve and publish on ...": a person approves the article for a moment; the blog tick publishes it then.
+ * This is the only way an article goes live without someone clicking Publish at that minute.
+ */
+export async function schedulePost(admin: AdminSession, id: string, at: Date | string, now = new Date()): Promise<BlogPostView> {
+  const when = at instanceof Date ? at : new Date(at);
+  if (!Number.isFinite(when.getTime())) throw new JobError("Pick a valid date and time.");
+  if (when.getTime() <= now.getTime()) throw new JobError("Pick a time in the future.");
+  if (when.getTime() - now.getTime() > SCHEDULE_MAX_MS) throw new JobError("Pick a time within the next 90 days.");
+  const cur = await db.blogPost.findUnique({ where: { id }, include: { sources: true } });
+  if (!cur) throw new JobError("Article not found.", 404);
+  if (cur.status === "published") throw new JobError("This article is already live.", 409);
+  if (cur.status === "rejected") throw new JobError("Restore the article before scheduling it.", 409);
+  const { problems, report } = await publishProblems(cur);
+  if (problems.length) throw new JobError(problems.join(" "), 409);
+  const saved = await db.blogPost.update({ where: { id }, data: { status: "approved", reviewedBy: admin.login, scheduledFor: when, qualityReport: JSON.stringify(report), qualityOk: report.ok }, include: { sources: true } });
+  await audit(admin, "blog.schedule", id, { status: cur.status, scheduledFor: cur.scheduledFor }, { status: "approved", scheduledFor: when });
   return postView(saved);
+}
+
+/** Keeps the approval, drops the date: the article waits for a manual publish. */
+export async function unschedulePost(admin: AdminSession, id: string): Promise<BlogPostView> {
+  const cur = await db.blogPost.findUnique({ where: { id }, include: { sources: true } });
+  if (!cur) throw new JobError("Article not found.", 404);
+  if (cur.status !== "approved" || !cur.scheduledFor) return postView(cur);
+  const saved = await db.blogPost.update({ where: { id }, data: { scheduledFor: null, reviewedBy: admin.login }, include: { sources: true } });
+  await audit(admin, "blog.unschedule", id, { scheduledFor: cur.scheduledFor }, { scheduledFor: null });
+  return postView(saved);
+}
+
+/**
+ * R1178: publishes approved articles whose date has come, as the person who approved them. The date is cleared
+ * before publishing (claim), so two ticks never publish twice and a failing article is not retried every minute.
+ */
+export async function publishDue(now = new Date()): Promise<{ published: string[]; failed: { id: string; reason: string }[] }> {
+  const due = await db.blogPost.findMany({ where: { status: "approved", scheduledFor: { lte: now } }, orderBy: { scheduledFor: "asc" }, take: 10, select: { id: true, title: true, reviewedBy: true } });
+  const out = { published: [] as string[], failed: [] as { id: string; reason: string }[] };
+  for (const p of due) {
+    const claimed = await db.blogPost.updateMany({ where: { id: p.id, status: "approved", scheduledFor: { lte: now } }, data: { scheduledFor: null } });
+    if (!claimed.count) continue;
+    // "marketing" is the lowest role with the content area, which is all publishPost needs.
+    const as: AdminSession = { id: "schedule", name: p.reviewedBy || "Schedule", login: p.reviewedBy || "schedule", role: "marketing" };
+    try {
+      const v = await publishPost(as, p.id);
+      out.published.push(p.id);
+      await adminEvent("blog.published", `Scheduled article "${v.title}" is live`, p.reviewedBy ? `Approved by ${p.reviewedBy}` : undefined, `/blog/${v.slug}`);
+    } catch (e: any) {
+      const reason = String(e?.message ?? e).slice(0, 400);
+      out.failed.push({ id: p.id, reason });
+      await adminEvent("blog.publish_failed", `Scheduled article "${p.title}" did not go live`, `${reason} It stays approved; fix it and publish or pick a new date.`, `/admin/blog/review/${p.id}`);
+    }
+  }
+  return out;
 }
 
 export async function unpublishPost(admin: AdminSession, id: string): Promise<BlogPostView> {

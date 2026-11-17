@@ -48,7 +48,7 @@ describe("1117 one-row website bar", () => {
   test("dense theme switcher keeps a 36px hit area", () => {
     expect(theme).toContain("dense = false");
     expect(theme).toContain('dense ? "relative h-8 w-9 before:absolute before:-inset-y-0.5');
-    expect(theme).toContain('dense ? "p-0.5" : "p-1"');
+    expect(theme).toContain('dense ? "p-0.5 ring-1 ring-inset ring-border" : "p-1"'); // 1179: outlined group, no glass blob
   });
 
   test("focus in the bar is lime, never the purple ring", () => {

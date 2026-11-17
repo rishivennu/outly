@@ -2,7 +2,8 @@ import { z } from "zod";
 import { json, HttpError } from "@/lib/http";
 import { adminRoute, adminEvent } from "@/lib/admin/route";
 import { getConfig, saveConfig } from "@/lib/settings";
-import { BLOG_MODELS, BLOG_TONES, blogConfigIssues, type BlogConfig } from "@/lib/blog/config";
+import { BLOG_MODELS, BLOG_TONES, blogConfigIssues, pruneSkipDates, type BlogConfig } from "@/lib/blog/config";
+import { localDay } from "@/lib/blog/job";
 import { blogReady, blogWebReady } from "@/lib/blog/llm";
 
 export const dynamic = "force-dynamic";
@@ -25,12 +26,15 @@ const Put = z.object({
   paused: z.boolean().optional(),
   model: z.enum(BLOG_MODELS).optional(),
   webResearch: z.boolean().optional(),
+  skipDates: z.array(z.string().trim().max(10)).max(200).optional(),
 });
 
 export const PUT = adminRoute("content", async (req, { admin }) => {
   const patch = Put.parse(await req.json());
   const cur = await getConfig("blog");
   const next: BlogConfig = { ...cur, ...patch, schedule: { ...cur.schedule, ...(patch.schedule ?? {}), autoPublish: false } } as BlogConfig;
+  // R1178: a form that does not know about skipped days keeps them; old days drop off on every save.
+  next.skipDates = pruneSkipDates(patch.skipDates ?? cur.skipDates ?? [], localDay(next.timezone));
   const issues = blogConfigIssues(next);
   if (issues.length) throw new HttpError(400, issues[0], "VALIDATION");
   const saved = await saveConfig("blog", next);

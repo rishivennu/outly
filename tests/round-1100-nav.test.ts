@@ -23,7 +23,7 @@ describe("1100 pulse rail", () => {
   });
   test("tooltips only while collapsed, labels shown when open", () => {
     expect(rail).toContain("open={open && !expanded}");
-    expect(css).toMatch(/html\[data-rail="open"\] \.rail \{ width: 232px;/);
+    expect(css).toMatch(/html\[data-rail="open"\] \.rail \{ width: 240px;/); // 1179: 80 / 240 per the spacing sheet
   });
   test("every dashboard style gets the rail (1103), desktop only", () => {
     expect(nav).toContain("return <PulseRail />;");
@@ -100,7 +100,7 @@ describe("1100 phone drawer", () => {
 describe("1100 review fixes", () => {
   const acct = src("components/shell/AccountMenu.tsx");
   test("rail: 72px collapsed, state read before paint, timer cleared, script icon-free", () => {
-    expect(css).toMatch(/\.rail \{[^}]*width: 72px/);
+    expect(css).toMatch(/\.rail \{[^}]*width: 80px/);
     expect(rail).toContain("useLayoutEffect(() => setOpen(");
     expect(rail).toContain("clearTimeout(settle.current)");
     expect(src("lib/rail.ts")).not.toContain("lucide");

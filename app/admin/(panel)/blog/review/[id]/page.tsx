@@ -21,7 +21,7 @@ export default async function Review(props: { params: Promise<{ id: string }> })
   return (
     <>
       <PageHead eyebrow="Content Studio" title="Review & edit" body="Read it the way a visitor would, fix what needs fixing, then approve. Approve & Publish is the only way an article goes live; the server runs the quality checks again on every save and on publish." />
-      <ReviewDesk initial={post} categories={cfg.categories} allowedLinks={links} siteUrl={env.APP_URL} />
+      <ReviewDesk initial={post} categories={cfg.categories} allowedLinks={links} siteUrl={env.APP_URL} timezone={cfg.timezone} />
     </>
   );
 }

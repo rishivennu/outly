@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/admin/guard";
 import { getConfig } from "@/lib/settings";
 import { blogStats, listPosts, todayBlog } from "@/lib/blog/posts";
+import { localDay } from "@/lib/blog/job";
 import { blogReady } from "@/lib/blog/llm";
 import { Card, CardTitle, Empty, PageHead, Pill, Table, fmtDate } from "@/components/admin/ui";
 import { TodayBlogCard } from "@/components/admin/blog/TodayBlogCard";
@@ -24,7 +25,7 @@ export default async function BlogDashboard() {
         actions={<Link href="/admin/blog/generate" className="inline-flex min-h-11 items-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90">Generate Today's Blog</Link>}
       />
       <div className="mb-5">
-        <TodayBlogCard post={today.post} job={today.job} ready={ready} />
+        <TodayBlogCard post={today.post} job={today.job} ready={ready} skippedToday={(cfg.skipDates ?? []).includes(localDay(cfg.timezone))} />
       </div>
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[

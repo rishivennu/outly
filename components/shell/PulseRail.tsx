@@ -172,12 +172,18 @@ export function PulseRail() {
 
             <div ref={scroller} data-lenis-prevent className="rail-mid nav-scroll">
               <nav className="rail-group" aria-label="Studio">
+                <p className="rail-sec" aria-hidden="true">Studio</p>
                 {studio.map(({ href, label }) => <Row key={href} href={href} label={label} active={isActive(path, href)} />)}
               </nav>
-              <div className="rail-sep" aria-hidden="true" />
-              <div className="rail-group" role="group" aria-label="Workspace">
-                {lower.map(({ href, label }) => <Row key={href} href={href} label={label} active={isActive(path, href)} />)}
-              </div>
+              {lower.length > 0 && (
+                <>
+                  <div className="rail-sep" aria-hidden="true" />
+                  <div className="rail-group" role="group" aria-label="Workspace">
+                    <p className="rail-sec" aria-hidden="true">Workspace</p>
+                    {lower.map(({ href, label }) => <Row key={href} href={href} label={label} active={isActive(path, href)} />)}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="rail-bottom">

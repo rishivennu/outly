@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Captions, Clock, Download, Loader2, Lock, Plus, RotateCcw, Sparkles, Trash2, Type, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
+import { RunCard, transcribeSteps } from "@/components/create/captions/RunCard";
+import { languageName } from "@/lib/captions/languages";
 import { drawCue, recorderType, sampleText } from "@/lib/client/captions";
 import { CAPTION_STYLES, cueAt, toSrt, type CaptionPos, type Cue } from "@/lib/captions/cues";
 import { cn } from "@/lib/utils";
@@ -331,12 +333,18 @@ export function CaptionBurner({ src, file, filename, duration, session, onBurned
             <Button type="button" variant="outline" onClick={() => store.set((s) => ({ typing: !s.typing }))} disabled={working} aria-expanded={typing}>
               <Type className="h-4 w-4" aria-hidden /> Type or paste
             </Button>
-            {(busy?.kind === "transcribe" || busy?.kind === "translate") && <Button type="button" variant="ghost" onClick={() => store.stop()}><X className="h-4 w-4" aria-hidden />Stop</Button>}
+            {busy?.kind === "translate" && <Button type="button" variant="ghost" onClick={() => store.stop()}><X className="h-4 w-4" aria-hidden />Stop</Button>}
           </div>
-          {busy?.kind === "transcribe" && busy.total > 1 && (
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary" role="progressbar" aria-label="Transcribing" aria-valuemin={0} aria-valuemax={busy.total} aria-valuenow={busy.done} aria-valuetext={`${busy.done} of ${busy.total} parts ready`}>
-              <div className="h-full rounded-full bg-lime transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${(busy.done / busy.total) * 100}%` }} />
-            </div>
+          {busy?.kind === "transcribe" && (
+            <RunCard
+              className="mt-4"
+              title={busy.total === 0 ? "Extracting audio" : "Transcribing"}
+              chip={spoken ? languageName(spoken) : undefined}
+              percent={busy.total === 0 ? null : (busy.done / busy.total) * 100}
+              detail={busy.total > 1 ? `${busy.done} of ${busy.total} parts` : busy.total === 1 ? "One part" : undefined}
+              steps={transcribeSteps(busy)}
+              onStop={() => store.stop()}
+            />
           )}
           {aiReady !== false && (
             <CaptionLanguage

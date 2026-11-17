@@ -5,7 +5,8 @@ import { Shell } from "@/components/marketing/bits";
 import { BlogCta } from "@/components/blog/BlogCta";
 import { Breadcrumbs } from "@/components/blog/Breadcrumbs";
 import { JsonLd } from "@/components/blog/JsonLd";
-import { PostGrid } from "@/components/blog/PostCard";
+import Link from "next/link";
+import { pillChip, pillLink, PostGrid } from "@/components/blog/PostCard";
 import { ShareControls } from "@/components/blog/ShareControls";
 import { Toc, tocWorthy } from "@/components/blog/Toc";
 import { renderMarkdown } from "@/lib/blog/markdown";
@@ -64,7 +65,15 @@ export default async function ArticlePage(props: Props) {
         <Shell>
           <Breadcrumbs trail={[{ name: "Blog", href: "/blog" }, ...(catHref ? [{ name: post.category, href: catHref }] : []), { name: post.title }]} />
           <header className="mt-6 max-w-3xl">
-            <h1 className="display text-balance text-[clamp(2.1rem,4.2vw+0.6rem,3.5rem)]">{post.title}</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              {catHref && (
+                <Link href={catHref} className={pillLink}>
+                  {post.category}
+                </Link>
+              )}
+              <span className={pillChip}>{post.readingMin} min read</span>
+            </div>
+            <h1 className="display mt-5 text-balance text-[clamp(2.1rem,4.2vw+0.6rem,3.5rem)]">{post.title}</h1>
             {post.excerpt && <p className="mt-6 text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-lg">{post.excerpt}</p>}
             <p className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-muted-foreground">
               <span>
@@ -82,8 +91,6 @@ export default async function ArticlePage(props: Props) {
                   </span>
                 </>
               )}
-              <span aria-hidden="true">·</span>
-              <span>{post.readingMin} min read</span>
             </p>
           </header>
 
