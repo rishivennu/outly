@@ -144,6 +144,21 @@ export const platformCopyRequestSchema = z.object({
   intent: z.enum(["write", "rewrite"]).default("write"),
 });
 
+/** 1190 "Write once": one message in, every place's caption out. The same words asked again within 30 minutes cost nothing. */
+export const adaptRequestSchema = z.object({
+  text: z.string().trim().min(1).max(4000),
+  platforms: z.array(platformSchema).min(1),
+  longForm: z.boolean().optional(),
+  duration: z.number().nonnegative().max(86_400).nullable().optional(),
+  seen: z.string().max(1500).optional(),
+  transcript: z.string().max(6000).optional(),
+  tone: z.enum(["default", "takeaway", "hook", "professional", "conversational", "shorter"]).optional(),
+  /** Regenerate: skip the 30-minute memory and really write again. */
+  fresh: z.boolean().optional(),
+  /** The creator chose to go ahead with a short message after Pip asked for more. */
+  noClarify: z.boolean().optional(),
+});
+
 export const replySuggestRequestSchema = z.object({
   comment: z.string().trim().min(1).max(2000),
   author: z.string().trim().max(120).default(""),

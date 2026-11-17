@@ -49,10 +49,12 @@ export type PipFooter = { id: PipFooterId; label: string; disabled: boolean; hin
  * Back to editing), so Pip never skips a check the page makes. Closing Pip is a separate button and never
  * finalizes, saves or sends anything.
  */
-export function pipFooter(x: { step: Step; storyOpen: boolean; storyWhy?: string | null; finalized: boolean; canFinalize: boolean; busy?: boolean }): PipFooter {
+export function pipFooter(x: { step: Step; storyOpen: boolean; storyWhy?: string | null; finalized: boolean; canFinalize: boolean; busy?: boolean; composer?: boolean }): PipFooter {
   if (x.step === "video") return { id: "story", label: "Continue to Your Story", disabled: !x.storyOpen, hint: x.storyOpen ? null : (x.storyWhy ?? "Add a video first.") };
   if (x.step === "story") {
     if (x.finalized && !x.canFinalize) return { id: "everywhere", label: "Continue to Everywhere", disabled: false, hint: null };
+    // 1190: the captions are written from the message on the page, so that is what the footer waits for.
+    if (x.composer && !x.canFinalize) return { id: "everywhere", label: "Continue to Everywhere", disabled: true, hint: "Write what your video is about, then press Generate captions with Pip AI." };
     const why = x.busy ? "Writing your hook…" : "Tell me what it's about, then pick a hook.";
     return { id: "finalize", label: "Finalize caption", disabled: !x.canFinalize || !!x.busy, hint: x.canFinalize && !x.busy ? null : why };
   }

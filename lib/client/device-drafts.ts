@@ -59,6 +59,8 @@ export interface DeviceDraft {
   schedule?: { at: string | null; tz: string };
   /** The caption track as the editor holds it. */
   captions?: unknown;
+  /** 1190: what Pip wrote for each place, so "Restore Pip's version" survives a reload. */
+  adapted?: unknown;
 }
 
 export type DeviceDraftInput = Omit<DeviceDraft, "updatedAt" | "videoKey" | "videoType" | "syncState" | "clientKey"> & Partial<Pick<DeviceDraft, "syncState" | "clientKey">>;
@@ -310,6 +312,7 @@ export function openDrafts(userId: string) {
       clientKey: isClientKey(prev?.clientKey) ? prev!.clientKey : isClientKey(d.clientKey) ? d.clientKey : clientKeyFor(d.id),
       ...("schedule" in d ? { schedule: d.schedule } : prev?.schedule !== undefined ? { schedule: prev.schedule } : {}),
       ...("captions" in d ? { captions: d.captions } : prev?.captions !== undefined ? { captions: prev.captions } : {}),
+      ...("adapted" in d ? { adapted: d.adapted } : prev?.adapted !== undefined ? { adapted: prev.adapted } : {}),
     };
     const ok = await run([META, VIDEO], "readwrite", (tx) => {
       const req = tx.objectStore(META).put(record);
@@ -379,6 +382,7 @@ export function openDrafts(userId: string) {
         clientKey: d.clientKey,
         ...(d.schedule !== undefined ? { schedule: d.schedule } : {}),
         ...(d.captions !== undefined ? { captions: d.captions } : {}),
+        ...(d.adapted !== undefined ? { adapted: d.adapted } : {}),
       };
       const ok = await run([META, VIDEO], "readwrite", (tx) => {
         const req = tx.objectStore(META).put(record);

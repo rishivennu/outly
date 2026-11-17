@@ -65,6 +65,8 @@ interface Props {
   captions?: boolean;
   /** The hook picked on Your Story, saved with the draft. The caption is final once there is one. */
   finalHook?: string | null;
+  /** 1190: Step 2 has the write-once composer on the page, so Pip does not ask for the same words again. */
+  composer?: boolean;
   /** Your Story is open (the server has the video), and why not when it isn't. */
   storyOpen?: boolean;
   storyWhy?: string | null;
@@ -157,6 +159,8 @@ export function Assistant(p: Props) {
 
   const vertical = p.meta?.width && p.meta?.height ? p.meta.height > p.meta.width : null;
   const askStory = p.step !== "video" && !p.submittedStory;
+  /** 1190: the message is written on the page now. One box for it, never two. */
+  const ownBox = askStory && !p.composer;
 
   /* 1182: Step 1 facts from the server, caption notes from the real run, and the footer's one lit button. */
   const facts = limitFacts(p.limits ?? null);
@@ -167,7 +171,7 @@ export function Assistant(p: Props) {
   const tweakDirty = editing && !!current && tweak.trim() !== current.text.trim();
   const capBlank = capEdit !== null && !canSaveCaption(capEdit);
   const canFinalize = p.step === "story" && !p.chosenHook && !!current && !!pick && !capBlank;
-  const footer = p.onFooter ? pipFooter({ step: p.step, storyOpen: !!p.storyOpen, storyWhy: p.storyWhy, finalized: !!p.finalHook?.trim(), canFinalize, busy: p.hooks.loading }) : null;
+  const footer = p.onFooter ? pipFooter({ step: p.step, storyOpen: !!p.storyOpen, storyWhy: p.storyWhy, finalized: !!p.finalHook?.trim(), canFinalize, busy: p.hooks.loading, composer: p.composer }) : null;
   const footNote = footer?.id === "finalize" && capBlank ? "Your Original caption is empty. Write it, or press Cancel." : (footer?.hint ?? (footer?.id === "finalize" ? "Uses the hook on show and your Original caption." : null));
   const footNoteId = `${inputId}-foot`;
   /** Saves an open Original edit first, then picks the hook on show: the same onUse as the page, so nothing is skipped. */
@@ -273,7 +277,7 @@ export function Assistant(p: Props) {
         {p.step !== "video" && (
           <Bubble from="outly">
             <span className="display block text-[26px] leading-[1.05] tracking-[-0.035em]">What&apos;s this video about?</span>
-            {askStory && <span className="mt-2 block text-sm text-muted-foreground">A sentence or two is plenty. Tell it the way you&apos;d tell a friend.</span>}
+            {askStory && <span className="mt-2 block text-sm text-muted-foreground">{p.composer ? "Write it in the box on the page, then press Generate captions. I'll adapt it to every place you post." : "A sentence or two is plenty. Tell it the way you'd tell a friend."}</span>}
           </Bubble>
         )}
 
@@ -326,7 +330,7 @@ export function Assistant(p: Props) {
           </motion.div>
         )}
 
-        {askStory && !p.story && (!p.watch || p.watch.kind === "idle" || p.watch.kind === "failed") && (
+        {ownBox && !p.story && (!p.watch || p.watch.kind === "idle" || p.watch.kind === "failed") && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="flex flex-col items-start gap-1.5" role="group" aria-label="Story ideas">
             {EXAMPLES.map((e) => (
               <button key={e} type="button" onClick={() => p.onStory(e)} className="min-h-[44px] max-w-full rounded-2xl px-3.5 py-2 text-left text-[13px] leading-snug text-muted-foreground hairline transition hover:bg-secondary hover:text-foreground motion-reduce:transition-none">
@@ -567,7 +571,7 @@ export function Assistant(p: Props) {
         <div ref={end} />
       </div>
 
-      {askStory && (
+      {ownBox && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
