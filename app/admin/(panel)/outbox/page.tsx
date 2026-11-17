@@ -14,7 +14,7 @@ export default async function Outbox() {
       <PageHead
         eyebrow="Support"
         title="Email outbox"
-        body={cfg.provider === "mock" ? "Email is in Mock mode: everything Outlly would send is captured here instead of being delivered. Switch to Resend in Integrations to send for real." : "Every email Outlly sent through Resend, with delivery status."}
+        body={cfg.provider === "mock" ? "Mock mode: email is captured here, not delivered. Switch to Resend in Integrations." : "Every email Outlly sent through Resend, with delivery status."}
       />
       <OutboxView rows={rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }))} />
     </>

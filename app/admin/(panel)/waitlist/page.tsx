@@ -52,7 +52,7 @@ export default async function WaitlistAdminPage(props: { searchParams: Promise<S
       <PageHead
         eyebrow="Setup"
         title="Waitlist"
-        body="One switch pauses new signups. Every “Start creating” button becomes “Join the waitlist”, /signup shows the waitlist page, and you invite people in when you're ready. The list below is always available, on or off."
+        body="One switch pauses new signups. The list below is always available."
         actions={<RefreshButton total={counts.total} noun="people" loadedAt={new Date().toISOString()} />}
       />
       <AutoRefresh />

@@ -21,7 +21,7 @@ export default async function BlogDashboard() {
       <PageHead
         eyebrow="Content Studio"
         title="Blog"
-        body={`One article a day about a real creator problem, written and checked by the agent, published only when you approve it. ${cfg.paused ? "Scheduled runs are paused." : sched.enabled ? `The next scheduled run starts at ${sched.startTime} ${cfg.timezone} and should be ready by ${sched.readyBy}.` : "Scheduled runs are off; use Generate when you want one."}`}
+        body={`One article a day, published only when you approve it. ${cfg.paused ? "Scheduled runs are paused." : sched.enabled ? `The next scheduled run starts at ${sched.startTime} ${cfg.timezone} and should be ready by ${sched.readyBy}.` : "Scheduled runs are off; use Generate when you want one."}`}
         actions={<Link href="/admin/blog/generate" className="inline-flex min-h-11 items-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90">Generate Today's Blog</Link>}
       />
       <div className="mb-5">

@@ -35,7 +35,7 @@ export default async function RetentionPage(props: { searchParams: Promise<{ f?:
       <PageHead
         eyebrow="Run"
         title="At risk"
-        body="Creators likely to leave, scored from what they actually do: posting less, going quiet, failed posts, a signed-out account, a paused or cancelling plan. Paying creators weigh a little more."
+        body="Creators likely to leave, scored from what they actually do."
       />
 
       <EnterRoot>

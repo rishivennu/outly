@@ -14,7 +14,7 @@ export default async function LandingAdminPage() {
       <PageHead
         eyebrow="Setup"
         title="Landing page"
-        body="Choose what visitors see on the home page. Each switch saves at once and the page follows within about 15 seconds. Hidden sections also drop out of the nav and footer links."
+        body="Choose what visitors see on the home page. Each switch saves at once."
       />
       <LandingToggles initial={landing} />
     </>

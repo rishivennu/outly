@@ -27,7 +27,7 @@ export default async function Tickets(props: { searchParams: Promise<{ s?: strin
   rows.sort((a, b) => (PRIO[a.priority] - PRIO[b.priority]) || (s === "active" ? +a.createdAt - +b.createdAt : 0));
   return (
     <>
-      <PageHead eyebrow="Support" title="Tickets" body="Raised automatically when Pip can't answer twice or someone asks for a person. Money questions are marked urgent. The customer already has an email with their ticket number." />
+      <PageHead eyebrow="Support" title="Tickets" body="Raised when Pip can't answer twice or someone asks for a person." />
       <Card>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <FilterChips param="s" current={s} options={[{ value: "active", label: "Needs action" }, { value: "open", label: "Open" }, { value: "pending", label: "Waiting on customer" }, { value: "resolved", label: "Resolved" }, { value: "", label: "All" }]} />

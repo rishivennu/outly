@@ -14,7 +14,7 @@ export default async function BlogCalendarPage() {
   const [calendar, topics, cfg] = await Promise.all([calendarMonth(), backlogTopics(), getConfig("blog")]);
   return (
     <>
-      <PageHead eyebrow="Content Studio" title="Calendar" body="Every run, draft and published article on the day it happened, with the daily run marked. Pick a day to generate for it, skip it, or move an approved article. Nothing goes live without a person approving it." />
+      <PageHead eyebrow="Content Studio" title="Calendar" body="Every run, draft and published article, by day." />
       <div className="grid gap-5">
         <BlogCalendar initial={calendar} ready={blogReady()} />
         <TopicBacklog initial={topics} categories={cfg.categories} />

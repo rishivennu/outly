@@ -15,7 +15,7 @@ export default async function MascotAdminPage() {
       <PageHead
         eyebrow="Setup"
         title="Mascot colours"
-        body="Pip keeps the same look everywhere; only the colours change. Give each moment its own colourway, for example gold when someone hits a goal or ember inside the streak flame. Each pick saves at once."
+        body="Give each moment its own Pip colourway. Each pick saves at once."
       />
       <MascotPicker initial={mascot} />
     </>

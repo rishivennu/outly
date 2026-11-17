@@ -10,7 +10,7 @@ export default async function Faq() {
   const items = await listFaq({ all: true });
   return (
     <>
-      <PageHead eyebrow="Support" title="FAQ & knowledge base" body={<>Shown on <a href="/help" target="_blank" className="underline underline-offset-4">/help</a> and used by Pip to answer chat questions, so a good answer here means fewer tickets. Changes are live immediately.</>} />
+      <PageHead eyebrow="Support" title="FAQ & knowledge base" body={<>Shown on <a href="/help" target="_blank" className="underline underline-offset-4">/help</a> and used by Pip. Changes are live at once.</>} />
       <FaqEditor categories={[...FAQ_CATEGORIES]} initial={items.map((i) => ({ id: i.id, category: i.category, question: i.question, answer: i.answer, published: i.published, sortOrder: i.sortOrder }))} />
     </>
   );

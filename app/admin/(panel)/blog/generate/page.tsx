@@ -20,7 +20,7 @@ export default async function Generate() {
   ]);
   return (
     <>
-      <PageHead eyebrow="Content Studio" title="Generate blog" body="One click runs the whole thing: topic, research, outline, two drafting passes, SEO set, quality check. Each stage reports when it is really done; there is no made-up progress bar. The article lands in Pending approval, never straight on the site." />
+      <PageHead eyebrow="Content Studio" title="Generate blog" body="One click: topic, research, outline, drafts, SEO, quality check. It lands in Pending approval." />
       <GenerateDesk initial={{ running: running ? toView(running) : null, jobs, ready: blogReady(), web: blogWebReady() }} history={history} timezone={cfg.timezone} today={todayIn(cfg.timezone)} />
     </>
   );

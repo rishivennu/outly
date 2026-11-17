@@ -18,7 +18,7 @@ export default async function Integrations() {
       <PageHead
         eyebrow="Setup"
         title="Integrations"
-        body="Switch payment gateways and email providers here, no code or redeploy. Keys are encrypted in the database and never shown again after saving. Mock is on by default so you can test everything safely."
+        body="Switch payment gateways and email providers. Keys are encrypted and never shown again."
       />
       <IntegrationsForm payments={redact("payments", p)} email={redact("email", e)} webhooks={{ stripe: `${base}/api/billing/webhooks/stripe`, razorpay: `${base}/api/billing/webhooks/razorpay`, paypal: `${base}/api/billing/webhooks/paypal`, youpi: `${base}/api/billing/webhooks/youpi` }} />
       <div className="mt-5">

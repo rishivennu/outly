@@ -15,7 +15,7 @@ export default async function Subscriptions() {
       <PageHead
         eyebrow="Run"
         title="Subscriptions"
-        body="First-time and returning prices, the 7-day trial, repeat-offer checks and the margin on every paying subscriber. Prices are snapshotted when someone buys, so nothing here re-prices an existing subscriber."
+        body="Prices, the 7-day trial, and the margin on every paying subscriber."
       />
       <SubscriptionsAdmin target={target} openFlags={openFlags} />
     </>

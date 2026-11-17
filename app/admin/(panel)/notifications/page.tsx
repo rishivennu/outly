@@ -43,7 +43,7 @@ export default async function AdminNotificationsPage() {
       <PageHead
         eyebrow="Setup"
         title="Notifications"
-        body={`Everything Outlly says to creators, and why. Two units appear on this page and they are never mixed: a notification is one decision for one creator; a channel attempt is one channel's outcome for it (the bell, web push, the Android app or email). The last ${over.days} days unless a card says otherwise. Creators keep their own switches; nothing here overrides what somebody asked for, it only decides when and how loudly Outlly speaks.`}
+        body={`Everything Outlly says to creators, and why. The last ${over.days} days unless a card says otherwise.`}
       />
 
       <EnterRoot>
@@ -110,7 +110,7 @@ export default async function AdminNotificationsPage() {
 
         {n.byCategory.length > 0 && (
           <Card data-enter className="mb-4">
-            <CardTitle hint="Notifications are decisions per creator; the attempt columns split each group's channel attempts by what happened. The attempt columns add up to the group's attempts, never to its notifications.">By group</CardTitle>
+            <CardTitle hint="A notification is one decision for one creator; a channel attempt is one channel's outcome for it (the bell, web push, the Android app or email). The attempt columns split each group's channel attempts by what happened. The attempt columns add up to the group's attempts, never to its notifications.">By group</CardTitle>
             <Table label="Notifications by group" head={["Group", "Notifications", "Attempts", "Accepted", "Held back", "Failed", "Waiting"]}>
               {n.byCategory.map((c) => (
                 <tr key={c.id || "other"}>

@@ -22,7 +22,7 @@ export default async function Pricing() {
       <PageHead
         eyebrow="Run"
         title="Pricing"
-        body="Edit a plan and save: the website, checkout and billing page use the new price on the very next request. People already subscribed keep the price they paid until they change plan."
+        body="Edit a plan and save. People already subscribed keep the price they paid."
       />
       <PricingEditor
         display={display}

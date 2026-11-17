@@ -38,7 +38,7 @@ export default async function AiUsage(props: { searchParams: Promise<Params> }) 
   ];
   return (
     <>
-      <PageHead eyebrow="Run" title="AI usage" body="AI calls by feature, people close to their monthly AI limit, and every Unlimited AI Access grant. Usage is counted for everyone, including calls an Unlimited grant covered." />
+      <PageHead eyebrow="Run" title="AI usage" body="AI calls by feature, who is near their limit, and every Unlimited grant." />
       <Card className="mb-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
           <SearchBox placeholder="Search name or email" />

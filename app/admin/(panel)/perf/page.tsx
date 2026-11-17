@@ -58,7 +58,7 @@ export default async function PerfPage() {
       <PageHead
         eyebrow="Setup"
         title="Startup speed"
-        body="How long the studio takes to appear on real devices: first byte, first paint, largest paint, layout shift, hydration and the first Home card, plus the server's own timings. Cold = first load of an app session. Nothing here identifies a person."
+        body="How long the studio takes to appear on real devices. Cold = first load of a session."
       />
       <Window title="Last 24 hours" sum={day} />
       <Window title="Last 7 days" sum={week} />

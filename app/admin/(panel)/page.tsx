@@ -43,7 +43,7 @@ export default async function Overview(props: { searchParams: Promise<{ denied?:
       <PageHead
         greet={<Greeting name={admin.name.split(" ")[0]} />}
         title="How Outlly is doing"
-        body={`${o.sample ? "Showing sample data mixed with real data. Clear it from here before you share numbers." : "Numbers from the database, worked out when you opened the page and shared between admins for 20 seconds."} Active means a user opened the studio that day. Last updated ${new Date(o.at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC. The globe below is the one live part: it refreshes itself.`}
+        body={`${o.sample ? "Showing sample data mixed with real data. Clear it here before you share numbers. " : ""}Last updated ${new Date(o.at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC. The globe refreshes itself.`}
         actions={admin.role === "super" ? <SampleData hasSample={o.sample} /> : undefined}
       />
       {searchParams.denied && (

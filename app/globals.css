@@ -4008,6 +4008,30 @@ html.theme-anim *::after {
 @media (hover: hover) { .admin-tipwrap:hover > .admin-tip { display: block; opacity: 1; } }
 /* Belt and braces: nothing inside the panel may widen the page sideways. */
 .admin-root { overflow-x: clip; }
+
+/* 1186: the panel read harsh. Two causes, both admin-only (marketing pages and the studio keep their
+   own contrast): near-white ink on near-black charcoal, and display headings at weight 700 with -3%
+   tracking, which closes the counters up on Bricolage. Ink drops one step, display weight caps at 600
+   and tracking relaxes. Contrast still clears AA by a wide margin: dark ink ~15:1, dark muted ~6.3:1,
+   light ink ~12:1, light muted ~6.2:1. Buttons keep --primary, so calls to action stay strong. */
+.admin-root {
+  --foreground: 222 16% 19%;
+  --muted-foreground: 218 11% 38%;
+}
+.dark .admin-root {
+  --foreground: 40 20% 90%;
+  --muted-foreground: 40 6% 60%;
+}
+.admin-root h1, .admin-root h2, .admin-root h3, .admin-root h4 {
+  font-weight: 600;
+  letter-spacing: -0.008em;
+}
+/* .admin-root .font-display beats a bare Tailwind tracking/weight utility on specificity alone, so no
+   !important: one lever for every big number in the panel without touching 23 components. */
+.admin-root .font-display { letter-spacing: -0.012em; }
+.admin-root .font-display.font-bold,
+.admin-root .font-display.font-extrabold,
+.admin-root .font-display.font-black { font-weight: 600; }
 /* Slim sidebar: the nav scroller would clip a tooltip, so AdminShell draws one fixed tooltip outside it. */
 .admin-tip--fixed { display: block; position: fixed; left: auto; bottom: auto; opacity: 1; translate: 0 -50%; white-space: nowrap; }
 

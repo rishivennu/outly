@@ -20,7 +20,7 @@ export default async function PlatformsAdmin() {
       <PageHead
         eyebrow="Setup"
         title="Social platforms"
-        body="Paste each platform's developer app keys here. The moment a platform has both keys, creators see it in the studio and can connect it. Secrets are encrypted in the database and never shown again after saving."
+        body="Paste each platform's app keys. With both keys set, creators can connect it."
       />
       <PlatformKeysForm keys={keys} live={live} base={base} dm={dm} />
     </>

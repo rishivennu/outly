@@ -13,7 +13,7 @@ export default async function BetaAdminPage() {
       <PageHead
         eyebrow="Setup"
         title="Beta program"
-        body="One switch shows or hides every “beta” mention on the site. While it's on, the first members you choose get a one-time code for a free stretch of a paid plan."
+        body="Show or hide every beta mention, and pick who gets an early-access code."
       />
       <BetaPanel initial={await betaState()} />
     </>

@@ -34,7 +34,7 @@ export default async function GrowthPage(props: { searchParams: Promise<{ r?: st
       <PageHead
         eyebrow="Run"
         title="Growth"
-        body="Where people drop off between hearing about Outlly and paying for it, who to nudge next, and which channels bring creators who stay."
+        body="Where people drop off, and which channels bring creators who stay."
         actions={<FilterChips param="r" current={r === "90" ? "" : r} options={[{ value: "30", label: "30 days" }, { value: "", label: "90 days" }, { value: "all", label: "All time" }]} glide />}
       />
 

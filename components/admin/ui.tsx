@@ -10,8 +10,8 @@ export function PageHead({ eyebrow, greet, title, body, actions }: { eyebrow?: s
       <div className="min-w-0">
         {greet && <div className="mb-3">{greet}</div>}
         {eyebrow && <p className="eyebrow mb-2 text-[11px]">{eyebrow}</p>}
-        <h1 className="font-display text-[clamp(1.6rem,3vw,2.2rem)] font-bold leading-tight tracking-[-0.03em]">{title}</h1>
-        {body && <p className="mt-2 max-w-2xl text-[14.5px] leading-relaxed text-muted-foreground">{body}</p>}
+        <h1 className="font-display text-[clamp(1.45rem,2.6vw,1.9rem)] font-semibold leading-[1.18]">{title}</h1>
+        {body && <p className="mt-1.5 max-w-xl text-[13.5px] leading-[1.6] text-muted-foreground">{body}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>

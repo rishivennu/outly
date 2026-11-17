@@ -19,7 +19,7 @@ export default async function DashboardStyleAdminPage() {
       <PageHead
         eyebrow="Setup"
         title="Dashboard style"
-        body="Pick which studio dashboard people see after they sign in: the classic Home, or the analytics dashboard. You can also let each person choose for themselves, and set when phones are offered Outlly on their Home Screen and what they see the first time they open it from there."
+        body="Pick which dashboard people see after they sign in, and what phones are offered."
       />
       <div className="grid gap-5">
         <DashboardStylePicker initial={cfg} />

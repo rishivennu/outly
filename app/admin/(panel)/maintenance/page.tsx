@@ -14,7 +14,7 @@ export default async function MaintenancePage() {
       <PageHead
         eyebrow="Setup"
         title="Maintenance mode"
-        body="One switch closes the site to new visitors and shows a 'back soon' page with a live countdown where they can leave their email. Members who joined before it started keep working and posting, and you can still use everything. Turning it off emails everyone who asked."
+        body="Close the site to new visitors and show a 'back soon' page. Members keep working."
       />
       <MaintenanceToggle initial={site} subscribers={subscribers} />
     </>

@@ -32,7 +32,7 @@ export function AdminKpi({ label, value, sub, change, invert, tone, spark, i = 0
         {hint && <Hint text={hint} label={`How ${label} is counted`} />}
       </p>
       <div className="mt-2 flex min-w-0 items-end justify-between gap-3">
-        {unavailable ? <Unavailable reason={unavailable} /> : <RollingNumber value={value} className={cn("block min-w-0 font-display text-[1.85rem] font-bold leading-none tracking-[-0.03em] tabular", tone === "bad" && "text-destructive")} />}
+        {unavailable ? <Unavailable reason={unavailable} /> : <RollingNumber value={value} className={cn("block min-w-0 font-display text-[1.75rem] font-semibold leading-none tabular", tone === "bad" && "text-destructive")} />}
         {!unavailable && spark && spark.length > 1 && (
           <div className="w-[42%] max-w-[110px] shrink-0">
             <Sparkline data={spark} tone={trendTone(spark, invert)} delay={0.1 + i * 0.045} />

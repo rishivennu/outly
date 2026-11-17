@@ -16,7 +16,7 @@ export default async function PlanGrantsPage(props: { searchParams: Promise<{ em
       <PageHead
         eyebrow="Run"
         title="Plan grants"
-        body="Give someone Creator, Studio or Pro for a set time, by email. Extend, change or revoke it later. Every change is logged with who made it."
+        body="Give someone Creator, Studio or Pro for a set time, by email."
       />
       <PlanGrantsPanel
         plans={plans.filter((p) => p.priceMinor > 0).map((p) => ({ slug: p.slug, name: p.name }))}

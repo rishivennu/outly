@@ -31,7 +31,7 @@ export default async function Payments(props: { searchParams: Promise<{ status?:
       <PageHead
         eyebrow="Run"
         title="Payments & invoices"
-        body={<>Refunds go back through the same gateway and end the plan immediately. Invoices are created automatically the moment a payment succeeds and emailed to the customer. Gateway: <b className="text-foreground">{gw.provider === "mock" ? "Mock (test)" : `${gw.provider} · ${gw.cfg.mode}`}</b>{gw.misconfigured && <span className="text-warning"> (your chosen gateway is missing keys, so checkout is using Mock)</span>}.</>}
+        body={<>Refunds go back through the same gateway and end the plan at once. Gateway: <b className="text-foreground">{gw.provider === "mock" ? "Mock (test)" : `${gw.provider} · ${gw.cfg.mode}`}</b>{gw.misconfigured && <span className="text-warning"> (your chosen gateway is missing keys, so checkout is using Mock)</span>}.</>}
       />
       <Card>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

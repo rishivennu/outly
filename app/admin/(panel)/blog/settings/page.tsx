@@ -11,7 +11,7 @@ export default async function BlogSettings() {
   const cfg = await getConfig("blog");
   return (
     <>
-      <PageHead eyebrow="Content Studio" title="Blog settings" body="Who the writer is talking to, how it sounds, when it runs, and what it must never write about. Auto-publish does not exist on purpose: a person approves every article." />
+      <PageHead eyebrow="Content Studio" title="Blog settings" body="Audience, tone, schedule, and the topics it must never write about." />
       <BlogSettingsForm initial={cfg} ready={blogReady()} web={blogWebReady()} modelLabel={blogModelLabel()} />
     </>
   );

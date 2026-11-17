@@ -145,7 +145,7 @@ export default async function AnalyticsPage(props: { searchParams: Promise<{ d?:
     const r = await outllyAnalytics(win);
     return (
       <>
-        <PageHead title="Analytics" body="Outlly's own records: every account and post counts, no cookies needed. Visitors who never sign up are only in PostHog. The two sources are shown one at a time and never added together." />
+        <PageHead title="Analytics" body="Outlly's own records, never added together with PostHog." />
         <AdminFilterBar label="Analytics filters" meta={<ReportMeta source="Outlly data" range={windowLabel(win)} tz={r.timezone} updatedAt={r.generatedAt} />}>
           {source}
           {range}
@@ -174,7 +174,7 @@ export default async function AnalyticsPage(props: { searchParams: Promise<{ d?:
   if (!report.connected) {
     return (
       <>
-        <PageHead title="Analytics" body="Site traffic and the signup funnel, from PostHog. Switch to Outlly data for numbers from Outlly's own records." actions={open} />
+        <PageHead title="Analytics" body="Site traffic and the signup funnel, from PostHog." actions={open} />
         {bar}
         <Card>
           <Empty title="PostHog is not connected" body={`The reports need ${report.missing.join(" and ")} set in the server environment, then a redeploy. No PostHog numbers are shown until then.`}>
@@ -191,7 +191,7 @@ export default async function AnalyticsPage(props: { searchParams: Promise<{ d?:
   const { daily, signups, funnel, pages, referrers, countries } = report;
   return (
     <>
-      <PageHead title="Analytics" body={`Site traffic from PostHog, which only counts visitors who accepted analytics cookies. These numbers are never added to Outlly data, so nobody is counted twice.`} actions={open} />
+      <PageHead title="Analytics" body="Site traffic from PostHog: visitors who accepted analytics cookies." actions={open} />
       {bar}
       {note}
 

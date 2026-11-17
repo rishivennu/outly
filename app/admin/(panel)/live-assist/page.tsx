@@ -13,7 +13,7 @@ export default async function LiveAssist() {
       <PageHead
         eyebrow="Support"
         title="Live Assist"
-        body="Customers who asked Pip for a person wait here. Accept one to chat; Pip stays quiet until you hand the chat back or resolve it."
+        body="Customers waiting for a person. Accept one to chat; Pip stays quiet until you resolve it."
       />
       <LiveAssistConsole me={{ id: a.id, name: a.name }} role={a.role} />
     </>

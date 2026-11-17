@@ -10,7 +10,7 @@ export default async function BlogLibrary() {
   const posts = await listPosts({ take: 300 });
   return (
     <>
-      <PageHead eyebrow="Content Studio" title="Library" body="Every article the agent has written: pending, published and rejected. Open one to read, edit, publish or take it offline." />
+      <PageHead eyebrow="Content Studio" title="Library" body="Every article the agent has written. Open one to edit, publish or take it offline." />
       <Library posts={posts} />
     </>
   );

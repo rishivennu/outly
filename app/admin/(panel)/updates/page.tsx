@@ -14,7 +14,7 @@ export default async function UpdatesPage() {
       <PageHead
         eyebrow="Setup"
         title="Update notice"
-        body="After you ship changes, tell members what moved. Publishing shows this card once to everyone who joined before it, the next time they open their dashboard, with a button to tell you if anything feels off. Those messages arrive in Tickets."
+        body="Tell members what moved after you ship. Their replies arrive in Tickets."
       />
       <UpdatesEditor initial={notice} />
     </>

@@ -13,7 +13,7 @@ export default async function CampaignsAdminPage() {
       <PageHead
         eyebrow="Run"
         title="Offers"
-        body="Flash sales and promo offers. The popup shows once per visit to people the offer fits, priced from the live plan price; checkout checks the offer again and the invoice lists it as a discount."
+        body="Flash sales and promo offers, priced from the live plan price."
       />
       <CampaignsPanel initial={await campaignsState()} />
     </>

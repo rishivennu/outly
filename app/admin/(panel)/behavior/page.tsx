@@ -30,7 +30,7 @@ export default async function BehaviorPage(props: { searchParams: Promise<{ rang
       <PageHead
         eyebrow="Insights"
         title="User behavior"
-        body={stats.sample ? "Includes sample users. Clear sample data on the Overview before you share these numbers." : "How people use Outlly: where they drop off, who comes back and how often. Every number is from Outlly's own records in UTC days; hover the i beside a number to see how it is counted."}
+        body={stats.sample ? "Includes sample users. Clear sample data on the Overview before you share these numbers." : "Where people drop off, who comes back, and how often."}
       />
       <BehaviorView stats={stats} history={history} selected={selected} tab={searchParams.tab === "ai" ? "ai" : "breakdown"} aiReady={aiReady()} />
     </>
