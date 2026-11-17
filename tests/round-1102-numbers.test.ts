@@ -154,9 +154,12 @@ describe("1102 wiring", () => {
 });
 
 describe("1102 zoom lock", () => {
-  test("viewport never scales", () => {
+  // 1192: accidental zoom stays off (double tap, focusing a field) but pinch is allowed again: blocking it
+  // fails WCAG 1.4.4 and axe calls it critical on every page.
+  test("the viewport allows pinch zoom and nothing else scales the page", () => {
     const l = src("app/layout.tsx");
-    expect(l).toMatch(/Promise<Viewport> \{\s*return \{[^}]*maximumScale: 1, userScalable: false/); // 1108: generateViewport (theme cookie)
+    expect(l).toMatch(/Promise<Viewport> \{\s*return \{[^}]*maximumScale: 5, userScalable: true/); // 1108: generateViewport (theme cookie)
+    expect(l).not.toContain("userScalable: false");
     expect(l).toContain('viewportFit: "cover"');
   });
   test("no double-tap zoom; phone fields at least 16px", () => {

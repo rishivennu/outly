@@ -80,9 +80,12 @@ export const metadata: Metadata = {
   applicationName: "Outlly",
 };
 
-// Round 1 (1102): an app, not a page, so phones never zoom (pinch, double tap or focusing a field). The user asked
-// for it; iOS Safari still allows pinch whatever this says, and every field is 16px on phones (globals.css), so
-// nothing needs zooming to read or type.
+// Round 1 (1102): an app, not a page, so phones never zoom by accident. Double tap is still blocked by
+// `html { touch-action: manipulation }` and focusing a field never zooms because every phone field is 16px
+// (both in globals.css), which is what made the page feel like an app.
+// 1192: pinch zoom is allowed again (maximumScale 5, userScalable true). Blocking it fails WCAG 1.4.4 and axe
+// flags it critical on every page, iOS Safari ignored it anyway, and it is the one zoom a low-vision reader
+// actually asks for. The two that made the app feel like a page are still off, so nothing moved by accident.
 // 1105: one theme-color, the dark page background (the default theme). The head script (lib/theme/script.ts) runs
 // right after this tag and swaps it to the saved theme before the first paint; ThemeToggle keeps it in step after.
 // Not a light/dark media pair: that follows the phone's setting, not the theme picked inside Outlly.
@@ -90,32 +93,35 @@ export const metadata: Metadata = {
 // app reads it as the page arrives. Root layout reads headers() for the nonce, so every page renders per request
 // anyway and reading the cookie costs nothing. Public pages override it for their own light background.
 export async function generateViewport(): Promise<Viewport> {
-  return { width: "device-width", initialScale: 1, maximumScale: 1, userScalable: false, themeColor: themeColorFor((await cookies()).get(THEME_COOKIE)?.value), viewportFit: "cover" };
+  return { width: "device-width", initialScale: 1, maximumScale: 5, userScalable: true, themeColor: themeColorFor((await cookies()).get(THEME_COOKIE)?.value), viewportFit: "cover" };
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // The Content Security Policy only runs scripts carrying this request's nonce (set by middleware.ts).
+  // 1192: the browser hides a script's nonce attribute once it has parsed it (so a stolen nonce can't be read back
+  // out of the DOM), which means React hydrates and finds nonce="" where the server sent a value. The scripts are
+  // fine and already ran; suppressHydrationWarning silences the one warning that reported it on every page.
   // Perf: themeCss comes from the shared data cache and answers the defaults on any failure, so the first byte never waits on the database.
   const [nonce, theme] = await Promise.all([headers().then((h) => h.get("x-nonce") ?? undefined), themeCss()]);
   return (
     <html lang="en" className={`dark ${display.variable} ${body.variable} ${classicDisplay.variable} ${classicBody.variable} ${serif.variable} ${gopher.variable} ${jakarta.variable} ${fraunces.variable} ${archivo.variable} ${tinos.variable} ${rubik.variable} ${spaceMono.variable}`} suppressHydrationWarning>
       <head>
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
         {/* 1079: a tab left open across a deploy reloads once instead of hanging on a chunk the new build dropped. */}
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: chunkScript }} />
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: chunkScript }} />
         {/* Inside the Android app: mark <html> before first paint so the app layout (app/mobile-app.css) never flashes the web one. */}
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: appScript }} />
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: appScript }} />
         {/* Pulse rail open or closed (1100), before paint so the page column never jumps. */}
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: railScript }} />
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: railScript }} />
         {/* First launch from the Home Screen (1100): paint the welcome first, never a flash of the dashboard. After appScript. */}
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: welcomeScript }} />
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: welcomeScript }} />
         {/* 1099: keep the browser's one-time install prompt for the studio's "Add to Home Screen" card. */}
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: installCaptureScript }} />
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: installCaptureScript }} />
         {/* Perf: register the service worker on load (production only), so the second launch already has the app shell. */}
-        {swScript && <script nonce={nonce} dangerouslySetInnerHTML={{ __html: swScript }} />}
+        {swScript && <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: swScript }} />}
         {/* Landing sections the admin hid (readable hint cookie set by middleware): mark <html> before the
             first paint so CSS drops their nav and footer links at once, instead of a link flashing in and out. */}
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `try{var m=document.cookie.match(/(?:^|; )outlly_lh=([^;]*)/);if(m)document.documentElement.setAttribute("data-lh",decodeURIComponent(m[1]).split(".").join(" "))}catch(e){}` }} />
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: `try{var m=document.cookie.match(/(?:^|; )outlly_lh=([^;]*)/);if(m)document.documentElement.setAttribute("data-lh",decodeURIComponent(m[1]).split(".").join(" "))}catch(e){}` }} />
         {/* Pip colourways (Admin > Mascot colours) and the site font set (Admin > Site fonts). Tiny, cached;
             without it Pip is Indigo and the fonts are the originals. */}
         {/* 1113: inlined (about 2 KB) instead of a render-blocking /api/pip-theme request on every first paint. */}

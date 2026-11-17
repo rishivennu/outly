@@ -143,12 +143,12 @@ describe("1163 pages", () => {
     expect(moneyBranch).toContain('label="Active subscriptions"');
     expect(page).toContain('compare="the 30 days before"');
   });
-  test("Overview trends: table view and all-zero state on every chart, 12px axis labels", () => {
+  test("Overview trends: table view and all-zero state on every chart, 13px axis labels (1165)", () => {
     const c = read("components/admin/OverviewCharts.tsx");
     expect(c).toContain("AdminChartCard");
     expect((c.match(/allZero=\{zero\(/g) ?? []).length).toBe(4);
     expect((c.match(/table=\{tbl\(/g) ?? []).length).toBe(4);
-    expect(c).toContain("fontSize: 12");
+    expect(c).toContain("fontSize: 13"); // 1165 raised the axis from 12 to 13 for readability
     expect(c).not.toContain("fontSize: 11");
   });
   test("emails are masked on the server for non-super roles", async () => {

@@ -152,7 +152,7 @@ describe("1099 head script", () => {
   });
   test("root layout runs it with the CSP nonce, and iOS web-app metadata is set", () => {
     const l = src("app/layout.tsx");
-    expect(l).toContain("<script nonce={nonce} dangerouslySetInnerHTML={{ __html: installCaptureScript }} />");
+    expect(l).toContain("<script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: installCaptureScript }} />"); // 1192: nonce is hidden from the DOM, so hydration must not warn
     expect(l).toMatch(/appleWebApp: \{ capable: true, title: "Outlly"/);
   });
 });
