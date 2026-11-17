@@ -58,7 +58,30 @@ export function postView(p: PostRow): BlogPostView {
 export async function getPost(id: string): Promise<BlogPostView> {
   const p = await db.blogPost.findUnique({ where: { id }, include: { sources: { orderBy: { accessedAt: "asc" } } } });
   if (!p) throw new JobError("Article not found.", 404);
+  // R1180: a draft's automatic checks are re-run on open, so a report saved under older rules never blocks by mistake.
+  if (p.status !== "published" && p.qualityReport) {
+    const report = await refreshQuality(p);
+    const next = JSON.stringify(report);
+    if (next !== p.qualityReport) return postView(await db.blogPost.update({ where: { id }, data: { qualityReport: next, qualityOk: report.ok }, include: { sources: { orderBy: { accessedAt: "asc" } } } }));
+  }
   return postView(p);
+}
+
+/**
+ * R1180: the admin opened a source and confirmed it backs the claim (or takes that back). Only live search results
+ * are verified automatically; this is the human check the quality report asks for. Audit-logged, checks re-run.
+ */
+export async function verifySource(admin: AdminSession, id: string, sourceId: string, verified: boolean): Promise<BlogPostView> {
+  const src = await db.blogSource.findFirst({ where: { id: sourceId, postId: id } });
+  if (!src) throw new JobError("That source is not part of this article.", 404);
+  if (src.verified !== verified) {
+    await db.blogSource.update({ where: { id: sourceId }, data: { verified } });
+    await audit(admin, verified ? "blog.source.verify" : "blog.source.unverify", id, { url: src.url, verified: src.verified }, { url: src.url, verified });
+  }
+  const cur = await db.blogPost.findUnique({ where: { id }, include: { sources: { orderBy: { accessedAt: "asc" } } } });
+  if (!cur) throw new JobError("Article not found.", 404);
+  const report = await refreshQuality(cur);
+  return postView(await db.blogPost.update({ where: { id }, data: { qualityReport: JSON.stringify(report), qualityOk: report.ok }, include: { sources: { orderBy: { accessedAt: "asc" } } } }));
 }
 
 export async function listPosts(filter: { status?: string; q?: string; take?: number } = {}): Promise<BlogPostView[]> {

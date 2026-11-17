@@ -1,6 +1,6 @@
 /** 1101: the Home Screen welcome redesigned after the reference (headline, hero art, stacked actions, text link). */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { HEADLINE_NOWRAP, WELCOME_DEFAULT, WELCOME_OLD_TITLE, headlineParts, normalizeWelcome } from "../lib/pwa-welcome";
 
 const src = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
@@ -62,8 +62,8 @@ describe("1101 actions keep working", () => {
 });
 
 describe("1101 look and motion", () => {
-  test("follows the theme: paper in light, ink in dark; black primary with white text in light", () => {
-    expect(block).toMatch(/--pw-bg: hsl\(40 33% 96%\);[^}]*--pw-cta-bg: hsl\(232 16% 7%\); --pw-cta-fg: hsl\(0 0% 100%\)/);
+  test("follows the theme: white in light (R1180), ink in dark; black primary with white text in light", () => {
+    expect(block).toMatch(/--pw-bg: hsl\(0 0% 100%\);[^}]*--pw-cta-bg: hsl\(232 16% 7%\); --pw-cta-fg: hsl\(0 0% 100%\)/);
     expect(block).toMatch(/html\.dark\[data-welcome\] \.pwa-welcome \{\s*--pw-bg: hsl\(232 16% 7%\)/);
     expect(w).toContain("<WelcomeArt />");
   });
@@ -93,11 +93,15 @@ describe("1101 look and motion", () => {
     for (const s of ["top", "right", "bottom", "left"]) expect(block).toContain(`env(safe-area-inset-${s})`);
     expect(block).toContain("@media (max-height: 700px) and (max-width: 1023px)");
   });
-  test("the art is decorative, self-contained and theme-aware", () => {
+  test("the art is decorative, local and theme-aware", () => {
     const a = src("components/shell/WelcomeArt.tsx");
     expect(a).toContain('aria-hidden="true"');
-    expect(a).toContain("<feTurbulence");
     expect(a).toContain('stroke="currentColor"');
-    expect(a).not.toMatch(/<image|href=/);
+    // R1180: the supplied character renders, served from our own origin with intrinsic sizes (no layout shift)
+    expect(a.match(/alt=""/g)?.length).toBe(2);
+    expect(a).not.toMatch(/https?:\/\//);
+    for (const n of ["kiki", "koko"]) for (const w of [480, 960]) expect(existsSync(`public/brand/welcome/${n}-${w}.webp`)).toBe(true);
+    expect(a).toMatch(/width=\{480\} height=\{497\}/);
+    expect(a).toMatch(/width=\{480\} height=\{525\}/);
   });
 });

@@ -7,6 +7,7 @@ import { startTour } from "@/components/onboarding/Tour";
 import { cn } from "@/lib/utils";
 import { useUser } from "./UserContext";
 import { WelcomeArt } from "./WelcomeArt";
+import { welcomeFont } from "./welcome-font";
 import { HEADLINE_NOWRAP, WELCOMED_EVENT, WELCOME_DEFAULT, WELCOME_KEY, WELCOME_SESSION_KEY, fillGreeting, fillName, headlineParts, shouldWelcome, type WelcomeConfig } from "@/lib/pwa-welcome";
 
 /** What the person picked on the way out (1101). Every one of them counts as seen. */
@@ -138,7 +139,13 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
   // A title that was only "{name}" would leave the dialog's label blank for someone without a name.
   const head = headlineParts(fillName(fillGreeting(config.title, hour), name).trim() || fillGreeting(WELCOME_DEFAULT.title, hour).replace(/,?\s*\{name\}/g, ""));
   const line = (t: string) => cn("pw-line", t.length <= HEADLINE_NOWRAP && "pw-nowrap");
-  const last = head.tail ? `${head.tail} ${head.hl}` : head.hl;
+  // R1180: the headline is set in two halves around the art, "[Good morning, Maya." left and "Let's get to it.]"
+  // right. A one-sentence title splits before its last word instead. The brackets are decoration (aria-hidden).
+  const split = head.lines.length > 0;
+  const one = split ? head.lines : head.tail ? [head.tail] : [];
+  const two = split ? head.tail : "";
+  const last = two ? `${two} ${head.hl}` : head.hl;
+  const open = <span aria-hidden="true" className="pw-br">[</span>;
   return (
     <div
       ref={box}
@@ -162,7 +169,7 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
           items[next].focus();
         }
       }}
-      className="pwa-welcome"
+      className={cn("pwa-welcome", welcomeFont.variable)}
     >
       <div className="pw-wrap">
         <header className="pw-top pw-a">
@@ -176,15 +183,24 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
         </header>
         {/* Not a heading: the dialog is already labelled by it, and studio pages own their only h1. */}
         <p id="pw-title" className="pw-title pw-b">
-          {head.lines.map((t, i) => (
-            <span key={i} className={line(t)} suppressHydrationWarning>
-              {t}{" "}
+          {one.length > 0 && (
+            <span className="pw-say pw-say-1">
+              {one.map((t, i) => (
+                <span key={i} className={line(t)} suppressHydrationWarning>
+                  {i === 0 && open}
+                  {t}{" "}
+                </span>
+              ))}
             </span>
-          ))}
-          <span className={line(last)} suppressHydrationWarning>
-            {head.tail && `${head.tail} `}
-            <span className="pw-hl" suppressHydrationWarning>
-              {head.hl}
+          )}
+          <span className="pw-say pw-say-2">
+            <span className={line(last)} suppressHydrationWarning>
+              {!one.length && open}
+              {two && `${two} `}
+              <span className="pw-hl" suppressHydrationWarning>
+                {head.hl}
+              </span>
+              <span aria-hidden="true" className="pw-br">]</span>
             </span>
           </span>
         </p>

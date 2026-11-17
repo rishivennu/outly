@@ -324,13 +324,13 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       if (ctrl.signal.aborted) return;
       if (!frames.length) return setWatch(NO_WATCH);
       const heard = captionsRef.current?.cues.map((c) => c.text.trim()).filter(Boolean).join("\n") || undefined;
-      const r = await api<{ story?: string; skipped?: string }>("/api/ai/video-caption", { method: "POST", json: { frames, duration, transcript: heard, auto: true }, signal: ctrl.signal });
+      const r = await api<{ story?: string; seen?: string; skipped?: string }>("/api/ai/video-caption", { method: "POST", json: { frames, duration, transcript: heard, auto: true }, signal: ctrl.signal });
       if (ctrl.signal.aborted) return;
       // A plan or quota stop stays quiet (the plan says so elsewhere); a busy AI is said out loud, with a retry (1174).
       const story = r.story?.trim();
       if (r.skipped === "busy" || (!r.skipped && !story)) return setWatch({ kind: "failed" });
       if (r.skipped || !story) return setWatch(NO_WATCH);
-      setWatch({ kind: "ready", story });
+      setWatch({ kind: "ready", story, ...(r.seen?.trim() ? { seen: r.seen.trim() } : {}) });
     } catch {
       if (!ctrl.signal.aborted) setWatch({ kind: "failed" }); // the creator can always tell the story themselves
     } finally {

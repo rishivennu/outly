@@ -190,6 +190,7 @@ Brand facts you may state without a source: ${cfg.brandLines.join(" ")}
 Write ${half === 1 ? "the first half" : "the second half"} of this article in Markdown.
 Title (do not include it in the output): ${o.workingTitle}
 Primary keyword, used naturally a few times, never stuffed: ${t.primaryKeyword}
+${half === 1 ? `Use the exact phrase "${t.primaryKeyword}" word for word at least once in the first section, and once more later in this half.` : `Use the exact phrase "${t.primaryKeyword}" word for word once in this half.`}
 Research you may draw on (cite nothing you do not see here; where a claim is a recommendation or hypothesis, write it as advice or a likely cause, not as fact):
 ${researchBlock(r)}
 
@@ -245,8 +246,10 @@ export function normaliseSeo(cfg: BlogConfig, t: TopicCandidate, o: OutlineStage
     seoTitle: String(d?.seoTitle ?? o.workingTitle).trim().slice(0, 70) || o.workingTitle,
     metaDescription: meta,
     slug: unique,
-    primaryKeyword: String(d?.primaryKeyword ?? t.primaryKeyword).trim().toLowerCase() || t.primaryKeyword,
-    secondaryKeywords: strs(d?.secondaryKeywords).slice(0, 8),
+    // R1180: the draft was written around the topic's keyword, so that stays primary; a different SEO suggestion
+    // becomes the first secondary keyword instead of silently failing the keyword check.
+    primaryKeyword: t.primaryKeyword || String(d?.primaryKeyword ?? "").trim().toLowerCase(),
+    secondaryKeywords: [...new Set([String(d?.primaryKeyword ?? "").trim().toLowerCase(), ...strs(d?.secondaryKeywords)].filter((k) => k && k !== t.primaryKeyword))].slice(0, 8),
     searchIntent: String(d?.searchIntent ?? t.searchIntent) || t.searchIntent,
     relatedQuestions: strs(d?.relatedQuestions).slice(0, 6),
     category: cat,
@@ -276,6 +279,33 @@ export interface QualityInput {
   allowedHrefs: string[];
 }
 
+const KW_STOP = new Set(["a", "an", "the", "to", "for", "of", "in", "on", "at", "by", "and", "or", "is", "are", "my", "your", "how", "what", "why", "when", "with", "not", "no", "do", "does", "it", "vs"]);
+const kwWords = (s: string) => s.toLowerCase().replace(/[\u2019']/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean);
+/** Crude stem so "fixes", "fixing" and "fixed" all meet "fix", and "calendars" meets "calendar". */
+const stem = (w: string) => (w.length > 4 ? w.replace(/(ing|ed|es|s)$/, "") : w.replace(/s$/, ""));
+
+/**
+ * R1180: how often the primary keyword appears. `exact` ignores case, punctuation and hyphens ("Content-calendar"
+ * counts for "content calendar"). `close` counts sentences that hold every meaningful word of the keyword in any
+ * order and form ("why your content calendar keeps not working, and the fix"), so a natural sentence is not a miss.
+ */
+export function keywordUses(body: string, keyword: string): { exact: number; close: number } {
+  const kw = kwWords(keyword);
+  if (!kw.length) return { exact: 0, close: 0 };
+  const text = ` ${kwWords(body).join(" ")} `;
+  const exact = text.split(` ${kw.join(" ")} `).length - 1;
+  const need = [...new Set(kw.filter((w) => !KW_STOP.has(w)).map(stem))];
+  if (!need.length) return { exact, close: 0 };
+  let close = 0;
+  for (const sentence of body.split(/[.!?\n]+/)) {
+    const words = kwWords(sentence);
+    if (words.join(" ").includes(kw.join(" "))) continue;
+    const have = new Set(words.map(stem));
+    if (need.every((w) => have.has(w))) close++;
+  }
+  return { exact, close };
+}
+
 /** The deterministic half of the gate: things code can see. */
 export function qualityChecks(q: QualityInput): QualityCheck[] {
   const { cfg, body, seo } = q;
@@ -283,7 +313,7 @@ export function qualityChecks(q: QualityInput): QualityCheck[] {
   const h2 = [...body.matchAll(/^##\s+(.+)$/gm)].map((m) => m[1].trim());
   const lower = body.toLowerCase();
   const kw = seo.primaryKeyword.toLowerCase();
-  const kwCount = kw ? lower.split(kw).length - 1 : 0;
+  const kwUse = keywordUses(body, kw);
   const links = [...body.matchAll(/\]\((\/[^)\s]*)\)/g)].map((m) => m[1]);
   const badLinks = [...new Set([...links, ...seo.internalLinks.map((l) => l.href)])].filter((h) => !q.allowedHrefs.includes(h));
   const verified = q.sources.filter((s) => s.verified).length;
@@ -291,17 +321,38 @@ export function qualityChecks(q: QualityInput): QualityCheck[] {
   const overlap = q.existing.find((e) => overlaps(e.title, seo.seoTitle) || (e.primaryKeyword && e.primaryKeyword === seo.primaryKeyword));
   const stats = (body.match(/\b\d+(\.\d+)?\s?%/g) ?? []).length;
   const linkedStats = (body.match(/\[[^\]]*\d+(\.\d+)?\s?%[^\]]*\]\(https?:/g) ?? []).length;
+  // R1180: sources only block when the article leans on them (an outside link or a figure). Advice-only articles get a warning.
+  const outside = (body.match(/\]\(https?:\/\//g) ?? []).length;
+  const leansOnSources = outside > 0 || stats > 0;
   const outllyMentions = (lower.match(/outlly/g) ?? []).length;
   return [
     { id: "length", label: `Length ${words} words (target ${cfg.minWords}-${cfg.maxWords})`, ok: words >= Math.floor(cfg.minWords * 0.85) && words <= Math.ceil(cfg.maxWords * 1.25), critical: false, note: words < cfg.minWords ? "Shorter than the target. Fine if every paragraph earns its place." : words > cfg.maxWords ? "Longer than the target. Check for padding." : "" },
     { id: "structure", label: `Structure: ${h2.length} sections`, ok: h2.length >= 7, critical: true, note: h2.length < 7 ? "The brief asks for sections B to I at least (eight H2 headings)." : "" },
     { id: "headings", label: "Headings are distinct", ok: new Set(h2.map((h) => h.toLowerCase())).size === h2.length, critical: false, note: "" },
-    { id: "keyword", label: `Primary keyword used ${kwCount} times`, ok: kwCount >= 1 && kwCount <= 12, critical: true, note: kwCount === 0 ? "The primary keyword does not appear in the body." : kwCount > 12 ? "That reads as keyword stuffing." : "" },
+    {
+      id: "keyword",
+      label: `Primary keyword used ${kwUse.exact} time${kwUse.exact === 1 ? "" : "s"}${kwUse.close ? ` (+${kwUse.close} close variant${kwUse.close === 1 ? "" : "s"})` : ""}`,
+      ok: !kw || (kwUse.exact + kwUse.close >= 1 && kwUse.exact <= 12),
+      critical: true,
+      note: !kw ? "" : kwUse.exact + kwUse.close === 0 ? `Neither "${kw}" nor its words together appear in the body. Use the phrase once in the opening section, or change the primary keyword on the SEO tab to the phrase the article uses.` : kwUse.exact > 12 ? "That reads as keyword stuffing." : kwUse.exact === 0 ? `Only close variants appear. Using "${kw}" word for word once in the opening helps search.` : "",
+    },
     { id: "titleKeyword", label: "Title carries the keyword or its words", ok: !kw || overlaps(seo.seoTitle, kw) || seo.seoTitle.toLowerCase().includes(kw), critical: false, note: "" },
     { id: "meta", label: `Meta description ${seo.metaDescription.length} characters`, ok: seo.metaDescription.length >= 70 && seo.metaDescription.length <= 160, critical: true, note: seo.metaDescription.length < 70 ? "Too short to earn the click." : seo.metaDescription.length > 160 ? "Search engines will cut it." : "" },
     { id: "slug", label: `Slug /blog/${seo.slug}`, ok: SLUG_RE.test(seo.slug) && seo.slug.length <= 72, critical: true, note: "" },
     { id: "links", label: badLinks.length ? `Unknown internal links: ${badLinks.join(", ")}` : "Internal links point at real pages", ok: badLinks.length === 0, critical: true, note: badLinks.length ? "Links must be existing Outlly pages or published articles." : "" },
-    { id: "sources", label: `${verified} verified source${verified === 1 ? "" : "s"} recorded`, ok: verified >= 1, critical: true, note: verified ? "" : q.sources.length ? "Sources were named but none came from live search results. Verify them by hand before approving." : "No sources recorded. The article should lean on qualified statements only." },
+    {
+      id: "sources",
+      label: `${verified} verified source${verified === 1 ? "" : "s"} recorded`,
+      ok: verified >= 1,
+      critical: verified === 0 && leansOnSources,
+      note: verified
+        ? ""
+        : q.sources.length
+          ? `None came from live search results. Open each one on the Sources & quality tab and mark the ones you checked${leansOnSources ? ", or remove the outside links and figures that rely on them" : ""}.`
+          : leansOnSources
+            ? "The article links outside pages or quotes figures but no source is recorded. Remove those claims or rewrite them as advice."
+            : "No sources recorded. Fine for an advice article; keep every claim qualified.",
+    },
     { id: "stats", label: stats ? `${stats} percentage figure${stats === 1 ? "" : "s"}, ${linkedStats} linked to a source` : "No unsourced percentages", ok: stats === 0 || linkedStats >= stats, critical: false, note: stats > linkedStats ? "A number without a link reads as a made-up statistic. Link it or remove it." : "" },
     { id: "restricted", label: restricted.length ? `Touches restricted topics: ${restricted.join(", ")}` : "Stays clear of restricted topics", ok: restricted.length === 0, critical: true, note: "" },
     { id: "overlap", label: overlap ? `Overlaps "${overlap.title}"` : "No overlap with existing articles", ok: !overlap, critical: true, note: overlap ? "Two articles for one query compete with each other. Merge or change the angle." : "" },

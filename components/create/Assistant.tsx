@@ -210,8 +210,15 @@ export function Assistant(p: Props) {
         {askStory && p.watch?.kind === "ready" && (
           <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={T.card} className="space-y-2">
             <Bubble from="outly">
-              I watched it. Here&apos;s how I&apos;d tell it:
-              <span className="mt-2 block whitespace-pre-wrap rounded-2xl bg-background/60 px-3 py-2.5 text-[14px] leading-snug text-foreground hairline">{p.watch.story}</span>
+              I watched it.
+              {p.watch.seen && (
+                <span className="mt-1 block text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">What I saw: </span>
+                  {p.watch.seen}
+                </span>
+              )}
+              <span className="mt-3 block text-sm font-medium text-foreground">Here&apos;s the caption I&apos;d post:</span>
+              <span className="mt-1.5 block whitespace-pre-wrap rounded-2xl bg-background/60 px-3 py-2.5 text-[14px] leading-snug text-foreground hairline">{p.watch.story}</span>
             </Bubble>
             <div className="flex flex-wrap gap-2 pl-1" role="group" aria-label="Pip's story">
               <Button type="button" variant="lime" className="min-h-11 rounded-full px-4" onClick={() => p.onUseWatched?.(false)}>

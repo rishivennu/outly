@@ -4,7 +4,9 @@ import { requireAdmin } from "@/lib/admin/guard";
 import { formatMoney } from "@/lib/billing/money";
 import { SAMPLE_DOMAIN } from "@/lib/admin/sample";
 import { PLATFORMS, PLATFORM_META } from "@/lib/domain";
-import { Card, Empty, PageHead, Pill, Table, ago, fmtDate } from "@/components/admin/ui";
+import { Empty, Pill, Table, ago, fmtDate } from "@/components/admin/ui";
+import { CustomerHead, MilestonePanel, Panel, PanelHead, PlanMixPanel, ProfilePanel, SummaryPanel, type Recent, type Summary } from "@/components/admin/users/CustomerOverview";
+import { Users as UsersIcon } from "lucide-react";
 import { DataSwap } from "@/components/shared/DataSwap";
 import { FilterChips, FilterSelect, MoreFilters, SearchBox } from "@/components/admin/SearchBox";
 import { RefreshButton } from "@/components/admin/RefreshButton";
@@ -114,6 +116,43 @@ export default async function Users(props: { searchParams: Promise<Params> }) {
     }),
     db.user.count({ where }),
   ]);
+  // R1180: the overview above the list always describes every account, whatever the list is filtered to.
+  const since14 = new Date(Date.now() - 14 * 864e5);
+  const connectedWhere = { socialAccounts: { some: { status: "connected" } } };
+  const [all, paying, active7, new7, prev7, founding, verified, connected, posted, twoStep, setUp, planRows, newest] = await Promise.all([
+    db.user.count(),
+    db.user.count({ where: { subscriptions: { some: { status: "active" } } } }),
+    db.user.count({ where: { lastActiveAt: { gte: since7 } } }),
+    db.user.count({ where: { createdAt: { gte: since7 } } }),
+    db.user.count({ where: { createdAt: { gte: since14, lt: since7 } } }),
+    db.user.count({ where: { foundingNo: { not: null } } }),
+    db.user.count({ where: { emailVerifiedAt: { not: null } } }),
+    db.user.count({ where: connectedWhere }),
+    db.user.count({ where: { posts: { some: {} } } }),
+    db.user.count({ where: { totpEnabledAt: { not: null } } }),
+    db.user.count({ where: { AND: [connectedWhere, { posts: { some: {} } }] } }),
+    db.plan.findMany({ orderBy: { sortOrder: "asc" }, select: { name: true, _count: { select: { subscriptions: { where: { status: "active" } } } } } }),
+    db.user.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 3,
+      select: {
+        id: true, name: true, email: true, createdAt: true, lastSeenAt: true, lastActiveAt: true,
+        locCountry: true, locRegion: true, locCity: true, locVia: true,
+        subscriptions: { where: { status: "active" }, take: 1, select: { plan: { select: { name: true } } } },
+        socialAccounts: { where: { status: "connected" }, select: { platform: true } },
+      },
+    }),
+  ]);
+  const summary: Summary = {
+    total: all, paying, active7, new7, prev7, founding, verified, connected, posted, twoStep, setUp,
+    plans: planRows.map((p) => ({ name: p.name, count: p._count.subscriptions })),
+  };
+  const recent: Recent[] = newest.map((u) => ({
+    id: u.id, name: u.name, email: u.email, createdAt: u.createdAt, seenAt: u.lastSeenAt ?? u.lastActiveAt,
+    plan: u.subscriptions[0]?.plan.name ?? null,
+    platforms: [...new Set(u.socialAccounts.map((a) => a.platform))],
+    loc: { country: u.locCountry, region: u.locRegion, city: u.locCity, via: u.locVia },
+  }));
   // Phase 3 (A4): AI usage this month, monthly limit and Unlimited AI Access for this page of people.
   const ai = await aiAccessRows(rows.map((r) => r.id)).catch(() => new Map());
   const manageAi = can(admin.role, "plans");
@@ -124,13 +163,26 @@ export default async function Users(props: { searchParams: Promise<Params> }) {
   const narrowing = [q, f, plan, joined, platform, tag].filter(Boolean).length;
   return (
     <>
-      <PageHead
-        eyebrow="Run"
-        title="Users"
+      <CustomerHead
+        recent={recent}
+        summary={summary}
         body={`${total.toLocaleString("en-IN")} ${narrowing ? "matching" : "creator accounts"}. Last seen updates every minute while someone is in the app; locations are approximate, estimated from the network address.`}
         actions={<RefreshButton total={total} loadedAt={new Date().toISOString()} />}
       />
-      <Card>
+      <div className="cx-grid mb-5 grid gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-5">
+          <SummaryPanel s={summary} />
+          <div className="grid gap-5 2xl:grid-cols-2">
+            <MilestonePanel s={summary} />
+            <PlanMixPanel s={summary} />
+          </div>
+        </div>
+        <div className="flex min-w-0 flex-col gap-5">
+          <ProfilePanel p={recent[0] ?? null} />
+        </div>
+      </div>
+      <Panel label="cx-list">
+        <PanelHead id="cx-list" icon={UsersIcon} title="Customer list" hint={`${total.toLocaleString("en-IN")} ${narrowing ? "match the filters" : "accounts"}, ${PER} per page`} />
         {/* Phones: status chips in one sideways row, search on its own full-width row, Plan + Sort side by side,
             the rest behind "More filters". From 640px: chips and search share a row, every filter sits in one
             row that wraps only when it runs out of room. All of it lives in the URL, so it survives refresh and back. */}
@@ -195,7 +247,7 @@ export default async function Users(props: { searchParams: Promise<Params> }) {
           </nav>
         )}
         </DataSwap>
-      </Card>
+      </Panel>
     </>
   );
 }

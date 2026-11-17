@@ -37,25 +37,23 @@ describe("1161 registry", () => {
   });
 });
 
-describe("1161 copy", () => {
+describe("R1180 copy (simplified section)", () => {
   test("the brief's headlines, word for word", () => {
     expect(USP.eyebrow.toUpperCase()).toBe("WHY CREATORS CHOOSE OUTLLY");
     expect(USP.title).toBe("Your entire creator workflow. One powerful platform.");
-    expect(USP.cards.map((c) => c.title)).toEqual([
-      "Your videos. Captions in seconds.",
-      "Create once. Customize for every platform.",
-      "Your entire content schedule. Under control.",
-      "Know what is working across every platform.",
-      "Your creator conversations in one place.",
-      "Meet Pip. Your AI-powered creator companion.",
-    ]);
+    expect(USP.body).toBe("Create, publish, manage and grow your content from one place. No switching between multiple tools.");
+    expect(USP.cards.map((c) => c.title)).toEqual(["AI Captions & Subtitles", "Multi-Platform Publishing", "Smart Content Calendar", "Unified Analytics", "Pip AI Assistant"]);
+    expect(USP.cards[0].body).toBe("Turn videos into accurate captions, translate regional languages and create synchronized subtitles faster.");
     expect(USP.cta.title).toBe("Everything your creator workflow needs. In one place.");
+    expect(USP.cta.body).toBe("Spend less time managing tools and more time creating.");
     expect(USP.cta.label).toBe("Explore Outlly");
   });
-  test("six cards, five against five in the comparison", () => {
-    expect(USP.cards.length).toBe(6);
-    expect(USP.compare.without.items.length).toBe(5);
-    expect(USP.compare.with.items.length).toBe(5);
+  test("five cards and no with/without comparison", () => {
+    expect(USP.cards.length).toBe(5);
+    expect("compare" in USP).toBe(false);
+    const src = read("components/marketing/WhyOutlly.tsx");
+    expect(src).not.toContain("Without Outlly");
+    expect(src).not.toContain("usp-cmp");
   });
   test("no platform that is not connected is named as live, and no numbers are invented", () => {
     const text = JSON.stringify(USP);
@@ -63,37 +61,29 @@ describe("1161 copy", () => {
     expect(text).not.toMatch(/\d+%|\d+x\b|\d[\d,]*\s*(followers|views|hours)/i);
     expect(text).not.toMatch(/[\u2014\u2013]/); // no dashes in copy
   });
-  test("the inbox and analytics cards say what they do not do", () => {
-    const inbox = USP.cards.find((c) => c.id === "inbox")!;
-    expect(inbox.note).toMatch(/Direct messages are not included/);
-    const analytics = USP.cards.find((c) => c.id === "analytics")!;
-    expect(analytics.note).toMatch(/never filled in/);
-  });
-  test("previews only draw the three core platforms by default", () => {
-    const src = read("components/marketing/usp/Previews.tsx");
-    for (const p of EXTRA_PLATFORMS) expect(src).not.toContain(`"${p}"`);
-    for (const p of CORE_PLATFORMS) expect(src).toContain(`"${p}"`);
+  test("one larger card, four equal ones; the CTA follows waitlist mode", () => {
+    const src = read("components/marketing/WhyOutlly.tsx");
+    expect(src).toContain("lg:grid-cols-4");
+    expect(src).toContain("md:col-span-2 lg:row-span-2");
+    expect(src).toContain("#173A24");
+    expect(src).toContain("#B5FF00");
+    expect(src).toContain("<SignupCta");
+    expect(src).not.toContain("CaptionPreview");
   });
 });
 
-describe("1161 motion", () => {
-  test("loops are transform and opacity only, paused until the grid is on screen, off under reduced motion", () => {
+describe("R1180 motion", () => {
+  test("no loops: the old keyframes are gone, hover lift is off under reduced motion", () => {
     const css = read("app/globals.css");
-    const block = css.slice(css.indexOf("Why Outlly (1161)"));
-    const frames = [...block.matchAll(/@keyframes [\w-]+ \{([^}]*\}\s*)*?\}/g)].map((m) => m[0]);
-    expect(frames.length).toBeGreaterThan(8);
-    for (const f of frames) {
-      const props = [...f.matchAll(/([a-z-]+):/g)].map((m) => m[1]);
-      for (const p of props) expect(["opacity", "transform", "color", "text-shadow"]).toContain(p);
-    }
-    expect(block).toContain("html.js .usp-grid:not([data-live])");
+    const block = css.slice(css.indexOf("Why Outlly (R1180"), css.indexOf("1163: admin tooltip"));
+    expect(block).not.toContain("@keyframes");
     expect(block).toContain("prefers-reduced-motion: reduce");
     expect(block).not.toContain("transition: all");
+    expect(css).not.toContain("usp-word");
   });
-  test("the stage only marks the grid live while visible", () => {
-    const src = read("components/marketing/usp/Stage.tsx");
-    expect(src).toContain("IntersectionObserver");
-    expect(src).toContain("visibilitychange");
-    expect(src).toContain('"data-live"');
+  test("the grid enters once in ScrollScenes, with no per-card stagger", () => {
+    const src = read("components/marketing/ScrollScenes.tsx");
+    expect(src).toContain('usp.querySelector(".usp-grid")');
+    expect(src).not.toContain(".usp-cmp");
   });
 });

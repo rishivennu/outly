@@ -58,7 +58,7 @@ export const POST = route(
       if (auto) return json({ skipped: "busy" });
       throw new HttpError(503, "The assistant couldn't watch your video just now. Try again in a moment, or tell me about it yourself.", "AI_BUSY");
     }
-    return json({ story: out.story });
+    return json({ story: out.story, ...(out.seen ? { seen: out.seen } : {}) });
   },
   { limit: [20, 60_000] },
 );

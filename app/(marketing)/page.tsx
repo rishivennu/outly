@@ -95,7 +95,7 @@ export default async function LandingPage() {
       {on("hero") && <Hero showHow={on("how")} beta={beta} live={live} />}
       {on("hero") && <LogoTicker live={live} />}
       {/* Why Outlly (1161): the six strengths straight after the hero, its own switch in Admin > Landing page. */}
-      {on("usp") && <WhyOutlly live={live} showHow={on("how")} />}
+      {on("usp") && <WhyOutlly live={live} />}
       {/* Try it (10-28): its own switch in Admin > Landing page. Off also closes /api/try. */}
       {on("try") && <TryIt />}
       {on("hero") && on("how") && (

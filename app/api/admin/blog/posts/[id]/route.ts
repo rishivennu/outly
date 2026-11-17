@@ -3,7 +3,7 @@ import { json, HttpError } from "@/lib/http";
 import { adminRoute, adminEvent } from "@/lib/admin/route";
 import { getConfig } from "@/lib/settings";
 import { JobError } from "@/lib/blog/job";
-import { getPost, publishPost, regenerateSection, rejectPost, restorePost, schedulePost, unpublishPost, unschedulePost, updatePost } from "@/lib/blog/posts";
+import { getPost, publishPost, regenerateSection, rejectPost, restorePost, schedulePost, unpublishPost, unschedulePost, updatePost, verifySource } from "@/lib/blog/posts";
 
 export const dynamic = "force-dynamic";
 /** Regenerating a section is one model call, budgeted at 55 s. */
@@ -48,6 +48,7 @@ const Act = z.discriminatedUnion("action", [
   z.object({ action: z.literal("regenerate"), heading: z.string().trim().min(1).max(200), note: z.string().trim().max(600).default("") }),
   z.object({ action: z.literal("schedule"), at: z.string().trim().min(1).max(40) }),
   z.object({ action: z.literal("unschedule") }),
+  z.object({ action: z.literal("verifySource"), sourceId: z.string().trim().min(1).max(60), verified: z.boolean() }),
 ]);
 
 export const POST = adminRoute<{ params: { id: string } }>("content", async (req, { params, admin }) => {
@@ -68,6 +69,8 @@ export const POST = adminRoute<{ params: { id: string } }>("content", async (req
         return schedulePost(admin, params.id, a.at);
       case "unschedule":
         return unschedulePost(admin, params.id);
+      case "verifySource":
+        return verifySource(admin, params.id, a.sourceId, a.verified);
     }
   });
   if (a.action === "schedule" && post.scheduledFor) {

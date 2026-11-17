@@ -17,11 +17,11 @@ export default async function Review(props: { params: Promise<{ id: string }> })
     throw e;
   });
   if (!post) notFound();
-  const [cfg, links] = await Promise.all([getConfig("blog"), allowedLinks(id)]);
+  const [cfg, links, waitlist] = await Promise.all([getConfig("blog"), allowedLinks(id), getConfig("site").then((s) => s.waitlist).catch(() => false)]);
   return (
     <>
       <PageHead eyebrow="Content Studio" title="Review & edit" body="Read it the way a visitor would, fix what needs fixing, then approve. Approve & Publish is the only way an article goes live; the server runs the quality checks again on every save and on publish." />
-      <ReviewDesk initial={post} categories={cfg.categories} allowedLinks={links} siteUrl={env.APP_URL} timezone={cfg.timezone} />
+      <ReviewDesk initial={post} categories={cfg.categories} allowedLinks={links} siteUrl={env.APP_URL} timezone={cfg.timezone} waitlist={waitlist} />
     </>
   );
 }

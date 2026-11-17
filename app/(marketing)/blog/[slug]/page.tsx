@@ -5,8 +5,8 @@ import { Shell } from "@/components/marketing/bits";
 import { BlogCta } from "@/components/blog/BlogCta";
 import { Breadcrumbs } from "@/components/blog/Breadcrumbs";
 import { JsonLd } from "@/components/blog/JsonLd";
-import Link from "next/link";
-import { pillChip, pillLink, PostGrid } from "@/components/blog/PostCard";
+import { BlogArticle } from "@/components/blog/BlogArticle";
+import { PostGrid } from "@/components/blog/PostCard";
 import { ShareControls } from "@/components/blog/ShareControls";
 import { Toc, tocWorthy } from "@/components/blog/Toc";
 import { renderMarkdown } from "@/lib/blog/markdown";
@@ -61,58 +61,31 @@ export default async function ArticlePage(props: Props) {
     <>
       <JsonLd data={articleJsonLd(base, post)} />
       <JsonLd data={breadcrumbJsonLd(base, [{ name: "Home", path: "/" }, ...trail])} />
-      <article className="py-12 sm:py-20">
-        <Shell>
+      <article className="py-12 sm:py-16">
+        <div className="mx-auto w-full max-w-[780px] px-5 sm:px-6">
           <Breadcrumbs trail={[{ name: "Blog", href: "/blog" }, ...(catHref ? [{ name: post.category, href: catHref }] : []), { name: post.title }]} />
-          <header className="mt-6 max-w-3xl">
-            <div className="flex flex-wrap items-center gap-2">
-              {catHref && (
-                <Link href={catHref} className={pillLink}>
-                  {post.category}
-                </Link>
-              )}
-              <span className={pillChip}>{post.readingMin} min read</span>
-            </div>
-            <h1 className="display mt-5 text-balance text-[clamp(2.1rem,4.2vw+0.6rem,3.5rem)]">{post.title}</h1>
-            {post.excerpt && <p className="mt-6 text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-lg">{post.excerpt}</p>}
-            <p className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-muted-foreground">
-              <span>
-                By <span className="font-medium text-foreground">{post.author}</span>
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>
-                Published <time dateTime={post.publishedAt.toISOString()}>{blogDate(post.publishedAt)}</time>
-              </span>
-              {showUpdated(post.publishedAt, post.updatedAt) && (
-                <>
-                  <span aria-hidden="true">·</span>
-                  <span>
-                    Updated <time dateTime={post.updatedAt.toISOString()}>{blogDate(post.updatedAt)}</time>
-                  </span>
-                </>
-              )}
-            </p>
-          </header>
-
-          <div className={toc ? "mt-12 grid gap-10 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-16" : "mt-12"}>
-            {toc && (
-              <div className="lg:order-2">
-                <div className="lg:sticky lg:top-24">
-                  <Toc headings={headings} />
+          <BlogArticle
+            className="mt-6"
+            title={post.title}
+            excerpt={post.excerpt}
+            category={post.category}
+            categoryHref={catHref || undefined}
+            author={post.author}
+            readingMin={post.readingMin}
+            published={{ iso: post.publishedAt.toISOString(), label: blogDate(post.publishedAt) }}
+            updated={showUpdated(post.publishedAt, post.updatedAt) ? { iso: post.updatedAt.toISOString(), label: blogDate(post.updatedAt) } : null}
+            html={html}
+            toc={toc ? <Toc headings={headings} /> : undefined}
+            footer={
+              <>
+                <div className="border-t border-border pt-8">
+                  <ShareControls url={url} title={post.title} />
                 </div>
-              </div>
-            )}
-            <div className="min-w-0 lg:order-1">
-              <div className="blog-prose" dangerouslySetInnerHTML={{ __html: html }} />
-              <div className="mt-12 max-w-[68ch] border-t border-border pt-8">
-                <ShareControls url={url} title={post.title} />
-              </div>
-              <div className="mt-12 max-w-[68ch]">
                 <BlogCta />
-              </div>
-            </div>
-          </div>
-        </Shell>
+              </>
+            }
+          />
+        </div>
       </article>
 
       {related.length > 0 && (

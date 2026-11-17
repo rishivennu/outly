@@ -9,10 +9,11 @@ import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { adminApi } from "@/lib/client/admin-api";
 import { cn } from "@/lib/utils";
-import { countWords, type BlogJobView, type BlogPostPatch, type BlogPostView } from "@/lib/blog/types";
+import { countWords, readingMinutes, type BlogJobView, type BlogPostPatch, type BlogPostView } from "@/lib/blog/types";
 import { renderMarkdown } from "@/lib/blog/markdown";
 import { Card, CardTitle, Pill, fmtDate } from "../ui";
-import { ArticleBody } from "./ArticleBody";
+import { BlogArticle } from "@/components/blog/BlogArticle";
+import { BlogCtaCard } from "@/components/blog/BlogCtaCard";
 import { PublishLaterForm } from "./BlogCalendar";
 import { fmtZoned } from "./zoned";
 
@@ -28,7 +29,7 @@ const STATUS: Record<string, { label: string; tone: "ok" | "warn" | "bad" | "mut
  * R1175 review desk. The admin reads, edits and decides. Nothing here is automatic: Save writes the edits,
  * Approve & Publish is the only way an article goes live, and the server re-checks quality on both.
  */
-export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezone }: { initial: BlogPostView; categories: string[]; allowedLinks: { href: string; label: string }[]; siteUrl: string; timezone: string }) {
+export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezone, waitlist = false }: { initial: BlogPostView; categories: string[]; allowedLinks: { href: string; label: string }[]; siteUrl: string; timezone: string; waitlist?: boolean }) {
   const [post, setPost] = useState(initial);
   const [d, setD] = useState<BlogPostPatch>(toPatch(initial));
   const [tab, setTab] = useState<Tab>("write");
@@ -42,7 +43,8 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
   const toast = useToast();
   const router = useRouter();
   const dirty = JSON.stringify(d) !== JSON.stringify(toPatch(post));
-  const headings = useMemo(() => renderMarkdown(d.bodyMd ?? "").headings.filter((h) => h.level === 2), [d.bodyMd]);
+  const rendered = useMemo(() => renderMarkdown(d.bodyMd ?? ""), [d.bodyMd]);
+  const headings = rendered.headings.filter((h) => h.level === 2);
   const words = countWords(d.bodyMd ?? "");
   const live = post.status === "published";
   const set = <K extends keyof BlogPostPatch>(k: K, v: BlogPostPatch[K]) => setD((x) => ({ ...x, [k]: v }));
@@ -72,7 +74,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
       const r = await adminApi<{ post: BlogPostView }>(`/api/admin/blog/posts/${post.id}`, { method: "POST", json: { action, ...extra } });
       setPost(r.post);
       setD(toPatch(r.post));
-      toast(action === "publish" ? "Published. It is live now." : action === "unschedule" ? "Schedule cancelled. Still approved, not live." : action === "unpublish" ? "Taken offline" : action === "reject" ? "Article rejected" : action === "restore" ? "Back in the review queue" : "Section rewritten");
+      toast(action === "publish" ? "Published. It is live now." : action === "unschedule" ? "Schedule cancelled. Still approved, not live." : action === "unpublish" ? "Taken offline" : action === "reject" ? "Article rejected" : action === "restore" ? "Back in the review queue" : action === "verifySource" ? (extra.verified ? "Marked as checked" : "Marked as unchecked") : "Section rewritten");
       router.refresh();
     } catch (e: any) {
       setErr(e.message);
@@ -192,7 +194,14 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
         )}
         {!live && blocking.length > 0 && (
           <p className="basis-full rounded-2xl bg-warning/10 p-3 text-[13.5px]">
-            <AlertTriangle className="mr-1.5 inline h-4 w-4" aria-hidden /> Publishing is blocked until these pass: {blocking.map((c) => c.label).join("; ")}. Edit the article or regenerate a section, then save.
+            <AlertTriangle className="mr-1.5 inline h-4 w-4" aria-hidden /> Publishing is blocked until these pass: {blocking.map((c) => c.label).join("; ")}. Edit the article or regenerate a section, then save.{blocking.some((c) => c.id === "sources") && (
+              <>
+                {" "}
+                <button type="button" className="font-medium underline underline-offset-4" onClick={() => setTab("sources")}>
+                  Check the sources
+                </button>
+              </>
+            )}
           </p>
         )}
       </Card>
@@ -220,9 +229,9 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
                   <p className="text-[13.5px] font-semibold">Regenerate one section</p>
                   <p className="mt-1 text-[12.5px] text-muted-foreground">Rewrites only that section, keeping the rest. Unsaved edits are saved first.</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
-                    <div className="grid gap-1.5">
+                    <div className="grid min-w-0 gap-1.5">
                       <Label htmlFor="rg-h">Section</Label>
-                      <select id="rg-h" value={regen.heading} onChange={(e) => setRegen((r) => ({ ...r, heading: e.target.value }))} className="field min-h-11 rounded-xl border border-border bg-card px-3 text-[14px]">
+                      <select id="rg-h" value={regen.heading} onChange={(e) => setRegen((r) => ({ ...r, heading: e.target.value }))} className="field min-h-11 w-full min-w-0 truncate rounded-xl border border-border bg-card px-3 text-[14px]">
                         <option value="">Choose a section</option>
                         {headings.map((h) => (
                           <option key={h.id} value={h.text}>
@@ -231,7 +240,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
                         ))}
                       </select>
                     </div>
-                    <div className="grid gap-1.5">
+                    <div className="grid min-w-0 gap-1.5">
                       <Label htmlFor="rg-n">What should change</Label>
                       <Input id="rg-n" value={regen.note} onChange={(e) => setRegen((r) => ({ ...r, note: e.target.value }))} placeholder="e.g. more concrete, add what to measure" maxLength={600} />
                     </div>
@@ -246,8 +255,16 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
 
           {tab === "preview" && (
             <div className="mt-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[13px] text-muted-foreground">How readers will see it at /blog/{d.slug}</p>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+                <p className="min-w-0 text-[13px] text-muted-foreground">
+                  {live ? (
+                    <a href={`${siteUrl}/blog/${post.slug}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1 break-all underline underline-offset-4">
+                      {siteUrl.replace(/^https?:\/\//, "")}/blog/{post.slug} <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    </a>
+                  ) : (
+                    <span className="inline-flex min-h-11 items-center break-all">Draft preview, not public yet: /blog/{d.slug}</span>
+                  )}
+                </p>
                 <div role="group" aria-label="Preview width" className="flex gap-1 rounded-full bg-secondary p-1">
                   <button type="button" aria-pressed={device === "desktop"} onClick={() => setDevice("desktop")} className={cn("grid h-9 w-9 place-items-center rounded-full", device === "desktop" && "bg-card shadow-sm")} aria-label="Desktop preview">
                     <Monitor className="h-4 w-4" aria-hidden />
@@ -257,13 +274,20 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
                   </button>
                 </div>
               </div>
-              <div className={cn("mx-auto mt-4 rounded-[20px] border border-border bg-background p-5 sm:p-8", device === "mobile" ? "max-w-[390px]" : "max-w-[720px]")}>
-                <p className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">{d.category}</p>
-                <h1 className="mt-2 font-display text-[1.6rem] font-bold leading-tight sm:text-[2rem]">{d.title}</h1>
-                <p className="mt-2 text-[14px] text-muted-foreground">
-                  {post.author} · {post.readingMin} min read
-                </p>
-                <ArticleBody md={d.bodyMd ?? ""} className="mt-6" />
+              {/* The same component as the public page. Nothing here is an admin control. */}
+              <div className={cn("mx-auto py-8", device === "mobile" ? "max-w-[390px] px-5" : "max-w-[780px] px-1 sm:px-6")}>
+                <BlogArticle
+                  mobile={device === "mobile"}
+                  title={d.title ?? ""}
+                  excerpt={d.excerpt}
+                  category={d.category}
+                  author={post.author}
+                  readingMin={readingMinutes(words)}
+                  published={post.publishedAt ? { iso: post.publishedAt, label: previewDate(post.publishedAt) } : null}
+                  draftNote={post.scheduledFor ? `Scheduled for ${fmtZoned(post.scheduledFor, timezone)}` : "Not published yet"}
+                  html={rendered.html}
+                  footer={<BlogCtaCard waitlist={waitlist} preview />}
+                />
               </div>
             </div>
           )}
@@ -284,7 +308,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Category" id="cat">
-                  <select id="cat" value={d.category ?? ""} onChange={(e) => set("category", e.target.value)} className="field min-h-11 rounded-xl border border-border bg-card px-3 text-[14px]">
+                  <select id="cat" value={d.category ?? ""} onChange={(e) => set("category", e.target.value)} className="field min-h-11 w-full min-w-0 rounded-xl border border-border bg-card px-3 text-[14px]">
                     {!categories.includes(d.category ?? "") && <option value={d.category ?? ""}>{d.category || "Pick one"}</option>}
                     {categories.map((c) => (
                       <option key={c} value={c}>
@@ -334,7 +358,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
             <div className="mt-4 grid gap-5">
               <div>
                 <p className="text-[13.5px] font-semibold">Research sources</p>
-                <p className="mt-1 text-[12.5px] text-muted-foreground">"Verified" means the page came back in live search results during research. Unverified sources were named by the AI and should be checked by hand before the article leans on them.</p>
+                <p className="mt-1 text-[12.5px] text-muted-foreground">"Verified" means the page came back in live search results during research, or an admin opened it and confirmed it backs the claim. Open an unverified source, read it, then mark it as checked.</p>
                 {post.sources.length ? (
                   <ul className="mt-3 grid gap-2">
                     {post.sources.map((s) => (
@@ -350,6 +374,13 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
                           {s.url} · accessed {fmtDate(s.accessedAt)}
                         </p>
                         {s.supports && <p className="mt-1 text-[12.5px]">Supports: {s.supports}</p>}
+                        {!live && (
+                          <div className="mt-2">
+                            <Button type="button" size="sm" variant={s.verified ? "ghost" : "outline"} className="min-h-11" disabled={!!busy} onClick={() => act("verifySource", { sourceId: s.id, verified: !s.verified })} aria-label={`${s.verified ? "Mark as unchecked" : "I checked this source"}: ${s.title || s.url}`}>
+                              {busy === "verifySource" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : !s.verified && <Check className="h-4 w-4" aria-hidden />} {s.verified ? "Mark as unchecked" : "I checked it, it backs the claim"}
+                            </Button>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -479,3 +510,4 @@ const splitList = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolea
 function toPatch(p: BlogPostView): BlogPostPatch {
   return { title: p.title, seoTitle: p.seoTitle, metaDescription: p.metaDescription, excerpt: p.excerpt, bodyMd: p.bodyMd, category: p.category, tags: p.tags, primaryKeyword: p.primaryKeyword, secondaryKeywords: p.secondaryKeywords, slug: p.slug, internalLinks: p.internalLinks };
 }
+const previewDate = (iso: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(iso));

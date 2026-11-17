@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { NextRequest } from "next/server";
 import * as realAuth from "../lib/auth";
 import { env } from "../lib/env";
-import { TRANSCRIPT_MAX, videoPrompt } from "../lib/ai/video-caption";
+import { narrates, TRANSCRIPT_MAX, videoPrompt } from "../lib/ai/video-caption";
 
 const src = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
@@ -19,7 +19,7 @@ describe("1160 prompt", () => {
     expect(p).toContain("These are 4 frames from one video");
     expect(p).toContain("It is 42 seconds long.");
     expect(p).toContain("We sold out by noon.");
-    expect(p).toContain('{"story": string}');
+    expect(p).toContain('{"seen": string, "point": string, "caption": string}'); // R1180: look, understand, then write
   });
   test("one frame, no transcript: says so and goes by the frames", () => {
     const p = videoPrompt(1, null);
@@ -31,6 +31,19 @@ describe("1160 prompt", () => {
     const p = videoPrompt(3, "x".repeat(TRANSCRIPT_MAX * 3), 10);
     expect(p.length).toBeLessThan(TRANSCRIPT_MAX + 1200);
     expect(p).toContain("x".repeat(100));
+  });
+});
+
+describe("R1180 a caption, not a frame report", () => {
+  test("the 11-17 NVIDIA answer is caught as narration; real captions are not", () => {
+    expect(narrates("A South Park style scene shows a board meeting with a sign that says HQ BOARD MEETING. Characters stand behind boxes labeled TYLER INC and PRIYA INC while captions say transitioned its like fired and investors are furious. A phone screen shows captions on the video being transcribed. The final scene shows one character raising a hand with the caption Post it First decision as CEO.")).toBe(true);
+    expect(narrates("In this video we see me at the market. The next scene is the stall.")).toBe(true);
+    for (const ok of [
+      "Two hours of drama, four seconds of content\n\nWhen your farewell speech becomes a clip\n\nSend this to someone who overthinks every post",
+      "Even aliens need help posting content\n\nStop juggling platforms and start creating.\n\nTag a creator who posts everywhere",
+      "I open the shop at 5 AM and show what the first hour really looks like.",
+    ])
+      expect(narrates(ok)).toBe(false);
   });
 });
 
@@ -69,10 +82,10 @@ describe("1160 frames reach Gemini", () => {
   test("every frame goes in as inline_data in order, the prompt last (Kimi, when ranked first, gets the same frames: 1174)", async () => {
     const { generateVideoStory } = await import("../lib/ai/video-caption");
     keys("kimi-key");
-    answer = JSON.stringify({ story: "I open the shop at 5 AM and show what the first hour really looks like." });
+    answer = JSON.stringify({ seen: "A talking head at a bakery counter before sunrise.", point: "The first hour is the hardest.", caption: "I open the shop at 5 AM and show what the first hour really looks like." });
     stub();
     const out = await generateVideoStory([{ mime: "image/jpeg", data: "QQ==" }, { mime: "image/jpeg", data: "Qg==" }, { mime: "image/jpeg", data: "Qw==" }], "First hour at the shop.", { timeoutMs: 5000, duration: 31 });
-    expect(out).toEqual({ story: "I open the shop at 5 AM and show what the first hour really looks like." });
+    expect(out).toEqual({ story: "I open the shop at 5 AM and show what the first hour really looks like.", seen: "A talking head at a bakery counter before sunrise." });
     const parts = sent.find((s) => s.url.includes("generativelanguage"))!.body.contents[0].parts;
     expect(parts.slice(0, 3)).toEqual([{ inline_data: { mime_type: "image/jpeg", data: "QQ==" } }, { inline_data: { mime_type: "image/jpeg", data: "Qg==" } }, { inline_data: { mime_type: "image/jpeg", data: "Qw==" } }]);
     expect(parts.at(-1).text).toContain("These are 3 frames");
@@ -91,6 +104,24 @@ describe("1160 frames reach Gemini", () => {
     answer = null;
     stub();
     expect(await generateVideoStory([{ mime: "image/jpeg", data: "QQ==" }], null, { timeoutMs: 3000 })).toBeNull();
+  });
+
+  test("R1180: a frame report is asked for again once, and the real caption wins", async () => {
+    const { generateVideoStory } = await import("../lib/ai/video-caption");
+    keys();
+    const report = JSON.stringify({ seen: "Kids at a snow fort.", caption: "A scene shows a board meeting. The final scene shows a raised hand." });
+    const real = JSON.stringify({ seen: "Kids at a snow fort.", caption: "Two hours of drama, four seconds of content\n\nSend this to someone who overthinks every post" });
+    let calls = 0;
+    globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+      if (!String(url).includes("generativelanguage")) return realFetch(url, init);
+      calls++;
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      const again = body.contents[0].parts.at(-1).text.includes("described the frames instead");
+      return gem(again ? real : report);
+    }) as typeof fetch;
+    const out = await generateVideoStory([{ mime: "image/jpeg", data: "QQ==" }], null, { timeoutMs: 5000 });
+    expect(calls).toBe(2);
+    expect(out).toEqual({ story: "Two hours of drama, four seconds of content\n\nSend this to someone who overthinks every post", seen: "Kids at a snow fort." });
   });
 });
 
@@ -176,7 +207,7 @@ describe("1160 workspace", () => {
     const w = src("components/create/CreateWorkspace.tsx");
     expect(w).toContain("if (submittedRef.current === null) void watchVideo(url);");
     expect(w).toContain("const { frames, duration } = await readFrames(url, 4, ctrl.signal);");
-    expect(w).toContain('api<{ story?: string; skipped?: string }>("/api/ai/video-caption"');
+    expect(w).toContain('api<{ story?: string; seen?: string; skipped?: string }>("/api/ai/video-caption"');
     expect(w).toContain("transcript: heard, auto: true");
     expect(w.indexOf("stopWatching();")).toBeGreaterThan(0);
     expect(w).toContain("const submitText = (s: string) => {\n    stopWatching();");

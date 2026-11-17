@@ -278,16 +278,9 @@ export function ScrollScenes() {
         }
       }
 
-      // d2. Why Outlly (1161): the bento rises as one; on lg the lead panel lands first and each panel after it
-      //     settles a beat later and from a little lower, so the asymmetric grid reads left to right, top to bottom.
-      //     The with/without pair comes up together, the "with" side a step behind.
+      // d2. Why Outlly (R1180): the five cards rise once, together. Nothing else moves in this section.
       const usp = sec("#why-outlly");
-      if (usp) {
-        const grid = usp.querySelector(".usp-grid");
-        enter([grid], usp, { y: 60 * k }, "top 88%");
-        if (lg && grid) (q(grid, "article") as HTMLElement[]).forEach((a, i) => i && enter([a], grid, { y: 30 + 16 * i }, "top 80%", 0, 0.07 * i));
-        enter(q(usp, ".usp-cmp"), usp, { y: 44 * k }, "top 85%", 0.12);
-      }
+      if (usp) enter([usp.querySelector(".usp-grid")], usp, { y: 40 * k }, "top 88%");
 
       // e. Demo: the whole player comes forward like a screen. On lg it is done before the section pins.
       const demoS = sec("#demo");

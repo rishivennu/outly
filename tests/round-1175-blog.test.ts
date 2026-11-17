@@ -80,10 +80,10 @@ import { db } from "../lib/db";
 import { can } from "../lib/admin/perms";
 import { BLOG_DEFAULT, blogConfigIssues } from "../lib/blog/config";
 import { countWords, slugify, SLUG_RE } from "../lib/blog/types";
-import { overlaps, pickDistinct, normaliseSeo, qualityChecks } from "../lib/blog/stages";
+import { overlaps, pickDistinct, normaliseSeo, qualityChecks, keywordUses } from "../lib/blog/stages";
 import { renderMarkdown, stripMarkdown } from "../lib/blog/markdown";
 import { localDay, startJob, runStage, cancelJob, recentJobs, STATIC_LINKS } from "../lib/blog/job";
-import { getPost, listPosts, publishPost, updatePost, rejectPost, restorePost, splitSections, blogStats, todayBlog, unpublishPost, regenerateSection } from "../lib/blog/posts";
+import { getPost, listPosts, publishPost, updatePost, rejectPost, restorePost, splitSections, blogStats, todayBlog, unpublishPost, regenerateSection, verifySource } from "../lib/blog/posts";
 
 const ADMIN = { id: "adm-blog", name: "Asha", login: "asha", role: "marketing" as const };
 const TOPIC = { topic: "t", problem: "p", primaryKeyword: KW, searchIntent: "informational", category: "Growth", score: 9, basis: "b" };
@@ -288,5 +288,53 @@ describe("1175 job flow", () => {
     await startJob({ kind: "manual", by: "asha", now: new Date(Date.now() + 3 * 86_400_000) }).catch((e) => (err = e));
     expect(err?.status).toBe(409);
     await saveConfig("blog", { ...BLOG_DEFAULT, paused: false });
+  });
+});
+
+describe("R1180 a fair publishing gate", () => {
+  const seoFor = () => normaliseSeo(BLOG_DEFAULT, TOPIC, OUTLINE, { seoTitle: "Instagram reach drop: what to check", metaDescription: "x".repeat(90), slug: "a-slug", internalLinks: [] }, { allowedLinks: STATIC_LINKS, takenSlugs: [] });
+  const run = (body: string, sources: any[] = [], seo = seoFor()) => qualityChecks({ cfg: BLOG_DEFAULT, topic: TOPIC, outline: OUTLINE, body, seo, sources, existing: [], allowedHrefs: STATIC_LINKS.map((l) => l.href) });
+  test("keywordUses ignores case, punctuation and word forms", () => {
+    expect(keywordUses("Fix your Content-Calendar today.", "content calendar")).toEqual({ exact: 1, close: 0 });
+    expect(keywordUses("Why is my content calendar not working? Here is the fix.", "content calendar not working fix")).toEqual({ exact: 0, close: 0 });
+    expect(keywordUses("When the content calendar stops working, the fixes are simple.", "content calendar not working fix")).toEqual({ exact: 0, close: 1 });
+    expect(keywordUses("Nothing about planning here.", "content calendar not working fix")).toEqual({ exact: 0, close: 0 });
+  });
+  test("a close variant passes the keyword check; no trace still blocks", () => {
+    const sections = SECTIONS.filter((s) => "BCDEFGHI".includes(s.key)).map((s) => `## ${s.heading}\n\n${paragraph(1)}`).join("\n\n");
+    const variant = run(`${sections}\n\nWhen Instagram reach starts to drop, check the hook first.`).find((c) => c.id === "keyword")!;
+    expect(variant.ok).toBe(true);
+    expect(variant.label).toContain("close variant");
+    const none = run(sections.replace(/instagram|reach/gi, "views")).find((c) => c.id === "keyword")!;
+    expect(none.ok).toBe(false);
+    expect(none.critical).toBe(true);
+  });
+  test("unverified sources warn on an advice article but block when it links out or quotes figures", () => {
+    const advice = "## A\n\nCheck the hook first.";
+    const unverified = [{ url: "https://madeup.example/x", title: "", publisher: "", kind: "publication", supports: "", verified: false }];
+    const warn = run(advice, unverified).find((c) => c.id === "sources")!;
+    expect(warn.ok).toBe(false);
+    expect(warn.critical).toBe(false);
+    expect(run(`${advice} [A study](https://madeup.example/x) says so.`, unverified).find((c) => c.id === "sources")!.critical).toBe(true);
+    expect(run(`${advice} Reach fell 40% for most.`, unverified).find((c) => c.id === "sources")!.critical).toBe(true);
+  });
+  test("the SEO stage cannot swap the keyword the draft was written around", () => {
+    const s = normaliseSeo(BLOG_DEFAULT, TOPIC, OUTLINE, { primaryKeyword: "Content Calendar Not Working Fix", secondaryKeywords: ["reach"] }, { allowedLinks: STATIC_LINKS, takenSlugs: [] });
+    expect(s.primaryKeyword).toBe(KW);
+    expect(s.secondaryKeywords).toEqual(["content calendar not working fix", "reach"]);
+  });
+  test("an admin can mark a source as checked; it clears the block and is audit-logged", async () => {
+    const body = `${SECTIONS.filter((s) => "BCDEFGHI".includes(s.key)).map((s) => `## ${s.heading}\n\n${paragraph(2)}`).join("\n\n")}\n\nAn ${KW} is common, says [a survey](https://madeup.example/r1180).`;
+    const post = await db.blogPost.create({ data: { slug: "r1180-gate", title: "R1180 gate", bodyMd: body, metaDescription: "m".repeat(90), category: "Growth", primaryKeyword: KW, status: "pending", qualityReport: JSON.stringify({ checks: [], ok: true, editorNote: "", wordCount: 0 }), sources: { create: [{ url: "https://madeup.example/r1180", title: "Survey", verified: false }] } }, include: { sources: true } });
+    const opened = await getPost(post.id);
+    const src = opened.quality!.checks.find((c) => c.id === "sources")!;
+    expect(src.ok).toBe(false);
+    expect(src.critical).toBe(true);
+    await expect(verifySource(ADMIN, post.id, "not-a-source", true)).rejects.toThrow();
+    const after = await verifySource(ADMIN, post.id, post.sources[0].id, true);
+    expect(after.sources[0].verified).toBe(true);
+    expect(after.quality!.checks.find((c) => c.id === "sources")!.ok).toBe(true);
+    expect(await db.auditLog.findFirst({ where: { action: "blog.source.verify", targetId: post.id } })).toBeTruthy();
+    await db.blogPost.delete({ where: { id: post.id } });
   });
 });
