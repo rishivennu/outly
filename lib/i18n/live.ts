@@ -50,7 +50,7 @@ export type LiveT = {
 };
 
 const en: LiveT = {
-  offer: "I'd like to get a human expert to help you with this. Would you like me to connect you with our support team?",
+  offer: "I'd like a person to help you with this. Would you like me to connect you with a human support specialist?",
   connect: "Connect to a human",
   keepPip: "Continue with Pip",
   connecting: "Connecting you with an Outlly support specialist. Please wait...",

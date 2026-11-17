@@ -327,7 +327,9 @@ describe("chat widget", () => {
   });
   test("nothing else can send while resolved, and focus lands on Reopen", () => {
     expect(src).toContain("{waitingEmail && !resolved && (");
-    expect(src.match(/disabled=\{busy \|\| !!resolved\} onClick=\{\(\) => send\(s\)\}/g)?.length).toBe(2);
+    // R1189: the welcome questions go through pick(), which refuses while resolved like send() does.
+    expect(src).toContain("disabled={busy || !!resolved} onClick={() => pick(tp.id, q, i)}");
+    expect(src).toMatch(/function pick\([^)]*\) \{\s+if \(busy \|\| resolved\) return;/);
     expect(src).toContain("[busy, resolved, conv, msgs,");
     expect(src).toContain("reopenRef.current?.focus()");
     // "Did that help? Yes" offers to resolve in a saved chat, instead of a dead-end line. 1151: only while not

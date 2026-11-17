@@ -98,7 +98,7 @@ afterAll(async () => {
 
 describe("the agreed words", () => {
   test("the offer, the two buttons and the six states are exactly the product wording", () => {
-    expect(LIVE_EN.offer).toBe("I'd like to get a human expert to help you with this. Would you like me to connect you with our support team?");
+    expect(LIVE_EN.offer).toBe("I'd like a person to help you with this. Would you like me to connect you with a human support specialist?");
     expect(LIVE_EN.connect).toBe("Connect to a human");
     expect(LIVE_EN.keepPip).toBe("Continue with Pip");
     expect(LIVE_EN.connecting).toBe("Connecting you with an Outlly support specialist. Please wait...");

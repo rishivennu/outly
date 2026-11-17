@@ -28,7 +28,7 @@ type ChatT = {
 
 export const T: Record<Lang, ChatT> = {
   en: {
-    open: "Chat with Pip", close: "Close chat", title: "Pip from Outlly", status: "Usually answers instantly",
+    open: "Chat with Pip", close: "Close chat", title: "Pip from Outlly", status: "Online",
     hello: "Hi! I'm Pip. Ask me anything about Outlly: billing, publishing, your account. If I can't solve it, I'll get a person.",
     placeholder: "Type your question", send: "Send", thinking: "Pip is thinking",
     helpful: "Did that help?", yes: "Yes, thanks", no: "Not really", human: "Talk to a person",
@@ -44,7 +44,7 @@ export const T: Record<Lang, ChatT> = {
     more: "Sorry about that. Can you tell me a bit more?", nudge: "Questions? I can help.",
   },
   hi: {
-    open: "Pip से बात करें", close: "चैट बंद करें", title: "Outlly का Pip", status: "आमतौर पर तुरंत जवाब देता है",
+    open: "Pip से बात करें", close: "चैट बंद करें", title: "Outlly का Pip", status: "ऑनलाइन",
     hello: "नमस्ते! मैं Pip हूँ। Outlly के बारे में कुछ भी पूछिए: बिलिंग, पब्लिशिंग, आपका अकाउंट। अगर मैं हल न कर पाऊँ, तो किसी व्यक्ति को बुला दूँगा।",
     placeholder: "अपना सवाल लिखें", send: "भेजें", thinking: "Pip सोच रहा है",
     helpful: "क्या इससे मदद मिली?", yes: "हाँ, धन्यवाद", no: "नहीं", human: "किसी व्यक्ति से बात करें",
@@ -60,7 +60,7 @@ export const T: Record<Lang, ChatT> = {
     more: "माफ़ कीजिए। क्या आप थोड़ा और बता सकते हैं?", nudge: "कोई सवाल? मैं मदद कर सकता हूँ।",
   },
   es: {
-    open: "Chatea con Pip", close: "Cerrar chat", title: "Pip de Outlly", status: "Suele responder al instante",
+    open: "Chatea con Pip", close: "Cerrar chat", title: "Pip de Outlly", status: "En línea",
     hello: "¡Hola! Soy Pip. Pregúntame lo que quieras sobre Outlly: facturación, publicaciones o tu cuenta. Si no puedo resolverlo, te paso con una persona.",
     placeholder: "Escribe tu pregunta", send: "Enviar", thinking: "Pip está pensando",
     helpful: "¿Te ayudó?", yes: "Sí, gracias", no: "No mucho", human: "Hablar con una persona",
@@ -76,7 +76,7 @@ export const T: Record<Lang, ChatT> = {
     more: "Lo siento. ¿Me cuentas un poco más?", nudge: "¿Dudas? Te ayudo.",
   },
   fr: {
-    open: "Discuter avec Pip", close: "Fermer le chat", title: "Pip d'Outlly", status: "Répond généralement tout de suite",
+    open: "Discuter avec Pip", close: "Fermer le chat", title: "Pip d'Outlly", status: "En ligne",
     hello: "Salut ! Je suis Pip. Pose-moi tes questions sur Outlly : facturation, publication, ton compte. Si je ne peux pas t'aider, je fais appel à une personne.",
     placeholder: "Écris ta question", send: "Envoyer", thinking: "Pip réfléchit",
     helpful: "Ça t'a aidé ?", yes: "Oui, merci", no: "Pas vraiment", human: "Parler à une personne",
@@ -92,7 +92,7 @@ export const T: Record<Lang, ChatT> = {
     more: "Désolé. Tu peux m'en dire un peu plus ?", nudge: "Une question ? Je peux aider.",
   },
   de: {
-    open: "Mit Pip chatten", close: "Chat schließen", title: "Pip von Outlly", status: "Antwortet meist sofort",
+    open: "Mit Pip chatten", close: "Chat schließen", title: "Pip von Outlly", status: "Online",
     hello: "Hallo! Ich bin Pip. Frag mich alles zu Outlly: Abrechnung, Veröffentlichen, dein Konto. Wenn ich nicht helfen kann, hole ich einen Menschen dazu.",
     placeholder: "Deine Frage", send: "Senden", thinking: "Pip denkt nach",
     helpful: "Hat das geholfen?", yes: "Ja, danke", no: "Nicht wirklich", human: "Mit einem Menschen sprechen",
@@ -108,7 +108,7 @@ export const T: Record<Lang, ChatT> = {
     more: "Das tut mir leid. Kannst du mir etwas mehr erzählen?", nudge: "Fragen? Ich helfe gern.",
   },
   pt: {
-    open: "Conversar com o Pip", close: "Fechar chat", title: "Pip da Outlly", status: "Costuma responder na hora",
+    open: "Conversar com o Pip", close: "Fechar chat", title: "Pip da Outlly", status: "Online",
     hello: "Oi! Eu sou o Pip. Pergunte o que quiser sobre a Outlly: cobrança, publicação, sua conta. Se eu não resolver, chamo uma pessoa.",
     placeholder: "Digite sua pergunta", send: "Enviar", thinking: "Pip está pensando",
     helpful: "Ajudou?", yes: "Sim, obrigado", no: "Não muito", human: "Falar com uma pessoa",
@@ -124,7 +124,7 @@ export const T: Record<Lang, ChatT> = {
     more: "Desculpe. Pode me contar um pouco mais?", nudge: "Dúvidas? Eu ajudo.",
   },
   ar: {
-    open: "تحدث مع Pip", close: "إغلاق المحادثة", title: "Pip من Outlly", status: "يرد عادةً فورًا",
+    open: "تحدث مع Pip", close: "إغلاق المحادثة", title: "Pip من Outlly", status: "متصل",
     hello: "مرحبًا! أنا Pip. اسألني أي شيء عن Outlly: الفواتير، النشر، حسابك. إذا لم أستطع الحل، سأحوّلك إلى شخص من فريقنا.",
     placeholder: "اكتب سؤالك", send: "إرسال", thinking: "Pip يفكر",
     helpful: "هل ساعدك ذلك؟", yes: "نعم، شكرًا", no: "ليس تمامًا", human: "التحدث مع شخص",
@@ -140,7 +140,7 @@ export const T: Record<Lang, ChatT> = {
     more: "آسف لذلك. هل يمكنك إخباري بالمزيد؟", nudge: "لديك سؤال؟ يمكنني المساعدة.",
   },
   zh: {
-    open: "和 Pip 聊天", close: "关闭聊天", title: "Outlly 的 Pip", status: "通常即时回复",
+    open: "和 Pip 聊天", close: "关闭聊天", title: "Outlly 的 Pip", status: "在线",
     hello: "你好！我是 Pip。关于 Outlly 的任何问题都可以问我：账单、发布、你的账户。如果我解决不了，我会请同事来帮你。",
     placeholder: "输入你的问题", send: "发送", thinking: "Pip 正在思考",
     helpful: "有帮助吗？", yes: "有，谢谢", no: "不太有", human: "联系人工客服",
@@ -156,7 +156,7 @@ export const T: Record<Lang, ChatT> = {
     more: "抱歉。能再多说一点吗？", nudge: "有问题？我可以帮忙。",
   },
   ja: {
-    open: "Pip とチャット", close: "チャットを閉じる", title: "Outlly の Pip", status: "たいていすぐに返信します",
+    open: "Pip とチャット", close: "チャットを閉じる", title: "Outlly の Pip", status: "オンライン",
     hello: "こんにちは！Pip です。Outlly のことなら何でも聞いてください。請求、投稿、アカウントなど。解決できないときは担当者につなぎます。",
     placeholder: "質問を入力", send: "送信", thinking: "Pip が考え中",
     helpful: "お役に立てましたか？", yes: "はい、ありがとう", no: "いまひとつ", human: "担当者と話す",
@@ -172,7 +172,7 @@ export const T: Record<Lang, ChatT> = {
     more: "すみません。もう少し詳しく教えてもらえますか？", nudge: "質問はありますか？お手伝いします。",
   },
   ru: {
-    open: "Чат с Pip", close: "Закрыть чат", title: "Pip из Outlly", status: "Обычно отвечает сразу",
+    open: "Чат с Pip", close: "Закрыть чат", title: "Pip из Outlly", status: "В сети",
     hello: "Привет! Я Pip. Спрашивайте что угодно об Outlly: оплата, публикации, ваш аккаунт. Если не смогу помочь, позову человека.",
     placeholder: "Введите вопрос", send: "Отправить", thinking: "Pip думает",
     helpful: "Это помогло?", yes: "Да, спасибо", no: "Не совсем", human: "Связаться с человеком",
@@ -188,7 +188,7 @@ export const T: Record<Lang, ChatT> = {
     more: "Извините. Расскажете чуть подробнее?", nudge: "Есть вопросы? Я помогу.",
   },
   id: {
-    open: "Chat dengan Pip", close: "Tutup chat", title: "Pip dari Outlly", status: "Biasanya langsung menjawab",
+    open: "Chat dengan Pip", close: "Tutup chat", title: "Pip dari Outlly", status: "Online",
     hello: "Hai! Aku Pip. Tanya apa saja tentang Outlly: tagihan, publikasi, akunmu. Kalau aku tidak bisa membantu, aku panggilkan orang dari tim kami.",
     placeholder: "Ketik pertanyaanmu", send: "Kirim", thinking: "Pip sedang berpikir",
     helpful: "Apakah ini membantu?", yes: "Ya, terima kasih", no: "Kurang", human: "Bicara dengan orang",
@@ -204,7 +204,7 @@ export const T: Record<Lang, ChatT> = {
     more: "Maaf soal itu. Bisa ceritakan sedikit lagi?", nudge: "Ada pertanyaan? Aku bisa bantu.",
   },
   bn: {
-    open: "Pip-এর সাথে চ্যাট", close: "চ্যাট বন্ধ করুন", title: "Outlly-এর Pip", status: "সাধারণত সঙ্গে সঙ্গে উত্তর দেয়",
+    open: "Pip-এর সাথে চ্যাট", close: "চ্যাট বন্ধ করুন", title: "Outlly-এর Pip", status: "অনলাইন",
     hello: "নমস্কার! আমি Pip। Outlly নিয়ে যা খুশি জিজ্ঞেস করুন: বিলিং, পাবলিশিং, আপনার অ্যাকাউন্ট। আমি সমাধান না পারলে একজন মানুষকে ডেকে দেব।",
     placeholder: "আপনার প্রশ্ন লিখুন", send: "পাঠান", thinking: "Pip ভাবছে",
     helpful: "এটা কি কাজে লাগল?", yes: "হ্যাঁ, ধন্যবাদ", no: "তেমন না", human: "একজন মানুষের সাথে কথা বলুন",
@@ -296,6 +296,140 @@ export const PIP_DATA: Partial<Record<Lang, { yours: string; suggestions: string
     ask: "Tell me more",
   },
 };
+
+/**
+ * Pip's welcome (R1189): four topics instead of a long list, each with its three most asked questions and the
+ * rest one tap away. The questions are sent as the person's own message, so Pip answers them like anything typed.
+ * Analytics questions stay in English in every language: the record lookups are planned from English wording
+ * (see PIP_DATA), and Pip still answers in the language picked below the composer.
+ */
+export type PipTopicId = "analytics" | "publishing" | "billing" | "human";
+export type PipTopic = { id: PipTopicId; title: string; line: string; questions: string[]; more: string[] };
+type HomeWords = {
+  ask: string; label: string; more: string; fewer: string; back: string; signIn: string; signInBtn: string;
+  analytics: [string, string]; publishing: [string, string, string[]]; billing: [string, string, string[]]; human: [string, string, string[]];
+};
+const HOME: Record<Lang, HomeWords> = {
+  en: {
+    ask: "What can I help you with today?", label: "Help topics", more: "More questions", fewer: "Fewer questions", back: "All topics",
+    signIn: "Sign in and I'll answer from your real numbers.", signInBtn: "Sign in",
+    analytics: ["Your Analytics", "Views, reach, growth, engagement and performance."],
+    publishing: ["Publishing & Content", "Failed posts, scheduling, captions and content creation.", ["Why did my post fail?", "Where can I see scheduled posts?", "How do I improve my caption?"]],
+    billing: ["Account & Billing", "Subscription plans, payments, invoices and account settings.", ["How do I change my plan?", "Where can I find my invoices?", "Why did my payment fail?"]],
+    human: ["Human Support", "Connect with an Outlly support specialist.", ["Connect me with a support specialist.", "Check my existing support ticket."]],
+  },
+  hi: {
+    ask: "आज मैं आपकी किस चीज़ में मदद करूँ?", label: "मदद के विषय", more: "और सवाल", fewer: "कम सवाल", back: "सभी विषय",
+    signIn: "साइन इन करें, फिर मैं आपके असली आंकड़ों से जवाब दूँगा।", signInBtn: "साइन इन करें",
+    analytics: ["आपके एनालिटिक्स", "व्यूज़, रीच, ग्रोथ, एंगेजमेंट और परफ़ॉर्मेंस।"],
+    publishing: ["पब्लिशिंग और कंटेंट", "फेल पोस्ट, शेड्यूलिंग, कैप्शन और कंटेंट बनाना।", ["मेरी पोस्ट फेल क्यों हुई?", "शेड्यूल की गई पोस्ट कहाँ देखूँ?", "मैं अपना कैप्शन कैसे बेहतर करूँ?"]],
+    billing: ["अकाउंट और बिलिंग", "सब्सक्रिप्शन प्लान, पेमेंट, इनवॉइस और अकाउंट सेटिंग्स।", ["मैं अपना प्लान कैसे बदलूँ?", "मेरे इनवॉइस कहाँ मिलेंगे?", "मेरा पेमेंट फेल क्यों हुआ?"]],
+    human: ["इंसानी सपोर्ट", "Outlly के सपोर्ट विशेषज्ञ से जुड़ें।", ["मुझे सपोर्ट विशेषज्ञ से जोड़ें।", "मेरा मौजूदा सपोर्ट टिकट देखें।"]],
+  },
+  es: {
+    ask: "¿En qué te puedo ayudar hoy?", label: "Temas de ayuda", more: "Más preguntas", fewer: "Menos preguntas", back: "Todos los temas",
+    signIn: "Inicia sesión y te respondo con tus números reales.", signInBtn: "Iniciar sesión",
+    analytics: ["Tus estadísticas", "Vistas, alcance, crecimiento, interacción y rendimiento."],
+    publishing: ["Publicación y contenido", "Publicaciones fallidas, programación, textos y creación de contenido.", ["¿Por qué falló mi publicación?", "¿Dónde veo mis publicaciones programadas?", "¿Cómo mejoro el texto de mi publicación?"]],
+    billing: ["Cuenta y facturación", "Planes, pagos, facturas y ajustes de la cuenta.", ["¿Cómo cambio mi plan?", "¿Dónde encuentro mis facturas?", "¿Por qué falló mi pago?"]],
+    human: ["Soporte humano", "Habla con un especialista de soporte de Outlly.", ["Conéctame con un especialista de soporte.", "Revisa mi ticket de soporte abierto."]],
+  },
+  fr: {
+    ask: "Comment puis-je t'aider aujourd'hui ?", label: "Sujets d'aide", more: "Plus de questions", fewer: "Moins de questions", back: "Tous les sujets",
+    signIn: "Connecte-toi et je réponds avec tes vrais chiffres.", signInBtn: "Se connecter",
+    analytics: ["Tes statistiques", "Vues, portée, croissance, engagement et performances."],
+    publishing: ["Publication et contenu", "Publications échouées, programmation, légendes et création de contenu.", ["Pourquoi ma publication a échoué ?", "Où voir mes publications programmées ?", "Comment améliorer ma légende ?"]],
+    billing: ["Compte et facturation", "Abonnements, paiements, factures et réglages du compte.", ["Comment changer d'abonnement ?", "Où trouver mes factures ?", "Pourquoi mon paiement a échoué ?"]],
+    human: ["Assistance humaine", "Parle à un spécialiste de l'assistance Outlly.", ["Mets-moi en contact avec un spécialiste de l'assistance.", "Vérifie mon ticket d'assistance en cours."]],
+  },
+  de: {
+    ask: "Wobei kann ich dir heute helfen?", label: "Hilfethemen", more: "Mehr Fragen", fewer: "Weniger Fragen", back: "Alle Themen",
+    signIn: "Melde dich an, dann antworte ich mit deinen echten Zahlen.", signInBtn: "Anmelden",
+    analytics: ["Deine Statistiken", "Aufrufe, Reichweite, Wachstum, Interaktion und Leistung."],
+    publishing: ["Veröffentlichen und Inhalte", "Fehlgeschlagene Posts, Planung, Captions und Inhalte erstellen.", ["Warum ist mein Post fehlgeschlagen?", "Wo sehe ich geplante Posts?", "Wie verbessere ich meine Caption?"]],
+    billing: ["Konto und Abrechnung", "Abos, Zahlungen, Rechnungen und Kontoeinstellungen.", ["Wie ändere ich mein Abo?", "Wo finde ich meine Rechnungen?", "Warum ist meine Zahlung fehlgeschlagen?"]],
+    human: ["Persönlicher Support", "Sprich mit einer Fachperson aus dem Outlly-Support.", ["Verbinde mich mit einer Support-Fachperson.", "Prüfe mein offenes Support-Ticket."]],
+  },
+  pt: {
+    ask: "Como posso te ajudar hoje?", label: "Temas de ajuda", more: "Mais perguntas", fewer: "Menos perguntas", back: "Todos os temas",
+    signIn: "Entre na conta e eu respondo com seus números reais.", signInBtn: "Entrar",
+    analytics: ["Suas estatísticas", "Visualizações, alcance, crescimento, engajamento e desempenho."],
+    publishing: ["Publicação e conteúdo", "Posts com falha, agendamento, legendas e criação de conteúdo.", ["Por que meu post falhou?", "Onde vejo os posts agendados?", "Como melhoro minha legenda?"]],
+    billing: ["Conta e cobrança", "Planos, pagamentos, faturas e configurações da conta.", ["Como mudo meu plano?", "Onde encontro minhas faturas?", "Por que meu pagamento falhou?"]],
+    human: ["Suporte humano", "Fale com um especialista do suporte da Outlly.", ["Me conecte com um especialista do suporte.", "Ver meu chamado de suporte aberto."]],
+  },
+  ar: {
+    ask: "كيف يمكنني مساعدتك اليوم؟", label: "مواضيع المساعدة", more: "أسئلة أخرى", fewer: "أسئلة أقل", back: "كل المواضيع",
+    signIn: "سجّل الدخول وسأجيبك من أرقامك الحقيقية.", signInBtn: "تسجيل الدخول",
+    analytics: ["إحصاءاتك", "المشاهدات والوصول والنمو والتفاعل والأداء."],
+    publishing: ["النشر والمحتوى", "المنشورات الفاشلة والجدولة والتعليقات وصناعة المحتوى.", ["لماذا فشل منشوري؟", "أين أرى المنشورات المجدولة؟", "كيف أحسّن نص منشوري؟"]],
+    billing: ["الحساب والفوترة", "الخطط والمدفوعات والفواتير وإعدادات الحساب.", ["كيف أغيّر خطتي؟", "أين أجد فواتيري؟", "لماذا فشلت عملية الدفع؟"]],
+    human: ["الدعم البشري", "تواصل مع أحد متخصصي الدعم في Outlly.", ["أوصلني بأحد متخصصي الدعم.", "تحقق من تذكرة الدعم الحالية."]],
+  },
+  zh: {
+    ask: "今天我能帮你做什么？", label: "帮助主题", more: "更多问题", fewer: "收起问题", back: "全部主题",
+    signIn: "登录后，我会用你的真实数据回答。", signInBtn: "登录",
+    analytics: ["你的数据分析", "播放量、覆盖、增长、互动和表现。"],
+    publishing: ["发布与内容", "发布失败、定时发布、文案和内容创作。", ["我的帖子为什么发布失败？", "在哪里查看已定时的帖子？", "怎样改进我的文案？"]],
+    billing: ["账户与账单", "订阅方案、付款、发票和账户设置。", ["怎样更换我的方案？", "在哪里找到我的发票？", "我的付款为什么失败？"]],
+    human: ["人工支持", "联系 Outlly 支持专员。", ["帮我联系支持专员。", "查看我现有的支持工单。"]],
+  },
+  ja: {
+    ask: "今日はどんなことをお手伝いしましょうか？", label: "ヘルプのトピック", more: "ほかの質問", fewer: "質問を閉じる", back: "すべてのトピック",
+    signIn: "ログインすると、実際の数値をもとにお答えします。", signInBtn: "ログイン",
+    analytics: ["アナリティクス", "再生数、リーチ、成長、エンゲージメント、パフォーマンス。"],
+    publishing: ["投稿とコンテンツ", "投稿の失敗、予約投稿、キャプション、コンテンツ作成。", ["投稿が失敗したのはなぜ？", "予約した投稿はどこで見られる？", "キャプションを良くするには？"]],
+    billing: ["アカウントと請求", "プラン、支払い、請求書、アカウント設定。", ["プランを変更するには？", "請求書はどこにある？", "支払いが失敗したのはなぜ？"]],
+    human: ["担当者サポート", "Outlly のサポート担当者につなぎます。", ["サポート担当者につないでください。", "今のサポートチケットを確認したい。"]],
+  },
+  ru: {
+    ask: "Чем я могу помочь сегодня?", label: "Темы помощи", more: "Ещё вопросы", fewer: "Меньше вопросов", back: "Все темы",
+    signIn: "Войдите, и я отвечу по вашим реальным цифрам.", signInBtn: "Войти",
+    analytics: ["Ваша аналитика", "Просмотры, охват, рост, вовлечённость и результаты."],
+    publishing: ["Публикации и контент", "Неудачные публикации, расписание, подписи и создание контента.", ["Почему моя публикация не вышла?", "Где посмотреть запланированные публикации?", "Как улучшить подпись к посту?"]],
+    billing: ["Аккаунт и оплата", "Тарифы, платежи, счета и настройки аккаунта.", ["Как сменить тариф?", "Где найти мои счета?", "Почему не прошёл платёж?"]],
+    human: ["Живая поддержка", "Свяжитесь со специалистом поддержки Outlly.", ["Соедините меня со специалистом поддержки.", "Проверить мой открытый запрос в поддержку."]],
+  },
+  id: {
+    ask: "Ada yang bisa aku bantu hari ini?", label: "Topik bantuan", more: "Pertanyaan lain", fewer: "Lebih sedikit", back: "Semua topik",
+    signIn: "Masuk dulu, nanti aku jawab dari angka aslimu.", signInBtn: "Masuk",
+    analytics: ["Analitikmu", "Tayangan, jangkauan, pertumbuhan, interaksi dan performa."],
+    publishing: ["Posting dan konten", "Posting gagal, penjadwalan, caption dan pembuatan konten.", ["Kenapa postinganku gagal?", "Di mana aku lihat postingan terjadwal?", "Bagaimana memperbaiki caption-ku?"]],
+    billing: ["Akun dan tagihan", "Paket langganan, pembayaran, invoice dan pengaturan akun.", ["Bagaimana cara ganti paket?", "Di mana invoice-ku?", "Kenapa pembayaranku gagal?"]],
+    human: ["Dukungan manusia", "Terhubung dengan spesialis dukungan Outlly.", ["Hubungkan aku dengan spesialis dukungan.", "Cek tiket dukunganku yang ada."]],
+  },
+  bn: {
+    ask: "আজ আমি কীভাবে সাহায্য করতে পারি?", label: "সাহায্যের বিষয়", more: "আরও প্রশ্ন", fewer: "কম প্রশ্ন", back: "সব বিষয়",
+    signIn: "সাইন ইন করুন, তারপর আপনার আসল সংখ্যা থেকে উত্তর দেব।", signInBtn: "সাইন ইন",
+    analytics: ["আপনার অ্যানালিটিক্স", "ভিউ, রিচ, বৃদ্ধি, এনগেজমেন্ট আর পারফরম্যান্স।"],
+    publishing: ["পাবলিশিং ও কনটেন্ট", "ব্যর্থ পোস্ট, শিডিউলিং, ক্যাপশন আর কনটেন্ট তৈরি।", ["আমার পোস্ট কেন ব্যর্থ হলো?", "শিডিউল করা পোস্ট কোথায় দেখব?", "ক্যাপশন কীভাবে আরও ভালো করব?"]],
+    billing: ["অ্যাকাউন্ট ও বিলিং", "সাবস্ক্রিপশন প্ল্যান, পেমেন্ট, ইনভয়েস আর অ্যাকাউন্ট সেটিংস।", ["প্ল্যান কীভাবে বদলাব?", "আমার ইনভয়েস কোথায় পাব?", "আমার পেমেন্ট কেন ব্যর্থ হলো?"]],
+    human: ["মানুষের সাপোর্ট", "Outlly-এর সাপোর্ট বিশেষজ্ঞের সঙ্গে যুক্ত হন।", ["আমাকে সাপোর্ট বিশেষজ্ঞের সঙ্গে যুক্ত করুন।", "আমার চালু সাপোর্ট টিকিট দেখুন।"]],
+  },
+};
+/** The questions that used to sit in the long welcome list live on under "More questions", so none is lost. */
+const ANALYTICS_QS = ["How many views did I get this week?", "Compare my Instagram and YouTube performance.", "When is my best time to post?"];
+const MORE_EN: Record<Exclude<PipTopicId, "analytics">, string[]> = {
+  publishing: ["My upload is stuck. What can I do?"],
+  billing: ["How do I cancel my subscription?", "Can I get a refund?", "Which payment methods do you accept?", "How do I reset my password?", "How do I change the email on my account?"],
+  human: [],
+};
+export type PipHome = Omit<HomeWords, "analytics" | "publishing" | "billing" | "human"> & { topics: PipTopic[] };
+export function pipHome(l: Lang): PipHome {
+  const w = HOME[l] ?? HOME.en;
+  const pd = PIP_DATA.en!.suggestions;
+  const extra = (id: Exclude<PipTopicId, "analytics">) => (l === "en" ? MORE_EN[id] : id === "billing" ? [T[l].suggestions[0]] : []);
+  const { analytics, publishing, billing, human, ...words } = w;
+  return {
+    ...words,
+    topics: [
+      { id: "analytics", title: analytics[0], line: analytics[1], questions: ANALYTICS_QS, more: pd.filter((q) => !/views did I get|Compare|best time/i.test(q)) },
+      { id: "publishing", title: publishing[0], line: publishing[1], questions: publishing[2], more: extra("publishing") },
+      { id: "billing", title: billing[0], line: billing[1], questions: billing[2], more: extra("billing") },
+      { id: "human", title: human[0], line: human[1], questions: human[2], more: extra("human") },
+    ],
+  };
+}
 
 /** Resolve Conversation (1126). Languages without an entry use English. */
 export type ResolveT = {

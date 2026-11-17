@@ -26,7 +26,7 @@ describe("1125 Pip typography: Poppins inside Pip only", () => {
     expect(css).not.toMatch(/(^|\n)(body|html|:root)[^{]*\{[^}]*--font-pip/);
   });
   test("weights follow the hierarchy", () => {
-    expect(widget).toContain('className="pc-display mt-2 text-[19px] font-extrabold"');
+    expect(widget).toContain('className="pc-display text-[19px] font-extrabold"');
     expect(widget).toContain('id="pc-title" className="truncate text-[15px] font-bold');
     expect(css).toContain(".pc .pc-num { font-weight: 700;");
     expect(css).toContain(".pc .pc-eyebrow { font-weight: 600;");

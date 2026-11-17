@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowDown, ArrowUp, Check, ChevronDown, Copy, Headset, Loader2, Maximize2, Minimize2, RotateCw, SquarePen, X } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, CalendarClock, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, CreditCard, Globe, Headset, Loader2, Maximize2, Minimize2, RotateCw, SquarePen, X } from "lucide-react";
 import { Pip, type PipMood } from "@/components/brand/Pip";
 import { useMaybeUser } from "@/components/shell/UserContext";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
@@ -11,13 +11,14 @@ import { PipDataCard } from "./PipDataCard";
 import { pipFont } from "./font";
 import type { PipResult } from "@/lib/pip/types";
 import type { Insight } from "@/lib/pip/analytics-core";
-import { CX, LANGS, PIP_DATA, T, langDir, readLang, resolveT, writeLang, type Lang } from "@/lib/i18n/support";
+import { CX, LANGS, PIP_DATA, T, langDir, pipHome, readLang, resolveT, writeLang, type Lang, type PipTopicId } from "@/lib/i18n/support";
 import { HUMAN_RE } from "@/lib/support/smalltalk";
 import { liveSysLine, liveT, type LiveT } from "@/lib/i18n/live";
 import { mergeLive, receipt, type CustomerState, type WireMsg, type WidgetState } from "@/lib/support/live-core";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
+const TOPIC_ICON: Record<PipTopicId, typeof Headset> = { analytics: BarChart3, publishing: CalendarClock, billing: CreditCard, human: Headset };
 const STUDIO = ["/home", "/create", "/calendar", "/content", "/analytics", "/inbox", "/approvals", "/accounts", "/billing", "/settings", "/support"];
 type Msg = {
   id: number; role: "user" | "bot"; text: string; sources?: { id: string; question: string }[]; ask?: boolean; kind?: "escalate" | "ticket" | "error" | "resolve" | "connect" | "live" | "sys"; data?: PipResult; offer?: boolean;
@@ -84,6 +85,11 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   // 1123: evidence-backed nudges from the person's own numbers. Only dismissed ids are stored, never the text.
   const [insights, setInsights] = useState<Insight[]>([]);
   const [dismissed, setDismissed] = useState<string[]>([]);
+  // R1189: the welcome shows four topics; one opened shows its three questions, and "More questions" the rest.
+  const [topic, setTopic] = useState<PipTopicId | null>(null);
+  const [allQs, setAllQs] = useState(false);
+  const backRef = useRef<HTMLButtonElement>(null);
+  const topicRefs = useRef<Partial<Record<PipTopicId, HTMLButtonElement | null>>>({});
   const [retrying, setRetrying] = useState<string | null>(null);
   // Editors can't re-send posts (the retry route refuses them), so the failed-post card offers no Try again for them.
   const canRetry = useMaybeUser()?.workspace?.role !== "editor";
@@ -736,6 +742,26 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     if (q) send(q);
   }
 
+  function openTopic(id: PipTopicId) {
+    setTopic(id); setAllQs(false);
+    setTimeout(() => backRef.current?.focus({ preventScroll: true }), 30);
+  }
+  function closeTopic() {
+    const was = topic;
+    setTopic(null); setAllQs(false);
+    setTimeout(() => { if (was) topicRefs.current[was]?.focus({ preventScroll: true }); }, 30);
+  }
+  // A picked question is the person's own message and Pip answers it like anything typed. "Connect me with a
+  // support specialist" goes straight to the handoff offer (Live Assist when signed in, an email ticket otherwise).
+  function pick(id: PipTopicId, q: string, i: number) {
+    if (busy || resolved) return;
+    if (id === "human" && i === 0) {
+      push({ role: "user", text: q });
+      return escalate();
+    }
+    send(q);
+  }
+
   function newChat() {
     // An open request is ended first, so nobody on the support team waits for a chat that has moved on.
     if (conv && inLive(live)) fetch("/api/support/live", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "cancel", conversationId: conv }) }).catch(() => {});
@@ -744,6 +770,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     setLive("none"); setLiveInfo(NO_LIVE); setHasLive(false); setUnread(0); setLiveErr("");
     setMsgs([]); setFails(0); setTicket({ busy: false, error: "", ref: "" }); setInput("");
     setConv(null); setResolved(null); setClosing({ busy: false, error: "" });
+    setTopic(null); setAllQs(false);
     try { sessionStorage.removeItem(STORE); } catch {}
     setAnnounce(cx.newChatDone);
     inputRef.current?.focus();
@@ -766,6 +793,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const nudges = insights.filter((n) => !dismissed.includes(`insight:${n.id}`));
   const pd = PIP_DATA[lang];
   const pdx = PIP_DATA.en!;
+  const home = pipHome(lang);
+  const tp = topic ? home.topics.find((x) => x.id === topic) ?? null : null;
   // Studio pages are signed-in only, so visitors (marketing pages) never see the data starters.
   const signedIn = inStudio;
   const left = MAX - input.length;
@@ -818,17 +847,69 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
 
           <div className="relative min-h-0 flex-1">
             <div ref={listRef} onScroll={onScroll} data-lenis-prevent className="h-full overflow-y-auto overscroll-contain px-4 pb-4 pt-5">
-              <div className="pc-welcome mb-5 text-center">
-                <div className="mx-auto grid w-max place-items-center"><Pip size={msgs.length ? 52 : 76} mood={mood} /></div>
-                <p className="pc-display mt-2 text-[19px] font-extrabold">{cx.welcome}</p>
-                <p className="pc-muted mx-auto mt-1 max-w-[34ch] text-[14px] leading-relaxed">{t.hello}</p>
+              {/* R1189: one welcome, only before the first message. After that the chat is just the conversation. */}
+              {msgs.length === 0 && (<div className="pc-home">
+              <div className="pc-welcome mb-4">
+                <p className="pc-display text-[19px] font-extrabold">{cx.welcome} <span aria-hidden>👋</span></p>
+                <p className="pc-muted mt-0.5 text-[14px] leading-snug">{home.ask}</p>
               </div>
 
+              {!tp ? (
+                <nav aria-label={home.label}>
+                  <ul className="pc-topics">
+                    {home.topics.map((x) => {
+                      const Icon = TOPIC_ICON[x.id];
+                      return (
+                        <li key={x.id}>
+                          <button type="button" ref={(el) => { topicRefs.current[x.id] = el; }} onClick={() => openTopic(x.id)} className="pc-row">
+                            <span className="pc-row-icon" aria-hidden><Icon className="h-[18px] w-[18px]" /></span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[14.5px] font-semibold leading-snug">{x.title}</span>
+                              <span className="pc-muted block text-[12.5px] leading-snug">{x.line}</span>
+                            </span>
+                            <ChevronRight className="pc-muted h-4 w-4 shrink-0 rtl:rotate-180" aria-hidden />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </nav>
+              ) : (
+                <section aria-labelledby="pc-topic" className="pc-topics pc-in">
+                  <div className="pc-topic-head flex items-center gap-1 pe-3">
+                    <button ref={backRef} type="button" onClick={closeTopic} aria-label={home.back} title={home.back} className="pc-icon"><ChevronLeft className="h-5 w-5 rtl:rotate-180" aria-hidden /></button>
+                    <h3 id="pc-topic" className="min-w-0 truncate text-[14.5px] font-semibold">{tp.title}</h3>
+                  </div>
+                  {tp.id === "analytics" && !signedIn ? (
+                    <div className="px-3 pb-3 pt-2.5">
+                      <p className="text-[14px] leading-snug">{home.signIn}</p>
+                      <Link href="/login?next=/analytics" onClick={close} className="pc-btn pc-btn-primary mt-2.5">{home.signInBtn}</Link>
+                    </div>
+                  ) : (<>
+                    <ul>
+                      {(allQs ? [...tp.questions, ...tp.more] : tp.questions).map((q, i) => (
+                        <li key={q}>
+                          <button type="button" disabled={busy || !!resolved} onClick={() => pick(tp.id, q, i)} className="pc-row pc-q">
+                            <span className="min-w-0 flex-1">{q}</span>
+                            <ArrowUp className="pc-muted h-4 w-4 shrink-0 rotate-45 rtl:-rotate-45" aria-hidden />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    {tp.more.length > 0 && (
+                      <div className="pc-topic-foot px-3">
+                        <button type="button" onClick={() => setAllQs((v) => !v)} aria-expanded={allQs} className="pc-link inline-flex min-h-11 items-center text-[13px]">{allQs ? home.fewer : `${home.more} (${tp.more.length})`}</button>
+                      </div>
+                    )}
+                  </>)}
+                </section>
+              )}
+
               {shown.length > 0 && (
-                <section aria-labelledby="pc-att" className="mb-5">
+                <section aria-labelledby="pc-att" className="mt-5">
                   <h3 id="pc-att" className="pc-eyebrow mb-2">{cx.attention}</h3>
                   <ul className="space-y-2">
-                    {shown.map((c) => {
+                    {shown.slice(0, 2).map((c) => {
                       const name = PLATFORM_META[c.platform].name;
                       const text = c.kind === "failed" ? cx.failed(name, c.title) : c.kind === "reconnect" ? cx.reconnect(name) : cx.expiring(name, c.days);
                       const needsConnect = c.kind !== "failed" || c.reconnect;
@@ -857,10 +938,10 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
               )}
 
               {nudges.length > 0 && (
-                <section aria-labelledby="pc-worth" className="mb-5">
+                <section aria-labelledby="pc-worth" className="mt-5">
                   <h3 id="pc-worth" className="pc-eyebrow mb-2">{(pd ?? pdx).worth}</h3>
                   <ul className="space-y-2">
-                    {nudges.map((n) => (
+                    {nudges.slice(0, 1).map((n) => (
                       <li key={n.id} className={cn("pc-card pi-card flex items-start gap-3 p-3", `pi-${n.level}`)}>
                         <div className="min-w-0 flex-1">
                           <p className="text-[14px] font-bold leading-snug">{n.title}</p>
@@ -875,27 +956,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                 </section>
               )}
 
-              {msgs.length === 0 && signedIn && pd && (
-                <section aria-labelledby="pc-yours" className="mb-5">
-                  <h3 id="pc-yours" className="pc-eyebrow mb-2">{pd.yours}</h3>
-                  <ul className="flex flex-col gap-2">
-                    {pd.suggestions.map((s) => (
-                      <li key={s}><button type="button" disabled={busy || !!resolved} onClick={() => send(s)} className="pc-chip w-full text-start">{s}</button></li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-
-              {msgs.length === 0 && (
-                <section aria-labelledby="pc-pop">
-                  <h3 id="pc-pop" className="pc-eyebrow mb-2">{cx.popular}</h3>
-                  <ul className="flex flex-col gap-2">
-                    {t.suggestions.map((s) => (
-                      <li key={s}><button type="button" disabled={busy || !!resolved} onClick={() => send(s)} className="pc-chip w-full text-start">{s}</button></li>
-                    ))}
-                  </ul>
-                </section>
-              )}
+              </div>)}
 
               <div role="log" aria-live="polite" aria-relevant="additions" aria-label={cx.conversation} aria-busy={busy} className="space-y-3">
                 {msgs.map((m, i) => m.kind === "sys" ? (
@@ -926,7 +987,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                         {!!m.sources?.length && !m.ask && !liveOn && (
                           <>
                             <span className="pc-muted px-1 text-[12px]">{t.related}:</span>
-                            {m.sources.map((s) => <button key={s.id} type="button" disabled={busy || !!resolved} onClick={() => send(s.question, s.id)} className="pc-chip pc-chip-sm text-start">{s.question}</button>)}
+                            {m.sources.slice(0, 3).map((s) => <button key={s.id} type="button" disabled={busy || !!resolved} onClick={() => send(s.question, s.id)} className="pc-chip pc-chip-sm text-start">{s.question}</button>)}
                           </>
                         )}
                       </div>
@@ -1079,18 +1140,20 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
               />
               <button type="submit" disabled={!input.trim() || (busy && !liveOn) || !!resolved || live === "connecting"} aria-label={t.send} title={t.send} className="pc-send grid h-11 w-11 shrink-0 place-items-center rounded-full"><ArrowUp className="h-5 w-5" aria-hidden /></button>
             </form>
-            <p id="pc-hint" className={cn("pc-muted mt-1.5 truncate px-2 text-[12px]", left > 100 && "max-sm:sr-only")}>
+            <p id="pc-hint" className={cn("pc-muted mt-1.5 truncate px-2 text-[12px]", left > 100 && "sr-only")}>
               {left <= 100 ? <span aria-live="polite" className={cn(left <= 20 && "pc-error font-medium")}>{cx.charsLeft(left)}</span> : cx.hint}
             </p>
             </>)}
             <div className="mt-0.5 flex items-center justify-between gap-2 ps-1">
               <button type="button" onClick={openBrowse} aria-expanded={browse} className="pc-link inline-flex min-h-11 items-center text-[13px]">{t.faqLink}</button>
-              <label className="relative shrink-0">
+              <label className="pc-lang relative inline-flex h-11 shrink-0 items-center">
                 <span className="sr-only">{t.lang}</span>
-                <select value={lang} onChange={(e) => { const l = e.target.value as Lang; setLang(l); writeLang(l); }} title={t.lang} className="pc-select h-11 max-w-[9.5rem] cursor-pointer appearance-none truncate rounded-full py-0 pe-8 ps-4 text-[13px] font-medium">
+                <span className="pc-select pc-muted pointer-events-none inline-flex h-8 max-w-[9.5rem] items-center gap-1.5 rounded-full pe-2.5 ps-3 text-[12.5px] font-medium" aria-hidden>
+                  <Globe className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{LANGS.find((l) => l.id === lang)?.label}</span><ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                </span>
+                <select value={lang} onChange={(e) => { const l = e.target.value as Lang; setLang(l); writeLang(l); }} title={t.lang} className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0">
                   {LANGS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
                 </select>
-                <ChevronDown className="pc-muted pointer-events-none absolute end-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2" aria-hidden />
               </label>
             </div>
           </footer>
