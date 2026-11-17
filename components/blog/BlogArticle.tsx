@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { SplitLines } from "@/components/shared/SplitLines";
 
 /**
  * R1180: the one article layout. The public page (app/(marketing)/blog/[slug]) and the admin Preview tab
@@ -43,7 +44,7 @@ export function BlogArticle({ title, excerpt, category, categoryHref, author, re
         ) : (
           <p className={cn(catClass, "flex min-h-11 items-center")}>{cat}</p>
         ))}
-        <h1 className={cn("display mt-2 text-balance", mobile ? "text-[1.875rem] leading-[1.15]" : "text-[clamp(1.75rem,2.6vw+1rem,2.75rem)] leading-[1.1]")}>{title}</h1>
+        <SplitLines className={cn("display mt-2 text-balance", mobile ? "text-[1.875rem] leading-[1.15]" : "text-[clamp(1.75rem,2.6vw+1rem,2.75rem)] leading-[1.1]")}>{title}</SplitLines>
         {excerpt?.trim() && <p className={cn("mt-4 text-pretty leading-relaxed text-muted-foreground", mobile ? "text-[16px]" : "text-[17px] sm:text-[18px]")}>{excerpt}</p>}
         <p className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13.5px] text-muted-foreground">
           <span>

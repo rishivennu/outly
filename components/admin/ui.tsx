@@ -276,7 +276,9 @@ export function Table({ head, children, className, label = "Table", mobile = "ca
         "data-label": kind === "field" ? (cell.props["data-label"] ?? labels[i] ?? undefined) : undefined,
       });
     });
-    return React.cloneElement(row as React.ReactElement<Record<string, unknown>>, { role: "row" }, cells);
+    // 1188: the row's key is its identity across a filter, sort or page change, so Flip can glide it from
+    // its old place to its new one (lib/motion/flip.ts). Pages write <tr key={record.id}>; nothing else to do.
+    return React.cloneElement(row as React.ReactElement<Record<string, unknown>>, { role: "row", "data-flip-id": row.key ?? undefined }, cells);
   });
   return (
     <ScrollX label={label} className={cn("atable -mx-5 px-5 sm:-mx-6 sm:px-6", mobile === "cards" ? "atable--cards" : "atable--scroll pin-first", className)}>

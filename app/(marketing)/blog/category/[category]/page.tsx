@@ -4,6 +4,7 @@ import { cache } from "react";
 import { Shell } from "@/components/marketing/bits";
 import { Breadcrumbs } from "@/components/blog/Breadcrumbs";
 import { CategoryNav } from "@/components/blog/CategoryNav";
+import { SplitLines } from "@/components/shared/SplitLines";
 import { JsonLd } from "@/components/blog/JsonLd";
 import { Pagination } from "@/components/blog/Pagination";
 import { PostGrid } from "@/components/blog/PostCard";
@@ -57,7 +58,7 @@ export default async function CategoryPage(props: Props) {
             <span aria-hidden="true" className="h-1.5 w-1.5 rotate-45 bg-lime" />
             Topic
           </p>
-          <h1 className="display mt-6 max-w-2xl text-balance text-[clamp(2.4rem,5.2vw,4rem)]">{cat.name}</h1>
+          <SplitLines className="display mt-6 max-w-2xl text-balance text-[clamp(2.4rem,5.2vw,4rem)]">{cat.name}</SplitLines>
           <p className="mt-6 max-w-2xl text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-lg">
             {lead(cat.name)} {cat.count} {cat.count === 1 ? "article" : "articles"}.
           </p>

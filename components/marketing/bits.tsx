@@ -1,4 +1,5 @@
 import { Reveal } from "./Reveal";
+import { SplitLines } from "@/components/shared/SplitLines";
 import { splitWords } from "./Split";
 import { cn } from "@/lib/utils";
 import { ScrambleText } from "@/components/ui/text-fx";
@@ -63,7 +64,8 @@ export function Prose({ children }: { children: React.ReactNode }) {
 export function PageHead({ title, updated, lead }: { title: string; updated?: string; lead: string }) {
   return (
     <div className="max-w-2xl">
-      <h1 className="display text-balance text-[clamp(2.4rem,6.5vw,4rem)]">{title}</h1>
+      {/* 1188: the page headline rises line by line out of its own masks (GSAP SplitText). */}
+      <SplitLines className="display text-balance text-[clamp(2.4rem,6.5vw,4rem)]">{title}</SplitLines>
       {updated && <p className="mt-3 text-[14px] text-muted-foreground">Last updated {updated}</p>}
       <p className="mt-6 text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-lg">{lead}</p>
     </div>

@@ -39,7 +39,7 @@ export default async function Tickets(props: { searchParams: Promise<{ s?: strin
         ) : (
           <ul className="-mx-2 flex flex-col">
             {rows.map((t) => (
-              <li key={t.id}>
+              <li key={t.id} data-flip-id={t.id}>
                 <Link href={`/admin/tickets/${t.id}`} className="group flex items-start gap-3 rounded-2xl px-2 py-3 transition-colors hover:bg-foreground/[0.03]">
                   <span className={cn("mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full", t.priority === "urgent" ? "bg-destructive" : t.priority === "high" ? "bg-warning" : "bg-muted-foreground/30")} aria-hidden />
                   <span className="min-w-0 flex-1">

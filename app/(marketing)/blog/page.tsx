@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight, Rss } from "lucide-react";
 import { Shell } from "@/components/marketing/bits";
+import { SplitLines } from "@/components/shared/SplitLines";
 import { CategoryNav } from "@/components/blog/CategoryNav";
 import { JsonLd } from "@/components/blog/JsonLd";
 import { Pagination } from "@/components/blog/Pagination";
@@ -71,9 +72,9 @@ export default async function BlogPage(props: Props) {
                 <span aria-hidden="true" className="h-1.5 w-1.5 rotate-45 bg-lime" />
                 The Outlly blog
               </p>
-              <h1 className="display mt-6 max-w-[14ch] text-balance text-[clamp(2.4rem,5.2vw,4rem)]">
+              <SplitLines className="display mt-6 max-w-[14ch] text-balance text-[clamp(2.4rem,5.2vw,4rem)]">
                 Guides for creators who <span className="accent-serif">publish</span> everywhere.
-              </h1>
+              </SplitLines>
               <p className="mt-6 max-w-xl text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-lg">{LEAD}</p>
             </div>
             <SearchForm q={q} className="mt-8" />

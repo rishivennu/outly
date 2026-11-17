@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { ListChecks, Loader2, Plus, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Icon3D, type IconName } from "@/components/brand/Icon3D";
@@ -27,6 +27,10 @@ import { bulkDeleteCopy, matchesQuery, selectRange } from "@/lib/client/library-
 import type { PostView } from "@/lib/services";
 import type { LibraryCounts, LibraryPage } from "@/lib/posts/library";
 import { T } from "@/lib/motion/tokens";
+import { flipCapture, flipPlay, loadFlip, type FlipSnapshot } from "@/lib/motion/flip";
+import { onIdle } from "@/lib/client/when-idle";
+
+const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -208,10 +212,30 @@ export function ContentLibrary({
   // Local matches show at once; the server's answer replaces them when it lands.
   const list = !q ? shown : remote && (remote.posts.length || !remote.loading) ? remote.posts.filter((p) => match(p, filter)) : shown.filter((p) => matchesQuery(p, q));
   const clearSearch = () => {
+    snapGrid();
     setQuery("");
     setQ("");
     searchRef.current?.focus();
   };
+
+  /*
+   * 1188: filtering and searching rearrange the grid instead of redrawing it (GSAP Flip, lib/motion/flip.ts).
+   * Every card that is still in the list glides from where it was to where it now belongs; the cards that are
+   * genuinely new keep their own fade (framer, opacity only, so the two engines never write the same property).
+   * The old places are measured in the click or keystroke itself, before React renders the new list.
+   */
+  const grid = useRef<HTMLUListElement>(null);
+  const first = useRef<FlipSnapshot>(null);
+  const snapGrid = () => {
+    first.current ??= flipCapture(grid.current);
+  };
+  const order = list.map((p) => p.id).join(",");
+  useIso(() => {
+    const from = first.current;
+    first.current = null;
+    return from ? flipPlay(grid.current, from, { enter: false }) : undefined;
+  }, [order]);
+  useEffect(() => onIdle(() => void loadFlip()), []);
 
   // 1148: multi-select. "Select" turns every card into a checkbox (phones); on a desktop the box shows on hover
   // or focus and shift-click picks a run of cards.
@@ -301,6 +325,7 @@ export function ContentLibrary({
       <div role="tablist" aria-label="Filter by status" className="scrollbar-none -mx-1 mt-8 flex gap-2 overflow-x-auto px-1 pb-1">
         {FILTERS.filter((f) => f.id === "all" || f.id === filter || counts[f.id] > 0).map((f) => (
           <button key={f.id} role="tab" aria-selected={filter === f.id} onClick={() => {
+              if (f.id !== filter) snapGrid();
               setFilter(f.id);
               window.history.replaceState(null, "", f.id === "all" ? "/content" : `/content?filter=${f.id}`);
             }} className={cn("relative h-11 shrink-0 rounded-full px-4 text-sm font-medium transition", filter === f.id ? "text-background" : "text-muted-foreground hairline hover:text-foreground")}>
@@ -320,7 +345,7 @@ export function ContentLibrary({
             ref={searchRef}
             type="search"
             value={query}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => (snapGrid(), setQuery(e.target.value))}
             onKeyDown={(e) => e.key === "Escape" && query && (e.preventDefault(), clearSearch())}
             placeholder="Search titles, captions, tags, file names"
             maxLength={100}
@@ -372,10 +397,9 @@ export function ContentLibrary({
       ) : list.length === 0 ? (
         <Empty filter={filter} />
       ) : (
-        <motion.ul layout className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-          <AnimatePresence>
+        <ul ref={grid} className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {list.map((p, i) => (
-              <motion.li key={p.id} className="group/card relative" layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0, transition: { delay: Math.min(i * 0.03, 0.3) } }} exit={{ opacity: 0, scale: 0.95 }}>
+              <motion.li key={p.id} data-flip-id={p.id} className="group/card relative" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: Math.min(i * 0.03, 0.3), duration: 0.3 } }}>
                 <button
                   type="button"
                   onClick={(e) => (picking ? toggle(i, e.shiftKey) : hasLive(p) ? setStats(p) : setOpen(p))}
@@ -427,8 +451,7 @@ export function ContentLibrary({
                 )}
               </motion.li>
             ))}
-          </AnimatePresence>
-        </motion.ul>
+        </ul>
       )}
 
       {q && remote?.next && list.length > 0 && (

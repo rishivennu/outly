@@ -643,6 +643,19 @@ html.js .rv-head:not([data-shown]) .rv-body { opacity: 0; transform: translate3d
   html.js [data-reveal]:not([data-shown]) .rv-line { transform: none; }
 }
 
+/* ---------- Headline lines (1188: GSAP SplitText, lib/motion/split.ts) ----------
+   Page headlines (legal, status, changelog, blog index, categories, articles) rise line by line out of
+   their own masks. The waiting state is opacity .01, never 0: Chrome counts .01 as painted, so the
+   headline still records the page's LCP at first paint, and without JS nothing is hidden at all. If the
+   plugin never arrives, the headline shows itself anyway after 2s. */
+@keyframes sl-failsafe { to { opacity: 1; } }
+html.js [data-split-lines]:not([data-split-done]) { opacity: .01; animation: sl-failsafe 0s linear 2s forwards; }
+/* SplitText clips each line in a copy of itself (class + "-mask"); the padding keeps descenders off that edge. */
+.sl-line-mask { padding-bottom: .1em; margin-bottom: -.1em; }
+@media (prefers-reduced-motion: reduce) {
+  html.js [data-split-lines]:not([data-split-done]) { opacity: 1; animation: none; }
+}
+
 /* ---------- Demo flow ---------- */
 .demo-card { box-shadow: 0 50px 120px -60px hsl(250 60% 20% / .55), 0 0 0 1px hsl(var(--border) / .6); }
 .dark .demo-card { box-shadow: 0 60px 140px -60px hsl(228 100% 55% / .35), 0 0 0 1px hsl(var(--border)); }
