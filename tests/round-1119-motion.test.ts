@@ -39,7 +39,8 @@ describe("motion tokens (1119)", () => {
 
   test("no token curve or spring overshoots", () => {
     for (const b of Object.values(EASE)) expect(overshoots(b as Bezier)).toBe(false);
-    expect(T.glide.bounce).toBe(0);
+    // 1187: the tab pill is a GSAP power2.inOut tween now (no spring at all, so nothing can overshoot).
+    expect(T.glide.type).toBe("tween");
     expect(dampingRatio(500, 60)).toBeGreaterThan(1); // kyma's overdamped spring, for reference
     for (const k of ["press", "hover", "menu", "menuExit", "nav", "page", "card", "section", "fill"] as const) expect(T[k].type).toBe("tween");
     expect(FX.dialog.animate.transition).toBe(T.card);
@@ -98,7 +99,7 @@ describe("nothing bounces (1119)", () => {
   test("the app's shared roots use the tokens", () => {
     expect(read("components/shared/MotionRoot.tsx")).toContain("T.card");
     expect(read("lib/motion/reveal.ts")).toContain("GSAP_EASE.out");
-    expect(read("lib/motion/route.ts")).toContain("GSAP_EASE.out");
+    expect(read("lib/motion/route.ts")).toContain("GSAP_EASE.smooth"); // 1187: tabs ease in and out
     expect(read("lib/motion/numbers.ts")).toContain("DUR.chart");
   });
 });

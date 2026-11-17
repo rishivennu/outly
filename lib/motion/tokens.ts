@@ -62,6 +62,10 @@ export const EASE = {
   in: [0.7, 0, 0.84, 0],
   /** Colour and opacity hovers, where a fast start would read as a flicker. */
   std: [0.4, 0, 0.2, 1],
+  /** 1187: tabs (user, 11-17: "the smooth ease in and out from gsap for tabs"). GSAP's power2.inOut as a CSS curve:
+   *  a gentle start, an even middle and a soft landing, with no snap at either end. CSS plates use this; framer pills
+   *  use smoothInOut below (the exact GSAP function); route entrances ask GSAP for power2.inOut by name. */
+  smooth: [0.65, 0, 0.35, 1],
 } as const satisfies Record<string, Bezier>;
 export type EaseName = keyof typeof EASE;
 
@@ -73,7 +77,9 @@ export const cssDur = (name: DurName) => `${DUR[name]}ms`;
 export const cssT = (prop: string, dur: DurName, ease: EaseName = "out") => `${prop} ${cssDur(dur)} ${cssEase(ease)}`;
 
 /** GSAP names for the same curves: expo.out matches EASE.out to within a frame, expo.inOut matches EASE.swap. */
-export const GSAP_EASE = { out: "expo.out", swap: "expo.inOut", in: "power3.in", std: "power2.out" } as const;
+export const GSAP_EASE = { out: "expo.out", swap: "expo.inOut", in: "power3.in", std: "power2.out", smooth: "power2.inOut", fade: "sine.inOut" } as const;
+/** GSAP's power2.inOut, written out so framer-motion pills can use the very same curve without loading GSAP. */
+export const smoothInOut = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t < 0.5 ? 4 * t * t * t : 1 - Math.pow(2 - 2 * t, 3) / 2);
 /** GSAP takes seconds. */
 export const sec = (name: DurName) => DUR[name] / 1000;
 
@@ -99,9 +105,9 @@ export const T = {
   page: tween("page", "out"),
   card: tween("card", "out"),
   section: tween("section", "out"),
-  /** A shared-layout indicator (layoutId pill) moving between tabs. A critically damped spring timed like `nav`,
-   *  so quick repeated clicks keep their speed instead of restarting from rest; it never overshoots. */
-  glide: { type: "spring" as const, bounce: 0, duration: sec("nav") },
+  /** A shared-layout indicator (layoutId pill) moving between tabs. 1187: GSAP's power2.inOut over the `page` time,
+   *  so the pill eases out of the old tab, glides, and eases into the new one while the page arrives with it. */
+  glide: { type: "tween" as const, duration: sec("page"), ease: smoothInOut },
   /** Width/height of a progress fill: a swap between two values. */
   fill: tween("nav", "swap"),
   /** Reduced motion: a short fade and nothing else. */

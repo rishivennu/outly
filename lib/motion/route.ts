@@ -32,7 +32,11 @@ export type RouteKind = "page" | "detail" | "tab";
 export type RouteDir = 1 | -1;
 
 const CLEAR = "opacity,transform,transition,clipPath";
-const EASE = GSAP_EASE.out; // token ease-out (lib/motion/tokens.ts)
+// 1187: tabs ease in AND out (user, 11-17: "the smooth ease in and out from gsap for tabs"). Every block glides on
+// GSAP's power2.inOut: it leaves its start gently, travels evenly and settles softly, where expo.out used to jump
+// most of the way in the first frames. The stage's own fade rides sine.inOut, a touch softer still, so nothing pops.
+const EASE = GSAP_EASE.smooth;
+const FADE = GSAP_EASE.fade;
 const SKELETON = "[data-route-skeleton]";
 // A block holding a non-portalled fixed overlay is only faded: a transform or clip on an ancestor would
 // re-anchor or cut that overlay while the entrance runs.
@@ -52,8 +56,8 @@ function ready() {
 export const ROUTE_TIMING = {
   page: { mask: sec("page"), fade: 0.24, block: sec("card"), delay: 0.05, travel: 18, lift: 8, spread: 0.18 },
   detail: { mask: 0, fade: 0, block: 0.38, delay: 0, travel: 24, lift: 0, spread: 0.12 },
-  tab: { mask: 0, fade: 0, block: 0.32, delay: 0, travel: 14, lift: 0, spread: 0.1 },
-  settle: { block: 0.3, lift: 6, spread: 0.12 },
+  tab: { mask: 0, fade: 0, block: 0.38, delay: 0, travel: 14, lift: 0, spread: 0.1 },
+  settle: { block: 0.34, lift: 6, spread: 0.12 },
 } as const;
 
 const parts = (p: string) => p.split("/").filter(Boolean);
@@ -217,8 +221,8 @@ export function enterRoute(root: HTMLElement | null, kind: RouteKind, dir: Route
     run.touched.add(root);
     const clip = !lite && !root.querySelector(PINNED);
     gsap.set(root, { opacity: 0, ...(clip ? { clipPath: mask(dir) } : {}) });
-    run.tweens.push(gsap.to(root, { opacity: 1, duration: t.fade, ease: "power1.out" }));
-    run.tweens.push(gsap.to(root, { ...(clip ? { clipPath: OPEN } : {}), duration: t.mask, ease: "power3.out", onComplete: () => gsap.set(root, { clearProps: CLEAR }), onInterrupt: () => gsap.set(root, { clearProps: CLEAR }) }));
+    run.tweens.push(gsap.to(root, { opacity: 1, duration: t.fade, ease: FADE }));
+    run.tweens.push(gsap.to(root, { ...(clip ? { clipPath: OPEN } : {}), duration: t.mask, ease: EASE, onComplete: () => gsap.set(root, { clearProps: CLEAR }), onInterrupt: () => gsap.set(root, { clearProps: CLEAR }) }));
   }
   const { statics, blocks } = blocksOf(root);
   // A tab bar that stays put only moves with a full page change, never with a switch between its own tabs.

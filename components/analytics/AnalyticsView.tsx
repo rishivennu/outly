@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
+import { T } from "@/lib/motion/tokens";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ArrowDownRight, ArrowUpRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -94,14 +95,14 @@ function RangePicker({ value, onPick, maxDays, custom, onCustom }: { value: numb
     <div ref={rail} role="radiogroup" aria-label="Time range" className="edge-fade scrollbar-none flex min-w-0 max-w-full gap-1 overflow-x-auto rounded-full bg-secondary/60 p-1 hairline">
       {shown.map((r) => (
         <button key={r.d} type="button" role="radio" aria-checked={!custom && value === r.d} aria-label={r.label} onClick={() => onPick(r.d)} className={cn(opt, !custom && value === r.d ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
-          {!custom && value === r.d && <motion.span layoutId="range" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
+          {!custom && value === r.d && <motion.span layoutId="range" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
           <span className="relative sm:hidden" aria-hidden="true">{r.short}</span>
           <span className="relative hidden sm:inline" aria-hidden="true">{r.label}</span>
         </button>
       ))}
       {/* 1140: your own two dates, inside the same plan window as the presets. */}
       <button type="button" role="radio" aria-checked={custom} onClick={onCustom} className={cn(opt, custom ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
-        {custom && <motion.span layoutId="range" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
+        {custom && <motion.span layoutId="range" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
         <span className="relative">Custom</span>
       </button>
       {maxDays < 365 && (
@@ -365,7 +366,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
               <div role="radiogroup" aria-label="Chart metric" className="flex gap-1 rounded-full bg-secondary/60 p-1 hairline">
                 {CHART_METRICS.map((m) => (
                   <button key={m.k} type="button" role="radio" aria-checked={metric === m.k} onClick={() => setMetric(m.k)} className={cn("relative h-11 rounded-full px-3 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", metric === m.k ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                    {metric === m.k && <motion.span layoutId="chart-metric" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
+                    {metric === m.k && <motion.span layoutId="chart-metric" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
                     <span className="relative">{m.label}</span>
                   </button>
                 ))}

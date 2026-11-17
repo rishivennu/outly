@@ -85,6 +85,7 @@
     --m-ease-swap: cubic-bezier(0.87, 0, 0.13, 1);
     --m-ease-in: cubic-bezier(0.7, 0, 0.84, 0);
     --m-ease-std: cubic-bezier(0.4, 0, 0.2, 1);
+    --m-ease-smooth: cubic-bezier(0.65, 0, 0.35, 1); /* 1187: GSAP power2.inOut, for every tab indicator */
     /* Older names, now the same curve, so every existing rule moves in one language. */
     --ease-out: var(--m-ease-out);
   }
@@ -3287,7 +3288,7 @@ html[data-contrast="more"] .fw-ring:has(:is(input, textarea):focus) { box-shadow
 .pulse-seg-pill { position: absolute; top: 3px; bottom: 3px; left: 0; width: var(--w, 0px); transform: translateX(var(--x, 0px)); border-radius: 12px; background: hsl(var(--background));
   box-shadow: 0 1px 2px rgba(0, 0, 0, .12), 0 0 0 1px hsl(var(--foreground) / .08); }
 .dark .pulse-seg-pill { background: hsl(240 4% 18%); }
-@media (prefers-reduced-motion: no-preference) { .pulse-underline, .pulse-seg-pill { transition: transform .35s var(--ease-liquid), width .35s var(--ease-liquid); } }
+@media (prefers-reduced-motion: no-preference) { .pulse-underline, .pulse-seg-pill { transition: transform var(--m-page) var(--m-ease-smooth), width var(--m-page) var(--m-ease-smooth); } }
 
 .pulse-delta { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: 999px; font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .pulse-delta.is-up { background: hsl(var(--lime) / .16); color: hsl(var(--lime-ink)); }
@@ -3356,7 +3357,7 @@ html[data-contrast="more"] .fw-ring:has(:is(input, textarea):focus) { box-shadow
 .chip-glide:hover { color: hsl(var(--foreground)); }
 .chip-glide.is-on { font-weight: 600; color: hsl(var(--lime-foreground)); }
 .chip-glide:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
-@media (prefers-reduced-motion: no-preference) { .chip-plate { transition: transform .35s var(--ease-liquid), width .35s var(--ease-liquid), height .35s var(--ease-liquid); } }
+@media (prefers-reduced-motion: no-preference) { .chip-plate { transition: transform var(--m-page) var(--m-ease-smooth), width var(--m-page) var(--m-ease-smooth), height var(--m-page) var(--m-ease-smooth); } }
 @media (forced-colors: active) { .chip-plate { background: Highlight; } .chip-glide.is-on { color: HighlightText; } }
 /* funnel bars and the risk meter reveal through a clip, so the rounded ends never stretch */
 .grow-clip { clip-path: inset(0 var(--cut, 100%) 0 0 round 12px); }

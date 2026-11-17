@@ -1,5 +1,6 @@
 "use client";
 import { motion, useReducedMotion } from "framer-motion";
+import { T } from "@/lib/motion/tokens";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn, compact } from "@/lib/utils";
@@ -46,7 +47,7 @@ export function ProfileAccounts({ platform, accounts, active, onPick, busy, last
                 a.accountId === active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {a.accountId === active && <motion.span layoutId="acct-pick" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
+              {a.accountId === active && <motion.span layoutId="acct-pick" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
               <span className="relative flex items-center gap-2">
                 {a.avatar ? (
                   // eslint-disable-next-line @next/next/no-img-element

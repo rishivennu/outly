@@ -1,5 +1,5 @@
 "use client";
-import { ease } from "@/lib/motion/tokens";
+import { T, ease } from "@/lib/motion/tokens";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { pollable } from "@/lib/client/idle";
 import Link from "next/link";
@@ -253,7 +253,7 @@ export function PlatformDashboardView({ platform, initial, connected, renderedAt
           <div role="radiogroup" aria-label="Reporting period" className="flex gap-1 rounded-full bg-secondary/60 p-1 hairline">
             {options.map((d) => (
               <button key={d} type="button" role="radio" aria-checked={d === days} disabled={busy} onClick={() => d !== days && void loadProfile(acct, { days: d })} className={cn("relative h-11 rounded-full px-4 text-sm font-medium tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring", d === days ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                {d === days && <motion.span layoutId="live-range" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
+                {d === days && <motion.span layoutId="live-range" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
                 <span className="relative">{d} days</span>
               </button>
             ))}
@@ -474,7 +474,7 @@ function Trend({ data, color, className }: { data: PlatformDashboard; color: str
           <div role="radiogroup" aria-label="Metric" className="flex gap-1 rounded-full bg-secondary/60 p-1">
             {data.series.map((x) => (
               <button key={x.key} role="radio" aria-checked={x.key === s?.key} onClick={() => setK(x.key)} className={cn("relative h-11 rounded-full px-3.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring", x.key === s?.key ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                {x.key === s?.key && <motion.span layoutId="series-pill" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
+                {x.key === s?.key && <motion.span layoutId="series-pill" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
                 <span className="relative">{x.label}</span>
               </button>
             ))}
@@ -676,7 +676,7 @@ function Posts({ posts, platform, className }: { posts: LivePost[]; platform: Pl
         <div role="radiogroup" aria-label="Sort posts" className="-mx-1 flex max-w-full gap-1 overflow-x-auto rounded-full bg-secondary/60 p-1 scrollbar-none">
           {SORTS.map((s) => (
             <button key={s.k} role="radio" aria-checked={sort === s.k} onClick={() => setSort(s.k)} className={cn("relative h-11 shrink-0 whitespace-nowrap rounded-full px-3.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring", sort === s.k ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-              {sort === s.k && <motion.span layoutId="sort-pill" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
+              {sort === s.k && <motion.span layoutId="sort-pill" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
               <span className="relative">{s.label}</span>
             </button>
           ))}

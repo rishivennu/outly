@@ -6,7 +6,7 @@ import { ExternalLink } from "lucide-react";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn, compact } from "@/lib/utils";
-import { ease } from "@/lib/motion/tokens";
+import { T, ease } from "@/lib/motion/tokens";
 import { ranksFor, rankStandouts, vsAverage, type RankKey, type StandoutPost } from "@/lib/analytics/core";
 
 /**
@@ -35,12 +35,12 @@ export function Standouts({ posts, avgViews }: { posts: StandoutPost[]; avgViews
           {platforms.length > 1 && (
             <div role="radiogroup" aria-label="Filter by platform" className="flex gap-1 rounded-full bg-secondary/60 p-1">
               <button type="button" role="radio" aria-checked={only === null} onClick={() => setOnly(null)} className={cn(pill, only === null ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                {only === null && <motion.span layoutId="so-plat" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
+                {only === null && <motion.span layoutId="so-plat" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
                 <span className="relative">All</span>
               </button>
               {platforms.map((p) => (
                 <button key={p} type="button" role="radio" aria-checked={only === p} onClick={() => setOnly(p)} className={cn(pill, "px-2.5", only === p ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                  {only === p && <motion.span layoutId="so-plat" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
+                  {only === p && <motion.span layoutId="so-plat" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
                   <span className="relative flex items-center gap-1.5">
                     <PlatformOrb platform={p} size={16} /> {PLATFORM_META[p].name}
                   </span>
@@ -52,7 +52,7 @@ export function Standouts({ posts, avgViews }: { posts: StandoutPost[]; avgViews
             <div role="radiogroup" aria-label="Rank by" className="flex gap-1 rounded-full bg-secondary/60 p-1">
               {ranks.map((r) => (
                 <button key={r.k} type="button" role="radio" aria-checked={by === r.k} onClick={() => setBy(r.k)} className={cn(pill, by === r.k ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                  {by === r.k && <motion.span layoutId="so-rank" className="absolute inset-0 rounded-full bg-background shadow-sm" />}
+                  {by === r.k && <motion.span layoutId="so-rank" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
                   <span className="relative">{r.label}</span>
                 </button>
               ))}
