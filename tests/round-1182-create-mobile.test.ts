@@ -13,10 +13,11 @@ const bar = src("components/create/ActionBar.tsx");
 const facts = (f: Partial<CaptionFacts> = {}): CaptionFacts => ({ lines: 0, busy: null, failed: false, gaps: 0, spoken: "", english: false, ai: true, ...f });
 
 describe("1182 Pip opens on Steps 1 and 2 until the caption is final", () => {
-  test("only Your Video and Your Story open it, and only while nothing is finalized", () => {
+  test("Your Video opens it until the caption is final; Your Story always does", () => {
     const steps: Step[] = ["video", "story", "everywhere", "launch"];
     expect(steps.filter((s) => pipOpensOn(s, false))).toEqual(["video", "story"]);
-    expect(steps.filter((s) => pipOpensOn(s, true))).toEqual([]);
+    // R1198: Your Story always opens it, since its asks work on the captions written there.
+    expect(steps.filter((s) => pipOpensOn(s, true))).toEqual(["story"]);
   });
   test("a caption is final once a real hook is picked; spaces are not a hook", () => {
     expect(captionFinal("Five years in one minute")).toBe(true);
@@ -138,20 +139,20 @@ describe("1182 the deck: connected cards first, compact rows for the rest", () =
     expect(deck).toMatch(/variant="ghost" data-connect="" className="h-11 shrink-0 rounded-full px-3 hairline" onClick=\{\(\) => p\.onConnect\(pl\)\}/);
   });
   test("the two groups are named, connected first, with a Connect more platforms shortcut", () => {
-    expect(deck.indexOf(">Connected accounts</h3>")).toBeGreaterThan(0);
-    expect(deck.indexOf(">Not connected</h3>")).toBeGreaterThan(deck.indexOf(">Connected accounts</h3>"));
+    expect(deck.indexOf(">Your platforms</h3>")).toBeGreaterThan(0);
+    expect(deck.indexOf(">Connect more platforms</h3>")).toBeGreaterThan(deck.indexOf(">Your platforms</h3>"));
     expect(deck).toContain("Connect more platforms");
   });
   test("no Preview only pill or label is left", () => {
     expect(deck).not.toContain(">Preview only<");
     expect(deck).not.toContain('"Preview only"');
   });
-  test("the editor is for a connected account only, folds on a second tap, and opens under its card on a phone", () => {
+  test("the editor is for a connected account only, folds on a second tap, and opens under the switcher", () => {
     expect(deck).toContain("const active = linked.includes(picked) ? picked : (linked[0] ?? picked);");
     expect(deck).toContain("onClick={() => (on ? setShut((v) => !v) : (setActive(pl), setShut(false)))}");
     expect(deck).toContain("aria-expanded={open}");
-    expect(deck).toContain("{narrow && open && editor}");
-    expect(deck).toContain("{!narrow && !shut && editor}");
+    expect(deck).not.toContain("narrow && open && editor");
+    expect(deck).toContain("{!shut && editor}");
   });
   test("a place switched on from an older draft but not connected can be left out from its row", () => {
     expect(deck).toContain("onClick={() => p.onDraft(pl, { enabled: false })}");

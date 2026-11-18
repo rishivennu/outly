@@ -174,10 +174,10 @@ describe("1190 Step 2: one box, then a card for every place", () => {
   const a = src("components/create/AdaptedCaptions.tsx");
 
   test("the composer says what it does, and takes the creator's own words", () => {
-    expect(c).toContain("Write once. Outlly adapts it everywhere.");
-    expect(c).toContain("What&apos;s your video about?");
+    // R1198: one editor titled Your caption
+    expect(c).toContain('<label htmlFor="story-box">Your caption</label>');
     expect(c).toContain("Generate captions with Pip AI");
-    expect(c).toContain("Use my text as is");
+    expect(c).toContain("Use my text as it is");
     expect(c).toContain("Analyze my video for more accurate captions");
     expect(c).toContain("maxLength={ADAPT_MAX}");
     expect(c).toContain("Call to action");
@@ -199,7 +199,9 @@ describe("1190 Step 2: one box, then a card for every place", () => {
   });
 
   test("an edit of the creator's own is proposed to, never written over", () => {
-    expect(w).toContain("const fill = o.direct || untouched(c.platform);");
+    // R1198: written straight in only while the words are Pip's or there are none, Regenerate included
+    expect(w).toContain("const fill = untouched(c.platform) || !(d0.title + d0.caption + d0.description).trim();");
+    expect(w).not.toContain("o.direct || untouched");
     expect(w).toContain("else applyCopy([c]);");
     expect(w).toContain("const untouched = (pl: Platform) => {");
     expect(a).toContain("Restore Pip&apos;s version");
@@ -208,12 +210,12 @@ describe("1190 Step 2: one box, then a card for every place", () => {
   test("each card is editable, counted against the real limit, and approved here", () => {
     expect(a).toContain("PLATFORM_META[platform]");
     expect(a).toContain("composedCopy(platform, d).length");
-    expect(a).toContain("<Counter value={bodyLen} max={meta.captionLimit} />");
+    expect(a).toContain("bodyLen");
     expect(a).toContain("meta.titleLimit ?? 100");
     expect(a).toContain("set({ reviewed: !d.reviewed })");
     expect(a).toContain("navigator.clipboard.writeText(text)");
     expect(a).toContain("Regenerate all");
-    expect(a).toContain('role="tablist"');
+    expect(a).not.toContain('role="tablist"'); // R1198: a compact list, every platform visible at once
   });
 
   test("Pip never asks for the same words twice, and says where the box is", () => {

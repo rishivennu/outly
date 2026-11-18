@@ -50,8 +50,8 @@ describe("1095 launch collapse", () => {
     expect(workspace).toContain('pipShown ? "max-w-[1100px]" : "max-w-[1240px]"');
     expect(workspace).toContain("transition-[max-width]");
     expect(workspace).toContain("transition-[width,opacity]");
-    // column width, Pip width and the upload tips chevron
-    expect(workspace.match(/motion-reduce:transition-none/g)?.length).toBe(3);
+    // column width, Pip width, the upload tips chevron and (R1198) the phone's video preview chevron
+    expect(workspace.match(/motion-reduce:transition-none/g)?.length).toBe(4);
   });
   test("the step drives it from one place", () => {
     expect(workspace).toContain('panelDispatch({ t: "step", step });');
@@ -78,7 +78,8 @@ describe("1095 editing the original caption", () => {
   });
 
   test("both AI calls read the same source", () => {
-    expect(workspace.match(/captionSource\(\{ edited: editedOriginal, submittedStory, story \}\)/g)?.length).toBe(2);
+    // R1198: also Pip's one-tap asks and the deck's Original caption panel
+    expect(workspace.match(/captionSource\(\{ edited: editedOriginal, submittedStory, story \}\)/g)?.length).toBe(4);
     expect(workspace).not.toContain("{ story: submittedStory ?? story, hook: h, platforms }");
     expect(workspace).toContain("original={editedOriginal ?? hooks.result?.original ?? \"\"}");
     expect(workspace).toContain("onOriginal={setEditedOriginal}");

@@ -36,10 +36,10 @@ export const foldsConversation = (step: Step) => step === "everywhere" || step =
 export const captionFinal = (hook: string | null | undefined) => !!hook?.trim();
 
 /**
- * Entering Your Video or Your Story opens Pip until the caption is final. Any other step, or a final caption,
- * leaves Pip the way it is. Called only when a step is entered, never on a keystroke.
+ * Entering Your Video opens Pip until the caption is final; R1198: entering Your Story always opens it, since its
+ * asks work on the captions written there. Any other step leaves Pip the way it is. Called only when a step is entered, never on a keystroke.
  */
-export const pipOpensOn = (step: Step, finalized: boolean) => !finalized && (step === "video" || step === "story");
+export const pipOpensOn = (step: Step, finalized: boolean) => step === "story" || (!finalized && step === "video");
 
 export type PipFooterId = "story" | "finalize" | "everywhere" | "done" | "edit";
 export type PipFooter = { id: PipFooterId; label: string; disabled: boolean; hint: string | null };
@@ -122,6 +122,21 @@ export function routeCopy(d: Draft, c: PlatformCopy, why: string): { kind: "fill
   if (!Object.keys(patch).length) return { kind: "same" };
   return { kind: "propose", proposal: { patch, why: why || c.note } };
 }
+
+/**
+ * R1198: what one of Pip's asks would change, as a suggestion. Always a proposal, even on a place still holding
+ * Pip's own words: an ask is applied only when the creator accepts it. Null when nothing would change.
+ */
+export function askProposal(d: Draft, c: PlatformCopy, keys: readonly TextKey[], why: string): Proposal | null {
+  const next: Record<TextKey, string> = { title: c.title ?? d.title, caption: c.caption ?? d.caption, description: c.description ?? d.description, hashtags: c.hashtags ?? d.hashtags };
+  const patch: Partial<Draft> = {};
+  for (const k of keys) if (next[k].trim() && next[k] !== d[k]) patch[k] = next[k];
+  if (!Object.keys(patch).length) return null;
+  return { patch, why: why || c.note || "Pip's take on your words." };
+}
+
+/** R1198: the place Pip's asks work on. The one the creator last touched, if it is still switched on, else the first. */
+export const pipTarget = (focus: Platform | null, places: readonly Platform[]): Platform | null => (focus && places.includes(focus) ? focus : (places[0] ?? null));
 
 export type Suggestions = { proposals: Partial<Record<Platform, Proposal>>; undo: Partial<Record<Platform, Undo>> };
 export const NO_SUGGESTIONS: Suggestions = { proposals: {}, undo: {} };

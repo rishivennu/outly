@@ -23,10 +23,10 @@ describe("p3 deck contract", () => {
     expect(deck).toContain("This looks good");
     expect(deck).toContain("onClick={() => p.onRewrite(pl)}");
   });
-  test("platform cards wrap in a grid, no sideways rail, keyboard reachable, names never clipped without a title", () => {
-    expect(deck).not.toContain("overflow-x-auto");
+  test("R1198: platform cards are one compact horizontal switcher, keyboard reachable, names never clipped without a title", () => {
     expect(deck).not.toContain("deck-rail");
-    expect(deck).toContain("repeat(auto-fill,minmax(min(100%,210px),1fr))");
+    expect(deck).toContain('className="-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-1 pb-2');
+    expect(deck).toContain("w-[min(80vw,236px)] shrink-0 snap-start");
     expect(deck).toContain("onKeyDown={onCardKeys}");
     expect(deck).toContain('title={who}');
     expect(deck).toContain("onClick={() => p.onConnect(pl)}");

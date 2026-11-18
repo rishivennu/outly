@@ -3,7 +3,7 @@ import { useRef } from "react";
 import { motion } from "framer-motion";
 import { Check, Eye, Hash, Megaphone, Pencil, RefreshCw, Sparkles, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Counter, Label, Textarea } from "@/components/ui/field";
+import { Counter, Textarea } from "@/components/ui/field";
 import { ADAPT_MAX, ADAPT_TONES, CTA_PREFIX, KEYWORDS_PREFIX, withLine, type AdaptTone } from "@/lib/ai/adapt-core";
 import { cn } from "@/lib/utils";
 import { T } from "@/lib/motion/tokens";
@@ -31,9 +31,13 @@ interface Props {
   onAnalyze: () => void;
   onUseWatched: (edit: boolean) => void;
   onDismissClarify: () => void;
+  /** R1198: the autosave line ("Saved just now"), so the creator sees their words are kept. */
+  status?: string | null;
   className?: string;
 }
 
+/** R1198: the one writing box on Your Story. */
+export const CAPTION_PLACEHOLDER = "Write your caption, describe your video, or tell Pip what you want your audience to know...";
 const EXAMPLE = "I tried the 5am routine for 30 days. Days 1 to 4 were rough, by week two I was getting more done before 9am than I used to all morning. Here's what actually made it work.";
 
 /**
@@ -61,23 +65,19 @@ export function StoryComposer(p: Props) {
   };
 
   return (
-    <section aria-labelledby="write-once" className={cn("glass rounded-[24px] p-4 sm:p-5", p.className)}>
-      <p className="eyebrow flex items-center gap-1.5">
-        <Sparkles className="h-3.5 w-3.5 text-lime" aria-hidden="true" />
-        Write once. Outlly adapts it everywhere.
-      </p>
-      <h2 id="write-once" className="mt-1.5 text-[clamp(1.25rem,1.1rem+0.5vw,1.6rem)] font-semibold leading-tight tracking-[-0.02em]">
-        What&apos;s your video about?
-      </h2>
-      <p className="mt-1.5 max-w-[60ch] text-pretty text-[13px] leading-relaxed text-muted-foreground">
-        Say it once, the way you&apos;d tell a friend. Pip rewrites it for each place you post without changing what you said, then you edit anything you like.
+    <section aria-labelledby="your-caption" className={cn("glass rounded-[24px] p-4 sm:p-5", p.className)}>
+      {/* R1198: one editor, "Your caption". Pip writes each platform's version from it; nothing needs the video read first. */}
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id="your-caption" className="text-[clamp(1.2rem,1.05rem+0.5vw,1.5rem)] font-semibold leading-tight tracking-[-0.02em]">
+          <label htmlFor="story-box">Your caption</label>
+        </h2>
+        <Counter value={p.story.length} max={ADAPT_MAX} />
+      </div>
+      <p className="mt-1 max-w-[60ch] text-pretty text-[13px] leading-relaxed text-muted-foreground">
+        Write it once in your own words. Pip writes a version for each platform you picked, and you approve every one.
       </p>
 
-      <div className="mt-4">
-        <Label htmlFor="story-box" className="mb-1.5">
-          <span>Your message</span>
-          {p.story.length > ADAPT_MAX * 0.75 && <Counter value={p.story.length} max={ADAPT_MAX} />}
-        </Label>
+      <div className="mt-3.5">
         <Textarea
           id="story-box"
           ref={box}
@@ -85,9 +85,13 @@ export function StoryComposer(p: Props) {
           value={p.story}
           maxLength={ADAPT_MAX}
           onChange={(e) => p.onStory(e.target.value)}
-          placeholder={EXAMPLE}
+          placeholder={CAPTION_PLACEHOLDER}
+          aria-describedby="story-box-status"
           className="min-h-[148px] text-[15px]"
         />
+        <p id="story-box-status" className="mt-1 text-xs text-muted-foreground">
+          {p.status || "Saves as you type."}
+        </p>
         <div className="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="Add to your message">
           <Chip onClick={() => addLine(CTA_PREFIX)} icon={<Megaphone className="h-3.5 w-3.5" aria-hidden="true" />}>
             Call to action
@@ -129,14 +133,14 @@ export function StoryComposer(p: Props) {
             </Button>
           </>
         ) : (
-          <Button type="button" variant="lime" className="min-h-12 w-full rounded-full px-5 sm:w-auto" disabled={!enough || !p.places || p.online === false} onClick={() => p.onGenerate()}>
+          <Button type="button" variant="lime" className="min-h-12 w-full rounded-full px-5" disabled={!enough || !p.places || p.online === false} onClick={() => p.onGenerate()}>
             {p.adapted ? <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden="true" /> : <Sparkles className="mr-1.5 h-4 w-4" aria-hidden="true" />}
             {p.adapted ? "Write them again" : "Generate captions with Pip AI"}
           </Button>
         )}
         {!busy && enough && (
           <Button type="button" variant="ghost" className="min-h-12 rounded-full px-4 text-[13px]" onClick={p.onUseAsIs}>
-            Use my text as is
+            Use my text as it is
           </Button>
         )}
       </div>

@@ -4,6 +4,7 @@ import { cleanJson, partialArray, partialString } from "./llm-core";
 import type { Platform } from "../domain";
 import { DEFAULT_RULES, enginePrompt, polish, type EngineWhy } from "./caption-engine";
 import { captionRules } from "./engine-store";
+import { ASK_KEYS, PIP_ASK_RULE, type PipAsk } from "./pip-asks";
 
 export type Tone = "default" | "punchier" | "professional" | "genz";
 
@@ -363,6 +364,41 @@ export async function generatePlatformCopy(story: string, hook: string, platform
     const m = g.items.find((i) => i && i.platform === f.platform);
     return m ? shape(f, m) : f;
   });
+}
+
+/**
+ * R1198: one of Pip's asks for ONE place, worked on the words that place has now. Null when no model answered:
+ * the caller says so, and never falls back to template copy, since this is a suggestion the creator asked for.
+ * Only the fields the ask may change come back changed (hashtags never touch the caption).
+ */
+export async function askPlatformCopy(
+  story: string,
+  platform: Platform,
+  ask: PipAsk,
+  current: { title: string; caption: string; description: string; hashtags: string },
+  opts: GeminiOpts & { voice?: string } = {},
+): Promise<PlatformCopy | null> {
+  const rules = await captionRules();
+  const { voice, ...rest } = opts;
+  const yt = platform === "youtube";
+  type Item = { title?: unknown; caption?: unknown; description?: unknown; hashtags?: unknown; why?: unknown };
+  const raw = await gemini<Item | { items: Item[] }>(
+    `${VOICE}${voice ?? ""}\n\n${enginePrompt(rules, [platform])}\n\nYou are editing ONE existing ${platform} caption on request. Never invent anything about the video that the creator's words do not say: no places, numbers, people or results that are not there.`,
+    `Creator's own words about the video: """${story}"""\nCurrent ${platform} copy:\n${yt ? `title: """${current.title}"""\ndescription: """${current.description}"""` : `caption: """${current.caption}"""`}\nhashtags: """${current.hashtags}"""\nRequest: ${PIP_ASK_RULE[ask]}\nReturn JSON {${yt ? '"title","description"' : '"caption"'},"hashtags": "#a #b","why": one short sentence saying what you changed}`,
+    rest,
+  );
+  const m: Item | undefined = raw && "items" in raw && Array.isArray(raw.items) ? raw.items[0] : (raw as Item | null) ?? undefined;
+  if (!m) return null;
+  const keys = ASK_KEYS[ask];
+  const pick = (k: "title" | "caption" | "description", limit: number) => (keys.includes(k) ? asText(m[k]).slice(0, limit) || current[k] : current[k]);
+  const next = {
+    title: yt ? pick("title", 200) : current.title,
+    caption: yt ? current.caption : pick("caption", 5000),
+    description: yt ? pick("description", 5000) : current.description,
+    hashtags: keys.includes("hashtags") ? asTags(m.hashtags) || current.hashtags : current.hashtags,
+  };
+  const { copy } = polish(platform, next, rules);
+  return { platform, title: yt ? copy.title : undefined, caption: copy.caption, description: yt ? copy.description : undefined, hashtags: copy.hashtags, note: asText(m.why).slice(0, 160) };
 }
 
 /** Any model value as plain text: arrays joined, objects dropped. */

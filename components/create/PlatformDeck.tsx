@@ -19,6 +19,7 @@ import { enabledPlatforms, launchGate } from "./publish";
 import type { Proposal, Undo } from "./proposal";
 import type { AccountView, Draft } from "./types";
 import { ease } from "@/lib/motion/tokens";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 interface Props {
   drafts: Record<Platform, Draft>;
@@ -41,6 +42,13 @@ interface Props {
   onAccept: (p: Platform) => void;
   onReject: (p: Platform) => void;
   onRevert: (p: Platform) => void;
+  /** R1198: tells the page which platform is open in the editor (null when folded), so Pip works on that one. */
+  onActive?: (p: Platform | null) => void;
+  /** R1198: the creator's original caption from Your Story, and a way to edit it here. */
+  story?: string;
+  onStory?: (s: string) => void;
+  /** R1198: write these platforms again from the edited source. Edited ones get a suggestion, never an overwrite. */
+  onRegenerate?: (p: Platform[]) => void;
 }
 
 const READY_LABEL: Record<Platform, string> = { instagram: "Ready to go", youtube: "Wants a stronger title", x: "Make it impossible to ignore", tiktok: "Hook in the first second", threads: "Keep it conversational", facebook: "Ready for the feed", linkedin: "Lead with the lesson" };
@@ -68,14 +76,10 @@ export function PlatformDeck(p: Props) {
   const active = linked.includes(picked) ? picked : (linked[0] ?? picked);
   /** A second tap on the open card folds its editor; picking another card opens that one. */
   const [shut, setShut] = useState(false);
-  const [narrow, setNarrow] = useState(false);
+  const onActive = p.onActive;
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 639px)");
-    const f = () => setNarrow(mq.matches);
-    f();
-    mq.addEventListener("change", f);
-    return () => mq.removeEventListener("change", f);
-  }, []);
+    onActive?.(linked.length && !shut ? active : null);
+  }, [active, shut, linked.length, onActive]);
   const offRef = useRef<HTMLElement>(null);
   const reduce = useReducedMotion();
   const toOff = () => {
@@ -84,7 +88,6 @@ export function PlatformDeck(p: Props) {
     el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
     el.querySelector<HTMLButtonElement>("button[data-connect]:not([disabled])")?.focus({ preventScroll: true });
   };
-  const hookId = useId();
   const mainId = useId();
   const cards = useRef<Partial<Record<Platform, HTMLButtonElement | null>>>({});
 
@@ -161,7 +164,7 @@ export function PlatformDeck(p: Props) {
         initial={reduce ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25, ease: ease("out") }}
-        className={cn("glass relative overflow-hidden rounded-[32px] p-4 sm:p-6", narrow && "col-span-full")}
+        className="glass relative overflow-hidden rounded-[32px] p-4 sm:p-6"
       >
         <span className={cn("pointer-events-none absolute inset-0", SURFACE[active])} aria-hidden="true" />
         <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_clamp(260px,36%,380px)] lg:items-start lg:gap-8">
@@ -190,27 +193,34 @@ export function PlatformDeck(p: Props) {
         <h2 className="display text-[clamp(1.9rem,3.6vw,2.8rem)]">
           Now let&apos;s make it <span className="energy-text">fit everywhere.</span>
         </h2>
-        <div className="mt-5 max-w-2xl">
-          <Label htmlFor={hookId}>
-            Your hook <Counter value={p.hook.length} max={500} />
-          </Label>
-          <Input id={hookId} value={p.hook.replace(/\n/g, " ")} maxLength={500} onChange={(e) => p.onHook(e.target.value)} className="font-semibold" />
-        </div>
+        <p className="mt-2 max-w-[60ch] text-pretty text-[15px] leading-relaxed text-muted-foreground">Review each platform&apos;s version. Make your final edits before publishing.</p>
+        {p.story?.trim() && p.onStory && (
+          <SourceCaption
+            story={p.story}
+            onStory={p.onStory}
+            active={linked.length && !shut ? active : null}
+            activeWords={p.drafts[active][bodyKey(active)]}
+            onUse={(text) => p.onDraft(active, { [bodyKey(active)]: clipTo(text, bodyRoom(active, p.drafts[active])), custom: true })}
+            regenerable={enabled.filter((pl) => linked.includes(pl))}
+            onRegenerate={p.onRegenerate}
+            online={p.online !== false}
+          />
+        )}
       </header>
 
       <section aria-labelledby={`${mainId}-dest`} className="mb-6">
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          <h3 id={`${mainId}-dest`} className="text-base font-semibold">Connected accounts</h3>
+          <h3 id={`${mainId}-dest`} className="text-base font-semibold">Your platforms</h3>
           <p className="tabular-nums text-[13px] text-muted-foreground">{linked.length === 0 ? "None yet" : enabled.length === 0 ? "Pick at least one" : `${enabled.length} selected`}</p>
         </div>
         {linked.length === 0 ? (
           <p className="rounded-2xl bg-secondary/30 px-4 py-3 text-[13px] leading-relaxed text-muted-foreground hairline">
-            No accounts connected yet, so there is nowhere to send this post. Connect one under Not connected; your draft and its copy stay as they are.
+            No accounts connected yet, so there is nowhere to send this post. Connect one under Connect more platforms; your draft and its copy stay as they are.
           </p>
         ) : (
-          /* Selecting a card picks what you edit (on a phone its editor opens right under it, and a second tap folds it);
-             the checkbox under it decides if it is sent. Siblings, never nested. 1182: only connected accounts get a card. */
-          <div role="group" aria-label="Destinations" onKeyDown={onCardKeys} className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr))] max-sm:grid-cols-1">
+          /* R1198: a compact horizontal switcher. Selecting a card picks the one platform you edit (a second tap folds
+             it); the checkbox under it decides if it is sent. Siblings, never nested. Only connected accounts get a card. */
+          <div role="group" aria-label="Destinations" onKeyDown={onCardKeys} className="-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-1 pb-2 [scrollbar-width:thin]">
             {linked.map((pl) => {
               const s = status[pl];
               const on = active === pl;
@@ -224,7 +234,7 @@ export function PlatformDeck(p: Props) {
                 <Fragment key={pl}>
                   <div
                     className={cn(
-                      "relative flex min-w-0 flex-col rounded-3xl border transition-[background-color,border-color,box-shadow] duration-nav ease-out motion-reduce:transition-none",
+                      "relative flex w-[min(80vw,236px)] shrink-0 snap-start flex-col rounded-3xl border transition-[background-color,border-color,box-shadow] duration-nav ease-out motion-reduce:transition-none",
                       on ? "border-foreground/35 bg-card shadow-[0_18px_50px_-30px_var(--halo)]" : "border-border/70 bg-secondary/30",
                     )}
                     style={{ ["--halo" as string]: PLATFORM_HALO[pl] }}
@@ -241,9 +251,9 @@ export function PlatformDeck(p: Props) {
                       aria-controls={open ? `panel-${pl}` : undefined}
                       aria-label={`Edit ${PLATFORM_META[pl].name}. ${who}. ${p.writing.includes(pl) && d.enabled ? "Writing" : s.label}.`}
                       onClick={() => (on ? setShut((v) => !v) : (setActive(pl), setShut(false)))}
-                      className={cn("relative flex min-h-[72px] min-w-0 items-center gap-3 rounded-t-3xl p-3.5 pr-10 text-left", open && "pr-[76px]", " transition-[background-color] duration-hover ease-out motion-reduce:transition-none", FOCUS, !on && "[@media(hover:hover)]:hover:bg-secondary/60")}
+                      className={cn("relative flex min-h-[64px] min-w-0 items-center gap-2.5 rounded-t-3xl p-3 pr-9 text-left", open && "pr-[76px]", " transition-[background-color] duration-hover ease-out motion-reduce:transition-none", FOCUS, !on && "[@media(hover:hover)]:hover:bg-secondary/60")}
                     >
-                      <PlatformOrb platform={pl} size={36} />
+                      <PlatformOrb platform={pl} size={30} />
                       <span className="min-w-0 flex-1" aria-hidden="true">
                         <span className="flex min-w-0 items-baseline gap-1.5 text-sm font-semibold">
                           <span className="truncate">{PLATFORM_META[pl].name}</span>
@@ -290,7 +300,6 @@ export function PlatformDeck(p: Props) {
                       )}
                     </div>
                   </div>
-                  {narrow && open && editor}
                 </Fragment>
               );
             })}
@@ -319,7 +328,7 @@ export function PlatformDeck(p: Props) {
         </section>
       )}
 
-      {!narrow && !shut && editor}
+      {!shut && editor}
 
       <p className="mt-4 text-sm text-muted-foreground" aria-live="polite">
         {enabled.length === 0 ? "Pick at least one place to send it." : ready ? "All set. Nothing goes out until you publish." : pendingLine(pending, linked)}
@@ -330,8 +339,8 @@ export function PlatformDeck(p: Props) {
       {off.length > 0 && (
         <section ref={offRef} aria-labelledby={`${mainId}-off`} className="mt-8 scroll-mt-24">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-            <h3 id={`${mainId}-off`} className="text-base font-semibold">Not connected</h3>
-            <p className="text-[13px] text-muted-foreground">Connect one to send there too.</p>
+            <h3 id={`${mainId}-off`} className="text-base font-semibold">Connect more platforms</h3>
+            <p className="text-[13px] text-muted-foreground">Preview only until you connect. Nothing is sent there.</p>
           </div>
           <ul className="grid gap-2 md:grid-cols-2">
             {off.map((pl) => {
@@ -367,6 +376,121 @@ export function PlatformDeck(p: Props) {
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * R1198: the creator's original caption from Your Story, folded by default. View it, edit it (then choose whether
+ * the platform captions are written again from it), or put it on the open platform as it is. Nothing here
+ * changes a platform's caption without the creator asking for exactly that.
+ */
+function SourceCaption(p: {
+  story: string;
+  onStory: (s: string) => void;
+  active: Platform | null;
+  activeWords: string;
+  onUse: (text: string) => void;
+  regenerable: Platform[];
+  onRegenerate?: (p: Platform[]) => void;
+  online: boolean;
+}) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const [edit, setEdit] = useState<string | null>(null);
+  const [ask, setAsk] = useState<"regen" | "use" | null>(null);
+  const name = p.active ? PLATFORM_META[p.active].name : "";
+  const save = () => {
+    const next = (edit ?? "").trim();
+    setEdit(null);
+    if (!next || next === p.story.trim()) return;
+    p.onStory(next);
+    if (p.regenerable.length && p.onRegenerate) setAsk("regen");
+  };
+  const use = () => (p.activeWords.trim() && p.activeWords.trim() !== p.story.trim() ? setAsk("use") : p.onUse(p.story));
+  return (
+    <section aria-labelledby={`${id}-h`} className="mt-4 max-w-3xl rounded-2xl bg-secondary/30 hairline">
+      <h3 id={`${id}-h`} className="m-0">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={`${id}-body`}
+          onClick={() => setOpen((v) => !v)}
+          className={cn("flex min-h-12 w-full items-center gap-2 rounded-2xl px-3.5 text-left text-sm font-semibold", FOCUS)}
+        >
+          <span className="min-w-0 flex-1">
+            Original caption
+            <span className="ml-2 font-normal text-muted-foreground">{open ? "" : "View original"}</span>
+          </span>
+          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
+        </button>
+      </h3>
+      <div id={`${id}-body`} hidden={!open} className="px-3.5 pb-3.5">
+        {edit === null ? (
+          <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl bg-card px-3 py-2.5 text-[13px] leading-relaxed hairline" dir="auto">
+            {p.story}
+          </p>
+        ) : (
+          <>
+            <Label htmlFor={`${id}-edit`} className="sr-only">
+              Edit source caption
+            </Label>
+            <Textarea id={`${id}-edit`} rows={4} value={edit} maxLength={4000} onChange={(e) => setEdit(e.target.value)} className="text-[14px]" />
+          </>
+        )}
+        <div className="mt-2.5 flex flex-wrap gap-2">
+          {edit === null ? (
+            <>
+              <Button type="button" size="sm" variant="subtle" className="min-h-11 rounded-full px-3.5" onClick={() => setEdit(p.story)}>
+                Edit source caption
+              </Button>
+              <Button type="button" size="sm" variant="ghost" className="min-h-11 rounded-full px-3.5" disabled={!p.active} onClick={use} title={p.active ? undefined : "Open a platform first."}>
+                Use original caption{name ? <span className="sr-only"> for {name}</span> : null}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button type="button" size="sm" variant="lime" className="min-h-11 rounded-full px-3.5" disabled={!edit.trim()} onClick={save}>
+                Save source caption
+              </Button>
+              <Button type="button" size="sm" variant="ghost" className="min-h-11 rounded-full px-3.5" onClick={() => setEdit(null)}>
+                Cancel
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+      <ConfirmDialog
+        open={ask === "regen"}
+        onOpenChange={(o) => !o && setAsk(null)}
+        title="Update platform captions too?"
+        body={
+          p.online
+            ? "Your source caption is saved. Pip can write each platform's caption again from it. Empty ones are filled; the rest get a suggestion to accept or skip, so nothing is replaced without you."
+            : "Your source caption is saved. You're offline, so Pip can write the platform captions again once you reconnect."
+        }
+        confirmLabel="Update captions"
+        cancelLabel="Keep them as they are"
+        tone="primary"
+        disabled={!p.online}
+        onConfirm={() => {
+          setAsk(null);
+          p.onRegenerate?.(p.regenerable);
+        }}
+      />
+      <ConfirmDialog
+        open={ask === "use"}
+        onOpenChange={(o) => !o && setAsk(null)}
+        title={`Use your original caption for ${name}?`}
+        body={`${name}'s caption is replaced with your original words, trimmed to fit if needed. The other platforms stay as they are.`}
+        confirmLabel="Use original caption"
+        cancelLabel="Keep this one"
+        tone="primary"
+        onConfirm={() => {
+          setAsk(null);
+          p.onUse(p.story);
+        }}
+      />
+    </section>
   );
 }
 

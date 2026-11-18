@@ -14,6 +14,7 @@ import { PLATFORM_META, type Platform } from "@/lib/domain";
 import type { Draft, HooksState, Step, Tone, UploadState, WatchState } from "./types";
 import type { Hold } from "./publish";
 import { T } from "@/lib/motion/tokens";
+import { PipActions, type PipActionsProps } from "./PipActions";
 
 const EXAMPLES = ["How a ₹5 shampoo sachet changed Indian retail", "My 5 AM routine that actually stuck", "Why Blockbuster said no to Netflix"];
 
@@ -74,6 +75,8 @@ interface Props {
   onFooter?: (id: PipFooterId) => void;
   /** Close only folds Pip: nothing is saved, finalized or sent, and everything typed stays for next time. */
   onClose?: () => void;
+  /** R1198: Pip's one-tap asks on Your Story and Everywhere, each answered as a suggestion to accept or skip. */
+  pip?: PipActionsProps | null;
 }
 
 const names = (ps: Platform[]) => {
@@ -277,7 +280,7 @@ export function Assistant(p: Props) {
         {p.step !== "video" && (
           <Bubble from="outly">
             <span className="display block text-[26px] leading-[1.05] tracking-[-0.035em]">What&apos;s this video about?</span>
-            {askStory && <span className="mt-2 block text-sm text-muted-foreground">{p.composer ? "Write it in the box on the page, then press Generate captions. I'll adapt it to every place you post." : "A sentence or two is plenty. Tell it the way you'd tell a friend."}</span>}
+            {askStory && <span className="mt-2 block text-sm text-muted-foreground">{p.composer ? "Write your caption on the page, then press Generate captions with Pip AI. I'll adapt it to every place you post, and you can ask me to sharpen any of them below." : "A sentence or two is plenty. Tell it the way you'd tell a friend."}</span>}
           </Bubble>
         )}
 
@@ -568,6 +571,7 @@ export function Assistant(p: Props) {
               </Bubble>
             );
           })()}
+        {p.pip && (p.step === "story" || p.step === "everywhere") && <PipActions {...p.pip} />}
         <div ref={end} />
       </div>
 

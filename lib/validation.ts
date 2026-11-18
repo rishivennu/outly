@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PIP_ASKS } from "./ai/pip-asks";
 import { PLATFORMS } from "./domain";
 import { MAX_SLIDES, POST_FORMATS } from "./formats";
 import { DISPOSABLE_MESSAGE, isDisposableEmail } from "./disposable-email";
@@ -142,6 +143,11 @@ export const platformCopyRequestSchema = z.object({
   platforms: z.array(platformSchema).min(1),
   // Phase 3: "Rewrite this one" on copy the creator already has is metered as caption rewriting.
   intent: z.enum(["write", "rewrite"]).default("write"),
+  // R1198: one of Pip's one-tap asks for ONE place, with the words that place has now. The answer is a suggestion.
+  ask: z.enum(PIP_ASKS).optional(),
+  current: z
+    .object({ title: z.string().max(400).default(""), caption: z.string().max(6000).default(""), description: z.string().max(6000).default(""), hashtags: z.string().max(1200).default("") })
+    .optional(),
 });
 
 /** 1190 "Write once": one message in, every place's caption out. The same words asked again within 30 minutes cost nothing. */
