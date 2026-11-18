@@ -1,3 +1,4 @@
+import { fmtHandle } from "@/lib/handle";
 import "server-only";
 import { db } from "../db";
 import { invalidate } from "../cache";
@@ -37,7 +38,7 @@ const fmt = (iso: string | null, tz: string) => {
     return new Intl.DateTimeFormat("en-IN", { ...o, timeZone: "UTC" }).format(new Date(iso));
   }
 };
-const who = (platform: Platform, username: string) => `${PLATFORM_META[platform].name} ${username ? (username.startsWith("@") ? username : `@${username}`) : ""}`.trim();
+const who = (platform: Platform, username: string) => `${PLATFORM_META[platform].name} ${fmtHandle(username)}`.trim();
 
 /** One account's verdict from what the sync and the live read said. Pure, exported for tests. */
 export function verdict(o: { syncable: boolean; outcome: SyncOutcome | null; cooldownUntil: Date | null; liveOk: boolean; reconnect: boolean; now: Date }): { ok: boolean; code: RefreshCode; why: string } {

@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
@@ -79,7 +80,7 @@ export function Standouts({ posts, avgViews }: { posts: StandoutPost[]; avgViews
                   <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                     <PlatformOrb platform={plat} size={16} />
                     <span>{PLATFORM_META[plat].name}</span>
-                    {p.username && <span>@{p.username.replace(/^@/, "")}</span>}
+                    {p.username && <span>{fmtHandle(p.username)}</span>}
                     {p.publishedAt && <span>{new Date(p.publishedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>}
                     {vs !== null && (
                       <span className={cn("rounded-full px-2 py-px font-medium", vs >= 0 ? "bg-lime/25 text-lime-ink" : "bg-secondary")}>

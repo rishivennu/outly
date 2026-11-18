@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { useEffect, useState } from "react";
 import { Check, Copy, LogOut, Trash2, UserPlus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,7 +43,7 @@ function AccountAccess({ m, accounts, busy, onSave }: { m: Member; accounts: Acc
               <li key={a.id}>
                 <label className="flex min-h-11 items-center gap-3 text-sm">
                   <input type="checkbox" className="h-5 w-5 accent-[hsl(var(--lime))]" checked={all || picked.has(a.id)} onChange={() => flip(a.id)} />
-                  <span className="truncate">{a.username} <span className="text-muted-foreground">{PNAME[a.platform] ?? a.platform}</span></span>
+                  <span className="truncate">{fmtHandle(a.username)} <span className="text-muted-foreground">{PNAME[a.platform] ?? a.platform}</span></span>
                 </label>
               </li>
             ))}

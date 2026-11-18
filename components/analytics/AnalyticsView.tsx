@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
@@ -280,7 +281,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
     viewsTrend,
     posts: data.byPlatform.reduce((n, b) => n + b.posts, 0),
     rangePhrase: range.phrase,
-    accountName: drilled ? `@${drilled.username.replace(/^@/, "")}` : null,
+    accountName: drilled ? fmtHandle(drilled.username) : null,
   });
 
   // Follower history, one line per account: never one summed line, because each platform counts its own way.
@@ -375,7 +376,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
                 {metric === "followers"
                   ? follow.lines.map((h) => (
                       <li key={h.accountId} className="flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: PLATFORM_HALO[h.platform] }} aria-hidden="true" /> @{h.username.replace(/^@/, "")}
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: PLATFORM_HALO[h.platform] }} aria-hidden="true" /> {fmtHandle(h.username)}
                         <span className="sr-only"> {h.metric}</span>
                       </li>
                     ))

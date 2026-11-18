@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
@@ -108,7 +109,7 @@ export function SendingNow({ items }: { items: SendingItem[] }) {
                       <p className="flex flex-wrap items-baseline gap-x-2 text-[13px] leading-snug">
                         <span className="font-semibold">{isPlatform(t.platform) ? PLATFORM_META[t.platform].name : t.platform}</span>
                         <span className={cn(s.stalled ? "text-[#ff8a80]" : s.done ? "text-[hsl(var(--lime))]" : "text-white/70")}>{liveLabel(t, p.status)}</span>
-                        {t.account && <span className="truncate text-white/50">{t.account.username ? `@${t.account.username}` : t.account.name}</span>}
+                        {t.account && <span className="truncate text-white/50">{fmtHandle(t.account.username) || t.account.name}</span>}
                         {seen && <span className="text-white/40">{seen}</span>}
                       </p>
                       <span

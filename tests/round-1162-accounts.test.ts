@@ -64,7 +64,7 @@ describe("1162 which account", () => {
     expect(deck).toContain("aria-label={`Which ${PLATFORM_META[pl].name} account`}");
     expect(deck).toContain("onChange={(e) => p.onDraft(pl, { accountId: e.target.value })}");
     expect(deck).toMatch(/<select[\s\S]*?className=\{cn\("h-9 /); // inside an h-11 row: a 44px target
-    expect(deck).toContain('{a.username}{a.mock ? " (practice)" : ""}');
+    expect(deck).toContain('{fmtHandle(a.username)}{a.mock ? " (practice)" : ""}');
   });
 });
 

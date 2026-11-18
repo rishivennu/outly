@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { useCallback, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -157,7 +158,7 @@ export function CreatorProfileCard() {
             </h2>
             {card?.niche && <span className="pcard-niche">{card.niche}</span>}
           </div>
-          {card && (card.handle ? <p className="mt-0.5 text-[15px] text-[hsl(var(--pc-muted))]">@{card.handle}</p> : <p className="mt-0.5 text-[15px] text-[hsl(var(--pc-muted))]">No handle yet</p>)}
+          {card && (card.handle ? <p className="mt-0.5 text-[15px] text-[hsl(var(--pc-muted))]">{fmtHandle(card.handle)}</p> : <p className="mt-0.5 text-[15px] text-[hsl(var(--pc-muted))]">No handle yet</p>)}
           {card && (
             <div className="group/bio mt-3 flex items-start gap-2">
               <p className={cn("min-w-0 flex-1 whitespace-pre-line break-words text-[15px] leading-relaxed", !card.bio && "text-[hsl(var(--pc-muted))]")}>{card.bio || "Add a short bio so people know what you make."}</p>

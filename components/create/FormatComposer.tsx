@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -66,7 +67,7 @@ function uploadError(e: unknown) {
   return `This browser couldn't prepare this file${name}. Tap Try again, or save it as a JPEG first.`;
 }
 
-const handle = (u: string) => (u.startsWith("@") ? u : `@${u}`);
+const handle = (u: string) => fmtHandle(u);
 
 function radioKeys<V>(values: readonly V[], current: V, set: (v: V) => void) {
   return (e: KeyboardEvent<HTMLElement>) => {

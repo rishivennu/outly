@@ -5,6 +5,7 @@
  * Nothing here invents a number. A stat no connected platform reports is null ("Unavailable" on the card), a
  * platform that didn't answer is listed as missing, and progress only counts things that can be checked.
  */
+import { fmtHandle } from "@/lib/handle";
 import { PLATFORMS, type Platform } from "./domain";
 
 export const BIO_MAX = 160;
@@ -149,7 +150,7 @@ export function cardLinks(accounts: LinkAccount[], prefs: ProfileLinks): CardLin
     if (!isPlatform(a.platform)) continue;
     const url = accountUrl(a.platform, a.username, a.platformUserId);
     if (url) urls.add(url.toLowerCase());
-    out.push({ key: a.id, platform: a.platform, label: /^@|\s/.test(a.username) ? a.username : `@${a.username}`, url, source: "connected", public: !hidden.has(a.id) });
+    out.push({ key: a.id, platform: a.platform, label: fmtHandle(a.username), url, source: "connected", public: !hidden.has(a.id) });
   }
   for (const l of prefs.links) {
     if (urls.has(l.url.toLowerCase())) continue;

@@ -1,4 +1,5 @@
 "use client";
+import { bareHandle, fmtHandle } from "@/lib/handle";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { BarChart2, Bookmark, Camera, Heart, MessageCircle, MoreHorizontal, Music2, Pause, Play, Repeat2, Search, Send, Share, ThumbsDown, ThumbsUp, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -264,7 +265,7 @@ export function YouTubeShort({ draft, src, poster, handle, avatar, interactive, 
         </p>
         <div className="flex items-center gap-2" aria-hidden="true">
           <Avatar name={handle} src={avatar} className="h-7 w-7" />
-          <span className="min-w-0 truncate text-[13px] font-medium">@{handle.replace(/^@/, "").replace(/\s+/g, "").toLowerCase()}</span>
+          <span className="min-w-0 truncate text-[13px] font-medium">{fmtHandle(bareHandle(handle).replace(/\s+/g, "").toLowerCase())}</span>
           <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-black">Subscribe</span>
         </div>
         {draft.hashtags && <p className="truncate text-xs text-white/80" aria-hidden="true">{draft.hashtags}</p>}
@@ -284,7 +285,7 @@ export function XPost({ draft, src, poster, handle, name, avatar, aspect, intera
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1 text-[15px]" aria-hidden="true">
             <span className="truncate font-bold text-white">{name}</span>
-            <span className="truncate text-[#71767b]">@{handle.replace(/^@/, "")} · now</span>
+            <span className="truncate text-[#71767b]">{fmtHandle(handle)} · now</span>
             <MoreHorizontal className="ml-auto h-4 w-4 shrink-0 text-[#71767b]" />
           </p>
           <p className="mt-0.5 whitespace-pre-line break-words text-[15px] leading-[1.35]" aria-hidden="true">
@@ -324,7 +325,7 @@ function TikTokVideo({ draft, src, poster, handle, avatar, interactive, classNam
       </div>
       <Rail items={[{ icon: Heart, fill: true }, { icon: MessageCircle, fill: true }, { icon: Bookmark, fill: true }, { icon: Share }]} />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 space-y-1.5 p-3 pr-12" aria-hidden="true">
-        <p className="truncate text-[14px] font-semibold">@{handle.replace(/^@/, "")}</p>
+        <p className="truncate text-[14px] font-semibold">{fmtHandle(handle)}</p>
         <p className="line-clamp-3 whitespace-pre-line break-words text-[13px] leading-snug">
           {caption ? <Rich text={caption} tagClass="font-semibold" /> : <span className="text-white/60">Your caption shows here</span>}
         </p>

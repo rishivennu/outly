@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { firstCommentLine } from "@/lib/client/first-comment";
 import { coverLine } from "@/lib/client/cover";
@@ -497,7 +498,7 @@ function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, can
             ) : (
               <PlatformOrb platform={t.platform} size={18} />
             )}
-            <span className="truncate text-[13px] font-semibold">{acct ? (acct.username ? `@${acct.username}` : acct.name) : `Your ${meta.name} account`}</span>
+            <span className="truncate text-[13px] font-semibold">{acct ? (fmtHandle(acct.username) || acct.name) : `Your ${meta.name} account`}</span>
           </span>
           {caption && <span className="mt-1 block truncate text-xs leading-snug text-white/60">{caption}</span>}
         </span>

@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { useState } from "react";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
@@ -50,7 +51,7 @@ export function Compare({ accounts }: { accounts: Acct[] }) {
               )}
             >
               <PlatformOrb platform={a.platform} size={18} />
-              <span className="truncate">@{a.username.replace(/^@/, "")}</span>
+              <span className="truncate">{fmtHandle(a.username)}</span>
               <span className="sr-only"> on {PLATFORM_META[a.platform].name}</span>
             </button>
           );
@@ -66,7 +67,7 @@ export function Compare({ accounts }: { accounts: Acct[] }) {
               {rows.map((r, i) => (
                 <th key={r.accountId} scope="col" className="pb-2 pr-4 font-medium">
                   <span className="flex items-center gap-1.5">
-                    <PlatformOrb platform={r.platform as Platform} size={16} /> @{r.username.replace(/^@/, "")}
+                    <PlatformOrb platform={r.platform as Platform} size={16} /> {fmtHandle(r.username)}
                     {i === 0 && <span className="rounded-full bg-secondary px-2 py-px text-xs font-semibold uppercase tracking-wide">Baseline</span>}
                   </span>
                 </th>
@@ -86,7 +87,7 @@ export function Compare({ accounts }: { accounts: Acct[] }) {
                       {d && d.pct !== null && (
                         <span className={cn("ml-2 text-xs font-medium", d.pct >= 0 ? "text-success-ink" : "text-warning-ink")}>
                           {d.pct >= 0 ? "+" : "−"}{Math.round(Math.abs(d.pct))}%
-                          <span className="sr-only"> compared with @{base.username.replace(/^@/, "")}</span>
+                          <span className="sr-only"> compared with {fmtHandle(base.username)}</span>
                         </span>
                       )}
                     </td>

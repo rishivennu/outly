@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
@@ -147,8 +148,8 @@ export function AccountsView({ initial, previous: initialPrevious = [], setup, a
     const gone = new Set(r.replaced ?? []);
     setPrevious((pv) => [...pv.filter((x) => x.id !== acc.id), ...accounts.filter((x) => gone.has(x.id)).map((x) => ({ id: x.id, platform: x.platform, username: x.username }))]);
     setAccounts((all) => [...all.filter((x) => x.id !== acc.id && !gone.has(x.id)), acc]);
-    if (dmScope) toast(`${PLATFORM_META[acc.platform].name} ${acc.username} is connected, but messages were left unticked, so DMs won't arrive in your Inbox. To get them, reconnect and keep "Manage messages" ticked.`, "info");
-    else toast(`${PLATFORM_META[acc.platform].name} ${acc.username} is connected. Ready to publish.`);
+    if (dmScope) toast(`${PLATFORM_META[acc.platform].name} ${fmtHandle(acc.username)} is connected, but messages were left unticked, so DMs won't arrive in your Inbox. To get them, reconnect and keep "Manage messages" ticked.`, "info");
+    else toast(`${PLATFORM_META[acc.platform].name} ${fmtHandle(acc.username)} is connected. Ready to publish.`);
     router.refresh();
   };
   const onChoiceOther = async () => {
@@ -238,19 +239,19 @@ export function AccountsView({ initial, previous: initialPrevious = [], setup, a
                             {x.username.replace(/^@/, "").slice(0, 1).toUpperCase()}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">{x.username}</p>
+                            <p className="truncate text-sm font-medium">{fmtHandle(x.username)}</p>
                             <p className={cn("flex items-center gap-1 text-xs", xok ? "text-success-ink" : "text-warning-ink")}>
                               {xok ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <CircleAlert className="h-3.5 w-3.5" aria-hidden="true" />}
                               {xok ? "Ready to publish" : `${PLATFORM_META[p].name} needs you to reconnect.`}
                             </p>
                           </div>
                           {!xok && setup[p].oauth && list.length > 1 && (
-                            <a href={connectHref(p, { intent: "reconnect", expect: x.id })} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={`Reconnect ${x.username}`}>
+                            <a href={connectHref(p, { intent: "reconnect", expect: x.id })} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={`Reconnect ${fmtHandle(x.username)}`}>
                               <RefreshCw className="h-4 w-4" aria-hidden="true" />
                             </a>
                           )}
                           {list.length > 1 && (
-                            <button type="button" onClick={() => setConfirm({ platform: p, id: x.id, name: `@${x.username.replace(/^@/, "")}` })} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={`Disconnect ${x.username}`}>
+                            <button type="button" onClick={() => setConfirm({ platform: p, id: x.id, name: fmtHandle(x.username) })} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={`Disconnect ${fmtHandle(x.username)}`}>
                               <Unplug className="h-4 w-4" aria-hidden="true" />
                             </button>
                           )}
@@ -281,8 +282,8 @@ export function AccountsView({ initial, previous: initialPrevious = [], setup, a
                   <ul className="mt-1">
                     {prev(p).map((x) => (
                       <li key={x.id} className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 truncate font-medium">{x.username}</span>
-                        <a href={connectHref(p, { intent: "reconnect", expect: x.id })} className="inline-flex min-h-11 shrink-0 items-center font-medium underline underline-offset-4" aria-label={`Reconnect ${x.username}`}>
+                        <span className="min-w-0 truncate font-medium">{fmtHandle(x.username)}</span>
+                        <a href={connectHref(p, { intent: "reconnect", expect: x.id })} className="inline-flex min-h-11 shrink-0 items-center font-medium underline underline-offset-4" aria-label={`Reconnect ${fmtHandle(x.username)}`}>
                           Reconnect
                         </a>
                       </li>
@@ -422,7 +423,7 @@ function TokenConnect({ onConnected, defaultOpen }: { onConnected: (a: AccountVi
       const r = await api<{ account: AccountView }>("/api/accounts/instagram/token", { method: "POST", json: { token } });
       setToken("");
       onConnected(r.account);
-      toast(`Instagram ${r.account.username} is connected for real. Your live dashboard is ready.`);
+      toast(`Instagram ${fmtHandle(r.account.username)} is connected for real. Your live dashboard is ready.`);
     } catch (x) {
       setErr(x instanceof ApiError ? x.message : "That token didn't work.");
     } finally {

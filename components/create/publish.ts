@@ -1,3 +1,4 @@
+import { fmtHandle } from "@/lib/handle";
 import { blocking, checksFor, composedCopy, countHashtags, type Draft } from "@/lib/client/checks";
 import { PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
 
@@ -114,7 +115,7 @@ export function confirmRows(drafts: Drafts, accounts: RowAccounts, media: Media,
     const a = accounts[p];
     const held = hold.find((h) => h.platform === p);
     const warnings = checksFor(p, drafts[p], media).filter((c) => c.level === "warning").map((c) => c.text);
-    return { platform: p, handle: a?.username ? `@${a.username.replace(/^@/, "")}` : null, sending: !held, reason: held?.reason ?? null, warnings, practice: !!a?.mock };
+    return { platform: p, handle: fmtHandle(a?.username) || null, sending: !held, reason: held?.reason ?? null, warnings, practice: !!a?.mock };
   });
 }
 

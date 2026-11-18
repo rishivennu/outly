@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import * as Switch from "@radix-ui/react-switch";
@@ -217,7 +218,7 @@ export function PlatformDeck(p: Props) {
               const d = p.drafts[pl];
               const acct = p.accounts[pl];
               const connected = acct?.status === "connected";
-              const who = acct ? `${acct.username}${acct.mock ? " (practice)" : ""}` : "No account yet";
+              const who = acct ? `${fmtHandle(acct.username)}${acct.mock ? " (practice)" : ""}` : "No account yet";
               const choice = connected && acct ? p.options?.[pl] : undefined;
               return (
                 <Fragment key={pl}>
@@ -280,7 +281,7 @@ export function PlatformDeck(p: Props) {
                           >
                             {choice.map((a) => (
                               <option key={a.id} value={a.id}>
-                                {a.username}{a.mock ? " (practice)" : ""}
+                                {fmtHandle(a.username)}{a.mock ? " (practice)" : ""}
                               </option>
                             ))}
                           </select>
@@ -448,8 +449,8 @@ function PlatformStage(p: StageProps) {
             <h3 className="truncate text-lg font-semibold tracking-tight">
               {meta.name} {meta.format}
             </h3>
-            <p className="truncate text-[13px] text-muted-foreground" title={acct?.username}>
-              {acct ? `as ${acct.username}` : "No account connected"}
+            <p className="truncate text-[13px] text-muted-foreground" title={fmtHandle(acct?.username)}>
+              {acct ? `as ${fmtHandle(acct.username)}` : "No account connected"}
             </p>
           </div>
         </div>

@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { FX } from "@/lib/motion/tokens";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
@@ -12,7 +13,7 @@ import type { ChoiceView } from "@/lib/connect-choice";
 /** The exact question (1095) for an account this studio has had before. */
 export const KNOWN_QUESTION = "This account was previously connected to Outlly. Would you like to reconnect this account or connect a different account?";
 
-const at = (u: string) => (/^@/.test(u) || /\s/.test(u) ? u : `@${u}`);
+const at = (u: string) => fmtHandle(u);
 const list = (xs: { username: string }[]) => xs.map((x) => at(x.username)).join(", ");
 
 /** The copy for each kind of question, kept pure so tests can read it. */

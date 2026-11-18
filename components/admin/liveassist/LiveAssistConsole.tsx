@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -505,7 +506,7 @@ function Details({ d, info, onOpen, onNote }: { d: Detail; info: Info | null; on
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[12.5px] font-medium">{PLAT_LABEL[a.platform] ?? a.platform}</span>
-                      <span className="block truncate text-[11.5px] text-muted-foreground">@{a.username}</span>
+                      <span className="block truncate text-[11.5px] text-muted-foreground">{fmtHandle(a.username)}</span>
                     </span>
                     <Pill tone={st.tone} className="shrink-0">{st.label}</Pill>
                   </li>

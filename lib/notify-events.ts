@@ -1,3 +1,4 @@
+import { fmtHandle } from "@/lib/handle";
 import "server-only";
 import { format } from "date-fns";
 import { db } from "./db";
@@ -99,7 +100,7 @@ export function noticeAccountConnected(acct: { id: string; userId: string; platf
       kind: "account_connected",
       tone: "info",
       title: `${name(acct.platform)} ${again ? "reconnected" : "connected"}`,
-      body: `@${acct.username.replace(/^@/, "")} is ready to post to.`,
+      body: `${fmtHandle(acct.username)} is ready to post to.`,
       href: "/accounts",
       action: "See accounts",
       key: `connected:${acct.id}:${dayStamp(new Date(), tz)}`,

@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,7 +50,7 @@ export function ConnectStep({ options }: { options: ConnectOption[] }) {
                 {o.status ? (
                   <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <StatusBadge status={o.status} />
-                    {o.username && <span className="truncate">@{o.username.replace(/^@/, "")}</span>}
+                    {o.username && <span className="truncate">{fmtHandle(o.username)}</span>}
                     {o.practice && <span>Practice account, nothing is posted</span>}
                   </p>
                 ) : (

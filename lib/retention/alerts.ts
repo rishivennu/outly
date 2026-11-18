@@ -1,3 +1,4 @@
+import { fmtHandle } from "@/lib/handle";
 import "server-only";
 import { db } from "../db";
 import { PLATFORM_META, isPlatform } from "../domain";
@@ -85,7 +86,7 @@ async function sweepPage(accts: Acct[], now: Date, dayAgo: Date, weekBefore: Dat
     const r = spikeRatio(views, prior.get(a.id) ?? 0, prefs.spikeX);
     if (r === null) continue;
     const name = isPlatform(a.platform) ? PLATFORM_META[a.platform].name : a.platform;
-    const who = a.username ? `@${a.username.replace(/^@/, "")}` : name;
+    const who = fmtHandle(a.username) || name;
     const res = await notify(
       a.userId,
       {

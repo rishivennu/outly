@@ -1,3 +1,4 @@
+import { fmtHandle } from "@/lib/handle";
 import "server-only";
 import type { z } from "zod";
 import { db } from "../db";
@@ -44,7 +45,7 @@ export async function bookBatch(userId: string, body: z.infer<typeof bulkSchedul
     const bad = picked.findIndex((a) => !a || !inScope(scope, a.id));
     if (bad >= 0) throw new HttpError(403, "One of those accounts isn't one you can post to here.", "ROLE");
     const off = picked.find((a) => a!.status !== "connected");
-    if (off) throw new HttpError(409, `@${off.username} on ${PLATFORM_META[off.platform as Platform]?.name ?? off.platform} needs reconnecting first.`, "NOT_CONNECTED");
+    if (off) throw new HttpError(409, `${fmtHandle(off.username)} on ${PLATFORM_META[off.platform as Platform]?.name ?? off.platform} needs reconnecting first.`, "NOT_CONNECTED");
     rounds = accountRounds(picked.map((a) => ({ id: a!.id, platform: a!.platform as Platform }))).map((r) => r.map((a) => ({ platform: a.platform, accountId: a.id })));
   } else {
     const platforms = [...new Set(body.platforms)];

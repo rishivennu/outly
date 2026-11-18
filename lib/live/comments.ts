@@ -1,3 +1,4 @@
+import { fmtHandle } from "@/lib/handle";
 import "server-only";
 import { httpFailure, type AccountContext, type PlatformComment } from "../social/types";
 import { instagramMedia, youtubeEmbed, youtubeThumb, type CommentMedia } from "../inbox-media";
@@ -22,7 +23,7 @@ type IgC = { id: string; text?: string; username?: string; timestamp?: string; l
 const igC = (c: IgC, parentId: string | null = null): PlatformComment => ({
   id: c.id,
   text: c.text ?? "",
-  authorName: c.username ? `@${c.username}` : "Someone on Instagram",
+  authorName: fmtHandle(c.username) || "Someone on Instagram",
   createdAt: c.timestamp ?? new Date().toISOString(),
   likeCount: c.like_count,
   parentId,
@@ -35,7 +36,7 @@ export async function instagramThreads(acct: AccountContext, skip: Set<string>, 
   if (!r.ok) throw await httpFailure(r, "instagram media");
   type IgM = { id: string; caption?: string; permalink?: string; comments_count?: number; timestamp?: string; media_type?: string; media_url?: string; thumbnail_url?: string };
   const media = ((await r.json()) as { data?: IgM[] }).data ?? [];
-  const handle = acct.username ? `@${acct.username}` : null;
+  const handle = fmtHandle(acct.username) || null;
   const withComments = media.filter((m) => (m.comments_count ?? 0) > 0 && !skip.has(m.id)).slice(0, maxPosts);
   const fields = encodeURIComponent("id,text,username,timestamp,like_count,replies{id,text,username,timestamp,like_count}");
   const threads = await Promise.all(

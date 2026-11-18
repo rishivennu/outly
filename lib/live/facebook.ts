@@ -1,3 +1,4 @@
+import { fmtHandle } from "@/lib/handle";
 import "server-only";
 import { httpFailure } from "../social/types";
 import type { AccountContext } from "../social/types";
@@ -100,7 +101,7 @@ export async function facebookDashboard(acct: AccountContext, rangeDays = 28): P
     status: "ok",
     fetchedAt: new Date().toISOString(),
     rangeDays,
-    profile: { name: p.name, handle: p.username ? `@${p.username}` : p.name, avatar: p.picture?.data?.url ?? null, url: p.link ?? `https://www.facebook.com/${p.id}`, bio: p.about ?? null },
+    profile: { name: p.name, handle: fmtHandle(p.username) || p.name, avatar: p.picture?.data?.url ?? null, url: p.link ?? `https://www.facebook.com/${p.id}`, bio: p.about ?? null },
     headline,
     // A Page reports no post total; the card falls back to the posts sent from Outlly and says so.
     totals: { followers: p.followers_count ?? null, posts: null, views: sum("views"), viewsScope: "28_days" },

@@ -132,11 +132,11 @@ describe("the screens really use it", () => {
     expect(pv).toContain("pct === null ? `STEP ${step.stepNumber}/${step.total}`");
   });
   test("the cards show the account, the thumbnail, the caption and when it last changed", () => {
-    expect(pv).toContain("acct.username ? `@${acct.username}`");
+    expect(pv).toContain("fmtHandle(acct.username) || acct.name"); // R1197: one @, from the shared formatter
     expect(pv).toContain('className="la-thumb shrink-0"');
     expect(pv).toContain("{caption && <span");
     expect(pv).toContain("{seen && <span");
-    expect(sn).toContain("t.account.username ? `@${t.account.username}`");
+    expect(sn).toContain("fmtHandle(t.account.username) || t.account.name");
     expect(sn).toContain("liveLabel(t, p.status)");
   });
   test("all three screens wake on the service worker's push message, focus and the tab coming back", () => {

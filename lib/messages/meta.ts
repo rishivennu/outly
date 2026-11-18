@@ -1,3 +1,4 @@
+import { fmtHandle } from "@/lib/handle";
 import "server-only";
 import { httpFailure, type AccountContext } from "../social/types";
 
@@ -80,7 +81,7 @@ export function mapConversation(c: GConv, selfId: string, selfUsername?: string 
     conversationId: c.id,
     participantId: other.id,
     participantName: other.name ?? null,
-    participantHandle: other.username ? `@${other.username}` : null,
+    participantHandle: fmtHandle(other.username) || null,
     updatedAt: c.updated_time ? new Date(c.updated_time) : messages[0]?.sentAt ?? new Date(),
     messages,
   };
@@ -110,7 +111,7 @@ export async function fetchProfile(platform: DmPlatform, acct: AccountContext, p
     if (!r.ok) return null;
     const j = (await r.json()) as { name?: string; username?: string; profile_pic?: string; first_name?: string; last_name?: string };
     const name = j.name ?? ([j.first_name, j.last_name].filter(Boolean).join(" ") || null);
-    return { name, handle: j.username ? `@${j.username}` : null, avatar: j.profile_pic ?? null };
+    return { name, handle: fmtHandle(j.username) || null, avatar: j.profile_pic ?? null };
   } catch {
     return null;
   }

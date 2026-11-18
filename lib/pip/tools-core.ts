@@ -1,3 +1,4 @@
+import { fmtHandle } from "@/lib/handle";
 import "server-only";
 import { formatMoney } from "../billing/money";
 import { MAX_DOCS, signDocs, type PipDoc } from "./links";
@@ -145,5 +146,5 @@ export function mergeRelink<N extends { level: "info" | "warn"; text: string }>(
   return out;
 }
 /** How an account is named: "@handle", never "@@handle", and a page or channel name with spaces stays as it is. */
-export const at = (u: string | null | undefined) => { const v = (u ?? "").trim(); return !v ? "" : v.startsWith("@") || /\s/.test(v) ? v : `@${v}`; };
+export const at = (u: string | null | undefined) => fmtHandle(u); // R1197: the shared formatter (lib/handle.ts)
 export const pct = (n: number) => `${n >= 0 ? "+" : ""}${Math.round(n * 10) / 10}%`;

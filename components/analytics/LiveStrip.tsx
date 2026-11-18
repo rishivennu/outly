@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { HoverLink as Link } from "@/components/shell/HoverLink";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, CircleAlert, Link2, RefreshCw } from "lucide-react";
@@ -160,7 +161,7 @@ const href = (t: Tile) => `/analytics/${t.platform}${t.card ? `?account=${encode
 const dashOf = (t: Tile): Slot => (t.card ? (t.card.dash ?? "error") : undefined);
 
 function Top({ t, big }: { t: Tile; big?: boolean }) {
-  const handle = t.card ? (t.card.username.startsWith("@") ? t.card.username : `@${t.card.username}`) : null;
+  const handle = t.card ? fmtHandle(t.card.username) : null;
   return (
     <span className="relative flex min-w-0 items-center gap-2.5 text-[15px] font-medium">
       <PlatformOrb platform={t.platform} size={big ? 34 : 26} />
@@ -262,7 +263,7 @@ function Foot({ t, busy, onRefresh }: { t: Tile; busy: boolean; onRefresh: (id: 
         type="button"
         onClick={() => onRefresh(t.card!.accountId)}
         disabled={busy}
-        aria-label={`Refresh ${t.card!.username} on ${name}`}
+        aria-label={`Refresh ${fmtHandle(t.card!.username)} on ${name}`}
         className="ml-auto inline-flex h-9 min-w-[44px] touch:h-11 items-center gap-1.5 rounded-full px-3 text-xs font-medium hairline hover:bg-secondary/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         <RefreshCw className={cn("h-3.5 w-3.5", busy && "animate-spin motion-reduce:animate-none")} aria-hidden="true" /> Refresh

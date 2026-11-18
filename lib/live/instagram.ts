@@ -1,3 +1,4 @@
+import { fmtHandle } from "@/lib/handle";
 import "server-only";
 import { httpFailure } from "../social/types";
 import type { AccountContext } from "../social/types";
@@ -130,7 +131,7 @@ export async function instagramDashboard(acct: AccountContext, timezone: string,
     status: "ok",
     fetchedAt: new Date().toISOString(),
     rangeDays,
-    profile: { name: me.name || me.username, handle: `@${me.username}`, avatar: me.profile_picture_url ?? null, url: `https://www.instagram.com/${me.username}/`, bio: me.biography ?? null },
+    profile: { name: me.name || me.username, handle: fmtHandle(me.username), avatar: me.profile_picture_url ?? null, url: `https://www.instagram.com/${me.username}/`, bio: me.biography ?? null },
     headline,
     // Instagram keeps no lifetime view count: the card says these are the last 28 days.
     totals: { followers: me.followers_count ?? null, posts: me.media_count ?? null, views: tv(c, "views"), viewsScope: "28_days" },

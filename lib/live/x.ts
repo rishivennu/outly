@@ -1,3 +1,4 @@
+import { fmtHandle } from "@/lib/handle";
 import "server-only";
 import { httpFailure } from "../social/types";
 import type { AccountContext } from "../social/types";
@@ -53,7 +54,7 @@ export async function xDashboard(acct: AccountContext, rangeDays = 28): Promise<
     status: "ok",
     fetchedAt: new Date().toISOString(),
     rangeDays,
-    profile: { name: u.name, handle: `@${u.username}`, avatar: u.profile_image_url ?? null, url: `https://x.com/${u.username}`, bio: u.description ?? null },
+    profile: { name: u.name, handle: fmtHandle(u.username), avatar: u.profile_image_url ?? null, url: `https://x.com/${u.username}`, bio: u.description ?? null },
     headline: [
       { key: "followers", label: "Followers", value: u.public_metrics?.followers_count ?? null },
       { key: "posts", label: "Posts", value: u.public_metrics?.tweet_count ?? null },

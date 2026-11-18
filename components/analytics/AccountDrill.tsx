@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, FileDown, FileSpreadsheet, Loader2 } from "lucide-react";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
@@ -176,7 +177,7 @@ export function AccountDrill({ accounts, active, onPick, busy }: { accounts: Acc
                 <span className="absolute -bottom-1 -right-1"><PlatformOrb platform={a.platform as Platform} size={18} /></span>
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{a.username}<span className="sr-only"> on {PLATFORM_META[a.platform as Platform]?.name ?? a.platform}</span></span>
+                <span className="block truncate font-medium">{fmtHandle(a.username)}<span className="sr-only"> on {PLATFORM_META[a.platform as Platform]?.name ?? a.platform}</span></span>
                 <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-secondary" aria-hidden="true">
                   <span className="block h-full rounded-full lime-bg" style={{ width: `${(a.views / max) * 100}%` }} />
                 </span>

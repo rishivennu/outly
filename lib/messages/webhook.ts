@@ -1,3 +1,4 @@
+import { fmtHandle } from "@/lib/handle";
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "../env";
@@ -139,7 +140,7 @@ export function parseCommentWebhook(body: unknown): CommentEvent[] {
         const v = c.value as IgComment;
         const from = v.from?.id ? String(v.from.id) : "";
         if (!v.id || !v.media?.id || !from || from === self) continue;
-        out.push({ platform, accountPlatformId: self, commentId: String(v.id), mediaId: String(v.media.id), parentId: v.parent_id ? String(v.parent_id) : null, text: String(v.text ?? ""), fromId: from, fromName: v.from?.username ? `@${String(v.from.username).replace(/^@+/, "")}` : "Someone", sentAt: when(e.time) });
+        out.push({ platform, accountPlatformId: self, commentId: String(v.id), mediaId: String(v.media.id), parentId: v.parent_id ? String(v.parent_id) : null, text: String(v.text ?? ""), fromId: from, fromName: fmtHandle(v.from?.username ? String(v.from.username) : "") || "Someone", sentAt: when(e.time) });
       }
       if (platform === "facebook" && c.field === "feed") {
         const v = c.value as FbFeed;

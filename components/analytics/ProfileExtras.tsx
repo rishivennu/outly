@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { motion, useReducedMotion } from "framer-motion";
 import { T } from "@/lib/motion/tokens";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
@@ -55,7 +56,7 @@ export function ProfileAccounts({ platform, accounts, active, onPick, busy, last
                 ) : (
                   <PlatformOrb platform={platform} size={22} />
                 )}
-                @{a.username.replace(/^@/, "")}
+                {fmtHandle(a.username)}
                 {a.status !== "active" && <span className="text-xs font-semibold text-warning-ink">needs reconnect</span>}
                 {a.practice && <span className="text-xs text-muted-foreground">practice</span>}
               </span>

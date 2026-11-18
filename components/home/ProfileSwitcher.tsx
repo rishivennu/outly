@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Layers, Search } from "lucide-react";
@@ -50,7 +51,7 @@ export function ProfileSwitcher({ profiles, activeId, children }: { profiles: Pr
           <div className="min-w-0">
             <h2 id="profiles-h" className="text-lg font-semibold">Your profiles</h2>
             <p className="mt-1 text-sm text-muted-foreground" aria-live="polite">
-              {current ? <>Working on <span className="font-medium text-foreground">{current.username}</span>. Home, Content, Calendar and Analytics show only this account.</> : <>Showing all {profiles.length} accounts. Pick one to focus on it.</>}
+              {current ? <>Working on <span className="font-medium text-foreground">{fmtHandle(current.username)}</span>. Home, Content, Calendar and Analytics show only this account.</> : <>Showing all {profiles.length} accounts. Pick one to focus on it.</>}
             </p>
             {children}
           </div>
@@ -99,7 +100,7 @@ export function ProfileSwitcher({ profiles, activeId, children }: { profiles: Pr
                   <span className="absolute -bottom-1 -right-1"><PlatformOrb platform={p.platform} size={20} ring /></span>
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{p.username}</span>
+                  <span className="block truncate font-medium">{fmtHandle(p.username)}</span>
                   <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                     <span className={cn("h-2 w-2 shrink-0 rounded-full", p.online ? "bg-success" : "bg-muted-foreground/50")} aria-hidden="true" />
                     {p.online ? "Connected" : p.status === "expired" ? "Needs reconnecting" : "Offline"}

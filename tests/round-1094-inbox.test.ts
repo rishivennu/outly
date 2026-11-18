@@ -28,7 +28,7 @@ describe("1094 inbox notice", () => {
 describe("1094 own handle", () => {
   test("every leading @ is stripped when matching the creator", () => {
     expect(src("components/inbox/InboxView.tsx")).toContain('replace(/^@+/, "")');
-    expect(src("lib/inbox.ts")).toContain('`@${acct.username.replace(/^@+/, "")}`');
+    expect(src("lib/inbox.ts")).toContain("fmtHandle(acct.username)"); // R1197: the shared formatter strips every leading @
   });
   test("the creator's own comments never count as waiting", () => {
     const s = src("components/inbox/InboxView.tsx");

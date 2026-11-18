@@ -1,4 +1,5 @@
 "use client";
+import { fmtHandle } from "@/lib/handle";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -269,7 +270,7 @@ export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: str
                       className={cn("inline-flex min-h-[44px] items-center gap-2 rounded-full py-1.5 pl-1.5 pr-4 text-sm font-medium transition hairline", on ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
                     >
                       <PlatformOrb platform={a.platform} size={30} />
-                      {a.username}
+                      {fmtHandle(a.username)}
                       <span className="sr-only"> on {PLATFORM_META[a.platform].name}</span>
                       {on && <Check className="h-4 w-4" aria-hidden />}
                     </button>

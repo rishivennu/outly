@@ -1,3 +1,4 @@
+import { fmtHandle } from "@/lib/handle";
 import "server-only";
 import { db } from "../db";
 import { getAnalytics } from "../analytics";
@@ -47,7 +48,7 @@ export async function buildRangeReport(user: Pick<SessionUser, "id" | "scope" | 
       {
         title: t.title || t.post.title || t.post.hook || "Untitled",
         platform: t.platform,
-        account: t.socialAccount?.username ? `@${t.socialAccount.username}` : "",
+        account: fmtHandle(t.socialAccount?.username),
         publishedAt: t.publishedAt?.toISOString() ?? null,
         views: s._sum.views ?? 0,
         likes: s._sum.likes ?? 0,
@@ -59,7 +60,7 @@ export async function buildRangeReport(user: Pick<SessionUser, "id" | "scope" | 
   });
 
   const one = ids && ids.length === 1 ? profiles.find((p) => p.id === ids[0]) : null;
-  const scope = one ? `@${one.username} on ${platformName(one.platform)}` : ids ? `${ids.length} accounts` : "All accounts";
+  const scope = one ? `${fmtHandle(one.username)} on ${platformName(one.platform)}` : ids ? `${ids.length} accounts` : "All accounts";
   const now = new Date();
   return {
     workspace: user.name || "Outlly",
@@ -72,7 +73,7 @@ export async function buildRangeReport(user: Pick<SessionUser, "id" | "scope" | 
     totals: a.totals,
     ...fairPrevious(a.totals.views, a.previous.views, a.periods, a.coverage),
     byPlatform: a.byPlatform.filter((p) => p.views > 0),
-    byAccount: a.byAccount.map((x) => ({ platform: x.platform, username: `@${x.username}`, views: x.views, engagement: x.engagement, posts: x.posts })),
+    byAccount: a.byAccount.map((x) => ({ platform: x.platform, username: fmtHandle(x.username), views: x.views, engagement: x.engagement, posts: x.posts })),
     daily: a.series.map((s) => ({ date: s.date, views: Object.entries(s).reduce((n, [k, v]) => (k === "date" ? n : n + (v as number)), 0) })),
     posts,
   };
