@@ -74,6 +74,16 @@ describe("horizontal galleries (1183)", () => {
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{ \.hs-hint \{ display: block;/);
     expect(css).toContain("#features { overflow-x: clip; }");
     expect(css).toContain("#try { overflow-x: clip; }");
+    expect(css).toContain("#pricing { overflow-x: clip; }");
+  });
+
+  test("R1196: Pricing is a gallery too, as a list; its cards rise the old way only when every plan fits", () => {
+    const cards = read("components/marketing/PricingCards.tsx");
+    expect(cards).toContain('<HScroll label="Plans" focusable list');
+    expect(row).toContain('const Track = list ? "ul" : "div"');
+    expect(scenes).toContain("still.push(el)");
+    expect(scenes).toContain("still.some((g) => pri.contains(g))");
+    expect(css.indexOf(".price-item {")).toBeLessThan(css.indexOf("1120: creator profile card"));
   });
 
   test("the CSS lives above the studio markers", () => {

@@ -5,7 +5,8 @@ import { scrollPageTo, smoothEngine } from "./smooth";
 gsap.registerPlugin(ScrollTrigger);
 
 /**
- * 1183: the GSAP "horizontal scrolling gallery" demo (user, 11-17) for the landing's What you get and Try it rows.
+ * 1183: the GSAP "horizontal scrolling gallery" demo (user, 11-17) for the landing's What you get and Try it rows
+ * (and Pricing, R1196).
  * The section holds still while the vertical scroll drives its card track sideways, one pixel across per pixel down,
  * and each card grows into place as it arrives from the right edge.
  *

@@ -7,7 +7,7 @@ import { RocketCta } from "@/components/billing/RocketCta";
 import { CycleSwitch } from "@/components/billing/CycleSwitch";
 import type { CardStyle } from "@/lib/billing/display";
 import type { Cycle } from "@/lib/billing/cycle";
-import { Reveal } from "./Reveal";
+import { HScroll } from "./HScroll";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react";
 import { GUARANTEE_LINE } from "@/lib/billing/guarantee-core";
@@ -31,10 +31,12 @@ export type IntroPrice = { label: string; minor: number; then: string };
 
 /**
  * The landing pricing cards: Monthly / Yearly switch, the admin's card style, and rocket CTAs.
- * R1194: one sideways row that snaps card by card instead of a grid. Cards keep one readable width on every screen
- * (a slice of the next card shows on a phone, so the row reads as scrollable), the edges fade where more is hidden
- * (`.scroll-x`, data-more), the row is focusable for keyboard scrolling, and two arrows step a card at a time for
- * mouse users. When every card fits, the row centres itself and the arrows stay away.
+ * R1194: one sideways row instead of a grid; cards keep one readable width on every screen.
+ * R1196 (user, 11-18): the row is the landing's GSAP horizontal scrolling gallery (HScroll, lib/motion/hscroll.ts), like
+ * What you get and Try it: the sheet holds while the page scroll drives the plans sideways and each card grows in from
+ * the right. Without it (no JS, reduced motion) the row is a native snap scroller, focusable for the keyboard, and two
+ * arrows step it a card at a time for mouse users; with the gallery on, the arrows stand down (globals.css). When every
+ * card fits, the row centres itself and the arrows stay away.
  */
 export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; variant: CardStyle; top: string }) {
   const beta = useBeta();
@@ -42,10 +44,11 @@ export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; varia
   const reduce = useReducedMotion();
   const save = Math.max(0, ...plans.map((p) => p.year?.save ?? 0));
   const anyYear = plans.some((p) => p.year && p.state === "available");
-  const rowRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const box = () => wrapRef.current?.querySelector<HTMLElement>("[data-hs-box]") ?? null; // HScroll's own scroll box
   const [more, setMore] = useState("");
   useEffect(() => {
-    const el = rowRef.current;
+    const el = box();
     if (!el) return;
     const read = () => {
       const max = el.scrollWidth - el.clientWidth;
@@ -61,7 +64,7 @@ export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; varia
   }, [plans.length]);
   // One card (plus the gap) per tap, in the row's own scroll, so snap settles it on a card edge.
   const step = (dir: 1 | -1) => {
-    const el = rowRef.current;
+    const el = box();
     if (!el) return;
     const card = el.querySelector<HTMLElement>("li");
     el.scrollBy({ left: dir * ((card?.offsetWidth ?? 320) + 20), behavior: reduce ? "auto" : "smooth" });
@@ -74,17 +77,8 @@ export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; varia
           <CycleSwitch value={cycle} onChange={setCycle} save={save} />
         </div>
       )}
-      <div className={cn("relative", top)}>
-        <div
-          ref={rowRef}
-          role="region"
-          aria-label="Plans"
-          tabIndex={0}
-          data-more={more || undefined}
-          data-testid="pricing-row"
-          className="scroll-x pricing-row snap-x snap-mandatory"
-        >
-          <Reveal as="ul" fx="cards" className="flex w-max min-w-full gap-5">
+      <div ref={wrapRef} className={cn("relative", top)}>
+        <HScroll label="Plans" focusable list className="price-hs">
             {plans.map((p) => {
           const live = p.state === "available";
           const y = cycle === "year" && p.year ? p.year : null;
@@ -92,7 +86,7 @@ export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; varia
           const label = intro ? intro.label : y ? y.label : p.month.label;
           const tone = variant === "bold" && p.featured && live ? "ink" : "lime";
           return (
-            <li key={p.id} className="w-[min(86vw,340px)] shrink-0 snap-start first:ml-auto last:mr-auto">
+            <li key={p.id} className="hs-item price-item">
               <PlanCardView
                 variant={variant}
                 name={p.name}
@@ -142,10 +136,9 @@ export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; varia
             </li>
           );
         })}
-          </Reveal>
-        </div>
+        </HScroll>
         {more && (
-          <div className="mt-5 flex items-center justify-center gap-3">
+          <div className="price-arrows mt-5 flex items-center justify-center gap-3">
             <button type="button" onClick={() => step(-1)} disabled={!more.includes("left")} aria-label="Previous plans" className={arrow}>
               <ChevronLeft className="h-5 w-5" aria-hidden="true" />
             </button>

@@ -27,8 +27,8 @@ gsap.registerPlugin(ScrollTrigger);
  *      section group is a full-screen sheet; when one ends it stays put and the next slides up over it while it sinks
  *      away (lib/motion/panels.ts). How it works and Demo then hold their sheet on screen while their steps play
  *      (the hold replaces their own pin: ScrollTrigger cannot nest pins).
- *  10. Horizontal galleries (1183, user 11-17, the GSAP "horizontal scrolling gallery" demo): What you get and Try it
- *      hold their sheet while the scroll drives the card row sideways (lib/motion/hscroll.ts), then sink like the rest.
+ *  10. Horizontal galleries (1183, user 11-17, the GSAP "horizontal scrolling gallery" demo): What you get, Try it and
+ *      Pricing (R1196) hold their sheet while the scroll drives the card row sideways (lib/motion/hscroll.ts), then sink like the rest.
  *   8. Parallax (1064): decorative layers marked data-parallax="px" drift against the scroll, a few dozen px at
  *      most. The one scroll-linked effect left (parallax is position by definition), smoothed so it never jerks.
  *      Below lg, How it works fills a thin line along each step once it comes up.
@@ -245,13 +245,17 @@ export function ScrollScenes() {
       //     that never pins (the last, a flow sheet, no stack) pins its own section, after the stack, in page order.
       const pinned = new Set(stack ? panels.slice(0, -1).filter((p) => p.dataset.panel !== "flow") : []);
       const ownPins: Array<() => void> = [];
+      const still: HTMLElement[] = []; // galleries whose cards all fit: nothing to drive
       for (const el of Array.from(main.querySelectorAll<HTMLElement>("[data-hscroll]"))) {
         const g = hscroll(el);
         if (!g) continue;
         undo.push(g.kill);
         const sheet = panelOf(el);
         const k = g.screens();
-        if (k < 0.05) continue; // every card already fits
+        if (k < 0.05) {
+          still.push(el); // every card already fits
+          continue;
+        }
         if (sheet && pinned.has(sheet) && !holds.has(sheet)) holds.set(sheet, { screens: k, onHold: g.drive, bind: g.bind });
         else ownPins.push(g.pin);
       }
@@ -345,9 +349,10 @@ export function ScrollScenes() {
       const cmpS = sec("#compare");
       if (cmpS) enter(q(cmpS, "[data-cmp]"), cmpS, { y: 70 * k }, "top 88%");
 
-      // i. Pricing: the middle plan leads and the outer two follow it up; on phones each card rises on its own.
+      // i. Pricing (R1196): the plans are a gallery (scene 10), which brings each card in as it arrives. Only when every
+      //    plan fits (nothing to drive) do they rise the old way: the middle of three leads, else each on its own.
       const pri = sec("#pricing");
-      if (pri) {
+      if (pri && still.some((g) => pri.contains(g))) {
         const cards = q(pri, "ul > li > article");
         if (wide && cards.length === 3) cards.forEach((c, i) => enter([c], pri, { y: i === 1 ? 30 : 80 }, "top 70%", 0, i === 1 ? 0 : 0.14));
         else cards.forEach((c) => enter([c], c, { y: 30 * k }, "top 92%"));

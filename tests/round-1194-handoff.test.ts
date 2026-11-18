@@ -411,22 +411,23 @@ describe("cancel, a ticket already open, the button, a visitor", () => {
 });
 
 describe("pricing cards scroll sideways", () => {
-  test("one snapping row, focusable, fading edges, arrows only when something is hidden, centred when it all fits", () => {
+  test("R1196: one gallery row (HScroll), focusable, same card width, centred when it fits, arrows for the plain row only", () => {
     const src = readFileSync("components/marketing/PricingCards.tsx", "utf8");
     const css = readFileSync("app/globals.css", "utf8");
     expect(src).not.toContain("md:grid-cols-2");
-    expect(src).toContain('className="scroll-x pricing-row snap-x snap-mandatory"');
-    expect(src).toContain('role="region"');
-    expect(src).toContain('aria-label="Plans"');
-    expect(src).toContain("tabIndex={0}");
-    expect(src).toContain("data-more={more || undefined}");
-    expect(src).toContain('className="flex w-max min-w-full gap-5"');
-    expect(src).toContain('className="w-[min(86vw,340px)] shrink-0 snap-start first:ml-auto last:mr-auto"');
+    expect(src).toContain('<HScroll label="Plans" focusable list className="price-hs">');
+    expect(src).toContain('className="hs-item price-item"');
+    expect(src).not.toContain("pricing-row");
+    expect(src).not.toContain('fx="cards"'); // the gallery moves each card; a reveal on the track would fight it
+    expect(src).toContain('querySelector<HTMLElement>("[data-hs-box]")');
     expect(src).toContain('aria-label="Previous plans"');
     expect(src).toContain('aria-label="Next plans"');
     expect(src).toMatch(/\{more && \(/);
+    expect(src).toContain('className="price-arrows mt-5 flex');
     expect(src).toContain('behavior: reduce ? "auto" : "smooth"');
-    expect(css).toMatch(/\.pricing-row \{ max-width: none; margin-inline: -20px;/);
-    expect(css).toContain("@media (min-width: 640px) { .pricing-row { margin-inline: -32px;");
+    expect(css).toContain(".price-item { --hs-w: min(340px, 86vw); }");
+    expect(css).toContain(".price-hs .hs-track { gap: 20px; margin-inline: auto; }");
+    expect(css).toContain(".price-hs[data-hs-on] ~ .price-arrows { display: none; }");
+    expect(css).not.toContain(".pricing-row {");
   });
 });
