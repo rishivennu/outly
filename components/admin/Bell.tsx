@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { pollable } from "@/lib/client/idle";
+import { backgroundAlerts, idleFor, pollable } from "@/lib/client/idle";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -14,6 +14,7 @@ import { chime, setSound, soundOn, SOUND_EVENT } from "@/lib/client/live-sound";
 
 type Ev = { id: string; kind: string; title: string; body?: string | null; href?: string | null; createdAt: string };
 const SEEN = "outly-admin-seen";
+const BELL_LAST = "outly-bell-last";
 const ICON: Record<string, typeof Tag> = { payment_failed: AlertTriangle, subscription_new: CreditCard, ticket_new: LifeBuoy, ticket_urgent: LifeBuoy, live_request: Headset, live_urgent: Headset, plan_changed: Tag, integration: Plug, behavior_analysis: Sparkles };
 const LOUD = new Set(["payment_failed", "ticket_urgent", "ticket_new", "subscription_new", "live_request", "live_urgent"]);
 const BAD = new Set(["payment_failed", "ticket_urgent", "live_urgent"]);
@@ -29,8 +30,9 @@ function ago(iso: string) {
 type Pos = { top: number; right: number; width: number; maxHeight: number };
 
 /**
- * Real-time-ish alerts: polls every 15 s while the tab is visible (no websocket server needed on
- * Vercel). New failed payments, subscriptions and tickets also pop a toast.
+ * Real-time-ish alerts: polls every 30 s while someone is at the tab (no websocket server needed on Vercel), and
+ * once a minute in a background tab for a live-chat specialist with desktop alerts on (R1208, backgroundAlerts).
+ * New failed payments, subscriptions and tickets also pop a toast.
  *
  * 1142: the panel is portalled to <body> and fixed to the bell's own rectangle. It used to be an absolute child
  * of the sticky, backdrop-blurred top bar: a blurred ancestor stops the panel's own blur from reaching the page
@@ -61,7 +63,6 @@ export function Bell({ role }: { role: AdminRole }) {
   }, []);
 
   const poll = useCallback(async () => {
-    if (document.visibilityState !== "visible") return;
     try {
       const r = await fetch(`/api/admin/events${since.current ? `?since=${encodeURIComponent(since.current)}` : ""}`, { cache: "no-store" });
       if (!r.ok) return;
@@ -77,6 +78,7 @@ export function Bell({ role }: { role: AdminRole }) {
         const ids = live.map((e) => /[?&]s=([A-Za-z0-9_-]+)/.exec(e.href ?? "")?.[1] ?? e.id);
         chime(live.some((e) => e.kind === "live_urgent"), ids);
         // R1207: and a desktop alert from whichever admin page is open, when this window is not the one in front.
+        // R1208: a background tab now checks too (backgroundAlerts), so this reaches someone working elsewhere.
         // Tag = the request, so the Live Support console's own alert and this one never stack up twice.
         if (typeof Notification !== "undefined" && Notification.permission === "granted" && (document.visibilityState !== "visible" || !document.hasFocus()))
           for (const [i, e] of live.slice(0, 2).entries())
@@ -94,15 +96,36 @@ export function Bell({ role }: { role: AdminRole }) {
 
   useEffect(() => {
     setSeen(localStorage.getItem(SEEN) ?? "");
-    poll();
-    const t = setInterval(() => pollable() && poll(), 30_000); // 1150: was every 15 s, hidden tabs included
-    const v = () => document.visibilityState === "visible" && poll();
+    let at = Date.now();
+    // R1208: every admin tab writes when it last checked, so background checks are once a minute for the whole
+    // browser, not once a minute per tab (and nothing in the background while a tab someone uses is checking).
+    const shared = () => {
+      try {
+        return Number(localStorage.getItem(BELL_LAST)) || 0;
+      } catch {
+        return 0;
+      }
+    };
+    const run = () => {
+      at = Date.now();
+      try {
+        localStorage.setItem(BELL_LAST, String(at));
+      } catch {}
+      void poll();
+    };
+    run();
+    // 1150: every 30 s while someone is at the tab. R1208: otherwise once a minute, for desktop alerts only.
+    const live = can(role, "live");
+    const perm = () => (typeof Notification === "undefined" ? null : Notification.permission);
+    const t = setInterval(() => (pollable() || backgroundAlerts(live, Date.now() - Math.max(at, shared()), idleFor(), perm())) && run(), 30_000);
+    // Coming back to the tab checks at once, unless this tab checked in the last 10 s (quick tab flipping).
+    const v = () => document.visibilityState === "visible" && Date.now() - at > 10_000 && run();
     document.addEventListener("visibilitychange", v);
     return () => {
       clearInterval(t);
       document.removeEventListener("visibilitychange", v);
     };
-  }, [poll]);
+  }, [poll, role]);
 
   // Anchor: right edge lined up with the bell, 8px under it. On a phone it spans the screen less 12px each side and
   // stops 12px above the bottom (and the home indicator), so it is never clipped and its list scrolls inside.

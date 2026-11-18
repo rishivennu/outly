@@ -525,7 +525,7 @@ describe("review fixes: a live chat can't be stranded", () => {
     expect(w).toContain("{m.ask && !liveOn && (");
     expect(w).toContain("!m.ask && !liveOn && (");
     expect(w).toContain("disabled={!!liveBusy || busy}");
-    expect(w).toContain("const cid = inStudio || me ? newCid() : undefined;");
+    expect(w).toContain("const cid = signedIn || me ? newCid() : undefined;"); // R1208: was inStudio
     expect(w).not.toMatch(/animate-spin(?! motion-reduce)/);
   });
 });

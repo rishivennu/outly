@@ -9,6 +9,11 @@ export const SIGNED_IN_HINT = "outlly_in";
  * cacheable: the same HTML goes to everyone and the nav swaps "Log in" for "Dashboard" after
  * hydration. The hint is not a credential; the dashboard re-checks the real session.
  */
+/** R1208: the same check, read right now. Only for code that never renders on the server (Pip is ssr:false). */
+export function hasSignedInHint() {
+  return typeof document !== "undefined" && document.cookie.split("; ").some((c) => c === `${SIGNED_IN_HINT}=1`);
+}
+
 export function useSignedIn(fallback = false) {
   const [signedIn, setSignedIn] = useState(fallback);
   useEffect(() => {

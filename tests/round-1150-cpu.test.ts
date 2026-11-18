@@ -72,12 +72,14 @@ describe("pollable(): visible and someone is there", () => {
   test("every background poller checks it", () => {
     for (const f of ["components/admin/Bell.tsx", "components/shared/LiveCount.tsx", "components/founding/FoundingSeats.tsx", "components/admin/WaitlistBits.tsx", "components/admin/live/LiveGlobeCard.tsx", "components/inbox/MessagesView.tsx", "components/analytics/PlatformDashboardView.tsx", "components/analytics/ProfileReview.tsx", "components/shell/SendingPill.tsx"]) {
       const s = src(f);
-      expect(s).toContain('import { pollable } from "@/lib/client/idle";');
+      // R1208: the bell also imports the background-alert check from the same module.
+      expect(s).toMatch(/import \{ (?:[\w, ]+, )?pollable \} from "@\/lib\/client\/idle";/);
       expect(s).toContain("pollable()");
     }
     const bell = src("components/admin/Bell.tsx");
     expect(bell).not.toContain("setInterval(poll, 15_000)");
-    expect(bell).toContain("setInterval(() => pollable() && poll(), 30_000)");
+    // R1208: a hidden or idle tab checks once a minute only for desktop live-chat alerts (round-1208-bell-bg).
+    expect(bell).toContain("setInterval(() => (pollable() || backgroundAlerts(live, Date.now() - Math.max(at, shared()), idleFor(), perm())) && run(), 30_000)");
     // A send in progress keeps its fast poll whoever is watching.
     expect(src("components/shell/SendingPill.tsx")).toContain("(polling || pollable()) && void check()");
   });

@@ -26,6 +26,26 @@ export function pollable(idleMs = IDLE_MS, now = Date.now()) {
   return document.visibilityState === "visible" && now - last < idleMs;
 }
 
+/** R1208: how long since anyone used this tab, whether or not it is on screen (pollable() also wants it visible). */
+export function idleFor(now = Date.now()) {
+  wire();
+  return now - last;
+}
+
+/**
+ * R1208: when pollable() says no (tab hidden, or nobody at it), the admin bell still checks once a minute, so a new
+ * Live Support request reaches the specialist as a desktop alert while they work in another tab or app. Only for
+ * someone who takes live chats and has allowed desktop alerts (nobody else gets anything from a background check),
+ * and not after 10 hours with nobody at the tab (a tab left open overnight stops costing server calls). The 10 hours
+ * count use of THIS tab only: someone working in other apps all day without touching it stops getting these alerts
+ * after 10 hours (the phone alerts carry on). sinceLast is since the last check by ANY admin tab (Bell shares it).
+ */
+export const BG_MS = 60_000;
+export const BG_MAX = 10 * 3600_000;
+export function backgroundAlerts(live: boolean, sinceLast: number, idle: number, perm: string | null) {
+  return live && perm === "granted" && sinceLast >= BG_MS - 5_000 && idle < BG_MAX;
+}
+
 /** Test hook: pretend the last activity was at `at`. */
 export function _setLastActivity(at: number) {
   last = at;

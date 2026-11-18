@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ArrowDown, ArrowUp, BarChart3, CalendarClock, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, CreditCard, Globe, Headset, Loader2, Maximize2, Minimize2, RotateCw, SquarePen, X } from "lucide-react";
 import { Pip, type PipMood } from "@/components/brand/Pip";
 import { useMaybeUser } from "@/components/shell/UserContext";
+import { hasSignedInHint } from "@/components/marketing/useSignedIn";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { Answer } from "./Answer";
 import { PipDataCard } from "./PipDataCard";
@@ -99,7 +100,18 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const user = useMaybeUser();
   const canRetry = user?.workspace?.role !== "editor";
   // R1194: a signed-in person anywhere (studio or marketing pages) can talk to a specialist right here.
-  const signedIn = inStudio || !!user;
+  // R1208: Pip mounts in RootClient, outside UserProvider (studio layout only), so useMaybeUser() is null on every
+  // marketing page. There the readable session hint (middleware keeps it in step with the real cookie) says who is
+  // signed in. A 401 from the resume check means the hint outlived the session: the visitor path takes over.
+  // Read on the first render (no false-then-true flip: a question that opens Pip goes out signed in) and again on
+  // every page change, because Pip stays mounted through a client-side sign-in and the links that follow it.
+  const [hinted, setHinted] = useState(hasSignedInHint);
+  const [hintStale, setHintStale] = useState(false);
+  useEffect(() => {
+    setHinted(hasSignedInHint());
+    if (inStudio) setHintStale(false); // the studio is signed in only, so a stale verdict from earlier is over
+  }, [path, inStudio]);
+  const signedIn = inStudio || !!user || (hinted && !hintStale);
   const [copied, setCopied] = useState<number | null>(null);
   const [atBottom, setAtBottom] = useState(true);
   const [sleepy, setSleepy] = useState(false);
@@ -278,7 +290,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     const history = msgs.filter((m) => !m.kind).map((m) => ({ role: m.role, text: m.text })).slice(-8);
     // The last records card, so "and in August?" or "download them" means the same records (1049).
     const lastData = [...msgs].reverse().find((m) => m.data)?.data;
-    const cid = inStudio || me ? newCid() : undefined;
+    // R1208: signedIn, not inStudio, so a handoff asked for on a marketing page is matched to its line too.
+    const cid = signedIn || me ? newCid() : undefined;
     push({ role: "user", text: q, ...(cid ? { cid } : {}) });
     if (!navigator.onLine) return push({ role: "bot", text: T[lang].offline, kind: "error" });
     setBusy(true);
@@ -330,7 +343,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     } finally {
       setBusy(false);
     }
-  }, [busy, resolved, conv, msgs, lang, fails, escalate, path, live, inStudio]);
+  }, [busy, resolved, conv, msgs, lang, fails, escalate, path, live, signedIn]);
   // R1194: the queue place and the chat come back in a fresh tab or after a restart: the server knows which
   // conversation this person is waiting in. Asked once per mount, only with nothing restored from this tab.
   // R1205: also a few seconds after any page loads (Pip closed), so a reply that came while this person was away
@@ -341,7 +354,10 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
       if (resumedRef.current || convRef.current) return;
       resumedRef.current = true;
       fetch("/api/support/live?resume=1", { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : null))
+        .then((r) => {
+          if (r.status === 401 && !inStudio && !user) setHintStale(true);
+          return r.ok ? r.json() : null;
+        })
         .then((j) => {
           if (!j || typeof j.conversationId !== "string" || convRef.current) return;
           cursorRef.current = null;
