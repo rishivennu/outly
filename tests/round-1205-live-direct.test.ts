@@ -54,7 +54,7 @@ describe("the queue estimate", () => {
     expect(core.queueEta({ ...base, position: 2 })).toBeNull();
     expect(core.queueEta({ ...base, position: null })).toBeNull();
     expect(core.queueEta({ ...base, waitedMs: null })).toBeNull();
-    expect(core.queueEta({ ...base, state: "unavailable" })).toBeNull();
+    expect(core.queueEta({ ...base, state: "resolved" })).toBeNull();
     expect(core.queueEta({ ...base, state: "connected" })).toBeNull();
   });
 
@@ -82,16 +82,16 @@ describe("leave a message stays in the chat", () => {
     await nobodyOnline();
     const u = await mkUser("left");
     const r = await live.requestHuman(u.id, { message: "Instagram says my token expired" });
-    expect(r.state).toBe("unavailable");
+    expect(r.state).toBe("waiting");
     const left = await live.leaveMessage(u.id, { conversationId: r.conversationId, text: "I reconnected and it still fails.", cid: cid() });
-    expect({ state: left.state, mode: left.mode }).toEqual({ state: "unavailable", mode: "waiting" });
+    expect({ state: left.state, mode: left.mode }).toEqual({ state: "waiting", mode: "waiting" });
     expect(await db.ticket.count({ where: { userId: u.id } })).toBe(0);
     const msgs = await db.pipMessage.findMany({ where: { conversationId: r.conversationId }, select: { role: true, text: true } });
     expect(msgs.filter((m) => m.text === "live.left").length).toBe(1);
     expect(msgs.some((m) => m.role === "user" && m.text === "I reconnected and it still fails.")).toBe(true);
     expect(msgs.some((m) => m.text.startsWith("live.ticket"))).toBe(false);
-    // The tab closes for an hour: an abandoned request is swept, one with a message is kept.
-    const old = new Date(Date.now() - core.ABANDON_MS - 60_000);
+    // R1207: the tab closes for an hour and the request is still queued. Nothing is dropped for want of a specialist.
+    const old = new Date(Date.now() - 60 * 60_000);
     await db.supportSession.update({ where: { id: r.session!.id }, data: { customerSeenAt: old } });
     await live.sweepAbandoned(Date.now(), true);
     expect((await db.supportSession.findUniqueOrThrow({ where: { id: r.session!.id } })).status).toBe("waiting");
@@ -121,13 +121,14 @@ describe("leave a message stays in the chat", () => {
 
 describe("the words", () => {
   const LANGS = ["en", "hi", "es", "fr", "de", "pt", "ar", "zh", "ja", "ru", "id", "bn"] as const;
-  const KEYS = ["handoff", "waitingEta", "waitingLong", "queueConnecting", "queueWaiting", "queueAway", "etaLine", "available", "leftHere", "leaveHint", "signedOut", "humanOnline", "humanAway", "humanLabel", "unavailable"] as const;
+  // R1207: queueAway, available, humanOnline, humanAway and unavailable are gone; staff availability is never shown.
+  const KEYS = ["handoff", "waitingEta", "waitingLong", "queueConnecting", "queueWaiting", "etaLine", "leftHere", "leaveHint", "signedOut", "humanLabel", "queueTitle", "connectedTitle"] as const;
   test("the brief's exact English", () => {
     expect(LIVE_EN.waitingEta).toBe("You're in the queue. Please wait approximately 1 minute while we connect you to a support specialist.");
     expect(LIVE_EN.queueConnecting).toBe("Queue status: Connecting to a specialist");
     expect(LIVE_EN.etaLine).toBe("Estimated wait: Approximately 1 minute");
-    expect(LIVE_EN.connectedWith("Priya")).toBe("You're now connected with Priya. They'll assist you here.");
-    expect(LIVE_EN.humanOnline).toBe("Human support · Online");
+    expect(LIVE_EN.connectedWith("Priya")).toBe("You're connected! Priya has joined the conversation. How can we help?");
+    expect(LIVE_EN.humanLabel).toBe("Human support");
     expect(liveSysLine(liveT("en"), "live.left")).toBe(LIVE_EN.leftHere);
   });
   test("every language has every new key, translated, with no em dash and no email", () => {
@@ -140,17 +141,19 @@ describe("the words", () => {
       }
       expect(t.connectedWith("Zed")).toContain("Zed");
       expect("emailWhy" in t).toBe(false);
-      for (const k of ["unavailable", "leftHere", "leaveHint", "available"] as const) expect({ l, k, email: /e-?mail/i.test(t[k]) }).toEqual({ l, k, email: false });
+      for (const k of ["waiting", "leftHere", "leaveHint", "handoff"] as const) expect({ l, k, email: /e-?mail/i.test(t[k]) }).toEqual({ l, k, email: false });
     }
   });
 });
 
 describe("the widget", () => {
   const w = readFileSync("components/support/ChatWidget.tsx", "utf8");
-  test("Online and Away come from the backend; no email form for a signed-in person", () => {
+  // R1207: staff availability is never shown. The header reads "Human support", the same in every state.
+  test("the header never reports staff availability; no email form for a signed-in person", () => {
     expect(w).not.toContain("emailWhy");
-    expect(w).toContain("lt.humanOnline");
-    expect(w).toContain("lt.humanAway");
+    expect(w).toContain("lt.humanLabel");
+    expect(w).not.toContain("lt.humanOnline");
+    expect(w).not.toContain("lt.humanAway");
     expect(w).toMatch(/fetch\("\/api\/support\/live"/);
     expect(w).toContain("lt.waitingEta");
     expect(w).toContain("lt.etaLine");

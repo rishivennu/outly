@@ -102,9 +102,11 @@ describe("the agreed words", () => {
     expect(LIVE_EN.connect).toBe("Connect to a human");
     expect(LIVE_EN.keepPip).toBe("Continue with Pip");
     expect(LIVE_EN.connecting).toBe("Sending your request to our support team...");
-    expect(LIVE_EN.waiting).toBe("You're in the support queue. Your conversation is saved. An Outlly support specialist will join this chat.");
-    expect(LIVE_EN.connected).toBe("You're now connected with an Outlly support specialist.");
-    expect(LIVE_EN.unavailable).toBe("No specialist is available right now. Your conversation is saved. Leave a message here and a specialist will reply in this chat.");
+    // R1207: the queue words. The customer is never told the team is unavailable, so there is no "unavailable" line to show.
+    expect(LIVE_EN.queueTitle).toBe("You're in the support queue!");
+    expect(LIVE_EN.waiting).toBe("Please wait while we connect you with an Outlly support specialist. Your conversation is saved. A specialist will join this chat as soon as they're available.");
+    expect(LIVE_EN.connectedTitle).toBe("You're connected!");
+    expect(LIVE_EN.connected).toBe("You're connected! A support specialist has joined the chat.");
     expect(LIVE_EN.reconnecting).toBe("Connection interrupted. We're trying to reconnect you...");
     expect(LIVE_EN.resolved).toBe("Your conversation with our support team has been marked as resolved. If you need anything else, you can start another conversation.");
   });
@@ -120,7 +122,7 @@ describe("the agreed words", () => {
   test("stored status codes read in the customer's words and in the console's", () => {
     const t = liveT("en");
     expect(liveSysLine(t, "live.requested")).toBe(LIVE_EN.handoff);
-    expect(liveSysLine(t, "live.connected|Priya")).toBe("You're now connected with Priya. They'll assist you here.");
+    expect(liveSysLine(t, "live.connected|Priya")).toBe("You're connected! Priya has joined the conversation. How can we help?");
     expect(liveSysLine(t, "live.connected")).toBe(LIVE_EN.connected);
     expect(liveSysLine(t, "live.resolved")).toBe(LIVE_EN.resolved);
     expect(liveSysLine(t, "live.ticket|T-1234")).toContain("T-1234");
@@ -135,12 +137,14 @@ describe("the agreed words", () => {
 
 describe("pure rules", () => {
   const now = Date.now();
-  test("the customer's state comes from the session row and who is online", () => {
+  // R1207: who is online no longer changes what the customer sees. A waiting request always reads "waiting".
+  test("the customer's state comes from the session row alone", () => {
     expect(core.customerState(null, { agentsOnline: 3 })).toBe("none");
     expect(core.customerState({ status: "active", requestedAt: new Date(now) }, { agentsOnline: 0 })).toBe("connected");
     expect(core.customerState({ status: "resolved", requestedAt: new Date(now) }, { agentsOnline: 0 })).toBe("resolved");
     expect(core.customerState({ status: "waiting", requestedAt: new Date(now) }, { agentsOnline: 1, now })).toBe("waiting");
-    expect(core.customerState({ status: "waiting", requestedAt: new Date(now) }, { agentsOnline: 0, now })).toBe("unavailable");
+    expect(core.customerState({ status: "waiting", requestedAt: new Date(now) }, { agentsOnline: 0, now })).toBe("waiting");
+    expect(core.customerState({ status: "waiting", requestedAt: new Date(now) })).toBe("waiting");
     expect(core.customerState({ status: "waiting", requestedAt: new Date(now - 11 * 60_000) }, { agentsOnline: 2, now })).toBe("waiting");
     for (const st of ["cancelled", "returned", "ticket"]) expect(core.customerState({ status: st, requestedAt: new Date(now) }, { agentsOnline: 1 })).toBe("none");
   });
@@ -191,7 +195,7 @@ describe("two sessions end to end: a customer and the support team", () => {
   let before: Awaited<ReturnType<typeof live.analytics>>;
   const firstCid = cid();
 
-  test("asking for a person: queued, classified, the team is told, nobody online means unavailable", async () => {
+  test("asking for a person: queued, classified, the team is told; nobody online still means waiting", async () => {
     await nobodyOnline();
     before = await live.analytics({ days: 7 });
     u = await mkUser("cust");
@@ -203,7 +207,7 @@ describe("two sessions end to end: a customer and the support team", () => {
     conv = r.conversationId;
     sid = r.session!.id;
     expect(r.mode).toBe("waiting");
-    expect(r.state).toBe("unavailable");
+    expect(r.state).toBe("waiting");
     expect(r.position).toBeGreaterThanOrEqual(1);
     // R1194: the customer's words first, then Pip's one confirmation line.
     expect(r.messages.map((m) => [m.role, m.text])).toEqual([["user", "I was charged twice for my plan"], ["system", "live.requested"]]);
@@ -217,14 +221,16 @@ describe("two sessions end to end: a customer and the support team", () => {
     await live.heartbeat(A.s);
     const p = await live.customerPoll(u.id, { conversationId: conv });
     expect(p.state).toBe("waiting");
-    expect(p.agentsOnline).toBeGreaterThanOrEqual(1);
+    // R1207: the customer poll never reports how many specialists are online.
+    expect(p.agentsOnline).toBeNull();
     const again = await live.requestHuman(u.id, { conversationId: conv, message: "hello?" });
     expect(again.created).toBe(false);
     expect(again.session!.id).toBe(sid);
     expect(await db.supportSession.count({ where: { conversationId: conv } })).toBe(1);
-    // Away hides them again.
+    // R1207: away is internal. The customer still reads "waiting", and never learns how many specialists there are.
     await live.heartbeat(A.s, { away: true });
-    expect((await live.customerPoll(u.id, { conversationId: conv })).state).toBe("unavailable");
+    const away = await live.customerPoll(u.id, { conversationId: conv });
+    expect({ state: away.state, online: away.agentsOnline }).toEqual({ state: "waiting", online: null });
     await live.heartbeat(A.s, { away: false });
     expect((await live.customerPoll(u.id, { conversationId: conv })).state).toBe("waiting");
   });
@@ -434,10 +440,10 @@ describe("cancel, leave a message, back to Pip", () => {
     await nobodyOnline();
     const u = await mkUser("leave");
     const r = await live.requestHuman(u.id, { message: "My Instagram post failed to publish" });
-    expect(r.state).toBe("unavailable");
+    expect(r.state).toBe("waiting");
     const left = await live.leaveMessage(u.id, { conversationId: r.conversationId, text: "It was the 9am reel.", cid: cid() });
     expect("ref" in left).toBe(false);
-    expect({ state: left.state, mode: left.mode }).toEqual({ state: "unavailable", mode: "waiting" });
+    expect({ state: left.state, mode: left.mode }).toEqual({ state: "waiting", mode: "waiting" });
     const row = await db.supportSession.findUniqueOrThrow({ where: { id: r.session!.id } });
     expect({ status: row.status, ticketId: row.ticketId }).toEqual({ status: "waiting", ticketId: null });
     expect(await db.pipMessage.count({ where: { conversationId: r.conversationId, role: "user", text: "It was the 9am reel." } })).toBe(1);
@@ -495,7 +501,8 @@ describe("review fixes: a live chat can't be stranded", () => {
     const ra = await live.requestHuman(a.id, {});
     const rb = await live.requestHuman(b.id, {});
     const before = (await live.customerPoll(b.id, { conversationId: rb.conversationId })).position!;
-    const old = new Date(Date.now() - core.ABANDON_MS - 60_000);
+    // R1207: a request is only closed once the customer has been gone for LEFT_KEEP_MS (7 days).
+    const old = new Date(Date.now() - core.LEFT_KEEP_MS - 60_000);
     await db.supportSession.update({ where: { id: ra.session!.id }, data: { customerSeenAt: old, requestedAt: new Date(old.getTime() - 1000) } });
     const after = (await live.customerPoll(b.id, { conversationId: rb.conversationId })).position!;
     expect(after).toBe(before - 1);
@@ -540,7 +547,7 @@ describe("ownership, roles and the routes", () => {
     const mine = await GET(liveRoute.GET as Handler, `/api/support/live?conversationId=${r.conversationId}`);
     expect(mine.status).toBe(200);
     expect(mine.headers.get("cache-control")).toContain("no-store");
-    expect((await mine.json()).state).toBe("unavailable");
+    expect((await mine.json()).state).toBe("waiting");
     await live.cancelRequest(owner.id, r.conversationId);
     await live.cancelRequest(other.id, hijack.conversationId);
   });
@@ -604,20 +611,22 @@ describe("retention and the rest of the product", () => {
     expect(await db.pipConversation.count({ where: { id: plain.id } })).toBe(0);
   });
 
-  test("the sidebar lists Support as Tickets, Live Assist, FAQ, Email outbox, for support and super", () => {
+  test("the sidebar lists Support as Tickets, Live Support, FAQ, Email outbox, for support and super", () => {
     const src = readFileSync("components/admin/AdminShell.tsx", "utf8");
     const at = ["/admin/tickets\"", "/admin/live-assist\"", "/admin/faq\"", "/admin/outbox\""].map((h) => src.indexOf(`href: "${h}`));
     expect(at.every((i) => i > 0)).toBe(true);
     expect([...at].sort((x, y) => x - y)).toEqual(at);
     const lines = src.split(/\r?\n/).filter((l) => l.includes('group: "Support"'));
-    expect(lines.map((l) => /label: "([^"]+)"/.exec(l)![1])).toEqual(["Tickets", "Live Assist", "FAQ", "Email outbox"]);
+    expect(lines.map((l) => /label: "([^"]+)"/.exec(l)![1])).toEqual(["Tickets", "Live Support", "FAQ", "Email outbox"]);
     expect(readFileSync("lib/admin/perms.ts", "utf8")).toMatch(/live: \["super", "support"\]/);
   });
 
   test("the widget speaks through /api/support/live, uses the shared words and keeps the old email ticket path", () => {
     const w = readFileSync("components/support/ChatWidget.tsx", "utf8");
     expect(w).toContain("/api/support/live");
-    for (const k of ["connecting", "waiting", "connected", "unavailable", "reconnecting", "resolved", "keepPip"]) expect({ k, used: w.includes(`lt.${k}`) }).toEqual({ k, used: true });
+    for (const k of ["connecting", "queueTitle", "waiting", "connectedTitle", "connected", "reconnecting", "resolved", "keepPip"]) expect({ k, used: w.includes(`lt.${k}`) }).toEqual({ k, used: true });
+    // R1207: the customer is never shown the unavailable line.
+    expect(w).not.toContain("lt.unavailable");
     expect(w).toContain("liveT(lang).offer");
     expect(w).toContain("askEmail");
     expect(w).not.toMatch(/dangerouslySetInnerHTML=\{\{ __html: m\.text/);

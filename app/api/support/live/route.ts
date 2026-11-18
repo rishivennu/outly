@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { json, route } from "@/lib/http";
 import { realUserId } from "@/lib/auth";
-import { agentsOnline, cancelRequest, customerPoll, customerSend, customerTyping, leaveMessage, rate, requestHuman, resumeLive } from "@/lib/support/live";
+import { cancelRequest, customerPoll, customerSend, customerTyping, leaveMessage, rate, requestHuman, resumeLive } from "@/lib/support/live";
 import { wantsHuman } from "@/lib/support/intent";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +11,10 @@ const num = (v: string | null) => (v == null || v === "" ? null : Number(v));
 
 /**
  * R1184 Live Assist, customer side. GET ?conversationId=&after=&read= is the widget's check-in: the state from
- * real rows, messages after its cursor, typing and receipts. Without a conversation it only says whether anyone
- * from the support team is around (a yes or no, never how many). Always the person really signed in.
+ * real rows, messages after its cursor, typing and receipts. Always the person really signed in.
+ * R1207: without a conversation it no longer says whether anyone from the team is online (staff availability is
+ * internal; every request is queued and the team's phones are alerted either way). `online: null` keeps an older
+ * cached widget on its neutral "Human support" label.
  */
 export const GET = route(async (req, { user }) => {
   const p = req.nextUrl.searchParams;
@@ -20,7 +22,7 @@ export const GET = route(async (req, { user }) => {
   // R1194: ?resume=1 from a fresh tab: the conversation this person is waiting in (or talking in), so the queue
   // place and the chat come back after a refresh, a restart or a return later. null when there is none.
   if (!id && p.get("resume")) return json(await resumeLive(realUserId(user)), { headers: NO_STORE });
-  if (!id) return json({ online: (await agentsOnline()) > 0 }, { headers: NO_STORE });
+  if (!id) return json({ online: null }, { headers: NO_STORE });
   const snap = await customerPoll(realUserId(user), { conversationId: id.slice(0, 40), after: num(p.get("after")), read: num(p.get("read")) });
   return json(snap, { headers: NO_STORE });
 }, { limit: [150, 60_000] });

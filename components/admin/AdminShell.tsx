@@ -42,7 +42,7 @@ export const NAV: { href: string; label: string; icon: typeof Users; area: Admin
   { href: "/admin/blog/seo", label: "SEO performance", icon: TrendingUp, area: "content", group: "Content Studio" },
   { href: "/admin/blog/settings", label: "Blog settings", icon: SlidersHorizontal, area: "content", group: "Content Studio" },
   { href: "/admin/tickets", label: "Tickets", icon: LifeBuoy, area: "tickets", group: "Support" },
-  { href: "/admin/live-assist", label: "Live Assist", icon: Headset, area: "live", group: "Support" },
+  { href: "/admin/live-assist", label: "Live Support", icon: Headset, area: "live", group: "Support" },
   { href: "/admin/faq", label: "FAQ", icon: BookOpen, area: "faq", group: "Support" },
   { href: "/admin/outbox", label: "Email outbox", icon: Mail, area: "outbox", group: "Support" },
   { href: "/admin/integrations", label: "Integrations", icon: Plug, area: "integrations", group: "Setup" },

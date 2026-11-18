@@ -4,7 +4,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Activity, AlertTriangle, BellRing, CheckCircle2, Download, Loader2, RefreshCw, Settings2, ShieldAlert, X } from "lucide-react";
 import { useToast } from "@/components/shared/Toast";
 import { Card, CardTitle, Pill, Section, Table, ago, fmtDate, type Tone } from "@/components/admin/ui";
-import { pushSupport, currentSub, permission, urlB64ToBytes, type PushSupport } from "@/lib/client/push";
+import { pushSupport, currentSub, permission, installedNow, type PushSupport } from "@/lib/client/push";
+import { ADMIN_DEVICES_URL, adminPushFlag, enableAdminPush, setAdminPushFlag, syncAdminPush } from "@/lib/client/admin-push";
 import type { AdminRole } from "@/lib/admin/perms";
 import type { healthOverview, incidentRow } from "@/lib/health/overview";
 import type { WatchdogConfig } from "@/lib/health/config";
@@ -117,51 +118,10 @@ function Stat({ label, value, hint }: { label: string; value: React.ReactNode; h
   );
 }
 
-const PUSH_FLAG = "outlly:watchdog-push";
-const DEVICES = "/api/admin/health/devices";
-const flagOn = () => {
-  try {
-    return localStorage.getItem(PUSH_FLAG) === "1";
-  } catch {
-    return false;
-  }
-};
-const setFlag = (on: boolean) => {
-  try {
-    if (on) localStorage.setItem(PUSH_FLAG, "1");
-    else localStorage.removeItem(PUSH_FLAG);
-  } catch {}
-};
-const installedNow = () => window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
-
-async function registration() {
-  const have = await navigator.serviceWorker.getRegistration("/");
-  if (have) return have;
-  await navigator.serviceWorker.register("/sw.js");
-  return navigator.serviceWorker.ready;
-}
-
-/** The admin's "Alert me on this device" tap: permission inside the gesture, subscribe, save as an admin alert device. */
-async function enableAdminPush(publicKey: string): Promise<Device[]> {
-  if (pushSupport() !== "supported") throw new Error("This browser can't show notifications from Outlly.");
-  const perm = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
-  if (perm !== "granted") throw new Error(perm === "denied" ? "Notifications are blocked for Outlly in this browser. Allow them in the site settings, then try again." : "Notifications weren't allowed.");
-  const reg = await registration();
-  let sub = await reg.pushManager.getSubscription();
-  const key = sub?.options?.applicationServerKey;
-  if (sub && key) {
-    const a = new Uint8Array(key);
-    const b = urlB64ToBytes(publicKey);
-    if (a.length !== b.length || a.some((x, i) => x !== b[i])) {
-      await sub.unsubscribe().catch(() => {});
-      sub = null;
-    }
-  }
-  sub ??= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(publicKey) });
-  const r = await call<{ id: string; devices: Device[] }>(DEVICES, { sub: sub.toJSON(), installed: installedNow(), touchMac: navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1, key: publicKey });
-  setFlag(true);
-  return r.devices;
-}
+/** R1207: enrolling this browser lives in lib/client/admin-push.ts, shared with the Live Support console. */
+const DEVICES = ADMIN_DEVICES_URL;
+const flagOn = adminPushFlag;
+const setFlag = setAdminPushFlag;
 
 export function SystemHealth({ me, role }: { me: { id: string; name: string }; role: AdminRole }) {
   const toast = useToast();
@@ -228,10 +188,7 @@ export function SystemHealth({ me, role }: { me: { id: string; name: string }; r
   }, []);
   // Re-save a still-valid subscription when the page opens (refreshes "last seen"; brings it back after a reinstall).
   useEffect(() => {
-    if (!data?.vapidPublicKey || !flagOn()) return;
-    void currentSub().then((s) => {
-      if (s && permission() === "granted") void call(DEVICES, { sub: s.toJSON(), installed: installedNow(), key: data.vapidPublicKey }).catch(() => {});
-    });
+    void syncAdminPush(data?.vapidPublicKey);
     // Only when the key arrives the first time.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.vapidPublicKey]);

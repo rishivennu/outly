@@ -7,7 +7,7 @@ export const ROLE_LABEL: Record<AdminRole, string> = { super: "Super admin", fin
 export const ROLE_BLURB: Record<AdminRole, string> = {
   super: "Everything, including integrations and the team.",
   finance: "Revenue, payments, invoices, pricing, plan grants and referral rewards.",
-  support: "Tickets, Live Assist chats, FAQ, users and the email outbox.",
+  support: "Tickets, Live Support chats, FAQ, users and the email outbox.",
   marketing: "Growth: signup funnel, lead lists, campaign links, referrals, win-back and the blog.",
 };
 

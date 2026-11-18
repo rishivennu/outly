@@ -8,6 +8,8 @@ import { useToast } from "@/components/shared/Toast";
 import { Pill, STATUS_LABEL, ago, fmtDate, type Tone } from "@/components/admin/ui";
 import { BRAND_PATH, BrandGlyph } from "@/components/brand/brands";
 import { chime, setSound, soundOn, SOUND_EVENT } from "@/lib/client/live-sound";
+import { adminPushFlag, disableAdminPush, enableAdminPush, syncAdminPush } from "@/lib/client/admin-push";
+import { permission, pushSupport } from "@/lib/client/push";
 import type { AdminRole } from "@/lib/admin/perms";
 import { CATEGORY_LABEL, HISTORY_WORD, LIVE_CATEGORIES, LIVE_MAX_TEXT, LIVE_PRIORITIES, NOTE_MAX, STATUS_WORD, fmtDuration, mergeLive, receipt, staffSysLine, type LiveCategory, type Receipt, type SessionStatus, type WireMsg } from "@/lib/support/live-core";
 import type { analytics, detail, queue, QueueFilter, QueueRow, QueueSort } from "@/lib/support/live";
@@ -29,7 +31,7 @@ import { cn } from "@/lib/utils";
  * focus kept inside, system back closes it, the page behind it does not scroll, quiet scrollbars).
  */
 
-type QueueData = Awaited<ReturnType<typeof queue>> & { away: boolean; analytics: Awaited<ReturnType<typeof analytics>> | null };
+type QueueData = Awaited<ReturnType<typeof queue>> & { away: boolean; analytics: Awaited<ReturnType<typeof analytics>> | null; vapidPublicKey: string | null; pushDevices: number };
 type Detail = Awaited<ReturnType<typeof detail>>;
 type Msg = { key: string; sid?: string; seq?: number; cid?: string; pending?: boolean; failed?: boolean; role: WireMsg["role"]; text: string; author: string | null; at: string };
 
@@ -661,6 +663,8 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
   const [days, setDays] = useState(7);
   const [sound, setSoundUi] = useState(false);
   const [perm, setPerm] = useState("unsupported");
+  // R1207: phone alerts (Web Push) for this browser. True only when this browser is really subscribed and allowed.
+  const [pushHere, setPushHere] = useState(false);
   const [sel, setSel] = useState<string | null>(null);
   const [d, setD] = useState<Detail | null>(null);
   const [info, setInfo] = useState<Info | null>(null);
@@ -713,10 +717,19 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
   useEffect(() => {
     setSoundUi(soundOn());
     setPerm(notifySupported() ? Notification.permission : "unsupported");
+    if (adminPushFlag() && permission() === "granted") setPushHere(true);
     const on = (e: Event) => setSoundUi(!!(e as CustomEvent<boolean>).detail);
     window.addEventListener(SOUND_EVENT, on);
     return () => window.removeEventListener(SOUND_EVENT, on);
   }, []);
+
+  // R1207: this browser opted in before, so its subscription is re-saved when the console opens (it refreshes
+  // "last seen" and brings it back after a reinstall). Never asks for permission on its own.
+  const vapid = q?.vapidPublicKey ?? null;
+  useEffect(() => {
+    if (!vapid) return;
+    void syncAdminPush(vapid).then((ok) => ok && setPushHere(true));
+  }, [vapid]);
 
   const qs = useMemo(() => {
     const p = new URLSearchParams({ filter, sort });
@@ -743,7 +756,7 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
         try {
           const r = fresh[0];
           const n = new Notification(urgent ? "Urgent live chat" : "New live chat", {
-            body: r ? `${r.customer?.name || "A customer"}: ${r.preview || catWord(r.category)}` : `${data.counts.waiting} waiting in Live Assist`,
+            body: r ? `${r.customer?.name || "A customer"}: ${r.preview || catWord(r.category)}` : `${data.counts.waiting} waiting in Live Support`,
             tag: r ? `live-${r.id}` : "live-queue",
           });
           n.onclick = () => {
@@ -996,7 +1009,7 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
   };
 
   const accept = async () => {
-    const r = await act({ action: "accept" }, "You have this chat. The customer can see you joined.");
+    const r = await act({ action: "accept" }, "You joined the conversation. The customer can see it.");
     if (r) setTimeout(() => inputRef.current?.focus(), 50);
   };
   const takeover = async () => {
@@ -1070,6 +1083,33 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
     if (on) chime();
   };
 
+  /**
+   * R1207: "Phone alerts" on this device. Permission is asked inside this tap (never on load), the subscription is
+   * stored as an admin alert device, and from then on a new support request reaches this phone even with Outlly
+   * closed. Tapping again removes this device only.
+   */
+  const togglePush = async () => {
+    setBusy("push");
+    try {
+      if (pushHere) {
+        await disableAdminPush();
+        setPushHere(false);
+        toast("Phone alerts are off on this device.", "ok");
+      } else {
+        if (pushSupport() === "ios-needs-install") throw new Error("On iPhone and iPad, add Outlly to the Home Screen first, then turn phone alerts on from the installed app.");
+        if (!vapid) throw new Error("Web Push is not configured on the server (VAPID keys).");
+        await enableAdminPush(vapid);
+        setPushHere(true);
+        toast("Phone alerts are on for this device. A new support request will reach you even with Outlly closed.", "ok");
+      }
+      void loadQueue();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't change phone alerts here.", "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const askAlerts = async () => {
     try {
       const p = await Notification.requestPermission();
@@ -1132,6 +1172,13 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
               <button type="button" onClick={askAlerts} className={cn(btnChip, "bg-secondary text-foreground hover:bg-secondary/70")}>
                 <BellRing className="h-4 w-4" aria-hidden />
                 Desktop alerts
+              </button>
+            )}
+            {/* R1207: a real Web Push subscription for this device, so a request reaches the phone with Outlly closed. */}
+            {pushSupport() !== "unsupported" && (
+              <button type="button" aria-pressed={pushHere} disabled={busy === "push" || (!pushHere && !vapid)} onClick={togglePush} className={pushHere ? cn(btnChip, "bg-success/20 text-foreground hover:bg-success/30") : cn(btnChip, "bg-secondary text-foreground hover:bg-secondary/70")} title={pushHere ? "This device gets a push notification for every new support request. Tap to turn off." : "Get a push notification on this device for every new support request, even with Outlly closed."}>
+                {busy === "push" ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <BellRing className="h-4 w-4" aria-hidden />}
+                {pushHere ? "Phone alerts on" : "Phone alerts"}
               </button>
             )}
             <button type="button" aria-pressed={reports} onClick={() => setReports((x) => !x)} className={reports ? cn(btnChip, "bg-foreground text-background hover:bg-foreground/90") : cn(btnChip, "bg-secondary text-foreground hover:bg-secondary/70")}>
@@ -1257,10 +1304,12 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
                   </p>
                 )}
                 <div className="flex flex-wrap items-center gap-2">
+                  {/* R1207: one primary action on a waiting chat. It assigns this chat to me, turns Waiting into
+                      Active, and the customer's Pip chat says a specialist joined. */}
                   {s.status === "waiting" && (!s.agentId || mine) && (
                     <button type="button" onClick={accept} disabled={!!busy} className={btnPrimary}>
                       {busy === "accept" ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Check className="h-4 w-4" aria-hidden />}
-                      Accept
+                      Join conversation
                     </button>
                   )}
                   {open && s.agentId && !mine && (
@@ -1415,8 +1464,8 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
                   <p className="text-[12.5px] text-muted-foreground">
                     {s.status === "waiting"
                       ? s.agentId && !mine
-                        ? `Assigned to ${s.agentName}. They need to accept it, or you can take it over.`
-                        : "Accept the chat to reply. The customer sees that you joined."
+                        ? `Assigned to ${s.agentName}. They need to join it, or you can take it over.`
+                        : "Join the conversation to reply. The customer sees that you joined."
                       : s.status === "active"
                         ? `${s.agentName || "Another specialist"} has this chat. Take it over to reply.`
                         : `This chat ended: ${statusWord(s.status).toLowerCase()}. Reopen it to write to the customer again.`}

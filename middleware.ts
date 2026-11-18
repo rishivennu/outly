@@ -318,7 +318,9 @@ async function route(req: NextRequest, headers: Headers, ev: NextFetchEvent | un
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     if (req.cookies.get("outly_admin")?.value) return pass();
     const u = new URL("/admin/login", req.url);
-    if (pathname !== "/admin") u.searchParams.set("next", pathname);
+    // R1207: the query goes with it, so tapping a support push while signed out still lands on that conversation
+    // (/admin/live-assist?s=<request>) after signing in.
+    if (pathname !== "/admin") u.searchParams.set("next", pathname + (req.nextUrl.search || ""));
     return NextResponse.redirect(u);
   }
   if (OPEN.includes(pathname) || OPEN_PREFIX.some((p) => pathname.startsWith(p))) return hint(req, pass(), authed);

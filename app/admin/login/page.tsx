@@ -11,7 +11,9 @@ export const metadata: Metadata = { title: "Admin sign in", robots: { index: fal
 export default async function AdminLogin(props: { searchParams: Promise<{ next?: string }> }) {
   const searchParams = await props.searchParams;
   if (await getAdmin()) redirect("/admin");
-  const next = searchParams.next?.startsWith("/admin") ? searchParams.next : "/admin";
+  // R1207: a path inside /admin, with its query ("/admin/live-assist?s=..."), and never a protocol-relative URL.
+  const raw = searchParams.next ?? "";
+  const next = raw.startsWith("/admin") && !raw.startsWith("/admin/login") && !raw.includes("//") ? raw : "/admin";
   return (
     <AuthCard id="main" eyebrow="Outlly team console" lines={["Keep every post", "moving, quietly"]}>
       <AdminLoginForm next={next} />

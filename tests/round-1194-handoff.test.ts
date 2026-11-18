@@ -160,10 +160,11 @@ describe("intent: an explicit ask for a person is recognised, nothing else is", 
 
 describe("the words", () => {
   test("Pip's one handoff line, the queue line, the repeat line and the named connection, in every language", () => {
-    expect(LIVE_EN.handoff).toBe("Connecting you with a support specialist now. You can keep writing here while you wait.");
+    // R1207: the queue confirmation, word for word from the brief.
+    expect(LIVE_EN.handoff).toBe("You're in the support queue! Please wait while we connect you with a specialist. Your conversation is saved.");
     expect(LIVE_EN.already).toBe("You're already in the support queue. A specialist will join this chat as soon as one is available.");
-    expect(LIVE_EN.connectedWith("Priya")).toBe("You're now connected with Priya. They'll assist you here.");
-    expect(LIVE_EN.continueWaiting).toBe("Continue waiting");
+    expect(LIVE_EN.connectedWith("Priya")).toBe("You're connected! Priya has joined the conversation. How can we help?");
+    expect(LIVE_EN.leave).toBe("Leave a message");
     expect(LIVE_EN.cancel).toBe("Cancel support request");
     expect("emailWhy" in LIVE_EN).toBe(false);
     for (const l of ["hi", "es", "fr", "de", "pt", "ar", "zh", "ja", "ru", "id", "bn"] as const) {
@@ -172,7 +173,7 @@ describe("the words", () => {
     }
     const t = liveT("en");
     expect(liveSysLine(t, "live.requested")).toBe(LIVE_EN.handoff);
-    expect(liveSysLine(t, "live.connected|Priya")).toBe("You're now connected with Priya. They'll assist you here.");
+    expect(liveSysLine(t, "live.connected|Priya")).toBe("You're connected! Priya has joined the conversation. How can we help?");
   });
   test("the old dead-end copy is gone from the widget and the bot", () => {
     const widget = readFileSync("components/support/ChatWidget.tsx", "utf8");
@@ -183,7 +184,10 @@ describe("the words", () => {
       expect(src).not.toContain("Where should we reply?");
       expect(src).not.toContain("Open ticket");
     }
-    expect(widget).toContain("lt.continueWaiting");
+    // R1207: both buttons are on the queue card from the first moment, so there is no "Continue waiting" step.
+    expect(widget).toContain("lt.leave");
+    expect(widget).toContain("lt.cancel");
+    expect(widget).not.toContain("lt.continueWaiting");
     expect(widget).not.toContain("emailWhy");
     expect(widget).toMatch(/\b(lt|liveT\(lang\))\.already\b/);
     expect(widget).toContain("/api/support/live?resume=1");
@@ -254,8 +258,8 @@ describe("the brief's sequence, through the real chat route", () => {
     const j = await (await GET(liveRoute.GET as Handler, "/api/support/live?resume=1")).json();
     expect({ conv: j.conversationId, mode: j.mode, state: j.conversationState, sid: j.session.id }).toEqual({ conv, mode: "waiting", state: "WAITING_FOR_AGENT", sid });
     expect(j.messages.length).toBe(6);
-    // Nobody online: the honest line, never "connecting".
-    expect(j.state).toBe("unavailable");
+    // R1207: nobody online reads as "waiting" too. The customer is never told the team is away.
+    expect(j.state).toBe("waiting");
     await live.heartbeat(A.s);
     expect((await live.customerPoll(u.id, { conversationId: conv })).state).toBe("waiting");
   });
@@ -269,7 +273,7 @@ describe("the brief's sequence, through the real chat route", () => {
     const p = await live.customerPoll(u.id, { conversationId: conv });
     expect({ state: p.state, mode: p.mode, cs: p.conversationState, agent: p.session!.agent }).toEqual({ state: "connected", mode: "human", cs: "HUMAN_ACTIVE", agent: core.firstName(win.name) });
     const line = p.messages.find((m) => m.role === "system" && m.text.startsWith("live.connected"))!;
-    expect(liveSysLine(liveT("en"), line.text)).toBe(`You're now connected with ${core.firstName(win.name)}. They'll assist you here.`);
+    expect(liveSysLine(liveT("en"), line.text)).toBe(`You're connected! ${core.firstName(win.name)} has joined the conversation. How can we help?`);
     expect(await db.pipMessage.count({ where: { conversationId: conv, text: { startsWith: "live.connected" } } })).toBe(1);
   });
 

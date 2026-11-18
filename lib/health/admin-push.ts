@@ -16,7 +16,7 @@ export type AdminPushResult = { devices: number; sent: number; failed: number; d
 
 const SELECT = { id: true, adminId: true, endpoint: true, p256dh: true, auth: true, vapidKey: true, failures: true } as const;
 
-export async function webPushToAdmins(m: WebPushMessage, opts: { adminIds?: string[]; roles?: AdminRole[]; only?: string; ttl?: number; urgency?: "normal" | "high" } = {}): Promise<AdminPushResult> {
+export async function webPushToAdmins(m: WebPushMessage, opts: { adminIds?: string[]; roles?: AdminRole[]; only?: string; ttl?: number; urgency?: "normal" | "high"; retries?: number } = {}): Promise<AdminPushResult> {
   const res: AdminPushResult = { devices: 0, sent: 0, failed: 0, dropped: 0, perAdmin: {} };
   try {
     const subs = await db.adminPushSub.findMany({
@@ -36,7 +36,12 @@ export async function webPushToAdmins(m: WebPushMessage, opts: { adminIds?: stri
         const per = (res.perAdmin[s.adminId] ??= { sent: 0, failed: 0, devices: 0 });
         per.devices++;
         const sub: Sub = { id: s.id, endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth, vapidKey: s.vapidKey, failures: s.failures };
-        const { outcome } = await pushToSub(sub, payload, ttl, urgency, m.tag);
+        let { outcome } = await pushToSub(sub, payload, ttl, urgency, m.tag);
+        // R1207: a temporary failure (network, 429, 5xx) is tried again after a short pause, `retries` times.
+        for (let i = 0; outcome === "retry" && i < (opts.retries ?? 0); i++) {
+          await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+          ({ outcome } = await pushToSub(sub, payload, ttl, urgency, m.tag));
+        }
         if (outcome === "sent") {
           await db.adminPushSub.update({ where: { id: s.id }, data: { failures: 0, lastPushAt: now } }).catch(() => null);
           res.sent++;

@@ -39,7 +39,7 @@ const NO_LIVE: LiveInfo = { agent: null, position: null, canRate: false, rated: 
 const ETA_MS = 60_000;
 const LIVE_STATES: WidgetState[] = ["none", "waiting", "unavailable", "connected", "resolved", "connecting", "reconnecting"];
 /** Waiting for, or talking with, a support specialist: Pip stays out of it. */
-const inLive = (s: WidgetState) => s === "waiting" || s === "connected" || s === "unavailable" || s === "reconnecting" || s === "connecting";
+const inLive = (s: WidgetState) => s === "waiting" || s === "connected" || s === "reconnecting" || s === "connecting";
 const newCid = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`).replace(/[^A-Za-z0-9]/g, "").slice(0, 32);
 /** A server message as a chat line: the specialist's words, the person's own, or a status line in their language. */
 function liveMsg(m: WireMsg, l: LiveT, id: number): Msg {
@@ -146,9 +146,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const [liveErr, setLiveErr] = useState("");
   const [hasLive, setHasLive] = useState(false);
   // R1194: "Continue waiting" pressed: the two buttons fold away and the queue line stays.
-  const [ack, setAck] = useState(false);
   // R1205: is anyone from the support team online right now (the server's yes or no; null until it answers)?
-  const [teamOnline, setTeamOnline] = useState<boolean | null>(null);
   // R1205: "Leave a message" pressed with nothing typed: say where to write it.
   const [leaveHint, setLeaveHint] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -194,7 +192,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
       if (s) {
         // A message still on its way when the page changed may not have arrived: it offers Retry (never doubled).
         setMsgs((s.msgs ?? []).map((m: Msg) => (m.pending ? { ...m, pending: false, failed: true } : m))); setFails(s.fails ?? 0); setDismissed(s.dismissed ?? []);
-        if (typeof s.live === "string" && LIVE_STATES.includes(s.live)) setLive(s.live === "connecting" ? "reconnecting" : s.live);
+        if (typeof s.live === "string" && LIVE_STATES.includes(s.live)) setLive(s.live === "connecting" ? "reconnecting" : s.live === "unavailable" ? "waiting" : s.live);
         if (typeof s.cursor === "number") cursorRef.current = s.cursor;
         if (s.hasLive) setHasLive(true);
         setTicket((x) => ({ ...x, ref: s.ref ?? "" }));
@@ -358,26 +356,6 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, signedIn, conv]);
 
-  // R1205: "Human support · Online" only when the server says a specialist checked in within the last 90 s. Asked on
-  // open and every 30 s while Pip is open outside a live chat (the queue panel has its own, per-request answer).
-  useEffect(() => {
-    if (!open || !signedIn || inLive(live)) return;
-    let stop = false;
-    const ask = () => {
-      if (document.hidden) return;
-      fetch("/api/support/live", { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((j) => { if (!stop) setTeamOnline(j && typeof j.online === "boolean" ? j.online : null); })
-        .catch(() => { if (!stop) setTeamOnline(null); });
-    };
-    ask();
-    const id = window.setInterval(ask, 30_000);
-    const onVis = () => { if (!document.hidden) ask(); };
-    document.addEventListener("visibilitychange", onVis);
-    // An old answer is never shown on the next open: it is asked again first.
-    return () => { stop = true; window.clearInterval(id); document.removeEventListener("visibilitychange", onVis); setTeamOnline(null); };
-  }, [open, signedIn, live]);
-
   // R1205: the one-minute estimate ends on time, even between check-ins. The end is the server's own wait count
   // (waitedMs) plus the time since that answer; the next check-in confirms it. The state itself is never guessed.
   const etaEndRef = useRef(0);
@@ -398,8 +376,11 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     if (!j || typeof j.conversationId !== "string") return;
     pollFails.current = 0;
     const prev = liveRef.current;
-    const next: WidgetState = LIVE_STATES.includes(j.state) ? j.state : "none";
-    const on = next === "waiting" || next === "connected" || next === "unavailable";
+    // R1207: the customer is never shown "unavailable". The request is queued either way, so an answer from an
+    // older server (or a cached one) is read as waiting.
+    const raw: WidgetState = LIVE_STATES.includes(j.state) ? j.state : "none";
+    const next: WidgetState = raw === "unavailable" ? "waiting" : raw;
+    const on = next === "waiting" || next === "connected";
     if (typeof j.cursor === "number") cursorRef.current = j.cursor;
     const l = liveT(lang);
     // Pip's replies are already on screen (the chat answered them), and outside a live chat so are the person's
@@ -421,18 +402,9 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     if (next !== prev) {
       liveRef.current = next;
       setLive(next);
-      if (next !== "unavailable") setLeaveHint(false);
-      // R1205: told nobody was free, and now a specialist is online with this request still queued: say so here,
-      // and on the launcher when Pip is closed.
-      if (prev === "unavailable" && next === "waiting") {
-        setMsgs((x) => [...x.filter((m) => !(m.kind === "sys" && m.text === l.available)), { role: "bot", text: l.available, kind: "sys", id: idRef.current++ }]);
-        setAnnounce(l.available);
-        if (!openRef.current) setUnread((n) => n + 1);
-      }
-      if (next !== "waiting" && next !== "unavailable") alreadyRef.current = false;
-      if (next === "waiting" || next === "unavailable") setAck(false);
-      // Waiting, connected and resolved arrive as lines in the log (read out there). Unavailable has no line.
-      if (next === "unavailable") setAnnounce(l.unavailable);
+      if (next !== "waiting") setLeaveHint(false);
+      if (next !== "waiting") alreadyRef.current = false;
+      // Waiting, connected and resolved arrive as lines in the log, and are read out from there.
       if (next === "resolved") {
         setFails(0);
         const el = document.activeElement;
@@ -894,7 +866,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     if (conv && inLive(live)) fetch("/api/support/live", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "cancel", conversationId: conv }) }).catch(() => {});
     cursorRef.current = null;
     liveRef.current = "none";
-    setLive("none"); setLiveInfo(NO_LIVE); setHasLive(false); setUnread(0); setLiveErr(""); setAck(false); alreadyRef.current = false;
+    setLive("none"); setLiveInfo(NO_LIVE); setHasLive(false); setUnread(0); setLiveErr(""); alreadyRef.current = false;
     setMsgs([]); setFails(0); setTicket({ busy: false, error: "", ref: "" }); setInput("");
     setConv(null); setResolved(null); setClosing({ busy: false, error: "" });
     setTopic(null); setAllQs(false);
@@ -955,13 +927,11 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                 {resolved || live === "resolved" ? (
                   <span className="pc-badge-resolved pc-fade inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"><Check className="h-3 w-3" aria-hidden />{rt.status}</span>
                 ) : liveOn ? (
-                  <><Headset className={cn("h-3.5 w-3.5 shrink-0", live === "connected" && "pc-live-ok")} aria-hidden /><span className="truncate">{live === "connected" ? (liveInfo.agent ? lt.agentLabel(liveInfo.agent) : lt.statusConnected) : live === "unavailable" ? lt.statusUnavailable : live === "reconnecting" ? lt.statusReconnecting : lt.statusWaiting}</span></>
-                ) : signedIn && teamOnline === null ? (
-                  /* R1205: not known yet, or the check failed: name the service, claim nothing. */
-                  <span className="truncate">{lt.humanLabel}</span>
+                  <><Headset className={cn("h-3.5 w-3.5 shrink-0", live === "connected" && "pc-live-ok")} aria-hidden /><span className="truncate">{live === "connected" ? (liveInfo.agent ? lt.agentLabel(liveInfo.agent) : lt.statusConnected) : live === "reconnecting" ? lt.statusReconnecting : lt.statusWaiting}</span></>
                 ) : signedIn ? (
-                  /* R1205: Online only when the backend says a specialist is online right now; the words carry the meaning, not the dot. */
-                  <><span className={cn("pc-dot h-1.5 w-1.5 shrink-0 rounded-full", !teamOnline && "pc-dot-away")} aria-hidden /><span className="min-w-0 leading-tight">{teamOnline ? lt.humanOnline : lt.humanAway}</span></>
+                  /* R1207: the service, not the shift. Whether a specialist is on duty is internal, and the request
+                     is queued either way, so the header never says Online or Away. */
+                  <span className="truncate">{lt.humanLabel}</span>
                 ) : (
                   <><span className="pc-dot h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden /><span className="truncate">{t.status}</span></>
                 )}
@@ -1231,39 +1201,43 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
               </div>
             ) : (<>
             {liveOn && (
-              <div className={cn("pc-live pc-in mb-2 p-3", live === "connected" && "pc-live-on", (live === "unavailable" || live === "reconnecting") && "pc-live-warn")}>
+              <div className={cn("pc-live pc-in mb-2 p-3", live === "connected" && "pc-live-on", live === "reconnecting" && "pc-live-warn")}>
+                {/* R1207: the card leads with its own line ("You're in the support queue!", "You're connected!"), then
+                    what happens next. It never mentions whether anyone is on shift. */}
                 <p className="flex items-start gap-2 text-[14px] font-medium leading-snug">
                   {live === "connecting" || live === "reconnecting" ? <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden /> : <Headset className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />}
-                  <span>{live === "connecting" ? lt.connecting : live === "waiting" ? (liveInfo.late ? lt.waitingLong : liveInfo.eta === "1min" ? lt.waitingEta : lt.waiting) : live === "unavailable" ? lt.unavailable : live === "reconnecting" ? lt.reconnecting : liveInfo.agent ? lt.agentLabel(liveInfo.agent) : lt.connected}</span>
+                  <span>
+                    {live === "waiting" && <strong className="block font-bold">{lt.queueTitle}</strong>}
+                    {live === "connected" && <strong className="block font-bold">{lt.connectedTitle}</strong>}
+                    {live === "connecting" ? lt.connecting : live === "waiting" ? (liveInfo.late ? lt.waitingLong : liveInfo.eta === "1min" ? lt.waitingEta : lt.waiting) : live === "reconnecting" ? lt.reconnecting : liveInfo.agent ? lt.connectedWith(liveInfo.agent) : lt.connected}
+                  </span>
                 </p>
                 {/* R1205: the queue status comes from the backend. The one-minute estimate shows only while a specialist is online,
                     this person is first in line and has waited under a minute; after that the honest update replaces it. */}
-                {(live === "waiting" || live === "unavailable") && (
+                {live === "waiting" && (
                   <div className="pc-muted mt-1.5 space-y-0.5 ps-6 text-[13px] leading-snug">
                     <p className="flex items-center gap-1.5">
-                      <span className={cn("pc-dot h-1.5 w-1.5 shrink-0 rounded-full", live === "unavailable" ? "pc-dot-away" : "pc-pulse")} aria-hidden />
-                      {live === "unavailable" ? lt.queueAway : liveInfo.eta === "1min" && !liveInfo.late ? lt.queueConnecting : lt.queueWaiting}
+                      <span className="pc-dot pc-pulse h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden />
+                      {liveInfo.eta === "1min" && !liveInfo.late ? lt.queueConnecting : lt.queueWaiting}
                     </p>
-                    {live === "waiting" && liveInfo.eta === "1min" && !liveInfo.late && <p>{lt.etaLine}</p>}
-                    {live === "waiting" && !(liveInfo.eta === "1min" && !liveInfo.late) && liveInfo.position != null && <p>{lt.position(liveInfo.position)}</p>}
+                    {liveInfo.eta === "1min" && !liveInfo.late && <p>{lt.etaLine}</p>}
+                    {!(liveInfo.eta === "1min" && !liveInfo.late) && liveInfo.position != null && <p>{lt.position(liveInfo.position)}</p>}
                   </div>
                 )}
                 {live !== "connecting" && (
                   <div className="mt-2 flex flex-wrap gap-2 ps-6">
                     {live === "connected" ? (
                       <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{lt.endChat}</button>
-                    ) : live === "waiting" && !ack ? (<>
-                      {/* R1194: in the queue. Continue waiting swaps these for Leave a message / Cancel; the request itself is untouched. */}
-                      <button type="button" onClick={() => { setAck(true); inputRef.current?.focus(); }} disabled={!!liveBusy} className="pc-btn pc-btn-primary">{lt.continueWaiting}</button>
+                    ) : (<>
+                      {/* R1207: both actions the brief asks for, from the first moment in the queue: leave a message
+                          (it stays in this chat) or cancel the request (back to Pip). The request itself is untouched. */}
+                      <button type="button" onClick={leaveHere} disabled={!!liveBusy} className="pc-btn">{liveBusy === "leave" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{liveBusy === "leave" ? lt.leaving : lt.leave}</button>
                       <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{lt.cancel}</button>
-                    </>) : (<>
-                      <button type="button" onClick={leaveHere} disabled={!!liveBusy} className={cn("pc-btn", live === "unavailable" && "pc-btn-primary")}>{liveBusy === "leave" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{liveBusy === "leave" ? lt.leaving : lt.leave}</button>
-                      <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{live === "unavailable" ? lt.keepPip : lt.cancel}</button>
                     </>)}
                   </div>
                 )}
                 {/* R1205: no email, no ticket. A message left here stays in this chat and the request stays in the queue. */}
-                {leaveHint && (live === "waiting" || live === "unavailable") && <p className="pc-muted mt-2 ps-6 text-[13px] leading-snug">{lt.leaveHint}</p>}
+                {leaveHint && live === "waiting" && <p className="pc-muted mt-2 ps-6 text-[13px] leading-snug">{lt.leaveHint}</p>}
                 {liveErr && <p role="alert" className="pc-error mt-2 ps-6 text-[13px]">{liveErr}</p>}
               </div>
             )}

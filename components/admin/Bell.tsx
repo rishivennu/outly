@@ -71,9 +71,24 @@ export function Bell({ role }: { role: AdminRole }) {
       if (!j.events.length) return;
       setEvents((x) => [...j.events, ...x.filter((e) => !j.events.some((n) => n.id === e.id))].slice(0, 30));
       if (!first) for (const e of j.events.filter((e) => LOUD.has(e.kind)).slice(0, 2)) toast(e.title, BAD.has(e.kind) ? "error" : "info");
-      // R1184: a new Live Assist request also chimes (when sound is on), wherever in the admin panel the specialist is.
+      // R1184: a new Live Support request also chimes (when sound is on), wherever in the admin panel the specialist is.
       const live = first ? [] : j.events.filter((e) => e.kind === "live_request" || e.kind === "live_urgent");
-      if (live.length) chime(live.some((e) => e.kind === "live_urgent"), live.map((e) => /[?&]s=([A-Za-z0-9_-]+)/.exec(e.href ?? "")?.[1] ?? e.id));
+      if (live.length) {
+        const ids = live.map((e) => /[?&]s=([A-Za-z0-9_-]+)/.exec(e.href ?? "")?.[1] ?? e.id);
+        chime(live.some((e) => e.kind === "live_urgent"), ids);
+        // R1207: and a desktop alert from whichever admin page is open, when this window is not the one in front.
+        // Tag = the request, so the Live Support console's own alert and this one never stack up twice.
+        if (typeof Notification !== "undefined" && Notification.permission === "granted" && (document.visibilityState !== "visible" || !document.hasFocus()))
+          for (const [i, e] of live.slice(0, 2).entries())
+            try {
+              const n = new Notification(e.title, { body: e.body || "A customer is waiting for a support specialist.", tag: `live-${ids[i]}` });
+              n.onclick = () => {
+                window.focus();
+                if (e.href) window.location.assign(e.href);
+                n.close();
+              };
+            } catch {}
+      }
     } catch {}
   }, [toast]);
 

@@ -50,9 +50,6 @@ export const ETA_MS = 60_000;
 /** R1205: a message left for the team keeps the request in the queue this long, even after the customer's browser
  *  is gone, so a specialist can still answer it in the same chat. */
 export const LEFT_KEEP_MS = 7 * 24 * 3600_000;
-/** A waiting request whose browser hasn't checked in for this long is abandoned: it no longer counts toward
- *  anyone's place in line, and the sweep closes it (endedBy "system") so the queue doesn't fill with ghosts. */
-export const ABANDON_MS = 30 * 60_000;
 /** Place in line only counts requests whose browser checked in within this window. */
 export const QUEUE_SEEN_MS = 5 * 60_000;
 export const LIVE_MAX_TEXT = 2000;
@@ -119,19 +116,71 @@ export function classify(texts: string[]): { category: LiveCategory; priority: L
 }
 
 /**
- * What the customer sees for a session, from real rows only. Nobody online = unavailable (still queued).
- * R1205: a long wait with a specialist online stays "waiting" (the widget says it is taking longer); saying nobody is
- * available while someone is online would be false, and it would hide the "a specialist is online now" notice.
+ * What the customer sees for a session, from real rows only.
+ * R1207: a waiting request is "waiting" whether or not anyone from the team is online. The customer is never told
+ * the team is offline or unavailable (internal staff availability is not theirs to see); the request stays in the
+ * queue, the team's phones are alerted, and the chat says "You're in the support queue!" either way. "unavailable"
+ * stays in the type only so an old cached widget still parses an answer; the server no longer sends it.
  */
 export function customerState(
   s: { status: string; requestedAt: Date | string } | null,
-  o: { agentsOnline: number; now?: number },
+  _o: { agentsOnline?: number | null; now?: number } = {},
 ): CustomerState {
   if (!s) return "none";
   if (s.status === "active") return "connected";
   if (s.status === "resolved") return "resolved";
   if (s.status !== "waiting") return "none";
-  return o.agentsOnline < 1 ? "unavailable" : "waiting";
+  return "waiting";
+}
+
+/**
+ * R1207: the team's phone alert for a new request (Web Push to admin devices). Who is waiting and a short preview of
+ * their question, nothing a specialist or Pip said to them. The tag is the request, so a follow-up alert for the same
+ * request replaces the earlier one on the device instead of stacking.
+ */
+export const LIVE_PUSH_TITLE = "Outlly — New Human Support Request";
+export const livePushTag = (sessionId: string) => `live-${sessionId}`;
+export const livePushHref = (sessionId: string) => `/admin/live-assist?s=${encodeURIComponent(sessionId)}`;
+const clip = (s: string, n: number) => {
+  const t = s.replace(/\s+/g, " ").trim();
+  return t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t;
+};
+export function liveRequestPush(o: { sessionId: string; customer: string | null | undefined; preview: string | null | undefined; urgent?: boolean }) {
+  const who = clip(o.customer || "A customer", 60);
+  const said = clip(o.preview || "", 110);
+  return {
+    title: o.urgent ? `${LIVE_PUSH_TITLE} (urgent)` : LIVE_PUSH_TITLE,
+    body: `A customer is waiting for a support specialist. ${who}${said ? `: "${said}"` : ""}`,
+    href: livePushHref(o.sessionId),
+    tag: livePushTag(o.sessionId),
+    kind: "live_request",
+    keepOpen: true,
+  };
+}
+/** R1207: a later customer message on a request nobody is looking at yet (or whose specialist is offline). */
+export function liveMessagePush(o: { sessionId: string; customer: string | null | undefined; text: string; waiting: boolean }) {
+  const who = clip(o.customer || "A customer", 60);
+  return {
+    title: o.waiting ? `${who} is still waiting · Outlly support` : `New message from ${who} · Outlly support`,
+    body: clip(o.text, 140),
+    href: livePushHref(o.sessionId),
+    tag: livePushTag(o.sessionId),
+    kind: "live_message",
+    keepOpen: o.waiting,
+  };
+}
+/** R1207: follow-up alerts for one request are at most one per this window, so a customer typing ten lines buzzes once. */
+export const FOLLOWUP_PUSH_MS = 3 * 60_000;
+/**
+ * R1207: whether a customer's later message alerts the live team's phones. Waiting: yes (nobody has it yet).
+ * Active: only when the specialist who joined has dropped off (their console stopped checking in), so the customer
+ * is not left talking to nobody and someone else can take it over. Anything else (cancelled, resolved, handed back
+ * to Pip): no, the alerts stop. A specialist with the chat open sees the message in the console instead.
+ */
+export function followupTarget(s: { status: string; agentId: string | null; agentSeenAt: Date | string | null }, now = Date.now()): "waiting" | "unattended" | null {
+  if (s.status === "waiting") return "waiting";
+  if (s.status === "active" && (!s.agentId || !isOnline(s.agentSeenAt, AGENT_ONLINE_MS, now))) return "unattended";
+  return null;
 }
 
 /**
@@ -262,4 +311,5 @@ export const HISTORY_WORD: Record<string, string> = {
   leave_message: "Left a message in the chat",
   duplicate: "Asked again while waiting",
   notify_failed: "Team notification failed",
+  alerted: "Team phones alerted",
 };

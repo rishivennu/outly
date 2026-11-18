@@ -8,9 +8,14 @@ import { adminEvent } from "../admin/route";
 import type { AdminSession } from "../admin/auth";
 import { ADMIN_ROLES, can, type AdminRole } from "../admin/perms";
 import { nextSeqs, startConversation } from "./conversations";
+import { webPushToAdmins } from "../health/admin-push";
+import type { WebPushMessage } from "../push/webpush";
 import {
-  ABANDON_MS,
   AGENT_ONLINE_MS,
+  FOLLOWUP_PUSH_MS,
+  followupTarget,
+  liveMessagePush,
+  liveRequestPush,
   byPriority,
   CATEGORY_LABEL,
   classify,
@@ -111,6 +116,65 @@ export function handoffLog(event: string, data: Record<string, unknown>) {
   } catch {}
 }
 
+/**
+ * R1207: work that should not hold the customer's answer (a phone alert). Inside a request, Next's after() runs it
+ * once the response is sent and keeps the function alive until it finishes; anywhere else (tests, scripts) it just
+ * runs now. Never throws.
+ */
+async function later(fn: () => Promise<unknown>) {
+  const run = () => fn().catch((e) => handoffLog("alert_failed", { error: e instanceof Error ? e.message.slice(0, 200) : String(e) }));
+  try {
+    const { after: afterResponse } = await import("next/server");
+    afterResponse(run);
+  } catch {
+    await run();
+  }
+}
+
+/**
+ * R1207: Web Push to the live team's phones and laptops (AdminPushSub devices of every active admin whose role can do
+ * live support), whether or not anyone is online. Same devices, encryption and cleanup as Watchdog alerts: a device
+ * the push service says is gone is removed, a temporary failure is tried once more. The tag is the request, so a
+ * later alert for it replaces the earlier one on the device instead of stacking.
+ * `first`: the new-request alert. Exactly once per request (the history row "alerted" is the marker, checked before
+ * sending), and it opens the follow-up window, so a message seconds later does not buzz the phone again.
+ */
+async function alertTeam(sessionId: string, m: WebPushMessage, o: { first?: boolean } = {}) {
+  if (o.first) {
+    const had = await db.supportAssignment.findFirst({ where: { sessionId, action: "alerted" }, select: { id: true } }).catch(() => null);
+    if (had) return;
+    await log(db, sessionId, "alerted", null, { note: "Sending phone alerts" }).catch(() => {});
+    await limitShared(`live-push:${sessionId}`, 1, FOLLOWUP_PUSH_MS).catch(() => null);
+  }
+  await later(async () => {
+    const r = await webPushToAdmins(m, { roles: LIVE_ROLES, urgency: "high", ttl: 24 * 3600, retries: 1 });
+    handoffLog(o.first ? "alerted" : "alerted_followup", { sessionId, devices: r.devices, sent: r.sent, failed: r.failed, dropped: r.dropped });
+    if (o.first)
+      await db.supportAssignment
+        .updateMany({
+          where: { sessionId, action: "alerted" },
+          data: { note: r.devices ? `${r.sent} of ${r.devices} device${r.devices === 1 ? "" : "s"} reached${r.failed ? `, ${r.failed} failed` : ""}` : "No team device has phone alerts on" },
+        })
+        .catch(() => {});
+  });
+}
+
+/**
+ * R1207: a customer's later message on an open request. Waiting, or with a specialist whose console has dropped off:
+ * the team's phones hear about it, at most once per FOLLOWUP_PUSH_MS per request. A specialist with the chat open
+ * sees it in the console instead, and nothing is sent once the request is cancelled, resolved or handed back.
+ */
+async function followup(userId: string, sessionId: string, text: string) {
+  const s = await db.supportSession.findUnique({ where: { id: sessionId }, select: { id: true, status: true, agentId: true, userId: true } });
+  if (!s || s.userId !== userId) return;
+  const agentSeenAt = s.agentId ? ((await db.adminUser.findUnique({ where: { id: s.agentId }, select: { liveSeenAt: true } }))?.liveSeenAt ?? null) : null;
+  const target = followupTarget({ status: s.status, agentId: s.agentId, agentSeenAt });
+  if (!target) return;
+  if (!(await limitShared(`live-push:${sessionId}`, 1, FOLLOWUP_PUSH_MS)).ok) return;
+  const who = await db.user.findUnique({ where: { id: userId }, select: { name: true } });
+  await alertTeam(sessionId, liveMessagePush({ sessionId, customer: who?.name, text, waiting: target === "waiting" }));
+}
+
 /** Every specialist action goes to the audit log too (who, what, which chat). Message text never does. */
 async function audit(admin: AdminSession, action: string, sessionId: string, note = "", before?: unknown, after?: unknown) {
   await db.auditLog
@@ -142,20 +206,21 @@ export async function agentsOnline(now = Date.now()) {
 
 let swept = 0;
 /**
- * Closes waiting requests whose customer left (no check-in for ABANDON_MS): status cancelled, endedBy "system",
- * Pip back on the conversation. Conditional on status like every other closer, so an accept racing it wins or loses
- * cleanly. Runs from the console's queue poll, at most once a minute per instance.
+ * Closes waiting requests whose customer has been gone for LEFT_KEEP_MS (7 days): status cancelled, endedBy
+ * "system", Pip back on the conversation. Conditional on status like every other closer, so an accept racing it wins
+ * or loses cleanly. Runs from the console's queue poll, at most once a minute per instance.
+ * R1207: every request stays in the queue that long, message or not, so a specialist who gets the phone alert hours
+ * later (nobody was online) still finds the customer there and answers in the same chat. A request is never rejected
+ * because nobody was available. (Before R1207 a request with no message left closed after 30 minutes.)
  */
 export async function sweepAbandoned(now = Date.now(), force = false) {
   if (!force && now - swept < 60_000) return 0;
   swept = now;
-  const cut = new Date(now - ABANDON_MS);
+  const cut = new Date(now - LEFT_KEEP_MS);
   const rows = await db.supportSession.findMany({
-    // R1205: a request the customer left a message on stays in the queue (for LEFT_KEEP_MS), browser or not.
     where: {
       status: "waiting",
       OR: [{ customerSeenAt: { lt: cut } }, { customerSeenAt: null, requestedAt: { lt: cut } }],
-      history: { none: { action: "leave_message", createdAt: { gt: new Date(now - LEFT_KEEP_MS) } } },
     },
     select: { id: true, conversationId: true },
     take: 50,
@@ -255,7 +320,7 @@ export async function customerPoll(userId: string, o: { conversationId: string; 
     if (writes.length) await Promise.all(writes);
   }
 
-  const state = customerState(shown, { agentsOnline: online ?? 1, now });
+  const state = customerState(shown);
   const waitedMs = s?.status === "waiting" ? Math.max(0, now - s.requestedAt.getTime()) : null;
   return {
     conversationId: conv.id,
@@ -275,7 +340,8 @@ export async function customerPoll(userId: string, o: { conversationId: string; 
         }
       : null,
     position,
-    agentsOnline: online,
+    // R1207: never sent to the customer (the team's availability is internal). Kept in the type as null.
+    agentsOnline: null,
     eta: queueEta({ state, agentsOnline: online, position, waitedMs }),
     waitedMs,
     readUpTo: s ? Math.max(s.custReadSeq, o.read == null || !Number.isFinite(o.read) ? 0 : Math.min(Math.floor(o.read), conv.seq)) : 0,
@@ -387,6 +453,8 @@ export async function requestHuman(
     handoffLog("notify_failed", { sessionId: created.id, error: e instanceof Error ? e.message : String(e) });
     await log(db, created.id, "notify_failed", null, { note: e instanceof Error ? e.message.slice(0, 200) : "notify failed" }).catch(() => {});
   }
+  // R1207: and every live-team device with phone alerts on, whether or not anyone is online. Once per request.
+  await alertTeam(created.id, liveRequestPush({ sessionId: created.id, customer: who?.name, preview, urgent: priority === "urgent" }), { first: true });
   return { ...(await customerPoll(userId, { conversationId: convId })), created: true };
 }
 
@@ -417,9 +485,11 @@ export async function customerSend(userId: string, o: { conversationId: string; 
       return post(tx, conv.id, { role: "user", text, clientId: cid });
     });
     changed();
-    // R1205: words written while nobody is online are a message left for the team, same as Leave a message: the
-    // request stays queued and the chat says the message is saved. With a specialist online it is just a message.
-    if (conv.mode === "waiting" && (await agentsOnline()) < 1) await noteLeft(userId, conv.id, liveId).catch(() => {});
+    // R1205, R1207: words written while waiting are a message left for the team, same as Leave a message: the chat
+    // says once that the message is saved and a specialist will reply here. The same line whether or not anyone is
+    // online, so the customer can never read the team's availability from it.
+    if (conv.mode === "waiting") await noteLeft(userId, conv.id, liveId).catch(() => {});
+    await followup(userId, liveId, text).catch(() => {});
     return { message: wire(m, "customer"), duplicate: false };
   } catch (e: any) {
     if (e?.code === "P2002") {
@@ -559,7 +629,7 @@ export async function accept(admin: AdminSession, id: string) {
  */
 export async function assign(admin: AdminSession, id: string, toId: string, kind: "assign" | "transfer" = "assign") {
   const target = await db.adminUser.findFirst({ where: { id: toId, active: true }, select: { id: true, name: true, role: true } });
-  if (!target || !can(target.role as AdminRole, "live")) throw new HttpError(400, "Pick a teammate who answers Live Assist chats.", "BAD_AGENT");
+  if (!target || !can(target.role as AdminRole, "live")) throw new HttpError(400, "Pick a teammate who answers Live Support chats.", "BAD_AGENT");
   const s = await session(id);
   if (!isOpen(s.status)) throw ENDED();
   if (kind === "transfer" && s.status !== "active") throw new HttpError(409, "Only a chat someone accepted can be transferred. Assign this one instead.", "NOT_ACTIVE");
