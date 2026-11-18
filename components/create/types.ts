@@ -1,6 +1,7 @@
 import type { AccountView, MediaView, PostView, TargetView } from "@/lib/services";
 import type { Platform } from "@/lib/domain";
 import type { Draft } from "@/lib/client/checks";
+import type { UploadInfo } from "@/lib/client/upload";
 
 export type { AccountView, MediaView, PostView, TargetView, Draft };
 
@@ -45,7 +46,8 @@ export const NO_HOOKS: HooksState = { loading: false, more: false, status: "", r
 
 export type UploadState =
   | { kind: "idle" }
-  | { kind: "uploading"; progress: number; eta?: number | null }
+  /** R1193: `info` = the engine's phase, bytes, speed and parts (direct uploads), for the card and the stage pill. */
+  | { kind: "uploading"; progress: number; eta?: number | null; info?: UploadInfo }
   /** 1170: stopped by the creator on Step 1; Resume sends the same file again and picks up what already landed. */
   | { kind: "paused"; progress: number }
   | { kind: "done" }

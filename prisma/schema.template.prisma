@@ -74,6 +74,7 @@ model User {
   aiEntitlements AiEntitlement[]
   aiFeatureUsage AiFeatureUsage[]
   media          Media[]
+  uploadSessions UploadSession[]
   posts          Post[]
   subscriptions  Subscription[]
   payments       Payment[]
@@ -206,8 +207,54 @@ model Media {
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   posts     Post[]
   postItems PostMedia[] // 1131: slides of photo / carousel / story posts
+  upload    UploadSession? // R1193: the multipart session while it uploads
 
   @@index([userId])
+}
+
+/// R1193 (R2 upload engine): one row per browser multipart upload to R2/S3. It keeps the bucket's upload id, so
+/// Cancel and the sweeper can abort it, and the part size this upload was cut with, so a later change to
+/// UPLOAD_PART_MB never breaks an upload already on its way. Parts are recorded as the browser confirms them;
+/// at completion the bucket's own part list is still the truth.
+model UploadSession {
+  id               String   @id @default(cuid())
+  userId           String
+  mediaId          String   @unique
+  objectKey        String
+  uploadId         String
+  originalFilename String
+  fileSize         Int
+  contentType      String
+  chunkSize        Int
+  totalParts       Int
+  completedParts   Int      @default(0)
+  status           String   @default("uploading") // uploading | finalizing | completed | aborted | failed
+  /// The browser's identity check for the file (name, size and a hash of its first and last bytes).
+  fingerprint      String?
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media Media        @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  parts UploadPart[]
+
+  @@index([userId])
+  @@index([status, updatedAt])
+}
+
+/// A part the browser uploaded and the bucket answered with an ETag. Re-sending a part replaces its row.
+model UploadPart {
+  id         String   @id @default(cuid())
+  sessionId  String
+  partNumber Int
+  etag       String
+  size       Int
+  createdAt  DateTime @default(now())
+
+  session UploadSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, partNumber])
 }
 
 model Post {

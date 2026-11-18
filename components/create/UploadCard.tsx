@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, Check, Film, HardDrive, Layers, Loader2, Pause, Play, RefreshCw, RotateCcw, UploadCloud, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { acceptAttr, acceptedFormats, formatBytes, formatProblem, type UploadLimits } from "@/lib/client/upload";
+import { acceptAttr, acceptedFormats, formatBytes, formatProblem, formatSpeed, type UploadLimits } from "@/lib/client/upload";
 import { cn } from "@/lib/utils";
 import type { UploadState } from "./types";
 
@@ -215,8 +215,21 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60))
 export function fileStatus(upload: UploadState, online = true): { tone: "busy" | "ok" | "bad" | "idle"; text: string } {
   switch (upload.kind) {
     case "uploading": {
+      const at = pct(upload.progress);
+      switch (upload.info?.phase) {
+        case "preparing":
+          return { tone: "busy", text: "Preparing the upload" };
+        case "resuming":
+          return { tone: "busy", text: `Resuming from ${at}%` };
+        case "reconnecting":
+          return { tone: "busy", text: online ? `Reconnecting at ${at}%. What's up is kept.` : `Waiting for a connection at ${at}%. It picks up on its own.` };
+        case "finalizing":
+          return { tone: "busy", text: "Finalizing the upload" };
+        case "processing":
+          return { tone: "busy", text: "Processing your video" };
+      }
       const left = eta(upload.eta);
-      return { tone: "busy", text: `Uploading ${pct(upload.progress)}%${left ? `, ${left}` : ""}` };
+      return { tone: "busy", text: `Uploading ${at}%${left ? `, ${left}` : ""}` };
     }
     case "paused":
       return { tone: "idle", text: `Paused at ${pct(upload.progress)}%` };
@@ -228,6 +241,22 @@ export function fileStatus(upload: UploadState, online = true): { tone: "busy" |
       return { tone: "idle", text: "Getting ready" };
   }
 }
+
+/** Less than half a megabyte reads as nothing yet, not as "1 MB". */
+const amount = (b: number) => (b < 524_288 ? "0 MB" : formatBytes(b));
+
+/** R1193: the quiet line under the status, "750 MB of 1 GB · 18 MB/s · 47 of 63 parts". Null when there's nothing to add. */
+export function uploadDetail(upload: UploadState): string | null {
+  const i = upload.kind === "uploading" ? upload.info : undefined;
+  if (!i || i.phase === "preparing" || i.phase === "processing" || i.total <= 0) return null;
+  const bits = [`${amount(i.bytes)} of ${formatBytes(i.total)}`];
+  if (i.phase === "uploading" && i.speed) bits.push(formatSpeed(i.speed));
+  if (i.partsTotal > 1) bits.push(`${i.partsDone} of ${i.partsTotal} parts`);
+  return bits.join(" · ");
+}
+
+/** iPhone and iPad suspend a page in the background (an iPad says it is a Mac, but has touch). */
+const isIos = () => typeof navigator !== "undefined" && (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
 
 interface FileProps {
   name: string;
@@ -241,6 +270,8 @@ interface FileProps {
   onPause?: () => void;
   onResume?: () => void;
   onRetry?: () => void;
+  /** R1193: stop for good, and tell the server to drop what already went up. */
+  onCancel?: () => void;
   onRemove: () => void;
   onReplace: (f: File) => void;
   limits: UploadLimits | null;
@@ -248,13 +279,20 @@ interface FileProps {
 }
 
 /** The video picked on Step 1, with its own progress, pause, retry, replace and remove. */
-export function UploadFileCard({ name, size, poster, duration, width, height, upload, online, onPause, onResume, onRetry, onRemove, onReplace, limits, className }: FileProps) {
+export function UploadFileCard({ name, size, poster, duration, width, height, upload, online, onPause, onResume, onRetry, onCancel, onRemove, onReplace, limits, className }: FileProps) {
   const picker = useRef<HTMLInputElement>(null);
   const st = fileStatus(upload, online);
+  const detail = uploadDetail(upload);
+  // Read after mount: the server render can't know the device.
+  const [ios, setIos] = useState(false);
+  useEffect(() => setIos(isIos()), []);
   const progress = upload.kind === "uploading" || upload.kind === "paused" ? pct(upload.progress) : upload.kind === "done" ? 100 : 0;
   const shape = width && height ? (height > width ? "Vertical" : height === width ? "Square" : "Horizontal") : null;
   const facts = [size ? formatBytes(size) : null, duration ? clock(duration) : null, shape].filter(Boolean).join(" · ");
   const busy = upload.kind === "uploading";
+  // Once the bucket is stitching the parts there is nothing left to pause, and once it's processing nothing to cancel.
+  const phase = upload.kind === "uploading" ? upload.info?.phase : undefined;
+  const stitching = phase === "finalizing" || phase === "processing";
   return (
     <div data-testid="upload-file" data-state={upload.kind} className={cn("rounded-[24px] bg-card/70 p-3 hairline sm:p-4", className)}>
       <div className="flex items-start gap-3 sm:gap-4">
@@ -279,6 +317,11 @@ export function UploadFileCard({ name, size, poster, duration, width, height, up
             {st.tone === "bad" && <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
             <span className="tabular-nums">{st.text}</span>
           </p>
+          {detail && (
+            <p data-testid="upload-detail" className="mt-0.5 truncate text-xs tabular-nums text-muted-foreground">
+              {detail}
+            </p>
+          )}
         </div>
         <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={onRemove} aria-label={busy ? `Stop uploading ${name}` : `Remove ${name}`}>
           <X className="h-4 w-4" aria-hidden="true" />
@@ -290,7 +333,7 @@ export function UploadFileCard({ name, size, poster, duration, width, height, up
         </span>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {busy && onPause && (
+        {busy && !stitching && onPause && (
           <Button variant="subtle" size="sm" className="min-h-11" onClick={onPause}>
             <Pause className="h-4 w-4" aria-hidden="true" /> Pause
           </Button>
@@ -298,6 +341,11 @@ export function UploadFileCard({ name, size, poster, duration, width, height, up
         {upload.kind === "paused" && onResume && (
           <Button variant="primary" size="sm" className="min-h-11" onClick={onResume}>
             <Play className="h-4 w-4" aria-hidden="true" /> Resume
+          </Button>
+        )}
+        {((busy && phase !== "processing") || upload.kind === "paused") && onCancel && (
+          <Button variant="ghost" size="sm" className="min-h-11" onClick={onCancel}>
+            Cancel upload
           </Button>
         )}
         {upload.kind === "failed" && onRetry && (
@@ -323,7 +371,11 @@ export function UploadFileCard({ name, size, poster, duration, width, height, up
             if (f) onReplace(f);
           }}
         />
-        {upload.kind === "uploading" && <p className="text-xs text-muted-foreground">Keep this tab open while it uploads.</p>}
+        {upload.kind === "uploading" && (
+          <p className="text-xs text-muted-foreground">
+            {ios ? "Keep Outlly open. Uploads pause in the background and pick up when you come back." : "Keep this tab open while it uploads. A dropped connection picks up where it left off."}
+          </p>
+        )}
       </div>
     </div>
   );

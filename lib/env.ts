@@ -26,13 +26,19 @@ const schema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().optional().default(""),
   R2_BUCKET: z.string().optional().default("outlly-media"),
   R2_ENDPOINT: z.string().optional().default(""),
-  /** Part size for browser multipart uploads to R2/S3 (min 5 MB; R2 needs equal parts). */
   /** Pin each presigned upload URL to its exact Content-Length (default on). Turn off only if the bucket rejects signed lengths. */
   UPLOAD_PIN_LENGTH: z
     .string()
     .optional()
     .transform((v) => v !== "false"),
-  UPLOAD_PART_MB: z.coerce.number().int().min(5).max(100).default(10),
+  /**
+   * Part size for browser multipart uploads to R2/S3, in MB. R2 needs every part but the last the same size and at
+   * least 5 MiB, and at most 10,000 parts, so a file too big for this size gets a bigger one (lib/storage partSizeFor).
+   * R1193: 16 MB by default (was 10): fewer requests per GB, and a lost part costs seconds even on 4G.
+   */
+  UPLOAD_PART_MB: z.coerce.number().int().min(5).max(100).default(16),
+  /** R1193: how long a presigned part or file URL stays valid, in seconds. The browser signs again when one runs out. */
+  UPLOAD_URL_TTL_SEC: z.coerce.number().int().min(60).max(21_600).default(900),
   MAX_UPLOAD_MB: z.coerce.number().int().positive().max(4096).default(500),
   FFMPEG_PATH: z.string().optional().default(""),
   FFPROBE_PATH: z.string().optional().default(""),

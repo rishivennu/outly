@@ -614,6 +614,8 @@ const DIRECT_UPLOAD_GRACE_MS = 15 * 60_000;
  * one and simply never call complete, leaving it in the bucket for good. Each sweep, an "uploading" row
  * whose object is already bigger than what was reserved, or that is older than STALE_DIRECT_UPLOAD_MS (a day,
  * so even a slow resumed upload is finished), becomes "failed" and only then loses its object. Bounded to 25 rows per call so the sweeper stays fast.
+ * R1193: a multipart upload's parts sit in the bucket, not at the key, until it is completed. Its UploadSession
+ * holds the upload id, so the sweep aborts it too (the bucket's own 7-day lifecycle rule is the backstop).
  */
 export async function sweepDirectUploads(now = Date.now()) {
   const rows = await db.media.findMany({
@@ -632,6 +634,11 @@ export async function sweepDirectUploads(now = Date.now()) {
     // Claim the row first: if /complete already moved it on, the bytes are in use and must stay.
     const r = await db.media.updateMany({ where: { id: m.id, status: "uploading" }, data: { status: "failed" } });
     if (r.count !== 1) continue;
+    const s = await db.uploadSession.findUnique({ where: { mediaId: m.id }, select: { id: true, uploadId: true } }).catch(() => null);
+    if (s) {
+      if (storage.multipart) await storage.multipart.abort(m.storageKey, s.uploadId).catch(() => {});
+      await db.uploadSession.update({ where: { id: s.id }, data: { status: "aborted" } }).catch(() => {});
+    }
     await storage.remove(m.storageKey).catch(() => {});
     removed++;
   }

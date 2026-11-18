@@ -335,9 +335,10 @@ export function CaptionBurner({ src, file, filename, duration, session, onBurned
             </Button>
             {busy?.kind === "translate" && <Button type="button" variant="ghost" onClick={() => store.stop()}><X className="h-4 w-4" aria-hidden />Stop</Button>}
           </div>
+          {/* R1193: from md up the card sits under the video (TranscribeRun); on a phone the video is far above, so it stays here. */}
           {busy?.kind === "transcribe" && (
             <RunCard
-              className="mt-4"
+              className="mt-4 md:hidden"
               title={busy.total === 0 ? "Extracting audio" : "Transcribing"}
               chip={spoken ? languageName(spoken) : undefined}
               percent={busy.total === 0 ? null : (busy.done / busy.total) * 100}

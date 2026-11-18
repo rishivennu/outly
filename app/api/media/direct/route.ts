@@ -7,6 +7,7 @@ import { HttpError, json, route } from "@/lib/http";
 import { storage } from "@/lib/storage";
 import { ALLOWED_EXT, ALLOWED_VIDEO_MIME } from "@/lib/media/probe";
 import { assertStorage, assertUploadSize, storageUsage, uploadLimitBytes } from "@/lib/billing/entitlements";
+import { SESSION_TTL_MS } from "@/lib/media/upload-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +16,8 @@ const body = z.object({
   name: z.string().min(1).max(200),
   type: z.string().max(100),
   size: z.number().int().positive(),
+  /** R1193: the browser's identity check for the file, compared again before a resume. */
+  fingerprint: z.string().max(300).optional(),
 });
 
 /**
@@ -40,6 +43,8 @@ export const GET = route(async (_req, { user }) => {
 /**
  * Step 1 of a direct upload. Validates the file up front, reserves a private key under the user's
  * folder and returns a one-time signed upload token for exactly that key. No video bytes touch our server.
+ * R1193: a multipart upload also gets an UploadSession (upload id, part size, expiry), so it can be resumed,
+ * cancelled and swept, and its links are short-lived and signed again on request.
  */
 export const POST = route(
   async (req, { user }) => {
@@ -62,8 +67,28 @@ export const POST = route(
     const base = { mediaId: media.id, key, mode: up.mode, contentType: mime };
     if (up.mode === "tus")
       return json({ ...base, bucket: env.SUPABASE_BUCKET, token: up.token, uploadUrl: up.url, resumableUrl: up.resumableUrl, chunkSize: 6 * 1024 * 1024 }, { status: 201 });
-    if (up.mode === "put") return json({ ...base, uploadUrl: up.url, chunkSize: b.size }, { status: 201 });
-    return json({ ...base, uploadId: up.uploadId, partSize: up.partSize, chunkSize: up.partSize, parts: Math.ceil(b.size / up.partSize) }, { status: 201 });
+    const ttl = storage.multipart?.urlTtlSec;
+    if (up.mode === "put") return json({ ...base, uploadUrl: up.url, chunkSize: b.size, ttl }, { status: 201 });
+    const parts = Math.ceil(b.size / up.partSize);
+    const session = await db.uploadSession.create({
+      data: {
+        userId: user.id,
+        mediaId: media.id,
+        objectKey: key,
+        uploadId: up.uploadId,
+        originalFilename: b.name,
+        fileSize: b.size,
+        contentType: mime,
+        chunkSize: up.partSize,
+        totalParts: parts,
+        fingerprint: b.fingerprint ?? null,
+        expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+      },
+    });
+    return json(
+      { ...base, uploadId: up.uploadId, partSize: up.partSize, chunkSize: up.partSize, parts, sessionId: session.id, expiresAt: session.expiresAt.getTime(), ttl },
+      { status: 201 },
+    );
   },
   { limit: [20, 60_000] },
 );

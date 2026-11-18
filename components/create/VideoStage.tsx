@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Maximize2, Minimize2, Pause, Play, RefreshCw, Replace, Volume2, VolumeX, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { aspectLabel, cn, formatBytes, formatDuration } from "@/lib/utils";
-import { acceptAttr, formatProblem, useUploadLimits } from "@/lib/client/upload";
+import { acceptAttr, formatProblem, formatSpeed, useUploadLimits } from "@/lib/client/upload";
 import type { UploadState } from "./types";
 import { OutlyMark } from "@/components/brand/Logo";
 import { DancingPip } from "./Groove";
@@ -30,11 +30,13 @@ interface Props {
   overlay?: React.ReactNode;
   /** Sized by its column (the editor's left rail) instead of by the viewport height. */
   column?: boolean;
+  /** R1193: something sits under the column's video for now (the transcribe card): a little shorter on short screens, so it all fits. */
+  roomBelow?: boolean;
 }
 
 type Load = "loading" | "ready" | "error";
 
-export function VideoStage({ src, poster, filename, meta, upload, onReplace, onRetry, onCancel, onError, compact, videoRef, overlay, column }: Props) {
+export function VideoStage({ src, poster, filename, meta, upload, onReplace, onRetry, onCancel, onError, compact, videoRef, overlay, column, roomBelow }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const own = useRef<HTMLVideoElement>(null);
   const video = videoRef ?? own;
@@ -150,6 +152,26 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
     if (s < 60) return `about ${Math.max(1, Math.round(s))}s left`;
     return `about ${Math.round(s / 60)}m left`;
   })();
+  // R1193: the pill follows the engine's phase when it reports one (direct uploads); otherwise it reads the percent.
+  const pill = (() => {
+    if (upload.kind !== "uploading") return null;
+    const i = upload.info;
+    switch (i?.phase) {
+      case "preparing":
+        return { title: "Getting it ready", sub: "Preparing" };
+      case "resuming":
+        return { title: "Picking it up again", sub: "Where it left off" };
+      case "reconnecting":
+        return { title: "Reconnecting", sub: "What's up is kept" };
+      case "finalizing":
+        return { title: "Putting it together", sub: "Almost there" };
+      case "processing":
+        return { title: "Making it ready", sub: "Almost there" };
+      case "uploading":
+        return { title: "Bringing it over", sub: etaLabel ?? (i.speed ? formatSpeed(i.speed) : "On its way") };
+    }
+    return upload.progress < 1 ? { title: "Bringing it over", sub: etaLabel ?? "On its way" } : { title: "Making it ready", sub: etaLabel ?? "Almost there" };
+  })();
 
   const ratio = natural ?? (meta?.width && meta?.height ? meta.width / meta.height : 9 / 16);
   const vertical = ratio < 1;
@@ -181,7 +203,7 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
         onKeyDown={onKey}
         className={cn(
           "group relative isolate mx-auto overflow-hidden bg-[hsl(240_8%_4%)] shadow-[0_40px_100px_-40px_hsl(262_40%_18%/0.55)] hairline",
-          full ? "flex h-full w-full items-center justify-center rounded-none" : column ? "rounded-[24px] [--stage-h:min(54dvh,480px)] md:[--stage-h:min(68dvh,640px)]" : "rounded-[28px]",
+          full ? "flex h-full w-full items-center justify-center rounded-none" : column ? cn("rounded-[24px] [--stage-h:min(54dvh,480px)]", roomBelow ? "md:[--stage-h:min(54dvh,640px)]" : "md:[--stage-h:min(68dvh,640px)]") : "rounded-[28px]",
         )}
         style={full ? undefined : box}
       >
@@ -225,7 +247,7 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
         {showLoading && (
           <div className="skeleton absolute inset-0 grid place-items-center" aria-hidden="true">
             <span className="flex items-center gap-2 rounded-full bg-black/55 px-3.5 py-2 text-[13px] font-medium text-white">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading your preview
+              <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> Loading your preview
             </span>
           </div>
         )}
@@ -280,8 +302,8 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
                 <div className="relative flex items-center gap-2.5">
                   <DancingPip size={40} className="groove-glass shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{upload.progress < 1 ? "Bringing it over" : "Making it ready"}</p>
-                    <p className="truncate text-xs font-bold uppercase tracking-[0.1em] text-[hsl(var(--lime))]">{etaLabel ?? (upload.progress < 1 ? "On its way" : "Almost there")}</p>
+                    <p className="truncate text-sm font-semibold">{pill?.title}</p>
+                    <p className="truncate text-xs font-bold uppercase tracking-[0.1em] text-[hsl(var(--lime))]">{pill?.sub}</p>
                   </div>
                   {/* The number has its own slot in the header (1053): inside the track the rocket rode over it near 100%. */}
                   <span className="w-[3.25rem] shrink-0 text-right font-mono text-sm font-semibold tabular-nums text-white/85" aria-hidden="true">

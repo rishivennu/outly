@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  */
 export type RunStep = { label: string; state: "done" | "active" | "next" };
 
-export function RunCard({ title, chip, percent, detail, steps, onStop, stopLabel = "Stop", className }: {
+export function RunCard({ title, chip, percent, detail, steps, onStop, stopLabel = "Stop", compact, className }: {
   title: string;
   /** Short context next to the title: the language, the file, the caption style. */
   chip?: string;
@@ -22,10 +22,51 @@ export function RunCard({ title, chip, percent, detail, steps, onStop, stopLabel
   steps: RunStep[];
   onStop?: () => void;
   stopLabel?: string;
+  /** R1193: the short form for the video column: one header row, the bar, and the steps for screen readers only. */
+  compact?: boolean;
   className?: string;
 }) {
   const p = percent == null ? null : Math.max(0, Math.min(100, Math.round(percent)));
   const live = steps.find((s) => s.state === "active");
+  const valueText = p == null ? `${live?.label ?? "Working"}, amount not known yet` : `${p} percent${detail ? `, ${detail}` : ""}`;
+  if (compact)
+    return (
+      <section aria-label={title} className={cn("run-card relative overflow-hidden rounded-[22px] bg-[hsl(240_6%_9%)] p-4 text-[hsl(40_33%_95%)] shadow-[0_24px_60px_-28px_rgba(0,0,0,.55)]", className)}>
+        <div className="flex items-center gap-3">
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-lime motion-reduce:animate-none" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-[15px] font-semibold leading-tight">{title}</h3>
+            {chip && <p className="mt-0.5 truncate text-[12.5px] text-white/65">{chip}</p>}
+          </div>
+          {p != null && (
+            <span className="shrink-0 font-display text-[22px] font-semibold leading-none tabular-nums" aria-hidden="true">
+              {p}
+              <span className="text-white/45">%</span>
+            </span>
+          )}
+          {onStop && (
+            <Button type="button" variant="ghost" size="icon" onClick={onStop} aria-label={`${stopLabel} ${title.toLowerCase()}`} title={stopLabel} className="h-11 w-11 shrink-0 rounded-full bg-white/10 text-white ring-1 ring-inset ring-white/25 hover:bg-white/15 hover:text-white">
+              <X className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          )}
+        </div>
+        <div role="progressbar" aria-label={title} aria-valuemin={0} aria-valuemax={100} aria-valuenow={p ?? undefined} aria-valuetext={valueText} className="relative mt-3 flex h-9 items-center overflow-hidden rounded-full bg-white/10">
+          <span
+            className={cn("run-fill absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,hsl(var(--lime)),hsl(84_95%_47%))] transition-[width] duration-500 ease-out motion-reduce:transition-none", p == null && "run-fill-wait")}
+            style={{ width: p == null ? "38%" : `${Math.max(p, 4)}%` }}
+            aria-hidden="true"
+          />
+          {detail && <span className="relative ml-auto mr-1 inline-flex h-7 items-center rounded-full bg-white/10 px-2.5 text-[12.5px] font-medium text-white/85 backdrop-blur">{detail}</span>}
+        </div>
+        <ol className="sr-only">
+          {steps.map((s) => (
+            <li key={s.label}>
+              {s.label}, {s.state === "done" ? "done" : s.state === "active" ? "in progress" : "next"}
+            </li>
+          ))}
+        </ol>
+      </section>
+    );
   return (
     <section
       aria-label={title}
@@ -45,7 +86,7 @@ export function RunCard({ title, chip, percent, detail, steps, onStop, stopLabel
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={p ?? undefined}
-        aria-valuetext={p == null ? `${live?.label ?? "Working"}, amount not known yet` : `${p} percent${detail ? `, ${detail}` : ""}`}
+        aria-valuetext={valueText}
         className="relative mt-4 flex h-12 items-center overflow-hidden rounded-full bg-white/10"
       >
         <span

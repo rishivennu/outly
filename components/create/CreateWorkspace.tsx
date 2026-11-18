@@ -10,7 +10,7 @@ import { useToast } from "@/components/shared/Toast";
 import { defaultSchedule } from "@/components/shared/DateTimePicker";
 import { api, ApiError, offerUpgrade, streamApi } from "@/lib/client/api";
 import { track } from "@/lib/analytics/track";
-import { limitsProblem, loadUploadLimits, uploadVideo, type UploadLimits } from "@/lib/client/upload";
+import { discardUpload, limitsProblem, loadUploadLimits, uploadVideo, type UploadLimits } from "@/lib/client/upload";
 import { useOnline } from "@/lib/client/use-online";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { CaptionTrack } from "@/lib/captions/edit";
@@ -34,7 +34,7 @@ import { PublishTo } from "./PublishTo";
 import { SaveDraft } from "./SaveDraft";
 import { autosaveLine, draftTitle, enabledPlatforms, launchGate, launchPlan, pickedAccount, scheduleProblem, targetPayload } from "./publish";
 import { CaptionBurner } from "./CaptionBurner";
-import { CaptionRunProvider, useCaptionBurning, useCaptionRunLine, useCaptionWorkspace } from "./captions/CaptionRun";
+import { CaptionRunProvider, TranscribeRun, useCaptionBurning, useCaptionRunLine, useCaptionTranscribing, useCaptionWorkspace } from "./captions/CaptionRun";
 import { readFrames, readVideo } from "./frame";
 import { primeGroove } from "./Groove";
 import { ActionBar, barState, BURN_SEND, PreviewSheet, type BarId } from "./ActionBar";
@@ -270,6 +270,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   const capStore = useCaptionWorkspace();
   const capLine = useCaptionRunLine(capStore);
   const capBurning = useCaptionBurning(capStore);
+  const capTranscribing = useCaptionTranscribing(capStore);
 
   /* 1152: the assistant is a side panel from 1280px; below that the same element opens as a drawer (one instance,
      so the conversation survives a resize, a close and a reopen). */
@@ -277,7 +278,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   const [drawer, setDrawer] = useState(false);
   const drawerFrom = useRef<HTMLElement | null>(null);
   const drawerClose = useRef<HTMLButtonElement>(null);
-  const drawerRef = useRef<HTMLElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1280px)");
     const f = () => setWide(mq.matches);
@@ -398,6 +399,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   const startUpload = useCallback(
     async (file: File, objectUrl?: string, resume?: { progress: number }) => {
       uploadAbort.current?.abort();
+      // R1193: a different file takes over, so the old one's unfinished upload is dropped on the server too.
+      if (fileRef.current && fileRef.current !== file) discardUpload(fileRef.current, { resumeKey: deviceId.current ?? undefined });
       const ctrl = new AbortController();
       uploadAbort.current = ctrl;
       fileRef.current = file;
@@ -431,7 +434,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       uploadFail.current = null;
       const run = (async () => {
         try {
-          const r = await uploadVideo<MediaView>(file, (p, eta) => { setUpload({ kind: "uploading", progress: p, eta }); }, ctrl.signal, { resumeKey: deviceId.current ?? undefined });
+          const r = await uploadVideo<MediaView>(file, (p, eta, info) => { if (!ctrl.signal.aborted) setUpload({ kind: "uploading", progress: p, eta, info }); }, ctrl.signal, { resumeKey: deviceId.current ?? undefined });
           if (ctrl.signal.aborted) return null;
           setMedia(r.media);
           setUpload({ kind: "done" });
@@ -514,6 +517,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   const cancelUpload = useCallback(() => {
     uploadAbort.current?.abort();
     uploadAbort.current = null;
+    // R1193: Cancel is for good. Pause keeps the upload; this forgets it here and drops its parts on the server.
+    if (fileRef.current) discardUpload(fileRef.current, { resumeKey: deviceId.current ?? undefined });
     stopWatching();
     mediaReady.current = null;
     uploadFail.current = null;
@@ -1421,6 +1426,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                       onPause={upload.kind === "uploading" ? pauseUpload : undefined}
                       onResume={upload.kind === "paused" && fileRef.current ? resumeUpload : undefined}
                       onRetry={upload.kind === "failed" && fileRef.current ? retryUpload : undefined}
+                      onCancel={upload.kind === "uploading" || upload.kind === "paused" ? () => setStopAsk(true) : undefined}
                       onRemove={() => setStopAsk(true)}
                       onReplace={(f) => setReplacing(f)}
                       limits={limits}
@@ -1466,6 +1472,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                 <div className="md:sticky md:top-20 min-[1800px]:top-6">
                 <VideoStage
                   column
+                  roomBelow={capTranscribing}
                   videoRef={capVideo}
                   overlay={<canvas ref={capCanvas} className="pointer-events-none absolute inset-0 h-full w-full object-cover" aria-hidden="true" />}
                   src={capLive && preCaption ? preCaption.media.url : src}
@@ -1478,6 +1485,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                   onCancel={() => setStopAsk(true)}
                   onError={(m) => toast(m, "info")}
                 />
+                {/* R1193: the transcribe run card lives with the video it reads (on a phone it stays in the caption editor). */}
+                <TranscribeRun className="mt-3 hidden md:block" />
                 </div>
                 <div data-pip={pipShown ? "open" : "closed"} className="group/edit mt-5 min-w-0 space-y-5 md:mt-0">
                 <StoryComposer
@@ -1652,10 +1661,10 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
         <ConfirmDialog
           open={stopAsk}
           onOpenChange={setStopAsk}
-          title={upload.kind === "uploading" ? "Stop this upload?" : "Remove this video?"}
+          title={upload.kind === "uploading" || upload.kind === "paused" ? "Stop this upload?" : "Remove this video?"}
           body="The video comes off this draft and you can pick another one. What you have written stays on this screen."
-          confirmLabel={upload.kind === "uploading" ? "Stop upload" : "Remove video"}
-          cancelLabel={upload.kind === "uploading" ? "Keep uploading" : "Keep it"}
+          confirmLabel={upload.kind === "uploading" || upload.kind === "paused" ? "Stop upload" : "Remove video"}
+          cancelLabel={upload.kind === "uploading" ? "Keep uploading" : upload.kind === "paused" ? "Keep it paused" : "Keep it"}
           onConfirm={() => {
             setStopAsk(false);
             cancelUpload();
@@ -1663,10 +1672,11 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
         />
       </div>
 
-      <aside
+      {/* R1193: a div with a role, not an aside: an aside can't be a dialog, and swapping the element would unmount the chat. */}
+      <div
         ref={drawerRef}
         aria-label="AI assistant"
-        role={sheet ? "dialog" : undefined}
+        role={sheet ? "dialog" : "complementary"}
         aria-modal={sheet || undefined}
         onKeyDown={sheet ? onDrawerKey : undefined}
         className={cn(
@@ -1705,7 +1715,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
           </Button>
           {assistant}
         </div>
-      </aside>
+      </div>
     </div>
     </CaptionRunProvider>
   );

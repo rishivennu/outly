@@ -52,9 +52,13 @@ Caveats when scaling out: the rate limiter (`lib/rate-limit.ts`) and the signed-
 
 Supabase Free caps each object at 50 MB. R2 has no practical cap, 10 GB free storage and free egress. Browsers upload straight to R2 (Vercel never sees the bytes):
 
-- up to 10 MB: one presigned PUT, its Content-Length pinned in the signature so the size cannot be swapped
-- above that: S3 multipart, 10 MB parts, 4 in parallel, each part URL pinned to its exact size; retries per part and resumes after a reload
-- `/api/media/direct/complete` lists the parts on R2 and refuses (409 `PARTS_MISSING`) unless every part is there and the sizes add up, then checks the file's magic bytes
+- up to one part (16 MB): one presigned PUT, its Content-Length pinned in the signature so the size cannot be swapped
+- above that: S3 multipart, 16 MB parts (grown in whole MB for a file that would need more than 10,000), each part URL pinned to its exact size and valid 15 minutes (signed again as it runs out)
+- R1193: parallel parts adapt to the connection (start 4, up to 6 on a desktop; 3 to 4 on a phone; 2 to 3 on a slow or data-saving connection), each retried with jittered backoff; an offline spell waits for the connection instead of failing
+- every multipart upload has an `UploadSession` row (upload id, part size, status, 24 h expiry) and `UploadPart` rows (part number, ETag, size) reported by the browser; a resume checks the file's fingerprint and sends only the parts R2 does not already have
+- `/api/media/direct/complete` claims the session first (a second, racing complete gets 409 `FINALIZING` and then the finished video), lists the parts on R2 and refuses (409 `PARTS_MISSING`) unless every part is there and the sizes add up, then checks the file's magic bytes
+- Cancel calls `/api/media/direct/abort` (aborts the multipart upload, deletes the object); the sweeper aborts uploads left over 24 h. Keep the bucket's default lifecycle rule (abort incomplete multipart uploads after 7 days) as the last net
+- the tables are created by `prisma db push` in the build (`scripts/db-sync.mjs`); no migration to run
 
 ### Setup
 
@@ -73,7 +77,8 @@ Supabase Free caps each object at 50 MB. R2 has no practical cap, 10 GB free sto
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | token keys |
 | `R2_BUCKET` | `outlly-media` (default) |
 | `R2_ENDPOINT` | optional, e.g. `https://<id>.eu.r2.cloudflarestorage.com` for an EU bucket |
-| `UPLOAD_PART_MB` | optional, part size 5 to 100 (default 10) |
+| `UPLOAD_PART_MB` | optional, part size 5 to 100 (default 16). Changing it never breaks an upload in flight: each one keeps the size it started with |
+| `UPLOAD_URL_TTL_SEC` | optional, how long a signed upload link lasts, 60 to 21600 (default 900) |
 | `UPLOAD_PIN_LENGTH` | optional, `false` only if R2 ever rejects signed Content-Length |
 | `MAX_UPLOAD_MB` / `NEXT_PUBLIC_MAX_UPLOAD_MB` | e.g. `500` (X caps video at 512 MB) |
 

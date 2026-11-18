@@ -99,8 +99,8 @@ describe("workspace wiring", () => {
     expect(ws).toContain("onReplace={(f) => setReplacing(f)}");
     expect(ws).toContain("onCancel={() => setStopAsk(true)}");
     expect(ws).toContain('title="Replace your video?"');
-    // 1170: the same dialog stops a running upload or removes a finished one.
-    expect(ws).toContain('title={upload.kind === "uploading" ? "Stop this upload?" : "Remove this video?"}');
+    // 1170: the same dialog stops a running upload or removes a finished one. R1193: a paused one is still stopped.
+    expect(ws).toContain('title={upload.kind === "uploading" || upload.kind === "paused" ? "Stop this upload?" : "Remove this video?"}');
     expect(src("components/create/CoverPicker.tsx")).toContain('title="Remove the cover?"');
     expect(src("components/create/DeviceDrafts.tsx")).toContain("Remove this draft from this device?");
   });

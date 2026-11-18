@@ -24,8 +24,14 @@ export interface StorageDriver {
   createDirectUpload?(key: string, file: { size: number; contentType: string }): Promise<DirectUpload>;
   /** S3/R2 multipart: presigned part URLs, the parts already stored, and the final stitch. */
   multipart?: {
+    /** The configured part size (UPLOAD_PART_MB). A given upload uses partSizeFor(its size), kept on its UploadSession. */
     partSize: number;
-    sign(key: string, uploadId: string, size: number, parts: number[]): Promise<Record<number, string>>;
+    /** R1193: the part size for a file of `size` bytes: partSize, grown when the file would need over 10,000 parts. */
+    partSizeFor(size: number): number;
+    /** R1193: seconds a URL from sign() stays valid (UPLOAD_URL_TTL_SEC). */
+    urlTtlSec: number;
+    /** Presigned part URLs, each pinned to its part's exact byte size. `partSize` is the upload's own (default partSize). */
+    sign(key: string, uploadId: string, size: number, parts: number[], partSize?: number): Promise<Record<number, string>>;
     list(key: string, uploadId: string): Promise<PartInfo[]>;
     complete(key: string, uploadId: string, parts: PartInfo[]): Promise<void>;
     abort(key: string, uploadId: string): Promise<void>;
@@ -99,8 +105,20 @@ const local: StorageDriver = {
   },
 };
 
+const MiB = 1024 * 1024;
+/** R2 and S3 multipart rules: every part but the last at least 5 MiB, and no more than 10,000 parts. */
+export const MIN_PART_BYTES = 5 * MiB;
+export const MAX_PARTS = 10_000;
+
+/** R1193: the part size for a file: `base` (at least 5 MiB), grown in whole MiB only when the file would need more than 10,000 parts. */
+export function partSizeFor(size: number, base: number) {
+  const b = Math.max(MIN_PART_BYTES, base);
+  if (Math.ceil(size / b) <= MAX_PARTS) return b;
+  return Math.ceil(size / MAX_PARTS / MiB) * MiB;
+}
+
 /** S3-compatible bucket (Cloudflare R2 or AWS S3). Private; reads and browser uploads go through presigned URLs. */
-export function s3Driver(cfg: S3Config, name: "s3" | "r2", partSize = env.UPLOAD_PART_MB * 1024 * 1024): StorageDriver {
+export function s3Driver(cfg: S3Config, name: "s3" | "r2", partSize = env.UPLOAD_PART_MB * MiB, urlTtlSec = env.UPLOAD_URL_TTL_SEC): StorageDriver {
   const c = makeS3(cfg, { pinLength: env.UPLOAD_PIN_LENGTH });
   return {
     name,
@@ -121,14 +139,17 @@ export function s3Driver(cfg: S3Config, name: "s3" | "r2", partSize = env.UPLOAD
     },
     remove: (key) => c.del(key),
     async createDirectUpload(key, file) {
-      if (file.size <= partSize) return { mode: "put", url: await c.presignPut(key, file.size) };
-      return { mode: "multipart", uploadId: await c.createMultipart(key, file.contentType), partSize };
+      const ps = partSizeFor(file.size, partSize);
+      if (file.size <= ps) return { mode: "put", url: await c.presignPut(key, file.size, urlTtlSec) };
+      return { mode: "multipart", uploadId: await c.createMultipart(key, file.contentType), partSize: ps };
     },
     multipart: {
       partSize,
-      async sign(key, uploadId, size, parts) {
+      partSizeFor: (size) => partSizeFor(size, partSize),
+      urlTtlSec,
+      async sign(key, uploadId, size, parts, ps = partSize) {
         const out: Record<number, string> = {};
-        for (const n of parts) out[n] = await c.presignPart(key, uploadId, n, partBytes(size, partSize, n));
+        for (const n of parts) out[n] = await c.presignPart(key, uploadId, n, partBytes(size, ps, n), urlTtlSec);
         return out;
       },
       list: (key, uploadId) => c.listParts(key, uploadId),

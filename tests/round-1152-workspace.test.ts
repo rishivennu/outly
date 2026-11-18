@@ -73,7 +73,8 @@ describe("1152 layout and assistant", () => {
     expect(ws).toContain("<StepProgress step={step}");
   });
   test("below 1280px the one assistant opens as a modal drawer", () => {
-    expect(ws).toContain('role={sheet ? "dialog" : undefined}');
+    // R1193: "complementary" when it is a side panel (a div with a role: an aside can't be a dialog).
+    expect(ws).toContain('role={sheet ? "dialog" : "complementary"}');
     expect(ws).toContain("aria-modal={sheet || undefined}");
     expect(ws).toContain('aria-label="Close Pip"');
     expect(ws).toContain('if (e.key === "Escape")');

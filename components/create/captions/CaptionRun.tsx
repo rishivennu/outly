@@ -1,6 +1,8 @@
 "use client";
 import { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
+import { languageName } from "@/lib/captions/languages";
+import { RunCard, transcribeSteps } from "./RunCard";
 import { createCaptionStore, PILL_TIP, runLine, runPill, type CaptionState, type CaptionStore } from "./run-store";
 
 const Ctx = createContext<CaptionStore | null>(null);
@@ -48,6 +50,34 @@ function useRunText(pick: (s: CaptionState) => string | null, store?: CaptionSto
 
 /** True while captions are being burned in, so Publish and Schedule wait for the captioned video. */
 export const useCaptionBurning = (store: CaptionStore) => useSyncExternalStore(store.subscribe, () => store.getState().busy?.kind === "burn", () => false);
+
+/** R1193: true while the words are being transcribed, so the video column makes room for its run card. */
+export const useCaptionTranscribing = (store: CaptionStore) => useSyncExternalStore(store.subscribe, () => store.getState().busy?.kind === "transcribe", () => false);
+
+/**
+ * R1193: the transcribe run card, under the video in the stage's column (it used to sit in the caption editor,
+ * a long scroll away from the video it reads). Compact so the sticky column still fits the screen. Reads the
+ * workspace store; renders nothing unless a transcribe is running.
+ */
+export function TranscribeRun({ className }: { className?: string }) {
+  const store = useContext(Ctx);
+  const s = useSyncExternalStore(store ? store.subscribe : NONE, store ? store.getState : idle, idle);
+  const busy = s?.busy;
+  if (!store || !s || busy?.kind !== "transcribe") return null;
+  const spoken = s.langPick !== "auto" ? s.langPick : s.heard;
+  return (
+    <RunCard
+      compact
+      className={className}
+      title={busy.total === 0 ? "Extracting audio" : "Transcribing"}
+      chip={spoken ? languageName(spoken) : undefined}
+      percent={busy.total === 0 ? null : (busy.done / busy.total) * 100}
+      detail={busy.total > 1 ? `${busy.done} of ${busy.total} parts` : busy.total === 1 ? "One part" : undefined}
+      steps={transcribeSteps(busy)}
+      onStop={() => store.stop()}
+    />
+  );
+}
 
 /** The action bar line while captions are being made on any step. null when nothing is running. */
 export const useCaptionRunLine = (store?: CaptionStore | null) => useRunText(runLine, store);
