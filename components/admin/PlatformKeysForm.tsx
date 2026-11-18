@@ -11,7 +11,7 @@ import { PLATFORM_SETUP } from "@/lib/social/platform-setup";
 import { Card, Pill } from "./ui";
 import { CopyRow, SecretField, type Secret, type SecretEdit } from "./IntegrationsForm";
 
-type Keys = Record<Platform, { clientId: string; clientSecret: Secret; dms?: boolean }>;
+type Keys = Record<Platform, { clientId: string; clientSecret: Secret; dms?: boolean; insights?: boolean }>;
 
 /** The messaging permissions, dropped from the Scopes line when DMs are switched off (1031f). */
 const DM_SCOPES = ["instagram_business_manage_messages", "pages_messaging", "pages_manage_metadata"];
@@ -49,10 +49,15 @@ function PlatformCard({ p, saved, live, base, dm, clash, onSaved }: { p: Platfor
   const [secret, setSecret] = useState<SecretEdit>(undefined);
   const [busy, setBusy] = useState(false);
   const [dms, setDms] = useState(saved.dms !== false);
+  // R1199: off unless switched on. Off still asks a signed-in super admin, so the review screencast can be recorded.
+  const [insights, setInsights] = useState(saved.insights === true);
+  const ig = p === "instagram";
+  const insightsChanged = ig && insights !== (saved.insights === true);
   const core = CORE_PLATFORMS.includes(p as never);
   const dmsChanged = !!dm && dms !== (saved.dms !== false);
-  const dirty = id.trim() !== saved.clientId || (secret !== undefined && secret !== "") || dmsChanged;
-  const scopes = dm && !dms ? s.scopes.split(",").map((x) => x.trim()).filter((x) => !DM_SCOPES.includes(x)).join(", ") : s.scopes;
+  const dirty = id.trim() !== saved.clientId || (secret !== undefined && secret !== "") || dmsChanged || insightsChanged;
+  const baseScopes = dm && !dms ? s.scopes.split(",").map((x) => x.trim()).filter((x) => !DM_SCOPES.includes(x)).join(", ") : s.scopes;
+  const scopes = ig && insights ? `${baseScopes}, instagram_business_manage_insights` : baseScopes;
   const willBeLive = !!id.trim() && (secret === null ? false : saved.clientSecret.set || !!secret);
 
   async function save() {
@@ -60,7 +65,7 @@ function PlatformCard({ p, saved, live, base, dm, clash, onSaved }: { p: Platfor
     try {
       const r = await adminApi<{ platforms: Keys; live: Platform[] }>("/api/admin/platforms", {
         method: "PUT",
-        json: { platform: p, clientId: id.trim(), clientSecret: secret === undefined || secret === "" ? undefined : secret, ...(dm ? { dms } : {}) },
+        json: { platform: p, clientId: id.trim(), clientSecret: secret === undefined || secret === "" ? undefined : secret, ...(dm ? { dms } : {}), ...(ig ? { insights } : {}) },
       });
       onSaved(r.platforms, r.live);
       setSecret(undefined);
@@ -118,6 +123,24 @@ function PlatformCard({ p, saved, live, base, dm, clash, onSaved }: { p: Platfor
             <CopyRow label="Webhook URL" value={dm.webhook} />
             <CopyRow label="Verify token" value={dm.verifyToken} />
             <CopyRow label="Data deletion URL" value={dm.deletion} />
+          </div>
+        )}
+        {ig && (
+          <div className="grid min-w-0 grid-cols-1 gap-2 [&>*]:min-w-0" aria-label="Instagram insights">
+            <p className="text-[12.5px] font-semibold text-foreground">Insights</p>
+            <label className="flex min-h-[3.25rem] cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4 py-2.5 hairline">
+              <span className="min-w-0">
+                <span className="block text-[14px] font-medium">Ask creators for Instagram insights</span>
+                <span id="instagram-insights-hint" className="block text-[12px] leading-snug text-muted-foreground">
+                  {insights
+                    ? "On: every creator is asked to share views, reach and followers at login. Leave this on only once Meta has approved insights for your app."
+                    : "Off: creators are not asked, so login keeps working while Meta reviews insights. A super admin signed in here is still asked, for the review recording."}
+                </span>
+              </span>
+              <input type="checkbox" role="switch" checked={insights} onChange={(e) => setInsights(e.target.checked)} aria-describedby="instagram-insights-hint" className="peer sr-only" />
+              <span aria-hidden="true" className="relative h-7 w-12 shrink-0 rounded-full bg-muted transition-colors peer-checked:bg-lime peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-background after:shadow after:transition-transform after:duration-300 peer-checked:after:translate-x-5" />
+            </label>
+            {insightsChanged && <p className="text-[12px] text-muted-foreground">Press Save to apply. Creators who are already connected see insights after they reconnect Instagram once.</p>}
           </div>
         )}
         <p className="text-[12.5px] leading-relaxed text-muted-foreground">

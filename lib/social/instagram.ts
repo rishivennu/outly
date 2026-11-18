@@ -1,5 +1,5 @@
 import { collectPages, COMMENT_PAGES } from "./paging";
-import { creds, dmsOn } from "./keys";
+import { creds, dmsOn, insightsOn } from "./keys";
 import { commonMediaChecks, httpFailure, PublisherError, type AccountContext, type CommentTarget, type PlatformComment, type ConnectOptions, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
 import { formPost, newState } from "./oauth";
 
@@ -17,7 +17,10 @@ const KIDS_SESSION = "session:igkids:";
 const IG_BASE_SCOPES = "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments";
 /** Direct messages (1031). Left out when the admin switches DMs off (1031f). */
 export const IG_DM_SCOPE = "instagram_business_manage_messages";
-export const instagramScopes = (dms: boolean) => (dms ? `${IG_BASE_SCOPES},${IG_DM_SCOPE}` : IG_BASE_SCOPES);
+/** Views, reach, followers over time and watch time for Analytics (R1199). Asked only when insightsOn() or a super admin connects. */
+export const IG_INSIGHTS_SCOPE = "instagram_business_manage_insights";
+export const instagramScopes = (dms: boolean, insights = false) =>
+  [IG_BASE_SCOPES, ...(dms ? [IG_DM_SCOPE] : []), ...(insights ? [IG_INSIGHTS_SCOPE] : [])].join(",");
 
 /**
  * The code-for-token answer. Meta documents it wrapped as {"data":[{access_token,user_id,permissions}]},
@@ -48,7 +51,7 @@ export class InstagramPublisher implements SocialPublisher {
       client_id: creds("instagram").clientId,
       redirect_uri: redirectUri,
       response_type: "code",
-      scope: instagramScopes(dmsOn("instagram")),
+      scope: instagramScopes(dmsOn("instagram"), insightsOn() || opts.insights === true),
       state,
       // 1095: Instagram's documented switch to ask for the login even when someone is signed in already.
       ...(opts.fresh ? { force_reauth: "true" } : {}),

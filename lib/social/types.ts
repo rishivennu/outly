@@ -26,6 +26,8 @@ export interface ConnectedProfile {
 export interface ConnectOptions {
   /** "Connect a different account": ask the platform for a fresh sign-in or its account picker where it has one. */
   fresh?: boolean;
+  /** Instagram only (R1199): also ask for the insights permission, even while the admin switch is off. */
+  insights?: boolean;
 }
 
 /** Decrypted account handed to a publisher. Exists only inside workers, never serialised to the client. */

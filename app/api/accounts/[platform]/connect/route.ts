@@ -3,7 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { isPlatform } from "@/lib/domain";
 import { getPublisher, hasCredentials, loadKeys, practiceAllowed } from "@/lib/social/registry";
-import { instagramIdLooksLikeMetaAppId } from "@/lib/social/keys";
+import { insightsOn, instagramIdLooksLikeMetaAppId } from "@/lib/social/keys";
+import { getAdmin } from "@/lib/admin/auth";
 import { safeReturnTo, saveOAuthState } from "@/lib/oauth-state";
 import { isNativeUA } from "@/lib/app-mode";
 import { APP_AUTH_PAGE } from "@/lib/app-handoff";
@@ -52,7 +53,10 @@ export async function GET(req: NextRequest, props: { params: Promise<{ platform:
   const sp = req.nextUrl.searchParams;
   const intent = parseIntent(sp.get("intent"), sp.get("add"));
   const expect = intent === "reconnect" && ACCOUNT_ID.test(sp.get("expect") ?? "") ? sp.get("expect") : null;
-  const start = await getPublisher(params.platform).connect(redirectUri, { fresh: intent === "new" || sp.get("fresh") === "1" });
+  // R1199: while the insights switch is off, a signed-in super admin is still asked for Instagram insights. Their own
+  // account has a role on the Meta app, so the login works for them, and nobody else's login changes.
+  const insights = params.platform === "instagram" && !insightsOn() && (await getAdmin())?.role === "super";
+  const start = await getPublisher(params.platform).connect(redirectUri, { fresh: intent === "new" || sp.get("fresh") === "1", ...(insights ? { insights: true } : {}) });
   await saveOAuthState(params.platform, { state: start.state, verifier: start.codeVerifier, returnTo: safeReturnTo(sp.get("returnTo")), intent, expect });
   return NextResponse.redirect(start.url);
 }

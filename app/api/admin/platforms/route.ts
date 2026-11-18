@@ -12,6 +12,8 @@ const Body = z.object({
   clientSecret: secret,
   /** Instagram and Facebook only (1031f): false = don't ask for the messaging permissions. */
   dms: z.boolean().optional(),
+  /** Instagram only (R1199): true = ask every creator for the insights permission. */
+  insights: z.boolean().optional(),
 });
 
 export const GET = adminRoute("platforms", async () => {
@@ -32,11 +34,12 @@ export const PUT = adminRoute("platforms", async (req, { admin }) => {
       );
   }
   const dmCapable = b.platform === "instagram" || b.platform === "facebook";
-  const v = await saveConfig("platforms", { [b.platform]: { clientId: b.clientId, clientSecret: b.clientSecret, ...(dmCapable && b.dms !== undefined ? { dms: b.dms } : {}) } });
+  const storeInsights = b.platform === "instagram" && b.insights !== undefined;
+  const v = await saveConfig("platforms", { [b.platform]: { clientId: b.clientId, clientSecret: b.clientSecret, ...(dmCapable && b.dms !== undefined ? { dms: b.dms } : {}), ...(storeInsights ? { insights: b.insights } : {}) } });
   await loadKeys();
   const live = livePlatforms();
   const name = PLATFORM_META[b.platform].name;
-  await adminEvent("integration", `${admin.name} updated ${name} keys`, `${live.includes(b.platform) ? `${name} is live` : `${name} is off`}${dmCapable && b.dms !== undefined ? `, direct messages ${b.dms ? "on" : "off"}` : ""}`, "/admin/platforms");
+  await adminEvent("integration", `${admin.name} updated ${name} keys`, `${live.includes(b.platform) ? `${name} is live` : `${name} is off`}${dmCapable && b.dms !== undefined ? `, direct messages ${b.dms ? "on" : "off"}` : ""}${storeInsights ? `, insights ${b.insights ? "on" : "off"}` : ""}`, "/admin/platforms");
   return json({ platforms: redact("platforms", v), live });
 }, [30, 60_000]);
 

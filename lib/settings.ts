@@ -39,8 +39,9 @@ export interface PaymentConfig {
 /** Every platform, keyed the same way so the admin form and the registry stay generic. */
 export const KEYED_PLATFORMS = ["instagram", "youtube", "x", "tiktok", "facebook", "threads", "linkedin"] as const;
 export type KeyedPlatform = (typeof KEYED_PLATFORMS)[number];
-/** `dms` (Instagram and Facebook only, 1031f): false = don't ask for the messaging permissions. Unset = on. */
-export type PlatformKeys = Record<KeyedPlatform, { clientId: string; clientSecret: string; dms?: boolean }>;
+/** `dms` (Instagram and Facebook only, 1031f): false = don't ask for the messaging permissions. Unset = on.
+ * `insights` (Instagram only, R1199): true = ask every creator for instagram_business_manage_insights. Unset = off. */
+export type PlatformKeys = Record<KeyedPlatform, { clientId: string; clientSecret: string; dms?: boolean; insights?: boolean }>;
 
 export interface SiteConfig {
   maintenance: boolean;

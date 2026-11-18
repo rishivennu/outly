@@ -44,6 +44,16 @@ export function dmsOn(p: "instagram" | "facebook"): boolean {
   return g.__pkeys?.[p]?.dms !== false;
 }
 
+/**
+ * Instagram insights (R1199). OFF unless the admin switched it on in Admin > Social platforms, the opposite of
+ * dmsOn: Meta has not approved instagram_business_manage_insights yet, and asking for it would block the login
+ * for the public. While it is off only a super admin connecting their own app-role account is asked
+ * (app/api/accounts/[platform]/connect), which is what the App Review screencast needs.
+ */
+export function insightsOn(): boolean {
+  return g.__pkeys?.instagram?.insights === true;
+}
+
 /** Test hook: replace the snapshot without a database. */
 export function __setKeys(k: Partial<PlatformKeys> | undefined) {
   g.__pkeys = k;
