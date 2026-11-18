@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { json, route } from "@/lib/http";
 import { realUserId } from "@/lib/auth";
-import { agentsOnline, cancelRequest, customerPoll, customerSend, customerTyping, leaveMessage, rate, requestHuman } from "@/lib/support/live";
+import { agentsOnline, cancelRequest, customerPoll, customerSend, customerTyping, leaveMessage, rate, requestHuman, resumeLive } from "@/lib/support/live";
+import { wantsHuman } from "@/lib/support/intent";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,9 @@ const num = (v: string | null) => (v == null || v === "" ? null : Number(v));
 export const GET = route(async (req, { user }) => {
   const p = req.nextUrl.searchParams;
   const id = p.get("conversationId");
+  // R1194: ?resume=1 from a fresh tab: the conversation this person is waiting in (or talking in), so the queue
+  // place and the chat come back after a refresh, a restart or a return later. null when there is none.
+  if (!id && p.get("resume")) return json(await resumeLive(realUserId(user)), { headers: NO_STORE });
   if (!id) return json({ online: (await agentsOnline()) > 0 }, { headers: NO_STORE });
   const snap = await customerPoll(realUserId(user), { conversationId: id.slice(0, 40), after: num(p.get("after")), read: num(p.get("read")) });
   return json(snap, { headers: NO_STORE });
@@ -23,7 +27,7 @@ export const GET = route(async (req, { user }) => {
 
 const Id = z.string().min(1).max(40);
 const Body = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("request"), conversationId: Id.nullish(), message: z.string().max(4000).optional(), cid: z.string().max(40).optional() }),
+  z.object({ action: z.literal("request"), conversationId: Id.nullish(), message: z.string().max(4000).optional(), cid: z.string().max(40).optional(), source: z.enum(["button"]).optional() }),
   z.object({ action: z.literal("send"), conversationId: Id, text: z.string().max(4000), cid: z.string().max(40).optional() }),
   z.object({ action: z.literal("typing"), conversationId: Id }),
   z.object({ action: z.literal("read"), conversationId: Id, read: z.number().int().min(0).max(1e9) }),
@@ -39,9 +43,18 @@ export const POST = route(async (req, { user }) => {
   const h = { headers: NO_STORE };
   switch (b.action) {
     case "request":
-      return json(await requestHuman(who, { conversationId: b.conversationId, message: b.message, cid: b.cid }), h);
-    case "send":
-      return json(await customerSend(who, { conversationId: b.conversationId, text: b.text, cid: b.cid }), h);
+      return json(await requestHuman(who, { conversationId: b.conversationId, message: b.message, cid: b.cid, source: b.source ?? "button" }), h);
+    case "send": {
+      const sent = await customerSend(who, { conversationId: b.conversationId, text: b.text, cid: b.cid });
+      // R1194: "connect me to support" typed while already waiting (or talking) arrives here too, since the widget
+      // sends live messages through this route. Counted the same way as through Pip's route; the widget says
+      // "You're already in the support queue" once, and nothing while a specialist is in the chat.
+      if (!sent.duplicate && wantsHuman(String(b.text ?? ""))) {
+        const again = await requestHuman(who, { conversationId: b.conversationId, source: "chat", intent: b.text, repeat: true }).catch(() => null);
+        if (again) return json({ ...sent, handoff: "already", snapshot: again }, h);
+      }
+      return json(sent, h);
+    }
     case "typing":
       return json(await customerTyping(who, b.conversationId), h);
     case "read":

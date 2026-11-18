@@ -37,6 +37,8 @@ import {
   type SessionStatus,
   type WireMsg,
   type WireRole,
+  conversationState,
+  type ConversationState,
 } from "./live-core";
 
 /**
@@ -95,6 +97,16 @@ async function log(tx: Tx, sessionId: string, action: string, by: AdminSession |
   await tx.supportAssignment.create({
     data: { sessionId, action, fromId: o.fromId ?? null, toId: o.toId ?? null, byId: by?.id ?? null, byName: by?.name.slice(0, 80) ?? "Customer", note: (o.note ?? "").slice(0, 300) },
   });
+}
+
+/**
+ * R1194: one structured line per handoff event (request, duplicate, accept, first_response, resolve, cancel,
+ * notify_failed), so a support lead can follow one request through the server logs. Message text never goes in.
+ */
+export function handoffLog(event: string, data: Record<string, unknown>) {
+  try {
+    console.info("[live:handoff]", JSON.stringify({ event, at: new Date().toISOString(), ...data }));
+  } catch {}
 }
 
 /** Every specialist action goes to the audit log too (who, what, which chat). Message text never does. */
@@ -176,6 +188,8 @@ export type CustomerSnapshot = {
   conversationId: string;
   mode: string;
   state: CustomerState;
+  /** R1194: the one authoritative name for where this conversation stands (AI_ASSISTED ... CANCELLED). */
+  conversationState: ConversationState;
   session: { id: string; status: string; agent: string | null; requestedAt: string; acceptedAt: string | null; endedAt: string | null; canRate: boolean; rated: boolean } | null;
   position: number | null;
   agentsOnline: number | null;
@@ -232,6 +246,7 @@ export async function customerPoll(userId: string, o: { conversationId: string; 
     conversationId: conv.id,
     mode: conv.mode,
     state: customerState(shown, { agentsOnline: online ?? 1, now }),
+    conversationState: conversationState(conv.mode, s?.status ?? null),
     session: s
       ? {
           id: s.id,
@@ -254,6 +269,16 @@ export async function customerPoll(userId: string, o: { conversationId: string; 
   };
 }
 
+/**
+ * R1194: the conversation a signed-in person is waiting in, or talking to a specialist in, if any. A new tab or
+ * a restarted browser asks this once on open, so the queue place and the chat come back without the person
+ * having to ask again (the server is the one source of truth; the browser only cached it).
+ */
+export async function resumeLive(userId: string): Promise<CustomerSnapshot | null> {
+  const c = await db.pipConversation.findFirst({ where: { userId, mode: { in: ["waiting", "human"] }, liveId: { not: null } }, orderBy: { updatedAt: "desc" }, select: { id: true } });
+  return c ? customerPoll(userId, { conversationId: c.id }) : null;
+}
+
 class Already extends Error {}
 
 /**
@@ -262,13 +287,33 @@ class Already extends Error {}
  * `message` is the customer's own words when Pip hasn't written any down yet; nothing a browser claims Pip said
  * is ever stored.
  */
-export async function requestHuman(userId: string, o: { conversationId?: string | null; message?: unknown; cid?: unknown }): Promise<CustomerSnapshot & { created: boolean }> {
+export type HandoffSource = "chat" | "button";
+export async function requestHuman(
+  userId: string,
+  o: { conversationId?: string | null; message?: unknown; cid?: unknown; source?: HandoffSource; intent?: unknown; repeat?: boolean },
+): Promise<CustomerSnapshot & { created: boolean }> {
   const message = cleanText(o.message);
   const cid = isClientId(o.cid) ? o.cid : null;
+  const source: HandoffSource = o.source ?? "button";
+  const intent = cleanText(o.intent, 200) || message.slice(0, 200);
   let conv = o.conversationId ? await db.pipConversation.findFirst({ where: { id: o.conversationId, userId }, select: { id: true, status: true, mode: true, liveId: true } }) : null;
-  if (conv?.liveId) {
-    const open = await db.supportSession.findFirst({ where: { id: conv.liveId, status: { in: OPEN } }, select: { id: true } });
-    if (open) return { ...(await customerPoll(userId, { conversationId: conv.id })), created: false };
+  // R1194: one open request per person, whichever conversation the words arrived in (this chat, a fresh chat after
+  // a reload, another tab, the button after the words). Any request of theirs still open is the one they are in.
+  const OPEN_SELECT = { id: true, status: true, conversationId: true } as const;
+  const open =
+    (conv?.liveId ? await db.supportSession.findFirst({ where: { id: conv.liveId, status: { in: OPEN } }, select: OPEN_SELECT }) : null) ??
+    (await db.supportSession.findFirst({ where: { userId, status: { in: OPEN } }, orderBy: { createdAt: "desc" }, select: OPEN_SELECT }));
+  if (open) {
+    // Asked again while already in the queue (or already talking). The words still reach the specialist (saved in
+    // the conversation that holds the request), the ask is counted and written down, and there is never a second
+    // request or a second ticket. The widget shows "You're already in the support queue" once.
+    if (message) await customerSend(userId, { conversationId: open.conversationId, text: message, cid }).catch(() => {});
+    await Promise.all([
+      db.supportSession.update({ where: { id: open.id }, data: { duplicates: { increment: 1 }, lastDuplicateAt: new Date() } }),
+      log(db, open.id, "duplicate", null, { note: intent || `again via ${source}` }),
+    ]).catch(() => {});
+    handoffLog("duplicate", { userId, conversationId: open.conversationId, sessionId: open.id, status: open.status, source, repeat: !!o.repeat, sameConversation: conv?.liveId === open.id });
+    return { ...(await customerPoll(userId, { conversationId: open.conversationId })), created: false };
   }
   if (!(await limitShared(`live-request:${userId}`, 6, 3600_000)).ok)
     throw new HttpError(429, "You've asked for our support team a few times in the last hour. Leave a message instead and we'll follow up by email.", "RATE_LIMITED");
@@ -280,30 +325,50 @@ export async function requestHuman(userId: string, o: { conversationId?: string 
   const { category, priority } = classify(words);
   const preview = (message || recent[0]?.text || "").replace(/\s+/g, " ").slice(0, 200);
 
+  // R1194: "create or reuse the existing support ticket". A ticket this customer already has open (last 14 days)
+  // is linked, so the specialist sees it. No new ticket is opened here: the request itself is the record (one
+  // row, one queue place), and a ticket only appears when the customer leaves a message for an email reply.
+  const openTicket = await db.ticket.findFirst({ where: { userId, status: { not: "resolved" }, createdAt: { gt: new Date(Date.now() - 14 * DAY) } }, orderBy: { createdAt: "desc" }, select: { id: true, ref: true } });
   const created = await db
     .$transaction(async (tx) => {
-      const s = await tx.supportSession.create({ data: { conversationId: convId, userId, category, priority, preview, customerSeenAt: new Date(), unreadAgent: message ? 1 : 0 }, select: { id: true } });
+      const s = await tx.supportSession.create({
+        data: { conversationId: convId, userId, category, priority, preview, customerSeenAt: new Date(), unreadAgent: message ? 1 : 0, source, intentText: intent, ticketId: openTicket?.id ?? null },
+        select: { id: true },
+      });
       // The claim: only a conversation with no open request takes a new one. A racing second tap loses here.
       const took = await tx.pipConversation.updateMany({ where: { id: convId, userId, liveId: null }, data: { liveId: s.id, mode: "waiting" } });
       if (!took.count) throw new Already();
-      await post(tx, convId, { role: "system", text: sysText(SYS.requested) });
+      // The customer's words first, then Pip's one confirmation line (the stored live.requested status).
       if (message) await post(tx, convId, { role: "user", text: message, clientId: cid });
-      await log(tx, s.id, "request", null, { note: CATEGORY_LABEL[category] });
+      await post(tx, convId, { role: "system", text: sysText(SYS.requested) });
+      await log(tx, s.id, "request", null, { note: `${CATEGORY_LABEL[category]} via ${source}${openTicket ? ` · ticket ${openTicket.ref}` : ""}` });
       return s;
     })
     .catch((e) => {
       if (e instanceof Already) return null;
       throw e;
     });
-  if (!created) return { ...(await customerPoll(userId, { conversationId: convId })), created: false };
+  if (!created) {
+    // Lost the race to a second tap a moment earlier: the request is in the queue, and these words still go with it.
+    if (message) await customerSend(userId, { conversationId: convId, text: message, cid }).catch(() => {});
+    handoffLog("duplicate", { userId, conversationId: convId, source, race: true });
+    return { ...(await customerPoll(userId, { conversationId: convId })), created: false };
+  }
   changed();
+  handoffLog("request", { userId, conversationId: convId, sessionId: created.id, source, category, priority, ticketId: openTicket?.id ?? null, agentsOnline: await agentsOnline() });
   const who = await db.user.findUnique({ where: { id: userId }, select: { name: true } });
-  await adminEvent(
-    priority === "urgent" ? "live_urgent" : "live_request",
-    `${priority === "urgent" ? "Urgent live chat" : "Live chat request"}: ${who?.name || "a customer"}`,
-    `${CATEGORY_LABEL[category]}${preview ? ` · ${preview.slice(0, 120)}` : ""}`,
-    `/admin/live-assist?s=${created.id}`,
-  );
+  // The team's bell. A failure here never fails the request (it is already in the queue); it is logged for the diagnostics page.
+  try {
+    await adminEvent(
+      priority === "urgent" ? "live_urgent" : "live_request",
+      `${priority === "urgent" ? "Urgent live chat" : "Live chat request"}: ${who?.name || "a customer"}`,
+      `${CATEGORY_LABEL[category]}${preview ? ` · ${preview.slice(0, 120)}` : ""}`,
+      `/admin/live-assist?s=${created.id}`,
+    );
+  } catch (e) {
+    handoffLog("notify_failed", { sessionId: created.id, error: e instanceof Error ? e.message : String(e) });
+    await log(db, created.id, "notify_failed", null, { note: e instanceof Error ? e.message.slice(0, 200) : "notify failed" }).catch(() => {});
+  }
   return { ...(await customerPoll(userId, { conversationId: convId })), created: true };
 }
 
@@ -366,7 +431,10 @@ export async function cancelRequest(userId: string, conversationId: string) {
       await log(tx, s.id, "cancel", null, { fromId: s.agentId, note: s.status === "active" ? "Customer ended the chat" : "Customer cancelled the request" });
       return true;
     });
-    if (ended) changed();
+    if (ended) {
+      changed();
+      handoffLog("cancel", { userId, conversationId: conv.id, sessionId: liveId });
+    }
   }
   return customerPoll(userId, { conversationId: conv.id });
 }
@@ -448,6 +516,7 @@ export async function accept(admin: AdminSession, id: string) {
     throw new HttpError(409, "This request isn't waiting any more. The customer may have gone back to Pip or left a message.", "ENDED");
   }
   changed();
+  handoffLog("accept", { sessionId: id, agentId: admin.id, waitMs: Date.now() - (await db.supportSession.findUnique({ where: { id }, select: { requestedAt: true } }))!.requestedAt.getTime() });
   await audit(admin, "accept", id);
   return { ok: true, already: false };
 }
@@ -530,7 +599,8 @@ export async function agentSend(admin: AdminSession, id: string, o: { text: unkn
       const msg = await post(tx, s.conversationId, { role: "agent", text, clientId: cid, authorId: admin.id, authorName: admin.name.slice(0, 80) });
       // Replying means everything before it was seen. First response time is set once, by the first reply.
       await tx.supportSession.update({ where: { id }, data: { agentDeliveredSeq: msg.seq ?? 0, agentReadSeq: msg.seq ?? 0 } });
-      await tx.supportSession.updateMany({ where: { id, firstResponseAt: null }, data: { firstResponseAt: now } });
+      const first = await tx.supportSession.updateMany({ where: { id, firstResponseAt: null }, data: { firstResponseAt: now } });
+      if (first.count) handoffLog("first_response", { sessionId: id, agentId: admin.id });
       return msg;
     });
     changed();
@@ -612,6 +682,7 @@ export async function resolve(admin: AdminSession, id: string) {
     await log(tx, id, "resolve", admin, { fromId: s.agentId });
   });
   changed();
+  handoffLog("resolve", { sessionId: id, agentId: admin.id, conversationId: s.conversationId });
   await audit(admin, "resolve", id);
   return { ok: true };
 }
@@ -828,6 +899,16 @@ export async function detail(admin: AdminSession, id: string, o: { after?: numbe
       csat: s.csat,
       unread: s.unreadAgent,
       waitMs: Math.max(0, (s.acceptedAt ?? (isOpen(s.status) ? new Date(now) : (s.endedAt ?? new Date(now)))).getTime() - s.requestedAt.getTime()),
+      // R1194 handoff diagnostics: how it started, the words, repeats while waiting, and the conversation's state name.
+      handoff: {
+        source: s.source,
+        intent: s.intentText,
+        duplicates: s.duplicates,
+        lastDuplicateAt: s.lastDuplicateAt?.toISOString() ?? null,
+        firstResponseMs: s.firstResponseAt ? Math.max(0, s.firstResponseAt.getTime() - s.requestedAt.getTime()) : null,
+        state: conversationState(conv.liveId === s.id ? conv.mode : s.status === "resolved" ? "resolved" : "ai", s.status),
+        notifyFailed: s.history.some((h) => h.action === "notify_failed"),
+      },
     },
     conversation: { id: conv.id, ref: conv.ref, subject: conv.subject, mode: conv.mode, current: conv.liveId === s.id, openSessionId: conv.liveId },
     messages: rows.map((m) => wire(m, "agent")),

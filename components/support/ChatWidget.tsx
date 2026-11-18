@@ -28,7 +28,7 @@ type Msg = {
   agent?: string; sid?: string; seq?: number; cid?: string; pending?: boolean; failed?: boolean;
 };
 type Snap = {
-  conversationId: string; mode: string; state: CustomerState; position: number | null; messages: WireMsg[]; cursor: number; more: boolean; typing: string | null;
+  conversationId: string; mode: string; state: CustomerState; conversationState?: string; position: number | null; messages: WireMsg[]; cursor: number; more: boolean; typing: string | null;
   session: { id: string; status: string; agent: string | null; canRate: boolean; rated: boolean } | null; receipts: { delivered: number; read: number };
 };
 type LiveInfo = { agent: string | null; position: number | null; canRate: boolean; rated: boolean; typing: string | null; receipts: { delivered: number; read: number } };
@@ -92,7 +92,10 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const topicRefs = useRef<Partial<Record<PipTopicId, HTMLButtonElement | null>>>({});
   const [retrying, setRetrying] = useState<string | null>(null);
   // Editors can't re-send posts (the retry route refuses them), so the failed-post card offers no Try again for them.
-  const canRetry = useMaybeUser()?.workspace?.role !== "editor";
+  const user = useMaybeUser();
+  const canRetry = user?.workspace?.role !== "editor";
+  // R1194: a signed-in person anywhere (studio or marketing pages) can talk to a specialist right here.
+  const signedIn = inStudio || !!user;
   const [copied, setCopied] = useState<number | null>(null);
   const [atBottom, setAtBottom] = useState(true);
   const [sleepy, setSleepy] = useState(false);
@@ -138,6 +141,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const [liveBusy, setLiveBusy] = useState<"" | "connect" | "cancel" | "leave" | "csat">("");
   const [liveErr, setLiveErr] = useState("");
   const [hasLive, setHasLive] = useState(false);
+  // R1194: "Continue waiting" pressed: the two buttons fold away and the queue line stays.
+  const [ack, setAck] = useState(false);
   const [unread, setUnread] = useState(0);
   const cursorRef = useRef<number | null>(null);
   const liveRef = useRef<WidgetState>("none");
@@ -145,6 +150,10 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const msgsRef = useRef<Msg[]>([]);
   const openRef = useRef(false);
   const pollRef = useRef<(() => Promise<void>) | null>(null);
+  // R1194: the direct request ("Connect me with a support specialist" tapped on the welcome), reachable from the
+  // whether "You're already in the support queue" has been said for this request.
+  const alreadyRef = useRef(false);
+  const resumedRef = useRef(false);
   const pollFails = useRef(0);
   const pollBusy = useRef(false);
   const typedAt = useRef(0);
@@ -243,12 +252,14 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     if (!me) fetch("/api/support/me").then((r) => r.json()).then((u) => { if (u) { setMe(u); setEmail((e) => e || u.email); } }).catch(() => {});
   }, [lang, me]);
   // R1184: a signed-in creator can talk to a support specialist right here. Visitors leave an email for a ticket.
+  // R1194: an explicit ask for a person never comes through here: the server reads it in the message and starts the
+  // handoff itself (send() above, j.handoff). This is only Pip's own doubt (two misses, the model), which offers first.
   const escalate = useCallback(() => {
-    if (!inStudio) return askEmail();
+    if (!signedIn) return askEmail();
     if (inLive(liveRef.current)) return;
     setMsgs((x) => x.map((m) => (m.kind === "connect" && m.offer ? { ...m, offer: false } : m)));
     push({ role: "bot", text: liveT(lang).offer, kind: "connect", offer: true });
-  }, [lang, inStudio, askEmail]);
+  }, [lang, signedIn, askEmail]);
 
   const send = useCallback(async (text: string, faqId?: string) => {
     const q = text.trim().slice(0, MAX);
@@ -273,11 +284,21 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
       if (!r.ok) throw Object.assign(new Error(typeof j.error === "string" ? j.error : ""), { fromServer: true });
       if (typeof j.conversationId === "string") setConv(j.conversationId);
       // R1184: the support team has this chat (picked up in another tab, or reopened): the words went to them.
+      // R1194: or the words were an ask for a person, and the server put the request in the queue itself
+      // (handoff "started", with the stored confirmation line in the snapshot), or found one there already.
       if (j.live) {
         const w = j.message as WireMsg | undefined;
         setMsgs((x) => x.map((m) => (cid && m.cid === cid ? { ...m, kind: "live" as const, sid: w?.id, seq: w?.seq ?? undefined } : m)));
         setHasLive(true);
-        if (!inLive(liveRef.current)) { liveRef.current = "waiting"; setLive("waiting"); }
+        setFails(0);
+        if (j.snapshot && typeof j.snapshot === "object") {
+          if (j.handoff === "started") { cursorRef.current = null; alreadyRef.current = false; }
+          applyLive(j.snapshot as Snap);
+        } else if (!inLive(liveRef.current)) { liveRef.current = "waiting"; setLive("waiting"); }
+        if (j.handoff === "already" && !alreadyRef.current && liveRef.current !== "connected") {
+          alreadyRef.current = true;
+          push({ role: "bot", text: liveT(lang).already, kind: "sys" });
+        }
         return;
       }
       // "My issue is resolved": a compact offer to close and email the transcript. Nothing closes until they confirm.
@@ -304,6 +325,22 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
       setBusy(false);
     }
   }, [busy, resolved, conv, msgs, lang, fails, escalate, path, live, inStudio]);
+  // R1194: the queue place and the chat come back in a fresh tab or after a restart: the server knows which
+  // conversation this person is waiting in. Asked once per mount, only with nothing restored from this tab.
+  useEffect(() => {
+    if (!open || !signedIn || conv || resumedRef.current) return;
+    resumedRef.current = true;
+    fetch("/api/support/live?resume=1", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!j || typeof j.conversationId !== "string" || convRef.current) return;
+        cursorRef.current = null;
+        setHasLive(true);
+        applyLive(j as Snap);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, signedIn, conv]);
 
   // ---------- R1184 Live Assist, the customer side ----------
   // Every state shown comes from the server's answer (a real queue row), never from a timer in the browser.
@@ -330,6 +367,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     if (next !== prev) {
       liveRef.current = next;
       setLive(next);
+      if (next !== "waiting" && next !== "unavailable") alreadyRef.current = false;
+      if (next === "waiting" || next === "unavailable") setAck(false);
       // Waiting, connected and resolved arrive as lines in the log (read out there). Unavailable has no line.
       if (next === "unavailable") setAnnounce(l.unavailable);
       if (next === "resolved") {
@@ -423,6 +462,11 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
       if (!r.ok || !j.message) throw new Error(typeof j.error === "string" ? j.error : "");
       const w = j.message as WireMsg;
       setMsgs((x) => x.map((m) => (m.cid === cid ? { ...m, sid: w.id, seq: w.seq ?? undefined, pending: false, failed: false } : m)));
+      // Asked for a person again while waiting: one "You're already in the support queue", never a second request.
+      if (j.handoff === "already" && !alreadyRef.current && liveRef.current !== "connected") {
+        alreadyRef.current = true;
+        push({ role: "bot", text: liveT(lang).already, kind: "sys" });
+      }
     } catch (e) {
       setMsgs((x) => x.map((m) => (m.cid === cid ? { ...m, pending: false, failed: true } : m)));
       if (e instanceof Error && e.message) setLiveErr(e.message);
@@ -439,11 +483,16 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     fetch("/api/support/live", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "typing", conversationId: id }) }).catch(() => {});
   }
 
-  /** "Connect to a human": a real request in the queue before anything past "Connecting" shows. */
-  async function connect(m: Msg) {
-    if (!m.offer || liveBusy || busy) return;
-    m.offer = false;
-    setMsgs((x) => x.map((y) => (y.id === m.id ? { ...y, offer: false } : y)));
+  /**
+   * A real request in the queue before anything past "Sending your request" shows. From the offer card's
+   * "Connect to a human" (m is the card). Asks in words go through send() and the chat route (source "chat").
+   */
+  async function requestLive(source: "button", m?: Msg) {
+    if (m) {
+      if (!m.offer || liveBusy || busy) return;
+      m.offer = false;
+      setMsgs((x) => x.map((y) => (y.id === m.id ? { ...y, offer: false } : y)));
+    } else if (liveBusy || inLive(liveRef.current)) return;
     const l = liveT(lang);
     setLiveErr("");
     setLiveBusy("connect");
@@ -454,7 +503,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     const last = conv ? undefined : [...msgsRef.current].reverse().find((x) => x.role === "user");
     const began = Date.now();
     try {
-      const r = await fetch("/api/support/live", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "request", ...(conv ? { conversationId: conv } : {}), ...(last ? { message: last.text, ...(last.cid ? { cid: last.cid } : {}) } : {}) }) });
+      const r = await fetch("/api/support/live", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "request", source, ...(conv ? { conversationId: conv } : {}), ...(last ? { message: last.text, ...(last.cid ? { cid: last.cid } : {}) } : {}) }) });
       const j = await r.json().catch(() => ({}));
       // Signed out in another tab: the email ticket still reaches the team.
       if (r.status === 401) { liveRef.current = "none"; setLive("none"); askEmail(); return; }
@@ -463,8 +512,15 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
       const wait = 600 - (Date.now() - began);
       if (wait > 0) await new Promise((res) => setTimeout(res, wait));
       cursorRef.current = null;
+      alreadyRef.current = false;
       setHasLive(true);
+      setFails(0);
       applyLive(j as Snap);
+      // The request was already there (another tab, an earlier ask): said once, and no second request was made.
+      if (j.created === false && (j as Snap).mode !== "human") {
+        alreadyRef.current = true;
+        push({ role: "bot", text: l.already, kind: "sys" });
+      }
     } catch (e) {
       liveRef.current = "none";
       setLive("none");
@@ -475,6 +531,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
       setLiveBusy("");
     }
   }
+  const connect = (m: Msg) => requestLive("button", m);
   function keepPip(m: Msg) {
     if (!m.offer) return;
     m.offer = false;
@@ -752,10 +809,11 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     setTimeout(() => { if (was) topicRefs.current[was]?.focus({ preventScroll: true }); }, 30);
   }
   // A picked question is the person's own message and Pip answers it like anything typed. "Connect me with a
-  // support specialist" goes straight to the handoff offer (Live Assist when signed in, an email ticket otherwise).
+  // support specialist" is read by the server as the ask it is (R1194): the request goes in the queue at once for
+  // a signed-in person, and a visitor is told the email route. No offer card, no second question.
   function pick(id: PipTopicId, q: string, i: number) {
     if (busy || resolved) return;
-    if (id === "human" && i === 0) {
+    if (id === "human" && i === 0 && !signedIn) {
       push({ role: "user", text: q });
       return escalate();
     }
@@ -767,7 +825,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     if (conv && inLive(live)) fetch("/api/support/live", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "cancel", conversationId: conv }) }).catch(() => {});
     cursorRef.current = null;
     liveRef.current = "none";
-    setLive("none"); setLiveInfo(NO_LIVE); setHasLive(false); setUnread(0); setLiveErr("");
+    setLive("none"); setLiveInfo(NO_LIVE); setHasLive(false); setUnread(0); setLiveErr(""); setAck(false); alreadyRef.current = false;
     setMsgs([]); setFails(0); setTicket({ busy: false, error: "", ref: "" }); setInput("");
     setConv(null); setResolved(null); setClosing({ busy: false, error: "" });
     setTopic(null); setAllQs(false);
@@ -795,8 +853,6 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const pdx = PIP_DATA.en!;
   const home = pipHome(lang);
   const tp = topic ? home.topics.find((x) => x.id === topic) ?? null : null;
-  // Studio pages are signed-in only, so visitors (marketing pages) never see the data starters.
-  const signedIn = inStudio;
   const left = MAX - input.length;
   // Receipts sit under the person's latest message to the support team (and under any that failed).
   const lastMine = msgs.reduce((k, m, i) => (m.role === "user" && m.kind === "live" ? i : k), -1);
@@ -1110,18 +1166,29 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                   <div className="mt-2 flex flex-wrap gap-2 ps-6">
                     {live === "connected" ? (
                       <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{lt.endChat}</button>
-                    ) : (<>
+                    ) : live === "waiting" && !ack ? (<>
+                      {/* R1194: in the queue. Continue waiting swaps these for Leave a message / Cancel; the request itself is untouched. */}
+                      <button type="button" onClick={() => { setAck(true); inputRef.current?.focus(); }} disabled={!!liveBusy} className="pc-btn pc-btn-primary">{lt.continueWaiting}</button>
+                      <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{lt.cancel}</button>
+                    </>) : (<>
                       <button type="button" onClick={() => liveAction("leave", input.trim() ? { text: input.trim() } : {})} disabled={!!liveBusy} className={cn("pc-btn", live === "unavailable" && "pc-btn-primary")}>{liveBusy === "leave" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{liveBusy === "leave" ? lt.leaving : lt.leave}</button>
                       <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{live === "unavailable" ? lt.keepPip : lt.cancel}</button>
                     </>)}
                   </div>
+                )}
+                {/* R1194: email is optional and explained: leaving a message makes a ticket that is answered by email. */}
+                {live === "waiting" && !ack && (
+                  <p className="pc-muted mt-2 ps-6 text-[13px] leading-snug">
+                    {lt.emailWhy(me?.email ?? user?.email ?? null)}{" "}
+                    <button type="button" onClick={() => liveAction("leave", input.trim() ? { text: input.trim() } : {})} disabled={!!liveBusy} className="pc-link font-medium">{liveBusy === "leave" ? lt.leaving : lt.leave}</button>
+                  </p>
                 )}
                 {liveErr && <p role="alert" className="pc-error mt-2 ps-6 text-[13px]">{liveErr}</p>}
               </div>
             )}
             {!liveOn && liveErr && <p role="alert" className="pc-error mb-1.5 px-2 text-[13px]">{liveErr}</p>}
             {!liveOn && !waitingEmail && fails > 0 && !ticket.ref && (
-              <button type="button" onClick={escalate} className="pc-link mb-1.5 min-h-11 text-[14px] font-medium">{t.human}</button>
+              <button type="button" onClick={() => escalate()} className="pc-link mb-1.5 min-h-11 text-[14px] font-medium">{t.human}</button>
             )}
             <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="pc-composer flex items-end gap-2 p-1.5">
               <label htmlFor="pc-in" className="sr-only">{liveOn ? lt.placeholder : t.placeholder}</label>

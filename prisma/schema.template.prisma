@@ -665,6 +665,12 @@ model SupportSession {
   lastMessageAt     DateTime  @default(now())
   preview           String    @default("") // the latest customer or specialist words, for the queue row (no extra query per row)
   csat              Int? // 1 = helpful, 0 = not helpful: asked once after a specialist resolves
+  // R1194 handoff diagnostics: how the request started, the words that started it, and how often the customer
+  // asked again while already in the queue (each one is also a SupportAssignment row, action "duplicate").
+  source            String    @default("button") // chat = Pip read the ask in the message (typed or a picked help question) | button = the offer card
+  intentText        String    @default("")
+  duplicates        Int       @default(0)
+  lastDuplicateAt   DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

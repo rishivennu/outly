@@ -4,7 +4,8 @@ import { gemini } from "../ai/creative";
 import { env } from "../env";
 import { productBrief } from "./knowledge";
 import type { Lang } from "../i18n/support";
-import { HUMAN_RE, detectScript, norm, smallTalk } from "./smalltalk";
+import { HUMAN_RE, detectScript, smallTalk } from "./smalltalk";
+import { wantsHuman } from "./intent";
 
 const STOP = new Set("a an the is are am i me my we you your it to of in on for and or do does did can could how what why when where which with this that there be have has was not no yes please hi hello hey outly outlly actually really just".split(" "));
 const words = (s: string) =>
@@ -66,18 +67,18 @@ export interface BotReply {
 export type BotLang = Lang;
 type Copy = { human: string; unsure: string; name: string };
 const COPY: Record<Lang, Copy> = {
-  en: { human: "Sure, I'll get a person on this. Tell me your email and I'll open a ticket for you.", unsure: "I'm not sure I've got that one right. Could you say it another way? If I still can't help, I'll pass it to our team.", name: "English" },
-  hi: { human: "ज़रूर, मैं इसे हमारी टीम के किसी व्यक्ति तक पहुँचाता हूँ। अपना ईमेल बताइए, मैं आपके लिए टिकट खोल दूँगा।", unsure: "मुझे पक्का नहीं कि मैं सही समझा। क्या आप इसे दूसरे शब्दों में पूछ सकते हैं? फिर भी मदद न कर पाया तो मैं इसे हमारी टीम को भेज दूँगा।", name: "Hindi (Devanagari script)" },
-  es: { human: "Claro, paso esto a una persona. Dime tu correo y abro un ticket.", unsure: "No estoy seguro de haberlo entendido. ¿Puedes decirlo de otra forma? Si sigo sin poder ayudarte, se lo paso a nuestro equipo.", name: "Spanish" },
-  fr: { human: "Bien sûr, je transmets à une personne. Donne-moi ton e-mail et j'ouvre un ticket.", unsure: "Je ne suis pas sûr d'avoir bien compris. Tu peux reformuler ? Si je ne peux toujours pas aider, je transmets à l'équipe.", name: "French" },
-  de: { human: "Klar, ich hole eine Person dazu. Nenn mir deine E-Mail und ich eröffne ein Ticket.", unsure: "Ich bin nicht sicher, ob ich das richtig verstanden habe. Kannst du es anders formulieren? Wenn ich dann nicht helfen kann, gebe ich es ans Team weiter.", name: "German" },
-  pt: { human: "Claro, vou passar para uma pessoa. Me diga seu e-mail e eu abro um chamado.", unsure: "Não tenho certeza se entendi. Pode dizer de outro jeito? Se ainda não conseguir ajudar, passo para a nossa equipe.", name: "Portuguese (Brazil)" },
-  ar: { human: "بالتأكيد، سأحوّل هذا إلى أحد أفراد الفريق. أخبرني ببريدك الإلكتروني وسأفتح لك تذكرة.", unsure: "لست متأكدًا أنني فهمت ذلك. هل يمكنك قولها بطريقة أخرى؟ إن لم أستطع المساعدة، سأحوّلها إلى فريقنا.", name: "Arabic (Modern Standard)" },
-  zh: { human: "好的，我帮你转给真人客服。告诉我你的邮箱，我来为你创建工单。", unsure: "我不太确定理解对了。能换个说法吗？如果还是帮不上忙，我会转给我们的团队。", name: "Simplified Chinese" },
-  ja: { human: "わかりました、担当者につなぎます。メールアドレスを教えてください。チケットを作成します。", unsure: "うまく理解できたか自信がありません。別の言い方で聞いてもらえますか？それでも難しければ、チームに引き継ぎます。", name: "Japanese" },
-  ru: { human: "Конечно, передам это человеку. Напишите ваш e-mail, и я создам обращение.", unsure: "Не уверен, что правильно понял. Можете сформулировать иначе? Если всё равно не смогу помочь, передам команде.", name: "Russian" },
-  id: { human: "Tentu, aku teruskan ke tim kami. Kasih tahu email kamu dan aku buatkan tiket.", unsure: "Aku belum yakin paham maksudnya. Bisa dijelaskan dengan cara lain? Kalau masih belum bisa, aku teruskan ke tim kami.", name: "Indonesian" },
-  bn: { human: "অবশ্যই, আমি এটা আমাদের টিমের কাউকে দিচ্ছি। আপনার ইমেল দিন, আমি একটি টিকিট খুলে দিচ্ছি।", unsure: "ঠিক বুঝেছি কিনা নিশ্চিত নই। অন্যভাবে বলবেন? তবুও সাহায্য করতে না পারলে আমাদের টিমকে পাঠিয়ে দেব।", name: "Bengali" },
+  en: { human: "I can pass this to our support team. You're not signed in, so they'll reply by email.", unsure: "I'm not sure I've got that one right. Could you say it another way? If I still can't help, I'll pass it to our team.", name: "English" },
+  hi: { human: "मैं इसे हमारी सपोर्ट टीम तक पहुँचा सकता हूँ। आप साइन इन नहीं हैं, इसलिए वे ईमेल से जवाब देंगे।", unsure: "मुझे पक्का नहीं कि मैं सही समझा। क्या आप इसे दूसरे शब्दों में पूछ सकते हैं? फिर भी मदद न कर पाया तो मैं इसे हमारी टीम को भेज दूँगा।", name: "Hindi (Devanagari script)" },
+  es: { human: "Puedo pasar esto a nuestro equipo de soporte. No has iniciado sesión, así que te responderán por correo.", unsure: "No estoy seguro de haberlo entendido. ¿Puedes decirlo de otra forma? Si sigo sin poder ayudarte, se lo paso a nuestro equipo.", name: "Spanish" },
+  fr: { human: "Je peux transmettre ça à notre équipe d'assistance. Tu n'es pas connecté, elle te répondra donc par e-mail.", unsure: "Je ne suis pas sûr d'avoir bien compris. Tu peux reformuler ? Si je ne peux toujours pas aider, je transmets à l'équipe.", name: "French" },
+  de: { human: "Ich kann das an unser Support-Team weitergeben. Du bist nicht angemeldet, deshalb antwortet es per E-Mail.", unsure: "Ich bin nicht sicher, ob ich das richtig verstanden habe. Kannst du es anders formulieren? Wenn ich dann nicht helfen kann, gebe ich es ans Team weiter.", name: "German" },
+  pt: { human: "Posso passar isso para a nossa equipe de suporte. Você não está conectado, então eles respondem por e-mail.", unsure: "Não tenho certeza se entendi. Pode dizer de outro jeito? Se ainda não conseguir ajudar, passo para a nossa equipe.", name: "Portuguese (Brazil)" },
+  ar: { human: "يمكنني تحويل هذا إلى فريق الدعم. أنت غير مسجّل الدخول، لذا سيردّون عبر البريد الإلكتروني.", unsure: "لست متأكدًا أنني فهمت ذلك. هل يمكنك قولها بطريقة أخرى؟ إن لم أستطع المساعدة، سأحوّلها إلى فريقنا.", name: "Arabic (Modern Standard)" },
+  zh: { human: "我可以把这个转给支持团队。你还没有登录，所以他们会通过邮件回复。", unsure: "我不太确定理解对了。能换个说法吗？如果还是帮不上忙，我会转给我们的团队。", name: "Simplified Chinese" },
+  ja: { human: "サポートチームにお伝えできます。ログインしていないため、返信はメールで届きます。", unsure: "うまく理解できたか自信がありません。別の言い方で聞いてもらえますか？それでも難しければ、チームに引き継ぎます。", name: "Japanese" },
+  ru: { human: "Я могу передать это нашей службе поддержки. Вы не вошли в аккаунт, поэтому ответ придёт по электронной почте.", unsure: "Не уверен, что правильно понял. Можете сформулировать иначе? Если всё равно не смогу помочь, передам команде.", name: "Russian" },
+  id: { human: "Aku bisa meneruskan ini ke tim support. Kamu belum masuk, jadi mereka akan membalas lewat email.", unsure: "Aku belum yakin paham maksudnya. Bisa dijelaskan dengan cara lain? Kalau masih belum bisa, aku teruskan ke tim kami.", name: "Indonesian" },
+  bn: { human: "আমি এটা আমাদের সাপোর্ট টিমকে পাঠাতে পারি। আপনি সাইন ইন করেননি, তাই তারা ইমেলে উত্তর দেবে।", unsure: "ঠিক বুঝেছি কিনা নিশ্চিত নই। অন্যভাবে বলবেন? তবুও সাহায্য করতে না পারলে আমাদের টিমকে পাঠিয়ে দেব।", name: "Bengali" },
 };
 
 /** Turns a non-English question into English search words so the English FAQ can match it. */
@@ -170,7 +171,9 @@ export async function answer(question: string, history: { role: "user" | "bot"; 
   // Someone typing in another script gets answered in that script, whatever the picker says.
   const use: Lang = detectScript(q) ?? (COPY[lang] ? lang : "en");
   const L = COPY[use];
-  if (HUMAN_RE.test(q) || HUMAN_RE.test(norm(q))) return { answer: L.human, confident: false, sources: [], wantsHuman: true, lang: use };
+  // R1194: a signed-in person's ask for a human never reaches this far (the chat route starts the handoff first), so
+  // what is left is a visitor asking for one: Pip explains the email route. For everyone else the words are a question.
+  if (!ctx.signedIn && wantsHuman(q)) return { answer: L.human, confident: false, sources: [], wantsHuman: true, lang: use };
   // AI first (10-16): Gemini reads the WHOLE help centre plus the product brief and the chat so far, so
   // everyday wording, typos, follow-ups ("and on YouTube?") and any language get a real answer.
   // The keyword matcher below is the fallback when no key is set or Gemini is down.

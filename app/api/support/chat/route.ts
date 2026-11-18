@@ -11,7 +11,9 @@ import { planFor, runPip } from "@/lib/pip/run";
 import { PIP_TOOLS } from "@/lib/pip/types";
 import { asksForPastChats, asksForTranscript, wantsToResolve } from "@/lib/support/resolve";
 import { openConversation, PAST_CHATS_TEXT, PAST_CHATS_VISITOR, recordTurn, transcriptAvailable, transcriptUnavailableText } from "@/lib/support/conversations";
-import { customerSend } from "@/lib/support/live";
+import { customerSend, handoffLog, requestHuman } from "@/lib/support/live";
+import { routeIntent } from "@/lib/support/intent";
+import { conversationState } from "@/lib/support/live-core";
 
 const Body = z.object({
   message: z.string().trim().min(1).max(800),
@@ -60,19 +62,44 @@ export const POST = route(async (req) => {
   // is theirs). A resolved conversation refuses new messages here too, not only in the browser.
   const who = me ? realUserId(me) : null;
   const conv = who ? await openConversation(who, b.conversationId) : null;
+  // R1194: what these words ask for, read before any answer is written. The conversation's stored mode wins:
+  // a specialist in the chat > a waiting request > an explicit ask for a person > everything Pip answers.
+  const { intent, repeat } = b.faqId ? { intent: "GENERAL" as const, repeat: false } : routeIntent(b.message, { mode: conv?.mode });
   // R1184 Live Assist: while the person waits for, or talks with, a support specialist, Pip stays silent.
   // The words go to the support team through the same conversation (and the same idempotent write), never the model.
   if (who && conv && (conv.mode === "waiting" || conv.mode === "human")) {
     const sent = await customerSend(who, { conversationId: conv.id, text: b.message, cid: b.cid });
-    return json({ live: true, answer: "", confident: true, sources: [], wantsHuman: false, message: sent.message, duplicate: sent.duplicate, conversationId: conv.id });
+    // Asked for a person again while already in the queue: counted (requestHuman writes the duplicate down and
+    // returns the request already there), and the widget says "You're already in the support queue" once.
+    const again = repeat && !sent.duplicate ? await requestHuman(who, { conversationId: conv.id, source: "chat", intent: b.message, repeat: true }) : null;
+    return json({
+      live: true, answer: "", confident: true, sources: [], wantsHuman: false, message: sent.message, duplicate: sent.duplicate, conversationId: conv.id,
+      conversationState: conversationState(conv.mode, null),
+      ...(again ? { handoff: "already", snapshot: again } : {}),
+    });
+  }
+  // R1194: "Connect me with a support specialist", "connect me in chat", "I want to talk to a human": the handoff
+  // starts here, on the server, with no further question. One request (idempotent), one stored confirmation line,
+  // the team notified, the state WAITING_FOR_AGENT. Visitors have no account to hang a live chat on: Pip explains
+  // the email route instead (bot.ts COPY.human) and the widget shows the form.
+  if (who && intent === "HUMAN_SUPPORT_REQUEST") {
+    handoffLog("intent", { userId: who, conversationId: conv?.id ?? null, from: conv ? "AI_ASSISTED" : "NEW", to: "HUMAN_SUPPORT_REQUESTED" });
+    const r = await requestHuman(who, { conversationId: conv?.id, message: b.message, cid: b.cid, source: "chat", intent: b.message, repeat: !!conv });
+    const own = r.messages.find((m) => m.role === "user" && b.cid && m.cid === b.cid) ?? null;
+    return json({
+      live: true, answer: "", confident: true, sources: [], wantsHuman: false, conversationId: r.conversationId, conversationState: r.conversationState,
+      handoff: r.created ? "started" : "already", snapshot: r, message: own,
+    });
   }
   // Writes the turn and hands back the conversation id. Records cards (r.data) are never written down.
   // `shown` is the full text the person saw, when it differs from `answer` (the resolve offer adds its question).
+  // Every answer of Pip's carries the conversation's state too (R1194): AI_ASSISTED here, since anything waiting or
+  // with a specialist returned above. (After a cancelled request the state is CANCELLED until the next answer, which is this one.)
   const reply = async <T extends { answer: string }>(out: T, shown?: string) => {
     if (!who) return json(out);
     try {
       const conversationId = await recordTurn({ userId: who, conversation: conv, question: b.message, answer: shown ?? out.answer, askedAt });
-      return json({ ...out, conversationId });
+      return json({ ...out, conversationId, conversationState: conversationState(conv?.mode ?? "ai", null) });
     } catch (e) {
       console.error("[pip:record]", e);
       return json(out);

@@ -101,10 +101,10 @@ describe("the agreed words", () => {
     expect(LIVE_EN.offer).toBe("I'd like a person to help you with this. Would you like me to connect you with a human support specialist?");
     expect(LIVE_EN.connect).toBe("Connect to a human");
     expect(LIVE_EN.keepPip).toBe("Continue with Pip");
-    expect(LIVE_EN.connecting).toBe("Connecting you with an Outlly support specialist. Please wait...");
-    expect(LIVE_EN.waiting).toBe("Our support team has received your request. You're in the queue.");
+    expect(LIVE_EN.connecting).toBe("Sending your request to our support team...");
+    expect(LIVE_EN.waiting).toBe("You're in the support queue. Your conversation is saved. An Outlly support specialist will join this chat.");
     expect(LIVE_EN.connected).toBe("You're now connected with an Outlly support specialist.");
-    expect(LIVE_EN.unavailable).toBe("Our support team is currently unavailable. You can continue with Pip or leave your message and we'll follow up.");
+    expect(LIVE_EN.unavailable).toBe("Our support team has received your request. No specialist is available just yet, but your conversation is saved. You can leave this chat and return later.");
     expect(LIVE_EN.reconnecting).toBe("Connection interrupted. We're trying to reconnect you...");
     expect(LIVE_EN.resolved).toBe("Your conversation with our support team has been marked as resolved. If you need anything else, you can start another conversation.");
   });
@@ -119,8 +119,9 @@ describe("the agreed words", () => {
   });
   test("stored status codes read in the customer's words and in the console's", () => {
     const t = liveT("en");
-    expect(liveSysLine(t, "live.requested")).toBe(LIVE_EN.waiting);
-    expect(liveSysLine(t, "live.connected|Priya")).toBe(LIVE_EN.connected);
+    expect(liveSysLine(t, "live.requested")).toBe(LIVE_EN.handoff);
+    expect(liveSysLine(t, "live.connected|Priya")).toBe("You're now connected with Priya.");
+    expect(liveSysLine(t, "live.connected")).toBe(LIVE_EN.connected);
     expect(liveSysLine(t, "live.resolved")).toBe(LIVE_EN.resolved);
     expect(liveSysLine(t, "live.ticket|T-1234")).toContain("T-1234");
     expect(liveSysLine(t, "live.transferred|Arjun")).toContain("Arjun");
@@ -204,8 +205,9 @@ describe("two sessions end to end: a customer and the support team", () => {
     expect(r.mode).toBe("waiting");
     expect(r.state).toBe("unavailable");
     expect(r.position).toBeGreaterThanOrEqual(1);
-    expect(r.messages.map((m) => [m.role, m.text])).toEqual([["system", "live.requested"], ["user", "I was charged twice for my plan"]]);
-    expect(r.messages[1].cid).toBe(firstCid);
+    // R1194: the customer's words first, then Pip's one confirmation line.
+    expect(r.messages.map((m) => [m.role, m.text])).toEqual([["user", "I was charged twice for my plan"], ["system", "live.requested"]]);
+    expect(r.messages[0].cid).toBe(firstCid);
     const row = await db.supportSession.findUniqueOrThrow({ where: { id: sid } });
     expect({ status: row.status, category: row.category, priority: row.priority, unread: row.unreadAgent }).toEqual({ status: "waiting", category: "billing", priority: "urgent", unread: 1 });
     expect(await db.adminEvent.count({ where: { kind: "live_urgent", href: `/admin/live-assist?s=${sid}` } })).toBe(1);

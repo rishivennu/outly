@@ -17,6 +17,19 @@ export type SessionStatus = "waiting" | "active" | "resolved" | "cancelled" | "r
 export type CustomerState = "none" | "waiting" | "unavailable" | "connected" | "resolved";
 export type WidgetState = CustomerState | "connecting" | "reconnecting";
 export type LivePriority = "normal" | "high" | "urgent";
+/**
+ * R1194: the one name for where a conversation stands, derived from the stored rows (mode + the latest request's
+ * status), never from the browser. HUMAN_SUPPORT_REQUESTED is the moment between reading the ask and the queue row
+ * committing (inside requestHuman's transaction); every answer the widget sees is already WAITING_FOR_AGENT.
+ */
+export type ConversationState = "AI_ASSISTED" | "HUMAN_SUPPORT_REQUESTED" | "WAITING_FOR_AGENT" | "HUMAN_ACTIVE" | "RESOLVED" | "CANCELLED";
+export function conversationState(mode: string | null | undefined, sessionStatus: string | null | undefined): ConversationState {
+  if (mode === "human") return "HUMAN_ACTIVE";
+  if (mode === "waiting") return "WAITING_FOR_AGENT";
+  if (mode === "resolved") return "RESOLVED";
+  if (sessionStatus === "cancelled") return "CANCELLED";
+  return "AI_ASSISTED";
+}
 export type LiveCategory = "billing" | "account" | "publishing" | "technical" | "other";
 export type WireRole = "user" | "pip" | "agent" | "system";
 
@@ -227,4 +240,6 @@ export const HISTORY_WORD: Record<string, string> = {
   reopen: "Reopened",
   cancel: "Ended by the customer",
   ticket: "Left a message",
+  duplicate: "Asked again while waiting",
+  notify_failed: "Team notification failed",
 };

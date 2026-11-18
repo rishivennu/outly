@@ -69,7 +69,7 @@ describe("R1189 widget: one welcome, then only the conversation", () => {
     expect(widget).toContain("setTopic(null); setAllQs(false);");
   });
   test("questions become the person's message; Connect goes to the real handoff", () => {
-    expect(widget).toMatch(/if \(id === "human" && i === 0\) \{\s+push\(\{ role: "user", text: q \}\);\s+return escalate\(\);/);
+    expect(widget).toMatch(/if \(id === "human" && i === 0 && !signedIn\) \{\s+push\(\{ role: "user", text: q \}\);\s+return escalate\(\);/);
     expect(widget).toMatch(/function pick[\s\S]{0,300}send\(q\);/);
     expect(LIVE_EN.offer).toContain("Would you like me to connect you with a human support specialist?");
   });
