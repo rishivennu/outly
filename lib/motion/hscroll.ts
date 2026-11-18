@@ -62,8 +62,11 @@ export function hscroll(root: HTMLElement): HScroll | null {
   };
 
   const setX = gsap.quickSetter(track, "x", "px") as (v: number) => void;
+  // R1196: scaleX and scaleY each get a setter. "scale" is a shorthand that quickSetter never writes, so the cards
+  // used to tilt and fade in without growing.
   const fx = items.map((el) => ({
-    scale: gsap.quickSetter(el, "scale") as (v: number) => void,
+    sx: gsap.quickSetter(el, "scaleX") as (v: number) => void,
+    sy: gsap.quickSetter(el, "scaleY") as (v: number) => void,
     rotate: gsap.quickSetter(el, "rotation", "deg") as (v: number) => void,
     y: gsap.quickSetter(el, "y", "px") as (v: number) => void,
     opacity: gsap.quickSetter(el, "opacity") as (v: number) => void,
@@ -79,7 +82,8 @@ export function hscroll(root: HTMLElement): HScroll | null {
       // 0 while the card is still past the right edge, 1 once most of it is on screen.
       const e = clamp((vw - (boxLeft + offs[i] + x)) / Math.max(1, ws[i] * 0.85));
       const a = 1 - (1 - e) * (1 - e);
-      fx[i].scale(0.86 + 0.14 * a);
+      fx[i].sx(0.86 + 0.14 * a);
+      fx[i].sy(0.86 + 0.14 * a);
       fx[i].rotate(5 * (1 - a));
       fx[i].y(28 * (1 - a));
       fx[i].opacity(0.35 + 0.65 * a);

@@ -48,7 +48,9 @@ describe("horizontal galleries (1183)", () => {
   });
 
   test("cards grow into place as they arrive, moved on their wrapper only", () => {
-    expect(hs).toContain('gsap.quickSetter(el, "scale")');
+    expect(hs).toContain('gsap.quickSetter(el, "scaleX")');
+    expect(hs).toContain('gsap.quickSetter(el, "scaleY")');
+    expect(hs).not.toContain('gsap.quickSetter(el, "scale")'); // R1196: the shorthand never painted
     expect(scenes).toContain("[data-hscroll],.hs-item");
   });
 
