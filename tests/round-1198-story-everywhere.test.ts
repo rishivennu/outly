@@ -151,7 +151,8 @@ describe("R1198 review fixes", () => {
   });
   test("a place with no hashtags field (X) never offers the hashtags ask, and a platform's own ask shows only there", () => {
     expect(acts).toContain('import { fieldsFor } from "./deck-logic";');
-    expect(acts).toContain('(a.id !== "hashtags" || !t || fieldsFor(t).hashtags) && (!a.only || (!!t && a.only.includes(t)))');
+    // R1206: on Your Story the asks work on the creator's own caption, so no platform's fields filter them there.
+    expect(acts).toContain('(a.id !== "hashtags" || !!cap || !t || fieldsFor(t).hashtags) && (!a.only || (!!t && a.only.includes(t)))');
   });
   test("burning captions opens the subtitles section too", () => {
     expect(subs).toContain("burning");

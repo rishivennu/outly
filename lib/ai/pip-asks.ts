@@ -50,6 +50,26 @@ export const DECK_ASKS: { id: PipAsk; label: string; only?: readonly Platform[] 
   { id: "adapt", label: "Adapt for the selected platform" },
 ];
 
+/**
+ * R1206: on Your Story the asks work on the creator's own caption, the one every platform's version is written
+ * from, not on any one platform. These are the ones that make sense there ("Adapt for another platform" adds a
+ * platform instead), each said about the original caption rather than a platform's copy.
+ */
+export const CAPTION_ASKS = ["hook", "shorter", "engaging", "conversational", "professional", "voice", "cta", "hashtags"] as const satisfies readonly PipAsk[];
+export type CaptionAsk = (typeof CAPTION_ASKS)[number];
+export const isCaptionAsk = (v: unknown): v is CaptionAsk => typeof v === "string" && (CAPTION_ASKS as readonly string[]).includes(v);
+
+export const CAPTION_ASK_RULE: Record<CaptionAsk, string> = {
+  hook: PIP_ASK_RULE.hook,
+  shorter: PIP_ASK_RULE.shorter,
+  engaging: PIP_ASK_RULE.engaging,
+  conversational: PIP_ASK_RULE.conversational,
+  professional: PIP_ASK_RULE.professional,
+  voice: PIP_ASK_RULE.voice,
+  cta: "Improve only the call to action so it asks for one specific, easy action. If a line starts with \"CTA:\", improve that line and keep its label. Keep everything else exactly as it is.",
+  hashtags: "Suggest 3 to 8 relevant hashtags taken only from what the caption really says: nothing off-topic, nothing trending for its own sake. Do not change the caption.",
+};
+
 /** The words Pip may change for an ask. Hashtags never touch the caption; the others leave first comments alone. */
 export const ASK_KEYS: Record<PipAsk, readonly ("title" | "caption" | "description" | "hashtags")[]> = {
   hook: ["title", "caption", "description"],

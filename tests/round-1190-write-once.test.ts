@@ -215,7 +215,9 @@ describe("1190 Step 2: one box, then a card for every place", () => {
     expect(a).toContain("set({ reviewed: !d.reviewed })");
     expect(a).toContain("navigator.clipboard.writeText(text)");
     expect(a).toContain("Regenerate all");
-    expect(a).not.toContain('role="tablist"'); // R1198: a compact list, every platform visible at once
+    // R1206 gap 7: one platform at a time, picked from a row of tabs that each carry their own state.
+    expect(a).toContain('role="tablist"');
+    expect(a).toContain("<Row key={sel} platform={sel} {...p} />");
   });
 
   test("Pip never asks for the same words twice, and says where the box is", () => {

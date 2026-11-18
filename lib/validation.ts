@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PIP_ASKS } from "./ai/pip-asks";
+import { CAPTION_ASKS, PIP_ASKS } from "./ai/pip-asks";
 import { PLATFORMS } from "./domain";
 import { MAX_SLIDES, POST_FORMATS } from "./formats";
 import { DISPOSABLE_MESSAGE, isDisposableEmail } from "./disposable-email";
@@ -148,6 +148,12 @@ export const platformCopyRequestSchema = z.object({
   current: z
     .object({ title: z.string().max(400).default(""), caption: z.string().max(6000).default(""), description: z.string().max(6000).default(""), hashtags: z.string().max(1200).default("") })
     .optional(),
+});
+
+/** R1206: one of Pip's asks on the creator's own caption, on Your Story. The answer is a suggestion for the one editor. */
+export const captionAskRequestSchema = z.object({
+  text: z.string().trim().min(3).max(4000),
+  ask: z.enum(CAPTION_ASKS),
 });
 
 /** 1190 "Write once": one message in, every place's caption out. The same words asked again within 30 minutes cost nothing. */

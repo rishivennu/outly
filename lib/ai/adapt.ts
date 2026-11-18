@@ -4,7 +4,8 @@ import { partialArray, partialString } from "./llm-core";
 import { gemini, asTags, asText, type GeminiOpts, type PlatformCopy } from "./creative";
 import { enginePrompt, polish, type EngineRules } from "./caption-engine";
 import { captionRules } from "./engine-store";
-import { cleanChapters, firstSentence, longFormRules, offlineAdapt, splitStory, toneLine, type AdaptTone } from "./adapt-core";
+import { ADAPT_MAX, cleanChapters, firstSentence, longFormRules, offlineAdapt, splitStory, toneLine, withHashtags, type AdaptTone } from "./adapt-core";
+import { CAPTION_ASK_RULE, type CaptionAsk } from "./pip-asks";
 import type { Platform } from "../domain";
 
 /**
@@ -46,6 +47,51 @@ const FAITHFUL = [
   "- Hashtags come from the creator's keywords first, then from words that are really in the text. Nothing off-topic, nothing trending for its own sake.",
   "- Each platform reads differently: never paste the same caption everywhere.",
 ].join("\n");
+
+/* ---------------- R1206: Pip's asks on the creator's own caption ---------------- */
+const EDITOR = `You are Pip, Outlly's caption editor. You are editing the creator's own caption: the one message every platform's version is later written from. You are a careful editor, not a copywriter with ideas of your own: the creator's meaning, facts and voice always win.`;
+
+const SOURCE_RULES = [
+  "## Rules for the original caption (these win over everything above)",
+  "- Never add a fact, number, result, promise, event, quote or detail that is not in it. Nothing about the video that the creator's words do not say.",
+  "- Write in the language the creator wrote in.",
+  "- Keep it platform neutral: no platform names and no formatting meant for one platform. Each platform gets its own version later.",
+  "- Keep any line that starts with \"CTA:\", \"Keywords:\" or \"Hashtags:\" as a labelled line with its label.",
+  "- Plain text only: no markdown, no quotes around it, no notes to the creator inside the caption.",
+  "- No em dashes or en dashes: use a comma, a full stop or a colon instead.",
+].join("\n");
+
+/**
+ * R1206: one of Pip's asks on Your caption, before or after any platform is written. The answer is the whole
+ * caption with that one change made, a suggestion for the one editor that goes in only when the creator applies
+ * it. Null when no model answered, so the caller says so instead of passing something else off as Pip's idea.
+ */
+export async function askSourceCaption(text: string, ask: CaptionAsk, opts: GeminiOpts & { voice?: string } = {}): Promise<{ text: string; why: string } | null> {
+  const { voice, ...rest } = opts;
+  const tagsOnly = ask === "hashtags";
+  type Item = { caption?: unknown; hashtags?: unknown; why?: unknown };
+  const raw = await gemini<Item | { items: Item[] }>(
+    `${EDITOR}${voice ?? ""}\n\n${SOURCE_RULES}`,
+    [
+      `The creator's caption:\n"""${text}"""`,
+      `Request: ${CAPTION_ASK_RULE[ask]}`,
+      tagsOnly ? `Return JSON {"hashtags": "#a #b", "why": one short sentence saying why these}` : `Return JSON {"caption": the whole caption with only that change made, "why": one short sentence saying what you changed}`,
+    ].join("\n"),
+    rest,
+  );
+  const m: Item | undefined = raw && "items" in raw && Array.isArray(raw.items) ? raw.items[0] : ((raw as Item | null) ?? undefined);
+  if (!m) return null;
+  const banned = tagsOnly ? new Set((await captionRules()).bannedTags.map((t) => t.toLowerCase())) : null;
+  const tags = tagsOnly
+    ? asTags(m.hashtags)
+        .split(/\s+/)
+        .filter((t) => t && !banned?.has(t.replace(/^#/, "").toLowerCase()))
+        .join(" ")
+    : "";
+  const next = tagsOnly ? (tags ? withHashtags(text, tags) : "") : asText(m.caption).replace(/\s*[\u2013\u2014]\s*/g, ", ").slice(0, ADAPT_MAX);
+  if (!next.trim()) return null;
+  return { text: next.trim(), why: asText(m.why).slice(0, 160) };
+}
 
 /* ---------------- 30-minute memory: the same words asked again cost nothing ---------------- */
 const TTL = 30 * 60_000;

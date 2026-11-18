@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { AlertTriangle, CalendarClock, CalendarDays, Check, Flame, LayoutGrid, Loader2, Pencil, Plus, Send, X } from "lucide-react";
+import { AlertTriangle, CalendarClock, CalendarDays, Check, CircleCheck, Film, Flame, LayoutGrid, Link2, Loader2, Pencil, Plus, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Icon3D } from "@/components/brand/Icon3D";
 import { Pip } from "@/components/brand/Pip";
@@ -17,7 +17,7 @@ import { api } from "@/lib/client/api";
 import { MIN_SAMPLES, type BestTimes } from "@/lib/schedule/best-time";
 import type { AccountView, Draft, PostView } from "./types";
 import { calendarHref } from "@/lib/client/post-words";
-import { confirmRows, diffRows, enabledPlatforms, scheduleProblem } from "./publish";
+import { confirmRows, diffRows, enabledPlatforms, FIX_LABEL, readinessLine, scheduleProblem, type Fix } from "./publish";
 import { MusicNote } from "./MusicNote";
 import { CoverPicker } from "./CoverPicker";
 import { OFFLINE_SEND } from "./ActionBar";
@@ -44,6 +44,10 @@ interface Props {
   onEdit: () => void;
   /** Switches a held place off, so the rest can go. */
   onLeaveOut: (p: Platform) => void;
+  /** R1206: connect or reconnect a held place's account, right from here. */
+  onConnect: (p: Platform) => void;
+  /** R1206: open that one platform on Everywhere, for a failing check, a waiting suggestion or a first look. */
+  onFix: (p: Platform) => void;
   /** Back to step 1 to swap in a version of the video that has music on it. */
   onReplaceVideo: () => void;
   /** 1083: the post's own cover image, if any; it also stands in for the poster in the summary. */
@@ -337,9 +341,17 @@ export function LaunchPanel(p: Props) {
           )}
 
           <section aria-labelledby="launch-confirm" className="rounded-[24px] p-4 hairline sm:p-5">
-            <h3 id="launch-confirm" className="text-sm font-semibold">
-              {lead}:
-            </h3>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <h3 id="launch-confirm" className="text-sm font-semibold">
+                {lead}:
+              </h3>
+              {rows.length > 0 && (
+                <p className={cn("flex items-center gap-1.5 text-[13px] font-medium tabular-nums", sending.length === rows.length ? "text-success-ink" : "text-muted-foreground")} role="status" aria-live="polite">
+                  {sending.length === rows.length && <CircleCheck className="h-3.5 w-3.5" aria-hidden="true" />}
+                  {readinessLine(rows)}
+                </p>
+              )}
+            </div>
             {rows.length === 0 ? (
               <p className="mt-2 text-sm text-muted-foreground">Nothing is switched on. Pick at least one place in Everywhere.</p>
             ) : (
@@ -369,9 +381,12 @@ export function LaunchPanel(p: Props) {
                       ))}
                     </div>
                     {!r.sending && (
-                      <Button variant="ghost" size="sm" className="min-h-11" onClick={() => p.onLeaveOut(r.platform)} disabled={p.busy}>
-                        Leave it out
-                      </Button>
+                      <div className="flex w-full flex-wrap gap-1.5 pl-[40px] sm:w-auto sm:pl-0">
+                        {r.fix && <FixButton fix={r.fix} name={PLATFORM_META[r.platform].name} disabled={p.busy || ((r.fix === "connect" || r.fix === "reconnect") && !online)} onClick={() => (r.fix === "connect" || r.fix === "reconnect" ? p.onConnect(r.platform) : r.fix === "video" ? p.onReplaceVideo() : p.onFix(r.platform))} />}
+                        <Button variant="ghost" size="sm" className="min-h-11" onClick={() => p.onLeaveOut(r.platform)} disabled={p.busy}>
+                          Leave it out <span className="sr-only">{PLATFORM_META[r.platform].name}</span>
+                        </Button>
+                      </div>
                     )}
                   </li>
                 ))}
@@ -400,6 +415,17 @@ export function LaunchPanel(p: Props) {
         </Button>
       </Sheet>
     </div>
+  );
+}
+
+/** R1206: the one action that clears a held place: connect where it isn't, a new video, or open it on Everywhere. */
+function FixButton({ fix, name, disabled, onClick }: { fix: Fix; name: string; disabled: boolean; onClick: () => void }) {
+  const link = fix === "connect" || fix === "reconnect";
+  return (
+    <Button variant="subtle" size="sm" className="min-h-11" onClick={onClick} disabled={disabled}>
+      {link ? <Link2 className="h-4 w-4" aria-hidden="true" /> : fix === "video" ? <Film className="h-4 w-4" aria-hidden="true" /> : <Pencil className="h-4 w-4" aria-hidden="true" />}
+      {FIX_LABEL[fix]} <span className="sr-only">{link ? name : fix === "video" ? `, too long for ${name}` : `for ${name}, in Everywhere`}</span>
+    </Button>
   );
 }
 

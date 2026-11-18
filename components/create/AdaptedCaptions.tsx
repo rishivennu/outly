@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { motion } from "framer-motion";
 import { Check, Copy, Pencil, RefreshCw, RotateCcw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,17 +40,71 @@ interface Props {
   className?: string;
 }
 
+type StateKind = "writing" | "proposal" | "approved" | "empty" | "mine" | "ready";
+
+/** Still Pip's words, or the creator's own now? Only the fields shown for the platform count. */
+const isMine = (d: Draft, pip: PlatformCopy | undefined) => !!pip && copyKey(d) !== copyKey({ title: pip.title ?? "", caption: pip.caption, description: pip.description ?? "", hashtags: pip.hashtags });
+
+/** One platform's state in a word or two: the tab and the open card say the same thing. */
+export function captionState(o: { busy: boolean; proposal: boolean; reviewed: boolean; empty: boolean; mine: boolean }): { kind: StateKind; label: string } {
+  if (o.busy) return { kind: "writing", label: "Writing…" };
+  if (o.proposal) return { kind: "proposal", label: "Suggestion waiting" };
+  if (o.reviewed) return { kind: "approved", label: "Approved" };
+  if (o.empty) return { kind: "empty", label: "Not written yet" };
+  if (o.mine) return { kind: "mine", label: "Edited by you" };
+  return { kind: "ready", label: "Ready to review" };
+}
+
+function stateFor(platform: Platform, p: Props) {
+  const d = p.drafts[platform];
+  return captionState({
+    busy: p.writing.includes(platform),
+    proposal: !!p.proposals?.[platform],
+    reviewed: !!d?.reviewed,
+    empty: !d || (!d.title.trim() && !d.caption.trim() && !d.description.trim()),
+    mine: !!d && isMine(d, p.adapted[platform]),
+  });
+}
+
+function StateMark({ kind }: { kind: StateKind }) {
+  if (kind === "writing") return <Sparkles className="h-3.5 w-3.5 motion-safe:animate-pulse" aria-hidden="true" />;
+  if (kind === "approved") return <Check className="h-3.5 w-3.5" aria-hidden="true" />;
+  if (kind === "mine") return <Pencil className="h-3 w-3" aria-hidden="true" />;
+  if (kind === "proposal") return <span className="h-2 w-2 rounded-full bg-accent" aria-hidden="true" />;
+  if (kind === "empty") return <span className="h-2 w-2 rounded-full border border-current opacity-60" aria-hidden="true" />;
+  return null;
+}
+
 /**
- * 1190 Step 2, R1198 compact: one row per platform with the caption Pip wrote from "Your caption". A row shows the
- * words, the count against the platform's limit and whether it is approved; Edit opens its fields in place.
- * An edit is the creator's own: Pip never writes over it, Regenerate touches only that row, and Pip's version
- * stays one tap away. Approving is the same `reviewed` flag Everywhere and Launch already read.
+ * 1190 Step 2, R1206 one at a time: a row of platform tabs, each with its own state, and the one picked open
+ * below with the caption Pip wrote from "Your caption", its count against the platform's limit and Approve.
+ * An edit is the creator's own: Pip never writes over it, Regenerate touches only that platform, and Pip's
+ * version stays one tap away. Approving is the same `reviewed` flag Everywhere and Launch already read.
  */
 export function AdaptedCaptions(p: Props) {
   const places = p.platforms;
   const written = places.filter((x) => p.adapted[x]).length;
   const approved = places.filter((x) => p.drafts[x]?.reviewed).length;
+  const ids = useId();
+  const [own, setOwn] = useState<Platform | null>(null);
+  const tabs = useRef<Partial<Record<Platform, HTMLButtonElement | null>>>({});
   if (!places.length) return null;
+  // The page's pick (Pip just added a platform, say) wins; otherwise the one tapped here, else the first.
+  const want = p.focus ?? own;
+  const sel = want && places.includes(want) ? want : places[0];
+  const pick = (pl: Platform) => {
+    setOwn(pl);
+    p.onFocus?.(pl);
+  };
+  /** Arrow keys move along the tabs, Home and End jump to the ends: one tab stop for the whole row. */
+  const onKey = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
+    const n = places.length;
+    const to = e.key === "ArrowRight" ? (i + 1) % n : e.key === "ArrowLeft" ? (i - 1 + n) % n : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : -1;
+    if (to < 0) return;
+    e.preventDefault();
+    pick(places[to]);
+    tabs.current[places[to]]?.focus();
+  };
 
   return (
     <section aria-labelledby="adapted-captions" className={cn("glass rounded-[24px] p-4 sm:p-5", p.className)}>
@@ -70,11 +124,41 @@ export function AdaptedCaptions(p: Props) {
           </Button>
         )}
       </div>
-      <ul className="mt-3.5 space-y-2.5">
-        {places.map((pl) => (
-          <Row key={pl} platform={pl} {...p} />
-        ))}
-      </ul>
+      <div role="tablist" aria-label="Your platforms" className="-mx-1 mt-3.5 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {places.map((pl, i) => {
+          const on = pl === sel;
+          const s = stateFor(pl, p);
+          return (
+            <button
+              key={pl}
+              ref={(el) => {
+                tabs.current[pl] = el;
+              }}
+              type="button"
+              role="tab"
+              id={`${ids}-${pl}-tab`}
+              aria-selected={on}
+              aria-controls={`${ids}-panel`}
+              tabIndex={on ? 0 : -1}
+              data-tab={pl}
+              onClick={() => pick(pl)}
+              onKeyDown={(e) => onKey(e, i)}
+              className={cn(
+                "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-[13px] font-semibold outline-none transition-[background-color,color] duration-200 hairline motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring",
+                on ? "bg-foreground text-background" : "text-muted-foreground [@media(hover:hover)]:hover:bg-secondary/70 [@media(hover:hover)]:hover:text-foreground",
+              )}
+            >
+              <PlatformOrb platform={pl} size={24} />
+              {PLATFORM_META[pl].name}
+              <StateMark kind={s.kind} />
+              <span className="sr-only">, {s.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div role="tabpanel" id={`${ids}-panel`} aria-labelledby={`${ids}-${sel}-tab`} className="mt-2.5">
+        <Row key={sel} platform={sel} {...p} />
+      </div>
     </section>
   );
 }
@@ -95,10 +179,8 @@ function Row({ platform, ...p }: Props & { platform: Platform }) {
   const over = bodyLen > meta.captionLimit;
   const cap = HASHTAG_CAP[platform];
   const tagCount = countHashtags(d.hashtags);
-  /** Still Pip's words, or the creator's own now? Only the fields on this row count. */
-  const mine = !!pip && copyKey(d) !== copyKey({ title: pip.title ?? "", caption: pip.caption, description: pip.description ?? "", hashtags: pip.hashtags });
+  const mine = isMine(d, pip);
   const empty = !d.title.trim() && !d.caption.trim() && !d.description.trim();
-  const focused = p.focus === platform;
   const proposal = p.proposals?.[platform];
 
   useEffect(() => {
@@ -118,19 +200,10 @@ function Row({ platform, ...p }: Props & { platform: Platform }) {
     }
   };
 
-  const state = busy ? "Writing…" : proposal ? "Suggestion waiting" : d.reviewed ? "Approved" : empty ? "Not written yet" : mine ? "Edited by you" : "Ready to review";
+  const state = captionState({ busy, proposal: !!proposal, reviewed: d.reviewed, empty, mine }).label;
 
   return (
-    <motion.li
-      layout="position"
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={T.card}
-      data-pl={platform}
-      onFocusCapture={() => p.onFocus?.(platform)}
-      onPointerDown={() => p.onFocus?.(platform)}
-      className={cn("min-w-0 rounded-2xl border p-3 transition-[border-color] motion-reduce:transition-none sm:p-3.5", focused ? "border-foreground/30 bg-card" : "border-border/60 bg-secondary/25")}
-    >
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={T.card} data-pl={platform} className="min-w-0 rounded-2xl border border-border/60 bg-card p-3 sm:p-3.5">
       <div className="flex min-w-0 items-center gap-2.5">
         <PlatformOrb platform={platform} size={26} />
         <p className="min-w-0 flex-1 truncate text-sm font-semibold">
@@ -245,6 +318,6 @@ function Row({ platform, ...p }: Props & { platform: Platform }) {
           </Button>
         )}
       </div>
-    </motion.li>
+    </motion.div>
   );
 }

@@ -89,7 +89,9 @@ export function barState(i: BarInput): BarState {
         : !i.hasHook
           ? "Pick a hook with Pip first."
           : null;
-  const notReady = step === "launch" ? "Some places aren't ready yet. Leave them out or fix them in Everywhere." : i.pending?.length ? `Look over ${list(i.pending)} first.` : "Look over each place on the Everywhere step first.";
+  // R1206: on Launch the note names who is held; the list above has the one action that clears each.
+  const heldLine = i.pending?.length ? (i.pending.length === 1 ? `${i.pending[0]} isn't ready yet. Fix it or leave it out in the list above.` : `${list(i.pending)} aren't ready yet. Fix them or leave them out in the list above.`) : "Some places aren't ready yet. Leave them out or fix them in Everywhere.";
+  const notReady = step === "launch" ? heldLine : i.pending?.length ? `Look over ${list(i.pending)} first.` : "Look over each place on the Everywhere step first.";
   const sendBlock = !i.online ? OFFLINE_SEND : (base ?? (!i.ready ? notReady : i.burning ? BURN_SEND : null));
   const send: BarAction = { disabled: !!sendBlock || i.launching, hint: sendBlock };
   // 1170: a paused upload has no video on the server yet, so there is nothing to save until it resumes.

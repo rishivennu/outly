@@ -49,8 +49,8 @@ import { StoryComposer } from "./StoryComposer";
 import { AdaptedCaptions } from "./AdaptedCaptions";
 import { VideoSubtitles } from "./VideoSubtitles";
 import type { PipActionsProps } from "./PipActions";
-import { ASK_KEYS, type PipAsk } from "@/lib/ai/pip-asks";
-import { copyKey, firstSentence, isLongForm, LONG_FORM_SEC, offlineAdapt, timedTranscript, type AdaptTone } from "@/lib/ai/adapt-core";
+import { ASK_KEYS, STORY_ASKS, type CaptionAsk, type PipAsk } from "@/lib/ai/pip-asks";
+import { ADAPT_MAX, copyKey, firstSentence, isLongForm, LONG_FORM_SEC, offlineAdapt, timedTranscript, type AdaptTone } from "@/lib/ai/adapt-core";
 import { T } from "@/lib/motion/tokens";
 
 interface Props {
@@ -207,9 +207,17 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   /** R1198: the place Pip's asks work on. Step 2: the one last touched; Step 3: the one open in the editor. */
   const [pipFocus, setPipFocus] = useState<Platform | null>(null);
   const [deckActive, setDeckActive] = useState<Platform | null>(null);
+  /** R1206: Launch's Fix it opens Everywhere on that one platform; cleared once the creator leaves Everywhere. */
+  const [deckOpen, setDeckOpen] = useState<Platform | null>(null);
+  useEffect(() => {
+    if (step !== "everywhere") setDeckOpen(null);
+  }, [step]);
   /** R1198: one ask in flight at a time, so the same request is never sent twice. */
   const [asking, setAsking] = useState<{ p: Platform; ask: PipAsk } | null>(null);
   const askingRef = useRef(false);
+  /** R1206: an ask on Your caption itself, and its answer waiting under the box to apply or skip. */
+  const [captionAsk, setCaptionAsk] = useState<CaptionAsk | null>(null);
+  const [captionProposal, setCaptionProposal] = useState<{ text: string; why: string; ask: CaptionAsk; from: string } | null>(null);
   /** R1198: on a phone the video preview above the editor folds away. */
   const [videoShut, setVideoShut] = useState(false);
   /** The drafts as last rendered, so copy that arrives mid-stream knows whether a draft already has words. */
@@ -633,6 +641,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
           setCoverUrl(null);
           window.history.replaceState(null, "", "/create");
           setStory(d.story);
+          setCaptionProposal(null);
           setSubmittedStory(d.story || null);
           setRestoredTrack(d.captions ?? null);
           if (d.adapted && typeof d.adapted === "object") setAdapted(d.adapted as Partial<Record<Platform, PlatformCopy>>);
@@ -716,6 +725,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   });
   const keepServer = (server: ServerDraft) => {
     setStory(server.story ?? "");
+    setCaptionProposal(null);
     setSubmittedStory(server.story || null);
     setHook(server.hook ?? null);
     setDrafts((cur) => {
@@ -952,7 +962,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
    * only source. A place they have edited themselves gets a proposal to accept or skip, never an overwrite; a
    * place still holding Pip's own last version is simply written again.
    */
-  const adapt = async (platforms: Platform[], o: { fresh?: boolean; tone?: AdaptTone; noClarify?: boolean; direct?: boolean } = {}) => {
+  const adapt = async (platforms: Platform[], o: { fresh?: boolean; tone?: AdaptTone; noClarify?: boolean; direct?: boolean; update?: boolean } = {}) => {
     const text = story.trim();
     if (!text) return;
     if (!platforms.length) return toast("Pick at least one place to post to first.", "info");
@@ -1002,7 +1012,12 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       // Regenerate is direct and says nothing: the row itself shows what changed.
       if (!o.direct) {
         const wrote = platforms.length - left.size;
-        if (wrote > 0) {
+        // R1206: updating some of them after the caption changed says which, and that the rest kept their words.
+        const rest = o.update ? adaptPlaces.filter((x) => !platforms.includes(x)).length : 0;
+        if (wrote > 0 && rest > 0) {
+          toast(`${wrote === 1 ? PLATFORM_META[platforms.find((x) => !left.has(x)) ?? platforms[0]].name : `${wrote} platforms`} updated from your new caption. The other ${rest === 1 ? "one keeps its" : `${rest} keep their`} words. Have a read.`, "ok");
+          requestAnimationFrame(() => document.getElementById("adapted-captions")?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }));
+        } else if (wrote > 0) {
           toast(wrote === platforms.length ? (wrote === 1 ? "Your caption is ready for 1 platform. Have a read." : `Your caption is ready for all ${wrote} platforms. Have a read.`) : `Your caption is ready for ${wrote} of ${platforms.length} platforms. Have a read.`, "ok");
           requestAnimationFrame(() => document.getElementById("adapted-captions")?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }));
         }
@@ -1116,6 +1131,33 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     } finally {
       askingRef.current = false;
       setAsking(null);
+    }
+  };
+
+  /**
+   * R1206: one of Pip's asks on Your caption, the words every platform's version is written from. The answer is
+   * a suggestion under the box; nothing changes until the creator applies it, and then "Update" rewrites the
+   * platforms from the new words.
+   */
+  const askCaption = async (ask: CaptionAsk) => {
+    if (askingRef.current) return;
+    if (!navigator.onLine) return toast("You're offline. Pip can help as soon as you reconnect.", "info");
+    if (adaptAbort.current) return toast("Pip is still writing your platform captions. Try again in a moment.", "info");
+    const from = story;
+    const text = from.trim();
+    if (text.length < 3) return toast("Write a sentence or two first, then Pip can help.", "info");
+    askingRef.current = true;
+    setCaptionAsk(ask);
+    try {
+      const r = await api<{ text: string; why: string }>("/api/ai/caption", { method: "POST", json: { text: text.slice(0, 4000), ask } });
+      const next = (r.text ?? "").trim().slice(0, ADAPT_MAX);
+      if (!next || next === text) toast("Pip didn't find a better version. Your caption is unchanged.", "info");
+      else setCaptionProposal({ text: next, why: (r.why ?? "").trim(), ask, from });
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Pip couldn't do that just now. Your caption is unchanged.", "info");
+    } finally {
+      askingRef.current = false;
+      setCaptionAsk(null);
     }
   };
 
@@ -1313,6 +1355,14 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     setStep(s);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+  /** R1206: from Launch's list, straight to the one platform that needs it, saying what to do there. */
+  const fixOnDeck = (pl: Platform) => {
+    const why = plan.hold.find((h) => h.platform === pl)?.reason;
+    goTo("everywhere", () => {
+      setDeckOpen(pl);
+      if (why) toast(`${PLATFORM_META[pl].name}: ${why} ${why === "Not looked over yet." ? "Read it, then approve it." : why === "A suggestion is waiting." ? "Accept it or skip it." : "Fix it here, then come back."}`, "info");
+    });
+  };
   /** Steps 1 and 2: Schedule and Publish take you to Launch with that choice made. Nothing is sent from there. */
   const toLaunch = (how: "now" | "schedule") => goTo("launch", () => setMode(how));
   const onBar = (id: BarId) => {
@@ -1388,14 +1438,14 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
           step: "story",
           places: storyWritten,
           target: pipTarget(pipFocus, storyWritten),
-          onTarget: setPipFocus,
+          caption: { busy: captionAsk, waiting: !!captionProposal, onAsk: (a) => void askCaption(a) },
           others: live.filter((pl) => !drafts[pl].enabled),
           onAdd: (pl) => {
             setDrafts((d) => ({ ...d, [pl]: { ...d[pl], enabled: true } }));
             setPipFocus(pl);
             if (story.trim()) void adapt([pl], { direct: true, tone: adaptTone ?? undefined });
           },
-          why: pipOffline ?? (adapting ? "Pip is writing your captions. These open when it's done." : !storyWritten.length ? "Generate your captions first, then ask Pip to sharpen any of them." : null),
+          why: pipOffline ?? (adapting ? "Pip is writing your captions. These open when it's done." : story.trim().length < 3 ? "Write a sentence or two in Your caption first, then ask Pip to sharpen it." : null),
           context: `Your caption: ${story.trim().length} characters. ${adaptPlaces.length} ${adaptPlaces.length === 1 ? "place" : "places"} picked, ${adaptPlaces.filter((pl) => drafts[pl].reviewed).length} approved.`,
         }
       : step === "everywhere"
@@ -1671,6 +1721,27 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                   onUseWatched={useWatched}
                   onDismissClarify={() => setClarify(null)}
                   status={autosaveLine(saved, savedAt)}
+                  platforms={adaptPlaces}
+                  changed={someAdapted && !!submittedStory && story.trim() !== submittedStory.trim()}
+                  onUpdate={(pls) => {
+                    setPipFocus(pls[0]);
+                    void adapt(pls, { fresh: true, tone: adaptTone ?? undefined, update: true });
+                  }}
+                  suggestion={
+                    captionProposal && {
+                      text: captionProposal.text,
+                      why: captionProposal.why,
+                      label: STORY_ASKS.find((a) => a.id === captionProposal.ask)?.label ?? "Pip's take",
+                      stale: story.trim() !== captionProposal.from.trim(),
+                    }
+                  }
+                  onApply={() => {
+                    if (!captionProposal) return;
+                    setStory(captionProposal.text);
+                    setCaptionProposal(null);
+                    toast(someAdapted ? "Pip's version is in Your caption. Update your platform captions from it when you're ready." : "Pip's version is in Your caption.", "ok");
+                  }}
+                  onSkip={() => setCaptionProposal(null)}
                 />
                 <PublishTo className="" platforms={live} drafts={drafts} accounts={accounts} onToggle={(pl, on) => onDraft(pl, { enabled: on })} />
                 {(someAdapted || adapting) && (
@@ -1691,7 +1762,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                     onAccept={(pl) => onSuggest({ t: "accept", p: pl, draft: drafts[pl] })}
                     onReject={(pl) => onSuggest({ t: "reject", p: pl })}
                     onRevert={(pl) => onSuggest({ t: "revert", p: pl })}
-                    focus={pipTarget(pipFocus, storyWritten)}
+                    focus={pipFocus}
                     onFocus={setPipFocus}
                   />
                 )}
@@ -1726,6 +1797,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                   onActive={setDeckActive}
                   story={captionSource({ edited: editedOriginal, submittedStory, story })}
                   onEditSource={() => goTo("story", () => toast("Your caption is the one place it's written. Change it here, then ask Pip again.", "info"))}
+                  open={deckOpen}
                 />
               </motion.section>
             )}
@@ -1738,6 +1810,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                 <LaunchPanel drafts={drafts} accounts={accounts} media={meta} poster={poster} hook={hook ?? ""} title={draftTitle({ drafts, hook, filename: media?.filename ?? fileRef.current?.name })} status={autosaveLine(saved, savedAt)} tz={tz} when={when} onWhen={setWhen} mode={mode} onMode={setMode} busy={launching} error={launchError} online={online}
                   onEdit={() => goTo("everywhere")}
                   onLeaveOut={(p) => onDraft(p, { enabled: false })}
+                  onConnect={(p) => void connect(p)}
+                  onFix={fixOnDeck}
                   onReplaceVideo={() => {
                     goTo("video");
                     toast("Use Replace under your video to upload the version with music. Your copy stays.", "info");

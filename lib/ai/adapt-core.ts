@@ -60,6 +60,21 @@ export function splitStory(text: string): StoryParts {
   return { body: body.join("\n").replace(/\n{3,}/g, "\n\n").trim(), cta: cta.join(" "), keywords: keywords.slice(0, 12) };
 }
 
+const TAGS_LINE = /^\s*hashtags?\s*[:：]/i;
+
+/**
+ * R1206: "Suggest hashtags" on Your caption. The tags go on their own labelled line (the one already there is
+ * replaced), so the words above stay exactly as written and Pip reads them as keywords for every platform.
+ */
+export function withHashtags(text: string, tags: string): string {
+  const line = `Hashtags: ${tags.trim()}`;
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  const at = lines.findIndex((l) => TAGS_LINE.test(l));
+  if (at >= 0) return [...lines.slice(0, at), line, ...lines.slice(at + 1)].join("\n").slice(0, ADAPT_MAX);
+  const base = text.replace(/\s+$/, "");
+  return `${base}${base ? "\n" : ""}${line}`.slice(0, ADAPT_MAX);
+}
+
 /** Adds a labelled line (or puts the cursor on the one already there), for the composer's chips. */
 export function withLine(text: string, prefix: string): { text: string; caret: number } {
   const lines = text.replace(/\r\n?/g, "\n").split("\n");

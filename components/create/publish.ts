@@ -72,6 +72,35 @@ type Names = Partial<Record<Platform, { name: string }>>;
 export type Hold = { platform: Platform; reason: string };
 
 /**
+ * R1206: the one thing that clears a held place. Connecting and reconnecting happen right from Launch, a video
+ * that is too long goes back to Step 1 to replace it, and the other three open that platform on Everywhere.
+ */
+export type Fix = "connect" | "reconnect" | "video" | "check" | "suggestion" | "review";
+
+/** Why one switched-on place is held, and what clears it; null when it is ready to go. The first problem wins. */
+export function holdOf(p: Platform, drafts: Drafts, accounts: Accounts, media: Media, proposed: readonly Platform[] = []): { reason: string; fix: Fix } | null {
+  const acct = accounts[p];
+  const err = checksFor(p, drafts[p], media).find((c) => c.level === "error");
+  if (!acct) return { reason: "Not connected yet.", fix: "connect" };
+  if (acct.status !== "connected") return { reason: "The connection needs a refresh.", fix: "reconnect" };
+  // A video that is too long is fixed by swapping the video (Step 1), never on Everywhere.
+  if (err) return { reason: err.text, fix: err.field === "media" ? "video" : "check" };
+  if (proposed.includes(p)) return { reason: "A suggestion is waiting.", fix: "suggestion" };
+  if (!drafts[p].reviewed) return { reason: "Not looked over yet.", fix: "review" };
+  return null;
+}
+
+/** The button that clears each kind of hold, in plain words. */
+export const FIX_LABEL: Record<Fix, string> = {
+  connect: "Connect",
+  reconnect: "Reconnect",
+  video: "Replace video",
+  check: "Fix it",
+  suggestion: "Review the suggestion",
+  review: "Look it over",
+};
+
+/**
  * Phase 3 (B3): who really gets this post. A place that is switched on but not connected, not looked over or
  * failing a check is held back with its reason, and is never sent; only `send` reaches the launch.
  */
@@ -79,13 +108,8 @@ export function launchPlan(drafts: Drafts, accounts: Accounts, media: Media, pro
   const send: Platform[] = [];
   const hold: Hold[] = [];
   for (const p of enabledPlatforms(drafts)) {
-    const acct = accounts[p];
-    const err = checksFor(p, drafts[p], media).find((c) => c.level === "error");
-    if (!acct) hold.push({ platform: p, reason: "Not connected yet." });
-    else if (acct.status !== "connected") hold.push({ platform: p, reason: "The connection needs a refresh." });
-    else if (err) hold.push({ platform: p, reason: err.text });
-    else if (proposed.includes(p)) hold.push({ platform: p, reason: "A suggestion is waiting." });
-    else if (!drafts[p].reviewed) hold.push({ platform: p, reason: "Not looked over yet." });
+    const h = holdOf(p, drafts, accounts, media, proposed);
+    if (h) hold.push({ platform: p, reason: h.reason });
     else send.push(p);
   }
   return { send, hold };
@@ -105,18 +129,26 @@ export function scheduleProblem(when: Date, now = Date.now()): string | null {
   return when.getTime() <= now + 60_000 ? "Pick a time in the future." : null;
 }
 
-export type ConfirmRow = { platform: Platform; handle: string | null; sending: boolean; reason: string | null; warnings: string[]; practice: boolean };
+export type ConfirmRow = { platform: Platform; handle: string | null; sending: boolean; reason: string | null; fix: Fix | null; warnings: string[]; practice: boolean };
 type RowAccounts = Partial<Record<Platform, { status: string; username?: string | null; mock?: boolean } | undefined>>;
 
 /** "Publishing to: YouTube, @acct" rows for Launch: every switched-on place, the held ones with their reason. */
 export function confirmRows(drafts: Drafts, accounts: RowAccounts, media: Media, proposed: readonly Platform[] = []): ConfirmRow[] {
-  const { hold } = launchPlan(drafts, accounts, media, proposed);
   return enabledPlatforms(drafts).map((p) => {
     const a = accounts[p];
-    const held = hold.find((h) => h.platform === p);
+    const held = holdOf(p, drafts, accounts, media, proposed);
     const warnings = checksFor(p, drafts[p], media).filter((c) => c.level === "warning").map((c) => c.text);
-    return { platform: p, handle: fmtHandle(a?.username) || null, sending: !held, reason: held?.reason ?? null, warnings, practice: !!a?.mock };
+    return { platform: p, handle: fmtHandle(a?.username) || null, sending: !held, reason: held?.reason ?? null, fix: held?.fix ?? null, warnings, practice: !!a?.mock };
   });
+}
+
+/** R1206: the readiness line over Launch's list: how many are ready, and what is left. */
+export function readinessLine(rows: readonly Pick<ConfirmRow, "sending">[]): string {
+  const ready = rows.filter((r) => r.sending).length;
+  if (!rows.length) return "Nothing is switched on yet.";
+  if (ready === rows.length) return rows.length === 1 ? "Ready to go." : `All ${rows.length} are ready to go.`;
+  const left = rows.length - ready;
+  return `${ready} of ${rows.length} ready. Fix ${left === 1 ? "the one" : `the ${left}`} below or leave ${left === 1 ? "it" : "them"} out.`;
 }
 
 export type DiffRow = { platform: Platform; format: string; firstLine: string; hashtags: number };

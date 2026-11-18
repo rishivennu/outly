@@ -48,6 +48,8 @@ interface Props {
   story?: string;
   /** R1206: take the creator back to Your caption, the only place the caption is written. */
   onEditSource?: () => void;
+  /** R1206: the platform to open first, when Launch sent the creator here to fix that one. */
+  open?: Platform | null;
 }
 
 const READY_LABEL: Record<Platform, string> = { instagram: "Ready to go", youtube: "Wants a stronger title", x: "Make it impossible to ignore", tiktok: "Hook in the first second", threads: "Keep it conversational", facebook: "Ready for the feed", linkedin: "Lead with the lesson" };
@@ -71,7 +73,7 @@ export function PlatformDeck(p: Props) {
   /** 1182: connected accounts first, as cards you can open to edit; everything else is a compact Not connected row. */
   const linked = live.filter((pl) => p.accounts[pl]?.status === "connected");
   const off = live.filter((pl) => p.accounts[pl]?.status !== "connected");
-  const [picked, setActive] = useState<Platform>(() => enabled.find((pl) => p.accounts[pl]?.status === "connected") ?? enabled[0] ?? "instagram");
+  const [picked, setActive] = useState<Platform>(() => (p.open && linked.includes(p.open) ? p.open : null) ?? enabled.find((pl) => p.accounts[pl]?.status === "connected") ?? enabled[0] ?? "instagram");
   const active = linked.includes(picked) ? picked : (linked[0] ?? picked);
   /** A second tap on the open card folds its editor; picking another card opens that one. */
   const [shut, setShut] = useState(false);
@@ -81,6 +83,18 @@ export function PlatformDeck(p: Props) {
   }, [active, shut, linked.length, onActive]);
   const offRef = useRef<HTMLElement>(null);
   const reduce = useReducedMotion();
+  // Sent here from Launch to fix one platform: its editor is the one in view, with focus on its card.
+  const sentTo = useRef(p.open && linked.includes(p.open) ? p.open : null);
+  useEffect(() => {
+    const pl = sentTo.current;
+    if (!pl) return;
+    const t = setTimeout(() => {
+      document.getElementById(`panel-${pl}`)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+      cards.current[pl]?.focus({ preventScroll: true });
+    }, 60);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const toOff = () => {
     const el = offRef.current;
     if (!el) return;
