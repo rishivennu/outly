@@ -209,7 +209,7 @@ export function PlatformDashboardView({ platform, initial, connected, renderedAt
               <div className="flex items-center gap-2">
                 <dt className="sr-only">Connection</dt>
                 <dd className="flex items-center gap-2">
-                  {picked && picked.status !== "active" ? (
+                  {picked && picked.status !== "connected" ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-1 text-xs font-semibold text-warning-ink">
                       <CircleAlert className="h-3.5 w-3.5" aria-hidden="true" /> Needs reconnect
                     </span>
