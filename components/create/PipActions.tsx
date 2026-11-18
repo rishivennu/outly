@@ -42,7 +42,8 @@ export function PipActions(p: PipActionsProps) {
   const [picking, setPicking] = useState(false);
   const t = p.target;
   // A platform with no hashtags field (X) never gets the hashtags ask: its answer would have nowhere to go.
-  const asks = (p.step === "story" ? STORY_ASKS : DECK_ASKS).filter((a) => a.id !== "hashtags" || !t || fieldsFor(t).hashtags);
+  // R1206: a platform's own ask (YouTube's metadata, LinkedIn's lesson, X's one post) shows only on that platform.
+  const asks = (p.step === "story" ? STORY_ASKS : DECK_ASKS).filter((a) => (a.id !== "hashtags" || !t || fieldsFor(t).hashtags) && (!a.only || (!!t && a.only.includes(t))));
   const off = !!p.why || !!p.busy || !t;
   const name = t ? PLATFORM_META[t].name : "";
 
@@ -125,7 +126,7 @@ export function PipActions(p: PipActionsProps) {
           {p.proposed.map((pl) => (
             <li key={pl} className="flex flex-wrap items-center gap-2 rounded-2xl bg-card p-2.5 hairline">
               <PlatformOrb platform={pl} size={22} />
-              <span className="min-w-0 flex-1 text-[13px] leading-snug">New words for {PLATFORM_META[pl].name}. Compare them on the page.</span>
+              <span className="min-w-0 flex-1 text-[13px] leading-snug">New words for {PLATFORM_META[pl].name}. The same suggestion as on its card, if you'd rather decide from here.</span>
               <span className="flex gap-1.5">
                 <Button type="button" size="sm" variant="lime" className="min-h-11 rounded-full px-3" onClick={() => p.onAccept(pl)}>
                   <Check className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> Accept <span className="sr-only">for {PLATFORM_META[pl].name}</span>

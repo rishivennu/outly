@@ -5,26 +5,49 @@ import { cn } from "@/lib/utils";
 import { useCaptionPick } from "./captions/CaptionRun";
 import type { CaptionState } from "./captions/run-store";
 
-/** How many subtitle lines the video has, as a string so the reader re-renders only when it changes. */
-const lineCount = (s: CaptionState) => String(s.tracks.orig.length);
+/** R1206: what the closed section says about the subtitles, in the brief's own vocabulary. */
+export type SubtitleFacts = { lines: number; busy: "transcribe" | "translate" | "burn" | null; failed: boolean; gaps: number; english: boolean };
+export type SubtitleTone = "idle" | "busy" | "ok" | "warn";
 
-/** "3 subtitles ready", "Transcribing…" or the invitation, for the closed section's summary line. */
-export function subtitlesLine(n: number, transcribing: boolean): string {
-  if (transcribing) return "Transcribing your video…";
-  if (n > 0) return `${n} ${n === 1 ? "subtitle" : "subtitles"} ready`;
-  return "None yet";
-}
+/** A short string, so the reader re-renders only when one of these facts changes. */
+export const subtitleFactsKey = (s: CaptionState) =>
+  JSON.stringify({ lines: s.tracks.orig.length, busy: s.busy?.kind ?? null, failed: s.outcome === "failed", gaps: s.gaps.length, english: !!s.tracks.en } satisfies SubtitleFacts);
 
 /**
- * R1198: the subtitle tools (transcribe, sync, style, burn) under one collapsible "Video subtitles" section, closed
- * by default. Subtitles are the spoken words on the video; they are a separate thing from each platform's social
- * caption and never feed or replace one. The editor inside stays mounted while folded, so its preview overlay on
- * the video and a run in progress carry on.
+ * R1206: the one status line, the brief's six states in priority order. A run in progress wins, then a failure,
+ * then parts that came back empty, then the English track, then the count. Never a claim the video has words
+ * on it when it has none.
+ */
+export function subtitleStatus(f: SubtitleFacts): { label: string; tone: SubtitleTone } {
+  if (f.busy === "transcribe") return { label: "Transcribing", tone: "busy" };
+  if (f.busy === "translate") return { label: "Translating", tone: "busy" };
+  if (f.busy === "burn") return { label: "Adding them to the video", tone: "busy" };
+  if (f.failed) return { label: "Failed — retry", tone: "warn" };
+  if (f.gaps > 0) return { label: "Needs review", tone: "warn" };
+  if (!f.lines) return { label: "Not generated yet", tone: "idle" };
+  const count = `${f.lines} ${f.lines === 1 ? "subtitle" : "subtitles"} ready`;
+  return f.english ? { label: `${count} · translation available`, tone: "ok" } : { label: count, tone: "ok" };
+}
+
+const TONE: Record<SubtitleTone, string> = {
+  idle: "text-muted-foreground",
+  busy: "text-foreground",
+  ok: "text-success-ink",
+  warn: "text-destructive",
+};
+
+/**
+ * R1198, R1206: the subtitle tools (transcribe, sync, style, burn) under one collapsible "Video subtitles" section,
+ * closed by default and sitting directly above Your caption. Subtitles are the spoken words on the video; they are a
+ * separate thing from each platform's social caption and never feed or replace one. The editor inside stays mounted
+ * while folded, so its preview overlay on the video and a run in progress carry on.
  */
 export function VideoSubtitles({ transcribing, burning = false, children, className }: { transcribing: boolean; burning?: boolean; children: React.ReactNode; className?: string }) {
   const [open, setOpen] = useState(false);
   const id = useId();
-  const n = Number(useCaptionPick(lineCount) ?? 0);
+  const key = useCaptionPick(subtitleFactsKey);
+  const facts: SubtitleFacts = key ? (JSON.parse(key) as SubtitleFacts) : { lines: 0, busy: null, failed: false, gaps: 0, english: false };
+  const status = subtitleStatus(facts);
   // A transcribe or burn started from Pip or a restored run opens the section, so its progress is never hidden.
   useEffect(() => {
     if (transcribing || burning) setOpen(true);
@@ -44,10 +67,10 @@ export function VideoSubtitles({ transcribing, burning = false, children, classN
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-[15px] font-semibold leading-tight">Video subtitles</span>
-            <span className="block text-[13px] leading-snug text-muted-foreground">Transcribe spoken words and synchronize subtitles with your video.</span>
+            <span className="block text-[13px] leading-snug text-muted-foreground">Transcribe speech and create synchronized subtitles for your video.</span>
           </span>
-          <span className={cn("shrink-0 text-xs font-semibold tabular-nums", n > 0 ? "text-success-ink" : "text-muted-foreground")} aria-live="polite">
-            {subtitlesLine(n, transcribing)}
+          <span className={cn("shrink-0 text-right text-xs font-semibold tabular-nums", TONE[status.tone])} aria-live="polite">
+            {status.label}
           </span>
           <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
         </button>

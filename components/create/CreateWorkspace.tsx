@@ -253,6 +253,14 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       /* private mode: Pip just starts open */
     }
   }, []);
+  /** R1206: the creator's own fold, read straight from this browser. Pip never opens itself over one. */
+  const pipFolded = () => {
+    try {
+      return window.localStorage.getItem(PIP_PANEL_KEY) === "closed";
+    } catch {
+      return false;
+    }
+  };
   const togglePanel = () => {
     const open = !panel.open;
     panelDispatch({ t: "toggle" });
@@ -323,6 +331,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     if (!deviceReady || pipStep.current === step) return;
     pipStep.current = step;
     if (!pipOpensOn(step, captionFinal(hook))) return;
+    // R1206: once Pip is folded it stays folded, on every step and every visit, until the creator opens it again.
+    if (pipFolded()) return;
     if (window.matchMedia("(min-width: 1280px)").matches) panelDispatch({ t: "set", open: true });
     // R1198: on a phone Your Story keeps Pip as the card above the editor, so a sheet never covers the actions.
     else if (step !== "story") {
@@ -988,6 +998,15 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       if (r.core?.trim()) setHook(r.core.trim());
       setSubmittedStory(text);
       setEditedOriginal(null);
+      // R1206: one compact confirmation, then straight into reviewing the platform results. A single row's
+      // Regenerate is direct and says nothing: the row itself shows what changed.
+      if (!o.direct) {
+        const wrote = platforms.length - left.size;
+        if (wrote > 0) {
+          toast(wrote === platforms.length ? (wrote === 1 ? "Your caption is ready for 1 platform. Have a read." : `Your caption is ready for all ${wrote} platforms. Have a read.`) : `Your caption is ready for ${wrote} of ${platforms.length} platforms. Have a read.`, "ok");
+          requestAnimationFrame(() => document.getElementById("adapted-captions")?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }));
+        }
+      }
     } catch (e) {
       if (ctrl.signal.aborted) return;
       toast(e instanceof ApiError ? e.message : "Couldn't write the captions just now. Your words are saved, so you can try again.", "info");
@@ -1552,8 +1571,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                     <Sparkles className="h-4 w-4" />
                   </span>
                   <p className="min-w-0 flex-1 text-[13px] leading-snug">
-                    <span className="block font-semibold">{someAdapted ? "Ask Pip to sharpen a caption" : "Pip writes each platform's caption"}</span>
-                    <span className="block text-muted-foreground">{someAdapted ? "A better hook, shorter, a clearer CTA. You approve every change." : "Write your caption below, then generate."}</span>
+                    <span className="block font-semibold">{someAdapted ? "Ask Pip to sharpen a caption" : "Stuck on the words? Ask Pip"}</span>
+                    <span className="block text-muted-foreground">{someAdapted ? "A better hook, shorter, a clearer CTA. You approve every change." : "A sharper hook, hashtags, your own voice. You write it below; Pip only suggests."}</span>
                   </p>
                   <Button variant="primary" size="sm" className="min-h-11 shrink-0" onClick={openDrawer} aria-haspopup="dialog" aria-expanded={drawer} aria-controls={ASSISTANT_PANEL}>
                     Open Pip
@@ -1592,6 +1611,48 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                 <TranscribeRun className="mt-3 hidden md:block" />
                 </div>
                 <div data-pip={pipShown ? "open" : "closed"} className="group/edit mt-5 min-w-0 space-y-5 md:mt-0">
+                {/* R1206: subtitles sit directly above Your caption (the brief's order): the spoken words on
+                    the video come first, and stay a separate thing from each platform's social caption. */}
+                {(preCaption || (src && media && upload.kind === "done")) && (
+                  <VideoSubtitles transcribing={capTranscribing} burning={capBurning}>
+                  <CaptionBurner
+                    video={capVideo}
+                    canvas={capCanvas}
+                    onLive={onCapLive}
+                    key={preCaption?.media.id ?? media?.id}
+                    /* always the clean video, so the preview overlay and a re-burn never double the captions */
+                    src={(preCaption ? preCaption.media.url : src) ?? src ?? ""}
+                    file={preCaption ? preCaption.file : fileRef.current}
+                    filename={(preCaption?.media ?? media)?.filename ?? fileRef.current?.name ?? "video.mp4"}
+                    duration={meta?.duration ?? 0}
+                    initialTrack={restoredTrack ?? undefined}
+                    onTrackChange={onTrackChange}
+                    session={(preCaption?.media ?? media)?.id}
+                    onBurned={(f, kind) => {
+                      setPreCaption((p) => p ?? (media ? { media, file: fileRef.current } : null));
+                      startUpload(f);
+                      toast(kind === "cut" ? "Clip cut. Uploading it as your video…" : "Captions added. Uploading the captioned video…", "info");
+                    }}
+                    onUndo={
+                      preCaption
+                        ? () => {
+                            const p = preCaption;
+                            uploadAbort.current?.abort(); // a captioned upload still in flight must not land afterwards
+                            setPreCaption(null);
+                            fileRef.current = p.file;
+                            synced.current = p.media.id;
+                            setMedia(p.media);
+                            setLocalMeta(null);
+                            setLocalPoster(null);
+                            setLocalUrl(null);
+                            setUpload({ kind: "done" });
+                          }
+                        : undefined
+                    }
+                    onError={(m) => toast(m, "error")}
+                  />
+                  </VideoSubtitles>
+                )}
                 <StoryComposer
                   story={story}
                   onStory={setStory}
@@ -1634,46 +1695,6 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                     onFocus={setPipFocus}
                   />
                 )}
-                {(preCaption || (src && media && upload.kind === "done")) && (
-                  <VideoSubtitles transcribing={capTranscribing} burning={capBurning}>
-                  <CaptionBurner
-                    video={capVideo}
-                    canvas={capCanvas}
-                    onLive={onCapLive}
-                    key={preCaption?.media.id ?? media?.id}
-                    /* always the clean video, so the preview overlay and a re-burn never double the captions */
-                    src={(preCaption ? preCaption.media.url : src) ?? src ?? ""}
-                    file={preCaption ? preCaption.file : fileRef.current}
-                    filename={(preCaption?.media ?? media)?.filename ?? fileRef.current?.name ?? "video.mp4"}
-                    duration={meta?.duration ?? 0}
-                    initialTrack={restoredTrack ?? undefined}
-                    onTrackChange={onTrackChange}
-                    session={(preCaption?.media ?? media)?.id}
-                    onBurned={(f, kind) => {
-                      setPreCaption((p) => p ?? (media ? { media, file: fileRef.current } : null));
-                      startUpload(f);
-                      toast(kind === "cut" ? "Clip cut. Uploading it as your video…" : "Captions added. Uploading the captioned video…", "info");
-                    }}
-                    onUndo={
-                      preCaption
-                        ? () => {
-                            const p = preCaption;
-                            uploadAbort.current?.abort(); // a captioned upload still in flight must not land afterwards
-                            setPreCaption(null);
-                            fileRef.current = p.file;
-                            synced.current = p.media.id;
-                            setMedia(p.media);
-                            setLocalMeta(null);
-                            setLocalPoster(null);
-                            setLocalUrl(null);
-                            setUpload({ kind: "done" });
-                          }
-                        : undefined
-                    }
-                    onError={(m) => toast(m, "error")}
-                  />
-                  </VideoSubtitles>
-                )}
                 <SaveDraft className="px-1 xl:hidden" state={saved} at={savedAt} onSave={saveDraftNow} busy={saved === "saving"} hideButton sync={syncLine} />
                 </div>
                 </div>
@@ -1704,8 +1725,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                   onRevert={(p) => onSuggest({ t: "revert", p })}
                   onActive={setDeckActive}
                   story={captionSource({ edited: editedOriginal, submittedStory, story })}
-                  onStory={(s) => (setStory(s), setSubmittedStory(s), setEditedOriginal(null), setHook(firstSentence(s, 160)))}
-                  onRegenerate={(pls) => void fetchCopy(pls, hook || firstSentence(story, 160), "rewrite")}
+                  onEditSource={() => goTo("story", () => toast("Your caption is the one place it's written. Change it here, then ask Pip again.", "info"))}
                 />
               </motion.section>
             )}

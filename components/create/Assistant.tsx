@@ -284,7 +284,7 @@ export function Assistant(p: Props) {
           </Bubble>
         )}
 
-        {askStory && p.watch?.kind === "watching" && (
+        {askStory && !p.composer && p.watch?.kind === "watching" && (
           <Bubble from="outly">
             <span className="inline-flex items-center gap-2">
               <Eye className="h-4 w-4 shrink-0 motion-safe:animate-pulse" aria-hidden="true" />
@@ -293,7 +293,7 @@ export function Assistant(p: Props) {
             <span className="text-muted-foreground">Or just start typing, your words win.</span>
           </Bubble>
         )}
-        {askStory && p.watch?.kind === "ready" && (
+        {askStory && !p.composer && p.watch?.kind === "ready" && (
           <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={T.card} className="space-y-2">
             <Bubble from="outly">
               I watched it.
@@ -319,7 +319,7 @@ export function Assistant(p: Props) {
           </motion.div>
         )}
 
-        {askStory && p.watch?.kind === "failed" && (
+        {askStory && !p.composer && p.watch?.kind === "failed" && (
           <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={T.card} className="space-y-2">
             <Bubble from="outly">
               I couldn&apos;t watch it just now, the AI is busy. <span className="text-muted-foreground">Tell me about it yourself, or I can try again.</span>
@@ -358,7 +358,7 @@ export function Assistant(p: Props) {
 
         {p.hooks.error && <Bubble from="outly" className="text-destructive">{p.hooks.error}</Bubble>}
 
-        {result?.understood && (
+        {!p.composer && result?.understood && (
           <>
             <Bubble from="outly">
               <span className="font-semibold">Oh, I like this one.</span> {result.understood}

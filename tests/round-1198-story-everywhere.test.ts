@@ -5,7 +5,7 @@ import { ASK_KEYS, DECK_ASKS, isPipAsk, PIP_ASK_RULE, PIP_ASKS, STORY_ASKS } fro
 import { askProposal, pipOpensOn, pipTarget } from "../components/create/assistant-state";
 import { emptyDraft, type PlatformCopy } from "../components/create/types";
 import { platformCopyRequestSchema } from "../lib/validation";
-import { subtitlesLine } from "../components/create/VideoSubtitles";
+import { subtitleStatus } from "../components/create/VideoSubtitles";
 import { CAPTION_PLACEHOLDER } from "../components/create/StoryComposer";
 
 const src = (f: string) => readFileSync(f, "utf8").replace(/\r\n/g, "\n");
@@ -20,8 +20,14 @@ const creative = src("lib/ai/creative.ts");
 
 describe("R1198 Pip's asks", () => {
   test("Step 2 and Step 3 offer exactly the asks in the brief", () => {
-    expect(STORY_ASKS.map((a) => a.label)).toEqual(["Improve my hook", "Make it shorter", "Make it engaging", "Improve the CTA", "Adapt for another platform"]);
-    expect(DECK_ASKS.map((a) => a.label)).toEqual(["Improve this hook", "Make it shorter", "Improve the CTA", "Suggest relevant hashtags", "Adapt for the selected platform"]);
+    // R1206: the brief's four missing asks are in Step 2, and each platform's own ask is in Step 3.
+    expect(STORY_ASKS.map((a) => a.label)).toEqual(["Improve my hook", "Make it shorter", "Make it engaging", "Make it conversational", "Make it professional", "Rewrite in my voice", "Improve the CTA", "Suggest hashtags", "Adapt for another platform"]);
+    expect(DECK_ASKS.map((a) => a.label)).toEqual(["Improve this hook", "Make it shorter", "Improve the CTA", "Suggest relevant hashtags", "Write the title, description and keywords", "Lead with the lesson", "Say it in one post", "Adapt for the selected platform"]);
+    expect(DECK_ASKS.filter((a) => a.only).map((a) => [a.id, a.only])).toEqual([
+      ["ytmeta", ["youtube"]],
+      ["lesson", ["linkedin"]],
+      ["concise", ["x"]],
+    ]);
   });
   test("every ask has a rule for the model and the fields it may change; hashtags never touch the caption", () => {
     for (const a of PIP_ASKS) {
@@ -70,7 +76,7 @@ describe("R1198 Pip's asks", () => {
 
 describe("R1198 Step 2: Your caption", () => {
   test("one editor titled Your caption with the brief's placeholder, a count and the autosave line", () => {
-    expect(CAPTION_PLACEHOLDER).toBe("Write your caption, describe your video, or tell Pip what you want your audience to know...");
+    expect(CAPTION_PLACEHOLDER).toBe("Write your caption or describe what you want your audience to know...");
     expect(story).toContain('<label htmlFor="story-box">Your caption</label>');
     expect(story).toContain("<Counter value={p.story.length} max={ADAPT_MAX} />");
     expect(story).toContain('aria-describedby="story-box-status"');
@@ -88,14 +94,15 @@ describe("R1198 Step 2: Your caption", () => {
   });
   test("subtitles live in their own collapsed Video subtitles section, kept mounted", () => {
     expect(subs).toContain("Video subtitles");
-    expect(subs).toContain("Transcribe spoken words and synchronize subtitles with your video.");
+    expect(subs).toContain("Transcribe speech and create synchronized subtitles for your video.");
     expect(subs).toContain("useState(false)");
     expect(subs).toContain("hidden={!open}");
     expect(ws).toMatch(/<VideoSubtitles transcribing=\{capTranscribing\} burning=\{capBurning\}>\s*<CaptionBurner/);
-    expect(subtitlesLine(0, false)).toBe("None yet");
-    expect(subtitlesLine(1, false)).toBe("1 subtitle ready");
-    expect(subtitlesLine(12, false)).toBe("12 subtitles ready");
-    expect(subtitlesLine(12, true)).toContain("Transcribing");
+    const facts = { lines: 0, busy: null, failed: false, gaps: 0, english: false } as const;
+    expect(subtitleStatus(facts).label).toBe("Not generated yet");
+    expect(subtitleStatus({ ...facts, lines: 1 }).label).toBe("1 subtitle ready");
+    expect(subtitleStatus({ ...facts, lines: 12 }).label).toBe("12 subtitles ready");
+    expect(subtitleStatus({ ...facts, lines: 12, busy: "transcribe" }).label).toBe("Transcribing");
   });
   test("Pip opens on Your Story; a phone keeps it as a card so a sheet never covers the actions", () => {
     expect(pipOpensOn("story", true)).toBe(true);
@@ -115,10 +122,11 @@ describe("R1198 Step 3: Everywhere", () => {
     expect(deck).toContain("Review each platform&apos;s version. Make your final edits before publishing.");
     expect(deck).not.toContain("Your hook <Counter");
   });
-  test("the original caption panel: folded, view, edit with a question, use for this platform", () => {
-    for (const s of ["Original caption", "View original", "Edit source caption", "Use original caption", "Update platform captions too?", "Keep them as they are", "Keep this one"]) expect(deck).toContain(s);
-    expect(deck).toContain('if (p.regenerable.length && p.onRegenerate) setAsk("regen");');
-    expect(ws).toContain('onRegenerate={(pls) => void fetchCopy(pls, hook || firstSentence(story, 160), "rewrite")}');
+  test("the original caption panel: folded, view, read-only, use for this platform (R1206)", () => {
+    for (const s of ["Original caption", "View original", "Use original caption", "Keep this one", "Change your caption"]) expect(deck).toContain(s);
+    // R1206: the caption is written in exactly one place, so Step 3 never saves one.
+    for (const s of ["Edit source caption", "Save source caption", "Update platform captions too?", "Keep them as they are"]) expect(deck).not.toContain(s);
+    expect(ws).toContain('onEditSource={() => goTo("story"');
   });
   test("one editor at a time, and the page knows which one Pip works on", () => {
     expect(deck).toContain("onActive?.(linked.length && !shut ? active : null);");
@@ -141,9 +149,9 @@ describe("R1198 review fixes", () => {
     expect(body).toContain("reviewed: false");
     expect(body).toContain('suggest(s, { t: "reject", p: c.platform })');
   });
-  test("a place with no hashtags field (X) never offers the hashtags ask", () => {
+  test("a place with no hashtags field (X) never offers the hashtags ask, and a platform's own ask shows only there", () => {
     expect(acts).toContain('import { fieldsFor } from "./deck-logic";');
-    expect(acts).toContain('.filter((a) => a.id !== "hashtags" || !t || fieldsFor(t).hashtags)');
+    expect(acts).toContain('(a.id !== "hashtags" || !t || fieldsFor(t).hashtags) && (!a.only || (!!t && a.only.includes(t)))');
   });
   test("burning captions opens the subtitles section too", () => {
     expect(subs).toContain("burning");

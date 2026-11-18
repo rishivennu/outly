@@ -3,7 +3,7 @@ import { fmtHandle } from "@/lib/handle";
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import * as Switch from "@radix-ui/react-switch";
-import { AlertCircle, Check, ChevronDown, CircleAlert, ImageIcon, Link2, MessageSquarePlus, RefreshCw, Sparkles } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, CircleAlert, ImageIcon, Link2, MessageSquarePlus, Pencil, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Counter, Input, Label, Textarea } from "@/components/ui/field";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { SnippetBar } from "./SnippetBar";
 import { PlatformPreview } from "./PlatformPreview";
 import { SuggestionCard } from "./SuggestionCard";
-import { bodyKey, bodyRoom, clipTo, fieldsFor, isCustom, mainCaption, nextIndex, normalizeTags, previewDraft, previewNote, propagateMain, type FieldKey } from "./deck-logic";
+import { bodyKey, bodyRoom, clipTo, fieldsFor, nextIndex, normalizeTags, previewDraft, previewNote, type FieldKey } from "./deck-logic";
 import { enabledPlatforms, launchGate } from "./publish";
 import type { Proposal, Undo } from "./proposal";
 import type { AccountView, Draft } from "./types";
@@ -44,11 +44,10 @@ interface Props {
   onRevert: (p: Platform) => void;
   /** R1198: tells the page which platform is open in the editor (null when folded), so Pip works on that one. */
   onActive?: (p: Platform | null) => void;
-  /** R1198: the creator's original caption from Your Story, and a way to edit it here. */
+  /** R1206: the creator's one caption from Your caption, read-only here. It is written in exactly one place. */
   story?: string;
-  onStory?: (s: string) => void;
-  /** R1198: write these platforms again from the edited source. Edited ones get a suggestion, never an overwrite. */
-  onRegenerate?: (p: Platform[]) => void;
+  /** R1206: take the creator back to Your caption, the only place the caption is written. */
+  onEditSource?: () => void;
 }
 
 const READY_LABEL: Record<Platform, string> = { instagram: "Ready to go", youtube: "Wants a stronger title", x: "Make it impossible to ignore", tiktok: "Hook in the first second", threads: "Keep it conversational", facebook: "Ready for the feed", linkedin: "Lead with the lesson" };
@@ -112,28 +111,6 @@ export function PlatformDeck(p: Props) {
   // Skipped platforms are not in the gate at all, so switching one off can never hold up the launch.
   const { pending, ready } = launchGate(p.drafts, p.accounts, p.media, Object.keys(p.proposals) as Platform[]);
 
-  /* Main caption: one text for every place that follows it. A place with its own words is never touched. */
-  const shared = mainCaption(p.drafts);
-  const [typed, setTyped] = useState<string | null>(null);
-  const main = typed ?? shared;
-  const showMain = enabled.length >= 2;
-  const followers = enabled.filter((pl) => !isCustom(pl, p.drafts[pl], main));
-  const trimmedFor = followers.filter((pl) => clipTo(main, bodyRoom(pl, p.drafts[pl])).length < main.length);
-
-  const editMain = (v: string) => {
-    setTyped(v);
-    for (const { platform, patch } of propagateMain(p.drafts, v, main)) p.onDraft(platform, patch);
-  };
-  const follow = (pl: Platform, on: boolean) => {
-    if (!on) return p.onDraft(pl, { custom: true });
-    const own = p.drafts[pl][bodyKey(pl)];
-    if (!main.trim()) {
-      setTyped(own);
-      return p.onDraft(pl, { custom: false });
-    }
-    p.onDraft(pl, { custom: false, [bodyKey(pl)]: clipTo(main, bodyRoom(pl, p.drafts[pl])) });
-  };
-
   const markReviewed = (pl: Platform) => {
     p.onDraft(pl, { reviewed: true });
     const next = enabled.find((x) => x !== pl && !p.drafts[x].reviewed && linked.includes(x));
@@ -177,9 +154,6 @@ export function PlatformDeck(p: Props) {
               platform={active}
               checks={status[active].checks}
               onReviewed={() => markReviewed(active)}
-              showMain={showMain}
-              follows={followers.includes(active)}
-              onFollow={(on) => follow(active, on)}
             />
           </div>
         </div>
@@ -194,16 +168,13 @@ export function PlatformDeck(p: Props) {
           Now let&apos;s make it <span className="energy-text">fit everywhere.</span>
         </h2>
         <p className="mt-2 max-w-[60ch] text-pretty text-[15px] leading-relaxed text-muted-foreground">Review each platform&apos;s version. Make your final edits before publishing.</p>
-        {p.story?.trim() && p.onStory && (
+        {p.story?.trim() && (
           <SourceCaption
             story={p.story}
-            onStory={p.onStory}
+            onEditSource={p.onEditSource}
             active={linked.length && !shut ? active : null}
             activeWords={p.drafts[active][bodyKey(active)]}
             onUse={(text) => p.onDraft(active, { [bodyKey(active)]: clipTo(text, bodyRoom(active, p.drafts[active])), custom: true })}
-            regenerable={enabled.filter((pl) => linked.includes(pl))}
-            onRegenerate={p.onRegenerate}
-            online={p.online !== false}
           />
         )}
       </header>
@@ -312,22 +283,6 @@ export function PlatformDeck(p: Props) {
         )}
       </section>
 
-      {showMain && (
-        <section aria-labelledby={`${mainId}-mainl`} className="mb-6 rounded-3xl bg-secondary/30 p-4 hairline sm:p-5">
-          <Label htmlFor={`${mainId}-main`} id={`${mainId}-mainl`} className="text-sm text-foreground">
-            Main caption
-            <span className="tabular-nums text-xs text-muted-foreground">{main.length}</span>
-          </Label>
-          <Textarea id={`${mainId}-main`} rows={3} value={main} onChange={(e) => editMain(e.target.value)} aria-describedby={`${mainId}-mainh`} placeholder="Write it once. Every place set to use the main caption gets it." />
-          <p id={`${mainId}-mainh`} className="mt-2 text-[13px] text-muted-foreground" aria-live="polite">
-            {followers.length === 0
-              ? "Every place has its own caption now. Pick Use main caption on one to bring it back."
-              : `Used by ${followers.map((x) => PLATFORM_META[x].name).join(", ")}.`}
-            {trimmedFor.length > 0 && ` Trimmed to fit ${trimmedFor.map((x) => PLATFORM_META[x].name).join(", ")}.`}
-          </p>
-        </section>
-      )}
-
       {!shut && editor}
 
       <p className="mt-4 text-sm text-muted-foreground" aria-live="polite">
@@ -380,32 +335,21 @@ export function PlatformDeck(p: Props) {
 }
 
 /**
- * R1198: the creator's original caption from Your Story, folded by default. View it, edit it (then choose whether
- * the platform captions are written again from it), or put it on the open platform as it is. Nothing here
- * changes a platform's caption without the creator asking for exactly that.
+ * R1206: the one caption the creator wrote on Your caption, folded by default and read-only here. It can be viewed,
+ * put on the open platform as it is, or changed, which takes them back to the single editor. There is no second
+ * writer: a caption is written in exactly one place, and nothing here changes a platform's words unasked.
  */
 function SourceCaption(p: {
   story: string;
-  onStory: (s: string) => void;
   active: Platform | null;
   activeWords: string;
   onUse: (text: string) => void;
-  regenerable: Platform[];
-  onRegenerate?: (p: Platform[]) => void;
-  online: boolean;
+  onEditSource?: () => void;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
-  const [edit, setEdit] = useState<string | null>(null);
-  const [ask, setAsk] = useState<"regen" | "use" | null>(null);
+  const [ask, setAsk] = useState<"use" | null>(null);
   const name = p.active ? PLATFORM_META[p.active].name : "";
-  const save = () => {
-    const next = (edit ?? "").trim();
-    setEdit(null);
-    if (!next || next === p.story.trim()) return;
-    p.onStory(next);
-    if (p.regenerable.length && p.onRegenerate) setAsk("regen");
-  };
   const use = () => (p.activeWords.trim() && p.activeWords.trim() !== p.story.trim() ? setAsk("use") : p.onUse(p.story));
   return (
     <section aria-labelledby={`${id}-h`} className="mt-4 max-w-3xl rounded-2xl bg-secondary/30 hairline">
@@ -425,58 +369,22 @@ function SourceCaption(p: {
         </button>
       </h3>
       <div id={`${id}-body`} hidden={!open} className="px-3.5 pb-3.5">
-        {edit === null ? (
-          <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl bg-card px-3 py-2.5 text-[13px] leading-relaxed hairline" dir="auto">
-            {p.story}
-          </p>
-        ) : (
-          <>
-            <Label htmlFor={`${id}-edit`} className="sr-only">
-              Edit source caption
-            </Label>
-            <Textarea id={`${id}-edit`} rows={4} value={edit} maxLength={4000} onChange={(e) => setEdit(e.target.value)} className="text-[14px]" />
-          </>
-        )}
+        <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl bg-card px-3 py-2.5 text-[13px] leading-relaxed hairline" dir="auto">
+          {p.story}
+        </p>
+        <p className="mt-2 text-[13px] text-muted-foreground">Your caption is the one place it is written. Change it there and ask Pip again, and every platform follows.</p>
         <div className="mt-2.5 flex flex-wrap gap-2">
-          {edit === null ? (
-            <>
-              <Button type="button" size="sm" variant="subtle" className="min-h-11 rounded-full px-3.5" onClick={() => setEdit(p.story)}>
-                Edit source caption
-              </Button>
-              <Button type="button" size="sm" variant="ghost" className="min-h-11 rounded-full px-3.5" disabled={!p.active} onClick={use} title={p.active ? undefined : "Open a platform first."}>
-                Use original caption{name ? <span className="sr-only"> for {name}</span> : null}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button type="button" size="sm" variant="lime" className="min-h-11 rounded-full px-3.5" disabled={!edit.trim()} onClick={save}>
-                Save source caption
-              </Button>
-              <Button type="button" size="sm" variant="ghost" className="min-h-11 rounded-full px-3.5" onClick={() => setEdit(null)}>
-                Cancel
-              </Button>
-            </>
+          {p.onEditSource && (
+            <Button type="button" size="sm" variant="subtle" className="min-h-11 rounded-full px-3.5" onClick={p.onEditSource}>
+              <Pencil className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              Change your caption
+            </Button>
           )}
+          <Button type="button" size="sm" variant="ghost" className="min-h-11 rounded-full px-3.5" disabled={!p.active} onClick={use} title={p.active ? undefined : "Open a platform first."}>
+            Use original caption{name ? <span className="sr-only"> for {name}</span> : null}
+          </Button>
         </div>
       </div>
-      <ConfirmDialog
-        open={ask === "regen"}
-        onOpenChange={(o) => !o && setAsk(null)}
-        title="Update platform captions too?"
-        body={
-          p.online
-            ? "Your source caption is saved. Pip can write each platform's caption again from it. Empty ones are filled; the rest get a suggestion to accept or skip, so nothing is replaced without you."
-            : "Your source caption is saved. You're offline, so Pip can write the platform captions again once you reconnect."
-        }
-        confirmLabel="Update captions"
-        cancelLabel="Keep them as they are"
-        tone="primary"
-        disabled={!p.online}
-        onConfirm={() => {
-          setAsk(null);
-          p.onRegenerate?.(p.regenerable);
-        }}
-      />
       <ConfirmDialog
         open={ask === "use"}
         onOpenChange={(o) => !o && setAsk(null)}
@@ -519,7 +427,7 @@ function FieldChecks({ checks, field, id }: { checks: DeckCheck[]; field: CheckF
   );
 }
 
-type StageProps = Props & { platform: Platform; checks: DeckCheck[]; onReviewed: () => void; showMain: boolean; follows: boolean; onFollow: (on: boolean) => void };
+type StageProps = Props & { platform: Platform; checks: DeckCheck[]; onReviewed: () => void };
 
 function PlatformStage(p: StageProps) {
   const pl = p.platform;
@@ -552,7 +460,8 @@ function PlatformStage(p: StageProps) {
   const cap = HASHTAG_CAP[pl];
   const general = p.checks.filter((c) => !c.field || c.field === "media" || c.field === "account");
 
-  const editBody = (v: string) => set(p.showMain && p.follows ? { [f.body.key]: v, custom: true } : { [f.body.key]: v });
+  // R1206: there is no shared writer here any more, so typing in a place is always that place's own words.
+  const editBody = (v: string) => set({ [f.body.key]: v, custom: true });
 
   const acceptThen = (field: FieldKey | null) => {
     const proposal = p.proposals[pl];
@@ -651,29 +560,6 @@ function PlatformStage(p: StageProps) {
         )}
 
         <div>
-          {p.showMain && (
-            <div role="radiogroup" aria-label={`${f.body.label} source`} className="mb-3 inline-flex rounded-full bg-secondary/60 p-1 hairline">
-              {[
-                { on: true, label: "Use main caption" },
-                { on: false, label: "Customise" },
-              ].map((o) => (
-                <button
-                  key={o.label}
-                  type="button"
-                  role="radio"
-                  aria-checked={p.follows === o.on}
-                  onClick={() => p.follows !== o.on && p.onFollow(o.on)}
-                  className={cn(
-                    "min-h-11 rounded-full px-4 text-[13px] font-semibold transition-[background-color,color,transform] duration-press ease-out active:scale-[0.96] motion-reduce:transition-none",
-                    FOCUS,
-                    p.follows === o.on ? "bg-foreground text-background" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground",
-                  )}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          )}
           <Label htmlFor={fieldDom(id, f.body.key)}>
             {f.body.label} <Counter value={bodyLen} max={f.body.limit} />
           </Label>
@@ -687,7 +573,7 @@ function PlatformStage(p: StageProps) {
             aria-describedby={`${id}-body-h${has("body") ? ` ${id}-body-c` : ""}`}
           />
           <p id={`${id}-body-h`} className="mt-1.5 text-[13px] text-muted-foreground">
-            {p.showMain && p.follows ? "Follows the main caption. Typing here gives this place its own." : f.hashtags && d.hashtags.trim() ? "The count includes your hashtags." : pl === "x" ? "X has no hashtag field. Put any tags in the post." : "Only this place gets these words."}
+            {f.hashtags && d.hashtags.trim() ? "The count includes your hashtags." : pl === "x" ? "X has no hashtag field. Put any tags in the post." : "Only this place gets these words."}
           </p>
           <FieldChecks checks={p.checks} field="body" id={`${id}-body-c`} />
         </div>

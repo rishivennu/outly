@@ -37,7 +37,7 @@ interface Props {
 }
 
 /** R1198: the one writing box on Your Story. */
-export const CAPTION_PLACEHOLDER = "Write your caption, describe your video, or tell Pip what you want your audience to know...";
+export const CAPTION_PLACEHOLDER = "Write your caption or describe what you want your audience to know...";
 const EXAMPLE = "I tried the 5am routine for 30 days. Days 1 to 4 were rough, by week two I was getting more done before 9am than I used to all morning. Here's what actually made it work.";
 
 /**
