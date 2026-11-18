@@ -221,7 +221,9 @@ describe("audit: service worker and manifest", () => {
     for (const bad of ["//evil.example", "https://evil.example", "/\\evil.example", "", null, 7, "javascript:alert(1)"]) expect(safePath(bad)).toBe("/home");
   });
   test("admin windows are never reused for a creator's notification, and admin pages are never cached", () => {
-    expect(sw).toContain('!new URL(c.url).pathname.startsWith("/admin")');
+    // R1195: admin alerts reuse admin windows and creator notifications reuse creator windows, never across.
+    expect(sw).toContain('const admin = path.startsWith("/admin");');
+    expect(sw).toContain('new URL(c.url).pathname.startsWith("/admin") === admin');
     expect(sw).toContain('url.pathname.startsWith("/admin")');
   });
   test("one push with the same tag replaces the older one instead of stacking", () => {

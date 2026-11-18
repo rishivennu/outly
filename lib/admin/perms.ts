@@ -1,7 +1,7 @@
 /** Client-safe: shared by the admin sidebar and the server guards. */
 export type AdminRole = "super" | "finance" | "support" | "marketing";
 export const ADMIN_ROLES = ["super", "finance", "support", "marketing"] as const satisfies readonly AdminRole[];
-export type AdminArea = "overview" | "users" | "insights" | "payments" | "pricing" | "tickets" | "faq" | "integrations" | "outbox" | "team" | "site" | "platforms" | "retention" | "growth" | "plans" | "referrals" | "content" | "live";
+export type AdminArea = "overview" | "users" | "insights" | "payments" | "pricing" | "tickets" | "faq" | "integrations" | "outbox" | "team" | "site" | "platforms" | "retention" | "growth" | "plans" | "referrals" | "content" | "live" | "health";
 
 export const ROLE_LABEL: Record<AdminRole, string> = { super: "Super admin", finance: "Finance", support: "Support", marketing: "Marketing lead" };
 export const ROLE_BLURB: Record<AdminRole, string> = {
@@ -33,6 +33,8 @@ const ACCESS: Record<AdminArea, AdminRole[]> = {
   content: ["super", "marketing"],
   // R1184 Live Assist: talking to customers in real time is the support team's job (super admins can step in).
   live: ["super", "support"],
+  // R1195 Watchdog: System Health is operations; support sees it too (they take the "is it down?" tickets).
+  health: ["super", "support"],
 };
 
 export const can = (role: AdminRole | undefined | null, area: AdminArea) => !!role && ACCESS[area].includes(role);

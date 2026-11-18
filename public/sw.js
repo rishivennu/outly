@@ -275,7 +275,9 @@ self.addEventListener("notificationclick", (e) => {
           .then(() => tell({ type: "outlly:notice" }))
           .catch(() => {});
       const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-      const mine = all.filter((c) => new URL(c.url).origin === self.location.origin && !new URL(c.url).pathname.startsWith("/admin"));
+      /* R1195: a Watchdog alert points into the admin console, so it reuses an admin window; everything else keeps to member pages. */
+      const admin = path.startsWith("/admin");
+      const mine = all.filter((c) => new URL(c.url).origin === self.location.origin && new URL(c.url).pathname.startsWith("/admin") === admin);
       const at = (c) => {
         const u = new URL(c.url);
         return u.pathname + u.search;

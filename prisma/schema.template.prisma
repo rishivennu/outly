@@ -807,6 +807,8 @@ model AdminUser {
   liveAway     Boolean   @default(false) // R1184: marked themselves away, so customers aren't told someone is there
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  pushSubs AdminPushSub[] // R1195: alert devices
 }
 
 /// Notification feed for the admin bell (failed payments, new subscriptions, new tickets).
@@ -1759,4 +1761,109 @@ model BlogJobEvent {
   job       BlogJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([jobId, createdAt])
+}
+
+/// R1195 Watchdog: one row per health check run (pruned after the retention window).
+model HealthCheck {
+  id        String   @id @default(cuid())
+  service   String // registry id (lib/health/registry.ts)
+  status    String // ok | warning | critical | unknown
+  latencyMs Int?
+  detail    String   @default("") // redacted, one line
+  metrics   String   @default("{}") // JSON numbers for the Performance section
+  checkedAt DateTime @default(now())
+
+  @@index([service, checkedAt])
+  @@index([checkedAt])
+}
+
+/// R1195 Watchdog: a failure or degradation, grouped per service while it is open (repeats bump occurrences).
+model HealthIncident {
+  id                 String    @id @default(cuid())
+  service            String
+  severity           String // critical | warning | info
+  title              String
+  description        String    @default("")
+  errorDetail        String    @default("") // redacted, no keys / tokens / customer data
+  likelyCause        String    @default("") // estimated, never asserted
+  status             String    @default("open") // open | acknowledged | investigating | resolved
+  firstDetectedAt    DateTime  @default(now())
+  lastObservedAt     DateTime  @default(now())
+  resolvedAt         DateTime?
+  resolvedBy         String? // admin login, or "watchdog" after verified recovery
+  occurrences        Int       @default(1) // failed checks grouped into this incident
+  affectedCount      Int       @default(0) // operations affected, when the check can count them
+  okStreak           Int       @default(0) // consecutive passing checks since the last failure (recovery needs several)
+  assigneeId         String?
+  assigneeName       String?
+  ackById            String?
+  ackAt              DateTime?
+  escalatedAt        DateTime? // a warning that persisted or repeated and became critical
+  notifiedAt         DateTime? // admins told about this incident
+  lastReminderAt     DateTime? // last unresolved-critical reminder
+  recoveryNotifiedAt DateTime? // exactly one recovery notification
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  notes      HealthIncidentNote[]
+  deliveries HealthAlertDelivery[]
+
+  @@index([status, severity, firstDetectedAt])
+  @@index([service, status])
+  @@index([firstDetectedAt])
+}
+
+/// R1195 Watchdog: the audit trail on an incident (notes, status changes, assignments, acknowledgements).
+model HealthIncidentNote {
+  id         String   @id @default(cuid())
+  incidentId String
+  adminId    String? // null = the watchdog itself
+  adminName  String   @default("Watchdog")
+  kind       String // note | status | assign | ack | system
+  text       String
+  createdAt  DateTime @default(now())
+
+  incident HealthIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId, createdAt])
+}
+
+/// R1195 Watchdog: what was sent to whom, and whether the channel accepted it. Never says "delivered" on its own.
+model HealthAlertDelivery {
+  id         String   @id @default(cuid())
+  incidentId String?
+  kind       String // critical | warning | escalation | reminder | recovery | watchdog
+  channel    String // bell | push | email
+  adminId    String?
+  status     String // sent | failed | skipped
+  detail     String   @default("")
+  createdAt  DateTime @default(now())
+
+  incident HealthIncident? @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+
+  @@index([incidentId])
+  @@index([createdAt])
+}
+
+/// R1195 Watchdog: an admin's browser or Home Screen app that turned alert pushes on. Same Web Push stack as
+/// members (lib/push/webpush.ts), kept apart from WebPushSub so member cleanup never touches admin devices.
+model AdminPushSub {
+  id           String    @id @default(cuid())
+  adminId      String
+  endpointHash String    @unique
+  endpoint     String // encrypted
+  p256dh       String // encrypted
+  auth         String // encrypted
+  vapidKey     String
+  platform     String
+  device       String
+  client       String
+  failures     Int       @default(0)
+  createdAt    DateTime  @default(now())
+  lastSeenAt   DateTime  @default(now())
+  lastPushAt   DateTime?
+
+  admin AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
 }

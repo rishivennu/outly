@@ -45,7 +45,7 @@ export type PushAction = { action: string; title: string; href: string };
 /** A direct message thread, or one comment on a post (targetId as in lib/inbox.ts). */
 export type PushReply = { kind: "dm"; threadId: string } | { kind: "comment"; targetId: string; commentId: string };
 
-type Sub = { id: string; endpoint: string; p256dh: string; auth: string; vapidKey: string; failures: number };
+export type Sub = { id: string; endpoint: string; p256dh: string; auth: string; vapidKey: string; failures: number };
 
 const safeHref = (h?: string | null) => (h && /^\/(?![/\\])/.test(h) ? h : "/home");
 /** Our own files, or a picture on https (a platform's profile photo). Anything else is dropped. */
@@ -104,7 +104,10 @@ export function payloadOf(m: WebPushMessage) {
 export const endpointHash = (endpoint: string) => sha256(`webpush:${endpoint}`);
 
 /** "local" = our side failed (e.g. payload too large): the device is fine and must not be touched. */
-type SendOutcome = Outcome | "local";
+export type SendOutcome = Outcome | "local";
+
+/** R1195: one encrypted push to one device, no bookkeeping. The admin alert devices (lib/health/admin-push.ts) reuse it. */
+export const pushToSub = (sub: Sub, payload: string, ttl: number, urgency: string, tag: string) => post(sub, payload, ttl, urgency, tag);
 
 async function post(sub: Sub, payload: string, ttl: number, urgency: string, tag: string): Promise<{ outcome: SendOutcome; status: number | null }> {
   const v = await vapidKeys();

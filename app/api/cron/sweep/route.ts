@@ -42,11 +42,16 @@ async function sweep(req: NextRequest) {
   await import("@/lib/accounts").then((m) => m.resubscribeCommentsOnce()).catch((e) => console.error("[sweep] comment subs", e)); // 1141b, runs once
   await import("@/lib/analytics/sync").then((m) => m.syncMetrics({ budgetMs: 8_000 })).catch((e) => console.error("[sweep] metrics", e)); // 1140 analytics background sync
   await import("@/lib/blog/schedule").then((m) => m.kickBlogTick(req.nextUrl.origin)).catch((e) => console.error("[sweep] blog", e)); // R1178: due blog work runs in its own /api/cron/blog invocation
+  // R1195 Watchdog: the health cycle rides the sweep (no always-on worker here). Budgeted, after the creator-facing
+  // work, never fatal: monitoring must not delay a scheduled post. Services that do not fit stay due for next minute.
+  const health = await import("@/lib/health/engine")
+    .then((m) => m.runHealthCycle({ origin: m.originOf(req.nextUrl.origin), budgetMs: Math.max(6_000, Math.min(22_000, 46_000 - (Date.now() - startedAt))), source: "sweep" }))
+    .catch((e) => (console.error("[sweep] health", e), null));
   // Without Redis the jobs above are timers in this invocation: let them run before the response ends it
   // (1027). Budget = what is left of maxDuration minus 10 s of headroom; whatever is still running then is
   // held by waitUntil or picked up by the next sweep.
   const running = await settle(Math.max(0, 50_000 - (Date.now() - startedAt)));
-  return NextResponse.json({ ok: true, requeued, cleaned, files, reminders, push, assist, campaign, subs, running }, { headers: { "cache-control": "no-store" } });
+  return NextResponse.json({ ok: true, requeued, cleaned, files, reminders, push, assist, campaign, subs, health, running }, { headers: { "cache-control": "no-store" } });
 }
 
 /** 1147: trials every 5 minutes (expiry + reminders); signal pruning and the ledger/month sweep once an hour. */
