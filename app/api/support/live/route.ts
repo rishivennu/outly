@@ -32,7 +32,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("typing"), conversationId: Id }),
   z.object({ action: z.literal("read"), conversationId: Id, read: z.number().int().min(0).max(1e9) }),
   z.object({ action: z.literal("cancel"), conversationId: Id }),
-  z.object({ action: z.literal("leave"), conversationId: Id, text: z.string().max(4000).optional() }),
+  z.object({ action: z.literal("leave"), conversationId: Id, text: z.string().max(4000).optional(), cid: z.string().max(40).optional() }),
   z.object({ action: z.literal("csat"), conversationId: Id, helpful: z.boolean() }),
 ]);
 
@@ -62,7 +62,7 @@ export const POST = route(async (req, { user }) => {
     case "cancel":
       return json(await cancelRequest(who, b.conversationId), h);
     case "leave":
-      return json(await leaveMessage(who, { conversationId: b.conversationId, text: b.text }), h);
+      return json(await leaveMessage(who, { conversationId: b.conversationId, text: b.text, cid: b.cid }), h);
     case "csat":
       return json(await rate(who, { conversationId: b.conversationId, helpful: b.helpful }), h);
   }

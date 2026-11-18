@@ -4315,6 +4315,12 @@ html.theme-anim *::after {
 .pc-live-on { background: var(--pc-agent-fill); border-color: color-mix(in srgb, var(--pc-agent) 30%, var(--pc-line)); }
 .pc-live-on > p:first-child svg, .pc-live-ok { color: var(--pc-agent); }
 .pc-live-warn { background: color-mix(in srgb, var(--pc-warn) 9%, var(--pc-solid)); border-color: color-mix(in srgb, var(--pc-warn) 34%, var(--pc-line)); }
+/* R1205: Away is a hollow, muted dot; the label beside it says Away, so colour never carries the meaning alone. */
+.pc-dot.pc-dot-away { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+/* R1205: the live queue dot breathes while we connect. Off for reduced motion. */
+.pc-pulse { animation: pc-pulse 1.6s ease-out infinite; }
+@keyframes pc-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, hsl(var(--success)) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 6px color-mix(in srgb, hsl(var(--success)) 0%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .pc-pulse { animation: none; } }
 .pc-live-warn > p:first-child svg { color: var(--pc-warn); }
 .pc-unread { position: absolute; top: -2px; inset-inline-end: -2px; display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1; background: var(--pc-err); color: #fff; box-shadow: 0 0 0 2px var(--pc-solid); }
 .dark .pc-unread { color: #1a0505; }

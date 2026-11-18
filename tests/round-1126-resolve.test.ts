@@ -326,7 +326,7 @@ describe("chat widget", () => {
     expect(src).toMatch(/if \(r\.status === 404\) \{\s+setConv\(null\);/);
   });
   test("nothing else can send while resolved, and focus lands on Reopen", () => {
-    expect(src).toContain("{waitingEmail && !resolved && (");
+    expect(src).toContain("{waitingEmail && !signedIn && !resolved && (");
     // R1189: the welcome questions go through pick(), which refuses while resolved like send() does.
     expect(src).toContain("disabled={busy || !!resolved} onClick={() => pick(tp.id, q, i)}");
     expect(src).toMatch(/function pick\([^)]*\) \{\s+if \(busy \|\| resolved\) return;/);

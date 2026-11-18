@@ -7,7 +7,6 @@ import { limitShared } from "../rate-limit";
 import { adminEvent } from "../admin/route";
 import type { AdminSession } from "../admin/auth";
 import { ADMIN_ROLES, can, type AdminRole } from "../admin/perms";
-import { raiseTicket, type TranscriptLine } from "./tickets";
 import { nextSeqs, startConversation } from "./conversations";
 import {
   ABANDON_MS,
@@ -22,18 +21,21 @@ import {
   isClientId,
   isOnline,
   isTyping,
+  LEFT_KEEP_MS,
   LIVE_CATEGORIES,
   LIVE_PRIORITIES,
   mean,
   median,
   NOTE_MAX,
   QUEUE_SEEN_MS,
+  queueEta,
   startOfDay,
   SYS,
   sysText,
   type CustomerState,
   type LiveCategory,
   type LivePriority,
+  type QueueEta,
   type SessionStatus,
   type WireMsg,
   type WireRole,
@@ -149,7 +151,12 @@ export async function sweepAbandoned(now = Date.now(), force = false) {
   swept = now;
   const cut = new Date(now - ABANDON_MS);
   const rows = await db.supportSession.findMany({
-    where: { status: "waiting", OR: [{ customerSeenAt: { lt: cut } }, { customerSeenAt: null, requestedAt: { lt: cut } }] },
+    // R1205: a request the customer left a message on stays in the queue (for LEFT_KEEP_MS), browser or not.
+    where: {
+      status: "waiting",
+      OR: [{ customerSeenAt: { lt: cut } }, { customerSeenAt: null, requestedAt: { lt: cut } }],
+      history: { none: { action: "leave_message", createdAt: { gt: new Date(now - LEFT_KEEP_MS) } } },
+    },
     select: { id: true, conversationId: true },
     take: 50,
   });
@@ -193,6 +200,12 @@ export type CustomerSnapshot = {
   session: { id: string; status: string; agent: string | null; requestedAt: string; acceptedAt: string | null; endedAt: string | null; canRate: boolean; rated: boolean } | null;
   position: number | null;
   agentsOnline: number | null;
+  /** R1205: "1min" only while a specialist is online, nobody is ahead and the wait is under a minute (queueEta). */
+  eta: QueueEta;
+  /** R1205: how long this request has been waiting, by the server's clock (null unless waiting). */
+  waitedMs: number | null;
+  /** R1205: the last message number this customer had on screen, so a fresh tab counts only what is really new. */
+  readUpTo: number;
   messages: WireMsg[];
   cursor: number;
   more: boolean;
@@ -242,10 +255,12 @@ export async function customerPoll(userId: string, o: { conversationId: string; 
     if (writes.length) await Promise.all(writes);
   }
 
+  const state = customerState(shown, { agentsOnline: online ?? 1, now });
+  const waitedMs = s?.status === "waiting" ? Math.max(0, now - s.requestedAt.getTime()) : null;
   return {
     conversationId: conv.id,
     mode: conv.mode,
-    state: customerState(shown, { agentsOnline: online ?? 1, now }),
+    state,
     conversationState: conversationState(conv.mode, s?.status ?? null),
     session: s
       ? {
@@ -261,6 +276,9 @@ export async function customerPoll(userId: string, o: { conversationId: string; 
       : null,
     position,
     agentsOnline: online,
+    eta: queueEta({ state, agentsOnline: online, position, waitedMs }),
+    waitedMs,
+    readUpTo: s ? Math.max(s.custReadSeq, o.read == null || !Number.isFinite(o.read) ? 0 : Math.min(Math.floor(o.read), conv.seq)) : 0,
     messages: rows.map((m) => wire(m, "customer")),
     cursor,
     more: rows.length === TAKE,
@@ -316,7 +334,7 @@ export async function requestHuman(
     return { ...(await customerPoll(userId, { conversationId: open.conversationId })), created: false };
   }
   if (!(await limitShared(`live-request:${userId}`, 6, 3600_000)).ok)
-    throw new HttpError(429, "You've asked for our support team a few times in the last hour. Leave a message instead and we'll follow up by email.", "RATE_LIMITED");
+    throw new HttpError(429, "You've asked for our support team a few times in the last hour. Give it a little while, then ask again here.", "RATE_LIMITED");
   if (conv && (conv.status === "resolved" || conv.mode === "resolved")) conv = null;
   const convId = conv?.id ?? (await startConversation(userId, message || "Talk to our support team")).id;
 
@@ -327,7 +345,7 @@ export async function requestHuman(
 
   // R1194: "create or reuse the existing support ticket". A ticket this customer already has open (last 14 days)
   // is linked, so the specialist sees it. No new ticket is opened here: the request itself is the record (one
-  // row, one queue place), and a ticket only appears when the customer leaves a message for an email reply.
+  // row, one queue place). R1205: leaving a message no longer makes one either; the answer comes in this chat.
   const openTicket = await db.ticket.findFirst({ where: { userId, status: { not: "resolved" }, createdAt: { gt: new Date(Date.now() - 14 * DAY) } }, orderBy: { createdAt: "desc" }, select: { id: true, ref: true } });
   const created = await db
     .$transaction(async (tx) => {
@@ -399,6 +417,9 @@ export async function customerSend(userId: string, o: { conversationId: string; 
       return post(tx, conv.id, { role: "user", text, clientId: cid });
     });
     changed();
+    // R1205: words written while nobody is online are a message left for the team, same as Leave a message: the
+    // request stays queued and the chat says the message is saved. With a specialist online it is just a message.
+    if (conv.mode === "waiting" && (await agentsOnline()) < 1) await noteLeft(userId, conv.id, liveId).catch(() => {});
     return { message: wire(m, "customer"), duplicate: false };
   } catch (e: any) {
     if (e?.code === "P2002") {
@@ -440,31 +461,42 @@ export async function cancelRequest(userId: string, conversationId: string) {
 }
 
 /**
- * "Leave a message": the conversation so far becomes a ticket (the existing ticket flow: email to the customer,
- * bell for the team), the request ends, and Pip is back. Works with or without an open request.
+ * R1205: a message was left on a waiting request. Once per request: one "Your message is saved in this chat" line and
+ * one leave_message history row (the abandoned-request sweep keeps these queued). Both checks run inside one
+ * transaction on the session row, so two sends at once still write each only once. True when this call wrote them.
  */
-export async function leaveMessage(userId: string, o: { conversationId: string; text?: unknown }) {
-  const conv = await ownConversation(userId, o.conversationId);
-  const extra = cleanText(o.text);
-  if (!(await limitShared(`live-leave:${userId}`, 5, 3600_000)).ok) throw new HttpError(429, "You've left a few messages already. We'll follow up on those by email.", "RATE_LIMITED");
-  const user = await db.user.findUnique({ where: { id: userId }, select: { name: true, email: true } });
-  if (!user) throw NOT_FOUND();
-  const rows = await db.pipMessage.findMany({ where: { conversationId: conv.id, role: { in: ["user", "pip", "agent"] } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 20, select: { role: true, text: true, authorName: true } });
-  rows.reverse();
-  const transcript: TranscriptLine[] = rows.map((r) => ({ role: r.role === "user" ? "user" : "bot", text: r.role === "agent" ? `${firstName(r.authorName)} (support): ${r.text}` : r.text }));
-  if (extra) transcript.push({ role: "user", text: extra });
-  if (!transcript.some((t) => t.role === "user")) throw new HttpError(400, "Write what you need help with, then leave it for us.", "EMPTY");
-  const t = await raiseTicket({ email: user.email, name: user.name, userId, transcript, reason: "asked_human" });
-  const ref = t.ticket.ref;
-  const liveId = conv.liveId;
-  await db.$transaction(async (tx) => {
-    const s = liveId ? await tx.supportSession.findFirst({ where: { id: liveId, userId, status: { in: OPEN } }, select: { id: true, status: true, agentId: true } }) : null;
-    const r = s ? await tx.supportSession.updateMany({ where: { id: s.id, status: s.status }, data: { status: "ticket", ticketId: t.ticket.id, endedAt: new Date(), endedBy: "customer", customerTypingAt: null } }) : { count: 0 };
-    await post(tx, conv.id, { role: "system", text: sysText(SYS.ticket, ref) }, r.count ? { mode: "ai", liveId: null } : {});
-    if (s && r.count) await log(tx, s.id, "ticket", null, { fromId: s.agentId, note: ref });
+async function noteLeft(userId: string, conversationId: string, liveId: string) {
+  const said = await db.$transaction(async (tx) => {
+    const s = await tx.supportSession.findFirst({ where: { id: liveId, userId, status: "waiting" }, select: { id: true, requestedAt: true } });
+    if (!s) return false;
+    await tx.supportSession.update({ where: { id: s.id }, data: { customerSeenAt: new Date() } });
+    const before = await tx.pipMessage.findFirst({ where: { conversationId, role: "system", text: SYS.left, createdAt: { gte: s.requestedAt } }, select: { id: true } });
+    const had = await tx.supportAssignment.findFirst({ where: { sessionId: s.id, action: "leave_message" }, select: { id: true } });
+    if (!had) await log(tx, s.id, "leave_message", null, { note: "Left a message in the chat" });
+    if (before) return false;
+    await post(tx, conversationId, { role: "system", text: sysText(SYS.left) });
+    return true;
   });
-  changed();
-  return { ref, ...(await customerPoll(userId, { conversationId: conv.id })) };
+  if (said) {
+    changed();
+    handoffLog("leave", { userId, conversationId, sessionId: liveId });
+  }
+  return said;
+}
+
+/**
+ * R1205 "Leave a message", when no specialist is free: the words go into this same chat (no ticket, no email),
+ * the request stays in the queue even after the customer closes the tab, and a specialist answers right here.
+ * One "Your message is saved in this chat" line per request. Needs a request that is still waiting.
+ */
+export async function leaveMessage(userId: string, o: { conversationId: string; text?: unknown; cid?: unknown }) {
+  const conv = await ownConversation(userId, o.conversationId);
+  if (!conv.liveId || conv.mode !== "waiting") throw NOT_LIVE();
+  if (!(await limitShared(`live-leave:${userId}`, 10, 3600_000)).ok) throw new HttpError(429, "That's a lot of messages at once. A specialist will read the ones already in this chat.", "RATE_LIMITED");
+  const liveId = conv.liveId;
+  if (cleanText(o.text)) await customerSend(userId, { conversationId: conv.id, text: o.text, cid: o.cid });
+  await noteLeft(userId, conv.id, liveId);
+  return customerPoll(userId, { conversationId: conv.id });
 }
 
 /** One answer per resolved chat: 1 = helpful, 0 = not. */

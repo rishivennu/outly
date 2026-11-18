@@ -30,9 +30,13 @@ type Msg = {
 type Snap = {
   conversationId: string; mode: string; state: CustomerState; conversationState?: string; position: number | null; messages: WireMsg[]; cursor: number; more: boolean; typing: string | null;
   session: { id: string; status: string; agent: string | null; canRate: boolean; rated: boolean } | null; receipts: { delivered: number; read: number };
+  // R1205: the server's queue estimate ("1min" or none), how long it has waited, and what this person already read.
+  eta?: "1min" | null; waitedMs?: number | null; readUpTo?: number; agentsOnline?: number | null;
 };
-type LiveInfo = { agent: string | null; position: number | null; canRate: boolean; rated: boolean; typing: string | null; receipts: { delivered: number; read: number } };
-const NO_LIVE: LiveInfo = { agent: null, position: null, canRate: false, rated: false, typing: null, receipts: { delivered: 0, read: 0 } };
+type LiveInfo = { agent: string | null; position: number | null; canRate: boolean; rated: boolean; typing: string | null; receipts: { delivered: number; read: number }; eta: "1min" | null; late: boolean };
+const NO_LIVE: LiveInfo = { agent: null, position: null, canRate: false, rated: false, typing: null, receipts: { delivered: 0, read: 0 }, eta: null, late: false };
+/** R1205: past this, a request still waiting gets the honest update (same number as the server's ETA_MS). */
+const ETA_MS = 60_000;
 const LIVE_STATES: WidgetState[] = ["none", "waiting", "unavailable", "connected", "resolved", "connecting", "reconnecting"];
 /** Waiting for, or talking with, a support specialist: Pip stays out of it. */
 const inLive = (s: WidgetState) => s === "waiting" || s === "connected" || s === "unavailable" || s === "reconnecting" || s === "connecting";
@@ -143,6 +147,10 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const [hasLive, setHasLive] = useState(false);
   // R1194: "Continue waiting" pressed: the two buttons fold away and the queue line stays.
   const [ack, setAck] = useState(false);
+  // R1205: is anyone from the support team online right now (the server's yes or no; null until it answers)?
+  const [teamOnline, setTeamOnline] = useState<boolean | null>(null);
+  // R1205: "Leave a message" pressed with nothing typed: say where to write it.
+  const [leaveHint, setLeaveHint] = useState(false);
   const [unread, setUnread] = useState(0);
   const cursorRef = useRef<number | null>(null);
   const liveRef = useRef<WidgetState>("none");
@@ -327,20 +335,60 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   }, [busy, resolved, conv, msgs, lang, fails, escalate, path, live, inStudio]);
   // R1194: the queue place and the chat come back in a fresh tab or after a restart: the server knows which
   // conversation this person is waiting in. Asked once per mount, only with nothing restored from this tab.
+  // R1205: also a few seconds after any page loads (Pip closed), so a reply that came while this person was away
+  // shows on the launcher's badge without them opening Pip first.
   useEffect(() => {
-    if (!open || !signedIn || conv || resumedRef.current) return;
-    resumedRef.current = true;
-    fetch("/api/support/live?resume=1", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        if (!j || typeof j.conversationId !== "string" || convRef.current) return;
-        cursorRef.current = null;
-        setHasLive(true);
-        applyLive(j as Snap);
-      })
-      .catch(() => {});
+    if (!signedIn || conv || resumedRef.current) return;
+    const go = () => {
+      if (resumedRef.current || convRef.current) return;
+      resumedRef.current = true;
+      fetch("/api/support/live?resume=1", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          if (!j || typeof j.conversationId !== "string" || convRef.current) return;
+          cursorRef.current = null;
+          setHasLive(true);
+          applyLive(j as Snap);
+        })
+        .catch(() => {});
+    };
+    if (open) { go(); return; }
+    const id = window.setTimeout(go, 3_000);
+    return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, signedIn, conv]);
+
+  // R1205: "Human support · Online" only when the server says a specialist checked in within the last 90 s. Asked on
+  // open and every 30 s while Pip is open outside a live chat (the queue panel has its own, per-request answer).
+  useEffect(() => {
+    if (!open || !signedIn || inLive(live)) return;
+    let stop = false;
+    const ask = () => {
+      if (document.hidden) return;
+      fetch("/api/support/live", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => { if (!stop) setTeamOnline(j && typeof j.online === "boolean" ? j.online : null); })
+        .catch(() => { if (!stop) setTeamOnline(null); });
+    };
+    ask();
+    const id = window.setInterval(ask, 30_000);
+    const onVis = () => { if (!document.hidden) ask(); };
+    document.addEventListener("visibilitychange", onVis);
+    // An old answer is never shown on the next open: it is asked again first.
+    return () => { stop = true; window.clearInterval(id); document.removeEventListener("visibilitychange", onVis); setTeamOnline(null); };
+  }, [open, signedIn, live]);
+
+  // R1205: the one-minute estimate ends on time, even between check-ins. The end is the server's own wait count
+  // (waitedMs) plus the time since that answer; the next check-in confirms it. The state itself is never guessed.
+  const etaEndRef = useRef(0);
+  useEffect(() => {
+    if (live !== "waiting" || liveInfo.eta !== "1min" || liveInfo.late || !etaEndRef.current) return;
+    const id = window.setTimeout(() => {
+      setLiveInfo((i) => (i.eta === "1min" && !i.late ? { ...i, late: true } : i));
+      setAnnounce(liveT(lang).waitingLong);
+    }, Math.max(0, etaEndRef.current - Date.now()));
+    return () => window.clearTimeout(id);
+  }, [live, liveInfo.eta, liveInfo.late, lang]);
 
   // ---------- R1184 Live Assist, the customer side ----------
   // Every state shown comes from the server's answer (a real queue row), never from a timer in the browser.
@@ -358,15 +406,29 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     // own words. A message from another tab still shows: it carries its client id.
     const incoming = (Array.isArray(j.messages) ? j.messages : []).filter((m) => m.role !== "pip" && (m.role !== "user" || on || !!m.cid));
     const known = new Set(msgsRef.current.map((m) => m.sid).filter(Boolean));
-    const fresh = incoming.filter((m) => m.role === "agent" && !known.has(m.id)).length;
+    // R1205: new words from the specialist, or the line saying one joined, that this person hasn't had on screen.
+    const seenTo = typeof j.readUpTo === "number" ? j.readUpTo : 0;
+    const fresh = incoming.filter((m) => !known.has(m.id) && (m.seq ?? 0) > seenTo && (m.role === "agent" || (m.role === "system" && m.text.startsWith("live.connected")))).length;
     if (incoming.length) setMsgs((x) => mergeLive(x, incoming, (m) => liveMsg(m, l, idRef.current++)).filter((m) => m.kind !== "sys" || !!m.text));
     if (fresh && !openRef.current) setUnread((n) => n + fresh);
     if (j.conversationId !== convRef.current) { convRef.current = j.conversationId; setConv(j.conversationId); }
     if (j.session) setHasLive(true);
-    setLiveInfo({ agent: j.session?.agent ?? null, position: j.position ?? null, canRate: !!j.session?.canRate, rated: !!j.session?.rated, typing: typeof j.typing === "string" ? j.typing : null, receipts: j.receipts ?? NO_LIVE.receipts });
+    setLiveInfo({
+      agent: j.session?.agent ?? null, position: j.position ?? null, canRate: !!j.session?.canRate, rated: !!j.session?.rated, typing: typeof j.typing === "string" ? j.typing : null, receipts: j.receipts ?? NO_LIVE.receipts,
+      eta: j.eta === "1min" ? "1min" : null, late: typeof j.waitedMs === "number" && j.waitedMs >= ETA_MS,
+    });
+    etaEndRef.current = j.eta === "1min" && typeof j.waitedMs === "number" ? Date.now() + ETA_MS - j.waitedMs : 0;
     if (next !== prev) {
       liveRef.current = next;
       setLive(next);
+      if (next !== "unavailable") setLeaveHint(false);
+      // R1205: told nobody was free, and now a specialist is online with this request still queued: say so here,
+      // and on the launcher when Pip is closed.
+      if (prev === "unavailable" && next === "waiting") {
+        setMsgs((x) => [...x.filter((m) => !(m.kind === "sys" && m.text === l.available)), { role: "bot", text: l.available, kind: "sys", id: idRef.current++ }]);
+        setAnnounce(l.available);
+        if (!openRef.current) setUnread((n) => n + 1);
+      }
       if (next !== "waiting" && next !== "unavailable") alreadyRef.current = false;
       if (next === "waiting" || next === "unavailable") setAck(false);
       // Waiting, connected and resolved arrive as lines in the log (read out there). Unavailable has no line.
@@ -505,8 +567,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     try {
       const r = await fetch("/api/support/live", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "request", source, ...(conv ? { conversationId: conv } : {}), ...(last ? { message: last.text, ...(last.cid ? { cid: last.cid } : {}) } : {}) }) });
       const j = await r.json().catch(() => ({}));
-      // Signed out in another tab: the email ticket still reaches the team.
-      if (r.status === 401) { liveRef.current = "none"; setLive("none"); askEmail(); return; }
+      // Signed out in another tab: say so (R1205: never an email form instead of the chat).
+      if (r.status === 401) { liveRef.current = "none"; setLive("none"); push({ role: "bot", text: l.signedOut, kind: "error" }); return; }
       if (!r.ok) throw new Error(typeof j.error === "string" ? j.error : l.error);
       // "Connecting" stays up long enough to read.
       const wait = 600 - (Date.now() - began);
@@ -525,8 +587,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
       liveRef.current = "none";
       setLive("none");
       push({ role: "bot", text: e instanceof Error && e.message ? e.message : l.error, kind: "error" });
-      // The request didn't go through: an email ticket still reaches the team.
-      askEmail();
+      // R1205: the request didn't go through. The chat stays as it was and the offer comes back to try again.
+      push({ role: "bot", text: l.offer, kind: "connect", offer: true });
     } finally {
       setLiveBusy("");
     }
@@ -554,7 +616,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
         setAnnounce(liveT(lang).thanks);
         return;
       }
-      if (action === "leave") { setInput(""); if (typeof j.ref === "string") setTicket((x) => ({ ...x, ref: j.ref })); }
+      if (action === "leave") { setInput(""); setLeaveHint(false); }
       applyLive(j as Snap);
       requestAnimationFrame(() => inputRef.current?.focus());
     } catch (e) {
@@ -562,6 +624,13 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     } finally {
       setLiveBusy("");
     }
+  }
+
+  // R1205: Leave a message never leaves the chat. With nothing typed yet it points at the composer; with words it sends them.
+  function leaveHere() {
+    const text = input.trim();
+    if (!text) { setLeaveHint(true); requestAnimationFrame(() => inputRef.current?.focus()); return; }
+    liveAction("leave", { text, cid: newCid() });
   }
 
   // open from anywhere: window.dispatchEvent(new CustomEvent("outly:chat-open", { detail: "optional question" }))
@@ -887,6 +956,12 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                   <span className="pc-badge-resolved pc-fade inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"><Check className="h-3 w-3" aria-hidden />{rt.status}</span>
                 ) : liveOn ? (
                   <><Headset className={cn("h-3.5 w-3.5 shrink-0", live === "connected" && "pc-live-ok")} aria-hidden /><span className="truncate">{live === "connected" ? (liveInfo.agent ? lt.agentLabel(liveInfo.agent) : lt.statusConnected) : live === "unavailable" ? lt.statusUnavailable : live === "reconnecting" ? lt.statusReconnecting : lt.statusWaiting}</span></>
+                ) : signedIn && teamOnline === null ? (
+                  /* R1205: not known yet, or the check failed: name the service, claim nothing. */
+                  <span className="truncate">{lt.humanLabel}</span>
+                ) : signedIn ? (
+                  /* R1205: Online only when the backend says a specialist is online right now; the words carry the meaning, not the dot. */
+                  <><span className={cn("pc-dot h-1.5 w-1.5 shrink-0 rounded-full", !teamOnline && "pc-dot-away")} aria-hidden /><span className="min-w-0 leading-tight">{teamOnline ? lt.humanOnline : lt.humanAway}</span></>
                 ) : (
                   <><span className="pc-dot h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden /><span className="truncate">{t.status}</span></>
                 )}
@@ -1110,7 +1185,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                 )}
               </div>
 
-              {waitingEmail && !resolved && (
+              {waitingEmail && !signedIn && !resolved && (
                 <form onSubmit={raise} className="pc-card pc-in mt-3 p-3" aria-describedby="pc-email-why">
                   <label htmlFor="pc-email" className="text-[14px] font-medium">{t.email}</label>
                   <p id="pc-email-why" className="sr-only">{t.escalate}</p>
@@ -1159,9 +1234,20 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
               <div className={cn("pc-live pc-in mb-2 p-3", live === "connected" && "pc-live-on", (live === "unavailable" || live === "reconnecting") && "pc-live-warn")}>
                 <p className="flex items-start gap-2 text-[14px] font-medium leading-snug">
                   {live === "connecting" || live === "reconnecting" ? <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden /> : <Headset className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />}
-                  <span>{live === "connecting" ? lt.connecting : live === "waiting" ? lt.waiting : live === "unavailable" ? lt.unavailable : live === "reconnecting" ? lt.reconnecting : liveInfo.agent ? lt.agentLabel(liveInfo.agent) : lt.connected}</span>
+                  <span>{live === "connecting" ? lt.connecting : live === "waiting" ? (liveInfo.late ? lt.waitingLong : liveInfo.eta === "1min" ? lt.waitingEta : lt.waiting) : live === "unavailable" ? lt.unavailable : live === "reconnecting" ? lt.reconnecting : liveInfo.agent ? lt.agentLabel(liveInfo.agent) : lt.connected}</span>
                 </p>
-                {live === "waiting" && liveInfo.position != null && <p className="pc-muted mt-1 ps-6 text-[13px]">{lt.position(liveInfo.position)}</p>}
+                {/* R1205: the queue status comes from the backend. The one-minute estimate shows only while a specialist is online,
+                    this person is first in line and has waited under a minute; after that the honest update replaces it. */}
+                {(live === "waiting" || live === "unavailable") && (
+                  <div className="pc-muted mt-1.5 space-y-0.5 ps-6 text-[13px] leading-snug">
+                    <p className="flex items-center gap-1.5">
+                      <span className={cn("pc-dot h-1.5 w-1.5 shrink-0 rounded-full", live === "unavailable" ? "pc-dot-away" : "pc-pulse")} aria-hidden />
+                      {live === "unavailable" ? lt.queueAway : liveInfo.eta === "1min" && !liveInfo.late ? lt.queueConnecting : lt.queueWaiting}
+                    </p>
+                    {live === "waiting" && liveInfo.eta === "1min" && !liveInfo.late && <p>{lt.etaLine}</p>}
+                    {live === "waiting" && !(liveInfo.eta === "1min" && !liveInfo.late) && liveInfo.position != null && <p>{lt.position(liveInfo.position)}</p>}
+                  </div>
+                )}
                 {live !== "connecting" && (
                   <div className="mt-2 flex flex-wrap gap-2 ps-6">
                     {live === "connected" ? (
@@ -1171,18 +1257,13 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                       <button type="button" onClick={() => { setAck(true); inputRef.current?.focus(); }} disabled={!!liveBusy} className="pc-btn pc-btn-primary">{lt.continueWaiting}</button>
                       <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{lt.cancel}</button>
                     </>) : (<>
-                      <button type="button" onClick={() => liveAction("leave", input.trim() ? { text: input.trim() } : {})} disabled={!!liveBusy} className={cn("pc-btn", live === "unavailable" && "pc-btn-primary")}>{liveBusy === "leave" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{liveBusy === "leave" ? lt.leaving : lt.leave}</button>
+                      <button type="button" onClick={leaveHere} disabled={!!liveBusy} className={cn("pc-btn", live === "unavailable" && "pc-btn-primary")}>{liveBusy === "leave" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{liveBusy === "leave" ? lt.leaving : lt.leave}</button>
                       <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{live === "unavailable" ? lt.keepPip : lt.cancel}</button>
                     </>)}
                   </div>
                 )}
-                {/* R1194: email is optional and explained: leaving a message makes a ticket that is answered by email. */}
-                {live === "waiting" && !ack && (
-                  <p className="pc-muted mt-2 ps-6 text-[13px] leading-snug">
-                    {lt.emailWhy(me?.email ?? user?.email ?? null)}{" "}
-                    <button type="button" onClick={() => liveAction("leave", input.trim() ? { text: input.trim() } : {})} disabled={!!liveBusy} className="pc-link font-medium">{liveBusy === "leave" ? lt.leaving : lt.leave}</button>
-                  </p>
-                )}
+                {/* R1205: no email, no ticket. A message left here stays in this chat and the request stays in the queue. */}
+                {leaveHint && (live === "waiting" || live === "unavailable") && <p className="pc-muted mt-2 ps-6 text-[13px] leading-snug">{lt.leaveHint}</p>}
                 {liveErr && <p role="alert" className="pc-error mt-2 ps-6 text-[13px]">{liveErr}</p>}
               </div>
             )}

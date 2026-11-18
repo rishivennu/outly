@@ -104,7 +104,7 @@ describe("the agreed words", () => {
     expect(LIVE_EN.connecting).toBe("Sending your request to our support team...");
     expect(LIVE_EN.waiting).toBe("You're in the support queue. Your conversation is saved. An Outlly support specialist will join this chat.");
     expect(LIVE_EN.connected).toBe("You're now connected with an Outlly support specialist.");
-    expect(LIVE_EN.unavailable).toBe("Our support team has received your request. No specialist is available just yet, but your conversation is saved. You can leave this chat and return later.");
+    expect(LIVE_EN.unavailable).toBe("No specialist is available right now. Your conversation is saved. Leave a message here and a specialist will reply in this chat.");
     expect(LIVE_EN.reconnecting).toBe("Connection interrupted. We're trying to reconnect you...");
     expect(LIVE_EN.resolved).toBe("Your conversation with our support team has been marked as resolved. If you need anything else, you can start another conversation.");
   });
@@ -120,7 +120,7 @@ describe("the agreed words", () => {
   test("stored status codes read in the customer's words and in the console's", () => {
     const t = liveT("en");
     expect(liveSysLine(t, "live.requested")).toBe(LIVE_EN.handoff);
-    expect(liveSysLine(t, "live.connected|Priya")).toBe("You're now connected with Priya.");
+    expect(liveSysLine(t, "live.connected|Priya")).toBe("You're now connected with Priya. They'll assist you here.");
     expect(liveSysLine(t, "live.connected")).toBe(LIVE_EN.connected);
     expect(liveSysLine(t, "live.resolved")).toBe(LIVE_EN.resolved);
     expect(liveSysLine(t, "live.ticket|T-1234")).toContain("T-1234");
@@ -141,7 +141,7 @@ describe("pure rules", () => {
     expect(core.customerState({ status: "resolved", requestedAt: new Date(now) }, { agentsOnline: 0 })).toBe("resolved");
     expect(core.customerState({ status: "waiting", requestedAt: new Date(now) }, { agentsOnline: 1, now })).toBe("waiting");
     expect(core.customerState({ status: "waiting", requestedAt: new Date(now) }, { agentsOnline: 0, now })).toBe("unavailable");
-    expect(core.customerState({ status: "waiting", requestedAt: new Date(now - 11 * 60_000) }, { agentsOnline: 2, now })).toBe("unavailable");
+    expect(core.customerState({ status: "waiting", requestedAt: new Date(now - 11 * 60_000) }, { agentsOnline: 2, now })).toBe("waiting");
     for (const st of ["cancelled", "returned", "ticket"]) expect(core.customerState({ status: st, requestedAt: new Date(now) }, { agentsOnline: 1 })).toBe("none");
   });
   test("receipts: sending, failed, sent, delivered, read", () => {
@@ -429,19 +429,24 @@ describe("cancel, leave a message, back to Pip", () => {
     expect(await err(live.agentSend(a.s, r.session!.id, { text: "hello?" }))).toEqual({ status: 409, code: "ENDED" });
   });
 
-  test("leave a message: the chat so far becomes a ticket and the request ends", async () => {
+  // R1205: no ticket and no email. The message stays in this chat and the request stays in the queue.
+  test("leave a message: the words stay in this chat and the request stays queued", async () => {
     await nobodyOnline();
     const u = await mkUser("leave");
     const r = await live.requestHuman(u.id, { message: "My Instagram post failed to publish" });
     expect(r.state).toBe("unavailable");
-    const left = await live.leaveMessage(u.id, { conversationId: r.conversationId, text: "It was the 9am reel." });
-    expect(left.ref).toMatch(/^T-/);
-    expect({ state: left.state, mode: left.mode }).toEqual({ state: "none", mode: "ai" });
+    const left = await live.leaveMessage(u.id, { conversationId: r.conversationId, text: "It was the 9am reel.", cid: cid() });
+    expect("ref" in left).toBe(false);
+    expect({ state: left.state, mode: left.mode }).toEqual({ state: "unavailable", mode: "waiting" });
     const row = await db.supportSession.findUniqueOrThrow({ where: { id: r.session!.id } });
-    expect(row.status).toBe("ticket");
-    const t = await db.ticket.findFirstOrThrow({ where: { id: row.ticketId! } });
-    expect(t.userId).toBe(u.id);
-    expect(await db.pipMessage.count({ where: { conversationId: r.conversationId, text: `live.ticket|${left.ref}` } })).toBe(1);
+    expect({ status: row.status, ticketId: row.ticketId }).toEqual({ status: "waiting", ticketId: null });
+    expect(await db.pipMessage.count({ where: { conversationId: r.conversationId, role: "user", text: "It was the 9am reel." } })).toBe(1);
+    expect(await db.pipMessage.count({ where: { conversationId: r.conversationId, text: "live.left" } })).toBe(1);
+    // A second leave adds the words but not a second notice.
+    await live.leaveMessage(u.id, { conversationId: r.conversationId, text: "Also the 6pm one.", cid: cid() });
+    expect(await db.pipMessage.count({ where: { conversationId: r.conversationId, text: "live.left" } })).toBe(1);
+    expect(await db.supportAssignment.count({ where: { sessionId: r.session!.id, action: "leave_message" } })).toBe(1);
+    await live.cancelRequest(u.id, r.conversationId);
   });
 
   test("a specialist hands the chat back to Pip", async () => {

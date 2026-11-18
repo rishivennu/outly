@@ -160,20 +160,19 @@ describe("intent: an explicit ask for a person is recognised, nothing else is", 
 
 describe("the words", () => {
   test("Pip's one handoff line, the queue line, the repeat line and the named connection, in every language", () => {
-    expect(LIVE_EN.handoff).toBe("I can connect you with our support team right here. I'll notify an available specialist. You can continue chatting in this conversation while you wait.");
+    expect(LIVE_EN.handoff).toBe("Connecting you with a support specialist now. You can keep writing here while you wait.");
     expect(LIVE_EN.already).toBe("You're already in the support queue. A specialist will join this chat as soon as one is available.");
-    expect(LIVE_EN.connectedWith("Priya")).toBe("You're now connected with Priya.");
+    expect(LIVE_EN.connectedWith("Priya")).toBe("You're now connected with Priya. They'll assist you here.");
     expect(LIVE_EN.continueWaiting).toBe("Continue waiting");
     expect(LIVE_EN.cancel).toBe("Cancel support request");
-    expect(LIVE_EN.emailWhy("a@b.co")).toContain("a@b.co");
-    expect(LIVE_EN.emailWhy(null)).toContain("email");
+    expect("emailWhy" in LIVE_EN).toBe(false);
     for (const l of ["hi", "es", "fr", "de", "pt", "ar", "zh", "ja", "ru", "id", "bn"] as const) {
       const t = liveT(l);
       expect({ l, ok: t.handoff !== LIVE_EN.handoff && t.already !== LIVE_EN.already && t.connectedWith("X").includes("X") }).toEqual({ l, ok: true });
     }
     const t = liveT("en");
     expect(liveSysLine(t, "live.requested")).toBe(LIVE_EN.handoff);
-    expect(liveSysLine(t, "live.connected|Priya")).toBe("You're now connected with Priya.");
+    expect(liveSysLine(t, "live.connected|Priya")).toBe("You're now connected with Priya. They'll assist you here.");
   });
   test("the old dead-end copy is gone from the widget and the bot", () => {
     const widget = readFileSync("components/support/ChatWidget.tsx", "utf8");
@@ -185,7 +184,7 @@ describe("the words", () => {
       expect(src).not.toContain("Open ticket");
     }
     expect(widget).toContain("lt.continueWaiting");
-    expect(widget).toContain("lt.emailWhy(");
+    expect(widget).not.toContain("emailWhy");
     expect(widget).toMatch(/\b(lt|liveT\(lang\))\.already\b/);
     expect(widget).toContain("/api/support/live?resume=1");
     // The connect question is sent to the server for a signed-in person (the server starts the handoff, no second question).
@@ -240,6 +239,8 @@ describe("the brief's sequence, through the real chat route", () => {
       "user:Connect me with a support specialist.",
       "system:live.requested",
       "user:Connect me in chat.",
+      // Nobody is online, so the first words while waiting are kept as a left message: one line, once.
+      "system:live.left",
       "user:Connect to live support.",
       "user:Also my reel failed to publish yesterday",
     ]);
@@ -252,7 +253,7 @@ describe("the brief's sequence, through the real chat route", () => {
     await signIn(u.id);
     const j = await (await GET(liveRoute.GET as Handler, "/api/support/live?resume=1")).json();
     expect({ conv: j.conversationId, mode: j.mode, state: j.conversationState, sid: j.session.id }).toEqual({ conv, mode: "waiting", state: "WAITING_FOR_AGENT", sid });
-    expect(j.messages.length).toBe(5);
+    expect(j.messages.length).toBe(6);
     // Nobody online: the honest line, never "connecting".
     expect(j.state).toBe("unavailable");
     await live.heartbeat(A.s);
@@ -268,7 +269,7 @@ describe("the brief's sequence, through the real chat route", () => {
     const p = await live.customerPoll(u.id, { conversationId: conv });
     expect({ state: p.state, mode: p.mode, cs: p.conversationState, agent: p.session!.agent }).toEqual({ state: "connected", mode: "human", cs: "HUMAN_ACTIVE", agent: core.firstName(win.name) });
     const line = p.messages.find((m) => m.role === "system" && m.text.startsWith("live.connected"))!;
-    expect(liveSysLine(liveT("en"), line.text)).toBe(`You're now connected with ${core.firstName(win.name)}.`);
+    expect(liveSysLine(liveT("en"), line.text)).toBe(`You're now connected with ${core.firstName(win.name)}. They'll assist you here.`);
     expect(await db.pipMessage.count({ where: { conversationId: conv, text: { startsWith: "live.connected" } } })).toBe(1);
   });
 
@@ -349,7 +350,7 @@ describe("cancel, a ticket already open, the button, a visitor", () => {
     const row = await db.supportSession.findUniqueOrThrow({ where: { id: sid } });
     expect(row.duplicates).toBe(2);
     const texts = (await db.pipMessage.findMany({ where: { conversationId: conv1 }, orderBy: { seq: "asc" }, select: { text: true } })).map((m) => m.text);
-    expect(texts).toEqual(["Connect me with a support specialist.", "live.requested", "Connect me in chat."]);
+    expect(texts).toEqual(["Connect me with a support specialist.", "live.requested", "Connect me in chat.", "live.left"]);
   });
 
   test("'connect me to support' typed into the live route while waiting is counted too, said once by the widget", async () => {

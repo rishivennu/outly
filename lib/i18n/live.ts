@@ -25,8 +25,6 @@ export type LiveT = {
   already: string;
   /** R1194: "You're now connected with Priya." (the specialist's first name). */
   connectedWith: (name: string) => string;
-  /** R1194: why an email is optional, under the queue line. */
-  emailWhy: (email: string | null) => string;
   leave: string;
   leaving: string;
   left: (ref: string) => string;
@@ -57,6 +55,24 @@ export type LiveT = {
   statusUnavailable: string;
   statusReconnecting: string;
   unread: (n: number) => string;
+  /** R1205: the queue line while a specialist is online and nobody is ahead (the first minute only). */
+  waitingEta: string;
+  /** R1205: the honest update once the first minute has passed. */
+  waitingLong: string;
+  queueConnecting: string;
+  queueWaiting: string;
+  queueAway: string;
+  etaLine: string;
+  /** R1205: a specialist came online while the customer was told nobody was available. */
+  available: string;
+  /** R1205: the live.left status line: the message stays in this chat. */
+  leftHere: string;
+  leaveHint: string;
+  signedOut: string;
+  /** R1205: the header, from the server's yes or no (never shown before it answers). */
+  humanOnline: string;
+  humanAway: string;
+  humanLabel: string;
 };
 
 const en: LiveT = {
@@ -67,15 +83,14 @@ const en: LiveT = {
   waiting: "You're in the support queue. Your conversation is saved. An Outlly support specialist will join this chat.",
   position: (n) => (n <= 1 ? "You're next in line." : `You're number ${n} in line.`),
   connected: "You're now connected with an Outlly support specialist.",
-  unavailable: "Our support team has received your request. No specialist is available just yet, but your conversation is saved. You can leave this chat and return later.",
+  unavailable: "No specialist is available right now. Your conversation is saved. Leave a message here and a specialist will reply in this chat.",
   reconnecting: "Connection interrupted. We're trying to reconnect you...",
   resolved: "Your conversation with our support team has been marked as resolved. If you need anything else, you can start another conversation.",
   cancel: "Cancel support request",
   continueWaiting: "Continue waiting",
-  handoff: "I can connect you with our support team right here. I'll notify an available specialist. You can continue chatting in this conversation while you wait.",
+  handoff: "Connecting you with a support specialist now. You can keep writing here while you wait.",
   already: "You're already in the support queue. A specialist will join this chat as soon as one is available.",
-  connectedWith: (n) => `You're now connected with ${n}.`,
-  emailWhy: (e) => (e ? `Prefer email? Leave a message and we'll reply to ${e}.` : "Prefer email? Leave a message and we'll follow up by email."),
+  connectedWith: (n) => `You're now connected with ${n}. They'll assist you here.`,
   leave: "Leave a message",
   leaving: "Saving your message...",
   left: (ref) => `Got it. Your message is saved as ticket ${ref} and we'll follow up by email.`,
@@ -106,6 +121,19 @@ const en: LiveT = {
   statusUnavailable: "Team unavailable",
   statusReconnecting: "Reconnecting",
   unread: (n) => (n === 1 ? "1 new message from support" : `${n} new messages from support`),
+  waitingEta: "You're in the queue. Please wait approximately 1 minute while we connect you to a support specialist.",
+  waitingLong: "Still connecting you. It's taking longer than a minute, and your place in the queue is kept.",
+  queueConnecting: "Queue status: Connecting to a specialist",
+  queueWaiting: "Queue status: Waiting for a specialist",
+  queueAway: "Queue status: No specialist available right now",
+  etaLine: "Estimated wait: Approximately 1 minute",
+  available: "A support specialist is online now, and you're still in the queue.",
+  leftHere: "Your message is saved in this chat. A specialist will reply here as soon as one is available.",
+  leaveHint: "Write your message below and send it. A specialist will reply in this chat.",
+  signedOut: "You're signed out. Sign in again to talk to our support team here.",
+  humanOnline: "Human support · Online",
+  humanAway: "Human support · Away",
+  humanLabel: "Human support",
 };
 
 const hi: Partial<LiveT> = {
@@ -116,15 +144,14 @@ const hi: Partial<LiveT> = {
   waiting: "आप सपोर्ट कतार में हैं। आपकी बातचीत सहेज ली गई है। Outlly का सपोर्ट विशेषज्ञ इस चैट में जुड़ेगा।",
   position: (n) => (n <= 1 ? "अगली बारी आपकी है।" : `कतार में आपका नंबर ${n} है।`),
   connected: "अब आप Outlly सपोर्ट विशेषज्ञ से जुड़ गए हैं।",
-  unavailable: "हमारी सपोर्ट टीम को आपका अनुरोध मिल गया है। अभी कोई विशेषज्ञ उपलब्ध नहीं है, लेकिन आपकी बातचीत सहेज ली गई है। आप यह चैट छोड़कर बाद में वापस आ सकते हैं।",
+  unavailable: "अभी कोई विशेषज्ञ उपलब्ध नहीं है। आपकी बातचीत सहेज ली गई है। यहीं संदेश छोड़ें, विशेषज्ञ इसी चैट में जवाब देंगे।",
   reconnecting: "कनेक्शन टूट गया। हम आपको फिर से जोड़ने की कोशिश कर रहे हैं...",
   resolved: "हमारी सपोर्ट टीम के साथ आपकी बातचीत हल के रूप में चिह्नित कर दी गई है। कुछ और चाहिए तो आप नई बातचीत शुरू कर सकते हैं।",
   cancel: "सपोर्ट अनुरोध रद्द करें",
   continueWaiting: "इंतज़ार जारी रखें",
-  handoff: "मैं आपको यहीं हमारी सपोर्ट टीम से जोड़ सकता हूँ। मैं उपलब्ध विशेषज्ञ को सूचित कर दूँगा। इंतज़ार के दौरान आप इसी बातचीत में लिखते रह सकते हैं।",
+  handoff: "मैं आपको अभी सपोर्ट विशेषज्ञ से जोड़ रहा हूँ। इंतज़ार के दौरान आप यहीं लिखते रह सकते हैं।",
   already: "आप पहले से सपोर्ट कतार में हैं। जैसे ही कोई विशेषज्ञ उपलब्ध होगा, वह इस चैट में जुड़ जाएगा।",
-  connectedWith: (n) => `अब आप ${n} से जुड़ गए हैं।`,
-  emailWhy: (e) => (e ? `ईमेल पसंद है? संदेश छोड़ें, हम ${e} पर जवाब देंगे।` : "ईमेल पसंद है? संदेश छोड़ें, हम ईमेल से जवाब देंगे।"),
+  connectedWith: (n) => `अब आप ${n} से जुड़ गए हैं। वे यहीं आपकी मदद करेंगे।`,
   leave: "संदेश छोड़ें",
   leaving: "आपका संदेश सहेजा जा रहा है...",
   left: (ref) => `ठीक है। आपका संदेश टिकट ${ref} के रूप में सहेज लिया गया है, हम ईमेल से संपर्क करेंगे।`,
@@ -144,6 +171,19 @@ const hi: Partial<LiveT> = {
   error: "अभी हम सपोर्ट टीम तक नहीं पहुँच पाए। थोड़ी देर में फिर कोशिश करें।",
   statusWaiting: "कतार में", statusConnected: "सपोर्ट विशेषज्ञ", statusUnavailable: "टीम उपलब्ध नहीं", statusReconnecting: "फिर से जोड़ रहे हैं",
   unread: (n) => `सपोर्ट से ${n} नए संदेश`,
+  waitingEta: "आप कतार में हैं। कृपया लगभग 1 मिनट प्रतीक्षा करें, हम आपको सपोर्ट विशेषज्ञ से जोड़ रहे हैं।",
+  waitingLong: "हम अभी भी आपको जोड़ रहे हैं। इसमें एक मिनट से ज़्यादा लग रहा है, कतार में आपकी जगह बनी हुई है।",
+  queueConnecting: "कतार की स्थिति: विशेषज्ञ से जोड़ा जा रहा है",
+  queueWaiting: "कतार की स्थिति: विशेषज्ञ का इंतज़ार",
+  queueAway: "कतार की स्थिति: अभी कोई विशेषज्ञ उपलब्ध नहीं",
+  etaLine: "अनुमानित प्रतीक्षा: लगभग 1 मिनट",
+  available: "एक सपोर्ट विशेषज्ञ अभी ऑनलाइन है, और आप अभी भी कतार में हैं।",
+  leftHere: "आपका संदेश इस चैट में सहेज लिया गया है। विशेषज्ञ उपलब्ध होते ही यहीं जवाब देंगे।",
+  leaveHint: "नीचे अपना संदेश लिखकर भेजें। विशेषज्ञ इसी चैट में जवाब देंगे।",
+  signedOut: "आप साइन आउट हो गए हैं। हमारी सपोर्ट टीम से यहाँ बात करने के लिए फिर से साइन इन करें।",
+  humanOnline: "ह्यूमन सपोर्ट · ऑनलाइन",
+  humanAway: "ह्यूमन सपोर्ट · अभी उपलब्ध नहीं",
+  humanLabel: "ह्यूमन सपोर्ट",
 };
 
 const es: Partial<LiveT> = {
@@ -154,15 +194,14 @@ const es: Partial<LiveT> = {
   waiting: "Estás en la cola de soporte. Tu conversación está guardada. Un especialista de soporte de Outlly se unirá a este chat.",
   position: (n) => (n <= 1 ? "Eres el siguiente." : `Eres el número ${n} en la cola.`),
   connected: "Ya estás conectado con un especialista de soporte de Outlly.",
-  unavailable: "Nuestro equipo de soporte recibió tu solicitud. Todavía no hay un especialista disponible, pero tu conversación está guardada. Puedes salir de este chat y volver más tarde.",
+  unavailable: "Ahora mismo no hay ningún especialista disponible. Tu conversación está guardada. Deja un mensaje aquí y un especialista te responderá en este chat.",
   reconnecting: "Se interrumpió la conexión. Estamos intentando reconectarte...",
   resolved: "Tu conversación con nuestro equipo de soporte se marcó como resuelta. Si necesitas algo más, puedes iniciar otra conversación.",
   cancel: "Cancelar solicitud de soporte",
   continueWaiting: "Seguir esperando",
-  handoff: "Puedo conectarte con nuestro equipo de soporte aquí mismo. Avisaré a un especialista disponible. Puedes seguir escribiendo en esta conversación mientras esperas.",
+  handoff: "Te estoy conectando con un especialista de soporte. Puedes seguir escribiendo aquí mientras esperas.",
   already: "Ya estás en la cola de soporte. Un especialista se unirá a este chat en cuanto haya uno disponible.",
-  connectedWith: (n) => `Ahora estás conectado con ${n}.`,
-  emailWhy: (e) => (e ? `¿Prefieres correo? Deja un mensaje y te responderemos a ${e}.` : "¿Prefieres correo? Deja un mensaje y te responderemos por correo."),
+  connectedWith: (n) => `Ya estás conectado con ${n}. Te ayudará aquí mismo.`,
   leave: "Dejar un mensaje",
   leaving: "Guardando tu mensaje...",
   left: (ref) => `Listo. Tu mensaje quedó guardado como el ticket ${ref} y te responderemos por correo.`,
@@ -182,6 +221,19 @@ const es: Partial<LiveT> = {
   error: "No pudimos contactar a nuestro equipo de soporte ahora. Inténtalo de nuevo en un momento.",
   statusWaiting: "En la cola", statusConnected: "Especialista de soporte", statusUnavailable: "Equipo no disponible", statusReconnecting: "Reconectando",
   unread: (n) => (n === 1 ? "1 mensaje nuevo de soporte" : `${n} mensajes nuevos de soporte`),
+  waitingEta: "Estás en la cola. Espera aproximadamente 1 minuto mientras te conectamos con un especialista de soporte.",
+  waitingLong: "Seguimos conectándote. Está tardando más de un minuto, pero conservas tu lugar en la cola.",
+  queueConnecting: "Estado de la cola: conectando con un especialista",
+  queueWaiting: "Estado de la cola: esperando a un especialista",
+  queueAway: "Estado de la cola: ningún especialista disponible ahora",
+  etaLine: "Espera estimada: aproximadamente 1 minuto",
+  available: "Ya hay un especialista de soporte en línea y sigues en la cola.",
+  leftHere: "Tu mensaje está guardado en este chat. Un especialista te responderá aquí en cuanto esté disponible.",
+  leaveHint: "Escribe tu mensaje abajo y envíalo. Un especialista te responderá en este chat.",
+  signedOut: "Se cerró tu sesión. Inicia sesión de nuevo para hablar aquí con nuestro equipo de soporte.",
+  humanOnline: "Soporte humano · En línea",
+  humanAway: "Soporte humano · No disponible",
+  humanLabel: "Soporte humano",
 };
 
 const fr: Partial<LiveT> = {
@@ -192,15 +244,14 @@ const fr: Partial<LiveT> = {
   waiting: "Tu es dans la file d'attente de l'assistance. Ta conversation est enregistrée. Un spécialiste de l'assistance Outlly rejoindra ce chat.",
   position: (n) => (n <= 1 ? "Vous êtes le prochain." : `Vous êtes numéro ${n} dans la file.`),
   connected: "Vous êtes maintenant en contact avec un spécialiste de l'assistance Outlly.",
-  unavailable: "Notre équipe d'assistance a bien reçu ta demande. Aucun spécialiste n'est disponible pour le moment, mais ta conversation est enregistrée. Tu peux quitter ce chat et revenir plus tard.",
+  unavailable: "Aucun spécialiste n'est disponible pour le moment. Ta conversation est enregistrée. Laisse un message ici et un spécialiste te répondra dans ce chat.",
   reconnecting: "Connexion interrompue. Nous essayons de vous reconnecter...",
   resolved: "Votre conversation avec notre équipe d'assistance a été marquée comme résolue. Si vous avez besoin d'autre chose, vous pouvez démarrer une nouvelle conversation.",
   cancel: "Annuler la demande d'assistance",
   continueWaiting: "Continuer d'attendre",
-  handoff: "Je peux te mettre en relation avec notre équipe d'assistance ici même. Je préviens un spécialiste disponible. Tu peux continuer à écrire dans cette conversation en attendant.",
+  handoff: "Je te mets en relation avec un spécialiste de l'assistance. Tu peux continuer à écrire ici pendant l'attente.",
   already: "Tu es déjà dans la file d'attente. Un spécialiste rejoindra ce chat dès qu'il sera disponible.",
-  connectedWith: (n) => `Tu es maintenant en relation avec ${n}.`,
-  emailWhy: (e) => (e ? `Tu préfères l'e-mail ? Laisse un message et nous te répondrons à ${e}.` : "Tu préfères l'e-mail ? Laisse un message et nous te répondrons par e-mail."),
+  connectedWith: (n) => `Tu es maintenant en relation avec ${n}, qui va t'aider ici.`,
   leave: "Laisser un message",
   leaving: "Enregistrement de votre message...",
   left: (ref) => `C'est noté. Votre message est enregistré sous le ticket ${ref} et nous vous répondrons par e-mail.`,
@@ -220,6 +271,19 @@ const fr: Partial<LiveT> = {
   error: "Impossible de joindre notre équipe d'assistance pour le moment. Réessayez dans un instant.",
   statusWaiting: "Dans la file", statusConnected: "Spécialiste de l'assistance", statusUnavailable: "Équipe indisponible", statusReconnecting: "Reconnexion",
   unread: (n) => (n === 1 ? "1 nouveau message de l'assistance" : `${n} nouveaux messages de l'assistance`),
+  waitingEta: "Tu es dans la file d'attente. Patiente environ 1 minute pendant que nous te mettons en relation avec un spécialiste de l'assistance.",
+  waitingLong: "Nous essayons toujours de te mettre en relation. Cela prend plus d'une minute, et tu gardes ta place dans la file.",
+  queueConnecting: "État de la file : mise en relation avec un spécialiste",
+  queueWaiting: "État de la file : en attente d'un spécialiste",
+  queueAway: "État de la file : aucun spécialiste disponible pour le moment",
+  etaLine: "Attente estimée : environ 1 minute",
+  available: "Un spécialiste de l'assistance est en ligne, et tu es toujours dans la file.",
+  leftHere: "Ton message est enregistré dans ce chat. Un spécialiste te répondra ici dès qu'il sera disponible.",
+  leaveHint: "Écris ton message ci-dessous et envoie-le. Un spécialiste te répondra dans ce chat.",
+  signedOut: "Tu es déconnecté. Reconnecte-toi pour parler ici à notre équipe d'assistance.",
+  humanOnline: "Assistance humaine · En ligne",
+  humanAway: "Assistance humaine · Indisponible",
+  humanLabel: "Assistance humaine",
 };
 
 const de: Partial<LiveT> = {
@@ -230,15 +294,14 @@ const de: Partial<LiveT> = {
   waiting: "Du bist in der Support-Warteschlange. Deine Unterhaltung ist gespeichert. Eine Fachperson aus dem Outlly-Support kommt in diesen Chat.",
   position: (n) => (n <= 1 ? "Du bist als Nächstes dran." : `Du bist Nummer ${n} in der Warteschlange.`),
   connected: "Du bist jetzt mit einer Outlly Support-Fachkraft verbunden.",
-  unavailable: "Unser Support-Team hat deine Anfrage erhalten. Gerade ist niemand verfügbar, aber deine Unterhaltung ist gespeichert. Du kannst diesen Chat verlassen und später zurückkommen.",
+  unavailable: "Gerade ist keine Fachperson verfügbar. Deine Unterhaltung ist gespeichert. Hinterlass hier eine Nachricht, dann antwortet dir eine Fachperson in diesem Chat.",
   reconnecting: "Verbindung unterbrochen. Wir versuchen, dich wieder zu verbinden...",
   resolved: "Deine Unterhaltung mit unserem Support-Team wurde als gelöst markiert. Wenn du noch etwas brauchst, kannst du eine neue Unterhaltung starten.",
   cancel: "Support-Anfrage abbrechen",
   continueWaiting: "Weiter warten",
-  handoff: "Ich kann dich hier direkt mit unserem Support-Team verbinden. Ich benachrichtige eine verfügbare Fachperson. Du kannst in dieser Unterhaltung weiterschreiben, während du wartest.",
+  handoff: "Ich verbinde dich jetzt mit einer Fachperson aus dem Support. Du kannst hier weiterschreiben, während du wartest.",
   already: "Du bist bereits in der Support-Warteschlange. Eine Fachperson kommt in diesen Chat, sobald jemand frei ist.",
-  connectedWith: (n) => `Du bist jetzt mit ${n} verbunden.`,
-  emailWhy: (e) => (e ? `Lieber per E-Mail? Hinterlass eine Nachricht und wir antworten an ${e}.` : "Lieber per E-Mail? Hinterlass eine Nachricht und wir antworten per E-Mail."),
+  connectedWith: (n) => `Du bist jetzt mit ${n} verbunden. ${n} hilft dir hier weiter.`,
   leave: "Nachricht hinterlassen",
   leaving: "Deine Nachricht wird gespeichert...",
   left: (ref) => `Erledigt. Deine Nachricht ist als Ticket ${ref} gespeichert und wir melden uns per E-Mail.`,
@@ -258,6 +321,19 @@ const de: Partial<LiveT> = {
   error: "Wir konnten unser Support-Team gerade nicht erreichen. Versuch es gleich noch einmal.",
   statusWaiting: "In der Warteschlange", statusConnected: "Support-Fachkraft", statusUnavailable: "Team nicht erreichbar", statusReconnecting: "Verbindet neu",
   unread: (n) => (n === 1 ? "1 neue Nachricht vom Support" : `${n} neue Nachrichten vom Support`),
+  waitingEta: "Du bist in der Warteschlange. Bitte warte etwa 1 Minute, während wir dich mit einer Fachperson aus dem Support verbinden.",
+  waitingLong: "Wir verbinden dich noch. Es dauert länger als eine Minute, dein Platz in der Warteschlange bleibt erhalten.",
+  queueConnecting: "Warteschlange: Verbindung mit einer Fachperson",
+  queueWaiting: "Warteschlange: Warten auf eine Fachperson",
+  queueAway: "Warteschlange: Gerade keine Fachperson verfügbar",
+  etaLine: "Geschätzte Wartezeit: etwa 1 Minute",
+  available: "Eine Fachperson aus dem Support ist jetzt online, und du bist weiter in der Warteschlange.",
+  leftHere: "Deine Nachricht ist in diesem Chat gespeichert. Eine Fachperson antwortet dir hier, sobald jemand verfügbar ist.",
+  leaveHint: "Schreib unten deine Nachricht und sende sie ab. Eine Fachperson antwortet dir in diesem Chat.",
+  signedOut: "Du wurdest abgemeldet. Melde dich wieder an, um hier mit unserem Support-Team zu sprechen.",
+  humanOnline: "Persönlicher Support · Online",
+  humanAway: "Persönlicher Support · Nicht verfügbar",
+  humanLabel: "Persönlicher Support",
 };
 
 const pt: Partial<LiveT> = {
@@ -268,15 +344,14 @@ const pt: Partial<LiveT> = {
   waiting: "Você está na fila do suporte. Sua conversa está salva. Um especialista do suporte da Outlly vai entrar neste chat.",
   position: (n) => (n <= 1 ? "Você é o próximo da fila." : `Você é o número ${n} da fila.`),
   connected: "Agora você está conectado a um especialista de suporte da Outlly.",
-  unavailable: "Nossa equipe de suporte recebeu seu pedido. Ainda não há um especialista disponível, mas sua conversa está salva. Você pode sair deste chat e voltar depois.",
+  unavailable: "Nenhum especialista está disponível agora. Sua conversa está salva. Deixe uma mensagem aqui e um especialista responderá neste chat.",
   reconnecting: "Conexão interrompida. Estamos tentando reconectar você...",
   resolved: "Sua conversa com nossa equipe de suporte foi marcada como resolvida. Se precisar de mais alguma coisa, pode iniciar outra conversa.",
   cancel: "Cancelar pedido de suporte",
   continueWaiting: "Continuar esperando",
-  handoff: "Posso te conectar com a nossa equipe de suporte aqui mesmo. Vou avisar um especialista disponível. Você pode continuar escrevendo nesta conversa enquanto espera.",
+  handoff: "Estou conectando você com um especialista de suporte. Você pode continuar escrevendo aqui enquanto espera.",
   already: "Você já está na fila do suporte. Um especialista vai entrar neste chat assim que houver alguém disponível.",
-  connectedWith: (n) => `Agora você está conectado com ${n}.`,
-  emailWhy: (e) => (e ? `Prefere e-mail? Deixe uma mensagem e respondemos em ${e}.` : "Prefere e-mail? Deixe uma mensagem e respondemos por e-mail."),
+  connectedWith: (n) => `Agora você está conectado com ${n}, que vai ajudar você aqui.`,
   leave: "Deixar uma mensagem",
   leaving: "Salvando sua mensagem...",
   left: (ref) => `Pronto. Sua mensagem foi salva como o ticket ${ref} e responderemos por e-mail.`,
@@ -296,6 +371,19 @@ const pt: Partial<LiveT> = {
   error: "Não conseguimos falar com nossa equipe de suporte agora. Tente de novo em instantes.",
   statusWaiting: "Na fila", statusConnected: "Especialista de suporte", statusUnavailable: "Equipe indisponível", statusReconnecting: "Reconectando",
   unread: (n) => (n === 1 ? "1 nova mensagem do suporte" : `${n} novas mensagens do suporte`),
+  waitingEta: "Você está na fila. Aguarde aproximadamente 1 minuto enquanto conectamos você com um especialista de suporte.",
+  waitingLong: "Ainda estamos conectando você. Está levando mais de um minuto, e seu lugar na fila está garantido.",
+  queueConnecting: "Status da fila: conectando com um especialista",
+  queueWaiting: "Status da fila: aguardando um especialista",
+  queueAway: "Status da fila: nenhum especialista disponível agora",
+  etaLine: "Espera estimada: aproximadamente 1 minuto",
+  available: "Um especialista de suporte está online agora, e você continua na fila.",
+  leftHere: "Sua mensagem está salva neste chat. Um especialista responderá aqui assim que estiver disponível.",
+  leaveHint: "Escreva sua mensagem abaixo e envie. Um especialista responderá neste chat.",
+  signedOut: "Você saiu da sua conta. Entre de novo para falar aqui com nossa equipe de suporte.",
+  humanOnline: "Suporte humano · Online",
+  humanAway: "Suporte humano · Indisponível",
+  humanLabel: "Suporte humano",
 };
 
 const ar: Partial<LiveT> = {
@@ -306,15 +394,14 @@ const ar: Partial<LiveT> = {
   waiting: "أنت في قائمة انتظار الدعم. محادثتك محفوظة. سينضم متخصص دعم من Outlly إلى هذه المحادثة.",
   position: (n) => (n <= 1 ? "أنت التالي في الدور." : `ترتيبك في قائمة الانتظار هو ${n}.`),
   connected: "أنت الآن متصل بأحد مختصي الدعم في Outlly.",
-  unavailable: "استلم فريق الدعم طلبك. لا يوجد متخصص متاح حاليًا، لكن محادثتك محفوظة. يمكنك مغادرة هذه المحادثة والعودة لاحقًا.",
+  unavailable: "لا يوجد متخصص متاح الآن. محادثتك محفوظة. اترك رسالة هنا وسيرد عليك أحد المتخصصين في هذه المحادثة.",
   reconnecting: "انقطع الاتصال. نحاول إعادة توصيلك...",
   resolved: "تم وضع علامة \"تم الحل\" على محادثتك مع فريق الدعم. إذا احتجت إلى أي شيء آخر، يمكنك بدء محادثة جديدة.",
   cancel: "إلغاء طلب الدعم",
   continueWaiting: "متابعة الانتظار",
-  handoff: "يمكنني توصيلك بفريق الدعم هنا مباشرة. سأُخطر متخصصًا متاحًا. يمكنك متابعة الكتابة في هذه المحادثة أثناء الانتظار.",
+  handoff: "أقوم الآن بتوصيلك بمتخصص دعم. يمكنك متابعة الكتابة هنا أثناء الانتظار.",
   already: "أنت بالفعل في قائمة انتظار الدعم. سينضم متخصص إلى هذه المحادثة بمجرد أن يتوفر أحد.",
-  connectedWith: (n) => `أنت الآن متصل مع ${n}.`,
-  emailWhy: (e) => (e ? `تفضّل البريد؟ اترك رسالة وسنرد على ${e}.` : "تفضّل البريد؟ اترك رسالة وسنرد عبر البريد الإلكتروني."),
+  connectedWith: (n) => `أنت الآن على تواصل مع ${n}، وسيساعدك هنا.`,
   leave: "ترك رسالة",
   leaving: "جارٍ حفظ رسالتك...",
   left: (ref) => `تم. حُفظت رسالتك كتذكرة ${ref} وسنتواصل معك عبر البريد الإلكتروني.`,
@@ -334,6 +421,19 @@ const ar: Partial<LiveT> = {
   error: "تعذّر الوصول إلى فريق الدعم الآن. حاول مرة أخرى بعد قليل.",
   statusWaiting: "في قائمة الانتظار", statusConnected: "مختص الدعم", statusUnavailable: "الفريق غير متاح", statusReconnecting: "جارٍ إعادة الاتصال",
   unread: (n) => `${n} رسائل جديدة من الدعم`,
+  waitingEta: "أنت في قائمة الانتظار. يُرجى الانتظار دقيقة واحدة تقريبًا بينما نوصلك بمتخصص دعم.",
+  waitingLong: "ما زلنا نحاول توصيلك. يستغرق الأمر أكثر من دقيقة، ومكانك في قائمة الانتظار محفوظ.",
+  queueConnecting: "حالة قائمة الانتظار: جارٍ التوصيل بمتخصص",
+  queueWaiting: "حالة قائمة الانتظار: في انتظار متخصص",
+  queueAway: "حالة قائمة الانتظار: لا يوجد متخصص متاح الآن",
+  etaLine: "مدة الانتظار المتوقعة: دقيقة واحدة تقريبًا",
+  available: "أحد متخصصي الدعم متصل الآن، وما زلت في قائمة الانتظار.",
+  leftHere: "رسالتك محفوظة في هذه المحادثة. سيرد عليك متخصص هنا فور توفره.",
+  leaveHint: "اكتب رسالتك في الأسفل وأرسلها. سيرد عليك متخصص في هذه المحادثة.",
+  signedOut: "تم تسجيل خروجك. سجّل الدخول مرة أخرى للتحدث مع فريق الدعم هنا.",
+  humanOnline: "الدعم البشري · متصل",
+  humanAway: "الدعم البشري · غير متاح",
+  humanLabel: "الدعم البشري",
 };
 
 const zh: Partial<LiveT> = {
@@ -344,15 +444,14 @@ const zh: Partial<LiveT> = {
   waiting: "你已在支持队列中。对话已保存。Outlly 支持专员将加入这个对话。",
   position: (n) => (n <= 1 ? "下一个就是你。" : `你排在第 ${n} 位。`),
   connected: "你已接通 Outlly 支持专员。",
-  unavailable: "支持团队已收到你的请求。目前暂无专员有空，但你的对话已保存。你可以先离开，稍后再回来。",
+  unavailable: "目前没有可用的专员。你的对话已保存。请在这里留言，专员会在这个对话里回复你。",
   reconnecting: "连接中断，正在尝试重新连接...",
   resolved: "你与我们支持团队的对话已标记为已解决。如果还需要帮助，可以开始新的对话。",
   cancel: "取消支持请求",
   continueWaiting: "继续等待",
-  handoff: "我可以在这里直接为你联系我们的支持团队。我会通知一位有空的专员。等待期间你可以继续在这个对话里聊。",
+  handoff: "正在为你接通支持专员。等待期间，你可以继续在这里输入。",
   already: "你已经在支持队列中了。一有专员有空，就会加入这个对话。",
-  connectedWith: (n) => `你现在已与 ${n} 连线。`,
-  emailWhy: (e) => (e ? `想用邮件？留言后我们会回复到 ${e}。` : "想用邮件？留言后我们会通过邮件回复。"),
+  connectedWith: (n) => `你已接通 ${n}，对方会在这里为你提供帮助。`,
   leave: "留言",
   leaving: "正在保存你的留言...",
   left: (ref) => `收到。你的留言已保存为工单 ${ref}，我们会通过邮件跟进。`,
@@ -372,6 +471,19 @@ const zh: Partial<LiveT> = {
   error: "暂时无法联系支持团队，请稍后再试。",
   statusWaiting: "排队中", statusConnected: "支持专员", statusUnavailable: "团队暂不可用", statusReconnecting: "正在重新连接",
   unread: (n) => `${n} 条来自支持团队的新消息`,
+  waitingEta: "你已进入排队。请等待约 1 分钟，我们正在为你接通支持专员。",
+  waitingLong: "仍在为你接通。已超过一分钟，你在队列中的位置会保留。",
+  queueConnecting: "排队状态：正在接通专员",
+  queueWaiting: "排队状态：等待专员",
+  queueAway: "排队状态：目前没有可用的专员",
+  etaLine: "预计等待：约 1 分钟",
+  available: "现在有支持专员在线，你仍在队列中。",
+  leftHere: "你的留言已保存在这个对话中。专员有空后会在这里回复你。",
+  leaveHint: "请在下方输入留言并发送。专员会在这个对话里回复你。",
+  signedOut: "你已退出登录。请重新登录，在这里与我们的支持团队交流。",
+  humanOnline: "人工支持 · 在线",
+  humanAway: "人工支持 · 暂不可用",
+  humanLabel: "人工支持",
 };
 
 const ja: Partial<LiveT> = {
@@ -382,15 +494,14 @@ const ja: Partial<LiveT> = {
   waiting: "サポートの待機列に入っています。会話は保存されています。Outlly のサポート担当者がこのチャットに参加します。",
   position: (n) => (n <= 1 ? "次はあなたの番です。" : `あなたは ${n} 番目です。`),
   connected: "Outlly のサポート担当者につながりました。",
-  unavailable: "サポートチームがリクエストを受け取りました。今は対応できる担当者がいませんが、会話は保存されています。このチャットを閉じて、後で戻ってきても大丈夫です。",
+  unavailable: "現在対応できる担当者がいません。会話は保存されています。ここにメッセージを残していただければ、担当者がこのチャットで返信します。",
   reconnecting: "接続が切れました。再接続しています...",
   resolved: "サポートチームとの会話は解決済みになりました。ほかにご用件があれば、新しい会話を始めてください。",
   cancel: "サポートリクエストを取り消す",
   continueWaiting: "待ち続ける",
-  handoff: "ここでそのままサポートチームにおつなぎできます。対応可能な担当者に連絡します。お待ちいただく間もこの会話で続けてご記入いただけます。",
+  handoff: "サポート担当者におつなぎしています。お待ちの間も、ここで続けて入力できます。",
   already: "すでにサポートの待機列に入っています。担当者の手が空き次第、このチャットに参加します。",
-  connectedWith: (n) => `${n} とつながりました。`,
-  emailWhy: (e) => (e ? `メールの方がよければ、メッセージを残してください。${e} に返信します。` : "メールの方がよければ、メッセージを残してください。メールで返信します。"),
+  connectedWith: (n) => `${n} におつなぎしました。このチャットでサポートします。`,
   leave: "メッセージを残す",
   leaving: "メッセージを保存しています...",
   left: (ref) => `承りました。メッセージはチケット ${ref} として保存されました。メールでご連絡します。`,
@@ -410,6 +521,19 @@ const ja: Partial<LiveT> = {
   error: "現在サポートチームに接続できません。しばらくしてからもう一度お試しください。",
   statusWaiting: "順番待ち", statusConnected: "サポート担当者", statusUnavailable: "対応できません", statusReconnecting: "再接続中",
   unread: (n) => `サポートから新着メッセージ ${n} 件`,
+  waitingEta: "順番待ちに入りました。サポート担当者におつなぎするまで、約1分お待ちください。",
+  waitingLong: "引き続きおつなぎしています。1分以上かかっていますが、順番はそのまま保たれています。",
+  queueConnecting: "待ち状況：担当者におつなぎ中",
+  queueWaiting: "待ち状況：担当者を待っています",
+  queueAway: "待ち状況：現在対応できる担当者がいません",
+  etaLine: "予想待ち時間：約1分",
+  available: "サポート担当者がオンラインになりました。順番待ちはそのまま続いています。",
+  leftHere: "メッセージはこのチャットに保存されました。担当者が対応でき次第、ここで返信します。",
+  leaveHint: "下にメッセージを入力して送信してください。担当者がこのチャットで返信します。",
+  signedOut: "サインアウトしました。ここでサポートチームと話すには、もう一度サインインしてください。",
+  humanOnline: "スタッフサポート · オンライン",
+  humanAway: "スタッフサポート · 現在不在",
+  humanLabel: "スタッフサポート",
 };
 
 const ru: Partial<LiveT> = {
@@ -420,15 +544,14 @@ const ru: Partial<LiveT> = {
   waiting: "Вы в очереди поддержки. Разговор сохранён. Специалист поддержки Outlly подключится к этому чату.",
   position: (n) => (n <= 1 ? "Вы следующий в очереди." : `Вы ${n}-й в очереди.`),
   connected: "Вы на связи со специалистом поддержки Outlly.",
-  unavailable: "Служба поддержки получила ваш запрос. Свободного специалиста пока нет, но разговор сохранён. Вы можете закрыть чат и вернуться позже.",
+  unavailable: "Сейчас нет свободных специалистов. Ваш разговор сохранён. Оставьте сообщение здесь, и специалист ответит в этом чате.",
   reconnecting: "Соединение прервалось. Пытаемся переподключить вас...",
   resolved: "Ваш разговор со службой поддержки отмечен как решённый. Если нужно что-то ещё, начните новый разговор.",
   cancel: "Отменить запрос в поддержку",
   continueWaiting: "Продолжить ожидание",
-  handoff: "Я могу связать вас с нашей службой поддержки прямо здесь. Я сообщу свободному специалисту. Пока ждёте, можете продолжать писать в этом чате.",
+  handoff: "Подключаю вас к специалисту поддержки. Пока ждёте, можете писать здесь.",
   already: "Вы уже в очереди поддержки. Специалист подключится к этому чату, как только освободится.",
-  connectedWith: (n) => `Теперь вы на связи с ${n}.`,
-  emailWhy: (e) => (e ? `Удобнее по почте? Оставьте сообщение, и мы ответим на ${e}.` : "Удобнее по почте? Оставьте сообщение, и мы ответим по электронной почте."),
+  connectedWith: (n) => `Вы на связи с ${n}. Вам помогут прямо здесь.`,
   leave: "Оставить сообщение",
   leaving: "Сохраняем ваше сообщение...",
   left: (ref) => `Готово. Ваше сообщение сохранено как обращение ${ref}, мы ответим по почте.`,
@@ -448,6 +571,19 @@ const ru: Partial<LiveT> = {
   error: "Сейчас не удалось связаться со службой поддержки. Попробуйте чуть позже.",
   statusWaiting: "В очереди", statusConnected: "Специалист поддержки", statusUnavailable: "Команда недоступна", statusReconnecting: "Переподключение",
   unread: (n) => `Новых сообщений от поддержки: ${n}`,
+  waitingEta: "Вы в очереди. Подождите примерно 1 минуту, пока мы подключаем вас к специалисту поддержки.",
+  waitingLong: "Мы всё ещё подключаем вас. Это занимает больше минуты, ваше место в очереди сохраняется.",
+  queueConnecting: "Статус очереди: подключаем специалиста",
+  queueWaiting: "Статус очереди: ожидание специалиста",
+  queueAway: "Статус очереди: сейчас нет свободных специалистов",
+  etaLine: "Примерное ожидание: около 1 минуты",
+  available: "Специалист поддержки сейчас в сети, а вы по-прежнему в очереди.",
+  leftHere: "Ваше сообщение сохранено в этом чате. Специалист ответит здесь, как только освободится.",
+  leaveHint: "Напишите сообщение ниже и отправьте его. Специалист ответит в этом чате.",
+  signedOut: "Вы вышли из аккаунта. Войдите снова, чтобы поговорить здесь с нашей поддержкой.",
+  humanOnline: "Живая поддержка · В сети",
+  humanAway: "Живая поддержка · Недоступна",
+  humanLabel: "Живая поддержка",
 };
 
 const id: Partial<LiveT> = {
@@ -458,15 +594,14 @@ const id: Partial<LiveT> = {
   waiting: "Kamu ada di antrean support. Percakapanmu tersimpan. Spesialis support Outlly akan bergabung ke chat ini.",
   position: (n) => (n <= 1 ? "Kamu berikutnya." : `Kamu nomor ${n} dalam antrean.`),
   connected: "Kamu sekarang terhubung dengan spesialis dukungan Outlly.",
-  unavailable: "Tim support sudah menerima permintaanmu. Belum ada spesialis yang tersedia, tapi percakapanmu tersimpan. Kamu bisa keluar dari chat ini dan kembali lagi nanti.",
+  unavailable: "Belum ada spesialis yang tersedia saat ini. Percakapanmu tersimpan. Tinggalkan pesan di sini dan spesialis akan membalas di chat ini.",
   reconnecting: "Koneksi terputus. Kami mencoba menghubungkanmu kembali...",
   resolved: "Percakapanmu dengan tim dukungan kami telah ditandai selesai. Jika butuh hal lain, kamu bisa memulai percakapan baru.",
   cancel: "Batalkan permintaan support",
   continueWaiting: "Lanjut menunggu",
-  handoff: "Aku bisa menghubungkan kamu dengan tim support di sini. Aku akan memberi tahu spesialis yang tersedia. Kamu bisa terus menulis di percakapan ini sambil menunggu.",
+  handoff: "Aku sedang menghubungkan kamu dengan spesialis support. Kamu bisa terus menulis di sini sambil menunggu.",
   already: "Kamu sudah ada di antrean support. Spesialis akan bergabung ke chat ini begitu ada yang tersedia.",
-  connectedWith: (n) => `Kamu sekarang terhubung dengan ${n}.`,
-  emailWhy: (e) => (e ? `Lebih suka email? Tinggalkan pesan dan kami balas ke ${e}.` : "Lebih suka email? Tinggalkan pesan dan kami balas lewat email."),
+  connectedWith: (n) => `Kamu sekarang terhubung dengan ${n}. Mereka akan membantumu di sini.`,
   leave: "Tinggalkan pesan",
   leaving: "Menyimpan pesanmu...",
   left: (ref) => `Siap. Pesanmu disimpan sebagai tiket ${ref} dan kami akan membalas lewat email.`,
@@ -486,6 +621,19 @@ const id: Partial<LiveT> = {
   error: "Kami belum bisa menghubungi tim dukungan. Coba lagi sebentar lagi.",
   statusWaiting: "Dalam antrean", statusConnected: "Spesialis dukungan", statusUnavailable: "Tim tidak tersedia", statusReconnecting: "Menghubungkan ulang",
   unread: (n) => `${n} pesan baru dari dukungan`,
+  waitingEta: "Kamu dalam antrean. Harap tunggu sekitar 1 menit sementara kami menghubungkanmu dengan spesialis support.",
+  waitingLong: "Kami masih menghubungkanmu. Ini memakan waktu lebih dari satu menit, dan posisimu di antrean tetap terjaga.",
+  queueConnecting: "Status antrean: Menghubungkan ke spesialis",
+  queueWaiting: "Status antrean: Menunggu spesialis",
+  queueAway: "Status antrean: Belum ada spesialis yang tersedia",
+  etaLine: "Perkiraan waktu tunggu: Sekitar 1 menit",
+  available: "Spesialis support sedang online, dan kamu masih dalam antrean.",
+  leftHere: "Pesanmu tersimpan di chat ini. Spesialis akan membalas di sini begitu tersedia.",
+  leaveHint: "Tulis pesanmu di bawah lalu kirim. Spesialis akan membalas di chat ini.",
+  signedOut: "Kamu sudah keluar. Masuk lagi untuk bicara dengan tim support kami di sini.",
+  humanOnline: "Support manusia · Online",
+  humanAway: "Support manusia · Tidak tersedia",
+  humanLabel: "Support manusia",
 };
 
 const bn: Partial<LiveT> = {
@@ -496,15 +644,14 @@ const bn: Partial<LiveT> = {
   waiting: "আপনি সাপোর্ট সারিতে আছেন। আপনার কথোপকথন সংরক্ষিত। Outlly-এর একজন সাপোর্ট বিশেষজ্ঞ এই চ্যাটে যোগ দেবেন।",
   position: (n) => (n <= 1 ? "পরের পালা আপনার।" : `সারিতে আপনার নম্বর ${n}।`),
   connected: "আপনি এখন Outlly সাপোর্ট বিশেষজ্ঞের সঙ্গে যুক্ত।",
-  unavailable: "আমাদের সাপোর্ট টিম আপনার অনুরোধ পেয়েছে। এই মুহূর্তে কোনো বিশেষজ্ঞ ফ্রি নেই, কিন্তু আপনার কথোপকথন সংরক্ষিত। আপনি এই চ্যাট ছেড়ে পরে ফিরে আসতে পারেন।",
+  unavailable: "এই মুহূর্তে কোনো বিশেষজ্ঞ উপলব্ধ নেই। আপনার কথোপকথন সংরক্ষিত আছে। এখানে একটি বার্তা রেখে যান, বিশেষজ্ঞ এই চ্যাটেই উত্তর দেবেন।",
   reconnecting: "সংযোগ বিচ্ছিন্ন হয়েছে। আমরা আবার যুক্ত করার চেষ্টা করছি...",
   resolved: "আমাদের সাপোর্ট টিমের সঙ্গে আপনার কথোপকথন সমাধান হিসেবে চিহ্নিত হয়েছে। আর কিছু দরকার হলে নতুন কথোপকথন শুরু করতে পারেন।",
   cancel: "সাপোর্ট অনুরোধ বাতিল করুন",
   continueWaiting: "অপেক্ষা চালিয়ে যান",
-  handoff: "আমি এখানেই আপনাকে আমাদের সাপোর্ট টিমের সাথে যুক্ত করতে পারি। একজন উপলব্ধ বিশেষজ্ঞকে জানিয়ে দিচ্ছি। অপেক্ষার সময়ও আপনি এই কথোপকথনে লিখতে পারেন।",
+  handoff: "আপনাকে এখন একজন সাপোর্ট বিশেষজ্ঞের সঙ্গে যুক্ত করছি। অপেক্ষার সময় এখানেই লিখতে থাকুন।",
   already: "আপনি আগে থেকেই সাপোর্ট সারিতে আছেন। একজন বিশেষজ্ঞ ফ্রি হলেই এই চ্যাটে যোগ দেবেন।",
-  connectedWith: (n) => `আপনি এখন ${n}-এর সাথে যুক্ত।`,
-  emailWhy: (e) => (e ? `ইমেল পছন্দ? বার্তা রেখে যান, আমরা ${e}-এ উত্তর দেব।` : "ইমেল পছন্দ? বার্তা রেখে যান, আমরা ইমেলে উত্তর দেব।"),
+  connectedWith: (n) => `আপনি এখন ${n}-এর সঙ্গে যুক্ত। তিনি এখানেই আপনাকে সাহায্য করবেন।`,
   leave: "বার্তা রেখে যান",
   leaving: "আপনার বার্তা সংরক্ষণ করা হচ্ছে...",
   left: (ref) => `ঠিক আছে। আপনার বার্তা টিকিট ${ref} হিসেবে সংরক্ষিত হয়েছে, আমরা ইমেলে যোগাযোগ করব।`,
@@ -524,6 +671,19 @@ const bn: Partial<LiveT> = {
   error: "এই মুহূর্তে সাপোর্ট টিমের সঙ্গে যোগাযোগ করা গেল না। একটু পরে আবার চেষ্টা করুন।",
   statusWaiting: "সারিতে", statusConnected: "সাপোর্ট বিশেষজ্ঞ", statusUnavailable: "টিম উপলব্ধ নয়", statusReconnecting: "আবার যুক্ত হচ্ছে",
   unread: (n) => `সাপোর্ট থেকে ${n}টি নতুন বার্তা`,
+  waitingEta: "আপনি সারিতে আছেন। আমরা আপনাকে একজন সাপোর্ট বিশেষজ্ঞের সঙ্গে যুক্ত করছি, অনুগ্রহ করে প্রায় ১ মিনিট অপেক্ষা করুন।",
+  waitingLong: "আমরা এখনও আপনাকে যুক্ত করার চেষ্টা করছি। এক মিনিটের বেশি লাগছে, সারিতে আপনার জায়গা বজায় আছে।",
+  queueConnecting: "সারির অবস্থা: বিশেষজ্ঞের সঙ্গে যুক্ত করা হচ্ছে",
+  queueWaiting: "সারির অবস্থা: বিশেষজ্ঞের অপেক্ষায়",
+  queueAway: "সারির অবস্থা: এই মুহূর্তে কোনো বিশেষজ্ঞ উপলব্ধ নেই",
+  etaLine: "আনুমানিক অপেক্ষা: প্রায় ১ মিনিট",
+  available: "একজন সাপোর্ট বিশেষজ্ঞ এখন অনলাইনে আছেন, আর আপনি এখনও সারিতে আছেন।",
+  leftHere: "আপনার বার্তা এই চ্যাটে সংরক্ষিত হয়েছে। বিশেষজ্ঞ উপলব্ধ হলেই এখানে উত্তর দেবেন।",
+  leaveHint: "নিচে আপনার বার্তা লিখে পাঠান। বিশেষজ্ঞ এই চ্যাটেই উত্তর দেবেন।",
+  signedOut: "আপনি সাইন আউট হয়ে গেছেন। এখানে আমাদের সাপোর্ট টিমের সঙ্গে কথা বলতে আবার সাইন ইন করুন।",
+  humanOnline: "মানব সাপোর্ট · অনলাইন",
+  humanAway: "মানব সাপোর্ট · এখন উপলব্ধ নয়",
+  humanLabel: "মানব সাপোর্ট",
 };
 
 const BY: Record<Lang, Partial<LiveT>> = { en, hi, es, fr, de, pt, ar, zh, ja, ru, id, bn };
@@ -552,6 +712,8 @@ export function liveSysLine(t: LiveT, raw: string): string | null {
       return t.customerLeft;
     case SYS.ticket:
       return t.left(arg || "");
+    case SYS.left:
+      return t.leftHere;
     default:
       return null;
   }

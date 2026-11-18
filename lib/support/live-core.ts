@@ -44,8 +44,12 @@ export const AGENT_ONLINE_MS = 90_000;
 export const TYPING_MS = 6_000;
 /** The customer's browser counts as there while it checked in within this window (it polls every 2 to 15 s). */
 export const CUSTOMER_ONLINE_MS = 45_000;
-/** Waiting longer than this with nobody accepting: tell the customer the team is unavailable (the request stays queued). */
-export const WAIT_GIVE_UP_MS = 10 * 60_000;
+/** R1205: "approximately 1 minute" is only said while a specialist is online, nobody is ahead and the request is
+ *  younger than this. Past it the customer gets the honest update instead (still connecting, place kept). */
+export const ETA_MS = 60_000;
+/** R1205: a message left for the team keeps the request in the queue this long, even after the customer's browser
+ *  is gone, so a specialist can still answer it in the same chat. */
+export const LEFT_KEEP_MS = 7 * 24 * 3600_000;
 /** A waiting request whose browser hasn't checked in for this long is abandoned: it no longer counts toward
  *  anyone's place in line, and the sweep closes it (endedBy "system") so the queue doesn't fill with ghosts. */
 export const ABANDON_MS = 30 * 60_000;
@@ -64,7 +68,8 @@ export const SYS = {
   reopened: "live.reopened", // live.reopened|<first name>
   cancelled: "live.cancelled",
   customerLeft: "live.customer_left",
-  ticket: "live.ticket", // live.ticket|<T-ref>
+  ticket: "live.ticket", // live.ticket|<T-ref> (before R1205: leaving a message made an email ticket)
+  left: "live.left", // R1205: the customer left a message in this chat; the request stays queued
 } as const;
 export type SysCode = (typeof SYS)[keyof typeof SYS];
 export const sysText = (code: SysCode, arg?: string) => (arg ? `${code}|${arg.replace(/\|/g, " ").slice(0, 60)}` : code);
@@ -113,7 +118,11 @@ export function classify(texts: string[]): { category: LiveCategory; priority: L
   return { category, priority: MONEY.test(all) ? "urgent" : "normal" };
 }
 
-/** What the customer sees for a session, from real rows only. Nobody online, or waiting too long = unavailable (still queued). */
+/**
+ * What the customer sees for a session, from real rows only. Nobody online = unavailable (still queued).
+ * R1205: a long wait with a specialist online stays "waiting" (the widget says it is taking longer); saying nobody is
+ * available while someone is online would be false, and it would hide the "a specialist is online now" notice.
+ */
 export function customerState(
   s: { status: string; requestedAt: Date | string } | null,
   o: { agentsOnline: number; now?: number },
@@ -122,8 +131,16 @@ export function customerState(
   if (s.status === "active") return "connected";
   if (s.status === "resolved") return "resolved";
   if (s.status !== "waiting") return "none";
-  const waited = (o.now ?? Date.now()) - new Date(s.requestedAt).getTime();
-  return o.agentsOnline < 1 || waited > WAIT_GIVE_UP_MS ? "unavailable" : "waiting";
+  return o.agentsOnline < 1 ? "unavailable" : "waiting";
+}
+
+/**
+ * R1205: the queue estimate, from real numbers only. "1min" while the request is waiting, a specialist is online,
+ * nobody is ahead and it is younger than ETA_MS. Anything else gets no estimate (never a made-up one).
+ */
+export type QueueEta = "1min" | null;
+export function queueEta(o: { state: CustomerState; agentsOnline: number | null; position: number | null; waitedMs: number | null }): QueueEta {
+  return o.state === "waiting" && (o.agentsOnline ?? 0) > 0 && o.position === 1 && o.waitedMs != null && o.waitedMs < ETA_MS ? "1min" : null;
 }
 
 export type Receipt = "sending" | "failed" | "sent" | "delivered" | "read";
@@ -222,6 +239,8 @@ export function staffSysLine(text: string): string | null {
       return "The customer ended the chat";
     case SYS.ticket:
       return `The customer left a message${arg ? ` (${arg})` : ""}`;
+    case SYS.left:
+      return "The customer left a message and will read your reply in this chat";
     default:
       return null;
   }
@@ -240,6 +259,7 @@ export const HISTORY_WORD: Record<string, string> = {
   reopen: "Reopened",
   cancel: "Ended by the customer",
   ticket: "Left a message",
+  leave_message: "Left a message in the chat",
   duplicate: "Asked again while waiting",
   notify_failed: "Team notification failed",
 };
