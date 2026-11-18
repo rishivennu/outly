@@ -9,9 +9,35 @@ const GRAPH = `https://graph.facebook.com/${V}`;
 const FB_BASE_SCOPES = "pages_show_list,pages_read_engagement,pages_manage_posts,publish_video,read_insights";
 /** pages_messaging + pages_manage_metadata (1031): read and answer the Page's Messenger conversations, and subscribe the Page to our webhook. */
 export const FB_DM_SCOPES = "pages_messaging,pages_manage_metadata";
+
 export const FACEBOOK_SCOPES = `${FB_BASE_SCOPES},${FB_DM_SCOPES}`;
 /** Left without the messaging pair when the admin switches DMs off (1031f). */
 export const facebookScopes = (dms: boolean) => (dms ? FACEBOOK_SCOPES : FB_BASE_SCOPES);
+
+type FbPage = { id: string; name: string; access_token: string; picture?: { data?: { url?: string } } };
+
+/**
+ * R1201: the Pages this login granted, read from the token's granular scopes (debug_token with the app token).
+ * Pages the person can post to come first; each Page is then read directly, which also returns its own token.
+ */
+export async function grantedPages(userToken: string, clientId: string, clientSecret: string): Promise<FbPage[]> {
+  type Debug = { data?: { granular_scopes?: { scope: string; target_ids?: string[] }[] } };
+  const app = encodeURIComponent(`${clientId}|${clientSecret}`);
+  const d: Debug = await fetch(`${GRAPH}/debug_token?input_token=${encodeURIComponent(userToken)}&access_token=${app}`)
+    .then((r) => (r.ok ? (r.json() as Promise<Debug>) : {}))
+    .catch(() => ({}));
+  const scopes = d.data?.granular_scopes ?? [];
+  const idsFor = (name: string) => scopes.filter((g) => g.scope === name).flatMap((g) => g.target_ids ?? []);
+  const ids = [...new Set([...idsFor("pages_manage_posts"), ...idsFor("pages_show_list")])].slice(0, 25);
+  const pages = await Promise.all(
+    ids.map((id) =>
+      fetch(`${GRAPH}/${id}?fields=id,name,access_token,picture{url}&access_token=${userToken}`)
+        .then((r) => (r.ok ? (r.json() as Promise<Partial<FbPage>>) : null))
+        .catch(() => null),
+    ),
+  );
+  return pages.filter((pg): pg is FbPage => !!pg?.id && !!pg.name && !!pg.access_token);
+}
 
 export class FacebookPublisher implements SocialPublisher {
   readonly platform = "facebook" as const;
@@ -35,7 +61,10 @@ export class FacebookPublisher implements SocialPublisher {
     const userToken = ((await l.json()) as { access_token: string }).access_token;
     const pages = await fetch(`${GRAPH}/me/accounts?fields=id,name,access_token,picture{url}&access_token=${userToken}`);
     if (!pages.ok) throw await httpFailure(pages, "facebook pages");
-    const list = ((await pages.json()) as { data?: { id: string; name: string; access_token: string; picture?: { data?: { url?: string } } }[] }).data ?? [];
+    let list = ((await pages.json()) as { data?: FbPage[] }).data ?? [];
+    // R1201: a Page granted through Facebook Login for Business (business access) is left out of /me/accounts even
+    // though the token holds every Page permission for it. The token's granular scopes still name it.
+    if (!list.length) list = await grantedPages(userToken, clientId, clientSecret);
     const page = list[0];
     if (!page) throw Object.assign(new Error("This Facebook account doesn't manage a Page yet. Reels publish to a Page."), { code: "NO_PAGE" });
     // The person's app-scoped id: Meta's data deletion callback names the user, not the Page (1031).
