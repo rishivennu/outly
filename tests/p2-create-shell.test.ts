@@ -106,9 +106,10 @@ describe("workspace wiring", () => {
   });
   test("the bar is one sticky element above the tab bar and the deck does not stack a second", () => {
     const bar = src("components/create/ActionBar.tsx");
-    // 11-16: the tab bar shows on /create again, so the bar sits 12px above it and follows it down when it tucks.
-    expect(bar).toContain("sticky bottom-[calc(env(safe-area-inset-bottom)+74px)]");
-    expect(bar).toContain("[html[data-tabs-tucked]_&]:bottom-[calc(env(safe-area-inset-bottom)+12px)]");
+    // 11-16: the tab bar shows on /create again, so the bar sits 12px above it (11-19: the tabs float and compact
+    // in place rather than tuck away, so this bar no longer moves with them).
+    expect(bar).toContain("sticky bottom-[calc(env(safe-area-inset-bottom)+84px)]");
+    expect(bar).not.toContain("data-tabs-tucked");
     expect(bar).not.toContain("transition-all");
     // Phase 3 CONTRACT-B: the deck no longer docks its own bar, so the one ActionBar is the only bar.
     expect(ws.match(/<ActionBar/g)?.length).toBe(1);

@@ -7,7 +7,7 @@ import { NoticesBell } from "./NoticesBell";
 import { PulseRail } from "./PulseRail";
 import { MobileDrawer } from "./MobileDrawer";
 import { MAIN, TOUR, isActive, pageTitle } from "./nav-items";
-import { hidesTabBar } from "@/lib/client/tab-bar";
+import { TAB_SCROLL_START, hidesTabBar, tabScrollStep, type TabScroll } from "@/lib/client/tab-bar";
 
 /**
  * Desktop sidebar: the collapsible rail for every dashboard style (1103). Classic and Analytics used to have
@@ -17,24 +17,25 @@ export function Sidebar() {
   return <PulseRail />;
 }
 
-// Phone tab bar (1100): five destinations, labels always on (Apple's tab-bar guidance: five at most). Every other
-// page and the account rows live in the top bar's menu drawer (MobileDrawer).
+// Phone tab bar (1100): five destinations (Apple's tab-bar guidance: five at most), icons only since 11-19 (the
+// creator's call; the top bar names the section you are in, and each tab keeps its name for screen readers). Every
+// other page and the account rows live in the top bar's menu drawer (MobileDrawer).
 const TABS = ["/home", "/create", "/calendar", "/inbox", "/analytics"];
 
 /**
- * Auto-hide (1105): scrolling down through a long page tucks the tab bar away; any scroll up, the top or the end
- * of the page, or a route change brings it back, and so does a page that shrinks to short. Short pages and reduced
- * motion never hide it, and nor does the page moving under the keyboard while you type. Hidden means inert at
- * once (no focus, nothing announced, even mid-slide) and visibility: hidden once it is off screen (globals.css).
+ * Compact on scroll (11-19, Instagram style; it replaced 1105's auto-hide, which slid the bar off screen): reading on
+ * down a long page compacts the tab bar (labels fold away, the pill shrinks, .mtab[data-compact] in globals.css); any
+ * scroll back up, the top or the end of the page, or a route change opens it again, and so does a page that shrinks
+ * to short. Short pages and reduced motion never compact it, and nor does the page moving under the keyboard while
+ * you type. The bar never leaves the screen. The rule itself is tabScrollStep (lib/client/tab-bar.ts), one step per
+ * frame: scroll events coalesce into a single requestAnimationFrame, and a state that has not changed never renders.
  */
-function useTuckOnScroll(path: string | null) {
-  const [hidden, setHidden] = useState(false);
-  const last = useRef(0);
-  const run = useRef(0);
+function useCompactOnScroll(path: string | null) {
+  const [compact, setCompact] = useState(false);
+  const s = useRef<TabScroll>(TAB_SCROLL_START);
   useEffect(() => {
-    setHidden(false);
-    last.current = window.scrollY;
-    run.current = 0;
+    setCompact(false);
+    s.current = { y: window.scrollY, run: 0, compact: false };
   }, [path]);
   useEffect(() => {
     const still = matchMedia("(prefers-reduced-motion: reduce)");
@@ -42,21 +43,9 @@ function useTuckOnScroll(path: string | null) {
     const typing = () => !!document.activeElement?.matches("input, textarea, select, [contenteditable]");
     const check = () => {
       raf = 0;
-      const y = window.scrollY;
-      const d = y - last.current;
-      last.current = y;
       const end = document.documentElement.scrollHeight - window.innerHeight;
-      if (still.matches || end < window.innerHeight * 0.75 || y < 80 || end - y < 80) {
-        run.current = 0;
-        return setHidden(false);
-      }
-      if (typing()) {
-        run.current = 0;
-        return;
-      }
-      run.current = Math.sign(d) === Math.sign(run.current) ? run.current + d : d;
-      if (run.current > 48) setHidden(true);
-      else if (run.current < -12) setHidden(false);
+      s.current = tabScrollStep(s.current, window.scrollY, end, window.innerHeight, { still: still.matches, typing: typing() });
+      setCompact(s.current.compact);
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(check);
@@ -72,43 +61,46 @@ function useTuckOnScroll(path: string | null) {
       cancelAnimationFrame(raf);
     };
   }, []);
-  return hidden;
+  return compact;
 }
 
 /**
- * 1105 refinement, 1115 docked: a full-width bar flush with the bottom edge, one solid surface down under the home
- * indicator with a hairline on top (.mtab in globals.css), the five tabs a 480px row in the middle. 62px plus the
- * safe area. Five equal tabs, each at least 52 x 51px. The active tab
- * keeps the lime pill with a dark icon and a semibold label; the pill grows in place (300ms), colours move in
- * 250ms, labels in 200ms, a press dips the icon (150ms), and the bar rises in once (400ms), all on
- * cubic-bezier(0.16, 1, 0.3, 1).
+ * 1105 refinement, 1115 docked, 11-19 floating: a pill 12px off the bottom edge and the sides (plus the safe area, so
+ * it clears the home indicator and Android's gesture strip), never wider than 440px, solid in the theme's surface
+ * colour with a hairline all round and a soft shadow (.mtab in globals.css). 60px tall, five equal icon-only tabs
+ * (22px icons on a 56 x 32 pill), each at least 50px tall and 56px wide on the narrowest phone, named for screen
+ * readers by visually hidden text. The active tab keeps the lime pill with a dark icon; the pill grows in place
+ * (300ms), colours move in 250ms, a press dips the icon (150ms), and the bar rises in once (400ms), all on
+ * cubic-bezier(0.16, 1, 0.3, 1). Reading on down a long page compacts it (data-compact, 300ms): the bar drops to
+ * 56px and shrinks about its bottom centre to 92%, every tab still at least 44 x 56px on screen.
  */
 export function MobileNav() {
   const path = usePathname();
   const tabs = TABS.map((h) => MAIN.find((m) => m.href === h)!);
-  const tucked = useTuckOnScroll(path);
+  const folded = useCompactOnScroll(path);
   // A page may opt out of the tab bar (lib/client/tab-bar.ts; none does since 11-16, /create's post actions bar
   // now sits above the tabs). The studio layout then drops the room it keeps for the bar (data-tabbar-off below).
   const off = hidesTabBar(path);
-  const hidden = tucked && !off;
-  // 1154: Pip (ChatWidget .pc-dock) tucks away with the bar, so it never floats alone over the content.
+  const compact = folded && !off;
+  // 1154: Pip (ChatWidget .pc-dock) steps aside while the bar is compact (you are reading on), so the foot of the
+  // page is clear; it is back the moment the bar opens.
   useEffect(() => {
-    document.documentElement.toggleAttribute("data-tabs-tucked", hidden);
-    return () => document.documentElement.removeAttribute("data-tabs-tucked");
-  }, [hidden]);
+    document.documentElement.toggleAttribute("data-tabs-compact", compact);
+    return () => document.documentElement.removeAttribute("data-tabs-compact");
+  }, [compact]);
   if (off) return <span hidden data-tabbar-off="" />;
   return (
-    <nav aria-label="Primary" data-hidden={hidden ? "" : undefined} inert={hidden} className="mtab web-only fixed inset-x-0 bottom-0 z-40 flex items-stretch lg:hidden">
+    <nav aria-label="Primary" data-compact={compact ? "" : undefined} className="mtab web-only fixed inset-x-0 z-40 flex items-stretch lg:hidden">
       {tabs.map(({ href, label, icon: Icon }) => {
         // One rule for every tab (1053): green marks where you are, nothing else.
         const active = isActive(path, href);
         return (
-          <Link key={href} href={href} data-tour={TOUR[href]} aria-current={active ? "page" : undefined} className="mtab-item group flex min-w-0 flex-1 flex-col items-center justify-center gap-[3px] rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
-            <span className="mtab-pill relative grid h-[30px] w-[52px] place-items-center">
+          <Link key={href} href={href} data-tour={TOUR[href]} aria-current={active ? "page" : undefined} className="mtab-item group flex min-w-0 flex-1 flex-col items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
+            <span className="mtab-pill relative grid h-[32px] w-[56px] place-items-center">
               <span className="mtab-ind" aria-hidden="true" />
-              <Icon className="relative h-5 w-5" strokeWidth={2} aria-hidden="true" />
+              <Icon className="relative h-[22px] w-[22px]" strokeWidth={2} aria-hidden="true" />
             </span>
-            <span className="mtab-label whitespace-nowrap text-[12px] leading-[14px]">{label}</span>
+            <span className="sr-only">{label}</span>
           </Link>
         );
       })}

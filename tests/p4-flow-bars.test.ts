@@ -128,10 +128,10 @@ describe("item 5 (changed 11-16): the tab bar shows on /create too, the Create b
   test("no page hides the tab bar", () => {
     for (const p of ["/create", "/create/", "/create?draft=1", "/create/bulk", "/home", "/inbox", "/creator", null, undefined, ""]) expect(hidesTabBar(p)).toBe(false);
   });
-  test("the post actions bar clears the tab bar on phones and follows it when it tucks", () => {
+  test("the post actions bar clears the tab bar on phones and holds its place while the bar compacts (11-19)", () => {
     const bar = src("components/create/ActionBar.tsx");
-    expect(bar).toContain("sticky bottom-[calc(env(safe-area-inset-bottom)+74px)]");
-    expect(bar).toContain("[html[data-tabs-tucked]_&]:bottom-[calc(env(safe-area-inset-bottom)+12px)]");
+    expect(bar).toContain("sticky bottom-[calc(env(safe-area-inset-bottom)+84px)]");
+    expect(bar).not.toContain("data-tabs-tucked");
     expect(bar).toContain("lg:bottom-4");
   });
   test("the drawer lists the tab pages where the bar is hidden", async () => {

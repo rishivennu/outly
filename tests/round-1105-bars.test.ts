@@ -119,49 +119,47 @@ describe("1105 phone top bar", () => {
 describe("1105 tab bar", () => {
   test("same five tabs on a lighter pill, equal widths, no liquid glass", () => {
     expect(nav).toContain('const TABS = ["/home", "/create", "/calendar", "/inbox", "/analytics"];');
-    // 1115: docked full width; the 62px height and the 480px row live in .mtab (globals.css).
-    expect(tabs).toContain("fixed inset-x-0 bottom-0");
+    // 1115 docked it full width; 11-19 it floats again: the 60px height and the 440px cap live in .mtab (globals.css).
+    expect(tabs).toContain("fixed inset-x-0 z-40");
     expect(tabs).not.toContain("max-w-[480px]");
-    expect(rule(".mtab")).toContain("height: calc(62px + env(safe-area-inset-bottom));");
-    expect(rule(".mtab")).toContain("calc((100% - 480px) / 2)");
+    expect(rule(".mtab")).toContain("height: 60px;");
+    expect(rule(".mtab")).toContain("env(safe-area-inset-right))), 440px);");
     expect(tabs).not.toContain("lg-glass");
     expect(tabs).toContain("min-w-0 flex-1");
-    expect(tabs).toContain("whitespace-nowrap");
     expect(tabs).toContain('strokeWidth={2}');
   });
-  test("active: lime pill, dark icon, semibold label; timings 250 / 300 / 150 / 200 / 400", () => {
+  test("active: lime pill, dark icon (11-19: icons only, the label is for screen readers); timings 250 / 300 / 150 / 400", () => {
     expect(css).toContain(".mtab-item[aria-current] .mtab-ind { opacity: 1; transform: none; }");
     expect(css).toContain(".mtab-item[aria-current] .mtab-pill > svg { color: hsl(var(--lime-foreground)); }");
-    expect(css).toContain(".mtab-item[aria-current] .mtab-label { font-weight: 650; }");
+    expect(css).not.toContain(".mtab-label");
+    expect(tabs).toContain('<span className="sr-only">{label}</span>');
     expect(css).toContain("transition: color .25s var(--ease-liquid); }");
     expect(rule(".mtab-ind")).toContain("transform .3s var(--ease-liquid)");
     expect(rule(".mtab-pill")).toContain("transform .15s var(--ease-liquid)");
-    expect(rule(".mtab-label")).toContain("color .2s var(--ease-liquid)");
     expect(css).toContain(".mtab { animation: mtab-in .4s var(--ease-liquid) backwards; }");
   });
   test("safe area at the bottom, page padding clears it, solid when asked", () => {
-    expect(rule(".mtab")).toContain("calc(5px + env(safe-area-inset-bottom))");
+    expect(rule(".mtab")).toContain("bottom: calc(env(safe-area-inset-bottom) + 12px);");
     expect(src("app/(studio)/layout.tsx")).toContain("pb-[calc(env(safe-area-inset-bottom)+88px)]");
     expect(css).toContain('html[data-contrast="more"] .mtab { background: hsl(var(--card));');
   });
-  test("tucks away scrolling down a long page, back on scroll up, top, end, route change and short pages", () => {
-    const hook = nav.slice(nav.indexOf("function useTuckOnScroll"), nav.indexOf("export function MobileNav"));
-    expect(hook).toContain("setHidden(false);\n    last.current = window.scrollY;\n    run.current = 0;\n  }, [path]);");
+  test("compacts scrolling down a long page (11-19; it used to hide), back on scroll up, top, end, route change and short pages", () => {
+    const hook = nav.slice(nav.indexOf("function useCompactOnScroll"), nav.indexOf("export function MobileNav"));
+    expect(hook).toContain("setCompact(false);\n    s.current = { y: window.scrollY, run: 0, compact: false };\n  }, [path]);");
     expect(hook).toContain("new ResizeObserver(onScroll)");
     expect(hook).toContain('matches("input, textarea, select, [contenteditable]")');
-    // hidden means out of the tab order too, so no focus hook is needed
     expect(tabs).not.toContain("onFocusCapture");
-    expect(tabs).toContain("inert={hidden}");
-    expect(css).toMatch(/\.mtab\[data-hidden\] \{[^}]*visibility: hidden;[^}]*visibility 0s \.3s;/);
-    expect(hook).toContain("still.matches || end < window.innerHeight * 0.75 || y < 80 || end - y < 80");
+    // never hidden, never inert: the bar stays on screen and in the tab order in both states
+    expect(tabs).not.toContain("inert=");
+    expect(tabs).not.toContain("data-hidden");
+    expect(css).not.toContain(".mtab[data-hidden]");
     expect(hook).toContain("{ passive: true }");
-    expect(css).toMatch(/\.mtab\[data-hidden\] \{[^}]*pointer-events: none;/);
   });
 });
 
 describe("1105 review fixes", () => {
   test("tab bar is solid (1115) so muted labels hold 4.5:1 over anything behind", () => {
-    expect(css).toContain("html.dark .mtab { --mtab-bg: 240 5% 10.5%; --mtab-line: 0 0% 100% / .08; }");
+    expect(css).toContain("html.dark .mtab { --mtab-bg: 240 5% 10.5%; --mtab-line: 0 0% 100% / .08; --mtab-shadow:");
     expect(rule(".mtab")).toContain("--mtab-bg: 0 0% 100%;");
     expect(rule(".mtab")).not.toContain("backdrop-filter");
   });
@@ -175,14 +173,14 @@ describe("1105 review fixes", () => {
     expect(css).toContain(".mtop-pre:first-child { padding-top: calc(env(safe-area-inset-top) + 0.5rem); }");
   });
   test("things that float above the tab bar sit 12px over its top edge", () => {
-    const over = "calc(env(safe-area-inset-bottom)+74px)";
+    const over = "calc(env(safe-area-inset-bottom)+84px)";
     for (const f of ["components/shared/CookieConsent.tsx", "components/shared/DeviceHint.tsx", "components/support/ChatWidget.tsx", "components/shared/Toast.tsx"]) {
       const s = src(f);
       expect(s).toContain(over);
       expect(s).not.toMatch(/bottom-\[9[26]px\]/);
     }
-    expect(rule(".install-card")).toContain("bottom: calc(env(safe-area-inset-bottom) + 74px);");
-    expect(css).toContain(".install-card { bottom: calc(env(safe-area-inset-bottom) + 66px); }");
+    expect(rule(".install-card")).toContain("bottom: calc(env(safe-area-inset-bottom) + 84px);");
+    expect(css).toContain(".install-card { bottom: calc(env(safe-area-inset-bottom) + 74px); }");
   });
   test("head script reads the contrast key from its constant", () => {
     expect(themeScript).toContain("localStorage.getItem('outly-contrast')");

@@ -85,7 +85,7 @@ export function NoticesBell({ placement = "side", className }: { placement?: "si
       // Under the phone top bar (1105): stops 8px above the floating tab bar (or the screen edge), so a short phone
       // never stacks the two and the list scrolls inside the panel instead.
       const tabs = document.querySelector("nav.mtab")?.getBoundingClientRect();
-      const floor = tabs && tabs.height > 0 && !document.querySelector("nav.mtab[data-hidden]") ? tabs.top - 8 : window.innerHeight - 12;
+      const floor = tabs && tabs.height > 0 ? tabs.top - 8 : window.innerHeight - 12;
       setPos({ top: r.bottom + 8, right: 12, width: w, maxHeight: Math.max(200, Math.min(520, floor - r.bottom - 8)) });
     }
   }, [placement]);

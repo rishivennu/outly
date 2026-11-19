@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { adminApi } from "@/lib/client/admin-api";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
+import { SHAKE_X, shakeTargets } from "@/lib/client/shake";
 
 /**
  * Admin sign in, styled like the creator AuthForm (10-15e): same fields, lime CTA, staggered entrance and
@@ -32,9 +33,13 @@ export function AdminLoginForm({ next }: { next: string }) {
       gsap.fromTo(gsap.utils.selector(root)(".gs-in"), { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out", stagger: 0.045, delay: 0.05 });
     });
   }, { scope: ref });
+  // 11-19: only the password field moves (lib/client/shake.ts), not the whole card.
   const shake = contextSafe(() => {
-    if (!ref.current || !window.matchMedia(MOTION_OK).matches) return;
-    gsap.fromTo(ref.current, { x: 0 }, { keyframes: { x: [-9, 8, -6, 4, -2, 0] }, duration: 0.45, ease: "power1.out", clearProps: "x" });
+    requestAnimationFrame(() => {
+      if (!ref.current || !window.matchMedia(MOTION_OK).matches) return;
+      const parts = shakeTargets(ref.current, document.activeElement);
+      if (parts.length) gsap.fromTo(parts, { x: 0 }, { keyframes: { x: SHAKE_X }, duration: 0.4, ease: "power1.out", clearProps: "x" });
+    });
   });
   useEffect(() => {
     if (tries) shake();

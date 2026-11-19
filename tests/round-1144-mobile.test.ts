@@ -23,7 +23,8 @@ describe("touch variant", () => {
 
 describe("touch targets", () => {
   test("phone tab labels are 12px", () => {
-    expect(read("components/shell/Nav.tsx")).toContain("mtab-label whitespace-nowrap text-[12px] leading-[14px]");
+    // 11-19: icons only; the name is there for screen readers, so no visible label size to hold at 12px.
+    expect(read("components/shell/Nav.tsx")).toContain('<span className="sr-only">{label}</span>');
   });
   test("compact controls get a 44px target", () => {
     expect(read("components/auth/AuthForm.tsx")).toContain("flex h-11 w-11 -translate-y-1/2");

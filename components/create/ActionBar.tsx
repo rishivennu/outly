@@ -192,13 +192,13 @@ const ICON: Record<BarId, typeof Save> = { save: Save, preview: Eye, schedule: C
 /**
  * The one set of post actions on every step, in one compact bar. Sticky in the page flow (not fixed), so the
  * end of the page always scrolls clear of it. 11-16: on phones it sits 12px above the shell's tab bar (62px plus the
- * safe area) and follows the bar down when that tucks away on a long scroll (html[data-tabs-tucked], Nav.tsx), so the
+ * safe area; 11-19: the bar floats and only compacts on a long scroll, so this one holds its place), so the
  * two never stack and never leave a gap. The assistant drawer opens over both.
  */
 export function ActionBar({ state, saveLabel, mode, onAction, className, fill, pip }: Props) {
   const btn = "h-auto min-h-[52px] min-w-0 flex-col gap-0.5 px-1 text-xs font-semibold sm:min-h-11 sm:flex-row sm:gap-2 sm:px-4 sm:text-sm";
   return (
-    <div role="region" aria-label="Post actions" className={cn("sticky bottom-[calc(env(safe-area-inset-bottom)+74px)] z-30 mt-6 transition-[bottom] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none [html[data-tabs-tucked]_&]:bottom-[calc(env(safe-area-inset-bottom)+12px)] [html[data-app]_&]:bottom-[calc(env(safe-area-inset-bottom)+12px)] max-lg:[html:has(&)]:scroll-pb-[calc(env(safe-area-inset-bottom)+210px)] lg:bottom-4", pip && "max-xl:mt-[70px]", className)}>
+    <div role="region" aria-label="Post actions" className={cn("sticky bottom-[calc(env(safe-area-inset-bottom)+84px)] z-30 mt-6 [html[data-app]_&]:bottom-[calc(env(safe-area-inset-bottom)+12px)] max-lg:[html:has(&)]:scroll-pb-[calc(env(safe-area-inset-bottom)+210px)] lg:bottom-4", pip && "max-xl:mt-[70px]", className)}>
       {/* 1182: in the app Create has no tab bar, so the bar sits 12px off the bottom; focus scrolls fields clear of it. */}
       {pip && <div className="absolute bottom-full right-1 mb-2.5 xl:hidden">{pip}</div>}
       <div className={cn("glass-strong mx-auto w-full rounded-[22px] p-1.5 shadow-[0_18px_40px_-24px_hsl(var(--foreground)/0.45)] hairline", fill ? "max-w-none sm:flex sm:items-center sm:gap-3 sm:pl-4" : "max-w-3xl")}>

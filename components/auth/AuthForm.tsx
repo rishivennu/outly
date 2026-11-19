@@ -14,6 +14,7 @@ import { PhoneInput, WhatsAppAuth, WhatsAppGlyph } from "./WhatsAppAuth";
 import { OutlyMark } from "@/components/brand/Logo";
 import { PipWatch } from "./PipWatch";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
+import { SHAKE_X, shakeTargets } from "@/lib/client/shake";
 import { sameSitePath } from "@/lib/safe-next";
 import { track } from "@/lib/analytics/track";
 
@@ -150,9 +151,14 @@ export function AuthForm({ mode, whatsapp = false, apple = false, googleClientId
     }, root);
     root.dataset.gsReady = "1";
   }, { scope: ref });
+  // 11-19: only the field the error is about moves (lib/client/shake.ts), not the whole card and the column with it.
+  // One frame late, so fail()'s focus has landed first and the shake follows the cursor.
   const shake = contextSafe(() => {
-    if (!ref.current || !window.matchMedia(MOTION_OK).matches) return;
-    gsap.fromTo(ref.current, { x: 0 }, { keyframes: { x: [-9, 8, -6, 4, -2, 0] }, duration: 0.45, ease: "power1.out", clearProps: "x" });
+    requestAnimationFrame(() => {
+      if (!ref.current || !window.matchMedia(MOTION_OK).matches) return;
+      const parts = shakeTargets(ref.current, document.activeElement);
+      if (parts.length) gsap.fromTo(parts, { x: 0 }, { keyframes: { x: SHAKE_X }, duration: 0.4, ease: "power1.out", clearProps: "x" });
+    });
   });
   const [tries, setTries] = useState(0);
   useEffect(() => {

@@ -167,8 +167,8 @@ describe("phone screens (source)", () => {
   });
   test("Pip tucks with the tab bar and the page makes room for it", () => {
     expect(src("components/support/ChatWidget.tsx")).toContain("pc pc-dock fixed");
-    expect(src("components/shell/Nav.tsx")).toContain('toggleAttribute("data-tabs-tucked", hidden)');
-    expect(css).toContain("html[data-tabs-tucked] .pc-dock:not([data-open])");
+    expect(src("components/shell/Nav.tsx")).toContain('toggleAttribute("data-tabs-compact", compact)');
+    expect(css).toContain("html[data-tabs-compact] .pc-dock:not([data-open])");
     expect(css).toContain("html:has(.pc-dock[data-lift]:not(.hidden)) .mmain");
   });
 });

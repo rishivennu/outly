@@ -164,7 +164,7 @@ describe("1182 the action bar on phones", () => {
     expect(s.buttons.map((b) => b.id)).toEqual(["save", "preview", "continue"]);
   });
   test("sits above the tab bar, 12px off the bottom in the app where Create has none, and fields scroll clear of it", () => {
-    expect(bar).toContain("sticky bottom-[calc(env(safe-area-inset-bottom)+74px)]");
+    expect(bar).toContain("sticky bottom-[calc(env(safe-area-inset-bottom)+84px)]");
     expect(bar).toContain("[html[data-app]_&]:bottom-[calc(env(safe-area-inset-bottom)+12px)]");
     expect(bar).toContain("max-lg:[html:has(&)]:scroll-pb-[calc(env(safe-area-inset-bottom)+210px)]");
   });

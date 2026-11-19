@@ -231,6 +231,6 @@ describe("1160 workspace", () => {
   test("the phone tab bar shows on /create and the post actions bar sits above it", async () => {
     const { hidesTabBar } = await import("../lib/client/tab-bar");
     expect(hidesTabBar("/create")).toBe(false);
-    expect(src("components/create/ActionBar.tsx")).toContain("bottom-[calc(env(safe-area-inset-bottom)+74px)]");
+    expect(src("components/create/ActionBar.tsx")).toContain("bottom-[calc(env(safe-area-inset-bottom)+84px)]");
   });
 });

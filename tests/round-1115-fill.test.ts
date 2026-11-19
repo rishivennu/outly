@@ -6,14 +6,14 @@ const src = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const css = src("app/globals.css");
 
 describe("1115 app fill", () => {
-  test("the tab bar is docked: full width, flush with the bottom, solid down under the home indicator", () => {
+  test("the tab bar is solid (1115) and, since 11-19, a floating pill clear of the home indicator", () => {
     const nav = src("components/shell/Nav.tsx");
-    expect(nav).toContain('className="mtab web-only fixed inset-x-0 bottom-0 z-40 flex items-stretch lg:hidden"');
+    expect(nav).toContain('className="mtab web-only fixed inset-x-0 z-40 flex items-stretch lg:hidden"');
     const rule = css.slice(css.indexOf(".mtab {"), css.indexOf("}", css.indexOf(".mtab {")));
-    expect(rule).toContain("border-top: 1px solid hsl(var(--mtab-line));");
-    expect(rule).not.toContain("box-shadow");
+    expect(rule).toContain("border: 1px solid hsl(var(--mtab-line));");
+    expect(rule).toContain("background: hsl(var(--mtab-bg));");
     expect(rule).not.toContain("left:");
-    expect(css).toContain("transform: translateY(calc(100% + 4px)); opacity: 0;");
+    expect(css).not.toContain("transform: translateY(calc(100% + 4px)); opacity: 0;");
   });
   test("inside the app on a phone the page is one flat fill; public pages keep their sky", () => {
     expect(css).toContain("body:not(:has(.sky-host))::before { display: none; }");

@@ -3465,31 +3465,38 @@ html[data-contrast="more"] .mtop[data-lifted] { background-color: hsl(var(--back
   .mtop-btn:not(:disabled):active { transform: none; }
 }
 
-/* Tab bar (.mtab; not .mnav, that is the marketing header). 1115: docked like a native app's tab bar: full width,
-   flush with the bottom edge, one solid surface that runs on under the home indicator (the safe area is padding inside
-   the bar, so nothing shows through below it), a hairline on top, no shadow, no blur. Solid, so muted labels hold
-   4.5:1 whatever scrolls behind. The tabs stay a 480px row in the middle of a wide phone or tablet, and clear the notch
-   when the phone is on its side. 62px plus the safe area; whatever floats above it sits at
-   env(safe-area-inset-bottom) + 74px, 12px over its top edge. */
+/* Tab bar (.mtab; not .mnav, that is the marketing header). 11-19: a floating pill, Instagram style, in place of the
+   docked bar of 1115. 60px tall, 12px off the bottom edge plus the safe area (so it clears the home indicator and
+   Android's gesture strip), 12px in from the sides (or the notch, on a phone on its side) and never wider than 440px;
+   fully rounded, solid in the theme's surface colour (muted labels hold 4.5:1 whatever scrolls behind), a hairline all
+   round and a soft shadow; icons only (11-19), each tab named for screen readers by hidden text. Reading on down a
+   long page compacts it (Nav.tsx useCompactOnScroll sets data-compact): the bar drops to 56px and shrinks to 92%
+   about its bottom centre, so it sits in the same spot; every tab still measures at least 44 x 56px on screen.
+   300ms on cubic-bezier(0.16, 1, 0.3, 1), on transform
+   and the bar's own height only, so nothing on the page moves with it. It never leaves the screen. Whatever floats
+   above it sits at env(safe-area-inset-bottom) + 84px, 12px over its open top edge. */
 .mtab {
   --mtab-bg: 0 0% 100%; --mtab-line: 222 20% 18% / .09;
-  height: calc(62px + env(safe-area-inset-bottom));
-  padding: 5px max(5px, env(safe-area-inset-right), calc((100% - 480px) / 2)) calc(5px + env(safe-area-inset-bottom)) max(5px, env(safe-area-inset-left), calc((100% - 480px) / 2));
+  --mtab-shadow: 0 12px 32px -14px rgb(15 20 40 / .35), 0 2px 8px -4px rgb(15 20 40 / .16);
+  bottom: calc(env(safe-area-inset-bottom) + 12px);
+  width: min(calc(100% - 2 * max(12px, env(safe-area-inset-left), env(safe-area-inset-right))), 440px);
+  margin-inline: auto;
+  height: 60px;
+  padding: 4px 6px;
+  border-radius: 9999px;
   background: hsl(var(--mtab-bg));
-  border-top: 1px solid hsl(var(--mtab-line));
-  transition: transform .3s var(--ease-liquid), opacity .3s var(--ease-liquid), visibility 0s;
+  border: 1px solid hsl(var(--mtab-line));
+  box-shadow: var(--mtab-shadow);
+  transform-origin: 50% 100%;
+  transition: transform .3s var(--ease-liquid), height .3s var(--ease-liquid), padding .3s var(--ease-liquid);
 }
-html.dark .mtab { --mtab-bg: 240 5% 10.5%; --mtab-line: 0 0% 100% / .08; }
+html.dark .mtab { --mtab-bg: 240 5% 10.5%; --mtab-line: 0 0% 100% / .08; --mtab-shadow: 0 12px 32px -14px rgb(0 0 0 / .7), 0 2px 8px -4px rgb(0 0 0 / .5); }
 html[data-contrast="more"] .mtab { background: hsl(var(--card)); border-color: hsl(var(--border)); }
 @media (forced-colors: active) { .mtab { border-color: CanvasText; } .mtab-item[aria-current] .mtab-ind { background: Highlight; } }
-/* Tucked away while scrolling down a long page (Nav.tsx useTuckOnScroll): slides below the screen edge, then turns
-   invisible once out of sight so Tab and screen readers skip it; visible again the instant it starts back. */
-.mtab[data-hidden] {
-  transform: translateY(calc(100% + 4px)); opacity: 0; pointer-events: none; visibility: hidden;
-  transition: transform .3s var(--ease-liquid), opacity .3s var(--ease-liquid), visibility 0s .3s;
-}
-/* Tabs: muted until chosen. Colour 250ms, label 200ms, the lime pill grows in place 300ms, a press dips the icon 150ms. */
-.mtab-item { color: hsl(var(--muted-foreground)); -webkit-tap-highlight-color: transparent; transition: color .25s var(--ease-liquid); }
+/* Compact while reading on (Nav.tsx useCompactOnScroll): 92% about the bottom centre, the tabs closed up. */
+.mtab[data-compact] { height: 56px; padding: 3px 10px; transform: scale(.92); }
+/* Tabs: muted until chosen. Colour 250ms, the lime pill grows in place 300ms, a press dips the icon 150ms. */
+.mtab-item { color: hsl(var(--muted-foreground)); -webkit-tap-highlight-color: transparent; }
 .mtab-item[aria-current] { color: hsl(var(--foreground)); }
 .mtab-pill { border-radius: 9999px; transition: transform .15s var(--ease-liquid), background-color .2s var(--ease-liquid); }
 .mtab-item:not(:disabled):active .mtab-pill { transform: scale(.96); }
@@ -3503,27 +3510,28 @@ html[data-contrast="more"] .mtab { background: hsl(var(--card)); border-color: h
 .mtab-item[aria-current] .mtab-ind { opacity: 1; transform: none; }
 .mtab-item[aria-current] .mtab-pill > svg { color: hsl(var(--lime-foreground)); }
 .mtab-pill > svg { transition: color .25s var(--ease-liquid); }
-.mtab-label { font-weight: 500; transition: color .2s var(--ease-liquid), font-weight .2s var(--ease-liquid); }
-.mtab-item[aria-current] .mtab-label { font-weight: 650; }
+.mtab-item { transition: color .25s var(--ease-liquid); }
 @media (prefers-reduced-motion: no-preference) {
   .mtab { animation: mtab-in .4s var(--ease-liquid) backwards; }
 }
 @keyframes mtab-in { from { opacity: 0; transform: translateY(16px); } }
 @media (prefers-reduced-motion: reduce) {
-  .mtab, .mtab-item, .mtab-pill, .mtab-pill > svg, .mtab-ind, .mtab-label { transition: none; }
+  .mtab, .mtab-item, .mtab-pill, .mtab-pill > svg, .mtab-ind { transition: none; }
   .mtab-item:not(:disabled):active .mtab-pill { transform: none; }
 }
+/* A phone on its side: 54px, 8px off the edge; compact only drops to 50px (no room to spare for a scale). */
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1023px) {
-  .mtab { height: calc(54px + env(safe-area-inset-bottom)); padding-top: 4px; padding-bottom: calc(4px + env(safe-area-inset-bottom)); }
-  .mtab-item { gap: 1px; }
-  .mmain { padding-bottom: calc(env(safe-area-inset-bottom) + 74px); }
+  .mtab { height: 54px; padding: 2px 6px; bottom: calc(env(safe-area-inset-bottom) + 8px); }
+  .mtab[data-compact] { height: 50px; transform: none; }
+  .mmain { padding-bottom: calc(env(safe-area-inset-bottom) + 76px); }
 }
 
-/* 1099 Add to Home Screen card: floats 12px above the tab bar (62px; 54px on a phone on its side, 1105; docked 1115). */
+/* 1099 Add to Home Screen card: floats 12px above the tab bar (60px, 12px off the edge; 54px and 8px on a phone on its
+   side). */
 .install-card {
   left: max(12px, env(safe-area-inset-left));
   right: max(12px, env(safe-area-inset-right));
-  bottom: calc(env(safe-area-inset-bottom) + 74px);
+  bottom: calc(env(safe-area-inset-bottom) + 84px);
   background: hsl(var(--glass-bg, var(--card)));
   -webkit-backdrop-filter: blur(28px) saturate(1.7);
   backdrop-filter: blur(28px) saturate(1.7);
@@ -3538,7 +3546,7 @@ html[data-install-card] .pc { opacity: 0; pointer-events: none; transition: opac
   .install-card { background: hsl(var(--card)); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1023px) {
-  .install-card { bottom: calc(env(safe-area-inset-bottom) + 66px); }
+  .install-card { bottom: calc(env(safe-area-inset-bottom) + 74px); }
 }
 
 /* Round 1 (1102): app-like touch. No double-tap zoom anywhere, and on phones every text field is at least 16px,
@@ -4383,13 +4391,14 @@ html:not(.dark) .la-themed:not(.dark *) .la-thumb { box-shadow: inset 0 0 0 1px 
 .edge-fade[data-fade="both"] { -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--fade-w), #000 calc(100% - var(--fade-w)), transparent); mask-image: linear-gradient(90deg, transparent, #000 var(--fade-w), #000 calc(100% - var(--fade-w)), transparent); }
 
 /* ---------- 1154: Pip on a phone (ChatWidget .pc-dock) ----------
-   It steps off to the right while the tab bar is tucked (Nav.tsx sets html[data-tabs-tucked]), turning invisible
-   once out of sight so it takes no taps or focus, and the page keeps 64px more room at its foot so the last card
-   scrolls clear of the bubble. An open chat never moves. */
+   It steps off to the right while the tab bar is compact (11-19: Nav.tsx sets html[data-tabs-compact] as you read
+   on; before that, while the bar was tucked away), turning invisible once out of sight so it takes no taps or focus,
+   and the page keeps 64px more room at its foot so the last card scrolls clear of the bubble. An open chat never
+   moves. */
 @media (max-width: 1023.98px) {
   html:has(.pc-dock[data-lift]:not(.hidden)) .mmain { padding-bottom: calc(env(safe-area-inset-bottom) + 152px); }
   .pc-dock { transition: transform .3s var(--ease-liquid), opacity .3s var(--ease-liquid), visibility 0s; }
-  html[data-tabs-tucked] .pc-dock:not([data-open]) {
+  html[data-tabs-compact] .pc-dock:not([data-open]) {
     transform: translateX(calc(100% + 24px)); opacity: 0; pointer-events: none; visibility: hidden;
     transition: transform .3s var(--ease-liquid), opacity .3s var(--ease-liquid), visibility 0s .3s;
   }
@@ -4398,7 +4407,7 @@ html:not(.dark) .la-themed:not(.dark *) .la-thumb { box-shadow: inset 0 0 0 1px 
 }
 /* R1189: the open chat is the whole screen on a phone; the device hint and cookie banner (z-60) step aside until it closes. */
 @media (max-width: 767.98px) { html:has(.pc-dock[data-open]) .consent-in { display: none; } }
-@media (prefers-reduced-motion: reduce) { .pc-dock, html[data-tabs-tucked] .pc-dock:not([data-open]) { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .pc-dock, html[data-tabs-compact] .pc-dock:not([data-open]) { transition: none; } }
 
 /* R1179 run card (components/create/captions/RunCard.tsx): the indeterminate fill sweeps while the work size is unknown. */
 @media (prefers-reduced-motion: no-preference) {
