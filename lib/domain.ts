@@ -189,7 +189,10 @@ export type RemoveMode = "deleted" | "hidden" | "deleting";
 /** Statuses a creator can still stop: nothing has asked the platform to go public yet. */
 export const STOPPABLE: readonly TargetStatus[] = ["pending", "queued", "uploading"];
 
-/** Drafts nobody saves for this many days are removed from Outlly (lib/retention/prune.ts); the browser keeps its own copy. */
+/**
+ * R1209: saved drafts are never removed automatically. An upload that no post or draft uses moves to Trash after
+ * this many days, and Trash is deleted for good 30 days later (lib/storage/lifecycle.ts, run by the retention cron).
+ */
 export const DRAFT_TTL_DAYS = 3;
 
 export function isPlatform(v: unknown): v is Platform {

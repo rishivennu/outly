@@ -54,6 +54,8 @@ export const savePostSchema = z.object({
   mediaId: z.string().cuid(),
   title: z.string().max(200).optional().nullable(),
   story: z.string().max(4000).optional().nullable(),
+  /** R1209 A1: Your Story's modes and boxes, one JSON string (components/create/story-meta). */
+  storyMeta: z.string().max(20_000).optional().nullable(),
   hook: z.string().max(500).optional().nullable(),
   targets: z.array(targetDraftSchema).max(PLATFORMS.length),
   /** 1131: video (the default, one clip) | photo | carousel | story. Not sent = keep what the post is. */
@@ -84,6 +86,7 @@ export const updatePostSchema = z.object({
   targets: z.array(targetDraftSchema).optional(),
   title: z.string().max(200).optional(),
   story: z.string().max(4000).optional().nullable(),
+  storyMeta: z.string().max(20_000).optional().nullable(),
   hook: z.string().max(500).optional().nullable(),
   requireApproval: z.boolean().optional(),
   baseUpdatedAt,
@@ -154,6 +157,8 @@ export const platformCopyRequestSchema = z.object({
 export const captionAskRequestSchema = z.object({
   text: z.string().trim().min(3).max(4000),
   ask: z.enum(CAPTION_ASKS),
+  /** R1209 A1: what Outlly saw in the video, read once already, so a refinement stays true to it. */
+  seen: z.string().max(1500).optional(),
 });
 
 /** 1190 "Write once": one message in, every place's caption out. The same words asked again within 30 minutes cost nothing. */

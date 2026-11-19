@@ -11,6 +11,7 @@ import { recordEdit } from "@/lib/collab";
 import { noticeScheduleChange } from "@/lib/notify-events";
 import { DRAFT_CONFLICT_MESSAGE, draftConflict, serverDraft, StaleDraftError } from "@/lib/posts/conflicts";
 import { assertPostSchedulable } from "@/lib/posts/guard-server";
+import { deleteDraftWithMedia } from "@/lib/storage/lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -35,13 +36,14 @@ export const PATCH = route(async (req, { user, params }) => {
   const changed = copyChanged(post, edit);
   const named = (body.targets ?? []).filter((t) => t.accountId);
   const pins = named.length ? await pinTargets(user, named, {}) : {};
-  const words = body.title !== undefined || body.story !== undefined || body.hook !== undefined;
+  // R1209 A1: Your Story's mode and boxes travel with the words, so an autosave keeps both captions.
+  const words = body.title !== undefined || body.story !== undefined || body.storyMeta !== undefined || body.hook !== undefined;
   // Phase 2: the words go first and, with a base, only onto the copy checked above. A save from another device
   // in between makes this a conflict (nothing written) instead of a silent overwrite.
   try {
     await db.$transaction(async (tx) => {
       if (words || (body.baseUpdatedAt && body.targets?.length)) {
-        const n = await tx.post.updateMany({ where: { id: post.id, ...(body.baseUpdatedAt ? { updatedAt: post.updatedAt } : {}) }, data: words ? { title: body.title, story: body.story, hook: body.hook } : { updatedAt: new Date() } });
+        const n = await tx.post.updateMany({ where: { id: post.id, ...(body.baseUpdatedAt ? { updatedAt: post.updatedAt } : {}) }, data: words ? { title: body.title, story: body.story, storyMeta: body.storyMeta, hook: body.hook } : { updatedAt: new Date() } });
         if (!n.count) throw new StaleDraftError();
       }
       for (const t of body.targets ?? []) {
@@ -84,13 +86,18 @@ export const PATCH = route(async (req, { user, params }) => {
  * Remove from the studio (1089: lib/posts/delete.ts). With ?platforms=1 the live copies are deleted on every
  * platform that allows it first; if any of those fails, nothing is removed from the studio. Anything not yet
  * sent is stopped before the post goes, so a scheduled job can't publish it afterwards.
+ * R1209: ?media=delete (Start Over "Delete", Storage Manager) also deletes the draft's cover and the media no
+ * other post uses, bucket first; ?media=keep (the default) leaves the files. Both answer freedBytes and refunded.
  */
 export const DELETE = route(
   async (req, { user, params }) => {
     const q = new URL(req.url).searchParams;
+    const media = q.get("media") ?? "keep";
+    if (media !== "keep" && media !== "delete") throw new HttpError(400, "media must be keep or delete.", "BAD_REQUEST");
+    if (media === "delete") return json(await deleteDraftWithMedia(user, params.id));
     try {
       const appOnly = q.get("appOnly");
-      return json(await deletePost(user, params.id, { platforms: q.get("platforms") === "1", appOnlyAck: appOnly === "ack" || appOnly === "verify", verify: appOnly === "verify" }));
+      return json({ ...(await deletePost(user, params.id, { platforms: q.get("platforms") === "1", appOnlyAck: appOnly === "ack" || appOnly === "verify", verify: appOnly === "verify" })), freedBytes: 0, refunded: false });
     } catch (e) {
       // The sheet shows what changed (some platforms may have said yes before one said no).
       if (e instanceof HttpError && e.code === "REMOVE_FAILED") {

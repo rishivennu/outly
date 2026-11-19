@@ -72,7 +72,7 @@ export const POST = route(async (req, { user }) => {
       if (["publishing", "published"].includes(existing.status)) throw new HttpError(409, "This one has already gone out.");
       changed = copyChanged(existing, body, { replaceTargets: true }) || existing.format !== format || itemsBefore !== itemsAfter;
     } else {
-      postId = (await db.post.create({ data: { userId: user.id, mediaId: body.mediaId, title: body.title, story: body.story, hook: body.hook, format, clientKey: body.clientKey ?? null } })).id;
+      postId = (await db.post.create({ data: { userId: user.id, mediaId: body.mediaId, title: body.title, story: body.story, storyMeta: body.storyMeta, hook: body.hook, format, clientKey: body.clientKey ?? null } })).id;
     }
     const id = postId!;
     try {
@@ -80,7 +80,7 @@ export const POST = route(async (req, { user }) => {
         if (existing) {
           // With a base, the write only lands on the copy that was checked above: a save from another device in
           // between makes it a conflict instead of a silent overwrite.
-          const n = await tx.post.updateMany({ where: { id, ...(body.baseUpdatedAt ? { updatedAt: existing.updatedAt } : {}) }, data: { mediaId: body.mediaId, title: body.title, story: body.story, hook: body.hook, format } });
+          const n = await tx.post.updateMany({ where: { id, ...(body.baseUpdatedAt ? { updatedAt: existing.updatedAt } : {}) }, data: { mediaId: body.mediaId, title: body.title, story: body.story, storyMeta: body.storyMeta, hook: body.hook, format } });
           if (!n.count) throw new StaleDraftError();
         }
         if (!existing || itemsBefore !== itemsAfter) {

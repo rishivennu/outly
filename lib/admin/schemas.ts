@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { CURRENCIES } from "../billing/money";
 import { PERKS } from "../billing/plan-rules";
+import { CYCLE_ANCHORS, QUOTA_POLICIES } from "../storage/quota-core";
 
 export const PlanInput = z.object({
   name: z.string().trim().min(1, "Give the plan a name").max(40),
@@ -53,6 +54,13 @@ export const PlanInput = z.object({
   fairUsePosts: z.number().int().min(0).max(100_000).optional(),
   /** Perks on the plan; null = every perk. */
   perks: z.array(z.enum(PERKS)).max(PERKS.length).nullable().optional(),
+  // R1209 (lib/storage/quota.ts). Optional, so an older editor never resets them.
+  /** Upload allowance per cycle, MB. null = the server default (2048 MB), 0 = no monthly cap. */
+  uploadMonthlyMb: z.number().int().min(0, "The monthly upload allowance can't be negative").max(10_000_000).nullable().optional(),
+  /** auto = Free counts monthly uploads, paid plans count kept storage. */
+  quotaPolicy: z.enum(QUOTA_POLICIES).optional(),
+  /** When the monthly allowance starts again. */
+  cycleAnchor: z.enum(CYCLE_ANCHORS).optional(),
 });
 
 export const FaqInput = z.object({

@@ -41,13 +41,10 @@ describe("1182 Pip opens on Steps 1 and 2 until the caption is final", () => {
 });
 
 describe("1182 finalizing folds Pip, closing never finalizes", () => {
-  test("Finalize caption runs the page's own chooseHook, then folds Pip and says so", () => {
-    const fn = ws.slice(ws.indexOf("const finalizeCaption = async"), ws.indexOf("const rewrite = async"));
-    expect(fn).toContain("await chooseHook(text);");
-    expect(fn).toContain("if (wide) setPip(false);");
-    expect(fn).toContain("closeDrawer();");
-    expect(fn).toContain("Caption finalized.");
-    expect(ws).toContain("onUse={finalizeCaption}");
+  test("R1209 A3: Pip has no Finalize of its own; the caption is final on the page (Use this caption)", () => {
+    expect(ws).not.toContain("const finalizeCaption = async");
+    expect(ws).not.toContain("onUse={finalizeCaption}");
+    expect(src("components/create/StoryComposer.tsx")).toContain("Use this caption");
   });
   test("Close and the X only fold: no hook, no save, no send", () => {
     const at = ws.indexOf("const closePip = ");
@@ -96,10 +93,10 @@ describe("1182 the footer's lit button, by step", () => {
     expect(pip).toContain('role="status">{status}</p>');
     expect(pip).toContain('<footer className="shrink-0 border-t');
     expect(pip).toMatch(/variant="ghost" className="min-h-11 shrink-0 px-3.5" onClick=\{p\.onClose\}>\s*Close/);
-    expect(pip).toContain('onClick={() => (footer.id === "finalize" ? finalize() : p.onFooter?.(footer.id))}');
+    expect(pip).toContain('onClick={() => footer.id !== "finalize" && p.onFooter?.(footer.id)}');
   });
-  test("changing what you said asks first when an edit would be lost", () => {
-    expect(pip).toContain('title="Discard your edit?"');
+  test("R1209 A3: no edit lives in Pip, so there is nothing to discard there", () => {
+    expect(pip).not.toContain('title="Discard your edit?"');
   });
 });
 

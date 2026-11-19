@@ -81,7 +81,7 @@ const ROWS = [
     body: "Only services doing a job for you: the platforms you post to, Google Gemini for AI features (including your video's audio for captions from speech), your payment gateway, Resend for email, and Supabase, Vercel and Cloudflare, which host Outlly and your files.",
   },
   { icon: Lock, title: "How it's protected", body: "HTTPS everywhere. Platform tokens are encrypted and never reach your browser. We never see your card, bank or platform passwords." },
-  { icon: Clock, title: "How long we keep it", body: "Drafts nobody touches for 3 days are removed. Email logs go after 90 days, post metric history after 180, sign-in codes after a day. Invoices are kept for 8 years after their date, as tax law requires." },
+  { icon: Clock, title: "How long we keep it", body: "Saved drafts stay until you delete them. Uploads no draft or post uses move to Trash after 3 days and are deleted 30 days later. Email logs go after 90 days, post metric history after 180, sign-in codes after a day. Invoices are kept for 8 years after their date, as tax law requires." },
   { icon: Ban, title: "What we never do", body: "Sell your data, show ads, run trackers, or train AI models on your videos, captions or numbers." },
   { icon: SlidersHorizontal, title: "You're in control", body: "Download a copy or delete your account in Settings, any time. Disconnect any platform in Accounts and its tokens are deleted at once." },
 ] as const;

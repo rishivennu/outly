@@ -63,6 +63,8 @@ export function nvidiaRequest(key: string, body: Record<string, unknown>, opts: 
 
 const stats = new Map<string, ModelStat>();
 export const modelStats = () => Object.fromEntries(stats);
+/** Tests only: forget every model's speed and bench, so one test file's mocked failures never reorder the next. */
+export const resetModelStats = () => stats.clear();
 
 export type LlmOpts = {
   temperature?: number;

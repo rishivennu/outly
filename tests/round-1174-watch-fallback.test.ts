@@ -8,7 +8,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { env } from "../lib/env";
-import { isOpenRouterKey, kimiRequest, kimiUser, llmText } from "../lib/ai/llm";
+import { isOpenRouterKey, kimiRequest, kimiUser, llmText, resetModelStats } from "../lib/ai/llm";
 
 const src = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
@@ -34,6 +34,8 @@ describe("1174 Kimi reads images", () => {
   test("Gemini out of free-tier quota: Kimi gets the same frames and its story is used", async () => {
     (env as { GEMINI_API_KEY: string }).GEMINI_API_KEY = "g";
     (env as { KIMI_API_KEY: string }).KIMI_API_KEY = "k";
+    // Earlier files bench Gemini with their own mocked 429s (the stats live for the whole process): start clean.
+    resetModelStats();
     sent = [];
     globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
       const u = String(url);
@@ -96,19 +98,18 @@ describe("1174 Kimi through OpenRouter", () => {
 
 describe("1174 a busy AI is said, not hidden", () => {
   test("the workspace marks a busy or failed watch and offers to watch again", () => {
-    expect(src("components/create/types.ts")).toContain('| { kind: "failed" }');
+    expect(src("components/create/types.ts")).toContain('| { kind: "failed"; why?: string }');
     const w = src("components/create/CreateWorkspace.tsx");
     expect(w).toContain('if (r.skipped === "busy" || (!r.skipped && !story)) return setWatch({ kind: "failed" });');
     expect(w).toContain("if (r.skipped || !story) return setWatch(NO_WATCH);"); // a plan or quota stop stays quiet
-    expect(w).toContain('if (!ctrl.signal.aborted) setWatch({ kind: "failed" });');
-    expect(w).toContain("if (watchUrl.current) void watchVideo(watchUrl.current);");
-    expect(w).toContain("onRewatch={rewatch}");
+    expect(w).toContain('if (!ctrl.signal.aborted) setWatch({ kind: "failed", ...(e instanceof ApiError && e.status !== 503 ? { why: e.message } : {}) });');
+    // R1209 A3: the retry is the page's own Try again (Generate caption), so the assistant has no second one.
+    expect(w).toContain("onGenerate={analyze}");
+    expect(w).not.toContain("onRewatch={rewatch}");
     const a = src("components/create/Assistant.tsx");
-    expect(a).toContain('p.watch?.kind === "failed"');
-    expect(a).toContain("Watch it again");
-    expect(a).toContain("p.onRewatch?.()");
-    // the story ideas still show under the failed note, so typing stays the easy way out
-    expect(a).toContain('p.watch.kind === "idle" || p.watch.kind === "failed"');
+    expect(a).not.toContain("Watch it again");
+    expect(a).not.toContain("onRewatch");
+    expect(src("components/create/StoryComposer.tsx")).toContain('{failed ? "Try again" : "Generate caption"}');
   });
   test("the route says in the log what was asked when no model answered", () => {
     expect(src("app/api/ai/video-caption/route.ts")).toContain("[video-caption] no model watched the video:");

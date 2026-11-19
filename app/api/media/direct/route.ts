@@ -6,7 +6,8 @@ import { env } from "@/lib/env";
 import { HttpError, json, route } from "@/lib/http";
 import { storage } from "@/lib/storage";
 import { ALLOWED_EXT, ALLOWED_VIDEO_MIME } from "@/lib/media/probe";
-import { assertStorage, assertUploadSize, storageUsage, uploadLimitBytes } from "@/lib/billing/entitlements";
+import { uploadLimitBytes } from "@/lib/billing/entitlements";
+import { legacyMeter, reserveUpload, sizeColumns, storageUsageFor } from "@/lib/storage/quota";
 import { SESSION_TTL_MS } from "@/lib/media/upload-session";
 
 export const runtime = "nodejs";
@@ -26,9 +27,12 @@ const body = z.object({
  * account may upload, shown before a file is picked.
  */
 export const GET = route(async (_req, { user }) => {
-  const [lim, st] = await Promise.all([uploadLimitBytes(user.id), storageUsage(user.id)]);
+  const [lim, usage] = await Promise.all([uploadLimitBytes(user.id), storageUsageFor(user.id)]);
+  const st = legacyMeter(usage);
   return json({
-    storage: { usedBytes: st.usedBytes, limitBytes: st.limitBytes, remainingBytes: st.remainingBytes, over: st.over, label: st.label },
+    // R1209: the limit that binds (the monthly allowance on Free, kept storage on paid plans); `quota` has both.
+    storage: { usedBytes: st.usedBytes, limitBytes: st.limitBytes, remainingBytes: st.remainingBytes, over: st.over, label: st.label, kind: st.kind },
+    quota: usage,
     direct: Boolean(storage.createDirectUpload),
     maxBytes: lim.bytes,
     maxMb: lim.mb,
@@ -54,16 +58,21 @@ export const POST = route(
     const mime = b.type || (ext === ".mov" ? "video/quicktime" : "video/mp4");
     if (!(ALLOWED_VIDEO_MIME as readonly string[]).includes(mime) || !(ALLOWED_EXT as readonly string[]).includes(ext))
       throw new HttpError(415, "That one isn't a video we can use yet. Try an MP4 or MOV.");
-    await assertUploadSize(user.id, b.size);
-    // The "uploading" row below holds this size against the allowance until it lands or is swept.
-    await assertStorage(user.id, b.size);
-
     const id = randomUUID();
     const key = `videos/${user.id}/${id}${ext}`;
-    const up = await storage.createDirectUpload(key, { size: b.size, contentType: mime });
-    const media = await db.media.create({
-      data: { userId: user.id, originalFilename: b.name, storageKey: key, mimeType: mime, size: b.size, status: "uploading" },
-    });
+    // R1209: per-file cap, monthly allowance and storage are checked and the "uploading" row that holds this size
+    // is made in one locked step, so two uploads started together can't both take the last room. The row holds the
+    // space until the upload lands, is cancelled or is swept.
+    const media = await reserveUpload(user.id, b.size, (tx) =>
+      tx.media.create({ data: { userId: user.id, originalFilename: b.name, storageKey: key, mimeType: mime, ...sizeColumns(b.size), status: "uploading" } }),
+    );
+    let up: Awaited<ReturnType<NonNullable<typeof storage.createDirectUpload>>>;
+    try {
+      up = await storage.createDirectUpload(key, { size: b.size, contentType: mime });
+    } catch (e) {
+      await db.media.updateMany({ where: { id: media.id, status: "uploading" }, data: { status: "failed" } });
+      throw e;
+    }
     const base = { mediaId: media.id, key, mode: up.mode, contentType: mime };
     if (up.mode === "tus")
       return json({ ...base, bucket: env.SUPABASE_BUCKET, token: up.token, uploadUrl: up.url, resumableUrl: up.resumableUrl, chunkSize: 6 * 1024 * 1024 }, { status: 201 });

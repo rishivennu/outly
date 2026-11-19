@@ -62,10 +62,10 @@ describe("R1206 the caption is written in exactly one place", () => {
     expect(deck).toContain("onEditSource?: () => void;");
     expect(ws).toContain('onEditSource={() => goTo("story"');
   });
-  test("Pip's own older hook flow and watch cards are off wherever the page has the editor", () => {
-    expect(pip).toContain("{!p.composer && result?.understood && (");
-    for (const k of ["watching", "ready", "failed"]) expect(pip).toContain(`{askStory && !p.composer && p.watch?.kind === "${k}" && (`);
-    expect(pip).toContain("const ownBox = askStory && !p.composer;");
+  test("Pip's own older hook flow and watch cards are gone (R1209 A3)", () => {
+    expect(pip).not.toContain("result?.understood");
+    expect(pip).not.toContain("ownBox");
+    for (const s of ["Suggested</p>", "Original</p>", "Try another", "Edit it first", "Watch it again"]) expect(pip).not.toContain(s);
   });
   test("generating confirms once and moves the creator into the platform results", () => {
     const fn = ws.slice(ws.indexOf("const adapt = async"), ws.indexOf("const analyze = () =>"));

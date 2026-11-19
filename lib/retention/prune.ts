@@ -1,8 +1,8 @@
 import "server-only";
 import { pruneDeletions } from "../account-cleanup";
 import { db } from "../db";
-import { storage } from "../storage";
 import { DRAFT_TTL_DAYS } from "../domain";
+import { purgeTrash, trashOrphanMedia } from "../storage/lifecycle";
 import { MAX_ANALYTICS_DAYS } from "../billing/plan-rules";
 import { PIP_CHAT_KEEP_DAYS } from "../support/conversations";
 import { RUN_CHUNK_FEATURE, RUN_FEATURE, RUN_TTL_MS } from "../ai/transcribe";
@@ -10,8 +10,8 @@ import { RUN_CHUNK_FEATURE, RUN_FEATURE, RUN_TTL_MS } from "../ai/transcribe";
 /**
  * Housekeeping: rows nobody reads any more. Logs and admin noise go after 90 days, per-post metric
  * samples after MAX_ANALYTICS_DAYS (2 years, the longest plan history, 1096), expired sign-in codes after a day.
- * Drafts nobody has touched for DRAFT_TTL_DAYS go too, with their video when no other post uses it
- * (the browser keeps its own copy, see lib/client/device-drafts.ts).
+ * R1209: saved drafts are kept. Uploads no post or draft uses move to Trash after DRAFT_TTL_DAYS, and Trash is
+ * deleted for good after TRASH_DAYS (lib/storage/lifecycle.ts), bucket first.
  * Run from the retention cron; every delete is a plain window on a timestamp, so it is safe to repeat.
  */
 const DAY = 864e5;
@@ -30,41 +30,6 @@ export async function pruneDetachedInvoices(now: Date = new Date()) {
   cutoff.setFullYear(cutoff.getFullYear() - INVOICE_KEEP_YEARS);
   const { count } = await db.invoice.deleteMany({ where: { userId: null, issuedAt: { lt: cutoff } } });
   return count;
-}
-
-/**
- * Untouched drafts: status draft, not saved for DRAFT_TTL_DAYS, not booked for a future time and not
- * waiting on a reviewer. The delete repeats the conditions, so a draft saved meanwhile survives.
- */
-export async function pruneStaleDrafts(now: Date = new Date(), batch = 500) {
-  const cutoff = new Date(now.getTime() - DRAFT_TTL_DAYS * DAY);
-  const where = {
-    status: "draft",
-    updatedAt: { lt: cutoff },
-    OR: [{ scheduledAt: null }, { scheduledAt: { lt: now } }],
-    reviews: { none: { status: "pending", expiresAt: { gt: now } } },
-  };
-  const stale = await db.post.findMany({ where, select: { id: true, mediaId: true, coverKey: true, items: { select: { mediaId: true } } }, take: batch });
-  if (!stale.length) return { drafts: 0, media: 0 };
-  const { count } = await db.post.deleteMany({ where: { ...where, id: { in: stale.map((p) => p.id) } } });
-  // 1083: a cover belongs to its post alone, so it goes once that post row is really gone.
-  const left = new Set((await db.post.findMany({ where: { id: { in: stale.map((p) => p.id) } }, select: { id: true } })).map((p) => p.id));
-  for (const p of stale)
-    if (p.coverKey && !left.has(p.id)) await storage.remove(p.coverKey).catch((e) => console.error("[prune:drafts] cover", p.coverKey, e));
-  const orphans = await db.media.findMany({
-    // 1131: carousel slides count too, and a slide another post still uses stays.
-    where: { id: { in: Array.from(new Set(stale.flatMap((p) => [p.mediaId, ...p.items.map((i) => i.mediaId)]))) }, posts: { none: {} }, postItems: { none: {} } },
-    select: { id: true, storageKey: true, thumbnailKey: true },
-  });
-  if (!orphans.length) return { drafts: count, media: 0 };
-  await db.media.deleteMany({ where: { id: { in: orphans.map((m) => m.id) }, posts: { none: {} }, postItems: { none: {} } } });
-  // Only files whose row is really gone: one picked up by a new post in the meantime stays.
-  const kept = new Set((await db.media.findMany({ where: { id: { in: orphans.map((m) => m.id) } }, select: { id: true } })).map((m) => m.id));
-  const removed = orphans.filter((m) => !kept.has(m.id));
-  for (const m of removed)
-    for (const key of [m.storageKey, m.thumbnailKey])
-      if (key) await storage.remove(key).catch((e) => console.error("[prune:drafts] storage", key, e));
-  return { drafts: count, media: removed.length };
 }
 
 /** Direct messages (1031) are kept for this long after they were sent; a conversation quiet for longer goes with them. */
@@ -92,17 +57,13 @@ export async function pruneOldData(now: Date = new Date()) {
   ]);
   // Deletion status records (1053): kept 30 days after the files are gone, for the person's status link.
   const deletions = await pruneDeletions(now).catch(() => 0);
-  // Batches of 500, a few per run, so a backlog drains without one huge delete.
-  const drafts = { drafts: 0, media: 0 };
-  for (let i = 0; i < 10; i++) {
-    const r = await pruneStaleDrafts(now);
-    drafts.drafts += r.drafts;
-    drafts.media += r.media;
-    if (r.drafts < 500) break;
-  }
+  // R1209: orphan uploads to Trash, then Trash past its 30 days deleted for good. Never fatal for the rest.
+  const trashed = await trashOrphanMedia(now).catch((e) => (console.error("[prune] trash", e), 0));
+  const trash = await purgeTrash(now).catch((e) => (console.error("[prune] purge", e), { purged: 0, restored: 0, queued: 0 }));
   return {
-    drafts: drafts.drafts,
-    draftMedia: drafts.media,
+    trashed,
+    trashPurged: trash.purged,
+    trashQueued: trash.queued,
     emailLogs: emailLogs.count,
     adminEvents: adminEvents.count,
     behaviorAnalyses: behaviorAnalyses.count,

@@ -1,9 +1,8 @@
 "use client";
 import { useState } from "react";
-import { Check, Plus, Sparkles, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Plus, Sparkles } from "lucide-react";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
-import { DECK_ASKS, isCaptionAsk, STORY_ASKS, type CaptionAsk, type PipAsk } from "@/lib/ai/pip-asks";
+import { DECK_ASKS, isCaptionAsk, STORY_MODE_ASKS, type CaptionAsk, type PipAsk } from "@/lib/ai/pip-asks";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { fieldsFor } from "./deck-logic";
@@ -16,10 +15,8 @@ export interface PipActionsProps {
   target: Platform | null;
   /** An ask in flight, so the same one is never sent twice. */
   busy: { p: Platform; ask: PipAsk } | null;
-  /** Places with a suggestion from Pip waiting for Accept or Skip. */
-  proposed: Platform[];
-  onAccept: (p: Platform) => void;
-  onReject: (p: Platform) => void;
+  /** R1209 A3: who writes Your Story's caption. Pip offers only the asks that mode's page doesn't already have. */
+  mode?: "generate" | "own";
   /** Step 2: places that could be added, for "Adapt for another platform". */
   others?: Platform[];
   onAdd?: (p: Platform) => void;
@@ -41,6 +38,8 @@ const CHIP =
 /**
  * R1198: Pip's one-tap asks. Each works on one place's words and comes back as a suggestion to accept or skip:
  * nothing Pip writes here lands without the creator's say-so, and the page never gets a second writing box.
+ * R1209 A3: the suggestion is decided in one place only, its card on the page (Your caption, or the platform's
+ * card), so Pip has no Accept or Skip buttons of its own.
  */
 export function PipActions(p: PipActionsProps) {
   const [picking, setPicking] = useState(false);
@@ -49,7 +48,7 @@ export function PipActions(p: PipActionsProps) {
   // R1206: a platform's own ask (YouTube's metadata, LinkedIn's lesson, X's one post) shows only on that platform.
   const cap = p.step === "story" ? p.caption : undefined;
   // On Your Story with `caption` the asks work on the creator's own words, so no one platform's fields decide them.
-  const asks = (p.step === "story" ? STORY_ASKS : DECK_ASKS).filter((a) => (a.id !== "hashtags" || !!cap || !t || fieldsFor(t).hashtags) && (!a.only || (!!t && a.only.includes(t))));
+  const asks = (p.step === "story" ? STORY_MODE_ASKS[p.mode ?? "own"] : DECK_ASKS).filter((a) => (a.id !== "hashtags" || !!cap || !t || fieldsFor(t).hashtags) && (!a.only || (!!t && a.only.includes(t))));
   const off = cap ? !!p.why || !!cap.busy || !!p.busy : !!p.why || !!p.busy || !t;
   const name = t ? PLATFORM_META[t].name : "";
 
@@ -108,27 +107,8 @@ export function PipActions(p: PipActionsProps) {
           ? "Working on your caption…"
           : p.busy
             ? `Working on ${PLATFORM_META[p.busy.p].name}…`
-            : (p.why ?? (cap?.waiting ? "Pip's suggestion is waiting under Your caption. Apply it or skip it there; a new ask replaces it." : "Each answer is a suggestion. Nothing changes until you accept it."))}
+            : (p.why ?? (cap?.waiting ? "The suggestion is waiting under Your caption. Accept it or keep yours there." : p.step === "everywhere" ? "Each answer waits on the platform's card. Nothing changes until you accept it." : "Each answer is a suggestion. Nothing changes until you accept it."))}
       </p>
-
-      {p.proposed.length > 0 && (
-        <ul className="mt-3 space-y-2" aria-label="Suggestions waiting">
-          {p.proposed.map((pl) => (
-            <li key={pl} className="flex flex-wrap items-center gap-2 rounded-2xl bg-card p-2.5 hairline">
-              <PlatformOrb platform={pl} size={22} />
-              <span className="min-w-0 flex-1 text-[13px] leading-snug">New words for {PLATFORM_META[pl].name}. The same suggestion as on its card, if you'd rather decide from here.</span>
-              <span className="flex gap-1.5">
-                <Button type="button" size="sm" variant="lime" className="min-h-11 rounded-full px-3" onClick={() => p.onAccept(pl)}>
-                  <Check className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> Accept <span className="sr-only">for {PLATFORM_META[pl].name}</span>
-                </Button>
-                <Button type="button" size="sm" variant="ghost" className="min-h-11 rounded-full px-3" onClick={() => p.onReject(pl)}>
-                  <X className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> Skip <span className="sr-only">for {PLATFORM_META[pl].name}</span>
-                </Button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

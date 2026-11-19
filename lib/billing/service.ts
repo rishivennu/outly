@@ -306,6 +306,7 @@ export async function completePayment(paymentId: string, providerRef?: string) {
         currency: p.currency,
         interval,
         provider: p.provider,
+        currentPeriodStart: now, // R1209: the billing anchor for the monthly upload allowance (lib/storage/quota.ts)
         currentPeriodEnd: new Date((interval === "year" ? addYears(now, 1) : addMonths(now, 1)).getTime() + carry),
         sample: p.sample,
         // 1147: the quoted tier is snapshotted with the price; editing the policy later never re-prices it.

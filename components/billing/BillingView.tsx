@@ -29,6 +29,7 @@ import { GuaranteeCard, type GuaranteeView } from "./GuaranteeCard";
 import { GUARANTEE_LINE } from "@/lib/billing/guarantee-core";
 import { AutoRenewToggle, CancelReasons, PriceSurvey, UsageExtras, type CancelWhy } from "./PlanExtras";
 import { SavedCardsSection } from "./SavedCards";
+import { QuotaCard, type QuotaView } from "./QuotaCard";
 import { BudgetMeter, CheckoutSummaryView, OfferGate, ReviewForm, TrialCard } from "./OfferCards";
 import { checkoutSummary, offerLine, type BudgetView, type QuoteView, type TrialView } from "./offer-core";
 import { track } from "@/lib/analytics/track";
@@ -61,7 +62,7 @@ type Usage = { used: number; limit: number; seats: number; aiCaptions: boolean; 
 type ExtraAccess = { planName: string; source: "admin" | "referral"; endsAt: string } | null;
 
 
-export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: string } | null; email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; charged?: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; status: BillingStatus; nextCharge: string | null; meters: MeterView[]; history: HistoryRow[]; ended?: EndedSub | null; beta?: BetaOffer | null; founding?: FoundingMine; foundingStatus?: string | null; badges?: Badges; guarantee?: GuaranteeView; offer?: OfferView | null }) {
+export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: string } | null; email: string; notice: ReturnNotice | null; receipt?: Receipt | null; focusPlan: string | null; cycle: Cycle; gateway: string; testMode: boolean; plans: PricedPlan[]; currency: string; charged?: string; currencySource: CurrencySource; current: Current; access?: ExtraAccess; usage: Usage; status: BillingStatus; nextCharge: string | null; meters: MeterView[]; history: HistoryRow[]; ended?: EndedSub | null; beta?: BetaOffer | null; founding?: FoundingMine; foundingStatus?: string | null; badges?: Badges; guarantee?: GuaranteeView; offer?: OfferView | null; quota?: QuotaView | null }) {
   const { plans, current } = props;
   const router = useRouter();
   const toast = useToast();
@@ -368,6 +369,7 @@ export function BillingView(props: { offerNote?: { tone: "ok" | "info"; text: st
 
       <Panel id="use-h" title="Plan usage & limits" className="mt-4" action={<span className="text-[12.5px] text-muted-foreground">Resets with your plan's period</span>}>
         <UsageGrid meters={props.meters} />
+        {props.quota && <QuotaCard q={props.quota} onUpgrade={() => toPlans()} />}
         {props.offer && <BudgetMeter budget={props.offer.budget} />}
         {(!!props.usage.maxUploadMb || (props.usage.captions && !props.usage.captions.burn && props.usage.aiCaptions)) && (
           <p className="mt-3 text-[12.5px] text-muted-foreground">

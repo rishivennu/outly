@@ -95,16 +95,12 @@ describe("p4 the hook once on Everywhere and Launch", () => {
     expect(foldsConversation("video")).toBe(false);
     expect(foldsConversation("story")).toBe(false);
   });
-  test("the panel shows its latest message and a labelled disclosure for the rest", () => {
+  test("R1209 A3: later steps say only their own line, so there is no history to fold", () => {
     const a = src("components/create/Assistant.tsx");
-    expect(a).toContain("const folds = foldsConversation(p.step) && !!p.chosenHook;");
-    expect(a).toContain('{unfolded ? "Hide conversation" : "Show conversation"}');
-    expect(a).toContain("aria-expanded={unfolded}");
-    expect(a).toContain("aria-controls={historyId}");
-    expect(a).toContain("{showHistory && (");
-    // the Suggested hook card sits inside the folded part, the Launch line outside it
-    expect(a.indexOf("{showHistory && (")).toBeLessThan(a.indexOf("Suggested</p>"));
-    expect(a.indexOf("Suggested</p>")).toBeLessThan(a.indexOf('{p.step === "launch" &&'));
+    expect(a).toContain('const early = p.step === "video" || p.step === "story";');
+    expect(a).toContain("{early && p.hasMedia && p.upload.kind === \"done\" && p.meta?.duration ? (");
+    expect(a).not.toContain("Show conversation");
+    expect(a).not.toContain("Suggested</p>");
   });
 });
 

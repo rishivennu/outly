@@ -121,7 +121,8 @@ describe("workspace wiring", () => {
     expect(ws).toContain("resumeKey: deviceId.current ?? undefined");
   });
   test("offline: AI writing, connecting and launch refuse with a reason", () => {
-    expect(ws).toContain("Pip can write hooks again when you reconnect.");
+    // R1209 A3: Pip writes no hooks of its own any more; its asks say when they come back.
+    expect(ws).toContain("You're offline. Pip can help as soon as you reconnect.");
     expect(ws).toContain("Pip can write the copy when you reconnect");
     expect(ws).toContain("Connect it when you're back online.");
     expect(ws).toContain("busy={launching} error={launchError} online={online}");

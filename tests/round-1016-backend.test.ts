@@ -209,7 +209,8 @@ describe("retention prune", () => {
 });
 
 describe("draft expiry", () => {
-  test("untouched drafts go after 3 days with their video; fresh, booked and reviewed ones stay", async () => {
+  // R1209: saved drafts are never auto-deleted any more. Only finished uploads nothing uses go to Trash after the TTL.
+  test("untouched drafts stay with their video; only unused uploads older than the TTL move to Trash", async () => {
     const u = await mk("drafts");
     const day = 864e5;
     const media = (k: string) => db.media.create({ data: { userId: u.id, originalFilename: `${k}.mp4`, storageKey: `drafts/${k}-${n}.mp4`, mimeType: "video/mp4", size: 10, status: "ready" } });
@@ -228,14 +229,19 @@ describe("draft expiry", () => {
     await db.post.create({ data: { userId: u.id, mediaId: shared.mediaId, status: "published" } });
     const sent = await draft("sent", 9, { status: "published" });
 
-    const out = await prune.pruneStaleDrafts();
-    expect(out.drafts).toBeGreaterThanOrEqual(2);
+    const orphanOld = await media("orphan-old");
+    await db.media.update({ where: { id: orphanOld.id }, data: { createdAt: new Date(Date.now() - 5 * day) } });
+    const orphanNew = await media("orphan-new");
+
+    const out = await prune.pruneOldData();
+    expect(out.trashed).toBeGreaterThanOrEqual(1);
     const has = (id: string) => db.post.count({ where: { id } });
-    expect(await has(old.post.id)).toBe(0);
-    expect(await db.media.count({ where: { id: old.mediaId } })).toBe(0);
-    expect(await has(shared.post.id)).toBe(0);
-    expect(await db.media.count({ where: { id: shared.mediaId } })).toBe(1);
-    for (const keep of [fresh, booked, reviewed, sent]) expect(await has(keep.post.id)).toBe(1);
+    for (const keep of [old, fresh, booked, reviewed, shared, sent]) {
+      expect(await has(keep.post.id)).toBe(1);
+      expect((await db.media.findUnique({ where: { id: keep.mediaId } }))?.deletedAt).toBeNull();
+    }
+    expect((await db.media.findUnique({ where: { id: orphanOld.id } }))?.deletedAt).not.toBeNull();
+    expect((await db.media.findUnique({ where: { id: orphanNew.id } }))?.deletedAt).toBeNull();
   });
 });
 

@@ -179,7 +179,7 @@ export async function renewFromCharge(providerSubId: string, charge: { id: strin
   try {
     paymentId = await db.$transaction(async (tx) => {
       const p = await tx.payment.create({ data: { userId: sub.userId, subscriptionId: sub.id, planId: sub.planId, amountMinor: charge.amount, currency: charge.currency, interval: sub.interval, provider: "razorpay", providerRef: charge.id, status: "succeeded", purpose: "renewal", ...(sub.priceTier !== "legacy" ? { priceTier: sub.priceTier } : {}) } });
-      if (!stray) await tx.subscription.update({ where: { id: sub.id }, data: { currentPeriodEnd: end, status: "active", autoRenew: true, cancelAtPeriodEnd: false } });
+      if (!stray) await tx.subscription.update({ where: { id: sub.id }, data: { currentPeriodStart: s.currentPeriodEnd < now ? now : s.currentPeriodEnd, currentPeriodEnd: end, status: "active", autoRenew: true, cancelAtPeriodEnd: false } });
       return p.id;
     });
   } catch (e) {

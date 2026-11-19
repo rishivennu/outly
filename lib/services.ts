@@ -92,6 +92,8 @@ export async function postView(p: Post & { targets: PostTarget[]; media: Media; 
     id: p.id,
     title: p.title,
     story: p.story,
+    /** R1209 A1: Your Story's modes and boxes (components/create/story-meta), as saved. */
+    storyMeta: p.storyMeta ?? null,
     hook: p.hook,
     status: p.status,
     scheduledAt: p.scheduledAt?.toISOString() ?? null,

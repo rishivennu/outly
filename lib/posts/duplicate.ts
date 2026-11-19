@@ -17,6 +17,7 @@ export async function duplicatePost(userId: string, postId: string) {
       mediaId: src.mediaId,
       title: src.title ? `${src.title} (copy)` : null,
       story: src.story,
+      storyMeta: src.storyMeta,
       hook: src.hook,
       requireApproval: src.requireApproval,
       format: src.format,

@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Cloud } from "lucide-react";
 import { api, ApiError } from "@/lib/client/api";
-import { DRAFT_TTL_DAYS } from "@/lib/client/device-drafts";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Sheet } from "@/components/shared/Sheet";
 import { useToast } from "@/components/shared/Toast";
@@ -13,7 +12,7 @@ import type { PostView } from "./types";
 
 /**
  * 1170: Step 1's "Pick up where you left off". Two kinds of draft, said plainly:
- *  - On Outlly: saved to the account (GET /api/posts?status=draft), open on any device; removed after DRAFT_TTL_DAYS untouched.
+ *  - On Outlly: saved to the account (GET /api/posts?status=draft), open on any device; kept until deleted (R1209).
  *  - On this device: kept in this browser (IndexedDB), video included, until removed here.
  * A draft that is in both shows once, with the Outlly ones.
  */
@@ -108,7 +107,7 @@ export function SavedDrafts({ className }: { className?: string }) {
                 })}
               </ul>
             )}
-            <p className="mt-2.5 text-xs text-muted-foreground">Saved to your account, so they open on any device. Untouched for {DRAFT_TTL_DAYS} days, they are removed.</p>
+            <p className="mt-2.5 text-xs text-muted-foreground">Saved to your account, so they open on any device. They stay until you delete them.</p>
           </section>
         )}
         <DeviceDrafts
@@ -118,7 +117,7 @@ export function SavedDrafts({ className }: { className?: string }) {
           heading="On this device"
           hidePosts={cloud.map((p) => p.id)}
           onCount={setDeviceCount}
-          note="Kept in this browser only, video included, until you remove it. Handy when a draft on Outlly has expired."
+          note="Kept in this browser only, video included, until you remove it. Handy if a draft on Outlly was deleted."
         />
       </div>
       <ConfirmDialog

@@ -30,8 +30,8 @@ describe("1095 launch collapse", () => {
 
   test("the panel is folded by width, not unmounted", () => {
     expect(workspace).toContain('id={ASSISTANT_PANEL}');
-    // 1152: a 320/340px side panel from 1280px; below that the same element is the drawer
-    expect(workspace).toContain('panel.open ? "xl:w-[300px] xl:opacity-100 2xl:w-[320px]" : "xl:w-0 xl:opacity-0"');
+    // R1209 A3: a 320/340px side panel from 1280px (440/480px expanded); below that the same element is the drawer
+    expect(workspace).toContain('panel.open ? (pipBig ? "xl:w-[440px] xl:opacity-100 2xl:w-[480px]" : "xl:w-[320px] xl:opacity-100 2xl:w-[340px]") : "xl:w-0 xl:opacity-0"');
     expect(workspace).toContain("const pipShown = wide ? panel.open : drawer;");
     expect(workspace).toContain("inert={!pipShown}");
     expect(workspace).toContain("aria-hidden={!pipShown}");
@@ -78,44 +78,12 @@ describe("1095 editing the original caption", () => {
   });
 
   test("both AI calls read the same source", () => {
-    // R1198: also Pip's one-tap asks and the deck's Original caption panel
-    expect(workspace.match(/captionSource\(\{ edited: editedOriginal, submittedStory, story \}\)/g)?.length).toBe(4);
+    // R1209 A3: the platform copy and Pip's one-tap asks; Pip's hooks and the Original caption card are gone.
+    expect(workspace.match(/captionSource\(\{ edited: editedOriginal, submittedStory, story \}\)/g)?.length).toBe(2);
     expect(workspace).not.toContain("{ story: submittedStory ?? story, hook: h, platforms }");
-    expect(workspace).toContain("original={editedOriginal ?? hooks.result?.original ?? \"\"}");
-    expect(workspace).toContain("onOriginal={setEditedOriginal}");
   });
-  test("a new story clears the old edit", () => {
-    expect(workspace).toContain("setEditedOriginal(null); // a new story gets a new Original to read");
-  });
-
-  test("the Original card has a visible, labelled pencil", () => {
-    expect(assistant).toContain('aria-label="Edit original caption"');
-    expect(assistant).toContain('<Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Edit');
-    expect(assistant).toContain("min-h-[44px]");
-  });
-  test("the editor saves, cancels and answers the keyboard", () => {
-    expect(assistant).toContain('if (e.key === "Escape")');
-    expect(assistant).toContain('e.key === "Enter" && (e.metaKey || e.ctrlKey) && canSaveCaption(capEdit)');
-    expect(assistant).toContain("disabled={!canSaveCaption(capEdit)}");
-    expect(assistant).toContain("p.onOriginal(capEdit.trim());");
-    expect(assistant).toContain("<Button variant=\"subtle\" onClick={() => setCapEdit(null)}>");
-    expect(assistant).toContain("autoFocus");
-  });
-  test("lime is only on Save, and the card keeps its language", () => {
-    const card = assistant.slice(assistant.indexOf('<p className="eyebrow">Original</p>'), assistant.indexOf('Suggested'));
-    expect(card.match(/variant="lime"/g)?.length).toBe(1);
-    expect(card).toContain("rounded-2xl");
-    expect(card).toContain("hairline");
-  });
-  test("the suggested card and its wording are untouched", () => {
-    expect(assistant).toContain('<p className="eyebrow !text-foreground">Suggested</p>');
-    expect(assistant).toContain("Use this");
-    expect(assistant).toContain("Try another");
-    expect(assistant).toContain('aria-label={editing ? "Done editing" : "Tweak it yourself"}');
-  });
-  test("nothing changes before Save: the card reads the prop, the editor its own copy", () => {
-    expect(assistant).toContain("const [capEdit, setCapEdit] = useState<string | null>(null);");
-    expect(assistant).toContain("onClick={() => setCapEdit(p.original)}");
-    expect(assistant).toContain("<p className=\"text-[15px] text-muted-foreground\">{p.original}</p>");
+  test("R1209 A3: the Original and Suggested cards are gone; the caption has one editing place, on the page", () => {
+    for (const s of ['aria-label="Edit original caption"', "setCapEdit", "p.onOriginal", 'eyebrow !text-foreground">Suggested', "Try another", "Tweak it yourself"]) expect(assistant).not.toContain(s);
+    expect(workspace).not.toContain("onOriginal={setEditedOriginal}");
   });
 });

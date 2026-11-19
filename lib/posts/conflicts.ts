@@ -7,6 +7,8 @@ export interface ServerDraft {
   id: string;
   title: string | null;
   story: string | null;
+  /** R1209 A1: Your Story's modes and boxes, when stored. */
+  storyMeta?: string | null;
   hook: string | null;
   updatedAt: string;
   targets: { platform: string; socialAccountId: string | null; title: string | null; caption: string | null; description: string | null; hashtags: string | null; firstComment: string | null; enabled: boolean }[];
@@ -17,6 +19,7 @@ type StoredPost = {
   mediaId: string;
   title: string | null;
   story: string | null;
+  storyMeta?: string | null;
   hook: string | null;
   updatedAt: Date;
   targets: { platform: string; socialAccountId: string | null; title: string | null; caption: string | null; description: string | null; hashtags: string | null; firstComment: string | null }[];
@@ -28,6 +31,7 @@ export function serverDraft(p: StoredPost): ServerDraft {
     id: p.id,
     title: p.title,
     story: p.story,
+    ...(p.storyMeta != null ? { storyMeta: p.storyMeta } : {}),
     hook: p.hook,
     updatedAt: p.updatedAt.toISOString(),
     targets: p.targets.map((t) => ({ platform: t.platform, socialAccountId: t.socialAccountId, title: t.title, caption: t.caption, description: t.description, hashtags: t.hashtags, firstComment: t.firstComment, enabled: true })),

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Eye, Film, HardDrive, X } from "lucide-react";
-import { ago, DRAFT_TTL_DAYS, openDrafts, type DeviceDraft } from "@/lib/client/device-drafts";
+import { ago, openDrafts, type DeviceDraft } from "@/lib/client/device-drafts";
 import { useUser } from "@/components/shell/UserContext";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,7 @@ export function DraftRow({ thumb, title, meta, status, resumeHref, onPreview, on
 
 /**
  * Drafts saved in this browser. Shown on Create's first step and on the Drafts tab, so a draft whose server copy
- * expired after DRAFT_TTL_DAYS can still be picked up (the video comes along). `hidePosts` leaves out the ones
+ * was deleted can still be picked up (the video comes along). `hidePosts` leaves out the ones
  * already listed with the drafts on Outlly, so one draft is never shown twice.
  */
 export function DeviceDrafts({ className, limit = 3, heading = "Saved on this device", grid = "grid-cols-1", hidePosts, note, onCount, level = 2 }: { className?: string; limit?: number; heading?: string; grid?: string; hidePosts?: string[]; note?: React.ReactNode; onCount?: (n: number) => void; level?: 2 | 3 }) {
@@ -128,7 +128,7 @@ export function DeviceDrafts({ className, limit = 3, heading = "Saved on this de
         }}
       />
       <p className="mt-2.5 text-xs text-muted-foreground">
-        {note ?? <>Drafts you don&apos;t touch for {DRAFT_TTL_DAYS} days are removed from Outlly. The copy in this browser stays until you remove it.</>}
+        {note ?? <>The copy in this browser stays until you remove it, even if the draft on Outlly is deleted.</>}
       </p>
     </section>
   );

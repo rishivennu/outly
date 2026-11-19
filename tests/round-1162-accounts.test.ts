@@ -77,14 +77,16 @@ describe("1162 start over", () => {
     expect(fn.indexOf("await mediaReady.current")).toBeLessThan(fn.indexOf("writeLocal.current();"));
     expect(fn.indexOf("writeLocal.current();")).toBeLessThan(fn.indexOf("await sync.syncNow();"));
     expect(fn.indexOf("await sync.syncNow();")).toBeLessThan(fn.indexOf("another();"));
-    expect(fn).toMatch(/catch \{[\s\S]*?\}\s*another\(\);/); // a failed sync never traps the creator here
+    // a failed sync never traps the creator here; R1209: the fresh page says what happened to the work
+    expect(fn).toMatch(/catch \{[\s\S]*?\}\s*flashNext\([\s\S]*?\);\s*another\(\);/);
   });
   test("asks first when there is something to keep; with no video it just starts", () => {
-    expect(ws).toContain("onClick={() => (hasMedia ? setOverAsk(true) : another())}");
-    expect(ws).toContain('title="Start over?"');
-    expect(ws).toContain('confirmLabel={overBusy ? "Saving…" : "Save and start over"}');
-    expect(ws).toContain('cancelLabel="Keep going"');
-    expect(ws).toContain("disabled={overBusy || phase !== \"edit\"}"); // never while the post is going out
+    expect(ws).toContain("onClick={() => (hasMedia ? (setOverError(null), setOverAsk(true)) : another())}");
+    // R1209 B: save, delete (after a second confirmation) or cancel, in StartOverDialog
+    expect(ws).toContain("<StartOverDialog\n          open={overAsk}");
+    expect(ws).toContain("onSave={() => void startOver()}");
+    expect(ws).toContain("onDelete={() => void deleteAndStartOver()}");
+    expect(ws).toContain("disabled={!!overBusy || phase !== \"edit\"}"); // never while the post is going out
   });
   test("on the rail from 1280px, and in the top row below it, on every step", () => {
     expect(ws).toMatch(/const railStatus = \([\s\S]*?\{startOverButton\}/);

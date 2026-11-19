@@ -12,11 +12,11 @@ import { voiceFor } from "@/lib/ai/voice";
  */
 export const POST = route(
   async (req, { user }) => {
-    const { text, ask } = captionAskRequestSchema.parse(await req.json());
+    const { text, ask, seen } = captionAskRequestSchema.parse(await req.json());
     const uid = realUserId(user);
     const now = new Date();
     const charged = await chargeAi(uid, "ai", now, undefined, "rewrite");
-    const out = await askSourceCaption(text, ask, { cacheKey: uid, signal: req.signal, voice: await voiceFor(uid) });
+    const out = await askSourceCaption(text, ask, { cacheKey: uid, signal: req.signal, voice: await voiceFor(uid), seen });
     if (!out) {
       await refundAi(uid, charged, "ai", now);
       throw new HttpError(503, "Pip couldn't do that just now. Your caption is unchanged, so try again in a moment.", "ai_busy");

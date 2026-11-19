@@ -8,6 +8,7 @@ import { pruneOldData } from "@/lib/retention/prune";
 import { sweepSpikes } from "@/lib/retention/alerts";
 import { backfillCreditNotes } from "@/lib/billing/credit-note";
 import { sendRenewalReminders } from "@/lib/billing/autorenew";
+import { closeUsageCycles } from "@/lib/storage/lifecycle";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -25,5 +26,7 @@ export async function GET(req: NextRequest) {
   const creditNotes = await backfillCreditNotes().catch((e) => (console.error("[retention] credit notes", e), null));
   const renewals = await sendRenewalReminders().catch((e) => (console.error("[retention] renewal reminders", e), null));
   const pruned = await pruneOldData();
-  return NextResponse.json({ accounts, nudges, spikes, creditNotes, renewals, pruned });
+  // R1209: write the monthly cycle that just ended into history (idempotent; a new cycle needs no reset step).
+  const usageCycles = await closeUsageCycles().catch((e) => (console.error("[retention] usage cycles", e), null));
+  return NextResponse.json({ accounts, nudges, spikes, creditNotes, renewals, pruned, usageCycles });
 }

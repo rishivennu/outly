@@ -1,7 +1,7 @@
 import "server-only";
 import { llmText, type LlmOpts } from "./llm";
 import { cleanJson, partialArray, partialString } from "./llm-core";
-import type { Platform } from "../domain";
+import { PLATFORM_META, type Platform } from "../domain";
 import { DEFAULT_RULES, enginePrompt, polish, type EngineWhy } from "./caption-engine";
 import { captionRules } from "./engine-store";
 import { ASK_KEYS, PIP_ASK_RULE, type PipAsk } from "./pip-asks";
@@ -384,7 +384,7 @@ export async function askPlatformCopy(
   type Item = { title?: unknown; caption?: unknown; description?: unknown; hashtags?: unknown; why?: unknown };
   const raw = await gemini<Item | { items: Item[] }>(
     `${VOICE}${voice ?? ""}\n\n${enginePrompt(rules, [platform])}\n\nYou are editing ONE existing ${platform} caption on request. Never invent anything about the video that the creator's words do not say: no places, numbers, people or results that are not there.`,
-    `Creator's own words about the video: """${story}"""\nCurrent ${platform} copy:\n${yt ? `title: """${current.title}"""\ndescription: """${current.description}"""` : `caption: """${current.caption}"""`}\nhashtags: """${current.hashtags}"""\nRequest: ${PIP_ASK_RULE[ask]}\nReturn JSON {${yt ? '"title","description"' : '"caption"'},"hashtags": "#a #b","why": one short sentence saying what you changed}`,
+    `Creator's own words about the video: """${story}"""\nCurrent ${platform} copy:\n${yt ? `title: """${current.title}"""\ndescription: """${current.description}"""` : `caption: """${current.caption}"""`}\nhashtags: """${current.hashtags}"""\nRequest: ${PIP_ASK_RULE[ask]}\nLimit: ${PLATFORM_META[platform].name} allows ${PLATFORM_META[platform].captionLimit} characters; keep the ${yt ? "description" : "caption"} and its hashtags within that.\nReturn JSON {${yt ? '"title","description"' : '"caption"'},"hashtags": "#a #b","why": one short sentence saying what you changed}`,
     rest,
   );
   const m: Item | undefined = raw && "items" in raw && Array.isArray(raw.items) ? raw.items[0] : (raw as Item | null) ?? undefined;

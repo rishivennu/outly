@@ -11,6 +11,7 @@ import { normalizeTopups, type TopUpKind } from "./topups-core";
 import { getConfig } from "../settings";
 import { activeAiGrant } from "../ai/entitlements";
 import { brandsBlock, fairUseCrossed, parsePerks, perkBlock, platformsBlock, type Perk } from "./plan-rules";
+import { resolveAnchor, resolvePolicy, type CycleAnchor, type QuotaPolicy } from "../storage/quota-core";
 
 export interface Entitlements {
   planSlug: string;
@@ -38,6 +39,11 @@ export interface Entitlements {
   perks: Perk[] | null;
   aiMonthly: number; // 1112: AI requests per calendar month (UTC); 0 = no monthly cap
   aiDaily: number; // 1112: AI requests per UTC day; 0 = the server default (AI_DAILY_LIMIT)
+  // R1209 (lib/storage/quota.ts): null = the server default allowance, 0 = no monthly cap.
+  uploadMonthlyMb: number | null;
+  quotaPolicy: QuotaPolicy;
+  cycleAnchor: CycleAnchor;
+  accessId: string | null; // the subscription or grant row the plan comes from
 }
 
 /** Which limit a 402 is about, so the upgrade popup can say the right thing. */
@@ -45,7 +51,7 @@ export type LimitFeature = "posts" | "upload" | "replies" | "captions" | "burn" 
 
 const limit = (message: string, feature: LimitFeature) => new HttpError(402, message, "PLAN_LIMIT", { feature, upgrade: "/billing" });
 
-const UNLIMITED: Omit<Entitlements, "planSlug" | "planName"> = { postLimit: 0, postPeriod: "month", aiCaptions: true, seats: 0, maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true, accountLimit: 0, storageMb: 0, source: "free", accessEndsAt: null, platformLimit: 0, brandLimit: 0, extraBrands: 0, extraSeats: 0, xPostLimit: 0, analyticsDays: 0, fairUsePosts: 0, perks: null, aiMonthly: 0, aiDaily: 0 };
+const UNLIMITED: Omit<Entitlements, "planSlug" | "planName"> = { postLimit: 0, postPeriod: "month", aiCaptions: true, seats: 0, maxUploadMb: 0, replyLimit: 0, captionVideos: 0, burnCaptions: true, accountLimit: 0, storageMb: 0, source: "free", accessEndsAt: null, platformLimit: 0, brandLimit: 0, extraBrands: 0, extraSeats: 0, xPostLimit: 0, analyticsDays: 0, fairUsePosts: 0, perks: null, aiMonthly: 0, aiDaily: 0, uploadMonthlyMb: 0, quotaPolicy: "storage", cycleAnchor: "billing", accessId: null };
 
 /**
  * What this account may do (1052): the best plan live right now across paid and gift subscriptions, admin
@@ -62,6 +68,7 @@ export async function entitlements(userId: string): Promise<Entitlements> {
     platformLimit: plan.platformLimit ?? 0, brandLimit: plan.brandLimit ?? 0, extraBrands: (plan.brandLimit ?? 0) > 0 ? extras.brands : 0, extraSeats: extras.seats,
     xPostLimit: plan.xPostLimit ?? 0, analyticsDays: plan.analyticsDays ?? 0, fairUsePosts: plan.fairUsePosts ?? 0, perks: parsePerks(plan.perks),
     aiMonthly: plan.aiMonthly ?? 0, aiDaily: plan.aiDaily ?? 0,
+    uploadMonthlyMb: plan.uploadMonthlyMb ?? null, quotaPolicy: resolvePolicy(plan.quotaPolicy, plan.priceMinor > 0), cycleAnchor: resolveAnchor(plan.cycleAnchor), accessId: best.id ?? null,
   };
 }
 
@@ -203,8 +210,12 @@ export async function assertUploadSize(userId: string, size: number) {
  * in progress counts at its declared size, so two tabs can't both squeeze into the last few MB.
  */
 export async function storageUsedBytes(userId: string) {
-  const r = await db.media.aggregate({ where: { userId, status: { not: "failed" } }, _sum: { size: true } });
-  return r._sum.size ?? 0;
+  // R1209: sizeBytes is exact past 2 GiB; rows written before it only have size.
+  const [exact, legacy] = await Promise.all([
+    db.media.aggregate({ where: { userId, status: { not: "failed" }, sizeBytes: { not: null } }, _sum: { sizeBytes: true } }),
+    db.media.aggregate({ where: { userId, status: { not: "failed" }, sizeBytes: null }, _sum: { size: true } }),
+  ]);
+  return Number(exact._sum.sizeBytes ?? 0) + (legacy._sum.size ?? 0);
 }
 
 /** The storage meter: "200 MB used, 300 MB remaining out of 500 MB". Same figures on every device. */

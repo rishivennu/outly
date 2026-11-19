@@ -40,6 +40,7 @@ export async function runCleanups(opts: { deletionId?: string; limit?: number; b
   let removed = 0;
   let failed = 0;
   const touched = new Set<string>();
+  const media = new Set<string>();
   for (const row of rows) {
     if (opts.budgetMs && Date.now() - started > opts.budgetMs) break;
     const attempts = row.attempts + 1;
@@ -57,6 +58,12 @@ export async function runCleanups(opts: { deletionId?: string; limit?: number; b
       await db.storageCleanup.update({ where: { id: row.id }, data: { lastError: String((e as Error)?.message ?? e).slice(0, 300) } }).catch(() => {});
     }
     if (row.deletionId) touched.add(row.deletionId);
+    if (row.mediaId) media.add(row.mediaId);
+  }
+  // R1209: a Trash purge or draft delete that had to wait for the bucket: the row goes once its last file is gone.
+  if (media.size) {
+    const { finishMediaPurge } = await import("./storage/lifecycle");
+    for (const id of media) await finishMediaPurge(id).catch((e) => console.error("[cleanup] media", id, e));
   }
   for (const id of touched) await settleDeletion(id).catch((e) => console.error("[cleanup] settle", id, e));
   return { removed, failed };

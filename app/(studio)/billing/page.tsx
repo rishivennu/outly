@@ -14,6 +14,7 @@ import { BillingView, type ReturnNotice } from "@/components/billing/BillingView
 import { paymentReceipt } from "@/lib/billing/receipt";
 import type { Receipt } from "@/lib/billing/receipt-core";
 import { captionUsage, entitlements, postUsage, replyUsage, storageUsage, uploadLimitBytes, xPostUsage } from "@/lib/billing/entitlements";
+import { legacyMeter, storageUsageFor } from "@/lib/storage/quota";
 import { accountMeter, billingStatus, historyRows, nextCharge, pickCurrent, type MeterView, type SubView } from "@/lib/billing/overview-core";
 import { accessFor } from "@/lib/billing/access";
 import { GIFT_PROVIDERS, isGiftProvider, isPaidSub } from "@/lib/billing/access-core";
@@ -119,6 +120,7 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
   const receipt = await receiptFor(user.id, searchParams, cancelledId).catch(() => null);
   const now = new Date();
   const aiqP = aiQuota(user.id).catch(() => null); // 1112: runs alongside the batch below
+  const quotaP = storageUsageFor(user.id, now).catch((e) => (console.error("[billing] quota", e), null)); // R1209
   const [plans, subs, invoices, gw, usage, display, replies, captions, upload, beta, betaCfg, founding, badges, storage, access, refund, ent, x, accounts, scheduled, seatsTaken, loose, lastEnded] = await Promise.all([
     listPlans(),
     db.subscription.findMany({ where: { userId: user.id, status: "active" }, include: { plan: true }, orderBy: { createdAt: "desc" } }),
@@ -279,6 +281,8 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
   // 1098: the usage grid, in the plan's own terms. Unlimited = no bar; not on the plan = "Not included".
   const acc = accountMeter(ent, accounts);
   const aiq = await aiqP;
+  const quota = await quotaP;
+  const qm = quota ? legacyMeter(quota) : null;
   // With no monthly cap aiQuota skips counting, so the unlimited meter reads every AI call made this month.
   const aiCalls = aiq?.unlimited ? (await featureUsageMonth(user.id, now).catch(() => [])).reduce((s, r) => s + r.count, 0) : 0;
   const meters: MeterView[] = [
@@ -290,7 +294,9 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
       ? { key: "ai", label: "AI-captioned videos", used: captions.used, limit: captions.captionVideos, extra: captions.credits || undefined, unit: "videos", note: "This month" }
       : { key: "ai", label: "AI captions", used: 0, limit: 0, unit: "", locked: true, note: `Not on ${ent.planName}` },
     { key: "accounts", label: "Connected accounts", used: acc.used, limit: acc.limit, unit: "accounts", note: acc.note, href: "/accounts" },
-    { key: "storage", label: "Storage", used: Math.round(storage.pct), limit: storage.limitBytes > 0 ? 100 : 0, unit: "%", display: storage.label, note: storage.over ? "Over: new uploads are paused" : null },
+    qm && quota
+      ? { key: "storage", label: qm.kind === "monthly" ? "Uploads this month" : "Storage", used: Math.round(qm.limitBytes > 0 ? Math.min(100, (qm.usedBytes / qm.limitBytes) * 100) : 0), limit: qm.limitBytes > 0 ? 100 : 0, unit: "%", display: qm.label, note: quota.canUpload ? (qm.kind === "monthly" ? "Deleting files does not give it back" : null) : "Full: new uploads are paused", href: "/settings#storage" }
+      : { key: "storage", label: "Storage", used: Math.round(storage.pct), limit: storage.limitBytes > 0 ? 100 : 0, unit: "%", display: storage.label, note: storage.over ? "Over: new uploads are paused" : null },
     ent.seats > 0
       ? { key: "seats", label: "Team seats", used: seatsTaken, limit: ent.seats, unit: "seats", note: ent.extraSeats ? `Includes ${ent.extraSeats} from a top-up` : null, href: "/settings#team" }
       : { key: "seats", label: "Team seats", used: 0, limit: 0, unit: "", locked: true, note: `Not on ${ent.planName}` },
@@ -343,6 +349,7 @@ export default async function BillingPage(props: { searchParams: Promise<Sp> }) 
         captions: { limit: captions.captionVideos, used: captions.used, burn: captions.burnCaptions },
         storage: { usedBytes: storage.usedBytes, limitBytes: storage.limitBytes, pct: storage.pct, over: storage.over, label: storage.label },
       }}
+      quota={quota}
       guarantee={refund ? (refund.state === "eligible" ? { ...refund, until: refund.until.toISOString() } : { state: refund.state }) : undefined}
     />
   );

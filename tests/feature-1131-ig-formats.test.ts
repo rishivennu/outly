@@ -293,7 +293,7 @@ let services: typeof import("../lib/services");
 let encrypt: typeof import("../lib/crypto").encrypt;
 let postsRoute: typeof import("../app/api/posts/route");
 let imageRoute: typeof import("../app/api/media/image/route");
-let pruneStaleDrafts: typeof import("../lib/retention/prune").pruneStaleDrafts;
+let deleteDraftWithMedia: typeof import("../lib/storage/lifecycle").deleteDraftWithMedia;
 
 beforeAll(async () => {
   previousBackend = g.__queueBackend;
@@ -304,7 +304,7 @@ beforeAll(async () => {
   ({ encrypt } = await import("../lib/crypto"));
   postsRoute = await import("../app/api/posts/route");
   imageRoute = await import("../app/api/media/image/route");
-  ({ pruneStaleDrafts } = await import("../lib/retention/prune"));
+  ({ deleteDraftWithMedia } = await import("../lib/storage/lifecycle"));
 }, 60_000);
 afterAll(() => {
   delete g.__fmtUser;
@@ -441,15 +441,15 @@ describe("saving and sending", () => {
     expect((await save({ mediaId: a.id, title: "P", format: "carousel", items: [{ mediaId: a.id }, { mediaId: theirs.id }], targets: [{ platform: "instagram" }] })).status).toBe(404);
   });
 
-  test("pruning an old draft takes its slides with it, but not a slide another post uses", async () => {
+  // R1209: drafts are no longer pruned by age; deleting one with its media (Start Over) is what takes the slides.
+  test("deleting a draft with its media takes its slides with it, but not a slide another post uses", async () => {
     const user = await who();
     const a = await video(user.id);
     const b = await video(user.id);
     const shared = await video(user.id);
     const { post } = await (await save({ mediaId: a.id, title: "Old", format: "carousel", items: [{ mediaId: a.id }, { mediaId: b.id }, { mediaId: shared.id }], targets: [{ platform: "instagram", caption: "x" }] })).json();
     const { post: other } = await (await save({ mediaId: shared.id, title: "Keep", format: "story", items: [{ mediaId: shared.id }], targets: [{ platform: "instagram" }] })).json();
-    await db.post.update({ where: { id: post.id }, data: { updatedAt: new Date(Date.now() - 400 * 864e5) } });
-    await pruneStaleDrafts();
+    await deleteDraftWithMedia(user, post.id);
     expect(await db.post.findUnique({ where: { id: post.id } })).toBeNull();
     expect(await db.media.findUnique({ where: { id: a.id } })).toBeNull();
     expect(await db.media.findUnique({ where: { id: b.id } })).toBeNull();

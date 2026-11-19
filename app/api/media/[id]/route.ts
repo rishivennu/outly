@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { json, route } from "@/lib/http";
 import { mediaMetaSchema } from "@/lib/validation";
 import { mediaView, ownedMedia } from "@/lib/services";
+import { purgeMedia, trashMedia } from "@/lib/storage/lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -24,3 +25,15 @@ export const PATCH = route(async (req, { user, params }) => {
   });
   return json({ media: await mediaView(updated) });
 });
+
+/**
+ * R1209: moves the file to Trash (restore with POST ./restore); ?purge=1 deletes it for good, bucket first.
+ * Paid storage is freed only by the permanent delete; Free monthly uploads are never given back.
+ */
+export const DELETE = route(
+  async (req, { user, params }) => {
+    const purge = new URL(req.url).searchParams.get("purge") === "1";
+    return json(purge ? await purgeMedia(user.id, params.id) : await trashMedia(user.id, params.id));
+  },
+  { limit: [60, 60_000] },
+);

@@ -205,18 +205,20 @@ describe("1160 route", () => {
 describe("1160 workspace", () => {
   test("Pip watches as soon as a video is added, stops on cancel, a new story or a sent one, and never fills the box by itself", () => {
     const w = src("components/create/CreateWorkspace.tsx");
-    expect(w).toContain("if (submittedRef.current === null) void watchVideo(url);");
+    // R1209 A1: once per video, and only while the story is still to be told.
+    expect(w).toContain("const look = o?.watch ?? (!same && submittedRef.current === null && !metaRef.current.original);");
+    expect(w).toContain("if (look) void watchVideo(url);");
     expect(w).toContain("const { frames, duration } = await readFrames(url, 4, ctrl.signal);");
     expect(w).toContain('api<{ story?: string; seen?: string; skipped?: string }>("/api/ai/video-caption"');
-    expect(w).toContain("transcript: heard, auto: true");
+    expect(w).toContain("transcript: heard, auto: !manual");
     expect(w.indexOf("stopWatching();")).toBeGreaterThan(0);
-    expect(w).toContain("const submitText = (s: string) => {\n    stopWatching();");
-    // the only writes of Pip's story into the box happen in useWatched, on a tap
-    expect(w.match(/setStory\(s\);/g)?.length).toBe(1);
-    expect(w).toContain("if (!edit) submitText(s);");
+    // R1209 A1/A3: Pip's caption lands on the page through takeGenerated (never over words the creator edited), so
+    // the assistant has no "Use this" or "Edit it first" of its own; it only says it is watching.
+    expect(w).toContain("watched.current(story, r.seen);");
+    expect(w).toContain("const r = takeGenerated(metaRef.current, story, text, seenText);");
     const a = src("components/create/Assistant.tsx");
-    expect(a).toContain("Use this");
-    expect(a).toContain("Edit it first");
+    expect(a).not.toContain("Use this");
+    expect(a).not.toContain("Edit it first");
     expect(a).toContain('p.watch?.kind === "watching"');
     expect(a).toContain("Watching your video…");
   });

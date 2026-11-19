@@ -11,7 +11,7 @@ const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 export type SettingsCategory = { id: string; label: string; blurb: string; icon: LucideIcon; content: React.ReactNode };
 
 /** Old deep links (/settings#team, emails with #referral) still land in the right place. */
-const HASH_TO_TAB: Record<string, string> = { team: "team", referral: "referral", "your-data": "privacy", security: "security", billing: "billing" };
+const HASH_TO_TAB: Record<string, string> = { team: "team", referral: "referral", "your-data": "privacy", security: "security", billing: "billing", storage: "storage" };
 
 type Dirty = { set: (id: string, on: boolean) => void; open: (id: string) => void };
 const DirtyCtx = createContext<Dirty>({ set: () => {}, open: () => {} });

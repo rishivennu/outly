@@ -23,7 +23,7 @@ describe("R1209 A2: Pip's footer on Your Story", () => {
     expect(f.hint).toContain("Write your caption on the page first.");
   });
   test("the composer gate is the caption, wired from CreateWorkspace", () => {
-    expect(src("components/create/Assistant.tsx")).toContain("finalized: p.composer ? !!p.hasCaption : !!p.finalHook?.trim()");
+    expect(src("components/create/Assistant.tsx")).toContain("finalized: !!p.hasCaption, canFinalize: false, composer: p.hasMedia");
     expect(src("components/create/CreateWorkspace.tsx")).toContain("hasCaption={!!caption}");
     expect(src("components/create/assistant-state.ts")).not.toContain("then pick a hook");
   });

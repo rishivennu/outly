@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, CalendarClock, Compass, CreditCard, Eye, Gift, Lock, Mail, Palette, ShieldCheck, Sparkles, Trophy, UserRound, Users } from "lucide-react";
+import { Bell, CalendarClock, Compass, CreditCard, Eye, Gift, HardDrive, Lock, Mail, Palette, ShieldCheck, Sparkles, Trophy, UserRound, Users } from "lucide-react";
 import { startTour } from "@/components/onboarding/Tour";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
@@ -20,6 +20,7 @@ import { VoiceMemoryCard } from "@/components/billing/PlanExtras";
 import { TwoStepCard } from "./TwoStepCard";
 import { PhoneCard } from "./PhoneCard";
 import { YourDataCard } from "./YourDataCard";
+import { StorageManager } from "./StorageManager";
 import Link from "next/link";
 import { AlertsCard } from "./AlertsCard";
 import { ALERT_DEFAULTS, type AlertPrefs } from "@/lib/alerts-core";
@@ -313,6 +314,7 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, per
         <MemberBillingNote owner={owner} />
       ),
     },
+    { id: "storage", label: "Storage", icon: HardDrive, blurb: "Your uploaded files and drafts, what they take up, and Trash.", content: <StorageManager /> },
     {
       id: "privacy",
       label: "Data & Privacy",

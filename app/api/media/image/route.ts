@@ -4,8 +4,7 @@ import { HttpError, json, route } from "@/lib/http";
 import { storage, UploadTooLargeError } from "@/lib/storage";
 import { jpegSize } from "@/lib/media/jpeg";
 import { mediaView } from "@/lib/services";
-import { assertStorage, storageUsage } from "@/lib/billing/entitlements";
-import { fitsStorage } from "@/lib/billing/access-core";
+import { recordUpload, reserveUpload, sizeColumns } from "@/lib/storage/quota";
 import { MAX_IMAGE_BYTES } from "@/lib/formats";
 
 export const runtime = "nodejs";
@@ -30,26 +29,21 @@ export const POST = route(
     if (bytes.length > MAX_BODY) throw new HttpError(413, "That photo is too big. Keep it under 4 MB.");
     const size = jpegSize(bytes);
     if (!size) throw new HttpError(415, "That file says it's a photo, but it doesn't look like one.");
-    await assertStorage(user.id, bytes.length);
-
     const key = `images/${user.id}/${randomUUID()}.jpg`;
+    // R1209: checked against the monthly allowance and storage, and held, in one locked step.
+    const held = await reserveUpload(user.id, bytes.length, (tx) =>
+      tx.media.create({ data: { userId: user.id, originalFilename: filename, storageKey: key, mimeType: "image/jpeg", ...sizeColumns(bytes.length), width: size.width, height: size.height, status: "uploading" } }),
+    );
     try {
       await storage.put(key, Buffer.from(bytes), "image/jpeg", MAX_BODY);
     } catch (e) {
+      await db.media.deleteMany({ where: { id: held.id, status: "uploading" } }).catch(() => {});
+      await storage.remove(key).catch(() => {});
       if (e instanceof UploadTooLargeError) throw new HttpError(413, "That photo is too big. Keep it under 4 MB.");
       throw e;
     }
-    const media = await db.media.create({
-      data: { userId: user.id, originalFilename: filename, storageKey: key, mimeType: "image/jpeg", size: bytes.length, width: size.width, height: size.height, status: "ready" },
-    });
-    // Two uploads at once can both pass the check above: count again with this one stored, and take it back if it doesn't fit.
-    const u = await storageUsage(user.id);
-    if (!fitsStorage(u.usedBytes, u.storageMb, 0)) {
-      await db.media.delete({ where: { id: media.id } }).catch(() => {});
-      await storage.remove(key).catch(() => {});
-      await assertStorage(user.id, bytes.length);
-      throw new HttpError(413, "There isn't room for this photo right now. Try again in a moment.", "STORAGE_FULL");
-    }
+    const media = await db.media.update({ where: { id: held.id }, data: { status: "ready" } });
+    await recordUpload(media, bytes.length);
     return json({ media: await mediaView(media) }, { status: 201 });
   },
   { limit: [60, 60_000] },

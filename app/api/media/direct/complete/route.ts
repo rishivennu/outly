@@ -6,6 +6,7 @@ import { looksLikeIsoBmff } from "@/lib/media/probe";
 import { enqueue } from "@/lib/queue";
 import { mediaView, ownedMedia } from "@/lib/services";
 import { claimFinalize, legacyPartSize, recordParts, releaseFinalize, sessionClosed } from "@/lib/media/upload-session";
+import { recordUpload, sizeColumns } from "@/lib/storage/quota";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -100,7 +101,9 @@ export const POST = route(async (req, { user }) => {
     throw new HttpError(415, "That file says it's a video, but it doesn't look like one.", "NOT_VIDEO");
   }
   // Claim the row before queueing: only the request that moves it on queues processing (Cancel may have won).
-  const claimed = await db.media.updateMany({ where: { id: m.id, status: "uploading" }, data: { status: "processing", size: st.size } });
+  const claimed = await db.media.updateMany({ where: { id: m.id, status: "uploading" }, data: { status: "processing", ...sizeColumns(st.size) } });
+  // R1209: counted once, at the size the bucket holds (the ledger is keyed by media, so a retry adds nothing).
+  if (claimed.count === 1) await recordUpload(m, st.size);
   if (claimed.count === 1) await enqueue("VIDEO_PROCESS", { mediaId: m.id });
   if (s) await db.uploadSession.update({ where: { id: s.id }, data: { status: claimed.count === 1 ? "completed" : "aborted", completedParts: claimed.count === 1 ? s.totalParts : undefined } });
   const updated = await db.media.findUniqueOrThrow({ where: { id: m.id } });

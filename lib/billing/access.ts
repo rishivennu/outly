@@ -23,7 +23,7 @@ const SYSTEM: Actor = { login: "system", role: null };
 const snap = (v: unknown) => (v == null ? null : JSON.stringify(v).slice(0, 4000));
 
 /** Append-only trail of every change to someone's access. Never throws: the change itself already happened. */
-export async function audit(e: { actor: Actor; action: string; targetType: "grant" | "referral" | "config"; targetId?: string | null; email?: string | null; before?: unknown; after?: unknown; note?: string }) {
+export async function audit(e: { actor: Actor; action: string; targetType: "grant" | "referral" | "config" | "storage"; targetId?: string | null; email?: string | null; before?: unknown; after?: unknown; note?: string }) {
   await db.auditLog
     .create({
       data: { actor: e.actor.login.slice(0, 120), actorRole: e.actor.role ?? null, action: e.action, targetType: e.targetType, targetId: e.targetId ?? null, email: e.email?.toLowerCase() ?? null, before: snap(e.before), after: snap(e.after), note: (e.note ?? "").slice(0, 500) },

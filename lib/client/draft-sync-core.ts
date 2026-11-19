@@ -115,6 +115,8 @@ export interface ServerDraft {
   id: string;
   title?: string | null;
   story?: string | null;
+  /** R1209 A1: Your Story's modes and boxes, when stored (components/create/story-meta). */
+  storyMeta?: string | null;
   hook?: string | null;
   updatedAt: string;
   targets?: ServerTarget[];

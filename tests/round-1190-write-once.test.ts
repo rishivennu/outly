@@ -65,7 +65,9 @@ describe("1190 a long video is not a Short", () => {
     const w = src("components/create/CreateWorkspace.tsx");
     expect(w).toContain("if (!manual && duration > LONG_FORM_SEC) return setWatch(NO_WATCH);");
     expect(w).toContain("const manual = manualWatch.current;");
-    expect(w).toContain("if (submittedRef.current === null) void watchVideo(url);"); // the automatic watch is unchanged
+    // R1209 A1: the automatic watch runs once per video, never again for a retry, a captioned copy or a restored draft.
+    expect(w).toContain("const look = o?.watch ?? (!same && submittedRef.current === null && !metaRef.current.original);");
+    expect(w).toContain("startUpload(f, undefined, undefined, { watch: false });");
     expect(w).toContain("manualWatch.current = true;");
   });
 });
@@ -181,8 +183,11 @@ describe("1190 Step 2: one box, then a card for every place", () => {
     // R1209: Step 2 only writes the main caption. Pip writes the platform captions from it on Everywhere.
     expect(c).not.toContain("Generate captions with Pip AI");
     expect(c).not.toContain("Use my text as it is");
-    expect(c).toContain("On Everywhere, Pip writes a version for each platform you pick, and you approve every one.");
-    expect(c).toContain("Analyze my video for more accurate captions");
+    // R1209 A1: one question, who writes it, with one box either way.
+    expect(c).toContain('{ id: "generate", label: "Generate with Outlly" }');
+    expect(c).toContain('{ id: "own", label: "Write my own" }');
+    expect(c).toContain("Rephrase with Outlly Assistant");
+    expect(c).not.toContain("Analyze my video for more accurate captions");
     expect(c).toContain("maxLength={ADAPT_MAX}");
     expect(c).toContain("Call to action");
     expect(c).toContain("Keywords");
@@ -225,10 +230,11 @@ describe("1190 Step 2: one box, then a card for every place", () => {
   });
 
   test("Pip never asks for the same words twice, and says where the box is", () => {
-    expect(w).toContain('composer={step === "story" && hasMedia}');
+    // R1209 A3: the assistant has no writing box on any step; the caption is written on the page only.
     const asst = src("components/create/Assistant.tsx");
-    expect(asst).toContain("const ownBox = askStory && !p.composer;");
-    expect(asst).toContain("{ownBox && (\n        <form");
+    expect(asst).not.toContain("<textarea");
+    expect(asst).not.toContain("<form");
+    expect(asst).not.toContain("What&apos;s this video about?");
     expect(src("components/create/assistant-state.ts")).toContain("Write your caption on the page first. Pip writes each platform's version on Everywhere.");
   });
 

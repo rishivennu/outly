@@ -31,6 +31,28 @@ export function panelReducer(s: PanelState, a: PanelAction): PanelState {
  */
 export const foldsConversation = (step: Step) => step === "everywhere" || step === "launch";
 
+/**
+ * R1209 A3: Pip's one line for the step and the caption mode, in place of "What's this video about?". Short, about
+ * the page, and never a request to describe a video Outlly has already read. Pure, so it is tested.
+ */
+export function stepLine(x: { step: Step; mode: "generate" | "own"; hasCaption: boolean; watching: boolean; place?: string | null; limit?: number | null }): { title: string; body: string } | null {
+  if (x.step === "story") {
+    if (x.mode === "own")
+      return x.hasCaption
+        ? { title: "Your words, sharpened.", body: "Press Rephrase on the page to compare a sharper version with yours, or ask me below." }
+        : { title: "Your words, sharpened.", body: "Write your caption on the page, then I can rephrase it." };
+    if (x.watching) return { title: "Writing from your video.", body: "Your caption appears on the page in a moment." };
+    return x.hasCaption
+      ? { title: "Written from your video.", body: "Edit it on the page, refine it there, or ask me below." }
+      : { title: "Written from your video.", body: "Press Generate caption on the page and I write it from what's in the video." };
+  }
+  if (x.step === "everywhere")
+    return x.place
+      ? { title: `Working on ${x.place}.`, body: x.limit ? `Up to ${x.limit.toLocaleString("en-US")} characters there. Each answer waits on its card for you to accept.` : "Each answer waits on its card for you to accept." }
+      : { title: "Now each platform.", body: "Open a platform's card and I work on that one." };
+  return null;
+}
+
 /* ---------------- 1182: Pip opens by itself on Steps 1 and 2 and folds once the caption is final ---------------- */
 
 /** The caption is final once a hook is picked on Your Story. The hook is saved with the draft, so a reload keeps it. */

@@ -5,6 +5,7 @@ import { AlertCircle, Check, Film, HardDrive, Layers, Loader2, Pause, Play, Refr
 import { Button } from "@/components/ui/button";
 import { acceptAttr, acceptedFormats, formatBytes, formatProblem, formatSpeed, type UploadLimits } from "@/lib/client/upload";
 import { cn } from "@/lib/utils";
+import { fmtBytes, fmtDay, type UsageState } from "@/lib/storage/quota-core";
 import type { UploadState } from "./types";
 
 /**
@@ -33,14 +34,48 @@ export function limitFacts(lim: UploadLimits | null) {
   const f = acceptedFormats(lim);
   const mb = lim ? (lim.maxMb ?? Math.round(lim.maxBytes / 1048576)) : null;
   const st = lim?.storage && lim.storage.limitBytes > 0 ? lim.storage : null;
+  // R1209: on Free the limit is what may be uploaded this month, never shown as storage that is kept.
+  const monthly = st?.kind === "monthly";
+  const resetAt = monthly ? lim?.quota?.monthly?.resetAt : undefined;
   return {
     formats: f.label,
     size: mb == null ? null : `Up to ${mb >= 1024 ? formatBytes(mb * 1048576) : `${mb} MB`} per file`,
     // st.label is the server's whole sentence ("200 MB used, 300 MB remaining out of 500 MB"), so the cap is formatted here.
-    storage: st ? (st.over ? `Storage full (${formatBytes(st.limitBytes)})` : `${formatBytes(st.remainingBytes)} of ${formatBytes(st.limitBytes)} left`) : null,
+    storage: st
+      ? monthly
+        ? st.over
+          ? `This month's ${formatBytes(st.limitBytes)} used`
+          : `${formatBytes(st.remainingBytes)} of ${formatBytes(st.limitBytes)} left this month`
+        : st.over
+          ? `Storage full (${formatBytes(st.limitBytes)})`
+          : `${formatBytes(st.remainingBytes)} of ${formatBytes(st.limitBytes)} left`
+      : null,
     full: !!st?.over,
+    monthly,
+    renews: resetAt ? fmtDay(resetAt) : null,
   };
 }
+
+/**
+ * R1209: Step 1's meter for the limit that binds, from the server's real figures (never negative, never invented).
+ * Free reads what was uploaded this month and when it renews; a paid plan reads what is kept. Null with no cap.
+ */
+export function quotaMeter(lim: UploadLimits | null): { state: UsageState; pct: number; label: string; text: string; tight: boolean } | null {
+  const q = lim?.quota;
+  if (!q) return null;
+  const m = q.monthly && !q.monthly.unlimited && q.monthly.allowanceBytes > 0 ? q.monthly : null;
+  const s = q.storage && !q.storage.unlimited && q.storage.capacityBytes > 0 ? q.storage : null;
+  const useMonthly = lim?.storage?.kind ? lim.storage.kind === "monthly" && !!m : !!m && !s;
+  const pct = (x: number) => Math.max(0, Math.min(100, Number.isFinite(x) ? x : 0));
+  if (useMonthly && m) {
+    const used = Math.max(0, m.usedBytes + m.reservedBytes);
+    return { state: q.state, pct: pct(m.percent), label: "Monthly upload allowance", text: `${fmtBytes(used)} of ${fmtBytes(m.allowanceBytes)} uploaded this month. Renews ${fmtDay(m.resetAt)}.`, tight: q.state !== "normal" };
+  }
+  if (!s) return null;
+  return { state: q.state, pct: pct(s.percent), label: "Storage", text: `${fmtBytes(Math.max(0, s.usedBytes))} of ${fmtBytes(s.capacityBytes)} storage used (${Math.round(pct(s.percent))}%).`, tight: q.state !== "normal" };
+}
+
+const METER_BAR: Record<UsageState, string> = { normal: "bg-lime", warning: "bg-warning", critical: "bg-destructive", full: "bg-destructive" };
 
 interface CardProps {
   limits: UploadLimits | null;
@@ -59,6 +94,7 @@ export function UploadCard({ limits, limitsFailed, onFiles, error, batchMax, cla
   const [over, setOver] = useState(false);
   const [typeError, setTypeError] = useState<string | null>(null);
   const facts = limitFacts(limits);
+  const meter = quotaMeter(limits);
   const disabled = facts.full;
   const errId = useId();
   const factsId = useId();
@@ -135,9 +171,13 @@ export function UploadCard({ limits, limitsFailed, onFiles, error, batchMax, cla
         <span className={cn("grid h-12 w-12 place-items-center rounded-2xl transition-transform duration-200 motion-reduce:transition-none", disabled ? "bg-secondary text-muted-foreground" : "lime-bg", over && "scale-105")} aria-hidden="true">
           {disabled ? <HardDrive className="h-5 w-5" /> : <UploadCloud className="h-5 w-5" />}
         </span>
-        <h2 className="mt-4 text-lg font-semibold tracking-[-0.015em] sm:text-xl">{disabled ? "Your storage is full" : over ? "Let go to upload" : "Drop your video here"}</h2>
+        <h2 className="mt-4 text-lg font-semibold tracking-[-0.015em] sm:text-xl">{disabled ? (facts.monthly ? "This month's uploads are used up" : "Your storage is full") : over ? "Let go to upload" : "Drop your video here"}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          {disabled ? "Delete some files in Content, or upgrade for more room. Your files are safe." : "Drag and drop your video or browse files"}
+          {disabled
+            ? facts.monthly
+              ? `Your allowance renews on ${facts.renews ?? "your renewal date"}. Upgrade your plan to unlock more upload capacity immediately.`
+              : "Delete files you no longer need in Storage, or upgrade for more room. Your files are safe."
+            : "Drag and drop your video or browse files"}
         </p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           {disabled ? (
@@ -145,9 +185,11 @@ export function UploadCard({ limits, limitsFailed, onFiles, error, batchMax, cla
               <Button asChild variant="primary" className="min-h-11">
                 <Link href="/billing">See plans</Link>
               </Button>
-              <Button asChild variant="subtle" className="min-h-11">
-                <Link href="/content">Manage files</Link>
-              </Button>
+              {!facts.monthly && (
+                <Button asChild variant="subtle" className="min-h-11">
+                  <Link href="/settings#storage">Manage storage</Link>
+                </Button>
+              )}
             </>
           ) : (
             <Button type="button" variant="primary" className="min-h-11 px-5" onClick={() => input.current?.click()} aria-describedby={cn(factsId, shownError && errId) || undefined}>
@@ -186,6 +228,24 @@ export function UploadCard({ limits, limitsFailed, onFiles, error, batchMax, cla
             </li>
           )}
         </ul>
+        {meter && (
+          <div className="mt-3 w-full max-w-[340px]" data-testid="upload-quota" data-state={meter.state}>
+            <div role="progressbar" aria-label={meter.label} aria-valuetext={meter.text} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(meter.pct)} className="h-1.5 overflow-hidden rounded-full bg-secondary">
+              <div className={cn("h-full rounded-full", METER_BAR[meter.state])} style={{ width: `${meter.pct > 0 ? Math.max(2, meter.pct) : 0}%` }} />
+            </div>
+            <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground tabular-nums">
+              {meter.text}
+              {meter.tight && !disabled && (
+                <>
+                  {" "}
+                  <Link href="/billing" className="inline-flex min-h-11 items-center font-medium text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 sm:min-h-0">
+                    Upgrade
+                  </Link>
+                </>
+              )}
+            </p>
+          </div>
+        )}
         <p className="mt-2 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
           <Layers className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span>

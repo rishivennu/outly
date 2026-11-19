@@ -73,6 +73,12 @@ export interface PublicPlan {
   aiMonthly: number;
   /** 1112. AI requests per UTC day; 0 = the server default. */
   aiDaily: number;
+  /** R1209. Upload allowance per cycle in MB; null = the server default, 0 = no monthly cap. */
+  uploadMonthlyMb?: number | null;
+  /** R1209. auto | monthly | storage | both (lib/storage/quota-core.ts). */
+  quotaPolicy?: string;
+  /** R1209. billing | signup | calendar: when the monthly allowance starts again. */
+  cycleAnchor?: string;
 }
 
 /**

@@ -88,9 +88,9 @@ describe("1152 layout and assistant", () => {
 });
 
 describe("1152 fits at 1280", () => {
-  test("xl gives the editor room: a slimmer preview column and a 300px Pip", () => {
+  test("xl gives the editor room: a slimmer preview column and a 320px Pip (R1209 A3)", () => {
     expect(ws).toContain("xl:grid-cols-[minmax(240px,272px)_minmax(0,1fr)]");
-    expect(ws).toContain('"xl:w-[300px] xl:opacity-100 2xl:w-[320px]"');
+    expect(ws).toContain('"xl:w-[320px] xl:opacity-100 2xl:w-[340px]"');
     expect(burner).toContain("sm:grid-cols-2 xl:group-data-[pip=open]/edit:grid-cols-1 2xl:group-data-[pip=open]/edit:grid-cols-2");
     expect(ws).toContain('data-pip={pipShown ? "open" : "closed"} className="group/edit');
   });

@@ -16,9 +16,16 @@ export function offerUpgrade(message: string, feature?: string) {
   window.dispatchEvent(new CustomEvent<UpgradeDetail>(UPGRADE_EVENT, { detail: { message, feature } }));
 }
 
-/** Any 402 PLAN_LIMIT from the server opens the upgrade popup; the caller still gets the error. */
+/** R1209: an upload refused for the monthly allowance, storage or the plan's per-file cap (413), and what it sells. */
+const QUOTA_SELLS: Record<string, string> = { quota_monthly: "uploads", quota_storage: "storage", file_too_big: "upload" };
+
+/**
+ * Any 402 PLAN_LIMIT from the server opens the upgrade popup; the caller still gets the error. R1209: so does a 413
+ * quota refusal, except a per-file cap a bigger plan would not lift (its message then has no "Upgrade").
+ */
 function planLimit(status: number, data: { error?: string; code?: string; feature?: string }) {
   if (status === 402 && data.code === "PLAN_LIMIT" && data.error) offerUpgrade(data.error, data.feature);
+  else if (status === 413 && data.error && data.code && QUOTA_SELLS[data.code] && (data.code !== "file_too_big" || /upgrade/i.test(data.error))) offerUpgrade(data.error, QUOTA_SELLS[data.code]);
 }
 
 /*

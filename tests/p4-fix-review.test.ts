@@ -132,11 +132,11 @@ describe("p4 fix: Publish and Schedule wait for a burn", () => {
 describe("p4 fix: Pip on Launch when folded", () => {
   test("the launch line sits outside the folded history, so the latest message always shows", () => {
     const a = src("components/create/Assistant.tsx");
-    const close = a.indexOf("{showHistory && (");
+    // R1209 A3: nothing folds any more; the launch line always shows, above the end marker.
     const launch = a.indexOf('{p.step === "launch" &&');
     const end = a.indexOf("<div ref={end} />");
-    expect(close).toBeGreaterThan(-1);
-    expect(launch).toBeGreaterThan(a.indexOf("{p.chosenHook && (showHistory || p.step === \"everywhere\") && ("));
+    expect(launch).toBeGreaterThan(-1);
+    expect(a).not.toContain("showHistory");
     expect(launch).toBeLessThan(end);
     expect(a).toContain("const l = launchLine(");
   });

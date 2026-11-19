@@ -9,6 +9,7 @@ import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { placeLabel } from "@/lib/geo";
 import { ago, fmtDate } from "@/components/admin/ui";
 import { cn } from "@/lib/utils";
+import { StoragePanel } from "./StoragePanel";
 
 /**
  * R1180: the Users page in the warm "customer information" style. Server-safe and presentational: the page
@@ -314,6 +315,8 @@ export function ProfilePanel({ p }: { p: Recent | null }) {
           ))}
         </dl>
       </Panel>
+      {/* R1209: opens on this customer; the email box looks up anyone else. */}
+      <StoragePanel userId={p.id} />
     </>
   );
 }

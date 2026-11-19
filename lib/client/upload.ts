@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { refusal } from "@/lib/storage/quota-core";
+import type { QuotaView } from "@/components/billing/QuotaCard";
 import { api, ApiError, cachedApi, offerUpgrade, uploadWithProgress } from "./api";
 import { track } from "@/lib/analytics/track";
 
@@ -41,7 +43,10 @@ export interface UploadLimits {
   maxMb?: number;
   planLimited?: boolean;
   planName?: string;
-  storage?: { usedBytes?: number; limitBytes: number; remainingBytes: number; over: boolean; label: string };
+  /** R1209: the limit that binds. `kind` "monthly" is the upload allowance (Free), "storage" what may be kept. */
+  storage?: { usedBytes?: number; limitBytes: number; remainingBytes: number; over: boolean; label: string; kind?: "monthly" | "storage" };
+  /** R1209: both figures, the warning state and the renewal date (GET /api/storage/usage). Missing on an older server. */
+  quota?: QuotaView;
   /** Missing on a server older than Phase 2: MP4 and MOV were the only formats then too. */
   formats?: { extensions: string[]; mimeTypes: string[]; label: string };
 }
@@ -94,14 +99,18 @@ export function limitsLine(lim: UploadLimits) {
   const size = `${f.label}, up to ${mb >= 1024 ? formatBytes(mb * 1048576) : `${mb} MB`} per file`;
   const st = lim.storage;
   if (!st || st.limitBytes <= 0) return size;
+  if (st.kind === "monthly") return st.over ? `${size}. This month's uploads are used up.` : `${size}. ${formatBytes(st.remainingBytes)} of this month's uploads left.`;
   return st.over ? `${size}. Storage is full (${st.label}).` : `${size}. ${formatBytes(st.remainingBytes)} of storage left.`;
 }
 
 /**
  * Why this file can't go up, checked against the server's own limits before a byte moves. Null = fine.
- * "storage" and "upload" are plan limits, so the caller can offer a bigger plan. The server checks again.
+ * "storage", "monthly" and "upload" are plan limits, so the caller can offer a bigger plan. The server checks again.
  */
-export type LimitProblem = { kind: "type" | "storage" | "upload" | "size"; message: string };
+export type LimitProblem = { kind: "type" | "storage" | "monthly" | "upload" | "size"; message: string };
+
+/** R1209: which upgrade the popup sells for a refused pick, or null when a bigger plan would not help. */
+export const upgradeFor = (k: LimitProblem["kind"]) => (k === "monthly" ? "uploads" : k === "storage" || k === "upload" ? k : null);
 export function limitsProblem(file: { name: string; type: string; size: number }, lim: UploadLimits): LimitProblem | null {
   const f = acceptedFormats(lim);
   const ext = /\.[^.]+$/.exec(file.name)?.[0]?.toLowerCase() ?? "";
@@ -109,6 +118,20 @@ export function limitsProblem(file: { name: string; type: string; size: number }
   if (!typeOk) return { kind: "type", message: `That one isn't a video we can use yet. Try an ${f.label}.` };
   const st = lim.storage;
   const plan = lim.planName ?? "Your plan";
+  // R1209: on Free the limit that binds is the monthly upload allowance. A delete never gives it back, so the way out
+  // is the renewal date or a bigger plan, in the server's own words (quota-core refusal).
+  if (st && st.kind === "monthly" && st.limitBytes > 0 && (st.over || file.size > st.remainingBytes)) {
+    const m = lim.quota?.monthly;
+    const room = st.over ? 0 : st.remainingBytes;
+    return {
+      kind: "monthly",
+      message: m
+        ? refusal("quota_monthly", file.size, { ...m, remainingBytes: room }, null, plan)
+        : room < 1
+          ? `You've used this month's upload allowance on ${plan}. Upgrade your plan to upload more now.`
+          : `This file is ${formatBytes(file.size)} and you have ${formatBytes(room)} of this month's uploads left. Upgrade to upload more now.`,
+    };
+  }
   if (st && st.limitBytes > 0 && st.over) return { kind: "storage", message: `${plan} storage is full (${st.label}), so new uploads are paused. Your files are safe. Delete some, or upgrade for more room.` };
   if (st && st.limitBytes > 0 && file.size > st.remainingBytes)
     return { kind: "storage", message: `This file needs ${formatBytes(file.size)} and ${plan} has ${formatBytes(st.remainingBytes)} of storage left. Delete some files, or upgrade for more room.` };
@@ -472,8 +495,9 @@ export async function uploadVideo<M>(file: File, onProgress: UploadProgress, sig
   // Checked here so nobody waits through an upload the server will refuse anyway.
   const bad = limitsProblem(file, saved ? limitsForResume(cfg, file.size) : cfg);
   if (bad) {
-    if (bad.kind === "storage" || bad.kind === "upload") {
-      offerUpgrade(bad.message, bad.kind);
+    const sell = upgradeFor(bad.kind);
+    if (sell) {
+      offerUpgrade(bad.message, sell);
       throw new ApiError(402, bad.message, "PLAN_LIMIT");
     }
     throw new ApiError(bad.kind === "size" ? 413 : 415, bad.message, bad.kind === "size" ? "TOO_LARGE" : "BAD_TYPE");

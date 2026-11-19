@@ -75,6 +75,9 @@ model User {
   aiFeatureUsage AiFeatureUsage[]
   media          Media[]
   uploadSessions UploadSession[]
+  uploadLedger   UploadLedger[] // R1209: once-per-file upload consumption
+  usageCycles    UsageCycle[] // R1209: closed monthly cycles
+  quotaAdjustments QuotaAdjustment[] // R1209: admin extra allowance / cycle resets
   posts          Post[]
   subscriptions  Subscription[]
   payments       Payment[]
@@ -198,11 +201,15 @@ model Media {
   thumbnailKey     String?
   mimeType         String
   size             Int
+  /// R1209: the exact size in bytes (size is Int and overflows at 2 GiB). Read sizeBytes ?? size.
+  sizeBytes        BigInt?
   duration         Float?
   width            Int?
   height           Int?
   status           String   @default("uploaded") // uploading | uploaded | processing | ready | failed
   createdAt        DateTime @default(now())
+  /// R1209: in Trash since then (still counts against storage until purged 30 days later). Null = active.
+  deletedAt        DateTime?
 
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   posts     Post[]
@@ -210,6 +217,61 @@ model Media {
   upload    UploadSession? // R1193: the multipart session while it uploads
 
   @@index([userId])
+  @@index([deletedAt])
+}
+
+/// R1209: one row per finished upload, written once per media (mediaId unique), never decremented when the file
+/// is deleted. The Free monthly upload allowance is the sum of these rows in the current cycle. No relation to
+/// Media on purpose: the record outlives the file.
+model UploadLedger {
+  id       String   @id @default(cuid())
+  userId   String
+  mediaId  String   @unique
+  bytes    BigInt
+  cycleKey String
+  at       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, at])
+}
+
+/// R1209: a closed monthly cycle, written once by the daily retention job (unique key = a second run is a no-op).
+model UsageCycle {
+  id             String   @id @default(cuid())
+  userId         String
+  cycleKey       String
+  startsAt       DateTime
+  endsAt         DateTime
+  planSlug       String
+  policy         String // monthly | storage | both
+  uploadedBytes  BigInt
+  storedBytes    BigInt
+  allowanceBytes BigInt // 0 = no monthly cap
+  capacityBytes  BigInt // 0 = no storage cap
+  closedAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cycleKey])
+  @@index([closedAt])
+}
+
+/// R1209: a manual change to one cycle by staff (also in AuditLog). extra = more allowance this cycle,
+/// credit = uploads this cycle no longer counted (a reset).
+model QuotaAdjustment {
+  id        String   @id @default(cuid())
+  userId    String
+  cycleKey  String
+  kind      String // extra | credit
+  bytes     BigInt
+  actor     String
+  note      String   @default("")
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, cycleKey])
 }
 
 /// R1193 (R2 upload engine): one row per browser multipart upload to R2/S3. It keeps the bucket's upload id, so
@@ -263,6 +325,7 @@ model Post {
   mediaId     String
   title       String? // internal working title
   story       String? // creator's description of the video
+  storyMeta   String? // R1209: JSON {mode, generated, original, own, accepted, adaptedFrom, seen, mediaId}: Step 2 drafts kept across devices
   hook        String? // chosen hook
   status      String    @default("draft") // draft | scheduled | publishing | published | partial | failed
   requireApproval Boolean @default(false) // publishing is blocked until a reviewer approves
@@ -437,6 +500,9 @@ model Plan {
   highlight  Boolean  @default(false)
   sortOrder  Int      @default(0)
   storageMb  Int      @default(0) // total storage on this plan (1052), 0 = no cap
+  uploadMonthlyMb Int? // R1209: upload allowance per cycle, null = the server default (lib/storage/quota.ts), 0 = no monthly cap
+  quotaPolicy String  @default("auto") // R1209: auto (free = monthly allowance, paid = storage) | monthly | storage | both
+  cycleAnchor String  @default("billing") // R1209: billing (subscription period) | signup | calendar (1st, billing timezone)
   yearlyPrices String @default("{}") // 1096: JSON { USD: 7000 } exact yearly prices per currency; missing = scaled from monthly
   platformLimit Int   @default(0) // 1096: different platforms that can be connected, 0 = any
   brandLimit Int      @default(0) // 1096: accounts per platform (a "brand" = one of each), 0 = accountLimit rules
@@ -463,6 +529,7 @@ model Subscription {
   currency         String
   interval         String
   provider         String
+  currentPeriodStart DateTime? // R1209: when this subscription's billing cycle started (monthly allowance anchor)
   currentPeriodEnd DateTime
   cancelAtPeriodEnd Boolean  @default(false)
   canceledAt       DateTime?
@@ -1282,6 +1349,10 @@ model AccountDeletion {
 model StorageCleanup {
   id         String    @id @default(cuid())
   deletionId String?
+  /// R1209: a Trash purge or draft delete: the Media row goes once every file of it is gone.
+  mediaId    String?
+  userId     String?
+  purpose    String    @default("account") // account | media
   key        String
   attempts   Int       @default(0)
   nextAt     DateTime  @default(now())
@@ -1293,6 +1364,7 @@ model StorageCleanup {
 
   @@unique([deletionId, key])
   @@index([doneAt, nextAt])
+  @@index([mediaId])
 }
 
 /// 1096: a bought pack. ai/x packs are spent unit by unit after the plan allowance; brand/seat packs add room until expiresAt.

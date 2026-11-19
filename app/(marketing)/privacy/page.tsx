@@ -138,7 +138,7 @@ export default function PrivacyPage() {
           <p>
             Uploaded files go to private object storage tied to your account. Nothing is publicly listed. Playback inside Outlly, and the copy
             Instagram, Threads or Facebook fetch when they publish, use signed links that expire after a short time. When you delete a media
-            item, the stored file is deleted with it.
+            item it moves to Trash, and the stored file is deleted 30 days later, or at once if you delete it for good.
           </p>
 
           <h2>AI features</h2>
@@ -235,8 +235,8 @@ export default function PrivacyPage() {
             <li><strong>Take a copy:</strong> Settings, Your data, Download my data gives you a readable PDF with your profile, posts, schedule, library details, direct messages and invoices, or the same data as a JSON file to move to another service. Passwords and access tokens are never included.</li>
           </ul>
           <p>
-            Invoices stay on your Billing page for as long as you have an account. If you delete it, each invoice is kept until 8 years after the date it was issued, because Indian tax law requires it, and is then deleted automatically. A kept invoice holds only what was printed on it: the invoice number, date, plan, amount, tax and the name and email it was made out to. It is no longer linked to any account. Drafts nobody has touched for 3 days are removed
-            automatically. Email logs and Pip conversations are deleted after 90 days (a Pip conversation counts from its last message; a transcript email stores no copy of the chat in our logs), post metric history after 2 years and sign-in codes after one day. Your source files stay downloadable from the library for as long as your account exists.
+            Invoices stay on your Billing page for as long as you have an account. If you delete it, each invoice is kept until 8 years after the date it was issued, because Indian tax law requires it, and is then deleted automatically. A kept invoice holds only what was printed on it: the invoice number, date, plan, amount, tax and the name and email it was made out to. It is no longer linked to any account. Saved drafts stay until you delete them. An upload no draft or post uses moves to Trash after 3 days and is
+            deleted for good 30 days later. Email logs and Pip conversations are deleted after 90 days (a Pip conversation counts from its last message; a transcript email stores no copy of the chat in our logs), post metric history after 2 years and sign-in codes after one day. Source files your drafts and posts use stay downloadable from the library for as long as your account exists.
           </p>
 
           <h2>Your rights</h2>

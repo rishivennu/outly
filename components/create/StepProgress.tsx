@@ -92,7 +92,7 @@ export function StepProgress({ step, furthest, reachable, blocked, onGo, complet
                   aria-describedby={why && !s.canGo && !on ? whyId : undefined}
                   title={s.canGo ? `Go to ${s.label}` : !on && !complete ? (blocked?.[s.id] ?? undefined) : undefined}
                   className={cn(
-                    "group flex min-h-11 min-w-0 shrink-0 items-center gap-2 rounded-full py-1 pl-1 pr-2.5 text-left outline-none transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+                    "group flex min-h-11 min-w-0 shrink items-center gap-2 rounded-full py-1 pl-1 pr-2.5 text-left outline-none transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
                     s.canGo ? "cursor-pointer [@media(hover:hover)]:hover:bg-secondary/70" : on ? "cursor-default" : "cursor-not-allowed",
                   )}
                 >

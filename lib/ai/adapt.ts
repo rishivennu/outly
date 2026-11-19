@@ -66,14 +66,16 @@ const SOURCE_RULES = [
  * caption with that one change made, a suggestion for the one editor that goes in only when the creator applies
  * it. Null when no model answered, so the caller says so instead of passing something else off as Pip's idea.
  */
-export async function askSourceCaption(text: string, ask: CaptionAsk, opts: GeminiOpts & { voice?: string } = {}): Promise<{ text: string; why: string } | null> {
-  const { voice, ...rest } = opts;
+export async function askSourceCaption(text: string, ask: CaptionAsk, opts: GeminiOpts & { voice?: string; seen?: string } = {}): Promise<{ text: string; why: string } | null> {
+  const { voice, seen, ...rest } = opts;
   const tagsOnly = ask === "hashtags";
   type Item = { caption?: unknown; hashtags?: unknown; why?: unknown };
   const raw = await gemini<Item | { items: Item[] }>(
     `${EDITOR}${voice ?? ""}\n\n${SOURCE_RULES}`,
     [
       `The creator's caption:\n"""${text}"""`,
+      // R1209 A1: what was seen in the video, read once already. The change stays true to it; nothing beyond it is added.
+      ...(seen?.trim() ? [`What the video shows (for context only, add nothing that isn't in it or the caption):\n"""${seen.trim().slice(0, 1500)}"""`] : []),
       `Request: ${CAPTION_ASK_RULE[ask]}`,
       tagsOnly ? `Return JSON {"hashtags": "#a #b", "why": one short sentence saying why these}` : `Return JSON {"caption": the whole caption with only that change made, "why": one short sentence saying what you changed}`,
     ].join("\n"),

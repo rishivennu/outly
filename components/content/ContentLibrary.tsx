@@ -551,7 +551,7 @@ export function ContentLibrary({
 function Empty({ filter }: { filter: F }) {
   const copy: Record<F, [string, string, IconName]> = {
     all: ["Nothing here yet.", "Your first video is one drop away.", "gallery"],
-    draft: ["No drafts.", "Everything you started, you finished. Drafts you leave for 3 days are removed.", "drafts"],
+    draft: ["No drafts.", "Everything you started, you finished. Saved drafts stay here until you delete them.", "drafts"],
     scheduled: ["Nothing on the calendar.", "Schedule something and it'll wait here.", "schedule"],
     published: ["Nothing live yet.", "Send your first one out. It's a good feeling.", "publish"],
     failed: ["Nothing went wrong.", "Every post made it where it was going.", "success"],

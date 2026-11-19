@@ -1,7 +1,7 @@
 "use client";
 /**
- * Drafts kept in this browser (IndexedDB), video included, so a draft survives even after the
- * server copy expires (untouched drafts leave Outlly after DRAFT_TTL_DAYS, see lib/retention/prune.ts).
+ * Drafts kept in this browser (IndexedDB), video included, so a draft survives even when the server copy is
+ * deleted (R1209: saved drafts on Outlly are kept until deleted; only unused uploads move to Trash, see lib/storage/lifecycle.ts).
  * Phase 2: one database per account ("outlly-drafts:<hashed user id>"), so a shared device never shows one
  * person's drafts to another. Sign-out deletes them all (lib/client/forget-billing.ts). The unscoped database
  * older builds wrote has no owner we can prove, so it is never adopted by itself: an empty one is deleted, one
@@ -44,6 +44,8 @@ export interface DeviceDraft {
   updatedAt: number;
   title: string;
   story: string;
+  /** R1209 A1: Your Story's two boxes, the mode picked and Outlly's untouched caption (components/create/story-meta). */
+  storyMeta?: string;
   hook: string | null;
   targets: Record<string, DeviceTarget>;
   filename: string | null;
@@ -313,6 +315,7 @@ export function openDrafts(userId: string) {
       ...("schedule" in d ? { schedule: d.schedule } : prev?.schedule !== undefined ? { schedule: prev.schedule } : {}),
       ...("captions" in d ? { captions: d.captions } : prev?.captions !== undefined ? { captions: prev.captions } : {}),
       ...("adapted" in d ? { adapted: d.adapted } : prev?.adapted !== undefined ? { adapted: prev.adapted } : {}),
+      ...(typeof d.storyMeta === "string" ? { storyMeta: d.storyMeta.slice(0, 20_000) } : typeof prev?.storyMeta === "string" ? { storyMeta: prev.storyMeta } : {}),
     };
     const ok = await run([META, VIDEO], "readwrite", (tx) => {
       const req = tx.objectStore(META).put(record);
@@ -383,6 +386,7 @@ export function openDrafts(userId: string) {
         ...(d.schedule !== undefined ? { schedule: d.schedule } : {}),
         ...(d.captions !== undefined ? { captions: d.captions } : {}),
         ...(d.adapted !== undefined ? { adapted: d.adapted } : {}),
+        ...(typeof d.storyMeta === "string" ? { storyMeta: d.storyMeta } : {}),
       };
       const ok = await run([META, VIDEO], "readwrite", (tx) => {
         const req = tx.objectStore(META).put(record);

@@ -22,6 +22,7 @@ const TITLE: Record<string, string> = {
   seats: "Upgrade to add your team",
   accounts: "Upgrade to connect more accounts",
   storage: "Upgrade for more storage",
+  uploads: "Upgrade to upload more this month",
   platforms: "Upgrade to post on more platforms",
   brands: "Upgrade for more brands",
   x: "Upgrade to post more to X",

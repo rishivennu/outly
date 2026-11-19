@@ -139,15 +139,18 @@ describe("gap 6: the caption changed after Pip wrote the platforms", () => {
     const fx = cw.slice(cw.indexOf("const adaptTried = useRef(\"\");"), cw.indexOf("const onDraft = (p: Platform"));
     expect(fx).toContain('if (step !== "everywhere" || phase !== "edit") {');
     expect(fx).toContain("const changed = submittedStory != null && caption !== submittedStory.trim();");
-    expect(fx).toContain("const todo = changed ? adaptPlaces : adaptPlaces.filter((pl) => !hasCopy(draftsRef.current[pl]) && !adaptedRef.current[pl]);");
+    // R1209 A2: each place remembers the caption it was written from, so only the stale ones are written again.
+    expect(fx).toContain("const todo = staleFor(from, adaptPlaces, caption, (pl) => changed || (!hasCopy(draftsRef.current[pl]) && !adaptedRef.current[pl]));");
     expect(fx).toContain("if (adaptTried.current === key) return;");
-    expect(fx).toContain("void adapt(todo, { direct: !changed && someAdapted, tone: adaptTone ?? undefined });");
+    expect(fx).toContain("void adapt(todo, { direct: !again && someAdapted, update: again && todo.length < adaptPlaces.length, tone: adaptTone ?? undefined });");
   });
 });
 
 describe("gap 3: Pip's asks on Your Story edit the original caption", () => {
   test("the caption asks are the story chips, less the one that adds a platform", () => {
-    expect([...CAPTION_ASKS]).toEqual(STORY_ASKS.filter((a) => a.id !== "other").map((a) => a.id) as string[]);
+    // R1209 A1: plus Rephrase, Write my own's one button.
+    expect([...CAPTION_ASKS].filter((a) => a !== "rephrase")).toEqual(STORY_ASKS.filter((a) => a.id !== "other").map((a) => a.id) as string[]);
+    expect(CAPTION_ASKS).toContain("rephrase");
     for (const a of CAPTION_ASKS) expect(CAPTION_ASK_RULE[a].length).toBeGreaterThan(20);
     expect(isCaptionAsk("hook")).toBe(true);
     expect(isCaptionAsk("adapt")).toBe(false);
@@ -195,12 +198,15 @@ describe("gap 3: Pip's asks on Your Story edit the original caption", () => {
 
   test("the answer waits under Your caption to apply or skip", () => {
     const s = src("components/create/StoryComposer.tsx");
-    expect(s).toContain("Pip&apos;s suggestion for your caption");
-    expect(s).toContain("Apply it");
+    // R1209 A1: the original and the suggestion side by side, then Accept, Edit or Keep.
+    expect(s).toContain("Suggested caption");
+    expect(s).toContain("Accept suggestion");
+    expect(s).toContain("Edit suggestion");
     expect(s).toContain("onClick={p.onSkip}");
     expect(s).toContain("You edited your caption after asking.");
     const cw = src("components/create/CreateWorkspace.tsx");
     expect(cw).toContain("setStory(captionProposal.text);");
+    expect(cw).toContain("const m = acceptRewrite(metaRef.current, story, captionProposal.text);");
     expect(cw).toContain("onSkip={() => setCaptionProposal(null)}");
     // A restore or the server's copy replaces the story, and takes any waiting suggestion with it.
     expect(cw.match(/setCaptionProposal\(null\);/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
