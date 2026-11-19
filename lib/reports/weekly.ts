@@ -97,9 +97,10 @@ export function weeklyHtml(o: { name: string; stats: WeeklyStats; intel: IntelBl
 }
 
 /** Sends to everyone whose Monday report is due. Skips people who never posted (nothing to say). */
-export async function sendWeeklyReports(now = new Date(), opts: { force?: boolean; limit?: number; intel?: (userId: string) => Promise<WeeklyIntelligence> } = {}) {
+export async function sendWeeklyReports(now = new Date(), opts: { force?: boolean; limit?: number; only?: string[]; intel?: (userId: string) => Promise<WeeklyIntelligence> } = {}) {
+  // R1245: `only` narrows a forced run to given users; tests on a shared database use it so they do not send to everyone.
   const users = await db.user.findMany({
-    where: { weeklyReport: true, OR: [{ lastReportAt: null }, { lastReportAt: { lt: new Date(now.getTime() - 6 * 864e5) } }], posts: { some: { status: { not: "draft" } } } },
+    where: { ...(opts.only ? { id: { in: opts.only } } : {}), weeklyReport: true, OR: [{ lastReportAt: null }, { lastReportAt: { lt: new Date(now.getTime() - 6 * 864e5) } }], posts: { some: { status: { not: "draft" } } } },
     select: { id: true, name: true, email: true, timezone: true, weeklyReport: true, lastReportAt: true },
     take: opts.limit ?? 50,
   });

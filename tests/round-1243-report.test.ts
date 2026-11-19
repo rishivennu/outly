@@ -182,7 +182,7 @@ describe("R1243 weekly email block", () => {
     }
     const r = await weekly.sendWeeklyReports(new Date(), {
       force: true,
-      limit: 500,
+      only: [good.id, bad.id], // R1245: the full suite shares one database; a forced run over everyone took over 5 s
       intel: async (id) => {
         if (id === bad.id) throw new Error("overview failed");
         return wi();
