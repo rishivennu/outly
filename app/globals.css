@@ -2271,6 +2271,8 @@ html[data-lh~="faq"] [data-sec="faq"] { display: none !important; }
 .la-more{position:absolute;right:-.2rem;bottom:-.1rem;padding:0 .35rem;border-radius:999px;background:hsl(var(--lime));color:hsl(var(--lime-foreground));font-size:10px;font-weight:700;line-height:1.1rem}
 @media (prefers-reduced-motion:reduce){.la-print{transition:none}.la-stack-anim .la-print{animation:none}}
 .pub-eyebrow{background:hsl(var(--card)/.8);border:1px solid hsl(var(--foreground)/.08);color:hsl(var(--foreground))}
+/* R1218: the one small-caps label every block of the publishing success grid uses (where it went, Live activity, What happened) */
+.pub-label{font-size:12px;line-height:1.2;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:hsl(var(--muted-foreground))}
 .pub-pulse{width:8px;height:8px;border-radius:999px;background:hsl(var(--success));box-shadow:0 0 0 0 hsl(var(--success)/.6);animation:pub-ping 1.6s ease-out infinite}
 .pub-pulse-still{animation:none}
 @keyframes pub-ping{0%{box-shadow:0 0 0 0 hsl(var(--success)/.55)}100%{box-shadow:0 0 0 9px hsl(var(--success)/0)}}

@@ -106,9 +106,9 @@ describe("1212 publishing success screen", () => {
     const stage = at("<p className=\"text-[22px] font-semibold leading-tight tracking-[-0.02em]\">{stage}</p>");
     const actions = at("{actions}");
     const header = at('data-testid="pub-header"');
-    const preview = at("{!active && <PublishedPreview post={post} trackerOf={trackerOf} />}");
+    const preview = at('{!active && <PublishedPreview post={post} trackerOf={trackerOf} className="lg:col-start-2 lg:row-start-1" />}');
     const live = at("<ul aria-label={postWords(post.format).where}");
-    const what = at("{!active && <WhatHappened post={post} />}");
+    const what = at('{!active && <WhatHappened post={post} className="lg:col-start-1 lg:row-start-2" />}');
     expect(stage).toBeLessThan(actions);
     expect(actions).toBeLessThan(header);
     expect(header).toBeLessThan(preview);
