@@ -54,7 +54,7 @@ describe("pure helpers", () => {
     expect(ents.parseFeatures("all")).toBe("all");
     expect(ents.parseFeatures("translation,bogus,captions")).toEqual(["captions", "translation"]);
     expect(ents.serializeFeatures(["translation", "captions"])).toBe("captions,translation");
-    expect(ents.serializeFeatures(["captions", "transcription", "translation", "rewrite", "content", "other"])).toBe("all");
+    expect(ents.serializeFeatures(["captions", "transcription", "translation", "rewrite", "content", "other", "intelligence_wording"])).toBe("all");
     expect(ents.covers("all", "content")).toBe(true);
     expect(ents.covers(["content"], "content")).toBe(true);
     expect(ents.covers(["content"], "captions")).toBe(false);

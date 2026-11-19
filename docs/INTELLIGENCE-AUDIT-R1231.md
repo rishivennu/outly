@@ -366,6 +366,26 @@ Rules for every round: schema edits in both prisma files; pure core with unit te
 7. Plan gating: Content Intelligence free for all, paid only, or free dashboard with paid recommendations? Is AI wording a metered feature?
 8. Hosting: ship engine jobs on current Vercel Hobby (CPU already high), or decide Pro/Cloudflare before R1236?
 
+## 9. What shipped (R1232-R1244)
+
+One line per round: the files, then the honest gaps. Schema edits are in both `prisma/schema.prisma` and `prisma/schema.template.prisma`.
+
+- R1232 Engine core: `lib/intelligence/core.ts` (pure: availability, like-with-like format groups, topic index, signals, recommendation drafts, confidence). Test `tests/round-1232-intelligence-core.test.ts`.
+- R1233 Content Memory: models ContentItem, ContentVariation, ContentCategory, ContentItemCategory, ContentCampaign, BrandProfile, Recommendation, RecommendationEvent; `lib/intelligence/memory.ts`. Test `round-1233-content-memory`.
+- R1234 Lineage on create: `lib/intelligence/lineage.ts` (a ContentItem and variation per created or adapted post). Test `round-1234-lineage`. Gap: old posts are not backfilled (open decision 4).
+- R1235 Brand profile: `lib/intelligence/brand-core.ts`, `app/api/settings/brand/route.ts`, `app/api/settings/brand/profiles/route.ts`. Test `round-1235-brand-profile`. Gap: the brand route is owner-only; there is no scopeKey to SocialAccount mapping, so an agency client scope filters by ContentItem.brandKey only.
+- R1236 Service and read model: `lib/intelligence/service.ts` (loadPostRecords, overview), `app/api/intelligence/overview/route.ts`, cache invalidation in `lib/analytics/refresh.ts` and `lib/posts/delete.ts`. Test `round-1236-intelligence-service`.
+- R1237 Categories and topics: `lib/intelligence/categories-core.ts`, `categories.ts`, `app/api/content/categories/*`, `app/api/posts/[id]/tags/route.ts`, `components/content/*`. Test `round-1237-categories`. Gap: user-defined categories only, no suggestions (open decision 5).
+- R1238 Dashboard: `app/(studio)/intelligence/*`, `components/intelligence/*` (view-core.ts holds every gap and confidence word), `components/shell/nav-items.ts`. Test `round-1238-intelligence-ui`. Gap: the Topics section is a placeholder until enough categorised posts exist; outcomes are not shown on the dashboard yet.
+- R1239 Recommendation persistence and AI wording: `lib/intelligence/reco-core.ts` (pure: dedupe key, expiry, number-preserving wording check), `reco.ts`. Test `round-1239-reco`.
+- R1240 Planner lifecycle and audit: `lib/intelligence/planner-core.ts`, `planner.ts`, `app/api/recommendations/*`. Test `round-1240-planner`.
+- R1241 Content Studio prefill: `lib/intelligence/prefill-core.ts`, `components/create/CreateWorkspace.tsx`, `app/api/recommendations/[id]/route.ts`. Test `round-1241-prefill`. In progress with another teammate when this was written.
+- R1242 Outcomes loop: `lib/intelligence/outcome-core.ts` (pure: early signal against the same platform and format cohort, never causal), `outcome.ts` (outcome_link and outcome events), a bounded step in `app/api/cron/sweep/route.ts`. Test `round-1242-outcome`. Gap: nothing calls linkOutcome from the publish path yet, and the dashboard does not read outcomesFor yet.
+- R1243 Weekly Intelligence Report and agency views: `lib/intelligence/report-core.ts`, `lib/reports/weekly*.ts`. In progress with another teammate when this was written.
+- R1244 Hardening: Pip tool `intelligence_overview` (`lib/pip/tools-intelligence.ts`, registered in `lib/pip/types.ts`, `tools.ts`, `plan.ts`; read-only, overview in readOnly mode); AI wording behind an AI grant on the new AiFeature `intelligence_wording` (`lib/ai/features.ts`), counted in AiFeatureUsage, at most 5 per call and 30 per owner per UTC day; `act()` refuses expired rows with 400 EXPIRED and marks them; overview loads at most 2000 destinations, newest first, and reports `postsCapped`; `lib/intelligence/README.md`. Test `round-1244-hardening`. Gap: AI wording is only for accounts with an admin AI grant until plan gating is decided (open decision 7).
+
+Platform gaps that remain: per-post metrics come only from Instagram, YouTube and Facebook. X, TikTok, LinkedIn and Threads have no per-post metrics in Outlly (missing scopes or API access, see section 5), so their posts show as not provided and are never compared.
+
 ## References
 
 - `prisma/schema.prisma` (User 15, SocialAccount 170, Post 322, PostMedia 365, PostTarget 379, TargetMetric 428, ReviewRequest 445, Plan 493/522, BehaviorAnalysis 909, PerfSample 927, TeamMember 953, Idea 1070, Campaign 1450, AccountSnapshot 1580, AccountSyncState 1598), `prisma/schema.template.prisma`

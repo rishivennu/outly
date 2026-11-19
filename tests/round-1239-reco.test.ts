@@ -137,7 +137,13 @@ describe("R1239 persistRecommendations", () => {
     expect((await reco.listRecommendations(u.id, "", { status: "open", limit: 1 })).length).toBe(1);
   });
   test("AI wording is used only when it keeps the facts; otherwise the rule text stays", async () => {
-    const u = await user();
+    // R1244: wording needs a live AI grant covering it (lib/ai/entitlements.ts).
+    const granted = async () => {
+      const g = await user();
+      await db.aiEntitlement.create({ data: { userId: g.id, features: "intelligence_wording", note: "", grantedBy: "test" } });
+      return g;
+    };
+    const u = await granted();
     const faithful = async (_s: string, prompt: string) => {
       const o = JSON.parse(prompt.slice(prompt.indexOf("\n") + 1)) as { title: string; concept: string; why: string; label: string };
       return { title: o.title.replace("Post another", "Make one more"), concept: o.concept, why: o.why, label: "Start the draft" };
@@ -148,7 +154,7 @@ describe("R1239 persistRecommendations", () => {
     expect(good.nextAction.label).toBe("Start the draft");
     expect((await db.recommendation.findUnique({ where: { id: good.id } }))?.wordedBy).toBe("ai");
 
-    const v = await user();
+    const v = await granted();
     const liar = async () => ({ title: "Post another TikTok video", concept: "x", why: "Up 900%.", label: "Go" });
     const [kept] = await reco.persistRecommendations(v.id, "", drafts().slice(0, 1), period, { now: NOW, ask: liar });
     expect(kept.wordedBy).toBe("rules");
@@ -156,7 +162,7 @@ describe("R1239 persistRecommendations", () => {
     const broken = async () => {
       throw new Error("down");
     };
-    const w = await user();
+    const w = await granted();
     const [fallback] = await reco.persistRecommendations(w.id, "", drafts().slice(0, 1), period, { now: NOW, ask: broken });
     expect(fallback.wordedBy).toBe("rules");
   });

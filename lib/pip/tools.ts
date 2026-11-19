@@ -3,6 +3,7 @@ import { parseRange, type DateRange } from "./range";
 import { creditNotes, invoices, payments, refundsMissingCreditNote, spending, subscription } from "./tools-billing";
 import { activity, engagement, notices, posts, tickets, topPosts, uploads } from "./tools-content";
 import { addFreshness, ANALYTICS } from "./tools-analytics";
+import { intelligenceOverview } from "./tools-intelligence";
 import { isPlatform } from "../domain";
 import { ANALYTIC_TOOLS } from "./types";
 import { base, mergeRelink, type PipArgs, type PipCtx } from "./tools-core";
@@ -27,6 +28,7 @@ const TOOLS: Record<PipTool, Tool> = {
   notices,
   activity,
   ...ANALYTICS,
+  intelligence_overview: intelligenceOverview,
 };
 
 /** Money belongs to the workspace owner: a teammate gets a plain no, not a partial view. */

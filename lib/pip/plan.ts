@@ -68,6 +68,8 @@ export const platformsNamed = (t: string) => PLATFORM_WORDS.filter(([re]) => re.
 
 /** 1123: the analysis questions. Checked after billing and before the plain lookups; order matters. */
 function analyticOf(t: string): PipTool | null {
+  // R1244: Content Intelligence (what is working, what needs attention, what to make next).
+  if (/\b(content )?intelligence\b|\bwhat('s| is) (working|not working)\b|\bneeds? attention\b|\b(content )?recommendations?\b|\bwhat (should|do) i (make|create) next\b/i.test(t)) return "intelligence_overview";
   if (/\bwhy (did|was|is|has) (my |that |this |the )?(post|video|reel|short|tweet|it|one)\b|\bwhat made (it|that|this|my)\b/i.test(t) && !TROUBLE.test(t)) return "post_insight";
   if (/\b(full|complete|whole|detailed|cross[- ]platform|performance|monthly|weekly|quarterly)\s+(report|analysis|review|breakdown|summary)\b|\b(analy[sz]e|analysis|deep dive|audit)\b|\bstrateg(y|ies)\b|\bwhat should i (do|post|focus on|change|improve)\b|\bgame ?plan\b|\bhow (can|do|should) i (grow|improve|do better)\b/i.test(t)) return "report";
   if (/\b(forecast|predict|prediction|projection|projected|expect to get|estimate)\b/i.test(t)) return "forecast";
@@ -194,6 +196,7 @@ trend = whether views or engagement are rising or falling, and unusual days. con
 formats = which kinds of posts work (format, shape, caption length, hashtags; there are no categories). segments = high reach but low interaction, underperformers.
 schedule = upcoming, missed and failed posts. account = connected accounts, plan usage and AI usage. post_insight = why one post did better or worse than usual.
 forecast = expected views ahead (an estimate). report = a full analysis with a plan for next month.
+intelligence_overview = Content Intelligence: what is working, what needs attention, and the next content recommendations, compared like with like.
 Return JSON {"tool": one name or null, "period": the dates exactly as the person wrote them or null, "status", "platform", "minAmount", "maxAmount", "sort": "views"|"engagement"|"momentum"|null, "compare": boolean}.
 Use null for tool when the message is a how-to question, asks to change or cancel something, or is not about their own records.`;
 

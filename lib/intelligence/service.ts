@@ -21,7 +21,7 @@ import {
   type TopicInsight,
 } from "./core";
 import { getBrandProfile } from "./memory";
-import { persistRecommendations, type StoredRecommendation } from "./reco";
+import { persistRecommendations, storedFor, type StoredRecommendation } from "./reco";
 import { ACTIVE_STATUSES } from "./reco-core";
 
 /**
@@ -49,6 +49,8 @@ export interface LoadOpts {
 }
 
 const METRIC_KEYS = ["views", "likes", "comments", "shares", "saves"] as const;
+/** R1244: the most destinations one read loads, newest first, so a huge workspace cannot stall the overview. */
+export const POSTS_CAP = 2000;
 
 /** The cache key, exported so tests and future invalidation agree on its shape. One minute, like analytics. */
 export function postsCacheKey(userId: string, period: Period, accountIds: string[] | null, brandKey?: string): string {
@@ -79,6 +81,9 @@ async function computePostRecords(userId: string, period: Period, accountIds: st
   };
   const targets = await db.postTarget.findMany({
     where,
+    // R1244: hard cap, newest first (overview reports postsCapped when it is hit).
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+    take: POSTS_CAP,
     select: {
       id: true,
       platform: true,
@@ -142,6 +147,8 @@ export interface Overview {
   recommendations: StoredRecommendation[];
   /** Why the list is empty, when it is. */
   recommendationsReason: string | null;
+  /** R1244: true when POSTS_CAP destinations were loaded, so older ones in the window were left out. */
+  postsCapped: boolean;
   generatedAt: string;
 }
 
@@ -151,6 +158,8 @@ export interface OverviewOpts {
   objective?: string;
   accountIds?: string[] | null;
   brandKey?: string;
+  /** R1244: for Pip. Matches drafts to rows already stored and writes nothing (no new rows, events, expiry or wording). */
+  readOnly?: boolean;
 }
 
 /**
@@ -171,7 +180,9 @@ export async function overview(user: Scoped, opts: OverviewOpts): Promise<Overvi
   const me = await db.user.findUnique({ where: { id: user.id }, select: { name: true, niche: true } });
   const drafts = recommendationsFrom(working, { name: brand?.name ?? me?.name ?? null, niche: me?.niche ?? null });
   // R1239: stored idempotently, so the dashboard can link /create?rec=<id>. Rejected, done and expired rows are not shown.
-  const stored = await persistRecommendations(user.id, opts.brandKey ?? "", drafts.recommendations, period);
+  const stored = opts.readOnly
+    ? await storedFor(user.id, opts.brandKey ?? "", drafts.recommendations, period)
+    : await persistRecommendations(user.id, opts.brandKey ?? "", drafts.recommendations, period);
   const recommendations = stored.filter((r) => ACTIVE_STATUSES.includes(r.status));
   const reason = recommendations.length ? null : (drafts.reason ?? "Nothing new to suggest yet: you have already closed the recommendations these numbers support.");
   const curFrom = Date.parse(period.from);
@@ -188,6 +199,7 @@ export async function overview(user: Scoped, opts: OverviewOpts): Promise<Overvi
     attention,
     recommendations,
     recommendationsReason: reason,
+    postsCapped: posts.length >= POSTS_CAP,
     generatedAt: new Date().toISOString(),
   };
 }

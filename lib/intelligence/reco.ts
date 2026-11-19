@@ -3,6 +3,7 @@ import type { Recommendation as RecoRow } from "@prisma/client";
 import { db } from "../db";
 import { rangeLabel } from "../analytics/core";
 import { gemini } from "../ai/creative";
+import { activeAiGrant, countFeatureUse, utcDayKey } from "../ai/entitlements";
 import { aiAvailable } from "../live/review";
 import { MAX_RECOMMENDATIONS, type Confidence, type Evidence, type Period, type Recommendation } from "./core";
 import { dedupeKeyOf, isExpired, RECO_STATUSES, ruleKeyOf, validateWording, type RecoStatus, type RecoWording } from "./reco-core";
@@ -161,12 +162,14 @@ export async function persistRecommendations(
   }
   const views = out.map(view);
   const ask = opts.ask !== undefined ? opts.ask : defaultAsk();
-  if (ask && fresh.length) {
-    const ids = new Set(fresh.slice(0, MAX_RECOMMENDATIONS).map((r) => r.id));
-    const worded = await Promise.all(views.map((v) => (ids.has(v.id) ? wordRecommendation(v, { ask }) : v)));
-    return worded;
-  }
-  return views;
+  if (!ask || !fresh.length) return views;
+  // R1244: metered like every AI call, only with a grant covering it, and within the owner's day cap.
+  const allowed = Math.min(MAX_RECOMMENDATIONS, await wordingAllowance(ownerId, now));
+  const ids = new Set(fresh.slice(0, allowed).map((r) => r.id));
+  if (!ids.size) return views;
+  // Counted one by one before the parallel calls, so concurrent upserts on the same usage row never race.
+  for (let i = 0; i < ids.size; i++) await countFeatureUse(ownerId, WORDING_FEATURE, true, new Date(now));
+  return Promise.all(views.map((v) => (ids.has(v.id) ? wordOne(v, ask) : v)));
 }
 
 /** Newest first. An unknown status filter matches nothing rather than everything. */
@@ -182,9 +185,52 @@ export async function listRecommendations(ownerId: string, scopeKey: string, opt
   return rows.map(view);
 }
 
+/**
+ * R1244: the read-only twin of persistRecommendations, for Pip. Each draft is answered with the live row already
+ * stored for its rule (an open row past its expiry counts as expired, without writing that), or, when none is
+ * stored yet, with the draft itself as an unsaved row: id "", status open, wordedBy rules. Writes nothing.
+ */
+export async function storedFor(ownerId: string, scopeKey: string, drafts: Recommendation[], period: Pick<Period, "from" | "to">, now: number = Date.now()): Promise<StoredRecommendation[]> {
+  const list = (Array.isArray(drafts) ? drafts : []).slice(0, MAX_RECOMMENDATIONS);
+  if (!list.length) return [];
+  const live = await db.recommendation.findMany({ where: { ownerId, scopeKey, status: { not: "expired" } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 300 });
+  const byRule = new Map<string, StoredRecommendation>();
+  for (const r of live) {
+    const v = view(r);
+    if (!v.rule || byRule.has(v.rule)) continue;
+    byRule.set(v.rule, isExpired(v, now) ? { ...v, status: "expired" } : v);
+  }
+  return list.map((d) => {
+    const rule = ruleKeyOf(d);
+    const known = byRule.get(rule);
+    if (known) return known;
+    const { id: _draftId, ...rest } = d;
+    void _draftId;
+    return { ...rest, id: "", ownerId, scopeKey, rule, dedupeKey: dedupeKeyOf(d, period), status: "open", wordedBy: "rules", periodFrom: period.from, periodTo: period.to, feedback: null, contentItemId: null, createdAt: new Date(now).toISOString() };
+  });
+}
+
 /* ------------------------------------------------------------------ AI wording */
 
-/** The same gate as the Profile Review deep review (lib/live/review.ts), which does not charge AI credits either. */
+/** R1244: the AiFeature the admin grants and AiFeatureUsage counts for recommendation wording. */
+export const WORDING_FEATURE = "intelligence_wording" as const;
+/** R1244: rewordings per owner per UTC day, on top of MAX_RECOMMENDATIONS per call. */
+export const WORDING_DAY_CAP = 30;
+
+/**
+ * R1244: how many rewordings this owner may still have today. 0 without a live AI grant covering
+ * WORDING_FEATURE (lib/ai/entitlements.ts) or once WORDING_DAY_CAP calls were counted today; then the rule
+ * text is kept, with no error.
+ */
+export async function wordingAllowance(ownerId: string, now: number = Date.now()): Promise<number> {
+  if (!ownerId) return 0;
+  const at = new Date(now);
+  if (!(await activeAiGrant(ownerId, WORDING_FEATURE, at))) return 0;
+  const used = await db.aiFeatureUsage.findUnique({ where: { userId_day_feature: { userId: ownerId, day: utcDayKey(at), feature: WORDING_FEATURE } }, select: { count: true } });
+  return Math.max(0, WORDING_DAY_CAP - (used?.count ?? 0));
+}
+
+/** The same model gate as the Profile Review deep review (lib/live/review.ts). */
 function defaultAsk(): AskJson | null {
   if (!aiAvailable()) return null;
   return (system, prompt) => gemini<unknown>(system, prompt, { temperature: 0.4, timeoutMs: 8_000 });
@@ -196,10 +242,19 @@ const clean = (v: unknown) => (typeof v === "string" ? v.replace(/\s+/g, " ").tr
  * Rewords one open, rule-worded recommendation. The model only rephrases: validateWording rejects any answer that
  * drops or changes a number, a platform or a format, and then the rule text stays (wordedBy 'rules').
  */
-export async function wordRecommendation(rec: StoredRecommendation, opts: { ask?: AskJson | null } = {}): Promise<StoredRecommendation> {
+export async function wordRecommendation(rec: StoredRecommendation, opts: { ask?: AskJson | null; now?: number } = {}): Promise<StoredRecommendation> {
   if (rec.wordedBy !== "rules" || rec.status !== "open") return rec;
   const ask = opts.ask !== undefined ? opts.ask : defaultAsk();
   if (!ask) return rec;
+  const now = opts.now ?? Date.now();
+  if ((await wordingAllowance(rec.ownerId, now)) < 1) return rec;
+  await countFeatureUse(rec.ownerId, WORDING_FEATURE, true, new Date(now));
+  return wordOne(rec, ask);
+}
+
+/** One model call, already allowed and counted by the caller. */
+async function wordOne(rec: StoredRecommendation, ask: AskJson): Promise<StoredRecommendation> {
+  if (rec.wordedBy !== "rules" || rec.status !== "open") return rec;
   const original: RecoWording = { title: rec.title, concept: rec.concept, why: rec.why, nextAction: { label: rec.nextAction.label } };
   const raw = (await ask(
     "You reword content recommendations for a creator. Keep every number, percentage, date, platform name and format word exactly as given. Do not add any fact, number, platform, benchmark or promise. Plain words, short sentences, no emoji, no hype, no em dashes. Speak to the creator as you.",

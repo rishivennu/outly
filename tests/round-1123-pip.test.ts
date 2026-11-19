@@ -274,7 +274,7 @@ describe("1123 follow-ups remember the post and the range", () => {
   test("the model can name the new tools but nothing else", () => {
     expect(readPlan({ tool: "forecast", period: "next month" })?.tool).toBe("forecast");
     expect(readPlan({ tool: "run_sql" })).toBeNull();
-    expect(PIP_TOOLS.length).toBe(25);
+    expect(PIP_TOOLS.length).toBe(26); // R1244: + intelligence_overview
     for (const t of ANALYTIC_TOOLS) expect(PIP_TOOLS).toContain(t);
   });
 });

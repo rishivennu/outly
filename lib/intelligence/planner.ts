@@ -3,6 +3,7 @@ import type { Recommendation } from "@prisma/client";
 import { db } from "../db";
 import { HttpError } from "../http";
 import { DEDUPE_MS, NOTHING_TO_CHANGE, applyAction, eventTypeOf, ideaTextOf, isPlannerAction, isPlannerError, prefillOf, type Prefill } from "./planner-core";
+import { isExpired } from "./reco-core";
 
 /**
  * R1240: the Growth Planner's actions on a recommendation, each one a single transaction that writes the change and
@@ -19,13 +20,23 @@ export interface ActResult {
 const CODE_STATUS = { ILLEGAL_TRANSITION: 400, BAD_PAYLOAD: 400, FEEDBACK_GIVEN: 409, UNKNOWN_ACTION: 400 } as const;
 // Small by construction: edit fields are capped (title 120, concept 600), feedback notes at 300.
 const json = (v: Record<string, unknown> | null) => (v ? JSON.stringify(v) : null);
+const EXPIRED_MESSAGE = "This recommendation has expired: its numbers are too old to act on. Fresh ones appear on Content Intelligence.";
 
-export async function act(ownerId: string, recId: string, action: string, payload: unknown, actor: { id: string; role: string }): Promise<ActResult> {
+export async function act(ownerId: string, recId: string, action: string, payload: unknown, actor: { id: string; role: string }, now: number = Date.now()): Promise<ActResult> {
   if (!isPlannerAction(action)) throw new HttpError(400, "That isn't something you can do to a recommendation.", "UNKNOWN_ACTION");
   const type = eventTypeOf(action);
-  return db.$transaction(async (tx) => {
+  const out = await db.$transaction(async (tx): Promise<ActResult | "expired"> => {
     const rec = await tx.recommendation.findFirst({ where: { id: recId, ownerId } });
     if (!rec) throw new HttpError(404, "We couldn't find that recommendation.");
+    // R1244: an expired row only takes feedback. One the sweep has not marked yet is marked here, in this
+    // transaction, so the row stays truthful; the 400 is thrown after commit so that write is kept.
+    if (action !== "feedback" && (rec.status === "expired" || isExpired(rec, now))) {
+      if (rec.status !== "expired") {
+        const n = await tx.recommendation.updateMany({ where: { id: rec.id, ownerId, status: rec.status }, data: { status: "expired" } });
+        if (n.count) await tx.recommendationEvent.create({ data: { recommendationId: rec.id, actorId: actor.id, type: "expired", data: json({ by: "act", action, role: actor.role }) } });
+      }
+      return "expired";
+    }
     const history = await tx.recommendationEvent.findMany({ where: { recommendationId: rec.id }, orderBy: [{ at: "desc" }, { id: "desc" }], select: { type: true, actorId: true, at: true, data: true } });
     const last = history[0];
     const withPrefill = (r: Recommendation, deduped: boolean, ideaId?: string): ActResult => ({ recommendation: r, deduped, ...(action === "accept" ? { prefill: prefillOf(r) } : {}), ...(ideaId ? { ideaId } : {}) });
@@ -53,6 +64,8 @@ export async function act(ownerId: string, recId: string, action: string, payloa
     const after = await tx.recommendation.findUniqueOrThrow({ where: { id: rec.id } });
     return withPrefill(after, false, ideaId);
   });
+  if (out === "expired") throw new HttpError(400, EXPIRED_MESSAGE, "EXPIRED");
+  return out;
 }
 
 export interface RecoEventView {
