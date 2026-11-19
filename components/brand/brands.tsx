@@ -1,4 +1,6 @@
+import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
+import { isPlatform, type Platform } from "@/lib/domain";
 import { OutlyMark } from "./Logo";
 
 /**
@@ -29,6 +31,43 @@ export const BRAND_PATH = {
 
 export type Brand = keyof typeof BRAND_PATH | "metricool" | "later" | "outly";
 
+/**
+ * R1210: the platforms' own full-colour logos, from the official files supplied 11-19: public/brand/logos, each trimmed
+ * to its mark and fitted in 256 px, otherwise unaltered (LinkedIn without the registered mark, TikTok without the
+ * wordmark). X, TikTok and Threads are black marks, so each also comes reversed for dark surfaces ("-dark").
+ * scripts/brand-platform-icons.mjs makes the notification icons from the same files.
+ */
+export const LOGO_SIZE: Record<Platform, readonly [number, number]> = {
+  instagram: [256, 256],
+  youtube: [256, 180],
+  x: [256, 231],
+  tiktok: [227, 256],
+  threads: [256, 256],
+  facebook: [256, 256],
+  linkedin: [255, 256],
+};
+const REVERSED: ReadonlySet<Platform> = new Set<Platform>(["x", "tiktok", "threads"]);
+export const logoSrc = (p: Platform, dark = false) => `/brand/logos/${p}${dark && REVERSED.has(p) ? "-dark" : ""}.png`;
+/** The background a logo sits on. "auto" follows the site theme; a chip that is white in both themes is "light". */
+export type LogoSurface = "auto" | "light" | "dark";
+
+/** A platform's logo, sized by the caller's className or style. Decorative: the name is always beside it in text. */
+export function PlatformLogo({ platform, className, surface = "auto", style }: { platform: Platform; className?: string; surface?: LogoSurface; style?: CSSProperties }) {
+  const [w, h] = LOGO_SIZE[platform];
+  const img = (dark: boolean, show?: string) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={logoSrc(platform, dark)} alt="" aria-hidden="true" width={w} height={h} decoding="async" draggable={false} className={cn("select-none object-contain", className, show)} style={style} />
+  );
+  if (!REVERSED.has(platform) || surface !== "auto") return img(surface === "dark");
+  // Both are in the page and CSS shows the one for the theme, so a server render never shows the wrong one.
+  return (
+    <>
+      {img(false, "dark:hidden")}
+      {img(true, "hidden dark:inline-block")}
+    </>
+  );
+}
+
 /** One-colour mark in currentColor. */
 export function BrandGlyph({ brand, className }: { brand: keyof typeof BRAND_PATH; className?: string }) {
   return (
@@ -38,15 +77,22 @@ export function BrandGlyph({ brand, className }: { brand: keyof typeof BRAND_PAT
   );
 }
 
-/** How each brand dresses its own app icon: tile colour, mark colour, mark scale. */
-const TILE: Record<keyof typeof BRAND_PATH, { bg: string; fg: string; s: number }> = {
-  instagram: { bg: "radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)", fg: "#fff", s: 0.58 },
-  youtube: { bg: "#fff", fg: "#FF0000", s: 0.66 },
-  x: { bg: "#000", fg: "#fff", s: 0.5 },
-  tiktok: { bg: "#000", fg: "#fff", s: 0.54 },
-  threads: { bg: "#000", fg: "#fff", s: 0.56 },
-  facebook: { bg: "#fff", fg: "#0866FF", s: 0.7 },
-  linkedin: { bg: "#0A66C2", fg: "#fff", s: 0.52 },
+/**
+ * R1210: a platform's logo on its app-icon tile. `fill`: the logo is a tile already (Instagram, Threads, LinkedIn)
+ * and fills it; the rest sit on a white tile at `s` of its width. Kept in step with scripts/brand-platform-icons.mjs.
+ */
+export const LOGO_TILE: Record<Platform, { fill?: boolean; s: number }> = {
+  instagram: { fill: true, s: 1 },
+  threads: { fill: true, s: 1 },
+  linkedin: { fill: true, s: 1 },
+  youtube: { s: 0.68 },
+  facebook: { s: 0.7 },
+  x: { s: 0.5 },
+  tiktok: { s: 0.56 },
+};
+
+/** How the other brands dress their own app icon: tile colour, mark colour, mark scale. */
+const TILE: Record<"buffer" | "hootsuite", { bg: string; fg: string; s: number }> = {
   buffer: { bg: "#fff", fg: "#231F20", s: 0.56 },
   hootsuite: { bg: "#FF4C46", fg: "#fff", s: 0.6 },
 };
@@ -62,21 +108,25 @@ export function AppIcon({ brand, size = 44, className }: { brand: Brand; size?: 
   if (brand === "metricool" || brand === "later")
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={`/brands/${brand}.png`} alt="" aria-hidden="true" width={size} height={size} decoding="async" className={cn(base, className)} style={box} />;
-  const t = TILE[brand];
+  if (isPlatform(brand)) {
+    const l = LOGO_TILE[brand];
+    return (
+      <span className={cn(base, !l.fill && "bg-white", className)} style={box} aria-hidden="true">
+        {l.fill ? (
+          <PlatformLogo platform={brand} surface="light" className="h-full w-full object-cover" />
+        ) : (
+          <PlatformLogo platform={brand} surface="light" style={{ width: `${l.s * 100}%`, height: `${l.s * 100}%` }} />
+        )}
+      </span>
+    );
+  }
+  const t = TILE[brand as "buffer" | "hootsuite"];
   const g = Math.round(size * t.s);
   return (
     <span className={cn(base, className)} style={{ ...box, background: t.bg }} aria-hidden="true">
-      {brand === "tiktok" ? (
-        <span className="relative" style={{ width: g, height: g }}>
-          <BrandGlyph brand="tiktok" className="absolute inset-0 h-full w-full -translate-x-[4%] -translate-y-[3%] text-[#25F4EE]" />
-          <BrandGlyph brand="tiktok" className="absolute inset-0 h-full w-full translate-x-[4%] translate-y-[3%] text-[#FE2C55]" />
-          <BrandGlyph brand="tiktok" className="absolute inset-0 h-full w-full text-white" />
-        </span>
-      ) : (
-        <span style={{ width: g, height: g, color: t.fg }}>
-          <BrandGlyph brand={brand} className="h-full w-full" />
-        </span>
-      )}
+      <span style={{ width: g, height: g, color: t.fg }}>
+        <BrandGlyph brand={brand as "buffer" | "hootsuite"} className="h-full w-full" />
+      </span>
     </span>
   );
 }

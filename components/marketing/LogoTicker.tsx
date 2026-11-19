@@ -3,8 +3,8 @@ import { liveNow } from "@/lib/social/registry";
 import { PlatformGlyph } from "@/components/shared/PlatformIcon";
 
 /**
- * "Publishes to" logo ticker under the hero (10-16): every platform's mark and name in one quiet grey,
- * drifting left. Live places come first; the rest carry a small "soon" tag so nothing is overclaimed.
+ * "Publishes to" logo ticker under the hero (10-16): every platform's own logo (R1210) and its name in one quiet
+ * grey, drifting left. Live places come first; the rest carry a small "soon" tag so nothing is overclaimed.
  * Screen readers get one plain list; the moving copies are aria-hidden. Hover pauses it, and with
  * reduced motion it stops and wraps as a centred row (globals.css .lt-*).
  */

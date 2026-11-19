@@ -395,7 +395,7 @@ function OutCard({ k, text, p, rm, pending }: { k: Key; text: string; p: number;
     <article className={cn("try-card try-out", `try-out-${k}`)} data-tone={o.tone} data-tc="" aria-label={`${PLATFORM_META[k].name} ${KIND[k]}`}>
       <div className="flex items-start justify-between gap-3">
         <span className="try-pill">
-          <PlatformGlyph platform={k} className="h-3.5 w-3.5" />
+          <PlatformGlyph platform={k} surface="light" className="h-3.5 w-3.5" />
           {PLATFORM_META[k].name}
         </span>
         <Icon3D name={o.icon} size={64} className="try-obj-sm pop-in -mr-1 -mt-2 h-16 w-16 flex-none" />

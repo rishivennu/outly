@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { BrandGlyph } from "@/components/brand/brands";
+import { PlatformGlyph } from "@/components/shared/PlatformIcon";
 import { HUBS } from "./land";
 import { TAU, TILT, drawLand, landPoints, paintBase as paintGlobe, rot, toVec } from "./core";
 import { ORBIT, type Orbiter } from "./orbit";
@@ -381,7 +381,7 @@ export default function CanvasGlobe({ still, onReady, onSlow }: { still: boolean
           className="wl-orb-pos"
         >
           <span className="wl-orb">
-            <BrandGlyph brand={o.brand} className="h-[18px] w-[18px]" />
+            <PlatformGlyph platform={o.brand} surface="dark" className="h-[18px] w-[18px]" />
           </span>
         </span>
       ))}

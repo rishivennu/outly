@@ -6,7 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowDown, ArrowLeft, BarChart3, BellRing, Check, CheckCheck, Clock, Headset, Loader2, Maximize2, Minimize2, PanelRight, Plug, RotateCcw, Send, StickyNote, UserRound, Volume2, VolumeX, X } from "lucide-react";
 import { useToast } from "@/components/shared/Toast";
 import { Pill, STATUS_LABEL, ago, fmtDate, type Tone } from "@/components/admin/ui";
-import { BRAND_PATH, BrandGlyph } from "@/components/brand/brands";
+import { PlatformGlyph } from "@/components/shared/PlatformIcon";
+import { isPlatform } from "@/lib/domain";
 import { chime, setSound, soundOn, SOUND_EVENT } from "@/lib/client/live-sound";
 import { adminPushFlag, disableAdminPush, enableAdminPush, syncAdminPush } from "@/lib/client/admin-push";
 import { permission, pushSupport } from "@/lib/client/push";
@@ -407,7 +408,6 @@ function Line({ m, r, customer, onRetry }: { m: Msg; r: Receipt | null; customer
 
 type Info = NonNullable<Detail["customer"]>;
 
-const isBrand = (p: string): p is keyof typeof BRAND_PATH => p in BRAND_PATH;
 /** Each platform spelled the way it spells itself: a capitalised column value reads as "Youtube". */
 const PLAT_LABEL: Record<string, string> = { instagram: "Instagram", youtube: "YouTube", tiktok: "TikTok", x: "X", threads: "Threads", facebook: "Facebook", linkedin: "LinkedIn", buffer: "Buffer", hootsuite: "Hootsuite" };
 
@@ -504,7 +504,7 @@ function Details({ d, info, onOpen, onNote }: { d: Detail; info: Info | null; on
                 return (
                   <li key={`${a.platform}-${i}`} className="flex items-center gap-2.5">
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-secondary text-foreground/70">
-                      {isBrand(a.platform) ? <BrandGlyph brand={a.platform} className="h-4 w-4" /> : <Plug className="h-4 w-4" aria-hidden />}
+                      {isPlatform(a.platform) ? <PlatformGlyph platform={a.platform} className="h-4 w-4" /> : <Plug className="h-4 w-4" aria-hidden />}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[12.5px] font-medium">{PLAT_LABEL[a.platform] ?? a.platform}</span>

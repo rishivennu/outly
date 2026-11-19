@@ -1,7 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { BrandGlyph } from "@/components/brand/brands";
+import { PlatformGlyph } from "@/components/shared/PlatformIcon";
 import { LAND_H, LAND_W, isLand } from "./land";
 import { ORBIT } from "./orbit";
 
@@ -114,7 +114,7 @@ function CssGlobe({ moving, breathe, onReady }: { moving: boolean; breathe: bool
           <span key={o.brand} className="wl-corb-x" style={{ animationDelay: `${-i * 8}s` }}>
             <span className="wl-corb-y" style={{ animationDelay: `${-i * 8 - 6}s` }}>
               <span className="wl-orb wl-orb-sm">
-                <BrandGlyph brand={o.brand} className="h-[15px] w-[15px]" />
+                <PlatformGlyph platform={o.brand} surface="dark" className="h-[15px] w-[15px]" />
               </span>
             </span>
           </span>

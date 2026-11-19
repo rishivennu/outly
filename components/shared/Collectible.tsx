@@ -106,8 +106,9 @@ export function Collectible({ platform, size = 64, state = "idle", float = false
         {/* front */}
         <span className="face face-front overflow-hidden" style={{ width: `${s.w}em`, height: `${s.h}em`, background: s.body, transform: `translateZ(${half}em)` }}>
           <span className="absolute inset-0 [background:linear-gradient(125deg,rgba(255,255,255,.42)_0%,rgba(255,255,255,.08)_28%,transparent_45%,transparent_75%,rgba(255,255,255,.12)_100%)]" />
-          <span className="absolute left-1/2 top-[46%] grid h-[5em] w-[5em] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[1.4em]" style={{ background: s.plate, color: s.ink, boxShadow: "inset 0 .12em .3em rgba(255,255,255,.25), inset 0 -.2em .4em rgba(0,0,0,.25)" }}>
-            <PlatformGlyph platform={platform} className="h-[3em] w-[3em] drop-shadow-[0_.12em_.12em_rgba(0,0,0,.35)]" />
+          <span className="absolute left-1/2 top-[46%] grid h-[5em] w-[5em] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[1.4em]" style={{ background: "#fff", boxShadow: "inset 0 .12em .3em rgba(255,255,255,.25), inset 0 -.2em .4em rgba(0,0,0,.18)" }}>
+            {/* R1210: the platform's own logo, on a white plate so it reads on every box colour. */}
+            <PlatformGlyph platform={platform} surface="light" className="h-[3em] w-[3em] drop-shadow-[0_.08em_.1em_rgba(0,0,0,.18)]" />
           </span>
           {/* bottom label strip */}
           <span className="absolute inset-x-[.7em] bottom-[.6em] flex items-center justify-between rounded-[.35em] bg-black/30 px-[.5em] py-[.22em] font-mono text-[.62em] font-bold tracking-[.18em] text-white/90">
