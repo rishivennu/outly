@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, CalendarClock, Compass, CreditCard, Eye, Gift, HardDrive, Lock, Mail, Palette, ShieldCheck, Sparkles, Trophy, UserRound, Users } from "lucide-react";
+import { Bell, CalendarClock, Compass, CreditCard, Eye, Gift, HardDrive, Lock, Mail, Palette, ShieldCheck, Sparkles, Target, Trophy, UserRound, Users } from "lucide-react";
 import { startTour } from "@/components/onboarding/Tour";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
@@ -23,6 +23,7 @@ import { YourDataCard } from "./YourDataCard";
 import { StorageManager } from "./StorageManager";
 import Link from "next/link";
 import { AlertsCard } from "./AlertsCard";
+import { BrandProfileCard } from "./BrandProfileCard";
 import { ALERT_DEFAULTS, type AlertPrefs } from "@/lib/alerts-core";
 import { SettingsShell, Disclosure, useUnsaved, type SettingsCategory } from "./SettingsShell";
 import { RememberedDevicesCard, SessionsCard } from "./SecurityCards";
@@ -268,6 +269,13 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, per
           </Disclosure>
         </>
       ),
+    },
+    {
+      id: "brand",
+      label: "Brand",
+      icon: Target,
+      blurb: "What you are growing, who it is for, and what Outlly should never suggest.",
+      content: <BrandProfileCard />,
     },
     {
       id: "notifications",
