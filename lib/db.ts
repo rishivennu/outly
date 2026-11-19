@@ -24,5 +24,8 @@ function poolUrl(raw = process.env.DATABASE_URL ?? "") {
   }
 }
 const url = poolUrl();
-export const db = g.__prisma ?? new PrismaClient({ log: ["warn", "error"], ...(url ? { datasources: { db: { url } } } : {}) });
+// R1225: PRISMA_QUERY_LOG=1 prints every SQL statement (with its duration) to the server log, so a route's query
+// count can be measured instead of guessed. Off unless asked for: never in a normal deploy.
+const log: ("query" | "warn" | "error")[] = process.env.PRISMA_QUERY_LOG ? ["query", "warn", "error"] : ["warn", "error"];
+export const db = g.__prisma ?? new PrismaClient({ log, ...(url ? { datasources: { db: { url } } } : {}) });
 if (process.env.NODE_ENV !== "production") g.__prisma = db;

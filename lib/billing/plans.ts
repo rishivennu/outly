@@ -56,6 +56,12 @@ const FREE_MIGRATION_KEY = "migrate:free-limits-1026";
 
 const MIGRATION_KEYS = [FREE_MIGRATION_KEY, PRO_MIGRATION_KEY, PRO_RENAME_KEY, STORAGE_MIGRATION_KEY];
 let ensuring: Promise<void> | null = null;
+/**
+ * R1225: once an instance has seen the plans seeded and every migration marked, that cannot un-happen on its own, so
+ * the two-query check is skipped for SETTLED_MS. Production only: dev and the tests delete markers to re-run migrations.
+ */
+let settledAt = 0;
+const SETTLED_MS = 10 * 60_000;
 
 /**
  * Seeds plans on an empty database and runs the one-time migrations. 1142: it runs on every free account's
@@ -63,12 +69,16 @@ let ensuring: Promise<void> | null = null;
  * migration markers read together) and calls made at the same moment share it.
  */
 export function ensurePlans(): Promise<void> {
+  if (process.env.NODE_ENV === "production" && Date.now() - settledAt < SETTLED_MS) return Promise.resolve();
   return (ensuring ??= ensurePlansNow().finally(() => (ensuring = null)));
 }
 
 async function ensurePlansNow() {
   const [count, done] = await Promise.all([db.plan.count(), db.setting.count({ where: { key: { in: MIGRATION_KEYS } } })]);
-  if (count > 0 && done === MIGRATION_KEYS.length) return;
+  if (count > 0 && done === MIGRATION_KEYS.length) {
+    settledAt = Date.now();
+    return;
+  }
   if (count > 0) {
     await migrateFreeLimits();
     await migrateProManager();

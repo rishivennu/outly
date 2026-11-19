@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { randomUUID } from "node:crypto";
 import { db } from "../db";
 import { HttpError } from "../http";
@@ -56,8 +57,12 @@ const UNLIMITED: Omit<Entitlements, "planSlug" | "planName"> = { postLimit: 0, p
 /**
  * What this account may do (1052): the best plan live right now across paid and gift subscriptions, admin
  * grants and referral rewards (lib/billing/access.ts), else the Free plan, else no limits.
+ * R1225: computed once per request (React cache, like getCurrentUser). A studio page and the API calls it makes
+ * asked this 2-3 times each (Settings: three times, 7 queries a time, measured); within one request the answer
+ * cannot change, so the later asks share the first. Outside a request (sweeps, tests) it simply runs.
  */
-export async function entitlements(userId: string): Promise<Entitlements> {
+export const entitlements = cache(entitlementsNow);
+async function entitlementsNow(userId: string): Promise<Entitlements> {
   const [{ best }, extras] = await Promise.all([accessFor(userId), activeExtras(userId)]);
   if (!best) return { planSlug: "free", planName: "Free", ...UNLIMITED };
   const plan = best.plan;
