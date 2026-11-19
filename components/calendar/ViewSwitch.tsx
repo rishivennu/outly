@@ -18,7 +18,7 @@ export function ViewSwitch({ value, onChange, className }: { value: CalView; onC
     refs.current[to]?.focus();
   };
   return (
-    <div role="radiogroup" aria-label="Calendar view" onKeyDown={onKey} className={cn("inline-flex w-full rounded-full bg-secondary/70 p-1 hairline sm:w-auto", className)}>
+    <div role="radiogroup" aria-label="Calendar view" onKeyDown={onKey} className={cn("gseg inline-flex w-full rounded-full bg-secondary/70 p-1 hairline sm:w-auto", className)}>
       {VIEWS.map((v, i) => {
         const on = v === value;
         return (
@@ -37,7 +37,7 @@ export function ViewSwitch({ value, onChange, className }: { value: CalView; onC
               on ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground",
             )}
           >
-            {on && <motion.span layoutId="cal-view-pill" className="absolute inset-0 rounded-full bg-background shadow-sm hairline" transition={{ duration: 0.3, ease: ease("swap") }} aria-hidden="true" />}
+            {on && <motion.span layoutId="cal-view-pill" className="gseg-pane absolute inset-0 rounded-full bg-background shadow-sm hairline" transition={{ duration: 0.3, ease: ease("swap") }} aria-hidden="true" />}
             <span className="relative">{VIEW_LABEL[v]}</span>
           </button>
         );

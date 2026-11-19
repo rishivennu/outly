@@ -57,7 +57,7 @@ export function CaptionLanguage({ hint, onHint, detected, disabled, canTranslate
       )}
       {hasEnglish && (
         <div className="min-w-0 sm:col-span-2">
-          <div role="radiogroup" aria-label="Caption track" className="flex w-full max-w-sm rounded-2xl bg-secondary/60 p-1 hairline">
+          <div role="radiogroup" aria-label="Caption track" className="gseg flex w-full max-w-sm rounded-2xl bg-secondary/60 p-1 hairline">
             {(["original", "english"] as const).map((v) => (
               <button key={v} type="button" role="radio" aria-checked={view === v} disabled={disabled} onClick={() => onView(v)} className={cn(seg, view === v ? "bg-background text-foreground shadow-sm ring-1 ring-foreground/15" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
                 {v === "original" ? `Original${detected ? ` (${languageName(detected)})` : ""}` : "English"}

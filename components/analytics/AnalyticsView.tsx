@@ -93,17 +93,17 @@ function RangePicker({ value, onPick, maxDays, custom, onCustom }: { value: numb
   // instead of wrapping into a second line that pushes the numbers down.
   const opt = "relative h-11 shrink-0 whitespace-nowrap rounded-full px-3 text-sm font-medium tabular-nums transition-[color,transform] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] motion-reduce:transition-none sm:px-4 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring";
   return (
-    <div ref={rail} role="radiogroup" aria-label="Time range" className="edge-fade scrollbar-none flex min-w-0 max-w-full gap-1 overflow-x-auto rounded-full bg-secondary/60 p-1 hairline">
+    <div ref={rail} role="radiogroup" aria-label="Time range" className="gseg edge-fade scrollbar-none flex min-w-0 max-w-full gap-1 overflow-x-auto rounded-full bg-secondary/60 p-1 hairline">
       {shown.map((r) => (
         <button key={r.d} type="button" role="radio" aria-checked={!custom && value === r.d} aria-label={r.label} onClick={() => onPick(r.d)} className={cn(opt, !custom && value === r.d ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
-          {!custom && value === r.d && <motion.span layoutId="range" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
+          {!custom && value === r.d && <motion.span layoutId="range" className="gseg-pane absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
           <span className="relative sm:hidden" aria-hidden="true">{r.short}</span>
           <span className="relative hidden sm:inline" aria-hidden="true">{r.label}</span>
         </button>
       ))}
       {/* 1140: your own two dates, inside the same plan window as the presets. */}
       <button type="button" role="radio" aria-checked={custom} onClick={onCustom} className={cn(opt, custom ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
-        {custom && <motion.span layoutId="range" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
+        {custom && <motion.span layoutId="range" className="gseg-pane absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
         <span className="relative">Custom</span>
       </button>
       {maxDays < 365 && (
@@ -364,10 +364,10 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
             <h2 id="trend" className="text-lg font-semibold">{metric === "views" ? "Views over time" : metric === "engagement" ? "Engagement over time" : "Followers over time"}</h2>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               {/* 1140: the same window, a different measure. Nothing is refetched, so switching is instant. */}
-              <div role="radiogroup" aria-label="Chart metric" className="flex gap-1 rounded-full bg-secondary/60 p-1 hairline">
+              <div role="radiogroup" aria-label="Chart metric" className="gseg flex gap-1 rounded-full bg-secondary/60 p-1 hairline">
                 {CHART_METRICS.map((m) => (
                   <button key={m.k} type="button" role="radio" aria-checked={metric === m.k} onClick={() => setMetric(m.k)} className={cn("relative h-11 rounded-full px-3 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", metric === m.k ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                    {metric === m.k && <motion.span layoutId="chart-metric" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
+                    {metric === m.k && <motion.span layoutId="chart-metric" className="gseg-pane absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
                     <span className="relative">{m.label}</span>
                   </button>
                 ))}

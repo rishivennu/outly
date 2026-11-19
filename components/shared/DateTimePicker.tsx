@@ -135,7 +135,7 @@ export function DateTimePicker({ value, onChange, tz, peakHours = [] }: Props) {
         {quick.map((q) => {
           const on = vKey === q.key && v.h === q.h && v.min === q.m;
           return (
-            <button key={q.label} type="button" onClick={() => set(q.key, q.h, q.m)} aria-pressed={on} className={cn("h-9 rounded-full px-3.5 text-[13px] font-medium transition", on ? "lime-bg font-semibold shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_6px_16px_-8px_hsl(var(--lime)/0.75)]" : "bg-secondary text-foreground/85 hover:bg-secondary/70 hairline")}>
+            <button key={q.label} type="button" onClick={() => set(q.key, q.h, q.m)} aria-pressed={on} className={cn("gchip h-9 rounded-full px-3.5 text-[13px] font-medium transition", on ? "lime-bg font-semibold shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_6px_16px_-8px_hsl(var(--lime)/0.75)]" : "bg-secondary text-foreground/85 hover:bg-secondary/70 hairline")}>
               {q.label}
             </button>
           );
@@ -186,7 +186,7 @@ export function DateTimePicker({ value, onChange, tz, peakHours = [] }: Props) {
             const past = isPast(vKey, s.h, s.m);
             const peak = peakHours.includes(s.h);
             return (
-              <button key={`${s.h}:${s.m}`} type="button" disabled={past} aria-pressed={on} onClick={() => set(vKey, s.h, s.m)} className={cn("relative h-11 shrink-0 snap-start rounded-full px-4 text-[13px] font-medium tabular transition", on ? "lime-bg font-semibold shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_6px_16px_-8px_hsl(var(--lime)/0.75)]" : "bg-secondary/70 hover:bg-secondary hairline", past && "opacity-30")}>
+              <button key={`${s.h}:${s.m}`} type="button" disabled={past} aria-pressed={on} onClick={() => set(vKey, s.h, s.m)} className={cn("gchip relative h-11 shrink-0 snap-start rounded-full px-4 text-[13px] font-medium tabular transition", on ? "lime-bg font-semibold shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45),0_6px_16px_-8px_hsl(var(--lime)/0.75)]" : "bg-secondary/70 hover:bg-secondary hairline", past && "opacity-30")}>
                 {peak && !on && <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-cyan" aria-hidden="true" />}
                 {label(s.h, s.m)}
                 {peak && <span className="sr-only"> (best time to post)</span>}

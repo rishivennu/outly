@@ -69,8 +69,9 @@ describe("1100 phone drawer", () => {
     expect(css).not.toContain(".mtab-more");
   });
   test("top bar: bell and menu button, both 44px (1105: the theme switch lives in the drawer)", () => {
-    expect(bar).toContain('<MobileDrawer className="mtop-btn" />');
-    expect(bar).toContain('<NoticesBell placement="below" className="mtop-btn" />');
+    // R1214: both are the shared glass circles too (gbtn-icon), still .mtop-btn for size and icon
+    expect(bar).toContain('<MobileDrawer className="mtop-btn gbtn-icon ripple-host" />');
+    expect(bar).toContain('<NoticesBell placement="below" className="mtop-btn gbtn-icon ripple-host" />');
     expect(bar).not.toContain("<ThemeCycleButton");
     expect(drawer).toContain('aria-label="Open menu"');
     expect(drawer).toContain('aria-label="Close menu"');

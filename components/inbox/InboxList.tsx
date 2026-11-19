@@ -101,7 +101,7 @@ export function Kbd({ children }: { children: ReactNode }) {
 /** Comments / Messages. Real tabs: arrow keys move between them, the panel below is labelled by the selected one. */
 export function InboxTabs({ tab, onPick, counts }: { tab: InboxTab; onPick: (t: InboxTab) => void; counts: Record<InboxTab, number> }) {
   return (
-    <div role="tablist" aria-label="Inbox" className="grid grid-cols-2 rounded-xl bg-secondary p-[3px]">
+    <div role="tablist" aria-label="Inbox" className="gseg grid grid-cols-2 rounded-xl bg-secondary p-[3px]">
       {(["comments", "messages"] as const).map((t) => (
         <button
           key={t}
@@ -177,7 +177,7 @@ export function ScopeBar({
   const current = views ? view : needsOnly ? "needs" : "all";
   const pick = (id: string) => (views ? onView?.(id) : onNeedsOnly?.(id === "needs"));
   const segmented = (
-    <div role="group" aria-label="Which to show" className={cn("rounded-full bg-secondary p-0.5", views ? "grid min-w-0 grid-flow-col auto-cols-fr" : "flex shrink-0")}>
+    <div role="group" aria-label="Which to show" className={cn("gseg rounded-full bg-secondary p-0.5", views ? "grid min-w-0 grid-flow-col auto-cols-fr" : "flex shrink-0")}>
       {list.map((v) => (
         <button
           key={v.id}
@@ -239,7 +239,7 @@ export function ScopeBar({
 export function PlatformChips({ platforms, platform, onPlatform }: { platforms: readonly Platform[]; platform: Platform | "all"; onPlatform: (p: Platform | "all") => void }) {
   const chip = (on: boolean) =>
     cn(
-      "relative inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.96]",
+      "gchip relative inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.96]",
       on ? "bg-foreground text-background" : "bg-card text-foreground hairline [@media(hover:hover)]:hover:bg-secondary",
     );
   return (

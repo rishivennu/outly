@@ -122,7 +122,7 @@ export function StoryComposer(p: Props) {
       </div>
 
       {/* R1209 A1: one question first, who writes it. Only the way picked shows; both boxes are kept. */}
-      <div role="tablist" aria-label="Who writes your caption" className="mt-3 grid grid-cols-2 gap-1 rounded-full bg-secondary/70 p-1 hairline">
+      <div role="tablist" aria-label="Who writes your caption" className="gseg mt-3 grid grid-cols-2 gap-1 rounded-full bg-secondary/70 p-1 hairline">
         {CAPTION_MODES.map((m, i) => {
           const on = p.mode === m.id;
           return (

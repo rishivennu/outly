@@ -66,11 +66,11 @@ export function ProfileSwitcher({ profiles, activeId, children }: { profiles: Pr
 
         {platforms.length > 1 && (
           <div role="group" aria-label="Filter by platform" className="mt-4 flex flex-wrap gap-2">
-            <button type="button" aria-pressed={only === null} onClick={() => setOnly(null)} className={cn("h-11 rounded-full px-4 text-sm font-medium hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", only === null ? "lime-bg text-[hsl(var(--lime-foreground))]" : "hover:bg-secondary/70")}>
+            <button type="button" aria-pressed={only === null} onClick={() => setOnly(null)} className={cn("gchip h-11 rounded-full px-4 text-sm font-medium hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", only === null ? "lime-bg text-[hsl(var(--lime-foreground))]" : "hover:bg-secondary/70")}>
               Every platform
             </button>
             {platforms.map((p) => (
-              <button key={p} type="button" aria-pressed={only === p} onClick={() => setOnly(only === p ? null : p)} className={cn("flex h-11 items-center gap-2 rounded-full pl-2 pr-4 text-sm font-medium hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", only === p ? "lime-bg text-[hsl(var(--lime-foreground))]" : "hover:bg-secondary/70")}>
+              <button key={p} type="button" aria-pressed={only === p} onClick={() => setOnly(only === p ? null : p)} className={cn("gchip flex h-11 items-center gap-2 rounded-full pl-2 pr-4 text-sm font-medium hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", only === p ? "lime-bg text-[hsl(var(--lime-foreground))]" : "hover:bg-secondary/70")}>
                 <PlatformOrb platform={p} size={26} /> {PLATFORM_META[p].name}
               </button>
             ))}

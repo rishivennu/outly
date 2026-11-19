@@ -249,7 +249,7 @@ export function LaunchPanel(p: Props) {
             </div>
           </section>
 
-          <div role="radiogroup" aria-label="When should this go live?" className="grid grid-cols-2 gap-1.5 rounded-full bg-secondary/60 p-1.5 hairline">
+          <div role="radiogroup" aria-label="When should this go live?" className="gseg grid grid-cols-2 gap-1.5 rounded-full bg-secondary/60 p-1.5 hairline">
             {(["now", "schedule"] as const).map((m) => (
               <button
                 key={m}

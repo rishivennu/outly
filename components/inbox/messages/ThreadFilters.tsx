@@ -17,7 +17,7 @@ export function ThreadFilters({ filter, onChange, platforms, archived }: { filte
   return (
     <div className="mt-2.5 space-y-2">
       <ScrollX label="Which conversations to show" focusable={false} className="-mx-1 px-1">
-        <div role="group" aria-label="Which conversations to show" className="inline-flex rounded-full bg-secondary p-0.5">
+        <div role="group" aria-label="Which conversations to show" className="gseg inline-flex rounded-full bg-secondary p-0.5">
           {DM_VIEWS.map((v) => {
             const on = filter.view === v.id;
             return (
@@ -45,7 +45,7 @@ export function ThreadFilters({ filter, onChange, platforms, archived }: { filte
                 type="button"
                 aria-pressed={on}
                 onClick={() => !on && onChange({ ...filter, platform: p })}
-                className={cn(seg, "gap-1.5 hairline", on ? "bg-foreground text-background" : "bg-card text-foreground [@media(hover:hover)]:hover:bg-secondary")}
+                className={cn(seg, "gchip gap-1.5 hairline", on ? "bg-foreground text-background" : "bg-card text-foreground [@media(hover:hover)]:hover:bg-secondary")}
               >
                 {p !== "all" && <PlatformOrb platform={p} size={16} />}
                 {p === "all" ? "All platforms" : PLATFORM_META[p].name}

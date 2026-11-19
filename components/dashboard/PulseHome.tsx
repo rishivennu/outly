@@ -209,7 +209,7 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
         <div className="flex items-center gap-2">
           {canSwitch && <DashboardSwitch current="pulse" className="min-w-0 flex-1 sm:flex-none" />}
           {/* The replay is a flourish; on a phone the row keeps its room for the two things you came to do. */}
-          <button type="button" onClick={replay} {...replayIc.handlers} className="pulse-icon-btn max-sm:!hidden" aria-label="Replay the dashboard animation" title="Replay">
+          <button type="button" onClick={replay} {...replayIc.handlers} className="gbtn-icon ripple-host pulse-icon-btn max-sm:!hidden" aria-label="Replay the dashboard animation" title="Replay">
             <AnimIcon name="replay" size={18} iconRef={replayIc.ref} />
           </button>
           <Link href="/create" {...newIc.handlers} className="lime-glow inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-2xl bg-lime px-4 text-[15px] font-semibold text-[hsl(var(--lime-foreground))] transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] [@media(hover:hover)]:hover:-translate-y-px">
@@ -229,8 +229,8 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
           <span ref={tabsS.bar} aria-hidden="true" className="pulse-underline" />
         </div>
         <div className="flex items-center justify-between gap-3 sm:justify-start sm:pb-3">
-          <div ref={rangeS.box} role="radiogroup" aria-label="Date range" onKeyDown={onRangeKey} className="pulse-seg relative">
-            <span ref={rangeS.bar} aria-hidden="true" className="pulse-seg-pill" />
+          <div ref={rangeS.box} role="radiogroup" aria-label="Date range" onKeyDown={onRangeKey} className="pulse-seg gseg relative">
+            <span ref={rangeS.bar} aria-hidden="true" className="pulse-seg-pill gseg-pane" />
             {RANGES.map((r) => (
               <button key={r} type="button" role="radio" aria-checked={r === range} tabIndex={r === range ? 0 : -1} onClick={() => void pickRange(r)} className={cn("relative z-[1] h-11 min-w-[48px] rounded-[12px] px-2.5 text-[14px] tabular-nums font-semibold outline-none transition-[color,transform] duration-150 active:scale-[0.96] motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring sm:min-w-[52px] sm:px-3", r === range ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
                 {r}D

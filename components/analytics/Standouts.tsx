@@ -34,14 +34,14 @@ export function Standouts({ posts, avgViews }: { posts: StandoutPost[]; avgViews
         <h2 id="standouts" className="text-lg font-semibold">Your standout content</h2>
         <div className="flex flex-wrap items-center gap-2">
           {platforms.length > 1 && (
-            <div role="radiogroup" aria-label="Filter by platform" className="flex gap-1 rounded-full bg-secondary/60 p-1">
+            <div role="radiogroup" aria-label="Filter by platform" className="gseg flex gap-1 rounded-full bg-secondary/60 p-1">
               <button type="button" role="radio" aria-checked={only === null} onClick={() => setOnly(null)} className={cn(pill, only === null ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                {only === null && <motion.span layoutId="so-plat" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
+                {only === null && <motion.span layoutId="so-plat" className="gseg-pane absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
                 <span className="relative">All</span>
               </button>
               {platforms.map((p) => (
                 <button key={p} type="button" role="radio" aria-checked={only === p} onClick={() => setOnly(p)} className={cn(pill, "px-2.5", only === p ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                  {only === p && <motion.span layoutId="so-plat" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
+                  {only === p && <motion.span layoutId="so-plat" className="gseg-pane absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
                   <span className="relative flex items-center gap-1.5">
                     <PlatformOrb platform={p} size={16} /> {PLATFORM_META[p].name}
                   </span>
@@ -50,10 +50,10 @@ export function Standouts({ posts, avgViews }: { posts: StandoutPost[]; avgViews
             </div>
           )}
           {ranks.length > 1 && (
-            <div role="radiogroup" aria-label="Rank by" className="flex gap-1 rounded-full bg-secondary/60 p-1">
+            <div role="radiogroup" aria-label="Rank by" className="gseg flex gap-1 rounded-full bg-secondary/60 p-1">
               {ranks.map((r) => (
                 <button key={r.k} type="button" role="radio" aria-checked={by === r.k} onClick={() => setBy(r.k)} className={cn(pill, by === r.k ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                  {by === r.k && <motion.span layoutId="so-rank" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
+                  {by === r.k && <motion.span layoutId="so-rank" className="gseg-pane absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
                   <span className="relative">{r.label}</span>
                 </button>
               ))}

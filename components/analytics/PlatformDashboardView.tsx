@@ -250,10 +250,10 @@ export function PlatformDashboardView({ platform, initial, connected, renderedAt
 
       {live && (
         <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-          <div role="radiogroup" aria-label="Reporting period" className="flex gap-1 rounded-full bg-secondary/60 p-1 hairline">
+          <div role="radiogroup" aria-label="Reporting period" className="gseg flex gap-1 rounded-full bg-secondary/60 p-1 hairline">
             {options.map((d) => (
               <button key={d} type="button" role="radio" aria-checked={d === days} disabled={busy} onClick={() => d !== days && void loadProfile(acct, { days: d })} className={cn("relative h-11 rounded-full px-4 text-sm font-medium tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring", d === days ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                {d === days && <motion.span layoutId="live-range" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
+                {d === days && <motion.span layoutId="live-range" className="gseg-pane absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
                 <span className="relative">{d} days</span>
               </button>
             ))}
@@ -404,7 +404,7 @@ function Kpi({ h, i, platform, days }: { h: Headline; i: number; platform: Platf
         <span className="leading-snug">{h.label}</span>
         {help && (
           <span className="relative -mr-2 -mt-2 shrink-0">
-            <button type="button" aria-label={`About ${h.label}`} aria-describedby={tipId} title={help} className="peer grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            <button type="button" aria-label={`About ${h.label}`} aria-describedby={tipId} title={help} className="gbtn-icon ripple-host peer grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
               <Info className="h-4 w-4" aria-hidden="true" />
             </button>
             <span id={tipId} role="tooltip" className="pointer-events-none absolute right-0 top-10 z-20 hidden w-56 rounded-xl bg-popover px-3 py-2 text-left text-xs font-normal leading-snug text-popover-foreground shadow-lg hairline peer-hover:block peer-focus-visible:block">
@@ -471,10 +471,10 @@ function Trend({ data, color, className }: { data: PlatformDashboard; color: str
           )}
         </div>
         {data.series.length > 1 && (
-          <div role="radiogroup" aria-label="Metric" className="flex gap-1 rounded-full bg-secondary/60 p-1">
+          <div role="radiogroup" aria-label="Metric" className="gseg flex gap-1 rounded-full bg-secondary/60 p-1">
             {data.series.map((x) => (
               <button key={x.key} role="radio" aria-checked={x.key === s?.key} onClick={() => setK(x.key)} className={cn("relative h-11 rounded-full px-3.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring", x.key === s?.key ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                {x.key === s?.key && <motion.span layoutId="series-pill" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
+                {x.key === s?.key && <motion.span layoutId="series-pill" className="gseg-pane absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
                 <span className="relative">{x.label}</span>
               </button>
             ))}
@@ -673,10 +673,10 @@ function Posts({ posts, platform, className }: { posts: LivePost[]; platform: Pl
           <h2 id="posts" className={H2}>Recent {unit}</h2>
           <p className="mt-1 text-sm text-muted-foreground">The newest {posts.length} from {name}. Open one on {name} for its own analytics.</p>
         </div>
-        <div role="radiogroup" aria-label="Sort posts" className="-mx-1 flex max-w-full gap-1 overflow-x-auto rounded-full bg-secondary/60 p-1 scrollbar-none">
+        <div role="radiogroup" aria-label="Sort posts" className="gseg -mx-1 flex max-w-full gap-1 overflow-x-auto rounded-full bg-secondary/60 p-1 scrollbar-none">
           {SORTS.map((s) => (
             <button key={s.k} role="radio" aria-checked={sort === s.k} onClick={() => setSort(s.k)} className={cn("relative h-11 shrink-0 whitespace-nowrap rounded-full px-3.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring", sort === s.k ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-              {sort === s.k && <motion.span layoutId="sort-pill" className="absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
+              {sort === s.k && <motion.span layoutId="sort-pill" className="gseg-pane absolute inset-0 rounded-full bg-background shadow-sm" transition={T.glide} />}
               <span className="relative">{s.label}</span>
             </button>
           ))}

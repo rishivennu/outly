@@ -622,7 +622,7 @@ export function FormatComposer({ accounts, choices, initialPost, initialFormat, 
             </div>
           )}
 
-          <div role="radiogroup" aria-label="When should this go live?" onKeyDown={radioKeys(["now", "schedule"] as const, mode, setMode)} className="mt-5 grid grid-cols-2 gap-2 rounded-full bg-secondary/60 p-1.5 hairline">
+          <div role="radiogroup" aria-label="When should this go live?" onKeyDown={radioKeys(["now", "schedule"] as const, mode, setMode)} className="gseg mt-5 grid grid-cols-2 gap-2 rounded-full bg-secondary/60 p-1.5 hairline">
             {(["now", "schedule"] as const).map((m) => (
               <button key={m} type="button" role="radio" aria-checked={mode === m} tabIndex={mode === m ? 0 : -1} onClick={() => setMode(m)} className={cn("relative h-12 rounded-full text-sm font-semibold transition", mode === m ? "text-background" : "text-muted-foreground hover:text-foreground")}>
                 {mode === m && <motion.span layoutId="fmt-launch-mode" className="absolute inset-0 rounded-full bg-foreground" transition={T.glide} />}
@@ -718,7 +718,7 @@ function SlideState({ s, onRetry }: { s: Slide; onRetry: () => void }) {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/75 p-3 text-center text-xs text-white" role="alert">
       <span>{s.error ?? "Didn't upload."}</span>
-      {s.file && <button type="button" onClick={onRetry} className="min-h-[44px] rounded-full bg-white px-4 font-semibold text-black">Try again</button>}
+      {s.file && <button type="button" onClick={onRetry} className="gbtn gbtn-lime ripple-host min-h-[44px] rounded-full bg-white px-4 font-semibold text-black">Try again</button>}
     </div>
   );
 }
