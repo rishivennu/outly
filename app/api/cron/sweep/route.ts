@@ -37,6 +37,8 @@ async function sweep(req: NextRequest) {
   const assist = await import("@/lib/retention/sweep-notify").then((m) => m.sweepNotify()).catch((e) => (console.error("[sweep] notify", e), null)); // 1141 greetings, inactivity, event queue
   // 1142: the one-time waitlist update email. Fixes its cutoff on the first sweep after deploy; sends a short batch once launched.
   const campaign = await import("@/lib/campaigns").then((m) => m.sweepCampaigns()).catch((e) => (console.error("[sweep] campaign", e), null));
+  // R1242: outcomes of posts made from recommendations, every 10 minutes, at most 10 owners a run (never fatal).
+  const outcomes = new Date().getMinutes() % 10 === 4 ? await import("@/lib/intelligence/outcome").then((m) => m.sweepOutcomes({ maxOwners: 10 })).catch((e) => (console.error("[sweep] outcomes", e), null)) : null;
   if (new Date().getMinutes() === 7) await cleanupSubs().catch(() => 0);
   const subs = await sweepSubscriptions(new Date()); // 1147: trials, old signals, offer ledger + month rollover (never fatal)
   await import("@/lib/accounts").then((m) => m.resubscribeCommentsOnce()).catch((e) => console.error("[sweep] comment subs", e)); // 1141b, runs once
@@ -51,7 +53,7 @@ async function sweep(req: NextRequest) {
   // (1027). Budget = what is left of maxDuration minus 10 s of headroom; whatever is still running then is
   // held by waitUntil or picked up by the next sweep.
   const running = await settle(Math.max(0, 50_000 - (Date.now() - startedAt)));
-  return NextResponse.json({ ok: true, requeued, cleaned, files, reminders, push, assist, campaign, subs, health, running }, { headers: { "cache-control": "no-store" } });
+  return NextResponse.json({ ok: true, requeued, cleaned, files, reminders, push, assist, campaign, outcomes, subs, health, running }, { headers: { "cache-control": "no-store" } });
 }
 
 /** 1147: trials every 5 minutes (expiry + reminders); signal pruning and the ledger/month sweep once an hour. */
