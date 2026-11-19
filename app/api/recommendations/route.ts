@@ -1,0 +1,12 @@
+import { json, route } from "@/lib/http";
+import { listRecommendations } from "@/lib/intelligence/reco";
+
+export const dynamic = "force-dynamic";
+
+/** R1240: the workspace's recommendations, newest first. `status` filters, `scope` picks an agency client, `limit` <= 50. */
+export const GET = route(async (req, { user }) => {
+  const q = req.nextUrl.searchParams;
+  const status = q.get("status") || undefined;
+  const limit = Math.min(50, Math.max(1, Number(q.get("limit")) || 20));
+  return json({ recommendations: await listRecommendations(user.id, (q.get("scope") ?? "").slice(0, 100), { status, limit }) });
+});
