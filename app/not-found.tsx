@@ -1,21 +1,8 @@
-import Link from "next/link";
-import { ErrorScreen, ghostPill, pill } from "@/components/shared/ErrorScreen";
+import { NotFoundScreen } from "@/components/shared/NotFoundScreen";
 
 export const metadata = { title: "Page not found" };
 
+// R1224: one client reference, so the not-found tree Next ships with every page no longer drags other routes' JS along.
 export default function NotFound() {
-  return (
-    <ErrorScreen
-      code="Lost in orbit"
-      mood="think"
-      title="We couldn't find that page."
-      body="The link may be old, or the page moved. Your posts and media are safe; nothing was changed."
-      actions={
-        <>
-          <Link href="/home" className={`${pill} lime-bg lime-glow`}>Go to my dashboard</Link>
-          <Link href="/" className={ghostPill}>Outlly home</Link>
-        </>
-      }
-    />
-  );
+  return <NotFoundScreen />;
 }

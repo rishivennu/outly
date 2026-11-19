@@ -1520,6 +1520,11 @@ html:not(.dark) .wl-trail { background: linear-gradient(270deg, hsl(var(--lime-i
   -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 97%); mask-image: linear-gradient(to bottom, #000 58%, transparent 97%); }
 html:not(.dark) .hf-glow { background: radial-gradient(50% 40% at 50% 80%, hsl(78 100% 50% / .22), transparent 70%), radial-gradient(40% 38% at 18% 72%, hsl(216 90% 70% / .14), transparent 70%), radial-gradient(40% 38% at 84% 70%, hsl(206 90% 70% / .12), transparent 70%); }
 .hf-h1 { line-height: 1.02; }
+/* R1224: on 404-427 px phones (Pixel 7 and 8 at 412) the size-adjusted fallback face set the headline on two lines and
+   Manrope, a shade wider, on three, so the whole hero below dropped one line (41 px, CLS .117) when the font arrived.
+   Up to 427 px the real face always needs three lines (measured 320-426), so the heading reserves them from the first
+   paint: three line boxes, each 1.02em plus the .06em the .hf-line padding adds. Wider screens never shift (two lines in both faces). */
+@media (max-width: 427px) { #hero-title.hf-h1 { min-height: 3.24em; } }
 .hf-line { display: inline-block; color: hsl(var(--foreground)); padding-bottom: .06em; }
 .hf-accent { color: hsl(var(--lime-ink)); padding-right: .08em; }
 .dark .hf-accent { color: hsl(var(--lime)); }

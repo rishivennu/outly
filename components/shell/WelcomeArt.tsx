@@ -2,7 +2,7 @@
  * The welcome screen's hero (R1180, from the supplied art): Kiki, the glossy green tile giving a thumbs-up, stands
  * behind on the left and Koko, the blue triangle holding a pixel heart, leans in front on the right, with a small
  * globe and orbit arrow above them for "post everywhere".
- * The characters are local WebP renders (public/brand/welcome, trimmed, 480 and 960 wide, transparent), so they sit
+ * The characters are local WebP renders (public/brand/welcome, trimmed, 480, 720 and 960 wide, transparent), so they sit
  * on the white page and on ink alike. The globe stays vector; its orbit uses currentColor, so it follows the theme.
  * Decorative: the screen's headline says what it means (aria-hidden, empty alt).
  * Motion lives in globals.css (.wa-*): a one-time entrance from the parent, then a slow float on Koko.
@@ -10,7 +10,10 @@
 import { useId } from "react";
 
 const SIZES = "(min-width: 1024px) 340px, 56vw";
-const set = (name: string) => `/brand/welcome/${name}-480.webp 480w, /brand/welcome/${name}-960.webp 960w`;
+// R1224: a 720 step between 480 and 960. A 2.6x phone (Pixel 7, 56vw = 230 px -> 600 px) took the 960 files, 155 kB for
+// the two characters and the welcome's largest paint on a slow connection; 720 covers it at 103 kB. The head script
+// (lib/pwa-welcome.ts welcomeStep) preloads the same step the moment it decides to show the welcome.
+const set = (name: string) => `/brand/welcome/${name}-480.webp 480w, /brand/welcome/${name}-720.webp 720w, /brand/welcome/${name}-960.webp 960w`;
 
 export function WelcomeArt({ className }: { className?: string }) {
   // Ids are per instance (an admin preview may render a second copy next to the live one).
@@ -20,10 +23,10 @@ export function WelcomeArt({ className }: { className?: string }) {
   return (
     <div className={className ? `wa-stage ${className}` : "wa-stage"} aria-hidden="true">
       {/* eslint-disable-next-line @next/next/no-img-element -- fixed-size local art, no optimiser round trip on launch */}
-      <img className="wa-kiki" src="/brand/welcome/kiki-480.webp" srcSet={set("kiki")} sizes={SIZES} width={480} height={497} alt="" decoding="async" draggable={false} />
+      <img className="wa-kiki" src="/brand/welcome/kiki-480.webp" srcSet={set("kiki")} sizes={SIZES} width={480} height={497} alt="" decoding="async" fetchPriority="high" draggable={false} />
       <div className="wa-float wa-koko">
         {/* eslint-disable-next-line @next/next/no-img-element -- see above */}
-        <img src="/brand/welcome/koko-480.webp" srcSet={set("koko")} sizes={SIZES} width={480} height={525} alt="" decoding="async" draggable={false} />
+        <img src="/brand/welcome/koko-480.webp" srcSet={set("koko")} sizes={SIZES} width={480} height={525} alt="" decoding="async" fetchPriority="high" draggable={false} />
       </div>
       <svg className="wa-cloud wa-globe" viewBox="178 40 104 68" fill="none" strokeLinecap="round" strokeLinejoin="round" focusable="false">
         <defs>

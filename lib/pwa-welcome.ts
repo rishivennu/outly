@@ -124,11 +124,25 @@ export function shouldWelcome(o: { path: string; seen: boolean; referrer?: strin
 export const WELCOME_WATCHDOG_MS = 10_000;
 
 /**
+ * R1224: the two characters are the welcome's largest paint, and the browser only found them once the parser reached
+ * the overlay, at the end of the page (about 180 kB of HTML and inline data later). The head script, having just decided
+ * to show the welcome, preloads them at the step the picture's srcset will pick (the same arithmetic: 340 px on a desktop,
+ * 56vw on a phone, times the device pixel ratio; see welcomeStep). Wrapped in its own try, so an odd browser only loses
+ * the head start, never the welcome.
+ */
+export const WELCOME_STEPS = [480, 720, 960] as const;
+export function welcomeStep(viewportWidth: number, dpr: number) {
+  const px = (viewportWidth >= 1024 ? 340 : viewportWidth * 0.56) * (dpr || 1);
+  return WELCOME_STEPS.find((s) => s >= px) ?? 960;
+}
+const WELCOME_PRELOAD = `try{var w=window.innerWidth,p=(w>=1024?340:w*.56)*(window.devicePixelRatio||1),s=p<=480?480:p<=720?720:960;["kiki","koko"].forEach(function(n){var l=document.createElement("link");l.rel="preload";l.as="image";l.href="/brand/welcome/"+n+"-"+s+".webp";l.fetchPriority="high";document.head.appendChild(l)})}catch(e){}`;
+
+/**
  * Decides before the first paint, so an entry paints the welcome, not a flash of the dashboard. If the page never
  * hydrates (a failed chunk on a bad connection), the watchdog lifts the screen so nobody is stuck on it;
  * PwaWelcome cancels it (window.__owT) the moment it hydrates. Storage blocked: no welcome (it could never be closed for good).
  */
-export const welcomeScript = `try{var d=document.documentElement,r=document.referrer,o=location.origin,i=false;try{i=!!r&&r.indexOf(o+"/")===0&&${STUDIO_RE}.test(new URL(r).pathname)}catch(e){}if(!i&&${STUDIO_RE}.test(location.pathname)&&!sessionStorage.getItem("${WELCOME_SESSION_KEY}")){d.setAttribute("data-welcome","");window.__owT=setTimeout(function(){d.removeAttribute("data-welcome")},${WELCOME_WATCHDOG_MS})}}catch(e){}`;
+export const welcomeScript = `try{var d=document.documentElement,r=document.referrer,o=location.origin,i=false;try{i=!!r&&r.indexOf(o+"/")===0&&${STUDIO_RE}.test(new URL(r).pathname)}catch(e){}if(!i&&${STUDIO_RE}.test(location.pathname)&&!sessionStorage.getItem("${WELCOME_SESSION_KEY}")){d.setAttribute("data-welcome","");window.__owT=setTimeout(function(){d.removeAttribute("data-welcome")},${WELCOME_WATCHDOG_MS});${WELCOME_PRELOAD}}}catch(e){}`;
 
 /** The welcome is on screen (or about to be): the flag is set and the studio rendered it. */
 export function welcomePending() {

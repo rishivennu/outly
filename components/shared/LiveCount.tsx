@@ -7,6 +7,18 @@ import { cn } from "@/lib/utils";
 
 const POLL_MS = 60_000;
 let shared: { at: number; v: LiveView } | null = null; // two strips on one page share one request
+// R1224: and the request itself. Both strips (nav and footer) mount in the same frame, before any answer has filled
+// `shared`, so each sent its own /api/stats/live on every landing load (2 calls, measured). One in-flight promise now.
+let inflight: Promise<LiveView | null> | null = null;
+function fetchLive() {
+  inflight ??= fetch("/api/stats/live", { cache: "no-store", credentials: "same-origin" })
+    .then((r) => (r.ok ? (r.json() as Promise<LiveView>) : null))
+    .catch(() => null)
+    .finally(() => {
+      inflight = null;
+    });
+  return inflight;
+}
 
 /**
  * Real-time counts on every page (1037): creators on Outlly and how many are online now. Polls once a
@@ -24,15 +36,10 @@ export function useLiveView() {
     const load = async () => {
       if (!pollable()) return; // 1150: visible tab, and someone is there
       if (shared && Date.now() - shared.at < POLL_MS / 2) return alive && setV(shared.v);
-      try {
-        const r = await fetch("/api/stats/live", { cache: "no-store", credentials: "same-origin" });
-        if (!r.ok) return;
-        const next = (await r.json()) as LiveView;
-        shared = { at: Date.now(), v: next };
-        if (alive) setV(next);
-      } catch {
-        /* offline: keep the last numbers */
-      }
+      const next = await fetchLive(); // null when offline or refused: keep the last numbers
+      if (!next) return;
+      shared = { at: Date.now(), v: next };
+      if (alive) setV(next);
     };
     void load();
     const t = setInterval(load, POLL_MS);

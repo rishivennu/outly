@@ -39,7 +39,10 @@ const memo = new Map<string, { at: number; p: Promise<unknown>; v?: unknown; don
 /** The same GET as api(), shared with anyone who asked for it in the last `maxAge` ms (in flight included). */
 export function cachedApi<T>(url: string, maxAge = 60_000): Promise<T> {
   const hit = memo.get(url);
-  if (hit && Date.now() - hit.at < maxAge) return hit.p as Promise<T>;
+  // R1224: a request still in flight is shared whatever `maxAge` says, maxAge 0 included. A quiet refresh that
+  // lands while a warm-up for the same URL is still out used to send the identical request a second time
+  // (measured: two GET /api/analytics?days=7 on opening Analytics); the answer on its way is the freshest there is.
+  if (hit && (Date.now() - hit.at < maxAge || !hit.done)) return hit.p as Promise<T>;
   const p = api<T>(url);
   const entry: { at: number; p: Promise<unknown>; v?: unknown; done?: boolean } = { at: Date.now(), p };
   memo.set(url, entry);
