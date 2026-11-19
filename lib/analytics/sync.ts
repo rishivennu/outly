@@ -3,6 +3,7 @@ import { db } from "../db";
 import { isPlatform, type Platform } from "../domain";
 import { isPracticeAccount } from "../social/registry";
 import { snapshotTarget, targetInsights } from "../insights/post";
+import { applyVerify } from "../posts/reconcile";
 import { platformDashboard } from "../live";
 import { dayKey } from "./core";
 
@@ -163,6 +164,9 @@ export async function syncMetrics(opts: { budgetMs?: number; now?: Date; account
           stop = ins.code;
           break;
         }
+        // R1219: the platform says it has no such post. Recorded as "needs verification" first; only a second
+        // miss, CONFIRM_MS later, marks it deleted there. Never from this one answer.
+        if (ins.code === "GONE") await applyVerify(t, "missing", now).catch(() => {});
         r.failed++;
         bad++;
         continue;
@@ -170,7 +174,8 @@ export async function syncMetrics(opts: { budgetMs?: number; now?: Date; account
       if (ins.status !== "live") continue;
       await snapshotTarget(ins).catch((e) => console.warn(`[sync] snapshot ${ins.targetId}: ${(e as Error).message}`));
       // Remembered even when nothing changed (no row is written then), so an unchanged post isn't re-read every minute.
-      await db.postTarget.update({ where: { id: t.id }, data: { metricsCheckedAt: now } }).catch(() => {});
+      // R1219: fresh numbers are also proof the post is still there (lastVerifiedAt, any "needs verification" cleared).
+      await applyVerify(t, "live", now).catch(() => {});
       ok++;
       r.synced++;
     }

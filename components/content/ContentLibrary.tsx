@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ListChecks, Loader2, Plus, Search, Trash2, X } from "lucide-react";
+import { ListChecks, Loader2, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Icon3D, type IconName } from "@/components/brand/Icon3D";
 import { Thumb } from "@/components/shared/Thumb";
@@ -26,6 +26,8 @@ import { keepaliveDelete, reinsert } from "@/lib/client/deferred-delete";
 import { bulkDeleteCopy, matchesQuery, selectRange } from "@/lib/client/library-tools";
 import type { PostView } from "@/lib/services";
 import type { LibraryCounts, LibraryPage } from "@/lib/posts/library";
+import { lifecycleOf, type Lifecycle } from "@/lib/posts/lifecycle";
+import type { ReconcileSummary } from "@/lib/posts/reconcile";
 import { T } from "@/lib/motion/tokens";
 import { flipCapture, flipPlay, loadFlip, type FlipSnapshot } from "@/lib/motion/flip";
 import { onIdle } from "@/lib/client/when-idle";
@@ -38,6 +40,10 @@ const FILTERS = [
   { id: "scheduled", label: "Scheduled" },
   { id: "published", label: "Published" },
   { id: "failed", label: "Failed" },
+  // R1219: lifecycle tabs. Shown only when they have something in them (like Failed).
+  { id: "needs_verification", label: "Needs verification" },
+  { id: "archived", label: "Archived" },
+  { id: "deleted", label: "Deleted" },
 ] as const;
 type F = (typeof FILTERS)[number]["id"];
 
@@ -47,7 +53,16 @@ export const filterFromParam = (v: string | null | undefined): F => (FILTERS.som
 /** Live on at least one platform (published or partly published). */
 const hasLive = (p: PostView) => p.targets.some((t) => t.status === "published");
 
-const match = (p: PostView, f: F) => f === "all" || (f === "failed" ? ["failed", "partial"].includes(p.status) : f === "published" ? p.status === "published" : p.status === f);
+/** R1219: a post's lifecycle (archived, deleted, needs_verification take precedence over its publishing status). */
+const cycle = (p: PostView): Lifecycle => p.lifecycle ?? lifecycleOf({ status: p.status, archivedAt: p.archivedAt, targets: p.targets.map((t) => ({ status: t.status, removeMode: t.removeMode, verifyState: t.verifyState, platformPostId: t.platformPostId })) });
+const LIFECYCLE_TABS: readonly string[] = ["archived", "deleted", "needs_verification"];
+/** "All" and the publishing tabs are the active library: never an archived or a deleted post. */
+const match = (p: PostView, f: F) => {
+  const c = cycle(p);
+  if (LIFECYCLE_TABS.includes(f)) return c === (f as string);
+  if (c === "archived" || c === "deleted") return false;
+  return f === "all" || (f === "failed" ? ["failed", "partial"].includes(p.status) : f === "published" ? p.status === "published" : p.status === f);
+};
 
 const countIn = (list: Iterable<PostView>, f: F) => {
   let n = 0;
@@ -296,6 +311,27 @@ export function ContentLibrary({
     clearSelection();
   };
   const copy = del ? bulkDeleteCopy(del) : null;
+  // R1219: "Sync now" asks the platforms whether the live posts are still there, then reloads what changed.
+  const [syncing, setSyncing] = useState(false);
+  const syncNow = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const r = await api<{ sync: ReconcileSummary }>("/api/content/sync", { method: "POST" });
+      toast(syncSummary(r.sync), r.sync.deleted || r.sync.missing ? "info" : "ok");
+      if (r.sync.checked) {
+        const ids = [...new Set(r.sync.results.filter((x) => x.outcome !== "unsupported").map((x) => x.postId))];
+        const fresh = await Promise.all(ids.map((id) => api<{ post: PostView }>(`/api/posts/${id}`).then((x) => x.post).catch(() => null)));
+        const by = new Map(fresh.filter((p): p is PostView => !!p).map((p) => [p.id, p]));
+        setPosts((ps) => ps.map((p) => by.get(p.id) ?? p));
+        setFound((f) => (f ? { ...f, posts: f.posts.map((p) => by.get(p.id) ?? p) } : f));
+      }
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Couldn't reach the platforms just now. Nothing changed.", "error");
+    } finally {
+      setSyncing(false);
+    }
+  };
   useEffect(() => {
     if (!picking) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && !open && !stats && !del && clearSelection();
@@ -362,6 +398,11 @@ export function ContentLibrary({
             <ListChecks className="h-4 w-4" aria-hidden="true" /> {picking ? "Done" : "Select"}
           </Button>
         )}
+        {counts.published + counts.needs_verification > 0 && (
+          <Button variant="subtle" className="min-h-[44px]" onClick={() => void syncNow()} disabled={syncing} aria-label="Sync now: check with the platforms whether your live posts are still there">
+            <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} aria-hidden="true" /> {syncing ? "Checking…" : "Sync now"}
+          </Button>
+        )}
       </div>
       <p className="sr-only" role="status">
         {q ? (remote?.loading ? "Searching…" : `${list.length} ${list.length === 1 ? "result" : "results"} for ${q}`) : ""}
@@ -411,7 +452,7 @@ export function ContentLibrary({
                   <div className={cn("relative aspect-[9/16] overflow-hidden rounded-[24px] hairline transition duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_30px_60px_-30px_hsl(var(--energy-b)/0.6)]", selected.has(p.id) && "ring-2 ring-foreground ring-offset-2 ring-offset-background")}>
                     <Thumb src={p.media.thumbnailUrl} video={p.media.kind === "image" ? null : p.media.url} alt="" className="absolute inset-0" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/30" />
-                    <StatusBadge status={p.status} className={cn("absolute left-3", picking ? "top-[3.6rem]" : "top-3")} />
+                    <StatusBadge status={LIFECYCLE_TABS.includes(cycle(p)) || cycle(p) === "unavailable" ? cycle(p) : p.status} className={cn("absolute left-3", picking ? "top-[3.6rem]" : "top-3")} />
                     {p.media.duration ? <span className={cn("tabular absolute right-3 rounded-full bg-black/50 px-2 py-0.5 text-xs text-white backdrop-blur", isFailedPost(p) ? "top-[3.6rem]" : "top-3")}>{formatDuration(p.media.duration)}</span> : null}
                     <div className="absolute inset-x-0 bottom-0 p-3.5 text-white">
                       <p className="line-clamp-2 text-[15px] font-semibold leading-snug">{p.title ?? "Untitled idea"}</p>
@@ -555,6 +596,9 @@ function Empty({ filter }: { filter: F }) {
     scheduled: ["Nothing on the calendar.", "Schedule something and it'll wait here.", "schedule"],
     published: ["Nothing live yet.", "Send your first one out. It's a good feeling.", "publish"],
     failed: ["Nothing went wrong.", "Every post made it where it was going.", "success"],
+    needs_verification: ["Nothing to check.", "Every live post was where the platform said it was, last time Outlly asked.", "success"],
+    archived: ["Nothing archived.", "Archive a post to take it out of your views while it stays live and keeps its numbers.", "archive"],
+    deleted: ["Nothing deleted.", "Posts taken down from a platform stay listed here with the numbers they had.", "archive"],
   };
   return (
     <div className="mt-16 flex flex-col items-center text-center">
@@ -570,4 +614,16 @@ function Empty({ filter }: { filter: F }) {
       )}
     </div>
   );
+}
+
+/** R1219: one honest sentence about a Sync now. Never "deleted" from one missed answer. */
+export function syncSummary(s: ReconcileSummary): string {
+  if (s.cooldownMs) return `Checked less than a minute ago. Try again in ${Math.max(1, Math.ceil(s.cooldownMs / 1000))} s.`;
+  if (!s.checked) return s.unsupported ? "Nothing to check: these platforms don't let Outlly look posts up yet." : "Nothing live to check.";
+  const parts = [`Checked ${s.checked} ${s.checked === 1 ? "post" : "posts"}.`];
+  if (s.deleted) parts.push(`${s.deleted} confirmed deleted on the platform.`);
+  if (s.missing) parts.push(`${s.missing} not found; Outlly will check again before calling ${s.missing === 1 ? "it" : "them"} deleted.`);
+  if (s.unavailable) parts.push(`${s.unavailable} couldn't be checked (reconnect the account).`);
+  if (s.errors) parts.push(`${s.errors} didn't answer.`);
+  return parts.join(" ");
 }

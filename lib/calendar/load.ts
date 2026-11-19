@@ -27,7 +27,8 @@ async function view(rows: Row[]): Promise<CalendarPost[]> {
 
 async function scoped(user: U, extra: Prisma.PostWhereInput): Promise<Prisma.PostWhereInput> {
   const { where } = await postFilter(user);
-  return { AND: [{ userId: user.id }, where, extra] };
+  // R1219: an archived post is out of the active views; the calendar is one.
+  return { AND: [{ userId: user.id, archivedAt: null }, where, extra] };
 }
 
 /** The accounts a post can go out on, without tokens: enough to tell whether it still can. A scoped member sees only theirs. */

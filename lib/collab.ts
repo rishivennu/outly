@@ -15,7 +15,7 @@ import { assertPerk } from "./billing/entitlements";
 
 const actorOf = (u: SessionUser) => ({ id: realUserId(u), name: u.actor?.name ?? u.name });
 
-export type NoteView = { id: string; kind: "comment" | "edit" | "approved" | "changes"; body: string; authorName: string; mine: boolean; createdAt: string };
+export type NoteView = { id: string; kind: "comment" | "edit" | "approved" | "changes" | "sync"; body: string; authorName: string; mine: boolean; createdAt: string };
 
 export async function notesFor(u: SessionUser, postId: string): Promise<NoteView[]> {
   await ownedPost(u.id, postId);

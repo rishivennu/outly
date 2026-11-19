@@ -79,7 +79,7 @@ export async function removeFromPlatform(userId: string, targetId: string, actio
 
   const data =
     action === "delete"
-      ? { removedAt: new Date(), removeMode: "deleted", platformUrl: null }
+      ? { removedAt: new Date(), removeMode: "deleted", removedVia: "outlly", lastUrl: t.platformUrl, platformUrl: null, verifyState: null, missingSince: null }
       : action === "hide"
         ? { removedAt: new Date(), removeMode: "hidden" }
         : { removedAt: null, removeMode: null };
@@ -126,7 +126,9 @@ export async function confirmGone(userId: string, targetId: string, record = tru
 
 /** 1142: record a destination as deleted on the platform (after confirmGone said so). */
 export async function markDeleted(userId: string, targetId: string) {
-  await db.postTarget.updateMany({ where: { id: targetId, post: { userId } }, data: { removedAt: new Date(), removeMode: "deleted", platformUrl: null } });
+  const t = await db.postTarget.findFirst({ where: { id: targetId, post: { userId } }, select: { platformUrl: true } });
+  // R1219: removedVia "platform": the creator deleted it in the app and the platform confirmed it is gone.
+  await db.postTarget.updateMany({ where: { id: targetId, post: { userId } }, data: { removedAt: new Date(), removeMode: "deleted", removedVia: "platform", lastUrl: t?.platformUrl ?? null, platformUrl: null, verifyState: null, missingSince: null, lastVerifiedAt: new Date() } });
   invalidateComments(targetId);
   invalidateDashboards(userId);
 }

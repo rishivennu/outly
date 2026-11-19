@@ -339,6 +339,9 @@ model Post {
   editedById  String? // their user id: nobody but the owner approves their own change
   /// Phase 2 (1155): idempotency key from the device that created the draft, so an offline sync that retries never makes a second draft.
   clientKey   String?
+  /// R1219: lifecycle, kept apart from `status` (what publishing did). Set = the creator took the post out of the
+  /// active views (Content, Calendar, Home); it stays live on the platforms and keeps its numbers. Null = active.
+  archivedAt  DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -353,6 +356,7 @@ model Post {
   @@index([userId, scheduledAt])
   // 1091: the Content library lists newest edit first, page by page.
   @@index([userId, updatedAt])
+  @@index([userId, archivedAt])
   @@unique([userId, clientKey])
 }
 
@@ -399,7 +403,16 @@ model PostTarget {
   // Taken down from the platform through Outlly. platformStatus stays "published" so history and stats stay true.
   removedAt       DateTime?
   removeMode      String? // deleted (gone from the platform) | hidden (YouTube: made private, can be made public again)
-  metricsCheckedAt DateTime? // 1151: when the background sync last read this post's numbers, even when nothing changed
+  metricsCheckedAt DateTime? // 1151: when the background sync last read this post's numbers, even when nothing changed (= last synced)
+  // R1219: cross-platform sync. The platform is asked whether the post is still there; one "not found" is never
+  // taken as a delete. First miss: verifyState "needs_verification" + missingSince. A second miss at least
+  // CONFIRM_MS later: removeMode "deleted", removedVia "platform". "unavailable" = the account can't be asked (disconnected).
+  verifyState     String? // needs_verification | unavailable | null (verified or never checked)
+  missingSince    DateTime? // first time the platform said it has no such post (cleared when it is seen again)
+  lastVerifiedAt  DateTime? // last time the platform confirmed the post's state (live, or gone for good)
+  lastSyncError   String? // short code from the last check (NOT_FOUND, RATE_LIMITED, AUTH_EXPIRED, ...), never a body
+  removedVia      String? // outlly (taken down from here) | platform (detected: deleted on the platform itself)
+  lastUrl         String? // the public URL as it was before the post went away (platformUrl is cleared then)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -409,6 +422,7 @@ model PostTarget {
 
   @@unique([postId, platform])
   @@index([platformStatus])
+  @@index([verifyState])
 }
 
 model TargetMetric {

@@ -206,7 +206,7 @@ async function classicView(user: HomeUser, canSwitch: boolean, recapAtParam: str
   const [profiles, scope, badges] = await Promise.all([listProfiles(user.id, user.scope), postFilter(user), trustBadges(user.id)]);
   const [, drafts, next, live, welcome, published, ret, pulse, recap, founding, saved, storage, onboarding] = await Promise.all([
     loadKeys(),
-    db.post.findMany({ where: { userId: user.id, status: "draft", ...scope.where }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
+    db.post.findMany({ where: { userId: user.id, status: "draft", archivedAt: null, ...scope.where }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() }, ...scope.where }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),
     liveP,
     firstRun ? soft(welcomeOffer(user), CARD_MS, null, "home welcome") : null,

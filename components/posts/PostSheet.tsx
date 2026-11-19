@@ -4,7 +4,7 @@ import { firstCommentLine } from "@/lib/client/first-comment";
 import { coverLine } from "@/lib/client/cover";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CalendarClock, CalendarX, Check, Copy, Eye, EyeOff, ExternalLink, Link as LinkIcon, MessageSquareWarning, PenLine, RotateCcw, ShieldCheck, Trash2, Wrench } from "lucide-react";
+import { AlertTriangle, Archive, ArchiveRestore, CalendarClock, CalendarX, Check, Copy, Eye, EyeOff, ExternalLink, Link as LinkIcon, MessageSquareWarning, PenLine, RefreshCw, RotateCcw, ShieldCheck, Trash2, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/shared/Sheet";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -28,8 +28,11 @@ const isLive = (t: TargetView) => t.status === "published" && !!t.platformPostId
 
 function targetLine(t: TargetView, scheduled: boolean) {
   const name = PLATFORM_META[t.platform].name;
-  if (t.status === "published" && t.removeMode === "deleted") return `Deleted from ${name}`;
+  // R1219: say who removed it. "platform" = Outlly found it gone there (checked twice), not taken down from here.
+  if (t.status === "published" && t.removeMode === "deleted") return t.removedVia === "platform" ? `Deleted on ${name} itself. Its numbers here are kept` : `Deleted from ${name}`;
   if (t.status === "published" && t.removeMode === "hidden") return `Private on ${name}. Only you can see it`;
+  if (t.status === "published" && t.verifyState === "needs_verification") return `${name} said it couldn't find this post once. Outlly checks again before it believes that`;
+  if (t.status === "published" && t.verifyState === "unavailable") return `Can't check ${name} right now: reconnect the account`;
   if (t.status === "published") return "Published";
   if (t.status === "pending") return scheduled ? "Waiting for its moment" : "Not sent yet";
   return TARGET_COPY[t.status as TargetStatus];
@@ -109,6 +112,28 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRe
       const r = await api<{ post: PostView }>(`/api/posts/${post.id}/duplicate`, { method: "POST" });
       onDuplicate(r.post);
       toast("Made a copy. It's in your drafts.");
+    });
+
+  // R1219: archive = out of Content, Calendar and Home; still live on the platforms, numbers kept. Reversible.
+  const archive = (archived: boolean) =>
+    run(async () => {
+      const r = await api<{ post: PostView }>(`/api/posts/${post.id}/archive`, { method: "POST", json: { archived } });
+      onChange(r.post);
+      toast(archived ? "Archived. It stays live and keeps its numbers; find it under Archived." : "Back in your library.", "info");
+      router.refresh();
+      if (archived) onClose();
+    });
+
+  // R1219: ask the platforms whether this post is still there (two misses before anything is called deleted).
+  const checkNow = () =>
+    run(async () => {
+      const r = await api<{ post: PostView; sync: { checked: number; live: number; missing: number; deleted: number; unavailable: number } }>(`/api/posts/${post.id}/sync`, { method: "POST" });
+      onChange(r.post);
+      const s = r.sync;
+      toast(
+        !s.checked ? "Nothing to check here yet." : s.deleted ? "Confirmed: it's gone from the platform. Recorded as deleted there; its numbers are kept." : s.missing ? "Still not found. Outlly will check once more before calling it deleted." : s.unavailable ? "Couldn't check: reconnect the account first." : "Still live. All good.",
+        "info",
+      );
     });
 
   const reversible = !!onRestore && undoablePost(post);
@@ -313,6 +338,23 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRe
             <Button variant="subtle" onClick={duplicate} disabled={busy}>
               <Copy className="h-4 w-4" /> Duplicate
             </Button>
+            {post.targets.some((t) => isLive(t) && t.verifyState) && (
+              <Button variant="subtle" onClick={checkNow} disabled={busy}>
+                <RefreshCw className={busy ? "h-4 w-4 animate-spin" : "h-4 w-4"} /> Check now
+              </Button>
+            )}
+            {post.archivedAt ? (
+              <Button variant="subtle" onClick={() => archive(false)} disabled={busy}>
+                <ArchiveRestore className="h-4 w-4" /> Unarchive
+              </Button>
+            ) : (
+              post.status !== "scheduled" &&
+              post.status !== "publishing" && (
+                <Button variant="subtle" onClick={() => archive(true)} disabled={busy}>
+                  <Archive className="h-4 w-4" /> Archive
+                </Button>
+              )
+            )}
             <Button variant="danger" onClick={() => setView("remove")}>
               <Trash2 className="h-4 w-4" /> {post.status === "publishing" ? "Stop and delete" : "Delete post"}
             </Button>
@@ -366,7 +408,7 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRe
           ) : (
             <>
               <p className="text-muted-foreground">
-                It&rsquo;s live on {names(live)}. Do you want to delete it there too, or only from your studio?
+                It&rsquo;s live on {names(live)}. Delete it there too, archive it here (it stays live and keeps its numbers), or delete it from your studio only?
               </p>
               {appOnly.length > 0 && (
                 <div className="rounded-2xl bg-secondary/50 p-3 text-sm">
@@ -394,6 +436,11 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRe
                   <Button variant="danger" onClick={() => setConfirm("everywhere")} disabled={busy}>
                     <Trash2 className="h-4 w-4" /> Delete from {names(live)} and my studio
                   </Button>
+                  {!post.archivedAt && post.status !== "publishing" && (
+                    <Button variant="subtle" onClick={() => archive(true)} disabled={busy}>
+                      <Archive className="h-4 w-4" /> Archive: hide it here, keep it live and keep its numbers
+                    </Button>
+                  )}
                   <Button variant="subtle" onClick={() => setConfirm("studio")} disabled={busy}>
                     Delete from my studio only (stays live on {names(live)})
                   </Button>

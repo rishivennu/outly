@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Check, MessageSquare, MessageSquareWarning, PenLine, Send } from "lucide-react";
+import { Check, MessageSquare, MessageSquareWarning, PenLine, RefreshCw, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/Toast";
 import { fmt, useUser } from "@/components/shell/UserContext";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import type { PostView } from "@/lib/services";
 import type { NoteView } from "@/lib/collab";
 
-const ICON = { comment: MessageSquare, edit: PenLine, approved: Check, changes: MessageSquareWarning } as const;
+const ICON = { comment: MessageSquare, edit: PenLine, approved: Check, changes: MessageSquareWarning, sync: RefreshCw } as const;
 
 /**
  * Draft collaboration (1037): who changed what, comments, and an approve / ask-for-changes decision from

@@ -19,6 +19,11 @@ const MAP: Record<string, { label: string; dot: string; text: string }> = {
   needs_reconnect: { label: "Needs reconnection", dot: "bg-warning", text: "text-warning-ink" },
   disconnected: { label: "Disconnected", dot: "bg-muted-foreground", text: "text-muted-foreground" },
   connected: { label: "Connected", dot: "bg-success", text: "text-success-ink" },
+  // R1219: lifecycle (lib/posts/lifecycle), apart from the publishing status.
+  archived: { label: "Archived", dot: "bg-muted-foreground", text: "text-muted-foreground" },
+  deleted: { label: "Deleted", dot: "bg-muted-foreground", text: "text-muted-foreground" },
+  needs_verification: { label: "Needs verification", dot: "bg-warning", text: "text-warning-ink" },
+  unavailable: { label: "Can't check", dot: "bg-muted-foreground", text: "text-muted-foreground" },
 };
 
 /** Status is always dot + word, never colour alone. */

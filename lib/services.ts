@@ -14,6 +14,7 @@ import { assertApproved, reviewView } from "./review";
 import { assertPostScope, requestScope } from "./profiles";
 import { pickAccount, type Scope } from "./profiles-core";
 import { approvalCurrent } from "./collab-core";
+import { lifecycleOf, type VerifyState } from "./posts/lifecycle";
 
 /* ---------- client-safe shapes (no tokens, no storage keys) ---------- */
 
@@ -78,6 +79,15 @@ export function targetView(t: PostTarget) {
     /** Taken down on the platform through Outlly: deleted, or hidden (YouTube private). */
     removeMode: (t.removeMode as RemoveMode | null) ?? null,
     removedAt: t.removedAt?.toISOString() ?? null,
+    /** R1219: outlly (taken down from here) | platform (found gone on the platform itself) | null. */
+    removedVia: (t.removedVia as "outlly" | "platform" | null) ?? null,
+    /** R1219: the public URL it had before it went away (url is cleared then). */
+    lastUrl: t.lastUrl ?? t.platformUrl,
+    /** R1219: needs_verification (one "not found", not yet believed) | unavailable (account can't be asked) | null. */
+    verifyState: (t.verifyState as VerifyState | null) ?? null,
+    lastVerifiedAt: t.lastVerifiedAt?.toISOString() ?? null,
+    lastSyncedAt: t.metricsCheckedAt?.toISOString() ?? null,
+    lastSyncError: t.lastSyncError ?? null,
     /** What the creator can do to the live post from here (Instagram and TikTok: neither, open the app). */
     canDelete: t.platformStatus === "published" && !!t.platformPostId && t.removeMode !== "deleted" && isPlatform(t.platform) && REMOVAL[t.platform].delete,
     canHide: t.platformStatus === "published" && !!t.platformPostId && t.removeMode !== "deleted" && isPlatform(t.platform) && REMOVAL[t.platform].hide,
@@ -96,6 +106,9 @@ export async function postView(p: Post & { targets: PostTarget[]; media: Media; 
     storyMeta: p.storyMeta ?? null,
     hook: p.hook,
     status: p.status,
+    /** R1219: lifecycle, apart from status (lib/posts/lifecycle): archived, deleted, needs_verification, ... */
+    lifecycle: lifecycleOf({ status: p.status, archivedAt: p.archivedAt, targets: p.targets.map((t) => ({ status: t.platformStatus, removeMode: t.removeMode, verifyState: t.verifyState, platformPostId: t.platformPostId })) }),
+    archivedAt: p.archivedAt?.toISOString() ?? null,
     scheduledAt: p.scheduledAt?.toISOString() ?? null,
     publishedAt: p.publishedAt?.toISOString() ?? null,
     createdAt: p.createdAt.toISOString(),

@@ -18,7 +18,7 @@ export const GET = route(async (req, { user }) => {
   const status = req.nextUrl.searchParams.get("status");
   // The command palette only needs names: no media, no signed URLs, so it stays cheap.
   if (req.nextUrl.searchParams.get("brief") === "1") {
-    const rows = await db.post.findMany({ where: { userId: user.id, ...(await postFilter(user)).where }, select: { id: true, title: true, hook: true, status: true, scheduledAt: true, publishedAt: true, updatedAt: true }, orderBy: { updatedAt: "desc" }, take: 200 });
+    const rows = await db.post.findMany({ where: { userId: user.id, archivedAt: null, ...(await postFilter(user)).where }, select: { id: true, title: true, hook: true, status: true, scheduledAt: true, publishedAt: true, updatedAt: true }, orderBy: { updatedAt: "desc" }, take: 200 });
     return json({
       posts: rows.map((p) => ({
         id: p.id,
@@ -32,7 +32,7 @@ export const GET = route(async (req, { user }) => {
   // 1148: `q` searches the whole library (the search box, when not every post is loaded yet).
   if (req.nextUrl.searchParams.get("library") === "1") return json(await libraryPage(user, req.nextUrl.searchParams.get("cursor"), undefined, undefined, isLibraryStatus(status) ? status : null, req.nextUrl.searchParams.get("q")));
   const posts = await db.post.findMany({
-    where: { userId: user.id, ...(await postFilter(user)).where, ...(status && status !== "all" ? { status: status === "failed" ? { in: ["failed", "partial"] } : status } : {}) },
+    where: { userId: user.id, archivedAt: null, ...(await postFilter(user)).where, ...(status && status !== "all" ? { status: status === "failed" ? { in: ["failed", "partial"] } : status } : {}) },
     include: { targets: true, media: true, items: { include: { media: true }, orderBy: { position: "asc" } } },
     orderBy: { updatedAt: "desc" },
     take: 100,
