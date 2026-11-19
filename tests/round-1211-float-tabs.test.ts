@@ -66,28 +66,29 @@ describe("R1211 compact rule (tabScrollStep)", () => {
 });
 
 describe("R1211 floating pill", () => {
-  test("the bar is a centred pill, 12px off the bottom and the sides, never wider than 440px, solid, bordered, shadowed", () => {
+  test("the bar is a centred pill, 12px off the bottom and the sides, never wider than 440px, glass (R1213), rimmed, shadowed", () => {
     const r = rule(".mtab");
     expect(r).toContain("bottom: calc(env(safe-area-inset-bottom) + 12px);");
     expect(r).toContain("width: min(calc(100% - 2 * max(12px, env(safe-area-inset-left), env(safe-area-inset-right))), 440px);");
     expect(r).toContain("margin-inline: auto;");
     expect(r).toContain("border-radius: 9999px;");
     expect(r).toContain("border: 1px solid hsl(var(--mtab-line));");
-    expect(r).toContain("box-shadow: var(--mtab-shadow);");
-    expect(r).toContain("background: hsl(var(--mtab-bg));");
-    expect(r).not.toContain("backdrop-filter");
-    expect(css).toContain("html.dark .mtab { --mtab-bg: 240 5% 10.5%; --mtab-line: 0 0% 100% / .08; --mtab-shadow:");
+    // R1213: liquid glass in place of the solid pill of 11-19 (tests/round-1213-liquid-tabs.test.ts has the recipe)
+    expect(r).toContain("var(--mtab-shadow);");
+    expect(r).toContain("background: linear-gradient(180deg, hsl(var(--mtab-bg) / .72), hsl(var(--mtab-bg) / .62));");
+    expect(r).toContain("backdrop-filter: blur(22px) saturate(1.65);");
+    expect(css).toMatch(/html\.dark \.mtab \{\r?\n  --mtab-bg: 240 5% 11%; --mtab-line: 0 0% 100% \/ \.1;/);
   });
   test("compact: 92% about the bottom centre, 56px, 300ms on the liquid curve, no layout move", () => {
     const r = rule(".mtab");
     expect(r).toContain("transform-origin: 50% 100%;");
-    expect(r).toContain("transition: transform .3s var(--ease-liquid), height .3s var(--ease-liquid), padding .3s var(--ease-liquid);");
-    expect(css).toContain(".mtab[data-compact] { height: 56px; padding: 3px 10px; transform: scale(.92); }");
+    expect(r).toContain("transition: transform .3s var(--ease-liquid), height .3s var(--ease-liquid);");
+    expect(css).toContain(".mtab[data-compact] { height: 56px; padding: 3px 10px; transform: scale(.92); --mtab-px: 10px; }");
     // the liquid curve is the one asked for
     expect(css).toMatch(/--m-ease-out: cubic-bezier\(0\.16, ?1, ?0\.3, ?1\)/);
     expect(css).toContain(":root { --ease-liquid: var(--m-ease-out); }");
     // reduced motion: no transition (and the hook never compacts)
-    expect(css).toContain(".mtab, .mtab-item, .mtab-pill, .mtab-pill > svg, .mtab-ind { transition: none; }");
+    expect(css).toContain(".mtab, .mtab-item, .mtab-pill, .mtab-pill > svg, .mtab-ind, .mtab-ind::before, .mtab-ripple { transition: none; }");
     expect(nav).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
   });
   test("on a phone on its side the pill is 54px, 8px off the edge, and compact only drops to 50px", () => {

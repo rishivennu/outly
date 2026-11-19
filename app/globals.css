@@ -536,6 +536,9 @@ html:not(.dark) .o3d-floor { background: radial-gradient(closest-side, rgba(30, 
 @keyframes sf-done { 0% { filter: brightness(1); } 35% { filter: brightness(1.35) drop-shadow(0 0 8px hsl(var(--lime) / .9)); } 100% { filter: brightness(1); } }
 @media (prefers-reduced-motion: reduce) { .scroll-frame[data-done="1"] { animation: none; } }
 @media print { .scroll-frame { display: none; } }
+/* R1213: not in the studio on a phone. There the whole screen is the app, and a lime line creeping round its edge read
+   as a stray frame around the page (the Inbox screenshot of 11-19); the marketing pages and the desktop studio keep it. */
+@media (max-width: 1023px) { body:has(main.mmain) .scroll-frame { display: none; } }
 .mnav-link { position: relative; display: inline-flex; align-items: center; min-height: 44px; padding: 0 .85rem; border-radius: 9999px; font-size: 14px; font-weight: 550; color: hsl(var(--foreground) / .8); transition: color .2s, background-color .25s; }
 .mnav-link:hover { color: hsl(var(--foreground)); background: hsl(var(--foreground) / .05); }
 .mnav-link.is-active { color: hsl(var(--lime-foreground)); }
@@ -3468,56 +3471,133 @@ html[data-contrast="more"] .mtop[data-lifted] { background-color: hsl(var(--back
 /* Tab bar (.mtab; not .mnav, that is the marketing header). 11-19: a floating pill, Instagram style, in place of the
    docked bar of 1115. 60px tall, 12px off the bottom edge plus the safe area (so it clears the home indicator and
    Android's gesture strip), 12px in from the sides (or the notch, on a phone on its side) and never wider than 440px;
-   fully rounded, solid in the theme's surface colour (muted labels hold 4.5:1 whatever scrolls behind), a hairline all
-   round and a soft shadow; icons only (11-19), each tab named for screen readers by hidden text. Reading on down a
-   long page compacts it (Nav.tsx useCompactOnScroll sets data-compact): the bar drops to 56px and shrinks to 92%
-   about its bottom centre, so it sits in the same spot; every tab still measures at least 44 x 56px on screen.
-   300ms on cubic-bezier(0.16, 1, 0.3, 1), on transform
-   and the bar's own height only, so nothing on the page moves with it. It never leaves the screen. Whatever floats
-   above it sits at env(safe-area-inset-bottom) + 84px, 12px over its open top edge. */
+   fully rounded, icons only, each tab named for screen readers by hidden text.
+   R1213: liquid glass. The page shows through a 22px blur with a lift in saturation, under a light tint (62 to 72%
+   of the surface colour, so the muted icons hold the 3:1 asked of graphics over whatever scrolls behind, and 4.5:1
+   over the page itself); a gradient rim (::before, a
+   hairline masked to the edge, brightest top-left where light would catch the curve), a specular sheen across the
+   top half (::after) and a soft drop shadow give it depth. One lime pill (.mtab-ind) marks the tab you are on and
+   glides between tabs on --i (Nav.tsx sets it; fractional while a finger drags it, see useSlideTabs); a liquid
+   highlight (.mtab-ripple) rides under the finger at --fx and blooms once where it lets go (data-drop).
+   Reading on down a long page compacts the bar (Nav.tsx useCompactOnScroll sets data-compact): the bar drops to 56px
+   and shrinks to 92% about its bottom centre, so it sits in the same spot; every tab still measures at least
+   44 x 56px on screen. 300ms on cubic-bezier(0.16, 1, 0.3, 1), on transform and the bar's own height only, so nothing
+   on the page moves with it. It never leaves the screen. Whatever floats above it sits at env(safe-area-inset-bottom)
+   + 84px, 12px over its open top edge. No blur support, less transparency, more contrast and forced colours get the
+   solid pill of 11-19 back. */
 .mtab {
-  --mtab-bg: 0 0% 100%; --mtab-line: 222 20% 18% / .09;
+  --mtab-bg: 0 0% 100%; --mtab-line: 222 20% 18% / .1; --mtab-px: 6px;
+  --mtab-rim: linear-gradient(120deg, hsl(0 0% 100% / .95), hsl(0 0% 100% / .35) 32%, hsl(0 0% 100% / .12) 58%, hsl(0 0% 100% / .4) 88%, hsl(0 0% 100% / .8));
+  --mtab-sheen: linear-gradient(180deg, hsl(0 0% 100% / .5), hsl(0 0% 100% / 0));
   --mtab-shadow: 0 12px 32px -14px rgb(15 20 40 / .35), 0 2px 8px -4px rgb(15 20 40 / .16);
   bottom: calc(env(safe-area-inset-bottom) + 12px);
   width: min(calc(100% - 2 * max(12px, env(safe-area-inset-left), env(safe-area-inset-right))), 440px);
   margin-inline: auto;
   height: 60px;
-  padding: 4px 6px;
+  padding: 4px var(--mtab-px);
   border-radius: 9999px;
-  background: hsl(var(--mtab-bg));
+  isolation: isolate;
+  background: linear-gradient(180deg, hsl(var(--mtab-bg) / .72), hsl(var(--mtab-bg) / .62));
+  -webkit-backdrop-filter: blur(22px) saturate(1.65);
+  backdrop-filter: blur(22px) saturate(1.65);
   border: 1px solid hsl(var(--mtab-line));
-  box-shadow: var(--mtab-shadow);
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .55), inset 0 -1px 0 hsl(0 0% 100% / .16), var(--mtab-shadow);
   transform-origin: 50% 100%;
-  transition: transform .3s var(--ease-liquid), height .3s var(--ease-liquid), padding .3s var(--ease-liquid);
+  transition: transform .3s var(--ease-liquid), height .3s var(--ease-liquid);
+  touch-action: pan-y;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
 }
-html.dark .mtab { --mtab-bg: 240 5% 10.5%; --mtab-line: 0 0% 100% / .08; --mtab-shadow: 0 12px 32px -14px rgb(0 0 0 / .7), 0 2px 8px -4px rgb(0 0 0 / .5); }
-html[data-contrast="more"] .mtab { background: hsl(var(--card)); border-color: hsl(var(--border)); }
-@media (forced-colors: active) { .mtab { border-color: CanvasText; } .mtab-item[aria-current] .mtab-ind { background: Highlight; } }
-/* Compact while reading on (Nav.tsx useCompactOnScroll): 92% about the bottom centre, the tabs closed up. */
-.mtab[data-compact] { height: 56px; padding: 3px 10px; transform: scale(.92); }
-/* Tabs: muted until chosen. Colour 250ms, the lime pill grows in place 300ms, a press dips the icon 150ms. */
-.mtab-item { color: hsl(var(--muted-foreground)); -webkit-tap-highlight-color: transparent; }
+/* the rim: a 1px gradient hairline on the inside edge (a mask keeps only the border ring of the box) */
+.mtab::before {
+  content: ""; position: absolute; inset: -1px; z-index: -1; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: var(--mtab-rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+/* the sheen: light across the top half of the glass */
+.mtab::after {
+  content: ""; position: absolute; inset: 1px 1px auto; height: 50%; z-index: -1; pointer-events: none;
+  border-radius: inherit; border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+  background: var(--mtab-sheen);
+}
+html.dark .mtab {
+  --mtab-bg: 240 5% 11%; --mtab-line: 0 0% 100% / .1;
+  --mtab-rim: linear-gradient(120deg, hsl(0 0% 100% / .4), hsl(0 0% 100% / .12) 32%, hsl(0 0% 100% / .04) 58%, hsl(0 0% 100% / .14) 88%, hsl(0 0% 100% / .32));
+  --mtab-sheen: linear-gradient(180deg, hsl(0 0% 100% / .09), hsl(0 0% 100% / 0));
+  --mtab-shadow: 0 12px 32px -14px rgb(0 0 0 / .7), 0 2px 8px -4px rgb(0 0 0 / .5);
+}
+html.dark .mtab { box-shadow: inset 0 1px 0 hsl(0 0% 100% / .12), inset 0 -1px 0 hsl(0 0% 100% / .04), var(--mtab-shadow); }
+/* the solid pill of 11-19 wherever glass cannot or should not show: no blur support, less transparency, more contrast */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .mtab { background: hsl(var(--mtab-bg)); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .mtab { background: hsl(var(--mtab-bg)); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .mtab::before, .mtab::after { display: none; }
+}
+html[data-contrast="more"] .mtab { background: hsl(var(--card)); border-color: hsl(var(--border)); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: var(--mtab-shadow); }
+html[data-contrast="more"] .mtab::before, html[data-contrast="more"] .mtab::after { display: none; }
+@media (forced-colors: active) { .mtab { border-color: CanvasText; } .mtab-ind::before { background: Highlight; } .mtab-ripple, .mtab::before, .mtab::after { display: none; } }
+/* Compact while reading on (Nav.tsx useCompactOnScroll): 92% about the bottom centre, the tabs closed up. The
+   padding steps at once (no transition) so the pill's track (.mtab-ind, measured from --mtab-px) and the icons
+   move together. */
+.mtab[data-compact] { height: 56px; padding: 3px 10px; transform: scale(.92); --mtab-px: 10px; }
+/* Tabs: muted until chosen (72% ink: 4.5:1 on the tint over the page, 3:1 over anything). Colour 250ms, a press
+   dips the icon 150ms. */
+.mtab-item { color: hsl(var(--foreground) / .72); -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+html.dark .mtab-item { color: hsl(var(--foreground) / .78); }
 .mtab-item[aria-current] { color: hsl(var(--foreground)); }
 .mtab-pill { border-radius: 9999px; transition: transform .15s var(--ease-liquid), background-color .2s var(--ease-liquid); }
 .mtab-item:not(:disabled):active .mtab-pill { transform: scale(.96); }
+.mtab[data-drag] .mtab-item:active .mtab-pill { transform: none; }
 @media (hover: hover) { .mtab-item:not([aria-current]):hover { color: hsl(var(--foreground)); } .mtab-item:not([aria-current]):hover .mtab-pill { background-color: hsl(var(--foreground) / .06); } }
+/* The one lime pill. A track one tab wide (the bar's inner width over --n tabs) slides along by --i tab widths;
+   the 56 x 32 pill sits centred in it, so it lines up under every icon at any bar width. While a finger drags
+   (data-drag) the track follows with no easing and the pill stretches by --sx; letting go eases it to the tab. */
 .mtab-ind {
-  position: absolute; inset: 0; border-radius: inherit;
-  background: linear-gradient(135deg, hsl(var(--lime)) 0%, hsl(84 95% 47%) 100%);
-  opacity: 0; transform: scaleX(.55);
-  transition: transform .3s var(--ease-liquid), opacity .2s var(--ease-liquid);
+  position: absolute; top: 0; bottom: 0; left: var(--mtab-px);
+  width: calc((100% - 2 * var(--mtab-px)) / var(--n, 5));
+  display: grid; place-items: center; pointer-events: none;
+  translate: calc(var(--i, 0) * 100%) 0;
+  transition: translate .35s var(--ease-liquid), opacity .2s var(--ease-liquid);
 }
-.mtab-item[aria-current] .mtab-ind { opacity: 1; transform: none; }
+.mtab-ind::before {
+  content: ""; width: 56px; height: 32px; border-radius: 9999px;
+  background: linear-gradient(135deg, hsl(var(--lime)) 0%, hsl(84 95% 47%) 100%);
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .45), 0 4px 12px -6px hsl(var(--lime) / .7);
+  scale: var(--sx, 1) 1;
+  transition: scale .18s var(--ease-liquid);
+}
+.mtab[data-none]:not([data-drag]) .mtab-ind { opacity: 0; }
+.mtab[data-drag] .mtab-ind { transition: opacity .2s var(--ease-liquid); }
 .mtab-item[aria-current] .mtab-pill > svg { color: hsl(var(--lime-foreground)); }
+/* while a finger drags, the tab under it carries the ink and the one you came from lets it go */
+.mtab[data-drag] .mtab-item[data-over] .mtab-pill > svg { color: hsl(var(--lime-foreground)); }
+.mtab[data-drag] .mtab-item[aria-current]:not([data-over]) .mtab-pill > svg { color: hsl(var(--foreground) / .72); }
 .mtab-pill > svg { transition: color .25s var(--ease-liquid); }
 .mtab-item { transition: color .25s var(--ease-liquid); }
+/* The liquid highlight: a soft lime glow under the fingertip (--fx in the bar's own pixels), on from the first
+   touch (data-press), riding along the drag, and blooming out once where the finger lets go (data-drop). */
+.mtab-ripple {
+  position: absolute; top: 50%; left: 0; width: 112px; height: 112px; margin: -56px; z-index: -1; pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, hsl(var(--lime) / .42), hsl(var(--lime) / .18) 45%, hsl(var(--lime) / 0) 72%);
+  translate: var(--fx, 50%) 0; scale: .7; opacity: 0;
+  transition: opacity .22s var(--ease-liquid), scale .22s var(--ease-liquid);
+}
+.mtab[data-press] .mtab-ripple { opacity: 1; scale: 1; }
+.mtab[data-drop] .mtab-ripple { animation: mtab-drop .45s var(--ease-liquid) forwards; }
+@keyframes mtab-drop { from { opacity: .8; scale: 1; } to { opacity: 0; scale: 1.5; } }
 @media (prefers-reduced-motion: no-preference) {
   .mtab { animation: mtab-in .4s var(--ease-liquid) backwards; }
 }
 @keyframes mtab-in { from { opacity: 0; transform: translateY(16px); } }
 @media (prefers-reduced-motion: reduce) {
-  .mtab, .mtab-item, .mtab-pill, .mtab-pill > svg, .mtab-ind { transition: none; }
+  .mtab, .mtab-item, .mtab-pill, .mtab-pill > svg, .mtab-ind, .mtab-ind::before, .mtab-ripple { transition: none; }
   .mtab-item:not(:disabled):active .mtab-pill { transform: none; }
+  .mtab-ind::before { scale: 1 1; }
+  .mtab-ripple { display: none; }
 }
 /* A phone on its side: 54px, 8px off the edge; compact only drops to 50px (no room to spare for a scale). */
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1023px) {

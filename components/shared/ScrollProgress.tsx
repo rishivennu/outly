@@ -6,7 +6,8 @@ import { useEffect, useRef } from "react";
  * centre, runs out to both corners, down both sides and along the bottom, and closes at the bottom centre exactly when the
  * page reaches its end; closing it gives one soft glow pulse. Each side is split by real length (width vs height), so the
  * line moves at one steady speed all the way round. Six edge bars scaled with transforms: no layout, no SVG quirks, the
- * same in every browser. Hidden when a page does not scroll; decorative only (aria-hidden).
+ * same in every browser. Hidden when a page does not scroll; decorative only (aria-hidden). Not shown in the studio on a
+ * phone (globals.css, body:has(main.mmain) under 1024px): there it read as a frame around the app (R1213).
  */
 export function ScrollProgress() {
   const ref = useRef<HTMLDivElement>(null);

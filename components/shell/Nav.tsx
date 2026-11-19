@@ -1,13 +1,14 @@
 "use client";
 import { HoverLink as Link } from "./HoverLink";
-import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { OutlyLogo } from "@/components/brand/Logo";
 import { NoticesBell } from "./NoticesBell";
 import { PulseRail } from "./PulseRail";
 import { MobileDrawer } from "./MobileDrawer";
 import { MAIN, TOUR, isActive, pageTitle } from "./nav-items";
-import { TAB_SCROLL_START, hidesTabBar, tabScrollStep, type TabScroll } from "@/lib/client/tab-bar";
+import { TAB_SCROLL_START, hidesTabBar, slideIndex, slideLock, slideStretch, slideTarget, tabScrollStep, type TabScroll } from "@/lib/client/tab-bar";
+import { haptic } from "@/lib/client/app-mode";
 
 /**
  * Desktop sidebar: the collapsible rail for every dashboard style (1103). Classic and Analytics used to have
@@ -65,17 +66,170 @@ function useCompactOnScroll(path: string | null) {
 }
 
 /**
- * 1105 refinement, 1115 docked, 11-19 floating: a pill 12px off the bottom edge and the sides (plus the safe area, so
- * it clears the home indicator and Android's gesture strip), never wider than 440px, solid in the theme's surface
- * colour with a hairline all round and a soft shadow (.mtab in globals.css). 60px tall, five equal icon-only tabs
- * (22px icons on a 56 x 32 pill), each at least 50px tall and 56px wide on the narrowest phone, named for screen
- * readers by visually hidden text. The active tab keeps the lime pill with a dark icon; the pill grows in place
- * (300ms), colours move in 250ms, a press dips the icon (150ms), and the bar rises in once (400ms), all on
- * cubic-bezier(0.16, 1, 0.3, 1). Reading on down a long page compacts it (data-compact, 300ms): the bar drops to
- * 56px and shrinks about its bottom centre to 92%, every tab still at least 44 x 56px on screen.
+ * R1213 (11-19), finger-following tabs. Touch a tab and slide sideways: the lime pill (one element for the whole bar,
+ * .mtab-ind) leaves the tab you are on and follows the finger, a soft liquid highlight (.mtab-ripple) rides under the
+ * fingertip, the pill stretches a little in the direction of travel, and the tab nearest the finger lights up as you
+ * cross into it (data-over, with a tick of haptics where the phone has them). Letting go snaps the pill to that tab
+ * and opens it, once; letting go where you started, or a flick too short to cross a boundary, steps one tab on.
+ * A finger that moves up or down instead is the page scrolling (touch-action: pan-y hands it to the browser, which
+ * cancels the pointer) and nothing here fires; a plain tap stays a plain tap on the link. Everything the finger moves
+ * is a CSS variable on the bar (--i the pill's tab, fractional while dragging; --fx the highlight's x; --sx the
+ * stretch), so following it never renders React. Reduced motion keeps the slide (it is the control) and drops the
+ * stretch and the ripple. The track the finger is measured against is the bar's inner width (inside the border and
+ * --mtab-px), the same track .mtab-ind slides on, so the pill sits exactly under the finger in either bar size.
+ */
+function useSlideTabs(nav: RefObject<HTMLElement | null>, hrefs: string[], activeIdx: number, go: (href: string) => void) {
+  type Gesture = { id: number; x0: number; y0: number; x: number; t: number; vx: number; lock: "h" | "v" | null; over: number; bx: number; left: number; w: number; scale: number };
+  const g = useRef<Gesture | null>(null);
+  // when the last drag let go: the click the browser sends right after it must not open the link under the finger too
+  const dragEnd = useRef(0);
+  const still = useRef(false);
+  const timers = useRef<{ drop?: ReturnType<typeof setTimeout>; stretch?: ReturnType<typeof setTimeout> }>({});
+  const n = hrefs.length;
+  useEffect(() => {
+    const m = matchMedia("(prefers-reduced-motion: reduce)");
+    const read = () => void (still.current = m.matches);
+    read();
+    m.addEventListener("change", read);
+    return () => m.removeEventListener("change", read);
+  }, []);
+  const set = (k: string, v: string) => nav.current?.style.setProperty(k, v);
+  // The pill follows the tab you are on whenever a navigation lands (or does not: a redirect, a blocked route) and
+  // no finger holds it; React alone would only rewrite --i when the active tab changes.
+  useEffect(() => {
+    if (!g.current) set("--i", String(Math.max(0, activeIdx)));
+  }, [activeIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => {
+    clearTimeout(timers.current.drop);
+    clearTimeout(timers.current.stretch);
+  }, []);
+  // The bar may be scaled (compact): finger x in the bar's own layout pixels.
+  const fingerX = (s: Gesture, clientX: number) => `${((clientX - s.bx) / s.scale).toFixed(1)}px`;
+  // The track: the bar's inner width (inside its border and --mtab-px), as .mtab-ind measures it.
+  const measure = (el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    const scale = r.width / (el.offsetWidth || r.width);
+    const inset = ((parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.getPropertyValue("--mtab-px")) || 0)) * scale;
+    return { bx: r.left, left: r.left + inset, w: r.width - 2 * inset, scale };
+  };
+  const markOver = (i: number) => nav.current?.querySelectorAll<HTMLElement>(".mtab-item").forEach((el, k) => el.toggleAttribute("data-over", k === i));
+  const settle = (idx: number) => {
+    const el = nav.current;
+    if (!el) return;
+    el.removeAttribute("data-drag");
+    el.removeAttribute("data-press");
+    set("--i", String(Math.max(0, idx)));
+    set("--sx", "1");
+    clearTimeout(timers.current.stretch);
+    markOver(-1);
+    g.current = null;
+  };
+  // The release ripple: a short bloom where the finger left the glass (restarted if the last one is still going).
+  const drop = () => {
+    const el = nav.current;
+    if (!el || still.current) return;
+    clearTimeout(timers.current.drop);
+    el.removeAttribute("data-drop");
+    void el.offsetWidth;
+    el.setAttribute("data-drop", "");
+    timers.current.drop = setTimeout(() => el.removeAttribute("data-drop"), 480);
+  };
+  const onPointerDown = (e: ReactPointerEvent<HTMLElement>) => {
+    const el = nav.current;
+    if (e.button !== 0 || !el) return;
+    // a gesture whose end never reached the bar (a mouse let go outside it) gives way to the new one
+    if (g.current) settle(activeIdx);
+    const m = measure(el);
+    const s: Gesture = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, t: e.timeStamp, vx: 0, lock: null, over: Math.round(slideIndex(e.clientX, m.left, m.w, n)), ...m };
+    g.current = s;
+    set("--fx", fingerX(s, e.clientX));
+    el.setAttribute("data-press", "");
+  };
+  const onPointerMove = (e: ReactPointerEvent<HTMLElement>) => {
+    const s = g.current;
+    const el = nav.current;
+    if (!s || !el || e.pointerId !== s.id) return;
+    const dx = e.clientX - s.x0;
+    const dy = e.clientY - s.y0;
+    if (!s.lock) {
+      s.lock = slideLock(dx, dy);
+      if (s.lock === "h") {
+        try {
+          el.setPointerCapture(e.pointerId);
+        } catch {}
+        Object.assign(s, measure(el)); // the bar may have compacted since the touch
+        el.setAttribute("data-drag", "");
+      } else if (s.lock === "v") el.removeAttribute("data-press");
+    }
+    if (s.lock !== "h") return;
+    const fi = slideIndex(e.clientX, s.left, s.w, n);
+    // speed, smoothed over the last few samples so one late event does not read as a stop
+    s.vx = 0.6 * ((e.clientX - s.x) / Math.max(1, e.timeStamp - s.t)) + 0.4 * s.vx;
+    s.x = e.clientX;
+    s.t = e.timeStamp;
+    set("--i", fi.toFixed(3));
+    set("--fx", fingerX(s, e.clientX));
+    if (!still.current) {
+      set("--sx", slideStretch(s.vx).toFixed(3));
+      // a finger that stops lets the pill relax
+      clearTimeout(timers.current.stretch);
+      timers.current.stretch = setTimeout(() => set("--sx", "1"), 90);
+    }
+    const near = Math.round(fi);
+    if (near !== s.over) {
+      s.over = near;
+      markOver(near);
+      haptic(5);
+    }
+  };
+  const onPointerUp = (e: ReactPointerEvent<HTMLElement>) => {
+    const s = g.current;
+    const el = nav.current;
+    if (!s || !el || e.pointerId !== s.id) return;
+    if (s.lock === "h") {
+      const from = Math.round(slideIndex(s.x0, s.left, s.w, n));
+      const target = slideTarget(slideIndex(e.clientX, s.left, s.w, n), from, e.clientX - s.x0, n, 24, s.vx);
+      settle(target);
+      dragEnd.current = e.timeStamp;
+      if (target !== activeIdx) go(hrefs[target]!);
+    } else {
+      el.removeAttribute("data-press");
+      g.current = null;
+    }
+    drop();
+  };
+  const onPointerCancel = () => settle(activeIdx);
+  // a mouse or pen that leaves the bar before it has locked sideways is a press that came to nothing
+  const onPointerLeave = (e: ReactPointerEvent<HTMLElement>) => {
+    const s = g.current;
+    if (s && s.lock !== "h" && e.pointerId === s.id) settle(activeIdx);
+  };
+  // the click the browser sends after a drag must not open the link under the finger as well
+  const onClickCapture = (e: ReactMouseEvent<HTMLElement>) => {
+    if (!dragEnd.current || e.timeStamp - dragEnd.current > 500) return;
+    dragEnd.current = 0;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPointerLeave, onClickCapture };
+}
+
+/**
+ * 1105 refinement, 1115 docked, 11-19 floating, R1213 liquid glass: a pill 12px off the bottom edge and the sides
+ * (plus the safe area, so it clears the home indicator and Android's gesture strip), never wider than 440px. Since
+ * R1213 the pill is glass (.mtab in globals.css): the page shows through a blur and a light tint, a lit rim runs round
+ * the edge, a sheen sits across the top and a soft shadow grounds it; icons keep 4.5:1 on the tint whatever scrolls
+ * under. 60px tall, five equal icon-only tabs (22px icons on a 56 x 32 pill), each at least 50px tall and 56px wide
+ * on the narrowest phone, named for screen readers by visually hidden text. One lime pill (.mtab-ind) marks the tab
+ * you are on and glides to the next (350ms on cubic-bezier(0.16, 1, 0.3, 1)) instead of one pill fading out and
+ * another fading in; a finger can also drag it across the bar (useSlideTabs). Reading on down a long page compacts
+ * the bar (data-compact, 300ms): it drops to 56px and shrinks about its bottom centre to 92%, every tab still at
+ * least 44 x 56px on screen. It never leaves the screen.
  */
 export function MobileNav() {
   const path = usePathname();
+  const router = useRouter();
   const tabs = TABS.map((h) => MAIN.find((m) => m.href === h)!);
   const folded = useCompactOnScroll(path);
   // A page may opt out of the tab bar (lib/client/tab-bar.ts; none does since 11-16, /create's post actions bar
@@ -88,16 +242,29 @@ export function MobileNav() {
     document.documentElement.toggleAttribute("data-tabs-compact", compact);
     return () => document.documentElement.removeAttribute("data-tabs-compact");
   }, [compact]);
+  // One rule for every tab (1053): green marks where you are, nothing else. A page outside the five (Content,
+  // Settings) has no pill (data-none) until a finger brings one in.
+  const activeIdx = tabs.findIndex((t) => isActive(path, t.href));
+  const nav = useRef<HTMLElement | null>(null);
+  const slide = useSlideTabs(nav, TABS, activeIdx, (href) => router.push(href));
   if (off) return <span hidden data-tabbar-off="" />;
   return (
-    <nav aria-label="Primary" data-compact={compact ? "" : undefined} className="mtab web-only fixed inset-x-0 z-40 flex items-stretch lg:hidden">
+    <nav
+      ref={nav}
+      aria-label="Primary"
+      data-compact={compact ? "" : undefined}
+      data-none={activeIdx < 0 ? "" : undefined}
+      style={{ ["--i" as string]: Math.max(0, activeIdx), ["--n" as string]: tabs.length }}
+      className="mtab web-only fixed inset-x-0 z-40 flex items-stretch lg:hidden"
+      {...slide}
+    >
+      <span className="mtab-ind" aria-hidden="true" />
+      <span className="mtab-ripple" aria-hidden="true" />
       {tabs.map(({ href, label, icon: Icon }) => {
-        // One rule for every tab (1053): green marks where you are, nothing else.
         const active = isActive(path, href);
         return (
-          <Link key={href} href={href} data-tour={TOUR[href]} aria-current={active ? "page" : undefined} className="mtab-item group flex min-w-0 flex-1 flex-col items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
+          <Link key={href} href={href} data-tour={TOUR[href]} aria-current={active ? "page" : undefined} draggable={false} className="mtab-item group flex min-w-0 flex-1 flex-col items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
             <span className="mtab-pill relative grid h-[32px] w-[56px] place-items-center">
-              <span className="mtab-ind" aria-hidden="true" />
               <Icon className="relative h-[22px] w-[22px]" strokeWidth={2} aria-hidden="true" />
             </span>
             <span className="sr-only">{label}</span>

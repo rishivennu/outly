@@ -129,12 +129,13 @@ describe("1105 tab bar", () => {
     expect(tabs).toContain('strokeWidth={2}');
   });
   test("active: lime pill, dark icon (11-19: icons only, the label is for screen readers); timings 250 / 300 / 150 / 400", () => {
-    expect(css).toContain(".mtab-item[aria-current] .mtab-ind { opacity: 1; transform: none; }");
+    // R1213: one .mtab-ind for the whole bar, slid along by --i (tests/round-1213-liquid-tabs.test.ts)
+    expect(css).toContain(".mtab[data-none]:not([data-drag]) .mtab-ind { opacity: 0; }");
     expect(css).toContain(".mtab-item[aria-current] .mtab-pill > svg { color: hsl(var(--lime-foreground)); }");
     expect(css).not.toContain(".mtab-label");
     expect(tabs).toContain('<span className="sr-only">{label}</span>');
     expect(css).toContain("transition: color .25s var(--ease-liquid); }");
-    expect(rule(".mtab-ind")).toContain("transform .3s var(--ease-liquid)");
+    expect(rule(".mtab-ind")).toContain("translate .35s var(--ease-liquid)");
     expect(rule(".mtab-pill")).toContain("transform .15s var(--ease-liquid)");
     expect(css).toContain(".mtab { animation: mtab-in .4s var(--ease-liquid) backwards; }");
   });
@@ -158,10 +159,11 @@ describe("1105 tab bar", () => {
 });
 
 describe("1105 review fixes", () => {
-  test("tab bar is solid (1115) so muted labels hold 4.5:1 over anything behind", () => {
-    expect(css).toContain("html.dark .mtab { --mtab-bg: 240 5% 10.5%; --mtab-line: 0 0% 100% / .08; --mtab-shadow:");
+  test("tab bar tint (R1213 glass): 62 to 72% of the surface so the 72% ink holds 4.5:1 over the page and 3:1 over anything behind", () => {
+    expect(css).toMatch(/html\.dark \.mtab \{\r?\n  --mtab-bg: 240 5% 11%; --mtab-line: 0 0% 100% \/ \.1;/);
     expect(rule(".mtab")).toContain("--mtab-bg: 0 0% 100%;");
-    expect(rule(".mtab")).not.toContain("backdrop-filter");
+    expect(rule(".mtab")).toContain("hsl(var(--mtab-bg) / .72)");
+    expect(css).toContain(".mtab-item { color: hsl(var(--foreground) / .72);");
   });
   test("only the latest theme switch clears the transition flag", () => {
     expect(theme).toContain("const n = ++seq;");

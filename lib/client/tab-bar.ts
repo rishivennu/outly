@@ -33,3 +33,42 @@ export function tabScrollStep(s: TabScroll, y: number, end: number, viewport: nu
   const run = Math.sign(d) === Math.sign(s.run) ? s.run + d : d;
   return { y, run, compact: run > 48 ? true : run < -12 ? false : s.compact };
 }
+
+/*
+ * R1213 (11-19), finger-following tabs: touch a tab and slide sideways, and the lime pill follows the finger across
+ * the bar; letting go opens the tab under it. These are the rules, kept pure so they run in a test without a browser.
+ * Nav.tsx useSlideTabs feeds them pointer events and writes the results into CSS variables on the bar (--i, --fx,
+ * --sx), so following the finger never re-renders React.
+ */
+
+/** Where a finger at x sits along a track of n equal tabs: 0 at the first tab's centre, n - 1 at the last, clamped. */
+export function slideIndex(x: number, left: number, width: number, n: number) {
+  if (n <= 1 || width <= 0) return 0;
+  return Math.min(n - 1, Math.max(0, (x - left) / (width / n) - 0.5));
+}
+
+/**
+ * The gesture's direction, decided once the finger has moved past the slop: sideways ("h") slides the tabs, up or down
+ * ("v") is the page scrolling and the bar leaves it alone, null while it is still just a touch.
+ */
+export function slideLock(dx: number, dy: number, slop = 10): "h" | "v" | null {
+  const ax = Math.abs(dx);
+  const ay = Math.abs(dy);
+  if (ax < slop && ay < slop) return null;
+  return ax > ay ? "h" : "v";
+}
+
+/**
+ * The tab a released finger lands on: the nearest, or one step on for a quick flick that never left its own tab (at
+ * least `flick` px, still moving at `minV` px/ms when it let go; a slow drift that stays put stays put).
+ */
+export function slideTarget(fi: number, startIdx: number, dx: number, n: number, flick = 24, vx = Infinity, minV = 0.2) {
+  let i = Math.round(fi);
+  if (i === startIdx && Math.abs(dx) >= flick && Math.abs(vx) >= minV) i += Math.sign(dx);
+  return Math.min(n - 1, Math.max(0, i));
+}
+
+/** How far the pill stretches in the direction of travel for a finger speed in px/ms: up to 35% longer, never shorter. */
+export function slideStretch(vx: number, cap = 0.35) {
+  return 1 + Math.min(cap, Math.abs(vx) * 0.25);
+}

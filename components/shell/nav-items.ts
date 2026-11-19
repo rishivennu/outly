@@ -67,7 +67,7 @@ export function isActive(path: string | null, href: string) {
 const TITLES: [string, string][] = [
   ["/home", "Home"], ["/create", "Create"], ["/content", "Content"], ["/calendar", "Calendar"], ["/analytics", "Analytics"], ["/profile-review", "Profile Review"],
   ["/inbox", "Inbox"], ["/approvals", "Approvals"], ["/accounts", "Accounts"], ["/billing", "Billing"], ["/support", "Help"],
-  ["/settings", "Settings"],
+  ["/settings", "Settings"], ["/mascot", "Pip"],
 ];
 export function pageTitle(path: string | null) {
   return TITLES.find(([h]) => isActive(path, h))?.[1] ?? "";

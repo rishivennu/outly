@@ -16,16 +16,17 @@ const MOODS: { mood: PipMood; label: string; use: string }[] = [
 ];
 
 /**
- * Design preview of every Pip mood. One canvas colour runs edge to edge across every section,
- * like the reference board, so the glow reads the same everywhere. Not linked from the nav.
+ * Design preview of every Pip mood. Not linked from the nav. R1213: it sits on the studio page like every other
+ * screen (the shared gutter, the page background, theme colours) instead of its own full-height dark canvas, so on
+ * a phone the top bar, the page and the tab bar are one surface with no seam.
  */
 export default function MascotPage() {
   return (
-    <div className="min-h-dvh bg-[#121117] px-5 pb-16 pt-8 text-[#f1f0f7] sm:px-10 lg:pt-14">
+    <div className="page-frame pb-16 pt-8 lg:pt-14">
       <section aria-labelledby="pip-h" className="max-w-5xl">
-        <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#b4abff]">Brand</p>
+        <p className="eyebrow mb-3 text-accent">Brand</p>
         <h1 id="pip-h" className="display text-[clamp(2.4rem,5.5vw,4.2rem)]">Meet Pip.</h1>
-        <p className="mt-3 max-w-xl text-[#c3c0d0]">A soft glow cloud. The light inside changes shape with the mood; the eyes do the talking.</p>
+        <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-muted-foreground">A soft glow cloud. The light inside changes shape with the mood; the eyes do the talking.</p>
       </section>
 
       <section aria-label="Moods" className="mt-12 max-w-5xl">
@@ -34,31 +35,31 @@ export default function MascotPage() {
             <li key={m.mood} className="flex flex-col items-center gap-2 text-center">
               <Pip size={104} mood={m.mood} title={`Pip, ${m.label.toLowerCase()}`} />
               <span className="mt-2 font-semibold">{m.label}</span>
-              <span className="text-[13px] text-[#a9a6b8]">{m.use}</span>
+              <span className="text-[13px] text-muted-foreground">{m.use}</span>
             </li>
           ))}
         </ul>
       </section>
 
-      <section aria-labelledby="sf-h" className="mt-14 max-w-5xl border-t border-white/10 pt-10">
+      <section aria-labelledby="sf-h" className="mt-14 max-w-5xl border-t border-border pt-10">
         <h2 id="sf-h" className="text-xl font-semibold">Streak flame</h2>
-        <p className="mt-1 text-[13px] text-[#a9a6b8]">Grows hotter with the streak. Leave the page alone for 9 seconds and Pip starts babbling.</p>
+        <p className="mt-1 text-[13px] text-muted-foreground">Grows hotter with the streak. Leave the page alone for 9 seconds and Pip starts babbling.</p>
         <ul className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-5">
           {[0, 1, 4, 7, 12].map((n) => (
             <li key={n} className="flex flex-col items-center gap-2 text-center">
               <StreakFlame streak={n} met={false} className="w-[132px]" />
               <span className="mt-2 font-semibold">{TIER_NAME[streakTier(n)]}</span>
-              <span className="text-[13px] text-[#a9a6b8]">{n} week{n === 1 ? "" : "s"}</span>
+              <span className="text-[13px] text-muted-foreground">{n} week{n === 1 ? "" : "s"}</span>
             </li>
           ))}
         </ul>
       </section>
 
-      <section aria-label="Sizes" className="mt-14 max-w-5xl border-t border-white/10 pt-10">
+      <section aria-label="Sizes" className="mt-14 max-w-5xl border-t border-border pt-10">
         <div className="flex flex-wrap items-end gap-8">
           {[24, 32, 48, 64, 120].map((s) => <Pip key={s} size={s} mood="idle" />)}
         </div>
-        <p className="mt-4 text-[13px] text-[#a9a6b8]">24, 32, 48, 64 and 120 px</p>
+        <p className="mt-4 text-[13px] text-muted-foreground">24, 32, 48, 64 and 120 px</p>
       </section>
     </div>
   );
