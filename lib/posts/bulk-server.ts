@@ -14,6 +14,7 @@ import { BULK_MAX, accountRounds, bulkTargets } from "./bulk";
 import { requestScope } from "../profiles";
 import { inScope, pickAccount } from "../profiles-core";
 import { bookingIssues, throwGuard } from "./guard-server";
+import { lineageAfterCreate } from "../intelligence/lineage";
 
 /** Suggested times for a batch: best hours, spread over the days ahead, clear of what is already booked. */
 export async function planBatch(userId: string, platforms: Platform[], count: number, tz: string) {
@@ -99,6 +100,8 @@ export async function bookBatch(userId: string, body: z.infer<typeof bulkSchedul
       const post = await db.post.create({
         data: { userId, mediaId: it.mediaId, title: it.title?.trim() || null, targets: { create: bulkTargets(it, round.map((r) => r.platform)).map((t) => ({ ...t, socialAccountId: pin.get(t.platform) ?? null })) } },
       });
+      // R1234: every booked post gets its Content Memory item.
+      await lineageAfterCreate(userId, post.id);
       try {
         await launchPost(userId, post.id, "schedule", new Date(it.scheduledAt), "realistic");
       } catch (e) {

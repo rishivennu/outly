@@ -58,6 +58,8 @@ export const savePostSchema = z.object({
   storyMeta: z.string().max(20_000).optional().nullable(),
   hook: z.string().max(500).optional().nullable(),
   targets: z.array(targetDraftSchema).max(PLATFORMS.length),
+  /** R1234: the post this new draft was adapted from (Content Memory lineage). Only read when a post is created. */
+  adaptedFromPostId: z.string().regex(/^[A-Za-z0-9]{1,40}$/, "Bad post id.").max(40).optional().nullable(),
   /** 1131: video (the default, one clip) | photo | carousel | story. Not sent = keep what the post is. */
   format: z.enum(POST_FORMATS).optional(),
   /** 1131: the slides in order, for every format but video. The first one is also mediaId. */

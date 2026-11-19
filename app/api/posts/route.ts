@@ -11,6 +11,7 @@ import { recordEdit } from "@/lib/collab";
 import { FORMAT_LABEL, isImageMime, supportsFormat, takesFirstComment, type PostFormat } from "@/lib/formats";
 import { PLATFORM_META } from "@/lib/domain";
 import { DRAFT_CONFLICT_MESSAGE, draftConflict, serverDraft, StaleDraftError } from "@/lib/posts/conflicts";
+import { lineageAfterCreate } from "@/lib/intelligence/lineage";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +99,8 @@ export const POST = route(async (req, { user }) => {
       if (e instanceof StaleDraftError) throw new HttpError(409, DRAFT_CONFLICT_MESSAGE, "draft_conflict", { server: serverDraft(await ownedPost(user.id, id)) });
       throw e;
     }
+    // R1234: only a draft this call created gets its Content Memory item (a clientKey twin or an update already has one).
+    if (!existing) await lineageAfterCreate(user.id, id, body.adaptedFromPostId);
     if (changed) await recordEdit(user, { id });
     return json({ post: await postView(await ownedPost(user.id, id)), ...(deduped ? { deduped: true } : {}) });
   };

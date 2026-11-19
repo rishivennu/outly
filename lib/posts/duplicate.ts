@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "../db";
 import { ownedPost, postView } from "../services";
+import { lineageAfterCreate } from "../intelligence/lineage";
 
 /**
  * "Duplicate" from the post sheet: a fresh draft of the same video, ready to edit. The copy keeps everything
@@ -35,5 +36,7 @@ export async function duplicatePost(userId: string, postId: string) {
       },
     },
   });
+  // R1234: the copy is an adaptation of the source, filed under the source's Content Memory item.
+  await lineageAfterCreate(userId, copy.id, src.id, { origin: "adapt" });
   return postView(await ownedPost(userId, copy.id));
 }
