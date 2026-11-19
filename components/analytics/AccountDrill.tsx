@@ -170,7 +170,7 @@ export function AccountDrill({ accounts, active, onPick, busy }: { accounts: Acc
               <span className="relative shrink-0">
                 {a.avatar ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.avatar} alt="" className="h-10 w-10 rounded-full object-cover" referrerPolicy="no-referrer" />
+                  <img src={a.avatar} alt="" width={40} height={40} loading="lazy" decoding="async" className="h-10 w-10 rounded-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
                   <span className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-sm font-semibold" aria-hidden="true">{a.username.replace(/^@/, "").slice(0, 1).toUpperCase()}</span>
                 )}

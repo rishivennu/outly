@@ -46,8 +46,6 @@ const nextConfig = {
       "./public/brand/bimi.svg",
       "./public/brand/email/**",
       "./public/brand/founding/**",
-      "./public/brand/icon-sheet.png",
-      "./public/brand/icons/**",
       "./public/brand/pay/**",
       "./public/brand/rocket/**",
     ],

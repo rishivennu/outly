@@ -85,6 +85,6 @@ export function OrbAvatar({ avatar, seed, size = 36, className, label }: { avata
   const r = resolveAvatar(avatar, seed);
   if ("photo" in r)
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={r.photo} alt={label ?? ""} width={size} height={size} referrerPolicy="no-referrer" className={cn("shrink-0 rounded-full object-cover hairline", className)} style={{ width: size, height: size }} />;
+    return <img src={r.photo} alt={label ?? ""} width={size} height={size} decoding="async" referrerPolicy="no-referrer" className={cn("shrink-0 rounded-full object-cover hairline", className)} style={{ width: size, height: size }} />;
   return <OrbArt orb={r.orb} size={size} className={className} label={label} />;
 }

@@ -156,7 +156,7 @@ function Avatar({ name, src, size = 36 }: { name: string; src?: string | null; s
   const style = { width: size, height: size };
   if (src && !broken)
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt="" width={size} height={size} style={style} onError={() => setBroken(true)} className="shrink-0 rounded-full object-cover" />;
+    return <img src={src} alt="" width={size} height={size} loading="lazy" decoding="async" style={style} onError={() => setBroken(true)} className="shrink-0 rounded-full object-cover" />;
   return (
     <span aria-hidden style={style} className="grid shrink-0 place-items-center rounded-full bg-lime/20 text-[12px] font-bold text-lime-ink">
       {initials(name)}

@@ -83,7 +83,7 @@ export function PersonAvatar({ name, src, platform, size = 40, onBroken }: { nam
     <span className="relative shrink-0" style={{ width: size, height: size }}>
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" width={size} height={size} onError={onBroken} referrerPolicy="no-referrer" className="rounded-full object-cover" style={{ width: size, height: size }} />
+        <img src={src} alt="" width={size} height={size} loading="lazy" decoding="async" onError={onBroken} referrerPolicy="no-referrer" className="rounded-full object-cover" style={{ width: size, height: size }} />
       ) : (
         <span aria-hidden="true" className="ib-av grid place-items-center rounded-full font-semibold" style={{ width: size, height: size, fontSize: Math.round(size * 0.34), ["--h" as string]: hue(name) }}>
           {initials(name)}

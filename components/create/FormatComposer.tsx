@@ -687,7 +687,7 @@ function SlideArt({ s, contain, play }: { s: Slide; contain?: boolean; play?: bo
   return (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      {src ? <img src={src} alt="" className={cn("h-full w-full", fit)} /> : (
+      {src ? <img src={src} alt="" decoding="async" className={cn("h-full w-full", fit)} /> : (
         <span className="grid h-full w-full place-items-center text-muted-foreground">
           {s.kind === "video" ? <Film className="h-6 w-6" aria-hidden="true" /> : <ImageIcon className="h-6 w-6" aria-hidden="true" />}
         </span>

@@ -74,7 +74,7 @@ export function CoverPicker({ targets, coverUrl, ensurePost, onChange }: Props) 
           className="relative grid aspect-[9/16] w-20 shrink-0 place-items-center overflow-hidden rounded-2xl bg-secondary/70 text-muted-foreground outline-none transition-[background-color] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none [@media(hover:hover)]:hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 hairline"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {coverUrl ? <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <ImagePlus className="h-5 w-5" aria-hidden="true" />}
+          {coverUrl ? <img src={coverUrl} alt="" decoding="async" className="absolute inset-0 h-full w-full object-cover" /> : <ImagePlus className="h-5 w-5" aria-hidden="true" />}
           {busy === "up" && (
             <span className="absolute inset-0 grid place-items-center bg-background/60">
               <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />

@@ -11,9 +11,10 @@ import { cn } from "@/lib/utils";
  */
 /**
  * Rocket file for a drawn size (10-16 perf): up to 48px draws from a 96px WebP (~5 KB, sharp at 2x)
- * instead of the 256px PNG (35-53 KB). Both theme copies are in the page, so this matters twice.
+ * instead of the 256px one. R1222: the 256px copies and the tiles are WebP too (9-20 KB, were 18-225 KB as PNG).
+ * Both theme copies are in the page, so this matters twice.
  */
-const rocket = (name: string, size: number) => (size <= 48 ? `/brand/rocket/${name}-96.webp` : `/brand/rocket/${name}-256.png`);
+const rocket = (name: string, size: number) => (size <= 48 ? `/brand/rocket/${name}-96.webp` : `/brand/rocket/${name}-256.webp`);
 const px = (size: number) => (size <= 32 ? 64 : size <= 64 ? 128 : size <= 128 ? 256 : 512);
 
 export function OutlyMark({
@@ -52,8 +53,8 @@ export function OutlyMark({
     return <img src={src} {...common} className={cn("shrink-0 select-none", className)} />;
   }
   const n = px(size);
-  const dark = `/brand/rocket/mark-${Math.min(n, 256)}.png`;
-  const light = `/brand/rocket/mark-light-${n}.png`;
+  const dark = `/brand/rocket/mark-${Math.min(n, 256)}.webp`;
+  const light = `/brand/rocket/mark-light-${n}.webp`;
   const base = "shrink-0 select-none rounded-[22%]";
   if (tone !== "auto")
     // eslint-disable-next-line @next/next/no-img-element

@@ -47,7 +47,7 @@ export const LOGO_SIZE: Record<Platform, readonly [number, number]> = {
   linkedin: [255, 256],
 };
 const REVERSED: ReadonlySet<Platform> = new Set<Platform>(["x", "tiktok", "threads"]);
-export const logoSrc = (p: Platform, dark = false) => `/brand/logos/${p}${dark && REVERSED.has(p) ? "-dark" : ""}.png`;
+export const logoSrc = (p: Platform, dark = false) => `/brand/logos/${p}${dark && REVERSED.has(p) ? "-dark" : ""}.webp`;
 /** The background a logo sits on. "auto" follows the site theme; a chip that is white in both themes is "light". */
 export type LogoSurface = "auto" | "light" | "dark";
 
@@ -56,7 +56,7 @@ export function PlatformLogo({ platform, className, surface = "auto", style }: {
   const [w, h] = LOGO_SIZE[platform];
   const img = (dark: boolean, show?: string) => (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={logoSrc(platform, dark)} alt="" aria-hidden="true" width={w} height={h} decoding="async" draggable={false} className={cn("select-none object-contain", className, show)} style={style} />
+    <img src={logoSrc(platform, dark)} alt="" aria-hidden="true" width={w} height={h} loading="lazy" decoding="async" draggable={false} className={cn("select-none object-contain", className, show)} style={style} />
   );
   if (!REVERSED.has(platform) || surface !== "auto") return img(surface === "dark");
   // Both are in the page and CSS shows the one for the theme, so a server render never shows the wrong one.
@@ -107,7 +107,7 @@ export function AppIcon({ brand, size = 44, className }: { brand: Brand; size?: 
   if (brand === "outly") return <OutlyMark size={size} className={className} />; // bare rocket, no tile (10-12f)
   if (brand === "metricool" || brand === "later")
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={`/brands/${brand}.png`} alt="" aria-hidden="true" width={size} height={size} decoding="async" className={cn(base, className)} style={box} />;
+    return <img src={`/brands/${brand}.webp`} alt="" aria-hidden="true" width={size} height={size} loading="lazy" decoding="async" className={cn(base, className)} style={box} />;
   if (isPlatform(brand)) {
     const l = LOGO_TILE[brand];
     return (

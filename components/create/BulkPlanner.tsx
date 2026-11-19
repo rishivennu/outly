@@ -355,7 +355,7 @@ Spaced over the days ahead, one a day where they fit. {plan.reason}
                     <div className="flex gap-3 sm:gap-4">
                       <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-2xl bg-secondary hairline">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        {r.poster && <img src={r.poster} alt="" className="h-full w-full object-cover" />}
+                        {r.poster && <img src={r.poster} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />}
                         <span className="tabular absolute left-1.5 top-1.5 rounded-full bg-black/60 px-1.5 text-xs font-semibold text-white">{i + 1}</span>
                         {r.state !== "ready" && (
                           <div className="absolute inset-0 grid place-items-center bg-black/45 text-white">

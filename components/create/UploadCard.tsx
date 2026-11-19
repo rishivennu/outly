@@ -460,7 +460,7 @@ export function UploadFileCard({ name, size, poster, duration, width, height, mi
         <div className={cn("relative shrink-0 overflow-hidden rounded-2xl bg-secondary hairline", shape === "Horizontal" ? "h-[72px] w-[128px] sm:h-[81px] sm:w-[144px]" : shape === "Square" ? "h-[96px] w-[96px] sm:h-[108px] sm:w-[108px]" : "h-[128px] w-[72px] sm:h-[144px] sm:w-[81px]")}>
           {poster ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={poster} alt="" className="h-full w-full object-cover" />
+            <img src={poster} alt="" decoding="async" className="h-full w-full object-cover" />
           ) : (
             <Film className="absolute inset-0 m-auto h-6 w-6 text-muted-foreground" aria-hidden="true" />
           )}

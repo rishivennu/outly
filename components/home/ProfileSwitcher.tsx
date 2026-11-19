@@ -93,7 +93,7 @@ export function ProfileSwitcher({ profiles, activeId, children }: { profiles: Pr
                 <span className="relative shrink-0">
                   {p.avatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.avatar} alt="" className="h-11 w-11 rounded-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={p.avatar} alt="" width={44} height={44} loading="lazy" decoding="async" className="h-11 w-11 rounded-full object-cover" referrerPolicy="no-referrer" />
                   ) : (
                     <span className="grid h-11 w-11 place-items-center rounded-full bg-secondary font-semibold" aria-hidden="true">{p.username.replace(/^@/, "").slice(0, 1).toUpperCase()}</span>
                   )}

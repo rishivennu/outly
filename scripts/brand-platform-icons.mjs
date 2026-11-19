@@ -24,7 +24,7 @@ const R = (S * 0.225).toFixed(2);
 const rounded = (fill) => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${S}" height="${S}"><rect width="${S}" height="${S}" rx="${R}" ry="${R}" fill="${fill}"/></svg>`);
 
 for (const [p, t] of Object.entries(TILE)) {
-  const logo = join(LOGOS, `${p}.png`);
+  const logo = join(LOGOS, `${p}.webp`);
   let img;
   if (t.fill) {
     const art = await sharp(logo).resize(S, S, { fit: "cover" }).png().toBuffer();

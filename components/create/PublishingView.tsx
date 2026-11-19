@@ -484,7 +484,7 @@ function PublishedPreview({ post, trackerOf, className }: { post: PostView; trac
               <div className="relative h-[86px] w-[64px] shrink-0 overflow-hidden rounded-xl bg-secondary">
                 {thumb ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={thumb} alt="" className="h-full w-full object-cover" />
+                  <img src={thumb} alt="" decoding="async" className="h-full w-full object-cover" />
                 ) : (
                   <OutlyMark size={20} className="absolute inset-0 m-auto text-muted-foreground" />
                 )}
@@ -604,13 +604,13 @@ function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, can
       <div className="relative mt-3 flex items-center gap-2.5">
         {thumb && (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={thumb} alt="" className="la-thumb shrink-0" draggable={false} />
+          <img src={thumb} alt="" loading="lazy" decoding="async" className="la-thumb shrink-0" draggable={false} />
         )}
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-1.5">
             {acct?.avatar ? (
               /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={acct.avatar} alt="" className="la-face" draggable={false} />
+              <img src={acct.avatar} alt="" loading="lazy" decoding="async" className="la-face" draggable={false} />
             ) : (
               <PlatformOrb platform={t.platform} size={18} />
             )}
@@ -825,7 +825,7 @@ function SlideStack({ items, moving, landed }: { items: PostView["items"]; movin
       {shown.map((m, i) => (
         <span key={m.id} className="la-print" style={{ ["--i" as string]: i, ["--n" as string]: shown.length }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={m.thumbnailUrl!} alt="" className="h-full w-full object-cover" draggable={false} />
+          <img src={m.thumbnailUrl!} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" draggable={false} />
         </span>
       ))}
       {items.length > 3 && <span className="la-more">+{items.length - 3}</span>}

@@ -52,7 +52,7 @@ export function ProfileAccounts({ platform, accounts, active, onPick, busy, last
               <span className="relative flex items-center gap-2">
                 {a.avatar ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.avatar} alt="" referrerPolicy="no-referrer" className="h-6 w-6 rounded-full object-cover" />
+                  <img src={a.avatar} alt="" width={24} height={24} loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-6 w-6 rounded-full object-cover" />
                 ) : (
                   <PlatformOrb platform={platform} size={22} />
                 )}

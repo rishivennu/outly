@@ -6,11 +6,11 @@ import { cn } from "@/lib/utils";
  * `variant` picks one of the five stickers in /public/brand/founding.
  */
 const ART = {
-  badge: { src: "/brand/founding/01-rocket-badge.png", w: 512, h: 508 },
-  pill: { src: "/brand/founding/02-wordmark-pill.png", w: 512, h: 187 },
-  tile: { src: "/brand/founding/03-app-tile.png", w: 512, h: 509 },
-  flower: { src: "/brand/founding/04-rocket-flower.png", w: 512, h: 512 },
-  ring: { src: "/brand/founding/05-outlly-ring.png", w: 512, h: 512 },
+  badge: { src: "/brand/founding/01-rocket-badge.webp", w: 512, h: 508 },
+  pill: { src: "/brand/founding/02-wordmark-pill.webp", w: 512, h: 187 },
+  tile: { src: "/brand/founding/03-app-tile.webp", w: 512, h: 509 },
+  flower: { src: "/brand/founding/04-rocket-flower.webp", w: 512, h: 512 },
+  ring: { src: "/brand/founding/05-outlly-ring.webp", w: 512, h: 512 },
 } as const;
 
 export function FoundingStamp({ size = 72, variant = "badge", label, className, tilt = true }: { size?: number; variant?: keyof typeof ART; label?: string; className?: string; tilt?: boolean }) {

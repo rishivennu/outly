@@ -50,7 +50,7 @@ export function ReviewPage({ token, data }: { token: string; data: ReviewPackage
             <video src={data.post.media.url} poster={data.post.media.thumbnailUrl ?? undefined} controls playsInline className="h-full w-full object-cover" />
           ) : data.post.media.thumbnailUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={data.post.media.thumbnailUrl} alt="" className="h-full w-full object-cover" />
+            <img src={data.post.media.thumbnailUrl} alt="" decoding="async" className="h-full w-full object-cover" />
           ) : (
             <p className="grid h-full place-items-center p-4 text-center text-xs text-muted-foreground">The video preview isn&apos;t available on this link.</p>
           )}

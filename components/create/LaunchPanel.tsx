@@ -192,7 +192,7 @@ export function LaunchPanel(p: Props) {
           <section aria-labelledby="launch-summary" className="glass flex gap-4 rounded-[28px] p-4">
             <div className="relative aspect-[9/16] w-20 shrink-0 overflow-hidden rounded-2xl bg-secondary sm:w-24">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {thumb && <img src={thumb} alt="" className="h-full w-full object-cover" />}
+              {thumb && <img src={thumb} alt="" decoding="async" className="h-full w-full object-cover" />}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-start gap-3">
@@ -472,7 +472,7 @@ export function ScheduledView({ post, when, tz, poster, onAnother }: { post?: Po
         </div>
         {poster && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={poster} alt="" className="absolute -right-8 -top-6 aspect-[9/16] w-16 rotate-[10deg] rounded-xl object-cover shadow-xl hairline" />
+          <img src={poster} alt="" decoding="async" className="absolute -right-8 -top-6 aspect-[9/16] w-16 rotate-[10deg] rounded-xl object-cover shadow-xl hairline" />
         )}
       </motion.div>
       <Icon3D name="schedule" size={88} className="mb-6" />

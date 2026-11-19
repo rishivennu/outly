@@ -503,7 +503,7 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
           {data.top && (
             <Link href="/content" className="group relative flex min-h-[170px] overflow-hidden rounded-[28px] p-6 hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {data.top.thumbnailUrl && <img src={data.top.thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40 transition duration-700 group-hover:scale-105 dark:opacity-50" />}
+              {data.top.thumbnailUrl && <img src={data.top.thumbnailUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-40 transition duration-700 group-hover:scale-105 dark:opacity-50" />}
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
               <div className="relative mt-auto">
                 <p className="mb-2 text-sm font-semibold text-muted-foreground">Your standout</p>

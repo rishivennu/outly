@@ -53,7 +53,7 @@ export function FoundingPanel({ initial }: { initial: FoundingState }) {
         </CardTitle>
         <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4 hairline", on ? "bg-accent/10" : "bg-secondary/40")}>
           <div className="flex items-center gap-3">
-            <Image src="/brand/founding/01-rocket-badge.png" alt="" width={48} height={48} className="h-12 w-12 shrink-0" />
+            <Image src="/brand/founding/01-rocket-badge.webp" alt="" width={48} height={48} className="h-12 w-12 shrink-0" />
             <div>
               <p className="font-display text-[15px] font-semibold">{on ? `${c.left} of ${cfg.limit} seats left` : "No new founding members"}</p>
               <p className="text-[12.5px] text-muted-foreground">{on ? "Seats go to confirmed inboxes, in the order they claim." : "Turn on to show the counter on signup and start numbering members."}</p>

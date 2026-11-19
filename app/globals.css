@@ -451,9 +451,6 @@ html:not(.dark) .neon-rim::after {
   .animate-bob { animation: none; }
 }
 
-/* The 3D icon set ships a black drop shadow; soften it on warm white. */
-html:not(.dark) img[src*="/brand/icons/"]:not(.dark *) { filter: drop-shadow(0 10px 18px hsl(262 40% 30% / 0.2)) !important; }
-
 /* ---------- Outlly objects (Icon3D): sticker-bombed CSS collectibles ----------
    1em = a tenth of the rendered width, so any w-/h- utility scales the whole thing.
    Paint-only: gradients and box-shadows, no filters or 3D, so lots of them stay cheap. */

@@ -51,11 +51,11 @@ function StatusPill({ status }: { status: string }) {
 
 /** The real brand marks (public/brand/pay), sized per logo so they read at the same visual weight. */
 const LOGO: Record<MethodId, { src: string; w: number; h: number; cls: string }> = {
-  visa: { src: "/brand/pay/visa.png", w: 198, h: 64, cls: "h-[15px]" },
-  mc: { src: "/brand/pay/mastercard.png", w: 101, h: 64, cls: "h-[22px]" },
-  apple: { src: "/brand/pay/apple-pay.png", w: 50, h: 21, cls: "h-[19px]" },
-  gpay: { src: "/brand/pay/google-pay.png", w: 46, h: 40, cls: "h-[22px]" },
-  upi: { src: "/brand/pay/upi.png", w: 181, h: 64, cls: "h-[20px]" },
+  visa: { src: "/brand/pay/visa.webp", w: 198, h: 64, cls: "h-[15px]" },
+  mc: { src: "/brand/pay/mastercard.webp", w: 101, h: 64, cls: "h-[22px]" },
+  apple: { src: "/brand/pay/apple-pay.webp", w: 50, h: 21, cls: "h-[19px]" },
+  gpay: { src: "/brand/pay/google-pay.webp", w: 46, h: 40, cls: "h-[22px]" },
+  upi: { src: "/brand/pay/upi.webp", w: 181, h: 64, cls: "h-[20px]" },
 };
 function Chip({ id, className, style }: { id: MethodId; className?: string; style?: React.CSSProperties }) {
   const label = METHODS.find((m) => m.id === id)?.label ?? id;

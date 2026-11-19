@@ -213,7 +213,7 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRe
           <div className="flex gap-4">
             <div className="relative aspect-[9/16] w-24 shrink-0 overflow-hidden rounded-2xl bg-secondary hairline">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {post.media.thumbnailUrl && <img src={post.media.thumbnailUrl} alt="" className="h-full w-full object-cover" />}
+              {post.media.thumbnailUrl && <img src={post.media.thumbnailUrl} alt="" decoding="async" className="h-full w-full object-cover" />}
             </div>
             <div className="min-w-0 space-y-2 py-1">
               <StatusBadge status={attention ? displayStatus(post, attention) : post.status} />

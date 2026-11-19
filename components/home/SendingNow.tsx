@@ -84,7 +84,7 @@ export function SendingNow({ items }: { items: SendingItem[] }) {
                 <div className="flex items-center gap-3">
                   {p.thumbnailUrl && (
                     /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={p.thumbnailUrl} alt="" className="la-thumb" draggable={false} />
+                    <img src={p.thumbnailUrl} alt="" loading="lazy" decoding="async" className="la-thumb" draggable={false} />
                   )}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold">{p.title}</span>

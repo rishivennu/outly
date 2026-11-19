@@ -15,7 +15,7 @@ export function DraftRow({ thumb, title, meta, status, resumeHref, onPreview, on
       <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-secondary">
         {thumb ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={thumb} alt="" className="h-full w-full object-cover" />
+          <img src={thumb} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
         ) : (
           <Film className="absolute inset-0 m-auto h-4 w-4 text-muted-foreground" aria-hidden="true" />
         )}

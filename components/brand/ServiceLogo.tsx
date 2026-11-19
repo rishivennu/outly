@@ -28,7 +28,7 @@ export function ServiceLogo({ service, size = 36, className }: { service: Servic
     return (
       <span className={box} style={{ width: size, height: size, background: "#fff" }} aria-hidden="true">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/pay/upi.png" alt="" style={{ height: size * 0.36, width: "auto" }} />
+        <img src="/brand/pay/upi.webp" alt="" width={181} height={64} decoding="async" style={{ height: size * 0.36, width: "auto" }} />
       </span>
     );
   const m = MARK[service];

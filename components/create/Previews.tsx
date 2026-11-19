@@ -170,7 +170,7 @@ function Media({ src, poster, className, clip }: { src: string | null; poster: s
   if (src) return <LoopVideo src={src} poster={poster} className={className} />;
   if (poster)
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={poster} alt="" className={cn("h-full w-full object-cover", className)} />;
+    return <img src={poster} alt="" decoding="async" className={cn("h-full w-full object-cover", className)} />;
   return <div className={cn("h-full w-full bg-gradient-to-br from-secondary to-background", className)} />;
 }
 
@@ -188,7 +188,7 @@ function FeedMedia({ src, poster, aspect, clip, label, className }: { src: strin
 function Avatar({ name, src, className }: { name: string; src?: string | null; className?: string }) {
   return src ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="" className={cn("rounded-full object-cover", className)} />
+    <img src={src} alt="" decoding="async" className={cn("rounded-full object-cover", className)} />
   ) : (
     <span className={cn("grid place-items-center rounded-full energy-bg text-xs font-bold text-black", className)} aria-hidden="true">
       {name.slice(0, 1).toUpperCase()}

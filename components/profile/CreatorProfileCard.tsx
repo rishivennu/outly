@@ -73,7 +73,7 @@ export function CreatorProfileCard() {
         <motion.div {...m(PC.banner)} className="pcard-banner relative aspect-[3/1] w-full overflow-hidden">
           {card?.banner ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={card.banner} alt="" className="h-full w-full object-cover" />
+            <img src={card.banner} alt="" decoding="async" className="h-full w-full object-cover" />
           ) : (
             <span aria-hidden="true" className="pcard-art absolute inset-0" />
           )}

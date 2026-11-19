@@ -74,7 +74,7 @@ export function BlogArticle({ title, excerpt, category, categoryHref, author, re
       {image?.src && (
         // A plain img on purpose: the admin preview may show an upload that is not on an allowed image host yet.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={image.src} alt={image.alt} className="mt-8 aspect-video w-full rounded-2xl object-cover" />
+        <img src={image.src} alt={image.alt} width={1280} height={720} decoding="async" className="mt-8 aspect-video w-full rounded-2xl object-cover" />
       )}
 
       {toc && <div className="mt-8">{toc}</div>}

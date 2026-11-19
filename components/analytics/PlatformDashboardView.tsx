@@ -182,7 +182,7 @@ export function PlatformDashboardView({ platform, initial, connected, renderedAt
           <div className="relative shrink-0">
             {data.profile?.avatar ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={data.profile.avatar} alt="" referrerPolicy="no-referrer" className="h-16 w-16 rounded-full object-cover hairline sm:h-20 sm:w-20" />
+              <img src={data.profile.avatar} alt="" width={80} height={80} decoding="async" referrerPolicy="no-referrer" className="h-16 w-16 rounded-full object-cover hairline sm:h-20 sm:w-20" />
             ) : (
               <PlatformOrb platform={platform} size={64} />
             )}

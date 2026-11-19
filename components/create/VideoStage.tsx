@@ -237,7 +237,7 @@ export function VideoStage({ src, poster, filename, meta, upload, onReplace, onR
             />
           ) : poster ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={poster} alt="" className="h-full w-full object-cover" />
+            <img src={poster} alt="" decoding="async" className="h-full w-full object-cover" />
           ) : (
             <div className="skeleton h-full w-full" />
           )}
