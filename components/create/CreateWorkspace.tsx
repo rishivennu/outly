@@ -1918,10 +1918,13 @@ const SENT_REACHABLE: Record<Step, boolean> = { video: false, story: false, ever
 const noGo = () => {};
 
 function Glow() {
+  // R1223: the second glow hangs from the top (where the first screen ends), not the bottom. Pinned to the bottom it
+  // slid down every time the workspace grew (drafts arriving, a step opening), and a visible blob that moves is a
+  // layout shift: 0.2 CLS on a phone, measured, for a blur nobody could see moving.
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
       <div className="animate-morph absolute -left-40 -top-40 h-[520px] w-[520px] bg-lime opacity-[0.13] blur-[120px] dark:opacity-[0.1]" />
-      <div className="animate-morph absolute -bottom-60 right-0 h-[480px] w-[480px] bg-accent opacity-[0.1] blur-[130px] [animation-delay:-6s]" />
+      <div className="animate-morph absolute right-0 top-[60dvh] h-[480px] w-[480px] bg-accent opacity-[0.1] blur-[130px] [animation-delay:-6s]" />
     </div>
   );
 }

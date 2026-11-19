@@ -560,6 +560,10 @@ html:not(.dark) .o3d-floor { background: radial-gradient(closest-side, rgba(30, 
   .mnav-link { padding: 0 clamp(.6rem, .8vw, .85rem); }
 }
 .mnav-bar[data-fit="online"] .lc-total, .mnav-bar[data-fit="online"] .lc-sep, .mnav-bar[data-fit="none"] .mnav-live { display: none; }
+/* R1223: the strip keeps its room before the numbers arrive (no shift); the "online" step keeps less. */
+.mnav-bar[data-fit="online"] .mnav-live { min-width: 4.5rem; }
+/* R1223: currency signs outside Latin-1 (the rupee) from the system font: see PriceLabel in PricingCards.tsx. */
+.cur-sym { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif; }
 .lc-nav { color: hsl(var(--foreground) / .6); font-weight: 500; }
 .lc-nav .lc-num { font-weight: 600; color: hsl(var(--foreground) / .9); }
 /* Focus in the bar is brand lime, never the purple accent ring; on the light glass the darker lime ink keeps 3:1. */

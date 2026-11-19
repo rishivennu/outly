@@ -14,7 +14,7 @@ import { api, ApiError } from "@/lib/client/api";
 import { TeamCard } from "./TeamCard";
 import { ReferralCard } from "./ReferralCard";
 import { AvatarPicker } from "./AvatarPicker";
-import { CreatorProfileCard } from "@/components/profile/CreatorProfileCard";
+import { CreatorProfileCard, type ProfileIdentity } from "@/components/profile/CreatorProfileCard";
 import { SnippetsCard } from "./SnippetsCard";
 import { VoiceMemoryCard } from "@/components/billing/PlanExtras";
 import { TwoStepCard } from "./TwoStepCard";
@@ -204,7 +204,7 @@ function Note({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, perks = { digest: true, spike: true }, billing = null, initialTab }: { weeklyReport?: boolean; alerts?: AlertPrefs; perks?: { digest: boolean; spike: boolean }; billing?: BillingSummary | null; initialTab?: string }) {
+export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, perks = { digest: true, spike: true }, billing = null, identity = null, initialTab }: { weeklyReport?: boolean; alerts?: AlertPrefs; perks?: { digest: boolean; spike: boolean }; billing?: BillingSummary | null; identity?: ProfileIdentity | null; initialTab?: string }) {
   const user = useUser();
   const ws = user.workspace;
   const owner = ws?.ownerName ?? "the owner";
@@ -221,7 +221,7 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, per
         </Note>
       ) : (
         <>
-          <CreatorProfileCard />
+          <CreatorProfileCard identity={identity} />
           <ProfileForm />
           <AvatarPicker />
         </>

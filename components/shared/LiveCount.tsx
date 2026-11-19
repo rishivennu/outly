@@ -75,12 +75,16 @@ function Num({ n, format }: { n: number; format: (n: number) => string }) {
  */
 export function LiveCount({ compact = false, pill = false, nav = false, className }: { compact?: boolean; pill?: boolean; nav?: boolean; className?: string }) {
   const v = useLiveView();
-  if (!v || (v.total === null && v.online === null)) return null;
+  const empty = !v || (v.total === null && v.online === null);
+  // R1223: the website bar keeps the strip's room before the numbers arrive. Rendering nothing and then 170px of text
+  // pushed every nav link left a second after the page showed (CLS 0.11 twice on /#pricing, measured).
+  if (empty && nav) return <p className={cn("lc lc-nav inline-flex h-8 min-w-[10.5rem] items-center text-[12px] leading-none", className)} aria-hidden="true" />;
+  if (empty || !v) return null;
   const fmt = (n: number) => n.toLocaleString("en-US");
   const label = [v.total !== null ? `${fmt(v.total)} creators on Outlly` : null, v.online !== null ? `${fmt(v.online)} online now` : null].filter(Boolean).join(", ");
   if (nav) {
     return (
-      <p className={cn("lc lc-nav inline-flex h-8 items-center gap-1.5 whitespace-nowrap text-[12px] leading-none", className)} title={label}>
+      <p className={cn("lc lc-nav inline-flex h-8 min-w-[10.5rem] items-center gap-1.5 whitespace-nowrap text-[12px] leading-none", className)} title={label}>
         {v.total !== null && (
           <span className="lc-total inline-flex items-center gap-1">
             <Users className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />

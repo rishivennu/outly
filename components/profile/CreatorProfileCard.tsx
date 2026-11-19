@@ -26,7 +26,10 @@ const STAT_LABELS = { followers: "Total Followers", posts: "Posts Published", vi
  * only of checkable facts, three stats added up from the connected platforms, and the public links. Every number
  * is real: a stat no connected platform reports reads "Unavailable", never a made-up value.
  */
-export function CreatorProfileCard() {
+/** R1223: the card's own words, read by the Settings page so the first paint already has them (see there). */
+export type ProfileIdentity = { handle: string | null; bio: string | null; niche: string | null };
+
+export function CreatorProfileCard({ identity = null }: { identity?: ProfileIdentity | null } = {}) {
   const user = useUser();
   const router = useRouter();
   const reduce = useReducedMotion();
@@ -65,6 +68,8 @@ export function CreatorProfileCard() {
   const lit = card ? litTicks(card.progress, TICKS) : 0;
   const m = (x: object) => (reduce ? PC.fade : x);
   const compact = profileSetUp(card);
+  // Handle, niche and bio: from the loaded card, else from the server's copy, so these lines never arrive late.
+  const who = card ?? identity;
 
   return (
     <motion.section {...m(PC.card)} className="pcard relative mx-auto w-full max-w-[560px] overflow-hidden rounded-[32px]" aria-labelledby={`${ids}-name`} aria-busy={loading}>
@@ -156,13 +161,13 @@ export function CreatorProfileCard() {
             <h2 id={`${ids}-name`} className="min-w-0 break-words text-[26px] font-semibold leading-tight tracking-tight">
               {name}
             </h2>
-            {card?.niche && <span className="pcard-niche">{card.niche}</span>}
+            {who?.niche && <span className="pcard-niche">{who.niche}</span>}
           </div>
-          {card && (card.handle ? <p className="mt-0.5 text-[15px] text-[hsl(var(--pc-muted))]">{fmtHandle(card.handle)}</p> : <p className="mt-0.5 text-[15px] text-[hsl(var(--pc-muted))]">No handle yet</p>)}
-          {card && (
+          {who && (who.handle ? <p className="mt-0.5 text-[15px] text-[hsl(var(--pc-muted))]">{fmtHandle(who.handle)}</p> : <p className="mt-0.5 text-[15px] text-[hsl(var(--pc-muted))]">No handle yet</p>)}
+          {who && (
             <div className="group/bio mt-3 flex items-start gap-2">
-              <p className={cn("min-w-0 flex-1 whitespace-pre-line break-words text-[15px] leading-relaxed", !card.bio && "text-[hsl(var(--pc-muted))]")}>{card.bio || "Add a short bio so people know what you make."}</p>
-              <button type="button" onClick={() => edit("bio")} className="pcard-ico -mr-2 -mt-1.5" aria-label="Edit bio">
+              <p className={cn("min-w-0 flex-1 whitespace-pre-line break-words text-[15px] leading-relaxed", !who.bio && "text-[hsl(var(--pc-muted))]")}>{who.bio || "Add a short bio so people know what you make."}</p>
+              <button type="button" onClick={() => edit("bio")} className="pcard-ico -mr-2 -mt-1.5" aria-label="Edit bio" disabled={!card}>
                 <PenLine className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>

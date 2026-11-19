@@ -135,10 +135,13 @@ export function SetupChecklist({ onboarding, hidden: hiddenOnServer = false, dev
   const doneCount = steps.filter((s) => s.done).length;
   const open = (s: { done: boolean; skipped: boolean }) => !s.done && !s.skipped;
   // Before hydration nobody knows this device's two rows: keep one row's room unless last visit said there were none.
-  // Only when a past visit said a device row will show: a first visit reserves nothing, so nothing has to shrink.
-  const reserve = device === null && deviceOpen === true;
+  // R1223: a first visit on a device (no cookie yet) reserves too. It used to reserve nothing, so on a finished account
+  // the whole card dropped in above the dashboard once the browser said notifications were not granted (0.37 CLS on a
+  // phone, measured). Nearly every new device has a row to show, so the room is kept; the rare fully set-up device
+  // loses the empty card once, instead of everyone gaining one.
+  const reserve = device === null && deviceOpen !== false;
 
-  if (hidden || !(steps.some(open) || (device === null && deviceOpen === true))) return null;
+  if (hidden || !(steps.some(open) || reserve)) return null;
 
   const dismiss = () => {
     try {

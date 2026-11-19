@@ -41,10 +41,18 @@ export default async function SettingsPage(props: { searchParams?: Promise<{ tab
   const searchParams = await props.searchParams;
   const user = (await getCurrentUser())!;
   // Inside someone else's workspace the profile, email and billing settings are theirs, so they aren't shown.
-  const own = user.actor ? null : await db.user.findUnique({ where: { id: user.id }, select: { weeklyReport: true, alertPrefs: true } });
-  const billing = user.actor ? null : await billingSummary(user.id, user.name, user.email);
-  // 1096: a switch for something the plan doesn't include would save fine and then never send anything.
-  const e = user.actor ? null : await entitlements(user.id).catch(() => null);
+  // R1223: the three reads run together (they were one after the other), and the profile card's own words come along,
+  // so the card shows its handle and bio in the first paint instead of growing under the stats once /api/profile/card
+  // answers (0.2 CLS on a phone, measured). The stats still arrive from that request: they ask the platforms.
+  const [own, billing, e] = user.actor
+    ? [null, null, null]
+    : await Promise.all([
+        db.user.findUnique({ where: { id: user.id }, select: { weeklyReport: true, alertPrefs: true, handle: true, bio: true, niche: true } }),
+        billingSummary(user.id, user.name, user.email),
+        // 1096: a switch for something the plan doesn't include would save fine and then never send anything.
+        entitlements(user.id).catch(() => null),
+      ]);
+  const identity = own ? { handle: own.handle, bio: own.bio, niche: own.niche } : null;
   const perks = { digest: !e || hasPerk(e, "weekly-digest"), spike: !e || hasPerk(e, "spike-alerts") };
-  return <SettingsView weeklyReport={own?.weeklyReport ?? true} alerts={parseAlertPrefs(own?.alertPrefs)} perks={perks} billing={billing} initialTab={typeof searchParams?.tab === "string" ? searchParams.tab : undefined} />;
+  return <SettingsView weeklyReport={own?.weeklyReport ?? true} alerts={parseAlertPrefs(own?.alertPrefs)} perks={perks} billing={billing} identity={identity} initialTab={typeof searchParams?.tab === "string" ? searchParams.tab : undefined} />;
 }

@@ -107,7 +107,7 @@ export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; varia
                       exit={reduce ? { opacity: 0 } : { opacity: 0, y: -10, filter: "blur(4px)" }}
                       transition={{ duration: 0.3 }}
                     >
-                      {label}
+                      <PriceLabel label={label} />
                     </motion.span>
                   </AnimatePresence>
                 }
@@ -148,6 +148,22 @@ export function PricingCards({ plans, variant, top }: { plans: CardPlan[]; varia
           </div>
         )}
       </div>
+    </>
+  );
+}
+
+/**
+ * R1223: a currency sign outside Latin-1 (the rupee) is set in the system font. Inter's latin subset has no "₹", so
+ * the three prices alone made every landing visit download Inter's 83 KB latin-ext file, for one glyph that looks the
+ * same from the system font. Signs in Latin-1 or in that subset ("$", "€") are left as they are.
+ */
+export function PriceLabel({ label }: { label: string }) {
+  const m = /^(\D+?)(\d.*)$/s.exec(label);
+  if (!m || /^[\u0000-\u00ff\u20ac]+$/.test(m[1])) return <>{label}</>;
+  return (
+    <>
+      <span className="cur-sym">{m[1]}</span>
+      {m[2]}
     </>
   );
 }
