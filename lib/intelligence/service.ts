@@ -17,11 +17,12 @@ import {
   type Objective,
   type Period,
   type PostRecord,
-  type Recommendation,
   type Signal,
   type TopicInsight,
 } from "./core";
 import { getBrandProfile } from "./memory";
+import { persistRecommendations, type StoredRecommendation } from "./reco";
+import { ACTIVE_STATUSES } from "./reco-core";
 
 /**
  * R1236: the Prisma-backed half of Outlly Intelligence. It reads the published posts of one workspace and hands them
@@ -137,8 +138,8 @@ export interface Overview {
   topics: TopicInsight[];
   working: Signal[];
   attention: Signal[];
-  /** Drafts only: R1239 persists them with a dedupeKey and a lifecycle. */
-  recommendations: Recommendation[];
+  /** R1239: the stored rows behind the engine's drafts (id, status, wordedBy), still active ones only. */
+  recommendations: StoredRecommendation[];
   /** Why the list is empty, when it is. */
   recommendationsReason: string | null;
   generatedAt: string;
@@ -168,7 +169,11 @@ export async function overview(user: Scoped, opts: OverviewOpts): Promise<Overvi
   const working = whatIsWorking(posts, objective, period);
   const attention = whatNeedsAttention(posts, objective, period);
   const me = await db.user.findUnique({ where: { id: user.id }, select: { name: true, niche: true } });
-  const { recommendations, reason } = recommendationsFrom(working, { name: brand?.name ?? me?.name ?? null, niche: me?.niche ?? null });
+  const drafts = recommendationsFrom(working, { name: brand?.name ?? me?.name ?? null, niche: me?.niche ?? null });
+  // R1239: stored idempotently, so the dashboard can link /create?rec=<id>. Rejected, done and expired rows are not shown.
+  const stored = await persistRecommendations(user.id, opts.brandKey ?? "", drafts.recommendations, period);
+  const recommendations = stored.filter((r) => ACTIVE_STATUSES.includes(r.status));
+  const reason = recommendations.length ? null : (drafts.reason ?? "Nothing new to suggest yet: you have already closed the recommendations these numbers support.");
   const curFrom = Date.parse(period.from);
   const inCur = posts.filter((p) => Date.parse(String(p.publishedAt)) >= curFrom);
   return {
