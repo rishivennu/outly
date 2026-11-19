@@ -352,7 +352,7 @@ export function ContentLibrary({
             className="h-11 w-full rounded-full bg-secondary/60 pl-10 pr-11 text-sm text-foreground placeholder:text-muted-foreground hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))] [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
-            <button type="button" onClick={clearSearch} aria-label="Clear search" className="absolute right-0 top-0 grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-[hsl(var(--ring))]">
+            <button type="button" onClick={clearSearch} aria-label="Clear search" className="gbtn-icon ripple-host absolute right-0 top-0 grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-[hsl(var(--ring))]">
               <X className="h-4 w-4" aria-hidden="true" />
             </button>
           )}

@@ -378,7 +378,7 @@ export function ProfileReview() {
             <span className="block font-semibold">The review didn&apos;t load.</span>
             <span className="text-muted-foreground">{error}</span>
           </p>
-          <button type="button" onClick={load} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-5 text-sm font-semibold hairline transition hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]">
+          <button type="button" onClick={load} className="gbtn ripple-host inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-5 text-sm font-semibold hairline transition hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]">
             <RefreshCw className="h-4 w-4" aria-hidden="true" /> Try again
           </button>
         </div>

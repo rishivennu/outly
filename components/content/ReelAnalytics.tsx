@@ -85,7 +85,7 @@ export function ReelAnalytics({ post, onClose, onDetails }: { post: PostView | n
                       <div className="flex items-start justify-between gap-2">
                         <Dialog.Title className="line-clamp-2 text-lg font-semibold leading-snug tracking-tight [overflow-wrap:anywhere]">{post.title ?? "Untitled"}</Dialog.Title>
                         <Dialog.Close asChild>
-                          <button type="button" aria-label="Close analytics" className="-mr-1 -mt-1 grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+                          <button type="button" aria-label="Close analytics" className="gbtn-icon ripple-host -mr-1 -mt-1 grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
                             <X className="h-5 w-5" aria-hidden="true" />
                           </button>
                         </Dialog.Close>

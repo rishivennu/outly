@@ -252,7 +252,7 @@ export function ImageCropper({ kind, open, onOpenChange, onSaved, hasCurrent = f
                     </Button>
                   </div>
                   <Dialog.Close asChild>
-                    <button type="button" disabled={busy} aria-label="Close" className="absolute right-3 top-3 grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                    <button type="button" disabled={busy} aria-label="Close" className="gbtn-icon ripple-host absolute right-3 top-3 grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                       <X className="h-4 w-4" aria-hidden="true" />
                     </button>
                   </Dialog.Close>

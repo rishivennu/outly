@@ -37,7 +37,7 @@ export function DraftRow({ thumb, title, meta, status, resumeHref, onPreview, on
         <Button asChild variant="subtle" size="sm" className="min-h-11 px-3.5">
           <Link href={resumeHref} aria-label={`Resume "${title}"`}>Resume</Link>
         </Button>
-        <button type="button" onClick={onRemove} aria-label={removeLabel} className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground">
+        <button type="button" onClick={onRemove} aria-label={removeLabel} className="gbtn-icon ripple-host grid h-11 w-11 place-items-center rounded-full text-muted-foreground outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground">
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>

@@ -84,7 +84,7 @@ function RefreshData({ onRefreshed }: { onRefreshed?: () => void }) {
   const failed = s.items.filter((x) => !x.ok);
   return (
     <div className="mt-2">
-      <button type="button" onClick={go} disabled={s.busy} aria-busy={s.busy} className="pc-btn">
+      <button type="button" onClick={go} disabled={s.busy} aria-busy={s.busy} className="gbtn pc-btn">
         {s.busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <RefreshCw className="h-4 w-4" aria-hidden />}
         <span>{s.busy ? "Refreshing" : s.ok === false ? "Try again" : "Refresh data"}</span>
       </button>

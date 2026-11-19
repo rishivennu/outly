@@ -165,7 +165,7 @@ export function VideoPreview({ state, all, onSelect, onClose, onClosed }: { stat
                         </p>
                       </div>
                       <Dialog.Close asChild>
-                        <button type="button" data-preview-close aria-label="Close preview" className="hidden h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:grid">
+                        <button type="button" data-preview-close aria-label="Close preview" className="gbtn-icon ripple-host hidden h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:grid">
                           <X className="h-5 w-5" />
                         </button>
                       </Dialog.Close>

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { clampOffset, MAX_OFFSET, OFFSET_STEP, sayOffset, showOffset, stepOffset } from "@/lib/captions/offset";
 
 const btn =
-  "grid h-11 w-11 shrink-0 place-items-center rounded-xl text-foreground transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] motion-reduce:transition-none [@media(hover:hover)]:hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-40 disabled:active:scale-100";
+  "gbtn-icon ripple-host grid h-11 w-11 shrink-0 place-items-center rounded-xl text-foreground transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] motion-reduce:transition-none [@media(hover:hover)]:hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-40 disabled:active:scale-100";
 
 /** One shift for every line on both tracks, -2.0 to +2.0 s in 0.1 s steps. Arrow keys move the slider. */
 export function CaptionShift({ value, onChange, disabled }: { value: number; onChange: (v: number) => void; disabled?: boolean }) {

@@ -17,7 +17,7 @@ interface Props {
 }
 
 const btn =
-  "grid h-11 w-11 shrink-0 place-items-center rounded-xl text-foreground transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] motion-reduce:transition-none [@media(hover:hover)]:hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-40 disabled:active:scale-100";
+  "gbtn-icon ripple-host grid h-11 w-11 shrink-0 place-items-center rounded-xl text-foreground transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] motion-reduce:transition-none [@media(hover:hover)]:hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-40 disabled:active:scale-100";
 
 /** One edge of a caption: a seconds box with 0.1 s nudges either side. Arrow keys nudge too (Shift: 1 s). */
 export function TimeStepper({ label, name, value, min, max, onCommit, onNudge }: Props) {

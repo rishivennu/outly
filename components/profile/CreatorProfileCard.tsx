@@ -204,7 +204,7 @@ export function CreatorProfileCard() {
         {error && (
           <p role="alert" className="mt-4 flex items-center justify-center gap-2 text-sm text-destructive">
             {error}
-            <button type="button" onClick={load} className="pcard-ico" aria-label="Try again">
+            <button type="button" onClick={load} className="gbtn-icon ripple-host pcard-ico" aria-label="Try again">
               <RefreshCw className="h-4 w-4" aria-hidden="true" />
             </button>
           </p>

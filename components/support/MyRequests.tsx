@@ -18,7 +18,7 @@ const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "n
 /** Dashboard-only strip above the answers: ask Pip, write to a person, the setup guide (and tour), and the requests already sent. */
 export function MyRequests({ tickets, onboarding = null }: { tickets: MyTicket[]; onboarding?: OnboardingPayload | null }) {
   const tile = "ap-tile flex min-w-0 flex-col p-5";
-  const action = "mt-auto inline-flex min-h-11 items-center gap-2 self-start rounded-full bg-foreground/[0.06] px-4 text-sm font-semibold transition-colors hover:bg-foreground/[0.1]";
+  const action = "gbtn ripple-host mt-auto inline-flex min-h-11 items-center gap-2 self-start rounded-full bg-foreground/[0.06] px-4 text-sm font-semibold transition-colors hover:bg-foreground/[0.1]";
   return (
     <section aria-labelledby="help-quick" className="mt-8">
       <h2 id="help-quick" className="sr-only">Quick help</h2>

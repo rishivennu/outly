@@ -954,12 +954,12 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
               </p>
             </div>
             {msgs.length > 0 && (
-              <button type="button" onClick={newChat} aria-label={cx.newChat} title={cx.newChat} className="pc-icon"><SquarePen className="h-[18px] w-[18px]" aria-hidden /></button>
+              <button type="button" onClick={newChat} aria-label={cx.newChat} title={cx.newChat} className="gbtn-icon ripple-host pc-icon"><SquarePen className="h-[18px] w-[18px]" aria-hidden /></button>
             )}
             <button type="button" onClick={() => setBig((b) => !b)} aria-pressed={big} aria-label={big ? cx.shrink : cx.expand} title={big ? cx.shrink : cx.expand} className="pc-icon max-sm:hidden">
               {big ? <Minimize2 className="h-[18px] w-[18px]" aria-hidden /> : <Maximize2 className="h-[18px] w-[18px]" aria-hidden />}
             </button>
-            <button type="button" onClick={close} aria-label={t.close} title={t.close} className="pc-icon"><X className="h-5 w-5" aria-hidden /></button>
+            <button type="button" onClick={close} aria-label={t.close} title={t.close} className="gbtn-icon ripple-host pc-icon"><X className="h-5 w-5" aria-hidden /></button>
           </header>
 
           <div className="relative min-h-0 flex-1">
@@ -994,13 +994,13 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
               ) : (
                 <section aria-labelledby="pc-topic" className="pc-topics pc-in">
                   <div className="pc-topic-head flex items-center gap-1 pe-3">
-                    <button ref={backRef} type="button" onClick={closeTopic} aria-label={home.back} title={home.back} className="pc-icon"><ChevronLeft className="h-5 w-5 rtl:rotate-180" aria-hidden /></button>
+                    <button ref={backRef} type="button" onClick={closeTopic} aria-label={home.back} title={home.back} className="gbtn-icon ripple-host pc-icon"><ChevronLeft className="h-5 w-5 rtl:rotate-180" aria-hidden /></button>
                     <h3 id="pc-topic" className="min-w-0 truncate text-[14.5px] font-semibold">{tp.title}</h3>
                   </div>
                   {tp.id === "analytics" && !signedIn ? (
                     <div className="px-3 pb-3 pt-2.5">
                       <p className="text-[14px] leading-snug">{home.signIn}</p>
-                      <Link href="/login?next=/analytics" onClick={close} className="pc-btn pc-btn-primary mt-2.5">{home.signInBtn}</Link>
+                      <Link href="/login?next=/analytics" onClick={close} className="gbtn gbtn-lime pc-btn pc-btn-primary mt-2.5">{home.signInBtn}</Link>
                     </div>
                   ) : (<>
                     <ul>
@@ -1037,13 +1037,13 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                             <p className="text-[14px] leading-snug">{text}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                               {c.kind === "failed" && !c.reconnect && canRetry && (
-                                <button type="button" onClick={() => retry(c)} disabled={retrying === c.id} className="pc-btn pc-btn-primary">
+                                <button type="button" onClick={() => retry(c)} disabled={retrying === c.id} className="gbtn gbtn-lime pc-btn pc-btn-primary">
                                   {retrying === c.id ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <RotateCw className="h-4 w-4" aria-hidden />}
                                   {retrying === c.id ? cx.retrying : cx.retry}
                                 </button>
                               )}
-                              {needsConnect && <a href={`/api/accounts/${c.platform}/connect?returnTo=${returnTo}`} className="pc-btn pc-btn-primary">{cx.reconnectBtn}</a>}
-                              {c.kind === "failed" && <Link href="/content?filter=failed" onClick={close} className="pc-btn">{cx.seeAll}</Link>}
+                              {needsConnect && <a href={`/api/accounts/${c.platform}/connect?returnTo=${returnTo}`} className="gbtn gbtn-lime pc-btn pc-btn-primary">{cx.reconnectBtn}</a>}
+                              {c.kind === "failed" && <Link href="/content?filter=failed" onClick={close} className="gbtn pc-btn">{cx.seeAll}</Link>}
                             </div>
                           </div>
                           <button type="button" onClick={() => setDismissed((d) => [...d, c.id])} aria-label={`${cx.dismiss}: ${text}`} className="pc-icon -me-1.5 -mt-1.5"><X className="h-4 w-4" aria-hidden /></button>
@@ -1091,8 +1091,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                     )}
                     {m.kind === "connect" && m.offer && !liveOn && (
                       <div role="group" aria-label={t.human} className="pc-offer mt-1.5 flex flex-wrap items-center gap-2 ps-1">
-                        <button type="button" onClick={() => connect(m)} disabled={!!liveBusy || busy} className="pc-btn pc-btn-primary"><Headset className="h-4 w-4" aria-hidden />{lt.connect}</button>
-                        <button type="button" onClick={() => keepPip(m)} disabled={!!liveBusy || busy} className="pc-btn">{lt.keepPip}</button>
+                        <button type="button" onClick={() => connect(m)} disabled={!!liveBusy || busy} className="gbtn gbtn-lime pc-btn pc-btn-primary"><Headset className="h-4 w-4" aria-hidden />{lt.connect}</button>
+                        <button type="button" onClick={() => keepPip(m)} disabled={!!liveBusy || busy} className="gbtn pc-btn">{lt.keepPip}</button>
                       </div>
                     )}
                     {m.data && <PipDataCard r={m.data} onRefreshed={busy || resolved ? undefined : () => askAgain(m)} />}
@@ -1112,10 +1112,10 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                     {m.kind === "resolve" && m.offer && !resolved && !liveOn && (
                       <div className="pc-offer mt-1.5 ps-1">
                         <div role="group" aria-label={rt.reply} className="flex flex-wrap items-center gap-2">
-                          <button type="button" onClick={resolveNow} disabled={closing.busy} aria-busy={closing.busy} className="pc-btn pc-btn-primary">
+                          <button type="button" onClick={resolveNow} disabled={closing.busy} aria-busy={closing.busy} className="gbtn gbtn-lime pc-btn pc-btn-primary">
                             {closing.busy && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{closing.busy ? rt.sending : rt.resolve}
                           </button>
-                          <button type="button" onClick={() => keepChatting(m)} disabled={closing.busy} className="pc-btn">{rt.keep}</button>
+                          <button type="button" onClick={() => keepChatting(m)} disabled={closing.busy} className="gbtn pc-btn">{rt.keep}</button>
                         </div>
                         {closing.error && (
                           <p role="alert" className="pc-error mt-2 text-[13px]">{closing.error}</p>
@@ -1125,8 +1125,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                     {m.ask && !liveOn && (
                       <div role="group" aria-label={t.helpful} className="mt-1.5 flex flex-wrap items-center gap-2 ps-1">
                         <span className="pc-muted text-[13px]" aria-hidden>{t.helpful}</span>
-                        <button type="button" onClick={() => feedback(m, true)} className="pc-btn">{t.yes}</button>
-                        <button type="button" onClick={() => feedback(m, false)} className="pc-btn">{t.no}</button>
+                        <button type="button" onClick={() => feedback(m, true)} className="gbtn pc-btn">{t.yes}</button>
+                        <button type="button" onClick={() => feedback(m, false)} className="gbtn pc-btn">{t.no}</button>
                       </div>
                     )}
                   </div>
@@ -1177,7 +1177,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                   <p id="pc-email-why" className="sr-only">{t.escalate}</p>
                   <div className="mt-2 flex gap-2">
                     <input id="pc-email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" aria-invalid={!!ticket.error} aria-describedby={ticket.error ? "pc-email-err" : undefined} className="pc-field h-11 min-w-0 flex-1 px-4 text-[15px]" />
-                    <button type="submit" disabled={ticket.busy} className="pc-btn pc-btn-primary h-11 shrink-0">{ticket.busy && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{ticket.busy ? t.raising : t.raise}</button>
+                    <button type="submit" disabled={ticket.busy} className="gbtn gbtn-lime pc-btn pc-btn-primary h-11 shrink-0">{ticket.busy && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{ticket.busy ? t.raising : t.raise}</button>
                   </div>
                   {ticket.error && <p id="pc-email-err" role="alert" className="pc-error mt-2 text-[13px]">{ticket.error}</p>}
                 </form>
@@ -1194,7 +1194,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
               <div role="status" className="pc-resolved pc-in mb-1 p-3.5">
                 <p className="flex items-center gap-2 text-[15px] font-semibold"><span className="pc-resolved-mark grid h-6 w-6 shrink-0 place-items-center rounded-full" aria-hidden><Check className="h-3.5 w-3.5" /></span>{rt.doneTitle}</p>
                 <p className="pc-muted mt-1 text-[14px] leading-snug">{rt.doneBody(resolved.to)}</p>
-                <button ref={reopenRef} type="button" onClick={reopenNow} disabled={closing.busy} className="pc-btn mt-2.5">
+                <button ref={reopenRef} type="button" onClick={reopenNow} disabled={closing.busy} className="gbtn pc-btn mt-2.5">
                   {closing.busy ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <RotateCw className="h-4 w-4" aria-hidden />}{closing.busy ? rt.reopening : rt.reopen}
                 </button>
                 {closing.error && <p role="alert" className="pc-error mt-2 text-[13px]">{closing.error}</p>}
@@ -1206,13 +1206,13 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                 {liveInfo.canRate ? (
                   <div role="group" aria-label={lt.helpful} className="mt-2.5 flex flex-wrap items-center gap-2">
                     <span className="text-[14px] font-medium" aria-hidden>{lt.helpful}</span>
-                    <button type="button" onClick={() => liveAction("csat", { helpful: true })} disabled={!!liveBusy} className="pc-btn">{lt.yes}</button>
-                    <button type="button" onClick={() => liveAction("csat", { helpful: false })} disabled={!!liveBusy} className="pc-btn">{lt.no}</button>
+                    <button type="button" onClick={() => liveAction("csat", { helpful: true })} disabled={!!liveBusy} className="gbtn pc-btn">{lt.yes}</button>
+                    <button type="button" onClick={() => liveAction("csat", { helpful: false })} disabled={!!liveBusy} className="gbtn pc-btn">{lt.no}</button>
                   </div>
                 ) : liveInfo.rated ? (
                   <p className="mt-2 text-[14px] font-medium">{lt.thanks}</p>
                 ) : null}
-                <button ref={liveDoneRef} type="button" onClick={newChat} className="pc-btn pc-btn-primary mt-2.5"><SquarePen className="h-4 w-4" aria-hidden />{lt.newChat}</button>
+                <button ref={liveDoneRef} type="button" onClick={newChat} className="gbtn gbtn-lime pc-btn pc-btn-primary mt-2.5"><SquarePen className="h-4 w-4" aria-hidden />{lt.newChat}</button>
                 {liveErr && <p role="alert" className="pc-error mt-2 text-[13px]">{liveErr}</p>}
               </div>
             ) : (<>
@@ -1243,12 +1243,12 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                 {live !== "connecting" && (
                   <div className="mt-2 flex flex-wrap gap-2 ps-6">
                     {live === "connected" ? (
-                      <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{lt.endChat}</button>
+                      <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="gbtn pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{lt.endChat}</button>
                     ) : (<>
                       {/* R1207: both actions the brief asks for, from the first moment in the queue: leave a message
                           (it stays in this chat) or cancel the request (back to Pip). The request itself is untouched. */}
-                      <button type="button" onClick={leaveHere} disabled={!!liveBusy} className="pc-btn">{liveBusy === "leave" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{liveBusy === "leave" ? lt.leaving : lt.leave}</button>
-                      <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{lt.cancel}</button>
+                      <button type="button" onClick={leaveHere} disabled={!!liveBusy} className="gbtn pc-btn">{liveBusy === "leave" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{liveBusy === "leave" ? lt.leaving : lt.leave}</button>
+                      <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="gbtn pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{lt.cancel}</button>
                     </>)}
                   </div>
                 )}
@@ -1276,7 +1276,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                 placeholder={liveOn ? lt.placeholder : t.placeholder}
                 className="min-h-11 flex-1 resize-none bg-transparent px-3 py-[11px] text-[16px] leading-[22px] outline-none sm:text-[15px]"
               />
-              <button type="submit" disabled={!input.trim() || (busy && !liveOn) || !!resolved || live === "connecting"} aria-label={t.send} title={t.send} className="pc-send grid h-11 w-11 shrink-0 place-items-center rounded-full"><ArrowUp className="h-5 w-5" aria-hidden /></button>
+              <button type="submit" disabled={!input.trim() || (busy && !liveOn) || !!resolved || live === "connecting"} aria-label={t.send} title={t.send} className="gbtn gbtn-lime gbtn-icon pc-send grid h-11 w-11 shrink-0 place-items-center rounded-full"><ArrowUp className="h-5 w-5" aria-hidden /></button>
             </form>
             <p id="pc-hint" className={cn("pc-muted mt-1.5 truncate px-2 text-[12px]", left > 100 && "sr-only")}>
               {left <= 100 ? <span aria-live="polite" className={cn(left <= 20 && "pc-error font-medium")}>{cx.charsLeft(left)}</span> : cx.hint}

@@ -716,11 +716,11 @@ function History() {
                 </div>
                 <div className="flex shrink-0">
                   {!n.read && (
-                    <button type="button" className="nf-icon-btn" aria-label={`Mark "${n.title}" read`} onClick={() => act("PATCH", [n.id])}>
+                    <button type="button" className="gbtn-icon ripple-host nf-icon-btn" aria-label={`Mark "${n.title}" read`} onClick={() => act("PATCH", [n.id])}>
                       <Check className="h-4 w-4" aria-hidden="true" />
                     </button>
                   )}
-                  <button type="button" className="nf-icon-btn" aria-label={`Clear "${n.title}"`} onClick={() => act("DELETE", [n.id])}>
+                  <button type="button" className="gbtn-icon ripple-host nf-icon-btn" aria-label={`Clear "${n.title}"`} onClick={() => act("DELETE", [n.id])}>
                     <X className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>

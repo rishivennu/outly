@@ -33,7 +33,7 @@ export interface PipActionsProps {
 }
 
 const CHIP =
-  "inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition hairline motion-reduce:transition-none disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  "gchip inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition hairline motion-reduce:transition-none disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 /**
  * R1198: Pip's one-tap asks. Each works on one place's words and comes back as a suggestion to accept or skip:

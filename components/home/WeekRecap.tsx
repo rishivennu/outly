@@ -52,7 +52,7 @@ export function WeekRecap({ r, canEmail }: { r: Recap; canEmail: boolean }) {
           <p className="display mt-2 text-2xl leading-tight sm:text-[28px]">{r.copy.headline}</p>
           {(r.copy.versus || r.copy.goal) && <p className="mt-1.5 text-sm text-muted-foreground">{[r.copy.versus, r.copy.goal].filter(Boolean).join(" ")}</p>}
         </div>
-        <button type="button" onClick={hide} aria-label="Hide last week's recap until next Monday" className="-mr-2 -mt-2 grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground">
+        <button type="button" onClick={hide} aria-label="Hide last week's recap until next Monday" className="gbtn-icon ripple-host -mr-2 -mt-2 grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground">
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>

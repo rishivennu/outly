@@ -837,9 +837,9 @@ function CommentDetail({
     }
   };
 
-  const iconBtn = "grid h-11 w-11 shrink-0 place-items-center rounded-full text-foreground hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
+  const iconBtn = "gbtn-icon ripple-host grid h-11 w-11 shrink-0 place-items-center rounded-full text-foreground hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
   const wideBtn = "lg:flex lg:h-11 lg:w-auto lg:items-center lg:gap-1.5 lg:rounded-xl lg:px-3.5 lg:text-[13px] lg:font-medium lg:hairline";
-  const actBtn = "inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-foreground transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none [@media(hover:hover)]:hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.96]";
+  const actBtn = "gbtn ripple-host inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-foreground transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none [@media(hover:hover)]:hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.96]";
 
   return (
     <section aria-label={`Comment from ${comment.authorName}`} className="flex min-h-0 flex-1 flex-col">

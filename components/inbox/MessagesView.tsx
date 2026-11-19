@@ -601,7 +601,7 @@ function ThreadPane({
   return (
     <section aria-label={`Conversation with ${thread.participantName}`} className="flex min-h-0 flex-1 flex-col">
       <header className="flex items-center gap-2.5 border-b border-border px-2 pb-2 pt-[max(8px,env(safe-area-inset-top))] lg:gap-3 lg:px-5 lg:py-3">
-        <button type="button" onClick={onBack} aria-label="Back to conversations" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring lg:hidden">
+        <button type="button" onClick={onBack} aria-label="Back to conversations" className="gbtn-icon ripple-host grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring lg:hidden">
           <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </button>
         <ThreadAvatar t={thread} size={38} />
