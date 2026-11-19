@@ -3606,6 +3606,107 @@ html.dark .mtab-item { color: hsl(var(--foreground) / .78); }
   .mmain { padding-bottom: calc(env(safe-area-inset-bottom) + 76px); }
 }
 
+/* ---------- R1214: one liquid glass button system on the phone ----------
+   The tab bar's glass (R1213, .mtab) carried on to every important control under 1024px: the shared Button
+   (components/ui/button.tsx) wears these classes on every variant, the header's round actions (.mtop-btn,
+   .app-round), and the segmented controls and chips (.gseg, .gchip) that pages build by hand. Desktop keeps the
+   11-19 buttons: every rule below sits inside the phone media query, the tokens alone live on :root.
+   Hierarchy stays: lime glass = the one action (.gbtn-lime), ink glass = a firm action (.gbtn-primary), frosted
+   glass = everything else (.gbtn), red tint = destructive (.gbtn-danger), muted = disabled, a brighter pane =
+   the selected segment or chip. Text links, navigation labels and fields are untouched.
+   Tokens: --gb-bg/--gb-a (tint and its opacity), --gb-blur, --gb-sat, --gb-line (edge), --gb-hi/--gb-hi2 (inner
+   top and bottom highlights), --gb-shadow, --gb-r (radius), --gb-icon (round button size), --gb-dur/--gb-ease
+   (feedback), --gb-press (press scale). */
+:root {
+  --gb-bg: 0 0% 100%; --gb-a: .58; --gb-blur: 16px; --gb-sat: 1.5;
+  --gb-line: 222 20% 18% / .1; --gb-hi: 0 0% 100% / .8; --gb-hi2: 0 0% 100% / .2;
+  --gb-shadow: 0 8px 24px -14px rgb(15 20 40 / .32), 0 1px 3px -1px rgb(15 20 40 / .14);
+  --gb-r: 9999px; --gb-icon: 44px; --gb-dur: .2s; --gb-ease: var(--ease-liquid); --gb-press: .96;
+}
+html.dark {
+  --gb-bg: 240 5% 14%; --gb-a: .52; --gb-line: 0 0% 100% / .1; --gb-hi: 0 0% 100% / .14; --gb-hi2: 0 0% 100% / .04;
+  --gb-shadow: 0 8px 24px -14px rgb(0 0 0 / .65), 0 1px 3px -1px rgb(0 0 0 / .45);
+}
+@media (max-width: 1023.98px) {
+  .gbtn, .gbtn-icon, .gchip, .gseg {
+    position: relative; isolation: isolate;
+    background: linear-gradient(180deg, hsl(var(--gb-bg) / calc(var(--gb-a) + .1)), hsl(var(--gb-bg) / var(--gb-a)));
+    -webkit-backdrop-filter: blur(var(--gb-blur)) saturate(var(--gb-sat));
+    backdrop-filter: blur(var(--gb-blur)) saturate(var(--gb-sat));
+    box-shadow: inset 0 1px 0 hsl(var(--gb-hi)), inset 0 -1px 0 hsl(var(--gb-hi2)), 0 0 0 1px hsl(var(--gb-line)), var(--gb-shadow);
+    transition: transform var(--gb-dur) var(--gb-ease), box-shadow var(--gb-dur) var(--gb-ease), color var(--gb-dur) var(--gb-ease), opacity var(--gb-dur) var(--gb-ease);
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* the press: a pane of light over the glass (opacity fades, gradients cannot), and a 96% scale that settles back */
+  .gbtn::after, .gbtn-icon::after, .gchip::after {
+    content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+    background: hsl(0 0% 100% / .12); opacity: 0; transition: opacity var(--gb-dur) var(--gb-ease);
+  }
+  html.dark .gbtn::after, html.dark .gbtn-icon::after, html.dark .gchip::after { background: hsl(0 0% 100% / .08); }
+  .gbtn:not(:disabled):active::after, .gbtn-icon:not(:disabled):active::after, .gchip:not(:disabled):active::after { opacity: 1; }
+  .gbtn:not(:disabled):active, .gbtn-icon:not(:disabled):active, .gchip:not(:disabled):active { transform: scale(var(--gb-press)); }
+  /* the one action: lime glass, lime-ink text (the ink is 12:1 on lime at .8 over dark, 9:1 over white) */
+  .gbtn-lime {
+    --gb-bg: var(--lime); --gb-a: .8; --gb-line: var(--lime) / .5; --gb-hi: 0 0% 100% / .55; --gb-hi2: 0 0% 0% / .08;
+    --gb-shadow: 0 10px 28px -12px hsl(var(--lime) / .55), 0 1px 3px -1px rgb(15 20 40 / .14);
+    color: hsl(var(--lime-foreground));
+  }
+  /* a firm action: the theme's ink (or cream) as glass, so it still outranks frosted glass without going lime */
+  .gbtn-primary { --gb-bg: var(--primary); --gb-a: .84; --gb-line: var(--primary) / .5; --gb-hi: 0 0% 100% / .3; --gb-hi2: 0 0% 0% / .1; }
+  html.dark .gbtn-primary { --gb-hi: 0 0% 100% / .5; }
+  /* destructive keeps its red: a light red tint on the glass, the red text stays */
+  .gbtn-danger { --gb-bg: var(--destructive); --gb-a: .16; --gb-line: var(--destructive) / .35; --gb-hi: 0 0% 100% / .35; }
+  html.dark .gbtn-danger { --gb-a: .2; --gb-hi: 0 0% 100% / .08; }
+  /* round icon buttons: a circle, 44px (the header's bell and menu, close buttons, the icon sizes of Button) */
+  .gbtn-icon { border-radius: var(--gb-r); min-width: var(--gb-icon); min-height: var(--gb-icon); }
+  /* disabled: muted and flat (no blur, no lift), the text already muted by the Button classes */
+  .gbtn:disabled, .gbtn-icon:disabled, .gchip:disabled {
+    background: hsl(var(--secondary) / .7); color: hsl(var(--muted-foreground));
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    box-shadow: 0 0 0 1px hsl(var(--border) / .8); opacity: .8;
+  }
+  /* segmented control: one glass trough, the chosen segment a brighter pane inside it (a pane the page slides
+     itself, .gseg-pane, or the chosen button's own background where there is no sliding pane) */
+  .gseg { border-radius: var(--gb-r); padding: 3px; }
+  .gseg > [aria-pressed], .gseg > [aria-selected], .gseg > [role="tab"], .gseg > [role="radio"], .gseg > [data-on] {
+    border-radius: var(--gb-r); background: transparent; box-shadow: none;
+    transition: background-color var(--gb-dur) var(--gb-ease), color var(--gb-dur) var(--gb-ease), box-shadow var(--gb-dur) var(--gb-ease), transform var(--gb-dur) var(--gb-ease);
+  }
+  .gseg > [aria-pressed="true"], .gseg > [aria-selected="true"], .gseg > [aria-checked="true"]:not(:has(.gseg-pane)), .gseg > [data-on="true"], .gseg .gseg-pane {
+    background: hsl(var(--gb-bg) / calc(var(--gb-a) + .32)); color: hsl(var(--foreground)); border-radius: var(--gb-r);
+    box-shadow: inset 0 1px 0 hsl(var(--gb-hi)), 0 1px 2px rgb(0 0 0 / .08), 0 0 0 1px hsl(var(--gb-line));
+  }
+  html.dark .gseg > [aria-pressed="true"], html.dark .gseg > [aria-selected="true"], html.dark .gseg > [aria-checked="true"]:not(:has(.gseg-pane)), html.dark .gseg > [data-on="true"], html.dark .gseg .gseg-pane { background: hsl(0 0% 100% / .14); }
+  .gseg > :not(:disabled):active { transform: scale(var(--gb-press)); }
+  /* a chip on its own: glass at rest, a brighter pane with a lime edge when chosen */
+  .gchip { border-radius: var(--gb-r); }
+  .gchip[aria-pressed="true"], .gchip[aria-selected="true"], .gchip[data-on="true"] {
+    --gb-a: .88; --gb-line: var(--lime) / .6; color: hsl(var(--foreground));
+    box-shadow: inset 0 1px 0 hsl(var(--gb-hi)), inset 0 0 0 1px hsl(var(--lime) / .6), var(--gb-shadow);
+  }
+  html.dark .gchip[aria-pressed="true"], html.dark .gchip[aria-selected="true"], html.dark .gchip[data-on="true"] { --gb-bg: 240 5% 22%; --gb-a: .8; }
+  /* where glass cannot or should not show: a solid pane with the same edge and shadow */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .gbtn, .gbtn-icon, .gchip, .gseg { background: hsl(var(--gb-bg) / .94); }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .gbtn, .gbtn-icon, .gchip, .gseg { background: hsl(var(--gb-bg) / .96); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  }
+  html[data-contrast="more"] .gbtn, html[data-contrast="more"] .gbtn-icon, html[data-contrast="more"] .gchip, html[data-contrast="more"] .gseg {
+    background: hsl(var(--card)); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: 0 0 0 1px hsl(var(--border));
+  }
+  html[data-contrast="more"] .gbtn-lime { background: hsl(var(--lime)); }
+  html[data-contrast="more"] .gbtn-primary { background: hsl(var(--primary)); }
+  @media (forced-colors: active) {
+    .gbtn, .gbtn-icon, .gchip, .gseg { background: ButtonFace; color: ButtonText; box-shadow: none; border: 1px solid ButtonText; }
+    .gbtn::after, .gbtn-icon::after, .gchip::after { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .gbtn, .gbtn-icon, .gchip, .gseg, .gseg > *, .gseg-pane, .gbtn::after, .gbtn-icon::after, .gchip::after { transition: none; }
+    .gbtn:not(:disabled):active, .gbtn-icon:not(:disabled):active, .gchip:not(:disabled):active, .gseg > :not(:disabled):active { transform: none; }
+  }
+}
+
 /* 1099 Add to Home Screen card: floats 12px above the tab bar (60px, 12px off the edge; 54px and 8px on a phone on its
    side). */
 .install-card {
