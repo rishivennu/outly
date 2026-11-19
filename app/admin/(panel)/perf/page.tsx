@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/admin/guard";
 import { Card, CardTitle, Empty, PageHead, Table, fmtDate } from "@/components/admin/ui";
-import { byVersion, fmtMetric, SEGMENTS, summarize, type Segment, type Stat, type Summary } from "@/lib/perf/aggregate";
+import { BUDGET, byVersion, fmtMetric, overBudget, SEGMENTS, summarize, verdict, type Segment, type Stat, type Summary, type Verdict } from "@/lib/perf/aggregate";
 import { METRIC_LABEL, PERF_METRICS, type PerfMetric } from "@/lib/perf/sample";
 import { perfRows } from "@/lib/perf/store";
 
@@ -11,20 +11,34 @@ const DAY = 86_400_000;
 const SEGMENT_LABEL: Record<Segment, string> = { all: "All loads", cold: "Cold", warm: "Warm", installed: "Installed app", browser: "Browser" };
 const VERSION_METRICS: PerfMetric[] = ["ttfb", "fcp", "lcp", "cls", "hydrate", "content", "mwMs", "userMs"];
 
+/* R1230: the p75 against its budget, as a word and a colour (never colour alone). */
+const VERDICT_CLASS: Record<Verdict, string> = { good: "text-emerald-700 dark:text-emerald-300", "needs work": "text-amber-700 dark:text-amber-300", poor: "text-red-700 dark:text-red-300" };
 function Cell({ m, s }: { m: PerfMetric; s: Stat }) {
   if (!s.n) return <span className="text-muted-foreground">-</span>;
+  const v = verdict(m, s.p75);
   return (
     <span className="tabular-nums">
       {fmtMetric(m, s.p50)} / {fmtMetric(m, s.p75)} / {fmtMetric(m, s.p95)}
-      <span className="block text-[12px] text-muted-foreground">{s.n.toLocaleString("en-IN")} loads</span>
+      <span className="block text-[12px] text-muted-foreground">
+        {s.n.toLocaleString("en-IN")} loads
+        {v && (
+          <>
+            {" "}
+            <span className={VERDICT_CLASS[v]}>{v}</span>
+          </>
+        )}
+      </span>
     </span>
   );
 }
+const budgetHint = Object.entries(BUDGET)
+  .map(([m, b]) => `${METRIC_LABEL[m as PerfMetric]} ${fmtMetric(m as PerfMetric, b.good)}`)
+  .join(", ");
 
 function Window({ title, sum }: { title: string; sum: Summary }) {
   return (
     <Card className="mb-4">
-      <CardTitle hint="Each cell is p50 / p75 / p95.">{`${title}: ${sum.samples.all.toLocaleString("en-IN")} page loads`}</CardTitle>
+      <CardTitle hint={`Each cell is p50 / p75 / p95. The word under it judges the p75 against the budget (good up to: ${budgetHint}).`}>{`${title}: ${sum.samples.all.toLocaleString("en-IN")} page loads`}</CardTitle>
       {sum.samples.all ? (
         <Table label={`Startup timings, ${title}`} mobile="scroll" minWidth={900} head={["Metric", ...SEGMENTS.map((s) => `${SEGMENT_LABEL[s]} (${sum.samples[s]})`)]}>
           {PERF_METRICS.map((m) => (
@@ -65,7 +79,7 @@ export default async function PerfPage() {
       <Card>
         <CardTitle hint="p75 per release over the last 7 days, newest first.">By version</CardTitle>
         {versions.length ? (
-          <Table label="Startup timings by version" mobile="scroll" minWidth={900} head={["Version", "Loads", "Seen", ...VERSION_METRICS.map((m) => METRIC_LABEL[m])]}>
+          <Table label="Startup timings by version" mobile="scroll" minWidth={980} head={["Version", "Loads", "Seen", ...VERSION_METRICS.map((m) => METRIC_LABEL[m]), "Over budget"]}>
             {versions.map((v) => (
               <tr key={v.version}>
                 <th scope="row" className="text-left font-mono text-[12.5px] font-medium">{v.version}</th>
@@ -76,6 +90,7 @@ export default async function PerfPage() {
                 {VERSION_METRICS.map((m) => (
                   <td key={m} className="tabular-nums">{fmtMetric(m, v.p75[m])}</td>
                 ))}
+                <td className="text-[12.5px]">{overBudget(v.p75).length ? overBudget(v.p75).map((m) => METRIC_LABEL[m]).join(", ") : <span className="text-muted-foreground">none</span>}</td>
               </tr>
             ))}
           </Table>

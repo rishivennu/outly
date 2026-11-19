@@ -67,6 +67,30 @@ export function byVersion(rows: PerfRow[], limit = 12): VersionRow[] {
     .slice(0, limit);
 }
 
+/* R1230: budgets (web.dev "good" / "poor" thresholds, p75). CLS is stored x1000. Startup marks of our own
+   (hydrate, content) and the server legs (mwMs, userMs, cfgMs) have no public threshold: no verdict for them. */
+export const BUDGET: Partial<Record<PerfMetric, { good: number; poor: number }>> = {
+  ttfb: { good: 800, poor: 1800 },
+  fcp: { good: 1800, poor: 3000 },
+  lcp: { good: 2500, poor: 4000 },
+  cls: { good: 100, poor: 250 },
+  inp: { good: 200, poor: 500 },
+};
+export type Verdict = "good" | "needs work" | "poor";
+/** Where a p75 sits against its budget; null when the metric has no budget or no samples. */
+export function verdict(m: PerfMetric, p75: number | null): Verdict | null {
+  const b = BUDGET[m];
+  if (!b || p75 == null) return null;
+  return p75 <= b.good ? "good" : p75 > b.poor ? "poor" : "needs work";
+}
+/** Which metrics of a version sit over their budget (p75 beyond "good"), so a regression reads as a short list. */
+export function overBudget(p75: Partial<Record<PerfMetric, number | null>>): PerfMetric[] {
+  return PERF_METRICS.filter((m) => {
+    const v = verdict(m, p75[m] ?? null);
+    return v === "needs work" || v === "poor";
+  });
+}
+
 /** 840 -> "840 ms", 1240 -> "1.24 s"; CLS is stored x1000, so 92 -> "0.092". */
 export function fmtMetric(m: PerfMetric, v: number | null): string {
   if (v == null) return "-";

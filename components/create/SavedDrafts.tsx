@@ -134,7 +134,7 @@ export function SavedDrafts({ className }: { className?: string }) {
       />
       <Sheet open={!!previewing} onOpenChange={(o) => !o && setPreviewing(null)} title={previewing ? draftName(previewing) : "Preview"} description="The video saved with this draft." side="center">
         {previewing?.media?.url && (
-          <video src={previewing.media.url} poster={previewing.coverUrl ?? previewing.media.thumbnailUrl ?? undefined} controls playsInline className="mx-auto max-h-[65dvh] w-full max-w-[360px] rounded-2xl bg-black" />
+          <video src={previewing.media.url} poster={previewing.coverUrl ?? previewing.media.thumbnailUrl ?? undefined} controls playsInline preload="metadata" className="mx-auto max-h-[65dvh] w-full max-w-[360px] rounded-2xl bg-black" />
         )}
       </Sheet>
     </section>
