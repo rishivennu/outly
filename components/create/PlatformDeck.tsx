@@ -3,7 +3,7 @@ import { fmtHandle } from "@/lib/handle";
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import * as Switch from "@radix-ui/react-switch";
-import { AlertCircle, Check, ChevronDown, CircleAlert, ImageIcon, Link2, MessageSquarePlus, Pencil, RefreshCw, Sparkles } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, CircleAlert, ImageIcon, Link2, MessageSquarePlus, Pencil, RefreshCw, RotateCcw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Counter, Input, Label, Textarea } from "@/components/ui/field";
 import { PlatformOrb, PLATFORM_HALO } from "@/components/shared/PlatformIcon";
@@ -17,7 +17,10 @@ import { SuggestionCard } from "./SuggestionCard";
 import { bodyKey, bodyRoom, clipTo, fieldsFor, nextIndex, normalizeTags, previewDraft, previewNote, type FieldKey } from "./deck-logic";
 import { enabledPlatforms, launchGate } from "./publish";
 import type { Proposal, Undo } from "./proposal";
-import type { AccountView, Draft } from "./types";
+import type { AccountView, Draft, PlatformCopy } from "./types";
+import { copyKey, type AdaptTone } from "@/lib/ai/adapt-core";
+import { CaptionCards } from "./CaptionCards";
+import { APPROVE, REVIEW_LABEL, reviewKind } from "./review-state";
 import { ease } from "@/lib/motion/tokens";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
@@ -50,9 +53,17 @@ interface Props {
   onEditSource?: () => void;
   /** R1206: the platform to open first, when Launch sent the creator here to fix that one. */
   open?: Platform | null;
+  /** R1209: what Pip last wrote for each place, so "Restore Pip's version" is one tap away. */
+  adapted?: Partial<Record<Platform, PlatformCopy>>;
+  /** R1209: Pip writes this place again from the main caption. A place the creator edited gets a suggestion. */
+  onRegenerate?: (p: Platform) => void;
+  onRegenerateAll?: (tone?: AdaptTone) => void;
+  /** R1209: the direction Pip last wrote every place in. */
+  tone?: AdaptTone | null;
+  onRestore?: (p: Platform) => void;
+  /** R1209: set only while Pip writes the platform captions. */
+  onStopWriting?: () => void;
 }
-
-const READY_LABEL: Record<Platform, string> = { instagram: "Ready to go", youtube: "Wants a stronger title", x: "Make it impossible to ignore", tiktok: "Hook in the first second", threads: "Keep it conversational", facebook: "Ready for the feed", linkedin: "Lead with the lesson" };
 
 const SURFACE: Record<Platform, string> = {
   instagram: "bg-[radial-gradient(120%_80%_at_0%_0%,hsl(330_85%_62%/0.12),transparent_60%)]",
@@ -115,18 +126,19 @@ export function PlatformDeck(p: Props) {
       out[pl] = {
         checks,
         blocked: blocked || !connected,
-        label: !d.enabled ? (connected ? "Not sending" : acct ? "Needs a reconnect" : "Not connected") : !connected ? (acct ? "Needs a reconnect" : "Not connected yet") : d.reviewed && !blocked ? "Looks good" : blocked ? "Needs a hand" : READY_LABEL[pl],
+        // R1209: the same three words as the caption cards: Needs review, Edited, Approved.
+        label: !d.enabled ? (connected ? "Not sending" : acct ? "Needs a reconnect" : "Not connected") : !connected ? (acct ? "Needs a reconnect" : "Not connected yet") : blocked ? "Needs a hand" : p.proposals[pl] ? "Suggestion waiting" : REVIEW_LABEL[reviewKind(d)],
         tone: !d.enabled ? "off" : !connected || blocked ? "warn" : d.reviewed ? "done" : "ok",
       };
     }
     return out;
-  }, [p.drafts, p.accounts, p.media]);
+  }, [p.drafts, p.accounts, p.media, p.proposals]);
 
   // Skipped platforms are not in the gate at all, so switching one off can never hold up the launch.
   const { pending, ready } = launchGate(p.drafts, p.accounts, p.media, Object.keys(p.proposals) as Platform[]);
 
   const markReviewed = (pl: Platform) => {
-    p.onDraft(pl, { reviewed: true });
+    p.onDraft(pl, APPROVE);
     const next = enabled.find((x) => x !== pl && !p.drafts[x].reviewed && linked.includes(x));
     if (next) setTimeout(() => (setActive(next), setShut(false)), 350);
   };
@@ -134,6 +146,19 @@ export function PlatformDeck(p: Props) {
   // A place with no live account can still be judged: its preview shows the copy it would get, and nothing more.
   const previewOnly = p.accounts[active]?.status !== "connected" && !p.drafts[active].enabled;
   const look = previewOnly ? previewDraft(active, p.drafts, p.hook) : { draft: p.drafts[active], source: "own" as const };
+
+  /** R1209: Edit on a caption card opens this platform in the editor below, with the cursor in its words. */
+  const editOne = (pl: Platform) => {
+    setActive(pl);
+    setShut(false);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const panel = document.getElementById(`panel-${pl}`);
+        panel?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+        panel?.querySelector<HTMLElement>("[data-body]")?.focus({ preventScroll: true });
+      }),
+    );
+  };
 
   const onCardKeys = (e: KeyboardEvent<HTMLDivElement>) => {
     const i = linked.indexOf(active);
@@ -297,6 +322,24 @@ export function PlatformDeck(p: Props) {
         )}
       </section>
 
+      {linked.length > 0 && (
+        <CaptionCards
+          places={linked.filter((pl) => p.drafts[pl].enabled)}
+          drafts={p.drafts}
+          status={status}
+          writing={p.writing}
+          proposals={p.proposals}
+          online={p.online}
+          editing={!shut ? active : null}
+          onDraft={p.onDraft}
+          onEdit={editOne}
+          onRegenerate={p.onRegenerate}
+          onRegenerateAll={p.onRegenerateAll}
+          tone={p.tone}
+          onStop={p.onStopWriting}
+        />
+      )}
+
       {!shut && editor}
 
       <p className="mt-4 text-sm text-muted-foreground" aria-live="polite">
@@ -421,7 +464,7 @@ function pendingLine(pending: readonly Platform[], linked: readonly Platform[]) 
   const names = (xs: readonly Platform[]) => xs.map((x) => PLATFORM_META[x].name).join(", ");
   const on = pending.filter((x) => linked.includes(x));
   const off = pending.filter((x) => !linked.includes(x));
-  const parts = [on.length ? `${on.length} to look over: ${names(on)}` : "", off.length ? `Switched on but not connected: ${names(off)}. Connect or leave out` : ""];
+  const parts = [on.length ? `${on.length} to approve: ${names(on)}` : "", off.length ? `Switched on but not connected: ${names(off)}. Connect or leave out` : ""];
   return parts.filter(Boolean).join(". ");
 }
 
@@ -473,6 +516,10 @@ function PlatformStage(p: StageProps) {
   const tagCount = countHashtags(d.hashtags);
   const cap = HASHTAG_CAP[pl];
   const general = p.checks.filter((c) => !c.field || c.field === "media" || c.field === "account");
+
+  // R1209: the creator changed Pip's words here; Pip's last version is one tap away.
+  const pip = p.adapted?.[pl];
+  const restorable = !!pip && !!p.onRestore && copyKey(d) !== copyKey({ title: pip.title ?? "", caption: pip.caption, description: pip.description ?? "", hashtags: pip.hashtags });
 
   // R1206: there is no shared writer here any more, so typing in a place is always that place's own words.
   const editBody = (v: string) => set({ [f.body.key]: v, custom: true });
@@ -580,6 +627,7 @@ function PlatformStage(p: StageProps) {
           <Textarea
             id={fieldDom(id, f.body.key)}
             rows={pl === "x" ? 4 : 7}
+            data-body=""
             value={d[f.body.key]}
             onChange={(e) => editBody(e.target.value)}
             placeholder={pl === "x" ? "Say it in one breath." : pl === "youtube" ? "What is it about, and why watch to the end?" : "Tell them why it matters."}
@@ -607,7 +655,8 @@ function PlatformStage(p: StageProps) {
               onChange={(e) => set({ hashtags: e.target.value })}
               onBlur={(e) => {
                 const clean = normalizeTags(e.target.value);
-                if (clean !== d.hashtags) set({ hashtags: clean });
+                // Tidying the tags is not an edit, so it never takes an approval back.
+                if (clean !== d.hashtags) set({ hashtags: clean, reviewed: !!d.reviewed });
               }}
               placeholder="#oneidea #anotherone"
               aria-invalid={bad("hashtags") || undefined}
@@ -689,18 +738,23 @@ function PlatformStage(p: StageProps) {
         <Button
           variant={d.reviewed && !blocked ? "outline" : "primary"}
           onClick={() => (d.reviewed ? set({ reviewed: false }) : p.onReviewed())}
-          disabled={!d.enabled || blocked || busy || !connected}
+          disabled={!d.enabled || blocked || busy || !connected || (!d.reviewed && !!p.proposals[pl])}
           aria-pressed={d.reviewed}
         >
           <motion.span animate={flash ? { scale: [1, 1.2, 1] } : {}} transition={{ duration: 0.45, ease: ease("out") }} className="inline-flex motion-reduce:transform-none">
             <Check className="h-4 w-4" />
           </motion.span>
-          {d.reviewed ? "Looks good" : "This looks good"}
+          {d.reviewed ? "Approved" : "Approve"}
         </Button>
         <Button variant="ghost" onClick={() => p.onRewrite(pl)} disabled={!d.enabled || p.rewriting === pl || busy || offline} aria-describedby={`${id}-rw`}>
           <RefreshCw className={cn("h-4 w-4", p.rewriting === pl && "animate-spin motion-reduce:animate-none")} /> Rewrite this one
         </Button>
         <span id={`${id}-rw`} className="sr-only">Pip suggests new words. Nothing changes until you accept.</span>
+        {restorable && (
+          <Button variant="ghost" onClick={() => p.onRestore?.(pl)} disabled={busy}>
+            <RotateCcw className="h-4 w-4" aria-hidden="true" /> Restore Pip&apos;s version
+          </Button>
+        )}
       </div>
       </>
       )}

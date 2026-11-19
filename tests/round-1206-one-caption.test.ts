@@ -68,7 +68,7 @@ describe("R1206 the caption is written in exactly one place", () => {
     expect(pip).toContain("const ownBox = askStory && !p.composer;");
   });
   test("generating confirms once and moves the creator into the platform results", () => {
-    const fn = ws.slice(ws.indexOf("const adapt = async"), ws.indexOf("const useAsIs"));
+    const fn = ws.slice(ws.indexOf("const adapt = async"), ws.indexOf("const analyze = () =>"));
     expect(fn).toContain("Have a read.");
     expect(fn).toContain('document.getElementById("adapted-captions")?.scrollIntoView(');
     expect(fn).toContain("if (!o.direct) {");

@@ -5,7 +5,8 @@ const src = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), "ut
 const burner = src("components/create/CaptionBurner.tsx");
 const stage = src("components/create/VideoStage.tsx");
 const ws = src("components/create/CreateWorkspace.tsx");
-const publish = src("components/create/PublishTo.tsx");
+// R1209: picking the places moved from Your Story to the deck on Everywhere.
+const publish = src("components/create/PlatformDeck.tsx");
 const rail = src("components/create/JourneyRail.tsx");
 
 describe("1152 one video player", () => {
@@ -81,8 +82,8 @@ describe("1152 layout and assistant", () => {
     expect(ws.match(/\{assistant\}/g)?.length).toBe(1);
   });
   test("publishing shows how many places are picked", () => {
-    expect(publish).toContain("{chosen.length} selected");
-    expect(publish).toContain("aria-pressed={on}");
+    expect(publish).toContain("`${enabled.length} selected`");
+    expect(publish).toContain("<Switch.Root");
   });
 });
 
@@ -98,7 +99,8 @@ describe("1152 fits at 1280", () => {
     expect(stage).toContain("i > 0 && !column &&");
   });
   test("platform chips are wide enough for their names", () => {
-    expect(publish).toContain("minmax(min(100%,168px),1fr)");
+    expect(publish).toContain("w-[min(80vw,236px)] shrink-0 snap-start");
+    expect(publish).toContain("title={who}");
   });
 });
 

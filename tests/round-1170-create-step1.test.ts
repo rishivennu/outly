@@ -13,7 +13,7 @@ import type { Step } from "../components/create/types";
 const src = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
 const all: Record<Step, boolean> = { video: true, story: true, everywhere: true, launch: true };
 const none: Record<Step, boolean> = { video: true, story: false, everywhere: false, launch: false };
-const base: BarInput = { online: true, hasMedia: true, uploadFailed: false, hasHook: true, ready: true, enabledCount: 1, launching: false, saving: false };
+const base: BarInput = { online: true, hasMedia: true, uploadFailed: false, hasCaption: true, ready: true, enabledCount: 1, launching: false, saving: false };
 const MB = 1048576;
 const lim = (o: Partial<UploadLimits> = {}): UploadLimits => ({ direct: true, maxBytes: 500 * MB, maxMb: 500, ...o });
 
@@ -168,7 +168,8 @@ describe("workspace wiring", () => {
 describe("review fixes", () => {
   const ws = src("components/create/CreateWorkspace.tsx");
   test("a paused upload closes Everywhere and Launch too, and blocks save and send", () => {
-    expect(ws).toContain("everywhere: storyOpen && !!hook, launch: storyOpen && !!hook && allReviewed");
+    // R1209: Everywhere opens on the main caption, not on a picked hook.
+    expect(ws).toContain("everywhere: storyOpen && !!caption, launch: storyOpen && !!caption && allReviewed");
     const s = barState({ ...base, step: "launch", upload: "paused" });
     expect(s.note).toBe("Your upload is paused. Resume it on Your Video first.");
     expect(s.buttons.at(-1)!.disabled).toBe(true);

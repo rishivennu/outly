@@ -52,7 +52,7 @@ describe("upload limits from the server", () => {
 
 describe("action bar rules", () => {
   // Phase 4: sending lives on Launch only (Steps 1 and 2 have a single Continue), so the send rules are checked there.
-  const base: BarInput = { online: true, hasMedia: true, uploadFailed: false, hasHook: true, ready: true, enabledCount: 2, launching: false, saving: false, step: "launch", targets: ["youtube", "x"] };
+  const base: BarInput = { online: true, hasMedia: true, uploadFailed: false, hasCaption: true, ready: true, enabledCount: 2, launching: false, saving: false, step: "launch", targets: ["youtube", "x"] };
   test("all four work when the post is ready", () => {
     const s = barState(base);
     expect([s.save, s.preview, s.schedule, s.publish].every((a) => !a.disabled)).toBe(true);
@@ -68,7 +68,7 @@ describe("action bar rules", () => {
     expect(barState({ ...base, hasMedia: false }).note).toBe("Add a video first.");
     expect(barState({ ...base, uploadFailed: true }).note).toContain("didn't upload");
     expect(barState({ ...base, enabledCount: 0 }).note).toBe("Pick at least one place to send it.");
-    expect(barState({ ...base, hasHook: false }).note).toContain("hook");
+    expect(barState({ ...base, hasCaption: false }).note).toBe("Write your caption on Your Story first.");
     expect(barState({ ...base, ready: false }).note).toContain("Everywhere");
     expect(barState({ ...base, launching: true }).publish.disabled).toBe(true);
     expect(barState({ ...base, saving: true }).save.disabled).toBe(true);

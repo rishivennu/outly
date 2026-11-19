@@ -12,15 +12,16 @@ const mine = [deck, prev, card, pane, snip, src("components/create/deck-logic.ts
 
 describe("p3 deck contract", () => {
   test("props follow CONTRACT-B: no onContinue or docked, proposals/undo/accept/reject/revert required", () => {
-    const props = deck.slice(deck.indexOf("interface Props"), deck.indexOf("const READY_LABEL"));
+    const props = deck.slice(deck.indexOf("interface Props"), deck.indexOf("const SURFACE"));
     for (const k of ["onContinue", "docked"]) expect(props).not.toContain(k);
     for (const k of ["proposals: Partial<Record<Platform, Proposal>>;", "undo: Partial<Record<Platform, Undo>>;", "onAccept: (p: Platform) => void;", "onReject: (p: Platform) => void;", "onRevert: (p: Platform) => void;"]) expect(props).toContain(k);
     expect(deck).not.toContain("On to launch");
     expect(deck).not.toMatch(/sticky bottom-/);
   });
   test("the reviewed flag stays per platform and Rewrite goes through onRewrite", () => {
-    expect(deck).toContain("p.onDraft(pl, { reviewed: true });");
-    expect(deck).toContain("This looks good");
+    // R1209: Approve sets the one approved state (reviewed, not edited, not reopened).
+    expect(deck).toContain("p.onDraft(pl, APPROVE);");
+    expect(deck).toContain('{d.reviewed ? "Approved" : "Approve"}');
     expect(deck).toContain("onClick={() => p.onRewrite(pl)}");
   });
   test("R1198: platform cards are one compact horizontal switcher, keyboard reachable, names never clipped without a title", () => {

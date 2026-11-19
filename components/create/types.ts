@@ -8,8 +8,8 @@ export type { AccountView, MediaView, PostView, TargetView, Draft };
 export type Step = "video" | "story" | "everywhere" | "launch";
 export const STEPS: { id: Step; n: string; label: string; hint: string }[] = [
   { id: "video", n: "01", label: "Your Video", hint: "Upload your clip" },
-  { id: "story", n: "02", label: "Your Story", hint: "Find the hook" },
-  { id: "everywhere", n: "03", label: "Everywhere", hint: "Fit each platform" },
+  { id: "story", n: "02", label: "Your Story", hint: "Write your caption" },
+  { id: "everywhere", n: "03", label: "Everywhere", hint: "Approve each caption" },
   { id: "launch", n: "04", label: "Launch", hint: "Publish or schedule" },
 ];
 

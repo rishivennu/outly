@@ -14,6 +14,10 @@ export interface Draft {
   reviewed: boolean;
   /** Client only, never saved: this platform has its own caption instead of following the main caption. */
   custom?: boolean;
+  /** R1209, client only: typed in since Pip wrote it and not approved yet (the Edited state). */
+  edited?: boolean;
+  /** R1209, client only: typed in after it was approved, so it needs review again. */
+  reopened?: boolean;
   /** 1162: the account this place goes to when the creator has more than one there. Unset = the pinned or default one. */
   accountId?: string | null;
 }

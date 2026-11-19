@@ -30,7 +30,6 @@ import { LaunchPanel, ScheduledView, scheduleCheckLine, type ScheduleCheck } fro
 import { PlatformDeck } from "./PlatformDeck";
 import { PublishingView } from "./PublishingView";
 import { VideoStage } from "./VideoStage";
-import { PublishTo } from "./PublishTo";
 import { SaveDraft } from "./SaveDraft";
 import { autosaveLine, draftTitle, enabledPlatforms, launchGate, launchPlan, pickedAccount, scheduleProblem, targetPayload } from "./publish";
 import { CaptionBurner } from "./CaptionBurner";
@@ -46,11 +45,11 @@ import { SyncStatus } from "./SyncStatus";
 import { ConflictDialog } from "./ConflictDialog";
 import { emptyDraft, NOTES, type AccountView, type Draft, type Hook, type HookResult, type HooksState, NO_HOOKS, NO_WATCH, type MediaView, type PlatformCopy, type PostView, type Step, type Tone, type UploadState, type WatchState } from "./types";
 import { StoryComposer } from "./StoryComposer";
-import { AdaptedCaptions } from "./AdaptedCaptions";
+import { FRESH, hasCopy, withEditState } from "./review-state";
 import { VideoSubtitles } from "./VideoSubtitles";
 import type { PipActionsProps } from "./PipActions";
 import { ASK_KEYS, STORY_ASKS, type CaptionAsk, type PipAsk } from "@/lib/ai/pip-asks";
-import { ADAPT_MAX, copyKey, firstSentence, isLongForm, LONG_FORM_SEC, offlineAdapt, timedTranscript, type AdaptTone } from "@/lib/ai/adapt-core";
+import { ADAPT_MAX, copyKey, firstSentence, isLongForm, LONG_FORM_SEC, timedTranscript, type AdaptTone } from "@/lib/ai/adapt-core";
 import { T } from "@/lib/motion/tokens";
 
 interface Props {
@@ -127,7 +126,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   const [step, setStep] = useState<Step>(() => {
     if (!initialPost) return "video";
     if (initialPost.status === "scheduled") return "launch";
-    if (initialPost.hook) return "everywhere";
+    // R1209: a draft that has its main caption opens on Everywhere, where the platform captions are.
+    if (initialPost.hook || initialPost.story?.trim()) return "everywhere";
     return "story";
   });
   const [story, setStory] = useState(initialPost?.story ?? initialStory ?? "");
@@ -159,11 +159,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   const adaptedRef = useRef(adapted);
   adaptedRef.current = adapted;
   const [adaptWriting, setAdaptWriting] = useState<Platform[]>([]);
-  const [adaptTotal, setAdaptTotal] = useState(0);
   const [adapting, setAdapting] = useState(false);
   const [adaptTone, setAdaptTone] = useState<AdaptTone | null>(null);
-  /** Pip's one question when there is too little to keep a meaning intact. Asked once; the creator can go ahead anyway. */
-  const [clarify, setClarify] = useState<string | null>(null);
   const adaptAbort = useRef<AbortController | null>(null);
 
   /* ---------------- platforms ---------------- */
@@ -200,7 +197,6 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     for (const p of PLATFORMS) if ((out[p]?.length ?? 0) < 2) delete out[p];
     return out;
   }, [choices]);
-  const [copyLoading, setCopyLoading] = useState(false);
   const [rewriting, setRewriting] = useState<Platform | null>(null);
   /** Phase 3 (B2F): Pip's suggestions wait here for Accept or Skip; what Accept replaced is kept for Revert. */
   const [sugg, setSugg] = useState<Suggestions>(NO_SUGGESTIONS);
@@ -385,6 +381,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   /** The places a caption is written for: switched on here, and live on Outlly. */
   const adaptPlaces = enabledPlatforms(drafts).filter((pl) => live.includes(pl));
   const someAdapted = adaptPlaces.some((pl) => adapted[pl]);
+  /** R1209: the main caption from Your Story. Everywhere opens on it, and every platform's caption is written from it. */
+  const caption = story.trim() || (submittedStory ?? "").trim();
 
   /* ================= Pip watches the video (1160) ================= */
   const watchVideo = useCallback(async (url: string) => {
@@ -656,7 +654,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
           });
           if (found.video) {
             void startUpload(found.video);
-            setStep(d.hook ? "everywhere" : "story");
+            setStep(d.hook || d.story?.trim() ? "everywhere" : "story");
             toast(missingPostId ? "That draft had expired on Outlly, so we brought it back from this device. Uploading the video again." : "Picked up where you left off. Uploading the video again.", "info");
           } else {
             setStep("video");
@@ -934,7 +932,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   /** Pip's words for one place, straight into the draft. Used where the creator asked for exactly that. */
   const fillAdapted = (c: PlatformCopy) => {
     // R1198: new words are looked at again before Launch, and a suggestion for the old words no longer applies.
-    const patch: Partial<Draft> = { title: c.title ?? "", caption: c.caption ?? "", description: c.description ?? "", hashtags: c.hashtags ?? "", note: c.note, why: whyLine(c.why), reviewed: false };
+    // R1209: Pip's fresh words read Needs review, whatever the place said before.
+    const patch: Partial<Draft> = { title: c.title ?? "", caption: c.caption ?? "", description: c.description ?? "", hashtags: c.hashtags ?? "", note: c.note, why: whyLine(c.why), ...FRESH };
     setSugg((s) => (s.proposals[c.platform] ? suggest(s, { t: "reject", p: c.platform }).state : s));
     draftsRef.current = { ...draftsRef.current, [c.platform]: { ...draftsRef.current[c.platform], ...patch } };
     setDrafts((d) => ({ ...d, [c.platform]: { ...d[c.platform], ...patch } }));
@@ -962,8 +961,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
    * only source. A place they have edited themselves gets a proposal to accept or skip, never an overwrite; a
    * place still holding Pip's own last version is simply written again.
    */
-  const adapt = async (platforms: Platform[], o: { fresh?: boolean; tone?: AdaptTone; noClarify?: boolean; direct?: boolean; update?: boolean } = {}) => {
-    const text = story.trim();
+  const adapt = async (platforms: Platform[], o: { fresh?: boolean; tone?: AdaptTone; direct?: boolean; update?: boolean } = {}) => {
+    const text = caption;
     if (!text) return;
     if (!platforms.length) return toast("Pick at least one place to post to first.", "info");
     if (!navigator.onLine) return toast("You're offline. Pip can write the captions when you reconnect, or you can write your own.", "info");
@@ -972,9 +971,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     const ctrl = new AbortController();
     adaptAbort.current = ctrl;
     const left = new Set(platforms);
-    setClarify(null);
     setAdapting(true);
-    setAdaptTotal(platforms.length);
     setAdaptWriting(platforms);
     if (!o.direct) setAdaptTone(o.tone ?? null);
     const take = (c: PlatformCopy | undefined) => {
@@ -993,7 +990,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     try {
       const r = await streamApi<{ core?: string; items?: PlatformCopy[]; clarify?: string }>(
         "/api/ai/adapt",
-        { text, platforms, longForm, duration: meta.duration, seen: watch.kind === "ready" ? watch.seen : undefined, transcript: transcript || undefined, tone: o.tone, fresh: o.fresh, noClarify: o.noClarify },
+        { text, platforms, longForm, duration: meta.duration, seen: watch.kind === "ready" ? watch.seen : undefined, transcript: transcript || undefined, tone: o.tone, fresh: o.fresh, noClarify: true },
         (ev) => {
           if (ctrl.signal.aborted) return;
           // The message in one line stands in as the draft's hook, so Everywhere and Launch open as they always did.
@@ -1003,7 +1000,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
         { signal: ctrl.signal, timeoutMs: 45_000 },
       );
       if (ctrl.signal.aborted) return;
-      if (r.clarify) return setClarify(r.clarify);
+      // R1209: Your Story has no question card any more, so the writer is asked to write; a question is only a note.
+      if (r.clarify) return toast(r.clarify, "info");
       (r.items ?? []).forEach(take);
       if (r.core?.trim()) setHook(r.core.trim());
       setSubmittedStory(text);
@@ -1033,26 +1031,6 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       }
     }
   };
-  /** "Use my text as is": the creator's own words fitted to each place, no AI, nothing rewritten. */
-  const useAsIs = (platforms: Platform[]) => {
-    const text = story.trim();
-    if (!text) return;
-    if (!platforms.length) return toast("Pick at least one place to post to first.", "info");
-    stopAdapt();
-    setClarify(null);
-    const items = offlineAdapt(text, platforms, { longForm });
-    for (const c of items) {
-      const fill = untouched(c.platform);
-      adaptedRef.current = { ...adaptedRef.current, [c.platform]: c };
-      if (fill) fillAdapted(c);
-      else applyCopy([c]);
-    }
-    setAdapted((a) => ({ ...a, ...Object.fromEntries(items.map((c) => [c.platform, c])) }));
-    setAdaptTone(null);
-    setSubmittedStory(text);
-    setHook(firstSentence(text, 160));
-    toast("Your own words, fitted to each place. Nothing was rewritten.", "ok");
-  };
   /** The video is read only when asked for (1190), from the file in this tab or the one already uploaded. */
   const analyze = () => {
     const url = watchUrl.current ?? localUrl ?? media?.url ?? null;
@@ -1063,10 +1041,9 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
 
   const chooseHook = async (text: string) => {
     setHook(text);
+    // R1209: Pip's finalized words are the main caption when the box is empty; Everywhere writes every platform from it.
+    if (!story.trim()) setStory(text);
     setStep("everywhere");
-    setCopyLoading(true);
-    await fetchCopy(enabledPlatforms(drafts), text);
-    setCopyLoading(false);
   };
   /** 1182: Pip open or folded on wide screens, remembered in this browser like the panel's own button. */
   const setPip = (open: boolean) => {
@@ -1095,11 +1072,13 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   };
 
   const rewrite = async (p: Platform) => {
-    if (!hook) return;
+    // R1209: Everywhere can open on the caption alone, before Pip has put the message in one line.
+    const h = hook || firstSentence(caption, 160);
+    if (!h) return;
     setRewriting(p);
     // Rewriting words already there is caption rewriting; filling an empty place is writing captions.
     const d = draftsRef.current[p];
-    await fetchCopy([p], hook, d.caption || d.title || d.description ? "rewrite" : "write");
+    await fetchCopy([p], h, d.caption || d.title || d.description ? "rewrite" : "write");
     setRewriting(null);
   };
 
@@ -1161,20 +1140,33 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     }
   };
 
-  // Resuming a draft (or coming back from connecting an account): fill any empty destination.
+  /* R1209: Everywhere is where each platform's caption is written. On the way in (a resumed draft and coming back
+     from connecting an account included) Pip writes every place still without words; a caption changed on Your
+     Story is written again for them all (a place the creator edited gets a suggestion, never an overwrite). A
+     place switched on here is written the same way. Each try is made once per caption and set of places, so a
+     failure waits for Regenerate instead of looping. */
+  const adaptTried = useRef("");
+  const placesKey = adaptPlaces.join(",");
   useEffect(() => {
-    if (!hook || phase !== "edit") return;
-    const empty = PLATFORMS.filter((p) => drafts[p].enabled && !drafts[p].caption && !drafts[p].title && !drafts[p].description);
-    if (empty.length) {
-      setCopyLoading(true);
-      fetchCopy(empty, hook).finally(() => setCopyLoading(false));
+    if (step !== "everywhere" || phase !== "edit") {
+      adaptTried.current = "";
+      return;
     }
+    // Pip answering another ask would turn this write away, so wait for it rather than spend the one try.
+    if (!caption || online === false || adapting || asking || captionAsk) return;
+    const changed = submittedStory != null && caption !== submittedStory.trim();
+    const todo = changed ? adaptPlaces : adaptPlaces.filter((pl) => !hasCopy(draftsRef.current[pl]) && !adaptedRef.current[pl]);
+    if (!todo.length) return;
+    const key = `${caption}|${todo.join(",")}`;
+    if (adaptTried.current === key) return;
+    adaptTried.current = key;
+    void adapt(todo, { direct: !changed && someAdapted, tone: adaptTone ?? undefined });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [step, phase, caption, online, adapting, placesKey, asking, captionAsk]);
 
+  /** R1209: typing marks a caption Edited, or takes its approval back; Pip's own writes and Approve say so themselves. */
   const onDraft = (p: Platform, patch: Partial<Draft>) => {
-    setDrafts((d) => ({ ...d, [p]: { ...d[p], ...patch } }));
-    if (patch.enabled && hook && !drafts[p].caption && !drafts[p].title) rewrite(p);
+    setDrafts((d) => ({ ...d, [p]: { ...d[p], ...withEditState(d[p], patch) } }));
   };
 
   const onSuggest = (a: SuggestAction) => {
@@ -1348,7 +1340,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   );
 
   const syncLine = <SyncStatus status={sync.status} lastSyncedAt={sync.lastSyncedAt} error={sync.error} needsMedia={sync.needsMedia} storedHere={sync.storedHere} onRetry={sync.retry} onResolve={conflict ? () => setComparing(true) : undefined} />;
-  const bar = barState({ online, hasMedia, uploadFailed: upload.kind === "failed", hasHook: !!hook, ready: allReviewed, enabledCount: enabled.length, launching, saving: saved === "saving", step, mode, targets: plan.send, pending: pending.map((p) => PLATFORM_META[p].name), scheduleIssue, hasDraft: !!(postId || savedAt), activity: capLine, burning: capBurning, upload: upload.kind, progress: upload.kind === "uploading" || upload.kind === "paused" ? upload.progress : undefined, storySeen });
+  const bar = barState({ online, hasMedia, uploadFailed: upload.kind === "failed", hasCaption: !!caption, ready: allReviewed, enabledCount: enabled.length, launching, saving: saved === "saving", step, mode, targets: plan.send, pending: pending.map((p) => PLATFORM_META[p].name), scheduleIssue, hasDraft: !!(postId || savedAt), activity: capLine, burning: capBurning, upload: upload.kind, progress: upload.kind === "uploading" || upload.kind === "paused" ? upload.progress : undefined, storySeen });
   const onGo = (s: Step) => setStep(s);
   const goTo = (s: Step, before?: () => void) => {
     before?.();
@@ -1360,7 +1352,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     const why = plan.hold.find((h) => h.platform === pl)?.reason;
     goTo("everywhere", () => {
       setDeckOpen(pl);
-      if (why) toast(`${PLATFORM_META[pl].name}: ${why} ${why === "Not looked over yet." ? "Read it, then approve it." : why === "A suggestion is waiting." ? "Accept it or skip it." : "Fix it here, then come back."}`, "info");
+      if (why) toast(`${PLATFORM_META[pl].name}: ${why} ${why === "Not approved yet." ? "Read it, then approve it." : why === "A suggestion is waiting." ? "Accept it or skip it." : "Fix it here, then come back."}`, "info");
     });
   };
   /** Steps 1 and 2: Schedule and Publish take you to Launch with that choice made. Nothing is sent from there. */
@@ -1384,12 +1376,13 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   /** 1170: Your Story opens once the server has the video (or it was open before and a new one is coming in). */
   const storyOpen = hasMedia && (upload.kind === "done" || (storySeen && upload.kind === "uploading"));
   // A paused or failed upload closes every later step, not just Your Story: nothing can be sent without the video.
-  const reachable: Record<Step, boolean> = { video: true, story: storyOpen, everywhere: storyOpen && !!hook, launch: storyOpen && !!hook && allReviewed };
+  // R1209: Everywhere opens on the main caption (not a hook), and Launch once every platform caption is approved.
+  const reachable: Record<Step, boolean> = { video: true, story: storyOpen, everywhere: storyOpen && !!caption, launch: storyOpen && !!caption && allReviewed };
   const mediaWhy = !hasMedia ? "Add a video first." : upload.kind === "failed" ? "Your video didn't upload. Try it again first." : upload.kind === "paused" ? "Your upload is paused. Resume it first." : upload.kind === "uploading" && !storyOpen ? "Your video is still uploading. Your Story opens once it's in." : undefined;
   const blocked: Partial<Record<Step, string>> = {
     story: mediaWhy,
-    everywhere: mediaWhy ?? (!hook ? "Pick a hook on Your Story first." : undefined),
-    launch: mediaWhy ?? (!hook ? "Pick a hook on Your Story first." : !allReviewed ? "Look over each place on Everywhere first." : undefined),
+    everywhere: mediaWhy ?? (!caption ? "Write your caption on Your Story first." : undefined),
+    launch: mediaWhy ?? (!caption ? "Write your caption on Your Story first." : !allReviewed ? "Approve each platform caption on Everywhere first." : undefined),
   };
   /** 1182: the lit button at the foot of Pip runs the page's own move for this step, behind the page's own checks. */
   const onPipFooter = (id: PipFooterId) => {
@@ -1443,7 +1436,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
           onAdd: (pl) => {
             setDrafts((d) => ({ ...d, [pl]: { ...d[pl], enabled: true } }));
             setPipFocus(pl);
-            if (story.trim()) void adapt([pl], { direct: true, tone: adaptTone ?? undefined });
+            // R1209: platform captions are written on Everywhere, so adding one here only switches it on.
+            toast(`${PLATFORM_META[pl].name} added. Pip writes its caption on Everywhere.`, "ok");
           },
           why: pipOffline ?? (adapting ? "Pip is writing your captions. These open when it's done." : story.trim().length < 3 ? "Write a sentence or two in Your caption first, then ask Pip to sharpen it." : null),
           context: `Your caption: ${story.trim().length} characters. ${adaptPlaces.length} ${adaptPlaces.length === 1 ? "place" : "places"} picked, ${adaptPlaces.filter((pl) => drafts[pl].reviewed).length} approved.`,
@@ -1491,7 +1485,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
         if (!hooks.result && submittedStory) fetchHooks("default", [], submittedStory);
       }}
       chosenHook={hook && (hooks.result || step !== "story") ? hook : null}
-      copyLoading={copyLoading}
+      copyLoading={adapting}
       drafts={drafts}
       platforms={[...live]}
       proposed={proposed}
@@ -1503,6 +1497,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       online={online}
       captions={!!(media && upload.kind === "done")}
       finalHook={hook}
+      hasCaption={!!caption}
       storyOpen={storyOpen}
       storyWhy={blocked.story}
       composer={step === "story" && hasMedia}
@@ -1703,30 +1698,17 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                   />
                   </VideoSubtitles>
                 )}
+                {/* R1209: Your Story writes the main caption only. The platforms, their captions and approving them
+                    are all on Everywhere, written once from this caption on the way in. */}
                 <StoryComposer
                   story={story}
                   onStory={setStory}
-                  progress={adapting ? { done: adaptTotal - adaptWriting.length, total: adaptTotal } : null}
-                  places={adaptPlaces.length}
-                  adapted={someAdapted}
-                  tone={adaptTone}
-                  clarify={clarify}
                   watch={watch}
                   longForm={longForm}
                   online={online}
-                  onGenerate={(o) => void adapt(adaptPlaces, { ...o, fresh: o?.tone ? false : someAdapted })}
-                  onStop={stopAdapt}
-                  onUseAsIs={() => useAsIs(adaptPlaces)}
                   onAnalyze={analyze}
                   onUseWatched={useWatched}
-                  onDismissClarify={() => setClarify(null)}
                   status={autosaveLine(saved, savedAt)}
-                  platforms={adaptPlaces}
-                  changed={someAdapted && !!submittedStory && story.trim() !== submittedStory.trim()}
-                  onUpdate={(pls) => {
-                    setPipFocus(pls[0]);
-                    void adapt(pls, { fresh: true, tone: adaptTone ?? undefined, update: true });
-                  }}
                   suggestion={
                     captionProposal && {
                       text: captionProposal.text,
@@ -1739,33 +1721,10 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                     if (!captionProposal) return;
                     setStory(captionProposal.text);
                     setCaptionProposal(null);
-                    toast(someAdapted ? "Pip's version is in Your caption. Update your platform captions from it when you're ready." : "Pip's version is in Your caption.", "ok");
+                    toast(someAdapted ? "Pip's version is in Your caption. Your platform captions are written again from it on Everywhere." : "Pip's version is in Your caption.", "ok");
                   }}
                   onSkip={() => setCaptionProposal(null)}
                 />
-                <PublishTo className="" platforms={live} drafts={drafts} accounts={accounts} onToggle={(pl, on) => onDraft(pl, { enabled: on })} />
-                {(someAdapted || adapting) && (
-                  <AdaptedCaptions
-                    platforms={adaptPlaces}
-                    drafts={drafts}
-                    adapted={adapted}
-                    writing={asking && !adaptWriting.includes(asking.p) ? [...adaptWriting, asking.p] : adaptWriting}
-                    longForm={longForm}
-                    online={online}
-                    onDraft={onDraft}
-                    onRegenerate={(pl) => void adapt([pl], { fresh: true, direct: true, tone: adaptTone ?? undefined })}
-                    onRegenerateAll={() => void adapt(adaptPlaces, { fresh: true, tone: adaptTone ?? undefined })}
-                    onRestore={restoreAdapted}
-                    onCopied={(pl) => toast(`${PLATFORM_META[pl].name} caption copied.`, "ok")}
-                    proposals={sugg.proposals}
-                    undo={sugg.undo}
-                    onAccept={(pl) => onSuggest({ t: "accept", p: pl, draft: drafts[pl] })}
-                    onReject={(pl) => onSuggest({ t: "reject", p: pl })}
-                    onRevert={(pl) => onSuggest({ t: "revert", p: pl })}
-                    focus={pipFocus}
-                    onFocus={setPipFocus}
-                  />
-                )}
                 <SaveDraft className="px-1 xl:hidden" state={saved} at={savedAt} onSave={saveDraftNow} busy={saved === "saving"} hideButton sync={syncLine} />
                 </div>
                 </div>
@@ -1782,7 +1741,13 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                   accounts={accounts}
                   options={options}
                   media={{ src, poster, ...meta }}
-                  writing={asking && !copyWriting.includes(asking.p) ? [...copyWriting, asking.p] : copyWriting}
+                  writing={[...new Set([...copyWriting, ...adaptWriting, ...(asking ? [asking.p] : [])])]}
+                  adapted={adapted}
+                  onRegenerate={(pl) => void adapt([pl], { fresh: true, direct: true, tone: adaptTone ?? undefined })}
+                  onRegenerateAll={(t) => void adapt(adaptPlaces, { fresh: true, tone: t ?? adaptTone ?? undefined })}
+                  tone={adaptTone}
+                  onRestore={restoreAdapted}
+                  onStopWriting={adapting ? stopAdapt : undefined}
                   rewriting={rewriting}
                   onRewrite={rewrite}
                   onConnect={connect}

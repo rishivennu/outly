@@ -1,6 +1,7 @@
 import { COVER_SUPPORT, FIRST_COMMENT_LIMIT, PLATFORM_META, PLATFORMS, supportsFirstComment, type Platform } from "@/lib/domain";
 import type { Draft } from "@/lib/client/checks";
 import type { Proposal, Undo } from "./proposal";
+import { FRESH } from "./review-state";
 
 /* Pure rules for the Everywhere deck (Step 3), kept out of the component so they are unit tested. */
 
@@ -164,8 +165,11 @@ export function proposalChanges(p: Platform, d: Draft, proposal: Proposal) {
 export function acceptProposal(p: Platform, d: Draft, proposal: Proposal): { patch: Partial<Draft>; undo: Undo } {
   const undo: Undo = {};
   for (const k of Object.keys(proposal.patch) as (keyof Draft)[]) (undo as Record<string, unknown>)[k] = d[k];
-  const patch: Partial<Draft> = { ...proposal.patch, reviewed: false };
+  // R1209: Pip's words, so the place reads Needs review again (not Edited) until it is approved.
+  const patch: Partial<Draft> = { ...proposal.patch, ...FRESH };
   (undo as Record<string, unknown>).reviewed = d.reviewed;
+  (undo as Record<string, unknown>).edited = d.edited;
+  (undo as Record<string, unknown>).reopened = d.reopened;
   if (typeof patch[bodyKey(p)] === "string" && patch[bodyKey(p)] !== d[bodyKey(p)]) {
     patch.custom = true;
     (undo as Record<string, unknown>).custom = d.custom;

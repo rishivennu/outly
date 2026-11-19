@@ -23,7 +23,7 @@ const drafts = (on: Partial<Record<Platform, Partial<Draft>>>) => {
 const conn = (ps: Platform[], status = "connected") => Object.fromEntries(ps.map((p) => [p, { status, username: `me_${p}` }])) as Partial<Record<Platform, { status: string; username: string }>>;
 const vertical = { duration: 30, width: 1080, height: 1920 };
 
-const base: BarInput = { online: true, hasMedia: true, uploadFailed: false, hasHook: true, ready: true, enabledCount: 1, launching: false, saving: false };
+const base: BarInput = { online: true, hasMedia: true, uploadFailed: false, hasCaption: true, ready: true, enabledCount: 1, launching: false, saving: false };
 
 describe("B4 one action bar", () => {
   test("Everywhere: Save draft, Preview, Continue to Launch, with Continue the only primary", () => {
@@ -32,12 +32,12 @@ describe("B4 one action bar", () => {
     expect(s.buttons.filter((b) => b.primary).map((b) => b.id)).toEqual(["continue"]);
     expect(s.buttons.some((b) => b.id === "publish" || b.id === "schedule")).toBe(false);
   });
-  test("Everywhere: Continue waits for every place to be looked over and says which", () => {
+  test("Everywhere: Continue waits for every place to be approved and says which", () => {
     const s = barState({ ...base, step: "everywhere", ready: false, pending: ["YouTube", "X"] });
     const c = s.buttons.find((b) => b.id === "continue")!;
     expect(c.disabled).toBe(true);
-    expect(c.hint).toBe("Look over YouTube and X first.");
-    expect(s.note).toBe("Look over YouTube and X first.");
+    expect(c.hint).toBe("Approve YouTube and X first.");
+    expect(s.note).toBe("Approve YouTube and X first.");
     expect(barState({ ...base, step: "everywhere", enabledCount: 0 }).buttons[2].disabled).toBe(true);
   });
   test("Everywhere: moving on still works offline (nothing is sent from there)", () => {
@@ -88,7 +88,7 @@ describe("B3 Launch never sends a held place", () => {
     expect(plan.send).toEqual(["youtube"]);
     const why = Object.fromEntries(plan.hold.map((h) => [h.platform, h.reason]));
     expect(why.instagram).toBe("The connection needs a refresh.");
-    expect(why.x).toBe("Not looked over yet.");
+    expect(why.x).toBe("Not approved yet.");
     expect(why.threads).toBe("Add a caption.");
     expect(launchPlan(drafts({ tiktok: {} }), {}, vertical).hold[0]).toEqual({ platform: "tiktok", reason: "Not connected yet." });
   });
@@ -140,7 +140,8 @@ describe("B2F Pip suggestions are proposed, never written over", () => {
     expect(s.proposals.youtube).toBeDefined();
     const a = suggest(s, { t: "accept", p: "youtube", draft: d });
     // P3 review 6: accepted words have not been looked over yet, so the place is unreviewed until checked again.
-    expect(a.apply).toEqual({ title: "New title", hashtags: "#new", reviewed: false });
+    // R1209: they are Pip's words, so the place reads Needs review (not Edited) until it is approved.
+    expect(a.apply).toEqual({ title: "New title", hashtags: "#new", reviewed: false, edited: false, reopened: false });
     expect(a.state.proposals.youtube).toBeUndefined();
     expect(a.state.undo.youtube).toEqual({ title: "Old title", hashtags: "#routine", reviewed: true });
     s = a.state;

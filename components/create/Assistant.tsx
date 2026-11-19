@@ -66,6 +66,8 @@ interface Props {
   captions?: boolean;
   /** The hook picked on Your Story, saved with the draft. The caption is final once there is one. */
   finalHook?: string | null;
+  /** R1209: on Your Story the caption on the page is what Everywhere waits for, not a hook. */
+  hasCaption?: boolean;
   /** 1190: Step 2 has the write-once composer on the page, so Pip does not ask for the same words again. */
   composer?: boolean;
   /** Your Story is open (the server has the video), and why not when it isn't. */
@@ -174,7 +176,7 @@ export function Assistant(p: Props) {
   const tweakDirty = editing && !!current && tweak.trim() !== current.text.trim();
   const capBlank = capEdit !== null && !canSaveCaption(capEdit);
   const canFinalize = p.step === "story" && !p.chosenHook && !!current && !!pick && !capBlank;
-  const footer = p.onFooter ? pipFooter({ step: p.step, storyOpen: !!p.storyOpen, storyWhy: p.storyWhy, finalized: !!p.finalHook?.trim(), canFinalize, busy: p.hooks.loading, composer: p.composer }) : null;
+  const footer = p.onFooter ? pipFooter({ step: p.step, storyOpen: !!p.storyOpen, storyWhy: p.storyWhy, finalized: p.composer ? !!p.hasCaption : !!p.finalHook?.trim(), canFinalize, busy: p.hooks.loading, composer: p.composer }) : null;
   const footNote = footer?.id === "finalize" && capBlank ? "Your Original caption is empty. Write it, or press Cancel." : (footer?.hint ?? (footer?.id === "finalize" ? "Uses the hook on show and your Original caption." : null));
   const footNoteId = `${inputId}-foot`;
   /** Saves an open Original edit first, then picks the hook on show: the same onUse as the page, so nothing is skipped. */
@@ -280,7 +282,7 @@ export function Assistant(p: Props) {
         {p.step !== "video" && (
           <Bubble from="outly">
             <span className="display block text-[26px] leading-[1.05] tracking-[-0.035em]">What&apos;s this video about?</span>
-            {askStory && <span className="mt-2 block text-sm text-muted-foreground">{p.composer ? "Write your caption on the page, then press Generate captions with Pip AI. I'll adapt it to every place you post, and you can ask me to sharpen any of them below." : "A sentence or two is plenty. Tell it the way you'd tell a friend."}</span>}
+            {askStory && <span className="mt-2 block text-sm text-muted-foreground">{p.composer ? "Write your caption on the page. On Everywhere I write a version for every place you post, and you approve each one." : "A sentence or two is plenty. Tell it the way you'd tell a friend."}</span>}
           </Bubble>
         )}
 

@@ -107,7 +107,7 @@ describe("p4 fix: a burn that lands off step", () => {
 });
 
 describe("p4 fix: Publish and Schedule wait for a burn", () => {
-  const base: BarInput = { online: true, hasMedia: true, uploadFailed: false, hasHook: true, ready: true, enabledCount: 1, launching: false, saving: false, targets: ["youtube"] };
+  const base: BarInput = { online: true, hasMedia: true, uploadFailed: false, hasCaption: true, ready: true, enabledCount: 1, launching: false, saving: false, targets: ["youtube"] };
   test("Launch: the publish button is off with the reason while burning", () => {
     const s = barState({ ...base, step: "launch", burning: true });
     expect(s.publish.disabled).toBe(true);

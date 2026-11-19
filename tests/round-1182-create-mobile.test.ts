@@ -160,7 +160,7 @@ describe("1182 the deck: connected cards first, compact rows for the rest", () =
 });
 
 describe("1182 the action bar on phones", () => {
-  const base: BarInput = { online: true, hasMedia: true, uploadFailed: false, hasHook: true, ready: true, enabledCount: 2, launching: false, saving: false };
+  const base: BarInput = { online: true, hasMedia: true, uploadFailed: false, hasCaption: true, ready: true, enabledCount: 2, launching: false, saving: false };
   test("Step 3: one lit Continue to Launch, Save draft and Preview beside it", () => {
     const s = barState({ ...base, step: "everywhere" });
     expect(s.buttons.filter((b) => b.primary).map((b) => b.label)).toEqual(["Continue to Launch"]);

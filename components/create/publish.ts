@@ -86,7 +86,7 @@ export function holdOf(p: Platform, drafts: Drafts, accounts: Accounts, media: M
   // A video that is too long is fixed by swapping the video (Step 1), never on Everywhere.
   if (err) return { reason: err.text, fix: err.field === "media" ? "video" : "check" };
   if (proposed.includes(p)) return { reason: "A suggestion is waiting.", fix: "suggestion" };
-  if (!drafts[p].reviewed) return { reason: "Not looked over yet.", fix: "review" };
+  if (!drafts[p].reviewed) return { reason: "Not approved yet.", fix: "review" };
   return null;
 }
 

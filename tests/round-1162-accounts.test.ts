@@ -56,7 +56,9 @@ describe("1162 which account", () => {
     expect(ws).toContain('if (a.status !== "connected") continue;');
     expect(ws).toContain("if ((out[p]?.length ?? 0) < 2) delete out[p];");
     expect(ws).toContain("options={options}");
-    for (const s of ["<PublishTo", "<LaunchPanel", "<PreviewSheet"]) expect(ws).toMatch(new RegExp(`${s}[^\\n]*accounts=\\{accounts\\}`));
+    // R1209: the platform switches live on the deck now, which gets the accounts on its own line.
+    expect(ws).toMatch(/<PlatformDeck[^>]*?\n\s*accounts=\{accounts\}/);
+    for (const s of ["<LaunchPanel", "<PreviewSheet"]) expect(ws).toMatch(new RegExp(`${s}[^\\n]*accounts=\\{accounts\\}`));
   });
   test("the deck: a labelled native select on the card, only when connected with several, writing the pick to the draft", () => {
     const deck = src("components/create/PlatformDeck.tsx");

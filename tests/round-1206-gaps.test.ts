@@ -8,7 +8,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import type { Draft } from "../lib/client/checks";
 import { PLATFORMS, PLATFORM_META, type Platform } from "../lib/domain";
-import { captionState } from "../components/create/AdaptedCaptions";
+import { CARD_LABEL, canApprove, cardKind } from "../components/create/CaptionCards";
+import { APPROVE, FRESH, REVIEW_LABEL, reviewKind, withEditState } from "../components/create/review-state";
 import { FIX_LABEL, holdOf, launchPlan, readinessLine } from "../components/create/publish";
 import { withHashtags, splitStory, ADAPT_MAX } from "../lib/ai/adapt-core";
 import { captionAskRequestSchema } from "../lib/validation";
@@ -18,24 +19,56 @@ const src = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), "ut
 const draft = (o: Partial<Draft> = {}): Draft => ({ enabled: true, title: "", caption: "", description: "", hashtags: "", firstComment: "", note: "", reviewed: false, ...o });
 const drafts = (o: Partial<Record<Platform, Partial<Draft>>> = {}) => Object.fromEntries(PLATFORMS.map((p) => [p, draft({ enabled: false, ...(o[p] ?? {}) })])) as Record<Platform, Draft>;
 
-describe("gap 7: one platform at a time", () => {
-  const base = { busy: false, proposal: false, reviewed: false, empty: false, mine: false };
+// R1209 replaced gap 7's tabs: every switched-on platform gets one compact card on Everywhere, in three states.
+describe("R1209: one card per platform, three states, only Approved goes out", () => {
+  const words = draft({ caption: "Thirty days of 5am, here is what worked." });
   test("the state in a word or two, first one wins", () => {
-    expect(captionState({ ...base, busy: true, proposal: true, reviewed: true }).label).toBe("Writing…");
-    expect(captionState({ ...base, proposal: true, reviewed: true }).label).toBe("Suggestion waiting");
-    expect(captionState({ ...base, reviewed: true, mine: true }).label).toBe("Approved");
-    expect(captionState({ ...base, empty: true, mine: true }).label).toBe("Not written yet");
-    expect(captionState({ ...base, mine: true }).label).toBe("Edited by you");
-    expect(captionState(base)).toEqual({ kind: "ready", label: "Ready to review" });
+    expect(cardKind({ busy: true, proposal: true, draft: { ...words, reviewed: true } })).toBe("writing");
+    expect(cardKind({ busy: false, proposal: true, draft: { ...words, reviewed: true } })).toBe("proposal");
+    expect(cardKind({ busy: false, proposal: false, draft: draft() })).toBe("empty");
+    expect(cardKind({ busy: false, proposal: false, draft: { ...words, ...APPROVE } })).toBe("approved");
+    expect(cardKind({ busy: false, proposal: false, draft: { ...words, ...FRESH, edited: true } })).toBe("edited");
+    expect(cardKind({ busy: false, proposal: false, draft: { ...words, ...FRESH } })).toBe("needs-review");
+    expect(Object.values(REVIEW_LABEL)).toEqual(["Needs review", "Edited", "Approved"]);
+    expect(CARD_LABEL.writing).toBe("Writing…");
+    expect(CARD_LABEL.proposal).toBe("Suggestion waiting");
   });
 
-  test("tabs pick the platform and only that one is rendered", () => {
-    const s = src("components/create/AdaptedCaptions.tsx");
-    expect(s).toContain('role="tablist"');
-    expect(s).toContain('role="tabpanel"');
-    expect(s).toContain("<Row key={sel} platform={sel}");
-    expect(s).not.toContain("motion.li");
-    for (const k of ['"ArrowRight"', '"ArrowLeft"', '"Home"', '"End"']) expect(s).toContain(k);
+  test("typing on Needs review is Edited; typing on Approved goes back to Needs review; Pip's words start over", () => {
+    const fresh = { ...words, ...FRESH };
+    const typed = { ...fresh, ...withEditState(fresh, { caption: "My own words now." }) };
+    expect(reviewKind(typed)).toBe("edited");
+    const approved = { ...typed, ...withEditState(typed, APPROVE) };
+    expect(reviewKind(approved)).toBe("approved");
+    const reopened = { ...approved, ...withEditState(approved, { caption: "One more change." }) };
+    expect(reopened.reviewed).toBe(false);
+    expect(reviewKind(reopened)).toBe("needs-review");
+    // Still Needs review while typing goes on, until it is approved again.
+    expect(reviewKind({ ...reopened, ...withEditState(reopened, { caption: "And another." }) })).toBe("needs-review");
+    // Switching a place on or off is not an edit.
+    expect(withEditState(fresh, { enabled: false })).toEqual({ enabled: false });
+    // Regenerate and an accepted suggestion are Pip's words: Needs review again.
+    expect(reviewKind({ ...approved, ...withEditState(approved, FRESH) })).toBe("needs-review");
+  });
+
+  test("only words with nothing waiting and nothing failing can be approved", () => {
+    expect(canApprove({ busy: false, proposal: false, blocked: false, draft: words })).toBe(true);
+    expect(canApprove({ busy: true, proposal: false, blocked: false, draft: words })).toBe(false);
+    expect(canApprove({ busy: false, proposal: true, blocked: false, draft: words })).toBe(false);
+    expect(canApprove({ busy: false, proposal: false, blocked: true, draft: words })).toBe(false);
+    expect(canApprove({ busy: false, proposal: false, blocked: false, draft: draft({ hashtags: "#a" }) })).toBe(false);
+  });
+
+  test("a grid of cards with Approve all, and the words changed in the one editor below", () => {
+    const s = src("components/create/CaptionCards.tsx");
+    expect(s).toContain('<ul className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">');
+    expect(s).not.toContain('role="tablist"');
+    expect(s).not.toContain("<Textarea");
+    expect(s).toContain("toApprove.forEach((pl) => p.onDraft(pl, APPROVE))");
+    expect(s).toContain("Only approved captions are published.");
+    const deck = src("components/create/PlatformDeck.tsx");
+    expect(deck).toContain("onEdit={editOne}");
+    expect(deck).toContain('panel?.querySelector<HTMLElement>("[data-body]")?.focus({ preventScroll: true });');
   });
 });
 
@@ -93,22 +126,22 @@ describe("gap 8: Launch says what is ready and how to fix the rest", () => {
 });
 
 describe("gap 6: the caption changed after Pip wrote the platforms", () => {
-  test("update all, choose some, or keep them", () => {
+  // R1209: no update card on Your Story any more. Coming into Everywhere with a changed caption writes every place
+  // again; a place the creator edited gets a suggestion instead of an overwrite.
+  test("Your Story has no update card; the caption is only written there", () => {
     const s = src("components/create/StoryComposer.tsx");
-    // The card waits for a pause in typing, and only Generate gives way to it: "Use my text as it is" stays.
-    expect(s).toContain("setTimeout(() => setArmed(true), 900)");
-    expect(s).toContain(") : stale ? null : (");
-    expect(s).not.toContain('stale && "hidden"');
-    expect(s).toContain("Your caption changed since Pip wrote your platform captions.");
-    expect(s).toContain("Choose platforms");
-    expect(s).toContain("Keep them as they are");
-    expect(s).toContain("`Update all ${places.length}`");
+    expect(s).not.toContain("Your caption changed since Pip wrote your platform captions.");
+    expect(s).not.toContain("Choose platforms");
   });
 
-  test("the page passes the stale check and updates only the chosen places", () => {
+  test("Everywhere writes once per caption and set of places, all of them when the caption changed", () => {
     const cw = src("components/create/CreateWorkspace.tsx");
-    expect(cw).toContain("changed={someAdapted && !!submittedStory && story.trim() !== submittedStory.trim()}");
-    expect(cw).toContain("void adapt(pls, { fresh: true, tone: adaptTone ?? undefined, update: true });");
+    const fx = cw.slice(cw.indexOf("const adaptTried = useRef(\"\");"), cw.indexOf("const onDraft = (p: Platform"));
+    expect(fx).toContain('if (step !== "everywhere" || phase !== "edit") {');
+    expect(fx).toContain("const changed = submittedStory != null && caption !== submittedStory.trim();");
+    expect(fx).toContain("const todo = changed ? adaptPlaces : adaptPlaces.filter((pl) => !hasCopy(draftsRef.current[pl]) && !adaptedRef.current[pl]);");
+    expect(fx).toContain("if (adaptTried.current === key) return;");
+    expect(fx).toContain("void adapt(todo, { direct: !changed && someAdapted, tone: adaptTone ?? undefined });");
   });
 });
 
@@ -171,14 +204,13 @@ describe("gap 3: Pip's asks on Your Story edit the original caption", () => {
     expect(cw).toContain("onSkip={() => setCaptionProposal(null)}");
     // A restore or the server's copy replaces the story, and takes any waiting suggestion with it.
     expect(cw.match(/setCaptionProposal\(null\);/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
-    // Every tab is selectable, written or not: the raw focus goes in, AdaptedCaptions falls back itself.
-    expect(cw).toContain("focus={pipFocus}");
   });
 });
 
 describe("R1206 gaps: copy rules", () => {
   const files = [
-    "components/create/AdaptedCaptions.tsx",
+    "components/create/CaptionCards.tsx",
+    "components/create/review-state.ts",
     "components/create/publish.ts",
     "components/create/LaunchPanel.tsx",
     "components/create/PlatformDeck.tsx",
@@ -194,6 +226,6 @@ describe("R1206 gaps: copy rules", () => {
     expect(s).not.toContain("transition-all");
   });
   test("no text under 12px on Launch and Everywhere", () => {
-    for (const f of ["components/create/LaunchPanel.tsx", "components/create/PlatformDeck.tsx", "components/create/StoryComposer.tsx"]) expect(src(f)).not.toMatch(/text-\[(?:[0-9]|1[01])(?:\.\d+)?px\]/);
+    for (const f of ["components/create/LaunchPanel.tsx", "components/create/PlatformDeck.tsx", "components/create/StoryComposer.tsx", "components/create/CaptionCards.tsx"]) expect(src(f)).not.toMatch(/text-\[(?:[0-9]|1[01])(?:\.\d+)?px\]/);
   });
 });

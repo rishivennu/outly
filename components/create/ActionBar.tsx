@@ -14,8 +14,9 @@ export interface BarInput {
   online: boolean;
   hasMedia: boolean;
   uploadFailed: boolean;
-  hasHook: boolean;
-  /** Every place switched on is connected, passes its checks and has been looked over. */
+  /** R1209: the main caption on Your Story is written. Everywhere is written from it, so it is the gate. */
+  hasCaption: boolean;
+  /** Every place switched on is connected, passes its checks and has been approved. */
   ready: boolean;
   enabledCount: number;
   launching: boolean;
@@ -23,9 +24,9 @@ export interface BarInput {
   /** Phase 3: the bar changes with the step. Left out, it is the Steps 1 and 2 bar. */
   step?: Step;
   mode?: "now" | "schedule";
-  /** The places that will really get it (connected, checked, looked over). Names the Publish button. */
+  /** The places that will really get it (connected, checked, approved). Names the Publish button. */
   targets?: Platform[];
-  /** Names of the places still to look over on Everywhere, for the reason under the bar. */
+  /** Names of the places still to approve on Everywhere, for the reason under the bar. */
   pending?: string[];
   /** Why the time picked can't be booked (past, a clash, a platform rule), or null. */
   scheduleIssue?: string | null;
@@ -86,12 +87,12 @@ export function barState(i: BarInput): BarState {
         ? "Your upload is paused. Resume it on Your Video first."
       : i.enabledCount === 0
         ? "Pick at least one place to send it."
-        : !i.hasHook
-          ? "Pick a hook with Pip first."
+        : !i.hasCaption
+          ? "Write your caption on Your Story first."
           : null;
   // R1206: on Launch the note names who is held; the list above has the one action that clears each.
   const heldLine = i.pending?.length ? (i.pending.length === 1 ? `${i.pending[0]} isn't ready yet. Fix it or leave it out in the list above.` : `${list(i.pending)} aren't ready yet. Fix them or leave them out in the list above.`) : "Some places aren't ready yet. Leave them out or fix them in Everywhere.";
-  const notReady = step === "launch" ? heldLine : i.pending?.length ? `Look over ${list(i.pending)} first.` : "Look over each place on the Everywhere step first.";
+  const notReady = step === "launch" ? heldLine : i.pending?.length ? `Approve ${list(i.pending)} first.` : "Approve each platform caption on the Everywhere step first.";
   const sendBlock = !i.online ? OFFLINE_SEND : (base ?? (!i.ready ? notReady : i.burning ? BURN_SEND : null));
   const send: BarAction = { disabled: !!sendBlock || i.launching, hint: sendBlock };
   // 1170: a paused upload has no video on the server yet, so there is nothing to save until it resumes.
@@ -123,7 +124,7 @@ export function barState(i: BarInput): BarState {
     };
   }
   if (step === "story") {
-    const goBlock = !i.hasMedia ? "Add a video first." : !i.hasHook ? "Pick a hook with Pip to continue to Everywhere." : null;
+    const goBlock = !i.hasMedia ? "Add a video first." : !i.hasCaption ? "Write your caption to continue to Everywhere." : null;
     const failed = i.hasMedia && i.uploadFailed ? "Your video didn't upload. Try it again first." : null;
     return {
       ...flat,
@@ -260,7 +261,7 @@ export function PreviewSheet({ open, onOpenChange, platforms, drafts, accounts, 
           <PreviewFor platform={pl} {...props} />
         </div>
       ) : (
-        <p className="py-8 text-center text-sm text-muted-foreground">Nothing is switched on yet. Pick a place under Publish to.</p>
+        <p className="py-8 text-center text-sm text-muted-foreground">Nothing is switched on yet. Switch a platform on in Everywhere.</p>
       )}
     </Sheet>
   );

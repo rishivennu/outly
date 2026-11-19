@@ -171,13 +171,17 @@ describe("1190 the no-AI path keeps every word the creator's own", () => {
 describe("1190 Step 2: one box, then a card for every place", () => {
   const w = src("components/create/CreateWorkspace.tsx");
   const c = src("components/create/StoryComposer.tsx");
-  const a = src("components/create/AdaptedCaptions.tsx");
+  // R1209: the platform captions moved to Everywhere, one card each.
+  const a = src("components/create/CaptionCards.tsx");
+  const deck = src("components/create/PlatformDeck.tsx");
 
   test("the composer says what it does, and takes the creator's own words", () => {
     // R1198: one editor titled Your caption
     expect(c).toContain('<label htmlFor="story-box">Your caption</label>');
-    expect(c).toContain("Generate captions with Pip AI");
-    expect(c).toContain("Use my text as it is");
+    // R1209: Step 2 only writes the main caption. Pip writes the platform captions from it on Everywhere.
+    expect(c).not.toContain("Generate captions with Pip AI");
+    expect(c).not.toContain("Use my text as it is");
+    expect(c).toContain("On Everywhere, Pip writes a version for each platform you pick, and you approve every one.");
     expect(c).toContain("Analyze my video for more accurate captions");
     expect(c).toContain("maxLength={ADAPT_MAX}");
     expect(c).toContain("Call to action");
@@ -185,9 +189,10 @@ describe("1190 Step 2: one box, then a card for every place", () => {
   });
 
   test("real progress while it writes, and a way to stop", () => {
-    expect(c).toContain("Writing for {Math.min(p.progress!.done + 1, p.progress!.total)} of {p.progress!.total}");
-    expect(c).toContain("onClick={p.onStop}");
-    expect(w).toContain("progress={adapting ? { done: adaptTotal - adaptWriting.length, total: adaptTotal } : null}");
+    expect(a).toContain("from your caption…");
+    expect(a).toContain("onClick={p.onStop}");
+    expect(a).toContain("Stop writing");
+    expect(w).toContain("onStopWriting={adapting ? stopAdapt : undefined}");
     expect(w).toContain("const stopAdapt = () => {");
   });
 
@@ -195,7 +200,8 @@ describe("1190 Step 2: one box, then a card for every place", () => {
     expect(w).toContain('"/api/ai/adapt"');
     expect(w).toContain('if (ev.t === "core" && typeof ev.core === "string" && ev.core.trim()) setHook(ev.core.trim());');
     expect(w).toContain("<StoryComposer");
-    expect(w).toContain("<AdaptedCaptions");
+    expect(w).not.toContain("<AdaptedCaptions");
+    expect(deck).toContain("<CaptionCards");
   });
 
   test("an edit of the creator's own is proposed to, never written over", () => {
@@ -204,20 +210,18 @@ describe("1190 Step 2: one box, then a card for every place", () => {
     expect(w).not.toContain("o.direct || untouched");
     expect(w).toContain("else applyCopy([c]);");
     expect(w).toContain("const untouched = (pl: Platform) => {");
-    expect(a).toContain("Restore Pip&apos;s version");
+    expect(deck).toContain("Restore Pip&apos;s version");
   });
 
   test("each card is editable, counted against the real limit, and approved here", () => {
-    expect(a).toContain("PLATFORM_META[platform]");
-    expect(a).toContain("composedCopy(platform, d).length");
-    expect(a).toContain("bodyLen");
-    expect(a).toContain("meta.titleLimit ?? 100");
-    expect(a).toContain("set({ reviewed: !d.reviewed })");
-    expect(a).toContain("navigator.clipboard.writeText(text)");
+    expect(a).toContain("PLATFORM_META[pl]");
+    expect(a).toContain("composedCopy(pl, d).length");
+    expect(a).toContain("f.body.limit.toLocaleString()");
     expect(a).toContain("Regenerate all");
-    // R1206 gap 7: one platform at a time, picked from a row of tabs that each carry their own state.
-    expect(a).toContain('role="tablist"');
-    expect(a).toContain("<Row key={sel} platform={sel} {...p} />");
+    // R1209: one compact card per switched-on platform, approved one by one or all at once.
+    expect(a).toContain('"Approve all"');
+    expect(a).toContain("toApprove.forEach((pl) => p.onDraft(pl, APPROVE))");
+    expect(a).toContain("<Card key={pl} pl={pl} p={p} ready={ready(pl)} />");
   });
 
   test("Pip never asks for the same words twice, and says where the box is", () => {
@@ -225,7 +229,7 @@ describe("1190 Step 2: one box, then a card for every place", () => {
     const asst = src("components/create/Assistant.tsx");
     expect(asst).toContain("const ownBox = askStory && !p.composer;");
     expect(asst).toContain("{ownBox && (\n        <form");
-    expect(src("components/create/assistant-state.ts")).toContain("Write what your video is about, then press Generate captions with Pip AI.");
+    expect(src("components/create/assistant-state.ts")).toContain("Write your caption on the page first. Pip writes each platform's version on Everywhere.");
   });
 
   test("Pip's own version survives a reload, beside the draft in this browser", () => {
@@ -238,7 +242,8 @@ describe("1190 Step 2: one box, then a card for every place", () => {
     expect(ADAPT_TONES.map((t) => t.id)).toEqual(["takeaway", "hook", "professional", "conversational", "shorter"]);
     expect(toneLine("shorter")).toContain("half");
     expect(toneLine(undefined)).toBe("");
-    for (const t of ADAPT_TONES) expect(c).toContain("ADAPT_TONES.map");
+    // R1209: the asks rewrite every platform caption, so they sit with the captions on Everywhere.
+    for (const t of ADAPT_TONES) expect(a).toContain("ADAPT_TONES.map");
     expect(src("lib/validation.ts")).toContain('tone: z.enum(["default", "takeaway", "hook", "professional", "conversational", "shorter"]).optional()');
   });
 
@@ -256,7 +261,7 @@ describe("1190 Step 2: one box, then a card for every place", () => {
   });
 
   test("no dashes in the 1190 files", () => {
-    for (const f of ["components/create/StoryComposer.tsx", "components/create/AdaptedCaptions.tsx", "lib/ai/adapt-core.ts", "lib/ai/adapt.ts", "app/api/ai/adapt/route.ts"]) {
+    for (const f of ["components/create/StoryComposer.tsx", "components/create/CaptionCards.tsx", "components/create/review-state.ts", "lib/ai/adapt-core.ts", "lib/ai/adapt.ts", "app/api/ai/adapt/route.ts"]) {
       expect(src(f)).not.toInclude("\u2014");
       expect(src(f)).not.toInclude("\u2013");
     }

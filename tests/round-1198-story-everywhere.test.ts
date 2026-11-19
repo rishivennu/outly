@@ -12,7 +12,8 @@ const src = (f: string) => readFileSync(f, "utf8").replace(/\r\n/g, "\n");
 const ws = src("components/create/CreateWorkspace.tsx");
 const deck = src("components/create/PlatformDeck.tsx");
 const story = src("components/create/StoryComposer.tsx");
-const rows = src("components/create/AdaptedCaptions.tsx");
+// R1209: the platform captions are one card each on Everywhere.
+const rows = src("components/create/CaptionCards.tsx");
 const subs = src("components/create/VideoSubtitles.tsx");
 const acts = src("components/create/PipActions.tsx");
 const route = src("app/api/ai/platform/route.ts");
@@ -63,7 +64,7 @@ describe("R1198 Pip's asks", () => {
     expect(creative).toMatch(/if \(!m\) return null;/);
   });
   test("the page sends one ask at a time and always lands it as a suggestion", () => {
-    const fn = ws.slice(ws.indexOf("const askPip = async"), ws.indexOf("// Resuming a draft"));
+    const fn = ws.slice(ws.indexOf("const askPip = async"), ws.indexOf("const askCaption = async"));
     expect(fn).toContain("if (askingRef.current) return;");
     expect(fn).toContain("if (!navigator.onLine) return toast(");
     expect(fn).toContain('suggest(s, { t: "propose", p: pl, proposal })');
@@ -82,13 +83,15 @@ describe("R1198 Step 2: Your caption", () => {
     expect(story).toContain('aria-describedby="story-box-status"');
     expect(ws).toContain("status={autosaveLine(saved, savedAt)}");
   });
-  test("a full-width lime Generate captions with Pip AI, with Use my text as it is beside it", () => {
-    expect(story).toContain('variant="lime" className="min-h-12 w-full rounded-full px-5"');
-    expect(story).toContain("Generate captions with Pip AI");
-    expect(story).toContain("Use my text as it is");
+  test("R1209: no Generate button here; Pip writes the platform captions once, on Everywhere", () => {
+    expect(story).not.toContain("Generate captions with Pip AI");
+    expect(story).not.toContain("Use my text as it is");
+    expect(ws).not.toContain("<AdaptedCaptions");
+    expect(ws).not.toContain("<PublishTo");
+    expect(deck).toContain("<CaptionCards");
   });
-  test("each platform row has its count, Edit, one Regenerate, Copy and approval", () => {
-    for (const s of ["Edit", "Regenerate", "Copy", "Approve", "Suggestion waiting", "Edited by you"]) expect(rows).toContain(s);
+  test("each platform card has its count, Edit, one Regenerate and approval", () => {
+    for (const s of ["Edit", "Regenerate", "Approve", "Suggestion waiting", "characters"]) expect(rows).toContain(s);
     expect(ws).toContain("onRegenerate={(pl) => void adapt([pl], { fresh: true, direct: true, tone: adaptTone ?? undefined })}");
     expect(ws).toContain("proposals={sugg.proposals}");
   });
@@ -146,7 +149,8 @@ describe("R1198 review fixes", () => {
   });
   test("words Pip writes straight in are reviewed again, and a stale suggestion for that place is dropped", () => {
     const body = ws.slice(ws.indexOf("const fillAdapted = (c: PlatformCopy) => {"), ws.indexOf("const untouched = (pl: Platform)"));
-    expect(body).toContain("reviewed: false");
+    // R1209: FRESH is reviewed: false, edited: false, so Pip's new words read Needs review.
+    expect(body).toContain("...FRESH");
     expect(body).toContain('suggest(s, { t: "reject", p: c.platform })');
   });
   test("a place with no hashtags field (X) never offers the hashtags ask, and a platform's own ask shows only there", () => {

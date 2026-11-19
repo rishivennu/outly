@@ -1,4 +1,5 @@
 import { acceptProposal } from "./deck-logic";
+import { FRESH } from "./review-state";
 import type { Proposal, Undo } from "./proposal";
 import type { Draft, PlatformCopy, Step } from "./types";
 import type { Platform } from "@/lib/domain";
@@ -54,8 +55,8 @@ export function pipFooter(x: { step: Step; storyOpen: boolean; storyWhy?: string
   if (x.step === "story") {
     if (x.finalized && !x.canFinalize) return { id: "everywhere", label: "Continue to Everywhere", disabled: false, hint: null };
     // 1190: the captions are written from the message on the page, so that is what the footer waits for.
-    if (x.composer && !x.canFinalize) return { id: "everywhere", label: "Continue to Everywhere", disabled: true, hint: "Write what your video is about, then press Generate captions with Pip AI." };
-    const why = x.busy ? "Writing your hook…" : "Tell me what it's about, then pick a hook.";
+    if (x.composer && !x.canFinalize) return { id: "everywhere", label: "Continue to Everywhere", disabled: true, hint: "Write your caption on the page first. Pip writes each platform's version on Everywhere." };
+    const why = x.busy ? "Writing your hook…" : "Write your caption first.";
     return { id: "finalize", label: "Finalize caption", disabled: !x.canFinalize || !!x.busy, hint: x.canFinalize && !x.busy ? null : why };
   }
   if (x.step === "everywhere") return { id: "done", label: "Done", disabled: false, hint: null };
@@ -116,7 +117,7 @@ export const isEmptyDraft = (d: Pick<Draft, TextKey>) => TEXT_KEYS.every((k) => 
  */
 export function routeCopy(d: Draft, c: PlatformCopy, why: string): { kind: "fill"; patch: Partial<Draft> } | { kind: "propose"; proposal: Proposal } | { kind: "same" } {
   const next: Record<TextKey, string> = { title: c.title ?? "", caption: c.caption ?? "", description: c.description ?? "", hashtags: c.hashtags ?? "" };
-  if (isEmptyDraft(d)) return { kind: "fill", patch: { ...next, note: c.note, why, reviewed: false } };
+  if (isEmptyDraft(d)) return { kind: "fill", patch: { ...next, note: c.note, why, ...FRESH } };
   const patch: Partial<Draft> = {};
   for (const k of TEXT_KEYS) if (next[k] !== d[k]) patch[k] = next[k];
   if (!Object.keys(patch).length) return { kind: "same" };

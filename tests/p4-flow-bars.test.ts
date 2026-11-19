@@ -6,7 +6,7 @@ import { hidesTabBar, TAB_PAGES } from "../lib/client/tab-bar";
 import { PRIVACY_SUMMARY, PRIVACY_VERSION, markSummaryAnswered, resetSummaryMemory, summaryAnsweredThisSession } from "../lib/client/privacy-summary";
 
 const src = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
-const base: BarInput = { online: true, hasMedia: true, uploadFailed: false, hasHook: true, ready: true, enabledCount: 1, launching: false, saving: false };
+const base: BarInput = { online: true, hasMedia: true, uploadFailed: false, hasCaption: true, ready: true, enabledCount: 1, launching: false, saving: false };
 const ids = (s: ReturnType<typeof barState>) => s.buttons.map((b) => b.id);
 const primary = (s: ReturnType<typeof barState>) => s.buttons.filter((b) => b.primary);
 
@@ -25,13 +25,13 @@ describe("item 2: one action bar on Steps 1 and 2", () => {
     expect(s.note).toBeNull();
     expect(ids(barState({ ...base, step: "video", hasDraft: false }))).toEqual(["continue"]);
   });
-  test("Step 2 before a hook: Continue is the only disabled button and the note names the hook", () => {
-    const s = barState({ ...base, step: "story", hasHook: false });
+  test("Step 2 before a caption: Continue is the only disabled button and the note asks for the caption", () => {
+    const s = barState({ ...base, step: "story", hasCaption: false });
     expect(s.buttons.map((b) => b.label)).toEqual(["Save draft", "Preview", "Continue to Everywhere"]);
     expect(s.buttons.filter((b) => b.disabled).map((b) => b.id)).toEqual(["continue"]);
-    expect(s.note).toBe("Pick a hook with Pip to continue to Everywhere.");
+    expect(s.note).toBe("Write your caption to continue to Everywhere.");
   });
-  test("Step 2 with a hook: everything on, no note; offline still moves on", () => {
+  test("Step 2 with a caption: everything on, no note; offline still moves on", () => {
     const s = barState({ ...base, step: "story" });
     expect(s.buttons.every((b) => !b.disabled)).toBe(true);
     expect(s.note).toBeNull();
@@ -51,7 +51,7 @@ describe("item 2: one action bar on Steps 1 and 2", () => {
     expect(barState({ ...base, step: "story", activity: "Captions 3 of 7 parts" }).note).toBe("Captions 3 of 7 parts");
     expect(barState({ ...base, step: "everywhere", activity: "Translating" }).note).toBe("Translating");
     expect(barState({ ...base, step: "launch", targets: ["youtube"], activity: "Translating" }).note).toBe("Translating");
-    expect(barState({ ...base, step: "story", hasHook: false, activity: "Translating" }).note).toContain("hook");
+    expect(barState({ ...base, step: "story", hasCaption: false, activity: "Translating" }).note).toContain("caption");
   });
   test("the workspace wires one Continue to the next step and shows the bar on Step 1 too", () => {
     const ws = src("components/create/CreateWorkspace.tsx");
