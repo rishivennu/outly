@@ -114,9 +114,11 @@ export function barState(i: BarInput): BarState {
           : up === "uploading" && !i.storySeen
             ? `Your video is uploading${pct}. Continue opens as soon as it's in.`
             : null;
+    // 1212: once the server has the file, the bar says so and points at the next step (only on a confirmed "done").
+    const ready = !goBlock && i.upload === "done" && !activity ? "Your video is in. Continue to your story." : null;
     return {
       ...flat,
-      note: goBlock ?? activity,
+      note: goBlock ?? activity ?? ready,
       buttons: [
         ...(i.hasDraft ? [{ id: "save" as const, label: "Save draft", primary: false, ...save }] : []),
         { id: "continue", label: i.moving ? "Opening your story" : "Continue to Your Story", primary: true, disabled: !!goBlock || !!i.moving, hint: goBlock, loading: !!i.moving },

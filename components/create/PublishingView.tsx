@@ -15,6 +15,7 @@ import { OutlyMark } from "@/components/brand/Logo";
 import { Pip } from "@/components/brand/Pip";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { useUser } from "@/components/shell/UserContext";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DotText } from "@/components/brand/DotText";
 import { api, ApiError } from "@/lib/client/api";
 import { PLATFORM_META, STOPPABLE, TARGET_COPY, type Platform, type TargetStatus } from "@/lib/domain";
@@ -238,13 +239,19 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
   const allLive = out.allLive;
   const allStopped = !active && post.targets.length > 0 && stopped.length === post.targets.length;
   const names = (ts: TargetView[]) => ts.map((t) => PLATFORM_META[t.platform].name).join(" and ");
-  const headline = active ? "Sending it out" : out.allPractice ? "Practice run done." : out.allDone ? "You're live." : allStopped ? "Stopped. Nothing went out." : realLive.length ? "Almost everywhere." : "Something got in the way.";
+  const headline = active ? "Sending it out" : out.allPractice ? "Practice run done." : out.allDone ? "You're live!" : allStopped ? "Stopped. Nothing went out." : realLive.length ? "Almost everywhere." : "Something got in the way.";
+  // 1212: the quiet line above the actions: what finished, in plain words. The status pill beside it carries the count.
+  const stage = active ? "Publishing" : out.allPractice ? "Practice run complete" : out.allDone ? "Publishing complete" : allStopped ? "Publishing stopped" : realLive.length ? "Publishing partly done" : "Publishing didn't finish";
   const sub = active
     ? "Each platform moves at its own pace. You can leave this page; we'll keep going."
     : out.allPractice
       ? `${names(rehearsed)} ${rehearsed.length === 1 ? "is a practice account" : "are practice accounts"}, so nothing was posted for real.`
       : out.allDone
-      ? `Out on ${names(realLive)}. ${rehearsed.length ? `${names(rehearsed)} was a practice run, so nothing was posted there.` : post.format === "story" ? "It's up for the next 24 hours." : "Go say hi in the comments."}`
+      ? rehearsed.length
+        ? `Out on ${names(realLive)}. ${names(rehearsed)} was a practice run, so nothing was posted there.`
+        : post.format === "story"
+          ? `Your story is up on ${names(realLive)} for the next 24 hours.`
+          : "Your content is now published. Go say hi in the comments."
       : allStopped
         ? "You stopped every upload. Send any of them again whenever you're ready."
         : published.length
@@ -289,9 +296,40 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
     await act("all", `/api/posts/${post.id}/cancel`);
   };
 
+  // 1212: the actions sit top right once the send has finished (and nowhere else on the page).
+  const actions = !active && (
+    <div className="flex flex-wrap gap-2 [&>*]:flex-1 sm:shrink-0 sm:justify-end sm:[&>*]:flex-none" data-testid="pub-actions">
+      <Button asChild variant="primary" size="md">
+        <Link href="/content">
+          <LayoutGrid className="h-4 w-4" aria-hidden="true" /> See your content
+        </Link>
+      </Button>
+      <Button variant="subtle" size="md" onClick={onAnother}>
+        <Plus className="h-4 w-4" aria-hidden="true" /> Create another
+      </Button>
+      {isFailedPost(post) && (
+        <Button variant="danger" size="md" onClick={() => setConfirmDel(true)} disabled={busy === "delete"}>
+          <Trash2 className="h-4 w-4" aria-hidden="true" /> Delete this post
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <header className="relative text-center">
+      {!active && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+            <p className="text-[22px] font-semibold leading-tight tracking-[-0.02em]">{stage}</p>
+            <p className="pub-eyebrow inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold uppercase tracking-[0.12em]">
+              {out.allDone || out.allPractice ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <span className="h-2 w-2 rounded-full bg-warning" aria-hidden="true" />}
+              {summary}
+            </p>
+          </div>
+          {actions}
+        </div>
+      )}
+      <header className={cn("relative text-center", !active && "mx-auto mt-6 max-w-[40rem] rounded-[24px] bg-card px-5 py-6 hairline sm:px-8")} data-testid="pub-header">
         <p className="sr-only" role="status" aria-live="polite">{`${headline}. ${summary}.`}</p>
         {pollMiss >= 3 && polling && online && (
           <p role="status" className="mx-auto mb-4 max-w-md rounded-2xl px-4 py-2.5 text-[13px] leading-snug text-muted-foreground glass hairline">
@@ -303,15 +341,17 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
             This page can&apos;t check on the send any more. Open <Link href="/content" className="font-semibold text-foreground underline underline-offset-4">Content</Link> to see where it stands.
           </p>
         )}
-        <div className="mb-3 flex h-[104px] items-end justify-center">
-          {active ? <DancingPip size={92} /> : <Pip size={92} mood={out.allDone ? "happy" : "sad"} />}
+        <div className={cn("flex items-end justify-center", active ? "mb-3 h-[104px]" : "mb-2 h-[76px]")}>
+          {active ? <DancingPip size={92} /> : <Pip size={68} mood={out.allDone ? "happy" : "sad"} />}
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <p className="pub-eyebrow inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]">
-            {active ? <span className={cn("pub-pulse", reduce && "pub-pulse-still")} aria-hidden="true" /> : <Check className="h-3.5 w-3.5" aria-hidden="true" />}
-            {summary}
-            {active && <span className="font-mono tabular-nums normal-case tracking-normal text-muted-foreground" aria-hidden="true">{clock}</span>}
-          </p>
+          {active && (
+            <p className="pub-eyebrow inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]">
+              <span className={cn("pub-pulse", reduce && "pub-pulse-still")} aria-hidden="true" />
+              {summary}
+              <span className="font-mono tabular-nums normal-case tracking-normal text-muted-foreground" aria-hidden="true">{clock}</span>
+            </p>
+          )}
           {active && <MusicToggle g={g} />}
           {active && (notify === "off" || notify === "on") && (
             <button type="button" onClick={toggleNotify} aria-pressed={notify === "on"} className="inline-flex h-11 items-center gap-1.5 rounded-full bg-card px-4 text-xs font-semibold hairline hover:bg-secondary">
@@ -337,14 +377,21 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
             ))}
         </div>
         <AnimatePresence mode="wait">
-          <motion.h1 key={headline} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className={cn("display mt-4 text-[clamp(2.2rem,6vw,3.6rem)]", allLive && "energy-text")}>
+          <motion.h1 key={headline} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className={cn("display", active ? "mt-4 text-[clamp(2.2rem,6vw,3.6rem)]" : "mt-1 text-[clamp(1.9rem,4.5vw,2.75rem)]", allLive && "energy-text")}>
             {headline}
             {active && <span className={cn("pub-dots", reduce && "pub-dots-still")} aria-hidden="true"><i /><i /><i /></span>}
           </motion.h1>
         </AnimatePresence>
-        <p className="mx-auto mt-3 max-w-md text-muted-foreground">{sub}</p>
+        {!active && !out.allPractice && post.targets.length > 0 && (
+          <p className="mt-2 text-sm font-semibold tabular-nums text-[#173A24] dark:text-[hsl(var(--lime))]">
+            {rehearsed.length ? `${realLive.length} live, ${rehearsed.length} practice` : realLive.length === post.targets.length ? `${realLive.length === 1 ? "1 publication" : `${realLive.length} publications`} live` : `${realLive.length} of ${post.targets.length} live`}
+          </p>
+        )}
+        <p className={cn("mx-auto max-w-md text-muted-foreground", active ? "mt-3" : "mt-1.5 text-[15px]")}>{sub}</p>
         {allLive && !reduce && <Burst />}
       </header>
+
+      {!active && <PublishedPreview post={post} trackerOf={trackerOf} />}
 
       <ul aria-label={postWords(post.format).where} className="mx-auto mt-10 flex max-w-[56rem] flex-wrap justify-center gap-5">
         {post.targets.map((t, i) => (
@@ -360,29 +407,13 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
 
       {!active && <WhatHappened post={post} />}
 
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-10 flex flex-wrap justify-center gap-3">
-        {!active ? (
-          <>
-            <Button asChild variant="primary" size="lg">
-              <Link href="/content">
-                <LayoutGrid className="h-5 w-5" /> See your content
-              </Link>
-            </Button>
-            <Button variant="subtle" size="lg" onClick={onAnother}>
-              <Plus className="h-5 w-5" /> Create another
-            </Button>
-            {isFailedPost(post) && (
-              <Button variant="danger" size="lg" onClick={() => setConfirmDel(true)} disabled={busy === "delete"}>
-                <Trash2 className="h-5 w-5" aria-hidden="true" /> Delete this post
-              </Button>
-            )}
-          </>
-        ) : (
+      {active && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-10 flex flex-wrap justify-center gap-3">
           <Button variant="ghost" size="lg" onClick={onAnother}>
             <Plus className="h-5 w-5" /> Start the next one while this sends
           </Button>
-        )}
-      </motion.div>
+        </motion.div>
+      )}
       <ConfirmDialog
         open={confirmDel}
         onOpenChange={(o) => busy !== "delete" && setConfirmDel(o)}
@@ -398,6 +429,76 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
 
 /** The first line of whatever copy is going out, for the card's one-line reminder of what this is. */
 const firstLine = (s?: string | null) => (s ?? "").split("\n").find((x) => x.trim())?.trim() ?? null;
+
+/** "Today, 4:12 PM" or "18 Nov, 4:12 PM": when the platform confirmed it. Null when there is no confirmed time. */
+export function whenLabel(iso: string | null | undefined, now = new Date()): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const sameDay = d.toDateString() === now.toDateString();
+  return sameDay ? `Today, ${time}` : `${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}, ${time}`;
+}
+
+/**
+ * 1212: what went out, one card per destination: the real thumbnail, the title or first caption line, the platform,
+ * the account it posted to, the technical status, when the platform confirmed it, and a link only when the platform
+ * sent one back. Retry and stop stay on the Live Activity cards below, so nothing is wired twice.
+ */
+function PublishedPreview({ post, trackerOf }: { post: PostView; trackerOf: (t: TargetView) => LiveTarget | null }) {
+  const words = postWords(post.format, post.items.length);
+  const thumb = post.media.thumbnailUrl ?? post.items[0]?.thumbnailUrl ?? null;
+  if (post.targets.length === 0) return null;
+  return (
+    <section aria-labelledby="pub-preview-title" className="mx-auto mt-8 max-w-[56rem]" data-testid="published-preview">
+      <h2 id="pub-preview-title" className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+        {words.your}, where it went
+      </h2>
+      <ul className={cn("mt-3 grid gap-3", post.targets.length > 1 ? "sm:grid-cols-2" : "sm:max-w-[32rem]")}>
+        {post.targets.map((t) => {
+          const meta = PLATFORM_META[t.platform];
+          const acct = trackerOf(t)?.account ?? null;
+          const handle = acct ? fmtHandle(acct.username) || acct.name : null;
+          const line = firstLine(t.title || t.caption) || post.title || post.media.filename || words.your;
+          const when = t.status === "published" ? whenLabel(t.publishedAt) : null;
+          const live = t.status === "published" && !t.practice;
+          return (
+            <li key={t.id} className="flex gap-3 rounded-[20px] bg-card p-3 hairline" data-testid="preview-card" data-status={t.status}>
+              <div className="relative h-[72px] w-[54px] shrink-0 overflow-hidden rounded-xl bg-secondary">
+                {thumb ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={thumb} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <OutlyMark size={20} className="absolute inset-0 m-auto text-muted-foreground" />
+                )}
+                <PlatformOrb platform={t.platform} size={22} className="absolute bottom-1 right-1 shadow-sm" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="min-w-0 truncate text-[14px] font-semibold leading-snug" title={line}>{line}</p>
+                  <StatusBadge status={t.status} className="shrink-0" />
+                </div>
+                <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
+                  {meta.name}
+                  {handle ? <> <span aria-hidden="true">·</span> {handle}</> : null}
+                  {t.practice && t.status === "published" ? <> <span aria-hidden="true">·</span> practice run</> : null}
+                </p>
+                <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  {when && <span className="tabular-nums">{when}</span>}
+                  {live && t.url && (
+                    <a href={t.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 font-semibold text-foreground underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(hover:hover)]:hover:underline">
+                      Open on {meta.name} <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                    </a>
+                  )}
+                </p>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
 
 function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, canRetry, reduce }: { t: TargetView; i: number; lt: LiveTarget | null; now: number; usually: string | null; post: PostView; busy: boolean; onRetry: () => void; onStop: () => void; canRetry: boolean; reduce: boolean }) {
   const meta = PLATFORM_META[t.platform];

@@ -98,19 +98,20 @@ export function StepProgress({ step, furthest, reachable, blocked, onGo, complet
                 >
                   <span
                     className={cn(
-                      "grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-semibold tabular-nums transition-colors duration-200 motion-reduce:transition-none",
-                      on ? "lime-bg" : done ? "bg-foreground/90 text-background" : "bg-secondary text-muted-foreground hairline",
+                      "grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-semibold tabular-nums transition-colors duration-200 motion-reduce:transition-none",
+                      // 1212: lime for the step you are on, deep green with a check once it is done, a quiet lock until it opens.
+                      on ? "lime-bg ring-2 ring-[hsl(var(--lime)/0.35)]" : done ? "bg-[#173A24] text-white" : "bg-secondary text-muted-foreground hairline",
                     )}
                     aria-hidden="true"
                   >
-                    {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : s.state === "blocked" ? <Lock className="h-3 w-3" /> : s.n}
+                    {done ? <Check className="h-3 w-3" strokeWidth={3} /> : s.state === "blocked" ? <Lock className="h-2.5 w-2.5" /> : s.n}
                   </span>
                   <span className="min-w-0">
                     <span className={cn("block truncate text-[13px] font-semibold leading-tight tracking-[-0.01em]", on ? "text-foreground" : "text-muted-foreground")}>
                       <span className="sr-only">Step {s.i + 1}: </span>
                       {s.label}
                     </span>
-                    <span className={cn("hidden truncate text-[11px] leading-tight lg:block", on ? "text-muted-foreground" : "text-muted-foreground/80")}>
+                    <span className={cn("hidden truncate text-xs leading-tight lg:block", on ? "text-muted-foreground" : "text-muted-foreground/80")}>
                       {done ? "Done" : s.hint}
                     </span>
                     <span className="sr-only">{done ? ", done" : on ? ", current step" : s.state === "blocked" ? ", not available yet" : ""}</span>
@@ -118,7 +119,7 @@ export function StepProgress({ step, furthest, reachable, blocked, onGo, complet
                 </button>
                 {i < items.length - 1 && (
                   <span className="relative mx-1.5 h-px min-w-3 flex-1 bg-border lg:mx-2.5" aria-hidden="true">
-                    <motion.span className="absolute inset-0 origin-left bg-foreground/50" initial={false} animate={{ scaleX: done || complete ? 1 : 0 }} transition={T.fill} />
+                    <motion.span className="absolute inset-0 origin-left bg-[#173A24]/70" initial={false} animate={{ scaleX: done || complete ? 1 : 0 }} transition={T.fill} />
                   </span>
                 )}
               </li>

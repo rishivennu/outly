@@ -24,7 +24,7 @@ import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { Assistant } from "./Assistant";
 import { askProposal, captionFinal, captionSource, NO_SUGGESTIONS, PANEL_OPEN, panelReducer, PIP_PANEL_KEY, pipOpensOn, pipTarget, routeCopy, suggest, type PipFooterId, type SuggestAction, type Suggestions } from "./assistant-state";
 import { StepProgress, stepIndex } from "./StepProgress";
-import { UploadCard, UploadFileCard, uniqueFiles } from "./UploadCard";
+import { UploadCard, UploadFileCard, UploadTips, uniqueFiles } from "./UploadCard";
 import { SavedDrafts } from "./SavedDrafts";
 import { createFont } from "./font";
 import { LaunchPanel, ScheduledView, scheduleCheckLine, type ScheduleCheck } from "./LaunchPanel";
@@ -1568,10 +1568,10 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
               <motion.section key="drop" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={T.page} aria-labelledby="drop-title" data-testid="step-one" className={`${createFont.variable} font-create`}>
                 {/* 1170: a compact heading, the kind switch under it, then the card. Nothing competes with the upload. */}
                 <h1 id="drop-title" className="text-balance text-[clamp(1.6rem,1.25rem+1.1vw,2.25rem)] font-semibold leading-[1.1] tracking-[-0.03em]">
-                  Let&apos;s start with <span className="accent-serif energy-text">your video</span>
+                  Let&apos;s start with <span className="accent-serif energy-text">your video.</span>
                 </h1>
                 <p className="mt-2 max-w-[62ch] text-pretty text-[15px] leading-relaxed text-muted-foreground">
-                  Upload a clip. Outlly will help prepare it for Reels, Shorts, and other supported platforms. You&apos;ll review and approve everything before publishing.
+                  Upload your content. Outlly will prepare it for Reels, Shorts, and other supported platforms. You&apos;ll review everything before publishing.
                 </p>
                 {!initialPost && <PostKindSwitch inline value="video" className="mt-4" />}
                 {!accountList.some((a) => a.status === "connected") && (
@@ -1580,7 +1580,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                     <Link href="/accounts" className="inline-flex min-h-11 items-center font-medium text-foreground underline underline-offset-4">Connect an account</Link>
                   </p>
                 )}
-                <div className="mt-5 sm:mt-6">
+                <div className="mt-4 sm:mt-5">
                   {hasMedia ? (
                     <UploadFileCard
                       name={media?.filename ?? fileRef.current?.name ?? "Your video"}
@@ -1589,6 +1589,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                       duration={meta.duration}
                       width={meta.width}
                       height={meta.height}
+                      mimeType={meta.mimeType}
                       upload={upload}
                       online={online}
                       onPause={upload.kind === "uploading" ? pauseUpload : undefined}
@@ -1603,17 +1604,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                     <UploadCard limits={limits} limitsFailed={limitsFailed} onFiles={takeFiles} error={pickError} batchMax={BULK_MAX} />
                   )}
                 </div>
-                <details className="group mt-4 rounded-2xl text-sm">
-                  <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-full font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(hover:hover)]:hover:text-foreground [&::-webkit-details-marker]:hidden">
-                    <ChevronDown className="h-4 w-4 transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
-                    Tips for a smooth upload
-                  </summary>
-                  <ul className="mt-1 max-w-[70ch] list-disc space-y-1.5 pl-6 text-[13px] leading-relaxed text-muted-foreground">
-                    <li>Vertical 9:16 fits Reels, Shorts and TikTok without bars.</li>
-                    <li>Want trending music? Add it in Instagram, YouTube or your editor, export the video, then upload it here. Outlly posts the sound that&apos;s in your video to every platform.</li>
-                    <li>Your work saves as you go: to this browser straight away, and to Outlly once the video is in.</li>
-                  </ul>
-                </details>
+                {/* 1212: the tips fold into one compact panel, closed by default; the size limit comes from the server, never a typed number. */}
+                <UploadTips limits={limits} limitsFailed={limitsFailed} className="mt-3" />
                 {!hasMedia && !initialPost && !restoreLocal && deviceReady && <SavedDrafts key={adopted} className="mt-8 border-t pt-8" />}
               </motion.section>
             )}

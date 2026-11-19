@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { AlertCircle, Check, Film, HardDrive, Layers, Loader2, Pause, Play, RefreshCw, RotateCcw, UploadCloud, X } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, Film, HardDrive, Info, Layers, Loader2, Pause, Play, RefreshCw, RotateCcw, UploadCloud, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { acceptAttr, acceptedFormats, formatBytes, formatProblem, formatSpeed, type UploadLimits } from "@/lib/client/upload";
 import { cn } from "@/lib/utils";
@@ -318,6 +318,78 @@ export function uploadDetail(upload: UploadState): string | null {
 /** iPhone and iPad suspend a page in the background (an iPad says it is a Mac, but has touch). */
 const isIos = () => typeof navigator !== "undefined" && (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
 
+/** The stage the card is in, read off the one upload state so no two readouts can disagree. */
+export type UploadStage = "idle" | "preparing" | "uploading" | "reconnecting" | "paused" | "finalizing" | "processing" | "done" | "failed" | "offline";
+
+export interface UploadFigures {
+  stage: UploadStage;
+  /** One word for the stage, the card's status pill. */
+  label: string;
+  /** 0..100 from the engine's fraction. Null when a number would mislead (processing, failed, not started). */
+  pct: number | null;
+  /** "750 MB of 1 GB" from the engine's bytes, or null (streamed uploads and the stages with no bytes moving). */
+  bytes: string | null;
+  /** "18 MB/s" only while bytes are moving, never a stale figure. */
+  speed: string | null;
+  /** "about 30 s left" only while bytes are moving and the engine has enough signal. */
+  eta: string | null;
+  /** "47 of 63 parts" for a multipart upload (R1193), null for a single part or when nothing is moving. */
+  parts: string | null;
+  /** The bar has no honest width: it animates instead (preparing, finalizing, processing). */
+  indeterminate: boolean;
+}
+
+/**
+ * R1212: every number on the card, from the one UploadState (lib/client/upload reports fraction, eta and info in
+ * the same tick, so percent and bytes always agree). Paused keeps its percent and drops speed and time; processing
+ * is its own stage with no percent at all, so "100%" never shows before the server has confirmed the file.
+ */
+export function uploadFigures(upload: UploadState, online = true): UploadFigures {
+  const none = { bytes: null, speed: null, eta: null, parts: null, indeterminate: false };
+  switch (upload.kind) {
+    case "uploading": {
+      const i = upload.info;
+      // The number is capped at 99 until the server says done: a rounded 99.6% or the finalizing stitch is not "100%".
+      const at = Math.min(pct(upload.progress), 99);
+      const parts = i && i.partsTotal > 1 && i.phase !== "preparing" && i.phase !== "processing" ? `${i.partsDone} of ${i.partsTotal} parts` : null;
+      const bytes = i && i.total > 0 && i.phase !== "preparing" && i.phase !== "processing" ? `${amount(i.bytes)} of ${formatBytes(i.total)}` : null;
+      switch (i?.phase) {
+        case "preparing":
+          return { ...none, stage: "preparing", label: "Preparing", pct: null, indeterminate: true };
+        case "finalizing":
+          return { ...none, stage: "finalizing", label: "Finalizing", pct: at, bytes, parts, indeterminate: true };
+        case "processing":
+          return { ...none, stage: "processing", label: "Processing", pct: null, indeterminate: true };
+        case "reconnecting":
+          return { ...none, stage: online ? "reconnecting" : "offline", label: online ? "Reconnecting" : "Offline", pct: at, bytes, parts };
+        case "resuming":
+          return { ...none, stage: "uploading", label: "Resuming", pct: at, bytes, parts };
+      }
+      const moving = !i || i.phase === "uploading";
+      return { stage: "uploading", label: "Uploading", pct: at, bytes, speed: moving && i?.speed ? formatSpeed(i.speed) : null, eta: moving ? eta(upload.eta) : null, parts, indeterminate: false };
+    }
+    case "paused":
+      return { ...none, stage: "paused", label: "Paused", pct: pct(upload.progress) };
+    case "done":
+      return { ...none, stage: "done", label: "Uploaded", pct: 100 };
+    case "failed":
+      return { ...none, stage: online ? "failed" : "offline", label: online ? "Didn't upload" : "Offline", pct: null };
+    default:
+      return { ...none, stage: "idle", label: "Getting ready", pct: null };
+  }
+}
+
+/** "MP4", "MOV", "WEBM": the container, from the type the browser or server gave, else the file's extension. */
+export function fileFormat(mimeType: string | null | undefined, name: string): string | null {
+  const m = (mimeType ?? "").toLowerCase();
+  if (m === "video/quicktime") return "MOV";
+  if (m === "video/x-matroska") return "MKV";
+  const sub = /^video\/([a-z0-9.-]+)$/.exec(m)?.[1];
+  if (sub && !/^x-/.test(sub)) return sub.toUpperCase();
+  const ext = /\.([a-z0-9]{2,5})$/i.exec(name)?.[1];
+  return ext ? ext.toUpperCase() : null;
+}
+
 interface FileProps {
   name: string;
   size: number | null;
@@ -325,6 +397,8 @@ interface FileProps {
   duration: number | null;
   width: number | null;
   height: number | null;
+  /** The container type, for the format fact. */
+  mimeType?: string | null;
   upload: UploadState;
   online: boolean;
   onPause?: () => void;
@@ -338,61 +412,107 @@ interface FileProps {
   className?: string;
 }
 
-/** The video picked on Step 1, with its own progress, pause, retry, replace and remove. */
-export function UploadFileCard({ name, size, poster, duration, width, height, upload, online, onPause, onResume, onRetry, onCancel, onRemove, onReplace, limits, className }: FileProps) {
+const STAGE_PILL: Record<UploadStage, string> = {
+  idle: "bg-secondary text-muted-foreground",
+  preparing: "bg-secondary text-foreground",
+  uploading: "bg-[hsl(var(--lime)/0.18)] text-foreground",
+  reconnecting: "bg-warning/15 text-warning-ink",
+  paused: "bg-secondary text-foreground",
+  finalizing: "bg-[hsl(var(--lime)/0.18)] text-foreground",
+  processing: "bg-accent/15 text-foreground",
+  done: "bg-success/15 text-success-ink",
+  failed: "bg-destructive/12 text-[hsl(0_72%_38%)] dark:text-destructive",
+  offline: "bg-warning/15 text-warning-ink",
+};
+
+/**
+ * The video picked on Step 1, with its own progress, pause, retry, replace and remove.
+ * R1212: a premium status card. The frame is big and keeps the video's shape; the facts (size, length, shape,
+ * format) sit as quiet chips under the name; the upload block leads with the percentage, then the bar, then bytes,
+ * speed and time left; the controls sit on their own row. Every figure comes from uploadFigures, so the percentage,
+ * the bytes and the bar never tell different stories, and "Uploaded" waits for the server (upload.kind "done").
+ */
+export function UploadFileCard({ name, size, poster, duration, width, height, mimeType, upload, online, onPause, onResume, onRetry, onCancel, onRemove, onReplace, limits, className }: FileProps) {
   const picker = useRef<HTMLInputElement>(null);
   const st = fileStatus(upload, online);
-  const detail = uploadDetail(upload);
+  const fig = uploadFigures(upload, online);
   // Read after mount: the server render can't know the device.
   const [ios, setIos] = useState(false);
   useEffect(() => setIos(isIos()), []);
-  const progress = upload.kind === "uploading" || upload.kind === "paused" ? pct(upload.progress) : upload.kind === "done" ? 100 : 0;
   const shape = width && height ? (height > width ? "Vertical" : height === width ? "Square" : "Horizontal") : null;
-  const facts = [size ? formatBytes(size) : null, duration ? clock(duration) : null, shape].filter(Boolean).join(" · ");
+  const format = fileFormat(mimeType, name);
+  const facts = [size ? formatBytes(size) : null, duration ? clock(duration) : null, shape, format].filter(Boolean) as string[];
   const busy = upload.kind === "uploading";
   // Once the bucket is stitching the parts there is nothing left to pause, and once it's processing nothing to cancel.
   const phase = upload.kind === "uploading" ? upload.info?.phase : undefined;
   const stitching = phase === "finalizing" || phase === "processing";
+  const showBar = upload.kind !== "done" && upload.kind !== "idle";
+  const barWidth = fig.indeterminate ? 100 : Math.max(fig.pct ?? 0, 2);
+  const barTone = upload.kind === "failed" ? "bg-destructive/70" : upload.kind === "paused" ? "bg-foreground/40" : fig.stage === "offline" || fig.stage === "reconnecting" ? "bg-warning" : fig.stage === "processing" ? "bg-accent" : "bg-lime";
+  const under = [fig.bytes, fig.speed, fig.eta, fig.parts].filter(Boolean).join(" · ");
+  // With the big number on show, the status line says what is happening in words; the figures live in the progress block
+  // (st.text keeps the numbers for the progressbar's aria-valuetext).
+  const LINE: Partial<Record<UploadStage, string>> = { uploading: "Sending to Outlly.", paused: "Resume whenever you're ready.", reconnecting: "Picking up where it left off.", offline: "Waiting for your connection.", finalizing: "Putting the parts together.", processing: "Checking the file on our side.", preparing: "Reading the file." };
+  const statusText = upload.kind === "done" ? "Ready for your story." : showBar && st.tone !== "bad" ? (LINE[fig.stage] ?? st.text) : st.text;
   return (
-    <div data-testid="upload-file" data-state={upload.kind} className={cn("rounded-[24px] bg-card/70 p-3 hairline sm:p-4", className)}>
-      <div className="flex items-start gap-3 sm:gap-4">
-        <div className="relative h-[72px] w-[54px] shrink-0 overflow-hidden rounded-xl bg-secondary hairline sm:h-20 sm:w-[60px]">
+    <div data-testid="upload-file" data-state={upload.kind} data-stage={fig.stage} className={cn("overflow-hidden rounded-[24px] bg-card shadow-[0_18px_40px_-28px_hsl(var(--foreground)/0.35)] hairline", className)}>
+      <div className="flex items-start gap-4 p-4 sm:gap-5 sm:p-5">
+        <div className={cn("relative shrink-0 overflow-hidden rounded-2xl bg-secondary hairline", shape === "Horizontal" ? "h-[72px] w-[128px] sm:h-[81px] sm:w-[144px]" : shape === "Square" ? "h-[96px] w-[96px] sm:h-[108px] sm:w-[108px]" : "h-[128px] w-[72px] sm:h-[144px] sm:w-[81px]")}>
           {poster ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={poster} alt="" className="h-full w-full object-cover" />
           ) : (
-            <Film className="absolute inset-0 m-auto h-5 w-5 text-muted-foreground" aria-hidden="true" />
+            <Film className="absolute inset-0 m-auto h-6 w-6 text-muted-foreground" aria-hidden="true" />
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold" title={name}>{name}</p>
-          {facts && <p className="mt-0.5 truncate text-xs tabular-nums text-muted-foreground">{facts}</p>}
-          <p
-            role="status"
-            aria-live="polite"
-            className={cn("mt-1.5 flex items-start gap-1.5 text-[13px] leading-snug", st.tone === "bad" ? "text-[hsl(0_72%_42%)] dark:text-destructive" : st.tone === "ok" ? "text-foreground" : "text-muted-foreground")}
-          >
-            {st.tone === "busy" && <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
-            {st.tone === "ok" && <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" strokeWidth={3} aria-hidden="true" />}
-            {st.tone === "bad" && <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
-            <span className="tabular-nums">{st.text}</span>
-          </p>
-          {detail && (
-            <p data-testid="upload-detail" className="mt-0.5 truncate text-xs tabular-nums text-muted-foreground">
-              {detail}
-            </p>
+          <div className="flex items-start gap-2">
+            <p className="min-w-0 flex-1 truncate text-[15px] font-semibold leading-tight" title={name}>{name}</p>
+            <Button variant="ghost" size="icon" className="-mr-2 -mt-2 h-11 w-11 shrink-0" onClick={onRemove} aria-label={busy ? `Stop uploading ${name}` : `Remove ${name}`}>
+              <X className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+          {facts.length > 0 && (
+            <ul className="mt-1.5 flex flex-wrap gap-1.5" aria-label="About this video">
+              {facts.map((f) => (
+                <li key={f} className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+                  {f}
+                </li>
+              ))}
+            </ul>
           )}
+          <p role="status" aria-live="polite" className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-snug">
+            <span className={cn("inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold", STAGE_PILL[fig.stage])}>
+              {st.tone === "busy" && <Loader2 className="h-3 w-3 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
+              {st.tone === "ok" && <Check className="h-3 w-3 shrink-0" strokeWidth={3} aria-hidden="true" />}
+              {st.tone === "bad" && <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />}
+              {fig.stage === "paused" && <Pause className="h-3 w-3 shrink-0" aria-hidden="true" />}
+              {fig.label}
+            </span>
+            <span className={cn("tabular-nums", st.tone === "bad" ? "text-[hsl(0_72%_42%)] dark:text-destructive" : st.tone === "ok" ? "text-foreground" : "text-muted-foreground")}>
+              {statusText}
+            </span>
+          </p>
         </div>
-        <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={onRemove} aria-label={busy ? `Stop uploading ${name}` : `Remove ${name}`}>
-          <X className="h-4 w-4" aria-hidden="true" />
-        </Button>
       </div>
-      {upload.kind !== "done" && upload.kind !== "idle" && (
-        <span className="mt-3 block h-1.5 w-full overflow-hidden rounded-full bg-secondary" role="progressbar" aria-label={`Upload of ${name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} aria-valuetext={st.text}>
-          <span className={cn("block h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none", upload.kind === "failed" ? "bg-destructive/70" : upload.kind === "paused" ? "bg-foreground/40" : "bg-lime")} style={{ width: `${Math.max(progress, 2)}%` }} />
-        </span>
+      {showBar && (
+        <div className="px-4 pb-4 sm:px-5" data-testid="upload-progress">
+          <div className="flex items-end justify-between gap-3">
+            <p className="text-[28px] font-semibold leading-none tabular-nums tracking-[-0.02em]" aria-hidden="true">
+              {fig.pct === null ? <span className="text-muted-foreground">{fig.stage === "processing" ? "Processing" : fig.stage === "preparing" ? "Preparing" : "Stopped"}</span> : `${fig.pct}%`}
+            </p>
+            {under && (
+              <p data-testid="upload-detail" className="truncate text-xs tabular-nums text-muted-foreground">
+                {under}
+              </p>
+            )}
+          </div>
+          <span className="mt-2 block h-2 w-full overflow-hidden rounded-full bg-secondary" role="progressbar" aria-label={`Upload of ${name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={fig.pct ?? undefined} aria-valuetext={st.text}>
+            <span className={cn("block h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none", barTone, fig.indeterminate && "animate-pulse motion-reduce:animate-none")} style={{ width: `${barWidth}%` }} />
+          </span>
+        </div>
       )}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-4 py-3 sm:px-5">
         {busy && !stitching && onPause && (
           <Button variant="subtle" size="sm" className="min-h-11" onClick={onPause}>
             <Pause className="h-4 w-4" aria-hidden="true" /> Pause
@@ -432,11 +552,45 @@ export function UploadFileCard({ name, size, poster, duration, width, height, up
           }}
         />
         {upload.kind === "uploading" && (
-          <p className="text-xs text-muted-foreground">
+          <p className="min-w-0 flex-1 basis-full text-xs leading-snug text-muted-foreground sm:basis-auto sm:text-right">
             {ios ? "Keep Outlly open. Uploads pause in the background and pick up when you come back." : "Keep this tab open while it uploads. A dropped connection picks up where it left off."}
           </p>
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * R1212: the tips under the card, folded by default. The formats and the per-file cap are the server's own
+ * (GET /api/media/direct, through limitFacts), never typed in here; the rest is guidance.
+ */
+export function UploadTips({ limits, limitsFailed, className }: { limits: UploadLimits | null; limitsFailed?: boolean; className?: string }) {
+  const facts = limitFacts(limits);
+  const rows: { k: string; v: ReactNode }[] = [
+    { k: "Formats", v: facts.formats },
+    { k: "File size", v: facts.size ?? (limitsFailed ? "Checked when the upload starts" : "Checking your limits") },
+    { k: "Shape", v: "Vertical 9:16 fits Reels, Shorts and TikTok without bars. Square and 16:9 suit feeds and YouTube." },
+    { k: "Connection", v: "Keep this tab open while it uploads. A dropped connection picks up where it left off, and a reload resumes from the parts already in." },
+    { k: "Music", v: "Want trending music? Add it in Instagram, YouTube or your editor, export the video, then upload it here. Outlly posts the sound that's in your video to every platform." },
+    { k: "Saving", v: "Your work saves as you go: to this browser straight away, and to Outlly once the video is in." },
+  ];
+  return (
+    <details data-testid="upload-tips" className={cn("group rounded-2xl bg-card/60 hairline", className)}>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-2xl px-4 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(hover:hover)]:hover:bg-secondary/50 [&::-webkit-details-marker]:hidden">
+        <span className="inline-flex items-center gap-2">
+          <Info className="h-4 w-4 text-muted-foreground" aria-hidden="true" /> Tips for a smooth upload
+        </span>
+        <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+      </summary>
+      <dl className="grid gap-x-6 gap-y-3 px-4 pb-4 pt-1 text-[13px] leading-relaxed sm:grid-cols-2">
+        {rows.map((r) => (
+          <div key={r.k} className={cn(r.k === "Music" && "sm:col-span-2")}>
+            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{r.k}</dt>
+            <dd className="mt-0.5 text-foreground/90">{r.v}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   );
 }

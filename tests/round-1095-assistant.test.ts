@@ -50,8 +50,8 @@ describe("1095 launch collapse", () => {
     expect(workspace).toContain('pipShown ? "max-w-[1100px]" : "max-w-[1240px]"');
     expect(workspace).toContain("transition-[max-width]");
     expect(workspace).toContain("transition-[width,opacity]");
-    // column width, Pip width, the upload tips chevron and (R1198) the phone's video preview chevron
-    expect(workspace.match(/motion-reduce:transition-none/g)?.length).toBe(4);
+    // column width, Pip width and (R1198) the phone's video preview chevron; the upload tips chevron moved into UploadTips (1212)
+    expect(workspace.match(/motion-reduce:transition-none/g)?.length).toBe(3);
   });
   test("the step drives it from one place", () => {
     expect(workspace).toContain('panelDispatch({ t: "step", step });');
