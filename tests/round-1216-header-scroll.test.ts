@@ -39,7 +39,7 @@ describe("R1216 header scroll behaviour", () => {
   });
   test("a transform-only fold at 300ms on the liquid curve, no layout shift, reduced motion honoured", () => {
     expect(css).toMatch(/\.mtop \{[^}]*transform 0\.3s cubic-bezier\(0\.16, 1, 0\.3, 1\);/);
-    expect(css).toContain(".mtop[data-folded] { transform: translateY(-100%); pointer-events: none; }");
+    expect(css).toContain(".mtop[data-folded] { transform: translateY(calc(-100% + env(safe-area-inset-top, 0px))); pointer-events: none; }");
     expect(css).toContain("@media (prefers-reduced-motion: reduce) { .mtop[data-folded] { transition: none; } }");
     // the tab bar is never hidden (1105/1211): only the top bar folds
     expect(css).not.toContain(".mtab[data-folded]");

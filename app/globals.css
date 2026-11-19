@@ -3423,7 +3423,10 @@ html[data-contrast="more"] .fw-ring:has(:is(input, textarea):focus) { box-shadow
 }
 /* R1216: folded away while the page moves down (lib/client/header-scroll.ts). A transform only: the bar keeps its
    place in the flow, so nothing under it shifts, and it slides back over the content on the way up. */
-.mtop[data-folded] { transform: translateY(-100%); pointer-events: none; }
+/* R1220: in the installed app the bar folds up to the status bar, not under it: the safe-area strip stays as the
+   frosted surface the clock and battery sit on, so the page never scrolls bare under them. In a browser tab the
+   inset is 0 and the whole bar goes. */
+.mtop[data-folded] { transform: translateY(calc(-100% + env(safe-area-inset-top, 0px))); pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .mtop[data-folded] { transition: none; } }
 .mtop[data-lifted] {
   background-color: hsl(var(--background) / 0.78);
@@ -3557,7 +3560,7 @@ html.dark .mtab-item { color: hsl(var(--foreground) / .78); }
 .mtab-pill { border-radius: 9999px; transition: transform .15s var(--ease-liquid), background-color .2s var(--ease-liquid); }
 .mtab-item:not(:disabled):active .mtab-pill { transform: scale(.96); }
 .mtab[data-drag] .mtab-item:active .mtab-pill { transform: none; }
-@media (hover: hover) { .mtab-item:not([aria-current]):hover { color: hsl(var(--foreground)); } .mtab-item:not([aria-current]):hover .mtab-pill { background-color: hsl(var(--foreground) / .06); } }
+@media (hover: hover) { .mtab-item:not([aria-current]):hover { color: hsl(var(--foreground)); } }
 /* The one lime pill. A track one tab wide (the bar's inner width over --n tabs) slides along by --i tab widths;
    the 56 x 32 pill sits centred in it, so it lines up under every icon at any bar width. While a finger drags
    (data-drag) the track follows with no easing and the pill stretches by --sx; letting go eases it to the tab. */
@@ -3576,7 +3579,19 @@ html.dark .mtab-item { color: hsl(var(--foreground) / .78); }
   transition: scale .18s var(--ease-liquid);
 }
 .mtab[data-none]:not([data-drag]) .mtab-ind { opacity: 0; }
-.mtab[data-drag] .mtab-ind { transition: opacity .2s var(--ease-liquid); }
+.mtab[data-drag] .mtab-ind { transition: translate .2s var(--ease-liquid), opacity .2s var(--ease-liquid); }
+/* R1220, pointer devices only: hovering a tab brings the lime pill under it (the ink moves with it); it goes back to
+   the page you are on when the pointer leaves. Touch screens never match (hover: hover), so a tap can't leave it stuck. */
+@media (hover: hover) {
+  .mtab:has(.mtab-item:nth-of-type(1):hover) .mtab-ind { translate: 0 0; }
+  .mtab:has(.mtab-item:nth-of-type(2):hover) .mtab-ind { translate: 100% 0; }
+  .mtab:has(.mtab-item:nth-of-type(3):hover) .mtab-ind { translate: 200% 0; }
+  .mtab:has(.mtab-item:nth-of-type(4):hover) .mtab-ind { translate: 300% 0; }
+  .mtab:has(.mtab-item:nth-of-type(5):hover) .mtab-ind { translate: 400% 0; }
+  .mtab[data-none]:has(.mtab-item:hover) .mtab-ind { opacity: 1; }
+  .mtab:has(.mtab-item:hover) .mtab-item[aria-current]:not(:hover) .mtab-pill > svg { color: hsl(var(--foreground) / .72); }
+  .mtab-item:hover .mtab-pill > svg { color: hsl(var(--lime-foreground)); }
+}
 .mtab-item[aria-current] .mtab-pill > svg { color: hsl(var(--lime-foreground)); }
 /* while a finger drags, the tab under it carries the ink and the one you came from lets it go */
 .mtab[data-drag] .mtab-item[data-over] .mtab-pill > svg { color: hsl(var(--lime-foreground)); }

@@ -169,7 +169,9 @@ function useSlideTabs(nav: RefObject<HTMLElement | null>, hrefs: string[], activ
     s.vx = 0.6 * ((e.clientX - s.x) / Math.max(1, e.timeStamp - s.t)) + 0.4 * s.vx;
     s.x = e.clientX;
     s.t = e.timeStamp;
-    set("--i", fi.toFixed(3));
+    // R1220: the pill fills the tab under the finger (magnetic), never rests between two icons; the glow (--fx) is
+    // what follows the finger exactly.
+    set("--i", String(Math.round(fi)));
     set("--fx", fingerX(s, e.clientX));
     if (!still.current) {
       set("--sx", slideStretch(s.vx).toFixed(3));
@@ -206,6 +208,27 @@ function useSlideTabs(nav: RefObject<HTMLElement | null>, hrefs: string[], activ
     const s = g.current;
     if (s && s.lock !== "h" && e.pointerId === s.id) settle(activeIdx);
   };
+  // R1220: a gesture whose end never reaches the bar (the page took the touch, the app went to the background, iOS
+  // dropped the pointer) can't leave the pill parked where the finger last was: the window's own end events and a
+  // hidden tab put it back on the current page.
+  useEffect(() => {
+    const end = () => {
+      if (g.current) settle(activeIdx);
+    };
+    const hide = () => {
+      if (document.visibilityState === "hidden") end();
+    };
+    // Bubble phase: the bar's own handler (React, on the root) has already finished the gesture by then, so this
+    // only catches the ends it never saw.
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    document.addEventListener("visibilitychange", hide);
+    return () => {
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      document.removeEventListener("visibilitychange", hide);
+    };
+  }, [activeIdx]); // eslint-disable-line react-hooks/exhaustive-deps
   // the click the browser sends after a drag must not open the link under the finger as well
   const onClickCapture = (e: ReactMouseEvent<HTMLElement>) => {
     if (!dragEnd.current || e.timeStamp - dragEnd.current > 500) return;
@@ -303,7 +326,7 @@ export function MobileTopBar() {
         <span key={title} className="mtop-title max-w-[40vw] truncate text-[16px] font-medium tracking-[-0.01em] text-foreground">
           {title}
         </span>
-        <div className="flex items-center justify-self-end">
+        <div className="flex items-center gap-2 justify-self-end">
           <NoticesBell placement="below" className="mtop-btn gbtn-icon ripple-host" />
           <MobileDrawer className="mtop-btn gbtn-icon ripple-host" />
         </div>

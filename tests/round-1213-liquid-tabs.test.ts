@@ -92,7 +92,7 @@ describe("R1213 glass pill (globals.css)", () => {
     expect(rule(".mtab-ind::before")).toContain("width: 56px; height: 32px;");
     expect(rule(".mtab-ind::before")).toContain("scale: var(--sx, 1) 1;");
     expect(css).toContain(".mtab[data-none]:not([data-drag]) .mtab-ind { opacity: 0; }");
-    expect(css).toContain(".mtab[data-drag] .mtab-ind { transition: opacity .2s var(--ease-liquid); }");
+    expect(css).toContain(".mtab[data-drag] .mtab-ind { transition: translate .2s var(--ease-liquid), opacity .2s var(--ease-liquid); }");
     expect(css).not.toContain(".mtab-item .mtab-ind");
     expect(css).not.toContain(".mtab-item[aria-current] .mtab-ind");
   });
@@ -130,7 +130,7 @@ describe("R1213 finger-following nav (components/shell/Nav.tsx)", () => {
     expect(slide).toContain("s.lock = slideLock(dx, dy);");
     expect(slide).toContain('el.setAttribute("data-drag", "");');
     expect(slide).toContain("el.setPointerCapture(e.pointerId);");
-    expect(slide).toContain('set("--i", fi.toFixed(3));');
+    expect(slide).toContain('set("--i", String(Math.round(fi)));'); // R1220: magnetic, never between two icons
     expect(slide).toContain("haptic(5);");
     expect(slide).toContain("const onPointerCancel = () => settle(activeIdx);");
     expect(slide).toContain("if (target !== activeIdx) go(hrefs[target]!);");
