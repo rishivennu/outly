@@ -107,10 +107,11 @@ describe("R1198 Step 2: Your caption", () => {
     expect(subtitleStatus({ ...facts, lines: 12 }).label).toBe("12 subtitles ready");
     expect(subtitleStatus({ ...facts, lines: 12, busy: "transcribe" }).label).toBe("Transcribing");
   });
-  test("Pip opens on Your Story; a phone keeps it as a card so a sheet never covers the actions", () => {
+  test("Pip opens on Your Story; R1215: on a phone the sheet pops there (step 2), never on Your Video", () => {
     expect(pipOpensOn("story", true)).toBe(true);
     expect(pipOpensOn("everywhere", false)).toBe(false);
-    expect(ws).toContain('else if (step !== "story") {');
+    expect(ws).toContain('else if (step === "story") {');
+    expect(ws).not.toContain('else if (step !== "story") {');
   });
   test("on a phone the video preview folds away and pauses", () => {
     expect(ws).toContain('aria-controls="stage-video"');

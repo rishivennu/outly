@@ -3,7 +3,7 @@ import { cookies, headers } from "next/headers";
 import { Archivo, Bricolage_Grotesque, DM_Sans, Fraunces, Inter, Instrument_Serif, Manrope, Plus_Jakarta_Sans, Rubik, Space_Mono, Tinos } from "next/font/google";
 import localFont from "next/font/local";
 import { themeScript } from "@/lib/theme/script";
-import { THEME_COOKIE, themeColorFor } from "@/lib/theme/colors";
+import { iosStatusBarStyle, THEME_COOKIE, themeColorFor } from "@/lib/theme/colors";
 import { StatusBarSync } from "@/components/shared/StatusBarSync";
 import { RootClient } from "@/components/shared/RootClient";
 import { swScript } from "@/lib/sw-script";
@@ -61,7 +61,11 @@ const spaceMono = Space_Mono({ subsets: ["latin"], weight: ["400", "700"], style
 
 import { themeCss } from "@/lib/theme-css";
 
-export const metadata: Metadata = {
+// R1215: per request, because the iOS status bar style follows the saved theme (see iosStatusBarStyle). The layout
+// already reads headers() and cookies() for every request, so this costs nothing extra.
+export async function generateMetadata(): Promise<Metadata> {
+  const theme = (await cookies()).get(THEME_COOKIE)?.value;
+  return {
   metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3040"),
   title: { default: "Outlly · Create once. Publish everywhere.", template: "%s · Outlly" },
   description: "Upload one video, let AI tailor it for Instagram Reels, YouTube Shorts and X, then publish and track every destination from one creative workspace.",
@@ -71,14 +75,14 @@ export const metadata: Metadata = {
   other: { copyright: `\u00A9 ${new Date().getFullYear()} Outlly. All rights reserved.`, "apple-mobile-web-app-capable": "yes" },
   verification: { google: process.env.GOOGLE_SITE_VERIFICATION?.trim() || undefined },
   // 1099: launched from the iOS Home Screen it opens full screen with this name under the icon (app/apple-icon.png).
-  // 1105: status bar style stays "default", on purpose. iOS then paints the strip behind the time and battery in the
-  // theme-color (set to the page background of the active theme by the head script and the theme switch) and picks
-  // dark or light indicators to suit it. "black-translucent" would put the app under the bar, but its indicators are
-  // always white, so they vanish on the light theme. Next 15 only writes the new "mobile-web-app-capable" tag;
-  // iOS before 16.4 needs the apple- one (in `other` below) to open full screen.
-  appleWebApp: { capable: true, title: "Outlly", statusBarStyle: "default" },
+  // 1105 kept "default" so iOS would paint the strip behind the clock in the theme-color; on the dark theme it
+  // painted it white instead (R1215, real iPhone), so dark now runs under the bar and the light theme keeps "default"
+  // (its indicators must stay dark). Next 15 only writes the new "mobile-web-app-capable" tag; iOS before 16.4
+  // needs the apple- one (in `other` below) to open full screen.
+  appleWebApp: { capable: true, title: "Outlly", statusBarStyle: iosStatusBarStyle(theme) },
   applicationName: "Outlly",
-};
+  };
+}
 
 // Round 1 (1102): an app, not a page, so phones never zoom by accident. Double tap is still blocked by
 // `html { touch-action: manipulation }` and focusing a field never zooms because every phone field is 16px

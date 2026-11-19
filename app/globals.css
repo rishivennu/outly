@@ -3628,8 +3628,11 @@ html.dark {
   --gb-shadow: 0 8px 24px -14px rgb(0 0 0 / .65), 0 1px 3px -1px rgb(0 0 0 / .45);
 }
 @media (max-width: 1023.98px) {
+  /* R1215: the light pane (::after) needs a positioned box, but at zero specificity, so a button a page already
+     places (Tailwind's absolute/fixed, e.g. the X on the Pip sheet) stays where the page put it. */
+  :where(.gbtn, .gbtn-icon, .gchip, .gseg) { position: relative; }
   .gbtn, .gbtn-icon, .gchip, .gseg {
-    position: relative; isolation: isolate;
+    isolation: isolate;
     background: linear-gradient(180deg, hsl(var(--gb-bg) / calc(var(--gb-a) + .1)), hsl(var(--gb-bg) / var(--gb-a)));
     -webkit-backdrop-filter: blur(var(--gb-blur)) saturate(var(--gb-sat));
     backdrop-filter: blur(var(--gb-blur)) saturate(var(--gb-sat));

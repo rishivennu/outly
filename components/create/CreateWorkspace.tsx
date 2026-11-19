@@ -368,8 +368,9 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     // R1206: once Pip is folded it stays folded, on every step and every visit, until the creator opens it again.
     if (pipFolded()) return;
     if (window.matchMedia("(min-width: 1280px)").matches) panelDispatch({ t: "set", open: true });
-    // R1198: on a phone Your Story keeps Pip as the card above the editor, so a sheet never covers the actions.
-    else if (step !== "story") {
+    // R1215 (user 11-19): on a phone the sheet pops on Your Story (step 2), where Pip's asks work on the captions,
+    // and never on Your Video (step 1), where it covered the upload card. Everywhere and Launch keep the FAB.
+    else if (step === "story") {
       drawerFrom.current = null;
       setDrawer(true);
     }

@@ -27,6 +27,13 @@ describe("R1214 glass tokens and surfaces (globals.css)", () => {
     expect(head.match(/^[.a-z]/gm)?.filter((l) => l.startsWith(".")) ?? []).toEqual([]);
     expect(rules).toContain("backdrop-filter: blur(var(--gb-blur)) saturate(var(--gb-sat));");
   });
+  test("R1215: the positioned box comes from a zero-specificity :where, so a page's absolute/fixed placement wins", () => {
+    expect(block).toContain(":where(.gbtn, .gbtn-icon, .gchip, .gseg) { position: relative; }");
+    const main = block.slice(block.indexOf(".gbtn, .gbtn-icon, .gchip, .gseg {"), block.indexOf("/* the press:"));
+    expect(main).not.toContain("position: relative");
+    // the Pip sheet's X is placed by the page and must stay top-right
+    expect(src("components/create/CreateWorkspace.tsx")).toContain('className="absolute right-3 top-4 z-[2] xl:hidden" onClick={closeDrawer} aria-label="Close Pip"');
+  });
   test("four surfaces: frosted, lime, ink and red, plus the circle, the segment trough and the chip", () => {
     expect(block).toContain(".gbtn-lime {\n    --gb-bg: var(--lime);");
     expect(block).toContain("color: hsl(var(--lime-foreground));");

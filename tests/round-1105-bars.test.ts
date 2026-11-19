@@ -1,7 +1,7 @@
 /** 1105: status bar in step with the theme, one coordinated theme switch, and the refined phone top and tab bars. */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { THEME_COLOR, THEME_SWITCH_MS } from "@/lib/theme/colors";
+import { iosStatusBarStyle, THEME_COLOR, THEME_SWITCH_MS } from "@/lib/theme/colors";
 import { themeScript } from "@/lib/theme/script";
 import { pageTitle } from "@/components/shell/nav-items";
 
@@ -43,7 +43,13 @@ describe("1105 status bar colour", () => {
   test("no hard-coded status bar colour anywhere else", () => {
     const layout = src("app/layout.tsx");
     expect(layout).toContain("themeColor: themeColorFor((await cookies()).get(THEME_COOKIE)?.value)");
-    expect(layout).toContain('statusBarStyle: "default"');
+    // R1215: the style follows the saved theme (dark runs under the bar, light keeps iOS's default strip)
+    expect(layout).toContain("statusBarStyle: iosStatusBarStyle(theme)");
+    expect(layout).toContain("const theme = (await cookies()).get(THEME_COOKIE)?.value;");
+    expect(iosStatusBarStyle("dark")).toBe("black-translucent");
+    expect(iosStatusBarStyle(undefined)).toBe("black-translucent");
+    expect(iosStatusBarStyle("light")).toBe("default");
+    expect(iosStatusBarStyle("system")).toBe("default");
     expect(layout).toContain('"apple-mobile-web-app-capable": "yes"');
     expect(layout).toContain('viewportFit: "cover"');
     const manifest = src("app/manifest.ts");

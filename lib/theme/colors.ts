@@ -28,6 +28,17 @@ export function statusBarColor(dark: boolean, surface: Surface = "app") {
 export const THEME_COOKIE = "outly-theme";
 export const THEME_COOKIE_AGE = 60 * 60 * 24 * 365;
 
+/**
+ * R1215: how an iPhone Home Screen app draws its status bar. On the dark theme (Outlly's default) iOS painted the
+ * strip behind the clock white, whatever the theme-color said (user's phone, 11-19), so the page now runs under the
+ * bar ("black-translucent": white clock, our own dark background behind it, every top edge already pads
+ * env(safe-area-inset-top)). The light theme keeps "default": its clock has to be dark, and translucent would make
+ * it white on a light page. iOS reads this tag at launch, so a theme switch takes effect on the next launch.
+ */
+export function iosStatusBarStyle(choice: string | undefined): "black-translucent" | "default" {
+  return choice === "dark" || choice === undefined ? "black-translucent" : "default";
+}
+
 /** The theme-color for a saved choice. System (and anyone not on light or dark) gets one tag per OS appearance. */
 export function themeColorFor(choice: string | undefined, surface: Surface = "app") {
   if (choice === "light") return statusBarColor(false, surface);
