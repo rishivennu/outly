@@ -351,6 +351,7 @@ model Post {
   reviews ReviewRequest[]
   notes   PostNote[]
   items   PostMedia[]
+  variation ContentVariation? // R1233: this post as a variation of a ContentItem (relation only, no column)
 
   @@index([userId, status])
   @@index([userId, scheduledAt])
@@ -1606,6 +1607,145 @@ model AccountSyncState {
   updatedAt     DateTime  @updatedAt
 
   account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+/// R1233: Content Memory. One ContentItem is one idea; its variations are the Posts made from it (the original and
+/// every adaptation), so numbers can be traced back from a platform post to the idea. Owner-scoped like every table.
+model ContentItem {
+  id         String    @id @default(cuid())
+  ownerId    String // workspace (User.id), the tenant key
+  brandKey   String    @default("") // "" = whole workspace; else an agency client key, matches BrandProfile.scopeKey
+  title      String?
+  concept    String? // one-line idea
+  format     String // primary format: video | photo | carousel | story
+  topic      String?
+  origin     String    @default("manual") // manual | adapt | recommendation | backfill
+  campaignId String?
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  variations ContentVariation[]
+  categories ContentItemCategory[]
+
+  @@index([ownerId, createdAt])
+  @@index([ownerId, brandKey, createdAt])
+}
+
+/// R1233: a Post as one variation of a ContentItem. postId is unique: a Post belongs to at most one item.
+model ContentVariation {
+  id                String   @id @default(cuid())
+  itemId            String
+  postId            String   @unique
+  parentVariationId String? // adapted from which variation
+  kind              String   @default("original") // original | adapted
+  tone              String? // the AdaptTone used (lib/ai/adapt-core.ts)
+  platform          String? // the main target platform, copied here for grouping
+  createdAt         DateTime @default(now())
+
+  item     ContentItem        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  post     Post               @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent   ContentVariation?  @relation("VariationLineage", fields: [parentVariationId], references: [id], onDelete: SetNull)
+  children ContentVariation[] @relation("VariationLineage")
+
+  @@index([itemId])
+  @@index([parentVariationId])
+}
+
+/// R1233: the owner's own content categories (pillars). Never invented by the engine: user-made or suggested.
+model ContentCategory {
+  id        String   @id @default(cuid())
+  ownerId   String
+  name      String
+  keywords  String? // JSON string[] for classifyTopic (lib/intelligence/core.ts)
+  source    String   @default("user") // user | suggested
+  createdAt DateTime @default(now())
+
+  items ContentItemCategory[]
+
+  @@unique([ownerId, name])
+}
+
+model ContentItemCategory {
+  itemId     String
+  categoryId String
+
+  item     ContentItem     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  category ContentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, categoryId])
+  @@index([categoryId])
+}
+
+/// R1233: what the workspace (or one agency client, scopeKey) is trying to achieve, which decides the metrics that matter.
+model BrandProfile {
+  id        String   @id @default(cuid())
+  ownerId   String
+  scopeKey  String   @default("") // "" = whole workspace; else a client key
+  name      String?
+  objective String // awareness | engagement | community | traffic | leads | sales (lib/intelligence/core.ts Objective)
+  audience  String?
+  pillars   String? // JSON string[]
+  tone      String?
+  avoid     String? // JSON string[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ownerId, scopeKey])
+}
+
+/// R1233: a next-content recommendation computed by the engine. dedupeKey makes regeneration idempotent.
+model Recommendation {
+  id            String   @id @default(cuid())
+  ownerId       String
+  scopeKey      String   @default("")
+  dedupeKey     String // hash(rule, format, platform, topic, period)
+  title         String
+  format        String?
+  platform      String?
+  concept       String
+  why           String
+  evidence      String // JSON: the numbers the engine computed
+  postsAnalyzed Int
+  periodFrom    String
+  periodTo      String
+  confidence    String // low | medium | high
+  nextAction    String // JSON
+  status        String   @default("open") // open | accepted | edited | rejected | saved | done | expired
+  wordedBy      String   @default("rules") // rules | ai
+  feedback      String?
+  contentItemId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([ownerId, scopeKey, dedupeKey])
+  @@index([ownerId, scopeKey, status])
+}
+
+/// R1233: the audit trail of a recommendation's lifecycle.
+model RecommendationEvent {
+  id               String   @id @default(cuid())
+  recommendationId String
+  actorId          String?
+  type             String // generated | accepted | edited | rejected | saved | done | feedback | outcome
+  data             String? // small JSON
+  at               DateTime @default(now())
+
+  @@index([recommendationId, at])
+}
+
+/// R1233: a content campaign (a theme over dates). Not Campaign, which is a billing offer.
+model ContentCampaign {
+  id         String    @id @default(cuid())
+  ownerId    String
+  name       String
+  goal       String?
+  startsAt   DateTime?
+  endsAt     DateTime?
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([ownerId])
 }
 
 /// 1147: one row per hashed identity key (email | phone | device | payment). No FK on purpose: survives account deletion as a one-way hash.
