@@ -3417,8 +3417,12 @@ html[data-contrast="more"] .fw-ring:has(:is(input, textarea):focus) { box-shadow
   padding-right: env(safe-area-inset-right);
   background-color: hsl(var(--background) / 0);
   box-shadow: 0 0.5px 0 hsl(var(--border) / 0);
-  transition: background-color 0.25s ease, box-shadow 0.25s ease, -webkit-backdrop-filter 0.25s ease, backdrop-filter 0.25s ease;
+  transition: background-color 0.25s ease, box-shadow 0.25s ease, -webkit-backdrop-filter 0.25s ease, backdrop-filter 0.25s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
+/* R1216: folded away while the page moves down (lib/client/header-scroll.ts). A transform only: the bar keeps its
+   place in the flow, so nothing under it shifts, and it slides back over the content on the way up. */
+.mtop[data-folded] { transform: translateY(-100%); pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .mtop[data-folded] { transition: none; } }
 .mtop[data-lifted] {
   background-color: hsl(var(--background) / 0.78);
   -webkit-backdrop-filter: blur(20px) saturate(1.7);

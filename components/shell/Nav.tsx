@@ -9,6 +9,7 @@ import { MobileDrawer } from "./MobileDrawer";
 import { MAIN, TOUR, isActive, pageTitle } from "./nav-items";
 import { TAB_SCROLL_START, hidesTabBar, slideIndex, slideLock, slideStretch, slideTarget, tabScrollStep, type TabScroll } from "@/lib/client/tab-bar";
 import { haptic } from "@/lib/client/app-mode";
+import { useHeaderScroll } from "@/lib/client/header-scroll";
 
 /**
  * Desktop sidebar: the collapsible rail for every dashboard style (1103). Classic and Analytics used to have
@@ -284,29 +285,17 @@ export function MobileNav() {
  * lib/theme/colors.ts), with no border or shadow; once content scrolls under it a frosted layer and a hairline
  * fade in (.mtop in globals.css). One 44px button size, 20px icons. R1214: the bell and the menu are the shared
  * glass circles (.gbtn-icon, globals.css), the same glass as the tab bar and every phone button.
+ * R1216: the bar follows the scroll (lib/client/header-scroll.ts): moving down the page folds it away
+ * (data-folded, a 300ms translate in globals.css), moving back brings it in, at the top it always shows. One
+ * listener here for every mobile route and for pages that scroll in their own container; nothing else changed.
  */
 export function MobileTopBar() {
   const path = usePathname();
   const title = pageTitle(path);
-  const [lifted, setLifted] = useState(false);
-  useEffect(() => {
-    let raf = 0;
-    const check = () => {
-      raf = 0;
-      setLifted(window.scrollY > 2);
-    };
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(check);
-    };
-    check();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      cancelAnimationFrame(raf);
-    };
-  }, []);
+  const bar = useRef<HTMLElement>(null);
+  const { lifted, hidden } = useHeaderScroll(path, bar);
   return (
-    <header data-mtop="" data-lifted={lifted ? "" : undefined} className="mtop web-only sticky top-0 z-30 lg:hidden">
+    <header ref={bar} data-mtop="" data-lifted={lifted ? "" : undefined} data-folded={hidden ? "" : undefined} className="mtop web-only sticky top-0 z-30 lg:hidden">
       <div className="mtop-row grid h-[52px] grid-cols-[1fr_auto_1fr] items-center gap-2 pl-3 pr-1.5 min-[400px]:pl-4 min-[400px]:pr-2.5">
         <Link href="/home" className="mtop-logo flex h-11 min-w-11 items-center justify-self-start rounded-full px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Outlly dashboard">
           <OutlyLogo size={22} />
