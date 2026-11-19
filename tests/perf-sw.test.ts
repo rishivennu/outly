@@ -238,7 +238,7 @@ describe("perf B1: install and update", () => {
     for (const n of ["outly-offline-v4", "outly-static-v0", "outly-share", "outly-pages-v1", "outly-static-v1"]) await w.open(n);
     await w.lifecycle("activate");
     expect([...w.store.keys()].sort()).toEqual(["outly-pages-v1", "outly-share", "outly-static-v1"]);
-    expect(w.api.CURRENT).toEqual(["outly-offline-v5", "outly-static-v1", "outly-pages-v1", "outly-share"]);
+    expect(w.api.CURRENT).toEqual(["outly-offline-v5", "outly-static-v1", "outly-pages-v1", "outly-share", "outly-assets-v1"]);
   });
   test("push, share target and the offline page are untouched", () => {
     for (const s of ['addEventListener("push"', 'addEventListener("notificationclick"', 'addEventListener("pushsubscriptionchange"', '"/share-target"', "takeShare(req)", "/offline.html"]) expect(code).toContain(s);

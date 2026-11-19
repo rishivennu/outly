@@ -16,8 +16,14 @@ const CACHE = "outly-offline-v5";
 const STATIC = "outly-static-v1";
 const PAGES = "outly-pages-v1";
 const SHARE = "outly-share";
-const CURRENT = [CACHE, STATIC, PAGES, SHARE];
+/* R1226: brand art and sample posters (/brand, /samples; never the home-screen icons, which must stay fresh, nor the
+   email fonts). The kept copy answers at once and the network refreshes it in the background, so a relaunch, or
+   a day later when the browser's own copy has expired, paints the welcome art without a round trip. At most 40. */
+const ASSETS = "outly-assets-v1";
+const CURRENT = [CACHE, STATIC, PAGES, SHARE, ASSETS];
 const STATIC_MAX = 150;
+const ASSETS_MAX = 40;
+const ASSET = /^\/(brand|samples)\/(?!app\/|email\/)[\w./-]+\.(webp|avif|png|jpg|jpeg|svg|gif)$/;
 const PAGES_MAX = 12;
 const NAV_WAIT = 2500;
 const PRECACHE = ["/offline.html", "/manifest.webmanifest"];
@@ -37,6 +43,7 @@ function routeOf(req, url, origin) {
   if (KEEP.some((r) => r.test(p))) return "keep";
   if (p.startsWith("/api/")) return null;
   if (p.startsWith("/_next/static/")) return "static";
+  if (ASSET.test(p)) return "asset";
   if (req.mode === "navigate" && STUDIO.test(p)) return "page";
   return null;
 }
@@ -119,6 +126,24 @@ async function fromStatic(e, req) {
   return res;
 }
 
+/* R1226: brand art: the kept copy first, refreshed from the network in the background (stale-while-revalidate). */
+async function fromAsset(e, req) {
+  const c = await caches.open(ASSETS);
+  const hit = await c.match(req);
+  const net = fetch(req).then((res) => {
+    if (keepStatic(res)) {
+      const copy = res.clone();
+      e.waitUntil(c.put(req, copy).then(() => trim(c, ASSETS_MAX)).catch(() => {}));
+    }
+    return res;
+  });
+  if (hit) {
+    e.waitUntil(net.catch(() => {}));
+    return hit;
+  }
+  return net;
+}
+
 async function fromPage(e, req, url) {
   const key = url.pathname;
   let store = Promise.resolve();
@@ -160,6 +185,7 @@ self.addEventListener("fetch", (e) => {
   // null: the browser loads it, exactly as with no worker. Every other branch always answers with a real response.
   if (kind === "keep") e.respondWith(fromKeep(req, url));
   else if (kind === "static") e.respondWith(fromStatic(e, req).catch(() => fetch(req)).catch(() => new Response("", { status: 504, statusText: "Offline" })));
+  else if (kind === "asset") e.respondWith(fromAsset(e, req).catch(() => fetch(req)).catch(() => new Response("", { status: 504, statusText: "Offline" })));
   else if (kind === "page") e.respondWith(fromPage(e, req, url).catch(offlinePage));
 });
 
