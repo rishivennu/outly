@@ -106,14 +106,16 @@ describe("1212 publishing success screen", () => {
     const stage = at("<p className=\"text-[22px] font-semibold leading-tight tracking-[-0.02em]\">{stage}</p>");
     const actions = at("{actions}");
     const header = at('data-testid="pub-header"');
-    const preview = at('{!active && <PublishedPreview post={post} trackerOf={trackerOf} className="lg:col-start-2 lg:row-start-1" />}');
+    // R1221: the source walks the left column (You're live, What happened) then the right (preview, Live Activity);
+    // below lg the cards carry `order-1..4` so a phone still reads You're live, preview, What happened, Live Activity.
+    const preview = at('{!active && <PublishedPreview post={post} trackerOf={trackerOf} className="order-2 lg:order-none" />}');
     const live = at("<ul aria-label={postWords(post.format).where}");
-    const what = at('{!active && <WhatHappened post={post} className="lg:col-start-1 lg:row-start-2" />}');
+    const what = at('{!active && <WhatHappened post={post} className="order-3 lg:order-none" />}');
     expect(stage).toBeLessThan(actions);
     expect(actions).toBeLessThan(header);
-    expect(header).toBeLessThan(preview);
+    expect(header).toBeLessThan(what);
+    expect(what).toBeLessThan(preview);
     expect(preview).toBeLessThan(live);
-    expect(live).toBeLessThan(what);
   });
   test("the Live Activity component is rendered once, untouched, in its list", () => {
     expect(pv.match(/<LiveActivity key=\{t\.id\}/g)?.length).toBe(1);

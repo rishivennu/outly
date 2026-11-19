@@ -13,13 +13,14 @@ const css = src("app/globals.css");
 describe("R1218 publishing success bento", () => {
   test("a two column grid only once settled, single column below lg", () => {
     expect(view).toContain('className={cn(!active && "mt-6 grid items-start gap-4 lg:grid-cols-2 lg:gap-5")} data-testid="pub-bento"');
-    expect(view).toContain("lg:col-start-1 lg:row-start-1");
-    expect(view).toContain('className="lg:col-start-2 lg:row-start-1"');
-    expect(view).toContain('"min-w-0 lg:col-start-2 lg:row-start-2"');
-    expect(view).toContain('className="lg:col-start-1 lg:row-start-2"');
+    // R1221: two real columns from lg (each a flex column), `contents` below it so the cards order themselves
+    expect(view).toContain('className={cn("contents", !active && "lg:flex lg:min-w-0 lg:flex-col lg:gap-5")} data-testid="pub-col-left"');
+    expect(view).toContain('className={cn("contents", !active && "lg:flex lg:min-w-0 lg:flex-col lg:gap-5")} data-testid="pub-col-right"');
+    expect(view).toContain('<WhatHappened post={post} className="order-3 lg:order-none" />');
+    expect(view).toContain('<PublishedPreview post={post} trackerOf={trackerOf} className="order-2 lg:order-none" />');
   });
   test("one card style and one label style, no leftover themed card tokens", () => {
-    expect(view).toContain("rounded-[24px] bg-card px-5 py-7 hairline sm:px-8");
+    expect(view).toContain("rounded-[24px] bg-card px-5 py-6 hairline sm:px-8");
     expect(view).toContain("rounded-[24px] bg-card p-4 hairline sm:p-5");
     expect(view).not.toContain("la-card la-themed");
     expect(css).toContain(".pub-label");

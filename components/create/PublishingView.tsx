@@ -334,7 +334,10 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
           on the right. Source order is unchanged (grid placement does the arranging), cards share one radius,
           padding and gap, and rows start at the top so a taller Live Activity never stretches its neighbour. */}
       <div className={cn(!active && "mt-6 grid items-start gap-4 lg:grid-cols-2 lg:gap-5")} data-testid="pub-bento">
-      <header className={cn("relative text-center", !active && "flex min-h-full flex-col justify-center rounded-[24px] bg-card px-5 py-7 hairline sm:px-8 lg:col-start-1 lg:row-start-1")} data-testid="pub-header">
+      {/* R1221: each side is its own column (preview and Live Activity stack with no gap under a shorter You're live), the
+          wrappers are `contents` below lg so the four cards order themselves in one column, and nothing is stretched. */}
+      <div className={cn("contents", !active && "lg:flex lg:min-w-0 lg:flex-col lg:gap-5")} data-testid="pub-col-left">
+      <header className={cn("relative text-center", !active && "order-1 rounded-[24px] bg-card px-5 py-6 hairline sm:px-8 lg:order-none")} data-testid="pub-header">
         <p className="sr-only" role="status" aria-live="polite">{`${headline}. ${summary}.`}</p>
         {pollMiss >= 3 && polling && online && (
           <p role="status" className="mx-auto mb-4 max-w-md rounded-2xl px-4 py-2.5 text-[13px] leading-snug text-muted-foreground glass hairline">
@@ -395,26 +398,28 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
         <p className={cn("mx-auto max-w-md text-muted-foreground", active ? "mt-3" : "mt-2 text-[15px] leading-snug")}>{sub}</p>
         {allLive && !reduce && <Burst />}
       </header>
+      {!active && <WhatHappened post={post} className="order-3 lg:order-none" />}
+      </div>
 
-      {!active && <PublishedPreview post={post} trackerOf={trackerOf} className="lg:col-start-2 lg:row-start-1" />}
+      <div className={cn("contents", !active && "lg:flex lg:min-w-0 lg:flex-col lg:gap-5")} data-testid="pub-col-right">
+      {!active && <PublishedPreview post={post} trackerOf={trackerOf} className="order-2 lg:order-none" />}
 
-      {/* The existing Live Activity cards, untouched inside; only their outer list fits the grid cell (one card a row in the column). */}
-      <section aria-label={active ? undefined : "Live activity"} className={cn(!active && "min-w-0 lg:col-start-2 lg:row-start-2")} data-testid="pub-live">
+      {/* The existing Live Activity cards, untouched inside; only their outer list fits the column (one card a row, full width). */}
+      <section aria-label={active ? undefined : "Live activity"} className={cn(!active && "order-4 min-w-0 lg:order-none")} data-testid="pub-live">
         {!active && <p className="pub-label mb-3">Live activity</p>}
-        <ul aria-label={postWords(post.format).where} className={cn(active ? "mx-auto mt-10 flex max-w-[56rem] flex-wrap justify-center gap-5" : "flex flex-wrap justify-center gap-4 lg:[&>li]:!w-full")}>
+        <ul aria-label={postWords(post.format).where} className={cn(active ? "mx-auto mt-10 flex max-w-[56rem] flex-wrap justify-center gap-5" : "flex flex-col gap-4 [&>li]:!w-full")}>
           {post.targets.map((t, i) => (
             <LiveActivity key={t.id} t={t} i={i} lt={trackerOf(t)} now={now} usually={typicalLabel(times[t.platform])} post={post} busy={busy === t.id || busy === "all"} onRetry={() => retry(t)} onStop={() => stop(t)} canRetry={canRetry} reduce={!!reduce} />
           ))}
         </ul>
       </section>
+      </div>
 
       {err && (
-        <p role="alert" className={cn("text-center text-sm text-destructive", active ? "mt-4" : "lg:col-span-2")}>
+        <p role="alert" className={cn("text-center text-sm text-destructive", active ? "mt-4" : "order-5 lg:col-span-2")}>
           {err}
         </p>
       )}
-
-      {!active && <WhatHappened post={post} className="lg:col-start-1 lg:row-start-2" />}
       </div>
 
       {active && (
@@ -475,8 +480,8 @@ function PublishedPreview({ post, trackerOf, className }: { post: PostView; trac
           const when = t.status === "published" ? whenLabel(t.publishedAt) : null;
           const live = t.status === "published" && !t.practice;
           return (
-            <li key={t.id} className="grid grid-cols-[54px_minmax(0,1fr)_auto] items-center gap-3 rounded-[16px] bg-secondary/50 p-3 hairline" data-testid="preview-card" data-status={t.status}>
-              <div className="relative h-[72px] w-[54px] shrink-0 overflow-hidden rounded-xl bg-secondary">
+            <li key={t.id} className="grid grid-cols-[64px_minmax(0,1fr)_auto] items-start gap-3 rounded-[16px] bg-secondary/50 p-3 hairline" data-testid="preview-card" data-status={t.status}>
+              <div className="relative h-[86px] w-[64px] shrink-0 overflow-hidden rounded-xl bg-secondary">
                 {thumb ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={thumb} alt="" className="h-full w-full object-cover" />
@@ -486,7 +491,7 @@ function PublishedPreview({ post, trackerOf, className }: { post: PostView; trac
                 <PlatformOrb platform={t.platform} size={22} className="absolute bottom-1 right-1 shadow-sm" />
               </div>
               <div className="min-w-0">
-                <p className="truncate text-[15px] font-semibold leading-snug" title={line}>{line}</p>
+                <p className="line-clamp-2 text-[15px] font-semibold leading-snug" title={line}>{line}</p>
                 <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
                   {meta.name}
                   {handle ? <> <span aria-hidden="true">·</span> {handle}</> : null}
@@ -495,7 +500,7 @@ function PublishedPreview({ post, trackerOf, className }: { post: PostView; trac
                 <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   {when && <span className="tabular-nums">{when}</span>}
                   {live && t.url && (
-                    <a href={t.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 font-semibold text-foreground underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(hover:hover)]:hover:underline">
+                    <a href={t.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 whitespace-nowrap font-semibold text-foreground underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(hover:hover)]:hover:underline">
                       Open on {meta.name} <ExternalLink className="h-3 w-3" aria-hidden="true" />
                     </a>
                   )}

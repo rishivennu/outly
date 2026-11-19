@@ -1439,7 +1439,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       <div className="relative flex gap-0 lg:min-h-dvh">
         <Glow />
         <div className="relative min-w-0 flex-1 overflow-hidden px-[var(--frame-gutter)] pb-12 pt-4">
-          <StepProgress step="launch" complete reachable={SENT_REACHABLE} onGo={noGo} className="page-frame relative mb-8 px-0" />
+          <StepProgress step="launch" complete reachable={SENT_REACHABLE} onGo={noGo} className="relative mx-auto mb-8 w-full max-w-6xl px-0" />
           <div className="page-frame relative px-0">
             {phase === "publishing" && livePost ? <PublishingView initial={livePost} onAnother={another} /> : <ScheduledView post={scheduledPost} when={scheduledFor ?? when.toISOString()} tz={tz} poster={poster} onAnother={another} />}
           </div>
