@@ -136,7 +136,7 @@ describe("A9 home numbers stream behind a same-shape skeleton", () => {
   test("skeleton repeats PulseHome's boxes", () => {
     const k = src("components/dashboard/PulseSkeleton.tsx");
     const p = src("components/dashboard/PulseHome.tsx");
-    for (const cls of ["page-frame pb-16 pt-6 lg:pt-8", "pulse-seg relative"]) {
+    for (const cls of ["page-frame pb-16 pt-6 lg:pt-8", "pulse-seg gseg relative"]) {
       expect(k).toContain(cls);
       expect(p).toContain(cls);
     }

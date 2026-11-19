@@ -29,7 +29,7 @@ export function PulseSkeleton({ firstName, nextPost }: { firstName: string; next
           <span className="flex h-11 shrink-0 items-center px-3.5 text-[14px] font-medium">All platforms</span>
         </div>
         <div className="flex items-center justify-between gap-3 sm:justify-start sm:pb-3">
-          <span className="pulse-seg relative">
+          <span className="pulse-seg gseg relative">
             {[7, 30, 90].map((r) => (
               <span key={r} className="relative z-[1] grid h-11 min-w-[48px] place-items-center rounded-[12px] px-2.5 text-[14px] font-semibold tabular-nums text-muted-foreground sm:min-w-[52px] sm:px-3">{r}D</span>
             ))}
