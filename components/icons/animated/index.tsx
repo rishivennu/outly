@@ -25,6 +25,7 @@ import { SendIcon } from "./send";
 import { GaugeIcon } from "./gauge";
 import { RotateCCWIcon } from "./rotate-ccw";
 import { ShieldCheckIcon } from "./shield-check";
+import { SparklesIcon } from "./sparkles";
 
 export type IconHandle = { startAnimation: () => void; stopAnimation: () => void };
 export type AnimatedIcon = ComponentType<HTMLAttributes<HTMLSpanElement> & { size?: number } & RefAttributes<IconHandle>>;
@@ -37,6 +38,8 @@ export const ANIMATED = {
   analytics: ChartLineIcon,
   /** 1171: Profile Review, a score out of 100. */
   review: GaugeIcon,
+  /** R1238: Content Intelligence. */
+  intelligence: SparklesIcon,
   inbox: MessageCircleIcon,
   approvals: ClipboardCheckIcon,
   accounts: Link2Icon,

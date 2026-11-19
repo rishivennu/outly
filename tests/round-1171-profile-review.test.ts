@@ -19,13 +19,15 @@ const hover = src("components/shell/HoverLink.tsx");
 const middleware = src("middleware.ts");
 
 describe("sidebar entry", () => {
-  test("Profile Review sits directly below Analytics and above Inbox", () => {
+  // R1238: Content Intelligence joined the sidebar between Analytics and Profile Review, so the gap is one row wider.
+  test("Profile Review sits below the Analytics pair and above Inbox", () => {
     const hrefs = MAIN.map((m) => m.href);
     const a = hrefs.indexOf("/analytics");
     expect(a).toBeGreaterThan(-1);
-    expect(hrefs[a + 1]).toBe("/profile-review");
-    expect(hrefs[a + 2]).toBe("/inbox");
-    expect(MAIN[a + 1].label).toBe("Profile Review");
+    expect(hrefs[a + 1]).toBe("/intelligence");
+    expect(hrefs[a + 2]).toBe("/profile-review");
+    expect(hrefs[a + 3]).toBe("/inbox");
+    expect(MAIN[a + 2].label).toBe("Profile Review");
   });
 
   test("Analytics is unchanged", () => {
@@ -48,7 +50,8 @@ describe("sidebar entry", () => {
 
 describe("route", () => {
   test("needs a session, is never indexed, and is part of the studio for the PWA", () => {
-    expect(middleware).toContain('"/analytics", "/profile-review", "/inbox"');
+    // R1238: /intelligence now sits between them in the same list.
+    expect(middleware).toContain('"/profile-review", "/inbox"');
     expect(STUDIO_RE.test("/profile-review")).toBe(true);
     expect(STUDIO_RE.test("/profile-reviewer")).toBe(false);
   });
