@@ -282,7 +282,8 @@ export function MobileNav() {
  * pads its own, being a separate layer), so it is never applied twice.
  * 1099: no box. At rest it sits on the page background (the same colour the status bar is painted, see
  * lib/theme/colors.ts), with no border or shadow; once content scrolls under it a frosted layer and a hairline
- * fade in (.mtop in globals.css). One 44px button size, 20px icons.
+ * fade in (.mtop in globals.css). One 44px button size, 20px icons. R1214: the bell and the menu are the shared
+ * glass circles (.gbtn-icon, globals.css), the same glass as the tab bar and every phone button.
  */
 export function MobileTopBar() {
   const path = usePathname();
@@ -314,8 +315,8 @@ export function MobileTopBar() {
           {title}
         </span>
         <div className="flex items-center justify-self-end">
-          <NoticesBell placement="below" className="mtop-btn" />
-          <MobileDrawer className="mtop-btn" />
+          <NoticesBell placement="below" className="mtop-btn gbtn-icon ripple-host" />
+          <MobileDrawer className="mtop-btn gbtn-icon ripple-host" />
         </div>
       </div>
     </header>

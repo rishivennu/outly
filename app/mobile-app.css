@@ -93,7 +93,7 @@ html[data-app].dark { --ios-fill: 240 3% 52% / .24; --ios-sep: 0 0% 100% / .1; -
     font: 500 17px/1 var(--font-body), system-ui, sans-serif; color: hsl(var(--lime-ink));
   }
   html[data-app] .app-round, html[data-app] .app-bar .app-round {
-    display: grid; place-items: center; width: 40px; height: 40px; border-radius: 999px; background: hsl(var(--ios-fill)); color: hsl(var(--foreground));
+    display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; color: hsl(var(--foreground)); /* R1214: the surface is the shared glass circle (.gbtn-icon) */
   }
   html[data-app] .app-avatar { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; }
 

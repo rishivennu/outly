@@ -136,7 +136,7 @@ export function AppNavBar() {
         </div>
         <p className="app-bar-title" aria-hidden="true">{home ? "Home" : title}</p>
         <div className="app-bar-side justify-end">
-          {app && <NoticesBell placement="below" className="app-round" />}
+          {app && <NoticesBell placement="below" className="app-round gbtn-icon ripple-host" />}
           <button type="button" className="app-avatar" aria-label="Account and more" aria-haspopup="dialog" onClick={() => dispatchEvent(new Event(APP_MORE_EVENT))}>
             <OrbAvatar avatar={user.workspace ? null : user.avatar} seed={user.workspace?.me.email ?? user.email} size={34} />
           </button>
@@ -203,7 +203,7 @@ function AppSheetHeader() {
     >
       <span className="app-grabber" aria-hidden="true" />
       <div className="app-sheet-row">
-        <button type="button" onClick={dismiss} className="app-round" aria-label="Close">
+        <button type="button" onClick={dismiss} className="app-round gbtn-icon ripple-host" aria-label="Close">
           <X className="h-5 w-5" strokeWidth={2.4} aria-hidden="true" />
         </button>
         <p className="app-sheet-title">New post</p>
