@@ -140,6 +140,7 @@ async function run(user: { id: string; role?: string | null }, postId: string, o
   const freed = gone.count ? await releasePostSlot(user.id, postId).catch((e) => (console.error("[delete] slot", e), 0)) : 0;
   invalidate(`insights:${user.id}:${postId}`);
   invalidate(`pulse:${user.id}:`);
+  invalidate(`intel:posts:${user.id}:`); // R1236: a deleted post leaves the intelligence read model with it
   console.info(`[delete] post ${postId} local=${gone.count ? "deleted" : "already_gone"} stopped=${stopped.count} freed=${freed} remote=${remote.map((r) => `${r.platform}:${r.outcome}`).join(",") || "-"}`);
   return { ok: true, local: gone.count ? "deleted" : "already_gone", stopped: stopped.count, remote, quota: await quotaNow(user.id, freed > 0) };
 }

@@ -83,6 +83,8 @@ export async function refreshData(o: { ownerId: string; scope: string[] | null; 
     ),
   ]);
   invalidate(`pip:stats:${o.ownerId}:`);
+  // R1236: the intelligence read model is built from the same numbers, so a manual refresh clears it too.
+  invalidate(`intel:posts:${o.ownerId}:`);
   const liveOk = new Map(boards);
   const outcomes = new Map((report?.outcomes ?? []).map((x) => [x.accountId, x]));
   const states = await db.accountSyncState.findMany({ where: { accountId: { in: accts.map((a) => a.id) } }, select: { accountId: true, lastSyncAt: true } }).catch(() => []);
