@@ -51,6 +51,8 @@ import { VideoSubtitles } from "./VideoSubtitles";
 import type { PipActionsProps } from "./PipActions";
 import { ASK_KEYS, CAPTION_ASK_LABEL, type CaptionAsk, type PipAsk } from "@/lib/ai/pip-asks";
 import { acceptRewrite, parseMeta, serializeMeta, startMeta, staleFor, switchMode, takeGenerated, captionKey, type CaptionMode, type StoryMeta } from "./story-meta";
+import type { Prefill } from "@/lib/intelligence/planner-core";
+import { acceptsOnOpen, editorEmpty, prefillToDraft, type PrefillDraft } from "@/lib/intelligence/prefill-core";
 import { ADAPT_MAX, copyKey, firstSentence, isLongForm, LONG_FORM_SEC, timedTranscript, type AdaptTone } from "@/lib/ai/adapt-core";
 import { T } from "@/lib/motion/tokens";
 
@@ -70,6 +72,8 @@ interface Props {
   restoreLocal?: string | null;
   /** `?post=` that no longer exists on the server (an expired draft): look for a copy in this browser. */
   missingPostId?: string | null;
+  /** R1241: `?rec=` : a recommendation to start from (lib/intelligence/prefill-core). */
+  recId?: string | null;
 }
 
 type Meta = { duration: number; width: number; height: number };
@@ -78,7 +82,7 @@ const LIVE = ["publishing", "published", "partial", "failed"];
 /** The older version's drafts are offered once per tab, not on every visit to Create. */
 let legacyOffered = false;
 
-export function CreateWorkspace({ accounts: accountList, choices: choiceList, initialPost, tz, connected, connectError, initialStory, shared, restoreLocal, missingPostId }: Props) {
+export function CreateWorkspace({ accounts: accountList, choices: choiceList, initialPost, tz, connected, connectError, initialStory, shared, restoreLocal, missingPostId, recId }: Props) {
   const toast = useToast();
   // R1209 B: what Start over did (saved or deleted), said on the fresh Create it opened.
   useEffect(() => {
@@ -730,6 +734,53 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ---------------- R1241: started from a recommendation (/create?rec=<id>) ---------------- */
+  /** Sent with the first save only: the new post joins its source's item and the recommendation is linked to it. */
+  const recOrigin = useRef<Pick<PrefillDraft, "adaptedFromPostId" | "recommendationId"> | null>(null);
+  const recFields = () => (postIdRef.current || !recOrigin.current ? {} : recOrigin.current);
+  const [fromRec, setFromRec] = useState<PrefillDraft | null>(null);
+  /** Words were already here when the recommendation arrived: the creator picks, nothing is overwritten. */
+  const [recOffer, setRecOffer] = useState<PrefillDraft | null>(null);
+  const emptyRef = useRef(true);
+  emptyRef.current = editorEmpty({ story, hook, captions: PLATFORMS.map((p) => drafts[p].caption) });
+  const applyRec = (d: PrefillDraft) => {
+    setRecOffer(null);
+    setStory(d.story);
+    setCaptionProposal(null);
+    const sm = startMeta(null, d.story);
+    metaRef.current = sm;
+    setStoryMeta(sm);
+    const on = d.platforms.filter((p) => live.includes(p));
+    if (on.length)
+      setDrafts((cur) => {
+        const out = { ...cur };
+        for (const p of PLATFORMS) out[p] = { ...cur[p], enabled: on.includes(p) };
+        return out;
+      });
+    recOrigin.current = { recommendationId: d.recommendationId, ...(d.adaptedFromPostId ? { adaptedFromPostId: d.adaptedFromPostId } : {}) };
+    setFromRec(d);
+  };
+  useEffect(() => {
+    if (!recId || initialPost) return;
+    let alive = true;
+    (async () => {
+      const r = await api<{ recommendation: { id: string; status: string }; prefill: Prefill }>(`/api/recommendations/${encodeURIComponent(recId)}`).catch(() => null);
+      // Off the URL, so a reload does not apply it again.
+      window.history.replaceState(null, "", "/create");
+      if (!alive) return;
+      if (!r) return toast("We couldn't open that recommendation. You can still start your post here.", "info");
+      // Only open and saved ones can be accepted; the planner's 5 s window absorbs a double mount.
+      if (acceptsOnOpen(r.recommendation.status)) void api(`/api/recommendations/${encodeURIComponent(r.recommendation.id)}`, { method: "POST", json: { action: "accept" } }).catch(() => undefined);
+      const d = prefillToDraft(r.prefill, { recommendationId: r.recommendation.id });
+      if (emptyRef.current) applyRec(d);
+      else setRecOffer(d);
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // The one server writer while editing: every local save is followed by a sync of the same words.
   const sync = useDraftSync({
     userId: user.id,
@@ -738,7 +789,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
     baseUpdatedAt: initialPost?.updatedAt ?? null,
     getPayload: () =>
       !wiping.current && media && phase === "edit"
-        ? { mediaId: media.id, title: draftTitle({ drafts, hook, filename: media.filename ?? fileRef.current?.name }), story, storyMeta: metaJson, hook, targets: targetPayload(drafts, choices) }
+        ? { mediaId: media.id, title: draftTitle({ drafts, hook, filename: media.filename ?? fileRef.current?.name }), story, storyMeta: metaJson, hook, targets: targetPayload(drafts, choices), ...recFields() }
         : null,
     onSynced: (p) => {
       baseRef.current = p.updatedAt;
@@ -1224,6 +1275,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                 storyMeta: metaJson,
                 hook,
                 targets: targetPayload(drafts, choices),
+                ...recFields(),
                 baseUpdatedAt: postIdRef.current ? baseRef.current ?? undefined : undefined,
               },
             });
@@ -1564,6 +1616,35 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
             sit at its top, aligned with the heading, the card and the action bar. */}
         <div className={cn("mx-auto flex w-full flex-col px-4 pb-4 pt-3 transition-[max-width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none sm:px-6 lg:px-8 lg:pb-16 lg:pt-5", pipShown ? "max-w-[1100px]" : "max-w-[1240px]")}>
           <StepProgress step={step} furthest={furthest} reachable={reachable} blocked={blocked} onGo={onGo} trailing={railStatus} className="mb-5 lg:mb-7" />
+          {recOffer && (
+            <section aria-label="Recommendation" className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl bg-card/70 px-4 py-2 text-sm hairline">
+              <p className="min-w-0 flex-1 py-2">
+                You already have words here. Start from <span className="font-semibold">{recOffer.title}</span> instead?
+              </p>
+              <Button size="sm" className="min-h-11 px-4" onClick={() => applyRec(recOffer)}>
+                Use recommendation
+              </Button>
+              <Button variant="ghost" size="sm" className="min-h-11 px-3" onClick={() => setRecOffer(null)}>
+                Keep my draft
+              </Button>
+            </section>
+          )}
+          {fromRec && (
+            <div role="status" className="mb-4 flex flex-wrap items-center gap-x-2 rounded-2xl bg-card/70 py-1 pl-4 pr-1 text-sm hairline">
+              <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <p className="min-w-0 flex-1 py-2">
+                Started from a recommendation: <span className="font-semibold">{fromRec.title}</span>
+                {fromRec.topic ? <span className="text-muted-foreground"> ({fromRec.topic})</span> : null}
+                {fromRec.note ? <span className="mt-0.5 block text-muted-foreground">{fromRec.note}</span> : null}
+              </p>
+              <Link href="/intelligence" className="inline-flex min-h-11 items-center rounded-full px-3 font-semibold underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+                Intelligence
+              </Link>
+              <button type="button" aria-label="Dismiss" onClick={() => setFromRec(null)} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(hover:hover)]:hover:text-foreground">
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          )}
           {/* Steps animate in on mount. No exit choreography: a nested exit that never settles must not strand the next step. */}
             {stepOne && (
               <motion.section key="drop" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={T.page} aria-labelledby="drop-title" data-testid="step-one" className={`${createFont.variable} font-create`}>

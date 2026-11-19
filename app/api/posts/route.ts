@@ -100,7 +100,7 @@ export const POST = route(async (req, { user }) => {
       throw e;
     }
     // R1234: only a draft this call created gets its Content Memory item (a clientKey twin or an update already has one).
-    if (!existing) await lineageAfterCreate(user.id, id, body.adaptedFromPostId);
+    if (!existing) await lineageAfterCreate(user.id, id, { adaptedFromPostId: body.adaptedFromPostId, recommendationId: body.recommendationId });
     if (changed) await recordEdit(user, { id });
     return json({ post: await postView(await ownedPost(user.id, id)), ...(deduped ? { deduped: true } : {}) });
   };
