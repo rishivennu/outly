@@ -6,7 +6,9 @@ import { sendEmail, templates } from "../email";
 import { PLATFORM_META, isPlatform } from "../domain";
 import { entitlements } from "../billing/entitlements";
 import { hasPerk } from "../billing/plan-rules";
-import { recapCopy, recapVisible, recapWindow, reportDue, summarize, type RecapCopy, type WeeklyStats } from "./weekly-core";
+import { intelligenceBlock, recapCopy, recapVisible, recapWindow, reportDue, summarize, withinEmailBudget, type IntelBlock, type RecapCopy, type WeeklyStats } from "./weekly-core";
+import { overview } from "../intelligence/service";
+import { weeklyIntelligence, type WeeklyIntelligence } from "../intelligence/report-core";
 
 /** Posts that went out in [since, until), with their latest numbers. `names` swaps platform ids for display names (email). */
 async function statsBetween(userId: string, since: Date, until: Date, upcomingWhere: { gt: Date; lt?: Date }, names: boolean): Promise<WeeklyStats> {
@@ -69,8 +71,33 @@ async function postsOut(userId: string, since: Date, until: Date) {
   return rows.length;
 }
 
+/** R1243: the owner's own brand, last 28 days, judged on the saved objective (overview reads it from the brand profile). */
+async function ownerIntelligence(userId: string): Promise<WeeklyIntelligence> {
+  return weeklyIntelligence(await overview({ id: userId, scope: null }, { days: 28, accountIds: null }));
+}
+
+/** R1243: never lets the intelligence block stop the weekly email: any failure is logged and the block is left out. */
+export async function intelligenceFor(userId: string, load: (userId: string) => Promise<WeeklyIntelligence> = ownerIntelligence): Promise<IntelBlock | null> {
+  try {
+    return intelligenceBlock(await load(userId), env.APP_URL);
+  } catch (e) {
+    console.warn("[weekly] intelligence_skipped", userId, e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
+/** R1243: the weekly html, with the intelligence block when there is one and it keeps the email under the clip budget. */
+export function weeklyHtml(o: { name: string; stats: WeeklyStats; intel: IntelBlock | null }): string {
+  const base = { name: o.name, stats: o.stats, url: `${env.APP_URL}/analytics`, settingsUrl: `${env.APP_URL}/settings` };
+  if (!o.intel) return templates.weeklyReport(base);
+  const html = templates.weeklyReport({ ...base, intel: o.intel });
+  if (withinEmailBudget(html)) return html;
+  console.warn("[weekly] intelligence_dropped_over_budget");
+  return templates.weeklyReport(base);
+}
+
 /** Sends to everyone whose Monday report is due. Skips people who never posted (nothing to say). */
-export async function sendWeeklyReports(now = new Date(), opts: { force?: boolean; limit?: number } = {}) {
+export async function sendWeeklyReports(now = new Date(), opts: { force?: boolean; limit?: number; intel?: (userId: string) => Promise<WeeklyIntelligence> } = {}) {
   const users = await db.user.findMany({
     where: { weeklyReport: true, OR: [{ lastReportAt: null }, { lastReportAt: { lt: new Date(now.getTime() - 6 * 864e5) } }], posts: { some: { status: { not: "draft" } } } },
     select: { id: true, name: true, email: true, timezone: true, weeklyReport: true, lastReportAt: true },
@@ -84,8 +111,8 @@ export async function sendWeeklyReports(now = new Date(), opts: { force?: boolea
     if (!claimed.count) return;
     // Plans without the digest perk (1096) still get claimed above, so they don't sit "due" and crowd every batch.
     if (!hasPerk(await entitlements(u.id), "weekly-digest")) return;
-    const stats = await weeklyStats(u.id, now);
-    await sendEmail({ to: u.email, kind: "weekly_report", subject: stats.published ? `Your week: ${stats.published} post${stats.published === 1 ? "" : "s"} out` : "Your week on Outlly", html: templates.weeklyReport({ name: u.name, stats, url: `${env.APP_URL}/analytics`, settingsUrl: `${env.APP_URL}/settings` }) }).catch(() => {});
+    const [stats, intel] = await Promise.all([weeklyStats(u.id, now), intelligenceFor(u.id, opts.intel)]);
+    await sendEmail({ to: u.email, kind: "weekly_report", subject: stats.published ? `Your week: ${stats.published} post${stats.published === 1 ? "" : "s"} out` : "Your week on Outlly", html: weeklyHtml({ name: u.name, stats, intel }) }).catch(() => {});
     sent++;
   };
   // Five at a time: the run takes about a fifth of the time it did one-by-one, without flooding the DB pool or the mail API.

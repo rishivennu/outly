@@ -1,4 +1,5 @@
 import { weekDay, weekStart } from "../retention/core";
+import type { WeeklyIntelligence } from "../intelligence/report-core";
 /** Pure parts of the Monday report, unit-tested without a database. */
 export interface ReportTarget {
   platform: string;
@@ -110,4 +111,60 @@ export function recapCopy(s: Pick<WeeklyStats, "published" | "views" | "upcoming
   const short = Math.max(0, goal - s.upcoming);
   const cta = short > 0 ? { label: short === 1 ? "Plan one more for this week" : `Plan ${short} more for this week`, href: "/create/bulk" } : { label: "See this week", href: "/calendar" };
   return { headline, versus, goal: goalLine, cta };
+}
+
+/**
+ * R1243: Gmail clips a message past about 102 KB and hides the rest behind "View entire message", which would hide
+ * the unsubscribe link. The weekly email drops its intelligence block rather than cross this.
+ */
+export const EMAIL_HTML_BUDGET = 100_000;
+export const withinEmailBudget = (html: string) => new TextEncoder().encode(html).length <= EMAIL_HTML_BUDGET;
+
+export interface IntelItem {
+  title: string;
+  detail: string;
+  href: string | null;
+}
+export interface IntelSection {
+  label: string;
+  items: IntelItem[];
+}
+/** R1243: the Monday email's Content Intelligence block, as plain parts. lib/email renders the html in the house tiles. */
+export interface IntelBlock {
+  headline: string;
+  /** "Last 28 days, judged on Engagement, 42 posts analysed" */
+  sub: string;
+  sections: IntelSection[];
+  /** The empty state or why there is no recommendation. */
+  note: string | null;
+  caveats: string[];
+  url: string;
+  text: string;
+}
+
+const absolute = (base: string, href: string | null) => (href ? `${base.replace(/\/+$/, "")}${href}` : null);
+
+/** R1243: the weekly email's intelligence block from the same report the dashboard shows (lib/intelligence/report-core.ts). */
+export function intelligenceBlock(w: WeeklyIntelligence, appUrl: string): IntelBlock {
+  const sections: IntelSection[] = [];
+  const signal = (s: WeeklyIntelligence["movers"][number]): IntelItem => ({ title: s.title, detail: `${s.evidence} (${s.confidenceText})`, href: null });
+  if (w.movers.length) sections.push({ label: "What is working", items: w.movers.map(signal) });
+  if (w.attention.length) sections.push({ label: "Needs attention", items: w.attention.map(signal) });
+  const r = w.topRecommendation;
+  if (r) sections.push({ label: "Make next", items: [{ title: r.title, detail: `${r.concept} ${r.why} (${r.confidenceText})`, href: absolute(appUrl, r.href) }] });
+  const note = w.emptyText ?? w.recommendationNote;
+  const sub = `${w.period || "Recent posts"}, judged on ${w.objectiveLabel}, ${w.postsAnalyzed.toLocaleString("en")} post${w.postsAnalyzed === 1 ? "" : "s"} analysed`;
+  const url = `${appUrl.replace(/\/+$/, "")}/intelligence`;
+  const text = [
+    "Content Intelligence",
+    sub,
+    w.headline,
+    ...(w.versus ? [w.versus] : []),
+    ...sections.flatMap((s) => ["", `${s.label}:`, ...s.items.map((i) => `- ${i.title}: ${i.detail}${i.href ? ` ${i.href}` : ""}`)]),
+    ...(note ? ["", note] : []),
+    ...(w.caveats.length ? ["", ...w.caveats.map((c) => `* ${c}`)] : []),
+    "",
+    `Open Content Intelligence: ${url}`,
+  ].join("\n");
+  return { headline: w.headline, sub, sections, note, caveats: w.caveats, url, text };
 }

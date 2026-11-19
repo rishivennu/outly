@@ -89,9 +89,58 @@ export function bestGroups(formats: FormatGroup[]): { key: string; platform: str
 
 export const createHref = (id: string | null | undefined) => (id ? `/create?rec=${encodeURIComponent(id)}` : null);
 
-export function overviewUrl(days: number, objective: string | null, account: string | null): string {
+export function overviewUrl(days: number, objective: string | null, account: string | null, client: string | null = null): string {
   const q = new URLSearchParams({ days: String(days) });
   if (objective) q.set("objective", objective);
   if (account) q.set("account", account);
+  // R1243: an agency client's brand profile; "" is the owner's own brand and is the default, so it is never sent.
+  if (client) q.set("client", client);
   return `/api/intelligence/overview?${q.toString()}`;
+}
+
+/* R1243: agency client views. */
+
+export const CLIENT_KEY_MAX = 100;
+
+export interface ClientProfile {
+  scopeKey: string;
+  name: string | null;
+  objective: string;
+}
+export interface ClientOption {
+  key: string;
+  label: string;
+}
+
+/**
+ * Said under the switcher, because it is the honest limit today: nothing records which accounts or posts belong to
+ * which client, so a client changes the objective and wording, never the numbers.
+ */
+export const CLIENT_NOTE =
+  "A client sets the objective and wording only. Outlly does not yet know which accounts or posts belong to which client, so the numbers are still this workspace's (or the account you picked).";
+
+/** The switcher's choices: your own brand first, then each client. Null when there are no clients, so it is not shown. */
+export function clientOptions(profiles: readonly ClientProfile[] | null | undefined): ClientOption[] | null {
+  const clients = (Array.isArray(profiles) ? profiles : []).filter((p) => typeof p.scopeKey === "string" && p.scopeKey !== "" && p.scopeKey.length <= CLIENT_KEY_MAX);
+  if (!clients.length) return null;
+  const seen = new Set<string>();
+  const out: ClientOption[] = [{ key: "", label: "Your brand" }];
+  for (const c of clients) {
+    if (seen.has(c.scopeKey)) continue;
+    seen.add(c.scopeKey);
+    out.push({ key: c.scopeKey, label: c.name?.trim() || c.scopeKey });
+  }
+  return out;
+}
+
+/** A key the switcher may select: one of the options, else your own brand. */
+export const pickClient = (options: readonly ClientOption[] | null, key: string | null | undefined): string =>
+  options && typeof key === "string" && options.some((o) => o.key === key) ? key : "";
+
+/** Section 9's line: whether the card on screen is exactly what Monday's email will say. */
+export function weeklyReportNote(o: { days: number; objective: string; savedObjective: string | null; client: string | null }): string {
+  if (o.client) return "Monday's email covers your own brand. This is the same report judged the way this client's profile asks.";
+  if (o.days !== 28 || (o.savedObjective !== null && o.objective !== o.savedObjective))
+    return "Monday's email reads the last 28 days, judged on your saved objective. Switch back to those to see exactly what it will say.";
+  return "This is what Monday's email will say, from the same numbers.";
 }

@@ -250,6 +250,20 @@ export async function getBrandProfile(ownerId: string, scopeKey = ""): Promise<B
   return row ? view(row) : null;
 }
 
+/** R1243: cap on the client list one owner sees, so the switcher stays one short request. */
+export const BRAND_PROFILE_LIST_MAX = 200;
+
+/**
+ * R1243: every brand profile one owner has: the own brand (scopeKey "") first, then agency clients by name. Always
+ * filtered by ownerId, so one workspace never sees another's clients.
+ */
+export async function listBrandProfiles(ownerId: string): Promise<BrandProfileView[]> {
+  const rows = await db.brandProfile.findMany({ where: { ownerId }, orderBy: [{ scopeKey: "asc" }], take: BRAND_PROFILE_LIST_MAX });
+  const all = rows.map(view);
+  const label = (b: BrandProfileView) => (b.name ?? b.scopeKey).toLowerCase();
+  return [...all.filter((b) => b.scopeKey === ""), ...all.filter((b) => b.scopeKey !== "").sort((a, b) => (label(a) < label(b) ? -1 : label(a) > label(b) ? 1 : a.scopeKey < b.scopeKey ? -1 : 1))];
+}
+
 /* ------------------------------------------------------------------ backfill */
 
 /** The adaptedFrom post id in a storyMeta string, or null for anything that is not that exact shape. */

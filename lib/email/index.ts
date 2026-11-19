@@ -1,5 +1,5 @@
 import "server-only";
-import type { WeeklyStats } from "../reports/weekly-core";
+import type { IntelBlock, WeeklyStats } from "../reports/weekly-core";
 import { compact } from "../reports/weekly-core";
 import { db } from "../db";
 import { env } from "../env";
@@ -336,6 +336,22 @@ const rows = (items: [string, string][], tone: Tone = "white") =>
     )
     .join("")}</table>`;
 
+/** R1243: the weekly email's Content Intelligence tiles. Every string is escaped: titles can carry post text. */
+const intelTiles = (b: IntelBlock) => {
+  const head = `${chip("Content Intelligence", "cream")}<p style="margin:14px 0 0;font-family:${DISPLAY};font-size:22px;line-height:1.25;font-weight:bold;letter-spacing:-0.5px;color:${TONE.cream.fg}">${esc(b.headline)}</p><p style="margin:6px 0 0;font-family:${BODY};font-size:13px;line-height:1.5;color:${TONE.cream.sub}">${esc(b.sub)}</p>${
+    b.note ? `<p style="margin:12px 0 0;font-family:${BODY};font-size:14px;line-height:1.5;color:${TONE.cream.fg}">${esc(b.note)}</p>` : ""
+  }`;
+  const item = (i: IntelBlock["sections"][number]["items"][number], first: boolean) =>
+    `<div style="padding:12px 0;${first ? "" : `border-top:1.5px dashed ${C.rule};`}text-align:left"><div style="font-family:${BODY};font-size:15px;line-height:1.4;font-weight:bold;color:${TONE.white.fg}">${
+      i.href ? `<a href="${esc(i.href)}" style="color:${TONE.white.fg};font-family:${BODY}">${esc(i.title)}</a>` : esc(i.title)
+    }</div><div style="padding-top:4px;font-family:${BODY};font-size:13px;line-height:1.5;color:${TONE.white.sub}">${esc(i.detail)}</div></div>`;
+  const sections = b.sections.map((s) => `${gap()}${tile("white", `${chip(esc(s.label), "white")}<div style="height:6px;line-height:6px;font-size:0">&nbsp;</div>${s.items.map((i, n) => item(i, n === 0)).join("")}`, "22px 26px")}`).join("");
+  const caveats = b.caveats.length
+    ? `<tr><td style="padding:12px 4px 0;font-family:${BODY};font-size:12px;line-height:1.6;color:${C.muted};text-align:left">${b.caveats.map(esc).join("<br>")}<br><a href="${esc(b.url)}" style="color:${C.muted};font-family:${BODY}">Open Content Intelligence</a></td></tr>`
+    : "";
+  return `${tile("cream", head, "22px 26px")}${sections}${caveats}`;
+};
+
 /**
  * A Pip message for the transcript email: escaped, then Pip's light markdown (**bold**, [label](link), "- " lists)
  * turned back into plain HTML. Links only to https or Outlly's own pages; anything else stays as text.
@@ -456,7 +472,7 @@ export const templates = {
     ),
   backOnline: (o: { url: string }) =>
     wrap("We're back online", `${p("Maintenance is done and Outlly is running again. Thanks for waiting. Everything you scheduled is safe and will go out as planned.")}${btn(o.url, "Open Outlly")}`, { kicker: "Status" }),
-  weeklyReport: (o: { name: string; stats: WeeklyStats; url: string; settingsUrl: string }) => {
+  weeklyReport: (o: { name: string; stats: WeeklyStats; url: string; settingsUrl: string; intel?: IntelBlock | null }) => {
     const s = o.stats;
     const lead = s.published ? `Hi ${esc(o.name)}, here's how last week went.` : undefined;
     const tiles = s.published
@@ -484,7 +500,8 @@ export const templates = {
         kicker: "Weekly report",
         tone: s.published ? "lime" : "cream",
         lead,
-        tiles,
+        // R1243: the intelligence block sits under the week's own numbers, so a quiet week still gets it.
+        tiles: o.intel ? `${tiles ? `${tiles}${gap(16)}` : ""}${intelTiles(o.intel)}` : tiles,
         preheader: s.published ? `${s.published} post${s.published === 1 ? "" : "s"} and ${compact(s.views)} views last week` : undefined,
       },
     );

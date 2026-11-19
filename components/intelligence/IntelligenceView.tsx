@@ -4,12 +4,14 @@ import { api, ApiError } from "@/lib/client/api";
 import { objectiveOptions } from "@/lib/intelligence/brand-core";
 import { cn } from "@/lib/utils";
 import { BestPerformingContent } from "./BestPerformingContent";
+import { ClientSwitcher } from "./ClientSwitcher";
 import { FormatPerformance } from "./FormatPerformance";
 import { GrowthOverview } from "./GrowthOverview";
 import { LaterCard } from "./bits";
 import { NextContentRecommendations } from "./NextContentRecommendations";
 import { PlatformComparison } from "./PlatformComparison";
 import { WhatIsWorking, WhatNeedsAttention } from "./SignalSection";
+import { WeeklyReport } from "./WeeklyReport";
 import { DAY_OPTIONS, emptyStateText, hasEnoughPosts, overviewUrl } from "./view-core";
 import type { Objective, Overview } from "./types";
 
@@ -29,16 +31,22 @@ export function IntelligenceView({ initial, account }: { initial: Overview | nul
   const [objective, setObjective] = useState<Objective | null>(initial?.objective ?? null);
   const [loading, setLoading] = useState(!initial);
   const [error, setError] = useState<string | null>(null);
+  // R1243: the agency client whose brand profile judges this view ("" is your own brand).
+  const [client, setClient] = useState("");
   // The first paint already matches the server's read, so it is not fetched again.
   const first = useRef(!!initial);
+  // R1243: set when a read picked the objective itself (a client's), so adopting it does not fetch the same read twice.
+  const adopted = useRef(false);
+  const savedObjective = initial?.objective ?? null;
 
   const load = useCallback(
-    async (d: number, o: Objective | null) => {
+    async (d: number, o: Objective | null, c: string) => {
       setLoading(true);
       setError(null);
       try {
-        const r = await api<Overview>(overviewUrl(d, o, account ?? null));
+        const r = await api<Overview>(overviewUrl(d, o, account ?? null, c || null));
         setData(r);
+        if (r.objective !== o) adopted.current = true;
         setObjective(r.objective);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "Those numbers didn't load. Try again in a moment.");
@@ -54,8 +62,18 @@ export function IntelligenceView({ initial, account }: { initial: Overview | nul
       first.current = false;
       return;
     }
-    void load(days, objective);
-  }, [days, objective, load]);
+    if (adopted.current) {
+      adopted.current = false;
+      return;
+    }
+    void load(days, objective, client);
+  }, [days, objective, client, load]);
+
+  // R1243: a client brings its own objective, so the choice made for the previous one is dropped.
+  const switchClient = (key: string) => {
+    setClient(key);
+    setObjective(key ? null : savedObjective);
+  };
 
   const objectiveName = OBJECTIVES.find((o) => o.id === (data?.objective ?? objective))?.label ?? "Engagement";
 
@@ -102,6 +120,7 @@ export function IntelligenceView({ initial, account }: { initial: Overview | nul
             })}
           </div>
           <p className="text-[13px] text-muted-foreground">Your saved objective lives in Settings, Brand. Switching here only changes this view.</p>
+          <ClientSwitcher value={client} onChange={switchClient} />
         </div>
       </header>
 
@@ -126,7 +145,7 @@ export function IntelligenceView({ initial, account }: { initial: Overview | nul
             </>
           )}
           <LaterCard id="intel-topics" title="Topic and category insights" what="Which subjects beat your usual numbers, like with like." />
-          <LaterCard id="intel-weekly" title="Weekly intelligence report" what="The same findings as a Monday summary you can send on." />
+          <WeeklyReport data={data} savedObjective={savedObjective} client={client || null} />
         </div>
       )}
 

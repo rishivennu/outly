@@ -159,11 +159,13 @@ describe("R1238 the page and its sections", () => {
     }
     expect(view).toContain("<LaterCard");
   });
-  test("the two later sections say so instead of showing fake numbers", () => {
+  test("the later section says so instead of showing fake numbers", () => {
     const bits = read("components/intelligence/bits.tsx");
     expect(bits).toContain("Coming in a later round");
     expect(view).toContain("Topic and category insights");
-    expect(view).toContain("Weekly intelligence report");
+    // R1243: the weekly placeholder became the real section 9, built from the overview already loaded.
+    expect(view).toContain("<WeeklyReport data={data}");
+    expect(read("components/intelligence/WeeklyReport.tsx")).toContain("Weekly intelligence report");
   });
   test("the window and objective switches are real radio groups, and the objective is not saved here", () => {
     expect(view).toContain('role="radiogroup"');
