@@ -19,6 +19,7 @@ import { PLATFORM_META, TARGET_COPY, type Platform, type TargetStatus } from "@/
 import { targetErrorCopy } from "@/components/shared/errorCopy";
 import type { PostView, TargetView } from "@/lib/services";
 import { TeamNotes } from "./TeamNotes";
+import { TagsControl } from "@/components/content/TagsControl";
 import { MovePanel } from "@/components/calendar/MoveDialog";
 import { displayStatus, type AttentionReason } from "@/lib/posts/attention";
 import { recoveryActions, type RecoveryAction } from "@/lib/posts/recovery";
@@ -309,6 +310,7 @@ export function PostSheet({ post, onClose, onChange, onRemove, onDuplicate, onRe
 
           <ReviewBlock post={post} onChange={onChange} />
           <TeamNotes post={post} onChange={onChange} />
+          <TagsControl postId={post.id} />
 
           <div className="grid grid-cols-2 gap-2">
             {editable && (
