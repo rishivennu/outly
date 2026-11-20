@@ -21,7 +21,7 @@ export type Service = keyof typeof MARK | "upi" | "mock";
  * shows no white logo plates.
  */
 export function ServiceLogo({ service, size = 36, className, surface = "tile" }: { service: Service; size?: number; className?: string; surface?: "tile" | "transparent" }) {
-  const box = cn("inline-grid shrink-0 place-items-center overflow-hidden rounded-[28%] shadow-[0_0_0_1px_hsl(var(--foreground)/.12)]", className);
+  const box = cn("inline-grid shrink-0 place-items-center overflow-hidden rounded-[28%] shadow-[0_0_0_1px_hsl(var(--foreground)/.08)]", className);
   const bare = cn("inline-grid shrink-0 place-items-center", className);
   if (surface === "transparent" && service === "upi")
     return (
