@@ -214,10 +214,14 @@ describe("1147 trial", () => {
     expect(await trial.startTrial({ userId: u.id, req: req() })).toMatchObject({ ok: false, reason: "used" });
   });
 
+  // sweepTrials works on every active trial in the shared test database (200 a pass), and every other trial started
+  // here or in earlier files ends about 7 days from today. This one starts on a clock in 2000, so each sweep's
+  // windows hold only it, whatever ran before.
   test("sweep: reminders at 2 days and on the last day, once each; expiry drops to Free", async () => {
     await on();
-    const u = await user();
-    const r = await trial.startTrial({ userId: u.id, req: req() });
+    const start = new Date(Date.UTC(2000, 0, 1));
+    const u = await user({ createdAt: new Date(start.getTime() - 864e5) });
+    const r = await trial.startTrial({ userId: u.id, req: req(), now: start });
     if (!r.ok) throw new Error("trial did not start");
     const end = r.trial.endsAt.getTime();
     await trial.sweepTrials(new Date(end - 3 * 864e5));
@@ -229,9 +233,13 @@ describe("1147 trial", () => {
     await trial.sweepTrials(new Date(end - 3600_000));
     expect((await db.trial.findUniqueOrThrow({ where: { id: r.trial.id } })).remindedAt).toBe("0d");
     expect(await db.notice.count({ where: { userId: u.id, key: `trial:${r.trial.id}:0d` } })).toBe(1);
+    // The grant's endsAt is in 2000, so Free alone can't prove the sweep ended it: check the grant row itself too.
+    const activeGrants = () => db.planGrant.count({ where: { userId: u.id, source: "trial", status: "active" } });
+    expect(await activeGrants()).toBe(1);
     const res = await trial.sweepTrials(new Date(end + 1000));
     expect(res.expired).toBeGreaterThanOrEqual(1);
     expect((await db.trial.findUniqueOrThrow({ where: { id: r.trial.id } })).status).toBe("expired");
+    expect(await activeGrants()).toBe(0);
     expect((await ent.entitlements(u.id)).planSlug).toBe("free");
   });
 
