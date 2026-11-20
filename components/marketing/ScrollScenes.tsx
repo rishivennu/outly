@@ -306,7 +306,7 @@ export function ScrollScenes() {
       // a. Section heads drift in a little behind their section, for a layer of depth. The head wrapper moves as a
       //    block (the reveal engine only sets data-shown on it), so the title never slides over its own body text.
       //    In two-column sections the whole copy column moves instead (scene d, f).
-      for (const id of ["#why-outlly", "#how", "#features", "#compare", "#pricing"]) {
+      for (const id of ["#why-outlly", "#how", "#features", "#growth", "#compare", "#pricing"]) {
         const s = sec(id);
         if (s) enter(q(s, ".rv-head").slice(0, 1), s, { y: 48 * k }, "top 88%");
       }

@@ -37,7 +37,7 @@ export const STEPS: Step[] = [
   {
     n: "03",
     title: "Send it everywhere",
-    body: "Publish now or pick a time. Each destination reports its own progress, and anything that fails can be retried on its own.",
+    body: "Publish across every supported platform now or pick a time. Each destination reports its own progress, and anything that fails can be retried on its own.",
     icon: "publish",
   },
 ];
@@ -56,7 +56,7 @@ export const FEATURES: Feature[] = [
   },
   {
     title: "AI captions and hooks",
-    body: "Generate caption drafts, opening hooks, hashtag sets and titles that respect each platform's character limit and tone.",
+    body: "Generate caption drafts, opening hooks, hashtag sets and titles that respect each platform's character limit and tone, so every audience gets a version written for it.",
     icon: "ai-assistant",
   },
   {
@@ -66,7 +66,7 @@ export const FEATURES: Feature[] = [
   },
   {
     title: "Scheduling and a calendar",
-    body: "Queue a post for later and see everything you have lined up on one calendar, per platform and per day.",
+    body: "Plan and manage your publishing: queue a post for later and see everything you have lined up on one calendar, per platform and per day.",
     icon: "schedule",
   },
   {
@@ -86,8 +86,96 @@ export const FEATURES: Feature[] = [
   },
   {
     title: "Analytics where the platform allows",
-    body: "Views and engagement are pulled in per post wherever the platform's API exposes them, and we say so plainly when it does not.",
+    body: "Understand how each post performs: views and engagement are pulled in wherever the platform's API exposes them, and we say so plainly when it does not. Outlly Intelligence turns them into decisions.",
     icon: "analytics",
+  },
+];
+
+/**
+ * R1261: the Content Growth Engine section. Every bullet maps to something live (components/intelligence/*,
+ * lib/intelligence/*, lib/formats.ts); `soon` marks what is not built yet, `note` qualifies what is partial.
+ */
+export interface GrowthBullet {
+  label: string;
+  note?: string;
+  soon?: boolean;
+}
+
+export interface GrowthBlock {
+  id: "intelligence" | "memory" | "adapt" | "planner";
+  name: string;
+  title: string;
+  body: string;
+  icon: IconName;
+  bullets: GrowthBullet[];
+}
+
+export const GROWTH = {
+  eyebrow: "Content Growth Engine",
+  title: "More than publishing. A smarter way to grow.",
+  body: "Outlly helps you understand what works, discover what to create next and continuously improve your content strategy.",
+  loop: [
+    { label: "Create", hint: "One video, AI captions per platform" },
+    { label: "Publish", hint: "Every supported platform, now or scheduled" },
+    { label: "Learn", hint: "Performance wherever platforms share it" },
+    { label: "Improve", hint: "Recommendations you can create from" },
+  ],
+  loopNote: "Each recommendation opens in Content Studio, so the next loop starts from what the last one taught.",
+} as const;
+
+export const GROWTH_BLOCKS: GrowthBlock[] = [
+  {
+    id: "intelligence",
+    name: "Outlly Intelligence",
+    title: "Understand what works.",
+    body: "Outlly learns from your content history and available performance data to identify patterns, uncover opportunities and recommend what to create next.",
+    icon: "growth",
+    bullets: [
+      { label: "Best-performing content" },
+      { label: "Format and topic insights", note: "topics fill in as your tagged posts grow" },
+      { label: "Platform-specific performance", note: "where the platform shares numbers" },
+      { label: "Evidence-backed recommendations" },
+    ],
+  },
+  {
+    id: "memory",
+    name: "Content Memory",
+    title: "Your content has a memory.",
+    body: "Your original uploads, the version made for each platform, the posts you published and their available performance stay connected, so Outlly builds a deeper understanding of your brand.",
+    icon: "gallery",
+    bullets: [
+      { label: "Original content" },
+      { label: "Platform-specific versions" },
+      { label: "Performance linked to each post", note: "where the platform shares it" },
+      { label: "Brand profile that sets the goal Outlly judges by" },
+    ],
+  },
+  {
+    id: "adapt",
+    name: "Smart Content Adaptation",
+    title: "One idea. Multiple ways to connect.",
+    body: "Adapt one video into platform-ready posts with AI captions for each destination. Photo and carousel posts work on Instagram today, and text posts are next.",
+    icon: "auto-format",
+    bullets: [
+      { label: "Video adaptations" },
+      { label: "Image posts", note: "Instagram today" },
+      { label: "Carousel content", note: "Instagram today" },
+      { label: "Text posts", soon: true },
+      { label: "Platform-specific variations" },
+    ],
+  },
+  {
+    id: "planner",
+    name: "Growth Planner",
+    title: "Know what to create next.",
+    body: "Turn your content insights into a weekly report, new content ideas and recommendations aligned with your goal. Accept, save or edit each one, then create from it.",
+    icon: "generate-ideas",
+    bullets: [
+      { label: "Recommended content ideas" },
+      { label: "Suggested formats" },
+      { label: "Weekly intelligence report with a pick to make next" },
+      { label: "Performance-informed recommendations" },
+    ],
   },
 ];
 

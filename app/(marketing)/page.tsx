@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { Hero } from "@/components/marketing/Hero";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { Features } from "@/components/marketing/Features";
+import { GrowthEngine } from "@/components/marketing/GrowthEngine";
 import { WhyOutlly } from "@/components/marketing/WhyOutlly";
 import { Difference } from "@/components/marketing/Difference";
 import { Platforms } from "@/components/marketing/Platforms";
@@ -49,6 +50,8 @@ const metadata: Metadata = {
     "AI captions for creators",
     "schedule Reels Shorts X",
     "creator publishing workspace",
+    "content intelligence",
+    "content growth engine",
   ],
   openGraph: {
     type: "website",
@@ -130,6 +133,8 @@ export default async function LandingPage() {
       {!on("hero") && <div className="h-6" aria-hidden="true" />}
       {on("how") && <Panel><HowItWorks /></Panel>}
       {on("features") && <Panel><Features /></Panel>}
+      {/* R1261: rides the Features switch (Admin > Landing page has no switch of its own for it yet). */}
+      {on("features") && <Panel><GrowthEngine /></Panel>}
       {on("time") && <Panel><TimeSaved /></Panel>}
       {on("demo") && <Panel><Demo /></Panel>}
       {on("why") && <Panel><Difference beta={beta} /></Panel>}
