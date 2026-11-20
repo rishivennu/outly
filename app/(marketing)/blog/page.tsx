@@ -65,7 +65,7 @@ export default async function BlogPage(props: Props) {
     <section className="py-12 sm:py-20">
       <JsonLd data={collectionJsonLd(base, { type: "Blog", name: "Outlly Blog", description: LEAD, path: "/blog", posts: list.items })} />
       <Shell>
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-10">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-10">
           <div className="flex flex-col justify-between rounded-[1.75rem] border border-border bg-card p-6 sm:p-10">
             <div>
               <p className="inline-flex min-h-8 items-center gap-2 rounded-full border border-border px-3.5 text-[13px] font-medium leading-none text-muted-foreground">

@@ -25,7 +25,7 @@ export function JourneyRail({ step, reachable, onGo, status, complete }: Props) 
   const at = STEPS.findIndex((s) => s.id === step);
   const idx = complete ? STEPS.length : at;
   return (
-    <nav aria-label="Your journey" className={cn(createFont.variable, "font-create sticky top-0 hidden h-dvh w-[200px] shrink-0 flex-col px-3 py-6", RAIL_SHOW)}>
+    <nav aria-label="Your journey" className={cn(createFont.variable, "font-create sticky top-0 hidden h-dvh w-[200px] shrink-0 flex-col px-3 py-6 pb-[max(1.5rem,var(--sa-b))] pt-[max(1.5rem,var(--sa-t))]", RAIL_SHOW)}>
       <div className="mb-5 px-1.5">
         <p className="eyebrow">New creation</p>
         <p className="mt-1.5 font-create text-lg font-semibold leading-tight tracking-[-0.02em] tabular-nums">

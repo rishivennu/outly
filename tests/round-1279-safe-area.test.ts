@@ -105,9 +105,9 @@ describe("R1279 sides", () => {
   });
   test("admin header, content and drawer", () => {
     const shell = src("components/admin/AdminShell.tsx");
-    expect(shell).toContain("pl-[max(1rem,calc(var(--sa-l)+0.5rem))] pr-[max(0.75rem,var(--sa-r))]"); // +0.5rem: the menu button pulls itself in by -ml-2
+    expect(shell).toContain("pl-[max(1rem,var(--sa-l))] pr-[max(0.75rem,calc(var(--sa-r)+0.5rem))]"); // +0.5rem: the menu button (right, R1283) pulls itself in by -mr-2
     expect(shell).toContain("pl-[max(1rem,var(--sa-l))] pr-[max(1rem,var(--sa-r))] pt-2 sm:pl-[max(1.5rem,var(--sa-l))] sm:pr-[max(1.5rem,var(--sa-r))] lg:px-8");
-    expect(shell).toContain("fixed bottom-[calc(var(--sa-b)+0.5rem)] left-[max(0.5rem,var(--sa-l))] top-[calc(var(--sa-t)+0.5rem)]");
+    expect(shell).toContain("fixed bottom-[calc(var(--sa-b)+0.5rem)] right-[max(0.5rem,var(--sa-r))] top-[calc(var(--sa-t)+0.5rem)]");
   });
   test("drawer, sheet, toast, Pip, cookie banner, site bar", () => {
     const d = rule(".mdrawer");

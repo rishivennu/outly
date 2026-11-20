@@ -10,9 +10,13 @@ import { sweeperHealth, type SweeperHealth } from "@/lib/queue/health";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ToastProvider } from "@/components/shared/Toast";
 import { adminAppMeta } from "@/lib/admin/app-meta";
+import { THEME_COOKIE } from "@/lib/theme/colors";
+import { cookies } from "next/headers";
 import { waitingCount } from "@/lib/support/live";
 
-export const metadata: Metadata = { title: { default: "Admin", template: "%s · Outlly admin" }, robots: { index: false, follow: false }, ...adminAppMeta };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: { default: "Admin", template: "%s · Outlly admin" }, robots: { index: false, follow: false }, ...adminAppMeta((await cookies()).get(THEME_COOKIE)?.value) };
+}
 export const dynamic = "force-dynamic";
 
 /** What to check when the sweep this deployment relies on has gone quiet. */

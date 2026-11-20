@@ -55,3 +55,10 @@ export function countdown(ms: number, onDone: () => void, clock: Clock = realClo
   resume();
   return { pause, resume, cancel, left: () => (handle === null ? left : left - (clock.now() - startedAt)) };
 }
+
+/**
+ * R1283: a toast asked for from outside the studio and admin providers (components/pwa/FreshOnResume.tsx lives in the
+ * root layout, above both). Whichever ToastProvider is mounted shows it and sets `shown`; a page with none ignores it.
+ */
+export const TOAST_EVENT = "outlly:toast";
+export type ToastRequest = { text: string; tone?: ToastTone; opts?: ToastOptions; shown?: boolean };

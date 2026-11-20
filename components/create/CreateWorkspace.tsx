@@ -1954,7 +1954,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
         onKeyDown={sheet ? onDrawerKey : undefined}
         style={sheet && kbInset ? { paddingBottom: kbInset } : undefined}
         className={cn(
-          "xl:relative xl:sticky xl:top-0 xl:flex xl:h-dvh xl:shrink-0 xl:items-start xl:p-3",
+          "xl:relative xl:sticky xl:top-0 xl:flex xl:h-dvh xl:shrink-0 xl:items-start xl:p-3 xl:pb-[max(0.75rem,var(--sa-b))] xl:pr-[max(0.75rem,var(--sa-r))] xl:pt-[max(0.75rem,var(--sa-t))]",
           drawer ? "max-xl:fixed max-xl:inset-0 max-xl:z-[60] max-xl:flex max-xl:flex-col max-xl:justify-end md:max-xl:flex-row md:max-xl:justify-end" : "max-xl:hidden",
         )}
       >
@@ -1984,7 +1984,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
             // R1209 A3: 320 to 340px beside the page, so a suggestion reads in lines, not a column; Expand widens it.
             panel.open ? (pipBig ? "xl:w-[440px] xl:opacity-100 2xl:w-[480px]" : "xl:w-[320px] xl:opacity-100 2xl:w-[340px]") : "xl:w-0 xl:opacity-0",
             // 1182: a phone sheet as tall as what it holds, up to 86dvh; header and footer stay put while the middle scrolls.
-            "max-xl:flex max-xl:max-h-[min(86dvh,720px)] max-xl:w-full max-xl:flex-col max-xl:rounded-t-[28px] max-xl:pb-[var(--sa-b)] md:max-xl:m-3 md:max-xl:max-h-none md:max-xl:w-[400px] md:max-xl:rounded-[28px] md:max-xl:pb-0",
+            "max-xl:flex max-xl:max-h-[min(86dvh,720px)] max-xl:w-full max-xl:flex-col max-xl:rounded-t-[28px] max-xl:pb-[var(--sa-b)] md:max-xl:m-3 md:max-xl:mt-[max(0.75rem,var(--sa-t))] md:max-xl:mb-[max(0.75rem,var(--sa-b))] md:max-xl:max-h-none md:max-xl:w-[400px] md:max-xl:rounded-[28px] md:max-xl:pb-0",
             // R1209 A3: expanded, the phone sheet fills the screen (safe areas kept) and the tablet panel widens.
             pipBig && "max-xl:h-dvh max-xl:max-h-none max-xl:rounded-none max-xl:pt-[var(--sa-t)] md:max-xl:m-0 md:max-xl:w-[min(600px,100vw)] md:max-xl:rounded-none",
           )}

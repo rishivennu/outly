@@ -3,9 +3,13 @@ import { redirect } from "next/navigation";
 import { getAdmin } from "@/lib/admin/auth";
 import { AdminLoginForm } from "@/components/admin/LoginForm";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { cookies } from "next/headers";
 import { adminAppMeta } from "@/lib/admin/app-meta";
+import { THEME_COOKIE } from "@/lib/theme/colors";
 
-export const metadata: Metadata = { title: "Admin sign in", robots: { index: false, follow: false }, ...adminAppMeta };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: "Admin sign in", robots: { index: false, follow: false }, ...adminAppMeta((await cookies()).get(THEME_COOKIE)?.value) };
+}
 
 /** Admin sign in on the same floating card as creator sign up (10-15e), with team-console copy on the light panel. */
 export default async function AdminLogin(props: { searchParams: Promise<{ next?: string }> }) {

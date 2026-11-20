@@ -43,7 +43,7 @@ describe("R1269 drawer", () => {
     expect(shell).toContain('matchMedia("(min-width: 1024px)")');
   });
   test("slide plus fade on the card time, opacity only under reduced motion", () => {
-    expect(shell).toContain("initial: { opacity: 0, x: -24 }");
+    expect(shell).toContain("initial: { opacity: 0, x: 24 }");
     expect(shell).toContain("animate: { opacity: 1, x: 0, transition: T.card }");
     expect(shell).toContain("{...(reduce ? FX.fade : DRAWER_FX)}");
     expect(shell).toContain("useReducedMotion()");

@@ -39,6 +39,17 @@ export function iosStatusBarStyle(choice: string | undefined): "black-translucen
   return choice === "dark" || choice === undefined ? "black-translucent" : "default";
 }
 
+/**
+ * R1283: the meta color-scheme in the first HTML. The browser reads it before any stylesheet arrives, so the blank
+ * canvas of a cold launch and the native form controls already match the saved theme (no white frame behind the
+ * status bar on the dark default). Once CSS loads, `html { color-scheme }` (globals.css) takes over and follows a
+ * theme switch; this tag only covers the frames before it.
+ */
+export function colorSchemeFor(choice: string | undefined): "dark" | "light" | "light dark" {
+  if (choice === "light") return "light";
+  return choice === "dark" || choice === undefined ? "dark" : "light dark";
+}
+
 /** The theme-color for a saved choice. System (and anyone not on light or dark) gets one tag per OS appearance. */
 export function themeColorFor(choice: string | undefined, surface: Surface = "app") {
   if (choice === "light") return statusBarColor(false, surface);

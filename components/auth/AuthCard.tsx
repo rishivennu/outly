@@ -11,12 +11,12 @@ import { AuthShowcase } from "@/components/auth/AuthShowcase";
  */
 export function AuthCard({ children, eyebrow, lines, id }: { children: React.ReactNode; eyebrow?: string; lines?: [string, string]; id?: string }) {
   return (
-    <main id={id} className="auth-canvas relative isolate flex min-h-dvh items-center justify-center overflow-hidden bg-[#05060e] p-2.5 sm:p-5 lg:p-5">
+    <main id={id} className="auth-canvas relative isolate flex min-h-dvh items-center justify-center overflow-hidden bg-[#05060e] pb-[calc(0.625rem+var(--sa-b))] pl-[max(0.625rem,var(--sa-l))] pr-[max(0.625rem,var(--sa-r))] pt-[calc(0.625rem+var(--sa-t))] sm:pb-[calc(1.25rem+var(--sa-b))] sm:pl-[max(1.25rem,var(--sa-l))] sm:pr-[max(1.25rem,var(--sa-r))] sm:pt-[calc(1.25rem+var(--sa-t))]">
       <StarField variant="space" />
       <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[70vmin] w-[90vmin] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[hsl(var(--lime)/0.10)] blur-[110px]" />
-      <div className="auth-shell grid w-full max-w-[1160px] gap-2.5 rounded-[28px] bg-card p-2.5 shadow-[0_40px_90px_-45px_hsl(var(--foreground)/0.45),0_0_0_1px_hsl(var(--border)/0.8)] sm:rounded-[34px] lg:min-h-[min(720px,calc(100dvh-2.5rem))] lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="auth-shell grid w-full max-w-[1160px] gap-2.5 rounded-[28px] bg-card p-2.5 shadow-[0_40px_90px_-45px_hsl(var(--foreground)/0.45),0_0_0_1px_hsl(var(--border)/0.8)] sm:rounded-[34px] lg:min-h-[min(720px,calc(100dvh-2.5rem-var(--sa-t)-var(--sa-b)))] lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <AuthShowcase eyebrow={eyebrow} lines={lines} />
-        <section className="relative flex min-h-[calc(100dvh-2.5rem)] flex-col px-3 pb-6 pt-1.5 sm:min-h-0 sm:px-8 lg:px-12">
+        <section className="relative flex min-h-[calc(100dvh-2.5rem-var(--sa-t)-var(--sa-b))] flex-col px-3 pb-6 pt-1.5 sm:min-h-0 sm:px-8 lg:px-12">
           <div className="flex items-center justify-between gap-3">
             <Link href="/" className="app-invisible inline-flex h-11 items-center gap-1.5 rounded-full px-3 text-[14px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />

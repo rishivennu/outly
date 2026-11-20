@@ -36,8 +36,8 @@ describe("1110 admin console in the iPhone Home Screen app", () => {
     expect([m.id, m.start_url, m.scope, m.display, m.short_name]).toEqual(["/admin", "/admin?source=pwa", "/admin", "standalone", "Admin"]);
     const { adminAppMeta, ADMIN_MANIFEST } = await import("@/lib/admin/app-meta");
     expect(ADMIN_MANIFEST).toBe("/admin.webmanifest");
-    expect(adminAppMeta.appleWebApp.title).toBe("Outlly Admin");
-    for (const f of ["app/admin/login/page.tsx", "app/admin/(panel)/layout.tsx"]) expect(src(f)).toContain("robots: { index: false, follow: false }, ...adminAppMeta };");
+    expect(adminAppMeta(undefined).appleWebApp.title).toBe("Outlly Admin");
+    for (const f of ["app/admin/login/page.tsx", "app/admin/(panel)/layout.tsx"]) expect(src(f)).toContain("robots: { index: false, follow: false }, ...adminAppMeta((await cookies()).get(THEME_COOKIE)?.value) };");
     // outside /admin/ so the middleware never sends a phone fetching it to sign in, and .webmanifest skips it entirely
     expect(src("middleware.ts")).toContain("webmanifest)$).*)");
   });

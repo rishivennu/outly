@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Check, Info, X } from "lucide-react";
 import { FX, T as T_ } from "@/lib/motion/tokens";
-import { countdown, toastDuration, type ToastCloseReason, type ToastOptions, type ToastTone } from "@/lib/client/toast-core";
+import { countdown, TOAST_EVENT, toastDuration, type ToastCloseReason, type ToastOptions, type ToastRequest, type ToastTone } from "@/lib/client/toast-core";
 
 type T = { id: number; text: string; tone: ToastTone } & ToastOptions;
 type Push = (text: string, tone?: ToastTone, opts?: ToastOptions) => number;
@@ -35,6 +35,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     return id;
   }, [close]);
   const dismiss = useCallback((id: number) => close(id, "dismiss"), [close]);
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<ToastRequest>).detail;
+      if (!d || d.shown) return;
+      d.shown = true;
+      push(d.text, d.tone, d.opts);
+    };
+    window.addEventListener(TOAST_EVENT, on);
+    return () => window.removeEventListener(TOAST_EVENT, on);
+  }, [push]);
   return (
     <Ctx.Provider value={push}>
       <DismissCtx.Provider value={dismiss}>

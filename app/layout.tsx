@@ -3,7 +3,7 @@ import { cookies, headers } from "next/headers";
 import { Archivo, Bricolage_Grotesque, DM_Sans, Fraunces, Inter, Instrument_Serif, Manrope, Plus_Jakarta_Sans, Rubik, Space_Mono, Tinos } from "next/font/google";
 import localFont from "next/font/local";
 import { themeScript } from "@/lib/theme/script";
-import { iosStatusBarStyle, THEME_COOKIE, themeColorFor } from "@/lib/theme/colors";
+import { colorSchemeFor, iosStatusBarStyle, THEME_COOKIE, themeColorFor } from "@/lib/theme/colors";
 import { StatusBarSync } from "@/components/shared/StatusBarSync";
 import { RootClient } from "@/components/shared/RootClient";
 import { swScript } from "@/lib/sw-script";
@@ -97,7 +97,7 @@ export async function generateMetadata(): Promise<Metadata> {
 // app reads it as the page arrives. Root layout reads headers() for the nonce, so every page renders per request
 // anyway and reading the cookie costs nothing. Public pages override it for their own light background.
 export async function generateViewport(): Promise<Viewport> {
-  return { width: "device-width", initialScale: 1, maximumScale: 5, userScalable: true, themeColor: themeColorFor((await cookies()).get(THEME_COOKIE)?.value), viewportFit: "cover" };
+  return { width: "device-width", initialScale: 1, maximumScale: 5, userScalable: true, themeColor: themeColorFor((await cookies()).get(THEME_COOKIE)?.value), viewportFit: "cover", colorScheme: colorSchemeFor((await cookies()).get(THEME_COOKIE)?.value) };
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

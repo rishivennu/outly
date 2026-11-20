@@ -3417,7 +3417,7 @@ html[data-contrast="more"] .fw-ring:has(:is(input, textarea):focus) { box-shadow
 
 /* ------------------------------------------------------------------------------------------------
  * 1099 mobile shell. Phone top bar: no box. It sits on the page background at rest; once the page
- * scrolls under it, a frosted layer and a half-pixel hairline fade in (Apple's scroll-edge effect).
+ * scrolls under it, R1284: it fills with the page colour and a soft fade replaces the old frost and hairline.
  * Safe areas on every side, so notches and landscape never clip the logo or the bell.
  * ---------------------------------------------------------------------------------------------- */
 .mtop {
@@ -3425,8 +3425,7 @@ html[data-contrast="more"] .fw-ring:has(:is(input, textarea):focus) { box-shadow
   padding-left: var(--sa-l);
   padding-right: var(--sa-r);
   background-color: hsl(var(--background) / 0);
-  box-shadow: 0 0.5px 0 hsl(var(--border) / 0);
-  transition: background-color 0.25s ease, box-shadow 0.25s ease, -webkit-backdrop-filter 0.25s ease, backdrop-filter 0.25s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.25s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 /* R1216: folded away while the page moves down (lib/client/header-scroll.ts). A transform only: the bar keeps its
    place in the flow, so nothing under it shifts, and it slides back over the content on the way up. */
@@ -3435,19 +3434,9 @@ html[data-contrast="more"] .fw-ring:has(:is(input, textarea):focus) { box-shadow
    inset is 0 and the whole bar goes. */
 .mtop[data-folded] { transform: translateY(-100%); pointer-events: none; } /* R1279: fold fully, .sa-band paints the status strip */
 @media (prefers-reduced-motion: reduce) { .mtop[data-folded] { transition: none; } }
-.mtop[data-lifted] {
-  background-color: hsl(var(--background) / 0.78);
-  -webkit-backdrop-filter: blur(20px) saturate(1.7);
-  backdrop-filter: blur(20px) saturate(1.7);
-  box-shadow: 0 0.5px 0 hsl(var(--border));
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .mtop[data-lifted] { background-color: hsl(var(--background) / 0.97); }
-}
-@media (prefers-reduced-transparency: reduce) {
-  .mtop[data-lifted] { background-color: hsl(var(--background)); -webkit-backdrop-filter: none; backdrop-filter: none; }
-}
-html[data-contrast="more"] .mtop[data-lifted] { background-color: hsl(var(--background)); backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: 0 1px 0 hsl(var(--border)); }
+/* R1284: scrolled, the bar is the page colour itself (no frost, no hairline); the soft fade under it is in the R1284 block. */
+.mtop[data-lifted] { background-color: hsl(var(--background)); }
+html[data-contrast="more"] .mtop[data-lifted] { box-shadow: 0 1px 0 hsl(var(--border)); }
 /* Phones on their side: every pixel of height counts. */
 @media (orientation: landscape) and (max-height: 500px) {
   .mtop-row { height: 48px; }
@@ -4690,7 +4679,7 @@ html:not(.dark) .la-themed:not(.dark *) .la-thumb { box-shadow: inset 0 0 0 1px 
 @media (max-width: 1023.98px) {
   .admin-top { transition: transform var(--m-nav) var(--m-ease-out); }
   .admin-top[data-folded] { transform: translateY(-100%); pointer-events: none; } /* R1279: fold fully, .sa-band paints the status strip */
-  .admin-top[data-lifted] { background-color: hsl(var(--background) / 0.88); }
+  .admin-top[data-lifted] { background-color: hsl(var(--background)); } /* R1284: the page colour itself, no panel */
 }
 @media (max-width: 1023.98px) and (prefers-reduced-motion: reduce) { .admin-top { transition: none; } }
 /* end R1269 */
@@ -4849,6 +4838,52 @@ html.dark .admin-root, html.dark .admin-layer { --gb-line: var(--admin-card-line
   html[data-contrast="more"] .atable--cards > table > tbody > tr { box-shadow: inset 0 0 0 1px hsl(var(--border)); }
 }
 /* end R1280 admin strokes a */
+/* R1283 edge sweep */
+/* The public site's phone menu sheet clears the status bar, the home indicator and a landscape cutout; its top
+   card keeps lining up with the bar (.mnav pads the same --sa-t), so the first row is never under the logo. */
+.mnav-sheet {
+  padding: calc(.75rem + var(--sa-t)) max(.75rem, var(--sa-r)) calc(.75rem + var(--sa-b)) max(.75rem, var(--sa-l));
+}
+/* Public pages, landscape: every section keeps clear of the notch side, as .mmain does in the studio. Margins, so
+   each page's own padding stays as it is; the footer's last row also clears the home indicator. */
+.sky-host:not(.admin-root) > :is(main, footer) { margin-left: var(--sa-l); margin-right: var(--sa-r); }
+.sky-host:not(.admin-root) > footer { margin-bottom: var(--sa-b); }
+/* Studio desktop rail (iPad landscape and up, black-translucent): its 12px inset becomes the status bar or home
+   indicator wherever those are taller, so the rail never starts under the clock. Same as the admin sidebar. */
+.rail-wrap { padding-top: max(.75rem, var(--sa-t)); padding-bottom: max(.75rem, var(--sa-b)); padding-left: max(.75rem, var(--sa-l)); }
+/* end R1283 */
+/* R1284 seamless phone header */
+/* Under 1024px the studio bar (.mtop) and the admin bar (.admin-top) are the top of the page, not a panel: no fill at
+   rest (the page and its ambient glow show through, so no strip), the page colour once content scrolls under them,
+   and a 28px fade from that colour instead of a hairline. Their icon buttons drop the R1214 glass circle (fill, ring,
+   blur, light pane) and keep only a tonal background while hovered (fine pointers), pressed or open. Scoped to the
+   two headers; every other .gbtn-icon keeps its glass. Increased contrast and forced colours keep their edges. */
+@media (max-width: 1023.98px) {
+  .mtop, .admin-top { --hdr-tone: .06; }
+  html.dark :is(.mtop, .admin-top) { --hdr-tone: .08; }
+  :is(.mtop, .admin-top)::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 28px; pointer-events: none;
+    background: linear-gradient(to bottom, hsl(var(--background)), hsl(var(--background) / 0));
+    opacity: 0; transition: opacity .25s ease;
+  }
+  :is(.mtop, .admin-top)[data-lifted]:not([data-folded])::after { opacity: 1; }
+  html[data-contrast="more"] :is(.mtop, .admin-top)::after { display: none; }
+  :is(.mtop, .admin-top) .gbtn-icon { background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  :is(.mtop, .admin-top) .gbtn-icon::after { display: none; }
+  :is(.mtop, .admin-top) .gbtn-icon:not(:disabled):active,
+  :is(.mtop, .admin-top) .gbtn-icon:is([aria-expanded="true"], [data-state="open"]) { background: hsl(var(--foreground) / var(--hdr-tone)); color: hsl(var(--foreground)); }
+  @media (hover: hover) and (pointer: fine) {
+    :is(.mtop, .admin-top) .gbtn-icon:not(:disabled):hover { background: hsl(var(--foreground) / var(--hdr-tone)); color: hsl(var(--foreground)); }
+  }
+}
+@media (max-width: 1023.98px) and (prefers-reduced-motion: reduce) { :is(.mtop, .admin-top)::after { transition: none; } }
+/* The studio bar's brand: rocket and wordmark, the rocket alone under 360px so the title never meets it. */
+.mtop-brand-mark { display: none; }
+@media (max-width: 359.98px) {
+  .mtop-logo .mtop-brand-full { display: none; }
+  .mtop-logo .mtop-brand-mark { display: inline-flex; }
+}
+/* end R1284 */
 /* ---------- 1100: Liquid glass on every studio card ----------
    The studio's screen cards wear the same liquid glass as the rail: a cool-to-deep tint, a lit rim on the top-left
    edge with a softer far edge, and a sheen across the top. Cards: .glass panels, the Analytics dashboard's

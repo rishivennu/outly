@@ -8,7 +8,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Activity, Award, BarChart3, BadgePercent, BellRing, ShieldAlert, CalendarDays, Gift, BadgeCheck, BookOpen, ChevronRight, Construction, FlaskConical, HeartPulse, Headset, Hourglass, Library, Newspaper, Rocket, PanelsTopLeft, PanelLeftClose, PanelLeftOpen, CreditCard, Globe, Handshake, Share2, SlidersHorizontal, Sparkles, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, Repeat, ShieldCheck, Tag, TrendingUp, Type, Users, Wand2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
-import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
+import { OutllyBrand, OutlyMark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { ContrastToggle } from "@/components/shared/ContrastToggle";
 import { can, ROLE_LABEL, type AdminArea, type AdminRole } from "@/lib/admin/perms";
@@ -74,9 +74,9 @@ const TOUCH_TIP = "[@media(hover:none)]:[&>.admin-tip]:!hidden";
 
 /** R1269: the phone drawer arrives like the studio one: a short slide plus fade on the card time, out quicker than in. */
 const DRAWER_FX = {
-  initial: { opacity: 0, x: -24 },
+  initial: { opacity: 0, x: 24 },
   animate: { opacity: 1, x: 0, transition: T.card },
-  exit: { opacity: 0, x: -24, transition: T.menuExit },
+  exit: { opacity: 0, x: 24, transition: T.menuExit },
 };
 
 /** Longest matching entry wins, so /admin/blog/library lights "Blog library" and not "Blog dashboard" as well. */
@@ -257,11 +257,11 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
   return (
     <div className="admin-root sky-host relative isolate flex min-h-dvh" data-nav={slim ? "slim" : "full"}>
       {!quiet && <StarField nebula />}
-      <div className="sticky top-0 z-[var(--admin-z-sidebar)] hidden h-dvh shrink-0 p-3 lg:block">
+      <div className="sticky top-0 z-[var(--admin-z-sidebar)] hidden h-dvh shrink-0 p-3 pt-[max(0.75rem,var(--sa-t))] lg:block">
         <aside data-route-order="" className={cn("glass flex h-full flex-col overflow-hidden rounded-[28px] transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none", slim ? "w-[72px]" : "w-[248px]")} aria-label="Admin sidebar">
           <div className={cn("flex items-center gap-2 pb-4 pt-5", slim ? "flex-col px-3" : "justify-between px-5")}>
             <Link href="/admin" aria-label="Admin overview" className="flex h-10 items-center">
-              {slim ? <OutlyMark size={26} /> : <OutlyLogo size={28} />}
+              <OutllyBrand variant={slim ? "icon" : "full"} size={slim ? 26 : undefined} label={false} />
             </Link>
             {!slim && <span className="rounded-full bg-lime/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-lime-ink">Admin</span>}
             {/* Slim: the rail clips its own overflow, so the toggle uses the same fixed tooltip as the nav items. */}
@@ -282,21 +282,23 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
       </div>
 
       <div className="min-w-0 flex-1">
-        {/* 1191: one bar, one hairline, one height. The phone bar is 52px tall (R1274: the studio bar's height) plus the status-bar inset (box-content, so the inset never eats the row), and
+        {/* 1191: one bar, one height. The phone bar is 52px tall (R1274: the studio bar's height) plus the status-bar inset (box-content, so the inset never eats the row), and
             the menu, mark, title and bell all sit on its centre line, so nothing shifts between admin pages. */}
-        {/* R1269: under 1024px .admin-top folds on data-folded (globals.css); it stays sticky in the flow, so nothing jumps. */}
-        <header ref={top} data-lifted={lifted ? "" : undefined} data-folded={hidden ? "" : undefined} className="admin-top sticky top-0 z-[var(--admin-z-header)] box-content flex h-[52px] items-center gap-2 border-b border-border/50 bg-background/75 pl-[max(1rem,calc(var(--sa-l)+0.5rem))] pr-[max(0.75rem,var(--sa-r))] pt-[var(--sa-t)] backdrop-blur-xl md:h-16 lg:h-auto lg:border-0 lg:bg-transparent lg:pl-8 lg:pr-8 lg:pt-5 lg:backdrop-blur-0">
+        {/* R1269: under 1024px .admin-top folds on data-folded (globals.css); it stays sticky in the flow, so nothing jumps.
+            R1284: no border, fill or blur of its own: under 1024px it is the page (globals.css R1284 block). */}
+        <header ref={top} data-lifted={lifted ? "" : undefined} data-folded={hidden ? "" : undefined} className="admin-top sticky top-0 z-[var(--admin-z-header)] box-content flex h-[52px] items-center gap-2 pl-[max(1rem,var(--sa-l))] pr-[max(0.75rem,calc(var(--sa-r)+0.5rem))] pt-[var(--sa-t)] md:h-16 lg:h-auto lg:pl-8 lg:pr-8 lg:pt-[max(1.25rem,var(--sa-t))]">
+          {/* R1283: on the phone the menu button sits on the RIGHT, after the bell (user request); the drawer opens from the same edge. */}
           <div className="flex min-w-0 items-center gap-1.5 lg:hidden">
-            <Tooltip text="Open menu" side="bottom" className={cn("-ml-2 flex shrink-0", TOUCH_TIP)}>
+            <OutlyMark size={24} />
+            <span className="truncate font-display text-[16px] font-semibold leading-none tracking-[-0.01em]">Admin</span>
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <Bell role={admin.role} />
+            <Tooltip text="Open menu" side="bottom" className={cn("-mr-2 flex shrink-0 lg:hidden", TOUCH_TIP)}>
               <Button ref={menuBtn} type="button" variant="ghost" size="icon" onPointerDown={() => (byPointer.current = true)} onKeyDown={() => (byPointer.current = false)} onClick={() => { fromTab.current = false; setOpen(true); }} aria-label="Open menu" aria-expanded={open} aria-haspopup="dialog" className="text-foreground">
                 <Menu className="h-5 w-5" strokeWidth={1.85} aria-hidden />
               </Button>
             </Tooltip>
-            <OutlyMark size={24} />
-            <span className="truncate font-display text-[16px] font-semibold leading-none tracking-[-0.01em]">Admin</span>
-          </div>
-          <div className="ml-auto flex shrink-0 items-center">
-            <Bell role={admin.role} />
           </div>
         </header>
         {/* 1163: one content column for every admin page. Wide enough to use a 1920 screen (four metric columns, two
@@ -354,12 +356,12 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
                   role="dialog"
                   aria-modal="true"
                   aria-label="Admin menu"
-                  className="admin-layer glass-strong fixed bottom-[calc(var(--sa-b)+0.5rem)] left-[max(0.5rem,var(--sa-l))] top-[calc(var(--sa-t)+0.5rem)] z-[var(--admin-z-drawer)] flex w-[min(300px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[28px] outline-none lg:hidden"
+                  className="admin-layer glass-strong fixed bottom-[calc(var(--sa-b)+0.5rem)] right-[max(0.5rem,var(--sa-r))] top-[calc(var(--sa-t)+0.5rem)] z-[var(--admin-z-drawer)] flex w-[min(300px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[28px] outline-none lg:hidden"
                   {...(reduce ? FX.fade : DRAWER_FX)}
                 >
                   <Dialog.Title className="sr-only">Admin menu</Dialog.Title>
                   <div className="flex items-center justify-between px-5 pb-3 pt-4">
-                    <OutlyLogo size={26} />
+                    <OutllyBrand variant="full" />
                     <Tooltip text="Close menu" side="bottom" className={cn("flex", TOUCH_TIP)}>
                       <Button type="button" variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close menu" className="text-foreground">
                         <X className="h-5 w-5" aria-hidden />
