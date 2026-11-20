@@ -19,13 +19,14 @@ export const REFRESH_MIN_AGE_MS = 30_000; // a manual refresh younger than this 
 const SNAPSHOT_EVERY_MS = 30 * 60_000;
 const T = () => AbortSignal.timeout(10_000);
 
-const SUPPORTED: Platform[] = ["instagram", "youtube", "facebook"];
+const SUPPORTED: Platform[] = ["instagram", "youtube", "facebook", "threads"];
 
 /** Per platform, what its API can ever give for a single video. Used to label the rest "not available". */
 export const CAN: Record<string, MetricKey[]> = {
   instagram: ["views", "reach", "likes", "comments", "shares", "saves", "engagementRate", "avgWatchSec", "watchTimeMin"],
   youtube: ["views", "likes", "comments", "shares", "engagementRate", "avgWatchSec", "watchTimeMin"],
   facebook: ["views", "reach", "likes", "comments", "avgWatchSec", "watchTimeMin", "engagementRate"],
+  threads: ["views", "likes", "comments", "shares", "engagementRate"],
 };
 const ALL: MetricKey[] = ["views", "reach", "impressions", "likes", "comments", "shares", "saves", "engagementRate", "watchTimeMin", "avgWatchSec"];
 
@@ -168,7 +169,32 @@ async function facebook(acct: AccountContext, videoId: string): Promise<Fetched>
   return { metrics: m, notes };
 }
 
-const FETCH: Partial<Record<Platform, (a: AccountContext, id: string) => Promise<Fetched>>> = { instagram, youtube, facebook };
+/* ------------------------------------------------------------ Threads */
+
+type ThIns = { data?: { name: string; values?: { value: number }[]; total_value?: { value: number } }[] };
+/** 1251: one Threads post's lifetime numbers (threads_manage_insights). Replies are its comments; reposts, quotes and shares together are its shares. */
+async function threads(acct: AccountContext, mediaId: string): Promise<Fetched> {
+  const G = "https://graph.threads.net/v1.0";
+  const ins = await getJson<ThIns>(`${G}/${encodeURIComponent(mediaId)}/insights?metric=views,likes,replies,reposts,quotes,shares&${tok(acct.accessToken)}`, "threads post insights");
+  const v = (k: string) => {
+    const row = ins.data?.find((d) => d.name === k);
+    return num(row?.total_value?.value ?? row?.values?.[0]?.value);
+  };
+  const m: Metrics = {};
+  const put = (k: MetricKey, x: number | null) => {
+    if (x !== null) m[k] = x;
+  };
+  put("views", v("views"));
+  put("likes", v("likes"));
+  put("comments", v("replies"));
+  const spread = [v("reposts"), v("quotes"), v("shares")];
+  if (spread.some((x) => x !== null)) m.shares = spread.reduce<number>((a, x) => a + (x ?? 0), 0);
+  const er = engagementRate(m, "views");
+  if (er !== null) m.engagementRate = er;
+  return { metrics: m, notes: [engagementNote(m, "views"), "Threads counts replies as comments here, and reposts, quotes and shares together as shares.", "Threads does not report reach or saves for a post."].filter((x): x is string => !!x) };
+}
+
+const FETCH: Partial<Record<Platform, (a: AccountContext, id: string) => Promise<Fetched>>> = { instagram, youtube, facebook, threads };
 
 /* ------------------------------------------------------------ one destination */
 

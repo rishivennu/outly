@@ -237,11 +237,28 @@ describe("plumbing", () => {
 });
 
 describe("dashboards", () => {
-  test("Threads shows Outlly's own record instead of calling another platform", async () => {
-    const calls = stubFetch(() => new Response("{}", { status: 401 }));
+  // 1251: Threads has its own reader now (lib/live/threads.ts); only its token's own API is ever called.
+  test("Threads reads the profile from graph.threads.net and never another platform", async () => {
+    const calls = stubFetch((url) => {
+      if (url.includes("insights")) return new Response(JSON.stringify({ error: { code: 10, message: "needs threads_manage_insights" } }), { status: 403 });
+      if (url.includes("/threads?")) return Response.json({ data: [{ id: "t1", media_type: "TEXT_POST", text: "Hello #threads", permalink: "https://www.threads.net/@me/post/t1", timestamp: new Date().toISOString() }] });
+      return Response.json({ id: "th1", username: "me", name: "Me" });
+    });
     const { u } = await setup("threads", { realAccount: true });
     const { platformDashboard } = await import("../lib/live");
     const d = await platformDashboard(u.id, "threads", { fresh: true });
+    expect(d.status).toBe("ok");
+    expect(d.posts.length).toBe(1);
+    expect(d.posts[0].views).toBeNull();
+    expect(d.notes[0].text).toContain("Reconnect Threads once");
+    expect(calls.every((c) => c.url.includes("graph.threads.net"))).toBe(true);
+  });
+
+  test("LinkedIn still shows Outlly's own record instead of calling another platform", async () => {
+    const calls = stubFetch(() => new Response("{}", { status: 401 }));
+    const { u } = await setup("linkedin", { realAccount: true });
+    const { platformDashboard } = await import("../lib/live");
+    const d = await platformDashboard(u.id, "linkedin", { fresh: true });
     expect(d.status).toBe("ok");
     expect(d.posts.length).toBe(1);
     expect(d.notes[0].text).toContain("connected");

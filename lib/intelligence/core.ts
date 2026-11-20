@@ -51,6 +51,7 @@ export const PER_POST_METRICS: Record<string, readonly MetricKey[]> = {
   instagram: ["views", "reach", "likes", "comments", "shares", "saves", "engagementRate", "avgWatchSec", "watchTimeMin"],
   youtube: ["views", "likes", "comments", "shares", "engagementRate", "avgWatchSec", "watchTimeMin"],
   facebook: ["views", "reach", "likes", "comments", "avgWatchSec", "watchTimeMin", "engagementRate"],
+  threads: ["views", "likes", "comments", "shares", "engagementRate"],
 };
 
 const WATCH: readonly MetricKey[] = ["watchTimeMin", "avgWatchSec"];

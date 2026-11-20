@@ -12,6 +12,7 @@ import { instagramDashboard } from "./instagram";
 import { youtubeDashboard } from "./youtube";
 import { xDashboard } from "./x";
 import { facebookDashboard } from "./facebook";
+import { threadsDashboard } from "./threads";
 import { outllyDashboard } from "./outlly";
 import { suggest } from "./suggest";
 import type { PlatformDashboard, Suggestion } from "./types";
@@ -86,13 +87,21 @@ export async function platformDashboard(userId: string, platform: Platform, opts
   const load = async (): Promise<PlatformDashboard> => {
     // Each platform's token only works on its own API. Platforms without a reader get Outlly's own record,
     // never another platform's endpoint (a Facebook token on X's API answered 401: "connection expired").
-    if (platform === "threads" || platform === "linkedin" || platform === "tiktok") {
+    if (platform === "linkedin" || platform === "tiktok") {
       const base = await outllyDashboard(userId, platform, acct, days);
       return { ...base, suggestions: [] };
     }
     const ctx = await liveAccount(acct);
     const base =
-      platform === "instagram" ? await instagramDashboard(ctx, tz, days) : platform === "youtube" ? await youtubeDashboard(ctx, days) : platform === "facebook" ? await facebookDashboard(ctx, days) : await xDashboard(ctx, days);
+      platform === "instagram"
+        ? await instagramDashboard(ctx, tz, days)
+        : platform === "youtube"
+          ? await youtubeDashboard(ctx, days)
+          : platform === "facebook"
+            ? await facebookDashboard(ctx, days)
+            : platform === "threads"
+              ? await threadsDashboard(ctx, days)
+              : await xDashboard(ctx, days);
     // Rule-based coaching only: the Gemini ideas are fetched separately (platformIdeas) so a slow model
     // never holds the numbers back. Throwing here keeps a failure out of every cache.
     return { ...base, suggestions: suggest({ platform, posts: base.posts, series: base.series, hours: base.hours, timezone: tz }) };

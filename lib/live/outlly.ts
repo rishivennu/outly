@@ -5,7 +5,7 @@ import { PLATFORM_META, type Platform } from "../domain";
 import type { LivePost, PlatformDashboard } from "./types";
 
 /**
- * Platforms without a live-numbers reader yet (Threads, LinkedIn, TikTok). Their tokens only work on their
+ * Platforms without a live-numbers reader yet (LinkedIn, TikTok; Threads got one in 1251). Their tokens only work on their
  * own API, so calling anyone else's (X, before 10-26) answered 401 and the page said "connection expired".
  * Show what Outlly knows for sure instead: the posts sent through it, with links, and say plainly why
  * there are no platform numbers.

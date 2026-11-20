@@ -13,7 +13,7 @@ import { dayKey } from "./core";
  * at all. The minute sweeper now calls this with a small budget, so history fills itself in.
  *
  * It is deliberately modest:
- *  - only accounts on platforms with a real per-post reader (Instagram, YouTube, Facebook);
+ *  - only accounts on platforms with a real per-post reader (Instagram, YouTube, Facebook, Threads);
  *  - only posts published recently, whose stored numbers are already stale;
  *  - a hard budget and per-run caps, so one sweep never spends a minute on analytics;
  *  - a platform that asks us to slow down puts that account in cooldown instead of being retried;
@@ -22,7 +22,7 @@ import { dayKey } from "./core";
  */
 
 /** Platforms whose per-post numbers Outlly can read (lib/insights/post.ts SUPPORTED). */
-export const SYNCABLE: Platform[] = ["instagram", "youtube", "facebook"];
+export const SYNCABLE: Platform[] = ["instagram", "youtube", "facebook", "threads"];
 /** A target whose newest stored row is younger than this is already fresh enough. */
 export const TARGET_STALE_MS = 6 * 3600_000;
 /**

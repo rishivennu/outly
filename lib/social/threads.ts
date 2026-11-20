@@ -11,7 +11,7 @@ export class ThreadsPublisher implements SocialPublisher {
   async connect(redirectUri: string) {
     const state = newState();
     const u = new URL("https://threads.net/oauth/authorize");
-    u.search = new URLSearchParams({ client_id: creds("threads").clientId, redirect_uri: redirectUri, scope: "threads_basic,threads_content_publish,threads_delete", response_type: "code", state }).toString();
+    u.search = new URLSearchParams({ client_id: creds("threads").clientId, redirect_uri: redirectUri, scope: "threads_basic,threads_content_publish,threads_delete,threads_manage_insights", response_type: "code", state }).toString();
     return { url: u.toString(), state };
   }
 

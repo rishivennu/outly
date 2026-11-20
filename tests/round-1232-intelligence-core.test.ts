@@ -71,7 +71,8 @@ describe("R1232 availability", () => {
     expect(availabilityOf("tiktok", "video", "views", 500)).toBe("unavailable");
     expect(availabilityOf("x", "video", "likes", 3)).toBe("unavailable");
     expect(availabilityOf("linkedin", "video", "likes", 3)).toBe("unavailable");
-    expect(availabilityOf("threads", "video", "likes", 3)).toBe("unavailable");
+    expect(availabilityOf("threads", "video", "likes", 3)).toBe("available"); // 1251: Threads has a reader now
+    expect(availabilityOf("threads", "video", "reach", 3)).toBe("unavailable");
     expect(availabilityOf("youtube", "video", "saves", 4)).toBe("unavailable");
     expect(availabilityOf("instagram", "video", "saves", 4)).toBe("available");
     expect(availabilityOf("instagram", "carousel", "watchTimeMin", 9)).toBe("unsupported");
