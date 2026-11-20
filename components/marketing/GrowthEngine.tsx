@@ -6,6 +6,7 @@ import { Reveal } from "./Reveal";
 import { Shell } from "./bits";
 import { splitWords } from "./Split";
 import { GROWTH_EXAMPLES } from "./growth/Examples";
+import { Scrolly } from "./growth/Scrolly";
 import { GROWTH, GROWTH_BLOCKS, type GrowthBlock } from "@/lib/marketing/content";
 
 /**
@@ -72,12 +73,12 @@ function Workflow() {
 function Card({ b }: { b: GrowthBlock }) {
   const Example = GROWTH_EXAMPLES[b.id];
   return (
-    <li className="flex md:row-span-3 md:grid md:grid-rows-subgrid">
+    <li className="ge-item flex md:row-span-3 md:grid md:grid-rows-subgrid lg:flex lg:min-h-[70vh] lg:items-center">
       <article
         data-flick=""
         data-spot=""
         aria-labelledby={`ge-${b.id}`}
-        className="ge-card flex w-full flex-col gap-6 rounded-[1.75rem] border border-border bg-card p-6 transition-[transform,box-shadow] duration-200 ease-out motion-reduce:transition-none sm:p-8 md:row-span-3 md:p-6 lg:p-8 md:grid md:grid-rows-subgrid motion-safe:[@media(hover:hover)]:hover:-translate-y-1"
+        className="ge-card flex w-full flex-col gap-6 rounded-[1.75rem] border border-border bg-card p-6 transition-[transform,box-shadow] duration-200 ease-out motion-reduce:transition-none sm:p-8 md:row-span-3 md:p-6 md:grid md:grid-rows-subgrid motion-safe:[@media(hover:hover)]:hover:-translate-y-1 lg:flex lg:!translate-y-0 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none"
       >
         <div>
           <div className="flex items-center gap-3">
@@ -99,9 +100,34 @@ function Card({ b }: { b: GrowthBlock }) {
             </li>
           ))}
         </ul>
-        <Example />
+        <div className="lg:hidden">
+          <Example />
+        </div>
       </article>
     </li>
+  );
+}
+
+/**
+ * R1278: the right column of the lg scrolly, one frame per block holding its Example again (the examples are
+ * aria-hidden previews; the text is not repeated). Scrolly moves the strip; the stage is sticky, centred by CSS.
+ */
+function Stage() {
+  return (
+    <div aria-hidden="true" className="ge-stage sticky hidden self-start overflow-hidden rounded-[1.75rem] border border-border bg-card lg:block">
+      <div className="ge-strip flex h-full flex-col">
+        {GROWTH_BLOCKS.map((b, i) => {
+          const Example = GROWTH_EXAMPLES[b.id];
+          return (
+            <div key={b.id} data-i={i} className="ge-frame grid h-full w-full shrink-0 place-items-center p-8">
+              <div className="w-full">
+                <Example />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -112,11 +138,14 @@ export function GrowthEngine() {
       <Shell>
         <Head />
         <Workflow />
-        <Reveal as="ul" stagger className="mt-12 grid gap-5 sm:mt-14 md:grid-cols-2 md:gap-6">
-          {GROWTH_BLOCKS.map((b) => (
-            <Card key={b.id} b={b} />
-          ))}
-        </Reveal>
+        <Scrolly className="lg:mt-14 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,34rem)] lg:gap-x-16">
+          <Reveal as="ul" stagger className="mt-12 grid gap-5 sm:mt-14 md:grid-cols-2 md:gap-6 lg:mt-0 lg:flex lg:flex-col lg:gap-0">
+            {GROWTH_BLOCKS.map((b) => (
+              <Card key={b.id} b={b} />
+            ))}
+          </Reveal>
+          <Stage />
+        </Scrolly>
       </Shell>
     </section>
   );

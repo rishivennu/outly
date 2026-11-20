@@ -152,8 +152,9 @@ describe("R1213 finger-following nav (components/shell/Nav.tsx)", () => {
     expect(mobile).toContain("useSlideTabs(nav, TABS, activeIdx, (href) => router.push(href))");
     expect(slide).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
   });
-  test("the scroll progress frame stays off the studio on a phone (it read as a frame around the app)", () => {
-    expect(css).toContain('@media (max-width: 1023px) { body:has(main.mmain) .scroll-frame { display: none; } }');
+  test("the scroll progress frame stays off every phone and tablet page (R1279 widened R1213's studio-only rule)", () => {
+    expect(css).toContain("@media (max-width: 1023px) { .scroll-frame { display: none; } }");
+    expect(css).not.toContain("body:has(main.mmain) .scroll-frame");
     expect(css).toContain("@media print { .scroll-frame { display: none; } }"); // still there for everyone else
   });
   test("plain words, no em dashes", () => {

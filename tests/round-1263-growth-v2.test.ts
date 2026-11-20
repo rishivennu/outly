@@ -57,7 +57,10 @@ describe("R1263 workflow", () => {
 
 describe("R1263 examples", () => {
   test("four examples, each labelled Example and hidden from assistive tech", () => {
-    expect((html.match(/<div aria-hidden="true" class="ge-viz[^"]*"><p[^>]*>Example<\/p>/g) ?? []).length).toBe(4);
+    // R1278: the lg stage repeats each example once more, after the cards.
+    const cards = html.slice(0, html.indexOf("ge-stage"));
+    expect((cards.match(/<div aria-hidden="true" class="ge-viz[^"]*"><p[^>]*>Example<\/p>/g) ?? []).length).toBe(4);
+    expect((html.match(/<div aria-hidden="true" class="ge-viz[^"]*"><p[^>]*>Example<\/p>/g) ?? []).length).toBe(8);
   });
   test("memory: the exact tracking state per version, X never implies metrics", () => {
     const m = vizOf("memory");
@@ -78,7 +81,7 @@ describe("R1263 examples", () => {
     expect((a.match(/>Instagram</g) ?? []).length).toBe(2);
     expect((a.match(/Coming soon/g) ?? []).length).toBe(1);
     expect(a.slice(a.indexOf("Text post"))).toContain("Coming soon");
-    const soonTags = html.match(/class="lt-soon[^"]*">Coming soon</g) ?? [];
+    const soonTags = html.slice(0, html.indexOf("ge-stage")).match(/class="lt-soon[^"]*">Coming soon</g) ?? [];
     expect(soonTags.length).toBe(GROWTH_BLOCKS.flatMap((b) => b.bullets.filter((x) => x.soon)).length + 1);
     for (const id of ["intelligence", "memory", "planner"]) expect(vizOf(id)).not.toContain("Coming soon");
   });

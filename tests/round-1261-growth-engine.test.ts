@@ -41,7 +41,7 @@ describe("R1261 accuracy", () => {
   test("every not-yet-built bullet carries a Coming soon tag, and only those", () => {
     const soon = GROWTH_BLOCKS.flatMap((b) => b.bullets.filter((x) => x.soon));
     expect(soon.map((x) => x.label)).toEqual(["Text posts"]);
-    const tags = (html.match(/class="lt-soon[^"]*">Coming soon</g) ?? []).length;
+    const tags = (html.slice(0, html.indexOf("ge-stage")).match(/class="lt-soon[^"]*">Coming soon</g) ?? []).length; // R1278: before the lg stage copy
     expect(tags).toBe(soon.length + 1); // the bullet and the Text chip in the adaptation example
   });
   test("text posts are not a post format today, photos and carousels are Instagram only", () => {
@@ -59,7 +59,7 @@ describe("R1261 accuracy", () => {
     expect(intel.bullets.find((x) => x.label.startsWith("Platform"))?.note).toContain("where the platform");
   });
   test("every example visual is labelled as an example and hidden from assistive tech", () => {
-    const viz = html.match(/<div aria-hidden="true" class="ge-viz[^"]*"><p[^>]*>Example<\/p>/g) ?? [];
+    const viz = html.slice(0, html.indexOf("ge-stage")).match(/<div aria-hidden="true" class="ge-viz[^"]*"><p[^>]*>Example<\/p>/g) ?? [];
     expect(viz.length).toBe(4);
   });
 });

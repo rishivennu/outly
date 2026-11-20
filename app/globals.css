@@ -534,8 +534,9 @@ html:not(.dark) .o3d-floor { background: radial-gradient(closest-side, rgba(30, 
 @media (prefers-reduced-motion: reduce) { .scroll-frame[data-done="1"] { animation: none; } }
 @media print { .scroll-frame { display: none; } }
 /* R1213: not in the studio on a phone. There the whole screen is the app, and a lime line creeping round its edge read
-   as a stray frame around the page (the Inbox screenshot of 11-19); the marketing pages and the desktop studio keep it. */
-@media (max-width: 1023px) { body:has(main.mmain) .scroll-frame { display: none; } }
+   as a stray frame around the page (the Inbox screenshot of 11-19). R1279: not on any phone or tablet page (the user's
+   11-20 screenshots: on a handset it reads as the screen's own edge filling in); only the desktop keeps it. */
+@media (max-width: 1023px) { .scroll-frame { display: none; } }
 .mnav-link { position: relative; display: inline-flex; align-items: center; min-height: 44px; padding: 0 .85rem; border-radius: 9999px; font-size: 14px; font-weight: 550; color: hsl(var(--foreground) / .8); transition: color .2s, background-color .25s; }
 .mnav-link:hover { color: hsl(var(--foreground)); background: hsl(var(--foreground) / .05); }
 .mnav-link.is-active { color: hsl(var(--lime-foreground)); }
@@ -1876,7 +1877,7 @@ html.js .stk-wrap:not([data-shown]) .stk { opacity: 0; }
 .pc { --pc-accent: hsl(var(--lime)); --pc-accent-hover: hsl(78 92% 44%); --pc-on-accent: hsl(var(--lime-foreground)); --pc-ring: hsl(var(--lime-ink)); --pc-sheet: rgba(255,255,255,.9); --pc-solid: #fff; --pc-fill: hsl(240 6% 95%); --pc-tint: hsl(80 70% 94%); --pc-line: hsl(240 6% 88%); --pc-muted: hsl(240 5% 36%); --pc-err: hsl(0 72% 42%); }
 .dark .pc { --pc-accent: hsl(var(--lime)); --pc-accent-hover: hsl(78 92% 60%); --pc-on-accent: hsl(var(--lime-foreground)); --pc-ring: hsl(var(--lime)); --pc-sheet: rgba(24,24,28,.9); --pc-solid: #18181c; --pc-fill: hsl(240 5% 15%); --pc-tint: hsl(80 30% 14%); --pc-line: hsl(240 5% 22%); --pc-muted: hsl(40 6% 70%); --pc-err: hsl(0 85% 72%); }
 .pc-scrim { background: rgba(10,10,20,.18); }
-.pc-sheet { background: var(--pc-sheet); color: hsl(var(--foreground)); -webkit-backdrop-filter: blur(28px) saturate(1.6); backdrop-filter: blur(28px) saturate(1.6); height: 100dvh; width: 100%; padding-top: env(safe-area-inset-top); }
+.pc-sheet { background: var(--pc-sheet); color: hsl(var(--foreground)); -webkit-backdrop-filter: blur(28px) saturate(1.6); backdrop-filter: blur(28px) saturate(1.6); height: 100dvh; width: 100%; padding-top: var(--sa-t); }
 @media (min-width: 640px) {
   .pc-sheet { width: min(400px, calc(100dvw - 2rem)); height: min(640px, calc(100dvh - 130px)); border-radius: 26px; border: 1px solid var(--pc-line); box-shadow: 0 24px 64px -16px rgba(20,16,60,.28), 0 4px 14px rgba(20,16,60,.08); padding-top: 0; }
   .pc-sheet[data-size="lg"] { width: min(580px, calc(100dvw - 2rem)); height: min(820px, calc(100dvh - 120px)); }
@@ -1987,6 +1988,8 @@ html[data-contrast="more"] .pc-sheet { background: var(--pc-solid); backdrop-fil
 /* Avatar picker 10-15 */
 .av-opt input:focus-visible + .av-swatch, .av-opt input:focus-visible + .av-face { box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring)) !important; }
 .av-swatch.av-on { outline: 3px solid hsl(var(--foreground)); outline-offset: 3px; }
+/* R1280: inside admin the chosen swatch keeps its offset ring (shape cue + aria-checked) at a tonal weight */
+.admin-root .av-swatch.av-on, .admin-layer .av-swatch.av-on { outline: 2px solid hsl(var(--lime) / .55); outline-offset: 2px; }
 .av-face { border: 1px solid transparent; }
 .av-face:hover { background: hsl(var(--secondary)); }
 .av-face.av-on { background: hsl(var(--secondary)); border-color: hsl(var(--foreground) / .5); }
@@ -2079,16 +2082,16 @@ html:not(.dark) body:has(.sky-host)::before {
    surface edge to edge. 1108: public pages too (their sky glow reached the top edge, so the strip met a tinted band). */
 @media (max-width: 1023.98px) {
   body::before {
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(env(safe-area-inset-top, 0px) + 12px), #000 calc(env(safe-area-inset-top, 0px) + 152px));
-    mask-image: linear-gradient(to bottom, transparent 0, transparent calc(env(safe-area-inset-top, 0px) + 12px), #000 calc(env(safe-area-inset-top, 0px) + 152px));
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--sa-t) + 12px), #000 calc(var(--sa-t) + 152px));
+    mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--sa-t) + 12px), #000 calc(var(--sa-t) + 152px));
   }
   /* 1115: inside the app the page is one flat fill, edge to edge, like a native app: no corner glows behind the
      content. Public pages keep their sky (the light landing's blue mist, hue 216). */
   body:not(:has(.sky-host))::before { display: none; }
   /* 1109: the landing sky's comets and stars could cross the top rows, a moving dot under the status bar. */
   .sky {
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(env(safe-area-inset-top, 0px) + 12px), #000 calc(env(safe-area-inset-top, 0px) + 72px));
-    mask-image: linear-gradient(to bottom, transparent 0, transparent calc(env(safe-area-inset-top, 0px) + 12px), #000 calc(env(safe-area-inset-top, 0px) + 72px));
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--sa-t) + 12px), #000 calc(var(--sa-t) + 72px));
+    mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--sa-t) + 12px), #000 calc(var(--sa-t) + 72px));
   }
 }
 
@@ -3418,9 +3421,9 @@ html[data-contrast="more"] .fw-ring:has(:is(input, textarea):focus) { box-shadow
  * Safe areas on every side, so notches and landscape never clip the logo or the bell.
  * ---------------------------------------------------------------------------------------------- */
 .mtop {
-  padding-top: env(safe-area-inset-top);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
+  padding-top: var(--sa-t);
+  padding-left: var(--sa-l);
+  padding-right: var(--sa-r);
   background-color: hsl(var(--background) / 0);
   box-shadow: 0 0.5px 0 hsl(var(--border) / 0);
   transition: background-color 0.25s ease, box-shadow 0.25s ease, -webkit-backdrop-filter 0.25s ease, backdrop-filter 0.25s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -3430,7 +3433,7 @@ html[data-contrast="more"] .fw-ring:has(:is(input, textarea):focus) { box-shadow
 /* R1220: in the installed app the bar folds up to the status bar, not under it: the safe-area strip stays as the
    frosted surface the clock and battery sit on, so the page never scrolls bare under them. In a browser tab the
    inset is 0 and the whole bar goes. */
-.mtop[data-folded] { transform: translateY(calc(-100% + env(safe-area-inset-top, 0px))); pointer-events: none; }
+.mtop[data-folded] { transform: translateY(-100%); pointer-events: none; } /* R1279: fold fully, .sa-band paints the status strip */
 @media (prefers-reduced-motion: reduce) { .mtop[data-folded] { transition: none; } }
 .mtop[data-lifted] {
   background-color: hsl(var(--background) / 0.78);
@@ -3474,7 +3477,7 @@ html[data-contrast="more"] .mtop[data-lifted] { background-color: hsl(var(--back
 /* Banners above the bar (WorkspaceBar, the maintenance countdown) are then the first thing on screen, so the first
    one clears the notch itself. The bar keeps its own inset because it is the part that stays stuck to the top. */
 @media (max-width: 1023.98px) {
-  .mtop-pre:first-child { padding-top: calc(env(safe-area-inset-top) + 0.5rem); }
+  .mtop-pre:first-child { padding-top: calc(var(--sa-t) + 0.5rem); }
 }
 @media (prefers-reduced-motion: reduce) {
   .mtop, .mtop-btn { transition: none; }
@@ -3495,7 +3498,7 @@ html[data-contrast="more"] .mtop[data-lifted] { background-color: hsl(var(--back
    Reading on down a long page compacts the bar (Nav.tsx useCompactOnScroll sets data-compact): the bar drops to 56px
    and shrinks to 92% about its bottom centre, so it sits in the same spot; every tab still measures at least
    44 x 56px on screen. 300ms on cubic-bezier(0.16, 1, 0.3, 1), on transform and the bar's own height only, so nothing
-   on the page moves with it. It never leaves the screen. Whatever floats above it sits at env(safe-area-inset-bottom)
+   on the page moves with it. It never leaves the screen. Whatever floats above it sits at var(--sa-b)
    + 84px, 12px over its open top edge. No blur support, less transparency, more contrast and forced colours get the
    solid pill of 11-19 back. */
 .mtab {
@@ -3503,8 +3506,8 @@ html[data-contrast="more"] .mtop[data-lifted] { background-color: hsl(var(--back
   --mtab-rim: linear-gradient(120deg, hsl(0 0% 100% / .95), hsl(0 0% 100% / .35) 32%, hsl(0 0% 100% / .12) 58%, hsl(0 0% 100% / .4) 88%, hsl(0 0% 100% / .8));
   --mtab-sheen: linear-gradient(180deg, hsl(0 0% 100% / .5), hsl(0 0% 100% / 0));
   --mtab-shadow: 0 12px 32px -14px rgb(15 20 40 / .35), 0 2px 8px -4px rgb(15 20 40 / .16);
-  bottom: calc(env(safe-area-inset-bottom) + 12px);
-  width: min(calc(100% - 2 * max(12px, env(safe-area-inset-left), env(safe-area-inset-right))), 440px);
+  bottom: calc(var(--sa-b) + 12px);
+  width: min(calc(100% - 2 * max(12px, var(--sa-l), var(--sa-r))), 440px);
   margin-inline: auto;
   height: 60px;
   padding: 4px var(--mtab-px);
@@ -3626,9 +3629,9 @@ html.dark .mtab-item { color: hsl(var(--foreground) / .78); }
 }
 /* A phone on its side: 54px, 8px off the edge; compact only drops to 50px (no room to spare for a scale). */
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1023px) {
-  .mtab { height: 54px; padding: 2px 6px; bottom: calc(env(safe-area-inset-bottom) + 8px); }
+  .mtab { height: 54px; padding: 2px 6px; bottom: calc(var(--sa-b) + 8px); }
   .mtab[data-compact] { height: 50px; transform: none; }
-  .mmain { padding-bottom: calc(env(safe-area-inset-bottom) + 76px); }
+  .mmain { padding-bottom: calc(var(--sa-b) + 76px); }
 }
 
 /* ---------- R1214: one liquid glass button system on the phone ----------
@@ -3738,9 +3741,9 @@ html.dark {
 /* 1099 Add to Home Screen card: floats 12px above the tab bar (60px, 12px off the edge; 54px and 8px on a phone on its
    side). */
 .install-card {
-  left: max(12px, env(safe-area-inset-left));
-  right: max(12px, env(safe-area-inset-right));
-  bottom: calc(env(safe-area-inset-bottom) + 84px);
+  left: max(12px, var(--sa-l));
+  right: max(12px, var(--sa-r));
+  bottom: var(--sa-float);
   background: hsl(var(--glass-bg, var(--card)));
   -webkit-backdrop-filter: blur(28px) saturate(1.7);
   backdrop-filter: blur(28px) saturate(1.7);
@@ -3755,7 +3758,7 @@ html[data-install-card] .pc { opacity: 0; pointer-events: none; transition: opac
   .install-card { background: hsl(var(--card)); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1023px) {
-  .install-card { bottom: calc(env(safe-area-inset-bottom) + 74px); }
+  .install-card { bottom: calc(var(--sa-b) + 74px); }
 }
 
 /* Round 1 (1102): app-like touch. No double-tap zoom anywhere, and on phones every text field is at least 16px,
@@ -3914,9 +3917,9 @@ html.dark .rail-tip { background: hsl(240 5% 17%); }
 
 /* 1100 phone menu drawer (MobileDrawer): full height from the right, clear of the notch and home indicator. */
 .mdrawer {
-  padding-top: env(safe-area-inset-top);
-  padding-right: env(safe-area-inset-right);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-top: var(--sa-t);
+  padding-right: var(--sa-r);
+  padding-bottom: var(--sa-b);
   border-radius: 28px 0 0 28px;
   box-shadow: inset 1px 0 0 hsl(var(--foreground) / .08), -24px 0 60px -24px rgb(0 0 0 / .45);
 }
@@ -3946,7 +3949,7 @@ html[data-welcome] .pwa-welcome {
   --pw-bg: hsl(0 0% 100%); --pw-fg: hsl(232 16% 9%); --pw-line: hsl(232 16% 9% / .82); --pw-hl: hsl(84 85% 24%);
   --pw-cta-bg: hsl(232 16% 7%); --pw-cta-fg: hsl(0 0% 100%); --pw-hover: hsl(232 16% 9% / .06);
   position: fixed; inset: 0; z-index: 120; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain;
-  padding: max(12px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  padding: max(12px, var(--sa-t)) max(20px, var(--sa-r)) max(16px, var(--sa-b)) max(20px, var(--sa-l));
   background: var(--pw-bg); color: var(--pw-fg);
   -webkit-tap-highlight-color: transparent;
 }
@@ -4037,7 +4040,7 @@ html[data-contrast="more"] .pw-ghost { box-shadow: inset 0 0 0 2px var(--pw-fg);
 }
 /* Desktop and tablets in landscape: words and actions on the left, the art takes the right half. */
 @media (min-width: 1024px) and (min-height: 600px) {
-  html[data-welcome] .pwa-welcome { padding: max(24px, env(safe-area-inset-top)) max(40px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(40px, env(safe-area-inset-left)); }
+  html[data-welcome] .pwa-welcome { padding: max(24px, var(--sa-t)) max(40px, var(--sa-r)) max(32px, var(--sa-b)) max(40px, var(--sa-l)); }
   .pw-wrap {
     max-width: 1320px; column-gap: clamp(20px, 2.6vw, 48px);
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto;
@@ -4415,8 +4418,8 @@ html.theme-anim *::after {
   .atable--cards > table > thead > tr > th[data-kind="select"] { display: flex; align-items: center; gap: .5rem; padding: 0 0 .625rem .5rem; border: 0; }
   .atable--cards > table > thead > tr > th[data-kind="select"]::after { content: "Select all"; text-transform: none; letter-spacing: 0; font-size: 12.5px; }
   .atable--cards > table > tbody { display: flex; flex-direction: column; gap: .625rem; }
-  .atable--cards > table > tbody > tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem 1rem; padding: .875rem 1rem; border-radius: 18px;
-    background: hsl(var(--foreground) / .025); box-shadow: inset 0 0 0 1px hsl(var(--border)); }
+  .atable--cards > table > tbody > tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem 1rem; padding: .875rem 1rem; border-radius: 16px;
+    background: hsl(var(--foreground) / .025); box-shadow: inset 0 0 0 1px hsl(var(--admin-card-line, var(--border) / .55)); } /* R1280: row cards share the admin card line */
   .atable--cards > table > tbody > tr > :is(td, th) { display: block; min-width: 0; padding: 0 !important; border: 0 !important; text-align: left; white-space: normal; overflow-wrap: anywhere; }
   .atable--cards > table > tbody > tr > [data-cell="field"]::before { content: attr(data-label); display: block; margin-bottom: .2rem; font-size: 10.5px; font-weight: 600;
     letter-spacing: .08em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
@@ -4607,7 +4610,7 @@ html:not(.dark) .la-themed:not(.dark *) .la-thumb { box-shadow: inset 0 0 0 1px 
    and the page keeps 64px more room at its foot so the last card scrolls clear of the bubble. An open chat never
    moves. */
 @media (max-width: 1023.98px) {
-  html:has(.pc-dock[data-lift]:not(.hidden)) .mmain { padding-bottom: calc(env(safe-area-inset-bottom) + 152px); }
+  html:has(.pc-dock[data-lift]:not(.hidden)) .mmain { padding-bottom: calc(var(--sa-b) + 152px); }
   .pc-dock { transition: transform .3s var(--ease-liquid), opacity .3s var(--ease-liquid), visibility 0s; }
   html[data-tabs-compact] .pc-dock:not([data-open]) {
     transform: translateX(calc(100% + 24px)); opacity: 0; pointer-events: none; visibility: hidden;
@@ -4628,8 +4631,8 @@ html:not(.dark) .la-themed:not(.dark *) .la-thumb { box-shadow: inset 0 0 0 1px 
 .run-fill-wait { transform: translateX(0); }
 
 /* R1180 Users page, "customer information" style: warm cream panels, black icon badges, pastel KPI tiles. */
-:root { --cx-panel: 36 60% 97.5%; --cx-edge: 30 30% 87%; --cx-line: 30 30% 89%; }
-.dark { --cx-panel: 30 8% 9%; --cx-edge: 30 8% 20%; --cx-line: 30 8% 17%; }
+:root { --cx-panel: 36 60% 97.5%; --cx-edge: 30 30% 20% / .09; --cx-line: 30 30% 89%; }
+.dark { --cx-panel: 30 8% 9%; --cx-edge: 0 0% 100% / .06; --cx-line: 30 8% 17%; }
 [data-tone="tan"] { --cx-t: 34 72% 87%; --cx-deep: 30 70% 58%; }
 [data-tone="blue"] { --cx-t: 208 82% 90%; --cx-deep: 212 75% 60%; }
 [data-tone="lilac"] { --cx-t: 262 72% 92%; --cx-deep: 262 60% 66%; }
@@ -4656,7 +4659,7 @@ html:not(.dark) .la-themed:not(.dark *) .la-thumb { box-shadow: inset 0 0 0 1px 
 .cx-tile:hover { transform: translateY(-2px); box-shadow: 0 14px 30px -22px hsl(var(--cx-deep)); }
 .cx-tile-chip { background: hsl(0 0% 100% / .62); }
 .dark .cx-tile-chip { background: hsl(0 0% 100% / .08); }
-.cx-tile-go { border: 1px solid hsl(var(--foreground) / .18); transition: background-color .2s ease, color .2s ease; }
+.cx-tile-go { border: 1px solid hsl(var(--foreground) / .07); transition: background-color .2s ease, color .2s ease; }
 .cx-tile:hover .cx-tile-go { background: hsl(var(--foreground)); color: hsl(var(--background)); }
 .cx-delta[data-tone="up"], .cx-status[data-tone="ok"] { background: hsl(145 58% 88%); color: hsl(145 62% 20%); }
 .cx-delta[data-tone="down"], .cx-status[data-tone="low"] { background: hsl(8 82% 91%); color: hsl(6 70% 32%); }
@@ -4686,7 +4689,7 @@ html:not(.dark) .la-themed:not(.dark *) .la-thumb { box-shadow: inset 0 0 0 1px 
    Transform only, so it keeps its place in the flow and nothing under it shifts. Desktop is untouched. */
 @media (max-width: 1023.98px) {
   .admin-top { transition: transform var(--m-nav) var(--m-ease-out); }
-  .admin-top[data-folded] { transform: translateY(calc(-100% + env(safe-area-inset-top, 0px))); pointer-events: none; }
+  .admin-top[data-folded] { transform: translateY(-100%); pointer-events: none; } /* R1279: fold fully, .sa-band paints the status strip */
   .admin-top[data-lifted] { background-color: hsl(var(--background) / 0.88); }
 }
 @media (max-width: 1023.98px) and (prefers-reduced-motion: reduce) { .admin-top { transition: none; } }
@@ -4780,7 +4783,7 @@ html[data-contrast="more"] :where(.admin-card) { box-shadow: inset 0 0 0 1px hsl
    page floats at --admin-bottom-float, 12px over the bar's open top edge (like the studio's 84px); it is only set
    there, so give it a desktop fallback: bottom: var(--admin-bottom-float, 2rem). */
 @media (max-width: 1023.98px) {
-  .admin-root { --admin-bottom-float: calc(env(safe-area-inset-bottom) + 84px); }
+  .admin-root { --admin-bottom-float: calc(var(--sa-b) + 84px); }
 }
 /* More is the bar's only <button>, so the shared hover rules (which count <a> tabs with nth-of-type) would send the
    pill to the first tab; under a pointer it goes to the last slot, where More sits. */
@@ -4788,6 +4791,64 @@ html[data-contrast="more"] :where(.admin-card) { box-shadow: inset 0 0 0 1px hsl
   .mtab.admin-tabbar:has(> button.mtab-item:hover) .mtab-ind { translate: calc((var(--n, 5) - 1) * 100%) 0; }
 }
 /* end R1274 */
+/* R1278 growth scrolly */
+/* From lg the Growth Engine cards become a two-column scrolly (GrowthEngine.tsx, motion in growth/Scrolly.tsx): the
+   steps on the left lose their card chrome and the active one (data-on) is full ink, the others muted; on the right
+   the sticky .ge-stage is centred in the viewport and its strip is moved by GSAP (never from here). The dimming only
+   applies once Scrolly has armed (data-live), so without JS every step reads at full ink. */
+@media (min-width: 1024px) {
+  .ge-stage { --stage-h: min(34rem, calc(100vh - 9rem)); top: calc((100vh - var(--stage-h)) / 2); height: var(--stage-h); }
+  .ge-scrolly .ge-item > .ge-card, .ge-scrolly .ge-item > .ge-card:hover { box-shadow: none; border-color: transparent; }
+  .ge-scrolly .ge-item > .ge-card::before, .ge-scrolly .ge-item > .ge-card::after { display: none; }
+  html.js .ge-scrolly[data-live] .ge-item > .ge-card { color: hsl(var(--muted-foreground)); opacity: .7;
+    transition: color var(--m-card) var(--m-ease-out), opacity var(--m-card) var(--m-ease-out); }
+  html.js .ge-scrolly[data-live] .ge-item[data-on] > .ge-card { color: hsl(var(--foreground)); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { html.js .ge-scrolly[data-live] .ge-item > .ge-card { transition: none; } }
+/* end R1278 */
+/* R1279 safe area */
+/* One source for the device insets (notch, Dynamic Island, punch-hole, home indicator, gesture bar, landscape
+   cutouts). Every rule reads these and never env() itself, so a notch can be simulated by overriding them.
+   --sa-float is the line 12px over the studio tab bar's open top edge. */
+:root {
+  --sa-t: env(safe-area-inset-top, 0px);
+  --sa-b: env(safe-area-inset-bottom, 0px);
+  --sa-l: env(safe-area-inset-left, 0px);
+  --sa-r: env(safe-area-inset-right, 0px);
+  --sa-float: calc(var(--sa-b) + 84px);
+}
+/* The page runs edge to edge under the status bar (viewport-fit=cover; black-translucent on iOS; the Android app's
+   edge-to-edge). This band paints the page colour behind the OS clock and battery, so content scrolling up meets a
+   frosted edge instead of showing through under the indicators. It is 0px tall wherever there is no inset (desktop,
+   most browser tabs). One step under the shell headers (.mtop, .admin-top: 30), over the page; the tab bar (40),
+   drawers, sheets, dialogs and toasts stay above it. Nothing is drawn in it: the indicators stay native.
+   The app's Create sheet shows its dimmed backdrop up there instead (mobile-app.css). */
+.sa-band {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 29; height: var(--sa-t); pointer-events: none;
+  background: hsl(var(--background) / .84);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .sa-band { background: hsl(var(--background) / .97); } }
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  .sa-band { background: hsl(var(--background)); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+html[data-contrast="more"] .sa-band { background: hsl(var(--background)); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html[data-welcome] .sa-band, html[data-app][data-app-route="create"] .sa-band { display: none; }
+@media print { .sa-band { display: none; } }
+/* Landscape cutouts: the studio column keeps clear of the notch side (0 everywhere else). */
+.mmain { padding-left: var(--sa-l); padding-right: var(--sa-r); }
+/* end R1279 */
+/* R1280 admin strokes a */
+/* Under 1024px the shared glass buttons, chips and segments (.gbtn family) draw a 10% white ring and a 14% top rim in
+   dark; a column of row buttons (Users "Manage", the chart range chips, the Payments filter) read as outlined boxes.
+   Inside the admin they take the card line and a quieter rim. Coloured variants (lime, primary, danger, a chosen chip)
+   set their own line on the element and keep it. High contrast keeps --border on the phone table cards. */
+html.dark .admin-root, html.dark .admin-layer { --gb-line: var(--admin-card-line); --gb-hi: 0 0% 100% / .07; }
+@media (max-width: 639.98px) {
+  html[data-contrast="more"] .atable--cards > table > tbody > tr { box-shadow: inset 0 0 0 1px hsl(var(--border)); }
+}
+/* end R1280 admin strokes a */
 /* ---------- 1100: Liquid glass on every studio card ----------
    The studio's screen cards wear the same liquid glass as the rail: a cool-to-deep tint, a lit rim on the top-left
    edge with a softer far edge, and a sheen across the top. Cards: .glass panels, the Analytics dashboard's
