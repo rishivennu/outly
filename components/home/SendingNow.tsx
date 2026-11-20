@@ -94,7 +94,7 @@ export function SendingNow({ items }: { items: SendingItem[] }) {
                     </span>
                   </span>
                   <span className="flex shrink-0 -space-x-2" aria-hidden="true">
-                    {p.targets.filter((t) => isPlatform(t.platform)).map((t) => <PlatformOrb key={t.id} platform={t.platform as Platform} size={28} ring />)}
+                    {p.targets.filter((t) => isPlatform(t.platform)).map((t) => <PlatformOrb key={t.id} platform={t.platform as Platform} size={28} ring surface="dark" />)}
                   </span>
                   <ArrowUpRight className="h-4 w-4 shrink-0 text-white/60 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-white" aria-hidden="true" />
                 </div>

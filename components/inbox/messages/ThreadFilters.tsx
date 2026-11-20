@@ -47,7 +47,7 @@ export function ThreadFilters({ filter, onChange, platforms, archived }: { filte
                 onClick={() => !on && onChange({ ...filter, platform: p })}
                 className={cn(seg, "gchip gap-1.5 hairline", on ? "bg-foreground text-background" : "bg-card text-foreground [@media(hover:hover)]:hover:bg-secondary")}
               >
-                {p !== "all" && <PlatformOrb platform={p} size={16} />}
+                {p !== "all" && <PlatformOrb platform={p} size={16} surface={on ? "inverse" : undefined} />}
                 {p === "all" ? "All platforms" : PLATFORM_META[p].name}
               </button>
             );

@@ -252,7 +252,7 @@ export function PreviewSheet({ open, onOpenChange, platforms, drafts, accounts, 
                 x === pl ? "bg-foreground text-background" : "text-muted-foreground [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground",
               )}
             >
-              <PlatformOrb platform={x} size={20} />
+              <PlatformOrb platform={x} size={20} surface={x === pl ? "inverse" : undefined} />
               {PLATFORM_META[x].name}
             </button>
           ))}

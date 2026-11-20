@@ -4,7 +4,7 @@ import {
   Activity, ArrowUpRight, Award, BarChart3, Clock, CreditCard, Flag, Layers, Link2, Mail, MailCheck, MapPin,
   MoonStar, PenLine, Search, ShieldCheck, User, UserPlus, Users,
 } from "lucide-react";
-import { AppIcon, type Brand } from "@/components/brand/brands";
+import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { placeLabel } from "@/lib/geo";
 import { ago, fmtDate } from "@/components/admin/ui";
@@ -279,7 +279,7 @@ export function ProfilePanel({ p }: { p: Recent | null }) {
       label: "Connected",
       value: known.length ? (
         <span className="flex flex-wrap items-center gap-1.5">
-          {known.map((x) => <AppIcon key={x} brand={x as Brand} size={22} />)}
+          {known.map((x) => <PlatformOrb key={x} platform={x} size={22} />)}
           <span className="sr-only">{known.map((x) => PLATFORM_META[x].name).join(", ")}</span>
         </span>
       ) : "Nothing connected yet",

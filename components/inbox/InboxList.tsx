@@ -249,7 +249,7 @@ export function PlatformChips({ platforms, platform, onPlatform }: { platforms: 
       </button>
       {platforms.map((p) => (
         <button key={p} type="button" aria-pressed={platform === p} aria-label={PLATFORM_META[p].name} title={PLATFORM_META[p].name} onClick={() => onPlatform(p)} className={chip(platform === p)}>
-          <PlatformOrb platform={p} size={16} />
+          <PlatformOrb platform={p} size={16} surface={platform === p ? "inverse" : undefined} />
           <span aria-hidden="true" className="hidden min-[400px]:inline">
             {PLATFORM_META[p].name}
           </span>

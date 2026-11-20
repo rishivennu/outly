@@ -148,7 +148,7 @@ function PostCardImpl(props: Props) {
           {caption && <p className="mt-1 line-clamp-2 text-xs leading-snug text-white/80 max-md:hidden">{caption}</p>}
           <span className="mt-1.5 flex -space-x-1.5">
             {p.targets.map((t) => (
-              <PlatformOrb key={t.id} platform={t.platform} size={18} ring />
+              <PlatformOrb key={t.id} platform={t.platform} size={18} ring surface="dark" />
             ))}
           </span>
         </div>

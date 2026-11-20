@@ -136,9 +136,7 @@ function ConnectNudge({ platforms }: { platforms: Platform[] }) {
     <div className="glass mt-5 flex flex-col gap-5 rounded-[24px] p-5 sm:flex-row sm:items-center sm:p-6">
       <span className="flex shrink-0 -space-x-2" aria-hidden="true">
         {platforms.map((p) => (
-          <span key={p} className="rounded-full ring-2 ring-background">
-            <PlatformOrb platform={p} size={40} />
-          </span>
+          <PlatformOrb key={p} platform={p} size={40} ring />
         ))}
       </span>
       <p className="min-w-0 flex-1 text-[15px] leading-relaxed text-muted-foreground">

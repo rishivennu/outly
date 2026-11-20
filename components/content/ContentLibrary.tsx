@@ -459,7 +459,7 @@ export function ContentLibrary({
                       <div className="mt-2 flex items-center justify-between gap-2 text-xs text-white/80">
                         <span className="flex -space-x-1.5">
                           {p.targets.map((t) => (
-                            <PlatformOrb key={t.id} platform={t.platform} size={22} ring />
+                            <PlatformOrb key={t.id} platform={t.platform} size={22} ring surface="dark" />
                           ))}
                         </span>
                         <span className="truncate">

@@ -37,7 +37,7 @@ describe("R1221 publishing success columns", () => {
     // R1254: the three columns centre on one line
     expect(view).toContain("grid grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-3 rounded-[16px] bg-secondary/50 p-3 hairline sm:gap-4");
     expect(view).toContain('relative h-[86px] w-[64px] shrink-0 overflow-hidden rounded-xl bg-secondary');
-    expect(view).toContain('className="line-clamp-2 text-[15px] font-semibold leading-snug" title={line}');
+    expect(view).toContain('className="line-clamp-2 text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]" title={line}'); // R1260: unbroken captions wrap too
     expect(view).toContain("gap-1 whitespace-nowrap font-semibold text-foreground");
     expect(view).toContain('<StatusBadge status={t.status} className="shrink-0 self-center whitespace-nowrap" />');
   });

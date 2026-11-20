@@ -72,7 +72,7 @@ export function HeroFan({ cards = CARDS, cta, framed = false }: { cards?: FanCar
                   <p className="hf-sub">{c.sub}</p>
                 </div>
                 {c.platform ? (
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/90 text-black shadow-sm"><PlatformGlyph platform={c.platform} surface="light" className="h-4 w-4" /></span>
+                  <span className="grid h-9 w-9 shrink-0 place-items-center"><PlatformGlyph platform={c.platform} surface="dark" className="h-7 w-7" /></span>
                 ) : null}
               </div>
               {c.caption ? <CaptionPop text={c.caption} srText={false} className="hf-cap" /> : null}

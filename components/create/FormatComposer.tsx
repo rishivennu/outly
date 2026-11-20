@@ -610,7 +610,7 @@ export function FormatComposer({ accounts, choices, initialPost, initialFormat, 
                 return (
                   <button key={a.id} type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1} onClick={() => setIgId(a.id)}
                     className={cn("flex min-h-[52px] items-center gap-3 rounded-[18px] px-3 text-left transition hairline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-foreground text-background" : "hover:bg-secondary/60")}>
-                    <PlatformOrb platform="instagram" size={28} />
+                    <PlatformOrb platform="instagram" size={28} surface={on ? "inverse" : undefined} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold">{handle(a.username)}</span>
                       <span className={cn("block text-xs", on ? "text-background/70" : "text-muted-foreground")}>{a.status === "connected" ? (a.mock ? "Practice account" : "Ready to post") : "Needs reconnecting"}</span>

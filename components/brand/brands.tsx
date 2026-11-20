@@ -48,8 +48,11 @@ export const LOGO_SIZE: Record<Platform, readonly [number, number]> = {
 };
 const REVERSED: ReadonlySet<Platform> = new Set<Platform>(["x", "tiktok", "threads"]);
 export const logoSrc = (p: Platform, dark = false) => `/brand/logos/${p}${dark && REVERSED.has(p) ? "-dark" : ""}.webp`;
-/** The background a logo sits on. "auto" follows the site theme; a chip that is white in both themes is "light". */
-export type LogoSurface = "auto" | "light" | "dark";
+/**
+ * The background a logo sits on. "auto" follows the site theme; "light"/"dark" are the same in both themes;
+ * "inverse" is the opposite of the theme (a selected `bg-foreground` chip: dark in the light theme, light in the dark).
+ */
+export type LogoSurface = "auto" | "light" | "dark" | "inverse";
 
 /** A platform's logo, sized by the caller's className or style. Decorative: the name is always beside it in text. */
 export function PlatformLogo({ platform, className, surface = "auto", style }: { platform: Platform; className?: string; surface?: LogoSurface; style?: CSSProperties }) {
@@ -58,12 +61,13 @@ export function PlatformLogo({ platform, className, surface = "auto", style }: {
     // eslint-disable-next-line @next/next/no-img-element
     <img src={logoSrc(platform, dark)} alt="" aria-hidden="true" width={w} height={h} loading="lazy" decoding="async" draggable={false} className={cn("select-none object-contain", className, show)} style={style} />
   );
-  if (!REVERSED.has(platform) || surface !== "auto") return img(surface === "dark");
+  if (!REVERSED.has(platform) || surface === "light" || surface === "dark") return img(surface === "dark");
   // Both are in the page and CSS shows the one for the theme, so a server render never shows the wrong one.
+  const inv = surface === "inverse";
   return (
     <>
-      {img(false, "dark:hidden")}
-      {img(true, "hidden dark:inline-block")}
+      {img(inv, "dark:hidden")}
+      {img(!inv, "hidden dark:inline-block")}
     </>
   );
 }

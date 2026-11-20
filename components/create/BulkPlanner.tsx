@@ -269,7 +269,7 @@ export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: str
                       onClick={() => toggleAcct(a.id)}
                       className={cn("inline-flex min-h-[44px] items-center gap-2 rounded-full py-1.5 pl-1.5 pr-4 text-sm font-medium transition hairline", on ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
                     >
-                      <PlatformOrb platform={a.platform} size={30} />
+                      <PlatformOrb platform={a.platform} size={30} surface={on ? "inverse" : undefined} />
                       {fmtHandle(a.username)}
                       <span className="sr-only"> on {PLATFORM_META[a.platform].name}</span>
                       {on && <Check className="h-4 w-4" aria-hidden />}
@@ -289,7 +289,7 @@ export function BulkPlanner({ accounts, tz }: { accounts: AccountView[]; tz: str
                     onClick={() => toggle(p)}
                     className={cn("inline-flex min-h-[44px] items-center gap-2 rounded-full py-1.5 pl-1.5 pr-4 text-sm font-medium transition hairline", on ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
                   >
-                    <PlatformOrb platform={p} size={30} />
+                    <PlatformOrb platform={p} size={30} surface={on ? "inverse" : undefined} />
                     {PLATFORM_META[p].name}
                     {on && <Check className="h-4 w-4" aria-hidden />}
                   </button>

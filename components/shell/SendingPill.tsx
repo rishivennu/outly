@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AppIcon } from "@/components/brand/brands";
+import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { PLATFORM_META, isPlatform } from "@/lib/domain";
 import { fetchSending, liveLabel, notifyOnce, onSendingWake, sendSummary, type LivePost } from "@/lib/client/sending";
 import { cn } from "@/lib/utils";
@@ -102,7 +102,7 @@ export function SendingPill() {
           {p.targets.map((t) =>
             isPlatform(t.platform) ? (
               <span key={t.id} className="relative">
-                <AppIcon brand={t.platform} size={20} />
+                <PlatformOrb platform={t.platform} size={20} ring surface="dark" />
                 <span className={cn("sp-st", t.status === "published" ? "live" : t.status === "failed" ? "bad" : "work")} />
               </span>
             ) : null,

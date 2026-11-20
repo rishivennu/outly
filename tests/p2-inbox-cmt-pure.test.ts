@@ -76,7 +76,8 @@ describe("reply errors are told in plain words with the right status", () => {
   });
   test("the reply route uses it and marks the answered comment read", () => {
     const r = src("app/api/inbox/reply/route.ts");
-    expect(r).toContain("if (err instanceof PublisherError) throw replyFailure(err);");
+    expect(r).toContain("if (err instanceof PublisherError) {"); // 1258: the refusal is logged before the throw
+    expect(r).toContain("throw replyFailure(err);");
     expect(r).toContain("read: true");
   });
 });

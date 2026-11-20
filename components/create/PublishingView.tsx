@@ -467,7 +467,7 @@ export function whenLabel(iso: string | null | undefined, now = new Date()): str
  * the account it posted to, the technical status, when the platform confirmed it, and a link only when the platform
  * sent one back. Retry and stop stay on the Live Activity cards below, so nothing is wired twice.
  */
-function PublishedPreview({ post, trackerOf, className }: { post: PostView; trackerOf: (t: TargetView) => LiveTarget | null; className?: string }) {
+export function PublishedPreview({ post, trackerOf, className }: { post: PostView; trackerOf: (t: TargetView) => LiveTarget | null; className?: string }) {
   const words = postWords(post.format, post.items.length);
   const thumb = post.media.thumbnailUrl ?? post.items[0]?.thumbnailUrl ?? null;
   if (post.targets.length === 0) return null;
@@ -477,7 +477,8 @@ function PublishedPreview({ post, trackerOf, className }: { post: PostView; trac
         {words.your}, where it went
       </h2>
       {/* R1218: one row per platform, every row the same shape: thumb, words, badge. A long caption truncates in its
-          own column, so the badge never moves and the card never grows sideways. R1254: the three columns centre on
+          own column, so the badge never moves and the card never grows sideways (R1260: overflow-wrap:anywhere, so a
+          caption with no spaces, a link or a run of hashtags, still wraps onto the second line and clamps). R1254: the three columns centre on
           one line, and the thumb is one fixed 64x86 frame (object-cover) whatever shape the video is. */}
       <ul className="mt-3 flex flex-col gap-2.5">
         {post.targets.map((t) => {
@@ -496,10 +497,10 @@ function PublishedPreview({ post, trackerOf, className }: { post: PostView; trac
                 ) : (
                   <OutlyMark size={20} className="absolute inset-0 m-auto text-muted-foreground" />
                 )}
-                <PlatformOrb platform={t.platform} size={22} className="absolute bottom-1 right-1 shadow-sm" />
+                <PlatformOrb platform={t.platform} size={22} className="absolute bottom-1 right-1" />
               </div>
               <div className="min-w-0">
-                <p className="line-clamp-2 text-[15px] font-semibold leading-snug" title={line}>{line}</p>
+                <p className="line-clamp-2 text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]" title={line}>{line}</p>
                 <p className="mt-1 truncate text-[13px] text-muted-foreground">
                   {meta.name}
                   {handle ? <> <span aria-hidden="true">·</span> {handle}</> : null}
@@ -620,7 +621,7 @@ function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, can
               /* eslint-disable-next-line @next/next/no-img-element */
               <img src={acct.avatar} alt="" loading="lazy" decoding="async" className="la-face" draggable={false} />
             ) : (
-              <PlatformOrb platform={t.platform} size={18} />
+              <PlatformOrb platform={t.platform} size={18} surface="dark" />
             )}
             <span className="truncate text-[13px] font-semibold">{acct ? (fmtHandle(acct.username) || acct.name) : `Your ${meta.name} account`}</span>
           </span>
