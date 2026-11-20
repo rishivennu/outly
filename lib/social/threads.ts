@@ -79,6 +79,16 @@ export class ThreadsPublisher implements SocialPublisher {
     const c = await formPost(`${GRAPH}/${account.platformUserId}/threads`, { media_type: "TEXT", text: text.slice(0, 500), reply_to_id: commentId, access_token: account.accessToken });
     if (!c.ok) throw await httpFailure(c, "threads reply container");
     const creation = ((await c.json()) as { id: string }).id;
+    // 1258: like any container, a reply is not always ready the moment it is created; publishing too soon is a 400.
+    // Threads recommends checking the status first, so wait for FINISHED (a text reply takes a second or two).
+    for (let i = 0; i < 10; i++) {
+      const s = await fetch(`${GRAPH}/${creation}?fields=status,error_message&access_token=${account.accessToken}`);
+      if (!s.ok) throw await httpFailure(s, "threads reply status");
+      const j = (await s.json()) as { status?: string; error_message?: string };
+      if (j.status === "FINISHED") break;
+      if (j.status === "ERROR" || j.status === "EXPIRED") throw new PublisherError("MEDIA_REJECTED", "Media rejected", `threads reply container ${j.status}: ${j.error_message ?? ""}`, false);
+      await new Promise((r) => setTimeout(r, 1500));
+    }
     const p = await formPost(`${GRAPH}/${account.platformUserId}/threads_publish`, { creation_id: creation, access_token: account.accessToken });
     if (!p.ok) throw await httpFailure(p, "threads reply publish");
     const { id } = (await p.json()) as { id: string };

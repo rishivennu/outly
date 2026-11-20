@@ -67,16 +67,30 @@ describe("1252 publisher", () => {
       const u = new URL(String(input instanceof Request ? input.url : input));
       calls.push({ path: u.pathname, body: String(init?.body ?? "") });
       if (u.pathname === "/v1.0/me1/threads") return json({ id: "c9" });
+      // 1258: the container is IN_PROGRESS once, then FINISHED; publishing waits for that.
+      if (u.pathname === "/v1.0/c9") return json({ status: calls.filter((c) => c.path === "/v1.0/c9").length > 1 ? "FINISHED" : "IN_PROGRESS" });
       if (u.pathname === "/v1.0/me1/threads_publish") return json({ id: "r9" });
       return json({ error: "nope" }, 404);
     }) as typeof fetch;
     const r = await new ThreadsPublisher().replyToComment(acct, "r1", "Thanks Ana!");
-    expect(calls.map((c) => c.path)).toEqual(["/v1.0/me1/threads", "/v1.0/me1/threads_publish"]);
+    expect(calls.map((c) => c.path)).toEqual(["/v1.0/me1/threads", "/v1.0/c9", "/v1.0/c9", "/v1.0/me1/threads_publish"]);
     expect(calls[0].body).toContain("media_type=TEXT");
     expect(calls[0].body).toContain("reply_to_id=r1");
     expect(calls[0].body).toContain("text=Thanks+Ana%21");
-    expect(calls[1].body).toContain("creation_id=c9");
+    expect(calls[3].body).toContain("creation_id=c9");
     expect(r).toMatchObject({ id: "r9", text: "Thanks Ana!", authorName: "@outlly_com", parentId: "r1" });
+  });
+  test("1258: a reply container that ends in ERROR is a rejection carrying Threads' own words, and nothing is published", async () => {
+    const calls: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const u = new URL(String(input instanceof Request ? input.url : input));
+      calls.push(u.pathname);
+      if (u.pathname === "/v1.0/me1/threads") return json({ id: "c9" });
+      if (u.pathname === "/v1.0/c9") return json({ status: "ERROR", error_message: "Reply not allowed" });
+      return json({ id: "r9" });
+    }) as typeof fetch;
+    await expect(new ThreadsPublisher().replyToComment(acct, "r1", "Hi")).rejects.toMatchObject({ code: "MEDIA_REJECTED", technical: expect.stringContaining("Reply not allowed") });
+    expect(calls).not.toContain("/v1.0/me1/threads_publish");
   });
   test("a refused conversation read is a PublisherError, not a swallowed empty list", async () => {
     globalThis.fetch = (async () => json({ error: { message: "(#10) Application does not have permission for this action", code: 10 } }, 403)) as typeof fetch;

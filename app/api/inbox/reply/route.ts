@@ -18,7 +18,11 @@ export const POST = route(
       reply = await replyToComment(user.id, body.targetId, body.commentId, body.text, user.scope);
     } catch (err) {
       await slot.release();
-      if (err instanceof PublisherError) throw replyFailure(err);
+      // 1258: the creator sees a plain sentence; the platform's own words go to the log so a refusal can be traced.
+      if (err instanceof PublisherError) {
+        console.error("[inbox] reply refused", err.code, err.technical ?? err.message);
+        throw replyFailure(err);
+      }
       throw err;
     }
     // Answered means seen: the comment stops showing as unread.
