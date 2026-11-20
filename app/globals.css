@@ -3895,7 +3895,8 @@ html[data-rail="open"] .rail-mid.nav-scroll { scrollbar-width: thin; }
   background: hsl(232 16% 7%); color: hsl(40 33% 95%); box-shadow: 0 8px 24px -8px rgb(0 0 0 / .45);
 }
 html.dark .rail-tip { background: hsl(240 5% 17%); }
-@media (prefers-reduced-motion: no-preference) { .rail-tip { animation: rail-tip-in .18s var(--ease-liquid); } }
+@media (prefers-reduced-motion: no-preference) { .rail-tip { animation: rail-tip-in .18s var(--ease-liquid); } .rail-tip[data-state="closed"] { animation: rail-tip-out .09s var(--m-ease-in) forwards; } }
+@keyframes rail-tip-out { to { opacity: 0; transform: translate3d(-4px, 0, 0); } }
 @keyframes rail-tip-in { from { opacity: 0; transform: translate3d(-4px, 0, 0); } }
 
 /* Account menu (desktop dropdown): fades and scales out of the profile circle; out is quicker than in. */
@@ -3903,7 +3904,7 @@ html.dark .rail-tip { background: hsl(240 5% 17%); }
 .acct-sep { height: 1px; margin: 6px 10px; background: hsl(var(--foreground) / .08); }
 @media (prefers-reduced-motion: no-preference) {
   .acct-menu[data-state="open"] { animation: acct-in var(--m-menu) var(--m-ease-out); }
-  .acct-menu[data-state="closed"] { animation: acct-out var(--m-menu-exit) var(--m-ease-in) forwards; }
+  .acct-menu[data-state="closed"] { animation: acct-out calc(var(--m-menu) / 2) var(--m-ease-in) forwards; }
 }
 @media (prefers-reduced-motion: reduce) {
   .acct-menu[data-state="open"] { animation: page-fade .12s ease; }
@@ -3925,9 +3926,9 @@ html.dark .mdrawer { background: hsl(240 5% 8.5%); }
 .mdrawer-scrim { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: no-preference) {
   .mdrawer[data-state="open"] { animation: mdrawer-in var(--m-nav) var(--m-ease-out); }
-  .mdrawer[data-state="closed"] { animation: mdrawer-out var(--m-menu) var(--m-ease-in) forwards; }
+  .mdrawer[data-state="closed"] { animation: mdrawer-out calc(var(--m-nav) / 2) var(--m-ease-in) forwards; } /* R1255: a close takes half its open */
   .mdrawer-scrim[data-state="open"] { animation: page-fade var(--m-nav) var(--m-ease-std); }
-  .mdrawer-scrim[data-state="closed"] { animation: acct-fade-out var(--m-menu) var(--m-ease-std) forwards; }
+  .mdrawer-scrim[data-state="closed"] { animation: acct-fade-out calc(var(--m-nav) / 2) var(--m-ease-std) forwards; }
 }
 @media (prefers-reduced-motion: reduce) {
   .mdrawer[data-state="open"], .mdrawer-scrim[data-state="open"] { animation: page-fade .12s ease; }
@@ -4087,10 +4088,10 @@ html[data-contrast="more"] .pw-ghost { box-shadow: inset 0 0 0 2px var(--pw-fg);
  * 1105 notices panel: opens from its bell in 250ms on Outlly's curve; a plain fade under reduced motion.
  * ---------------------------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: no-preference) {
-  .notice-panel { animation: np-in .25s var(--ease-liquid); transform-origin: top right; }
+  .notice-panel { transform-origin: top right; } /* R1255: GSAP opens and closes it (usePanelPresence), from its bell */
 }
 @media (prefers-reduced-motion: reduce) {
-  .notice-panel { animation: page-fade .12s ease; }
+  .notice-panel { animation: none; }
 }
 
 /* ------------------------------------------------------------------------------------------------
@@ -4824,4 +4825,21 @@ html[data-contrast="more"]:not([data-app]) .mmain :is(.glass, .pulse-card, .card
   .la-scroll::-webkit-scrollbar-track, .la-scroll::-webkit-scrollbar-corner { background: transparent; }
   .la-scroll::-webkit-scrollbar-thumb { background-color: hsl(var(--foreground) / 0.2); border: 2px solid transparent; background-clip: padding-box; border-radius: 999px; }
   .la-scroll::-webkit-scrollbar-thumb:hover { background-color: hsl(var(--foreground) / 0.34); }
+}
+
+/* ---------- R1255: the fluid layer (lib/motion/fluid.ts, lib/motion/useFluid.ts) ----------
+   One hover pill per nav surface, glided by GSAP between items (.nav-hover); once it is live (data-hpill) the items
+   drop their own hover fill so the two never stack. The shared press tweens --press on any control without a press of
+   its own; `scale` composes with the control's own transform. Reduced motion: neither is installed. */
+.nav-hover {
+  position: absolute; left: 0; top: 0; width: 0; height: 0; border-radius: 9999px; pointer-events: none; opacity: 0;
+  background: hsl(var(--foreground) / .08);
+}
+@media not (forced-colors: active) {
+  .rail[data-hpill] :is(.rail-row, .rail-bell):not([aria-current="page"], .rail-new, .rail-logo, .rail-me, .rail-bell[aria-expanded="true"]):hover { background: transparent; }
+}
+[data-pressing] { scale: var(--press, 1); }
+@media (prefers-reduced-motion: reduce), (forced-colors: active) {
+  .nav-hover { display: none; }
+  [data-pressing] { scale: none; }
 }

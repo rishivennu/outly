@@ -8,6 +8,8 @@ import { api } from "@/lib/client/api";
 import { setBadge } from "@/lib/client/push";
 import { NOTICES_EVENT } from "./PushBridge";
 import { cn } from "@/lib/utils";
+import { PANEL } from "@/lib/motion/fluid";
+import { usePanelPresence } from "@/lib/motion/useFluid";
 
 type Notice = { id: string; kind: string; tone: "danger" | "warn" | "info"; title: string; body: string; href: string | null; action: string | null; read: boolean; createdAt: string };
 const ICON = { danger: AlertTriangle, warn: CircleAlert, info: Info } as const;
@@ -47,6 +49,8 @@ export function NoticesBell({ placement = "side", className }: { placement?: "si
   const [items, setItems] = useState<Notice[] | null>(null);
   const [unread, setUnread] = useState(0);
   const [pos, setPos] = useState<React.CSSProperties>({});
+  // R1255: rises from the rail bell (bottom left) or drops from the top bar bell (top right); leaves in half the time.
+  const shown = usePanelPresence(open, panel, placement === "side" ? PANEL.rise : PANEL.popover, placement === "side" ? "0% 100%" : "100% 0%");
 
   const load = useCallback((fresh?: boolean) => {
     fetchNotices(fresh === true)
@@ -136,7 +140,7 @@ export function NoticesBell({ placement = "side", className }: { placement?: "si
         aria-expanded={open}
         aria-controls={open ? `${id}-panel` : undefined}
         onClick={() => setOpen((v) => !v)}
-        className={cn("relative grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground", open && "bg-secondary text-foreground", className)}
+        className={cn("ripple-host relative grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground", open && "bg-secondary text-foreground", className)}
       >
         <Bell className="h-[18px] w-[18px]" aria-hidden="true" />
         {unread > 0 && (
@@ -145,7 +149,7 @@ export function NoticesBell({ placement = "side", className }: { placement?: "si
           </span>
         )}
       </button>
-      {open &&
+      {shown &&
         createPortal(
           <div
             ref={panel}

@@ -106,8 +106,11 @@ describe("1105 phone top bar", () => {
     expect(rule(".mtop-btn")).toContain("transform 0.15s var(--ease-liquid)");
     // 1119: the drawer opens at the nav token (300ms) and leaves faster than it came (menu, ease-in).
     expect(css).toContain('.mdrawer[data-state="open"] { animation: mdrawer-in var(--m-nav) var(--m-ease-out); }');
-    expect(css).toContain('.mdrawer[data-state="closed"] { animation: mdrawer-out var(--m-menu) var(--m-ease-in) forwards; }');
-    expect(css).toContain(".notice-panel { animation: np-in .25s var(--ease-liquid); transform-origin: top right; }");
+    // R1255: and closes in half that time.
+    expect(css).toContain('.mdrawer[data-state="closed"] { animation: mdrawer-out calc(var(--m-nav) / 2) var(--m-ease-in) forwards; }');
+    // R1255: the notices panel is tweened by GSAP from its bell (usePanelPresence), 200ms in and 100ms out.
+    expect(css).toContain(".notice-panel { transform-origin: top right; }");
+    expect(src("components/shell/NoticesBell.tsx")).toContain("usePanelPresence(open, panel,");
   });
   test("the drawer keeps search (moved off the bar) and opens it after it has gone", () => {
     const drawer = src("components/shell/MobileDrawer.tsx");

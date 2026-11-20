@@ -14,6 +14,10 @@ import { SignOutButton } from "./SignOutButton";
 import { openPalette } from "./CommandPalette";
 import { AccountMenu, useWho } from "./AccountMenu";
 import { ANIM, GLIDE, MAIN, RAIL_KEY, TOUR, isActive, workspaceItems } from "./nav-items";
+import { useHoverPill, usePressFx } from "@/lib/motion/useFluid";
+
+/** R1255: the rows the shared hover pill flows between (the logo, the profile and New post keep their own hover). */
+const HOVER_ITEMS = ".rail-row:not(.rail-logo, .rail-me, .rail-new), .rail-bell";
 
 const RailOpen = createContext(false);
 
@@ -116,6 +120,11 @@ export function PulseRail() {
   const out = useIconPlay();
   const settle = useRef(0);
   const scroller = useScrolling();
+  const aside = useRef<HTMLElement>(null);
+  const hoverPill = useRef<HTMLSpanElement>(null);
+  useHoverPill(aside, hoverPill, { items: HOVER_ITEMS, clip: ".rail-mid" });
+  // The shared press for the whole studio: the rail is mounted on every studio page (CSS hides it on phones).
+  usePressFx();
   // Before paint (the head script already set the width), so the toggle icon and tooltips never lag a frame.
   useLayoutEffect(() => setOpen(document.documentElement.getAttribute("data-rail") === "open"), []);
   useEffect(() => () => window.clearTimeout(settle.current), []);
@@ -137,7 +146,8 @@ export function PulseRail() {
     <RailOpen.Provider value={open}>
       <Tooltip.Provider delayDuration={150} skipDelayDuration={400}>
         <div className="rail-wrap sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
-          <aside id="pulse-rail" data-route-order="" data-shell="pulse" aria-label="Primary" className="rail lg-glass">
+          <aside ref={aside} id="pulse-rail" data-route-order="" data-shell="pulse" aria-label="Primary" className="rail lg-glass">
+            <span ref={hoverPill} className="nav-hover" aria-hidden="true" />
             <div className="rail-top">
               <HoverLink href="/home" className="rail-row rail-logo" aria-label="Outlly dashboard">
                 <span className="rail-disc">

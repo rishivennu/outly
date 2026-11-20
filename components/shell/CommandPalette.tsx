@@ -1,5 +1,6 @@
 "use client";
 import { FX, ease } from "@/lib/motion/tokens";
+import { FADE, PANEL } from "@/lib/motion/fluid";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -176,10 +177,9 @@ export function CommandPalette() {
             <Dialog.Content asChild forceMount aria-describedby={undefined}>
               <div className="fixed inset-0 z-[91] flex items-start justify-center p-4 pt-[min(14vh,120px)]" data-lenis-prevent onPointerDown={(e) => e.target === e.currentTarget && setOpen(false)}>
                 <motion.div
-                  initial={reduce ? false : { opacity: 0, y: -8, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
-                  transition={{ duration: reduce ? 0 : 0.22, ease: ease("out") }}
+                  initial={reduce ? false : { opacity: 0, ...PANEL.instant.from }}
+                  animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: reduce ? 0 : PANEL.instant.enter, ease: ease("out") } }}
+                  exit={{ opacity: 0, ...(reduce ? {} : PANEL.instant.from), transition: { duration: reduce ? FADE.exit : PANEL.instant.exit, ease: ease("in") } }}
                   className="glass-strong flex max-h-[min(560px,80dvh)] w-full max-w-[600px] flex-col overflow-hidden rounded-[28px]"
                 >
                   <Dialog.Title className="sr-only">Search Outlly</Dialog.Title>
