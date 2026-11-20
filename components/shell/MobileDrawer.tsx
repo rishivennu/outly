@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { HoverLink } from "./HoverLink";
 import { WhoCard, menuKeys, useWho } from "./AccountMenu";
+import { InstallOutllyButton } from "@/components/pwa/InstallOutllyButton";
 import { useSignOut } from "./SignOutButton";
 import { openPalette } from "./CommandPalette";
 import { MAIN, TOUR, accountItems, isActive, type NavItem } from "./nav-items";
@@ -160,6 +161,7 @@ export function MobileDrawer({ className }: { className?: string }) {
                   {drawerItems(who.teammate, hidesTabBar(path)).map(link)}
                 </Section>
                 <Section id="dr-me" title="My account">{account.map(link)}</Section>
+                <InstallOutllyButton layout="menu" onPick={close} />
                 <Section id="dr-help" title={who.teammate ? "Support" : "Support & billing"}>
                   {more.map((m) => link(m.href === "/billing" ? { ...m, label: "Billing" } : m))}
                 </Section>

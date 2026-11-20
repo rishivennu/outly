@@ -278,6 +278,12 @@ describe("where the button lives", () => {
     expect(a.match(/<InstallOutllyButton /g)?.length).toBe(1);
     expect(a).toContain('<InstallOutllyButton layout="menu" onPick={onPick} />');
   });
+  test("phone drawer: the same menu row under My account, closing the drawer first", () => {
+    const d = src("components/shell/MobileDrawer.tsx");
+    expect(d.match(/<InstallOutllyButton /g)?.length).toBe(1);
+    expect(d).toContain('<InstallOutllyButton layout="menu" onPick={close} />');
+    expect(d.indexOf('id="dr-me"')).toBeLessThan(d.indexOf("<InstallOutllyButton "));
+  });
   test("Settings > Appearance, which says Outlly is installed once it is", () => {
     const v = src("components/settings/SettingsView.tsx");
     expect(v).toContain("<InstallSettingsCard />");
