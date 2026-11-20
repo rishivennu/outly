@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState, useSyncExternalStore } 
 import { cn } from "@/lib/utils";
 import { languageName } from "@/lib/captions/languages";
 import { RunCard, transcribeSteps } from "./RunCard";
-import { createCaptionStore, PILL_TIP, runLine, runPill, type CaptionState, type CaptionStore } from "./run-store";
+import { createCaptionStore, INTERRUPTED_PILL, PILL_TIP, runLine, runPill, type CaptionState, type CaptionStore } from "./run-store";
 
 const Ctx = createContext<CaptionStore | null>(null);
 
@@ -15,7 +15,8 @@ const idle = () => null;
 
 /**
  * One caption store for the whole of /create. It stops its run when /create closes, and while a run is busy
- * the browser asks before the tab is closed or reloaded (that does stop it; changing steps does not).
+ * (transcribe, translate or burn: any busy kind) the browser asks before the tab is closed or reloaded (that does
+ * stop it; changing steps does not, and the editor offers to start again after a reload, see run-resume.ts).
  */
 export function useCaptionWorkspace(): CaptionStore {
   const [store] = useState(() => createCaptionStore());
@@ -90,7 +91,7 @@ export function CaptionRunPill({ className }: { className?: string }) {
   const text = useRunText(runPill);
   if (!text) return null;
   const settled = text === "Done" || text === "Captions ready";
-  const working = !settled && text !== "Stopped" && text !== "Needs a look";
+  const working = !settled && text !== "Stopped" && text !== "Needs a look" && text !== INTERRUPTED_PILL;
   return (
     <span title={PILL_TIP} className={cn("mt-1 inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-foreground tabular-nums hairline", className)}>
       <span aria-hidden="true" className={cn("h-1.5 w-1.5 shrink-0 rounded-full", working ? "bg-lime motion-safe:animate-pulse" : settled ? "bg-[#173A24] dark:bg-lime" : "bg-muted-foreground")} />

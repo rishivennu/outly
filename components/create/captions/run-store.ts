@@ -8,6 +8,7 @@ import { runChunks } from "@/lib/captions/run";
 import { mergeSubtitleRules, type Word } from "@/lib/captions/subtitle-engine";
 import { buildCues, followTrack, keepEnglish, spliceSpan, spliceWords, stitchWords } from "@/lib/captions/timing";
 import { translateWindows } from "@/lib/captions/translate-core";
+import { clearMarker, readMarker, restartAction, sessionStore, writeMarker, type MarkerStorage, type RunStage } from "./run-resume";
 
 /**
  * Phase 4: the caption run (transcribe, translate, burn) and the lines it makes live here, not in the editor.
@@ -49,6 +50,8 @@ export type CaptionState = {
   outcome: Outcome;
   /** A burn that finished while the editor was not showing. Kept here so the video never changes under another step. */
   pendingBurn: File | null;
+  /** R1265: a run on this video was still going when the page reloaded (read from the sessionStorage marker). */
+  interrupted: { stage: RunStage } | null;
   /** Goes up when a run replaces the lines, so an open timing panel closes. */
   rev: number;
 };
@@ -69,6 +72,7 @@ export type Deps = {
   burnCaptions: typeof burnCaptions;
   offerUpgrade: typeof offerUpgrade;
   runId: () => string;
+  storage: () => MarkerStorage | null;
 };
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
@@ -79,7 +83,7 @@ const within = (cs: Cue[], from: number, to: number) => cs.filter((c) => (c.star
 const sameLines = (x: Cue[], y: Cue[]) => x.length === y.length && x.every((c, i) => c.start === y[i].start && c.end === y[i].end && c.text === y[i].text);
 const QUIET: ChunkAnswer = { words: [], language: "" };
 const newRunId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`);
-const DEPS: Deps = { audioChunks, postChunk, api, burnCaptions, offerUpgrade, runId: newRunId };
+const DEPS: Deps = { audioChunks, postChunk, api, burnCaptions, offerUpgrade, runId: newRunId, storage: sessionStore };
 
 function fresh(key: string | null, initialTrack: unknown, duration: number): CaptionState {
   const init = readTrack(initialTrack, duration || Infinity);
@@ -104,6 +108,7 @@ function fresh(key: string | null, initialTrack: unknown, duration: number): Cap
     busy: null,
     outcome: null,
     pendingBurn: null,
+    interrupted: null,
     rev: 0,
   };
 }
@@ -117,12 +122,13 @@ export function trackOf(s: CaptionState): CaptionTrack | null {
 }
 
 /** The journey pill: what the run is doing, or how it ended. null = nothing to say. */
-export function runPill(s: Pick<CaptionState, "busy" | "outcome"> & { pendingBurn?: File | null }): string | null {
+export function runPill(s: Pick<CaptionState, "busy" | "outcome"> & { pendingBurn?: File | null; interrupted?: CaptionState["interrupted"] }): string | null {
   const b = s.busy;
   if (b?.kind === "transcribe") return b.total > 1 ? `Transcribing, ${b.done} of ${b.total} parts` : b.total === 1 ? "Transcribing" : "Extracting audio";
   if (b?.kind === "translate") return "Translating";
   if (b?.kind === "burn") return `Adding captions ${Math.round(b.p * 100)}%`;
   if (s.pendingBurn) return "Captions ready";
+  if (s.interrupted) return INTERRUPTED_PILL;
   if (s.outcome === "done") return "Done";
   if (s.outcome === "stopped") return "Stopped";
   if (s.outcome === "failed") return "Needs a look";
@@ -136,6 +142,8 @@ export function runLine(s: Pick<CaptionState, "busy">): string | null {
   const what = b.kind === "transcribe" ? (b.total > 1 ? `Transcribing, ${b.done} of ${b.total} parts ready` : b.total === 1 ? "Transcribing" : "Extracting audio") : b.kind === "translate" ? "Translating your captions" : `Adding captions ${Math.round(b.p * 100)}%`;
   return `${what}. They keep going on every step; a reload stops them.`;
 }
+
+export const INTERRUPTED_PILL = "Run interrupted";
 
 export const PILL_TIP = "Captions keep going while you work on other steps. Reloading or closing the tab stops them.";
 
@@ -171,16 +179,18 @@ export function createCaptionStore(deps: Partial<Deps> = {}) {
   };
   /** One caption allowance per video, however many chunks or re-runs. Same file + length = same ref. */
   const ref = () => `${ctx.filename}:${Math.round(ctx.duration * 10)}`;
-  const start = (busy: Busy) => {
+  const start = (busy: NonNullable<Busy>) => {
     abort?.abort();
     const ctrl = new AbortController();
     abort = ctrl;
-    set({ busy, note: null, outcome: null });
+    writeMarker(d.storage(), ctx.key, busy.kind);
+    set({ busy, note: null, outcome: null, interrupted: null });
     return ctrl;
   };
   const finish = (ctrl: AbortController, outcome: Outcome) => {
     if (abort !== ctrl) return;
     abort = null;
+    clearMarker(d.storage());
     set({ busy: null, outcome: ctrl.signal.aborted ? "stopped" : outcome });
   };
   const replaceOriginal = (orig: Cue[]): Partial<CaptionState> => ({ tracks: { orig, en: null, view: "original" }, untranslated: [] });
@@ -203,11 +213,13 @@ export function createCaptionStore(deps: Partial<Deps> = {}) {
       handlers = { ...handlers, onBurned: undefined };
     },
     /** The editor's "Use captioned video": hands the waiting burn to the mounted editor. */
-    takeBurn(): boolean {
+    takeBurn(onBurned?: Handlers["onBurned"]): boolean {
       const f = state.pendingBurn;
-      if (!f || !handlers.onBurned) return false;
+      // The Launch step has no editor mounted, so it hands in the workspace's own swap.
+      const to = onBurned ?? handlers.onBurned;
+      if (!f || !to) return false;
       set({ pendingBurn: null, burned: true, outcome: null });
-      handlers.onBurned(f, "captions");
+      to(f, "captions");
       return true;
     },
     dropBurn() {
@@ -225,7 +237,27 @@ export function createCaptionStore(deps: Partial<Deps> = {}) {
       chunks = null;
       lastRun = null;
       state = fresh(s.key, s.initialTrack, s.duration);
+      const mark = readMarker(d.storage());
+      // Only this video's run can have been cut short by a reload; any other marker belongs to a run that just stopped.
+      if (mark?.key === s.key) state = { ...state, interrupted: { stage: mark.stage } };
+      else clearMarker(d.storage());
       return true;
+    },
+    /** "Start again" after a reload: the same action as before, from scratch, on the lines the draft kept. */
+    restart(font?: string): Promise<void> {
+      const i = state.interrupted;
+      if (!i) return Promise.resolve();
+      const t = state.tracks;
+      const onShow = t.view === "english" && t.en ? t.en : t.orig;
+      const act = restartAction(i.stage, onShow.length > 0);
+      clearMarker(d.storage());
+      set({ interrupted: null, on: true });
+      return act === "transcribe" ? store.transcribe() : act === "translate" ? store.translate() : store.burn(onShow, font);
+    },
+    dismissInterrupted() {
+      if (!state.interrupted) return;
+      clearMarker(d.storage());
+      set({ interrupted: null });
     },
     /** The video's details change without it being another video (duration read, local file dropped). */
     update(s: Omit<Session, "initialTrack">) {
@@ -263,6 +295,7 @@ export function createCaptionStore(deps: Partial<Deps> = {}) {
     dispose() {
       abort?.abort();
       abort = null;
+      clearMarker(d.storage());
       handlers = {};
     },
     ack() {

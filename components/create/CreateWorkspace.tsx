@@ -35,6 +35,7 @@ import { SaveDraft } from "./SaveDraft";
 import { autosaveLine, draftTitle, enabledPlatforms, launchGate, launchPlan, pickedAccount, scheduleProblem, targetPayload } from "./publish";
 import { CaptionBurner } from "./CaptionBurner";
 import { CaptionRunProvider, TranscribeRun, useCaptionBurning, useCaptionRunLine, useCaptionTranscribing, useCaptionWorkspace } from "./captions/CaptionRun";
+import { PendingBurnNotice } from "./captions/PendingBurnNotice";
 import { readFrames, readVideo } from "./frame";
 import { primeGroove } from "./Groove";
 import { ActionBar, barState, BURN_SEND, PreviewSheet, type BarId } from "./ActionBar";
@@ -1430,6 +1431,13 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   );
 
   const syncLine = <SyncStatus status={sync.status} lastSyncedAt={sync.lastSyncedAt} error={sync.error} needsMedia={sync.needsMedia} storedHere={sync.storedHere} onRetry={sync.retry} onResolve={conflict ? () => setComparing(true) : undefined} />;
+  /* A captioned or cut copy is ready: keep the clean one to go back to, upload the new one. Step 2 and Launch share it. */
+  const onCapBurned = (f: File, kind?: "captions" | "cut") => {
+    setPreCaption((p) => p ?? (media ? { media, file: fileRef.current } : null));
+    // The same video, captioned or cut: never read again.
+    startUpload(f, undefined, undefined, { watch: false });
+    toast(kind === "cut" ? "Clip cut. Uploading it as your video…" : "Captions added. Uploading the captioned video…", "info");
+  };
   const bar = barState({ online, hasMedia, uploadFailed: upload.kind === "failed", hasCaption: !!caption, ready: allReviewed, enabledCount: enabled.length, launching, saving: saved === "saving", step, mode, targets: plan.send, pending: pending.map((p) => PLATFORM_META[p].name), scheduleIssue, hasDraft: !!(postId || savedAt), activity: capLine, burning: capBurning, upload: upload.kind, progress: upload.kind === "uploading" || upload.kind === "paused" ? upload.progress : undefined, storySeen });
   const onGo = (s: Step) => setStep(s);
   const goTo = (s: Step, before?: () => void) => {
@@ -1760,12 +1768,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                     initialTrack={restoredTrack ?? undefined}
                     onTrackChange={onTrackChange}
                     session={(preCaption?.media ?? media)?.id}
-                    onBurned={(f, kind) => {
-                      setPreCaption((p) => p ?? (media ? { media, file: fileRef.current } : null));
-                      // The same video, captioned or cut: never read again.
-                      startUpload(f, undefined, undefined, { watch: false });
-                      toast(kind === "cut" ? "Clip cut. Uploading it as your video…" : "Captions added. Uploading the captioned video…", "info");
-                    }}
+                    onBurned={onCapBurned}
                     onUndo={
                       preCaption
                         ? () => {
@@ -1864,6 +1867,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
               <motion.section key="launch" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={T.page}>
                 <h1 className="sr-only">Launch</h1>
                 {pipButton}
+                {/* R1265: a burn that finished off Step 2 is offered here too, so the clean video is never sent by accident. */}
+                <PendingBurnNotice store={capStore} onBurned={onCapBurned} className="mb-4" />
                 {/* Held places are listed with their reason and never sent; the bar's Publish waits until none are left. */}
                 <LaunchPanel drafts={drafts} accounts={accounts} media={meta} poster={poster} hook={hook ?? ""} title={draftTitle({ drafts, hook, filename: media?.filename ?? fileRef.current?.name })} status={autosaveLine(saved, savedAt)} tz={tz} when={when} onWhen={setWhen} mode={mode} onMode={setMode} busy={launching} error={launchError} online={online}
                   onEdit={() => goTo("everywhere")}

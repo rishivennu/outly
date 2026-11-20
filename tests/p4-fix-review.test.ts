@@ -98,9 +98,12 @@ describe("p4 fix: a burn that lands off step", () => {
   test("the editor wiring: detach on unmount, the offer, the pill settles", () => {
     const burner = src("components/create/CaptionBurner.tsx");
     expect(burner).toContain("useEffect(() => () => store.detach(), [store]);");
-    expect(burner).toContain("onClick={() => store.takeBurn()}");
-    expect(burner).toContain("Use captioned video");
-    expect(burner).toContain("onClick={() => store.dropBurn()}");
+    // R1265: the offer lives in PendingBurnNotice, shared with the Launch step.
+    expect(burner).toContain('<PendingBurnNotice store={store} className="mt-4" />');
+    const notice = src("components/create/captions/PendingBurnNotice.tsx");
+    expect(notice).toContain("use: () => store.takeBurn(onBurned)");
+    expect(notice).toContain("Use captioned video");
+    expect(notice).toContain("keep: () => store.dropBurn()");
     const run = src("components/create/captions/CaptionRun.tsx");
     expect(run).toContain('const settled = text === "Done" || text === "Captions ready";');
   });

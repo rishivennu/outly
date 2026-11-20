@@ -21,6 +21,8 @@ import { CaptionShift } from "./captions/CaptionShift";
 import { CaptionSize } from "./captions/CaptionSize";
 import { captionFontFamily, readyCaptionFont } from "./caption-font";
 import { useCaptionState, useCaptionStore } from "./captions/CaptionRun";
+import { PendingBurnNotice } from "./captions/PendingBurnNotice";
+import { interruptedLine } from "./captions/run-resume";
 import { ClipCutter } from "./ClipCutter";
 import { saveBlob } from "@/lib/client/native";
 
@@ -80,7 +82,7 @@ export function CaptionBurner({ src, file, filename, duration, session, onBurned
   useEffect(() => store.flush(), [store, key]);
   useEffect(() => store.update({ key, src, file, filename, duration }), [store, key, src, file, filename, duration]);
 
-  const { on, tracks, words, style, pos, offset, size, busy, typing, note, burned, aiReady, plan, langPick, heard, untranslated, gaps, outcome, rev, pendingBurn } = useCaptionState(store);
+  const { on, tracks, words, style, pos, offset, size, busy, typing, note, burned, aiReady, plan, langPick, heard, untranslated, gaps, outcome, rev, interrupted } = useCaptionState(store);
   /* Original words and, once translated, English: one timeline, line for line. `cues` is the track on show. */
   const showing: "orig" | "en" = tracks.view === "english" && tracks.en ? "en" : "orig";
   const cues = showing === "en" && tracks.en ? tracks.en : tracks.orig;
@@ -203,6 +205,15 @@ export function CaptionBurner({ src, file, filename, duration, session, onBurned
     await store.burn(cues, captionFontFamily);
   }
 
+  /* After a reload: the run that was cut short, again from the start. A burn still checks its lines first. */
+  function startAgain() {
+    if (interrupted?.stage === "burn" && cues.length) {
+      store.set({ on: true });
+      if (blocked()) return;
+    }
+    void store.restart(captionFontFamily);
+  }
+
   function downloadSrt() {
     if (blocked()) return;
     const tag = showing === "en" ? "-en" : "";
@@ -313,11 +324,13 @@ export function CaptionBurner({ src, file, filename, duration, session, onBurned
         </label>
       </div>
 
-      {pendingBurn && !working && (
-        <div role="status" className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl bg-secondary/60 p-3 hairline">
-          <p className="min-w-0 flex-1 basis-56 text-[13px] text-foreground">Your captioned video is ready. It finished on another step, so your post still uses the video without captions.</p>
-          <Button type="button" variant="primary" onClick={() => store.takeBurn()}><Captions className="h-4 w-4" aria-hidden />Use captioned video</Button>
-          <Button type="button" variant="ghost" onClick={() => store.dropBurn()}>Keep this video</Button>
+      <PendingBurnNotice store={store} className="mt-4" />
+
+      {interrupted && !working && (
+        <div role="status" aria-live="polite" className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl bg-secondary/60 p-3 hairline">
+          <p className="min-w-0 flex-1 basis-56 text-[13px] text-foreground">{interruptedLine(interrupted.stage)}</p>
+          <Button type="button" variant="primary" onClick={startAgain}><RotateCcw className="h-4 w-4" aria-hidden />Start again</Button>
+          <Button type="button" variant="ghost" onClick={() => store.dismissInterrupted()}>Dismiss</Button>
         </div>
       )}
 
