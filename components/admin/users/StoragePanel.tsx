@@ -106,7 +106,7 @@ export function StoragePanel({ userId, email }: { userId?: string; email?: strin
       <div className="mb-4 flex items-center gap-3">
         <span aria-hidden className="cx-badge grid size-10 shrink-0 place-items-center rounded-full"><HardDrive className="size-[18px]" strokeWidth={1.8} /></span>
         <div className="min-w-0">
-          <h3 id={`${id}-h`} className="font-display text-[1.08rem] font-semibold leading-tight tracking-tight">Storage</h3>
+          <h3 id={`${id}-h`} className="text-[16px] font-semibold leading-[1.3]">Storage</h3>
           <p className="mt-0.5 text-[12.5px] text-muted-foreground">Files kept, this cycle's uploads, and manual changes</p>
         </div>
       </div>
@@ -172,7 +172,7 @@ export function StoragePanel({ userId, email }: { userId?: string; email?: strin
               </div>
             )}
           </div>
-          <fieldset className="mt-5 space-y-3 rounded-[20px] p-4 hairline" disabled={busy}>
+          <fieldset className="mt-5 space-y-3 rounded-[20px] bg-secondary/40 p-4" disabled={busy}>
             <legend className="px-1 text-[13px] font-semibold">Manual change, this cycle only</legend>
             <div>
               <Label htmlFor={`${id}-note`}>Why (saved in the audit log)</Label>

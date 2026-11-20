@@ -50,7 +50,7 @@ export function UpdatesEditor({ initial }: { initial: UpdateNotice }) {
         >
           What changed
         </CardTitle>
-        <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4 hairline", notice.on ? "bg-success/10" : "bg-secondary/40")}>
+        <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4", notice.on ? "bg-success/10" : "bg-secondary/40")}>
           <div className="flex items-center gap-3">
             <span className={cn("grid h-11 w-11 place-items-center rounded-2xl", notice.on ? "bg-success/15 text-success" : "bg-foreground/10 text-muted-foreground")}>
               <Megaphone className="h-5 w-5" aria-hidden />

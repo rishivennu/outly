@@ -75,7 +75,7 @@ export function BlogSettingsForm({ initial, ready, web, modelLabel }: { initial:
               <Textarea id="aud" rows={3} value={c.audience} onChange={(e) => set("audience", e.target.value)} maxLength={600} />
             </F>
             <F id="tone" label="Tone">
-              <select id="tone" value={c.tone} onChange={(e) => set("tone", e.target.value as BlogConfig["tone"])} className="field min-h-11 rounded-xl border border-border bg-card px-3 text-[14px] capitalize">
+              <select id="tone" value={c.tone} onChange={(e) => set("tone", e.target.value as BlogConfig["tone"])} className="field min-h-11 rounded-xl border border-border/60 bg-card px-3 text-[14px] capitalize">
                 {BLOG_TONES.map((t) => (
                   <option key={t} value={t}>
                     {t}
@@ -125,7 +125,7 @@ export function BlogSettingsForm({ initial, ready, web, modelLabel }: { initial:
               <span className="font-medium">Live web research during the research stage</span>
               <Switch on={c.webResearch} onChange={(v) => set("webResearch", v)} label="Live web research during the research stage" disabled={!web} />
             </label>
-            <p className="rounded-xl border border-dashed border-border p-3 text-[12.5px] text-muted-foreground">Auto-publish: off, and not available. Every article needs Approve &amp; Publish from an admin.</p>
+            <p className="rounded-xl border border-dashed border-border/60 p-3 text-[12.5px] text-muted-foreground">Auto-publish: off, and not available. Every article needs Approve &amp; Publish from an admin.</p>
           </div>
         </Card>
 
@@ -180,7 +180,7 @@ function ListField({ id, label, items, onChange, placeholder, rows }: { id: stri
 }
 function FeatureRow({ f, onChange, onRemove }: { f: BlogFeatureRef; onChange: (f: BlogFeatureRef) => void; onRemove: () => void }) {
   return (
-    <div className={cn("grid gap-2 rounded-2xl border border-border p-3 sm:grid-cols-[1fr_1fr_auto]")}>
+    <div className={cn("grid gap-2 rounded-2xl bg-secondary/40 p-3 sm:grid-cols-[1fr_1fr_auto]")}>
       <Input aria-label="Feature name" value={f.name} onChange={(e) => onChange({ ...f, name: e.target.value, id: f.id || e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-") })} placeholder="Feature name" maxLength={80} />
       <Input aria-label="Link path" value={f.href} onChange={(e) => onChange({ ...f, href: e.target.value })} placeholder="/#features" maxLength={120} />
       <Button type="button" variant="ghost" className="min-h-11" onClick={onRemove}>

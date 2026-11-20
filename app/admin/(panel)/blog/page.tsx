@@ -34,7 +34,7 @@ export default async function BlogDashboard() {
           { label: "Topics covered", value: stats.topics, href: "/admin/blog/calendar" },
           { label: "Rejected", value: stats.rejected, href: "/admin/blog/library?status=rejected" },
         ].map((k) => (
-          <Link key={k.label} href={k.href} className="rounded-2xl border bg-card p-4 transition-colors hover:bg-secondary/60">
+          <Link key={k.label} href={k.href} className="admin-card rounded-[20px] bg-card p-4" data-interactive="">
             <p className="text-[12.5px] text-muted-foreground">{k.label}</p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">{k.value}</p>
           </Link>

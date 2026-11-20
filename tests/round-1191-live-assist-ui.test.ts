@@ -79,7 +79,7 @@ describe("1191 the console is a working screen", () => {
   test("the composer is one growing line, clears the home bar, and shows the send in flight", () => {
     expect(consoleSrc).toContain("rows={1}");
     expect(consoleSrc).toContain("el.style.height = `${Math.min(el.scrollHeight, 160)}px`;");
-    expect(consoleSrc).toContain('className="shrink-0 border-t border-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"');
+    expect(consoleSrc).toContain('className="shrink-0 border-t border-border/60 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"');
     expect(consoleSrc).toContain("disabled={!text.trim() || sending}");
     // R1271: the shared Button, lime as the one main action; size="icon" is the 44px square.
     expect(consoleSrc).toContain('<Button type="submit" variant="lime" size="icon" disabled={!text.trim() || sending} aria-label="Send the reply"');
@@ -88,7 +88,7 @@ describe("1191 the console is a working screen", () => {
   test("the details drawer is a real dialog on a phone", () => {
     expect(consoleSrc).toContain('role="dialog" aria-modal="true" aria-labelledby="la-drawer-t"');
     expect(consoleSrc).toContain("ref={panelRef} tabIndex={-1} onKeyDown={trapTab}");
-    expect(consoleSrc).toContain("absolute inset-y-0 right-0 flex w-full flex-col border-l border-border bg-card shadow-2xl outline-none sm:w-[min(94vw,26rem)] sm:rounded-l-[22px]");
+    expect(consoleSrc).toContain("absolute inset-y-0 right-0 flex w-full flex-col border-l border-border/60 bg-card shadow-2xl outline-none sm:w-[min(94vw,26rem)] sm:rounded-l-[22px]");
     // Escape, the backdrop, the close button and the system back button all shut it, and the page behind
     // it stops scrolling while it is open.
     expect(consoleSrc).toContain('e.key === "Escape" && closeDrawer()');

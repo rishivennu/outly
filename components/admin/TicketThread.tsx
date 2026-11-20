@@ -15,7 +15,7 @@ import { Card } from "./ui";
 type T = { avatar?: string | null; id: string; ref: string; subject: string; status: string; priority: string; email: string; name: string | null; source: string; createdAt: string };
 type M = { id: string; author: string; authorName: string | null; body: string; createdAt: string };
 
-const sel = "h-9 rounded-full bg-secondary/60 px-3 text-[13px] font-semibold hairline";
+const sel = "h-9 rounded-full bg-secondary/60 px-3 text-[13px] font-semibold border border-border/60";
 
 export function TicketThread({ ticket, messages: initial }: { ticket: T; messages: M[] }) {
   const [t, setT] = useState(ticket);
@@ -60,7 +60,7 @@ export function TicketThread({ ticket, messages: initial }: { ticket: T; message
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-mono text-[12px] text-muted-foreground">{t.ref}</p>
-          <h1 className="font-display text-[1.35rem] font-bold leading-tight tracking-tight">{t.subject}</h1>
+          <h1 className="text-[22px] font-[650] leading-[1.25] sm:text-[26px]">{t.subject}</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           <label className="sr-only" htmlFor="tk-status">Status</label>
@@ -82,7 +82,7 @@ export function TicketThread({ ticket, messages: initial }: { ticket: T; message
             return (
               <motion.li key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn("flex gap-2.5", mine && "flex-row-reverse")}>
                 {bot ? <Pip size={30} mood="idle" /> : <OrbAvatar avatar={mine ? null : t.avatar} seed={mine ? m.authorName ?? "team" : t.email} size={32} />}
-                <div className={cn("max-w-[80%] rounded-[20px] px-4 py-2.5 text-[14px] leading-relaxed", mine ? "rounded-tr-md bg-lime/15" : bot ? "rounded-tl-md bg-secondary/60" : "rounded-tl-md bg-card hairline")}>
+                <div className={cn("max-w-[80%] rounded-[20px] px-4 py-2.5 text-[14px] leading-relaxed", mine ? "rounded-tr-md bg-lime/15" : bot ? "rounded-tl-md bg-secondary/60" : "rounded-tl-md border border-border/60 bg-card")}>
                   <p className="mb-0.5 text-[11.5px] font-semibold text-muted-foreground">{bot ? "Pip" : m.authorName ?? (mine ? "Team" : t.name ?? "Customer")} · {new Date(m.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })}</p>
                   <p className="whitespace-pre-wrap break-words">{m.body}</p>
                 </div>
@@ -92,7 +92,7 @@ export function TicketThread({ ticket, messages: initial }: { ticket: T; message
         </AnimatePresence>
       </ol>
 
-      <form onSubmit={reply} className="mt-6 border-t border-border pt-5">
+      <form onSubmit={reply} className="mt-6 border-t border-border/60 pt-5">
         <label htmlFor="tk-reply" className="mb-2 block text-[13px] font-medium text-muted-foreground">Reply to {t.name ?? t.email} (sent by email)</label>
         <Textarea id="tk-reply" rows={4} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Hi, thanks for waiting…" onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) reply(e as any); }} />
         <div className="mt-3 flex flex-wrap items-center gap-2">

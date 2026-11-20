@@ -199,7 +199,7 @@ export function PolicyPanel() {
           <legend className="mb-2 text-[13px] font-semibold">Cost budget</legend>
           <div className="grid gap-2 sm:grid-cols-3">
             {MODES.map(([k, label, hint]) => (
-              <label key={k} className={cn("flex min-h-[44px] cursor-pointer gap-3 rounded-2xl px-4 py-3 hairline focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring", form.budgetMode === k ? "bg-secondary" : "bg-secondary/30")}>
+              <label key={k} className={cn("flex min-h-[44px] cursor-pointer gap-3 rounded-2xl px-4 py-3 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring", form.budgetMode === k ? "bg-secondary" : "bg-secondary/30")}>
                 <input type="radio" name="budget-mode" value={k} checked={form.budgetMode === k} onChange={() => setForm({ ...form, budgetMode: k })} className="mt-1 h-4 w-4 accent-current" />
                 <span className="min-w-0">
                   <span className="block text-[14px] font-medium">{label}</span>

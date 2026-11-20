@@ -117,14 +117,14 @@ export function ReferralsPanel({ initial, plans }: { initial: { rows: Row[]; tot
           <span className="inline-flex items-center gap-2"><Gift className="h-4 w-4" aria-hidden /> Reward terms</span>
         </CardTitle>
         <div className="grid gap-4">
-          <label className="flex min-h-[44px] cursor-pointer items-center justify-between gap-3 rounded-[20px] bg-secondary/40 px-4 hairline">
+          <label className="flex min-h-[44px] cursor-pointer items-center justify-between gap-3 rounded-[20px] bg-secondary/40 px-4">
             <span className="text-[14px] font-medium">Refer &amp; Earn is on</span>
             <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} className="h-5 w-5 accent-lime" />
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label htmlFor="rf-plan">Reward plan</Label>
-              <select id="rf-plan" value={draft.rewardPlan} onChange={(e) => setDraft({ ...draft, rewardPlan: e.target.value })} className="h-11 w-full rounded-2xl bg-secondary/50 px-3 text-[14px] hairline">
+              <select id="rf-plan" value={draft.rewardPlan} onChange={(e) => setDraft({ ...draft, rewardPlan: e.target.value })} className="h-11 w-full rounded-2xl bg-secondary/50 px-3 text-[14px] border border-border/60">
                 {plans.map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}
               </select>
             </div>
@@ -139,7 +139,7 @@ export function ReferralsPanel({ initial, plans }: { initial: { rows: Row[]; tot
               {plans.map((p) => {
                 const on = draft.eligiblePlans.includes(p.slug);
                 return (
-                  <button key={p.slug} type="button" role="checkbox" aria-checked={on} onClick={() => toggleEligible(p.slug)} className={cn("min-h-11 rounded-2xl px-4 text-[13.5px] hairline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-lime/20 font-semibold text-lime-ink" : "bg-secondary/40 text-muted-foreground")}>
+                  <button key={p.slug} type="button" role="checkbox" aria-checked={on} onClick={() => toggleEligible(p.slug)} className={cn("min-h-11 rounded-2xl px-4 text-[13.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-lime/20 font-semibold text-lime-ink" : "bg-secondary/40 text-muted-foreground")}>
                     {p.name}
                   </button>
                 );
@@ -162,7 +162,7 @@ export function ReferralsPanel({ initial, plans }: { initial: { rows: Row[]; tot
           </div>
           <div>
             <Label htmlFor="rf-st">Stage</Label>
-            <select id="rf-st" value={status} onChange={(e) => { setStatus(e.target.value); void load({ status: e.target.value }); }} className="h-11 rounded-2xl bg-secondary/50 px-3 text-[14px] hairline">
+            <select id="rf-st" value={status} onChange={(e) => { setStatus(e.target.value); void load({ status: e.target.value }); }} className="h-11 rounded-2xl bg-secondary/50 px-3 text-[14px] border border-border/60">
               <option value="">All but opened-only</option>
               <option value="invited">Opened only</option>
               <option value="registered">Registered</option>

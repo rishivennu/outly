@@ -140,7 +140,7 @@ function HistoryView({ h, target }: { h: History; target: number }) {
       {!h.timeline.length ? (
         <p className="text-[13.5px] text-muted-foreground">Nothing recorded yet.</p>
       ) : (
-        <ol className="grid gap-3 border-l border-border pl-4">
+        <ol className="grid gap-3 border-l border-border/60 pl-4">
           {h.timeline.map((e, i) => (
             <li key={i} className="relative min-w-0">
               <span aria-hidden className={`absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full ${e.tone === "ok" ? "bg-success" : e.tone === "bad" ? "bg-destructive" : e.tone === "warn" ? "bg-warning" : "bg-muted-foreground/50"}`} />

@@ -58,7 +58,7 @@ export function FontPicker({ initial }: { initial: FontConfig }) {
               <label
                 key={f.id}
                 className={cn(
-                  "relative flex cursor-pointer flex-col gap-4 rounded-3xl bg-secondary/40 p-5 hairline transition-shadow focus-within:ring-2 focus-within:ring-ring",
+                  "relative flex cursor-pointer flex-col gap-4 rounded-3xl bg-secondary/40 p-5 transition-shadow focus-within:ring-2 focus-within:ring-ring",
                   on && "ring-2 ring-foreground/70",
                 )}
               >

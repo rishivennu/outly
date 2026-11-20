@@ -68,11 +68,11 @@ export function LandingToggles({ initial }: { initial: LandingConfig }) {
           <table className="w-full border-separate border-spacing-0 text-[13.5px]">
             <thead>
               <tr className="text-left text-[12px] font-semibold text-muted-foreground">
-                <th scope="col" className="w-10 border-b border-border pb-2 pr-2">#</th>
-                <th scope="col" className="border-b border-border pb-2 pr-3">Section</th>
-                <th scope="col" className="hidden border-b border-border pb-2 pr-3 md:table-cell">What it shows</th>
-                <th scope="col" className="hidden border-b border-border pb-2 pr-3 sm:table-cell">Status</th>
-                <th scope="col" className="border-b border-border pb-2 text-right">On the page</th>
+                <th scope="col" className="w-10 border-b border-border/60 pb-2 pr-2">#</th>
+                <th scope="col" className="border-b border-border/60 pb-2 pr-3">Section</th>
+                <th scope="col" className="hidden border-b border-border/60 pb-2 pr-3 md:table-cell">What it shows</th>
+                <th scope="col" className="hidden border-b border-border/60 pb-2 pr-3 sm:table-cell">Status</th>
+                <th scope="col" className="border-b border-border/60 pb-2 text-right">On the page</th>
               </tr>
             </thead>
             <tbody>
@@ -80,15 +80,15 @@ export function LandingToggles({ initial }: { initial: LandingConfig }) {
                 const on = isOn("sections", s.id);
                 return (
                   <tr key={s.id} className={cn("transition-opacity", !on && "opacity-70")}>
-                    <td className="border-b border-border py-3 pr-2 align-middle font-mono text-[12px] tabular text-muted-foreground">{String(i + 1).padStart(2, "0")}</td>
-                    <td className="border-b border-border py-3 pr-3 align-middle">
+                    <td className="border-b border-border/60 py-3 pr-2 align-middle font-mono text-[12px] tabular text-muted-foreground">{String(i + 1).padStart(2, "0")}</td>
+                    <td className="border-b border-border/60 py-3 pr-3 align-middle">
                       <span className="font-medium">{s.label}</span>
                       {"core" in s && s.core && <span className="ml-2 text-[11.5px] text-muted-foreground">recommended</span>}
                       <span className="mt-0.5 block text-[12px] text-muted-foreground md:hidden">{s.shows}</span>
                     </td>
-                    <td className="hidden border-b border-border py-3 pr-3 align-middle text-muted-foreground md:table-cell">{s.shows}</td>
-                    <td className="hidden border-b border-border py-3 pr-3 align-middle sm:table-cell"><State on={on} /></td>
-                    <td className="border-b border-border py-3 text-right align-middle">
+                    <td className="hidden border-b border-border/60 py-3 pr-3 align-middle text-muted-foreground md:table-cell">{s.shows}</td>
+                    <td className="hidden border-b border-border/60 py-3 pr-3 align-middle sm:table-cell"><State on={on} /></td>
+                    <td className="border-b border-border/60 py-3 text-right align-middle">
                       <Switch on={on} disabled={busy === `sections.${s.id}`} label={`Show ${s.label} on the landing page`} onChange={(v) => flip("sections", s.id, v, s.label)} />
                     </td>
                   </tr>
@@ -110,7 +110,7 @@ export function LandingToggles({ initial }: { initial: LandingConfig }) {
           <fieldset>
             <legend className="mb-2 text-[12px] font-semibold text-muted-foreground">Columns</legend>
             <ul className="grid gap-2">
-              <li className="flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] bg-secondary/40 px-4 hairline">
+              <li className="flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] bg-secondary/40 px-4">
                 <span className="font-medium">Outlly</span>
                 <span className="text-[12px] text-muted-foreground">Always shown</span>
               </li>
@@ -118,7 +118,7 @@ export function LandingToggles({ initial }: { initial: LandingConfig }) {
                 const on = isOn("competitors", c.id);
                 const last = on && colsOn === 1;
                 return (
-                  <li key={c.id} className="flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] px-4 hairline">
+                  <li key={c.id} className="flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] bg-secondary/25 px-4">
                     <span className="min-w-0">
                       <span className="font-medium">{c.label}</span>
                       {last && <span className="block text-[11.5px] text-muted-foreground">Keep at least one to compare against</span>}
@@ -136,7 +136,7 @@ export function LandingToggles({ initial }: { initial: LandingConfig }) {
                 const on = isOn("groups", g);
                 const last = on && groupsOn === 1;
                 return (
-                  <li key={g} className="flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] px-4 hairline">
+                  <li key={g} className="flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] bg-secondary/25 px-4">
                     <span className="min-w-0">
                       <span className="font-medium">{g}</span>
                       {last && <span className="block text-[11.5px] text-muted-foreground">Hide the whole section instead</span>}

@@ -38,7 +38,7 @@ export function OutboxView({ rows }: { rows: R[] }) {
             <div className="flex gap-2"><dt className="w-16 shrink-0 text-muted-foreground">Via</dt><dd className="min-w-0 [overflow-wrap:anywhere] capitalize">{cur.provider}{cur.error && <span className="text-destructive"> · {cur.error}</span>}</dd></div>
           </dl>
           {/* sandbox: no scripts, no same-origin, so a stored email can never touch the admin session */}
-          <iframe title={`Email: ${cur.subject}`} sandbox="" srcDoc={cur.html} className="w-full flex-1 rounded-2xl bg-white hairline" style={{ minHeight: 480 }} />
+          <iframe title={`Email: ${cur.subject}`} sandbox="" srcDoc={cur.html} className="w-full flex-1 rounded-2xl bg-white border border-border/60" style={{ minHeight: 480 }} />
         </Card>
       )}
     </div>

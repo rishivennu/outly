@@ -61,7 +61,7 @@ export function TopicBacklog({ initial, categories }: { initial: Lists; categori
       {lists.backlog.length ? (
         <ol className="grid gap-2">
           {lists.backlog.map((t, i) => (
-            <li key={t.id} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border p-3">
+            <li key={t.id} className="flex flex-wrap items-start justify-between gap-3 rounded-2xl bg-secondary/40 p-3">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2 text-[14px] font-medium">
                   {i === 0 && <Pill tone="lime">Next run</Pill>}
@@ -96,7 +96,7 @@ export function TopicBacklog({ initial, categories }: { initial: Lists; categori
         <div className="grid gap-1.5">
           <Label htmlFor="tb-cat">Category</Label>
           {categories?.length ? (
-            <select id="tb-cat" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} className="field min-h-11 rounded-xl border border-border bg-card px-3 text-[14px]">
+            <select id="tb-cat" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} className="field min-h-11 rounded-xl border border-border/60 bg-card px-3 text-[14px]">
               {categories.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -120,7 +120,7 @@ export function TopicBacklog({ initial, categories }: { initial: Lists; categori
         {lists.candidates.length ? (
           <ul className="mt-3 grid gap-2">
             {lists.candidates.map((t) => (
-              <li key={t.id} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border p-3">
+              <li key={t.id} className="flex flex-wrap items-start justify-between gap-3 rounded-2xl bg-secondary/40 p-3">
                 <div className="min-w-0">
                   <p className="text-[14px] font-medium">{t.topic}</p>
                   <p className="mt-0.5 text-[12.5px] text-muted-foreground">{[`score ${t.score}`, t.category, t.primaryKeyword].filter(Boolean).join(" · ")}</p>

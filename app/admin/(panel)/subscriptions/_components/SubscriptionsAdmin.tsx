@@ -41,7 +41,7 @@ export function SubscriptionsAdmin({ target, openFlags }: { target: number; open
               onKeyDown={(e) => onKey(e, i)}
               className={cn(
                 "inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 text-[13px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none",
-                on ? "lime-bg" : "bg-secondary/60 text-muted-foreground hairline hover:text-foreground",
+                on ? "lime-bg" : "bg-secondary/60 text-muted-foreground hover:text-foreground",
               )}
             >
               {label}

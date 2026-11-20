@@ -119,7 +119,7 @@ export function AiAccessPanel({ userId, canManage, onChanged }: { userId: string
           </div>
         </div>
         <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px]">
-          <div className="rounded-[18px] bg-secondary/40 p-3 hairline">
+          <div className="rounded-[18px] bg-secondary/40 p-3">
             <dt className="text-[12px] text-muted-foreground">AI requests this month</dt>
             <dd className="mt-0.5 font-semibold tabular-nums">{acc.monthLimit > 0 ? `${acc.monthUsed} of ${acc.monthLimit}` : `${acc.monthUsed}, no monthly limit`}</dd>
             {acc.monthLimit > 0 && (
@@ -128,7 +128,7 @@ export function AiAccessPanel({ userId, canManage, onChanged }: { userId: string
               </div>
             )}
           </div>
-          <div className="rounded-[18px] bg-secondary/40 p-3 hairline">
+          <div className="rounded-[18px] bg-secondary/40 p-3">
             <dt className="text-[12px] text-muted-foreground">Unlimited AI Access</dt>
             <dd className="mt-0.5 font-semibold">{acc.live ? (acc.live.expiresAt ? `Until ${fmtDate(acc.live.expiresAt)}` : "Permanent") : "None"}</dd>
             {acc.live && <p className="mt-1 text-[12px] text-muted-foreground">{featuresText(acc.live.features)}</p>}
@@ -154,13 +154,13 @@ export function AiAccessPanel({ userId, canManage, onChanged }: { userId: string
           <fieldset disabled={!!busy} className="grid gap-4 disabled:opacity-60">
             <div role="group" aria-labelledby={`ai-feat-${userId}`}>
               <p id={`ai-feat-${userId}`} className="mb-2 text-[13px] font-medium">Features</p>
-              <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl bg-secondary/40 px-3 hairline">
+              <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl bg-secondary/40 px-3">
                 <input type="checkbox" className="h-5 w-5 accent-[hsl(var(--lime))]" checked={all} onChange={(e) => setAll(e.target.checked)} />
                 <span className="text-[14px] font-medium">All AI features</span>
               </label>
               <div className={cn("mt-2 grid gap-2 transition-opacity duration-200 sm:grid-cols-2", ease, all && "opacity-60")}>
                 {AI_FEATURES.map((f) => (
-                  <label key={f} className="flex min-h-11 cursor-pointer items-start gap-3 rounded-2xl px-3 py-2.5 hairline">
+                  <label key={f} className="flex min-h-11 cursor-pointer items-start gap-3 rounded-2xl bg-secondary/40 px-3 py-2.5">
                     <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0 accent-[hsl(var(--lime))]" disabled={all} checked={all || picked.includes(f)} onChange={() => toggle(f)} />
                     <span className="min-w-0 text-[13.5px]">
                       {AI_FEATURE_LABEL[f]}
@@ -174,7 +174,7 @@ export function AiAccessPanel({ userId, canManage, onChanged }: { userId: string
               <p id={`ai-len-${userId}`} className="mb-2 text-[13px] font-medium">How long</p>
               <div role="radiogroup" aria-labelledby={`ai-len-${userId}`} className="grid grid-cols-3 gap-2">
                 {(["days", "until", "permanent"] as const).map((m) => (
-                  <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={cn("min-h-11 rounded-2xl text-[13.5px] font-medium hairline transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", ease, mode === m ? "bg-foreground text-background" : "bg-secondary/40 [@media(hover:hover)]:hover:bg-secondary")}>
+                  <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={cn("min-h-11 rounded-2xl text-[13.5px] font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", ease, mode === m ? "bg-foreground text-background" : "bg-secondary/40 [@media(hover:hover)]:hover:bg-secondary")}>
                     {m === "days" ? "Duration" : m === "until" ? "Until a date" : "Permanent"}
                   </button>
                 ))}
@@ -182,7 +182,7 @@ export function AiAccessPanel({ userId, canManage, onChanged }: { userId: string
               {mode === "days" && (
                 <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Length">
                   {PRESETS.map((d) => (
-                    <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d)} className={cn("min-h-11 min-w-[5.5rem] rounded-2xl px-3 text-[13.5px] tabular-nums hairline transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", ease, days === d ? "bg-lime/20 font-semibold text-lime-ink" : "bg-secondary/40")}>
+                    <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d)} className={cn("min-h-11 min-w-[5.5rem] rounded-2xl px-3 text-[13.5px] tabular-nums transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", ease, days === d ? "bg-lime/20 font-semibold text-lime-ink" : "bg-secondary/40")}>
                       {d} days
                     </button>
                   ))}

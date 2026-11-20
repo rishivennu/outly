@@ -62,7 +62,7 @@ const ring = "focus-visible:outline focus-visible:outline-2 focus-visible:outlin
 // R1271: colour and press come from the shared Button variant; this keeps the 44px, 13px console shape.
 const btn = cn("inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-4 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-50", ring);
 const input = "h-11 rounded-2xl px-3 text-[13px]";
-const field = cn("min-h-11 rounded-2xl border border-border bg-background px-3 text-[13px]", ring);
+const field = cn("min-h-11 rounded-2xl border border-border/60 bg-background px-3 text-[13px]", ring);
 
 class CallError extends Error {
   constructor(public status: number, message: string, public code?: string) {
@@ -99,13 +99,13 @@ function LevelPill({ level, text }: { level: Level; text?: string }) {
 }
 
 function Kpi({ label, value, sub, tone }: { label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: Tone }) {
-  const edge = tone === "bad" ? "border-destructive/40" : tone === "warn" ? "border-warning/40" : tone === "ok" ? "border-success/30" : "border-border";
+  const edge = tone === "bad" ? "border border-destructive/40" : tone === "warn" ? "border border-warning/40" : tone === "ok" ? "border border-success/30" : undefined;
   return (
-    <div className={cn("rounded-[20px] border bg-card p-4", edge)}>
-      <p className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
+    <Card as="div" className={cn("rounded-[20px] p-4 sm:p-4", edge)}>
+      <p className="text-[12.5px] font-medium text-muted-foreground">{label}</p>
       <p className="mt-1.5 font-display text-[1.45rem] font-semibold leading-none tabular-nums">{value}</p>
       {sub && <p className="mt-1.5 text-[12.5px] text-muted-foreground">{sub}</p>}
-    </div>
+    </Card>
   );
 }
 
@@ -334,7 +334,7 @@ export function SystemHealth({ me, role }: { me: { id: string; name: string }; r
       ) : (
         <>
           {/* Overall status */}
-          <Card className={cn("border", overall === "critical" ? "border-destructive/40" : overall === "warning" ? "border-warning/40" : overall === "ok" ? "border-success/30" : "")}>
+          <Card className={cn(overall === "critical" ? "border border-destructive/40" : overall === "warning" ? "border border-warning/40" : overall === "ok" ? "border border-success/30" : "")}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <span aria-hidden className={cn("grid size-11 place-items-center rounded-full", overall === "critical" ? "bg-destructive/15 text-destructive" : overall === "warning" ? "bg-warning/15 pill-ink-warn" : overall === "ok" ? "bg-success/15 pill-ink-ok" : "bg-secondary text-muted-foreground")}>
@@ -698,10 +698,10 @@ function IncidentDrawer({ id, me, onClose, onChanged }: { id: string; me: { id: 
               {inc.resolvedAt && <Stat label="Resolved" value={`${fmtDate(inc.resolvedAt, true)} by ${inc.resolvedBy ?? "unknown"}`} />}
               {inc.recoveryNotifiedAt && <Stat label="Recovery alert" value={fmtDate(inc.recoveryNotifiedAt, true)} />}
             </dl>
-            <h3 className="mt-5 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">What failed</h3>
+            <h3 className="mt-5 text-[16px] font-semibold">What failed</h3>
             <p className="mt-1 text-[13.5px]">{inc.description || "No description recorded."}</p>
             {inc.errorDetail && <pre className="mt-2 whitespace-pre-wrap break-words rounded-[14px] bg-secondary/60 p-3 font-mono text-[12px]">{inc.errorDetail}</pre>}
-            <h3 className="mt-4 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Likely cause (estimated)</h3>
+            <h3 className="mt-4 text-[16px] font-semibold">Likely cause (estimated)</h3>
             <p className="mt-1 text-[13.5px] text-muted-foreground">{inc.likelyCause || "Not enough signal to estimate a cause."}</p>
 
             <div className="mt-5 flex flex-wrap gap-2">
@@ -745,7 +745,7 @@ function IncidentDrawer({ id, me, onClose, onChanged }: { id: string; me: { id: 
               </Button>
             </form>
 
-            <h3 className="mt-6 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Timeline</h3>
+            <h3 className="mt-6 text-[16px] font-semibold">Timeline</h3>
             <ol className="mt-2 space-y-2">
               {d.notes.map((n) => (
                 <li key={n.id} className="flex gap-3 text-[13px]">
@@ -758,7 +758,7 @@ function IncidentDrawer({ id, me, onClose, onChanged }: { id: string; me: { id: 
               {!d.notes.length && <li className="text-[13px] text-muted-foreground">No notes yet.</li>}
             </ol>
 
-            <h3 className="mt-6 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Alert deliveries</h3>
+            <h3 className="mt-6 text-[16px] font-semibold">Alert deliveries</h3>
             <ul className="mt-2 space-y-1.5">
               {d.deliveries.map((x) => (
                 <li key={x.id} className="flex flex-wrap items-center gap-2 text-[13px]">
@@ -773,7 +773,7 @@ function IncidentDrawer({ id, me, onClose, onChanged }: { id: string; me: { id: 
               {!d.deliveries.length && <li className="text-[13px] text-muted-foreground">No alert was attempted for this incident.</li>}
             </ul>
 
-            <h3 className="mt-6 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Checks around it</h3>
+            <h3 className="mt-6 text-[16px] font-semibold">Checks around it</h3>
             <ul className="mt-2 space-y-1.5">
               {d.checks.map((c, i) => (
                 <li key={i} className="flex flex-wrap items-center gap-2 text-[13px]">
@@ -801,7 +801,7 @@ function SettingsPanel({ data, isSuper, support, pushHere, busy, onClose, onTogg
   const pushWord = support === "unsupported" ? "This browser cannot show Outlly notifications." : support === "ios-needs-install" ? "On iPhone and iPad, add Outlly to the Home Screen first; Safari tabs cannot receive pushes." : pushHere ? "Alert pushes are on for this device." : "Alerts reach this device only after you turn pushes on here.";
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()} title="Alerts & settings" description="Watchdog" className="lg:w-[560px]">
-        <section aria-labelledby="set-push" className="rounded-[18px] border border-border p-4">
+        <section aria-labelledby="set-push" className="rounded-[18px] bg-secondary/40 p-4">
           <h3 id="set-push" className="flex items-center gap-2 text-[14px] font-semibold">
             <BellRing className="size-4" aria-hidden /> Alert pushes on this device
           </h3>
@@ -814,7 +814,7 @@ function SettingsPanel({ data, isSuper, support, pushHere, busy, onClose, onTogg
               {busy === "test" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null} Send a test alert
             </Button>
           </div>
-          <h4 className="mt-4 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Your alert devices</h4>
+          <h4 className="mt-4 text-[16px] font-semibold">Your alert devices</h4>
           <ul className="mt-1.5 divide-y divide-border/60">
             {data.devices.map((dv) => (
               <li key={dv.id} className="flex items-center justify-between gap-3 py-2 text-[13px]">
@@ -837,7 +837,7 @@ function SettingsPanel({ data, isSuper, support, pushHere, busy, onClose, onTogg
 
         {isSuper && cfg ? (
           <form
-            className="mt-4 rounded-[18px] border border-border p-4"
+            className="mt-4 rounded-[18px] bg-secondary/40 p-4"
             onSubmit={(e) => {
               e.preventDefault();
               void onSave({ enabled, alertEmail: email.trim(), muted, intervals });
@@ -856,7 +856,7 @@ function SettingsPanel({ data, isSuper, support, pushHere, busy, onClose, onTogg
               <span className="block text-[12px] text-muted-foreground">Used only when no alert device accepts a push. Blank turns the backup off.</span>
               <Input type="email" className={cn(input, "mt-1.5")} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ops@example.com" />
             </label>
-            <h4 className="mt-5 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Check frequency and muting</h4>
+            <h4 className="mt-5 text-[16px] font-semibold">Check frequency and muting</h4>
             <p className="mt-1 text-[12px] text-muted-foreground">Minimum 60 s: the engine runs from the minute cron, so nothing is checked more often than once a minute. A muted service is still checked and recorded, never alerted.</p>
             <ul className="mt-2 divide-y divide-border/60">
               {monitored.map((s) => (

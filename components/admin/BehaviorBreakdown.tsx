@@ -19,7 +19,7 @@ function Stat({ label, value, sub, hint }: { label: string; value: string; sub?:
         <span className="min-w-0">{label}</span>
         {hint && <Hint text={hint} label={`How ${label} is counted`} />}
       </p>
-      <p data-count={value} className="mt-2 font-display text-[1.75rem] font-bold leading-none tracking-[-0.03em] tabular">{value}</p>
+      <p data-count={value} className="mt-2 font-display text-[1.75rem] font-bold leading-none tabular">{value}</p>
       {sub && <p className="mt-2.5 text-[12.5px] text-muted-foreground">{sub}</p>}
     </Card>
   );

@@ -84,7 +84,7 @@ export function OverviewCharts({ series, revenueByPlan, currency, showMoney }: {
   return (
     <div ref={root} data-enter-root className="mt-6">
       <div data-enter className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="font-display text-[1.2rem] font-semibold tracking-tight">Trends</h2>
+        <h2 className="text-[20px] font-semibold leading-[1.3]">Trends</h2>
         <div ref={seg.box} role="radiogroup" aria-label="Date range" onKeyDown={onRangeKey} className="pulse-seg relative">
           <span ref={seg.bar} aria-hidden="true" className="pulse-seg-pill" />
           {RANGES.map((r) => (

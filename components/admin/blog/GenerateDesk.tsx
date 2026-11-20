@@ -165,7 +165,7 @@ export function StageList({ job, onCancel, compact = false }: { job: BlogJobView
     <Card as="div" className={cn(compact && "p-4")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Run for {job.forDate}</p>
+          <p className="text-[12px] font-semibold text-muted-foreground">Run for {job.forDate}</p>
           <p className="truncate font-display text-[1.05rem] font-semibold">{job.topic || "Choosing a creator problem"}</p>
         </div>
         <div className="flex items-center gap-2">

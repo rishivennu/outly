@@ -73,7 +73,7 @@ export function TeamView({ initial, me, roles }: { initial: A[]; me: string; rol
             <tr key={a.id}>
               <td><span className="block font-medium">{a.name}{a.id === me && <Pill className="ml-2" tone="lime">you</Pill>}</span><span className="font-mono text-[12px] text-muted-foreground">{a.login}</span></td>
               <td>
-                <select aria-label={`Role for ${a.name}`} value={a.role} onChange={(e) => patch(a, { role: e.target.value })} className="h-9 rounded-full bg-secondary/60 px-3 text-[13px] font-semibold hairline">
+                <select aria-label={`Role for ${a.name}`} value={a.role} onChange={(e) => patch(a, { role: e.target.value })} className="h-9 rounded-full bg-secondary/60 px-3 text-[13px] font-semibold border border-border/60">
                   {ROLES.map((r) => <option key={r} value={r}>{roles.label[r]}</option>)}
                 </select>
               </td>
@@ -95,7 +95,7 @@ export function TeamView({ initial, me, roles }: { initial: A[]; me: string; rol
           <div><Label htmlFor="tm-l">Login</Label><Input id="tm-l" value={form.login} onChange={(e) => setForm({ ...form, login: e.target.value.toLowerCase() })} autoComplete="off" required /></div>
           <div>
             <Label htmlFor="tm-r">Role</Label>
-            <select id="tm-r" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as AdminRole })} className="h-12 w-full rounded-2xl bg-secondary/60 px-3 text-[14px] hairline">
+            <select id="tm-r" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as AdminRole })} className="h-12 w-full rounded-2xl bg-secondary/60 px-3 text-[14px] border border-border/60">
               {ROLES.map((r) => <option key={r} value={r}>{roles.label[r]}</option>)}
             </select>
           </div>

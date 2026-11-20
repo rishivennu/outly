@@ -119,7 +119,7 @@ function PlatformCard({ p, saved, ready, base, dm, deletion, clash, onSaved }: {
         {dm && (
           <div className="grid min-w-0 grid-cols-1 gap-2 [&>*]:min-w-0" aria-label="Direct messages setup">
             <p className="text-[12.5px] font-semibold text-foreground">Direct messages</p>
-            <label className="flex min-h-[3.25rem] cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4 py-2.5 hairline">
+            <label className="flex min-h-[3.25rem] cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4 py-2.5">
               <span className="min-w-0">
                 <span className="block text-[14px] font-medium">Ask for the messaging permission</span>
                 <span id={`${p}-dms-hint`} className="block text-[12px] leading-snug text-muted-foreground">
@@ -139,7 +139,7 @@ function PlatformCard({ p, saved, ready, base, dm, deletion, clash, onSaved }: {
         {ig && (
           <div className="grid min-w-0 grid-cols-1 gap-2 [&>*]:min-w-0" aria-label="Instagram insights">
             <p className="text-[12.5px] font-semibold text-foreground">Insights</p>
-            <label className="flex min-h-[3.25rem] cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4 py-2.5 hairline">
+            <label className="flex min-h-[3.25rem] cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4 py-2.5">
               <span className="min-w-0">
                 <span className="block text-[14px] font-medium">Ask creators for Instagram insights</span>
                 <span id="instagram-insights-hint" className="block text-[12px] leading-snug text-muted-foreground">

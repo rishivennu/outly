@@ -73,14 +73,14 @@ export function AdminLoginForm({ next }: { next: string }) {
   }
 
   const label = "mb-1.5 text-[14px] font-semibold text-foreground";
-  const field = "h-12 rounded-xl border border-border bg-card shadow-[0_1px_2px_hsl(var(--foreground)/0.05)] hover:border-foreground/25 focus:border-foreground/40 focus:bg-card";
+  const field = "h-12 rounded-xl border border-border/60 bg-card shadow-[0_1px_2px_hsl(var(--foreground)/0.05)] hover:border-foreground/25 focus:border-foreground/40 focus:bg-card";
 
   return (
     <div ref={ref} className="gs-stage">
       <div className="gs-in mb-4 flex [@media(max-height:800px)]:hidden">
         <Pip size={56} mood={mood} />
       </div>
-      <h1 className="gs-in font-display text-[clamp(2rem,3.4vw,2.5rem)] font-bold leading-[1.05] tracking-[-0.035em]">Admin sign in</h1>
+      <h1 className="gs-in text-[26px] font-[650] leading-[1.2] sm:text-[28px] lg:text-[30px]">Admin sign in</h1>
       <p className="gs-in mb-6 mt-2.5 max-w-[40ch] text-[15px] leading-relaxed text-muted-foreground">The Outlly team console. Separate from creator accounts.</p>
 
       <form onSubmit={submit} noValidate className="w-full space-y-4 [@media(max-height:800px)]:space-y-3" aria-describedby={error ? "admin-login-error" : undefined}>

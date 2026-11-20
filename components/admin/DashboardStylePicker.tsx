@@ -27,7 +27,7 @@ const STYLES: { id: DashboardStyle; name: string; body: string; points: string[]
 function Preview({ id }: { id: DashboardStyle }) {
   const bar = "rounded-full bg-foreground/15";
   return (
-    <span aria-hidden className="flex h-28 gap-2 overflow-hidden rounded-2xl bg-background/60 p-2.5 hairline">
+    <span aria-hidden className="flex h-28 gap-2 overflow-hidden rounded-2xl bg-background/60 p-2.5">
       <span className="flex w-10 flex-col gap-1.5 rounded-xl bg-secondary/70 p-1.5">
         {[0, 1, 2, 3, 4].map((i) => <span key={i} className={cn("h-1.5", i === 0 ? "rounded-full bg-lime" : bar)} />)}
       </span>
@@ -89,7 +89,7 @@ export function DashboardStylePicker({ initial }: { initial: DashboardConfig }) 
             {STYLES.map((s) => {
               const on = cfg.style === s.id;
               return (
-                <label key={s.id} className={cn("relative flex cursor-pointer flex-col gap-3 rounded-3xl bg-secondary/40 p-5 hairline transition-shadow focus-within:ring-2 focus-within:ring-ring", on && "ring-2 ring-foreground/70")}>
+                <label key={s.id} className={cn("relative flex cursor-pointer flex-col gap-3 rounded-3xl bg-secondary/40 p-5 transition-shadow focus-within:ring-2 focus-within:ring-ring", on && "ring-2 ring-foreground/70")}>
                   <input type="radio" name="dash-style" value={s.id} checked={on} onChange={() => save({ style: s.id }, (c) => `Everyone now gets the ${name(c.style)} dashboard${c.userSwitch ? " unless they picked their own" : ""}.`)} className="sr-only" />
                   <span className="flex items-center justify-between gap-2">
                     <span className="flex flex-wrap items-center gap-2">
@@ -111,7 +111,7 @@ export function DashboardStylePicker({ initial }: { initial: DashboardConfig }) 
       </Card>
       <Card>
         <CardTitle hint="On: a small Classic / Analytics switch appears on Home and each browser keeps its own pick. Off: everyone sees the default above.">Let people switch</CardTitle>
-        <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-3 hairline">
+        <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-3">
           <span className="text-[14px] font-medium">Show the dashboard switch on Home</span>
           <Switch on={cfg.userSwitch} disabled={busy} label="Show the dashboard switch on Home" onChange={(v) => save({ userSwitch: v }, (c) => (c.userSwitch ? "People can now switch dashboards from Home." : `Switch hidden. Everyone sees the ${name(c.style)} dashboard.`))} />
         </label>

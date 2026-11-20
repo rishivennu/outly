@@ -81,7 +81,7 @@ export function NotificationsPanel({ initial, adminLogin, adminName = "", audit 
         >
           Global pause
         </CardTitle>
-        <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4 hairline", cfg.paused ? "bg-warning/10" : "bg-secondary/40")}>
+        <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4", cfg.paused ? "bg-warning/10" : "bg-secondary/40")}>
           <div className="flex items-center gap-3">
             <span className={cn("grid h-11 w-11 place-items-center rounded-2xl", cfg.paused ? "bg-warning/20 text-warning" : "bg-success/15 text-success")}>
               {cfg.paused ? <BellOff className="h-5 w-5" aria-hidden="true" /> : <BellRing className="h-5 w-5" aria-hidden="true" />}
@@ -96,7 +96,7 @@ export function NotificationsPanel({ initial, adminLogin, adminName = "", audit 
           {lastPause ? <>Last changed <span suppressHydrationWarning>{ago(lastPause.at)}</span>: {lastPause.body ?? lastPause.title}</> : "Never paused or resumed from this screen. Every change here is written to the admin audit log with who did it."}
         </p>
         {audit.length > 0 && (
-          <details className="mt-2 rounded-[14px] bg-secondary/30 px-3 py-2 hairline">
+          <details className="mt-2 rounded-[14px] bg-secondary/30 px-3 py-2">
             <summary className="cursor-pointer text-[13px] font-medium min-h-11 flex items-center">Recent changes from this screen ({audit.length})</summary>
             <ul className="mb-1 grid gap-1.5 text-[12.5px] text-muted-foreground">
               {audit.map((a) => (
@@ -116,7 +116,7 @@ export function NotificationsPanel({ initial, adminLogin, adminName = "", audit 
         </CardTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           {BUCKETS.map((b) => (
-            <div key={b.id} className="rounded-[18px] p-4 hairline">
+            <div key={b.id} className="rounded-[18px] bg-secondary/40 p-4">
               <Label htmlFor={`cd-${b.id}`}>{b.label}</Label>
               <div className="mt-2 flex items-center gap-2">
                 <Input
@@ -157,7 +157,7 @@ export function NotificationsPanel({ initial, adminLogin, adminName = "", audit 
         </p>
         <div className="grid gap-3">
           {IDLE_TIERS.map((t) => (
-            <div key={t} className="rounded-[18px] p-4 hairline">
+            <div key={t} className="rounded-[18px] bg-secondary/40 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-[14px] font-semibold">{IDLE_LABEL[t]}</p>
                 <Button size="sm" variant="outline" disabled={busy === `idle-${t}`} onClick={() => idle(t, { on: !cfg.idle[t].on })}>
@@ -187,7 +187,7 @@ export function NotificationsPanel({ initial, adminLogin, adminName = "", audit 
         </CardTitle>
         <div className="grid gap-3">
           {GREET_SLOTS.map((s) => (
-            <div key={s} className="rounded-[18px] p-4 hairline">
+            <div key={s} className="rounded-[18px] bg-secondary/40 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-[14px] font-semibold">{GREET_LABEL[s]}</p>
                 <Button size="sm" variant="outline" disabled={busy === `greet-${s}`} onClick={() => greet(s, { on: !cfg.greet[s].on })}>
@@ -199,7 +199,7 @@ export function NotificationsPanel({ initial, adminLogin, adminName = "", audit 
                 id={`greet-${s}`}
                 rows={3}
                 defaultValue={cfg.greet[s].lines.join("\n")}
-                className="mt-1 w-full rounded-[14px] bg-secondary/40 p-3 text-[13.5px] hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                className="mt-1 w-full rounded-[14px] bg-secondary/40 p-3 text-[13.5px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 aria-invalid={greetErr[s]?.length ? true : undefined}
                 aria-describedby={`greet-${s}-help`}
                 onBlur={(e) => {
@@ -233,7 +233,7 @@ export function NotificationsPanel({ initial, adminLogin, adminName = "", audit 
         <p className="mb-3 text-[13px] text-muted-foreground">
           Only pushes a cooldown held back are counted; the originals are already in the creator&apos;s bell, and the summary opens it. Every {cfg.digest.windowMin} minutes Outlly looks at the window just closed and, if {cfg.digest.min} or more were held back for one creator, sends one push saying how many. Fewer than that and nothing extra is sent. Warnings and failures are summarised separately from good news, so a problem never hides inside a happy count.
         </p>
-        <div className="flex flex-wrap items-end gap-4 rounded-[18px] p-4 hairline">
+        <div className="flex flex-wrap items-end gap-4 rounded-[18px] bg-secondary/40 p-4">
           <div>
             <Label htmlFor="dg-window">Window</Label>
             <Input id="dg-window" type="number" min={5} max={1440} className="mt-1 w-24 tabular" defaultValue={cfg.digest.windowMin} onBlur={(e) => {
@@ -259,7 +259,7 @@ export function NotificationsPanel({ initial, adminLogin, adminName = "", audit 
         <CardTitle hint="Sends one notification titled 'Test notification' to the account you are signed in with, through every channel that creator has on: the bell, web push to each connected browser or phone, and email if it is on. It can go nowhere else, so nobody is messaged by accident. The send is written to the admin audit log.">
           <span className="flex items-center gap-2"><Send className="h-4 w-4" aria-hidden="true" /> Test send</span>
         </CardTitle>
-        <div className="flex flex-wrap items-end gap-3 rounded-[18px] p-4 hairline">
+        <div className="flex flex-wrap items-end gap-3 rounded-[18px] bg-secondary/40 p-4">
           <div className="min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[16rem]">
             <Label htmlFor="nt-to">Your own creator account</Label>
             <Input id="nt-to" type="email" className="mt-1" value={to} onChange={(e) => setTo(e.target.value)} />
@@ -268,7 +268,7 @@ export function NotificationsPanel({ initial, adminLogin, adminName = "", audit 
           <Button disabled={busy === "test" || !to} onClick={test}>{busy === "test" ? "Sending" : "Send test"}</Button>
         </div>
         {result && (
-          <div className="mt-3 rounded-[18px] p-4 hairline" role="status">
+          <div className="mt-3 rounded-[18px] bg-secondary/40 p-4" role="status">
             <p className="text-[13px] font-semibold">What each channel said{result.sent ? ` for ${result.to}` : ""}</p>
             {result.channels.length === 0 ? (
               <p className="mt-1 text-[12.5px] text-muted-foreground">{result.skipped ? `Held back before any channel was tried: ${REASON[result.reason ?? ""] ?? result.reason ?? "a setting"}.` : "No delivery rows were written, so there is nothing to report."}</p>

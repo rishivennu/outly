@@ -22,7 +22,7 @@ const intIn = (v: string, min: number, max: number) => Math.max(min, Math.min(ma
 function Switch({ label, hint, checked, onChange, disabled }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   const id = useId();
   return (
-    <label className="flex min-h-[44px] cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4 py-2 hairline">
+    <label className="flex min-h-[44px] cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4 py-2">
       <span className="min-w-0">
         <span className="block text-[14px] font-medium">{label}</span>
         {hint && <span id={id} className="block text-[12px] text-muted-foreground">{hint}</span>}
@@ -234,12 +234,12 @@ export function PricingLab() {
           <span id="lab-rule">Decision rule</span>
         </CardTitle>
         <dl className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl bg-secondary/40 p-4 hairline">
+          <div className="rounded-2xl bg-secondary/40 p-4">
             <dt className="text-[12px] text-muted-foreground">Free to paid within 60 days</dt>
             <dd className="tabular mt-1 text-[1.6rem] font-semibold">{pct(m.freeToPaid60)} <span className="text-[13px] font-normal text-muted-foreground">target {pct(m.rule.freeToPaid60)}+</span></dd>
             <dd className="text-[12px] text-muted-foreground">{m.converted} of {m.cohort} people who signed up 60 to 120 days ago</dd>
           </div>
-          <div className="rounded-2xl bg-secondary/40 p-4 hairline">
+          <div className="rounded-2xl bg-secondary/40 p-4">
             <dt className="text-[12px] text-muted-foreground">Monthly churn</dt>
             <dd className="tabular mt-1 text-[1.6rem] font-semibold">{pct(m.churn)} <span className="text-[13px] font-normal text-muted-foreground">limit {pct(m.rule.churn)}</span></dd>
             <dd className="text-[12px] text-muted-foreground">{m.cancelled} of {m.liveThen} paid plans live 30 days ago were cancelled</dd>
@@ -266,7 +266,7 @@ export function PricingLab() {
                 ) : (
                   <span className="mt-1 flex gap-1">
                     <Input aria-label={`New pack ${i + 1} id`} value={p.id} onChange={(e) => setPack(i, { id: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 30) })} className="h-9 w-28 text-[12px]" />
-                    <select aria-label={`New pack ${i + 1} kind`} value={p.kind} onChange={(e) => setPack(i, { kind: e.target.value as TopUpKind })} className="h-9 min-h-[36px] rounded-xl bg-secondary px-2 text-[12px] hairline">
+                    <select aria-label={`New pack ${i + 1} kind`} value={p.kind} onChange={(e) => setPack(i, { kind: e.target.value as TopUpKind })} className="h-9 min-h-[36px] rounded-xl bg-secondary px-2 text-[12px] border border-border/60">
                       {TOPUP_KINDS.map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
                     </select>
                   </span>
@@ -305,7 +305,7 @@ export function PricingLab() {
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {exp.price.variants.map((v, i) => (
-            <fieldset key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2 rounded-2xl bg-secondary/40 p-3 hairline">
+            <fieldset key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2 rounded-2xl bg-secondary/40 p-3">
               <legend className="sr-only">Variant {v.id}</legend>
               <div><Label htmlFor={`ex-v${i}`}>Variant</Label><Input id={`ex-v${i}`} value={v.id} onChange={(e) => setVar(i, { id: e.target.value })} /></div>
               <div><Label htmlFor={`ex-p${i}`}>Price</Label><Input id={`ex-p${i}`} type="number" min={1} value={v.priceMinor / 100} onChange={(e) => setVar(i, { priceMinor: intIn(e.target.value, 1, 1_000_000) * 100 })} /></div>
@@ -384,7 +384,7 @@ export function PricingLab() {
                 <td className="max-w-[18rem] text-[12.5px]">{f.detail || <span className="text-muted-foreground">none</span>}</td>
                 <td>
                   {f.interview ? (
-                    <select aria-label={`Follow-up with ${f.name}`} value={f.status} onChange={(e) => mark(f.id, e.target.value)} className="min-h-[44px] rounded-xl bg-secondary px-3 text-[13px] hairline">
+                    <select aria-label={`Follow-up with ${f.name}`} value={f.status} onChange={(e) => mark(f.id, e.target.value)} className="min-h-[44px] rounded-xl bg-secondary px-3 text-[13px] border border-border/60">
                       <option value="new">Call: to do</option>
                       <option value="contacted">Contacted</option>
                       <option value="done">Done</option>

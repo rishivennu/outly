@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowDown, ArrowLeft, BarChart3, BellRing, Check, CheckCheck, Clock, Headset, Loader2, Maximize2, Minimize2, PanelRight, Plug, RotateCcw, Send, StickyNote, UserRound, Volume2, VolumeX, X } from "lucide-react";
 import { useToast } from "@/components/shared/Toast";
-import { LoadingState, Pill, STATUS_LABEL, StatusBadge, Tooltip, ago, fmtDate, type Tone } from "@/components/admin/ui";
+import { Card, LoadingState, Pill, STATUS_LABEL, StatusBadge, Tooltip, ago, fmtDate, type Tone } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -71,13 +71,13 @@ const isOpen = (s: string) => s === "waiting" || s === "active";
 const ring = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]";
 // R1271: colour and press come from the shared Button variant; this only keeps the console's 44px, 13px shape.
 const btn = cn("inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-4 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-50", ring);
-const field = cn("min-h-11 rounded-2xl border border-border bg-background px-3 text-[13px]", ring);
+const field = cn("min-h-11 rounded-2xl border border-border/60 bg-background px-3 text-[13px]", ring);
 // One shape for every control on the bar and in the chat header, so a row of them lines up at any width.
 const btnChip = cn(btn, "px-3.5");
 const iconBtn = "w-11 shrink-0 px-0";
 const pickField = cn(field, "w-full min-w-0");
 const pickLabel = "flex min-w-0 flex-col gap-1 text-[11px] font-medium text-muted-foreground";
-const H3 = "mb-2 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground";
+const H3 = "mb-2 text-[12.5px] font-semibold text-muted-foreground";
 const DL = "grid grid-cols-[minmax(5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-[12.5px]";
 const wrapAny = "break-words [overflow-wrap:anywhere]";
 const reduceMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -158,7 +158,7 @@ function Avatar({ name, src, size = 36 }: { name: string; src?: string | null; s
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={src} alt="" width={size} height={size} loading="lazy" decoding="async" style={style} onError={() => setBroken(true)} className="shrink-0 rounded-full object-cover" />;
   return (
-    <span aria-hidden style={style} className="grid shrink-0 place-items-center rounded-full bg-lime/20 text-[12px] font-bold text-lime-ink">
+    <span aria-hidden style={style} className="grid shrink-0 place-items-center rounded-full bg-lime/20 text-[12px] font-semibold text-lime-ink">
       {initials(name)}
     </span>
   );
@@ -172,7 +172,7 @@ function Counter({ label, n, on, onClick, tone }: { label: string; n: number; on
       onClick={onClick}
       className={cn(
         "flex h-full min-h-[4.5rem] flex-col items-start justify-between gap-1 rounded-2xl border px-3.5 py-2.5 text-left transition-colors",
-        on ? "border-foreground/40 bg-foreground/[0.06]" : "border-border hover:bg-secondary/60",
+        on ? "border-foreground/40 bg-foreground/[0.06]" : "border-border/60 hover:bg-secondary/60",
         ring,
       )}
     >
@@ -213,7 +213,7 @@ function QueueList({ rows, sel, onPick, now, meId, loading }: { rows: QueueRow[]
                 <span className="flex items-center gap-2">
                   <span className="truncate text-[13.5px] font-semibold">{name}</span>
                   {r.unread > 0 && (
-                    <span className="grid h-5 min-w-5 place-items-center rounded-full bg-lime px-1.5 text-[10.5px] font-bold text-[hsl(var(--lime-foreground))]" aria-label={`${r.unread} unread`}>
+                    <span className="grid h-5 min-w-5 place-items-center rounded-full bg-lime px-1.5 text-[10.5px] font-semibold text-[hsl(var(--lime-foreground))]" aria-label={`${r.unread} unread`}>
                       {r.unread > 99 ? "99+" : r.unread}
                     </span>
                   )}
@@ -238,7 +238,7 @@ function QueueList({ rows, sel, onPick, now, meId, loading }: { rows: QueueRow[]
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="flex h-full flex-col gap-0.5 rounded-2xl border border-border px-3.5 py-2.5">
+    <div className="flex h-full flex-col gap-0.5 rounded-2xl bg-secondary/40 px-3.5 py-2.5">
       <p className="text-[11.5px] leading-tight text-muted-foreground">{label}</p>
       <p className="font-display text-[1.2rem] font-semibold leading-none tabular-nums">{value}</p>
       {hint && <p className="mt-auto text-[11px] leading-tight text-muted-foreground">{hint}</p>}
@@ -248,7 +248,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 
 function Reports({ data, days, setDays }: { data: QueueData["analytics"]; days: number; setDays: (d: number) => void }) {
   return (
-    <section aria-labelledby="la-reports" className="rounded-[22px] border border-border bg-card p-4">
+    <Card aria-labelledby="la-reports" className="p-4 sm:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 id="la-reports" className="font-display text-[15px] font-semibold">
           Reports
@@ -308,7 +308,7 @@ function Reports({ data, days, setDays }: { data: QueueData["analytics"]; days: 
           )}
         </>
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -336,7 +336,7 @@ function Line({ m, r, customer, onRetry }: { m: Msg; r: Receipt | null; customer
   if (m.role === "system")
     return (
       <li className="my-1 flex justify-center">
-        <span className={cn("max-w-[90%] rounded-full border border-dashed border-border bg-secondary/60 px-3 py-1 text-center text-[11.5px] text-muted-foreground", wrapAny)}>
+        <span className={cn("max-w-[90%] rounded-full border border-dashed border-border/60 bg-secondary/60 px-3 py-1 text-center text-[11.5px] text-muted-foreground", wrapAny)}>
           {staffSysLine(m.text) ?? m.text} <span aria-hidden>&middot;</span> <time dateTime={m.at}>{time(m.at)}</time>
         </span>
       </li>
@@ -353,7 +353,7 @@ function Line({ m, r, customer, onRetry }: { m: Msg; r: Receipt | null; customer
         className={cn(
           "max-w-[min(85%,38rem)] whitespace-pre-wrap rounded-[18px] px-3.5 py-2 text-[13.5px] leading-relaxed",
           wrapAny,
-          m.role === "agent" ? "bg-foreground text-background" : m.role === "pip" ? "border border-border bg-lime/10" : "bg-secondary",
+          m.role === "agent" ? "bg-foreground text-background" : m.role === "pip" ? "border border-border/60 bg-lime/10" : "bg-secondary",
           (m.pending || m.failed) && "opacity-70",
         )}
       >
@@ -1169,9 +1169,9 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
         </div>
       )}
       {paused && (
-        <p role="status" className="rounded-2xl border border-border bg-card px-4 py-2.5 text-[12.5px]">
+        <Card as="div" role="status" className="rounded-2xl px-4 py-2.5 text-[12.5px] sm:px-4 sm:py-2.5">
           Updates paused while nobody was at the console. Move the mouse or press a key and they pick up again.
-        </p>
+        </Card>
       )}
 
       <div
@@ -1180,8 +1180,8 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
           wideNow ? "lg:grid-cols-[minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]" : "lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)] xl:grid-cols-[minmax(290px,350px)_minmax(0,1fr)_minmax(280px,340px)]",
         )}
       >
-        <section aria-label="Queue" className={cn("flex min-h-[26rem] flex-col overflow-hidden rounded-[22px] border border-border bg-card lg:min-h-0", sel && "hidden lg:flex", wideNow && "lg:hidden")}>
-          <div className="grid grid-cols-2 gap-2 border-b border-border p-3">
+        <Card aria-label="Queue" className={cn("flex min-h-[26rem] flex-col overflow-hidden p-0 sm:p-0 lg:min-h-0", sel && "hidden lg:flex", wideNow && "lg:hidden")}>
+          <div className="grid grid-cols-2 gap-2 border-b border-border/60 p-3">
             <label className={pickLabel}>
               Show
               <select value={filter} onChange={(e) => setFilter(e.target.value as QueueFilter)} className={pickField}>
@@ -1218,16 +1218,16 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
             </label>
           </div>
           {qErr && (
-            <p role="status" className="flex items-center gap-2 border-b border-border px-4 py-2 text-[12px] text-muted-foreground">
+            <p role="status" className="flex items-center gap-2 border-b border-border/60 px-4 py-2 text-[12px] text-muted-foreground">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden /> Can&apos;t reach the queue right now. Trying again.
             </p>
           )}
           <div className="la-scroll min-h-0 flex-1 overflow-y-auto">
             <QueueList rows={q?.items ?? []} sel={sel} onPick={pick} now={now} meId={me.id} loading={!q && !qErr} />
           </div>
-        </section>
+        </Card>
 
-        <section aria-label="Chat" className={cn("flex h-[calc(100dvh-13.5rem)] min-h-[24rem] flex-col overflow-hidden rounded-[22px] border border-border bg-card lg:h-auto lg:min-h-0", !sel && "hidden lg:flex")}>
+        <Card aria-label="Chat" className={cn("flex h-[calc(100dvh_-_13.5rem_-_var(--admin-bottom-float,0px))] min-h-[24rem] flex-col overflow-hidden p-0 sm:p-0 lg:h-auto lg:min-h-0", !sel && "hidden lg:flex")}>
           {!sel ? (
             <div className="grid flex-1 place-items-center p-8 text-center">
               <div>
@@ -1252,7 +1252,7 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
           ) : (
             <>
               {/* Three rows, in the order a specialist reads them: who this is, what I can do, how it is filed. */}
-              <header className="flex shrink-0 flex-col gap-2.5 border-b border-border p-3">
+              <header className="flex shrink-0 flex-col gap-2.5 border-b border-border/60 p-3">
                 <div className="flex items-center gap-2.5">
                   <Tooltip text="Back to the queue" side="bottom" className="lg:hidden">
                     <Button type="button" size="icon" onClick={() => pick(null)} aria-label="Back to the queue" className={cn(btn, iconBtn)}>
@@ -1372,7 +1372,7 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
                     {msgs.map((m, i) => (
                       <Fragment key={m.key}>
                         {(i === 0 || dayOf(m.at) !== dayOf(msgs[i - 1].at)) && (
-                          <li className="mt-1 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                          <li className="mt-1 flex items-center gap-3 text-[11.5px] font-semibold text-muted-foreground">
                             <span className="h-px flex-1 bg-border" aria-hidden />
                             <time dateTime={m.at}>{dayWord(m.at)}</time>
                             <span className="h-px flex-1 bg-border" aria-hidden />
@@ -1404,7 +1404,7 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
               </div>
 
               {/* The composer stays one line until the reply needs more, and clears the phone's home bar. */}
-              <footer className="shrink-0 border-t border-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              <footer className="shrink-0 border-t border-border/60 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 {mineActive ? (
                   <form
                     onSubmit={(e) => {
@@ -1463,9 +1463,9 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
               </footer>
             </>
           )}
-        </section>
+        </Card>
 
-        <aside aria-label="Customer details" className="la-scroll hidden min-h-0 overflow-y-auto rounded-[22px] border border-border bg-card xl:block">
+        <aside aria-label="Customer details" className="admin-card la-scroll hidden min-h-0 overflow-y-auto rounded-[24px] bg-card xl:block">
           {d ? <Details d={d} info={info} onOpen={pick} onNote={addNote} /> : <p className="p-5 text-[12.5px] text-muted-foreground">Who the customer is, their plan, platforms and past tickets show here.</p>}
         </aside>
       </div>
@@ -1474,8 +1474,8 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
       {drawer && d && (
         <div className="fixed inset-0 z-[70] xl:hidden" role="dialog" aria-modal="true" aria-labelledby="la-drawer-t">
           <div className="absolute inset-0 bg-foreground/35 backdrop-blur-[2px]" onClick={closeDrawer} aria-hidden />
-          <div ref={panelRef} tabIndex={-1} onKeyDown={trapTab} className="absolute inset-y-0 right-0 flex w-full flex-col border-l border-border bg-card shadow-2xl outline-none sm:w-[min(94vw,26rem)] sm:rounded-l-[22px]">
-            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <div ref={panelRef} tabIndex={-1} onKeyDown={trapTab} className="absolute inset-y-0 right-0 flex w-full flex-col border-l border-border/60 bg-card shadow-2xl outline-none sm:w-[min(94vw,26rem)] sm:rounded-l-[22px]">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
               <h2 id="la-drawer-t" className="truncate font-display text-[15px] font-semibold">
                 Details
               </h2>

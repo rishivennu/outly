@@ -47,7 +47,7 @@ export function InstallPromptSettings({ initial }: { initial: InstallConfig }) {
           const n = Number(e.target.value);
           void save({ [k]: n } as Partial<InstallConfig>, `${label}: ${unit(n)}.`);
         }}
-        className="h-11 rounded-xl bg-background px-3 text-[14px] hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-60"
+        className="h-11 rounded-xl bg-background px-3 text-[14px] border border-border/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-60"
       >
         {[...new Set([...opts, value])].sort((a, b) => a - b).map((n) => (
           <option key={n} value={n}>{unit(n)}</option>
@@ -63,7 +63,7 @@ export function InstallPromptSettings({ initial }: { initial: InstallConfig }) {
       <CardTitle hint="Phones only, in the browser. Android gets its own install prompt; iPhone and iPad get the three Share steps. Never shown inside the Android app, once Outlly is installed, or in Instagram and other in-app browsers.">
         Home Screen suggestion
       </CardTitle>
-      <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-3 hairline">
+      <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-3">
         <span className="text-[14px] font-medium">Suggest &ldquo;Add Outlly to your Home Screen&rdquo;</span>
         <Switch on={cfg.enabled} disabled={busy} label="Suggest “Add Outlly to your Home Screen”" onChange={(v) => save({ enabled: v }, v ? "Home Screen suggestion on." : "Home Screen suggestion off for everyone.")} />
       </label>

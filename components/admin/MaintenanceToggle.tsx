@@ -65,7 +65,7 @@ export function MaintenanceToggle({ initial, subscribers }: { initial: Site; sub
         <CardTitle hint={on ? `On since ${new Date(site.since).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" })}` : "The site is open to everyone."} action={<StatusBadge status={on ? "attention" : "live"} label={on ? "Maintenance ON" : undefined} />}>
           Site switch
         </CardTitle>
-        <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4 hairline", on ? "bg-warning/10" : "bg-secondary/40")}>
+        <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4", on ? "bg-warning/10" : "bg-secondary/40")}>
           <div className="flex items-center gap-3">
             <span className={cn("grid h-11 w-11 place-items-center rounded-2xl", on ? "bg-warning/20 text-warning" : "bg-success/15 text-success")}>
               {on ? <Construction className="h-5 w-5" aria-hidden /> : <Power className="h-5 w-5" aria-hidden />}
@@ -79,7 +79,7 @@ export function MaintenanceToggle({ initial, subscribers }: { initial: Site; sub
         </div>
 
         {on && site.endsAt && (
-          <div className="mt-4 rounded-[18px] bg-secondary/50 px-4 py-3 hairline">
+          <div className="mt-4 rounded-[18px] bg-secondary/50 px-4 py-3">
             <Countdown endsAt={site.endsAt} since={site.since} variant="bar" className="justify-start text-left" />
           </div>
         )}
@@ -107,7 +107,7 @@ export function MaintenanceToggle({ initial, subscribers }: { initial: Site; sub
                 </Button>
               );
             })}
-            <label className="fw-ring flex min-h-11 cursor-text items-center gap-1.5 rounded-full px-3 text-[13px] hairline">
+            <label className="fw-ring flex min-h-11 cursor-text items-center gap-1.5 rounded-full border border-border/60 px-3 text-[13px]">
               <span className="text-muted-foreground">Custom</span>
               <input
                 type="number"

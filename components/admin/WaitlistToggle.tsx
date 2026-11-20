@@ -73,7 +73,7 @@ export function WaitlistToggle({ initial }: { initial: WaitlistState }) {
         <CardTitle hint="Straight from the waitlist records. The switch never hides or changes them." action={<StatusBadge status={on ? "waiting" : "live"} label={on ? "Waitlist ON" : "Signups open"} />}>
           <span id="wl-overview">Waitlist overview</span>
         </CardTitle>
-        <dl className="mb-4 grid grid-cols-1 gap-2 rounded-[20px] bg-secondary/40 p-3 text-[13.5px] hairline sm:grid-cols-3 sm:gap-4 sm:p-4" aria-label="Waitlist status">
+        <dl className="mb-4 grid grid-cols-1 gap-2 rounded-[20px] bg-secondary/40 p-3 text-[13.5px] sm:grid-cols-3 sm:gap-4 sm:p-4" aria-label="Waitlist status">
           <div className="flex items-center justify-between gap-3 sm:block">
             <dt className="text-[12px] font-semibold text-muted-foreground">Waitlist mode</dt>
             <dd className="mt-0.5 flex items-center gap-2 font-semibold">
@@ -113,7 +113,7 @@ export function WaitlistToggle({ initial }: { initial: WaitlistState }) {
         <CardTitle hint={on && st.since ? `On since ${ist(st.since)}` : "Anyone can create an account."} action={<StatusBadge status={on ? "waiting" : "live"} label={on ? "Waitlist ON" : "Signups open"} />}>
           Waitlist switch
         </CardTitle>
-        <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4 hairline", on ? "bg-accent/10" : "bg-secondary/40")}>
+        <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4", on ? "bg-accent/10" : "bg-secondary/40")}>
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-2xl", on ? "bg-accent/15 text-foreground" : "bg-success/15 text-success")}>
               {on ? <Hourglass className="h-5 w-5" aria-hidden /> : <DoorOpen className="h-5 w-5" aria-hidden />}

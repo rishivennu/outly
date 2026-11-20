@@ -114,7 +114,7 @@ export function BehaviorAnalyses({ history, selected, aiReady, range, users, onC
                   <li key={i.id}>
                     <button type="button" onClick={() => open(i.id)} aria-current={on ? "true" : undefined} aria-label={`Version ${i.version}, ${h.label}, ${fmtDate(i.createdAt, true)}: ${i.headline}`} className={cn("min-h-11 w-full rounded-2xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-secondary" : "hover:bg-foreground/[0.04]")}>
                       <span className="flex items-center gap-2">
-                        <span className={cn("font-display text-[13.5px] font-bold tabular", on && "text-lime-ink")}>v{i.version}</span>
+                        <span className={cn("font-display text-[13.5px] font-semibold tabular", on && "text-lime-ink")}>v{i.version}</span>
                         <Pill tone={h.tone} className="h-5 px-2 text-[10.5px]">{h.label}</Pill>
                         <span className="ml-auto text-[11.5px] text-muted-foreground" suppressHydrationWarning>{loadingId === i.id ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden /> : ago(i.createdAt)}</span>
                       </span>
@@ -205,7 +205,7 @@ function Detail({ a }: { a: AnalysisFull }) {
     <Card as="article" aria-labelledby="beh-headline">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-display text-[1.25rem] font-bold tracking-tight">Version {a.version}</span>
+          <span className="text-[20px] font-semibold leading-[1.3]">Version {a.version}</span>
           <Pill tone={(HEALTH[r.health] ?? HEALTH.steady).tone}>{(HEALTH[r.health] ?? HEALTH.steady).label}</Pill>
           <Pill tone={LEVEL[r.confidence]}>{r.confidence} confidence</Pill>
         </div>
@@ -219,7 +219,7 @@ function Detail({ a }: { a: AnalysisFull }) {
       </p>
       {a.focus && <p className="mt-3 rounded-2xl bg-secondary px-4 py-2.5 text-[13px]"><span className="text-muted-foreground">Focus: </span>{a.focus}</p>}
 
-      <h2 id="beh-headline" className="gs-in mt-5 font-display text-[clamp(1.2rem,2.2vw,1.55rem)] font-bold leading-snug tracking-[-0.02em]">{r.headline}</h2>
+      <h2 id="beh-headline" className="gs-in mt-5 font-display text-[clamp(1.2rem,2.2vw,1.4rem)] font-semibold leading-[1.3]">{r.headline}</h2>
       <p className="gs-in mt-2 max-w-3xl text-[14.5px] leading-relaxed text-muted-foreground">{r.summary}</p>
 
       {r.changes.length > 0 && (
@@ -234,7 +234,7 @@ function Detail({ a }: { a: AnalysisFull }) {
         <Section icon={Lightbulb} title="What people are doing">
           <div className="grid gap-3 md:grid-cols-2">
             {r.insights.map((x, i) => (
-              <div key={i} className="rounded-2xl bg-secondary/60 p-4 hairline">
+              <div key={i} className="rounded-2xl bg-secondary/60 p-4">
                 <div className="flex items-start justify-between gap-2"><p className="font-semibold leading-snug">{x.title}</p><Pill tone={LEVEL[x.impact]} className="shrink-0">{x.impact} impact</Pill></div>
                 <p className="mt-1.5 text-[13px] leading-relaxed">{x.detail}</p>
                 {x.evidence && <p className="mt-2 text-[12px] text-muted-foreground">Evidence: {x.evidence}</p>}
@@ -270,7 +270,7 @@ function Detail({ a }: { a: AnalysisFull }) {
           <ol className="flex flex-col gap-3">
             {r.recommendations.map((x, i) => (
               <li key={i} className="flex gap-3 text-[13px]">
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-lime text-[12px] font-bold text-[hsl(var(--lime-foreground))]" aria-hidden>{i + 1}</span>
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-lime text-[12px] font-semibold text-[hsl(var(--lime-foreground))]" aria-hidden>{i + 1}</span>
                 <span className="min-w-0">
                   <b>{x.title}</b> <Pill className="ml-1 h-5 px-2 text-[10.5px]">{x.effort} effort</Pill>
                   <span className="mt-0.5 block leading-relaxed">{x.detail}</span>
@@ -286,7 +286,7 @@ function Detail({ a }: { a: AnalysisFull }) {
         <Section icon={FlaskConical} title="Experiments to run">
           <div className="grid gap-3 md:grid-cols-2">
             {r.experiments.map((x, i) => (
-              <div key={i} className="rounded-2xl p-4 text-[13px] hairline">
+              <div key={i} className="rounded-2xl bg-secondary/40 p-4 text-[13px]">
                 <p><span className="text-muted-foreground">Idea: </span>{x.hypothesis}</p>
                 <p className="mt-1.5"><span className="text-muted-foreground">Test: </span>{x.test}</p>
                 <p className="mt-1.5"><span className="text-muted-foreground">Success: </span>{x.successMetric}</p>
@@ -296,7 +296,7 @@ function Detail({ a }: { a: AnalysisFull }) {
         </Section>
       )}
 
-      <details className="mt-6 rounded-2xl bg-secondary/50 px-4 py-3 text-[13px] hairline">
+      <details className="mt-6 rounded-2xl bg-secondary/50 px-4 py-3 text-[13px]">
         <summary className="cursor-pointer font-medium">Numbers Gemini saw for this version</summary>
         <div className="mt-3 grid gap-4 sm:grid-cols-3">
           <div>

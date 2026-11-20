@@ -91,7 +91,7 @@ export function PanelHead({ icon, title, hint, actions, as: H = "h2", id }: { ic
       <div className="flex min-w-0 items-center gap-3">
         <Badge icon={icon} />
         <div className="min-w-0">
-          <H id={id} className="font-display text-[1.08rem] font-semibold leading-tight tracking-tight">{title}</H>
+          <H id={id} className="text-[16px] font-semibold leading-[1.3]">{title}</H>
           {hint && <p className="mt-0.5 text-[12.5px] text-muted-foreground">{hint}</p>}
         </div>
       </div>
@@ -136,7 +136,7 @@ export function CustomerHead({ recent, summary, body, actions }: { recent: Recen
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <p className="eyebrow mb-2 text-[11px]">Run · Users</p>
-          <h1 className="font-display text-[clamp(1.6rem,3vw,2.2rem)] font-bold leading-tight tracking-[-0.03em]">Customer information</h1>
+          <h1 className="text-[26px] font-[650] leading-[1.2] sm:text-[28px] lg:text-[30px]">Customer information</h1>
           <p className="mt-2 max-w-2xl text-[14.5px] leading-relaxed text-muted-foreground">{body}</p>
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -208,7 +208,7 @@ export function SummaryPanel({ s }: { s: Summary }) {
                 </span>
                 <span aria-hidden className="cx-tile-go grid size-8 place-items-center rounded-full"><ArrowUpRight className="size-4" strokeWidth={1.9} /></span>
               </span>
-              <span className="mt-5 font-display text-[2.1rem] font-bold leading-none tracking-[-0.03em] tabular-nums">{nf(t.value)}</span>
+              <span className="mt-5 font-display text-[2.1rem] font-bold leading-none tabular-nums">{nf(t.value)}</span>
               <span className="mt-2 text-[12px] leading-snug opacity-80">{t.line}</span>
             </Link>
           </li>
@@ -293,7 +293,7 @@ export function ProfilePanel({ p }: { p: Recent | null }) {
         <h2 id="cx-profile" className="sr-only">Newest customer</h2>
         <p className="eyebrow text-[11px]">Newest customer</p>
         <div className="mt-4 flex justify-center"><Avatar person={p} size="lg" /></div>
-        <p className="mt-3 font-display text-[1.25rem] font-semibold leading-tight tracking-tight">{p.name || firstName(p.name, p.email)}</p>
+        <p className="mt-3 text-[20px] font-semibold leading-[1.3]">{p.name || firstName(p.name, p.email)}</p>
         <p className="mt-1 text-[13px] text-muted-foreground">{p.plan ? `${p.plan} plan` : "Free plan"} · joined {fmtDate(p.createdAt)}</p>
         <div className="mt-4 flex justify-center gap-2">
           <RoundLink href={`mailto:${p.email}`} label={`Email ${firstName(p.name, p.email)}`} icon={Mail} />

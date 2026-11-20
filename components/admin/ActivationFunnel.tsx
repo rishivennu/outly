@@ -46,7 +46,7 @@ export function ActivationFunnel({ a, rangeDays }: { a: Activation; rangeDays: n
       <CardTitle
         hint={`${f.label}${f.from ? ", UTC days" : ""}. Each step counts the people who also did every step before it, at any time up to now.`}
         action={
-          <div role="radiogroup" aria-label="Funnel cohort" className="inline-flex shrink-0 rounded-full bg-secondary/70 p-1 hairline">
+          <div role="radiogroup" aria-label="Funnel cohort" className="inline-flex shrink-0 rounded-full bg-secondary/70 p-1">
             {(["range", "all"] as const).map((k) => (
               <button key={k} type="button" role="radio" aria-checked={which === k} onClick={() => setWhich(k)} className={cn("min-h-11 rounded-full px-3 text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", which === k ? "lime-bg" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
                 {k === "range" ? `Joined in ${rangeDays} days` : "All accounts"}

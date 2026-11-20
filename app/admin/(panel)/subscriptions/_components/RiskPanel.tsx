@@ -62,7 +62,7 @@ export function RiskPanel() {
       ) : (
         <ul className="grid gap-3">
           {d.rows.map((f) => (
-            <li key={f.id} className="min-w-0 rounded-[20px] bg-secondary/30 p-4 hairline">
+            <li key={f.id} className="min-w-0 rounded-[20px] bg-secondary/30 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="mr-auto min-w-0 break-words text-[14px] font-semibold">{f.email ?? "Deleted account"}</span>
                 <Pill tone={f.level === "high" ? "bad" : f.level === "medium" ? "warn" : "muted"}>{f.level} risk, score {f.score}</Pill>

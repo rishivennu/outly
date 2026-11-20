@@ -28,7 +28,7 @@ export function CampaignLinks({ base }: { base: string }) {
     }
   }
 
-  const field = "h-11 w-full rounded-2xl bg-background px-3.5 text-[14px] hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
+  const field = "h-11 w-full rounded-2xl bg-background px-3.5 text-[14px] border border-border/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
   return (
     <div>
       <div className="grid gap-3 sm:grid-cols-3">
@@ -52,7 +52,7 @@ export function CampaignLinks({ base }: { base: string }) {
         </div>
       </div>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-        <output id={ids.out} aria-label="Campaign link" className="flex min-h-11 flex-1 items-center break-all rounded-2xl bg-secondary/60 px-3.5 py-2 font-mono text-[12.5px] hairline">{url}</output>
+        <output id={ids.out} aria-label="Campaign link" className="flex min-h-11 flex-1 items-center break-all rounded-2xl bg-secondary/60 px-3.5 py-2 font-mono text-[12.5px] border border-border/60">{url}</output>
         <Button type="button" variant="lime" onClick={copy} aria-describedby={ids.out} className="shrink-0 gap-1.5 px-4 text-[13px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
           {copied ? <Check className="h-4 w-4" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />} {copied ? "Copied" : "Copy link"}
         </Button>

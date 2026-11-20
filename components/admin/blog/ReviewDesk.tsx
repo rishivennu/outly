@@ -231,7 +231,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
                   <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
                     <div className="grid min-w-0 gap-1.5">
                       <Label htmlFor="rg-h">Section</Label>
-                      <select id="rg-h" value={regen.heading} onChange={(e) => setRegen((r) => ({ ...r, heading: e.target.value }))} className="field min-h-11 w-full min-w-0 truncate rounded-xl border border-border bg-card px-3 text-[14px]">
+                      <select id="rg-h" value={regen.heading} onChange={(e) => setRegen((r) => ({ ...r, heading: e.target.value }))} className="field min-h-11 w-full min-w-0 truncate rounded-xl border border-border/60 bg-card px-3 text-[14px]">
                         <option value="">Choose a section</option>
                         {headings.map((h) => (
                           <option key={h.id} value={h.text}>
@@ -255,7 +255,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
 
           {tab === "preview" && (
             <div className="mt-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
                 <p className="min-w-0 text-[13px] text-muted-foreground">
                   {live ? (
                     <a href={`${siteUrl}/blog/${post.slug}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1 break-all underline underline-offset-4">
@@ -312,7 +312,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Category" id="cat">
-                  <select id="cat" value={d.category ?? ""} onChange={(e) => set("category", e.target.value)} className="field min-h-11 w-full min-w-0 rounded-xl border border-border bg-card px-3 text-[14px]">
+                  <select id="cat" value={d.category ?? ""} onChange={(e) => set("category", e.target.value)} className="field min-h-11 w-full min-w-0 rounded-xl border border-border/60 bg-card px-3 text-[14px]">
                     {!categories.includes(d.category ?? "") && <option value={d.category ?? ""}>{d.category || "Pick one"}</option>}
                     {categories.map((c) => (
                       <option key={c} value={c}>
@@ -366,7 +366,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
                 {post.sources.length ? (
                   <ul className="mt-3 grid gap-2">
                     {post.sources.map((s) => (
-                      <li key={s.id} className="rounded-xl border border-border p-3 text-[13.5px]">
+                      <li key={s.id} className="rounded-2xl bg-secondary/40 p-3 text-[13.5px]">
                         <div className="flex flex-wrap items-center gap-2">
                           <Pill tone={s.verified ? "ok" : "warn"}>{s.verified ? "Verified" : "Unverified"}</Pill>
                           <Pill tone="muted">{s.kind}</Pill>

@@ -116,7 +116,7 @@ export function WaitlistCampaign({ initial }: { initial: CampaignStatus }) {
         </span>
       </CardTitle>
 
-      <p className="mb-4 rounded-2xl bg-secondary/40 px-4 py-3 text-[13.5px] hairline [overflow-wrap:anywhere]">
+      <p className="mb-4 rounded-2xl bg-secondary/40 px-4 py-3 text-[13.5px] [overflow-wrap:anywhere]">
         <span className="block text-[12px] font-semibold text-muted-foreground">Subject</span>
         {st.subject}
       </p>
@@ -159,7 +159,7 @@ export function WaitlistCampaign({ initial }: { initial: CampaignStatus }) {
       </ul>
 
       {st.blockedWhy && !launched && (
-        <p role="status" className="mt-4 flex items-start gap-2 rounded-2xl bg-warning/10 px-4 py-3 text-[13px] hairline">
+        <p role="status" className="mt-4 flex items-start gap-2 rounded-2xl bg-warning/10 px-4 py-3 text-[13px]">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           {st.blockedWhy}
         </p>
@@ -184,7 +184,7 @@ export function WaitlistCampaign({ initial }: { initial: CampaignStatus }) {
       </div>
 
       {showPreview && preview !== null && (
-        <div id="wl-campaign-preview" className="mt-4 overflow-hidden rounded-[20px] bg-white hairline">
+        <div id="wl-campaign-preview" className="mt-4 overflow-hidden rounded-[20px] bg-white border border-border/60">
           <iframe title="Email preview" sandbox="" srcDoc={preview} className="block h-[640px] w-full border-0" />
         </div>
       )}

@@ -91,7 +91,7 @@ export function BlogCalendar({ initial, ready }: { initial: BlogCalendarMonth; r
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="font-display text-[1.25rem] font-semibold tracking-tight" aria-live="polite">
+            <h2 className="text-[20px] font-semibold leading-[1.3]" aria-live="polite">
               {monthTitle(cal.month)}
               {loading && <Loader2 className="ml-2 inline h-4 w-4 animate-spin motion-reduce:animate-none" aria-label="Loading" />}
             </h2>
@@ -128,10 +128,10 @@ export function BlogCalendar({ initial, ready }: { initial: BlogCalendarMonth; r
             </li>
           ))}
           <li>
-            <span className="inline-flex h-6 items-center gap-1 rounded-full border border-dashed border-border px-2.5 text-[11.5px] font-semibold text-muted-foreground">Run at {cal.startTime}</span>
+            <span className="inline-flex h-6 items-center gap-1 rounded-full border border-dashed border-border/60 px-2.5 text-[11.5px] font-semibold text-muted-foreground">Run at {cal.startTime}</span>
           </li>
           <li>
-            <span className="inline-flex h-6 items-center rounded-full border border-border px-2.5 text-[11.5px] font-semibold text-muted-foreground line-through">Skipped</span>
+            <span className="inline-flex h-6 items-center rounded-full border border-border/60 px-2.5 text-[11.5px] font-semibold text-muted-foreground line-through">Skipped</span>
           </li>
         </ul>
 
@@ -145,7 +145,7 @@ export function BlogCalendar({ initial, ready }: { initial: BlogCalendarMonth; r
           <div aria-label={`${monthTitle(cal.month)} blog calendar`} role="group" className="grid gap-1.5">
             <div aria-hidden className="grid grid-cols-7 gap-1.5">
               {WEEKDAYS.map((w) => (
-                <div key={w} className="px-1 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <div key={w} className="px-1 text-[12px] font-semibold text-muted-foreground">
                   {w}
                 </div>
               ))}
@@ -156,7 +156,7 @@ export function BlogCalendar({ initial, ready }: { initial: BlogCalendarMonth; r
                   d ? (
                     <div
                       key={d.date}
-                      className={cn("flex min-h-[7.5rem] min-w-0 flex-col gap-1 rounded-2xl border p-1.5", d.date === cal.today ? "border-2 border-foreground" : "border-border", d.date === sel && "bg-secondary/60", d.skipped && "bg-secondary/30")}
+                      className={cn("flex min-h-[7.5rem] min-w-0 flex-col gap-1 rounded-2xl border p-1.5", d.date === cal.today ? "border-2 border-foreground" : "border-border/60", d.date === sel && "bg-secondary/60", d.skipped && "bg-secondary/30")}
                     >
                       <DayButton d={d} cal={cal} sel={sel} onPick={setSel} onKey={onKey} />
                       <ul className="grid min-w-0 gap-1">
@@ -185,7 +185,7 @@ export function BlogCalendar({ initial, ready }: { initial: BlogCalendarMonth; r
           {agenda.length ? (
             <ul className="grid gap-2" aria-label={`${monthTitle(cal.month)} agenda`}>
               {agenda.map((d) => (
-                <li key={d.date} className={cn("rounded-2xl border p-3", d.date === cal.today ? "border-2 border-foreground" : "border-border", d.date === sel && "bg-secondary/60")}>
+                <li key={d.date} className={cn("rounded-2xl border p-3", d.date === cal.today ? "border-2 border-foreground" : "border-border/60", d.date === sel && "bg-secondary/60")}>
                   <DayButton d={d} cal={cal} sel={sel} onPick={setSel} wide />
                   {d.items.length > 0 && (
                     <ul className="mt-1.5 grid gap-1.5">
@@ -224,9 +224,9 @@ function DayButton({ d, cal, sel, onPick, onKey, wide = false }: { d: BlogCalend
     >
       <span className={cn("text-[14px] font-semibold tabular-nums", d.date < cal.today && "text-muted-foreground")}>{wide ? fmtYmd(d.date, { weekday: "short", day: "numeric", month: "short" }) : Number(d.date.slice(8))}</span>
       <span className="flex flex-wrap items-center gap-1" aria-hidden>
-        {d.date === cal.today && <span className="text-[11px] font-semibold uppercase tracking-wide">Today</span>}
-        {d.scheduledRun && <span className="rounded-full border border-dashed border-border px-1.5 text-[11px] text-muted-foreground">Run at {cal.startTime}</span>}
-        {d.skipped && <span className="rounded-full border border-border px-1.5 text-[11px] text-muted-foreground line-through">Skipped</span>}
+        {d.date === cal.today && <span className="text-[12px] font-medium">Today</span>}
+        {d.scheduledRun && <span className="rounded-full border border-dashed border-border/60 px-1.5 text-[11px] text-muted-foreground">Run at {cal.startTime}</span>}
+        {d.skipped && <span className="rounded-full border border-border/60 px-1.5 text-[11px] text-muted-foreground line-through">Skipped</span>}
       </span>
     </button>
   );
@@ -260,7 +260,7 @@ function DayPanel({ day, cal, ready, busy, onGenerate, onSkip, onChanged }: { da
       {day.items.length ? (
         <ul className="grid gap-2">
           {day.items.map((it) => (
-            <li key={it.kind + it.id} className="rounded-xl border border-border p-3">
+            <li key={it.kind + it.id} className="rounded-2xl bg-secondary/40 p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Pill tone={(CAL_STATUS[it.status] ?? CAL_STATUS.cancelled).tone}><StatusDot />{CAL_STATUS[it.status]?.label ?? it.status}</Pill>
                 <Link href={it.href} className="min-w-0 font-medium underline underline-offset-4">

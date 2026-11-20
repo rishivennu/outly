@@ -5,7 +5,7 @@ import { Switch as BaseSwitch } from "@/components/settings/notifications/parts"
 
 /**
  * R1269: the admin uses the same lime switch as Settings (role="switch", Space/Enter, 180ms knob) instead of a
- * hand-rolled toggle per panel. The settings switch reads its hairline from --nf-line, which only exists under .nf,
+ * hand-rolled toggle per panel. The settings switch reads its line from --nf-line, which only exists under .nf,
  * so the wrapper supplies the admin's border as that value; everything else is the shared control.
  */
 export type SwitchProps = ComponentProps<typeof BaseSwitch>;

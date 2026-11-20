@@ -169,7 +169,7 @@ export function CampaignsPanel({ initial }: { initial: CampaignsState }) {
               <div className="sm:col-span-2"><Label htmlFor="co-title">Title (admin and invoice)</Label><Input id="co-title" value={d.title} maxLength={LIMITS.title} onChange={(e) => set("title", e.target.value)} /></div>
               <div>
                 <Label htmlFor="co-kind">Discount</Label>
-                <select id="co-kind" value={d.kind} onChange={(e) => set("kind", e.target.value as Draft["kind"])} className="h-11 w-full rounded-2xl bg-secondary/50 px-3 text-[14px] hairline">
+                <select id="co-kind" value={d.kind} onChange={(e) => set("kind", e.target.value as Draft["kind"])} className="h-11 w-full rounded-2xl bg-secondary/50 px-3 text-[14px] border border-border/60">
                   <option value="pct">Percent off</option>
                   <option value="fixed">Fixed amount off</option>
                 </select>
@@ -179,7 +179,7 @@ export function CampaignsPanel({ initial }: { initial: CampaignsState }) {
                 <div className="flex gap-2">
                   <Input id="co-value" type="number" inputMode="decimal" min={1} max={d.kind === "pct" ? MAX_PCT : undefined} value={d.value} onChange={(e) => set("value", e.target.value)} />
                   {d.kind === "fixed" && (
-                    <select aria-label="Currency" value={d.currency} onChange={(e) => set("currency", e.target.value)} className="h-11 rounded-2xl bg-secondary/50 px-3 text-[14px] hairline">
+                    <select aria-label="Currency" value={d.currency} onChange={(e) => set("currency", e.target.value)} className="h-11 rounded-2xl bg-secondary/50 px-3 text-[14px] border border-border/60">
                       {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
                     </select>
                   )}
@@ -192,7 +192,7 @@ export function CampaignsPanel({ initial }: { initial: CampaignsState }) {
                   {st.plans.map((p) => {
                     const on = d.planSlugs.includes(p.slug);
                     return (
-                      <label key={p.slug} className={cn("inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-2xl px-3 text-[14px] hairline", on && "bg-lime/15")}>
+                      <label key={p.slug} className={cn("inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-2xl bg-secondary/40 px-3 text-[14px]", on && "bg-lime/15")}>
                         <input type="checkbox" checked={on} onChange={() => set("planSlugs", on ? d.planSlugs.filter((s) => s !== p.slug) : [...d.planSlugs, p.slug])} />
                         {p.name}{p.state !== "available" && <span className="text-[12px] text-muted-foreground">({p.state})</span>}
                       </label>
@@ -204,7 +204,7 @@ export function CampaignsPanel({ initial }: { initial: CampaignsState }) {
               <div><Label htmlFor="co-end">Ends</Label><Input id="co-end" type="datetime-local" value={d.endsAt} onChange={(e) => set("endsAt", e.target.value)} /></div>
               <div>
                 <Label htmlFor="co-elig">Who sees it</Label>
-                <select id="co-elig" value={d.eligibility} onChange={(e) => set("eligibility", e.target.value)} className="h-11 w-full rounded-2xl bg-secondary/50 px-3 text-[14px] hairline">
+                <select id="co-elig" value={d.eligibility} onChange={(e) => set("eligibility", e.target.value)} className="h-11 w-full rounded-2xl bg-secondary/50 px-3 text-[14px] border border-border/60">
                   {ELIGIBILITY.map((e) => <option key={e} value={e}>{ELIGIBILITY_LABEL[e]}</option>)}
                 </select>
               </div>

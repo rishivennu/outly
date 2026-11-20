@@ -59,7 +59,7 @@ export function WelcomeScreenSettings({ initial }: { initial: WelcomeConfig }) {
       <CardTitle hint="Shown every time someone comes into Outlly: a new browser tab, a launch from the Home Screen or the Android app, or signing in. Once per visit, so moving between pages or reloading does not bring it back. Cookie choice, privacy notice and the tour wait until they press the button. Escape also closes it.">
         Welcome screen
       </CardTitle>
-      <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-3 hairline">
+      <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-3">
         <span className="text-[14px] font-medium">Show a welcome each time someone comes into Outlly</span>
         <Switch on={cfg.enabled} disabled={busy} label="Show a welcome each time someone comes into Outlly" onChange={(v) => save({ enabled: v }, v ? "Welcome screen on." : "Welcome screen off for everyone.")} />
       </label>

@@ -134,7 +134,7 @@ function LocalPrices({ d, parsed, onChange }: { d: Draft; parsed: ReturnType<typ
 
 function Seg<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; label: string }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex w-full rounded-full bg-secondary/60 p-1 hairline">
+    <div role="radiogroup" aria-label={label} className="inline-flex w-full rounded-full bg-secondary/60 p-1">
       {options.map((o) => (
         <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)} className={cn("min-h-11 flex-1 rounded-full px-3 text-[13px] font-semibold transition-[background-color,color,box-shadow] duration-nav focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", value === o.value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
           {o.label}
@@ -147,7 +147,7 @@ function Seg<T extends string>({ value, onChange, options, label }: { value: T; 
 function Toggle({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
   const id = useId();
   return (
-    <label className="flex min-h-[3.25rem] cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4 py-2.5 hairline">
+    <label className="flex min-h-[3.25rem] cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4 py-2.5">
       <span className="min-w-0">
         <span className="block text-[14px] font-medium">{label}</span>
         {hint && <span id={id} className="block text-[12px] text-muted-foreground">{hint}</span>}
@@ -163,7 +163,7 @@ function Section({ n, title, hint, children }: { n: string; title: string; hint?
   return (
     <section aria-labelledby={id} className="la-box relative rounded-[1.5rem] p-4 sm:p-5">
       <div className="mb-4 flex items-baseline gap-3">
-        <span className="tabular text-[11px] font-bold uppercase tracking-[0.12em] la-accent" aria-hidden="true">{n}</span>
+        <span className="tabular text-[12px] font-medium la-accent" aria-hidden="true">{n}</span>
         <h2 id={id} className="text-[15px] font-semibold leading-tight">{title}</h2>
         {hint && <span className="ml-auto text-[12px] la-mute">{hint}</span>}
       </div>
@@ -202,16 +202,16 @@ function PlanCard({ p, on, onPick }: { p: Plan; on: boolean; onPick: () => void 
         <span className="relative mt-3 grid grid-cols-2 gap-3" aria-hidden="true">
           <span className="min-w-0">
             <span className="block truncate font-semibold leading-tight tabular">{priceLabel(p)}</span>
-            <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.08em] la-mute">{p.priceMinor === 0 ? "Free" : p.interval === "year" ? "Yearly" : "Monthly"}</span>
+            <span className="mt-1 block text-[11.5px] font-medium la-mute">{p.priceMinor === 0 ? "Free" : p.interval === "year" ? "Yearly" : "Monthly"}</span>
           </span>
           <span className="min-w-0">
             <span className="block font-semibold leading-tight tabular">{p.subscribers}</span>
-            <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.08em] la-mute">Active</span>
+            <span className="mt-1 block text-[11.5px] font-medium la-mute">Active</span>
           </span>
         </span>
         <span className="la-box relative mt-3 flex items-center justify-between gap-2 rounded-[1.1rem] px-3.5 py-2.5" aria-hidden="true">
           <span className="text-[14px] font-semibold">{STATE[p.state].label}</span>
-          <span className={cn("text-[10.5px] font-bold uppercase tracking-[0.1em]", live ? "la-accent" : "la-mute")}>{STATE[p.state].note}</span>
+          <span className={cn("text-[12px] font-medium", live ? "la-accent" : "la-mute")}>{STATE[p.state].note}</span>
         </span>
       </button>
     </li>
@@ -244,7 +244,7 @@ function Preview({ d, variant, cycle, freeMonths }: { d: ReturnType<typeof parse
         </AnimatePresence>
       }
       cta={
-        <span className={cn("inline-flex h-12 items-center justify-center rounded-full px-6 text-sm font-semibold", live ? (variant === "bold" && d.highlight ? "bg-[#0b0b0d] text-white" : "lime-glow bg-lime text-[hsl(var(--lime-foreground))]") : variant === "live" ? "la-box la-mute" : "border border-border text-muted-foreground")}>
+        <span className={cn("inline-flex h-12 items-center justify-center rounded-full px-6 text-sm font-semibold", live ? (variant === "bold" && d.highlight ? "bg-[#0b0b0d] text-white" : "lime-glow bg-lime text-[hsl(var(--lime-foreground))]") : variant === "live" ? "la-box la-mute" : "border border-border/60 text-muted-foreground")}>
           {live ? (d.priceMinor > 0 ? `Choose ${d.name || "plan"}${yearly ? " yearly" : ""}` : "Start creating") : d.state === "soon" ? "Not on sale yet" : "Hidden from the site"}
         </span>
       }
@@ -319,7 +319,7 @@ function DisplayPanel({ value, onChange }: { value: PricingDisplay; onChange: (d
               <span className="px-1 pb-1">
                 <span className="flex items-center gap-2 text-[14px] font-semibold">
                   {CARD_STYLE_META[v].label}
-                  {on && <span className="rounded-full bg-lime px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[hsl(var(--lime-foreground))]">Live</span>}
+                  {on && <span className="rounded-full bg-lime px-2 py-0.5 text-[12px] font-medium text-[hsl(var(--lime-foreground))]">Live</span>}
                 </span>
                 <span className="mt-0.5 block text-[12px] leading-snug la-mute">{CARD_STYLE_META[v].hint}</span>
               </span>
@@ -336,7 +336,7 @@ function DisplayPanel({ value, onChange }: { value: PricingDisplay; onChange: (d
             value={value.freeMonths}
             disabled={busy || !value.yearly}
             onChange={(e) => save({ freeMonths: Number(e.target.value) })}
-            className="h-12 w-full rounded-2xl bg-secondary/60 px-3 text-[14px] font-semibold hairline disabled:opacity-60"
+            className="h-12 w-full rounded-2xl bg-secondary/60 px-3 text-[14px] font-semibold disabled:opacity-60"
           >
             {[0, 1, 2, 3, 4, 5, 6].map((n) => (
               <option key={n} value={n}>{n === 0 ? "None (12 x monthly)" : `${n} month${n === 1 ? "" : "s"} (pay ${12 - n})`}</option>
@@ -369,11 +369,11 @@ function Impact({ current, parsed }: { current?: Plan; parsed: ReturnType<typeof
   return (
     <div className="la-card la-themed relative mt-4 overflow-hidden rounded-[1.75rem] p-4" aria-live="polite">
       <span className="la-grid rounded-[inherit]" aria-hidden="true" />
-      <p className="relative text-[11px] font-bold uppercase tracking-[0.12em] la-mute">When you save</p>
+      <p className="relative text-[12px] font-semibold la-mute">When you save</p>
       <dl className="relative mt-3 grid gap-2">
         {rows.map((r) => (
           <div key={r.k} className="la-box rounded-[1.1rem] px-3.5 py-2.5">
-            <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] la-mute">{r.k}</dt>
+            <dt className="text-[12px] font-medium la-mute">{r.k}</dt>
             <dd className={cn("mt-0.5 text-[13.5px] font-medium leading-snug", r.warn && "la-warn")}>{r.v}</dd>
           </div>
         ))}
@@ -481,11 +481,11 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
             onClick={() => pick("new")}
             aria-pressed={sel === "new"}
             className={cn(
-              "flex h-full min-h-[9.5rem] w-full flex-col items-center justify-center gap-2 rounded-[1.75rem] border-2 border-dashed border-border text-[14px] font-semibold text-muted-foreground transition-colors duration-hover hover:border-lime hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-[hsl(var(--ring))]",
+              "flex h-full min-h-[9.5rem] w-full flex-col items-center justify-center gap-2 rounded-[1.75rem] border-2 border-dashed border-border/60 text-[14px] font-semibold text-muted-foreground transition-colors duration-hover hover:border-lime hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-[hsl(var(--ring))]",
               sel === "new" && "border-lime text-foreground",
             )}
           >
-            <span className="grid h-11 w-11 place-items-center rounded-full bg-secondary hairline" aria-hidden="true"><Plus className="h-5 w-5" /></span>
+            <span className="grid h-11 w-11 place-items-center rounded-full bg-secondary" aria-hidden="true"><Plus className="h-5 w-5" /></span>
             Add a plan
           </button>
         </li>
@@ -497,7 +497,7 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
           <span className="la-grid rounded-[inherit]" aria-hidden="true" />
           <div className="relative flex flex-wrap items-center gap-3 px-2 pb-4 pt-2 sm:px-3">
             <DotText text={draft.name || (current ? current.name : "NEW")} className="h-8 max-w-[70%]" />
-            <span className="ml-auto text-[11px] font-bold uppercase tracking-[0.12em] la-mute">{current ? (current.locked ? "Has payments" : "Editing") : "New plan"}</span>
+            <span className="ml-auto text-[12px] font-medium la-mute">{current ? (current.locked ? "Has payments" : "Editing") : "New plan"}</span>
           </div>
 
           <div className="relative flex flex-col gap-3">
@@ -520,7 +520,7 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
               <div>
                 <Label htmlFor="pl-price">Price</Label>
                 <div className="flex gap-2">
-                  <select aria-label="Currency" value={draft.currency} onChange={(e) => set("currency", e.target.value)} className="h-12 rounded-2xl bg-secondary/60 px-3 text-[14px] font-semibold hairline">
+                  <select aria-label="Currency" value={draft.currency} onChange={(e) => set("currency", e.target.value)} className="h-12 rounded-2xl bg-secondary/60 px-3 text-[14px] font-semibold border border-border/60">
                     {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
                   </select>
                   <Input id="pl-price" inputMode="decimal" value={draft.price} onChange={(e) => set("price", e.target.value.replace(/[^\d.,]/g, ""))} className="tabular text-[17px] font-semibold" aria-describedby="pl-price-hint" />
@@ -682,7 +682,7 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
                     {PERKS.map((k) => {
                       const on = draft.perks!.includes(k);
                       return (
-                        <label key={k} className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-2xl bg-secondary/40 px-4 py-2 text-[13.5px] hairline">
+                        <label key={k} className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-2xl bg-secondary/40 px-4 py-2 text-[13.5px]">
                           <input type="checkbox" checked={on} onChange={(e) => set("perks", e.target.checked ? [...draft.perks!, k] : draft.perks!.filter((x) => x !== k))} className="h-4 w-4 accent-[hsl(var(--lime))]" />
                           {PERK_LABEL[k]}
                         </label>
@@ -711,7 +711,7 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
           </div>
 
           {/* save bar: stays in reach while the form scrolls */}
-          <div className="sticky bottom-3 z-10 mt-3 flex flex-wrap items-center gap-2 rounded-full bg-background/85 p-1.5 pl-4 shadow-[0_18px_40px_-20px_rgb(0_0_0/.5)] backdrop-blur-xl hairline">
+          <div className="sticky bottom-[var(--admin-bottom-float,2rem)] z-10 lg:bottom-3 mt-3 flex flex-wrap items-center gap-2 rounded-full bg-background/85 p-1.5 pl-4 shadow-[0_18px_40px_-20px_rgb(0_0_0/.5)] backdrop-blur-xl border border-border/60">
             <span className="mr-auto flex items-center gap-2 text-[13px] font-medium">
               <span aria-hidden="true" className={cn("h-2 w-2 rounded-full", current && !dirty ? "bg-lime" : "bg-amber-500")} />
               {current ? (dirty ? "Unsaved changes" : "Saved and live") : "Not created yet"}

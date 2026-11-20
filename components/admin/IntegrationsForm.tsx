@@ -37,7 +37,7 @@ export function SecretField({ id, label, saved, value, onChange, placeholder }: 
           <Button type="button" variant="ghost" size="sm" className="h-12" onClick={() => onChange(undefined)}>Cancel</Button>
         </div>
       ) : (
-        <div className="flex h-12 items-center gap-2 rounded-2xl bg-secondary/40 px-4 text-[13.5px] hairline">
+        <div className="flex h-12 items-center gap-2 rounded-2xl bg-secondary/40 px-4 text-[13.5px]">
           <span className="flex-1 font-mono text-muted-foreground">{value === null ? "Will be removed on save" : saved.set ? `•••••••••••• ${saved.last4}` : "Not set"}</span>
           <Button type="button" variant="ghost" size="sm" onClick={() => onChange("")} className="h-9 px-2.5 text-[12.5px] font-semibold text-foreground">{saved.set ? "Replace" : "Add"}</Button>
           {saved.set && value !== null && <Button type="button" variant="danger" size="sm" onClick={() => onChange(null)} className="h-9 px-2.5 text-[12.5px]">Remove</Button>}
@@ -54,7 +54,7 @@ function Choice<T extends string>({ value, onChange, options, label }: { value: 
       {options.map((o) => {
         const on = value === o.value;
         return (
-          <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => onChange(o.value)} className={cn("relative min-h-11 rounded-[20px] p-4 text-left transition-[background-color,box-shadow] duration-hover hairline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-lime/[0.08] ring-2 ring-lime" : "hover:bg-secondary/50")}>
+          <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => onChange(o.value)} className={cn("relative min-h-11 rounded-[20px] p-4 text-left transition-[background-color,box-shadow] duration-hover bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-lime/[0.08] ring-2 ring-lime" : "hover:bg-secondary/50")}>
             <span className="flex items-center justify-between gap-2">
               <span className="flex min-w-0 items-center gap-2.5">
                 {o.logo && <ServiceLogo service={o.logo} size={34} surface="transparent" />}
@@ -86,7 +86,7 @@ function Result({ r }: { r: { ok: boolean; message: string } | null }) {
 export function CopyRow({ label, value }: { label: string; value: string }) {
   const toast = useToast();
   return (
-    <div className="flex items-center gap-2 rounded-2xl bg-secondary/40 px-3 py-2 hairline">
+    <div className="flex items-center gap-2 rounded-2xl bg-secondary/40 px-3 py-2">
       <span className="shrink-0 text-[12px] font-semibold text-muted-foreground">{label}</span>
       <code className="min-w-0 flex-1 truncate text-[12.5px]">{value}</code>
       <Tooltip text={`Copy ${label}`}>
@@ -214,7 +214,7 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
           <div>
             <div className="liquid-inner grid gap-4 pt-5">
               <div className="flex flex-wrap items-center gap-3">
-                <div role="radiogroup" aria-label="Mode" className="inline-flex rounded-full bg-secondary/60 p-1 hairline">
+                <div role="radiogroup" aria-label="Mode" className="inline-flex rounded-full bg-secondary/60 p-1">
                   {(["test", "live"] as const).map((v) => (
                     <button key={v} type="button" role="radio" aria-checked={p.mode === v} onClick={() => setP((x) => ({ ...x, mode: v }))} className={cn("min-h-11 rounded-full px-4 text-[13px] font-semibold capitalize transition-colors duration-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", p.mode === v ? (v === "live" ? "bg-success text-white" : "lime-bg") : "text-muted-foreground")}>
                       {v} mode
@@ -281,7 +281,7 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
                   </div>
                   <SecretField id="yp-wh" label="Webhook secret" saved={pay.youpi?.webhookSecret ?? { set: false, last4: "" }} value={ps["youpi.webhookSecret"]} onChange={(v) => setPs((x) => ({ ...x, "youpi.webhookSecret": v }))} placeholder="the merchant webhook secret" />
                   <div className="sm:col-span-2">
-                    <div role="radiogroup" aria-label="Confirm a payment after" className="inline-flex rounded-full bg-secondary/60 p-1 hairline">
+                    <div role="radiogroup" aria-label="Confirm a payment after" className="inline-flex rounded-full bg-secondary/60 p-1">
                       {([1, 2] as const).map((v) => (
                         <button key={v} type="button" role="radio" aria-checked={p.ypLevel === v} onClick={() => setP((x) => ({ ...x, ypLevel: v }))} className={cn("min-h-11 rounded-full px-4 text-[13px] font-semibold transition-colors duration-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", p.ypLevel === v ? "lime-bg" : "text-muted-foreground")}>
                           {v === 1 ? "1 bank alert" : "SMS and email both"}
@@ -301,7 +301,7 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
           </div>
         </div>
 
-        <details className="group mt-5 rounded-[20px] hairline">
+        <details className="group mt-5 rounded-[20px] bg-secondary/40">
           <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-[14px] font-medium [&::-webkit-details-marker]:hidden">
             Invoice details (business name, address, GSTIN, tax)
             <span className="text-muted-foreground transition-transform group-open:rotate-45" aria-hidden>+</span>

@@ -35,18 +35,18 @@ export function BehaviorView({ stats, history, selected, tab, aiReady }: { stats
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div role="tablist" aria-label="User behavior views" className="inline-flex rounded-full bg-secondary/70 p-1 hairline">
+        <div role="tablist" aria-label="User behavior views" className="inline-flex rounded-full bg-secondary/70 p-1">
           {([["breakdown", "Breakdown", TrendingUp], ["ai", "Gemini analyses", Sparkles]] as const).map(([k, label, Icon]) => (
             <button key={k} id={`tab-${k}`} type="button" role="tab" aria-selected={t === k} aria-controls={`panel-${k}`} onClick={() => chooseTab(k)} className={cn("inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", t === k ? "lime-bg" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
               <Icon className="h-4 w-4" aria-hidden />
               {label}
-              {k === "ai" && count > 0 && <span className={cn("grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold tabular", t === k ? "bg-[hsl(var(--lime-foreground)/0.14)]" : "bg-foreground/[0.07]")}>{count}</span>}
+              {k === "ai" && count > 0 && <span className={cn("grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-semibold tabular", t === k ? "bg-[hsl(var(--lime-foreground)/0.14)]" : "bg-foreground/[0.07]")}>{count}</span>}
             </button>
           ))}
         </div>
         <div className="flex items-center gap-2">
           {pending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground motion-reduce:animate-none" aria-label="Loading" />}
-          <div role="radiogroup" aria-label="Date range" className="inline-flex rounded-full bg-secondary/70 p-1 hairline">
+          <div role="radiogroup" aria-label="Date range" className="inline-flex rounded-full bg-secondary/70 p-1">
             {RANGES.map((r) => (
               <button key={r} type="button" role="radio" aria-checked={stats.rangeDays === r} onClick={() => setParam((q) => (r === 30 ? q.delete("range") : q.set("range", String(r))), "push")} className={cn("min-h-11 rounded-full px-3.5 text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", stats.rangeDays === r ? "lime-bg" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
                 {r} days

@@ -66,7 +66,7 @@ export function BetaPanel({ initial }: { initial: BetaState }) {
         <CardTitle hint="Hero stamp, “Free during beta”, footer note, pricing and contact copy." action={<StatusBadge status={on ? "running" : "canceled"} label={on ? "Beta ON" : "Beta OFF"} />}>
           Beta switch
         </CardTitle>
-        <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4 hairline", on ? "bg-accent/10" : "bg-secondary/40")}>
+        <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4", on ? "bg-accent/10" : "bg-secondary/40")}>
           <div className="flex items-center gap-3">
             <span className={cn("grid h-11 w-11 place-items-center rounded-2xl", on ? "bg-accent/15 text-foreground" : "bg-secondary text-muted-foreground")}>
               <FlaskConical className="h-5 w-5" aria-hidden />
@@ -109,7 +109,7 @@ export function BetaPanel({ initial }: { initial: BetaState }) {
           </div>
           <div>
             <Label htmlFor="beta-plan">Plan</Label>
-            <select id="beta-plan" value={planSlug} onChange={(e) => setPlanSlug(e.target.value)} className="h-11 w-full rounded-2xl bg-secondary/50 px-3 text-[14px] hairline">
+            <select id="beta-plan" value={planSlug} onChange={(e) => setPlanSlug(e.target.value)} className="h-11 w-full rounded-2xl bg-secondary/50 px-3 text-[14px] border border-border/60">
               {st.plans.map((p) => (
                 <option key={p.slug} value={p.slug}>{p.name}</option>
               ))}
@@ -130,7 +130,7 @@ export function BetaPanel({ initial }: { initial: BetaState }) {
           </p>
         </div>
 
-        <div className="mt-6 rounded-[20px] bg-secondary/40 p-4 hairline">
+        <div className="mt-6 rounded-[20px] bg-secondary/40 p-4">
           <p className="flex items-center gap-2 font-display text-[15px] font-semibold"><Gift className="h-4 w-4" aria-hidden /> Make a code by hand</p>
           <p className="mt-1 text-[12.5px] text-muted-foreground">For a partner or a giveaway. Works for any account, once, and doesn't use a seat.</p>
           <div className="mt-3 flex flex-wrap items-end gap-2">
@@ -144,7 +144,7 @@ export function BetaPanel({ initial }: { initial: BetaState }) {
           </div>
           {made && (
             <div className="mt-3 flex flex-wrap items-center gap-2" role="status">
-              <code className="rounded-xl bg-background px-3 py-2 font-mono text-[15px] font-semibold tracking-wider hairline">{made}</code>
+              <code className="rounded-xl bg-background px-3 py-2 font-mono text-[15px] font-semibold tracking-wider border border-border/60">{made}</code>
               <Button type="button" size="sm" variant="ghost" onClick={() => copy(made)}><Copy className="h-4 w-4" aria-hidden /> Copy</Button>
             </div>
           )}

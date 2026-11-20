@@ -61,7 +61,7 @@ export function MascotPicker({ initial }: { initial: MascotConfig }) {
         </CardTitle>
         <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-7">
           {PIP_SITUATIONS.map((s) => (
-            <li key={s.id} className="flex flex-col items-center gap-1 rounded-2xl bg-secondary/40 p-3 text-center hairline">
+            <li key={s.id} className="flex flex-col items-center gap-1 rounded-2xl bg-secondary/40 p-3 text-center">
               <Pip size={64} mood={s.mood as PipMood} palette={cfg.situations[s.id]} situation={s.id} />
               <span className="text-[13px] font-medium leading-tight">{s.name}</span>
               <span className="text-[12px] text-muted-foreground">{paletteById(cfg.situations[s.id]).name}</span>
@@ -76,7 +76,7 @@ export function MascotPicker({ initial }: { initial: MascotConfig }) {
         return (
           <Card key={s.id}>
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-              <div className="grid h-28 w-28 shrink-0 place-items-center self-center rounded-3xl bg-secondary/40 hairline sm:self-start">
+              <div className="grid h-28 w-28 shrink-0 place-items-center self-center rounded-3xl bg-secondary/40 sm:self-start">
                 <Pip size={92} mood={s.mood as PipMood} palette={cur} situation={s.id} />
               </div>
               <fieldset className="min-w-0 flex-1" disabled={busy !== null && busy !== s.id}>

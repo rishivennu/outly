@@ -93,7 +93,7 @@ export default async function GrowthPage(props: { searchParams: Promise<{ r?: st
             <ol className="grid gap-1">
               {refs.rows.map((p, i) => (
                 <li key={p.id} data-enter={i < 10 ? "" : undefined} className="flex items-center gap-3 rounded-2xl px-2 py-2.5 hover:bg-foreground/[0.03]">
-                  <span className="w-6 text-center font-display text-[15px] font-bold tabular text-muted-foreground">{i + 1}</span>
+                  <span className="w-6 text-center font-display text-[15px] font-semibold tabular text-muted-foreground">{i + 1}</span>
                   <OrbAvatar avatar={p.avatar} seed={p.email} size={34} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{p.name}{p.email.endsWith(SAMPLE_DOMAIN) && <Pill className="ml-2" tone="info">sample</Pill>}</span>

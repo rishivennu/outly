@@ -142,7 +142,7 @@ export function LiveGlobeCard({ initial }: { initial: LiveMap }) {
           <p className="lg-eyebrow">
             <span className="lg-live" aria-hidden="true" /> Live
           </p>
-          <h2 id="lg-title" className="mt-2 font-display text-[1.2rem] font-bold tracking-[-0.02em] text-white">Who's using Outlly now</h2>
+          <h2 id="lg-title" className="mt-2 font-display text-[1.2rem] font-semibold text-white">Who's using Outlly now</h2>
           <p className="mt-1 text-[13px] text-white/70">Approximate locations from each member's network. Never exact.</p>
         </div>
         <div className="lg-controls">
@@ -156,7 +156,7 @@ export function LiveGlobeCard({ initial }: { initial: LiveMap }) {
               ))}
             </select>
           </label>
-          <Button type="button" variant="lime" className="px-[18px] text-[13.5px] font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-wait" onClick={() => void load(timeout, true)} disabled={busy} aria-busy={busy}>
+          <Button type="button" variant="lime" className="px-[18px] text-[13.5px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-wait" onClick={() => void load(timeout, true)} disabled={busy} aria-busy={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <RefreshCw className="h-4 w-4" aria-hidden />}
             {busy ? "Refreshing" : "Refresh"}
           </Button>
@@ -277,7 +277,7 @@ function PlacePanel({ place, now, timeout, onBack }: { place: LivePlace; now: nu
       <Button type="button" variant="ghost" size="sm" onClick={onBack} className="h-11 gap-1 rounded-xl pl-1 pr-2.5 text-[13px] font-semibold text-white/80 hover:bg-white/[0.06] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white touch:h-11">
         <ChevronLeft className="h-4 w-4" aria-hidden /> All places
       </Button>
-      <h3 className="mt-2 font-display text-[1.1rem] font-bold leading-tight text-white">{place.city ?? country}</h3>
+      <h3 className="mt-2 font-display text-[1.1rem] font-semibold leading-tight text-white">{place.city ?? country}</h3>
       <p className="mt-0.5 text-[13px] text-white/70">
         {place.city ? `${place.people[0]?.region && place.people[0].region !== place.city ? `${place.people[0].region}, ` : ""}${country}` : "City not reported. Shown at the country's centre."}
       </p>

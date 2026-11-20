@@ -131,9 +131,9 @@ export function PlanGrantsPanel({ plans, initialList, initialEmail }: { plans: P
               <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4" aria-hidden /> {acc.user?.name ?? acc.email}</span>
             </CardTitle>
             <p className="text-[13px] text-muted-foreground">{acc.email}</p>
-            <div className="mt-4 rounded-[20px] bg-secondary/40 p-4 hairline">
+            <div className="mt-4 rounded-[20px] bg-secondary/40 p-4">
               <p className="text-[12px] font-semibold text-muted-foreground">Access right now</p>
-              <p className="mt-1 font-display text-[1.4rem] font-bold">{acc.current?.planName ?? (acc.user ? "Free" : "None (not registered)")}</p>
+              <p className="mt-1 font-display text-[1.4rem] font-semibold">{acc.current?.planName ?? (acc.user ? "Free" : "None (not registered)")}</p>
               {acc.current && (
                 <p className="text-[13px] text-muted-foreground">
                   {SOURCE_LABEL[acc.current.source] ?? acc.current.source}
@@ -165,13 +165,13 @@ export function PlanGrantsPanel({ plans, initialList, initialEmail }: { plans: P
             <fieldset disabled={!!live || !!busy} className="grid gap-3 disabled:opacity-60">
               <div>
                 <Label htmlFor="pg-plan">Plan</Label>
-                <select id="pg-plan" value={plan} onChange={(e) => setPlan(e.target.value)} className="h-11 w-full rounded-2xl bg-secondary/50 px-3 text-[14px] hairline">
+                <select id="pg-plan" value={plan} onChange={(e) => setPlan(e.target.value)} className="h-11 w-full rounded-2xl bg-secondary/50 px-3 text-[14px] border border-border/60">
                   {plans.map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}
                 </select>
               </div>
               <div role="radiogroup" aria-label="How long" className="flex gap-2">
                 {(["days", "date"] as const).map((m) => (
-                  <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={cn("h-11 flex-1 rounded-2xl text-[13.5px] font-medium hairline transition-colors duration-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", mode === m ? "bg-foreground text-background" : "bg-secondary/40")}>
+                  <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={cn("h-11 flex-1 rounded-2xl text-[13.5px] font-medium transition-colors duration-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", mode === m ? "bg-foreground text-background" : "bg-secondary/40")}>
                     {m === "days" ? "For a length" : "Until a date"}
                   </button>
                 ))}
@@ -236,7 +236,7 @@ export function PlanGrantsPanel({ plans, initialList, initialEmail }: { plans: P
                       {g.note && <p className="mt-1 text-[12.5px] text-muted-foreground">Note: {g.note}</p>}
                       {g.revokeReason && <p className="mt-1 text-[12.5px] text-muted-foreground">Revoked by {g.revokedBy}: {g.revokeReason}</p>}
                       {edit?.id === g.id && (
-                        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-[20px] bg-secondary/40 p-3 hairline">
+                        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-[20px] bg-secondary/40 p-3">
                           {edit.kind === "extend" ? (
                             <>
                               <div>
@@ -252,7 +252,7 @@ export function PlanGrantsPanel({ plans, initialList, initialEmail }: { plans: P
                           ) : (
                             <div>
                               <Label htmlFor={`p-${g.id}`}>New plan</Label>
-                              <select id={`p-${g.id}`} value={newPlan} onChange={(e) => setNewPlan(e.target.value)} className="h-11 rounded-2xl bg-background px-3 text-[14px] hairline">
+                              <select id={`p-${g.id}`} value={newPlan} onChange={(e) => setNewPlan(e.target.value)} className="h-11 rounded-2xl bg-background px-3 text-[14px] border border-border/60">
                                 {plans.map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}
                               </select>
                             </div>
@@ -309,7 +309,7 @@ export function PlanGrantsPanel({ plans, initialList, initialEmail }: { plans: P
         <CardTitle
           hint="Admin grants across everyone, newest first."
           action={
-            <select aria-label="Filter grants" value={filter} onChange={(e) => { setFilter(e.target.value); void reloadList(e.target.value); }} className="h-11 rounded-2xl bg-secondary/50 px-3 text-[13.5px] hairline">
+            <select aria-label="Filter grants" value={filter} onChange={(e) => { setFilter(e.target.value); void reloadList(e.target.value); }} className="h-11 rounded-2xl bg-secondary/50 px-3 text-[13.5px] border border-border/60">
               <option value="">All</option>
               <option value="active">Active</option>
               <option value="pending">Pending</option>

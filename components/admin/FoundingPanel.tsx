@@ -52,7 +52,7 @@ export function FoundingPanel({ initial }: { initial: FoundingState }) {
         <CardTitle hint="Signup page seat counter, the one-time invitation on Home, the badge for paying members." action={<StatusBadge status={on ? "open" : "canceled"} label={on ? undefined : "Closed"} />}>
           Founding seats
         </CardTitle>
-        <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4 hairline", on ? "bg-accent/10" : "bg-secondary/40")}>
+        <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4", on ? "bg-accent/10" : "bg-secondary/40")}>
           <div className="flex items-center gap-3">
             <Image src="/brand/founding/01-rocket-badge.webp" alt="" width={48} height={48} className="h-12 w-12 shrink-0" />
             <div>
@@ -62,7 +62,7 @@ export function FoundingPanel({ initial }: { initial: FoundingState }) {
           </div>
           <Switch on={on} onChange={() => (on ? setAsk("off") : turn(true))} label="Founding seats open" disabled={!!busy} />
         </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-[20px] bg-secondary/40 p-4 hairline">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-[20px] bg-secondary/40 p-4">
           <div className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-2xl bg-secondary" aria-hidden><MailCheck className="h-5 w-5" /></span>
             <div>
@@ -123,7 +123,7 @@ export function FoundingPanel({ initial }: { initial: FoundingState }) {
           <Table label="Founding members" lead={1} head={["No.", "Member", "Discount", "Joined", <span key="a" className="sr-only">Action</span>]}>
             {st.members.map((m) => (
               <tr key={m.id}>
-                <td className="whitespace-nowrap font-display text-[15px] font-bold tabular">#{m.no}</td>
+                <td className="whitespace-nowrap font-display text-[15px] font-semibold tabular">#{m.no}</td>
                 <td className="max-w-[320px] truncate">{m.name ? `${m.name} (${m.email})` : m.email}</td>
                 <td className="text-muted-foreground sm:whitespace-nowrap">
                   {m.pct}% for life

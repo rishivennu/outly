@@ -53,7 +53,7 @@ export function AiEngineCard({ initial, funasrEnv, groqEnv }: { initial: Subtitl
   }
 
   const option = (value: SubtitleRules["provider"], title: string, body: string, disabled = false) => (
-    <label className={cn("flex min-h-11 cursor-pointer items-start gap-3 rounded-2xl px-3 py-3 hairline transition-colors duration-200", ease, provider === value ? "bg-lime/10 ring-1 ring-[hsl(var(--lime)/0.55)]" : "bg-secondary/30", disabled && "cursor-not-allowed opacity-60")}>
+    <label className={cn("flex min-h-11 cursor-pointer items-start gap-3 rounded-2xl px-3 py-3 transition-colors duration-200", ease, provider === value ? "bg-lime/10 ring-1 ring-[hsl(var(--lime)/0.55)]" : "bg-secondary/30", disabled && "cursor-not-allowed opacity-60")}>
       <input type="radio" name="subtitle-engine" value={value} className="mt-0.5 h-5 w-5 shrink-0 accent-[hsl(var(--lime))]" checked={provider === value} disabled={disabled} onChange={() => setProvider(value)} />
       <span className="min-w-0">
         <span className="block text-[14px] font-medium">{title}</span>
@@ -69,7 +69,7 @@ export function AiEngineCard({ initial, funasrEnv, groqEnv }: { initial: Subtitl
       </CardTitle>
       <div role="radiogroup" aria-label="Transcription engine" className="grid gap-2">
         {option("gemini", "Cloud (default)", "Whisper on Groq when GROQ_API_KEY is set (fastest, word timings built in), Gemini otherwise or as the fallback. Detects the spoken language.")}
-        <div className="rounded-2xl hairline">
+        <div className="rounded-2xl bg-secondary/30">
           <button type="button" aria-expanded={open} aria-controls="engine-worker" onClick={() => setOpen((o) => !o)} className="flex min-h-11 w-full items-center justify-between gap-2 rounded-2xl px-3 text-left text-[13.5px] font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(hover:hover)]:hover:text-foreground">
             Self-hosted worker (FunASR / Whisper), optional
             <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform duration-200", ease, open && "rotate-180")} aria-hidden />

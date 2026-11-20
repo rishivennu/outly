@@ -41,7 +41,7 @@ function Form({ item, categories, onSaved, onCancel, onDelete }: { item: F; cate
       <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
         <div>
           <Label htmlFor={`fq-c-${item.id}`}>Category</Label>
-          <select id={`fq-c-${item.id}`} value={d.category} onChange={(e) => setD({ ...d, category: e.target.value })} className="h-12 w-full rounded-2xl bg-secondary/60 px-3 text-[14px] hairline">
+          <select id={`fq-c-${item.id}`} value={d.category} onChange={(e) => setD({ ...d, category: e.target.value })} className="h-12 w-full rounded-2xl bg-secondary/60 px-3 text-[14px] border border-border/60">
             {categories.map((c) => <option key={c}>{c}</option>)}
           </select>
         </div>
@@ -56,7 +56,7 @@ function Form({ item, categories, onSaved, onCancel, onDelete }: { item: F; cate
           <Button type="button" variant="ghost" size="sm" onClick={() => setPreview((p) => !p)} className="text-foreground underline underline-offset-4">{preview ? "Edit" : "Preview"}</Button>
         </Label>
         {preview ? (
-          <div className="min-h-[120px] rounded-2xl bg-secondary/30 px-4 py-3 text-[14.5px] leading-relaxed text-muted-foreground hairline"><Answer text={d.answer || "Nothing yet."} /></div>
+          <div className="min-h-[120px] rounded-2xl bg-secondary/30 px-4 py-3 text-[14.5px] leading-relaxed text-muted-foreground"><Answer text={d.answer || "Nothing yet."} /></div>
         ) : (
           <Textarea id={`fq-a-${item.id}`} rows={5} value={d.answer} onChange={(e) => setD({ ...d, answer: e.target.value })} maxLength={2000} />
         )}
