@@ -4,7 +4,7 @@
  * Every new limit is 0 = "not limited" and an empty perk list = "every perk", so plans created before 1096
  * behave exactly as before until an admin (or the 2026-11 preset, applied by hand) sets them.
  */
-export const PERKS = ["weekly-digest", "voice-memory", "csv-export", "client-reports", "approvals", "spike-alerts", "ai-replies", "review-links"] as const;
+export const PERKS = ["weekly-digest", "voice-memory", "csv-export", "client-reports", "approvals", "spike-alerts", "ai-replies", "review-links", "ai-insights"] as const;
 export type Perk = (typeof PERKS)[number];
 
 export const PERK_LABEL: Record<Perk, string> = {
@@ -16,6 +16,7 @@ export const PERK_LABEL: Record<Perk, string> = {
   "spike-alerts": "Spike alerts", // failed-post alerts stay on every plan
   "ai-replies": "AI reply suggestions",
   "review-links": "Review links",
+  "ai-insights": "AI wording for Intelligence recommendations", // R1247
 };
 
 /** Stored perks -> list, or null for "every perk" (an empty or unreadable value never takes features away). */

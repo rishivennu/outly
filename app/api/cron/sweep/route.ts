@@ -39,6 +39,10 @@ async function sweep(req: NextRequest) {
   const campaign = await import("@/lib/campaigns").then((m) => m.sweepCampaigns()).catch((e) => (console.error("[sweep] campaign", e), null));
   // R1242: outcomes of posts made from recommendations, every 10 minutes, at most 10 owners a run (never fatal).
   const outcomes = new Date().getMinutes() % 10 === 4 ? await import("@/lib/intelligence/outcome").then((m) => m.sweepOutcomes({ maxOwners: 10 })).catch((e) => (console.error("[sweep] outcomes", e), null)) : null;
+  // R1247: Content Memory backfill of the last 180 days, every 10 minutes (slot 7), at most 5 owners and 100 posts each (never fatal).
+  const backfill = new Date().getMinutes() % 10 === 7
+    ? await import("@/lib/intelligence/memory").then((m) => m.sweepBackfill({ maxOwners: 5, batch: 100 })).then((r) => ({ owners: r.owners, items: r.items })).catch((e) => (console.error("[sweep] backfill", e), null))
+    : null;
   if (new Date().getMinutes() === 7) await cleanupSubs().catch(() => 0);
   const subs = await sweepSubscriptions(new Date()); // 1147: trials, old signals, offer ledger + month rollover (never fatal)
   await import("@/lib/accounts").then((m) => m.resubscribeCommentsOnce()).catch((e) => console.error("[sweep] comment subs", e)); // 1141b, runs once
@@ -53,7 +57,7 @@ async function sweep(req: NextRequest) {
   // (1027). Budget = what is left of maxDuration minus 10 s of headroom; whatever is still running then is
   // held by waitUntil or picked up by the next sweep.
   const running = await settle(Math.max(0, 50_000 - (Date.now() - startedAt)));
-  return NextResponse.json({ ok: true, requeued, cleaned, files, reminders, push, assist, campaign, outcomes, subs, health, running }, { headers: { "cache-control": "no-store" } });
+  return NextResponse.json({ ok: true, requeued, cleaned, files, reminders, push, assist, campaign, outcomes, backfill, subs, health, running }, { headers: { "cache-control": "no-store" } });
 }
 
 /** 1147: trials every 5 minutes (expiry + reminders); signal pruning and the ledger/month sweep once an hour. */

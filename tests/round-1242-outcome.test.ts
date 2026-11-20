@@ -201,6 +201,6 @@ describe("R1242 sweep step", () => {
   test("the cron route runs it gated, bounded and never fatal", () => {
     const s = readFileSync("app/api/cron/sweep/route.ts", "utf8");
     expect(s).toContain('getMinutes() % 10 === 4 ? await import("@/lib/intelligence/outcome").then((m) => m.sweepOutcomes({ maxOwners: 10 })).catch(');
-    expect(s).toContain("campaign, outcomes, subs");
+    expect(s).toContain("campaign, outcomes, backfill, subs"); // R1247: the backfill step joined the response between outcomes and subs
   });
 });

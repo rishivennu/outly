@@ -4,6 +4,8 @@ import { db } from "../db";
 import { rangeLabel } from "../analytics/core";
 import { gemini } from "../ai/creative";
 import { activeAiGrant, countFeatureUse, utcDayKey } from "../ai/entitlements";
+import { entitlements, type Entitlements } from "../billing/entitlements";
+import { hasPerk } from "../billing/plan-rules";
 import { aiAvailable } from "../live/review";
 import { MAX_RECOMMENDATIONS, type Confidence, type Evidence, type Period, type Recommendation } from "./core";
 import { dedupeKeyOf, isExpired, RECO_STATUSES, ruleKeyOf, validateWording, type RecoStatus, type RecoWording } from "./reco-core";
@@ -163,12 +165,13 @@ export async function persistRecommendations(
   const views = out.map(view);
   const ask = opts.ask !== undefined ? opts.ask : defaultAsk();
   if (!ask || !fresh.length) return views;
-  // R1244: metered like every AI call, only with a grant covering it, and within the owner's day cap.
-  const allowed = Math.min(MAX_RECOMMENDATIONS, await wordingAllowance(ownerId, now));
+  // R1244: metered like every AI call, within the owner's day cap. R1247: with a grant covering it or the plan perk.
+  const gate = await wordingGate(ownerId, now);
+  const allowed = Math.min(MAX_RECOMMENDATIONS, gate.left);
   const ids = new Set(fresh.slice(0, allowed).map((r) => r.id));
   if (!ids.size) return views;
   // Counted one by one before the parallel calls, so concurrent upserts on the same usage row never race.
-  for (let i = 0; i < ids.size; i++) await countFeatureUse(ownerId, WORDING_FEATURE, true, new Date(now));
+  for (let i = 0; i < ids.size; i++) await countFeatureUse(ownerId, WORDING_FEATURE, gate.grant, new Date(now));
   return Promise.all(views.map((v) => (ids.has(v.id) ? wordOne(v, ask) : v)));
 }
 
@@ -218,16 +221,31 @@ export const WORDING_FEATURE = "intelligence_wording" as const;
 export const WORDING_DAY_CAP = 30;
 
 /**
- * R1244: how many rewordings this owner may still have today. 0 without a live AI grant covering
- * WORDING_FEATURE (lib/ai/entitlements.ts) or once WORDING_DAY_CAP calls were counted today; then the rule
- * text is kept, with no error.
+ * R1247: does the plan include AI wording (the "ai-insights" perk, DECISIONS 7)? A plan that lists its perks decides.
+ * perks null means "every perk" so plans made before 1096 keep what they had; AI wording is new, so that fallback
+ * counts on paid, gift and granted plans but never on Free (the seeded Free plan has no perk list).
+ */
+export function planAllowsWording(e: Pick<Entitlements, "perks" | "source">): boolean {
+  return e.perks == null ? e.source !== "free" : hasPerk(e, "ai-insights");
+}
+
+/** R1244 + R1247: rewordings left today, and whether an admin AI grant (rather than the plan) allows them. */
+async function wordingGate(ownerId: string, now: number): Promise<{ left: number; grant: boolean }> {
+  if (!ownerId) return { left: 0, grant: false };
+  const at = new Date(now);
+  const grant = !!(await activeAiGrant(ownerId, WORDING_FEATURE, at));
+  if (!grant && !planAllowsWording(await entitlements(ownerId))) return { left: 0, grant: false };
+  const used = await db.aiFeatureUsage.findUnique({ where: { userId_day_feature: { userId: ownerId, day: utcDayKey(at), feature: WORDING_FEATURE } }, select: { count: true } });
+  return { left: Math.max(0, WORDING_DAY_CAP - (used?.count ?? 0)), grant };
+}
+
+/**
+ * R1244: how many rewordings this owner may still have today. R1247: 0 unless a live AI grant covers
+ * WORDING_FEATURE (lib/ai/entitlements.ts) or the plan has the "ai-insights" perk, and 0 once WORDING_DAY_CAP
+ * calls were counted today; then the rule text is kept, with no error.
  */
 export async function wordingAllowance(ownerId: string, now: number = Date.now()): Promise<number> {
-  if (!ownerId) return 0;
-  const at = new Date(now);
-  if (!(await activeAiGrant(ownerId, WORDING_FEATURE, at))) return 0;
-  const used = await db.aiFeatureUsage.findUnique({ where: { userId_day_feature: { userId: ownerId, day: utcDayKey(at), feature: WORDING_FEATURE } }, select: { count: true } });
-  return Math.max(0, WORDING_DAY_CAP - (used?.count ?? 0));
+  return (await wordingGate(ownerId, now)).left;
 }
 
 /** The same model gate as the Profile Review deep review (lib/live/review.ts). */
@@ -247,8 +265,9 @@ export async function wordRecommendation(rec: StoredRecommendation, opts: { ask?
   const ask = opts.ask !== undefined ? opts.ask : defaultAsk();
   if (!ask) return rec;
   const now = opts.now ?? Date.now();
-  if ((await wordingAllowance(rec.ownerId, now)) < 1) return rec;
-  await countFeatureUse(rec.ownerId, WORDING_FEATURE, true, new Date(now));
+  const gate = await wordingGate(rec.ownerId, now);
+  if (gate.left < 1) return rec;
+  await countFeatureUse(rec.ownerId, WORDING_FEATURE, gate.grant, new Date(now));
   return wordOne(rec, ask);
 }
 
