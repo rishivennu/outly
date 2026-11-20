@@ -2,8 +2,9 @@
 import { StarField } from "@/components/marketing/StarField";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Activity, Award, BarChart3, BadgePercent, BellRing, ShieldAlert, CalendarDays, Gift, BadgeCheck, BookOpen, ChevronRight, Construction, FlaskConical, HeartPulse, Headset, Hourglass, Library, Newspaper, Rocket, PanelsTopLeft, PanelLeftClose, PanelLeftOpen, CreditCard, Globe, Share2, SlidersHorizontal, Sparkles, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, Repeat, ShieldCheck, Tag, TrendingUp, Type, Users, Wand2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
@@ -14,7 +15,9 @@ import { can, ROLE_LABEL, type AdminArea, type AdminRole } from "@/lib/admin/per
 import { Bell } from "./Bell";
 import { ScrollArea } from "./ScrollArea";
 import { Tooltip } from "./ui";
-import { T } from "@/lib/motion/tokens";
+import { Button } from "@/components/ui/button";
+import { FX, T } from "@/lib/motion/tokens";
+import { useHeaderScroll } from "@/lib/client/header-scroll";
 
 /** 1163: five groups. Run is the daily console, Insights is read-only analysis, Setup is configuration, Administration is who may do what. */
 export type NavGroup = "Run" | "Insights" | "Content Studio" | "Support" | "Setup" | "Administration";
@@ -64,6 +67,16 @@ export const NAV: { href: string; label: string; icon: typeof Users; area: Admin
 /** Remembered per browser: the icon-only sidebar is a preference, not a page state. */
 export const SLIM_KEY = "admin:nav:slim";
 
+/** Touch screens focus a tapped button, which would leave its focus-within tooltip standing; there the label is aria only. */
+const TOUCH_TIP = "[@media(hover:none)]:[&>.admin-tip]:!hidden";
+
+/** R1269: the phone drawer arrives like the studio one: a short slide plus fade on the card time, out quicker than in. */
+const DRAWER_FX = {
+  initial: { opacity: 0, x: -24 },
+  animate: { opacity: 1, x: 0, transition: T.card },
+  exit: { opacity: 0, x: -24, transition: T.menuExit },
+};
+
 /** Longest matching entry wins, so /admin/blog/library lights "Blog library" and not "Blog dashboard" as well. */
 const active = (path: string, href: string) => {
   if (href === "/admin") return path === "/admin";
@@ -104,7 +117,7 @@ function NavItem({ href, label, icon: Icon, on, n, slim, onNavigate, layoutId, t
       aria-current={on ? "page" : undefined}
       aria-label={slim && n > 0 ? `${label}, ${n} open` : undefined}
       {...hover}
-      className={cn("group relative flex h-11 items-center rounded-2xl text-[14px] font-medium transition-colors duration-200 lg:h-10", slim ? "w-11 justify-center lg:w-10" : "gap-3 px-3", on ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:bg-foreground/[0.04] [@media(hover:hover)]:hover:text-foreground")}
+      className={cn("group relative flex h-11 items-center rounded-2xl text-[14px] font-medium outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:h-10", slim ? "w-11 justify-center lg:w-10" : "gap-3 px-3", on ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:bg-secondary/60 [@media(hover:hover)]:hover:text-foreground")}
     >
       {on && (
         <motion.span layoutId={layoutId} className="absolute inset-0 rounded-2xl bg-secondary" transition={T.glide}>
@@ -131,9 +144,9 @@ function NavList({ role, path, badges, onNavigate, layoutId, slim = false, tip }
         const list = items.filter((i) => i.group === g);
         if (!list.length) return null;
         return (
-          <div key={g} className={cn(slim && "flex flex-col items-center gap-0.5 border-t border-border/60 pt-3 first:border-0 first:pt-0")}>
-            <p className={cn("eyebrow mb-1.5 px-3 text-[10.5px]", slim && "sr-only")}>{g}</p>
-            <div className="flex flex-col gap-0.5">
+          <div key={g} className={cn(slim && "flex flex-col items-center gap-1 border-t border-border/60 pt-3 first:border-0 first:pt-0")}>
+            <p className={cn("mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground", slim && "sr-only")}>{g}</p>
+            <div className="flex flex-col gap-1">
               {list.map(({ href, label, icon, area }) => (
                 <NavItem key={href} href={href} label={label} icon={icon} on={active(path, href)} n={badges[area] ?? 0} slim={slim} onNavigate={onNavigate} layoutId={layoutId} tip={tip} />
               ))}
@@ -150,16 +163,16 @@ function Footer({ admin, path, onNavigate, slim = false }: { admin: { name: stri
   const mine = path === "/admin/account";
   const signOut = (
     <form action="/api/admin/logout" method="post" className="shrink-0">
-      <button type="submit" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground lg:h-10 lg:w-10" aria-label="Sign out">
+      <Button type="submit" variant="ghost" size="icon" className="lg:h-10 lg:w-10" aria-label="Sign out">
         <LogOut className="h-4 w-4" aria-hidden />
-      </button>
+      </Button>
     </form>
   );
   if (slim) {
     return (
       <div className="flex flex-col items-center gap-1 border-t border-border/60 px-3 pb-3 pt-3">
         <Tooltip text="My account" side="right" className="flex">
-          <Link href="/admin/account" onClick={onNavigate} aria-current={mine ? "page" : undefined} aria-label={`My account, ${admin.name}`} className={cn("grid h-11 w-11 place-items-center rounded-full lg:h-10 lg:w-10", mine && "bg-secondary")}>
+          <Link href="/admin/account" onClick={onNavigate} aria-current={mine ? "page" : undefined} aria-label={`My account, ${admin.name}`} className={cn("grid h-11 w-11 place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring lg:h-10 lg:w-10", mine && "bg-secondary")}>
             <OrbAvatar seed={admin.name} size={28} />
           </Link>
         </Tooltip>
@@ -181,7 +194,7 @@ function Footer({ admin, path, onNavigate, slim = false }: { admin: { name: stri
         </Tooltip>
       </div>
       <div className="flex items-center gap-1 rounded-2xl p-1.5 hairline">
-        <Link href="/admin/account" onClick={onNavigate} aria-current={mine ? "page" : undefined} className={cn("group flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1.5 text-left", mine ? "bg-secondary" : "[@media(hover:hover)]:hover:bg-secondary")}>
+        <Link href="/admin/account" onClick={onNavigate} aria-current={mine ? "page" : undefined} className={cn("group flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", mine ? "bg-secondary" : "[@media(hover:hover)]:hover:bg-secondary")}>
           <OrbAvatar seed={admin.name} size={34} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[13px] font-semibold">{admin.name}</span>
@@ -189,7 +202,9 @@ function Footer({ admin, path, onNavigate, slim = false }: { admin: { name: stri
           </span>
           <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
         </Link>
-        {signOut}
+        <Tooltip text="Sign out" side="top" className={cn("flex", TOUCH_TIP)}>
+          {signOut}
+        </Tooltip>
       </div>
     </div>
   );
@@ -204,7 +219,23 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
   // Slim starts false on both server and client (no hydration mismatch), then reads the saved preference.
   const [slim, setSlim] = useState(false);
   const slimTip = useSlimTip();
+  const reduce = useReducedMotion();
+  const top = useRef<HTMLElement>(null);
+  const menuBtn = useRef<HTMLButtonElement>(null);
+  const drawer = useRef<HTMLElement>(null);
+  // Opened by a tap, focus lands on the panel itself (no ring, no tooltip); from the keyboard, on its first control.
+  const byPointer = useRef(false);
+  // R1269: the phone and tablet bar folds away on the way down and comes back on the way up (the studio's own hook).
+  const { lifted, hidden } = useHeaderScroll(path, top);
   useEffect(() => setOpen(false), [path]);
+  // Rotating a tablet past the desktop breakpoint swaps in the sidebar; never leave an invisible modal behind.
+  useEffect(() => {
+    if (!open) return;
+    const mq = matchMedia("(min-width: 1024px)");
+    const off = () => mq.matches && setOpen(false);
+    mq.addEventListener("change", off);
+    return () => mq.removeEventListener("change", off);
+  }, [open]);
   useEffect(() => {
     try {
       setSlim(localStorage.getItem(SLIM_KEY) === "1");
@@ -217,17 +248,11 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
       localStorage.setItem(SLIM_KEY, next ? "1" : "0");
     } catch {}
   };
-  useEffect(() => {
-    if (!open) return;
-    const k = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", k);
-    return () => window.removeEventListener("keydown", k);
-  }, [open]);
 
   return (
     <div className="admin-root sky-host relative isolate flex min-h-dvh" data-nav={slim ? "slim" : "full"}>
       {!quiet && <StarField nebula />}
-      <div className="sticky top-0 hidden h-dvh shrink-0 p-3 lg:block">
+      <div className="sticky top-0 z-[var(--admin-z-sidebar)] hidden h-dvh shrink-0 p-3 lg:block">
         <aside data-route-order="" className={cn("glass hairline flex h-full flex-col overflow-hidden rounded-[28px] transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none", slim ? "w-[72px]" : "w-[248px]")} aria-label="Admin sidebar">
           <div className={cn("flex items-center gap-2 pb-4 pt-5", slim ? "flex-col px-3" : "justify-between px-5")}>
             <Link href="/admin" aria-label="Admin overview" className="flex h-10 items-center">
@@ -236,9 +261,9 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
             {!slim && <span className="rounded-full bg-lime/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-lime-ink">Admin</span>}
             {/* Slim: the rail clips its own overflow, so the toggle uses the same fixed tooltip as the nav items. */}
             <Tooltip text={slim ? "Expand sidebar" : "Collapse sidebar"} side="bottom" className={cn("flex", slim && "[&>.admin-tip]:!hidden")}>
-              <button type="button" onClick={toggleSlim} aria-pressed={slim} aria-label={slim ? "Expand sidebar" : "Collapse sidebar"} {...(slim ? { onPointerEnter: (e: React.PointerEvent<HTMLElement>) => slimTip.api.show(e.currentTarget, "Expand sidebar"), onPointerLeave: slimTip.api.hide, onFocus: (e: React.FocusEvent<HTMLElement>) => slimTip.api.show(e.currentTarget, "Expand sidebar"), onBlur: slimTip.api.hide } : {})} className="grid h-10 w-10 place-items-center rounded-full text-muted-foreground [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground">
+              <Button type="button" variant="ghost" size="icon-sm" onClick={toggleSlim} aria-pressed={slim} aria-label={slim ? "Expand sidebar" : "Collapse sidebar"} {...(slim ? { onPointerEnter: (e: React.PointerEvent<HTMLElement>) => slimTip.api.show(e.currentTarget, "Expand sidebar"), onPointerLeave: slimTip.api.hide, onFocus: (e: React.FocusEvent<HTMLElement>) => slimTip.api.show(e.currentTarget, "Expand sidebar"), onBlur: slimTip.api.hide } : {})} className="h-10 w-10">
                 {slim ? <PanelLeftOpen className="h-4 w-4" aria-hidden /> : <PanelLeftClose className="h-4 w-4" aria-hidden />}
-              </button>
+              </Button>
             </Tooltip>
           </div>
           <div className="flex min-h-0 flex-1 flex-col" onScrollCapture={slimTip.api.hide}>
@@ -254,11 +279,14 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
       <div className="min-w-0 flex-1">
         {/* 1191: one bar, one hairline, one height. The phone bar is 56px tall plus the status-bar inset, and
             the menu, mark, title and bell all sit on its centre line, so nothing shifts between admin pages. */}
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border/50 bg-background/75 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-[env(safe-area-inset-top)] backdrop-blur-xl lg:h-auto lg:border-0 lg:bg-transparent lg:pl-8 lg:pr-8 lg:pt-5 lg:backdrop-blur-0">
+        {/* R1269: under 1024px .admin-top folds on data-folded (globals.css); it stays sticky in the flow, so nothing jumps. */}
+        <header ref={top} data-lifted={lifted ? "" : undefined} data-folded={hidden ? "" : undefined} className="admin-top sticky top-0 z-[var(--admin-z-header)] flex h-14 items-center gap-2 border-b border-border/50 bg-background/75 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-[env(safe-area-inset-top)] backdrop-blur-xl md:h-16 lg:h-auto lg:border-0 lg:bg-transparent lg:pl-8 lg:pr-8 lg:pt-5 lg:backdrop-blur-0">
           <div className="flex min-w-0 items-center gap-1.5 lg:hidden">
-            <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" aria-expanded={open} className="-ml-2 grid h-11 w-11 shrink-0 place-items-center rounded-full [@media(hover:hover)]:hover:bg-secondary">
-              <Menu className="h-5 w-5" aria-hidden />
-            </button>
+            <Tooltip text="Open menu" side="bottom" className={cn("-ml-2 flex shrink-0", TOUCH_TIP)}>
+              <Button ref={menuBtn} type="button" variant="ghost" size="icon" onPointerDown={() => (byPointer.current = true)} onKeyDown={() => (byPointer.current = false)} onClick={() => setOpen(true)} aria-label="Open menu" aria-expanded={open} aria-haspopup="dialog" className="text-foreground">
+                <Menu className="h-5 w-5" aria-hidden />
+              </Button>
+            </Tooltip>
             <OutlyMark size={24} />
             <span className="truncate font-display text-[15px] font-bold leading-none tracking-tight">Admin</span>
           </div>
@@ -275,35 +303,57 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
         </main>
       </div>
 
-      <AnimatePresence>
-        {open && (
-          <>
-            <motion.div key="scrim" className="fixed inset-0 z-50 bg-foreground/40 backdrop-blur-[3px] lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOpen(false)} />
-            <motion.aside
-              key="drawer"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Admin menu"
-              className="glass-strong fixed inset-y-2 left-2 z-50 flex w-[min(300px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[28px] lg:hidden"
-              initial={{ x: "-110%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-110%" }}
-              transition={T.card}
-            >
-              <div className="flex items-center justify-between px-5 pb-3 pt-4">
-                <OutlyLogo size={26} />
-                <button type="button" onClick={() => setOpen(false)} aria-label="Close menu" className="grid h-11 w-11 place-items-center rounded-full [@media(hover:hover)]:hover:bg-secondary" autoFocus>
-                  <X className="h-5 w-5" aria-hidden />
-                </button>
-              </div>
-              <ScrollArea className="px-3 pb-3">
-                <NavList role={admin.role} path={path} badges={badges} onNavigate={() => setOpen(false)} layoutId="admin-pill-m" />
-              </ScrollArea>
-              <Footer admin={admin} path={path} onNavigate={() => setOpen(false)} />
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+      {/* R1269: Radix gives the focus trap, Escape, outside tap and the body scroll lock (data-scroll-locked, which
+          also pauses Lenis); framer only animates. Focus goes back to the menu button when it closes. */}
+      <Dialog.Root open={open} onOpenChange={setOpen}>
+        <AnimatePresence>
+          {open && (
+            <Dialog.Portal forceMount>
+              <Dialog.Overlay asChild forceMount>
+                <motion.div className="admin-layer fixed inset-0 z-[var(--admin-z-drawer)] bg-foreground/40 backdrop-blur-[3px] lg:hidden" {...(reduce ? FX.fade : FX.scrim)} />
+              </Dialog.Overlay>
+              <Dialog.Content
+                asChild
+                forceMount
+                aria-describedby={undefined}
+                onOpenAutoFocus={(e) => {
+                  if (!byPointer.current) return;
+                  e.preventDefault();
+                  drawer.current?.focus({ preventScroll: true });
+                }}
+                onCloseAutoFocus={(e) => {
+                  e.preventDefault();
+                  menuBtn.current?.focus({ preventScroll: true });
+                }}
+              >
+                <motion.aside
+                  ref={drawer}
+                  tabIndex={-1}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Admin menu"
+                  className="admin-layer glass-strong fixed inset-y-2 left-2 z-[var(--admin-z-drawer)] flex w-[min(300px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[28px] outline-none lg:hidden"
+                  {...(reduce ? FX.fade : DRAWER_FX)}
+                >
+                  <Dialog.Title className="sr-only">Admin menu</Dialog.Title>
+                  <div className="flex items-center justify-between px-5 pb-3 pt-4">
+                    <OutlyLogo size={26} />
+                    <Tooltip text="Close menu" side="bottom" className={cn("flex", TOUCH_TIP)}>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close menu" className="text-foreground">
+                        <X className="h-5 w-5" aria-hidden />
+                      </Button>
+                    </Tooltip>
+                  </div>
+                  <ScrollArea className="px-3 pb-3">
+                    <NavList role={admin.role} path={path} badges={badges} onNavigate={() => setOpen(false)} layoutId="admin-pill-m" />
+                  </ScrollArea>
+                  <Footer admin={admin} path={path} onNavigate={() => setOpen(false)} />
+                </motion.aside>
+              </Dialog.Content>
+            </Dialog.Portal>
+          )}
+        </AnimatePresence>
+      </Dialog.Root>
     </div>
   );
 }

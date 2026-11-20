@@ -4,12 +4,14 @@ import { createPortal } from "react-dom";
 import { backgroundAlerts, idleFor, pollable } from "@/lib/client/idle";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AlertTriangle, BellRing, Bell as BellIcon, CreditCard, Headset, LifeBuoy, Plug, Tag, Sparkles, Volume2, VolumeX, X } from "lucide-react";
 import { useToast } from "@/components/shared/Toast";
 import { can, type AdminRole } from "@/lib/admin/perms";
 import { cn } from "@/lib/utils";
-import { T } from "@/lib/motion/tokens";
+import { FX, T } from "@/lib/motion/tokens";
+import { Button } from "@/components/ui/button";
+import { Tooltip } from "./ui";
 import { chime, setSound, soundOn, SOUND_EVENT } from "@/lib/client/live-sound";
 
 type Ev = { id: string; kind: string; title: string; body?: string | null; href?: string | null; createdAt: string };
@@ -18,6 +20,8 @@ const BELL_LAST = "outly-bell-last";
 const ICON: Record<string, typeof Tag> = { payment_failed: AlertTriangle, subscription_new: CreditCard, ticket_new: LifeBuoy, ticket_urgent: LifeBuoy, live_request: Headset, live_urgent: Headset, plan_changed: Tag, integration: Plug, behavior_analysis: Sparkles };
 const LOUD = new Set(["payment_failed", "ticket_urgent", "ticket_new", "subscription_new", "live_request", "live_urgent"]);
 const BAD = new Set(["payment_failed", "ticket_urgent", "live_urgent"]);
+/** Touch screens focus a tapped button, which would leave its focus-within tooltip standing; there the label is aria only. */
+const TOUCH_TIP = "[@media(hover:none)]:[&>.admin-tip]:!hidden";
 
 function ago(iso: string) {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -28,6 +32,13 @@ function ago(iso: string) {
 }
 
 type Pos = { top: number; right: number; width: number; maxHeight: number };
+
+/** R1269: the same open and close times as the admin drawer (card in, menuExit out), grown from the bell's corner. */
+const PANEL_FX = {
+  initial: { opacity: 0, scale: 0.97 },
+  animate: { opacity: 1, scale: 1, transition: T.card },
+  exit: { opacity: 0, scale: 0.98, transition: T.menuExit },
+};
 
 /**
  * Real-time-ish alerts: polls every 30 s while someone is at the tab (no websocket server needed on Vercel), and
@@ -51,6 +62,7 @@ export function Bell({ role }: { role: AdminRole }) {
   const [pos, setPos] = useState<Pos | null>(null);
   const id = useId();
   const path = usePathname();
+  const reduce = useReducedMotion();
   // Portals need <body>, which the server render does not have.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -184,23 +196,26 @@ export function Bell({ role }: { role: AdminRole }) {
 
   return (
     <>
-      <button
-        ref={btn}
-        type="button"
-        onClick={() => {
-          setOpen((o) => !o);
-          if (!open) setTimeout(markSeen, 1200);
-        }}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        aria-controls={open ? `${id}-panel` : undefined}
-        aria-label={unread ? `Notifications, ${unread} new` : "Notifications"}
-        title="Notifications"
-        className={cn("relative grid h-11 w-11 place-items-center rounded-full hover:bg-secondary", open && "bg-secondary")}
-      >
-        {unread ? <BellRing className="bell-ring h-[19px] w-[19px]" /> : <BellIcon className="h-[19px] w-[19px]" />}
-        {unread > 0 && <span className="absolute right-[5px] top-[5px] grid h-[17px] min-w-[17px] place-items-center rounded-full bg-lime px-[3px] text-[10px] font-bold leading-none text-[hsl(var(--lime-foreground))] ring-2 ring-background">{unread > 9 ? "9+" : unread}</span>}
-      </button>
+      <Tooltip text="Notifications" side="bottom" className={cn("flex", TOUCH_TIP)}>
+        <Button
+          ref={btn}
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => {
+            setOpen((o) => !o);
+            if (!open) setTimeout(markSeen, 1200);
+          }}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          aria-controls={open ? `${id}-panel` : undefined}
+          aria-label={unread ? `Notifications, ${unread} new` : "Notifications"}
+          className={cn("text-foreground", open && "bg-secondary")}
+        >
+          {unread ? <BellRing className="bell-ring h-[19px] w-[19px]" /> : <BellIcon className="h-[19px] w-[19px]" />}
+          {unread > 0 && <span className="absolute right-[5px] top-[5px] grid h-[17px] min-w-[17px] place-items-center rounded-full bg-lime px-[3px] text-[10px] font-bold leading-none text-[hsl(var(--lime-foreground))] ring-2 ring-background">{unread > 9 ? "9+" : unread}</span>}
+        </Button>
+      </Tooltip>
       {mounted &&
         createPortal(
           <AnimatePresence>
@@ -209,16 +224,13 @@ export function Bell({ role }: { role: AdminRole }) {
                 ref={panel}
                 id={`${id}-panel`}
                 key="admin-bell"
-                initial={{ opacity: 0, scale: 0.97 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={T.menu}
+                {...(reduce ? FX.fade : PANEL_FX)}
                 style={{ top: pos.top, right: pos.right, width: pos.width, maxHeight: Math.min(560, pos.maxHeight) }}
                 data-lenis-prevent
                 tabIndex={-1}
                 role="dialog"
                 aria-labelledby={`${id}-h`}
-                className="glass-strong fixed z-[70] flex origin-top-right flex-col overflow-hidden rounded-[22px] shadow-2xl outline-none"
+                className="admin-layer glass-strong fixed z-[var(--admin-z-popover)] flex origin-top-right flex-col overflow-hidden rounded-[22px] shadow-2xl outline-none"
               >
                 <div className="flex items-center justify-between gap-2 border-b border-border/60 py-1.5 pl-4 pr-1.5">
                   <div className="min-w-0">
@@ -226,15 +238,19 @@ export function Bell({ role }: { role: AdminRole }) {
                     <p className="text-[11.5px] text-muted-foreground">Live · checks every 15 s</p>
                   </div>
                   {can(role, "live") && (
-                    <button type="button" aria-pressed={sound} aria-label={sound ? "Live chat sound on. Turn it off" : "Live chat sound off. Turn it on"} title={sound ? "Sound on for new live chats" : "Sound off for new live chats"} onClick={() => setSound(!sound)} className="ml-auto grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground">
-                      {sound ? <Volume2 className="h-4 w-4" aria-hidden /> : <VolumeX className="h-4 w-4" aria-hidden />}
-                    </button>
+                    <Tooltip text={sound ? "Sound on" : "Sound off"} side="bottom" className={cn("ml-auto flex shrink-0", TOUCH_TIP)}>
+                      <Button type="button" variant="ghost" size="icon" aria-pressed={sound} aria-label={sound ? "Live chat sound on. Turn it off" : "Live chat sound off. Turn it on"} onClick={() => setSound(!sound)}>
+                        {sound ? <Volume2 className="h-4 w-4" aria-hidden /> : <VolumeX className="h-4 w-4" aria-hidden />}
+                      </Button>
+                    </Tooltip>
                   )}
-                  <button type="button" aria-label="Close notifications" onClick={() => { setOpen(false); btn.current?.focus(); }} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground">
-                    <X className="h-4 w-4" aria-hidden />
-                  </button>
+                  <Tooltip text="Close" side="bottom" className={cn("flex shrink-0", TOUCH_TIP)}>
+                    <Button type="button" variant="ghost" size="icon" aria-label="Close notifications" onClick={() => { setOpen(false); btn.current?.focus(); }}>
+                      <X className="h-4 w-4" aria-hidden />
+                    </Button>
+                  </Tooltip>
                 </div>
-                <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
+                <ul data-lenis-prevent className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
                   {events.length === 0 && <li className="px-3 py-8 text-center text-[13px] text-muted-foreground">Nothing yet. Failed payments, new subscriptions, tickets and live chat requests show up here{role === "support" ? " (tickets for your role)" : ""}.</li>}
                   {events.map((e) => {
                     const Icon = ICON[e.kind] ?? BellIcon;
