@@ -5,7 +5,7 @@ import { inScope, type Scope } from "./profiles-core";
 import { db } from "./db";
 import { HttpError } from "./http";
 import { liveAccount } from "./live/account";
-import { instagramThreads, youtubeThreads, type AccountThread } from "./live/comments";
+import { instagramThreads, threadsThreads, youtubeThreads, type AccountThread } from "./live/comments";
 import { isPlatform, type ErrorCode, type Platform } from "./domain";
 import { isPracticeAccount, publisherForAccount } from "./social/registry";
 import { asPublisherError, type AccountContext, type PlatformComment, type SocialPublisher } from "./social/types";
@@ -223,6 +223,7 @@ const ownCache = (og.__ownCache ??= new Map());
 const OWN_LOADERS: Partial<Record<Platform, (a: AccountContext, skip: Set<string>) => Promise<AccountThread[]>>> = {
   instagram: instagramThreads,
   youtube: youtubeThreads,
+  threads: threadsThreads,
 };
 
 async function accountComments(userId: string, skip: Set<string>, platform?: Platform, scope: Scope = null) {

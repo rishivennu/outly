@@ -1,4 +1,5 @@
-import { commonMediaChecks, httpFailure, PublisherError, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
+import { commonMediaChecks, httpFailure, PublisherError, type AccountContext, type CommentTarget, type PlatformComment, type SocialPublisher, type PublishContext, type RemoteState } from "./types";
+import { collectPages, COMMENT_PAGES } from "./paging";
 import { formPost, newState } from "./oauth";
 import { creds } from "./keys";
 
@@ -11,7 +12,7 @@ export class ThreadsPublisher implements SocialPublisher {
   async connect(redirectUri: string) {
     const state = newState();
     const u = new URL("https://threads.net/oauth/authorize");
-    u.search = new URLSearchParams({ client_id: creds("threads").clientId, redirect_uri: redirectUri, scope: "threads_basic,threads_content_publish,threads_delete,threads_manage_insights", response_type: "code", state }).toString();
+    u.search = new URLSearchParams({ client_id: creds("threads").clientId, redirect_uri: redirectUri, scope: "threads_basic,threads_content_publish,threads_delete,threads_manage_insights,threads_read_replies,threads_manage_replies", response_type: "code", state }).toString();
     return { url: u.toString(), state };
   }
 
@@ -68,6 +69,22 @@ export class ThreadsPublisher implements SocialPublisher {
     return { state: "published", platformPostId: id, url: (link as { permalink?: string }).permalink };
   }
 
+  /** 1252: every reply in the post's conversation (threads_read_replies), nested one level under the reply to the post itself. */
+  async listComments(target: CommentTarget, account: AccountContext): Promise<PlatformComment[]> {
+    return threadsConversation(target.platformPostId, account.accessToken);
+  }
+
+  /** 1252: a reply is a text post with reply_to_id, created then published like any other (threads_manage_replies). */
+  async replyToComment(account: AccountContext, commentId: string, text: string): Promise<PlatformComment> {
+    const c = await formPost(`${GRAPH}/${account.platformUserId}/threads`, { media_type: "TEXT", text: text.slice(0, 500), reply_to_id: commentId, access_token: account.accessToken });
+    if (!c.ok) throw await httpFailure(c, "threads reply container");
+    const creation = ((await c.json()) as { id: string }).id;
+    const p = await formPost(`${GRAPH}/${account.platformUserId}/threads_publish`, { creation_id: creation, access_token: account.accessToken });
+    if (!p.ok) throw await httpFailure(p, "threads reply publish");
+    const { id } = (await p.json()) as { id: string };
+    return { id, text, authorName: account.username, createdAt: new Date().toISOString(), parentId: commentId };
+  }
+
   async delete(account: { accessToken: string }, id: string) {
     const r = await fetch(`${GRAPH}/${id}?access_token=${account.accessToken}`, { method: "DELETE" });
     if (!r.ok) throw await httpFailure(r, "threads delete");
@@ -76,3 +93,47 @@ export class ThreadsPublisher implements SocialPublisher {
       throw new PublisherError("UNKNOWN", "Threads didn't delete it", "threads delete: 200 success=false", false);
   }
 }
+
+export type ThreadsReply = { id: string; text?: string; username?: string; timestamp?: string; replied_to?: { id: string }; is_reply?: boolean; hide_status?: string };
+export const threadsReplyFields = "id,text,username,timestamp,replied_to,is_reply,hide_status";
+
+/**
+ * /conversation lists every reply under a post, nested ones included, each pointing at what it answered.
+ * Outlly shows one level: a reply to the post is a comment, anything deeper sits under the comment it descends from.
+ */
+export function nestThreadsReplies(postId: string, rows: ThreadsReply[]): PlatformComment[] {
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const topOf = (r: ThreadsReply): string | null => {
+    let cur = r;
+    for (let i = 0; i < 20; i++) {
+      const up = cur.replied_to?.id;
+      if (!up || up === postId) return cur === r ? null : cur.id;
+      const parent = byId.get(up);
+      if (!parent) return cur === r ? null : cur.id;
+      cur = parent;
+    }
+    return cur.id;
+  };
+  const toComment = (r: ThreadsReply, parentId: string | null): PlatformComment => ({ id: r.id, text: r.text ?? "", authorName: r.username ? `@${r.username}` : "Someone on Threads", createdAt: r.timestamp ?? new Date().toISOString(), parentId });
+  const top = rows.filter((r) => topOf(r) === null).map((r) => ({ ...toComment(r, null), replies: [] as PlatformComment[] }));
+  const topMap = new Map(top.map((t) => [t.id, t]));
+  for (const r of rows) {
+    const root = topOf(r);
+    if (root === null) continue;
+    const t = topMap.get(root);
+    if (t) t.replies!.push(toComment(r, r.replied_to?.id ?? root));
+  }
+  return top;
+}
+
+export async function threadsConversation(postId: string, token: string, pages = COMMENT_PAGES.threads): Promise<PlatformComment[]> {
+  const base = `${GRAPH}/${postId}/conversation?fields=${threadsReplyFields}&reverse=false&limit=50&access_token=${encodeURIComponent(token)}`;
+  const { items } = await collectPages<ThreadsReply>(async (after) => {
+    const r = await fetch(after ? `${base}&after=${encodeURIComponent(after)}` : base, { signal: AbortSignal.timeout(12_000), cache: "no-store" });
+    if (!r.ok) throw await httpFailure(r, "threads replies");
+    const j = (await r.json()) as { data?: ThreadsReply[]; paging?: { next?: string; cursors?: { after?: string } } };
+    return { items: j.data ?? [], next: (j.paging?.next && j.paging.cursors?.after) || null };
+  }, pages);
+  return nestThreadsReplies(postId, items);
+}
+

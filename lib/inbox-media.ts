@@ -26,6 +26,12 @@ export function youtubeEmbed(videoId: string) {
 
 type IgMedia = { media_type?: string; media_url?: string; thumbnail_url?: string; caption?: string; timestamp?: string };
 
+/** 1252 Threads: same shape as Instagram's media (VIDEO has media_url + thumbnail_url, IMAGE has media_url); a text post has nothing to preview. */
+export function threadsMedia(m: { media_type?: string; media_url?: string; thumbnail_url?: string; text?: string; timestamp?: string }, account: string | null): CommentMedia | null {
+  if (m.media_type !== "VIDEO" && m.media_type !== "IMAGE" && m.media_type !== "CAROUSEL_ALBUM") return null;
+  return instagramMedia({ media_type: m.media_type, media_url: m.media_url, thumbnail_url: m.thumbnail_url, caption: m.text, timestamp: m.timestamp }, account);
+}
+
 /** Instagram: a reel's media_url is the video and thumbnail_url its cover; a photo's media_url is the picture. */
 export function instagramMedia(m: IgMedia, account: string | null): CommentMedia {
   const video = m.media_type === "VIDEO" || m.media_type === "REELS";

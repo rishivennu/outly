@@ -13,7 +13,7 @@ import type { PublisherError } from "./social/types";
  */
 
 /** Platforms whose publisher in lib/social really lists comments. Facebook has no listComments, so it is left out. */
-export const COMMENT_PLATFORMS = ["instagram", "youtube", "x"] as const satisfies readonly Platform[];
+export const COMMENT_PLATFORMS = ["instagram", "youtube", "x", "threads"] as const satisfies readonly Platform[];
 export const commentCapable = (p: string): p is (typeof COMMENT_PLATFORMS)[number] => (COMMENT_PLATFORMS as readonly string[]).includes(p);
 
 /** "read" or "unread" once the creator has touched it; null = never opened, so Inbox decides from the reply state. */

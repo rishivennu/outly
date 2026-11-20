@@ -28,6 +28,8 @@ export const COMMENT_PAGES = {
   x: { maxPages: 3, maxItems: 300 },
   /** Account-wide sweeps run for several posts (or a whole channel) at once, so each one reads less. */
   instagramAccount: { maxPages: 4, maxItems: 200 },
+  threads: { maxPages: 10, maxItems: COMMENT_CAP },
+  threadsAccount: { maxPages: 4, maxItems: 200 },
   youtubeChannel: { maxPages: 3, maxItems: 300 },
 } satisfies Record<string, PageCaps>;
 

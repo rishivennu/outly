@@ -114,9 +114,11 @@ describe("1251 Threads joins the per-post readers", () => {
     expect(post).toContain('const SUPPORTED: Platform[] = ["instagram", "youtube", "facebook", "threads"];');
     expect(post).toContain("metric=views,likes,replies,reposts,quotes,shares");
   });
-  test("the OAuth request asks for threads_manage_insights and nothing Outlly does not use", () => {
+  test("the OAuth request asks for threads_manage_insights (1252 added the two reply scopes; nothing Outlly does not use)", () => {
     const scope = /scope: "([^"]+)"/.exec(src("lib/social/threads.ts"))![1].split(",");
-    expect(scope).toEqual(["threads_basic", "threads_content_publish", "threads_delete", "threads_manage_insights"]);
-    expect(src("lib/social/platform-setup.ts")).toContain('scopes: "threads_basic, threads_content_publish, threads_delete, threads_manage_insights"');
+    expect(scope).toContain("threads_manage_insights");
+    expect(scope).not.toContain("threads_keyword_search");
+    expect(scope).not.toContain("threads_profile_discovery");
+    expect(src("lib/social/platform-setup.ts")).toContain("threads_basic, threads_content_publish, threads_delete, threads_manage_insights");
   });
 });

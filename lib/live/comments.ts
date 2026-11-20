@@ -1,7 +1,8 @@
 import { fmtHandle } from "@/lib/handle";
 import "server-only";
 import { httpFailure, type AccountContext, type PlatformComment } from "../social/types";
-import { instagramMedia, youtubeEmbed, youtubeThumb, type CommentMedia } from "../inbox-media";
+import { instagramMedia, threadsMedia, youtubeEmbed, youtubeThumb, type CommentMedia } from "../inbox-media";
+import { threadsConversation } from "../social/threads";
 import { collectPages, COMMENT_PAGES } from "../social/paging";
 
 /** A post on the creator's own account that has comments, whether or not it went out through Outlly. */
@@ -17,6 +18,7 @@ export interface AccountThread {
 }
 
 const IG = "https://graph.instagram.com/v21.0";
+const TH = "https://graph.threads.net/v1.0";
 const YT = "https://www.googleapis.com/youtube/v3";
 
 type IgC = { id: string; text?: string; username?: string; timestamp?: string; like_count?: number; replies?: { data?: IgC[] } };
@@ -112,3 +114,27 @@ export async function youtubeThreads(acct: AccountContext, skip: Set<string>): P
     return { mediaId: id, title: sn?.title ?? "A video on your channel", url: `https://www.youtube.com/watch?v=${id}`, comments, media };
   });
 }
+
+/**
+ * 1252 Threads: the newest posts on the profile, each with its conversation (threads_read_replies). Threads
+ * reports no reply count on a post, so the newest ones are asked directly and the quiet ones dropped.
+ */
+export async function threadsThreads(acct: AccountContext, skip: Set<string>, maxPosts = 8): Promise<AccountThread[]> {
+  const t = encodeURIComponent(acct.accessToken);
+  const r = await fetch(`${TH}/${acct.platformUserId}/threads?fields=id,text,permalink,timestamp,media_type,media_url,thumbnail_url&limit=25&access_token=${t}`, { signal: AbortSignal.timeout(12_000), cache: "no-store" });
+  if (!r.ok) throw await httpFailure(r, "threads posts");
+  type ThM = { id: string; text?: string; permalink?: string; timestamp?: string; media_type?: string; media_url?: string; thumbnail_url?: string };
+  const media = (((await r.json()) as { data?: ThM[] }).data ?? []).filter((m) => !skip.has(m.id)).slice(0, maxPosts);
+  const handle = fmtHandle(acct.username) || null;
+  const threads = await Promise.all(
+    media.map(async (m) => ({
+      mediaId: m.id,
+      title: (m.text ?? "").split("\n")[0].trim() || "Untitled post",
+      url: m.permalink ?? null,
+      media: threadsMedia(m, handle),
+      comments: await threadsConversation(m.id, acct.accessToken, COMMENT_PAGES.threadsAccount),
+    })),
+  );
+  return threads.filter((th) => th.comments.length > 0);
+}
+
