@@ -6,6 +6,7 @@ import { Counter, Input, Label, Textarea } from "@/components/ui/field";
 import { api, ApiError } from "@/lib/client/api";
 import { useUser } from "@/components/shell/UserContext";
 import { platformLabel } from "@/components/intelligence/view-core";
+import { fmtHandle } from "@/lib/handle";
 import { BRAND_LIMITS, type ObjectiveOption } from "@/lib/intelligence/brand-core";
 import { cn } from "@/lib/utils";
 
@@ -222,7 +223,7 @@ function ClientsSection({ objectives, accounts, max }: { objectives: ObjectiveOp
                   <label key={a.id} className={cn("flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl px-3 text-sm hairline transition-colors hover:bg-secondary/60 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2")}>
                     <input type="checkbox" checked={draft.accountIds.includes(a.id)} onChange={() => toggle(a.id)} className="h-5 w-5 shrink-0 accent-[hsl(var(--lime))]" />
                     <span className="min-w-0 truncate">
-                      <span className="font-medium">{platformLabel(a.platform)}</span> @{a.username}
+                      <span className="font-medium">{platformLabel(a.platform)}</span> {fmtHandle(a.username)}
                     </span>
                   </label>
                 ))}

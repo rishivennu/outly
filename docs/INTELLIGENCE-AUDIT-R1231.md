@@ -358,15 +358,23 @@ Rules for every round: schema edits in both prisma files; pure core with unit te
 ## 8. Open decisions for the founder
 
 1. Objectives that need data Outlly cannot get (traffic, leads, sales): hide them, allow with an engagement proxy and a visible label, or let the user enter outcomes (clicks, sales) by hand?
+   Decision (11-21): keep traffic, leads and sales as labelled engagement proxies; no manual outcome entry. No code.
 2. Request more scopes to unlock metrics (TikTok video.list, Threads insights, paid X API, LinkedIn Marketing)? Each needs app review and cost; until then those platforms stay unavailable.
+   Decision (11-21): defer extra scopes (X, TikTok, LinkedIn, Threads per-post metrics) until a user asks; keep the "Numbers not provided by <platform>" wording. No code.
 3. Agency clients: keep a client as an owner workspace plus `BrandProfile.scopeKey`, or add a real Client entity grouping SocialAccounts? Affects R1235 and R1243.
+   Decision (11-21): keep `BrandProfile.scopeKey` and make it real: a client profile lists the social accounts it owns (`BrandProfile.accountIds`), the dashboard and overview API filter by them, clients are managed in Settings > Brand (owner only). R1246, R1249.
 4. Backfill: create a ContentItem for every old post automatically, or only link adapted ones and let the user opt in?
+   Decision (11-21): Content Memory items for published posts of the last 180 days (the outcome cohort window), as a bounded idempotent sweep step, never a one-shot migration. R1247.
 5. Categories: user-defined only, or also deterministic keyword suggestions the user confirms? (No AI auto-tagging proposed.)
+   Decision (11-21): keyword rules only, deterministic, no AI. No code.
 6. Sample thresholds (proposed 5 posts per format-platform cell for a claim, 10 for high confidence): accept or tune?
+   Decision (11-21): keep MIN_SAMPLE 3, confidence low under 5, medium under 12, high at 12 or more, SIGNAL_MIN_LIFT 20 %. No code.
 7. Plan gating: Content Intelligence free for all, paid only, or free dashboard with paid recommendations? Is AI wording a metered feature?
+   Decision (11-21): AI wording of recommendations is the plan perk `ai-insights` (presets: Creator and Agency, the decision's "Creator Pro, Business and Agency" mapped onto the plans that exist) with the existing 30 a day cap; Free gets rule wording; an admin AI grant still overrides. R1247.
 8. Hosting: ship engine jobs on current Vercel Hobby (CPU already high), or decide Pro/Cloudflare before R1236?
+   Decision (11-21): recommend Vercel Pro now (a user action, no code); the sweep steps stay throttled by minute slots.
 
-## 9. What shipped (R1232-R1244)
+## 9. What shipped (R1232-R1249)
 
 One line per round: the files, then the honest gaps. Schema edits are in both `prisma/schema.prisma` and `prisma/schema.template.prisma`.
 
@@ -383,6 +391,11 @@ One line per round: the files, then the honest gaps. Schema edits are in both `p
 - R1242 Outcomes loop: `lib/intelligence/outcome-core.ts` (pure: early signal against the same platform and format cohort, never causal), `outcome.ts` (outcome_link and outcome events), a bounded step in `app/api/cron/sweep/route.ts`. Test `round-1242-outcome`. Gap: nothing calls linkOutcome from the publish path yet, and the dashboard does not read outcomesFor yet.
 - R1243 Weekly Intelligence Report and agency views: `lib/intelligence/report-core.ts`, `lib/reports/weekly*.ts`. In progress with another teammate when this was written.
 - R1244 Hardening: Pip tool `intelligence_overview` (`lib/pip/tools-intelligence.ts`, registered in `lib/pip/types.ts`, `tools.ts`, `plan.ts`; read-only, overview in readOnly mode); AI wording behind an AI grant on the new AiFeature `intelligence_wording` (`lib/ai/features.ts`), counted in AiFeatureUsage, at most 5 per call and 30 per owner per UTC day; `act()` refuses expired rows with 400 EXPIRED and marks them; overview loads at most 2000 destinations, newest first, and reports `postsCapped`; `lib/intelligence/README.md`. Test `round-1244-hardening`. Gap: AI wording is only for accounts with an admin AI grant until plan gating is decided (open decision 7).
+- R1245 Suite fixes: `public/sw.js` (STUDIO route regex), the Pip tool count pin (26 tools), `lib/reports/weekly.ts` (`sendWeeklyReports` option `only` narrows a forced run to given users, so tests on a shared database never mail everyone). Test `round-1243-report` and the Pip tool count pin. No product change.
+- R1246 Clients made real: `BrandProfile.accountIds` (both prisma files), `lib/intelligence/brand-core.ts`, `memory.ts` (accountIdsForClient), `app/api/settings/brand/*` (?scope=), `components/settings/BrandProfileCard.tsx` (Settings Clients UI), `app/api/intelligence/overview/route.ts` (?client= narrows to the client's accounts, `clientAccounts`). Test `round-1246-clients`. Gap: a client scopeKey cannot be renamed; a client with no accounts shows the workspace numbers (said so with clientAccounts 0).
+- R1247 Backfill sweep and plan-gated wording: `lib/intelligence/memory.ts` (BACKFILL_DAYS 180, `backfillOwner` since, `sweepBackfill`), `app/api/cron/sweep/route.ts` (minute % 10 === 7, 5 owners, 100 posts each, `backfill: {owners, items}`), `lib/billing/plan-rules.ts` and `pricing-preset.ts` (perk `ai-insights` on Creator and Agency in both presets), `lib/intelligence/reco.ts` (grant or perk, the 30 a day cap on both; a plan with no perk list counts on paid plans, never on Free). Test `round-1247-backfill-gating`. Gap: 5 owners whose backfill keeps failing would block the step (oldest first picks them again); Starter has no AI wording.
+- R1248 Dashboard completeness: `components/intelligence/TopicInsights.tsx` (Topics from overview.topics), `RecActions.tsx` (planner actions on cards), `NextContentRecommendations.tsx` (outcomes on accepted and done cards), `GrowthOverview.tsx` (postsCapped line), `view-core.ts`, `app/api/recommendations/route.ts` (outcome per row). Test `round-1248-dashboard`. Gap: topics have no period-before comparison; the edit action is not on the dashboard (Content Studio prefill only).
+- R1249 Client-scoped recommendations: `lib/intelligence/service.ts` (OverviewOpts.scopeKey picks the brand profile and the scope recommendations are stored, expired and read under; brandKey stays the ContentItem filter), `app/api/intelligence/overview/route.ts` (?client= passes the client's scopeKey). Pip keeps the workspace scope. Test `round-1249-client-scope`. Gap: rows a client read stored under "" before R1249 stay in the workspace list until they expire or are closed.
 
 Platform gaps that remain: per-post metrics come only from Instagram, YouTube and Facebook. X, TikTok, LinkedIn and Threads have no per-post metrics in Outlly (missing scopes or API access, see section 5), so their posts show as not provided and are never compared.
 

@@ -157,7 +157,15 @@ export interface OverviewOpts {
   /** Overrides the workspace objective for this read only; nothing is saved. */
   objective?: string;
   accountIds?: string[] | null;
+  /** Only posts whose ContentItem sits in this brand scope (see LoadOpts). Left out = every post. */
   brandKey?: string;
+  /**
+   * R1249: the brand scope this read belongs to: "" = the workspace, else an agency client's scopeKey. It picks the
+   * brand profile and the scope the recommendations are stored, expired and read under, so a client's rows never
+   * land in the workspace list. Left out: brandKey, else "". Separate from brandKey because a client's numbers
+   * come from its accounts (accountIds, R1246), not from the brandKey of its items, which backfill leaves "".
+   */
+  scopeKey?: string;
   /** R1244: for Pip. Matches drafts to rows already stored and writes nothing (no new rows, events, expiry or wording). */
   readOnly?: boolean;
 }
@@ -170,7 +178,8 @@ export interface OverviewOpts {
 export async function overview(user: Scoped, opts: OverviewOpts): Promise<Overview> {
   const period = periodOf(Date.now(), opts.days);
   const previous = previousPeriod(period);
-  const brand = await getBrandProfile(user.id, opts.brandKey ?? "");
+  const scopeKey = opts.scopeKey ?? opts.brandKey ?? "";
+  const brand = await getBrandProfile(user.id, scopeKey);
   // The objective decides which metrics matter. Engagement is the fallback: it is the one thing every reporting
   // platform gives, so nothing is claimed from a metric the account cannot see.
   const objective: Objective = isObjective(opts.objective) ? opts.objective : (brand?.objective ?? "engagement");
@@ -181,8 +190,8 @@ export async function overview(user: Scoped, opts: OverviewOpts): Promise<Overvi
   const drafts = recommendationsFrom(working, { name: brand?.name ?? me?.name ?? null, niche: me?.niche ?? null });
   // R1239: stored idempotently, so the dashboard can link /create?rec=<id>. Rejected, done and expired rows are not shown.
   const stored = opts.readOnly
-    ? await storedFor(user.id, opts.brandKey ?? "", drafts.recommendations, period)
-    : await persistRecommendations(user.id, opts.brandKey ?? "", drafts.recommendations, period);
+    ? await storedFor(user.id, scopeKey, drafts.recommendations, period)
+    : await persistRecommendations(user.id, scopeKey, drafts.recommendations, period);
   const recommendations = stored.filter((r) => ACTIVE_STATUSES.includes(r.status));
   const reason = recommendations.length ? null : (drafts.reason ?? "Nothing new to suggest yet: you have already closed the recommendations these numbers support.");
   const curFrom = Date.parse(period.from);

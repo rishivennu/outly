@@ -40,7 +40,8 @@ export const GET = route(
     // Picking an account the client does not own leaves nothing, and the dashboard shows that as an empty read.
     const own = clientIds?.length ? new Set(clientIds) : null;
     const accountIds = own ? (scoped ? scoped.filter((id) => own.has(id)) : [...own]) : scoped;
-    const data = await overview(user, { days, objective: objective ?? clientObjective, accountIds });
+    // R1249: a client read stores and reads its recommendations under the client's scopeKey, never the workspace's "".
+    const data = await overview(user, { days, objective: objective ?? clientObjective, accountIds, scopeKey: client ?? "" });
     const body = clientIds ? { ...data, clientAccounts: clientIds.length } : data;
     return json(body, { headers: { "cache-control": "private, no-store" } });
   },
