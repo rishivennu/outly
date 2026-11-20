@@ -157,12 +157,13 @@ describe("R1238 the page and its sections", () => {
       expect(i, tag).toBeGreaterThan(at);
       at = i;
     }
-    expect(view).toContain("<LaterCard");
+    // R1248: the topics placeholder became the real section 5.
+    expect(view).toContain("<TopicInsights topics={data.topics} />");
   });
   test("the later section says so instead of showing fake numbers", () => {
     const bits = read("components/intelligence/bits.tsx");
     expect(bits).toContain("Coming in a later round");
-    expect(view).toContain("Topic and category insights");
+    expect(read("components/intelligence/TopicInsights.tsx")).toContain("Topic and category insights");
     // R1243: the weekly placeholder became the real section 9, built from the overview already loaded.
     expect(view).toContain("<WeeklyReport data={data}");
     expect(read("components/intelligence/WeeklyReport.tsx")).toContain("Weekly intelligence report");
@@ -177,9 +178,13 @@ describe("R1238 the page and its sections", () => {
   });
   test("the recommendation card shows every required field and gates the button on an id", () => {
     const rec = read("components/intelligence/NextContentRecommendations.tsx");
-    for (const bit of ["r.title", "r.concept", "r.why", "evidenceLine(r.evidence)", "r.postsAnalyzed", "r.period", "r.confidence", "createHref(r.id)"]) expect(rec).toContain(bit);
-    expect(rec).toContain("{href && (");
-    expect(rec).toContain("Create from this");
+    for (const bit of ["r.title", "r.concept", "r.why", "evidenceLine(r.evidence)", "r.postsAnalyzed", "r.period", "r.confidence"]) expect(rec).toContain(bit);
+    // R1248: the button moved into the planner's actions, still gated on an id.
+    expect(rec).toContain("{r.id && <RecActions");
+    const actions = read("components/intelligence/RecActions.tsx");
+    expect(actions).toContain("createHref(p.id)");
+    expect(actions).toContain('has("create") && href && (');
+    expect(actions).toContain("Create from this");
   });
   test("the house rules hold in every file of the page", () => {
     for (const src of [...files, page, read("app/(studio)/intelligence/loading.tsx")]) {

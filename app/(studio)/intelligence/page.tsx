@@ -1,6 +1,8 @@
 import { getCurrentUser } from "@/lib/auth";
 import { analyticsScope } from "@/lib/profiles";
 import { overview } from "@/lib/intelligence/service";
+import { outcomesFor } from "@/lib/intelligence/outcome";
+import { hasOutcomeLine } from "@/components/intelligence/view-core";
 import { IntelligenceView } from "@/components/intelligence/IntelligenceView";
 
 export const dynamic = "force-dynamic";
@@ -21,5 +23,8 @@ export default async function IntelligencePage(props: { searchParams: Promise<{ 
   const initial = await analyticsScope(user, account)
     .then((accountIds) => overview(user, { days: 28, accountIds }))
     .catch(() => null);
-  return <IntelligenceView initial={initial} account={account} />;
+  // R1248: the accepted cards' outcomes come with the first paint (one server read, no client round trip).
+  const accepted = initial?.recommendations.filter((r) => hasOutcomeLine(r.status)).map((r) => r.id) ?? [];
+  const initialOutcomes = accepted.length ? await outcomesFor(user.id, accepted).catch(() => undefined) : {};
+  return <IntelligenceView initial={initial} account={account} initialOutcomes={initialOutcomes} />;
 }

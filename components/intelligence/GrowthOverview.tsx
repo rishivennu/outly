@@ -1,6 +1,6 @@
 "use client";
 import { Card, ConfidenceBadge } from "./bits";
-import { confidenceNote, metricLabel } from "./view-core";
+import { POSTS_CAPPED_TEXT, confidenceNote, metricLabel } from "./view-core";
 import { OBJECTIVE_METRICS } from "@/lib/intelligence/core";
 import type { Overview } from "./types";
 
@@ -30,6 +30,8 @@ export function GrowthOverview({ data, objectiveLabel }: { data: Overview; objec
           Measured by a proxy: no platform gives Outlly clicks or sales, so {metrics.metrics.map(metricLabel).join(", ").toLowerCase()} stand in for it.
         </p>
       )}
+      {/* R1248: the overview loads at most POSTS_CAP destinations, newest first, and says so when it hit the cap. */}
+      {data.postsCapped && <p className="mt-4 text-[13px] font-medium">{POSTS_CAPPED_TEXT}</p>}
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <ConfidenceBadge level={note.level} />
         <p className="text-[13px] text-muted-foreground">{note.text}</p>

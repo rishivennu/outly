@@ -7,13 +7,13 @@ import { BestPerformingContent } from "./BestPerformingContent";
 import { ClientSwitcher } from "./ClientSwitcher";
 import { FormatPerformance } from "./FormatPerformance";
 import { GrowthOverview } from "./GrowthOverview";
-import { LaterCard } from "./bits";
 import { NextContentRecommendations } from "./NextContentRecommendations";
 import { PlatformComparison } from "./PlatformComparison";
 import { WhatIsWorking, WhatNeedsAttention } from "./SignalSection";
+import { TopicInsights } from "./TopicInsights";
 import { WeeklyReport } from "./WeeklyReport";
-import { DAY_OPTIONS, emptyStateText, hasEnoughPosts, overviewUrl } from "./view-core";
-import type { Objective, Overview } from "./types";
+import { DAY_OPTIONS, emptyStateText, hasEnoughPosts, hasOutcomeLine, overviewUrl } from "./view-core";
+import type { Objective, Overview, StoredOutcome } from "./types";
 
 /**
  * R1238: Content Intelligence, part one. The server hands over the first read so the page paints with real numbers;
@@ -25,7 +25,9 @@ const DAY_LABEL: Record<number, string> = { 7: "7 days", 28: "28 days", 90: "90 
 const pill =
   "relative inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full px-4 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring";
 
-export function IntelligenceView({ initial, account }: { initial: Overview | null; account?: string | null }) {
+type Listed = { recommendations: { id: string; outcome?: StoredOutcome | null }[] };
+
+export function IntelligenceView({ initial, account, initialOutcomes }: { initial: Overview | null; account?: string | null; initialOutcomes?: Record<string, StoredOutcome> }) {
   const [data, setData] = useState<Overview | null>(initial);
   const [days, setDays] = useState<number>(initial?.period.days ?? 28);
   const [objective, setObjective] = useState<Objective | null>(initial?.objective ?? null);
@@ -38,6 +40,10 @@ export function IntelligenceView({ initial, account }: { initial: Overview | nul
   // R1243: set when a read picked the objective itself (a client's), so adopting it does not fetch the same read twice.
   const adopted = useRef(false);
   const savedObjective = initial?.objective ?? null;
+  // R1248: outcomes of accepted cards. The server page sends the first read's; a later read only asks
+  // /api/recommendations when it brings accepted cards nobody has looked up yet, so a switch costs at most one call.
+  const [outcomes, setOutcomes] = useState<Record<string, StoredOutcome>>(initialOutcomes ?? {});
+  const asked = useRef(new Set<string>(initial && initialOutcomes ? initial.recommendations.filter((r) => hasOutcomeLine(r.status)).map((r) => r.id) : []));
 
   const load = useCallback(
     async (d: number, o: Objective | null, c: string) => {
@@ -68,6 +74,22 @@ export function IntelligenceView({ initial, account }: { initial: Overview | nul
     }
     void load(days, objective, client);
   }, [days, objective, client, load]);
+
+  useEffect(() => {
+    const need = (data?.recommendations ?? []).filter((r) => r.id && hasOutcomeLine(r.status) && !asked.current.has(r.id)).map((r) => r.id);
+    if (!need.length) return;
+    for (const id of need) asked.current.add(id);
+    const q = new URLSearchParams({ status: "accepted", limit: "50" });
+    if (client) q.set("scope", client);
+    api<Listed>(`/api/recommendations?${q.toString()}`)
+      .then((r) => {
+        const got: Record<string, StoredOutcome> = {};
+        for (const row of r.recommendations) if (row.outcome) got[row.id] = row.outcome;
+        setOutcomes((o) => ({ ...o, ...got }));
+      })
+      // No outcome reads as "Measuring", which is still true; the next read asks again.
+      .catch(() => need.forEach((id) => asked.current.delete(id)));
+  }, [data, client]);
 
   // R1243: a client brings its own objective, so the choice made for the previous one is dropped.
   const switchClient = (key: string) => {
@@ -141,10 +163,10 @@ export function IntelligenceView({ initial, account }: { initial: Overview | nul
               <FormatPerformance formats={data.formats} />
               <PlatformComparison formats={data.formats} />
               <BestPerformingContent formats={data.formats} />
-              <NextContentRecommendations recommendations={data.recommendations} reason={data.recommendationsReason} />
+              <NextContentRecommendations recommendations={data.recommendations} reason={data.recommendationsReason} outcomes={outcomes} />
             </>
           )}
-          <LaterCard id="intel-topics" title="Topic and category insights" what="Which subjects beat your usual numbers, like with like." />
+          <TopicInsights topics={data.topics} />
           <WeeklyReport data={data} savedObjective={savedObjective} client={client || null} />
         </div>
       )}
