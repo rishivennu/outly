@@ -15,7 +15,7 @@ export function AdminFilterBar({ children, meta, label = "Filters", className }:
   return (
     <div role="group" aria-label={label} className={cn("mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2", className)}>
       <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>
-      {meta && <p className="text-[12.5px] text-muted-foreground">{meta}</p>}
+      {meta && <p className="text-[12px] text-muted-foreground">{meta}</p>}
     </div>
   );
 }

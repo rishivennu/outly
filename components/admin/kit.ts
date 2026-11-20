@@ -3,6 +3,7 @@
  * them are the primitives the pages already used, so nothing was duplicated. Import from here in new admin code.
  *
  *   AdminPageHeader   title, lead, actions at the top of every page           (ui.tsx PageHead)
+ *   AdminCard         the .admin-card surface; tone "flat" (inside a card) | "float" (over media), interactive  (ui.tsx Card, R1275)
  *   AdminSidebar      the shell: nav groups, slim mode, drawer, account        (AdminShell.tsx)
  *   AdminMetricCard   a KPI with comparison period, definition and states      (motion/AdminKpi.tsx)
  *   AdminSection      titled region with a responsive grid                     (ui.tsx Section)

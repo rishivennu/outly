@@ -147,7 +147,9 @@ describe("states and table", () => {
     const html = renderToStaticMarkup(
       createElement(Table, { head: ["Name", "Count"], align: [undefined, "right"], children: createElement("tr", { key: "a" }, createElement("td", null, "x"), createElement("td", null, "3")) }),
     );
-    expect(html).toContain("text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground");
+    // R1275: headers read as sentence case at 12px/600, no uppercase or wide tracking.
+    expect(html).toContain("text-[12px] font-semibold tracking-normal text-muted-foreground");
+    expect(html).not.toContain("uppercase");
     expect(html).toContain("text-right tabular-nums");
     expect(html).toContain('data-cell="lead"');
     expect(html).toContain('data-label="Count"');

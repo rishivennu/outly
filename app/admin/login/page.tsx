@@ -15,8 +15,10 @@ export default async function AdminLogin(props: { searchParams: Promise<{ next?:
   const raw = searchParams.next ?? "";
   const next = raw.startsWith("/admin") && !raw.startsWith("/admin/login") && !raw.includes("//") ? raw : "/admin";
   return (
-    <AuthCard id="main" eyebrow="Outlly team console" lines={["Keep every post", "moving, quietly"]}>
-      <AdminLoginForm next={next} />
-    </AuthCard>
+    <div className="admin-type">
+      <AuthCard id="main" eyebrow="Outlly team console" lines={["Keep every post", "moving, quietly"]}>
+        <AdminLoginForm next={next} />
+      </AuthCard>
+    </div>
   );
 }

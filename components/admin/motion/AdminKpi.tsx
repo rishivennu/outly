@@ -26,13 +26,13 @@ export function AdminKpi({ label, value, sub, change, invert, tone, spark, i = 0
   const up = (change ?? 0) >= 0;
   const good = invert ? !up : up;
   return (
-    <div data-enter className="admin-card kpi-card flex min-w-0 flex-col rounded-[24px] bg-card p-5 hairline">
-      <p className="flex items-start gap-1 text-[12.5px] font-medium leading-snug text-muted-foreground">
+    <div data-enter className="admin-card kpi-card flex min-w-0 flex-col rounded-[24px] bg-card p-5">
+      <p className="flex items-start gap-1 text-[13px] font-medium leading-snug text-muted-foreground">
         <span className="min-w-0 break-words">{label}</span>
         {hint && <Hint text={hint} label={`How ${label} is counted`} />}
       </p>
       <div className="mt-2 flex min-w-0 items-end justify-between gap-3">
-        {unavailable ? <Unavailable reason={unavailable} /> : <RollingNumber value={value} className={cn("block min-w-0 font-display text-[1.75rem] font-semibold leading-none tabular", tone === "bad" && "text-destructive")} />}
+        {unavailable ? <Unavailable reason={unavailable} /> : <RollingNumber value={value} className={cn("block min-w-0 text-[26px] font-[650] leading-none tabular tabular-nums sm:text-[28px]", tone === "bad" && "text-destructive")} />}
         {!unavailable && spark && spark.length > 1 && (
           <div className="w-[42%] max-w-[110px] shrink-0">
             <Sparkline data={spark} tone={trendTone(spark, invert)} delay={0.1 + i * 0.045} />
@@ -41,12 +41,12 @@ export function AdminKpi({ label, value, sub, change, invert, tone, spark, i = 0
       </div>
       <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[12px]">
         {!unavailable && change !== undefined && change !== null && change !== 0 && (
-          <span className={cn("inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold", good ? "bg-success/12 text-success" : "bg-destructive/12 text-destructive")} title={`vs ${compare}`}>
+          <span className={cn("inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-medium tabular-nums", good ? "bg-success/12 text-success" : "bg-destructive/12 text-destructive")} title={`vs ${compare}`}>
             {up ? <ArrowUpRight className="h-3 w-3" aria-hidden /> : <ArrowDownRight className="h-3 w-3" aria-hidden />}
             {Math.abs(change * 100).toFixed(0)}%<span className="sr-only">{up ? " up" : " down"} on {compare}</span>
           </span>
         )}
-        {!unavailable && change === 0 && <span className="rounded-full bg-secondary px-1.5 py-0.5 font-semibold text-muted-foreground" title={`vs ${compare}`}>No change</span>}
+        {!unavailable && change === 0 && <span className="rounded-full bg-secondary px-1.5 py-0.5 font-medium text-muted-foreground" title={`vs ${compare}`}>No change</span>}
         {!unavailable && change !== undefined && change !== null && <span className="text-muted-foreground" aria-hidden>vs {compare}</span>}
         {!unavailable && change === null && <span className="text-muted-foreground">{compareNote ?? `Nothing in ${compare} to compare with`}</span>}
         {!unavailable && sub && <span className={cn("text-muted-foreground", change !== undefined && change !== null && "basis-full")}>{sub}</span>}

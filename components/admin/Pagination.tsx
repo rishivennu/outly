@@ -43,7 +43,7 @@ export function Pagination({ total, page, limit, label = "Pagination", className
   return (
     <nav aria-label={label} className={cn("mt-4 flex items-center justify-between gap-3", className)}>
       {side(w.prev, "prev")}
-      <p className="tabular text-[12.5px] text-muted-foreground" aria-live="polite">
+      <p className="tabular tabular-nums text-[13px] text-muted-foreground" aria-live="polite">
         <span className="font-semibold text-foreground">{fmt(w.from)}-{fmt(w.to)}</span> of {fmt(w.total)}
         <span className="sr-only">, page {w.page} of {w.pages}</span>
       </p>

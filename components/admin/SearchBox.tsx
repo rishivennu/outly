@@ -55,7 +55,7 @@ export function FilterChips({ param, options, current, glide = false, label = "F
     <ScrollX label={label} focusable={false} className="-mx-5 w-[calc(100%+2.5rem)] px-5 sm:mx-0 sm:w-auto sm:px-0 lg:overflow-visible">
       <div className="gseg flex w-max gap-0.5 lg:w-auto lg:flex-wrap lg:gap-1.5 lg:py-0.5" role="group" aria-label={label}>
         {options.map((o) => (
-          <Link key={o.value} href={href(o.value)} scroll={false} data-on={current === o.value ? "true" : "false"} aria-current={current === o.value ? "true" : undefined} className={cn("inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-[12.5px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))] sm:h-9 touch:h-11", current === o.value ? "lime-bg font-semibold" : "bg-secondary/60 font-medium text-muted-foreground hairline [@media(hover:hover)]:hover:text-foreground")}>
+          <Link key={o.value} href={href(o.value)} scroll={false} data-on={current === o.value ? "true" : "false"} aria-current={current === o.value ? "true" : undefined} className={cn("inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-[13px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))] sm:h-9 touch:h-11", current === o.value ? "lime-bg font-semibold" : "bg-secondary/60 font-medium text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
             {o.label}
           </Link>
         ))}
@@ -106,7 +106,7 @@ export function FilterSelect({ param, label, options, current, fill = false }: {
   const on = current !== "" && current !== options[0]?.value;
   return (
     <label className={cn("relative inline-flex min-w-0 flex-col gap-1", fill && "w-full sm:w-auto")}>
-      <span className="text-[11.5px] font-medium text-muted-foreground">{label}</span>
+      <span className="text-[12px] font-medium text-muted-foreground">{label}</span>
       <select
         value={current}
         aria-busy={pending}
@@ -150,7 +150,7 @@ export function DateFilter({ param, label, current, min, max }: { param: string;
   const [pending, start] = useTransition();
   return (
     <label className="relative inline-flex w-full min-w-0 flex-col gap-1 sm:w-auto">
-      <span className="text-[11.5px] font-medium text-muted-foreground">{label}</span>
+      <span className="text-[12px] font-medium text-muted-foreground">{label}</span>
       <Input
         type="date"
         value={current}
@@ -203,7 +203,7 @@ export function MoreFilters({ active, children }: { active: number; children: Re
         aria-controls={id}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-[13px] font-medium hairline [@media(hover:hover)]:hover:bg-secondary sm:hidden",
+          "inline-flex h-11 items-center justify-center gap-2 rounded-full bg-secondary/60 px-4 text-[13px] font-medium [@media(hover:hover)]:hover:bg-secondary sm:hidden",
           active > 0 && "font-semibold ring-1 ring-[hsl(var(--lime)/0.55)]",
         )}
       >

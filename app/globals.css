@@ -4706,6 +4706,88 @@ html:not(.dark) .la-themed:not(.dark *) .la-thumb { box-shadow: inset 0 0 0 1px 
 /* the sliding analytics chips (FilterChips glide) reach 44px on touch screens, like the plain chips */
 @media (pointer: coarse) and (max-width: 1023.98px) { .chip-glide { height: 44px; } }
 /* end R1270 */
+/* R1275 admin cards */
+/* One admin card surface, matched to the studio's cards (bg-card plus a low-alpha line, never a bright stroke):
+   the line is foreground ink at 7% in light, white at 5.5% in dark, under a soft two-step shadow. The rules sit in
+   :where() so a utility a page passes to Card (bg-lime/[0.05], rounded-2xl, a ring) still wins. --flat is a card
+   inside a card (tinted, no line, no shadow); --float is a panel over media or the page (bell, globe controls). */
+.admin-root, .admin-layer {
+  --admin-card-line: var(--foreground) / .07;
+  --admin-card-shadow: 0 1px 2px hsl(var(--foreground) / .04), 0 12px 32px -20px hsl(var(--foreground) / .18);
+  --admin-card-hover-shadow: 0 2px 4px hsl(var(--foreground) / .05), 0 18px 40px -22px hsl(var(--foreground) / .26);
+}
+.dark .admin-root, .dark .admin-layer, .dark.admin-layer {
+  --admin-card-line: 0 0% 100% / .055;
+  --admin-card-shadow: 0 1px 2px hsl(0 0% 0% / .28), 0 14px 34px -22px hsl(0 0% 0% / .7);
+  --admin-card-hover-shadow: 0 2px 4px hsl(0 0% 0% / .32), 0 20px 44px -22px hsl(0 0% 0% / .85);
+}
+:where(.admin-card) { background: hsl(var(--card)); border-radius: 24px; box-shadow: inset 0 0 0 1px hsl(var(--admin-card-line)), var(--admin-card-shadow); }
+:where(.admin-card.admin-card--flat) { background: hsl(var(--secondary) / .4); box-shadow: none; }
+:where(.admin-card.admin-card--float) { background: hsl(var(--glass-solid)); box-shadow: inset 0 0 0 1px hsl(var(--admin-card-line)), var(--glass-shadow); }
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :where(.admin-card.admin-card--float) { background: hsl(var(--glass-bg)); -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.5); backdrop-filter: blur(var(--glass-blur)) saturate(1.5); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :where(.admin-card.admin-card--float) { background: hsl(var(--glass-solid)); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+/* A clickable card answers a pointer with a deeper shadow; the 1px lift only when motion is welcome. A KPI is not
+   clickable, so the older 3px KPI lift (1081) is held still here. */
+@media (hover: hover) {
+  :is(.admin-card[data-interactive], a.admin-card):hover { box-shadow: inset 0 0 0 1px hsl(var(--admin-card-line)), var(--admin-card-hover-shadow); }
+  .admin-root .kpi-card:hover { transform: none; box-shadow: inset 0 0 0 1px hsl(var(--admin-card-line)), var(--admin-card-shadow); }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  :is(.admin-card[data-interactive], a.admin-card):hover { transform: translateY(-1px); }
+}
+html[data-contrast="more"] :where(.admin-card) { box-shadow: inset 0 0 0 1px hsl(var(--border)); }
+@media (forced-colors: active) { .admin-card { outline: 1px solid CanvasText; } }
+/* end R1275 */
+/* R1273 admin type */
+/* The panel, its portalled layers and its sign in read in Plus Jakarta Sans (--font-jakarta from app/layout.tsx); the
+   customer app keeps its own faces. Shared Radix dialogs (Sheet, ConfirmDialog) land on <body> without a class, and the
+   admin Toast region sits beside .admin-root, so both are matched only while an .admin-root is mounted. The shipped latin
+   file carries tnum, pnum, frac, liga and calt but no stylistic sets, so no font-feature-settings. Sizes sit at :where()
+   specificity, so a Tailwind text or leading utility on the element still wins. The :has() part sits in a forgiving
+   :where(), so a browser without :has() drops only that selector, not the whole rule. */
+.admin-root, .admin-layer, .admin-type,
+.admin-root ~ [role="status"][aria-live],
+:where(body:has(.admin-root) > :is([role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper])) {
+  font-family: var(--font-jakarta), var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+/* headings and .font-display otherwise pull --font-display (layer components h1-h4, the Tailwind font-display utility) */
+:where(.admin-root, .admin-layer, .admin-type, .admin-root ~ [role="status"][aria-live], body:has(.admin-root) > :is([role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper])) :is(h1, h2, h3, h4, h5, h6),
+:where(.admin-root, .admin-layer, .admin-type, .admin-root ~ [role="status"][aria-live], body:has(.admin-root) > :is([role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper])) :is(.font-display, .display) {
+  font-family: var(--font-jakarta), var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  font-variation-settings: normal;
+}
+.admin-root, .admin-layer { font-size: 14px; line-height: 1.5; }
+:where(.admin-root) h1 { font-size: 26px; line-height: 1.2; }
+@media (min-width: 640px) { :where(.admin-root) h1 { font-size: 28px; } }
+/* same weight lever as the 1186 rule above, one step up for page titles */
+.admin-root h1 { font-weight: 650; letter-spacing: -0.01em; }
+:where(.admin-root, .admin-layer) h2 { font-size: 20px; line-height: 1.3; }
+:where(.admin-root, .admin-layer) h3 { font-size: 16px; line-height: 1.35; }
+:where(.admin-root, .admin-layer) small { font-size: 12px; }
+:where(.admin-root, .admin-layer) th { font-size: 12.5px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.admin-root :is(td, .tabular, [data-num]), .admin-layer :is(td, .tabular, [data-num]) { font-variant-numeric: tabular-nums; }
+/* end R1273 */
+/* R1274 admin tabbar */
+/* The admin's phone and tablet tab bar (AdminTabBar) is the studio's .mtab, unforked. It sits at --admin-z-header
+   (30) beside the header, under the drawer and its scrim (50). Under 1024px anything fixed to the foot of an admin
+   page floats at --admin-bottom-float, 12px over the bar's open top edge (like the studio's 84px); it is only set
+   there, so give it a desktop fallback: bottom: var(--admin-bottom-float, 2rem). */
+@media (max-width: 1023.98px) {
+  .admin-root { --admin-bottom-float: calc(env(safe-area-inset-bottom) + 84px); }
+}
+/* More is the bar's only <button>, so the shared hover rules (which count <a> tabs with nth-of-type) would send the
+   pill to the first tab; under a pointer it goes to the last slot, where More sits. */
+@media (hover: hover) {
+  .mtab.admin-tabbar:has(> button.mtab-item:hover) .mtab-ind { translate: calc((var(--n, 5) - 1) * 100%) 0; }
+}
+/* end R1274 */
 /* ---------- 1100: Liquid glass on every studio card ----------
    The studio's screen cards wear the same liquid glass as the rail: a cool-to-deep tint, a lit rim on the top-left
    edge with a softer far edge, and a sheen across the top. Cards: .glass panels, the Analytics dashboard's

@@ -23,7 +23,7 @@ export function AdminChartCard({ title, hint, children, table, empty, allZero = 
       aria-pressed={view === v}
       aria-controls={id}
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[hsl(var(--ring))] touch:h-11",
+        "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[hsl(var(--ring))] touch:h-11",
         view === v ? "bg-background font-semibold text-foreground shadow-sm" : "font-medium text-muted-foreground [@media(hover:hover)]:hover:text-foreground",
       )}
     >
@@ -32,7 +32,7 @@ export function AdminChartCard({ title, hint, children, table, empty, allZero = 
     </button>
   );
   const toggle = table ? (
-    <div role="group" aria-label={`Show ${title} as`} className="gseg inline-flex shrink-0 items-center gap-0.5 rounded-full bg-secondary/60 p-0.5 hairline">
+    <div role="group" aria-label={`Show ${title} as`} className="gseg inline-flex shrink-0 items-center gap-0.5 rounded-full bg-secondary/60 p-0.5">
       {seg("chart", LineChart, "Chart")}
       {seg("table", Table2, "Table")}
     </div>

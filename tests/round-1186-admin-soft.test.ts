@@ -67,11 +67,12 @@ describe("1186 soft type", () => {
 
   test("the two shared headings dropped bold and the -3% tracking", () => {
     const ui = src("components/admin/ui.tsx");
-    expect(ui).toContain('<h1 className="font-display text-[clamp(1.45rem,2.6vw,1.9rem)] font-semibold leading-[1.18]">{title}</h1>');
+    // R1275: the kit type scale (PageHead 26-30px at 650, body 14-15px), still never bold and never -3%.
+    expect(ui).toContain('<h1 className="text-[26px] font-[650] leading-[1.2] tracking-[-0.01em] sm:text-[28px] lg:text-[30px]">{title}</h1>');
     expect(ui).not.toContain("tracking-[-0.03em]");
-    expect(ui).toContain('text-[13.5px] leading-[1.6] text-muted-foreground');
+    expect(ui).toContain('text-[14px] leading-relaxed text-muted-foreground sm:text-[15px]');
     const kpi = src("components/admin/motion/AdminKpi.tsx");
-    expect(kpi).toContain("font-display text-[1.75rem] font-semibold leading-none tabular");
+    expect(kpi).toContain("text-[26px] font-[650] leading-none tabular tabular-nums sm:text-[28px]");
     expect(kpi).not.toContain("font-bold");
   });
 });

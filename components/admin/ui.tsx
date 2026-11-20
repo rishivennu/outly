@@ -14,17 +14,21 @@ export function PageHead({ eyebrow, greet, title, body, actions, tight }: { eyeb
       <div className="min-w-0">
         {greet && <div className="mb-3">{greet}</div>}
         {eyebrow && <p className="eyebrow mb-2 text-[11px]">{eyebrow}</p>}
-        <h1 className="font-display text-[clamp(1.45rem,2.6vw,1.9rem)] font-semibold leading-[1.18]">{title}</h1>
-        {body && <p className="mt-1.5 max-w-xl text-[13.5px] leading-[1.6] text-muted-foreground">{body}</p>}
+        <h1 className="text-[26px] font-[650] leading-[1.2] tracking-[-0.01em] sm:text-[28px] lg:text-[30px]">{title}</h1>
+        {body && <p className="mt-1.5 max-w-prose text-[14px] leading-relaxed text-muted-foreground sm:text-[15px]">{body}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>
   );
 }
 
-export function Card({ className, children, as: As = "section", ...p }: { className?: string; children: React.ReactNode; as?: "section" | "div" | "article" } & React.HTMLAttributes<HTMLElement>) {
+/**
+ * R1275: the surface lives in CSS (.admin-card: card fill, a low-alpha line, a soft shadow). `tone="flat"` is a card
+ * inside a card, `tone="float"` a panel over media; `interactive` marks a clickable card so it answers hover.
+ */
+export function Card({ className, children, as: As = "section", tone = "default", interactive = false, ...p }: { className?: string; children: React.ReactNode; as?: "section" | "div" | "article"; tone?: "default" | "flat" | "float"; interactive?: boolean } & React.HTMLAttributes<HTMLElement>) {
   return (
-    <As className={cn("admin-card rounded-[24px] bg-card p-5 hairline sm:p-6", className)} {...p}>
+    <As className={cn("admin-card rounded-[24px] p-5 sm:p-6", tone === "default" && "bg-card", tone === "flat" && "admin-card--flat", tone === "float" && "admin-card--float", className)} data-interactive={interactive ? "" : undefined} {...p}>
       {children}
     </As>
   );
@@ -34,8 +38,8 @@ export function CardTitle({ children, hint, action }: { children: React.ReactNod
   return (
     <div className="mb-4 flex items-start justify-between gap-3">
       <div>
-        <h2 className="font-display text-[1.05rem] font-semibold tracking-tight">{children}</h2>
-        {hint && <p className="mt-0.5 text-[12.5px] text-muted-foreground">{hint}</p>}
+        <h2 className="text-[16px] font-semibold leading-[1.35]">{children}</h2>
+        {hint && <p className="mt-0.5 text-[13px] leading-normal text-muted-foreground">{hint}</p>}
       </div>
       {action}
     </div>
@@ -53,7 +57,7 @@ const TONES = {
 export type Tone = keyof typeof TONES;
 
 export function Pill({ tone = "muted", children, className }: { tone?: Tone; children: React.ReactNode; className?: string }) {
-  return <span className={cn("inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[11.5px] font-semibold", TONES[tone], className)}>{children}</span>;
+  return <span className={cn("inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[12px] font-medium", TONES[tone], className)}>{children}</span>;
 }
 
 /**
@@ -153,7 +157,7 @@ const DOT: Record<Tone, string> = {
 export function StatusBadge({ status, label, className, size = "md" }: { status: string; label?: React.ReactNode; className?: string; size?: "sm" | "md" }) {
   const s = has(STATUS_LABEL, status) ? STATUS_LABEL[status] : undefined;
   return (
-    <Pill tone={s?.tone ?? "muted"} className={cn(size === "sm" && "h-5 gap-1.5 px-2 text-[11px]", size === "md" && "gap-1.5", s?.strong && "ring-1 ring-inset ring-warning/70", className)}>
+    <Pill tone={s?.tone ?? "muted"} className={cn(size === "sm" && "h-5 gap-1.5 px-2 text-[12px]", size === "md" && "gap-1.5", s?.strong && "ring-1 ring-inset ring-warning/70", className)}>
       <span data-dot="" aria-hidden="true" className={cn("h-1.5 w-1.5 shrink-0 rounded-full", DOT[s?.dot ?? s?.tone ?? "muted"])} />
       {label ?? s?.label ?? status}
     </Pill>
@@ -200,7 +204,7 @@ export function Section({ title, hint, actions, cols = 1, className, children, i
     <section aria-labelledby={id ? `${id}-title` : undefined} className={cn("mt-8 first:mt-0", className)}>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3 px-1">
         <div className="min-w-0">
-          <h2 id={id ? `${id}-title` : undefined} className="font-display text-[1.05rem] font-semibold tracking-tight">{title}</h2>
+          <h2 id={id ? `${id}-title` : undefined} className="text-[20px] font-semibold leading-[1.3]">{title}</h2>
           {hint && <p className="mt-0.5 text-[13px] text-muted-foreground">{hint}</p>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -221,7 +225,7 @@ export function LoadingState({ lines = 3, className, label = "Loading", shape = 
       <div role="status" aria-live="polite" aria-busy="true" className={cn("grid gap-3 sm:grid-cols-2 xl:grid-cols-3", className)}>
         <span className="sr-only">{label}</span>
         {Array.from({ length: Math.max(1, lines) }, (_, i) => (
-          <div key={i} className="admin-card space-y-3 rounded-[24px] bg-card p-5 hairline sm:p-6">
+          <div key={i} className="admin-card space-y-3 rounded-[24px] bg-card p-5 sm:p-6">
             <Skeleton className="h-4 w-28 rounded-lg" />
             <Skeleton className="h-8 w-36 rounded-xl" />
             <Skeleton className="h-3.5 w-4/5 rounded-lg" />
@@ -231,7 +235,7 @@ export function LoadingState({ lines = 3, className, label = "Loading", shape = 
     );
   }
   return (
-    <div role="status" aria-live="polite" aria-busy="true" className={cn("admin-card rounded-[24px] bg-card p-5 hairline sm:p-6", className)}>
+    <div role="status" aria-live="polite" aria-busy="true" className={cn("admin-card rounded-[24px] bg-card p-5 sm:p-6", className)}>
       <span className="sr-only">{label}</span>
       {shape === "table" ? (
         <div className="space-y-0" aria-hidden>
@@ -268,11 +272,11 @@ export function ErrorState({ title = "Couldn't load this", body, retry, retryHre
     </Button>
   ) : null);
   return (
-    <div role="alert" className={cn("flex flex-col items-start gap-2 rounded-[20px] bg-destructive/[0.06] px-5 py-5 hairline", className)}>
-      <p className="flex items-center gap-2 font-display text-[1rem] font-semibold">
+    <div role="alert" className={cn("flex flex-col items-start gap-2 rounded-[20px] bg-destructive/[0.06] px-5 py-5", className)}>
+      <p className="flex items-center gap-2 text-[15px] font-semibold">
         <AlertTriangle className="h-4 w-4 text-destructive" aria-hidden /> {title}
       </p>
-      {body && <p className="max-w-prose text-[13.5px] leading-relaxed text-muted-foreground">{body}</p>}
+      {body && <p className="max-w-prose text-[13px] leading-relaxed text-muted-foreground">{body}</p>}
       {(again || children) && <div className="mt-1 flex flex-wrap items-center gap-2">{again}{children}</div>}
     </div>
   );
@@ -297,10 +301,10 @@ export const STATUS_TONE: Record<string, Tone> = {
 /** Nothing to show yet: an optional icon, what is missing, why or what to do, and at most one action. */
 export function Empty({ title, body, children, icon, action, className }: { title: string; body?: string; children?: React.ReactNode; icon?: React.ReactNode; action?: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("flex flex-col items-center gap-2 rounded-[20px] border border-dashed border-border px-6 py-12 text-center", className)}>
+    <div className={cn("flex flex-col items-center gap-2 rounded-[20px] border border-dashed border-border/70 px-6 py-12 text-center", className)}>
       {icon && <span aria-hidden="true" className="mb-1 grid h-11 w-11 place-items-center rounded-full bg-secondary text-muted-foreground [&_svg]:h-5 [&_svg]:w-5">{icon}</span>}
-      <p className="font-display text-[1.05rem] font-semibold">{title}</p>
-      {body && <p className="max-w-sm text-[13.5px] text-muted-foreground">{body}</p>}
+      <p className="text-[15px] font-semibold leading-[1.35]">{title}</p>
+      {body && <p className="max-w-sm text-[13px] leading-normal text-muted-foreground">{body}</p>}
       {action && <div className="mt-2 flex flex-wrap justify-center gap-2">{action}</div>}
       {children}
     </div>
@@ -392,13 +396,13 @@ export function Table({ head, children, className, label = "Table", mobile = "ca
         <thead role="rowgroup">
           <tr role="row">
             {head.map((h, i) => (
-              <th key={i} scope="col" role="columnheader" data-kind={kinds[i]} className={cn("border-b border-border pb-2.5 pr-4 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground last:pr-0", align?.[i] && ALIGN[align[i]!])}>
+              <th key={i} scope="col" role="columnheader" data-kind={kinds[i]} className={cn("border-b border-border/70 pb-2.5 pr-4 text-left text-[12px] font-semibold tracking-normal text-muted-foreground last:pr-0", align?.[i] && ALIGN[align[i]!])}>
                 {h}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody role="rowgroup" className="[&_td]:border-b [&_td]:border-border/60 [&_td]:py-3 [&_td]:pr-4 [&_td:last-child]:pr-0 [&_tr:last-child_td]:border-0 [&_tr]:transition-colors [@media(hover:hover)]:[&_tr:hover]:bg-foreground/[0.03]">
+        <tbody role="rowgroup" className="[&_td]:tabular-nums [&_td]:border-b [&_td]:border-border/60 [&_td]:py-3 [&_td]:pr-4 [&_td:last-child]:pr-0 [&_tr:last-child_td]:border-0 [&_tr]:transition-colors [@media(hover:hover)]:[&_tr:hover]:bg-foreground/[0.03]">
           {rows}
         </tbody>
       </table>
