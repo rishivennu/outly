@@ -1,0 +1,227 @@
+/* R1282 /partners hero. Near-black in both themes by design; the section ends on a rounded edge so the light page
+   below meets it cleanly. Only the four moving layers get will-change. */
+
+.hero {
+  --hero-bg: #080808;
+  --hero-ink: #f5f5f5;
+  --hero-copy: #e6e6e6;
+  --hero-muted: #a3a3a3;
+  --hero-lime: #b5ff00;
+  --hero-deep: #173a24;
+  --hero-nav: calc(var(--sa-t, 0px) + 4.25rem);
+  position: relative;
+  height: 160vh;
+  margin-top: calc(-1 * var(--hero-nav));
+  background: var(--hero-bg);
+  color: var(--hero-ink);
+  border-radius: 0 0 2.5rem 2.5rem;
+  isolation: isolate;
+  color-scheme: dark;
+}
+@media (min-width: 640px) {
+  .hero { --hero-nav: calc(var(--sa-t, 0px) + 4.5rem); }
+}
+@media (min-width: 768px) {
+  .hero { height: 200vh; border-radius: 0 0 3rem 3rem; }
+}
+
+.stage {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.copy {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: calc(var(--hero-nav) + clamp(1.5rem, 7dvh, 5rem)) 1.25rem 0;
+  text-align: center;
+}
+.copy::before {
+  content: "";
+  position: absolute;
+  inset: 10% -12% -14%;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgb(8 8 8 / 0.78), rgb(8 8 8 / 0.42) 60%, transparent);
+  pointer-events: none;
+}
+
+.title {
+  font-size: clamp(2.75rem, 7.2vw, 6rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  color: var(--hero-ink);
+}
+.sub {
+  margin-top: clamp(0.75rem, 1.6dvh, 1.25rem);
+  font-size: clamp(1.125rem, 1.4vw + 0.6rem, 1.5rem);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--hero-lime);
+}
+.desc {
+  margin-top: 0.875rem;
+  max-width: 34rem;
+  font-size: clamp(0.9375rem, 0.3vw + 0.85rem, 1.0625rem);
+  line-height: 1.6;
+  color: var(--hero-copy);
+  text-wrap: pretty;
+}
+
+.ctas {
+  margin-top: clamp(1.25rem, 3dvh, 2rem);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+.primary,
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0 1.375rem;
+  border-radius: 9999px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.primary {
+  background: var(--hero-lime);
+  color: #0b1a00;
+  box-shadow: 0 0 0 1px rgb(181 255 0 / 0.45), 0 10px 34px -10px rgb(181 255 0 / 0.6);
+}
+.primary:hover { box-shadow: 0 0 0 1px rgb(181 255 0 / 0.6), 0 12px 40px -8px rgb(181 255 0 / 0.75); }
+.secondary {
+  color: var(--hero-ink);
+  background: rgb(255 255 255 / 0.06);
+}
+.secondary:hover { background: rgb(255 255 255 / 0.1); }
+.primary:active,
+.secondary:active { transform: scale(0.97); }
+.primary:focus-visible,
+.secondary:focus-visible {
+  outline: 2px solid var(--hero-lime);
+  outline-offset: 3px;
+}
+.arrow { transition: transform 0.2s ease; }
+.primary:hover .arrow { transform: translateX(2px); }
+
+.icons {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--sa-b, 0px) + clamp(1.25rem, 5dvh, 2.75rem));
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  gap: clamp(1.25rem, 3vw, 2rem);
+  color: var(--hero-muted);
+}
+.icons svg { width: 1.25rem; height: 1.25rem; }
+
+/* Art layers: transparent, absolutely placed, animated independently. */
+.art {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.hand {
+  position: absolute;
+  width: clamp(13rem, 46vw, 20rem);
+  height: auto;
+  will-change: transform;
+}
+.handLeft {
+  left: 0;
+  top: 58%;
+  aspect-ratio: 1104 / 936;
+  transform: translate3d(-14%, 0, 0);
+  transform-origin: 88% 52%;
+}
+.handRight {
+  right: 0;
+  top: 64%;
+  aspect-ratio: 1000 / 776;
+  transform: translate3d(14%, 0, 0);
+  transform-origin: 10% 50%;
+}
+@media (min-width: 768px) {
+  .hand { width: clamp(18rem, 36vw, 38rem); }
+  .handLeft { top: 30%; }
+  .handRight { top: 42%; }
+}
+
+.halo {
+  position: absolute;
+  left: 50%;
+  top: 64%;
+  width: clamp(22rem, 70vw, 56rem);
+  aspect-ratio: 1;
+  margin: calc(clamp(22rem, 70vw, 56rem) / -2) 0 0 calc(clamp(22rem, 70vw, 56rem) / -2);
+  background:
+    radial-gradient(closest-side, rgb(181 255 0 / 0.22), rgb(181 255 0 / 0.08) 45%, rgb(23 58 36 / 0.12) 70%, transparent);
+  will-change: transform;
+}
+
+.orb {
+  --d: clamp(8.5rem, 18vw, 13.5rem);
+  position: absolute;
+  left: 50%;
+  top: 72%;
+  width: var(--d);
+  aspect-ratio: 480 / 576;
+  height: auto;
+  margin: calc(var(--d) * 1.2 / -2) 0 0 calc(var(--d) / -2);
+  will-change: transform;
+}
+@media (min-width: 768px) {
+  .orb { top: 71%; }
+  .halo { top: 66%; }
+}
+
+.glow {
+  position: absolute;
+  inset: -30% -40%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(181 255 0 / 0.34), rgb(181 255 0 / 0.12) 45%, rgb(181 255 0 / 0) 100%);
+}
+
+/* The stone itself: a slow idle drift. CSS, so it runs without GSAP and stops for reduced motion. */
+.stone {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: auto;
+  animation: heroSpin 28s ease-in-out infinite;
+}
+.reflect {
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: -14%;
+  height: 14%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(181 255 0 / 0.3), transparent);
+}
+
+@keyframes heroSpin {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-2deg); }
+  50% { transform: translate3d(0, -4%, 0) rotate(2deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stone { animation: none; }
+  .primary,
+  .secondary,
+  .arrow { transition: none; }
+}

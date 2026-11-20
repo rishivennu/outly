@@ -23,6 +23,8 @@ const LINKS = [
   { id: "pricing", label: "Pricing" },
   { id: "faq", label: "FAQ" },
 ];
+// R1282: a route, not a landing section, so it sits outside LINKS and the scrollspy.
+const PARTNERS = { href: "/partners", label: "Partner With Us", short: "Partners" };
 
 /**
  * Marketing nav: a floating pill on a near-solid card surface, so text holds 4.5:1 over
@@ -389,6 +391,17 @@ export function MarketingNav() {
               </li>
               ),
             )}
+            <li>
+              <Link
+                href={PARTNERS.href}
+                aria-current={pathname === PARTNERS.href ? "page" : undefined}
+                className={cn("mnav-link", pathname === PARTNERS.href && "!text-foreground")}
+              >
+                {/* The full label only fits the one-row bar from xl; at lg it shortens so the row never wraps. */}
+                <span className="xl:hidden"><FlipText text={PARTNERS.short} /></span>
+                <span className="hidden xl:inline"><FlipText text={PARTNERS.label} /></span>
+              </Link>
+            </li>
           </ul>
           </div>
         </nav>
@@ -477,6 +490,19 @@ export function MarketingNav() {
                 <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               </Link>
             ))}
+            <Link
+              data-mi=""
+              href={PARTNERS.href}
+              onClick={() => setOpen(false)}
+              aria-current={pathname === PARTNERS.href ? "page" : undefined}
+              className={cn(
+                "flex h-12 items-center justify-between rounded-2xl px-4 font-display text-[22px] font-semibold tracking-tight hover:bg-foreground/[0.05]",
+                pathname === PARTNERS.href && "bg-foreground/[0.06]",
+              )}
+            >
+              {PARTNERS.label}
+              <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            </Link>
           </nav>
           {!signedIn && (
             <div className="mnav-foot">
