@@ -130,7 +130,7 @@ export function GenerateDesk({ initial, history, timezone, today }: { initial: J
             <Input id="blog-for" type="date" value={forDate} min={today} max={addDays(today, 60)} onChange={(e) => setForDate(e.target.value || today)} disabled={running} className="min-h-11" />
           </div>
           <Button type="button" variant="lime" size="lg" onClick={start} disabled={busy || running || !state.ready} className="min-h-11">
-            {running ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Wand2 className="h-4 w-4" aria-hidden />}
+            {running ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Wand2 className="h-4 w-4" aria-hidden />}
             {running ? "Generating" : forDate && forDate !== today ? `Generate for ${fmtYmd(forDate, { day: "numeric", month: "short" })}` : "Generate Today's Blog"}
           </Button>
         </div>
@@ -195,7 +195,7 @@ export function StageList({ job, onCancel, compact = false }: { job: BlogJobView
           return (
             <li key={s} className={cn("flex items-start gap-3 rounded-xl px-3 py-2", active && "bg-lime/10", pending && "opacity-60")}>
               <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center" aria-hidden>
-                {finished ? <Check className="h-4 w-4 text-success" /> : active ? <Loader2 className="h-4 w-4 animate-spin" /> : failed ? <AlertTriangle className="h-4 w-4 text-destructive" /> : <span className="h-2 w-2 rounded-full bg-border" />}
+                {finished ? <Check className="h-4 w-4 text-success" /> : active ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : failed ? <AlertTriangle className="h-4 w-4 text-destructive" /> : <span className="h-2 w-2 rounded-full bg-border" />}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[14px] font-medium">

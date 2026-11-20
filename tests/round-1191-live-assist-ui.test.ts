@@ -81,7 +81,8 @@ describe("1191 the console is a working screen", () => {
     expect(consoleSrc).toContain("el.style.height = `${Math.min(el.scrollHeight, 160)}px`;");
     expect(consoleSrc).toContain('className="shrink-0 border-t border-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"');
     expect(consoleSrc).toContain("disabled={!text.trim() || sending}");
-    expect(consoleSrc).toContain('cn(btnPrimary, "h-11 w-11 shrink-0 px-0")');
+    // R1271: the shared Button, lime as the one main action; size="icon" is the 44px square.
+    expect(consoleSrc).toContain('<Button type="submit" variant="lime" size="icon" disabled={!text.trim() || sending} aria-label="Send the reply"');
   });
 
   test("the details drawer is a real dialog on a phone", () => {

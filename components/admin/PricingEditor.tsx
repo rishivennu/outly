@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, Sparkles, Trash2 } from "lucide-react";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { Switch } from "@/components/admin/Switch";
 import { adminApi } from "@/lib/client/admin-api";
 import { CURRENCIES, formatMoney, priceLabel, type PublicPlan } from "@/lib/billing/money";
 import { localPrice } from "@/lib/billing/currency";
@@ -135,7 +136,7 @@ function Seg<T extends string>({ value, onChange, options, label }: { value: T; 
   return (
     <div role="radiogroup" aria-label={label} className="inline-flex w-full rounded-full bg-secondary/60 p-1 hairline">
       {options.map((o) => (
-        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)} className={cn("h-10 flex-1 rounded-full px-3 text-[13px] font-semibold transition-all duration-300", value === o.value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)} className={cn("min-h-11 flex-1 rounded-full px-3 text-[13px] font-semibold transition-[background-color,color,box-shadow] duration-nav focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", value === o.value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
           {o.label}
         </button>
       ))}
@@ -144,14 +145,14 @@ function Seg<T extends string>({ value, onChange, options, label }: { value: T; 
 }
 
 function Toggle({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
+  const id = useId();
   return (
     <label className="flex min-h-[3.25rem] cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4 py-2.5 hairline">
       <span className="min-w-0">
         <span className="block text-[14px] font-medium">{label}</span>
-        {hint && <span className="block text-[12px] text-muted-foreground">{hint}</span>}
+        {hint && <span id={id} className="block text-[12px] text-muted-foreground">{hint}</span>}
       </span>
-      <input type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
-      <span aria-hidden className="relative h-7 w-12 shrink-0 rounded-full bg-muted transition-colors peer-checked:bg-lime peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-background after:shadow after:transition-transform after:duration-300 peer-checked:after:translate-x-5" />
+      <Switch on={checked} onChange={onChange} label={label} describedBy={hint ? id : undefined} />
     </label>
   );
 }
@@ -188,7 +189,7 @@ function PlanCard({ p, on, onPick }: { p: Plan; on: boolean; onPick: () => void 
         aria-pressed={on}
         aria-label={`${p.name}, ${priceLabel(p)}, ${STATE[p.state].label}${p.subscribers ? `, ${p.subscribers} active` : ""}`}
         className={cn(
-          "la-card la-themed relative flex h-full w-full flex-col overflow-hidden rounded-[1.75rem] p-4 text-left transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-[hsl(var(--ring))] motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+          "la-card la-themed relative flex h-full w-full flex-col overflow-hidden rounded-[1.75rem] p-4 text-left transition-[transform,box-shadow] duration-hover hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-[hsl(var(--ring))] motion-reduce:transition-none motion-reduce:hover:translate-y-0",
           live && "la-live",
           on && "ring-2 ring-lime ring-offset-2 ring-offset-background",
         )}
@@ -310,7 +311,7 @@ function DisplayPanel({ value, onChange }: { value: PricingDisplay; onChange: (d
               disabled={busy}
               onClick={() => !on && save({ cardStyle: v })}
               className={cn(
-                "la-box relative flex flex-col gap-3 rounded-[1.4rem] p-3 text-left transition-[box-shadow,transform] duration-300 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-[hsl(var(--ring))] disabled:cursor-progress motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+                "la-box relative flex flex-col gap-3 rounded-[1.4rem] p-3 text-left transition-[box-shadow,transform] duration-hover hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-[hsl(var(--ring))] disabled:cursor-progress motion-reduce:transition-none motion-reduce:hover:translate-y-0",
               )}
             >
               {on && <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-[1.4rem] ring-2 ring-inset ring-[hsl(var(--lime-ink))] dark:ring-lime" />}
@@ -480,7 +481,7 @@ export function PricingEditor({ initial, display: initialDisplay }: { initial: P
             onClick={() => pick("new")}
             aria-pressed={sel === "new"}
             className={cn(
-              "flex h-full min-h-[9.5rem] w-full flex-col items-center justify-center gap-2 rounded-[1.75rem] border-2 border-dashed border-border text-[14px] font-semibold text-muted-foreground transition-colors hover:border-lime hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-[hsl(var(--ring))]",
+              "flex h-full min-h-[9.5rem] w-full flex-col items-center justify-center gap-2 rounded-[1.75rem] border-2 border-dashed border-border text-[14px] font-semibold text-muted-foreground transition-colors duration-hover hover:border-lime hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-[hsl(var(--ring))]",
               sel === "new" && "border-lime text-foreground",
             )}
           >

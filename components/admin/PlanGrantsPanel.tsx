@@ -7,7 +7,7 @@ import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { adminApi } from "@/lib/client/admin-api";
 import { cn } from "@/lib/utils";
-import { Card, CardTitle, Empty, Pill, Table, ago, fmtDate, type Tone } from "./ui";
+import { Card, CardTitle, Empty, Pill, StatusBadge, Table, ago, fmtDate, type Tone } from "./ui";
 
 type PlanOpt = { slug: string; name: string };
 type Grant = {
@@ -148,7 +148,7 @@ export function PlanGrantsPanel({ plans, initialList, initialEmail }: { plans: P
                 <ul className="mt-1 space-y-1 text-[13px]">
                   {acc.subscriptions.slice(0, 6).map((s) => (
                     <li key={s.id} className="flex flex-wrap items-center gap-2">
-                      <Pill tone={s.status === "active" ? "ok" : "muted"}>{s.status}</Pill>
+                      <StatusBadge status={s.status} />
                       <span>{s.planName}</span>
                       <span className="text-muted-foreground">{s.paid ? "paid" : s.provider}, to {fmtDate(s.endsAt)}</span>
                     </li>
@@ -171,7 +171,7 @@ export function PlanGrantsPanel({ plans, initialList, initialEmail }: { plans: P
               </div>
               <div role="radiogroup" aria-label="How long" className="flex gap-2">
                 {(["days", "date"] as const).map((m) => (
-                  <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={cn("h-11 flex-1 rounded-2xl text-[13.5px] font-medium hairline", mode === m ? "bg-foreground text-background" : "bg-secondary/40")}>
+                  <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={cn("h-11 flex-1 rounded-2xl text-[13.5px] font-medium hairline transition-colors duration-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", mode === m ? "bg-foreground text-background" : "bg-secondary/40")}>
                     {m === "days" ? "For a length" : "Until a date"}
                   </button>
                 ))}
@@ -182,7 +182,7 @@ export function PlanGrantsPanel({ plans, initialList, initialEmail }: { plans: P
                   <div className="flex flex-wrap gap-2">
                     <Input id="pg-days" type="number" inputMode="numeric" min={1} max={3660} value={days} onChange={(e) => setDays(e.target.value)} className="w-28" />
                     {PRESETS.map((d) => (
-                      <button key={d} type="button" onClick={() => setDays(String(d))} className={cn("h-11 rounded-2xl px-3 text-[13px] hairline", n === d ? "bg-lime/20 text-lime-ink" : "bg-secondary/40")}>{d === 365 ? "1 year" : `${d / 30} mo`}</button>
+                      <Button key={d} type="button" size="sm" aria-pressed={n === d} onClick={() => setDays(String(d))} className={cn("h-11 rounded-2xl px-3 text-[13px] font-normal", n === d && "bg-lime/20 text-lime-ink hover:bg-lime/30")}>{d === 365 ? "1 year" : `${d / 30} mo`}</Button>
                     ))}
                   </div>
                 </div>
@@ -305,7 +305,7 @@ export function PlanGrantsPanel({ plans, initialList, initialEmail }: { plans: P
         </div>
       )}
 
-      <Card>
+      <Card className="min-w-0">
         <CardTitle
           hint="Admin grants across everyone, newest first."
           action={
@@ -326,7 +326,7 @@ export function PlanGrantsPanel({ plans, initialList, initialEmail }: { plans: P
             {list.map((g) => (
               <tr key={g.id}>
                 <td className="max-w-[260px] truncate">
-                  <button type="button" className="min-h-[44px] text-left underline-offset-2 hover:underline" onClick={() => { setQ(g.email); void lookup(g.email); window.scrollTo({ top: 0, behavior: "smooth" }); }}>{g.email}</button>
+                  <Button type="button" variant="ghost" size="sm" title={g.email} className="min-h-[44px] max-w-full justify-start px-2 text-left text-foreground underline-offset-2 hover:underline" onClick={() => { setQ(g.email); void lookup(g.email); window.scrollTo({ top: 0, behavior: "smooth" }); }}><span className="truncate">{g.email}</span></Button>
                 </td>
                 <td>{g.planName}</td>
                 <td><Pill tone={STATE_TONE[g.state] ?? "muted"}>{g.state}</Pill></td>

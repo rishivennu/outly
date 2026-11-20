@@ -5,6 +5,7 @@ import { pollable } from "@/lib/client/idle";
 import { ChevronLeft, Info, Loader2, MapPin, Minus, Plus, RefreshCw, RotateCcw, TriangleAlert } from "lucide-react";
 import { agoLabel, LIVE_POLL_MS, LIVE_TIMEOUTS_MIN, type LiveMap, type LivePlace } from "@/lib/live-map-core";
 import type { GlobeHandle } from "./LiveGlobeCanvas";
+import { Button } from "@/components/ui/button";
 
 // The canvas is its own chunk, loaded after the card has painted; the card works (list, counts) without it.
 const LiveGlobeCanvas = dynamic(() => import("./LiveGlobeCanvas"), { ssr: false, loading: () => <span className="lg-ph" aria-hidden="true" /> });
@@ -155,10 +156,10 @@ export function LiveGlobeCard({ initial }: { initial: LiveMap }) {
               ))}
             </select>
           </label>
-          <button type="button" className="lg-btn" onClick={() => void load(timeout, true)} disabled={busy} aria-busy={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <RefreshCw className="h-4 w-4" aria-hidden />}
+          <Button type="button" variant="lime" className="px-[18px] text-[13.5px] font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-wait" onClick={() => void load(timeout, true)} disabled={busy} aria-busy={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <RefreshCw className="h-4 w-4" aria-hidden />}
             {busy ? "Refreshing" : "Refresh"}
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -273,9 +274,9 @@ function PlacePanel({ place, now, timeout, onBack }: { place: LivePlace; now: nu
   const country = countryName(place.country);
   return (
     <div>
-      <button type="button" onClick={onBack} className="lg-back">
+      <Button type="button" variant="ghost" size="sm" onClick={onBack} className="h-11 gap-1 rounded-xl pl-1 pr-2.5 text-[13px] font-semibold text-white/80 hover:bg-white/[0.06] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white touch:h-11">
         <ChevronLeft className="h-4 w-4" aria-hidden /> All places
-      </button>
+      </Button>
       <h3 className="mt-2 font-display text-[1.1rem] font-bold leading-tight text-white">{place.city ?? country}</h3>
       <p className="mt-0.5 text-[13px] text-white/70">
         {place.city ? `${place.people[0]?.region && place.people[0].region !== place.city ? `${place.people[0].region}, ` : ""}${country}` : "City not reported. Shown at the country's centre."}

@@ -3,7 +3,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Activity, AlertTriangle, BellRing, CheckCircle2, Download, Loader2, RefreshCw, Settings2, ShieldAlert, X } from "lucide-react";
 import { useToast } from "@/components/shared/Toast";
-import { Card, CardTitle, Pill, Section, Table, ago, fmtDate, type Tone } from "@/components/admin/ui";
+import { Card, CardTitle, ErrorState, LoadingState, Pill, Section, Table, ago, fmtDate, type Tone } from "@/components/admin/ui";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/field";
+import { Sheet } from "@/components/shared/Sheet";
+import { Switch } from "@/components/admin/Switch";
 import { pushSupport, currentSub, permission, installedNow, type PushSupport } from "@/lib/client/push";
 import { ADMIN_DEVICES_URL, adminPushFlag, enableAdminPush, setAdminPushFlag, syncAdminPush } from "@/lib/client/admin-push";
 import type { AdminRole } from "@/lib/admin/perms";
@@ -55,10 +59,9 @@ const INC_STATUS: Record<string, { label: string; tone: Tone }> = { open: { labe
 const DELIVERY: Record<string, Tone> = { sent: "ok", failed: "bad", skipped: "muted" };
 
 const ring = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]";
-const btn = cn("inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-4 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50", ring);
-const btnPrimary = cn(btn, "bg-foreground text-background hover:bg-foreground/90");
-const btnQuiet = cn(btn, "bg-secondary text-foreground hover:bg-secondary/70");
-const btnDanger = cn(btn, "bg-destructive text-destructive-foreground hover:bg-destructive/90");
+// R1271: colour and press come from the shared Button variant; this keeps the 44px, 13px console shape.
+const btn = cn("inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-4 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-50", ring);
+const input = "h-11 rounded-2xl px-3 text-[13px]";
 const field = cn("min-h-11 rounded-2xl border border-border bg-background px-3 text-[13px]", ring);
 
 class CallError extends Error {
@@ -271,13 +274,15 @@ export function SystemHealth({ me, role }: { me: { id: string; name: string }; r
 
   if (error && !data)
     return (
-      <Card role="alert">
-        <CardTitle>Couldn't load System Health</CardTitle>
-        <p className="text-[13.5px] text-muted-foreground">{error}</p>
-        <button type="button" className={cn(btnQuiet, "mt-4")} onClick={() => void load()}>
-          Try again
-        </button>
-      </Card>
+      <ErrorState
+        title="Couldn't load System Health"
+        body={error}
+        retry={
+          <Button type="button" className={btn} onClick={() => void load()}>
+            Try again
+          </Button>
+        }
+      />
     );
 
   return (
@@ -311,23 +316,21 @@ export function SystemHealth({ me, role }: { me: { id: string; name: string }; r
             Last refresh failed: {error}
           </span>
         )}
-        <button type="button" className={btnQuiet} onClick={() => void load()} aria-label="Refresh">
+        <Button type="button" className={btn} onClick={() => void load()} aria-label="Refresh">
           <RefreshCw className="size-4" aria-hidden /> Refresh
-        </button>
+        </Button>
         {isSuper && (
-          <button type="button" className={btnPrimary} onClick={() => void runNow()} disabled={busy === "run"}>
-            {busy === "run" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Activity className="size-4" aria-hidden />} Run checks now
-          </button>
+          <Button type="button" variant="lime" className={btn} onClick={() => void runNow()} disabled={busy === "run"}>
+            {busy === "run" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Activity className="size-4" aria-hidden />} Run checks now
+          </Button>
         )}
-        <button type="button" className={btnQuiet} onClick={() => setSettingsOpen(true)} aria-haspopup="dialog">
+        <Button type="button" className={btn} onClick={() => setSettingsOpen(true)} aria-haspopup="dialog">
           <Settings2 className="size-4" aria-hidden /> Alerts & settings
-        </button>
+        </Button>
       </div>
 
       {!data ? (
-        <div role="status" className="admin-card rounded-[24px] bg-card p-6 hairline text-[13.5px] text-muted-foreground">
-          Loading System Health
-        </div>
+        <LoadingState lines={4} label="Loading System Health" />
       ) : (
         <>
           {/* Overall status */}
@@ -402,7 +405,7 @@ function ServicesSection({ services, onOpen }: { services: ServiceRow[]; onOpen:
       {groups.map((g) => {
         const rows = services.filter((s) => s.group === g);
         return (
-          <Card key={g}>
+          <Card key={g} className="min-w-0">
             <CardTitle hint={`${rows.filter((r) => r.monitored).length} monitored, ${rows.filter((r) => !r.monitored).length} not`}>{g}</CardTitle>
             <Table head={["Service", "Status", "Last checked", "Response", "Error rate", "Incidents", "Details"]} label={`${g} services`} minWidth={880}>
               {rows.map((s) => (
@@ -417,9 +420,9 @@ function ServicesSection({ services, onOpen }: { services: ServiceRow[]; onOpen:
                   <td className="tabular-nums">{s.monitored ? (s.errorRatePct === null ? "No checks yet" : `${s.errorRatePct}% of ${s.checks}`) : "n/a"}</td>
                   <td>
                     {s.openIncidents ? (
-                      <button type="button" className={cn("rounded-full px-2 py-1 text-[12.5px] font-semibold underline-offset-2 hover:underline", ring, s.openSeverity === "critical" ? "text-destructive" : "pill-ink-warn")} onClick={() => document.getElementById("inc-title")?.scrollIntoView({ block: "start" })}>
+                      <Button type="button" variant="ghost" size="sm" className={cn("px-2 text-[12.5px] font-semibold underline-offset-2 hover:underline", ring, s.openSeverity === "critical" ? "text-destructive" : "pill-ink-warn")} onClick={() => document.getElementById("inc-title")?.scrollIntoView({ block: "start" })}>
                         {s.openIncidents} open
-                      </button>
+                      </Button>
                     ) : (
                       <span className="text-muted-foreground">None</span>
                     )}
@@ -442,13 +445,13 @@ function ServicesSection({ services, onOpen }: { services: ServiceRow[]; onOpen:
 function IncidentsSection({ incidents, onOpen }: { incidents: Incident[]; onOpen: (id: string) => void }) {
   return (
     <Section id="inc" title="B. Active incidents" hint="Open, acknowledged or investigating. Acknowledging never resolves; an incident closes after two passing checks in a row or when someone resolves it.">
-      <Card>
+      <Card className="min-w-0">
         {incidents.length ? (
           <Table head={["Incident", "Severity", "Service", "First detected", "Duration", "Status", "Assignee"]} label="Active incidents" minWidth={880}>
             {incidents.map((i) => (
               <tr key={i.id}>
                 <td>
-                  <button type="button" className={cn("text-left font-semibold underline-offset-2 hover:underline", ring)} onClick={() => onOpen(i.id)}>
+                  <button type="button" className={cn("text-left font-semibold underline-offset-2 hover:underline touch:min-h-11", ring)} onClick={() => onOpen(i.id)}>
                     {i.title}
                   </button>
                   <span className="block text-[12px] text-muted-foreground">
@@ -552,13 +555,15 @@ function HistorySection({ data, range, onOpen }: { data: Data; range: string; on
         <Kpi label="Incidents in range" value={data.history.incidents.length} sub={`${data.history.incidents.filter((i) => i.resolvedAt).length} recovered`} />
         <Kpi label="Alert deliveries" value={channels.reduce((n, c) => n + Object.values(alerts[c] ?? {}).reduce((a, b) => a + b, 0), 0)} sub={channels.map((c) => `${c}: ${alerts[c]?.sent ?? 0} sent, ${alerts[c]?.failed ?? 0} failed, ${alerts[c]?.skipped ?? 0} skipped`).join(" / ")} />
       </div>
-      <Card>
+      <Card className="min-w-0">
         <CardTitle
           hint="Filter, then export the same list."
           action={
-            <a className={btnQuiet} href={`/api/admin/health/incidents?${query}&format=csv`} download>
-              <Download className="size-4" aria-hidden /> Export CSV
-            </a>
+            <Button asChild className={btn}>
+              <a href={`/api/admin/health/incidents?${query}&format=csv`} download>
+                <Download className="size-4" aria-hidden /> Export CSV
+              </a>
+            </Button>
           }
         >
           Incident history
@@ -595,22 +600,20 @@ function HistorySection({ data, range, onOpen }: { data: Data; range: string; on
               </option>
             ))}
           </select>
-          <input className={cn(field, "min-w-[180px] flex-1")} placeholder="Search title or details" aria-label="Search incidents" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Input className={cn(input, "w-auto min-w-[180px] flex-1")} placeholder="Search title or details" aria-label="Search incidents" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         {err ? (
           <p className="text-[13px] text-destructive" role="alert">
             {err}
           </p>
         ) : rows === null ? (
-          <p className="text-[13px] text-muted-foreground" role="status">
-            Loading history
-          </p>
+          <LoadingState lines={3} label="Loading history" />
         ) : rows.length ? (
           <Table head={["Incident", "Severity", "Service", "First detected", "Resolved", "Duration", "Status"]} label="Incident history" minWidth={880}>
             {rows.map((i) => (
               <tr key={i.id}>
                 <td>
-                  <button type="button" className={cn("text-left font-semibold underline-offset-2 hover:underline", ring)} onClick={() => onOpen(i.id)}>
+                  <button type="button" className={cn("text-left font-semibold underline-offset-2 hover:underline touch:min-h-11", ring)} onClick={() => onOpen(i.id)}>
                     {i.title}
                   </button>
                   <span className="block text-[12px] text-muted-foreground">{i.occurrences} check(s)</span>
@@ -643,23 +646,11 @@ function IncidentDrawer({ id, me, onClose, onChanged }: { id: string; me: { id: 
   const [err, setErr] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const box = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => call<Detail>(`/api/admin/health/incidents/${encodeURIComponent(id)}`).then((r) => (setD(r), setErr(null))).catch((e: unknown) => setErr(e instanceof Error ? e.message : "Couldn't load the incident.")), [id]);
   useEffect(() => {
     void load();
   }, [load]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    box.current?.focus();
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [onClose]);
 
   const act = async (action: string, extra: Record<string, unknown> = {}, done?: string) => {
     setBusy(action);
@@ -679,27 +670,15 @@ function IncidentDrawer({ id, me, onClose, onChanged }: { id: string; me: { id: 
   const inc = d?.incident;
   const resolved = inc?.status === "resolved";
   return (
-    <div className="fixed inset-0 z-[70] flex justify-end bg-foreground/30" onClick={onClose} role="presentation">
-      <div ref={box} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="inc-dlg-title" className={cn("flex h-full w-full max-w-[640px] flex-col overflow-y-auto bg-card shadow-2xl outline-none", "p-5 sm:p-6")} onClick={(e) => e.stopPropagation()}>
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="eyebrow mb-1 text-[11px]">Incident</p>
-            <h2 id="inc-dlg-title" className="font-display text-[1.15rem] font-semibold leading-tight">
-              {inc?.title ?? (err ? "Not available" : "Loading")}
-            </h2>
-            {inc && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                <Pill tone={SEVERITY[inc.severity]?.tone ?? "muted"}>{SEVERITY[inc.severity]?.label ?? inc.severity}</Pill>
-                <Pill tone={INC_STATUS[inc.status]?.tone ?? "muted"}>{INC_STATUS[inc.status]?.label ?? inc.status}</Pill>
-                <Pill tone="muted">{inc.serviceName}</Pill>
-                {inc.escalated && <Pill tone="bad">Escalated</Pill>}
-              </div>
-            )}
+    <Sheet open onOpenChange={(o) => !o && onClose()} title={inc?.title ?? (err ? "Not available" : "Loading")} description="Incident" className="lg:w-[640px]">
+        {inc && (
+          <div className="mb-4 flex flex-wrap gap-1.5">
+            <Pill tone={SEVERITY[inc.severity]?.tone ?? "muted"}>{SEVERITY[inc.severity]?.label ?? inc.severity}</Pill>
+            <Pill tone={INC_STATUS[inc.status]?.tone ?? "muted"}>{INC_STATUS[inc.status]?.label ?? inc.status}</Pill>
+            <Pill tone="muted">{inc.serviceName}</Pill>
+            {inc.escalated && <Pill tone="bad">Escalated</Pill>}
           </div>
-          <button type="button" className={cn(btnQuiet, "size-11 rounded-full px-0")} onClick={onClose} aria-label="Close">
-            <X className="size-4" aria-hidden />
-          </button>
-        </div>
+        )}
         {err && (
           <p className="text-[13.5px] text-destructive" role="alert">
             {err}
@@ -728,29 +707,29 @@ function IncidentDrawer({ id, me, onClose, onChanged }: { id: string; me: { id: 
             <div className="mt-5 flex flex-wrap gap-2">
               {!resolved && (
                 <>
-                  <button type="button" className={btnQuiet} disabled={!!busy || inc.acknowledged} onClick={() => void act("ack", {}, "Acknowledged. The incident stays open until it is resolved.")}>
+                  <Button type="button" className={btn} disabled={!!busy || inc.acknowledged} onClick={() => void act("ack", {}, "Acknowledged. The incident stays open until it is resolved.")}>
                     {inc.acknowledged ? "Acknowledged" : "Acknowledge"}
-                  </button>
-                  <button type="button" className={btnQuiet} disabled={!!busy || inc.status === "investigating"} onClick={() => void act("investigate", {}, "Marked as investigating.")}>
+                  </Button>
+                  <Button type="button" className={btn} disabled={!!busy || inc.status === "investigating"} onClick={() => void act("investigate", {}, "Marked as investigating.")}>
                     Investigating
-                  </button>
-                  <button type="button" className={btnQuiet} disabled={!!busy || inc.assigneeId === me.id} onClick={() => void act("assign", { assigneeId: me.id }, "Assigned to you.")}>
+                  </Button>
+                  <Button type="button" className={btn} disabled={!!busy || inc.assigneeId === me.id} onClick={() => void act("assign", { assigneeId: me.id }, "Assigned to you.")}>
                     Assign to me
-                  </button>
+                  </Button>
                   {inc.assigneeId && (
-                    <button type="button" className={btnQuiet} disabled={!!busy} onClick={() => void act("assign", { assigneeId: null }, "Assignee removed.")}>
+                    <Button type="button" className={btn} disabled={!!busy} onClick={() => void act("assign", { assigneeId: null }, "Assignee removed.")}>
                       Unassign
-                    </button>
+                    </Button>
                   )}
-                  <button type="button" className={btnDanger} disabled={!!busy} onClick={() => void act("resolve", text.trim() ? { text: text.trim() } : {}, "Resolved. A new incident opens if the check fails again.")}>
+                  <Button type="button" variant="danger" className={btn} disabled={!!busy} onClick={() => void act("resolve", text.trim() ? { text: text.trim() } : {}, "Resolved. A new incident opens if the check fails again.")}>
                     Resolve
-                  </button>
+                  </Button>
                 </>
               )}
               {resolved && (
-                <button type="button" className={btnQuiet} disabled={!!busy} onClick={() => void act("reopen", text.trim() ? { text: text.trim() } : {}, "Reopened.")}>
+                <Button type="button" className={btn} disabled={!!busy} onClick={() => void act("reopen", text.trim() ? { text: text.trim() } : {}, "Reopened.")}>
                   Reopen
-                </button>
+                </Button>
               )}
             </div>
             <form
@@ -760,10 +739,10 @@ function IncidentDrawer({ id, me, onClose, onChanged }: { id: string; me: { id: 
                 if (text.trim()) void act("note", { text: text.trim() }, "Note added.");
               }}
             >
-              <input className={cn(field, "flex-1")} value={text} onChange={(e) => setText(e.target.value)} placeholder="Add a note (also attached to Resolve / Reopen)" aria-label="Note" maxLength={2000} />
-              <button type="submit" className={btnPrimary} disabled={!!busy || !text.trim()}>
-                {busy === "note" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : "Add note"}
-              </button>
+              <Input className={cn(input, "flex-1")} value={text} onChange={(e) => setText(e.target.value)} placeholder="Add a note (also attached to Resolve / Reopen)" aria-label="Note" maxLength={2000} />
+              <Button type="submit" variant="lime" className={btn} disabled={!!busy || !text.trim()}>
+                {busy === "note" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : "Add note"}
+              </Button>
             </form>
 
             <h3 className="mt-6 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Timeline</h3>
@@ -807,8 +786,7 @@ function IncidentDrawer({ id, me, onClose, onChanged }: { id: string; me: { id: 
             </ul>
           </>
         )}
-      </div>
-    </div>
+    </Sheet>
   );
 }
 
@@ -819,47 +797,22 @@ function SettingsPanel({ data, isSuper, support, pushHere, busy, onClose, onTogg
   const [email, setEmail] = useState(cfg?.alertEmail ?? "");
   const [muted, setMuted] = useState<string[]>(cfg?.muted ?? []);
   const [intervals, setIntervals] = useState<Record<string, number>>(cfg?.intervals ?? {});
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    box.current?.focus();
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [onClose]);
   const monitored = data.services.filter((s) => s.monitored);
   const pushWord = support === "unsupported" ? "This browser cannot show Outlly notifications." : support === "ios-needs-install" ? "On iPhone and iPad, add Outlly to the Home Screen first; Safari tabs cannot receive pushes." : pushHere ? "Alert pushes are on for this device." : "Alerts reach this device only after you turn pushes on here.";
   return (
-    <div className="fixed inset-0 z-[70] flex justify-end bg-foreground/30" onClick={onClose} role="presentation">
-      <div ref={box} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="set-dlg-title" className="flex h-full w-full max-w-[560px] flex-col overflow-y-auto bg-card p-5 shadow-2xl outline-none sm:p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <p className="eyebrow mb-1 text-[11px]">Watchdog</p>
-            <h2 id="set-dlg-title" className="font-display text-[1.15rem] font-semibold leading-tight">
-              Alerts & settings
-            </h2>
-          </div>
-          <button type="button" className={cn(btnQuiet, "size-11 rounded-full px-0")} onClick={onClose} aria-label="Close">
-            <X className="size-4" aria-hidden />
-          </button>
-        </div>
-
+    <Sheet open onOpenChange={(o) => !o && onClose()} title="Alerts & settings" description="Watchdog" className="lg:w-[560px]">
         <section aria-labelledby="set-push" className="rounded-[18px] border border-border p-4">
           <h3 id="set-push" className="flex items-center gap-2 text-[14px] font-semibold">
             <BellRing className="size-4" aria-hidden /> Alert pushes on this device
           </h3>
           <p className="mt-1 text-[13px] text-muted-foreground">{pushWord} Pushes are sent by the server, so they arrive with the admin console closed or after you sign out. Only super admins receive incident alerts; the test below goes to your own devices.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" className={pushHere ? btnQuiet : btnPrimary} disabled={busy === "push" || support !== "supported"} onClick={() => void onTogglePush()}>
-              {busy === "push" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null} {pushHere ? "Turn off on this device" : "Turn on alert pushes here"}
-            </button>
-            <button type="button" className={btnQuiet} disabled={busy === "test" || !data.devices.length} onClick={() => void onTest()}>
-              {busy === "test" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null} Send a test alert
-            </button>
+            <Button type="button" variant={pushHere ? "subtle" : "lime"} className={btn} disabled={busy === "push" || support !== "supported"} onClick={() => void onTogglePush()}>
+              {busy === "push" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null} {pushHere ? "Turn off on this device" : "Turn on alert pushes here"}
+            </Button>
+            <Button type="button" className={btn} disabled={busy === "test" || !data.devices.length} onClick={() => void onTest()}>
+              {busy === "test" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null} Send a test alert
+            </Button>
           </div>
           <h4 className="mt-4 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Your alert devices</h4>
           <ul className="mt-1.5 divide-y divide-border/60">
@@ -873,9 +826,9 @@ function SettingsPanel({ data, isSuper, support, pushHere, busy, onClose, onTogg
                     {dv.failures ? `, ${dv.failures} refused` : ""}
                   </span>
                 </span>
-                <button type="button" className={cn(btnQuiet, "min-h-9 px-3 text-[12px]")} onClick={() => void onRemoveDevice(dv.id)}>
+                <Button type="button" size="sm" className={cn(btn, "min-h-9 px-3 text-[12px]")} onClick={() => void onRemoveDevice(dv.id)}>
                   Remove
-                </button>
+                </Button>
               </li>
             ))}
             {!data.devices.length && <li className="py-2 text-[13px] text-muted-foreground">None yet.</li>}
@@ -891,17 +844,17 @@ function SettingsPanel({ data, isSuper, support, pushHere, busy, onClose, onTogg
             }}
           >
             <h3 className="text-[14px] font-semibold">Watchdog settings</h3>
-            <label className="mt-3 flex items-center justify-between gap-3 text-[13.5px]">
+            <div className="mt-3 flex items-center justify-between gap-3 text-[13.5px]">
               <span>
                 Monitoring on
-                <span className="block text-[12px] text-muted-foreground">Off stops checks and alerts. Incidents stay as they are.</span>
+                <span id="h-mon-d" className="block text-[12px] text-muted-foreground">Off stops checks and alerts. Incidents stay as they are.</span>
               </span>
-              <input type="checkbox" className="size-5" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-            </label>
+              <Switch on={enabled} onChange={setEnabled} label="Monitoring on" describedBy="h-mon-d" />
+            </div>
             <label className="mt-4 block text-[13.5px]">
               Email backup for critical alerts
               <span className="block text-[12px] text-muted-foreground">Used only when no alert device accepts a push. Blank turns the backup off.</span>
-              <input type="email" className={cn(field, "mt-1.5 w-full")} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ops@example.com" />
+              <Input type="email" className={cn(input, "mt-1.5")} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ops@example.com" />
             </label>
             <h4 className="mt-5 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Check frequency and muting</h4>
             <p className="mt-1 text-[12px] text-muted-foreground">Minimum 60 s: the engine runs from the minute cron, so nothing is checked more often than once a minute. A muted service is still checked and recorded, never alerted.</p>
@@ -912,26 +865,26 @@ function SettingsPanel({ data, isSuper, support, pushHere, busy, onClose, onTogg
                   <span className="flex items-center gap-2">
                     <label className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
                       every
-                      <input type="number" min={60} max={3600} step={30} className={cn(field, "min-h-9 w-[90px] px-2")} value={intervals[s.id] ?? data.intervalsDefault[s.id] ?? 60} onChange={(e) => setIntervals({ ...intervals, [s.id]: Math.max(60, Math.min(3600, Number(e.target.value) || 60)) })} aria-label={`${s.name} check interval in seconds`} />
+                      <Input type="number" min={60} max={3600} step={30} className={cn(input, "h-9 w-[90px] px-2 touch:h-11")} value={intervals[s.id] ?? data.intervalsDefault[s.id] ?? 60} onChange={(e) => setIntervals({ ...intervals, [s.id]: Math.max(60, Math.min(3600, Number(e.target.value) || 60)) })} aria-label={`${s.name} check interval in seconds`} />
                       s
                     </label>
-                    <label className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
-                      <input type="checkbox" className="size-4" checked={muted.includes(s.id)} onChange={(e) => setMuted(e.target.checked ? [...muted, s.id] : muted.filter((x) => x !== s.id))} /> mute
-                    </label>
+                    <span className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+                      <Switch on={muted.includes(s.id)} onChange={(v) => setMuted(v ? [...muted, s.id] : muted.filter((x) => x !== s.id))} label={`Mute ${s.name}`} />
+                      <span aria-hidden>mute</span>
+                    </span>
                   </span>
                 </li>
               ))}
             </ul>
             <div className="mt-4 flex justify-end">
-              <button type="submit" className={btnPrimary} disabled={busy === "config"}>
-                {busy === "config" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null} Save settings
-              </button>
+              <Button type="submit" variant="lime" className={btn} disabled={busy === "config"}>
+                {busy === "config" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null} Save settings
+              </Button>
             </div>
           </form>
         ) : (
           <p className="mt-4 text-[13px] text-muted-foreground">Check frequencies, muting and the email backup are set by a super admin.</p>
         )}
-      </div>
-    </div>
+    </Sheet>
   );
 }

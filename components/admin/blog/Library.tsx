@@ -26,11 +26,11 @@ export function Library({ posts }: { posts: BlogPostView[] }) {
   }, [posts, f, q]);
   const counts = useMemo(() => Object.fromEntries(FILTERS.map(([k]) => [k, k === "all" ? posts.length : posts.filter((p) => p.status === k).length])), [posts]);
   return (
-    <Card>
+    <Card className="min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div role="tablist" aria-label="Status filter" className="flex flex-wrap gap-1 rounded-full bg-secondary p-1">
           {FILTERS.map(([k, label]) => (
-            <button key={k} role="tab" type="button" aria-selected={f === k} onClick={() => setF(k)} className={cn("min-h-10 rounded-full px-3.5 text-[13px] font-medium", f === k ? "bg-card shadow-sm" : "text-muted-foreground")}>
+            <button key={k} role="tab" type="button" aria-selected={f === k} onClick={() => setF(k)} className={cn("min-h-11 rounded-full px-3.5 text-[13px] font-medium transition-colors duration-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", f === k ? "bg-card shadow-sm" : "text-muted-foreground")}>
               {label} <span className="tabular-nums text-muted-foreground">{counts[k]}</span>
             </button>
           ))}

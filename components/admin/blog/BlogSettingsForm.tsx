@@ -8,6 +8,7 @@ import { adminApi } from "@/lib/client/admin-api";
 import { cn } from "@/lib/utils";
 import { BLOG_TONES, blogConfigIssues, type BlogConfig, type BlogFeatureRef } from "@/lib/blog/config";
 import { Card, CardTitle, Pill } from "../ui";
+import { Switch } from "@/components/admin/Switch";
 
 /** R1175 Blog settings: who the agent writes for, what it may say, and when it runs. Publishing stays manual. */
 export function BlogSettingsForm({ initial, ready, web, modelLabel }: { initial: BlogConfig; ready: boolean; web: boolean; modelLabel: string }) {
@@ -56,7 +57,7 @@ export function BlogSettingsForm({ initial, ready, web, modelLabel }: { initial:
             {saved.paused ? "Resume agent" : "Pause agent"}
           </Button>
           <Button type="submit" variant="lime" className="min-h-11" disabled={!dirty || busy || issues.length > 0}>
-            {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />} Save settings
+            {busy && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />} Save settings
           </Button>
         </div>
         {(err || issues[0]) && (
@@ -102,7 +103,7 @@ export function BlogSettingsForm({ initial, ready, web, modelLabel }: { initial:
           <div className="mt-4 grid gap-4">
             <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-secondary/60 px-3 text-[14px]">
               <span className="font-medium">Generate a draft every morning</span>
-              <input type="checkbox" className="h-5 w-5" checked={c.schedule.enabled} onChange={(e) => set("schedule", { ...c.schedule, enabled: e.target.checked })} />
+              <Switch on={c.schedule.enabled} onChange={(v) => set("schedule", { ...c.schedule, enabled: v })} label="Generate a draft every morning" />
             </label>
             <div className="grid grid-cols-2 gap-4">
               <F id="start" label="Start at">
@@ -122,7 +123,7 @@ export function BlogSettingsForm({ initial, ready, web, modelLabel }: { initial:
             </div>
             <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-secondary/60 px-3 text-[14px]">
               <span className="font-medium">Live web research during the research stage</span>
-              <input type="checkbox" className="h-5 w-5" checked={c.webResearch} onChange={(e) => set("webResearch", e.target.checked)} disabled={!web} />
+              <Switch on={c.webResearch} onChange={(v) => set("webResearch", v)} label="Live web research during the research stage" disabled={!web} />
             </label>
             <p className="rounded-xl border border-dashed border-border p-3 text-[12.5px] text-muted-foreground">Auto-publish: off, and not available. Every article needs Approve &amp; Publish from an admin.</p>
           </div>

@@ -6,6 +6,8 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/Toast";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { Empty, Pill, Table, type Tone } from "@/components/admin/ui";
+import { Button } from "@/components/ui/button";
+import { Input, Label, Textarea } from "@/components/ui/field";
 import { adminApi } from "@/lib/client/admin-api";
 import { DRAFTS, LISTS, type LeadKind, type Temp } from "@/lib/growth/core";
 import { cn } from "@/lib/utils";
@@ -124,19 +126,21 @@ export function LeadLists({ lists, total }: { lists: Record<LeadKind, LeadView[]
             {TEMPS.map((t) => {
               const n = t ? all.filter((l) => l.temp === t).length : all.length;
               return (
-                <button key={t || "all"} type="button" aria-pressed={temp === t} onClick={() => { setTemp(t); setPicked(new Set()); }} className={cn("h-11 rounded-full px-3.5 text-[12.5px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", temp === t ? "bg-foreground text-background" : "bg-secondary/60 text-muted-foreground hairline hover:text-foreground")}>
+                <Button key={t || "all"} type="button" size="sm" variant={temp === t ? "primary" : "subtle"} aria-pressed={temp === t} onClick={() => { setTemp(t); setPicked(new Set()); }} className={cn("h-11 px-3.5 text-[12.5px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", temp !== t && "text-muted-foreground hover:text-foreground")}>
                   {t ? t.charAt(0).toUpperCase() + t.slice(1) : "All"} <span className="tabular">{n}</span>
-                </button>
+                </Button>
               );
             })}
           </div>
           <div className="flex flex-wrap gap-2">
-            <a href={exportHref} download className="inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold hairline hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-              <Download className="h-4 w-4" aria-hidden /> Export CSV
-            </a>
-            <button type="button" disabled={!picked.size} onClick={() => setCompose([...picked])} className="lime-bg inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            <Button asChild variant="outline" className="gap-1.5 px-4 text-[13px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+              <a href={exportHref} download>
+                <Download className="h-4 w-4" aria-hidden /> Export CSV
+              </a>
+            </Button>
+            <Button type="button" variant="lime" disabled={!picked.size} onClick={() => setCompose([...picked])} className="gap-1.5 px-4 text-[13px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
               <Mail className="h-4 w-4" aria-hidden /> Email {picked.size ? picked.size : "selected"}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -173,9 +177,9 @@ export function LeadLists({ lists, total }: { lists: Record<LeadKind, LeadView[]
                   <td className="text-[13px]">{l.detail}{l.emailedAt && <span className="block text-[12px] text-muted-foreground">Emailed {short(l.emailedAt)}</span>}</td>
                   <td className="text-right">
                     {ok ? (
-                      <button type="button" onClick={() => setCompose([l.ref])} aria-label={`Email ${who}`} className="inline-flex h-11 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-[12.5px] font-semibold hairline hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                      <Button type="button" variant="outline" size="sm" onClick={() => setCompose([l.ref])} aria-label={`Email ${who}`} className="h-11 gap-1.5 px-3.5 text-[12.5px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                         <Mail className="h-3.5 w-3.5" aria-hidden /> Email
-                      </button>
+                      </Button>
                     ) : (
                       <span className="text-[12px] text-muted-foreground">Wait a week</span>
                     )}
@@ -202,16 +206,16 @@ export function LeadLists({ lists, total }: { lists: Record<LeadKind, LeadView[]
         extra={
           <div className="mt-4 grid gap-3 text-left">
             <div>
-              <label htmlFor={ids.subject} className="mb-1.5 block text-[13px] font-semibold">Subject</label>
-              <input id={ids.subject} value={draft.subject} maxLength={120} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} className="h-11 w-full rounded-2xl bg-background px-3.5 text-[14px] hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" />
+              <Label htmlFor={ids.subject} className="mb-1.5 font-semibold text-foreground">Subject</Label>
+              <Input id={ids.subject} value={draft.subject} maxLength={120} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} className="h-11 px-3.5 text-[14px]" />
             </div>
             <div>
-              <label htmlFor={ids.body} className="mb-1.5 block text-[13px] font-semibold">Message</label>
-              <textarea id={ids.body} value={draft.body} maxLength={4000} rows={8} onChange={(e) => setDraft({ ...draft, body: e.target.value })} className="w-full resize-y rounded-2xl bg-background px-3.5 py-2.5 text-[14px] leading-relaxed hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" />
+              <Label htmlFor={ids.body} className="mb-1.5 font-semibold text-foreground">Message</Label>
+              <Textarea id={ids.body} value={draft.body} maxLength={4000} rows={8} onChange={(e) => setDraft({ ...draft, body: e.target.value })} className="resize-y px-3.5 py-2.5 text-[14px]" />
             </div>
             <div>
-              <label htmlFor={ids.cta} className="mb-1.5 block text-[13px] font-semibold">Button label</label>
-              <input id={ids.cta} value={draft.cta} maxLength={40} onChange={(e) => setDraft({ ...draft, cta: e.target.value })} className="h-11 w-full rounded-2xl bg-background px-3.5 text-[14px] hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" />
+              <Label htmlFor={ids.cta} className="mb-1.5 font-semibold text-foreground">Button label</Label>
+              <Input id={ids.cta} value={draft.cta} maxLength={40} onChange={(e) => setDraft({ ...draft, cta: e.target.value })} className="h-11 px-3.5 text-[14px]" />
               <p className="mt-1 text-[12px] text-muted-foreground">The button opens {kind === "waitlist" ? "their personal signup invite" : <code>{DRAFTS[kind].path}</code>}.</p>
             </div>
           </div>

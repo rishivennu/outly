@@ -124,7 +124,7 @@ export function BlogCalendar({ initial, ready }: { initial: BlogCalendarMonth; r
         <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Legend">
           {Object.entries(CAL_STATUS).map(([k, s]) => (
             <li key={k}>
-              <Pill tone={s.tone}>{s.label}</Pill>
+              <Pill tone={s.tone}><StatusDot />{s.label}</Pill>
             </li>
           ))}
           <li>
@@ -167,9 +167,9 @@ export function BlogCalendar({ initial, ready }: { initial: BlogCalendarMonth; r
                         ))}
                       </ul>
                       {d.items.length > MAX_IN_CELL && (
-                        <button type="button" onClick={() => setSel(d.date)} className="min-h-8 rounded-lg px-1 text-left text-[12px] underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setSel(d.date)} className="h-8 justify-start rounded-lg px-1 text-[12px] text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                           {d.items.length - MAX_IN_CELL} more
-                        </button>
+                        </Button>
                       )}
                     </div>
                   ) : (
@@ -220,7 +220,7 @@ function DayButton({ d, cal, sel, onPick, onKey, wide = false }: { d: BlogCalend
       aria-pressed={d.date === sel}
       onClick={() => onPick(d.date)}
       onKeyDown={onKey ? (e) => onKey(e, d.date) : undefined}
-      className={cn("flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-xl px-1.5 text-left hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", wide && "justify-between")}
+      className={cn("flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-xl px-1.5 text-left transition-colors duration-hover hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", wide && "justify-between")}
     >
       <span className={cn("text-[14px] font-semibold tabular-nums", d.date < cal.today && "text-muted-foreground")}>{wide ? fmtYmd(d.date, { weekday: "short", day: "numeric", month: "short" }) : Number(d.date.slice(8))}</span>
       <span className="flex flex-wrap items-center gap-1" aria-hidden>
@@ -232,11 +232,16 @@ function DayButton({ d, cal, sel, onPick, onKey, wide = false }: { d: BlogCalend
   );
 }
 
+/** The kit badge carries a dot; these tones are the calendar's own, so the dot takes the word's colour. */
+export function StatusDot() {
+  return <span data-dot="" aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" />;
+}
+
 function ItemLink({ it, compact = false }: { it: BlogCalendarItem; compact?: boolean }) {
   const s = CAL_STATUS[it.status] ?? { label: it.status, tone: "muted" as const };
   return (
     <Link href={it.href} title={it.title} className={cn("group flex min-w-0 rounded-lg px-1 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", compact ? "flex-col items-start gap-0.5" : "min-h-11 items-center gap-2")}>
-      <Pill tone={s.tone} className={cn(compact && "h-5 px-2 text-[10.5px]")}>{s.label}</Pill>
+      <Pill tone={s.tone} className={cn(compact && "h-5 px-2 text-[10.5px]")}><StatusDot />{s.label}</Pill>
       <span className="w-full min-w-0 truncate text-[12.5px] underline underline-offset-4">{it.title}</span>
     </Link>
   );
@@ -257,7 +262,7 @@ function DayPanel({ day, cal, ready, busy, onGenerate, onSkip, onChanged }: { da
           {day.items.map((it) => (
             <li key={it.kind + it.id} className="rounded-xl border border-border p-3">
               <div className="flex flex-wrap items-center gap-2">
-                <Pill tone={(CAL_STATUS[it.status] ?? CAL_STATUS.cancelled).tone}>{CAL_STATUS[it.status]?.label ?? it.status}</Pill>
+                <Pill tone={(CAL_STATUS[it.status] ?? CAL_STATUS.cancelled).tone}><StatusDot />{CAL_STATUS[it.status]?.label ?? it.status}</Pill>
                 <Link href={it.href} className="min-w-0 font-medium underline underline-offset-4">
                   {it.title}
                 </Link>

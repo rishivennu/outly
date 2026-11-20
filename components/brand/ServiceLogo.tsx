@@ -15,9 +15,29 @@ const MARK = {
 
 export type Service = keyof typeof MARK | "upi" | "mock";
 
-/** A brand tile. Decorative: the option or heading next to it already says the name. */
-export function ServiceLogo({ service, size = 36, className }: { service: Service; size?: number; className?: string }) {
+/**
+ * A brand tile. Decorative: the option or heading next to it already says the name. R1271: `surface="transparent"`
+ * drops the white plate behind PayPal and UPI (the coloured tiles are the brand's own mark and stay), so the admin
+ * shows no white logo plates.
+ */
+export function ServiceLogo({ service, size = 36, className, surface = "tile" }: { service: Service; size?: number; className?: string; surface?: "tile" | "transparent" }) {
   const box = cn("inline-grid shrink-0 place-items-center overflow-hidden rounded-[28%] shadow-[0_0_0_1px_hsl(var(--foreground)/.12)]", className);
+  const bare = cn("inline-grid shrink-0 place-items-center", className);
+  if (surface === "transparent" && service === "upi")
+    return (
+      <span className={bare} style={{ width: size, height: size }} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/pay/upi.webp" alt="" width={181} height={64} decoding="async" style={{ height: size * 0.4, width: "auto" }} />
+      </span>
+    );
+  if (surface === "transparent" && service === "paypal")
+    return (
+      <span className={cn(bare, "text-[#003087] dark:text-[#009CDE]")} style={{ width: size, height: size }} aria-hidden="true">
+        <svg viewBox="0 0 24 24" style={{ width: size * 0.64, height: size * 0.64 }} fill="currentColor">
+          <path d={MARK.paypal.d} />
+        </svg>
+      </span>
+    );
   if (service === "mock")
     return (
       <span className={cn(box, "bg-secondary text-muted-foreground")} style={{ width: size, height: size }} aria-hidden="true">

@@ -6,7 +6,7 @@ import { Input, Label } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { adminApi } from "@/lib/client/admin-api";
 import { cn } from "@/lib/utils";
-import { Card, CardTitle, Pill } from "./ui";
+import { Card, CardTitle, Pill, Tooltip } from "./ui";
 import { ServiceLogo, type Service } from "@/components/brand/ServiceLogo";
 
 export type Secret = { set: boolean; last4: string };
@@ -39,9 +39,9 @@ export function SecretField({ id, label, saved, value, onChange, placeholder }: 
       ) : (
         <div className="flex h-12 items-center gap-2 rounded-2xl bg-secondary/40 px-4 text-[13.5px] hairline">
           <span className="flex-1 font-mono text-muted-foreground">{value === null ? "Will be removed on save" : saved.set ? `•••••••••••• ${saved.last4}` : "Not set"}</span>
-          <button type="button" onClick={() => onChange("")} className="rounded-full px-2.5 py-1 text-[12.5px] font-semibold hover:bg-secondary">{saved.set ? "Replace" : "Add"}</button>
-          {saved.set && value !== null && <button type="button" onClick={() => onChange(null)} className="rounded-full px-2.5 py-1 text-[12.5px] text-destructive hover:bg-destructive/10">Remove</button>}
-          {value === null && <button type="button" onClick={() => onChange(undefined)} className="rounded-full px-2.5 py-1 text-[12.5px] hover:bg-secondary">Undo</button>}
+          <Button type="button" variant="ghost" size="sm" onClick={() => onChange("")} className="h-9 px-2.5 text-[12.5px] font-semibold text-foreground">{saved.set ? "Replace" : "Add"}</Button>
+          {saved.set && value !== null && <Button type="button" variant="danger" size="sm" onClick={() => onChange(null)} className="h-9 px-2.5 text-[12.5px]">Remove</Button>}
+          {value === null && <Button type="button" variant="ghost" size="sm" onClick={() => onChange(undefined)} className="h-9 px-2.5 text-[12.5px] text-foreground">Undo</Button>}
         </div>
       )}
     </div>
@@ -54,10 +54,10 @@ function Choice<T extends string>({ value, onChange, options, label }: { value: 
       {options.map((o) => {
         const on = value === o.value;
         return (
-          <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => onChange(o.value)} className={cn("relative rounded-[20px] p-4 text-left transition-all duration-300 hairline", on ? "bg-lime/[0.08] ring-2 ring-lime" : "hover:bg-secondary/50")}>
+          <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => onChange(o.value)} className={cn("relative min-h-11 rounded-[20px] p-4 text-left transition-[background-color,box-shadow] duration-hover hairline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-lime/[0.08] ring-2 ring-lime" : "hover:bg-secondary/50")}>
             <span className="flex items-center justify-between gap-2">
               <span className="flex min-w-0 items-center gap-2.5">
-                {o.logo && <ServiceLogo service={o.logo} size={34} />}
+                {o.logo && <ServiceLogo service={o.logo} size={34} surface="transparent" />}
                 <span className="font-display text-[15px] font-semibold">{o.title}</span>
               </span>
               {o.badge && <Pill tone={on ? "lime" : "muted"}>{o.badge}</Pill>}
@@ -89,7 +89,9 @@ export function CopyRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-center gap-2 rounded-2xl bg-secondary/40 px-3 py-2 hairline">
       <span className="shrink-0 text-[12px] font-semibold text-muted-foreground">{label}</span>
       <code className="min-w-0 flex-1 truncate text-[12.5px]">{value}</code>
-      <button type="button" aria-label={`Copy ${label}`} onClick={() => navigator.clipboard.writeText(value).then(() => toast("Copied"))} className="grid h-8 w-8 place-items-center rounded-full hover:bg-secondary"><Copy className="h-3.5 w-3.5" /></button>
+      <Tooltip text={`Copy ${label}`}>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label={`Copy ${label}`} onClick={() => navigator.clipboard.writeText(value).then(() => toast("Copied"))} className="shrink-0"><Copy className="h-3.5 w-3.5" aria-hidden /></Button>
+      </Tooltip>
     </div>
   );
 }
@@ -214,7 +216,7 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
               <div className="flex flex-wrap items-center gap-3">
                 <div role="radiogroup" aria-label="Mode" className="inline-flex rounded-full bg-secondary/60 p-1 hairline">
                   {(["test", "live"] as const).map((v) => (
-                    <button key={v} type="button" role="radio" aria-checked={p.mode === v} onClick={() => setP((x) => ({ ...x, mode: v }))} className={cn("h-9 rounded-full px-4 text-[13px] font-semibold capitalize transition-all", p.mode === v ? (v === "live" ? "bg-success text-white" : "lime-bg") : "text-muted-foreground")}>
+                    <button key={v} type="button" role="radio" aria-checked={p.mode === v} onClick={() => setP((x) => ({ ...x, mode: v }))} className={cn("min-h-11 rounded-full px-4 text-[13px] font-semibold capitalize transition-colors duration-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", p.mode === v ? (v === "live" ? "bg-success text-white" : "lime-bg") : "text-muted-foreground")}>
                       {v} mode
                     </button>
                   ))}
@@ -281,7 +283,7 @@ export function IntegrationsForm({ payments, email, webhooks }: { payments: Pay;
                   <div className="sm:col-span-2">
                     <div role="radiogroup" aria-label="Confirm a payment after" className="inline-flex rounded-full bg-secondary/60 p-1 hairline">
                       {([1, 2] as const).map((v) => (
-                        <button key={v} type="button" role="radio" aria-checked={p.ypLevel === v} onClick={() => setP((x) => ({ ...x, ypLevel: v }))} className={cn("min-h-[40px] rounded-full px-4 text-[13px] font-semibold transition-all", p.ypLevel === v ? "lime-bg" : "text-muted-foreground")}>
+                        <button key={v} type="button" role="radio" aria-checked={p.ypLevel === v} onClick={() => setP((x) => ({ ...x, ypLevel: v }))} className={cn("min-h-11 rounded-full px-4 text-[13px] font-semibold transition-colors duration-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", p.ypLevel === v ? "lime-bg" : "text-muted-foreground")}>
                           {v === 1 ? "1 bank alert" : "SMS and email both"}
                         </button>
                       ))}

@@ -52,7 +52,7 @@ export default async function GrowthPage(props: { searchParams: Promise<{ r?: st
         <p className="mt-3 text-[12px] text-muted-foreground">Waitlist and signups are counted separately: when the waitlist is off, people sign up without joining it, so step 2 can be bigger than step 1.</p>
       </Card>
 
-      <Card data-enter className="mb-5">
+      <Card data-enter className="mb-5 min-w-0">
         <CardTitle hint="Scored hot, warm or cold by how recent and how active they are. Each list has a ready-written email that lands in the Outbox, and a CSV export.">Lead lists</CardTitle>
         <LeadLists lists={byKind} total={totals} />
       </Card>

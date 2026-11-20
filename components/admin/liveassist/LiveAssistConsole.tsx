@@ -1,12 +1,15 @@
 "use client";
 import { fmtHandle } from "@/lib/handle";
-import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowDown, ArrowLeft, BarChart3, BellRing, Check, CheckCheck, Clock, Headset, Loader2, Maximize2, Minimize2, PanelRight, Plug, RotateCcw, Send, StickyNote, UserRound, Volume2, VolumeX, X } from "lucide-react";
 import { useToast } from "@/components/shared/Toast";
-import { Pill, STATUS_LABEL, ago, fmtDate, type Tone } from "@/components/admin/ui";
-import { PlatformGlyph } from "@/components/shared/PlatformIcon";
+import { LoadingState, Pill, STATUS_LABEL, StatusBadge, Tooltip, ago, fmtDate, type Tone } from "@/components/admin/ui";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/field";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { isPlatform } from "@/lib/domain";
 import { chime, setSound, soundOn, SOUND_EVENT } from "@/lib/client/live-sound";
 import { adminPushFlag, disableAdminPush, enableAdminPush, syncAdminPush } from "@/lib/client/admin-push";
@@ -62,15 +65,12 @@ const SORTS: { value: QueueSort; label: string }[] = [
 ];
 const PRIORITY_LABEL: Record<string, string> = { normal: "Normal", high: "High", urgent: "Urgent" };
 const PRIORITY_TONE: Record<string, Tone> = { normal: "muted", high: "warn", urgent: "bad" };
-const STATUS_TONE: Record<string, Tone> = { waiting: "warn", active: "ok", resolved: "info", cancelled: "muted", returned: "muted", ticket: "muted" };
 const statusWord = (s: string) => STATUS_WORD[s as SessionStatus] ?? s;
 const catWord = (c: string) => CATEGORY_LABEL[c as LiveCategory] ?? c;
 const isOpen = (s: string) => s === "waiting" || s === "active";
 const ring = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]";
-const btn = cn("inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-4 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50", ring);
-const btnPrimary = cn(btn, "bg-foreground text-background hover:bg-foreground/90");
-const btnQuiet = cn(btn, "bg-secondary text-foreground hover:bg-secondary/70");
-const btnDanger = cn(btn, "bg-destructive text-destructive-foreground hover:bg-destructive/90");
+// R1271: colour and press come from the shared Button variant; this only keeps the console's 44px, 13px shape.
+const btn = cn("inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-4 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-50", ring);
 const field = cn("min-h-11 rounded-2xl border border-border bg-background px-3 text-[13px]", ring);
 // One shape for every control on the bar and in the chat header, so a row of them lines up at any width.
 const btnChip = cn(btn, "px-3.5");
@@ -183,7 +183,7 @@ function Counter({ label, n, on, onClick, tone }: { label: string; n: number; on
 }
 
 function QueueList({ rows, sel, onPick, now, meId, loading }: { rows: QueueRow[]; sel: string | null; onPick: (id: string) => void; now: number; meId: string; loading: boolean }) {
-  if (loading) return <p className="px-4 py-10 text-center text-[13px] text-muted-foreground">Loading the queue</p>;
+  if (loading) return <LoadingState label="Loading the queue" className="m-2 bg-transparent" />;
   if (!rows.length)
     return (
       <div className="px-5 py-10 text-center">
@@ -222,7 +222,7 @@ function QueueList({ rows, sel, onPick, now, meId, loading }: { rows: QueueRow[]
                 <span className="block truncate text-[11.5px] text-muted-foreground">{r.customer?.email ?? "Account removed"}</span>
                 <span className="mt-1 line-clamp-2 text-[12.5px] leading-snug text-foreground/80">{r.typing ? "Typing a message" : r.preview || "No message yet"}</span>
                 <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  <Pill tone={STATUS_TONE[r.status] ?? "muted"}>{statusWord(r.status)}</Pill>
+                  <StatusBadge status={r.status} label={statusWord(r.status)} />
                   {r.priority !== "normal" && <Pill tone={PRIORITY_TONE[r.priority]}>{PRIORITY_LABEL[r.priority] ?? r.priority}</Pill>}
                   <Pill>{catWord(r.category)}</Pill>
                   <span className="text-[11px] text-muted-foreground">{r.agentName ? (r.agentId === meId ? "You" : r.agentName) : "Unassigned"}</span>
@@ -255,14 +255,14 @@ function Reports({ data, days, setDays }: { data: QueueData["analytics"]; days: 
         </h2>
         <div className="flex gap-1" role="group" aria-label="Period">
           {[1, 7, 30, 90].map((d) => (
-            <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d)} className={cn(btn, "px-3 text-[12px]", days === d ? "bg-foreground text-background" : "bg-secondary text-foreground hover:bg-secondary/70")}>
+            <Button key={d} type="button" size="sm" variant={days === d ? "primary" : "subtle"} aria-pressed={days === d} onClick={() => setDays(d)} className={cn(btn, "px-3 text-[12px]")}>
               {d === 1 ? "Today" : `${d} days`}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
       {!data ? (
-        <p className="text-[13px] text-muted-foreground">Loading</p>
+        <LoadingState lines={2} label="Loading the reports" className="p-0 bg-transparent shadow-none sm:p-0" />
       ) : (
         <>
           <div className="grid grid-cols-2 items-stretch gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
@@ -309,39 +309,6 @@ function Reports({ data, days, setDays }: { data: QueueData["analytics"]; days: 
         </>
       )}
     </section>
-  );
-}
-
-/** Confirm step for Resolve. Focus starts on the safe choice; Escape and the backdrop cancel. */
-function Confirm({ title, body, yes, onYes, onNo, busy }: { title: string; body: string; yes: string; onYes: () => void; onNo: () => void; busy: boolean }) {
-  const id = useId();
-  const cancel = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    cancel.current?.focus();
-    const k = (e: KeyboardEvent) => e.key === "Escape" && onNo();
-    document.addEventListener("keydown", k);
-    return () => document.removeEventListener("keydown", k);
-  }, [onNo]);
-  return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-black/40 p-4" onPointerDown={(e) => e.target === e.currentTarget && onNo()}>
-      <div role="alertdialog" aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={`${id}-b`} className="glass-strong w-full max-w-sm rounded-[22px] p-5 shadow-2xl">
-        <h2 id={`${id}-t`} className="font-display text-[16px] font-semibold">
-          {title}
-        </h2>
-        <p id={`${id}-b`} className="mt-1.5 text-[13.5px] text-muted-foreground">
-          {body}
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
-          <button ref={cancel} type="button" onClick={onNo} className={btnQuiet}>
-            Cancel
-          </button>
-          <button type="button" onClick={onYes} disabled={busy} className={btnPrimary}>
-            {busy && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}
-            {yes}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -394,9 +361,9 @@ function Line({ m, r, customer, onRetry }: { m: Msg; r: Receipt | null; customer
       </div>
       {R &&
         (r === "failed" ? (
-          <button type="button" onClick={() => onRetry(m)} className={cn("inline-flex min-h-11 items-center gap-1 rounded-full px-2 text-[11.5px] font-semibold text-destructive hover:underline", ring)}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => onRetry(m)} className={cn("min-h-11 gap-1 px-2 text-[11.5px] font-semibold text-destructive hover:underline", ring)}>
             <AlertTriangle className="h-3.5 w-3.5" aria-hidden /> Not sent. Try again
-          </button>
+          </Button>
         ) : (
           <span className={cn("inline-flex items-center gap-1 px-1 text-[11px]", r === "read" ? "text-foreground" : "text-muted-foreground")}>
             <R.Icon className="h-3.5 w-3.5" aria-hidden /> {R.word}
@@ -475,12 +442,12 @@ function Details({ d, info, onOpen, onNote }: { d: Detail; info: Info | null; on
               <Row label="Last seen">{d.online ? "On the chat now" : ago(u.lastSeenAt)}</Row>
               <Row label="Time zone">{u.timezone}</Row>
             </dl>
-            <Link href={`/admin/users?q=${encodeURIComponent(u.email)}`} className={cn(btnQuiet, "mt-3 w-full")}>
-              Open in Users
-            </Link>
+            <Button asChild className={cn(btn, "mt-3 w-full")}>
+              <Link href={`/admin/users?q=${encodeURIComponent(u.email)}`}>Open in Users</Link>
+            </Button>
           </>
         ) : (
-          <p className="text-[12.5px] text-muted-foreground">{info ? "This account was removed." : "Loading"}</p>
+          info ? <p className="text-[12.5px] text-muted-foreground">This account was removed.</p> : <LoadingState lines={2} label="Loading the customer" className="p-0 bg-transparent shadow-none sm:p-0" />
         )}
       </section>
 
@@ -503,9 +470,13 @@ function Details({ d, info, onOpen, onNote }: { d: Detail; info: Info | null; on
                 const st = accountState(a.status);
                 return (
                   <li key={`${a.platform}-${i}`} className="flex items-center gap-2.5">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-secondary text-foreground/70">
-                      {isPlatform(a.platform) ? <PlatformGlyph platform={a.platform} className="h-4 w-4" /> : <Plug className="h-4 w-4" aria-hidden />}
-                    </span>
+                    {isPlatform(a.platform) ? (
+                      <PlatformOrb platform={a.platform} size={32} />
+                    ) : (
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-secondary text-foreground/70">
+                        <Plug className="h-4 w-4" aria-hidden />
+                      </span>
+                    )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[12.5px] font-medium">{PLAT_LABEL[a.platform] ?? a.platform}</span>
                       <span className="block truncate text-[11.5px] text-muted-foreground">{fmtHandle(a.username)}</span>
@@ -561,23 +532,23 @@ function Details({ d, info, onOpen, onNote }: { d: Detail; info: Info | null; on
           <label htmlFor="la-note" className="sr-only">
             New note, only your team can see it
           </label>
-          <textarea
+          <Textarea
             id="la-note"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             maxLength={NOTE_MAX}
             rows={3}
             placeholder="What should the next person on this chat know? The customer never sees this."
-            className={cn(field, "la-scroll min-h-[5rem] w-full resize-y py-2")}
+            className="la-scroll min-h-[5rem] resize-y px-3 py-2 text-[13px]"
           />
           <div className="flex items-center gap-2">
             <span role="status" className="min-w-0 flex-1 text-[11.5px] text-muted-foreground">
               {saved ? "Note saved." : note.length > NOTE_MAX - 100 ? `${note.length} of ${NOTE_MAX}` : ""}
             </span>
-            <button type="submit" disabled={!note.trim() || saving} className={btnQuiet}>
+            <Button type="submit" variant="lime" disabled={!note.trim() || saving} className={btn}>
               {saving && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}
               {saving ? "Saving" : "Add note"}
-            </button>
+            </Button>
           </div>
         </form>
       </section>
@@ -592,7 +563,7 @@ function Details({ d, info, onOpen, onNote }: { d: Detail; info: Info | null; on
                 <Link href={`/admin/tickets/${t.id}`} className={cn("flex min-h-11 flex-col justify-center gap-0.5 rounded-xl px-2 py-1.5 hover:bg-secondary/60", ring)}>
                   <span className="flex items-center gap-2">
                     <span className={cn("min-w-0 flex-1 truncate font-medium", wrapAny)}>{t.subject}</span>
-                    <Pill tone={t.status === "resolved" ? "muted" : "warn"} className="shrink-0">{t.status}</Pill>
+                    <StatusBadge status={t.status} className="shrink-0" />
                   </span>
                   <span className="text-[11px] text-muted-foreground">
                     Ticket {t.ref} <span aria-hidden>&middot;</span> {fmtDate(t.createdAt)}
@@ -606,7 +577,7 @@ function Details({ d, info, onOpen, onNote }: { d: Detail; info: Info | null; on
                 <button type="button" onClick={() => onOpen(p.id)} className={cn("flex min-h-11 w-full flex-col justify-center gap-0.5 rounded-xl px-2 py-1.5 text-left hover:bg-secondary/60", ring)}>
                   <span className="flex items-center gap-2">
                     <span className="min-w-0 flex-1 truncate font-medium">Live chat, {catWord(p.category).toLowerCase()}</span>
-                    <Pill tone={STATUS_TONE[p.status] ?? "muted"} className="shrink-0">{statusWord(p.status)}</Pill>
+                    <StatusBadge status={p.status} label={statusWord(p.status)} className="shrink-0" />
                   </span>
                   <span className="text-[11px] text-muted-foreground">
                     {fmtDate(p.requestedAt)}
@@ -665,6 +636,8 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
   const [perm, setPerm] = useState("unsupported");
   // R1207: phone alerts (Web Push) for this browser. True only when this browser is really subscribed and allowed.
   const [pushHere, setPushHere] = useState(false);
+  // Read after mount: the server always says "unsupported", so rendering it directly broke hydration (#418).
+  const [canPush, setCanPush] = useState(false);
   const [sel, setSel] = useState<string | null>(null);
   const [d, setD] = useState<Detail | null>(null);
   const [info, setInfo] = useState<Info | null>(null);
@@ -717,6 +690,7 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
   useEffect(() => {
     setSoundUi(soundOn());
     setPerm(notifySupported() ? Notification.permission : "unsupported");
+    setCanPush(pushSupport() !== "unsupported");
     if (adminPushFlag() && permission() === "granted") setPushHere(true);
     const on = (e: Event) => setSoundUi(!!(e as CustomEvent<boolean>).detail);
     window.addEventListener(SOUND_EVENT, on);
@@ -1160,31 +1134,31 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
             <span className="truncate">{q ? `${online} of ${q.agents.length} ${q.agents.length === 1 ? "specialist" : "specialists"} online` : "Checking who is online"}</span>
           </p>
           <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
-            <button type="button" aria-pressed={!!q?.away} disabled={!q || busy === "away"} onClick={toggleAway} className={q?.away ? cn(btnChip, "bg-warning/20 text-foreground hover:bg-warning/30") : btnChip + " bg-secondary text-foreground hover:bg-secondary/70"}>
+            <Button type="button" aria-pressed={!!q?.away} disabled={!q || busy === "away"} onClick={toggleAway} className={cn(btnChip, q?.away && "bg-warning/20 text-foreground hover:bg-warning/30")}>
               <UserRound className="h-4 w-4" aria-hidden />
               {q?.away ? "Away" : "Available"}
-            </button>
-            <button type="button" aria-pressed={sound} onClick={toggleSound} className={cn(btnChip, "bg-secondary text-foreground hover:bg-secondary/70")} aria-label={sound ? "Sound on for new chats, turn off" : "Sound off for new chats, turn on"}>
+            </Button>
+            <Button type="button" aria-pressed={sound} onClick={toggleSound} className={btnChip} aria-label={sound ? "Sound on for new chats, turn off" : "Sound off for new chats, turn on"}>
               {sound ? <Volume2 className="h-4 w-4" aria-hidden /> : <VolumeX className="h-4 w-4" aria-hidden />}
               {sound ? "Sound on" : "Sound off"}
-            </button>
+            </Button>
             {perm === "default" && (
-              <button type="button" onClick={askAlerts} className={cn(btnChip, "bg-secondary text-foreground hover:bg-secondary/70")}>
+              <Button type="button" onClick={askAlerts} className={btnChip}>
                 <BellRing className="h-4 w-4" aria-hidden />
                 Desktop alerts
-              </button>
+              </Button>
             )}
             {/* R1207: a real Web Push subscription for this device, so a request reaches the phone with Outlly closed. */}
-            {pushSupport() !== "unsupported" && (
-              <button type="button" aria-pressed={pushHere} disabled={busy === "push" || (!pushHere && !vapid)} onClick={togglePush} className={pushHere ? cn(btnChip, "bg-success/20 text-foreground hover:bg-success/30") : cn(btnChip, "bg-secondary text-foreground hover:bg-secondary/70")} title={pushHere ? "This device gets a push notification for every new support request. Tap to turn off." : "Get a push notification on this device for every new support request, even with Outlly closed."}>
+            {canPush && (
+              <Button type="button" aria-pressed={pushHere} disabled={busy === "push" || (!pushHere && !vapid)} onClick={togglePush} className={cn(btnChip, pushHere && "bg-success/20 text-foreground hover:bg-success/30")} title={pushHere ? "This device gets a push notification for every new support request. Tap to turn off." : "Get a push notification on this device for every new support request, even with Outlly closed."}>
                 {busy === "push" ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <BellRing className="h-4 w-4" aria-hidden />}
                 {pushHere ? "Phone alerts on" : "Phone alerts"}
-              </button>
+              </Button>
             )}
-            <button type="button" aria-pressed={reports} onClick={() => setReports((x) => !x)} className={reports ? cn(btnChip, "bg-foreground text-background hover:bg-foreground/90") : cn(btnChip, "bg-secondary text-foreground hover:bg-secondary/70")}>
+            <Button type="button" variant={reports ? "primary" : "subtle"} aria-pressed={reports} onClick={() => setReports((x) => !x)} className={btnChip}>
               <BarChart3 className="h-4 w-4" aria-hidden />
               Reports
-            </button>
+            </Button>
           </div>
         </div>
       </section>
@@ -1267,9 +1241,9 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
               {dErr ? (
                 <div>
                   <p className="text-[13.5px] font-semibold">{dErr}</p>
-                  <button type="button" onClick={() => pick(null)} className={cn(btnQuiet, "mt-3")}>
+                  <Button type="button" onClick={() => pick(null)} className={cn(btn, "mt-3")}>
                     Back to the queue
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground motion-reduce:animate-none" aria-label="Loading the chat" />
@@ -1280,9 +1254,11 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
               {/* Three rows, in the order a specialist reads them: who this is, what I can do, how it is filed. */}
               <header className="flex shrink-0 flex-col gap-2.5 border-b border-border p-3">
                 <div className="flex items-center gap-2.5">
-                  <button type="button" onClick={() => pick(null)} aria-label="Back to the queue" className={cn(btnQuiet, iconBtn, "lg:hidden")}>
-                    <ArrowLeft className="h-4 w-4" aria-hidden />
-                  </button>
+                  <Tooltip text="Back to the queue" side="bottom" className="lg:hidden">
+                    <Button type="button" size="icon" onClick={() => pick(null)} aria-label="Back to the queue" className={cn(btn, iconBtn)}>
+                      <ArrowLeft className="h-4 w-4" aria-hidden />
+                    </Button>
+                  </Tooltip>
                   <Avatar name={name} src={info?.user?.avatar} />
                   <div className="min-w-0 flex-1">
                     <h2 className="truncate font-display text-[15px] font-semibold leading-tight">{name}</h2>
@@ -1290,13 +1266,17 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
                       <span className={d.online ? "text-success-ink" : undefined}>{d.online ? "On the chat now" : "Not on the chat"}</span> <span aria-hidden>&middot;</span> {d.conversation.subject || catWord(s.category)}
                     </p>
                   </div>
-                  <Pill tone={STATUS_TONE[s.status] ?? "muted"} className="shrink-0">{statusWord(s.status)}</Pill>
-                  <button type="button" onClick={() => setWide((x) => !x)} aria-pressed={wide} aria-label={wide ? "Show the queue" : "Hide the queue and use the full width"} className={cn(btnQuiet, iconBtn, "hidden lg:inline-flex")}>
-                    {wide ? <Minimize2 className="h-4 w-4" aria-hidden /> : <Maximize2 className="h-4 w-4" aria-hidden />}
-                  </button>
-                  <button type="button" onClick={openDrawer} aria-label="Customer details" aria-expanded={drawer} className={cn(btnQuiet, iconBtn, "xl:hidden")}>
-                    <PanelRight className="h-4 w-4" aria-hidden />
-                  </button>
+                  <StatusBadge status={s.status} label={statusWord(s.status)} className="shrink-0" />
+                  <Tooltip text={wide ? "Show the queue" : "Full width"} side="bottom" className="hidden lg:inline-flex">
+                    <Button type="button" size="icon" onClick={() => setWide((x) => !x)} aria-pressed={wide} aria-label={wide ? "Show the queue" : "Hide the queue and use the full width"} className={cn(btn, iconBtn)}>
+                      {wide ? <Minimize2 className="h-4 w-4" aria-hidden /> : <Maximize2 className="h-4 w-4" aria-hidden />}
+                    </Button>
+                  </Tooltip>
+                  <Tooltip text="Customer details" side="bottom" className="xl:hidden">
+                    <Button type="button" size="icon" onClick={openDrawer} aria-label="Customer details" aria-expanded={drawer} className={cn(btn, iconBtn)}>
+                      <PanelRight className="h-4 w-4" aria-hidden />
+                    </Button>
+                  </Tooltip>
                 </div>
                 {dErr && (
                   <p role="status" className="text-[12px] text-muted-foreground">
@@ -1307,38 +1287,38 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
                   {/* R1207: one primary action on a waiting chat. It assigns this chat to me, turns Waiting into
                       Active, and the customer's Pip chat says a specialist joined. */}
                   {s.status === "waiting" && (!s.agentId || mine) && (
-                    <button type="button" onClick={accept} disabled={!!busy} className={btnPrimary}>
+                    <Button type="button" variant="lime" onClick={accept} disabled={!!busy} className={btn}>
                       {busy === "accept" ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Check className="h-4 w-4" aria-hidden />}
                       Join conversation
-                    </button>
+                    </Button>
                   )}
                   {open && s.agentId && !mine && (
-                    <button type="button" onClick={takeover} disabled={!!busy} className={s.status === "waiting" ? btnPrimary : btnQuiet}>
+                    <Button type="button" variant={s.status === "waiting" ? "lime" : "subtle"} onClick={takeover} disabled={!!busy} className={btn}>
                       Take over
-                    </button>
+                    </Button>
                   )}
                   {canManage && (
-                    <button type="button" onClick={() => void act({ action: "return" }, "Handed back to Pip. The customer was told.")} disabled={!!busy} className={btnQuiet}>
+                    <Button type="button" onClick={() => void act({ action: "return" }, "Handed back to Pip. The customer was told.")} disabled={!!busy} className={btn}>
                       <RotateCcw className="h-4 w-4" aria-hidden />
                       Return to Pip
-                    </button>
+                    </Button>
                   )}
                   {canManage && (
-                    <button type="button" onClick={() => setConfirm(true)} disabled={!!busy} className={btnQuiet}>
+                    <Button type="button" onClick={() => setConfirm(true)} disabled={!!busy} className={btn}>
                       <CheckCheck className="h-4 w-4" aria-hidden />
                       Resolve
-                    </button>
+                    </Button>
                   )}
                   {!open && !d.conversation.openSessionId && (
-                    <button type="button" onClick={reopen} disabled={!!busy} className={btnPrimary}>
+                    <Button type="button" variant="lime" onClick={reopen} disabled={!!busy} className={btn}>
                       <RotateCcw className="h-4 w-4" aria-hidden />
                       Reopen
-                    </button>
+                    </Button>
                   )}
                   {!open && d.conversation.openSessionId && d.conversation.openSessionId !== s.id && (
-                    <button type="button" onClick={() => pick(d.conversation.openSessionId)} className={btnQuiet}>
+                    <Button type="button" onClick={() => pick(d.conversation.openSessionId)} className={btn}>
                       Open the current chat
-                    </button>
+                    </Button>
                   )}
                 </div>
                 <div className="grid grid-cols-3 gap-2">
@@ -1414,10 +1394,12 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
                   )}
                 </div>
                 {!atEnd && (
-                  <button type="button" onClick={toLatest} className={cn(btn, "absolute bottom-3 left-1/2 -translate-x-1/2 border border-border bg-card px-4 shadow-xl hover:bg-secondary")}>
-                    <ArrowDown className="h-4 w-4" aria-hidden />
-                    Latest
-                  </button>
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
+                    <Button type="button" variant="outline" onClick={toLatest} className={cn(btn, "bg-card shadow-xl")}>
+                      <ArrowDown className="h-4 w-4" aria-hidden />
+                      Latest
+                    </Button>
+                  </div>
                 )}
               </div>
 
@@ -1451,9 +1433,11 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
                       aria-describedby="la-reply-hint"
                       className={cn(field, "max-h-40 min-h-11 flex-1 resize-none py-3 leading-snug")}
                     />
-                    <button type="submit" disabled={!text.trim() || sending} aria-label="Send the reply" className={cn(btnPrimary, "h-11 w-11 shrink-0 px-0")}>
-                      {sending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
-                    </button>
+                    <Tooltip text="Send">
+                      <Button type="submit" variant="lime" size="icon" disabled={!text.trim() || sending} aria-label="Send the reply" className="shrink-0">
+                        {sending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
+                      </Button>
+                    </Tooltip>
                   </form>
                 ) : null}
                 {mineActive ? (
@@ -1495,9 +1479,11 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
               <h2 id="la-drawer-t" className="truncate font-display text-[15px] font-semibold">
                 Details
               </h2>
-              <button ref={closeRef} type="button" onClick={closeDrawer} aria-label="Close details" className={cn(btnQuiet, iconBtn)}>
-                <X className="h-4 w-4" aria-hidden />
-              </button>
+              <Tooltip text="Close" side="bottom">
+                <Button ref={closeRef} type="button" size="icon" onClick={closeDrawer} aria-label="Close details" className={cn(btn, iconBtn)}>
+                  <X className="h-4 w-4" aria-hidden />
+                </Button>
+              </Tooltip>
             </div>
             <div className="la-scroll min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
               <Details d={d} info={info} onOpen={pick} onNote={addNote} />
@@ -1506,19 +1492,20 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
         </div>
       )}
 
-      {confirm && d && (
-        <Confirm
-          title="Resolve this chat?"
-          body="The customer is told it's resolved and can rate it or start a new chat. Nothing is deleted, and you can reopen it later."
-          yes="Resolve"
-          busy={busy === "resolve"}
-          onNo={closeConfirm}
-          onYes={async () => {
-            await act({ action: "resolve", confirm: true }, "Resolved. The customer can rate the chat.");
-            setConfirm(false);
-          }}
-        />
-      )}
+      <ConfirmDialog
+        open={confirm && !!d}
+        onOpenChange={(o) => !o && closeConfirm()}
+        title="Resolve this chat?"
+        body="The customer is told it's resolved and can rate it or start a new chat. Nothing is deleted, and you can reopen it later."
+        confirmLabel="Resolve"
+        cancelLabel="Cancel"
+        tone="primary"
+        busy={busy === "resolve"}
+        onConfirm={async () => {
+          await act({ action: "resolve", confirm: true }, "Resolved. The customer can rate the chat.");
+          setConfirm(false);
+        }}
+      />
     </div>
   );
 }

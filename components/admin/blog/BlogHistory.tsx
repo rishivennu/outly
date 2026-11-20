@@ -8,7 +8,8 @@ import { useToast } from "@/components/shared/Toast";
 import { adminApi } from "@/lib/client/admin-api";
 import type { BlogHistoryRow, BlogJobView } from "@/lib/blog/types";
 import { STAGE_LABEL } from "@/lib/blog/types";
-import { Card, CardTitle, Empty, Pill, Table } from "../ui";
+import { Card, CardTitle, Empty, LoadingState, Pill, Table } from "../ui";
+import { StatusDot } from "./BlogCalendar";
 import { HISTORY_STATUS } from "./calendar-grid";
 import { fmtYmd, fmtZoned } from "./zoned";
 
@@ -66,7 +67,7 @@ export function BlogHistory({ timezone, initial, refreshKey, onRetried, onAttach
   }
 
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardTitle hint={`Every run, whoever or whatever started it. Times in ${timezone}.`}>Generation history</CardTitle>
       {err && (
         <p role="alert" className="mb-3 text-[13.5px] text-destructive">
@@ -74,9 +75,7 @@ export function BlogHistory({ timezone, initial, refreshKey, onRetried, onAttach
         </p>
       )}
       {rows === null ? (
-        <p className="text-[13.5px] text-muted-foreground" role="status">
-          Loading runs
-        </p>
+        <LoadingState lines={3} label="Loading runs" className="p-0 bg-transparent sm:p-0" />
       ) : rows.length ? (
         <Table head={["Date", "Started", "Completed", "Topic", "Status", <span key="a" className="sr-only">Action</span>]} label="Generation history" lead={3} minWidth={860}>
           {rows.map((r) => {
@@ -100,7 +99,7 @@ export function BlogHistory({ timezone, initial, refreshKey, onRetried, onAttach
                   )}
                 </td>
                 <td>
-                  <Pill tone={s.tone}>{s.label}</Pill>
+                  <Pill tone={s.tone}><StatusDot />{s.label}</Pill>
                   {secondary && <span className="mt-1 block max-w-[36ch] text-[12px] text-muted-foreground">{secondary}</span>}
                 </td>
                 <td>
@@ -109,9 +108,9 @@ export function BlogHistory({ timezone, initial, refreshKey, onRetried, onAttach
                       {busy === r.jobId ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <RotateCcw className="h-4 w-4" aria-hidden />} Retry
                     </Button>
                   ) : onAttach && LIVE.includes(r.status) && r.jobId !== attachedId ? (
-                    <button type="button" className="min-h-11 underline underline-offset-4" onClick={() => onAttach(r.jobId)}>
+                    <Button type="button" variant="ghost" size="sm" className="min-h-11 text-foreground underline underline-offset-4" onClick={() => onAttach(r.jobId)}>
                       Follow
-                    </button>
+                    </Button>
                   ) : null}
                 </td>
               </tr>

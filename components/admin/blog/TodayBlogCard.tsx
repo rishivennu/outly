@@ -121,8 +121,8 @@ export function TodayBlogCard({ post, job, ready, compact = false, skippedToday 
       {err && <p role="alert" className="mt-3 text-[13px] text-destructive">{err}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button asChild variant="primary"><Link href={`/admin/blog/review/${post.id}`}><PenLine className="size-4" aria-hidden /> Review & Edit</Link></Button>
-        <Button variant="subtle" disabled={busy !== null} onClick={() => setConfirm("rewrite")}>{busy === "rewrite" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />} Regenerate</Button>
-        <Button variant="lime" disabled={busy !== null || blocking.length > 0} title={blocking.length ? "Fix the failing checks on the review desk first" : undefined} onClick={() => setConfirm("publish")}>{busy === "publish" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Check className="size-4" aria-hidden />} Approve & Publish</Button>
+        <Button variant="subtle" disabled={busy !== null} onClick={() => setConfirm("rewrite")}>{busy === "rewrite" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />} Regenerate</Button>
+        <Button variant="lime" disabled={busy !== null || blocking.length > 0} title={blocking.length ? "Fix the failing checks on the review desk first" : undefined} onClick={() => setConfirm("publish")}>{busy === "publish" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Check className="size-4" aria-hidden />} Approve & Publish</Button>
       </div>
       <ConfirmDialog
         open={confirm === "publish"}

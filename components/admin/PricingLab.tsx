@@ -1,12 +1,13 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { adminApi } from "@/lib/client/admin-api";
 import { formatMoney } from "@/lib/billing/money";
-import { Card, CardTitle, Empty, Pill, Table, fmtDate } from "@/components/admin/ui";
+import { Card, CardTitle, Empty, LoadingState, Pill, Table, fmtDate } from "@/components/admin/ui";
+import { Switch as AdminSwitch } from "@/components/admin/Switch";
 import { CANCEL_REASON_LABEL, type CancelReason, type ExperimentsConfig } from "@/lib/billing/experiments-core";
 import { TOPUP_KINDS, type TopUpConfig, type TopUpKind, type TopUpPack } from "@/lib/billing/topups-core";
 
@@ -17,15 +18,16 @@ const pct = (n: number) => `${Math.round(n * 1000) / 10}%`;
 const money = (minor: number | null, cur: string) => (minor == null ? "n/a" : formatMoney(minor, cur));
 const intIn = (v: string, min: number, max: number) => Math.max(min, Math.min(max, Math.floor(Number(v) || 0)));
 
+/** R1271: a labelled row around the shared admin switch; the whole row is the hit area through the label. */
 function Switch({ label, hint, checked, onChange, disabled }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+  const id = useId();
   return (
     <label className="flex min-h-[44px] cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4 py-2 hairline">
       <span className="min-w-0">
         <span className="block text-[14px] font-medium">{label}</span>
-        {hint && <span className="block text-[12px] text-muted-foreground">{hint}</span>}
+        {hint && <span id={id} className="block text-[12px] text-muted-foreground">{hint}</span>}
       </span>
-      <input type="checkbox" role="switch" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
-      <span aria-hidden className="relative h-7 w-12 shrink-0 rounded-full bg-muted transition-colors peer-checked:bg-lime peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-background after:shadow after:transition-transform after:duration-300 peer-checked:after:translate-x-5 motion-reduce:after:transition-none" />
+      <AdminSwitch on={checked} onChange={onChange} label={label} describedBy={hint ? id : undefined} disabled={disabled} />
     </label>
   );
 }
@@ -82,7 +84,7 @@ export function PresetPanel({ onChanged }: { onChanged: () => Promise<void> | vo
           )}
         </div>
         {s.stale && (s.stale.plans.length > 0 || s.stale.packs > 0) && (
-          <Button type="button" variant="lime" className="rounded-full" disabled={busy} onClick={() => run("copy")}>Fix plan wording</Button>
+          <Button type="button" variant="subtle" className="rounded-full" disabled={busy} onClick={() => run("copy")}>Fix plan wording</Button>
         )}
         {s.applied ? (
           <Button type="button" variant="ghost" className="rounded-full" disabled={busy || !!s.revision?.applied} title={s.revision?.applied ? "Undo the revised pricing first" : undefined} onClick={() => setAsk("undo")}>Undo preset</Button>
@@ -206,7 +208,7 @@ export function PricingLab() {
     }
   }
 
-  if (!lab || !topups || !exp) return <Card aria-busy="true"><CardTitle>Pricing lab</CardTitle><p className="text-[13px] text-muted-foreground">Loading…</p></Card>;
+  if (!lab || !topups || !exp) return <LoadingState lines={4} label="Loading the pricing lab" />;
   const m = lab.metrics;
   const setPack = (i: number, p: Partial<TopUpPack>) => setTopups({ ...topups, packs: topups.packs.map((x, j) => (j === i ? { ...x, ...p } : x)) });
   const setVar = (i: number, p: Partial<ExperimentsConfig["price"]["variants"][number]>) => setExp({ price: { ...exp.price, variants: exp.price.variants.map((v, j) => (j === i ? { ...v, ...p } : v)) } });
@@ -281,7 +283,7 @@ export function PricingLab() {
               </td>
               <td><Input aria-label={`${p.id} days`} type="number" min={1} max={365} value={p.days} onChange={(e) => setPack(i, { days: intIn(e.target.value, 1, 365) })} className="w-20" /></td>
               <td><Input aria-label={`${p.id} plans`} value={p.plans.join(", ")} placeholder="any" onChange={(e) => setPack(i, { plans: e.target.value.split(",").map((s) => s.trim().toLowerCase().replace(/\s+/g, "-")).filter(Boolean) })} /><span className="mt-1 block text-[11px] text-muted-foreground">Plan slugs, e.g. creator, pro-manager</span></td>
-              <td><Button type="button" variant="ghost" size="sm" className="min-h-[44px] rounded-full" aria-label={`Remove ${p.id}`} onClick={() => dropPack(i)}>Remove</Button></td>
+              <td><Button type="button" variant="danger" size="sm" className="min-h-[44px] rounded-full" aria-label={`Remove ${p.id}`} onClick={() => dropPack(i)}>Remove</Button></td>
             </tr>
           ))}
         </Table>
@@ -308,7 +310,7 @@ export function PricingLab() {
               <div><Label htmlFor={`ex-v${i}`}>Variant</Label><Input id={`ex-v${i}`} value={v.id} onChange={(e) => setVar(i, { id: e.target.value })} /></div>
               <div><Label htmlFor={`ex-p${i}`}>Price</Label><Input id={`ex-p${i}`} type="number" min={1} value={v.priceMinor / 100} onChange={(e) => setVar(i, { priceMinor: intIn(e.target.value, 1, 1_000_000) * 100 })} /></div>
               <div><Label htmlFor={`ex-w${i}`}>Weight</Label><Input id={`ex-w${i}`} type="number" min={0} max={100} value={v.weight} onChange={(e) => setVar(i, { weight: intIn(e.target.value, 0, 100) })} /></div>
-              <Button type="button" variant="ghost" size="sm" className="min-h-[44px] rounded-full" aria-label={`Remove variant ${v.id}`} disabled={exp.price.variants.length <= 2} onClick={() => dropVar(i)}>Remove</Button>
+              <Button type="button" variant="danger" size="sm" className="min-h-[44px] rounded-full" aria-label={`Remove variant ${v.id}`} disabled={exp.price.variants.length <= 2} onClick={() => dropVar(i)}>Remove</Button>
             </fieldset>
           ))}
         </div>

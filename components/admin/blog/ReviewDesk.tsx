@@ -11,7 +11,7 @@ import { adminApi } from "@/lib/client/admin-api";
 import { cn } from "@/lib/utils";
 import { countWords, readingMinutes, type BlogJobView, type BlogPostPatch, type BlogPostView } from "@/lib/blog/types";
 import { renderMarkdown } from "@/lib/blog/markdown";
-import { Card, CardTitle, Pill, fmtDate } from "../ui";
+import { Card, CardTitle, Pill, Tooltip, fmtDate } from "../ui";
 import { BlogArticle } from "@/components/blog/BlogArticle";
 import { BlogCtaCard } from "@/components/blog/BlogCtaCard";
 import { PublishLaterForm } from "./BlogCalendar";
@@ -134,7 +134,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={save} disabled={!dirty || !!busy} className="min-h-11">
-            {busy === "save" && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />} Save changes
+            {busy === "save" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />} Save changes
           </Button>
           {post.status === "rejected" ? (
             <Button type="button" variant="subtle" onClick={() => act("restore")} disabled={!!busy} className="min-h-11">
@@ -174,7 +174,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
                   Reschedule
                 </Button>
                 <Button type="button" variant="ghost" size="sm" className="min-h-11" onClick={() => act("unschedule")} disabled={!!busy}>
-                  {busy === "unschedule" && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />} Cancel schedule
+                  {busy === "unschedule" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />} Cancel schedule
                 </Button>
               </div>
             </div>
@@ -197,9 +197,9 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
             <AlertTriangle className="mr-1.5 inline h-4 w-4" aria-hidden /> Publishing is blocked until these pass: {blocking.map((c) => c.label).join("; ")}. Edit the article or regenerate a section, then save.{blocking.some((c) => c.id === "sources") && (
               <>
                 {" "}
-                <button type="button" className="font-medium underline underline-offset-4" onClick={() => setTab("sources")}>
+                <Button type="button" variant="ghost" size="sm" className="h-auto px-1 py-0.5 align-baseline font-medium text-foreground underline underline-offset-4 touch:h-auto" onClick={() => setTab("sources")}>
                   Check the sources
-                </button>
+                </Button>
               </>
             )}
           </p>
@@ -210,7 +210,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
         <Card as="div" className="min-w-0">
           <div role="tablist" aria-label="Article views" className="flex flex-wrap gap-1 rounded-full bg-secondary p-1">
             {(["write", "preview", "seo", "sources"] as Tab[]).map((t) => (
-              <button key={t} role="tab" type="button" aria-selected={tab === t} onClick={() => setTab(t)} className={cn("min-h-10 rounded-full px-4 text-[13.5px] font-medium capitalize", tab === t ? "bg-card shadow-sm" : "text-muted-foreground")}>
+              <button key={t} role="tab" type="button" aria-selected={tab === t} onClick={() => setTab(t)} className={cn("min-h-11 rounded-full px-4 text-[13.5px] font-medium capitalize transition-colors duration-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", tab === t ? "bg-card shadow-sm" : "text-muted-foreground")}>
                 {t === "seo" ? "SEO" : t === "sources" ? "Sources & quality" : t}
               </button>
             ))}
@@ -245,7 +245,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
                       <Input id="rg-n" value={regen.note} onChange={(e) => setRegen((r) => ({ ...r, note: e.target.value }))} placeholder="e.g. more concrete, add what to measure" maxLength={600} />
                     </div>
                     <Button type="button" variant="subtle" disabled={!regen.heading || !!busy} onClick={() => act("regenerate", { heading: regen.heading, note: regen.note })} className="min-h-11">
-                      {busy === "regenerate" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <RefreshCw className="h-4 w-4" aria-hidden />} Regenerate
+                      {busy === "regenerate" ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <RefreshCw className="h-4 w-4" aria-hidden />} Regenerate
                     </Button>
                   </div>
                 </div>
@@ -266,12 +266,16 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
                   )}
                 </p>
                 <div role="group" aria-label="Preview width" className="flex gap-1 rounded-full bg-secondary p-1">
-                  <button type="button" aria-pressed={device === "desktop"} onClick={() => setDevice("desktop")} className={cn("grid h-9 w-9 place-items-center rounded-full", device === "desktop" && "bg-card shadow-sm")} aria-label="Desktop preview">
-                    <Monitor className="h-4 w-4" aria-hidden />
-                  </button>
-                  <button type="button" aria-pressed={device === "mobile"} onClick={() => setDevice("mobile")} className={cn("grid h-9 w-9 place-items-center rounded-full", device === "mobile" && "bg-card shadow-sm")} aria-label="Mobile preview">
-                    <Smartphone className="h-4 w-4" aria-hidden />
-                  </button>
+                  <Tooltip text="Desktop preview" describe={false}>
+                    <Button type="button" variant="ghost" size="icon-sm" aria-pressed={device === "desktop"} onClick={() => setDevice("desktop")} className={cn(device === "desktop" && "bg-card text-foreground shadow-sm")} aria-label="Desktop preview">
+                      <Monitor className="h-4 w-4" aria-hidden />
+                    </Button>
+                  </Tooltip>
+                  <Tooltip text="Mobile preview" describe={false}>
+                    <Button type="button" variant="ghost" size="icon-sm" aria-pressed={device === "mobile"} onClick={() => setDevice("mobile")} className={cn(device === "mobile" && "bg-card text-foreground shadow-sm")} aria-label="Mobile preview">
+                      <Smartphone className="h-4 w-4" aria-hidden />
+                    </Button>
+                  </Tooltip>
                 </div>
               </div>
               {/* The same component as the public page. Nothing here is an admin control. */}
@@ -335,7 +339,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
                     const on = (d.internalLinks ?? []).some((x) => x.href === l.href);
                     return (
                       <li key={l.href}>
-                        <label className="flex min-h-10 cursor-pointer items-center gap-3 rounded-xl px-2 text-[13.5px] hover:bg-secondary/60">
+                        <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-2 text-[13.5px] hover:bg-secondary/60">
                           <input type="checkbox" checked={on} onChange={() => set("internalLinks", on ? (d.internalLinks ?? []).filter((x) => x.href !== l.href) : [...(d.internalLinks ?? []), l])} className="h-4 w-4" />
                           <span className="font-medium">{l.label}</span>
                           <span className="truncate text-muted-foreground">{l.href}</span>
@@ -377,7 +381,7 @@ export function ReviewDesk({ initial, categories, allowedLinks, siteUrl, timezon
                         {!live && (
                           <div className="mt-2">
                             <Button type="button" size="sm" variant={s.verified ? "ghost" : "outline"} className="min-h-11" disabled={!!busy} onClick={() => act("verifySource", { sourceId: s.id, verified: !s.verified })} aria-label={`${s.verified ? "Mark as unchecked" : "I checked this source"}: ${s.title || s.url}`}>
-                              {busy === "verifySource" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : !s.verified && <Check className="h-4 w-4" aria-hidden />} {s.verified ? "Mark as unchecked" : "I checked it, it backs the claim"}
+                              {busy === "verifySource" ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : !s.verified && <Check className="h-4 w-4" aria-hidden />} {s.verified ? "Mark as unchecked" : "I checked it, it backs the claim"}
                             </Button>
                           </div>
                         )}
