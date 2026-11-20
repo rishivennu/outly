@@ -114,6 +114,7 @@ model User {
   inboxStates     InboxItemState[] // Phase 2 (1155)
 
   @@index([lastSeenAt])
+  partnerApplications PartnerApplication[] // R1282
 }
 
 /// A browser the person chose to remember at sign-in (1053). The cookie holds `id.secret`; only a hash of
@@ -1292,6 +1293,7 @@ model PlanGrant {
   @@index([userId, status])
   @@index([email, status])
   @@index([status, endsAt])
+  partnerOffer PartnerOffer? // R1282: the partnership offer this benefit came from
 }
 
 /// Refer & Earn (1052). One row per friend: opened the link (invited), signed up (registered), first qualifying
@@ -2093,4 +2095,189 @@ model AdminPushSub {
   admin AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
   @@index([adminId])
+}
+
+/// R1282 Creator Partnership Program. One row per application; creator-provided numbers live in JSON strings and are
+/// always labelled "creator-provided" in the UI. Status values are typed in lib/partners/types.ts (no enums: SQLite + Postgres).
+model PartnerApplication {
+  id             String    @id @default(cuid())
+  ref            String    @unique // public application ID shown to the creator, e.g. OP-7F3K2Q
+  status         String    @default("submitted") // submitted | under_review | more_info | approved | rejected | offer_sent | offer_accepted | active | completed | withdrawn
+  fullName       String
+  email          String // lowercase
+  emailKey       String // folded inbox (gmail dots / +tags) for duplicate checks
+  country        String
+  city           String    @default("")
+  phone          String    @default("")
+  brandName      String    @default("")
+  userId         String? // Outlly account with the same verified email, when one exists
+  socials        String    @default("[]") // JSON PartnerSocial[]
+  stats          String    @default("{}") // JSON PartnerStats (creator-provided)
+  proposal       String    @default("{}") // JSON PartnerProposal
+  primaryPlatform String   @default("") // denormalised from socials[0] for the table
+  primaryHandle  String    @default("")
+  followers      Int       @default(0) // largest account
+  avgViews       Int       @default(0)
+  engagementRate Float? // percent, creator-provided
+  niche          String    @default("")
+  tier           String    @default("emerging") // emerging | growing | established (indicative only)
+  preference     String    @default("either") // paid | subscription | either | custom
+  consentAt      DateTime
+  termsVersion   String    @default("2026-11")
+  ipHash         String? // keyed hash, never the raw IP
+  source         String    @default("") // utm / ref that brought the creator to /partners
+  partnerCode    String?   @unique // creator referral code once a partnership is active, e.g. ria2026
+  lastNotified   String    @default("") // last status an email went out for (dedupe)
+  reviewedAt     DateTime?
+  decidedAt      DateTime?
+  withdrawnAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user         User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+  files        PartnerFile[]
+  notes        PartnerNote[]
+  events       PartnerEvent[]
+  offers       PartnerOffer[]
+  deliverables PartnerDeliverable[]
+  attributions PartnerAttribution[]
+
+  @@index([status, createdAt])
+  @@index([emailKey])
+  @@index([email])
+  @@index([primaryPlatform, status])
+  @@index([createdAt])
+}
+
+/// Analytics screenshots / media kits a creator attached (PNG, JPG, PDF). Stored privately; admins read through a signed route.
+model PartnerFile {
+  id            String   @id @default(cuid())
+  applicationId String
+  key           String   @unique // storage key partners/<applicationId>/<id>.<ext>
+  name          String // original file name, cleaned
+  mime          String
+  size          Int
+  createdAt     DateTime @default(now())
+
+  application PartnerApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+}
+
+/// Internal reviewer notes. Never sent to or shown to the creator.
+model PartnerNote {
+  id            String   @id @default(cuid())
+  applicationId String
+  author        String // admin login
+  body          String
+  createdAt     DateTime @default(now())
+
+  application PartnerApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+}
+
+/// Application history: every status change, offer action, benefit action and creator action, with who and when.
+model PartnerEvent {
+  id            String   @id @default(cuid())
+  applicationId String
+  actor         String // admin login | "creator" | "system"
+  action        String // status.change | note.add | offer.create | offer.send | offer.accept | offer.decline | benefit.grant | benefit.extend | benefit.end | deliverable.add | deliverable.submit | deliverable.review | email.sent | info.requested
+  from          String? // previous status when action is status.change
+  to            String? // new status
+  meta          String   @default("{}") // JSON details (offer id, deliverable id, email kind)
+  createdAt     DateTime @default(now())
+
+  application PartnerApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+}
+
+/// A formal offer an admin configures after approval. The creator reviews it through a signed link and accepts or declines.
+model PartnerOffer {
+  id              String    @id @default(cuid())
+  applicationId   String
+  status          String    @default("draft") // draft | sent | accepted | declined | withdrawn | expired
+  type            String // paid | subscription | custom
+  amountMinor     Int       @default(0)
+  currency        String    @default("INR")
+  paymentTerms    String    @default("") // e.g. "50% on acceptance, 50% on publication"
+  planSlug        String    @default("") // complimentary plan, usually "creator"
+  subscriptionDays Int      @default(0) // 30 | 60 | custom; 0 = no subscription benefit
+  startsAt        DateTime?
+  endsAt          DateTime? // end or review date
+  deliverables    Int       @default(0)
+  platforms       String    @default("[]") // JSON string[]
+  format          String    @default("")
+  deadlines       String    @default("")
+  disclosure      Boolean   @default(true) // sponsored / paid partnership label required
+  usageRights     String    @default("")
+  conditions      String    @default("")
+  token           String    @unique // signed link for the creator
+  expiresAt       DateTime? // when the link stops working
+  sentAt          DateTime?
+  respondedAt     DateTime?
+  decision        String    @default("") // accepted | declined
+  declineReason   String    @default("")
+  accepted        String    @default("") // JSON snapshot of the terms the creator accepted
+  grantId         String?   @unique // PlanGrant created when a subscription benefit was granted
+  createdBy       String // admin login
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  application PartnerApplication   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  grant       PlanGrant?           @relation(fields: [grantId], references: [id], onDelete: SetNull)
+  items       PartnerDeliverable[]
+
+  @@index([applicationId, status])
+}
+
+/// One agreed piece of promotional content. The creator submits the published URL through the portal; admins review it.
+model PartnerDeliverable {
+  id            String    @id @default(cuid())
+  applicationId String
+  offerId       String?
+  title         String
+  platform      String
+  format        String    @default("")
+  dueAt         DateTime?
+  publishedAt   DateTime?
+  url           String    @default("")
+  approval      String    @default("none") // none | pending | approved | changes (pre-approval, only when agreed)
+  status        String    @default("planned") // planned | submitted | published | verified | missed
+  views         Int       @default(0) // reported by the creator or recorded by an admin
+  reach         Int       @default(0)
+  likes         Int       @default(0)
+  comments      Int       @default(0)
+  clicks        Int       @default(0)
+  adminNote     String    @default("")
+  creatorNote   String    @default("")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  application PartnerApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  offer       PartnerOffer?      @relation(fields: [offerId], references: [id], onDelete: SetNull)
+
+  @@index([applicationId, status])
+  @@index([dueAt])
+}
+
+/// Attribution for outlly.com/?ref=<partnerCode>: one row per visit, signup and paid conversion. A signup counts only when
+/// the visit cookie is present at registration; a paid row only when the first payment belongs to that user.
+model PartnerAttribution {
+  id            String   @id @default(cuid())
+  applicationId String
+  kind          String // visit | signup | paid
+  visitorKey    String? // the ol_pref cookie value
+  userId        String?
+  paymentId     String?  @unique
+  landing       String   @default("") // path the visit landed on
+  source        String   @default("") // utm_source / campaign if present
+  createdAt     DateTime @default(now())
+
+  application PartnerApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, kind, visitorKey])
+  @@index([applicationId, kind, createdAt])
+  @@index([userId])
 }

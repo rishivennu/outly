@@ -72,7 +72,7 @@ export const WEBHOOK_ROUTES: Record<string, string> = {
 const WEBHOOK_TARGETS = new Set(Object.values(WEBHOOK_ROUTES));
 
 /** Top-level folders of public/ (a test keeps this in step with the folder). */
-export const PUBLIC_DIRS = ["audio", "brand", "brands", "samples"];
+export const PUBLIC_DIRS = ["audio", "brand", "brands", "partners", "samples"]; // R1282: /partners/hand-*.svg
 const STATIC_EXT = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|css|js|mjs|map|mp3|mp4|webm|wav|ogg|json|webmanifest|txt|xml|pdf|html)$/i;
 
 export type HostRoute =
