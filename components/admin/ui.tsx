@@ -2,6 +2,8 @@ import * as React from "react";
 import { AlertTriangle, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollX } from "@/components/ui/scroll-x";
+import { Skeleton } from "@/components/shared/Skeleton";
+import { Button } from "@/components/ui/button";
 import { PLATFORM_STATUS } from "@/lib/admin/platform-status";
 
 /** Server-safe building blocks for admin pages. */
@@ -59,7 +61,12 @@ export function Pill({ tone = "muted", children, className }: { tone?: Tone; chi
  * shows the agreed label and tone, so "skipped" reads "Held back" on every screen and a platform's state uses
  * the same seven words everywhere. Unknown values fall back to the raw text in a neutral badge.
  */
-export const STATUS_LABEL: Record<string, { label: string; tone: Tone }> = {
+/**
+ * R1270: `dot` gives the dot its own tone where the word and the dot should differ (a suspended account reads
+ * muted but its dot is red); `strong` adds a ring for the states a reader must act on.
+ */
+export type StatusEntry = { label: string; tone: Tone; dot?: Tone; strong?: boolean };
+export const STATUS_LABEL: Record<string, StatusEntry> = {
   // platform and integration configuration
   configured: { label: "Configured", tone: "info" },
   connected: { label: "Connected", tone: "ok" },
@@ -83,7 +90,7 @@ export const STATUS_LABEL: Record<string, { label: string; tone: Tone }> = {
   // money, tickets, accounts
   succeeded: { label: "Succeeded", tone: "ok" },
   active: { label: "Active", tone: "ok" },
-  suspended: { label: "Suspended", tone: "muted" },
+  suspended: { label: "Suspended", tone: "muted", dot: "bad" },
   resolved: { label: "Resolved", tone: "ok" },
   past_due: { label: "Past due", tone: "warn" },
   mocked: { label: "Practice", tone: "info" },
@@ -95,12 +102,59 @@ export const STATUS_LABEL: Record<string, { label: string; tone: Tone }> = {
   normal: { label: "Normal", tone: "muted" },
   paused: { label: "Paused", tone: "warn" },
   running: { label: "Running", tone: "ok" },
+  // R1270: the semantic set every admin page can rely on (statusOf maps raw database values onto these)
+  waiting: { label: "Waiting", tone: "warn" },
+  completed: { label: "Completed", tone: "ok" },
+  attention: { label: "Requires attention", tone: "warn", strong: true },
+  retrying: { label: "Retrying", tone: "warn" },
+  paid: { label: "Paid", tone: "ok" },
 };
 
-export function StatusBadge({ status, label, className }: { status: string; label?: React.ReactNode; className?: string }) {
-  const s = STATUS_LABEL[status];
+const SYNONYMS: Record<string, string> = {
+  ok: "active", enabled: "active", on: "active", success: "succeeded", successful: "succeeded",
+  error: "failed", errored: "failed", failure: "failed", fail: "failed",
+  complete: "completed", finished: "completed", closed: "resolved",
+  disabled: "suspended", inactive: "suspended", blocked: "suspended", banned: "suspended", off: "paused",
+  awaiting: "waiting", in_progress: "running", processing: "running",
+  needs_attention: "attention", requires_attention: "attention", action_required: "attention", warning: "attention",
+  cancelled: "canceled", retry: "retrying",
+};
+
+const has = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
+
+/**
+ * R1270: a raw database or API value as a STATUS_LABEL key: trimmed, lower case, spaces and dashes as
+ * underscores, common synonyms folded ("ok" and "enabled" are active, "error" is failed). An unknown value comes
+ * back cleaned, so StatusBadge still prints it in a neutral badge.
+ */
+export function statusOf(raw: string | null | undefined): string {
+  const s = (raw ?? "").trim().toLowerCase();
+  if (has(STATUS_LABEL, s)) return s;
+  const k = s.replace(/[\s-]+/g, "_");
+  if (has(STATUS_LABEL, k)) return k;
+  if (has(SYNONYMS, k)) return SYNONYMS[k];
+  const dashed = k.replace(/_/g, "-");
+  return has(STATUS_LABEL, dashed) ? dashed : s;
+}
+
+const DOT: Record<Tone, string> = {
+  lime: "bg-lime-ink",
+  ok: "bg-success",
+  warn: "bg-warning",
+  bad: "bg-destructive",
+  info: "bg-accent",
+  muted: "bg-muted-foreground",
+};
+
+/**
+ * Always a dot and a word, never colour alone. `size="sm"` is the table-row size. The status is looked up as
+ * given (a page that passes a raw value wraps it in statusOf), so existing screens keep their words.
+ */
+export function StatusBadge({ status, label, className, size = "md" }: { status: string; label?: React.ReactNode; className?: string; size?: "sm" | "md" }) {
+  const s = has(STATUS_LABEL, status) ? STATUS_LABEL[status] : undefined;
   return (
-    <Pill tone={s?.tone ?? "muted"} className={className}>
+    <Pill tone={s?.tone ?? "muted"} className={cn(size === "sm" && "h-5 gap-1.5 px-2 text-[11px]", size === "md" && "gap-1.5", s?.strong && "ring-1 ring-inset ring-warning/70", className)}>
+      <span data-dot="" aria-hidden="true" className={cn("h-1.5 w-1.5 shrink-0 rounded-full", DOT[s?.dot ?? s?.tone ?? "muted"])} />
       {label ?? s?.label ?? status}
     </Pill>
   );
@@ -129,7 +183,7 @@ export function Tooltip({ text, children, side = "top", describe = false, classN
 export function Hint({ text, label = "How this is counted" }: { text: string; label?: string }) {
   return (
     <Tooltip text={text} describe>
-      <button type="button" aria-label={label} className="grid h-6 w-6 place-items-center rounded-full text-muted-foreground [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground">
+      <button type="button" aria-label={label} className="relative grid h-6 w-6 place-items-center rounded-full text-muted-foreground touch:before:absolute touch:before:-inset-2.5 touch:before:rounded-full touch:before:content-[''] [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground">
         <Info className="h-3.5 w-3.5" aria-hidden />
       </button>
     </Tooltip>
@@ -156,18 +210,49 @@ export function Section({ title, hint, actions, cols = 1, className, children, i
   );
 }
 
-/** A card-shaped placeholder with the same radius and padding as the card it stands in for. */
-export function LoadingState({ lines = 3, className, label = "Loading" }: { lines?: number; className?: string; label?: string }) {
-  return (
-    <div role="status" aria-live="polite" className={cn("admin-card rounded-[24px] bg-card p-5 hairline sm:p-6", className)}>
-      <span className="sr-only">{label}</span>
-      <div className="space-y-3" aria-hidden>
-        <div className="skeleton h-4 w-32 rounded-lg" />
-        <div className="skeleton h-8 w-40 rounded-xl" />
-        {Array.from({ length: Math.max(0, lines - 2) }, (_, i) => (
-          <div key={i} className="skeleton h-3.5 rounded-lg" style={{ width: `${88 - i * 14}%` }} />
+/**
+ * A card-shaped placeholder with the same radius and padding as the card it stands in for. R1270: `shape` picks
+ * what it stands in for: "lines" (a KPI or text card), "cards" (a grid of cards, `lines` of them) or "table"
+ * (a header and `lines` rows). The shared Skeleton shimmer stops under reduced motion (globals.css).
+ */
+export function LoadingState({ lines = 3, className, label = "Loading", shape = "lines" }: { lines?: number; className?: string; label?: string; shape?: "lines" | "cards" | "table" }) {
+  if (shape === "cards") {
+    return (
+      <div role="status" aria-live="polite" aria-busy="true" className={cn("grid gap-3 sm:grid-cols-2 xl:grid-cols-3", className)}>
+        <span className="sr-only">{label}</span>
+        {Array.from({ length: Math.max(1, lines) }, (_, i) => (
+          <div key={i} className="admin-card space-y-3 rounded-[24px] bg-card p-5 hairline sm:p-6">
+            <Skeleton className="h-4 w-28 rounded-lg" />
+            <Skeleton className="h-8 w-36 rounded-xl" />
+            <Skeleton className="h-3.5 w-4/5 rounded-lg" />
+          </div>
         ))}
       </div>
+    );
+  }
+  return (
+    <div role="status" aria-live="polite" aria-busy="true" className={cn("admin-card rounded-[24px] bg-card p-5 hairline sm:p-6", className)}>
+      <span className="sr-only">{label}</span>
+      {shape === "table" ? (
+        <div className="space-y-0" aria-hidden>
+          <Skeleton className="mb-3 h-3 w-1/3 rounded-full" />
+          {Array.from({ length: Math.max(1, lines) }, (_, i) => (
+            <div key={i} className="flex items-center gap-4 border-t border-border/60 py-3.5">
+              <Skeleton className="h-3.5 w-1/3 rounded-lg" />
+              <Skeleton className="h-3.5 w-1/4 rounded-lg" />
+              <Skeleton className="ml-auto h-5 w-16 rounded-full" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3" aria-hidden>
+          <Skeleton className="h-4 w-32 rounded-lg" />
+          <Skeleton className="h-8 w-40 rounded-xl" />
+          {Array.from({ length: Math.max(0, lines - 2) }, (_, i) => (
+            <div key={i} className="skeleton h-3.5 rounded-lg" style={{ width: `${88 - i * 14}%` }} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -176,14 +261,19 @@ export function LoadingState({ lines = 3, className, label = "Loading" }: { line
  * What a card shows when its data could not be loaded: the fact, the cause in plain words, and a way to retry.
  * Never a zero and never a guess (brief 9: no mock data on failure).
  */
-export function ErrorState({ title = "Couldn't load this", body, retry, children, className }: { title?: string; body?: string; retry?: React.ReactNode; children?: React.ReactNode; className?: string }) {
+export function ErrorState({ title = "Couldn't load this", body, retry, retryHref, retryLabel = "Try again", children, className }: { title?: string; body?: string; retry?: React.ReactNode; /** R1270: a link that reloads the data (server pages), drawn as the shared lime Button. */ retryHref?: string; retryLabel?: string; children?: React.ReactNode; className?: string }) {
+  const again = retry ?? (retryHref ? (
+    <Button asChild variant="lime" size="sm">
+      <a href={retryHref}>{retryLabel}</a>
+    </Button>
+  ) : null);
   return (
     <div role="alert" className={cn("flex flex-col items-start gap-2 rounded-[20px] bg-destructive/[0.06] px-5 py-5 hairline", className)}>
       <p className="flex items-center gap-2 font-display text-[1rem] font-semibold">
         <AlertTriangle className="h-4 w-4 text-destructive" aria-hidden /> {title}
       </p>
       {body && <p className="max-w-prose text-[13.5px] leading-relaxed text-muted-foreground">{body}</p>}
-      {(retry || children) && <div className="mt-1 flex flex-wrap items-center gap-2">{retry}{children}</div>}
+      {(again || children) && <div className="mt-1 flex flex-wrap items-center gap-2">{again}{children}</div>}
     </div>
   );
 }
@@ -204,11 +294,14 @@ export const STATUS_TONE: Record<string, Tone> = {
   failed: "bad", canceled: "muted", refunded: "muted", urgent: "bad", high: "warn", normal: "muted",
 };
 
-export function Empty({ title, body, children }: { title: string; body?: string; children?: React.ReactNode }) {
+/** Nothing to show yet: an optional icon, what is missing, why or what to do, and at most one action. */
+export function Empty({ title, body, children, icon, action, className }: { title: string; body?: string; children?: React.ReactNode; icon?: React.ReactNode; action?: React.ReactNode; className?: string }) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-[20px] border border-dashed border-border px-6 py-12 text-center">
+    <div className={cn("flex flex-col items-center gap-2 rounded-[20px] border border-dashed border-border px-6 py-12 text-center", className)}>
+      {icon && <span aria-hidden="true" className="mb-1 grid h-11 w-11 place-items-center rounded-full bg-secondary text-muted-foreground [&_svg]:h-5 [&_svg]:w-5">{icon}</span>}
       <p className="font-display text-[1.05rem] font-semibold">{title}</p>
       {body && <p className="max-w-sm text-[13.5px] text-muted-foreground">{body}</p>}
+      {action && <div className="mt-2 flex flex-wrap justify-center gap-2">{action}</div>}
       {children}
     </div>
   );
@@ -248,7 +341,13 @@ type TableProps = {
   lead?: number;
   /** Narrowest the table may get on wide screens before it scrolls inside its card. Defaults to tableMinWidth(columns). */
   minWidth?: number;
+  /** R1270: per-column alignment; "right" also sets tabular figures (numeric columns). Phone cards stay left aligned. */
+  align?: ("left" | "right" | "center" | undefined)[];
+  /** R1270: pin the first column while the table scrolls sideways from 640px up ("scroll" mode always pins it). */
+  stickyFirst?: boolean;
 };
+
+const ALIGN = { left: "", right: "text-right tabular-nums", center: "text-center" } as const;
 
 /**
  * 1163: the floor under a table's width. The old fixed 640px forced two-column tables inside half-width cards
@@ -262,7 +361,7 @@ export const tableMinWidth = (columns: number) => Math.min(640, Math.max(240, co
  * than it (never the page). On phones it turns into labelled cards (or a pinned-column scroller, see `mobile`).
  * Labels are read from `head`, so every page gets the phone layout without changing how it writes its rows.
  */
-export function Table({ head, children, className, label = "Table", mobile = "cards", lead = 0, minWidth }: TableProps) {
+export function Table({ head, children, className, label = "Table", mobile = "cards", lead = 0, minWidth, align, stickyFirst = false }: TableProps) {
   const width = minWidth ?? tableMinWidth(head.length);
   const labels = head.map(headText);
   const kinds = head.map(headKind);
@@ -274,11 +373,13 @@ export function Table({ head, children, className, label = "Table", mobile = "ca
       const i = col;
       col += Math.max(1, Number(cell.props.colSpan) || 1);
       const kind = Number(cell.props.colSpan) > 1 ? "full" : i === lead ? "lead" : (kinds[i] ?? "field");
+      const a = kind === "full" ? undefined : align?.[i];
       // Explicit roles keep the table semantics when the phone layout turns rows into grid cards.
       return React.cloneElement(cell as React.ReactElement<Record<string, unknown>>, {
         role: cell.type === "th" ? "rowheader" : "cell",
         "data-cell": kind,
         "data-label": kind === "field" ? (cell.props["data-label"] ?? labels[i] ?? undefined) : undefined,
+        ...(a && ALIGN[a] ? { className: cn((cell.props as { className?: string }).className, ALIGN[a]) } : null),
       });
     });
     // 1188: the row's key is its identity across a filter, sort or page change, so Flip can glide it from
@@ -286,18 +387,18 @@ export function Table({ head, children, className, label = "Table", mobile = "ca
     return React.cloneElement(row as React.ReactElement<Record<string, unknown>>, { role: "row", "data-flip-id": row.key ?? undefined }, cells);
   });
   return (
-    <ScrollX label={label} className={cn("atable -mx-5 px-5 sm:-mx-6 sm:px-6", mobile === "cards" ? "atable--cards" : "atable--scroll pin-first", className)}>
+    <ScrollX label={label} className={cn("atable -mx-5 px-5 sm:-mx-6 sm:px-6", mobile === "cards" ? "atable--cards" : "atable--scroll pin-first", mobile === "cards" && stickyFirst && "pin-first atable--pin", className)}>
       <table role="table" className="w-full border-separate border-spacing-0 text-[13.5px]" style={{ minWidth: width }}>
         <thead role="rowgroup">
           <tr role="row">
             {head.map((h, i) => (
-              <th key={i} scope="col" role="columnheader" data-kind={kinds[i]} className="border-b border-border pb-2.5 pr-4 text-left text-[11.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground last:pr-0">
+              <th key={i} scope="col" role="columnheader" data-kind={kinds[i]} className={cn("border-b border-border pb-2.5 pr-4 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground last:pr-0", align?.[i] && ALIGN[align[i]!])}>
                 {h}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody role="rowgroup" className="[&_td]:border-b [&_td]:border-border/60 [&_td]:py-3 [&_td]:pr-4 [&_td:last-child]:pr-0 [&_tr:last-child_td]:border-0 [&_tr]:transition-colors [&_tr:hover]:bg-foreground/[0.02]">
+        <tbody role="rowgroup" className="[&_td]:border-b [&_td]:border-border/60 [&_td]:py-3 [&_td]:pr-4 [&_td:last-child]:pr-0 [&_tr:last-child_td]:border-0 [&_tr]:transition-colors [@media(hover:hover)]:[&_tr:hover]:bg-foreground/[0.03]">
           {rows}
         </tbody>
       </table>

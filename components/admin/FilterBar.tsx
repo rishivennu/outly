@@ -2,6 +2,8 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/field";
 import { FilterChips } from "./SearchBox";
 
 /**
@@ -69,13 +71,13 @@ export function AdminDateRangePicker({ param = "days", current, options = RANGE_
           }}
         >
           <label className="sr-only" htmlFor={`${param}-from`}>From</label>
-          <input id={`${param}-from`} type="date" value={a} max={b || undefined} onChange={(e) => setA(e.target.value)} className="h-9 rounded-full bg-secondary/60 px-3 hairline" />
+          <Input id={`${param}-from`} type="date" value={a} max={b || undefined} onChange={(e) => setA(e.target.value)} className="h-9 w-auto rounded-2xl px-3 text-[12.5px] touch:h-11" />
           <span aria-hidden className="text-muted-foreground">to</span>
           <label className="sr-only" htmlFor={`${param}-to`}>To</label>
-          <input id={`${param}-to`} type="date" value={b} min={a || undefined} onChange={(e) => setB(e.target.value)} className="h-9 rounded-full bg-secondary/60 px-3 hairline" />
-          <button type="submit" disabled={!a || !b || a > b} className="h-9 rounded-full bg-foreground px-3.5 font-semibold text-background disabled:opacity-40">Apply</button>
+          <Input id={`${param}-to`} type="date" value={b} min={a || undefined} onChange={(e) => setB(e.target.value)} className="h-9 w-auto rounded-2xl px-3 text-[12.5px] touch:h-11" />
+          <Button type="submit" variant="lime" size="sm" disabled={!a || !b || a > b}>Apply</Button>
           {customOn && (
-            <button type="button" onClick={clear} className="h-9 rounded-full px-3 font-medium text-muted-foreground [@media(hover:hover)]:hover:text-foreground">Clear</button>
+            <Button type="button" variant="ghost" size="sm" onClick={clear}>Clear</Button>
           )}
         </form>
       )}

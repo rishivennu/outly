@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Tooltip } from "./ui";
 
 const hhmm = (d: Date) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -72,16 +74,11 @@ export function RefreshButton({ total, noun = "users", loadedAt }: { total: numb
           <span className="text-muted-foreground">Last refreshed {hhmm(last)}</span>
         )}
       </span>
-      <button
-        type="button"
-        onClick={refresh}
-        disabled={running}
-        aria-busy={running}
-        className="inline-flex h-11 items-center gap-2 rounded-full bg-secondary px-4 text-[13.5px] font-semibold hairline transition-colors hover:bg-secondary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--lime))] focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-wait disabled:opacity-70"
-      >
-        {running ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <RefreshCw className="h-4 w-4" aria-hidden />}
-        {running ? "Refreshing…" : "Refresh"}
-      </button>
+      <Tooltip text={running ? "Refreshing" : `Refresh the list (${total.toLocaleString("en-IN")} ${noun})`}>
+        <Button type="button" size="icon-sm" onClick={refresh} disabled={running} aria-busy={running} aria-label={running ? "Refreshing" : "Refresh"} className="disabled:cursor-wait">
+          {running ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <RefreshCw className="h-4 w-4" aria-hidden />}
+        </Button>
+      </Tooltip>
     </div>
   );
 }

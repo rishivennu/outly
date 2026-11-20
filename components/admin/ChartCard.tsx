@@ -15,18 +15,34 @@ export function AdminChartCard({ title, hint, children, table, empty, allZero = 
   const [view, setView] = useState<"chart" | "table">("chart");
   const id = useId();
   const fmt = (v: string | number) => (typeof v === "number" ? v.toLocaleString("en-IN") : v);
-  const toggle = table ? (
-    <button type="button" onClick={() => setView(view === "chart" ? "table" : "chart")} aria-pressed={view === "table"} aria-controls={id} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-secondary/60 px-3 text-[12.5px] font-medium text-muted-foreground hairline [@media(hover:hover)]:hover:text-foreground">
-      {view === "chart" ? <Table2 className="h-3.5 w-3.5" aria-hidden /> : <LineChart className="h-3.5 w-3.5" aria-hidden />}
-      {view === "chart" ? "Table view" : "Chart view"}
+  // R1270: a two-way segmented control (glass trough on phones, .gseg) instead of one toggle button.
+  const seg = (v: "chart" | "table", Icon: typeof LineChart, text: string) => (
+    <button
+      type="button"
+      onClick={() => setView(v)}
+      aria-pressed={view === v}
+      aria-controls={id}
+      className={cn(
+        "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[hsl(var(--ring))] touch:h-11",
+        view === v ? "bg-background font-semibold text-foreground shadow-sm" : "font-medium text-muted-foreground [@media(hover:hover)]:hover:text-foreground",
+      )}
+    >
+      <Icon className="h-3.5 w-3.5" aria-hidden />
+      {text}
     </button>
+  );
+  const toggle = table ? (
+    <div role="group" aria-label={`Show ${title} as`} className="gseg inline-flex shrink-0 items-center gap-0.5 rounded-full bg-secondary/60 p-0.5 hairline">
+      {seg("chart", LineChart, "Chart")}
+      {seg("table", Table2, "Table")}
+    </div>
   ) : null;
   return (
     <Card data-enter className={cn("flex min-w-0 flex-col", className)}>
       <CardTitle hint={hint} action={action || toggle ? <div className="flex items-center gap-2">{action}{toggle}</div> : undefined}>{title}</CardTitle>
       <div id={id} className={cn("min-w-0 flex-1", tall && "min-h-[260px]")}>
         {view === "table" && table ? (
-          <Table label={table.label ?? `${title} as a table`} head={table.head}>
+          <Table label={table.label ?? `${title} as a table`} head={table.head} align={table.head.map((_, j) => (j > 0 ? "right" : undefined))}>
             {table.rows.map((r, i) => (
               <tr key={i}>
                 {r.map((c, j) => (

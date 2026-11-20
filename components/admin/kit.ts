@@ -14,8 +14,21 @@
  *   AdminEmptyState / AdminLoadingState / AdminErrorState                      (ui.tsx)
  *   AdminConfirmDialog  the shared Radix confirm                               (components/shared/ConfirmDialog)
  *   AdminTooltip / AdminHint                                                   (ui.tsx)
+ *   statusOf          raw database value to a STATUS_LABEL key                 (ui.tsx, R1270)
+ *   AdminPagination   Previous / "1-25 of 300" / Next from ?page=&limit=       (Pagination.tsx, R1270)
+ *   pageWindow / readPaging  the same arithmetic for server pages             (page-window.ts, R1270)
+ *   Switch / SwitchRow  the Settings lime switch, alone or as a labelled row   (Switch.tsx, R1270)
+ *   SearchBox / FilterChips / FilterSelect / DateFilter / MoreFilters          (SearchBox.tsx)
+ *   SearchInput       a local (not URL) search field                           (SearchInput.tsx)
+ *   RefreshButton     re-read the list without a reload                        (RefreshButton.tsx)
  */
-export { PageHead as AdminPageHeader, Card as AdminCard, CardTitle as AdminCardTitle, Section as AdminSection, Table as AdminDataTable, StatusBadge as AdminStatusBadge, STATUS_LABEL, Empty as AdminEmptyState, LoadingState as AdminLoadingState, ErrorState as AdminErrorState, Unavailable as AdminUnavailable, Tooltip as AdminTooltip, Hint as AdminHint, Pill, tableMinWidth, fmtDate, ago } from "./ui";
+export { PageHead as AdminPageHeader, Card as AdminCard, CardTitle as AdminCardTitle, Section as AdminSection, Table as AdminDataTable, StatusBadge as AdminStatusBadge, STATUS_LABEL, Empty as AdminEmptyState, LoadingState as AdminLoadingState, ErrorState as AdminErrorState, Unavailable as AdminUnavailable, Tooltip as AdminTooltip, Hint as AdminHint, Pill, tableMinWidth, fmtDate, ago, statusOf, type StatusEntry, type Tone } from "./ui";
+export { Pagination as AdminPagination, Pagination } from "./Pagination";
+export { pageWindow, readPaging, PAGE_LIMIT, type PageWindow } from "./page-window";
+export { Switch, SwitchRow } from "./Switch";
+export { SearchBox, FilterChips, FilterSelect, DateFilter, MoreFilters } from "./SearchBox";
+export { SearchInput } from "./SearchInput";
+export { RefreshButton } from "./RefreshButton";
 export { AdminShell as AdminSidebar, NAV, NAV_GROUPS } from "./AdminShell";
 export { AdminKpi as AdminMetricCard } from "./motion/AdminKpi";
 export { AdminFilterBar, AdminDateRangePicker, ReportMeta, RANGE_OPTIONS } from "./FilterBar";

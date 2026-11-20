@@ -1,8 +1,10 @@
 "use client";
-import { useEffect, useId, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, Loader2, Search, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, Loader2, SlidersHorizontal } from "lucide-react";
+import { Input } from "@/components/ui/field";
+import { SearchInput } from "./SearchInput";
 import { cn } from "@/lib/utils";
 import { ScrollX } from "@/components/ui/scroll-x";
 import { useSlider } from "@/components/dashboard/useSlider";
@@ -32,14 +34,7 @@ export function SearchBox({ placeholder, param = "q" }: { placeholder: string; p
     }, 220);
     return () => clearTimeout(t);
   }, [v, sp, param, path, router]);
-  return (
-    <label className="relative block w-full sm:w-72">
-      <span className="sr-only">{placeholder}</span>
-      <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-      <input type="search" aria-busy={pending} value={v} onChange={(e) => setV(e.target.value)} placeholder={placeholder} className="h-11 w-full rounded-full bg-secondary/60 pl-10 pr-10 sm:h-10 text-[14px] hairline placeholder:text-muted-foreground/80 focus:bg-secondary" />
-      {pending && <Loader2 className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-hidden />}
-    </label>
-  );
+  return <SearchInput value={v} onChange={setV} placeholder={placeholder} busy={pending} />;
 }
 
 export function FilterChips({ param, options, current, glide = false, label = "Filter" }: { param: string; options: { value: string; label: string }[]; current: string; glide?: boolean; label?: string }) {
@@ -52,13 +47,15 @@ export function FilterChips({ param, options, current, glide = false, label = "F
     return `${path}?${n}`;
   };
   if (glide) return <GlideChips options={options} current={current} href={href} />;
-  // Phones: one segmented row that scrolls sideways inside the card (edge fade shows there is more), never a
-  // stack of wrapped rows. From 640px up the chips wrap as before. 44px tall on touch screens, 36px with a mouse.
+  // Phones and tablets: one segmented control (the glass trough, .gseg, with the chosen chip as its brighter
+  // pane) that scrolls sideways inside the card (edge fade shows there is more), never a stack of wrapped rows.
+  // From 1024px up the .gseg rules are inert and the chips wrap as before. 44px tall on touch screens.
+  // R1270: the chips stay links (aria-current), not tabs.
   return (
-    <ScrollX label={label} focusable={false} className="-mx-5 w-[calc(100%+2.5rem)] px-5 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
-      <div className="flex w-max gap-1.5 py-0.5 sm:w-auto sm:flex-wrap" role="group" aria-label={label}>
+    <ScrollX label={label} focusable={false} className="-mx-5 w-[calc(100%+2.5rem)] px-5 sm:mx-0 sm:w-auto sm:px-0 lg:overflow-visible">
+      <div className="gseg flex w-max gap-0.5 lg:w-auto lg:flex-wrap lg:gap-1.5 lg:py-0.5" role="group" aria-label={label}>
         {options.map((o) => (
-          <Link key={o.value} href={href(o.value)} scroll={false} aria-current={current === o.value ? "true" : undefined} className={cn("inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-[12.5px] sm:h-9", current === o.value ? "lime-bg font-semibold" : "bg-secondary/60 font-medium text-muted-foreground hairline hover:text-foreground")}>
+          <Link key={o.value} href={href(o.value)} scroll={false} data-on={current === o.value ? "true" : "false"} aria-current={current === o.value ? "true" : undefined} className={cn("inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-[12.5px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))] sm:h-9 touch:h-11", current === o.value ? "lime-bg font-semibold" : "bg-secondary/60 font-medium text-muted-foreground hairline [@media(hover:hover)]:hover:text-foreground")}>
             {o.label}
           </Link>
         ))}
@@ -120,7 +117,7 @@ export function FilterSelect({ param, label, options, current, fill = false }: {
           start(() => router.replace(`${path}?${n}`, { scroll: false }));
         }}
         className={cn(
-          "h-11 rounded-full pl-3.5 pr-8 text-[13px]",
+          "h-11 cursor-pointer appearance-none rounded-2xl pl-3.5 pr-9 text-[13px] text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]",
           fill ? "w-full min-w-0 sm:w-auto sm:min-w-[9.5rem]" : "min-w-[9.5rem]",
           on ? "bg-[hsl(var(--lime)/0.16)] font-semibold ring-1 ring-[hsl(var(--lime)/0.55)]" : "bg-secondary/60 font-medium hairline",
         )}
@@ -131,7 +128,11 @@ export function FilterSelect({ param, label, options, current, fill = false }: {
           </option>
         ))}
       </select>
-      {pending && <Loader2 className="pointer-events-none absolute bottom-3.5 right-3 h-4 w-4 animate-spin text-muted-foreground" aria-hidden />}
+      {pending ? (
+        <Loader2 className="pointer-events-none absolute bottom-3.5 right-3 h-4 w-4 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden />
+      ) : (
+        <ChevronDown className="pointer-events-none absolute bottom-3.5 right-3 h-4 w-4 text-muted-foreground" aria-hidden />
+      )}
     </label>
   );
 }
@@ -150,7 +151,7 @@ export function DateFilter({ param, label, current, min, max }: { param: string;
   return (
     <label className="relative inline-flex w-full min-w-0 flex-col gap-1 sm:w-auto">
       <span className="text-[11.5px] font-medium text-muted-foreground">{label}</span>
-      <input
+      <Input
         type="date"
         value={current}
         min={min || undefined}
@@ -162,7 +163,7 @@ export function DateFilter({ param, label, current, min, max }: { param: string;
           n.delete("page");
           start(() => router.replace(`${path}?${n}`, { scroll: false }));
         }}
-        className={cn("h-11 w-full min-w-0 rounded-full px-3.5 text-[13px] sm:w-[10.5rem]", current ? "bg-[hsl(var(--lime)/0.16)] font-semibold ring-1 ring-[hsl(var(--lime)/0.55)]" : "bg-secondary/60 font-medium hairline")}
+        className={cn("h-11 w-full min-w-0 rounded-2xl px-3.5 text-[13px] sm:w-[10.5rem]", current && "bg-[hsl(var(--lime)/0.16)] font-semibold ring-1 ring-[hsl(var(--lime)/0.55)]")}
       />
     </label>
   );
@@ -171,15 +172,38 @@ export function DateFilter({ param, label, current, min, max }: { param: string;
 export function MoreFilters({ active, children }: { active: number; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const id = useId();
+  const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  // R1270: Escape closes and hands focus back to the button; a tap outside the button and the panel closes.
+  useEffect(() => {
+    if (!open) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      trigger.current?.focus();
+    };
+    const down = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (t && (trigger.current?.contains(t) || panel.current?.contains(t))) return;
+      setOpen(false);
+    };
+    document.addEventListener("keydown", key);
+    document.addEventListener("pointerdown", down);
+    return () => {
+      document.removeEventListener("keydown", key);
+      document.removeEventListener("pointerdown", down);
+    };
+  }, [open]);
   return (
     <>
       <button
+        ref={trigger}
         type="button"
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-[13px] font-medium hairline hover:bg-secondary sm:hidden",
+          "inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-[13px] font-medium hairline [@media(hover:hover)]:hover:bg-secondary sm:hidden",
           active > 0 && "font-semibold ring-1 ring-[hsl(var(--lime)/0.55)]",
         )}
       >
@@ -188,7 +212,7 @@ export function MoreFilters({ active, children }: { active: number; children: Re
         {active > 0 && <span className="tabular rounded-full bg-[hsl(var(--lime)/0.2)] px-1.5 text-[11.5px] font-semibold">{active}<span className="sr-only"> on</span></span>}
         <ChevronDown className={cn("h-4 w-4 transition-transform motion-reduce:transition-none", open && "rotate-180")} aria-hidden />
       </button>
-      <div id={id} className={cn("col-span-2 grid-cols-2 gap-2.5 sm:contents", open ? "grid" : "hidden")}>
+      <div ref={panel} id={id} className={cn("col-span-2 grid-cols-2 gap-2.5 sm:contents", open ? "grid" : "hidden")}>
         {children}
       </div>
     </>
