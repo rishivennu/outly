@@ -75,7 +75,7 @@ describe("A7 entry popups queue up and never take layout space", () => {
       ["components/shared/PrivacyNotice.tsx", /className="fixed inset-0 z-\[81\]/],
       ["components/promo/PromoSheet.tsx", /promo-sheet fixed/],
       ["components/shell/WhatsNew.tsx", /className="fixed inset-0 z-\[81\]/],
-      ["components/shell/InstallPrompt.tsx", /install-sheet fixed/],
+      ["components/pwa/InstallGuide.tsx", /install-sheet fixed/],
       ["components/founding/FoundingWelcome.tsx", /className="fixed inset-0/],
     ] as const)
       expect(src(f)).toMatch(re);

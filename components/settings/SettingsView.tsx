@@ -21,6 +21,7 @@ import { TwoStepCard } from "./TwoStepCard";
 import { PhoneCard } from "./PhoneCard";
 import { YourDataCard } from "./YourDataCard";
 import { StorageManager } from "./StorageManager";
+import { InstallSettingsCard } from "@/components/pwa/InstallSettingsCard";
 import Link from "next/link";
 import { AlertsCard } from "./AlertsCard";
 import { BrandProfileCard } from "./BrandProfileCard";
@@ -232,8 +233,13 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, per
       id: "appearance",
       label: "Appearance",
       icon: Palette,
-      blurb: "Light or dark, and how the cursor looks.",
-      content: <Look />,
+      blurb: "Light or dark, how the cursor looks, and Outlly on your Home Screen.",
+      content: (
+        <>
+          <Look />
+          <InstallSettingsCard />
+        </>
+      ),
     },
     {
       id: "security",

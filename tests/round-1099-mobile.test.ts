@@ -186,10 +186,12 @@ describe("1099 PWA basics the banner relies on", () => {
     expect(c).toContain("web-only fixed");
     expect(c).toContain("lg:hidden");
     expect(c).toContain('aria-label="Not now"');
-    expect(c).toContain("Add to Home Screen");
-    expect(c).toContain("Tap the Share button");
-    expect(c).toContain("Add to Home Screen\\u201d");
-    expect(c).toContain("Tap \\u201cAdd\\u201d");
+    // R1256: the card's action is the shared Install Outlly button; the iOS steps moved to components/pwa/InstallGuide.tsx.
+    expect(c).toContain('<InstallOutllyButton layout="card"');
+    const g = src("components/pwa/InstallGuide.tsx");
+    expect(g).toContain("Tap the Share icon");
+    expect(g).toContain("Select Add to Home Screen");
+    expect(g).toContain('title: "Tap Add"');
     expect(c).not.toMatch(/<motion\.aside[^>]*role="dialog"/);
   });
 });

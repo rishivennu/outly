@@ -10,6 +10,7 @@ import { HoverLink } from "./HoverLink";
 import { useUser } from "./UserContext";
 import { useSignOut } from "./SignOutButton";
 import { accountItems, isActive } from "./nav-items";
+import { InstallOutllyButton } from "@/components/pwa/InstallOutllyButton";
 
 /** Who is signed in, the way every account surface shows it. Teammates get their own orb, never the owner's avatar. */
 export function useWho() {
@@ -65,6 +66,7 @@ export function AccountRows({ onPick, onLogout, extra, rowClass }: { onPick: () 
       {extra}
       <div className="acct-sep" role="separator" />
       <div role="group" aria-label="More" className="flex flex-col gap-0.5">{more.map(link)}</div>
+      <InstallOutllyButton layout="menu" onPick={onPick} />
       <div className="acct-sep" role="separator" />
       <div className="flex items-center justify-between gap-2 px-3 py-1">
         <span className="text-[13px] text-muted-foreground">Theme</span>
