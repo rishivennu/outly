@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Activity, Award, BarChart3, BadgePercent, BellRing, ShieldAlert, CalendarDays, Gift, BadgeCheck, BookOpen, ChevronRight, Construction, FlaskConical, HeartPulse, Headset, Hourglass, Library, Newspaper, Rocket, PanelsTopLeft, PanelLeftClose, PanelLeftOpen, CreditCard, Globe, Share2, SlidersHorizontal, Sparkles, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, Repeat, ShieldCheck, Tag, TrendingUp, Type, Users, Wand2, X } from "lucide-react";
+import { Activity, Award, BarChart3, BadgePercent, BellRing, ShieldAlert, CalendarDays, Gift, BadgeCheck, BookOpen, ChevronRight, Construction, FlaskConical, HeartPulse, Headset, Hourglass, Library, Newspaper, Rocket, PanelsTopLeft, PanelLeftClose, PanelLeftOpen, CreditCard, Globe, Handshake, Share2, SlidersHorizontal, Sparkles, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, Repeat, ShieldCheck, Tag, TrendingUp, Type, Users, Wand2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
@@ -34,6 +34,7 @@ export const NAV: { href: string; label: string; icon: typeof Users; area: Admin
   { href: "/admin/plans", label: "Plan grants", icon: BadgeCheck, area: "plans", group: "Run" },
   { href: "/admin/ai-usage", label: "AI usage", icon: Sparkles, area: "users", group: "Run" },
   { href: "/admin/referrals", label: "Refer & Earn", icon: Gift, area: "referrals", group: "Run" },
+  { href: "/admin/partners", label: "Creator Partnerships", icon: Handshake, area: "partners", group: "Run" },
   { href: "/admin/health", label: "System Health", icon: ShieldAlert, area: "health", group: "Run" },
   { href: "/admin/behavior", label: "User behavior", icon: Activity, area: "insights", group: "Insights" },
   { href: "/admin/retention", label: "At risk", icon: HeartPulse, area: "retention", group: "Insights" },
