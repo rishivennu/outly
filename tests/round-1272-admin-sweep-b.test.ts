@@ -9,6 +9,7 @@ const read = (f: string) => readFileSync(f, "utf8");
 const EXCEPTIONS: Record<string, number> = {
   "components/admin/ActivationFunnel.tsx": 1, // range radio
   "components/admin/AiAccessPanel.tsx": 2, // mode radio + length chips
+  "components/admin/AdminTabBar.tsx": 1, // R1274 More tab of the phone tab bar (aria-expanded, .mtab-item ink)
   "components/admin/AiEngineCard.tsx": 1, // disclosure row
   "components/admin/BehaviorAnalyses.tsx": 1, // version list row
   "components/admin/BehaviorView.tsx": 2, // tabs + range radio

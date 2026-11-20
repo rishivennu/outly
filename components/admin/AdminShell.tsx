@@ -18,6 +18,7 @@ import { Tooltip } from "./ui";
 import { Button } from "@/components/ui/button";
 import { FX, T } from "@/lib/motion/tokens";
 import { useHeaderScroll } from "@/lib/client/header-scroll";
+import { AdminTabBar } from "./AdminTabBar";
 
 /** 1163: five groups. Run is the daily console, Insights is read-only analysis, Setup is configuration, Administration is who may do what. */
 export type NavGroup = "Run" | "Insights" | "Content Studio" | "Support" | "Setup" | "Administration";
@@ -78,7 +79,7 @@ const DRAWER_FX = {
 };
 
 /** Longest matching entry wins, so /admin/blog/library lights "Blog library" and not "Blog dashboard" as well. */
-const active = (path: string, href: string) => {
+export const active = (path: string, href: string) => {
   if (href === "/admin") return path === "/admin";
   if (path !== href && !path.startsWith(href + "/")) return false;
   return !NAV.some((n) => n.href !== href && n.href.length > href.length && (path === n.href || path.startsWith(n.href + "/")));
@@ -225,6 +226,9 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
   const drawer = useRef<HTMLElement>(null);
   // Opened by a tap, focus lands on the panel itself (no ring, no tooltip); from the keyboard, on its first control.
   const byPointer = useRef(false);
+  // R1274: the drawer opens from the header menu or from the tab bar's More; focus goes back to whichever opened it.
+  const moreBtn = useRef<HTMLButtonElement>(null);
+  const fromTab = useRef(false);
   // R1269: the phone and tablet bar folds away on the way down and comes back on the way up (the studio's own hook).
   const { lifted, hidden } = useHeaderScroll(path, top);
   useEffect(() => setOpen(false), [path]);
@@ -277,18 +281,18 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
       </div>
 
       <div className="min-w-0 flex-1">
-        {/* 1191: one bar, one hairline, one height. The phone bar is 56px tall plus the status-bar inset, and
+        {/* 1191: one bar, one hairline, one height. The phone bar is 52px tall (R1274: the studio bar's height) plus the status-bar inset (box-content, so the inset never eats the row), and
             the menu, mark, title and bell all sit on its centre line, so nothing shifts between admin pages. */}
         {/* R1269: under 1024px .admin-top folds on data-folded (globals.css); it stays sticky in the flow, so nothing jumps. */}
-        <header ref={top} data-lifted={lifted ? "" : undefined} data-folded={hidden ? "" : undefined} className="admin-top sticky top-0 z-[var(--admin-z-header)] flex h-14 items-center gap-2 border-b border-border/50 bg-background/75 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-[env(safe-area-inset-top)] backdrop-blur-xl md:h-16 lg:h-auto lg:border-0 lg:bg-transparent lg:pl-8 lg:pr-8 lg:pt-5 lg:backdrop-blur-0">
+        <header ref={top} data-lifted={lifted ? "" : undefined} data-folded={hidden ? "" : undefined} className="admin-top sticky top-0 z-[var(--admin-z-header)] box-content flex h-[52px] items-center gap-2 border-b border-border/50 bg-background/75 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-[env(safe-area-inset-top)] backdrop-blur-xl md:h-16 lg:h-auto lg:border-0 lg:bg-transparent lg:pl-8 lg:pr-8 lg:pt-5 lg:backdrop-blur-0">
           <div className="flex min-w-0 items-center gap-1.5 lg:hidden">
             <Tooltip text="Open menu" side="bottom" className={cn("-ml-2 flex shrink-0", TOUCH_TIP)}>
-              <Button ref={menuBtn} type="button" variant="ghost" size="icon" onPointerDown={() => (byPointer.current = true)} onKeyDown={() => (byPointer.current = false)} onClick={() => setOpen(true)} aria-label="Open menu" aria-expanded={open} aria-haspopup="dialog" className="text-foreground">
-                <Menu className="h-5 w-5" aria-hidden />
+              <Button ref={menuBtn} type="button" variant="ghost" size="icon" onPointerDown={() => (byPointer.current = true)} onKeyDown={() => (byPointer.current = false)} onClick={() => { fromTab.current = false; setOpen(true); }} aria-label="Open menu" aria-expanded={open} aria-haspopup="dialog" className="text-foreground">
+                <Menu className="h-5 w-5" strokeWidth={1.85} aria-hidden />
               </Button>
             </Tooltip>
             <OutlyMark size={24} />
-            <span className="truncate font-display text-[15px] font-bold leading-none tracking-tight">Admin</span>
+            <span className="truncate font-display text-[16px] font-semibold leading-none tracking-[-0.01em]">Admin</span>
           </div>
           <div className="ml-auto flex shrink-0 items-center">
             <Bell role={admin.role} />
@@ -298,10 +302,26 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
             charts side by side) and capped so ultrawide monitors do not stretch tables across the whole desk. */}
         {/* 1191: the console is sized to the window, so the panel's usual deep bottom padding would leave
             a dead strip under it and make the page scroll for nothing. */}
-        <main id="main" className={cn("admin-main mx-auto w-full max-w-[1480px] px-4 pt-2 sm:px-6 lg:px-8", quiet ? "pb-4" : "pb-24")}>
+        <main id="main" className={cn("admin-main mx-auto w-full max-w-[1480px] px-4 pb-[calc(env(safe-area-inset-bottom)+84px+1rem)] pt-2 sm:px-6 lg:px-8", quiet ? "lg:pb-4" : "lg:pb-24")}>
           {children}
         </main>
       </div>
+
+      {/* R1274: the phone and tablet tab bar; compact while the header is folded (the same scroll signal, one listener). */}
+      <AdminTabBar
+        ref={moreBtn}
+        nav={NAV}
+        role={admin.role}
+        path={path}
+        active={active}
+        compact={hidden}
+        open={open}
+        byPointer={byPointer}
+        onMore={() => {
+          fromTab.current = true;
+          setOpen(true);
+        }}
+      />
 
       {/* R1269: Radix gives the focus trap, Escape, outside tap and the body scroll lock (data-scroll-locked, which
           also pauses Lenis); framer only animates. Focus goes back to the menu button when it closes. */}
@@ -323,7 +343,8 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
                 }}
                 onCloseAutoFocus={(e) => {
                   e.preventDefault();
-                  menuBtn.current?.focus({ preventScroll: true });
+                  if (fromTab.current) moreBtn.current?.focus({ preventScroll: true });
+                  else menuBtn.current?.focus({ preventScroll: true });
                 }}
               >
                 <motion.aside
