@@ -6,6 +6,10 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { PublishedPreview } from "../components/create/PublishingView";
+import type { PostView } from "../components/create/types";
 
 const src = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const view = src("components/create/PublishingView.tsx");
@@ -71,6 +75,47 @@ describe("R1254 publishing layout", () => {
     expect(pv).toContain("Published {when}");
     expect(pv).toContain("{live && t.url && (");
     expect(pv).toContain('<StatusBadge status={t.status} className="shrink-0 self-center whitespace-nowrap" />');
+  });
+
+  test("R1260: a 300-character caption wraps and clamps in its own column, and the badge keeps its row", () => {
+    const words = "Behind the scenes of the launch day shoot, every take we kept and every one we threw away ";
+    const spaced = words.repeat(4).slice(0, 300);
+    const unbroken = "#".concat("outllylaunchday".repeat(20)).slice(0, 300);
+    for (const caption of [spaced, unbroken]) {
+      expect(caption).toHaveLength(300);
+      const post = {
+        format: "video",
+        title: null,
+        items: [],
+        media: { thumbnailUrl: null, filename: "clip.mp4" },
+        targets: [{ id: "t1", platform: "instagram", status: "published", title: null, caption, publishedAt: null, practice: false, url: null }],
+      } as unknown as PostView;
+      const html = renderToStaticMarkup(createElement(PublishedPreview, { post, trackerOf: () => null }));
+      const row = html.match(/<li class="([^"]+)" data-testid="preview-card"[^>]*>([\s\S]*)<\/li>/);
+      expect(row?.[1]).toContain("grid-cols-[64px_minmax(0,1fr)_auto]");
+      const [, , inner = ""] = row ?? [];
+      const line = inner.match(/<p class="([^"]+)" title="([^"]+)">/);
+      expect(line?.[1].split(" ")).toEqual(expect.arrayContaining(["line-clamp-2", "[overflow-wrap:anywhere]"]));
+      expect(line?.[2]).toBe(caption);
+      // three direct children in the one grid row: thumb frame, the words (min-w-0), then the badge last
+      const words3 = inner.indexOf('<div class="min-w-0">');
+      const badge = inner.lastIndexOf("whitespace-nowrap");
+      expect(inner.startsWith('<div class="relative h-[86px] w-[64px] shrink-0')).toBe(true);
+      expect(words3).toBeGreaterThan(0);
+      expect(badge).toBeGreaterThan(inner.indexOf(caption));
+      expect(inner.slice(inner.lastIndexOf("</div>"))).toContain("shrink-0 self-center whitespace-nowrap");
+    }
+  });
+
+  test("tablet (768 to 1023px): one column whose cards all shrink, and the Live Activity cards stay inside it", () => {
+    const grid = view.match(/!active && "([^"]+)"\)\} data-testid="pub-bento"/)?.[1] ?? "";
+    // below lg there is no column template: one implicit column, so only min-w-0 cards keep it at the screen width
+    expect(grid).not.toMatch(/(^| )(sm|md):grid-cols-/);
+    expect(view).toContain('className={cn("min-w-0 rounded-[24px] bg-card p-4 hairline sm:p-5", className)} data-testid="published-preview"');
+    expect(view).toContain('className={cn("min-w-0 rounded-[24px] bg-card p-4 hairline sm:p-5", className)} data-testid="what-happened"');
+    expect(view).toContain('"la-card la-col relative flex w-full flex-col overflow-hidden rounded-[2rem] p-5');
+    expect(view).toContain("[&>li]:!w-full [&>li]:min-w-0");
+    expect(fnBody("LiveActivity")).toContain('<span className="mt-1 block truncate text-xs leading-snug text-white/60">{caption}</span>');
   });
 
   test("What happened is compact: 44px rows, one heading row", () => {

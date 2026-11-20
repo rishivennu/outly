@@ -152,7 +152,7 @@ describe("item 5 (changed 11-16): the tab bar shows on /create too, the Create b
 describe("item 10: 44px on desktop too", () => {
   test("setup steps, inbox filters, Replace video and Open Pip use min-h-11", () => {
     const sc = src("components/onboarding/SetupChecklist.tsx");
-    expect(sc.match(/size="sm"[^>]*className="min-h-11"/g)?.length).toBe(3);
+    expect(sc.match(/size="sm"[^>]*className="min-h-11"/g)?.length).toBe(2); // R1260: the install row is the shared InstallOutllyButton (h-11)
     const il = src("components/inbox/InboxList.tsx");
     expect(il).not.toContain("h-8 touch:h-11");
     expect(il).not.toContain("lg:h-9");

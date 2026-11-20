@@ -126,7 +126,7 @@ describe("1141 house rules in the new screens", () => {
 
   test("the onboarding steps read the device, never the server", () => {
     const s = src("components/onboarding/SetupChecklist.tsx");
-    expect(s).toContain("provenInstalled");
+    expect(s).toContain("useInstallState()"); // R1260: the shared install manager, which reads the browser
     expect(s).toContain("permission()");
     expect(s).toContain('href="/settings/notifications#nf-device"');
   });

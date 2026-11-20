@@ -299,6 +299,17 @@ describe("where the button lives", () => {
     expect(c).toContain("isCalmPage(pathRef.current)");
     expect(c).toContain("installManager()?.dismissPromotion()");
   });
+  test("setup checklist reuses InstallOutllyButton and the shared manager, with no install code of its own", () => {
+    const c = src("components/onboarding/SetupChecklist.tsx");
+    expect(c).toContain('import { InstallOutllyButton } from "@/components/pwa/InstallOutllyButton";');
+    expect(c.match(/<InstallOutllyButton /g)?.length).toBe(1);
+    expect(c).toContain('<InstallOutllyButton layout="card" className="w-full sm:w-fit" describedBy="setup-note-install" />');
+    expect(c).toContain("useInstallState()");
+    expect(c).toContain('id={`setup-note-${s.id}`}');
+    for (const gone of ["beforeinstallprompt", "__outllyInstall", ".prompt()", "userChoice", "installMode(", "provenInstalled(", "matchMedia", "outly:installable"]) expect(c, gone).not.toContain(gone);
+    // the row only shows where there is something to do (prompt in hand, or iOS), never in an in-app browser
+    expect(c).toContain('s.installed || s.outcome === "accepted" || (!s.inApp && (s.canPrompt || s.platform === "ios"))');
+  });
   test("the button: label, supporting text, lime, prompt only from a click", () => {
     const b = src("components/pwa/InstallOutllyButton.tsx");
     expect(b).toContain('INSTALL_LABEL = "Install Outlly"');

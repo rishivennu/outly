@@ -731,6 +731,10 @@ html:not(.dark) .demo-aura span { opacity: .12; }
 html.lenis, html.lenis body { height: auto; }
 html.lenis { scroll-behavior: auto !important; }
 .lenis.lenis-stopped { overflow: hidden; }
+/* R1260: a Radix dialog (Command Palette, Sheet) already locks the page with overflow:hidden on body. With html hidden
+   too, body stops passing its overflow to the viewport and becomes a scroll box of its own at scrollTop 0, so sticky
+   children (the studio rail, .rail-wrap) re-anchor to it and jump up by the scroll offset. Leave html alone then. */
+html.lenis.lenis-stopped:has(> body[data-scroll-locked]) { overflow: visible; }
 
 /* 1181: GSAP ScrollSmoother on public pages (components/marketing/Smoother.tsx). The wrapper is fixed and the content
    glides inside it, so the nav leaves the flow too (fixed at the top) and the content keeps its room as padding. */
@@ -4843,3 +4847,23 @@ html[data-contrast="more"]:not([data-app]) .mmain :is(.glass, .pulse-card, .card
   .nav-hover { display: none; }
   [data-pressing] { scale: none; }
 }
+
+/* R1261 growth engine */
+/* The Create > Publish > Learn > Improve loop: a lime node per step and a connector to the next one, drawn in once
+   the loop is revealed (Reveal sets data-shown). Phones stack the steps, so the connector runs down; from sm it runs across.
+   The draw grows the connector's fill (a flat lime layer) instead of scaling it: the 1100 motion sweep reads to the end
+   of this file and keeps transforms out of it. */
+.ge-node { position: relative; z-index: 1; flex: none; width: 12px; height: 12px; margin-top: 4px; border-radius: 9999px; background: hsl(var(--lime)); box-shadow: 0 0 0 4px hsl(var(--lime) / .16); }
+.ge-seg { position: absolute; left: 5px; top: 16px; width: 2px; height: 100%; border-radius: 2px; background: linear-gradient(hsl(var(--lime)), hsl(var(--lime))) 0 0 / 100% 100% no-repeat; }
+.ge-loop[data-shown] .ge-seg { animation: ge-draw-y var(--m-section) var(--m-ease-out) calc(.25s + var(--i, 0) * .18s) backwards; }
+@keyframes ge-draw-y { from { background-size: 100% 0; } }
+@keyframes ge-draw-x { from { background-size: 0 100%; } }
+@media (min-width: 640px) {
+  .ge-node { margin-top: 0; }
+  .ge-seg { left: calc(50% + 10px); top: 5px; width: calc(100% - 4px); height: 2px; }
+  .ge-loop[data-shown] .ge-seg { animation-name: ge-draw-x; }
+}
+/* Reduced motion: the connectors arrive with the reveal's own short fade instead of drawing in. */
+@media (prefers-reduced-motion: reduce) { .ge-loop[data-shown] .ge-seg { animation: none; } }
+@media (forced-colors: active) { .ge-node, .ge-seg { background: CanvasText; box-shadow: none; } }
+/* end R1261 growth engine */

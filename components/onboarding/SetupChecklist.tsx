@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BellRing, Check, Share, SquarePlus, X } from "lucide-react";
+import { ArrowRight, BellRing, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/components/shell/UserContext";
 import { useToast } from "@/components/shared/Toast";
 import { ONBOARDING_CHANGED, openOnboarding, saveOnboarding } from "./onboarding-client";
-import { installMode, provenInstalled, type InstallMode } from "@/lib/pwa-core";
+import { InstallOutllyButton } from "@/components/pwa/InstallOutllyButton";
+import { useInstallState, type InstallSnapshot } from "@/lib/pwa/install";
 import { permission } from "@/lib/client/push";
 import { SETUP_COOKIE_DAYS, SETUP_DEVICE_COOKIE, SETUP_HIDDEN_COOKIE, setupHiddenFor, withSetupHidden, type OnboardingPayload, type OnboardingStepId } from "@/lib/onboarding-core";
 import { cn } from "@/lib/utils";
@@ -26,18 +27,10 @@ const writeCookie = (name: string, value: string) => {
  * are facts about this device, and the checklist must not claim either on a device where it is not true.
  * A browser that cannot install Outlly at all (a desktop without the prompt, an in-app browser) is not
  * shown the step, because there would be nothing to do about it.
+ * R1260: the install facts come from the shared install manager (lib/pwa/install.ts) that every Install Outlly
+ * button reads, so the row and its button never disagree; "Installing" stays up between accept and appinstalled.
  */
-function deviceSetup() {
-  const standalone = (q: string) => window.matchMedia?.(q).matches ?? false;
-  const installed = provenInstalled({
-    standalone: standalone("(display-mode: standalone)") || standalone("(display-mode: fullscreen)") || standalone("(display-mode: minimal-ui)") || standalone("(display-mode: window-controls-overlay)"),
-    iosStandalone: (navigator as Navigator & { standalone?: boolean }).standalone === true,
-    appMode: document.documentElement.hasAttribute("data-app"),
-    referrer: document.referrer,
-  });
-  const mode = installMode({ ua: navigator.userAgent, platform: navigator.platform, maxTouchPoints: navigator.maxTouchPoints, hasPrompt: !!(window as Window & { __outllyInstall?: unknown }).__outllyInstall });
-  return { installed, mode, perm: permission() };
-}
+const offersInstall = (s: InstallSnapshot) => s.installed || s.outcome === "accepted" || (!s.inApp && (s.canPrompt || s.platform === "ios"));
 
 const NOTICES: Record<string, { text: string; tone: "ok" | "info" | "error" }> = {
   no_channel: { text: "You're signed in. That Google account has no YouTube channel yet; create one on youtube.com, then connect it here.", tone: "info" },
@@ -67,33 +60,31 @@ export function SetupChecklist({ onboarding, hidden: hiddenOnServer = false, dev
   const toast = useToast();
   const [view, setView] = useState(onboarding);
   const [hidden, setHidden] = useState(hiddenOnServer);
-  const [device, setDevice] = useState<{ installed: boolean; mode: InstallMode; perm: string } | null>(null);
-  const [installing, setInstalling] = useState(false);
+  const install = useInstallState();
+  const [perm, setPerm] = useState<ReturnType<typeof permission> | null>(null);
 
-  // This device's own two facts, kept fresh: the browser may offer the install prompt a moment after load,
-  // and the notification permission can change in another tab or in the browser's own settings.
+  // This device's own two facts, kept fresh: the install manager follows the prompt and the display mode, and the
+  // notification permission can change in another tab or in the browser's own settings.
   useEffect(() => {
-    const read = () => {
-      const d = deviceSetup();
-      setDevice(d);
-      // Remembered for the server, so the next Home reserves the row only when it will be used.
-      const open = (!!(d.mode || d.installed) && !d.installed) || (d.perm !== "unsupported" && d.perm !== "granted");
-      try {
-        if (readCookie(SETUP_DEVICE_COOKIE) !== (open ? "1" : "0")) writeCookie(SETUP_DEVICE_COOKIE, open ? "1" : "0");
-      } catch {
-        /* cookies blocked: the row is simply reserved each time */
-      }
-    };
+    const read = () => setPerm(permission());
     read();
-    window.addEventListener("outly:installable", read);
-    window.addEventListener("outly:installed", read);
     window.addEventListener("focus", read);
-    return () => {
-      window.removeEventListener("outly:installable", read);
-      window.removeEventListener("outly:installed", read);
-      window.removeEventListener("focus", read);
-    };
+    return () => window.removeEventListener("focus", read);
   }, []);
+  const known = install.ready && perm !== null;
+  const offer = offersInstall(install);
+  const device = known ? { installed: install.installed, offer, perm } : null;
+
+  // Remembered for the server, so the next Home reserves the row only when it will be used.
+  useEffect(() => {
+    if (!known) return;
+    const open = (offer && !install.installed) || (perm !== "unsupported" && perm !== "granted");
+    try {
+      if (readCookie(SETUP_DEVICE_COOKIE) !== (open ? "1" : "0")) writeCookie(SETUP_DEVICE_COOKIE, open ? "1" : "0");
+    } catch {
+      /* cookies blocked: the row is simply reserved each time */
+    }
+  }, [known, offer, install.installed, perm]);
 
   useEffect(() => setView(onboarding), [onboarding]);
   useEffect(() => {
@@ -129,7 +120,7 @@ export function SetupChecklist({ onboarding, hidden: hiddenOnServer = false, dev
   const guided = view.finished ? [] : view.steps;
   const steps = [
     ...guided.map((g) => ({ id: g.id as string, title: g.title, done: g.status === "done", skipped: g.status === "skipped" })),
-    ...(device && (device.mode || device.installed) ? [{ id: "install", title: "Add Outlly to your home screen", done: device.installed, skipped: false }] : []),
+    ...(device && device.offer ? [{ id: "install", title: "Add Outlly to your home screen", done: device.installed, skipped: false }] : []),
     ...(device && device.perm !== "unsupported" ? [{ id: "notify", title: "Turn on notifications", done: device.perm === "granted", skipped: false }] : []),
   ];
   const doneCount = steps.filter((s) => s.done).length;
@@ -162,40 +153,7 @@ export function SetupChecklist({ onboarding, hidden: hiddenOnServer = false, dev
           {skipped ? "Pick it up again" : id === "welcome" ? "Start" : "Open this step"} <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Button>
       );
-    if (id === "install") {
-      if (device?.mode === "prompt")
-        return (
-          <Button
-            size="sm"
-            variant="outline"
-            className="min-h-11"
-            disabled={installing}
-            onClick={async () => {
-              const w = window as Window & { __outllyInstall?: { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> } | null };
-              const ev = w.__outllyInstall;
-              if (!ev) return toast("Your browser took the install prompt back. Use its own menu to add Outlly.", "info");
-              setInstalling(true);
-              try {
-                await ev.prompt();
-                const { outcome } = await ev.userChoice;
-                w.__outllyInstall = null; // a prompt can only be used once
-                if (outcome === "accepted") setDevice(deviceSetup());
-              } catch {
-                toast("That did not open. Use your browser's menu to add Outlly.", "info");
-              } finally {
-                setInstalling(false);
-              }
-            }}
-          >
-            <SquarePlus className="h-4 w-4" aria-hidden="true" /> Add to home screen
-          </Button>
-        );
-      return (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Share className="h-4 w-4 shrink-0" aria-hidden="true" /> Tap Share, then &quot;Add to Home Screen&quot;.
-        </p>
-      );
-    }
+    if (id === "install") return <InstallOutllyButton layout="card" className="w-full sm:w-fit" describedBy="setup-note-install" />;
     if (id === "notify")
       return (
         <Button asChild size="sm" variant={device?.perm === "denied" ? "outline" : "primary"} className="min-h-11">
@@ -251,7 +209,7 @@ export function SetupChecklist({ onboarding, hidden: hiddenOnServer = false, dev
                 </p>
                 {!s.done && (
                   <>
-                    {notes[s.id] && <p className="mt-0.5 text-sm text-muted-foreground">{notes[s.id]}</p>}
+                    {notes[s.id] && <p id={`setup-note-${s.id}`} className="mt-0.5 text-sm text-muted-foreground">{notes[s.id]}</p>}
                     <div className="mt-2.5">{action(s.id, s.skipped)}</div>
                   </>
                 )}
