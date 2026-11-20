@@ -80,6 +80,8 @@ export async function recordOpen(code: string | undefined, visitorKey: string | 
  * can see the attempt; a burst of signups or several from one network are flagged, not refused.
  */
 export async function attachReferral(newUserId: string, ip?: string) {
+  // R1282: a creator partner link (ol_pref) is a separate namespace; its hook never throws and never blocks this one.
+  await import("./partners/attribution").then((m) => m.attachPartnerSignup(newUserId)).catch((e) => console.error("[partners] signup", e));
   const jar = (await cookies());
   const code = jar.get(REF_COOKIE)?.value;
   const visitorKey = jar.get(REF_VISITOR)?.value;

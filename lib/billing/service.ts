@@ -326,6 +326,7 @@ export async function completePayment(paymentId: string, providerRef?: string) {
     const u = await db.user.findUnique({ where: { id: p.userId }, select: { name: true } });
     await adminEvent("subscription_new", `${u?.name ?? "A user"} subscribed to ${plan.name}`, formatMoney(p.amountMinor, p.currency), "/admin/payments");
     await rewardReferredFriend(p.id); // Refer & Earn: the sharer's month, when this is the friend's first qualifying payment
+    await import("../partners/attribution").then((m) => m.recordPaid(p.userId, p.id)).catch((e) => console.error("[partners] paid", e)); // R1282: never throws
     await onPaidFounding(p.userId); // 1067: a paid plan is what earns a founding seat (never throws)
     await noticePaymentOk(p.id); // 1118: never throws
   }

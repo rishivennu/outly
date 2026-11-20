@@ -18,6 +18,7 @@ const PostHogProvider = dynamic(() => import("@/components/analytics/PostHogProv
 const DeviceHint = dynamic(() => import("./DeviceHint").then((m) => m.DeviceHint), { ssr: false });
 const LiquidGlass = dynamic(() => import("./LiquidGlass").then((m) => m.LiquidGlass), { ssr: false });
 const LaunchHost = dynamic(() => import("@/components/billing/RocketCta").then((m) => m.LaunchHost), { ssr: false });
+const PartnerRefBeacon = dynamic(() => import("@/components/partners/PartnerRefBeacon").then((m) => m.PartnerRefBeacon), { ssr: false });
 
 /**
  * The root layout's client pieces (perf B2). Kept in the first bundle: what paints or answers at once (the page
@@ -59,6 +60,7 @@ export function RootClient({ children }: { children: React.ReactNode }) {
           <DeviceHint />
           <LaunchHost initial={launch} />
           <LiquidGlass />
+          <PartnerRefBeacon />
         </>
       )}
     </MotionRoot>
