@@ -4,6 +4,7 @@ import { db } from "../db";
 import { HttpError } from "../http";
 import { firstSentence } from "../ai/adapt-core";
 import { isObjective, type Objective } from "./core";
+import { CLIENTS_MAX, CLIENT_ACCOUNTS_MAX, isScopeKey, slugOf } from "./brand-core";
 
 /**
  * R1233: Content Memory. A ContentItem is one idea; each Post made from it is a ContentVariation (the original and
@@ -183,6 +184,8 @@ export interface BrandProfileInput {
   pillars?: string[] | null;
   tone?: string | null;
   avoid?: string[] | null;
+  /** R1246: the owner's accounts a client covers. Left out = keep what is stored. Ignored on the own brand. */
+  accountIds?: string[] | null;
 }
 export interface BrandProfileView {
   ownerId: string;
@@ -193,6 +196,8 @@ export interface BrandProfileView {
   pillars: string[];
   tone: string | null;
   avoid: string[];
+  /** R1246: always [] on the own brand, which covers the whole workspace. */
+  accountIds: string[];
   updatedAt: string;
 }
 
@@ -209,8 +214,26 @@ const parseList = (s: string | null): string[] => {
   }
 };
 const scopeOf = (k: string | null | undefined) => (typeof k === "string" ? k.trim().slice(0, 100) : "");
+const parseIds = (s: string | null): string[] => {
+  if (!s) return [];
+  try {
+    const v: unknown = JSON.parse(s);
+    return Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === "string" && !!x))].slice(0, CLIENT_ACCOUNTS_MAX) : [];
+  } catch {
+    return [];
+  }
+};
 
-function view(r: { ownerId: string; scopeKey: string; objective: string; name: string | null; audience: string | null; pillars: string | null; tone: string | null; avoid: string | null; updatedAt: Date }): BrandProfileView {
+/** R1246: the ids that really are this owner's SocialAccounts, in the order given. Another workspace's id is dropped. */
+async function ownedAccountIds(ownerId: string, ids: readonly string[]): Promise<string[]> {
+  const wanted = [...new Set(ids.filter((x) => typeof x === "string" && x))].slice(0, CLIENT_ACCOUNTS_MAX);
+  if (!wanted.length) return [];
+  const rows = await db.socialAccount.findMany({ where: { userId: ownerId, id: { in: wanted } }, select: { id: true } });
+  const mine = new Set(rows.map((r) => r.id));
+  return wanted.filter((id) => mine.has(id));
+}
+
+function view(r: { ownerId: string; scopeKey: string; objective: string; name: string | null; audience: string | null; pillars: string | null; tone: string | null; avoid: string | null; accountIds: string | null; updatedAt: Date }): BrandProfileView {
   return {
     ownerId: r.ownerId,
     scopeKey: r.scopeKey,
@@ -221,14 +244,24 @@ function view(r: { ownerId: string; scopeKey: string; objective: string; name: s
     pillars: parseList(r.pillars),
     tone: r.tone,
     avoid: parseList(r.avoid),
+    accountIds: r.scopeKey === "" ? [] : parseIds(r.accountIds),
     updatedAt: r.updatedAt.toISOString(),
   };
 }
 
-/** Creates or replaces the brand profile of a workspace ("" scope) or one of its clients. 400 on an unknown objective. */
+/**
+ * Creates or replaces the brand profile of a workspace ("" scope) or one of its clients. 400 on an unknown objective,
+ * 409 when a new client would pass CLIENTS_MAX. R1246: accountIds are checked against the owner's accounts here.
+ */
 export async function upsertBrandProfile(ownerId: string, scopeKey: string, data: BrandProfileInput): Promise<BrandProfileView> {
   if (!data || !isObjective(data.objective)) throw new HttpError(400, "Choose an objective: awareness, engagement, community, traffic, leads or sales.", "BAD_OBJECTIVE");
   const scope = scopeOf(scopeKey);
+  if (scope !== "") {
+    const exists = await db.brandProfile.findUnique({ where: { ownerId_scopeKey: { ownerId, scopeKey: scope } }, select: { id: true } });
+    if (!exists && (await db.brandProfile.count({ where: { ownerId, scopeKey: { not: "" } } })) >= CLIENTS_MAX)
+      throw new HttpError(409, `You can have up to ${CLIENTS_MAX} clients. Remove one to add another.`, "CLIENTS_MAX");
+  }
+  const ids = scope !== "" && Array.isArray(data.accountIds) ? await ownedAccountIds(ownerId, data.accountIds) : null;
   const fields = {
     objective: data.objective,
     name: text(data.name, 80),
@@ -236,6 +269,7 @@ export async function upsertBrandProfile(ownerId: string, scopeKey: string, data
     pillars: JSON.stringify(list(data.pillars)),
     tone: text(data.tone, 120),
     avoid: JSON.stringify(list(data.avoid)),
+    ...(ids ? { accountIds: JSON.stringify(ids) } : {}),
   };
   const row = await db.brandProfile.upsert({
     where: { ownerId_scopeKey: { ownerId, scopeKey: scope } },
@@ -248,6 +282,49 @@ export async function upsertBrandProfile(ownerId: string, scopeKey: string, data
 export async function getBrandProfile(ownerId: string, scopeKey = ""): Promise<BrandProfileView | null> {
   const row = await db.brandProfile.findUnique({ where: { ownerId_scopeKey: { ownerId, scopeKey: scopeOf(scopeKey) } } });
   return row ? view(row) : null;
+}
+
+/**
+ * R1246: a new client. The key is the one asked for (409 when taken) or one made from the name, with -2, -3 ... on a
+ * clash, so adding "Acme" twice never overwrites the first.
+ */
+export async function createClientProfile(ownerId: string, data: BrandProfileInput & { scopeKey?: string | null }): Promise<BrandProfileView> {
+  const name = text(data.name, 80);
+  if (!name) throw new HttpError(400, "Give the client a name.", "BAD_NAME");
+  const asked = typeof data.scopeKey === "string" ? data.scopeKey.trim() : "";
+  if (asked && !isScopeKey(asked)) throw new HttpError(400, "A client key is 1 to 40 characters: lowercase letters, digits and dashes.", "BAD_CLIENT");
+  const taken = new Set((await db.brandProfile.findMany({ where: { ownerId }, select: { scopeKey: true } })).map((r) => r.scopeKey));
+  if (asked && taken.has(asked)) throw new HttpError(409, "There is already a client with that key.", "CLIENT_EXISTS");
+  let key = asked || slugOf(name);
+  if (!asked) {
+    const base = key;
+    for (let i = 2; taken.has(key); i++) {
+      const tail = `-${i}`;
+      key = `${base.slice(0, 40 - tail.length).replace(/-+$/g, "")}${tail}`;
+    }
+  }
+  return upsertBrandProfile(ownerId, key, { ...data, name });
+}
+
+/** R1246: removes one client profile. Never the own brand (""). False when it is not this owner's. */
+export async function deleteBrandProfile(ownerId: string, scopeKey: string): Promise<boolean> {
+  const scope = scopeOf(scopeKey);
+  if (scope === "") return false;
+  const r = await db.brandProfile.deleteMany({ where: { ownerId, scopeKey: scope } });
+  return r.count > 0;
+}
+
+/**
+ * R1246: the accounts a client's numbers come from, re-checked against the owner's accounts (a removed account drops
+ * out). Null when there is no such client; [] when it has no accounts yet. The own brand ("") is always null: it
+ * covers the whole workspace.
+ */
+export async function accountIdsForClient(ownerId: string, scopeKey: string): Promise<string[] | null> {
+  const scope = scopeOf(scopeKey);
+  if (scope === "") return null;
+  const row = await db.brandProfile.findUnique({ where: { ownerId_scopeKey: { ownerId, scopeKey: scope } }, select: { accountIds: true } });
+  if (!row) return null;
+  return ownedAccountIds(ownerId, parseIds(row.accountIds));
 }
 
 /** R1243: cap on the client list one owner sees, so the switcher stays one short request. */
@@ -279,6 +356,9 @@ export function adaptedFromOf(storyMeta: string | null | undefined): string | nu
   }
 }
 
+/** R1247: the backfill sweep only looks this far back: the outcome cohort window (DECISIONS 4). */
+export const BACKFILL_DAYS = 180;
+
 export interface BackfillResult {
   scanned: number;
   created: number;
@@ -287,17 +367,28 @@ export interface BackfillResult {
 }
 
 /**
+ * R1247: a live platform post, published on or after `since` when given. A target with no publish date of its own
+ * (older rows) uses its post's, as the overview does (lib/intelligence/service.ts).
+ */
+const liveTarget = (since?: Date): Prisma.PostTargetWhereInput => ({
+  platformStatus: "published",
+  practice: false,
+  ...(since ? { OR: [{ publishedAt: { gte: since } }, { publishedAt: null, post: { publishedAt: { gte: since } } }] } : {}),
+});
+
+/**
  * Gives every real published post of the owner (a published, non-practice target) a ContentItem, oldest id first,
  * `batch` at a time. A post whose storyMeta names another post of the same owner in adaptedFrom joins that post's item
  * as an adaptation. Idempotent (posts with a variation are skipped) and resumable through nextCursor.
+ * R1247: `since` keeps it to posts with a live target published on or after that date.
  */
-export async function backfillOwner(ownerId: string, opts: { batch?: number; cursor?: string | null } = {}): Promise<BackfillResult> {
+export async function backfillOwner(ownerId: string, opts: { batch?: number; cursor?: string | null; since?: Date } = {}): Promise<BackfillResult> {
   const batch = Math.min(500, Math.max(1, Math.floor(opts.batch ?? 200) || 200));
   const posts = await db.post.findMany({
     where: {
       userId: ownerId,
       variation: { is: null },
-      targets: { some: { platformStatus: "published", practice: false } },
+      targets: { some: liveTarget(opts.since) },
       ...(opts.cursor ? { id: { gt: opts.cursor } } : {}),
     },
     orderBy: { id: "asc" },
@@ -322,4 +413,34 @@ export async function backfillOwner(ownerId: string, opts: { batch?: number; cur
     if (r?.created) created++;
   }
   return { scanned: posts.length, created, attached, nextCursor: posts.length === batch ? posts[posts.length - 1].id : null };
+}
+
+/**
+ * R1247: the backfill step of the minute sweep (DECISIONS 4). Owners with a live post of the last BACKFILL_DAYS that
+ * has no item yet, oldest such post first so nobody waits behind a busy owner, at most `maxOwners` a run and `batch`
+ * posts each. Safe to run as often as you like: a second run finds nothing left to do. One failing owner never
+ * stops the others.
+ */
+export async function sweepBackfill(opts: { maxOwners?: number; batch?: number; now?: Date | number } = {}): Promise<{ owners: number; items: number; failed: number }> {
+  const now = opts.now instanceof Date ? opts.now.getTime() : (opts.now ?? Date.now());
+  const maxOwners = Math.max(1, Math.min(20, Math.floor(opts.maxOwners ?? 5) || 5));
+  const since = new Date(now - BACKFILL_DAYS * 864e5);
+  const rows = await db.post.findMany({
+    where: { variation: { is: null }, targets: { some: liveTarget(since) } },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    distinct: ["userId"],
+    take: maxOwners,
+    select: { userId: true },
+  });
+  let items = 0;
+  let failed = 0;
+  for (const { userId } of rows) {
+    try {
+      items += (await backfillOwner(userId, { batch: opts.batch ?? 100, since })).created;
+    } catch (e) {
+      failed++;
+      console.error("[sweep] backfill", userId, e);
+    }
+  }
+  return { owners: rows.length, items, failed };
 }

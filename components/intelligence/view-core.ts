@@ -6,7 +6,9 @@ import { MIN_SAMPLE, SIGNAL_MIN_LIFT, confidenceOf } from "@/lib/intelligence/co
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { FORMAT_LABEL, type PostFormat } from "@/lib/formats";
 import { METRIC_LABEL, formatMetric, type MetricKey } from "@/lib/insights/post-core";
-import type { Confidence, Evidence, FormatGroup, MetricStat } from "./types";
+import { transitions } from "@/lib/intelligence/planner-core";
+import type { Outcome } from "@/lib/intelligence/outcome-core";
+import type { Confidence, Evidence, FormatGroup, MetricStat, TopicInsight } from "./types";
 
 export const DAY_OPTIONS = [7, 28, 90] as const;
 export type DayOption = (typeof DAY_OPTIONS)[number];
@@ -106,6 +108,8 @@ export interface ClientProfile {
   scopeKey: string;
   name: string | null;
   objective: string;
+  /** R1246: the accounts this client's numbers come from. */
+  accountIds?: string[];
 }
 export interface ClientOption {
   key: string;
@@ -113,11 +117,26 @@ export interface ClientOption {
 }
 
 /**
- * Said under the switcher, because it is the honest limit today: nothing records which accounts or posts belong to
- * which client, so a client changes the objective and wording, never the numbers.
+ * Said under the switcher. R1246: a client with accounts (Settings, Brand) shows only those accounts' numbers; one
+ * with none can only change the objective and wording, and the note says so instead of passing the numbers off as its.
  */
 export const CLIENT_NOTE =
-  "A client sets the objective and wording only. Outlly does not yet know which accounts or posts belong to which client, so the numbers are still this workspace's (or the account you picked).";
+  "A client with accounts shows only those accounts' numbers. A client with no accounts yet sets the objective and wording only, and the numbers stay this workspace's (or the account you picked).";
+export const CLIENT_NO_ACCOUNTS_NOTE = "This client has no accounts yet; add them in Settings, Brand. Until then the numbers are this workspace's.";
+
+/** R1246: the line under the switcher for the choice on screen. Null accounts = your own brand. */
+export function clientNote(accounts: number | null): string {
+  if (accounts === null) return CLIENT_NOTE;
+  if (accounts <= 0) return CLIENT_NO_ACCOUNTS_NOTE;
+  return `Numbers from this client's ${plural(accounts, "account")} only.`;
+}
+
+/** R1246: how many accounts the selected client has; null for your own brand or a key that is not in the list. */
+export function clientAccountCount(profiles: readonly ClientProfile[] | null | undefined, key: string): number | null {
+  if (!key || !Array.isArray(profiles)) return null;
+  const p = profiles.find((x) => x.scopeKey === key);
+  return p ? (Array.isArray(p.accountIds) ? p.accountIds.length : 0) : null;
+}
 
 /** The switcher's choices: your own brand first, then each client. Null when there are no clients, so it is not shown. */
 export function clientOptions(profiles: readonly ClientProfile[] | null | undefined): ClientOption[] | null {
@@ -143,4 +162,90 @@ export function weeklyReportNote(o: { days: number; objective: string; savedObje
   if (o.days !== 28 || (o.savedObjective !== null && o.objective !== o.savedObjective))
     return "Monday's email reads the last 28 days, judged on your saved objective. Switch back to those to see exactly what it will say.";
   return "This is what Monday's email will say, from the same numbers.";
+}
+
+/* R1248: topics, planner actions, outcomes and the posts cap. */
+
+export const POSTS_CAPPED_TEXT = "Only the newest 2000 posts are compared in this period.";
+
+/** The topic row's lead metric: the one the engine judged most of its posts on, else the objective's first. */
+export function topicLeadStat(t: Pick<TopicInsight, "metric" | "metrics">): MetricStat | undefined {
+  return (t.metric ? t.metrics.find((m) => m.metric === t.metric) : undefined) ?? t.metrics[0];
+}
+
+/** "Not enough posts yet: 2 of the 3 needed" until a topic has MIN_SAMPLE posts with a like-for-like score. */
+export const topicStatusWord = (t: Pick<TopicInsight, "scored" | "sufficient">) => (t.sufficient ? null : `Not enough posts yet: ${t.scored} of the ${MIN_SAMPLE} needed`);
+
+/**
+ * The engine's topic lift is each post against the median of its own platform and format (an index where 100 is
+ * your usual), so the words say that, not "the period before". Only shown once a topic has MIN_SAMPLE scored posts.
+ */
+export function topicLiftText(t: Pick<TopicInsight, "lift" | "sufficient">): string | null {
+  if (!t.sufficient || t.lift === null) return null;
+  return `${liftWord(t.lift)} vs your usual posts of the same platform and format`;
+}
+
+export const hasTopicInsights = (topics: readonly Pick<TopicInsight, "sufficient">[]) => topics.some((t) => t.sufficient);
+
+/** The empty state: no topic has enough posts, and how many the closest one still needs. */
+export function topicsEmptyText(topics: readonly Pick<TopicInsight, "topic" | "scored">[]): string {
+  const closest = [...topics].sort((a, b) => b.scored - a.scored)[0];
+  if (!closest) return `None of the posts in this period has a topic or category yet. A topic needs ${MIN_SAMPLE} posts with numbers before Outlly compares it with your usual posts.`;
+  const need = Math.max(1, MIN_SAMPLE - closest.scored);
+  return `No topic has ${MIN_SAMPLE} posts with numbers yet. The closest, ${closest.topic}, has ${closest.scored} of the ${MIN_SAMPLE} needed: ${plural(need, "more post")} on it and Outlly can compare it.`;
+}
+
+export const REC_STATUS_WORD: Record<string, string> = {
+  open: "New",
+  saved: "Saved for later",
+  accepted: "Accepted",
+  edited: "Edited",
+  done: "Done",
+  rejected: "Not for me",
+  expired: "Expired",
+};
+export const recStatusWord = (status: string) => REC_STATUS_WORD[status] ?? "Unknown";
+
+/** The status the card shows the moment a button is pressed, before the server answers. */
+export const REC_STATUS_AFTER = { save: "saved", reject: "rejected", done: "done" } as const;
+export type RecMove = keyof typeof REC_STATUS_AFTER;
+
+export type RecControl = "create" | "save" | "reject" | "reject-confirm" | "reject-cancel" | "done" | "feedback";
+
+/**
+ * The buttons a card shows: only the legal actions of its status (transitions() in planner-core). Edit is not
+ * offered on the dashboard. Rejecting asks first, and feedback is offered once.
+ */
+export function recControls(status: string, ui: { confirming?: boolean; feedbackGiven?: boolean } = {}): RecControl[] {
+  const legal = transitions(status);
+  const out: RecControl[] = [];
+  if (legal.includes("accept")) out.push("create");
+  if (legal.includes("save")) out.push("save");
+  if (legal.includes("done")) out.push("done");
+  if (legal.includes("reject")) out.push(...(ui.confirming ? (["reject-confirm", "reject-cancel"] as const) : (["reject"] as const)));
+  if (legal.includes("feedback") && !ui.feedbackGiven) out.push("feedback");
+  return out;
+}
+
+/** Statuses whose card carries an outcome line: the post made from it is being measured. */
+export const OUTCOME_STATUSES: readonly string[] = ["accepted", "done"];
+export const hasOutcomeLine = (status: string) => OUTCOME_STATUSES.includes(status);
+
+export const MEASURING_TEXT = "Measuring: first reading 48 h after publishing";
+
+/**
+ * The outcome line: an early signal and its confidence, never a cause. The engine's summary already leads with
+ * its verdict, so the verdict becomes the lead word and the rest follows it.
+ */
+export function outcomeLine(o: Pick<Outcome, "verdict" | "summary" | "confidence"> | null | undefined): { text: string; confidence: Confidence | null } {
+  if (!o) return { text: MEASURING_TEXT, confidence: null };
+  const rest = o.summary.replace(/^[^:]*:\s*/, "");
+  if (o.verdict === "too early") return { text: `Measuring: ${rest}`, confidence: null };
+  const lead = o.verdict === "early signal up" ? "up" : o.verdict === "early signal down" ? "down" : "in line";
+  return { text: `Early signal, ${lead}: ${rest}`, confidence: o.confidence };
+}
+
+/** The list rows with the latest outcome attached to accepted and done rows only; other rows are returned as they are. */
+export function withOutcomes<R extends { id: string; status: string }, O>(rows: readonly R[], outcomes: Record<string, O>): (R & { outcome?: O | null })[] {
+  return rows.map((r) => (hasOutcomeLine(r.status) ? { ...r, outcome: Object.prototype.hasOwnProperty.call(outcomes, r.id) ? outcomes[r.id] : null } : r));
 }

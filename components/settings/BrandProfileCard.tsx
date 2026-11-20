@@ -1,15 +1,20 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Target, X } from "lucide-react";
+import { Plus, Target, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Counter, Input, Label, Textarea } from "@/components/ui/field";
 import { api, ApiError } from "@/lib/client/api";
+import { useUser } from "@/components/shell/UserContext";
+import { platformLabel } from "@/components/intelligence/view-core";
 import { BRAND_LIMITS, type ObjectiveOption } from "@/lib/intelligence/brand-core";
 import { cn } from "@/lib/utils";
 
 type Objective = ObjectiveOption["id"];
 type Profile = { objective: Objective; name: string | null; audience: string | null; pillars: string[]; tone: string | null; avoid: string[] };
-type Loaded = { profile: Profile | null; objectives: ObjectiveOption[] };
+type Account = { id: string; platform: string; username: string; displayName: string | null };
+type Loaded = { profile: Profile | null; objectives: ObjectiveOption[]; accounts?: Account[]; limits?: { clients?: number } };
+type ClientRow = { scopeKey: string; name: string | null; objective: Objective; accountIds: string[] };
+type Draft = { scopeKey: string | null; name: string; objective: Objective; accountIds: string[] };
 
 /**
  * R1235: the brand profile of this workspace. The objective decides which metrics Outlly Intelligence judges a post
@@ -71,7 +76,191 @@ function Chips({ id, label, hint, values, placeholder, disabled, onChange }: { i
   );
 }
 
+const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
+const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2";
+
+/**
+ * R1246: agency clients. Each client is a brand profile with its own objective and the owner's accounts it covers, so
+ * Content Intelligence can show that client's numbers on their own. Owner only: the routes under /api/settings are too.
+ */
+function ClientsSection({ objectives, accounts, max }: { objectives: ObjectiveOption[]; accounts: Account[]; max: number }) {
+  const [rows, setRows] = useState<ClientRow[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+
+  const load = () =>
+    api<{ profiles: ClientRow[] }>("/api/settings/brand/profiles").then(
+      (r) => setRows(r.profiles.filter((p) => p.scopeKey !== "")),
+      () => setFailed(true),
+    );
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const objectiveLabel = (id: string) => objectives.find((o) => o.id === id)?.label ?? id;
+  const fail = (err: unknown) => setNote({ kind: "error", text: err instanceof ApiError ? err.message : "Something got in the way." });
+
+  const save = async () => {
+    if (!draft) return;
+    setBusy(true);
+    setNote(null);
+    try {
+      const fields = { objective: draft.objective, name: draft.name.trim(), accountIds: draft.accountIds };
+      if (draft.scopeKey) {
+        // The form edits name, objective and accounts; the rest of the profile is sent back as it was.
+        const cur = await api<{ profile: Profile | null }>(`/api/settings/brand?scope=${encodeURIComponent(draft.scopeKey)}`);
+        const keep = cur.profile ? { audience: cur.profile.audience, tone: cur.profile.tone, pillars: cur.profile.pillars, avoid: cur.profile.avoid } : {};
+        await api(`/api/settings/brand?scope=${encodeURIComponent(draft.scopeKey)}`, { method: "POST", json: { ...keep, ...fields } });
+      } else {
+        await api("/api/settings/brand", { method: "POST", json: { ...fields, client: true } });
+      }
+      setNote({ kind: "ok", text: `Saved ${draft.name.trim()}.` });
+      setDraft(null);
+      await load();
+    } catch (err) {
+      fail(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (key: string) => {
+    setBusy(true);
+    setNote(null);
+    try {
+      await api(`/api/settings/brand?scope=${encodeURIComponent(key)}`, { method: "DELETE" });
+      setConfirm(null);
+      setNote({ kind: "ok", text: "Client removed." });
+      await load();
+    } catch (err) {
+      fail(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const full = !!rows && rows.length >= max;
+  const toggle = (id: string) => setDraft((d) => (d ? { ...d, accountIds: d.accountIds.includes(id) ? d.accountIds.filter((x) => x !== id) : [...d.accountIds, id] } : d));
+
+  return (
+    <section className="grid gap-4 border-t border-border/60 pt-6" aria-labelledby="bp-clients-h">
+      <div>
+        <h3 id="bp-clients-h" className="text-lg font-semibold tracking-tight">Clients</h3>
+        <p className="mt-1 text-[13px] text-muted-foreground">For agencies. Give each client its accounts, and Content Intelligence shows that client&apos;s numbers on their own.</p>
+      </div>
+
+      {failed && <p className="text-sm text-destructive">Your clients didn&apos;t load. Refresh the page and try again.</p>}
+      {rows && rows.length === 0 && !draft && <p className="text-sm text-muted-foreground">No clients yet. Add one to see its numbers on their own.</p>}
+
+      {rows && rows.length > 0 && (
+        <ul className="grid gap-2">
+          {rows.map((c) => {
+            const label = c.name?.trim() || c.scopeKey;
+            return (
+              <li key={c.scopeKey} className="rounded-2xl p-3 hairline">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{label}</p>
+                    <p className="text-[13px] text-muted-foreground">
+                      {objectiveLabel(c.objective)} · {c.accountIds.length ? plural(c.accountIds.length, "account") : "No accounts yet"}
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" disabled={busy} className={FOCUS} onClick={() => { setConfirm(null); setDraft({ scopeKey: c.scopeKey, name: label, objective: c.objective, accountIds: c.accountIds }); }}>
+                    Edit<span className="sr-only"> {label}</span>
+                  </Button>
+                  <Button variant="danger" size="sm" disabled={busy} className={FOCUS} onClick={() => setConfirm(c.scopeKey)}>
+                    Remove<span className="sr-only"> {label}</span>
+                  </Button>
+                </div>
+                {confirm === c.scopeKey && (
+                  <div role="alert" className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+                    <span>Remove {label}? Its posts and accounts stay; only the client profile goes.</span>
+                    <Button variant="danger" size="sm" disabled={busy} className={FOCUS} onClick={() => remove(c.scopeKey)}>
+                      {busy ? "Removing..." : "Yes, remove"}
+                    </Button>
+                    <Button variant="ghost" size="sm" disabled={busy} className={FOCUS} onClick={() => setConfirm(null)}>
+                      Keep
+                    </Button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {draft ? (
+        <fieldset disabled={busy} className="grid gap-4 rounded-2xl p-4 hairline">
+          <legend className="px-1 text-[15px] font-medium">{draft.scopeKey ? "Edit client" : "Add a client"}</legend>
+          <div>
+            <Label htmlFor="bp-client-name">
+              Client name
+              <Counter value={draft.name.length} max={BRAND_LIMITS.name} />
+            </Label>
+            <Input id="bp-client-name" value={draft.name} maxLength={BRAND_LIMITS.name} placeholder="Zeta Foods" onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          </div>
+          <div className="grid gap-1.5">
+            <label htmlFor="bp-client-objective" className="text-sm font-medium">What this client is growing</label>
+            <select id="bp-client-objective" value={draft.objective} onChange={(e) => setDraft({ ...draft, objective: e.target.value as Objective })} className={cn("h-11 w-full max-w-xs rounded-2xl bg-secondary/50 px-3 text-[14px] hairline", FOCUS)}>
+              {objectives.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <fieldset>
+            <legend className="text-sm font-medium">Its accounts</legend>
+            {accounts.length === 0 ? (
+              <p className="mt-1 text-[13px] text-muted-foreground">You have no connected accounts yet. Connect one under Accounts, then give it to this client.</p>
+            ) : (
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {accounts.map((a) => (
+                  <label key={a.id} className={cn("flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl px-3 text-sm hairline transition-colors hover:bg-secondary/60 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2")}>
+                    <input type="checkbox" checked={draft.accountIds.includes(a.id)} onChange={() => toggle(a.id)} className="h-5 w-5 shrink-0 accent-[hsl(var(--lime))]" />
+                    <span className="min-w-0 truncate">
+                      <span className="font-medium">{platformLabel(a.platform)}</span> @{a.username}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </fieldset>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="lime" disabled={busy || !draft.name.trim()} onClick={save}>
+              {busy ? "Saving..." : draft.scopeKey ? "Save client" : "Add client"}
+            </Button>
+            <Button variant="ghost" disabled={busy} className={FOCUS} onClick={() => setDraft(null)}>
+              Cancel
+            </Button>
+          </div>
+        </fieldset>
+      ) : (
+        rows && (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="outline" disabled={busy || full} className={FOCUS} onClick={() => { setConfirm(null); setNote(null); setDraft({ scopeKey: null, name: "", objective: "engagement", accountIds: [] }); }}>
+              <Plus className="h-4 w-4" aria-hidden="true" /> Add client
+            </Button>
+            {full && <p className="text-[13px] text-muted-foreground">That is all {max} clients. Remove one to add another.</p>}
+          </div>
+        )
+      )}
+
+      {note && (
+        <p role="status" className={cn("text-sm", note.kind === "ok" ? "text-foreground" : "text-destructive")}>
+          {note.kind === "error" && <span className="font-medium">Not saved. </span>}
+          {note.text}
+        </p>
+      )}
+    </section>
+  );
+}
+
 export function BrandProfileCard() {
+  const { workspace } = useUser();
   const [d, setD] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
   const [objective, setObjective] = useState<Objective>("engagement");
@@ -201,6 +390,8 @@ export function BrandProfileCard() {
               </p>
             )}
           </div>
+
+          {!workspace && <ClientsSection objectives={d.objectives} accounts={d.accounts ?? []} max={d.limits?.clients ?? 20} />}
         </div>
       )}
     </section>

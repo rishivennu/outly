@@ -1688,6 +1688,7 @@ model BrandProfile {
   pillars   String? // JSON string[]
   tone      String?
   avoid     String? // JSON string[]
+  accountIds String? // R1246: JSON string[] of the owner's SocialAccount ids a client owns; null on the own brand
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
