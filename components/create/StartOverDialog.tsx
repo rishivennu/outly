@@ -80,7 +80,7 @@ export function StartOverDialog({ open, onOpenChange, busy, error, uploading, qu
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount>
               <div
-                className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+                className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-4 pb-[max(1rem,var(--sa-b))]"
                 data-lenis-prevent
                 data-testid="start-over"
                 data-stage={stage}

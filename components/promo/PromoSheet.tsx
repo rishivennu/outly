@@ -66,7 +66,7 @@ export function PromoCard({ offer, onClose, onClaim, preview }: { offer: Offer; 
           <X className="h-[18px] w-[18px]" aria-hidden />
         </button>
       )}
-      <div className="relative z-[2] px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-6 sm:px-7">
+      <div className="relative z-[2] px-6 pb-[max(1.25rem,var(--sa-b))] pt-6 sm:px-7">
         <div className="flex items-center gap-2.5 pr-12">
           <span className="promo-in promo-logo" style={{ ["--d" as string]: "180ms", ["--t" as string]: "350ms" }}>
             {/* A fixed dark tile: the card is cream in both themes, so the mark must not follow the app theme. */}

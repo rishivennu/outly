@@ -206,7 +206,7 @@ describe("1099 phone top bar and touch targets", () => {
     expect(css).toMatch(/\.mtop\[data-lifted\] \{[^}]*backdrop-filter/);
   });
   test("safe areas on three sides and a shorter row in landscape", () => {
-    for (const side of ["top", "left", "right"]) expect(css).toContain(`padding-${side}: env(safe-area-inset-${side});`);
+    for (const side of ["top", "left", "right"]) expect(css).toContain(`padding-${side}: var(--sa-${side[0]});`);
     expect(css).toMatch(/@media \(orientation: landscape\) and \(max-height: 500px\) \{\s*\.mtop-row \{ height: 48px; \}/);
   });
   test("every control is a 44px .mtop-btn with press feedback and a reduced-motion fallback", () => {

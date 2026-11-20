@@ -187,14 +187,14 @@ function Footer({ admin, path, onNavigate, slim = false }: { admin: { name: stri
     <div className="flex flex-col gap-2 border-t border-border/60 px-3 pb-3 pt-3">
       <div className="flex items-center gap-1">
         <ThemeToggle compact plain />
-        <ContrastToggle label={false} />
         <Tooltip text="View the site" side="top" className="ml-auto flex">
           <Link href="/" aria-label="View the site" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground">
             <Globe className="h-4 w-4" aria-hidden />
           </Link>
         </Tooltip>
       </div>
-      <div className="flex items-center gap-1 rounded-2xl p-1.5 hairline">
+      <ContrastToggle className="min-h-11 w-full justify-start" />
+      <div className="flex items-center gap-1 rounded-2xl bg-secondary/40 p-1.5">
         <Link href="/admin/account" onClick={onNavigate} aria-current={mine ? "page" : undefined} className={cn("group flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", mine ? "bg-secondary" : "[@media(hover:hover)]:hover:bg-secondary")}>
           <OrbAvatar seed={admin.name} size={34} />
           <span className="min-w-0 flex-1">
@@ -257,7 +257,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
     <div className="admin-root sky-host relative isolate flex min-h-dvh" data-nav={slim ? "slim" : "full"}>
       {!quiet && <StarField nebula />}
       <div className="sticky top-0 z-[var(--admin-z-sidebar)] hidden h-dvh shrink-0 p-3 lg:block">
-        <aside data-route-order="" className={cn("glass hairline flex h-full flex-col overflow-hidden rounded-[28px] transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none", slim ? "w-[72px]" : "w-[248px]")} aria-label="Admin sidebar">
+        <aside data-route-order="" className={cn("glass flex h-full flex-col overflow-hidden rounded-[28px] transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none", slim ? "w-[72px]" : "w-[248px]")} aria-label="Admin sidebar">
           <div className={cn("flex items-center gap-2 pb-4 pt-5", slim ? "flex-col px-3" : "justify-between px-5")}>
             <Link href="/admin" aria-label="Admin overview" className="flex h-10 items-center">
               {slim ? <OutlyMark size={26} /> : <OutlyLogo size={28} />}
@@ -284,7 +284,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
         {/* 1191: one bar, one hairline, one height. The phone bar is 52px tall (R1274: the studio bar's height) plus the status-bar inset (box-content, so the inset never eats the row), and
             the menu, mark, title and bell all sit on its centre line, so nothing shifts between admin pages. */}
         {/* R1269: under 1024px .admin-top folds on data-folded (globals.css); it stays sticky in the flow, so nothing jumps. */}
-        <header ref={top} data-lifted={lifted ? "" : undefined} data-folded={hidden ? "" : undefined} className="admin-top sticky top-0 z-[var(--admin-z-header)] box-content flex h-[52px] items-center gap-2 border-b border-border/50 bg-background/75 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-[env(safe-area-inset-top)] backdrop-blur-xl md:h-16 lg:h-auto lg:border-0 lg:bg-transparent lg:pl-8 lg:pr-8 lg:pt-5 lg:backdrop-blur-0">
+        <header ref={top} data-lifted={lifted ? "" : undefined} data-folded={hidden ? "" : undefined} className="admin-top sticky top-0 z-[var(--admin-z-header)] box-content flex h-[52px] items-center gap-2 border-b border-border/50 bg-background/75 pl-[max(1rem,calc(var(--sa-l)+0.5rem))] pr-[max(0.75rem,var(--sa-r))] pt-[var(--sa-t)] backdrop-blur-xl md:h-16 lg:h-auto lg:border-0 lg:bg-transparent lg:pl-8 lg:pr-8 lg:pt-5 lg:backdrop-blur-0">
           <div className="flex min-w-0 items-center gap-1.5 lg:hidden">
             <Tooltip text="Open menu" side="bottom" className={cn("-ml-2 flex shrink-0", TOUCH_TIP)}>
               <Button ref={menuBtn} type="button" variant="ghost" size="icon" onPointerDown={() => (byPointer.current = true)} onKeyDown={() => (byPointer.current = false)} onClick={() => { fromTab.current = false; setOpen(true); }} aria-label="Open menu" aria-expanded={open} aria-haspopup="dialog" className="text-foreground">
@@ -302,7 +302,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
             charts side by side) and capped so ultrawide monitors do not stretch tables across the whole desk. */}
         {/* 1191: the console is sized to the window, so the panel's usual deep bottom padding would leave
             a dead strip under it and make the page scroll for nothing. */}
-        <main id="main" className={cn("admin-main mx-auto w-full max-w-[1480px] px-4 pb-[calc(env(safe-area-inset-bottom)+84px+1rem)] pt-2 sm:px-6 lg:px-8", quiet ? "lg:pb-4" : "lg:pb-24")}>
+        <main id="main" className={cn("admin-main mx-auto w-full max-w-[1480px] pb-[calc(var(--sa-float)+1rem)] pl-[max(1rem,var(--sa-l))] pr-[max(1rem,var(--sa-r))] pt-2 sm:pl-[max(1.5rem,var(--sa-l))] sm:pr-[max(1.5rem,var(--sa-r))] lg:px-8", quiet ? "lg:pb-4" : "lg:pb-24")}>
           {children}
         </main>
       </div>
@@ -353,7 +353,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
                   role="dialog"
                   aria-modal="true"
                   aria-label="Admin menu"
-                  className="admin-layer glass-strong fixed inset-y-2 left-2 z-[var(--admin-z-drawer)] flex w-[min(300px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[28px] outline-none lg:hidden"
+                  className="admin-layer glass-strong fixed bottom-[calc(var(--sa-b)+0.5rem)] left-[max(0.5rem,var(--sa-l))] top-[calc(var(--sa-t)+0.5rem)] z-[var(--admin-z-drawer)] flex w-[min(300px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[28px] outline-none lg:hidden"
                   {...(reduce ? FX.fade : DRAWER_FX)}
                 >
                   <Dialog.Title className="sr-only">Admin menu</Dialog.Title>

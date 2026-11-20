@@ -1129,11 +1129,11 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
           <Counter label="Resolved today" n={c?.resolvedToday ?? 0} on={filter === "resolved"} onClick={counter("resolved")} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <p className="inline-flex min-h-11 min-w-0 items-center gap-2 rounded-full bg-secondary px-3.5 text-[12px] text-muted-foreground" aria-live="polite">
+          <p className="inline-flex min-h-11 w-full min-w-0 items-center gap-2 rounded-full bg-secondary px-3.5 text-[12px] text-muted-foreground sm:w-auto" aria-live="polite">
             <span className={cn("h-2 w-2 shrink-0 rounded-full", online > 0 ? "bg-success" : "bg-muted-foreground/50")} aria-hidden />
             <span className="truncate">{q ? `${online} of ${q.agents.length} ${q.agents.length === 1 ? "specialist" : "specialists"} online` : "Checking who is online"}</span>
           </p>
-          <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+          <div data-la-controls="" className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-1 sm:flex-wrap sm:items-center sm:justify-end">
             <Button type="button" aria-pressed={!!q?.away} disabled={!q || busy === "away"} onClick={toggleAway} className={cn(btnChip, q?.away && "bg-warning/20 text-foreground hover:bg-warning/30")}>
               <UserRound className="h-4 w-4" aria-hidden />
               {q?.away ? "Away" : "Available"}
@@ -1404,7 +1404,7 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
               </div>
 
               {/* The composer stays one line until the reply needs more, and clears the phone's home bar. */}
-              <footer className="shrink-0 border-t border-border/60 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              <footer className="shrink-0 border-t border-border/60 p-3 pb-[max(0.75rem,var(--sa-b))]">
                 {mineActive ? (
                   <form
                     onSubmit={(e) => {
@@ -1475,7 +1475,7 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
         <div className="fixed inset-0 z-[70] xl:hidden" role="dialog" aria-modal="true" aria-labelledby="la-drawer-t">
           <div className="absolute inset-0 bg-foreground/35 backdrop-blur-[2px]" onClick={closeDrawer} aria-hidden />
           <div ref={panelRef} tabIndex={-1} onKeyDown={trapTab} className="absolute inset-y-0 right-0 flex w-full flex-col border-l border-border/60 bg-card shadow-2xl outline-none sm:w-[min(94vw,26rem)] sm:rounded-l-[22px]">
-            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 p-3 pt-[max(0.75rem,var(--sa-t))]">
               <h2 id="la-drawer-t" className="truncate font-display text-[15px] font-semibold">
                 Details
               </h2>
@@ -1485,7 +1485,7 @@ export function LiveAssistConsole({ me, role }: { me: { id: string; name: string
                 </Button>
               </Tooltip>
             </div>
-            <div className="la-scroll min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+            <div className="la-scroll min-h-0 flex-1 overflow-y-auto pb-[var(--sa-b)]">
               <Details d={d} info={info} onOpen={pick} onNote={addNote} />
             </div>
           </div>

@@ -331,7 +331,7 @@ export function MarketingNav() {
   const ctaLabel = waitlist ? "Join Waitlist" : "Start creating";
 
   return (
-    <header ref={headerRef} className="mnav sticky top-0 z-50 px-3 pt-3 sm:px-6" data-scrolled={scrolled || open}>
+    <header ref={headerRef} className="mnav sticky top-0 z-50 pl-[max(0.75rem,var(--sa-l))] pr-[max(0.75rem,var(--sa-r))] pt-[calc(var(--sa-t)+0.75rem)] sm:pl-[max(1.5rem,var(--sa-l))] sm:pr-[max(1.5rem,var(--sa-r))]" data-scrolled={scrolled || open}>
       <div ref={barRef} data-lens="" data-lg-shine="" className="mnav-bar mx-auto flex h-14 max-w-[1180px] items-center gap-2 rounded-full pl-3 pr-1.5 sm:h-[60px] sm:pl-4 sm:pr-2">
         <span className="lg-shine" aria-hidden="true" />
         <Link ref={logoRef} href="/" data-mag="" className="flex h-11 shrink-0 items-center gap-2 rounded-full pr-1" aria-label="Outlly home">

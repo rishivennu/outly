@@ -90,7 +90,7 @@ describe("1101 look and motion", () => {
   test("44px targets, safe areas, fits short phones", () => {
     expect(block).toMatch(/\.pw-x \{[^}]*width: 44px; height: 44px/);
     expect(block).toMatch(/\.pw-link \{[^}]*min-height: 44px/);
-    for (const s of ["top", "right", "bottom", "left"]) expect(block).toContain(`env(safe-area-inset-${s})`);
+    for (const s of ["top", "right", "bottom", "left"]) expect(block).toContain(`var(--sa-${s[0]})`);
     expect(block).toContain("@media (max-height: 700px) and (max-width: 1023px)");
   });
   test("the art is decorative, local and theme-aware", () => {

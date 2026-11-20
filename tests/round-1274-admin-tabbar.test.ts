@@ -94,7 +94,7 @@ describe("R1274 shell wiring", () => {
     expect(shell).toContain("ref={moreBtn}");
   });
   test("content clears the bar under lg; desktop padding unchanged", () => {
-    expect(shell).toContain("pb-[calc(env(safe-area-inset-bottom)+84px+1rem)]");
+    expect(shell).toContain("pb-[calc(var(--sa-float)+1rem)]");
     expect(shell).toContain('quiet ? "lg:pb-4" : "lg:pb-24"');
   });
   test("header: the studio bar's 52px row plus the inset, a 44px menu button with the studio icon weight", () => {
@@ -104,7 +104,7 @@ describe("R1274 shell wiring", () => {
   test("CSS: float token under lg, More hover fix, z documented, before the 1100 marker", () => {
     expect(css.indexOf("/* R1274 admin tabbar */")).toBeGreaterThan(-1);
     expect(css.indexOf("/* R1274 admin tabbar */")).toBeLessThan(css.indexOf("/* ---------- 1100: Liquid glass on every studio card"));
-    expect(block).toContain("@media (max-width: 1023.98px) {\n  .admin-root { --admin-bottom-float: calc(env(safe-area-inset-bottom) + 84px); }");
+    expect(block).toContain("@media (max-width: 1023.98px) {\n  .admin-root { --admin-bottom-float: calc(var(--sa-b) + 84px); }");
     expect(block).toContain(".mtab.admin-tabbar:has(> button.mtab-item:hover) .mtab-ind { translate: calc((var(--n, 5) - 1) * 100%) 0; }");
     expect(block).toContain("--admin-z-header");
     expect(block).not.toContain("transition");

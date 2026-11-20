@@ -47,6 +47,7 @@ export function RootClient({ children }: { children: React.ReactNode }) {
       <SmoothScroll lazy={appStart} />
       <ScrollProgress />
       <PageScrollbar />
+      <div className="sa-band" aria-hidden="true" />
       {children}
       <LazyChat />
       <CookieBanner />

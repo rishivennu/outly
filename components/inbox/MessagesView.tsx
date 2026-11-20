@@ -600,7 +600,7 @@ function ThreadPane({
 
   return (
     <section aria-label={`Conversation with ${thread.participantName}`} className="flex min-h-0 flex-1 flex-col">
-      <header className="flex items-center gap-2.5 border-b border-border px-2 pb-2 pt-[max(8px,env(safe-area-inset-top))] lg:gap-3 lg:px-5 lg:py-3">
+      <header className="flex items-center gap-2.5 border-b border-border px-2 pb-2 pt-[max(8px,var(--sa-t))] lg:gap-3 lg:px-5 lg:py-3">
         <button type="button" onClick={onBack} aria-label="Back to conversations" className="gbtn-icon ripple-host grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring lg:hidden">
           <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </button>
@@ -728,7 +728,7 @@ function ThreadPane({
         <div ref={bottom} />
       </div>
 
-      <div className="border-t border-border px-3 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 lg:pb-3.5 lg:pl-5 lg:pr-[76px]">
+      <div className="border-t border-border px-3 pb-[calc(12px+var(--sa-b))] pt-3 lg:pb-3.5 lg:pl-5 lg:pr-[76px]">
         {/* 1090: the composer is always there. When it can't send, it says why and where to answer instead. */}
         {readOnly ? (
           <p id={`dm-lock-${thread.id}`} role="note" className="mb-2 rounded-2xl bg-secondary/60 p-3.5 text-sm">

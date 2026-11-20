@@ -68,8 +68,8 @@ describe("R1211 compact rule (tabScrollStep)", () => {
 describe("R1211 floating pill", () => {
   test("the bar is a centred pill, 12px off the bottom and the sides, never wider than 440px, glass (R1213), rimmed, shadowed", () => {
     const r = rule(".mtab");
-    expect(r).toContain("bottom: calc(env(safe-area-inset-bottom) + 12px);");
-    expect(r).toContain("width: min(calc(100% - 2 * max(12px, env(safe-area-inset-left), env(safe-area-inset-right))), 440px);");
+    expect(r).toContain("bottom: calc(var(--sa-b) + 12px);");
+    expect(r).toContain("width: min(calc(100% - 2 * max(12px, var(--sa-l), var(--sa-r))), 440px);");
     expect(r).toContain("margin-inline: auto;");
     expect(r).toContain("border-radius: 9999px;");
     expect(r).toContain("border: 1px solid hsl(var(--mtab-line));");
@@ -92,9 +92,9 @@ describe("R1211 floating pill", () => {
     expect(nav).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
   });
   test("on a phone on its side the pill is 54px, 8px off the edge, and compact only drops to 50px", () => {
-    expect(css).toContain(".mtab { height: 54px; padding: 2px 6px; bottom: calc(env(safe-area-inset-bottom) + 8px); }");
+    expect(css).toContain(".mtab { height: 54px; padding: 2px 6px; bottom: calc(var(--sa-b) + 8px); }");
     expect(css).toContain(".mtab[data-compact] { height: 50px; transform: none; }");
-    expect(css).toContain(".mmain { padding-bottom: calc(env(safe-area-inset-bottom) + 76px); }");
+    expect(css).toContain(".mmain { padding-bottom: calc(var(--sa-b) + 76px); }");
   });
   test("Nav.tsx: one rAF per scroll burst, cleanup, data-compact on the bar and the html, never hidden", () => {
     const hook = nav.slice(nav.indexOf("function useCompactOnScroll"), nav.indexOf("export function MobileNav"));
@@ -120,7 +120,7 @@ describe("R1211 floating pill", () => {
   });
   test("what floats above the bar moved up with it (84px), Pip follows the compact flag, and nothing keeps the old names", () => {
     for (const f of ["components/create/ActionBar.tsx", "components/support/ChatWidget.tsx", "components/shared/Toast.tsx", "components/shared/DeviceHint.tsx", "components/shared/CookieConsent.tsx"]) {
-      expect(src(f)).toContain("calc(env(safe-area-inset-bottom)+84px)");
+      expect(src(f)).toContain("var(--sa-float)");
       expect(src(f)).not.toContain("+74px");
     }
     expect(css).toContain("html[data-tabs-compact] .pc-dock:not([data-open]) {");

@@ -524,7 +524,7 @@ export function ContentLibrary({
       )}
 
       {selected.size > 0 && (
-        <div role="region" aria-label="Selected posts" className="sticky bottom-[calc(env(safe-area-inset-bottom)+82px)] z-30 mt-8 flex justify-center lg:bottom-6">
+        <div role="region" aria-label="Selected posts" className="sticky bottom-[calc(var(--sa-b)+82px)] z-30 mt-8 flex justify-center lg:bottom-6">
           <div className="glass-strong flex flex-wrap items-center justify-center gap-2 rounded-3xl p-2 pl-4 shadow-lg">
             <p className="tabular mr-1 text-sm font-semibold" aria-live="polite">
               {selected.size} selected

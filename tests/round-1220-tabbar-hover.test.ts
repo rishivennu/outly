@@ -39,8 +39,8 @@ describe("R1220 tab bar pill", () => {
     expect(nav).toContain('<span className="mtab-ripple" aria-hidden="true" />');
   });
   test("the folded top bar keeps the safe-area strip in the installed app", () => {
-    expect(css).toContain(".mtop[data-folded] { transform: translateY(calc(-100% + env(safe-area-inset-top, 0px))); pointer-events: none; }");
-    expect(css).toContain(".mtop {\n  padding-top: env(safe-area-inset-top);");
+    expect(css).toContain(".mtop[data-folded] { transform: translateY(-100%); pointer-events: none; }");
+    expect(css).toContain(".mtop {\n  padding-top: var(--sa-t);");
   });
 
   test("the bell and the menu button do not touch: an 8px gap between two 44px glass circles (each wears a 1px ring)", () => {

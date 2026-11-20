@@ -155,7 +155,7 @@ export function WhatsNew({ notice, userId, joinedAt }: { notice: UpdateNotice; u
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount {...(notice.body ? {} : { "aria-describedby": undefined })}>
               <div
-                className="fixed inset-0 z-[81] grid place-items-center overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+                className="fixed inset-0 z-[81] grid place-items-center overflow-y-auto overscroll-contain p-4 pb-[max(1rem,var(--sa-b))]"
                 data-lenis-prevent
                 onPointerDown={(e) => {
                   if (e.target === e.currentTarget) close();

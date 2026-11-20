@@ -148,7 +148,7 @@ export function VideoPreview({ state, all, onSelect, onClose, onClosed }: { stat
                         data-preview-close
                         type="button"
                         aria-label="Close preview"
-                        className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-10 grid h-11 w-11 place-items-center rounded-full bg-black/55 text-white backdrop-blur-md transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:hidden"
+                        className="absolute right-3 top-[max(0.75rem,var(--sa-t))] z-10 grid h-11 w-11 place-items-center rounded-full bg-black/55 text-white backdrop-blur-md transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:hidden"
                       >
                         <X className="h-5 w-5" />
                       </button>
@@ -171,7 +171,7 @@ export function VideoPreview({ state, all, onSelect, onClose, onClosed }: { stat
                       </Dialog.Close>
                     </header>
 
-                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-5" data-lenis-prevent>
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,var(--sa-b))] md:p-5" data-lenis-prevent>
                       {comment.media?.caption && <Caption text={comment.media.caption} />}
                       {comment.postUrl && (
                         <a href={comment.postUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-sm font-medium hairline transition hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
@@ -387,7 +387,7 @@ function Player({ media, title, platformName, postUrl }: { media: CommentMedia |
               v.muted = false;
               if (v.paused) v.play().catch(() => {});
             }}
-            className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-black/55 px-3.5 text-sm font-medium text-white backdrop-blur-md transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+            className="absolute left-3 top-[max(0.75rem,var(--sa-t))] inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-black/55 px-3.5 text-sm font-medium text-white backdrop-blur-md transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
           >
             <VolumeX className="h-4 w-4" aria-hidden="true" /> Tap for sound
           </button>

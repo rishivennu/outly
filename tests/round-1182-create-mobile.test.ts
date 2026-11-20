@@ -164,13 +164,13 @@ describe("1182 the action bar on phones", () => {
     expect(s.buttons.map((b) => b.id)).toEqual(["save", "preview", "continue"]);
   });
   test("sits above the tab bar, 12px off the bottom in the app where Create has none, and fields scroll clear of it", () => {
-    expect(bar).toContain("sticky bottom-[calc(env(safe-area-inset-bottom)+84px)]");
-    expect(bar).toContain("[html[data-app]_&]:bottom-[calc(env(safe-area-inset-bottom)+12px)]");
-    expect(bar).toContain("max-lg:[html:has(&)]:scroll-pb-[calc(env(safe-area-inset-bottom)+210px)]");
+    expect(bar).toContain("sticky bottom-[var(--sa-float)]");
+    expect(bar).toContain("[html[data-app]_&]:bottom-[calc(var(--sa-b)+12px)]");
+    expect(bar).toContain("max-lg:[html:has(&)]:scroll-pb-[calc(var(--sa-b)+210px)]");
   });
   test("the phone sheet fits what it holds, up to 86dvh, with the safe area kept", () => {
     expect(ws).toContain("max-xl:flex max-xl:max-h-[min(86dvh,720px)] max-xl:w-full max-xl:flex-col");
-    expect(ws).toContain("max-xl:pb-[env(safe-area-inset-bottom)]");
+    expect(ws).toContain("max-xl:pb-[var(--sa-b)]");
     expect(pip).toContain('<section aria-label="Creative partner" className="flex h-full min-h-0 flex-col">');
   });
   test("no dashes in the 1182 files", () => {

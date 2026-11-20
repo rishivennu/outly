@@ -93,7 +93,7 @@ describe("1100 phone drawer", () => {
     expect(drawerItems(true).some((i) => i.href === "/accounts")).toBe(false);
   });
   test("safe areas and reduced motion", () => {
-    for (const side of ["top", "right", "bottom"]) expect(css).toMatch(new RegExp(`\\.mdrawer \\{[^}]*padding-${side}: env\\(safe-area-inset-${side}\\)`));
+    for (const side of ["top", "right", "bottom"]) expect(css).toMatch(new RegExp(`\\.mdrawer \\{[^}]*padding-${side}: var\\(--sa-${side[0]}\\)`));
     expect(css).toMatch(/prefers-reduced-motion: reduce\) \{\s*\.mdrawer\[data-state="open"\], \.mdrawer-scrim\[data-state="open"\] \{ animation: page-fade/);
   });
 });

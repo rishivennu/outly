@@ -1,7 +1,7 @@
 /**
  * Phase 4 hid the phone tab bar on /create so it never stacked under the post actions bar. 11-16: the creator
  * wanted the tabs on /create too, so no page hides it now; a page with its own bottom bar sits that bar above the
- * tabs instead (ActionBar, BulkPlanner: env(safe-area-inset-bottom) + 84px, see .mtab in globals.css). The hook
+ * tabs instead (ActionBar, BulkPlanner: var(--sa-b) + 84px, see .mtab in globals.css). The hook
  * stays so a page can opt out again by listing itself in NO_TAB_BAR.
  */
 /** The phone tab bar's pages, in its order (Nav.tsx TABS). Where the bar is hidden, the menu drawer lists them. */

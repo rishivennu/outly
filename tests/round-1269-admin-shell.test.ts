@@ -26,7 +26,7 @@ describe("R1269 phone and tablet header", () => {
     expect(css.indexOf("/* R1269 admin shell */")).toBeGreaterThan(-1);
     expect(css.indexOf("/* R1269 admin shell */")).toBeLessThan(css.indexOf("/* ---------- 1100: Liquid glass on every studio card"));
     expect(block).toContain("@media (max-width: 1023.98px) {");
-    expect(block).toContain(".admin-top[data-folded] { transform: translateY(calc(-100% + env(safe-area-inset-top, 0px))); pointer-events: none; }");
+    expect(block).toContain(".admin-top[data-folded] { transform: translateY(-100%); pointer-events: none; }");
     expect(block).toContain(".admin-top { transition: transform var(--m-nav) var(--m-ease-out); }");
     expect(block).toContain("@media (max-width: 1023.98px) and (prefers-reduced-motion: reduce) { .admin-top { transition: none; } }");
     expect(block).not.toContain("transition: all");

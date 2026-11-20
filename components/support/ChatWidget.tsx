@@ -921,7 +921,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   return (
     // 1154 (pc-dock): on a phone Pip steps aside with the tab bar while you scroll down, and the page gets room
     // below its last card so the bubble never sits on top of it (globals.css).
-    <div data-open={open ? "" : undefined} data-lift={lift ? "" : undefined} className={cn(pipFont.variable, "pc pc-dock fixed right-4 z-[55] sm:right-6", (path.startsWith("/create") || waitTurn) && !open && "hidden", lift ? "bottom-[calc(env(safe-area-inset-bottom)+84px)] lg:bottom-6" : "bottom-[max(16px,env(safe-area-inset-bottom))] sm:bottom-6")}>
+    <div data-open={open ? "" : undefined} data-lift={lift ? "" : undefined} className={cn(pipFont.variable, "pc pc-dock fixed right-[max(1rem,var(--sa-r))] z-[55] sm:right-[max(1.5rem,var(--sa-r))]", (path.startsWith("/create") || waitTurn) && !open && "hidden", lift ? "bottom-[var(--sa-float)] lg:bottom-6" : "bottom-[max(16px,var(--sa-b))] sm:bottom-6")}>
       {open && <div className="pc-scrim fixed inset-0" aria-hidden onClick={close} />}
       {open && (
         <section
@@ -1189,7 +1189,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
             )}
           </div>
 
-          <footer className="pc-foot px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
+          <footer className="pc-foot px-3 pb-[max(12px,var(--sa-b))] pt-2.5">
             {resolved ? (
               <div role="status" className="pc-resolved pc-in mb-1 p-3.5">
                 <p className="flex items-center gap-2 text-[15px] font-semibold"><span className="pc-resolved-mark grid h-6 w-6 shrink-0 place-items-center rounded-full" aria-hidden><Check className="h-3.5 w-3.5" /></span>{rt.doneTitle}</p>

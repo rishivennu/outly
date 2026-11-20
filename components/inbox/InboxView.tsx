@@ -843,7 +843,7 @@ function CommentDetail({
 
   return (
     <section aria-label={`Comment from ${comment.authorName}`} className="flex min-h-0 flex-1 flex-col">
-      <header className="flex items-center gap-2 border-b border-border px-2 pb-2 pt-[max(8px,env(safe-area-inset-top))] lg:gap-3 lg:px-5 lg:py-3">
+      <header className="flex items-center gap-2 border-b border-border px-2 pb-2 pt-[max(8px,var(--sa-t))] lg:gap-3 lg:px-5 lg:py-3">
         <button type="button" onClick={onBack} aria-label="Back to comments" className={cn(iconBtn, "lg:hidden")}>
           <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </button>
@@ -923,7 +923,7 @@ function CommentDetail({
         </div>
       </div>
 
-      <div className="border-t border-border px-3 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 lg:pb-3.5 lg:pl-5 lg:pr-[76px]">
+      <div className="border-t border-border px-3 pb-[calc(12px+var(--sa-b))] pt-3 lg:pb-3.5 lg:pl-5 lg:pr-[76px]">
         {/* Same as the messages composer: it stays on screen, says who can answer, and sends nothing. */}
         {readOnly && (
           <p id={lockId} role="note" className="mb-2 rounded-2xl bg-secondary/60 p-3.5 text-sm">

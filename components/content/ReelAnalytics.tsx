@@ -69,7 +69,7 @@ export function ReelAnalytics({ post, onClose, onDetails }: { post: PostView | n
               <motion.div className="fixed inset-0 z-[70] bg-foreground/35 backdrop-blur-[3px]" {...FX.scrim} />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount aria-describedby={undefined}>
-              <div className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-6" data-lenis-prevent onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+              <div className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-3 pb-[max(0.75rem,var(--sa-b))] sm:p-6" data-lenis-prevent onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
                 <motion.div
                   initial={{ opacity: 0, y: 18, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}

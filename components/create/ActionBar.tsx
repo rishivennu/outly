@@ -200,7 +200,7 @@ const ICON: Record<BarId, typeof Save> = { save: Save, preview: Eye, schedule: C
 export function ActionBar({ state, saveLabel, mode, onAction, className, fill, pip }: Props) {
   const btn = "h-auto min-h-[52px] min-w-0 flex-col gap-0.5 px-1 text-xs font-semibold sm:min-h-11 sm:flex-row sm:gap-2 sm:px-4 sm:text-sm";
   return (
-    <div role="region" aria-label="Post actions" className={cn("sticky bottom-[calc(env(safe-area-inset-bottom)+84px)] z-30 mt-6 [html[data-app]_&]:bottom-[calc(env(safe-area-inset-bottom)+12px)] max-lg:[html:has(&)]:scroll-pb-[calc(env(safe-area-inset-bottom)+210px)] lg:bottom-4", pip && "max-xl:mt-[70px]", className)}>
+    <div role="region" aria-label="Post actions" className={cn("sticky bottom-[var(--sa-float)] z-30 mt-6 [html[data-app]_&]:bottom-[calc(var(--sa-b)+12px)] max-lg:[html:has(&)]:scroll-pb-[calc(var(--sa-b)+210px)] lg:bottom-4", pip && "max-xl:mt-[70px]", className)}>
       {/* 1182: in the app Create has no tab bar, so the bar sits 12px off the bottom; focus scrolls fields clear of it. */}
       {pip && <div className="absolute bottom-full right-1 mb-2.5 xl:hidden">{pip}</div>}
       <div className={cn("glass-strong mx-auto w-full rounded-[22px] p-1.5 shadow-[0_18px_40px_-24px_hsl(var(--foreground)/0.45)] hairline", fill ? "max-w-none sm:flex sm:items-center sm:gap-3 sm:pl-4" : "max-w-3xl")}>

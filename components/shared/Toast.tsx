@@ -39,7 +39,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={push}>
       <DismissCtx.Provider value={dismiss}>
         {children}
-        <div aria-live="polite" role="status" className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+84px)] z-[90] flex flex-col items-center gap-2 px-4 lg:bottom-8">
+        <div aria-live="polite" role="status" className="pointer-events-none fixed inset-x-0 bottom-[var(--sa-float)] z-[90] flex flex-col items-center gap-2 pl-[max(1rem,var(--sa-l))] pr-[max(1rem,var(--sa-r))] lg:bottom-8">
           <AnimatePresence>
             {items.map((t) => (
               <ToastItem key={t.id} t={t} onClose={(r) => close(t.id, r)} />

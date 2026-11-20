@@ -85,7 +85,7 @@ export default async function StudioLayout({ children }: { children: React.React
           {/* Room for the floating tab bar (62px over the home indicator's safe area, 1105) and 26px of air, so the
               last card always scrolls clear of it. It was 11rem plus each page's own. A page that opts out of the
               tab bar (MobileNav renders data-tabbar-off; none does since 11-16) keeps only the safe area. */}
-          <main id="main" tabIndex={-1} className="mmain relative flex-1 outline-none pb-[calc(env(safe-area-inset-bottom)+88px)] max-lg:[body:has([data-tabbar-off])_&]:pb-[env(safe-area-inset-bottom)] lg:pb-0">
+          <main id="main" tabIndex={-1} className="mmain relative flex-1 outline-none pb-[calc(var(--sa-b)+88px)] max-lg:[body:has([data-tabbar-off])_&]:pb-[var(--sa-b)] lg:pb-0">
             {children}
           </main>
         </div>

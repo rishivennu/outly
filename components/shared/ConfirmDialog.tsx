@@ -39,7 +39,7 @@ export function ConfirmDialog({ open, onOpenChange, title, body, confirmLabel, c
                 transform for y/scale, which wiped -translate-x/-y and pushed the card off-screen on phones. */}
             <Dialog.Content asChild forceMount>
               <div
-                className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+                className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-4 pb-[max(1rem,var(--sa-b))]"
                 data-lenis-prevent
                 onPointerDown={(e) => { if (e.target === e.currentTarget && !busy) onOpenChange(false); }}
               >

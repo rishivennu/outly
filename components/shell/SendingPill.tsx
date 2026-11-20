@@ -91,7 +91,7 @@ export function SendingPill() {
   const more = show.length - 1;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-[max(10px,env(safe-area-inset-top))] z-40 flex justify-center px-3 lg:pl-[17rem]">
+    <div className="pointer-events-none fixed inset-x-0 top-[max(10px,var(--sa-t))] z-40 flex justify-center px-3 lg:pl-[17rem]">
       <Link
         href={`/create?post=${p.id}`}
         className={cn("sp-pill pointer-events-auto inline-flex min-h-11 max-w-full items-center gap-2.5 rounded-full py-1.5 pl-3 pr-4 text-[13px] font-semibold text-white", `sp-${s.tone}`)}

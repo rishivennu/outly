@@ -21,7 +21,7 @@ describe("1115 app fill", () => {
   });
   test("nothing above the bar still uses the floating pill's offset", () => {
     for (const f of ["components/support/ChatWidget.tsx", "components/shared/DeviceHint.tsx", "components/shared/CookieConsent.tsx", "components/onboarding/Spotlight.tsx", "components/create/BulkPlanner.tsx", "components/create/PlatformDeck.tsx", "components/shared/Toast.tsx", "app/(studio)/layout.tsx"])
-      expect(src(f)).not.toMatch(/max\(12px, ?env\(safe-area-inset-bottom\)\) ?\+ ?\d+px/);
-    expect(css).not.toMatch(/max\(12px, env\(safe-area-inset-bottom\)\) \+ \d+px/);
+      expect(src(f)).not.toMatch(/max\(12px, ?var\(--sa-b\)\) ?\+ ?\d+px/);
+    expect(css).not.toMatch(/max\(12px, var\(--sa-b\)\) \+ \d+px/);
   });
 });

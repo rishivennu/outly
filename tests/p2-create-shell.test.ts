@@ -108,7 +108,7 @@ describe("workspace wiring", () => {
     const bar = src("components/create/ActionBar.tsx");
     // 11-16: the tab bar shows on /create again, so the bar sits 12px above it (11-19: the tabs float and compact
     // in place rather than tuck away, so this bar no longer moves with them).
-    expect(bar).toContain("sticky bottom-[calc(env(safe-area-inset-bottom)+84px)]");
+    expect(bar).toContain("sticky bottom-[var(--sa-float)]");
     expect(bar).not.toContain("data-tabs-tucked");
     expect(bar).not.toContain("transition-all");
     // Phase 3 CONTRACT-B: the deck no longer docks its own bar, so the one ActionBar is the only bar.

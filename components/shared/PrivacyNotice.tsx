@@ -164,7 +164,7 @@ export function PrivacyNotice() {
               }}
             >
               <div
-                className="fixed inset-0 z-[81] flex flex-col items-center overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+                className="fixed inset-0 z-[81] flex flex-col items-center overflow-y-auto p-4 pb-[max(1rem,var(--sa-b))]"
                 data-lenis-prevent
                 data-privacy-notice
                 onPointerDown={(e) => {

@@ -39,7 +39,7 @@ describe("1100 welcome screen", () => {
     expect(w).toMatch(/e\.key === "Tab"[\s\S]{0,700}preventDefault/); // 1101: a cycle over the screen's controls
   });
   test("safe areas, scroll lock, reduced motion, 56px button", () => {
-    for (const s of ["top", "right", "bottom", "left"]) expect(css).toContain(`env(safe-area-inset-${s})`);
+    for (const s of ["top", "right", "bottom", "left"]) expect(css).toContain(`var(--sa-${s[0]})`);
     expect(css).toMatch(/html\[data-welcome\]:has\(\[data-pwa-welcome\]\) body \{ overflow: hidden; \}/);
     expect(css).toMatch(/prefers-reduced-motion: reduce\) \{\s*html\[data-welcome\] \.pwa-welcome \{ animation: page-fade/);
     expect(css).toMatch(/\.pw-cta \{[^}]*height: 56px/);

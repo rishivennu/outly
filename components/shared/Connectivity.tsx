@@ -45,7 +45,7 @@ export function Connectivity() {
   }, [state, busy, draft.status]);
   if (state === "online") return null;
   return (
-    <div role="status" className="offline-bar fixed inset-x-0 top-[max(10px,env(safe-area-inset-top))] z-[96] mx-auto flex w-max max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-[20px] bg-foreground px-4 py-2 text-balance text-[13px] font-medium leading-snug text-background shadow-lg">
+    <div role="status" className="offline-bar fixed inset-x-0 top-[max(10px,var(--sa-t))] z-[96] mx-auto flex w-max max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-[20px] bg-foreground px-4 py-2 text-balance text-[13px] font-medium leading-snug text-background shadow-lg">
       {state === "offline" ? <WifiOff className="h-4 w-4 shrink-0" aria-hidden /> : <Wifi className="h-4 w-4 shrink-0" aria-hidden />}
       {connectivityLine(state, draft)}
     </div>

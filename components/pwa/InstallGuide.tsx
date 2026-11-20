@@ -263,10 +263,10 @@ export function InstallGuide({ open, onClose, kind, browser, tablet }: { open: b
                 data-lenis-prevent
                 className="install-sheet fixed inset-x-0 bottom-0 z-[81] mx-auto flex w-full max-w-[480px] flex-col overflow-y-auto overscroll-contain rounded-t-[28px] pt-3 outline-none sm:inset-0 sm:m-auto sm:h-fit sm:rounded-[28px] sm:pt-6"
                 style={{
-                  maxHeight: "calc(100dvh - env(safe-area-inset-top) - 12px)",
-                  paddingLeft: "max(20px, env(safe-area-inset-left))",
-                  paddingRight: "max(20px, env(safe-area-inset-right))",
-                  paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+                  maxHeight: "calc(100dvh - var(--sa-t) - 12px)",
+                  paddingLeft: "max(20px, var(--sa-l))",
+                  paddingRight: "max(20px, var(--sa-r))",
+                  paddingBottom: "max(16px, var(--sa-b))",
                 }}
                 {...motionProps}
               >

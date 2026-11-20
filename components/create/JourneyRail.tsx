@@ -86,7 +86,7 @@ export function JourneyRail({ step, reachable, onGo, status, complete }: Props) 
 export function JourneyBar({ step, reachable, onGo }: Pick<Props, "step" | "reachable" | "onGo">) {
   const idx = STEPS.findIndex((s) => s.id === step);
   return (
-    <nav aria-label="Your journey" className={cn(createFont.variable, "font-create glass sticky top-0 z-30 mx-3 mt-1 rounded-[22px] px-4 py-3", BAR_HIDE)}>
+    <nav aria-label="Your journey" className={cn(createFont.variable, "font-create glass sticky top-[var(--sa-t)] z-30 mx-3 mt-1 rounded-[22px] px-4 py-3", BAR_HIDE)}>
       <ol className="flex items-center gap-2">
         {STEPS.map((s, i) => (
           <li key={s.id} className="flex min-w-0 flex-1 flex-col gap-1.5">

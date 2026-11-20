@@ -89,7 +89,7 @@ describe("R1209 A3: size and the phone keyboard", () => {
     const s = src("components/create/CreateWorkspace.tsx");
     expect(s).toContain('pipBig ? "xl:w-[440px] xl:opacity-100 2xl:w-[480px]" : "xl:w-[320px] xl:opacity-100 2xl:w-[340px]"');
     expect(s).toContain("max-xl:h-dvh");
-    expect(s).toContain("max-xl:pt-[env(safe-area-inset-top)]");
+    expect(s).toContain("max-xl:pt-[var(--sa-t)]");
     expect(s).toContain('data-pip-size={pipBig ? "big" : "normal"}');
   });
   test("the sheet rises above the phone keyboard", () => {

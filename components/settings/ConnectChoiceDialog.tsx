@@ -58,7 +58,7 @@ function Shell({ open, onClose, busy, children }: { open: boolean; onClose: () =
               <motion.div className="fixed inset-0 z-[70] bg-foreground/35 backdrop-blur-[3px]" {...FX.scrim} />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount>
-              <div className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]" data-lenis-prevent>
+              <div className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-4 pb-[max(1rem,var(--sa-b))]" data-lenis-prevent>
                 <motion.div
                   {...FX.dialog}
                   className="glass-strong relative w-full max-w-[460px] rounded-[28px] p-5 motion-reduce:transition-none sm:p-6"

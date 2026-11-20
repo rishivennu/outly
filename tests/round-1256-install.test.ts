@@ -321,7 +321,7 @@ describe("where the button lives", () => {
   });
   test("the guide: safe areas, 44px close, a sheet on phones and a dialog wider, nothing auto-opened", () => {
     const g = src("components/pwa/InstallGuide.tsx");
-    for (const side of ["top", "left", "right", "bottom"]) expect(g).toContain(`env(safe-area-inset-${side})`);
+    for (const side of ["top", "left", "right", "bottom"]) expect(g).toContain(`var(--sa-${side[0]})`);
     expect(g).toContain("install-sheet fixed inset-x-0 bottom-0");
     expect(g).toContain("sm:inset-0 sm:m-auto");
     expect(g).toMatch(/Dialog\.Close aria-label="Close" className="[^"]*h-11 w-11/);

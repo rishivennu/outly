@@ -59,7 +59,7 @@ export function UpgradeDialog() {
             {/* flex-col + my-auto, not grid place-items: a tall card still scrolls from its top on short phones. */}
             <Dialog.Content asChild forceMount>
               <div
-                className="fixed inset-0 z-[81] flex flex-col overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+                className="fixed inset-0 z-[81] flex flex-col overflow-y-auto p-4 pb-[max(1rem,var(--sa-b))]"
                 data-lenis-prevent
                 onPointerDown={(e) => { if (e.target === e.currentTarget) setD(null); }}
               >

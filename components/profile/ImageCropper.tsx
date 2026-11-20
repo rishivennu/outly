@@ -162,7 +162,7 @@ export function ImageCropper({ kind, open, onOpenChange, onSaved, hasCurrent = f
               <motion.div className="fixed inset-0 z-[70] bg-foreground/40 backdrop-blur-[3px]" {...(reduce ? FX.fade : FX.scrim)} />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount aria-describedby="crop-d">
-              <div className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]" data-lenis-prevent>
+              <div className="fixed inset-0 z-[71] grid place-items-center overflow-y-auto p-4 pb-[max(1rem,var(--sa-b))]" data-lenis-prevent>
                 <motion.div {...(reduce ? FX.fade : FX.dialog)} className={cn("glass-strong relative w-full rounded-[28px] p-5 sm:p-6", isAvatar ? "max-w-[440px]" : "max-w-[640px]")}>
                   <Dialog.Title className="pr-12 text-lg font-semibold tracking-tight">{title}</Dialog.Title>
                   <Dialog.Description id="crop-d" className="mt-1 text-sm text-muted-foreground">

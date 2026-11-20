@@ -130,7 +130,7 @@ describe("item 5 (changed 11-16): the tab bar shows on /create too, the Create b
   });
   test("the post actions bar clears the tab bar on phones and holds its place while the bar compacts (11-19)", () => {
     const bar = src("components/create/ActionBar.tsx");
-    expect(bar).toContain("sticky bottom-[calc(env(safe-area-inset-bottom)+84px)]");
+    expect(bar).toContain("sticky bottom-[var(--sa-float)]");
     expect(bar).not.toContain("data-tabs-tucked");
     expect(bar).toContain("lg:bottom-4");
   });
@@ -144,7 +144,7 @@ describe("item 5 (changed 11-16): the tab bar shows on /create too, the Create b
     const nav = src("components/shell/Nav.tsx");
     expect(nav).toContain("const off = hidesTabBar(path);");
     expect(nav).toContain('if (off) return <span hidden data-tabbar-off="" />;');
-    expect(src("app/(studio)/layout.tsx")).toContain("max-lg:[body:has([data-tabbar-off])_&]:pb-[env(safe-area-inset-bottom)]");
+    expect(src("app/(studio)/layout.tsx")).toContain("max-lg:[body:has([data-tabbar-off])_&]:pb-[var(--sa-b)]");
     expect(src("components/shell/MobileDrawer.tsx")).toContain("drawerItems(who.teammate, hidesTabBar(path))");
   });
 });

@@ -71,6 +71,6 @@ describe("1108 status bar on every surface, iPhone and Android", () => {
     const css = src("app/globals.css");
     const i = css.indexOf("@media (max-width: 1023.98px) {\n  body::before {");
     const block = css.slice(i, css.indexOf("\n}\n", i));
-    expect(block).toMatch(/\.sky \{\s*-webkit-mask-image: linear-gradient\(to bottom, transparent 0, transparent calc\(env\(safe-area-inset-top, 0px\) \+ 12px\), #000 calc\(env\(safe-area-inset-top, 0px\) \+ 72px\)\);\s*mask-image: linear-gradient\(to bottom, transparent 0, transparent calc\(env\(safe-area-inset-top, 0px\) \+ 12px\)/);
+    expect(block).toMatch(/\.sky \{\s*-webkit-mask-image: linear-gradient\(to bottom, transparent 0, transparent calc\(var\(--sa-t\) \+ 12px\), #000 calc\(var\(--sa-t\) \+ 72px\)\);\s*mask-image: linear-gradient\(to bottom, transparent 0, transparent calc\(var\(--sa-t\) \+ 12px\)/);
   });
 });

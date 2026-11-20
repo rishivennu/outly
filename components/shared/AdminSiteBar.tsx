@@ -22,7 +22,7 @@ export function AdminSiteBar() {
   if (!flags || hidden || pathname.startsWith("/admin") || pathname === "/maintenance") return null;
   const m = flags.includes("m"), w = flags.includes("w");
   return (
-    <div role="status" className="fixed bottom-[calc(env(safe-area-inset-bottom)+88px)] left-1/2 z-[90] flex w-[min(720px,calc(100vw-1.5rem))] -translate-x-1/2 flex-wrap items-center gap-x-3 gap-y-2 rounded-[20px] bg-foreground px-4 py-3 text-[13px] leading-snug text-background shadow-2xl lg:bottom-6">
+    <div role="status" className="fixed bottom-[calc(var(--sa-b)+88px)] left-1/2 z-[90] flex w-[min(720px,calc(100vw-1.5rem-var(--sa-l)-var(--sa-r)))] -translate-x-1/2 flex-wrap items-center gap-x-3 gap-y-2 rounded-[20px] bg-foreground px-4 py-3 text-[13px] leading-snug text-background shadow-2xl lg:bottom-6">
       {m ? <Construction className="h-4 w-4 shrink-0 text-lime" aria-hidden /> : <Hourglass className="h-4 w-4 shrink-0 text-lime" aria-hidden />}
       <span className="min-w-0 flex-1 basis-[240px]">
         {m && <><strong className="font-semibold">Maintenance is on.</strong> Visitors and customers see the maintenance page; you see the site because you're signed in as admin.</>}
