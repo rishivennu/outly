@@ -337,7 +337,7 @@ export function MarketingNav() {
       <div ref={barRef} data-lens="" data-lg-shine="" className="mnav-bar mx-auto flex h-14 max-w-[1180px] items-center gap-2 rounded-full pl-3 pr-1.5 sm:h-[60px] sm:pl-4 sm:pr-2">
         <span className="lg-shine" aria-hidden="true" />
         <Link ref={logoRef} href="/" data-mag="" className="flex h-11 shrink-0 items-center gap-2 rounded-full pr-1" aria-label="Outlly home">
-          <OutlyLogo className="text-[17.4px]" />
+          <OutlyLogo className="text-[17.4px]" compactBelow={360} />
         </Link>
 
         <nav ref={navRef} aria-label="Sections" className="mx-auto hidden shrink-0 lg:block">

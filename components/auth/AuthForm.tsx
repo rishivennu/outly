@@ -11,7 +11,7 @@ import { GoogleOneTap } from "./GoogleOneTap";
 import { AppleButton } from "./AppleButton";
 import { OtpBoxes, type OtpBoxesHandle } from "./OtpBoxes";
 import { PhoneInput, WhatsAppAuth, WhatsAppGlyph } from "./WhatsAppAuth";
-import { OutlyMark } from "@/components/brand/Logo";
+import { OutllyBrand } from "@/components/brand/OutllyBrand";
 import { PipWatch } from "./PipWatch";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
 import { SHAKE_X, shakeTargets } from "@/lib/client/shake";
@@ -400,7 +400,7 @@ export function AuthForm({ mode, whatsapp = false, apple = false, googleClientId
     return (
       // The same root as the form below, so React keeps the node (and GSAP's data-gs-ready) when switching back.
       <div ref={ref} className="gs-stage">
-        <div className="mb-4 flex [@media(max-height:800px)]:hidden"><OutlyMark size={34} /></div>
+        <div className="mb-4 flex lg:hidden [@media(max-height:800px)]:hidden"><OutllyBrand variant="full" size={30} /></div>
         <WhatsAppAuth
           mode={mode}
           remember={remember}
@@ -420,7 +420,7 @@ export function AuthForm({ mode, whatsapp = false, apple = false, googleClientId
   const mismatch = step === "reset" && confirmPw.length > 0 && confirmPw !== form.password;
   return (
     <div ref={ref} className="gs-stage">
-      <div className="gs-in mb-4 flex [@media(max-height:800px)]:hidden"><OutlyMark size={34} /></div>
+      <div className="gs-in mb-4 flex lg:hidden [@media(max-height:800px)]:hidden"><OutllyBrand variant="full" size={30} /></div>
       <h1 className="gs-in font-display text-[clamp(2rem,3.4vw,2.5rem)] font-bold leading-[1.05] tracking-[-0.035em]">{heading}</h1>
       <p className="gs-in mb-6 mt-2.5 max-w-[40ch] text-[15px] leading-relaxed text-muted-foreground">{sub}</p>
       {step !== "2fa" && banner}

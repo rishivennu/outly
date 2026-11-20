@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { OutlyMark } from "@/components/brand/Logo";
+import { OutllyBrand } from "@/components/brand/OutllyBrand";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
 import { GlobeStage } from "@/components/waitlist/globe/GlobeStage";
 
@@ -61,7 +61,7 @@ export function AuthShowcase({ eyebrow = "With Outlly you can", lines = ["Make i
       const q = gsap.utils.selector(root);
       gsap.timeline({ defaults: { ease: "power3.out" } })
         .fromTo(q(".as-mesh"), { opacity: 0, scale: 1.08 }, { opacity: 1, scale: 1, duration: 1.4, ease: "power2.out" }, 0)
-        .fromTo(q(".as-mark"), { opacity: 0, scale: 0.6, rotation: -20 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.8, ease: "expo.out" }, 0.25)
+        .fromTo(q(".as-mark"), { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.8, ease: "expo.out" }, 0.25)
         .fromTo(q(".as-eyebrow"), { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5 }, 0.45)
         .fromTo(q(".as-line > span"), { yPercent: 110 }, { yPercent: 0, duration: 0.9, ease: "power4.out", stagger: 0.09 }, 0.5);
 
@@ -127,7 +127,7 @@ export function AuthShowcase({ eyebrow = "With Outlly you can", lines = ["Make i
         <span className="auth-grain absolute inset-0 opacity-[0.16] mix-blend-overlay" />
       </div>
 
-      <OutlyMark variant="white" size={44} className="as-mark gs-in" />
+      <OutllyBrand variant="full" size={36} tone="dark" label={false} className="as-mark gs-in self-start" />
 
       {globe && (
         <div className="as-globe">

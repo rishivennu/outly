@@ -6,7 +6,7 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import { NEXT_THEME, THEME_OPTIONS, ThemeToggle, useTheme } from "@/components/shared/ThemeToggle";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
-import { OutlyMark } from "@/components/brand/Logo";
+import { OutllyLogoIcon, OutllyWordmark } from "@/components/brand/OutllyBrand";
 import { AnimIcon, useIconPlay } from "@/components/icons/animated";
 import { HoverLink } from "./HoverLink";
 import { NoticesBell } from "./NoticesBell";
@@ -151,9 +151,9 @@ export function PulseRail() {
             <div className="rail-top">
               <HoverLink href="/home" className="rail-row rail-logo" aria-label="Outlly dashboard">
                 <span className="rail-disc">
-                  <OutlyMark size={22} />
+                  <OutllyLogoIcon size={22} />
                 </span>
-                <span className="rail-label rail-word">outlly</span>
+                <OutllyWordmark className="rail-label rail-word" />
               </HoverLink>
               <Tip label={open ? "Collapse sidebar" : "Expand sidebar"}>
                 <button type="button" onClick={toggle} aria-expanded={open} aria-controls="pulse-rail" aria-label={open ? "Collapse sidebar" : "Expand sidebar"} className="rail-row">

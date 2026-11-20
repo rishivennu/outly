@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /**
@@ -69,21 +70,83 @@ export function OutlyMark({
   );
 }
 
-/**
- * Mark + wordmark. The rocket is sized from the wordmark's own font (em), not pixels, so it always
- * matches the letters: MARK_EM of the wordmark size, centred on the word with a tight gap.
- * The wordmark keeps its size (1.15em of the surrounding text); `size` only matters with label={false}.
- */
-const MARK_EM = 1.08; // a touch taller than the letters, centred on them (user: "make it bigger", 10-12g)
+type Tone = "auto" | "light" | "dark";
+export type OutllyBrandVariant = "icon" | "compact" | "full";
 
-export function OutlyLogo({ size = 28, className, label = true, tone = "auto" }: { size?: number; className?: string; label?: boolean; tone?: "auto" | "light" | "dark" }) {
-  if (!label) return <OutlyMark size={size} tone={tone} className={className} />;
-  return (
-    <span className={cn("inline-flex", className)}>
-      <span className="inline-flex items-center gap-[0.16em] font-display text-[1.15em] font-bold leading-none tracking-[-0.045em]" style={{ ["--mk" as string]: `${MARK_EM}em` }}>
-        <OutlyMark size={size} tone={tone} className="h-[var(--mk)] w-[var(--mk)]" />
-        <span>outlly</span>
+// The rocket is sized from the wordmark's own font (em), so it always matches the letters: a touch taller, centred on them (10-12g).
+export const MARK_EM = 1.08;
+
+// Tailwind only ships classes it can read in the source, so the switch points are a fixed set (max-[Npx] = narrower than N).
+export const COMPACT_BELOW = {
+  360: "max-[360px]:hidden",
+  400: "max-[400px]:hidden",
+  480: "max-[480px]:hidden",
+  640: "max-[640px]:hidden",
+} as const;
+export type CompactBelow = keyof typeof COMPACT_BELOW;
+
+/** The symbol on its own (variant A): the supplied rocket art, square, never redrawn. */
+export function OutllyLogoIcon({ size = 28, tone = "auto", className }: { size?: number; tone?: Tone; className?: string }) {
+  return <OutlyMark size={size} tone={tone} className={className} />;
+}
+
+/** The word on its own. It takes the colour of the text around it, so it reads on either theme. */
+export function OutllyWordmark({ className }: { className?: string }) {
+  return <span className={cn("font-display font-bold tracking-[-0.045em]", className)}>outlly</span>;
+}
+
+/**
+ * One Outlly identity, three uses (docs/brand.md):
+ * - "full": rocket + wordmark (site header and footer, sign in, desktop sidebars, drawers).
+ * - "compact": the rocket alone in a 44px header slot (phone headers when space is short, compact nav).
+ * - "icon": the bare rocket (tiles, loading, small identifiers).
+ * `size` is the rocket height in px; without it a full lockup follows the surrounding text (wordmark 1.15em).
+ * The accessible name "Outlly" is given once, on the wrapper; `label={false}` when a parent already names it.
+ */
+export function OutllyBrand({
+  variant = "full",
+  size,
+  tone = "auto",
+  className,
+  href,
+  label = "Outlly",
+  compactBelow,
+}: {
+  variant?: OutllyBrandVariant;
+  size?: number;
+  tone?: Tone;
+  className?: string;
+  href?: string;
+  label?: string | false;
+  compactBelow?: CompactBelow;
+}) {
+  const name = label && !href ? { role: "img" as const, "aria-label": label } : { "aria-hidden": true as const };
+  let body: React.ReactNode;
+  if (variant === "full")
+    body = (
+      <span className={cn("inline-flex", className)} {...name}>
+        <span className={cn("inline-flex items-center gap-[0.16em] leading-none", !size && "text-[1.15em]")} style={{ ["--mk" as string]: `${MARK_EM}em`, ...(size ? { fontSize: size / MARK_EM } : {}) }}>
+          <OutlyMark size={size ?? 28} tone={tone} className="h-[var(--mk)] w-[var(--mk)]" />
+          <OutllyWordmark className={compactBelow && COMPACT_BELOW[compactBelow]} />
+        </span>
       </span>
-    </span>
+    );
+  else
+    body = (
+      <span className={cn("inline-flex shrink-0 items-center justify-center", variant === "compact" && "h-11 min-w-11", className)} {...name}>
+        <OutlyMark size={size ?? (variant === "compact" ? 26 : 28)} tone={tone} />
+      </span>
+    );
+  if (!href) return body;
+  return (
+    <Link href={href} aria-label={label || "Outlly"} className="inline-flex min-h-11 items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+      {body}
+    </Link>
   );
+}
+
+/** Legacy name for the full lockup; `label={false}` keeps its old meaning (rocket only). Size follows the text, as before. */
+export function OutlyLogo({ size = 28, className, label = true, tone = "auto", compactBelow }: { size?: number; className?: string; label?: boolean; tone?: Tone; compactBelow?: CompactBelow }) {
+  if (!label) return <OutlyMark size={size} tone={tone} className={className} />;
+  return <OutllyBrand variant="full" tone={tone} className={className} compactBelow={compactBelow} />;
 }

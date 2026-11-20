@@ -8,6 +8,8 @@ Next.js 14 (App Router) · TypeScript · Tailwind · Radix/shadcn primitives · 
 
 Honest status of every integration, what is verified and what is blocked: **[docs/INTEGRATION_STATUS.md](docs/INTEGRATION_STATUS.md)**.
 
+Status bar, safe areas and installed apps on iOS and Android (what the web controls, what the OS decides, the real-device test script): [docs/edge-to-edge.md](docs/edge-to-edge.md).
+
 ## Run it locally (no accounts needed)
 
 ```bash
@@ -76,3 +78,7 @@ Security: OAuth (state + PKCE where the platform supports it), encrypted tokens,
 ## Going live with real platforms
 
 Read the platform section of `docs/INTEGRATION_STATUS.md` first (app review, paid X tier, YouTube audit). Then set `MOCK_SOCIAL_PUBLISHING=false` and fill the client ID and secret for each platform. Redirect URI: `${APP_URL}/api/accounts/<platform>/callback`. Instagram needs a Business or Creator account linked to a Facebook Page. YouTube needs the `youtube.upload` scope. X needs media upload access on your API tier.
+
+## Brand
+
+Logo variants, sizes, clear space and the do/don't list: `docs/brand.md`. Use `OutllyBrand` from `components/brand/OutllyBrand.tsx`; never hand-roll a logo.

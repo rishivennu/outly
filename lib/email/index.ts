@@ -211,7 +211,7 @@ const footer = () => `<tr><td class="gutter" style="padding:36px 40px 0"><table 
 <tr><td class="gutter" style="padding:22px 40px 0;font-family:${BODY};font-size:14px;line-height:1.6;font-weight:bold;color:${C.ink}">Questions? Just reply. A real person from the team reads every one, or visit the <a href="${appUrl()}/help" style="color:${C.ink};font-family:${BODY};text-decoration:underline">Help centre</a>.</td></tr>
 <tr><td class="gutter" style="padding:22px 40px 0">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-<td valign="bottom" align="left"><a href="${appUrl()}/" style="text-decoration:none"><img class="wm" src="${art("wordmark.png")}" width="250" alt="Outlly" style="display:block;width:250px;height:auto;border:0;font-family:${DISPLAY};font-size:30px;font-weight:800;color:${C.ink}"></a></td>
+<td valign="bottom" align="left"><a href="${appUrl()}/" style="text-decoration:none"><img class="wm" src="${art("wordmark.png")}" width="250" height="74" alt="Outlly" style="display:block;width:250px;height:auto;border:0;font-family:${DISPLAY};font-size:30px;font-weight:800;color:${C.ink}"></a></td>
 <td class="foot-r" valign="bottom" align="right" style="text-align:right;font-family:${BODY};font-size:13px;line-height:2;font-weight:bold">${footLink("/help", "Help centre")}<br>${footLink("/privacy", "Privacy")} &nbsp;&middot;&nbsp; ${footLink("/terms", "Terms")}<br>${footLink("/settings", "Settings")}</td>
 </tr></table>
 </td></tr>

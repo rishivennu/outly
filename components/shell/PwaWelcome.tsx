@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Link2, PlayCircle, Rocket, X } from "lucide-react";
-import { OutlyMark } from "@/components/brand/Logo";
+import { OutllyBrand } from "@/components/brand/OutllyBrand";
 import { startTour } from "@/components/onboarding/Tour";
 import { cn } from "@/lib/utils";
 import { useUser } from "./UserContext";
@@ -173,10 +173,7 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
     >
       <div className="pw-wrap">
         <header className="pw-top pw-a">
-          <span className="pw-brand">
-            <OutlyMark size={28} />
-            Outlly
-          </span>
+          <OutllyBrand variant="full" className="pw-brand" />
           <button type="button" onClick={() => leave("start")} className="pw-x" aria-label="Close welcome">
             <X aria-hidden="true" />
           </button>
