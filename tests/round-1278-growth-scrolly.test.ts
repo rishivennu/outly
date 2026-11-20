@@ -67,7 +67,8 @@ describe("R1278 motion (Scrolly)", () => {
   });
   test("an IntersectionObserver band at the viewport centre picks one step, starting at 0", () => {
     expect(scrolly).toContain('const BAND = "-45% 0px -45% 0px";');
-    expect(scrolly).toContain("{ rootMargin: BAND }");
+    expect(scrolly).toContain("{ rootMargin: BAND, threshold: STEPS }");
+    expect(scrolly).toContain("const STEPS = Array.from({ length: 16 }, (_, i) => i / 100);");
     expect(scrolly).toContain('steps.forEach((s, n) => s.toggleAttribute("data-on", n === i));');
     expect(scrolly).toContain("show(0);");
   });

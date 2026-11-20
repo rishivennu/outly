@@ -9,6 +9,9 @@ const useIso = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 const LG = "(min-width: 1024px)";
 // A thin band at the viewport centre: the step crossing it is the active one.
 const BAND = "-45% 0px -45% 0px";
+// Fine ratios (a step overlaps the band by at most ~15% of its height) so that while two steps straddle the band the
+// callback keeps firing and the nearer one wins, instead of the pick freezing at the moment the second one entered.
+const STEPS = Array.from({ length: 16 }, (_, i) => i / 100);
 
 /**
  * R1278: the Growth Engine "film strip" from lg. The markup is server-rendered by GrowthEngine (the steps are the
@@ -72,7 +75,7 @@ export function Scrolly({ children, className }: { children: React.ReactNode; cl
           // ctx.add records the tween, so leaving lg (or unmounting) reverts it with the rest.
           ctx.add(() => show(best));
         },
-        { rootMargin: BAND },
+        { rootMargin: BAND, threshold: STEPS },
       );
       steps.forEach((s) => io.observe(s));
 
