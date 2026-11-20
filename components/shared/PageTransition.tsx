@@ -60,8 +60,8 @@ export function PageTransition({ children, variant = "site" }: { children: React
   return (
     <>
       <div ref={ref} className={kind === "push" || kind === "pop" || kind === "fade" ? `app-enter-${kind}` : undefined}>{children}</div>
-      {/* 1181: portalled to body. Public pages scroll inside ScrollSmoother's moving content, where position: fixed
-          would ride along with the page instead of covering the screen. */}
+      {/* 1181: portalled to body so the wave always covers the screen, whatever wraps the page content (R1262: the
+          page scrolls natively under Lenis, but a portal keeps this independent of any future wrapper). */}
       {wave && typeof document !== "undefined" && createPortal(
         <div className="page-wave" aria-hidden="true">
           <div className="pw-sheet"><span className="pw-crest" /></div>

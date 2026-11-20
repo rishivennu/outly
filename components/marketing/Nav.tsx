@@ -241,11 +241,11 @@ export function MarketingNav() {
   // The phone menu covers the screen: the page behind it goes inert and stops scrolling while it is open.
   useEffect(() => {
     if (!open) return;
-    const page = document.getElementById("smooth-wrapper");
-    page?.setAttribute("inert", "");
+    const page = Array.from(document.querySelectorAll<HTMLElement>("#main, #main ~ footer"));
+    page.forEach((el) => el.setAttribute("inert", ""));
     document.documentElement.classList.add("mnav-lock");
     return () => {
-      page?.removeAttribute("inert");
+      page.forEach((el) => el.removeAttribute("inert"));
       document.documentElement.classList.remove("mnav-lock");
     };
   }, [open]);

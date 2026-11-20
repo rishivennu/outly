@@ -4,7 +4,8 @@ import { usePathname } from "next/navigation";
 import type Lenis from "lenis";
 import { whenSettled } from "@/lib/client/when-idle";
 import { SMOOTH, smoothEase } from "@/lib/motion/tokens";
-import { clearSmoothEngine, onSmoothClaim, scrollPageTo, setSmoothEngine, smoothClaimed } from "@/lib/motion/smooth";
+import { clearSmoothEngine, scrollPageTo, setSmoothEngine } from "@/lib/motion/smooth";
+import { wheelDelta } from "@/lib/motion/scroll-control";
 
 let lenis: Lenis | null = null;
 let popped = false; // back/forward: let the browser restore the old position
@@ -34,7 +35,7 @@ function holdAnchor(id: string) {
     if (done) return;
     const off = target.getBoundingClientRect().top - (parseFloat(getComputedStyle(target).scrollMarginTop) || 0);
     if (Math.abs(off) < 2) return;
-    scrollPageTo(window.scrollY + off, true); // Lenis, ScrollSmoother or native: a jump, never a glide
+    scrollPageTo(window.scrollY + off, true); // Lenis or native: a jump, never a glide
   };
   const ro = new ResizeObserver(align);
   const quit = () => {
@@ -60,14 +61,18 @@ export function whenLenis(cb: (l: Lenis) => void): () => void {
 }
 
 /**
- * Inertial "liquid" scroll for every page: landing, studio and admin (mounted once in the root layout).
- * 1181: public pages hand the page to GSAP ScrollSmoother (Smoother.tsx claims it); Lenis stands down while that claim
- * is held and comes back when it is released (leaving the site for the studio). Both glide on SMOOTH (one curve).
- * Loaded after hydration so it never delays first paint, skipped for reduced motion and touch devices
- * (their native scroll is already fluid). In-page anchor links glide to their section.
+ * The one smooth scroll for every page: landing, blog, studio and admin (mounted once in the root layout, so it
+ * survives client navigation and is destroyed only on unmount). R1262: GSAP ScrollSmoother is gone; it left the native
+ * scroll position native, so a hard flick jumped 2000+ px at once and the reveals fired in a burst. Lenis owns the
+ * wheel instead, glides on SMOOTH (expo.out) and caps the speed (lib/motion/scroll-control.ts: per-event delta and how
+ * far the target may run ahead). Only wheel events are shaped; keyboard, the scrollbar and find-in-page stay native.
+ * Loaded after hydration so it never delays first paint. Reduced motion: no Lenis at all, plain native scroll.
+ * Touch screens and the phone PWA (pointer: coarse): no Lenis either, their native momentum scroll is already fluid.
+ * In-page anchor links glide to their section (anchors: true, honouring scroll-margin-top).
  * Panels that scroll on their own (sidebars, chat, dialogs, tables) keep native scroll: they are
  * marked data-lenis-prevent, and allowNestedScroll covers any we missed. While a dialog locks the
- * page (Radix sets data-scroll-locked on body) Lenis pauses so the page behind cannot drift.
+ * page (Radix sets data-scroll-locked on body) Lenis pauses so the page behind cannot drift. The phone menu sheet
+ * covers the screen and is data-lenis-prevent, so wheel over it never reaches the page.
  * `lazy` (a visit that starts in the studio): Lenis waits until the page has loaded and the browser is idle, so it
  * never competes with the dashboard's first paint and hydration.
  */
@@ -81,12 +86,23 @@ export function SmoothScroll({ lazy = false }: { lazy?: boolean }) {
     let cancelled = false;
     let loading = false;
     const load = () => {
-      if (cancelled || lenis || loading || smoothClaimed()) return;
+      if (cancelled || lenis || loading) return;
       loading = true;
       void import("lenis").then(({ default: L }) => {
         loading = false;
-        if (cancelled || lenis || smoothClaimed()) return;
-        const l = new L({ duration: SMOOTH.duration, easing: smoothEase, wheelMultiplier: SMOOTH.wheel, anchors: true, autoRaf: true, allowNestedScroll: true });
+        if (cancelled || lenis) return;
+        const l: Lenis = new L({
+          duration: SMOOTH.duration,
+          easing: smoothEase,
+          wheelMultiplier: SMOOTH.wheel,
+          anchors: true,
+          autoRaf: true,
+          allowNestedScroll: true,
+          virtualScroll: (data) => {
+            if (data.event.type.includes("wheel")) data.deltaY = wheelDelta(data.deltaY, l.targetScroll - l.animatedScroll, window.innerHeight);
+            return true;
+          },
+        });
         lenis = l;
         setSmoothEngine({ kind: "lenis", to: (y, now) => l.scrollTo(y, { immediate: !!now, force: true }) });
         waiting.forEach((cb) => cb(l));
@@ -98,6 +114,7 @@ export function SmoothScroll({ lazy = false }: { lazy?: boolean }) {
         window.addEventListener("popstate", onPop);
         const mo = new MutationObserver(sync);
         mo.observe(body, { attributes: true, attributeFilter: ["data-scroll-locked"] });
+        sync(); // a dialog may already be open when Lenis lands
         stop = () => {
           mo.disconnect();
           window.removeEventListener("popstate", onPop);
@@ -109,12 +126,9 @@ export function SmoothScroll({ lazy = false }: { lazy?: boolean }) {
         };
       }, () => void (loading = false));
     };
-    // ScrollSmoother claimed the page (a public page mounted): stand down. Released: come back.
-    const unclaim = onSmoothClaim(() => (smoothClaimed() ? stop() : load()));
     const unwait = lazy ? whenSettled(() => void load()) : (void load(), () => {});
     return () => {
       cancelled = true;
-      unclaim();
       unwait();
       stop();
     };
@@ -126,6 +140,14 @@ export function SmoothScroll({ lazy = false }: { lazy?: boolean }) {
     if (location.hash) return holdAnchor(location.hash.slice(1));
     if (!lenis) return;
     lenis.scrollTo(0, { immediate: true, force: true });
+  }, [path]);
+
+  // The same Lenis carries over to the new page (back/forward too): re-measure its height once the page has painted.
+  useEffect(() => {
+    const l = lenis;
+    if (!l) return;
+    const f = requestAnimationFrame(() => l.resize());
+    return () => cancelAnimationFrame(f);
   }, [path]);
 
   return null;

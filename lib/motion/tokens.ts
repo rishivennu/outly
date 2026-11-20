@@ -85,9 +85,9 @@ export const sec = (name: DurName) => DUR[name] / 1000;
 
 /**
  * 1181: one smooth scroll for the whole app (user, 11-17: "smooth scroll for the entire web app, from entry to exit,
- * the same"). Public pages ride GSAP ScrollSmoother (components/marketing/Smoother.tsx); the studio, admin and auth
- * pages ride Lenis (components/marketing/SmoothScroll.tsx). Both catch up on this one curve: the page glides to where
- * the wheel sent it in `duration` seconds on expo.out, ScrollSmoother's own default, so the two feel identical.
+ * the same"). R1262: every page rides the one Lenis (components/marketing/SmoothScroll.tsx) and
+ * lib/motion/scroll-control.ts caps how far ahead a wheel flick may send it. The page glides to where
+ * the wheel sent it in `duration` seconds on expo.out.
  * Touch screens and reduced motion keep the native scroll (it is already smooth there).
  */
 export const SMOOTH = { duration: 1, gsap: "expo.out", wheel: 1 } as const;

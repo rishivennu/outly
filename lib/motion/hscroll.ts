@@ -1,6 +1,6 @@
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { scrollPageTo, smoothEngine } from "./smooth";
+import { scrollPageTo } from "./smooth";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -92,7 +92,7 @@ export function hscroll(root: HTMLElement): HScroll | null {
   measure();
   render();
 
-  // Phones scroll natively, so the track takes a short ease to follow; ScrollSmoother already smooths the desktop.
+  // Phones scroll natively, so the track takes a short ease to follow; Lenis already smooths the desktop.
   let ease: gsap.core.Tween | null = null;
   const glide = (smooth: boolean) => {
     ease?.kill();
@@ -106,7 +106,7 @@ export function hscroll(root: HTMLElement): HScroll | null {
   let frozen = false;
   const drive = (p: number) => {
     goal = clamp(p);
-    if (!frozen) glide(touch && smoothEngine()?.kind !== "smoother");
+    if (!frozen) glide(touch);
   };
 
   let toScroll: ((p: number) => number) | null = null;

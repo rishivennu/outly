@@ -11,7 +11,7 @@ ScrollTrigger.config({ ignoreMobileResize: true });
  * demos.gsap.com/demo/pinned-panels-with-overscroll). Each panel is a full-screen sheet. When its bottom reaches the
  * bottom of the screen it stays put (pinned without spacing) while the next sheet slides up over it, and it sinks
  * away underneath: scale 1 to 0.7 and opacity 1 to 0.5 over the first 90% of that slide, then out to 0. Scrubbed,
- * so it is the scroll position itself (ScrollSmoother already smooths it), exactly as in the demo.
+ * so it is the scroll position itself (Lenis already smooths it, R1262), exactly as in the demo.
  *
  * A panel taller than the screen is simply read to its end first (the demo's "overscroll": its content scrolls on
  * before the next sheet comes in). It sinks around the middle of what is on screen, not its own middle far above.

@@ -5,7 +5,6 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { MOTION_OK } from "@/lib/motion/gsap";
 import { rowsIn } from "@/lib/motion/reveal";
 import { whenLenis } from "./SmoothScroll";
-import { whenScrollReady } from "@/lib/motion/smooth";
 import { GSAP_EASE, sec as secs } from "@/lib/motion/tokens";
 import { stackPanels, type PanelHold } from "@/lib/motion/panels";
 import { hscroll } from "@/lib/motion/hscroll";
@@ -62,9 +61,8 @@ export function ScrollScenes() {
     if (!main) return;
     const mm = gsap.matchMedia();
 
-    // Built when the main thread is free (or within 700ms), so it does not lengthen the hydration task, and never
-    // before the page's smooth scroller exists: a pin made outside ScrollSmoother would hold its element to the
-    // window while the content glides under it (1181, whenScrollReady in lib/motion/smooth.ts).
+    // Built when the main thread is free (or within 700ms), so it does not lengthen the hydration task. The pins run
+    // on the window's own scroll, which Lenis drives (R1262), so they need not wait for it.
     const build = () => mm.add({ motion: MOTION_OK, wide: "(min-width: 768px)", lg: "(min-width: 1024px)" }, (ctx) => {
       const { motion, wide, lg } = ctx.conditions as { motion: boolean; wide: boolean; lg: boolean };
       if (!motion) return;
@@ -75,7 +73,7 @@ export function ScrollScenes() {
       // media set reverts. (ctx.add(fn) would run fn right away, not on revert.)
       const undo: Array<() => void> = [];
       // 9. The panel stack: holds are collected by scenes 3, 4 and 10, the stack is built right after them. Phones too
-      //    (1183): their scroll stays native (no ScrollSmoother on touch), the pins run on it.
+      //    (1183): their scroll stays native (no Lenis on touch), the pins run on it.
       const panels = Array.from(main.querySelectorAll<HTMLElement>(".lp-panel"));
       const stack = panels.length > 1;
       const holds = new Map<HTMLElement, PanelHold>();
@@ -408,10 +406,14 @@ export function ScrollScenes() {
       });
       ro.observe(main);
 
-      // Smooth scroll moves the page from its own frame loop: update the triggers right there, once.
+      // Lenis moves the page from its own frame loop: update the triggers right there, once (the single
+      // ScrollTrigger <-> Lenis sync; nothing uses scrollerProxy or normalizeScroll). Re-measure once it is attached:
+      // Lenis may land after these triggers were built, and html.lenis changes the page height rules.
       let unhook = () => {};
       const stopWaiting = whenLenis((l) => {
         unhook = l.on("scroll", ScrollTrigger.update);
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => ScrollTrigger.refresh());
       });
       return () => {
         undo.forEach((f) => f());
@@ -423,13 +425,11 @@ export function ScrollScenes() {
     });
 
     const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
-    let stopWaitingForScroll = () => {};
-    const queue = () => (stopWaitingForScroll = whenScrollReady(build));
+    const queue = () => void build();
     const id = w.requestIdleCallback ? w.requestIdleCallback(queue, { timeout: 700 }) : window.setTimeout(queue, 1);
     return () => {
       if (w.cancelIdleCallback) w.cancelIdleCallback(id);
       else window.clearTimeout(id);
-      stopWaitingForScroll();
       mm.revert();
     };
   }, []);

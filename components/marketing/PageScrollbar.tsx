@@ -8,7 +8,7 @@ import { scrollPageTo } from "@/lib/motion/smooth";
  * Windows). The native page bar is hidden in CSS (html:has(.pb-rail), so there is no layout jump on hydration). The pill
  * rests soft, turns lime with a faint glow while scrolling, widens to 6px under the pointer, can be dragged, and a click
  * on the rail jumps there. Wheel, keyboard and touch scrolling are untouched. Touch screens keep their own overlay bar.
- * When smooth scroll is running (ScrollSmoother on public pages, Lenis elsewhere), drags and jumps go through it so the two never fight.
+ * When smooth scroll (Lenis) is running, drags and jumps go through it so the two never fight.
  */
 export function PageScrollbar() {
   const rail = useRef<HTMLDivElement>(null);

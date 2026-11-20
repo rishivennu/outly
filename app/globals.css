@@ -736,12 +736,6 @@ html.lenis { scroll-behavior: auto !important; }
    children (the studio rail, .rail-wrap) re-anchor to it and jump up by the scroll offset. Leave html alone then. */
 html.lenis.lenis-stopped:has(> body[data-scroll-locked]) { overflow: visible; }
 
-/* 1181: GSAP ScrollSmoother on public pages (components/marketing/Smoother.tsx). The wrapper is fixed and the content
-   glides inside it, so the nav leaves the flow too (fixed at the top) and the content keeps its room as padding. */
-html.smoother { scroll-behavior: auto !important; }
-html.smoother .mnav { position: fixed; inset-inline: 0; top: 0; }
-html.smoother #smooth-content { padding-top: var(--smooth-top, 0px); will-change: transform; }
-
 /* 1181: the landing's pinned-panel stack (lib/motion/panels.ts marks each panel data-sheet="first" or "next"; 768px
    and up, motion allowed; attributes, not sibling selectors, because every pinned panel gets its own pin-spacer). Each section group is a full-screen sheet, its content centred. From the second sheet on they are
    opaque with a rounded top and a soft upward shadow, so a sheet sliding up covers the one sinking behind it; the
@@ -4848,22 +4842,52 @@ html[data-contrast="more"]:not([data-app]) .mmain :is(.glass, .pulse-card, .card
   [data-pressing] { scale: none; }
 }
 
-/* R1261 growth engine */
-/* The Create > Publish > Learn > Improve loop: a lime node per step and a connector to the next one, drawn in once
-   the loop is revealed (Reveal sets data-shown). Phones stack the steps, so the connector runs down; from sm it runs across.
-   The draw grows the connector's fill (a flat lime layer) instead of scaling it: the 1100 motion sweep reads to the end
-   of this file and keeps transforms out of it. */
-.ge-node { position: relative; z-index: 1; flex: none; width: 12px; height: 12px; margin-top: 4px; border-radius: 9999px; background: hsl(var(--lime)); box-shadow: 0 0 0 4px hsl(var(--lime) / .16); }
-.ge-seg { position: absolute; left: 5px; top: 16px; width: 2px; height: 100%; border-radius: 2px; background: linear-gradient(hsl(var(--lime)), hsl(var(--lime))) 0 0 / 100% 100% no-repeat; }
-.ge-loop[data-shown] .ge-seg { animation: ge-draw-y var(--m-section) var(--m-ease-out) calc(.25s + var(--i, 0) * .18s) backwards; }
-@keyframes ge-draw-y { from { background-size: 100% 0; } }
-@keyframes ge-draw-x { from { background-size: 0 100%; } }
+/* R1263 growth engine */
+/* The Create > Publish > Learn > Improve loop (GrowthEngine.tsx). The ol is a grid: its first item is the ONE track
+   (.ge-track) and each step is placed by --n, so the track starts and ends on the first and last node at every width.
+   From sm it runs across the top of the four columns (inset by half a column each side); on phones it runs down
+   rows 1-3 and a negative bottom margin carries it on to the last node, whatever the hints wrap to.
+   Motion is GrowthLoop.tsx (GSAP, once): the lime fill is uncovered with clip-path while each node's lit overlay
+   (.ge-node-lit) and its label and hint fade in. The hidden pre-state below exists only under html.js until GrowthLoop
+   arms (data-ge="live"), with a 3 s failsafe if it never does; without JS, or with reduced motion, all of it is final.
+   The 1100 motion sweep reads to the end of this file: no transforms or transitions here (the card's hover lift
+   lives in its Tailwind classes). */
+.ge-steps { --ge-node: 14px; --ge-top: 3px; --ge-row: 20px; display: grid; grid-template-columns: var(--ge-node) minmax(0, 1fr); row-gap: var(--ge-row); }
+.ge-track { position: relative; overflow: hidden; grid-column: 1; grid-row: 1 / 4; justify-self: center; width: 2px; border-radius: 2px; background: hsl(var(--lime-ink) / .2);
+  margin-top: calc(var(--ge-top) + var(--ge-node) / 2); margin-bottom: calc(-1 * (var(--ge-row) + var(--ge-top) + var(--ge-node) / 2)); }
+.ge-track-fill { position: absolute; inset: 0; background: hsl(var(--lime)); }
+.dark .ge-track { background: hsl(var(--lime) / .18); }
+.ge-step { grid-column: 1 / -1; grid-row: var(--n); display: flex; align-items: flex-start; gap: 16px; min-width: 0; }
+.ge-node { position: relative; z-index: 1; flex: none; width: var(--ge-node); height: var(--ge-node); margin-top: var(--ge-top); border-radius: 9999px; background: hsl(var(--lime-ink) / .3); }
+.dark .ge-node { background: hsl(var(--lime) / .35); }
+.ge-node-lit { position: absolute; inset: 0; border-radius: inherit; background: hsl(var(--lime)); box-shadow: 0 0 0 4px hsl(var(--lime) / .16); }
 @media (min-width: 640px) {
+  .ge-steps { --ge-gap: 16px; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: var(--ge-gap); row-gap: 0; }
+  .ge-track { grid-column: 1 / -1; grid-row: 1; align-self: start; justify-self: stretch; width: auto; height: 2px; margin: calc(var(--ge-node) / 2 - 1px) calc((100% - 3 * var(--ge-gap)) / 8) 0; }
+  .ge-step { grid-column: var(--n); grid-row: 1; flex-direction: column; align-items: center; text-align: center; }
   .ge-node { margin-top: 0; }
-  .ge-seg { left: calc(50% + 10px); top: 5px; width: calc(100% - 4px); height: 2px; }
-  .ge-loop[data-shown] .ge-seg { animation-name: ge-draw-x; }
 }
-/* Reduced motion: the connectors arrive with the reveal's own short fade instead of drawing in. */
-@media (prefers-reduced-motion: reduce) { .ge-loop[data-shown] .ge-seg { animation: none; } }
-@media (forced-colors: active) { .ge-node, .ge-seg { background: CanvasText; box-shadow: none; } }
-/* end R1261 growth engine */
+@media (min-width: 1024px) { .ge-steps { --ge-gap: 32px; } }
+@keyframes ge-failsafe { to { opacity: 1; clip-path: inset(0); } }
+@media (prefers-reduced-motion: no-preference) {
+  html.js .ge-loop:not([data-ge="live"]) :is(.ge-node-lit, .ge-label, .ge-hint, .ge-note) { opacity: 0; animation: ge-failsafe 0s linear 3s forwards; }
+  html.js .ge-loop:not([data-ge="live"]) .ge-track-fill { clip-path: inset(0 0 100% 0); animation: ge-failsafe 0s linear 3s forwards; }
+}
+@media (prefers-reduced-motion: no-preference) and (min-width: 640px) {
+  html.js .ge-loop:not([data-ge="live"]) .ge-track-fill { clip-path: inset(0 100% 0 0); }
+  [dir="rtl"] html.js .ge-loop:not([data-ge="live"]) .ge-track-fill, html.js[dir="rtl"] .ge-loop:not([data-ge="live"]) .ge-track-fill { clip-path: inset(0 0 0 100%); }
+}
+/* Cards: a quiet resting shadow, a deeper one on hover (pointer devices only). Dark mode leans on the edge instead. */
+.ge-card { box-shadow: 0 1px 2px hsl(220 30% 20% / .04), 0 12px 32px -20px hsl(220 30% 20% / .16); }
+.dark .ge-card { box-shadow: inset 0 1px 0 hsl(0 0% 100% / .04), 0 12px 32px -20px hsl(0 0% 0% / .7); }
+@media (hover: hover) {
+  .ge-card:hover { border-color: hsl(var(--foreground) / .14); box-shadow: 0 2px 4px hsl(220 30% 20% / .05), 0 22px 44px -22px hsl(220 30% 20% / .26); }
+  .dark .ge-card:hover { border-color: hsl(var(--foreground) / .16); box-shadow: inset 0 1px 0 hsl(0 0% 100% / .06), 0 22px 44px -20px hsl(0 0% 0% / .8); }
+}
+/* Reduced motion: the loop is simply there, track drawn and nodes lit; GrowthLoop runs no timeline. */
+@media (prefers-reduced-motion: reduce) { .ge-loop :is(.ge-node-lit, .ge-label, .ge-hint, .ge-note) { opacity: 1; } .ge-loop .ge-track-fill { clip-path: none; } }
+@media (forced-colors: active) {
+  .ge-node, .ge-node-lit, .ge-track-fill { background: CanvasText; box-shadow: none; }
+  .ge-track { background: GrayText; }
+}
+/* end R1263 growth engine */

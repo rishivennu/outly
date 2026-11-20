@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { SMOOTH } from "@/lib/motion/tokens";
 
 /*
  * Round 1181 (user, 11-17): the four GSAP demos the user picked, built into the site.
- *   1. ScrollSmoother on every public page, one curve, entry to exit.
+ *   1. One smooth scroll on every page, one curve, entry to exit (R1262: Lenis only, ScrollSmoother removed).
  *   2. Pinned panels with overscroll: the landing sections as sheets that stack.
  *   3. Animate text replacement: send buttons that type their own progress.
  *   4. Orchestrated easeReverse + interruptible single timeline: the two nav menus.
@@ -18,34 +18,36 @@ const src = (["app", "components", "lib"] as const).flatMap((d) =>
     .map((f) => ({ file: join(d, f).replace(/\\/g, "/"), text: read(join(d, f)) })),
 );
 
-describe("one smooth scroll for the whole app (1181)", () => {
-  const smoother = read("components/marketing/Smoother.tsx");
+describe("one smooth scroll for the whole app (1181, Lenis only since R1262)", () => {
   const lenis = read("components/marketing/SmoothScroll.tsx");
   const registry = read("lib/motion/smooth.ts");
+  const layout = read("app/(marketing)/layout.tsx");
 
-  test("ScrollSmoother wraps main and the footer on every public page", () => {
-    const layout = read("app/(marketing)/layout.tsx");
-    expect(layout).toContain("<Smoother>");
-    expect(layout).toMatch(/<Smoother>[\s\S]*<main id="main"[\s\S]*MarketingFooter[\s\S]*<\/Smoother>/);
-    expect(smoother).toContain('id="smooth-wrapper"');
-    expect(smoother).toContain('id="smooth-content"');
-    expect(smoother).toContain("ScrollSmoother.create(");
+  test("one engine: Lenis, mounted once in the root client for every page", () => {
+    expect(existsSync("components/marketing/Smoother.tsx")).toBe(false);
+    const root = read("components/shared/RootClient.tsx");
+    expect((root.match(/<SmoothScroll\b/g) ?? []).length).toBe(1);
+    expect(lenis).toContain('import("lenis")');
+    expect(registry).toContain('kind: "lenis";');
   });
 
-  test("both engines glide on the same curve", () => {
+  test("public pages render main and the footer straight in the layout, no scroll wrapper", () => {
+    expect(layout).not.toContain("Smoother");
+    expect(layout).toMatch(/<main id="main" tabIndex=\{-1\} className="outline-none">\{children\}<\/main>\s*<MarketingFooter \/>/);
+  });
+
+  test("the glide keeps the one curve", () => {
     expect(SMOOTH.duration).toBe(1);
     expect(SMOOTH.gsap).toBe("expo.out");
-    expect(smoother).toContain("smooth: SMOOTH.duration");
-    expect(smoother).toContain("ease: SMOOTH.gsap");
     expect(lenis).toContain("duration: SMOOTH.duration");
     expect(lenis).toContain("easing: smoothEase");
   });
 
-  test("ScrollSmoother claims the page, so Lenis never runs underneath it", () => {
-    expect(smoother).toContain("claimSmooth()");
-    expect(lenis).toContain("smoothClaimed()");
-    expect(registry).toContain("export function claimSmooth");
-    expect(registry).toContain("export const smoothClaimed");
+  test("nothing claims the page and nothing imports ScrollSmoother", () => {
+    for (const name of ["claimSmooth", "smoothClaimed", "onSmoothClaim", "whenScrollReady"]) {
+      expect(src.filter((f) => f.text.includes(name)).map((f) => f.file)).toEqual([]);
+    }
+    expect(src.filter((f) => /gsap\/ScrollSmoother|getSmoother|html\.smoother|smooth-wrapper/.test(f.text)).map((f) => f.file)).toEqual([]);
   });
 
   test("nobody scrolls the page behind the engine's back", () => {
@@ -53,30 +55,21 @@ describe("one smooth scroll for the whole app (1181)", () => {
     expect(registry).toContain("export function scrollPageTo");
   });
 
-  test("the page's own pins are built after the smoother, never before it", () => {
-    expect(registry).toContain("export function whenScrollReady");
-    expect(read("components/marketing/ScrollScenes.tsx")).toContain("whenScrollReady(build)");
-  });
-
   test("touch and reduced motion keep plain native scroll", () => {
-    expect(smoother).toContain('window.matchMedia("(prefers-reduced-motion: no-preference)").matches');
-    expect(smoother).toContain('window.matchMedia("(pointer: coarse)").matches');
-    expect(smoother).toContain("smoothTouch: false");
+    expect(lenis).toContain('window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;');
+    expect(lenis).toContain('window.matchMedia("(pointer: coarse)").matches) return;');
   });
 
-  test("nothing inside the smoothed content relies on position: sticky, and the nav keeps its room", () => {
-    expect(smoother).toContain("function pinSticky");
-    expect(smoother).toContain("--smooth-top");
-    expect(read("app/globals.css")).toContain("html.smoother");
+  test("sticky bars stick natively again, and the nav keeps its own flow", () => {
+    const css = read("app/globals.css");
+    expect(css).not.toContain("--smooth-top");
+    expect(css).not.toContain("#smooth-content");
   });
 
-  test("the smooth engines and ScrollSmoother are never in the first-load bundle", () => {
+  test("the engine is never in the first-load bundle", () => {
     expect(registry).not.toMatch(/^import .*(gsap|lenis)/m);
-    for (const f of ["components/marketing/Smoother.tsx", "components/marketing/SmoothScroll.tsx"]) {
-      const t = read(f);
-      expect(t).not.toMatch(/^import (?!type)[^\n]*from "(gsap|lenis)/m);
-      expect(t).toMatch(/import\("(gsap|lenis)/);
-    }
+    expect(lenis).not.toMatch(/^import (?!type)[^\n]*from "(gsap|lenis)/m);
+    expect(lenis).toMatch(/import\("lenis"\)/);
   });
 });
 
@@ -228,8 +221,8 @@ describe("send buttons that type their own progress (1181)", () => {
   });
 });
 
-describe("the page transition still sits above the smoothed content (1181)", () => {
-  test("the wave is painted into the body, outside the transformed wrapper", () => {
+describe("the page transition sits above the page (1181)", () => {
+  test("the wave is painted into the body", () => {
     const pt = read("components/shared/PageTransition.tsx");
     expect(pt).toContain("createPortal");
     expect(pt).toMatch(/createPortal\([\s\S]{0,500}document\.body,\s*\)/);

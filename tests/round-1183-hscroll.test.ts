@@ -14,7 +14,7 @@ const row = read("components/marketing/HScroll.tsx");
 const features = read("components/marketing/Features.tsx");
 const stage = read("components/marketing/TryItStage.tsx");
 const css = read("app/globals.css");
-const smoother = read("components/marketing/Smoother.tsx");
+const lenis = read("components/marketing/SmoothScroll.tsx");
 
 describe("horizontal galleries (1183)", () => {
   test("What you get puts every feature card, lead first, in one gallery", () => {
@@ -94,8 +94,8 @@ describe("horizontal galleries (1183)", () => {
     expect(at).toBeLessThan(css.indexOf("1120: creator profile card"));
   });
 
-  test("phones keep native momentum scroll: ScrollSmoother still stays off on touch", () => {
-    expect(smoother).toContain('window.matchMedia("(pointer: coarse)").matches');
-    expect(smoother).toContain("smoothTouch: false");
+  test("phones keep native momentum scroll: Lenis stays off on touch, and never syncs touch", () => {
+    expect(lenis).toContain('window.matchMedia("(pointer: coarse)").matches) return;');
+    expect(lenis).not.toContain("syncTouch");
   });
 });
