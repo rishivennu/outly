@@ -13,7 +13,7 @@ import { ArrowRight, BarChart3, Bell, BellOff, Check, ChevronDown, ExternalLink,
 import { Button } from "@/components/ui/button";
 import { OutlyMark } from "@/components/brand/Logo";
 import { Pip } from "@/components/brand/Pip";
-import { PlatformOrb } from "@/components/shared/PlatformIcon";
+import { PlatformGlyph, PlatformOrb } from "@/components/shared/PlatformIcon";
 import { useUser } from "@/components/shell/UserContext";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DotText } from "@/components/brand/DotText";
@@ -297,8 +297,9 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
   };
 
   // 1212: the actions sit top right once the send has finished (and nowhere else on the page).
+  // R1254: full width side by side on a phone, pushed right (ml-auto) whenever the header row has to wrap.
   const actions = !active && (
-    <div className="flex flex-wrap gap-2 [&>*]:flex-1 sm:shrink-0 sm:justify-end sm:[&>*]:flex-none" data-testid="pub-actions">
+    <div className="flex w-full flex-wrap gap-2 [&>*]:flex-1 sm:ml-auto sm:w-auto sm:justify-end sm:[&>*]:flex-none" data-testid="pub-actions">
       <Button asChild variant="primary" size="md">
         <Link href="/content">
           <LayoutGrid className="h-4 w-4" aria-hidden="true" /> See your content
@@ -317,10 +318,12 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
 
   return (
     <div className="mx-auto w-full max-w-6xl">
+      {/* R1254: one header row inside the same max width as the stepper and the grid. It wraps instead of squeezing,
+          so the heading and the actions never overlap, and the primary action stays top right (top on a phone). */}
       {!active && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-            <p className="text-[22px] font-semibold leading-tight tracking-[-0.02em]">{stage}</p>
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3" data-testid="pub-head">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+            <p className="text-[22px] font-bold leading-tight tracking-[-0.02em] sm:text-2xl">{stage}.</p>
             <p className="pub-eyebrow inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold uppercase tracking-[0.12em]">
               {out.allDone || out.allPractice ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <span className="h-2 w-2 rounded-full bg-warning" aria-hidden="true" />}
               {summary}
@@ -333,11 +336,13 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
           column under it): You're live and What happened on the left, the preview and the existing Live Activity
           on the right. Source order is unchanged (grid placement does the arranging), cards share one radius,
           padding and gap, and rows start at the top so a taller Live Activity never stretches its neighbour. */}
-      <div className={cn(!active && "mt-6 grid items-start gap-4 lg:grid-cols-2 lg:gap-5")} data-testid="pub-bento">
+      {/* R1254: equal columns (grid-cols-2 is minmax(0,1fr) twice), one 20px gap both ways from sm, top edges aligned
+          (items-start) and no card given a height: each one is as tall as its content. */}
+      <div className={cn(!active && "mt-5 grid items-start gap-4 sm:gap-5 lg:grid-cols-2")} data-testid="pub-bento">
       {/* R1221: each side is its own column (preview and Live Activity stack with no gap under a shorter You're live), the
           wrappers are `contents` below lg so the four cards order themselves in one column, and nothing is stretched. */}
       <div className={cn("contents", !active && "lg:flex lg:min-w-0 lg:flex-col lg:gap-5")} data-testid="pub-col-left">
-      <header className={cn("relative text-center", !active && "order-1 rounded-[24px] bg-card px-5 py-6 hairline sm:px-8 lg:order-none")} data-testid="pub-header">
+      <header className={cn("relative text-center", !active && "order-1 rounded-[24px] bg-card px-5 py-6 hairline sm:px-8 sm:py-7 lg:order-none")} data-testid="pub-header">
         <p className="sr-only" role="status" aria-live="polite">{`${headline}. ${summary}.`}</p>
         {pollMiss >= 3 && polling && online && (
           <p role="status" className="mx-auto mb-4 max-w-md rounded-2xl px-4 py-2.5 text-[13px] leading-snug text-muted-foreground glass hairline">
@@ -349,7 +354,7 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
             This page can&apos;t check on the send any more. Open <Link href="/content" className="font-semibold text-foreground underline underline-offset-4">Content</Link> to see where it stands.
           </p>
         )}
-        <div className={cn("flex items-end justify-center", active ? "mb-3 h-[104px]" : "mb-2 h-[76px]")}>
+        <div className={cn("flex items-end justify-center", active ? "mb-3 h-[104px]" : "mb-3")}>
           {active ? <DancingPip size={92} /> : <Pip size={68} mood={out.allDone ? "happy" : "sad"} />}
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2">
@@ -395,7 +400,7 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
             {rehearsed.length ? `${realLive.length} live, ${rehearsed.length} practice` : realLive.length === post.targets.length ? `${realLive.length === 1 ? "1 publication" : `${realLive.length} publications`} live` : `${realLive.length} of ${post.targets.length} live`}
           </p>
         )}
-        <p className={cn("mx-auto max-w-md text-muted-foreground", active ? "mt-3" : "mt-2 text-[15px] leading-snug")}>{sub}</p>
+        <p className={cn("mx-auto max-w-md text-muted-foreground", active ? "mt-3" : "mt-2 text-[15px] leading-relaxed")}>{sub}</p>
         {allLive && !reduce && <Burst />}
       </header>
       {!active && <WhatHappened post={post} className="order-3 lg:order-none" />}
@@ -404,10 +409,12 @@ export function PublishingView({ initial, onAnother }: { initial: PostView; onAn
       <div className={cn("contents", !active && "lg:flex lg:min-w-0 lg:flex-col lg:gap-5")} data-testid="pub-col-right">
       {!active && <PublishedPreview post={post} trackerOf={trackerOf} className="order-2 lg:order-none" />}
 
-      {/* The existing Live Activity cards, untouched inside; only their outer list fits the column (one card a row, full width). */}
-      <section aria-label={active ? undefined : "Live activity"} className={cn(!active && "order-4 min-w-0 lg:order-none")} data-testid="pub-live">
-        {!active && <p className="pub-label mb-3">Live activity</p>}
-        <ul aria-label={postWords(post.format).where} className={cn(active ? "mx-auto mt-10 flex max-w-[56rem] flex-wrap justify-center gap-5" : "flex flex-col gap-4 [&>li]:!w-full")}>
+      {/* The existing Live Activity cards, untouched inside; only their outer list fits the column (one card a row, full
+          width). R1254: settled, each card takes the grid's 24px radius and drops the status box's minimum height, so a
+          finished send is only as tall as what it says; min-w-0 keeps it inside its column at every width. */}
+      <section aria-labelledby={active ? undefined : "pub-live-title"} className={cn(!active && "order-4 min-w-0 lg:order-none")} data-testid="pub-live">
+        {!active && <h2 id="pub-live-title" className="pub-label mb-3">Live activity</h2>}
+        <ul aria-label={postWords(post.format).where} className={cn(active ? "mx-auto mt-10 flex max-w-[56rem] flex-wrap justify-center gap-5" : "flex min-w-0 flex-col gap-4 [&>li]:!w-full [&>li]:min-w-0 [&>li]:rounded-[24px] [&_.la-box]:min-h-0")}>
           {post.targets.map((t, i) => (
             <LiveActivity key={t.id} t={t} i={i} lt={trackerOf(t)} now={now} usually={typicalLabel(times[t.platform])} post={post} busy={busy === t.id || busy === "all"} onRetry={() => retry(t)} onStop={() => stop(t)} canRetry={canRetry} reduce={!!reduce} />
           ))}
@@ -470,8 +477,9 @@ function PublishedPreview({ post, trackerOf, className }: { post: PostView; trac
         {words.your}, where it went
       </h2>
       {/* R1218: one row per platform, every row the same shape: thumb, words, badge. A long caption truncates in its
-          own column, so the badge never moves and the card never grows sideways. */}
-      <ul className="mt-3 flex flex-col gap-2">
+          own column, so the badge never moves and the card never grows sideways. R1254: the three columns centre on
+          one line, and the thumb is one fixed 64x86 frame (object-cover) whatever shape the video is. */}
+      <ul className="mt-3 flex flex-col gap-2.5">
         {post.targets.map((t) => {
           const meta = PLATFORM_META[t.platform];
           const acct = trackerOf(t)?.account ?? null;
@@ -480,7 +488,7 @@ function PublishedPreview({ post, trackerOf, className }: { post: PostView; trac
           const when = t.status === "published" ? whenLabel(t.publishedAt) : null;
           const live = t.status === "published" && !t.practice;
           return (
-            <li key={t.id} className="grid grid-cols-[64px_minmax(0,1fr)_auto] items-start gap-3 rounded-[16px] bg-secondary/50 p-3 hairline" data-testid="preview-card" data-status={t.status}>
+            <li key={t.id} className="grid grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-3 rounded-[16px] bg-secondary/50 p-3 hairline sm:gap-4" data-testid="preview-card" data-status={t.status}>
               <div className="relative h-[86px] w-[64px] shrink-0 overflow-hidden rounded-xl bg-secondary">
                 {thumb ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -492,13 +500,13 @@ function PublishedPreview({ post, trackerOf, className }: { post: PostView; trac
               </div>
               <div className="min-w-0">
                 <p className="line-clamp-2 text-[15px] font-semibold leading-snug" title={line}>{line}</p>
-                <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
+                <p className="mt-1 truncate text-[13px] text-muted-foreground">
                   {meta.name}
                   {handle ? <> <span aria-hidden="true">·</span> {handle}</> : null}
                   {t.practice && t.status === "published" ? <> <span aria-hidden="true">·</span> practice run</> : null}
                 </p>
-                <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  {when && <span className="tabular-nums">{when}</span>}
+                <p className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                  {when && <span className="tabular-nums">Published {when}</span>}
                   {live && t.url && (
                     <a href={t.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 whitespace-nowrap font-semibold text-foreground underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(hover:hover)]:hover:underline">
                       Open on {meta.name} <ExternalLink className="h-3 w-3" aria-hidden="true" />
@@ -506,7 +514,7 @@ function PublishedPreview({ post, trackerOf, className }: { post: PostView; trac
                   )}
                 </p>
               </div>
-              <StatusBadge status={t.status} className="shrink-0 self-start" />
+              <StatusBadge status={t.status} className="shrink-0 self-center whitespace-nowrap" />
             </li>
           );
         })}
@@ -645,7 +653,8 @@ function LiveActivity({ t, i, lt, now, usually, post, busy, onRetry, onStop, can
             </button>
           ) : (
             <span className="grid h-11 w-11 place-items-center" aria-hidden="true">
-              <PlatformOrb platform={t.platform} size={32} className={cn(t.status === "pending" && "opacity-60")} />
+              {/* R1254: the platform's own mark straight on the dark card, no white disc behind it. */}
+              <PlatformGlyph platform={t.platform} surface="dark" className={cn("h-7 w-7", t.status === "pending" && "opacity-60")} />
             </span>
           )}
         </span>
@@ -767,7 +776,8 @@ function WhatHappened({ post, className }: { post: PostView; className?: string 
     // R1218: the same card as the other three (one radius, padding, hairline), the page's own type, and the
     // shared Button for its two actions, so it reads as part of the grid rather than a second Live Activity card.
     <section aria-labelledby="what-happened" className={cn("min-w-0 rounded-[24px] bg-card p-4 hairline sm:p-5", className)} data-testid="what-happened">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      {/* R1254: compact: label, one summary line and the Analytics action on one row, then one tight row per place. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="min-w-0">
           <p className="pub-label">What happened</p>
           <h2 id="what-happened" className="mt-1 text-[17px] font-semibold leading-tight tracking-[-0.01em]">
@@ -782,15 +792,15 @@ function WhatHappened({ post, className }: { post: PostView; className?: string 
           </Button>
         )}
       </div>
-      <ul className="mt-3 divide-y divide-border/70">
+      <ul className="mt-2 divide-y divide-border/70">
         {rows.map(({ t, meta, result, why }) => (
-          <li key={t.id} className="grid min-h-[56px] grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 py-2.5">
+          <li key={t.id} className="grid min-h-11 grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 py-2">
             <PlatformOrb platform={t.platform} size={28} />
             <div className="min-w-0">
-              <p className="text-[15px] font-semibold leading-tight">
-                {meta.name} <span className="text-xs font-medium text-muted-foreground">{platformFormatLabel(meta.format, post.format)}</span>
+              <p className="truncate text-[15px] font-semibold leading-tight">
+                {meta.name} <span className="text-xs font-normal text-muted-foreground">{platformFormatLabel(meta.format, post.format)}</span>
               </p>
-              <p className={cn("mt-0.5 text-sm leading-snug", t.status === "published" && !t.practice ? "font-semibold text-[#173A24] dark:text-[hsl(var(--lime))]" : t.status === "failed" && t.errorCode !== "CANCELED" ? "text-destructive" : "text-muted-foreground")}>
+              <p className={cn("mt-0.5 text-[13px] leading-snug", t.status === "published" && !t.practice ? "font-semibold text-[#173A24] dark:text-[hsl(var(--lime))]" : t.status === "failed" && t.errorCode !== "CANCELED" ? "text-destructive" : "text-muted-foreground")}>
                 {result}
                 {why && <span className="font-normal text-muted-foreground">. {why}</span>}
               </p>

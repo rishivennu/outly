@@ -103,7 +103,8 @@ describe("1212 publishing success screen", () => {
       expect(i, s).toBeGreaterThan(-1);
       return i;
     };
-    const stage = at("<p className=\"text-[22px] font-semibold leading-tight tracking-[-0.02em]\">{stage}</p>");
+    // R1254: the page heading is bold and ends with a full stop ("Publishing complete.")
+    const stage = at("<p className=\"text-[22px] font-bold leading-tight tracking-[-0.02em] sm:text-2xl\">{stage}.</p>");
     const actions = at("{actions}");
     const header = at('data-testid="pub-header"');
     // R1221: the source walks the left column (You're live, What happened) then the right (preview, Live Activity);
