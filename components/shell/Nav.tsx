@@ -2,7 +2,7 @@
 import { HoverLink as Link } from "./HoverLink";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { OutlyLogo } from "@/components/brand/Logo";
+import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
 import { NoticesBell } from "./NoticesBell";
 import { PulseRail } from "./PulseRail";
 import { MobileDrawer } from "./MobileDrawer";
@@ -305,9 +305,10 @@ export function MobileNav() {
  * the bar stays as light as the tab bar. 52px tall plus the top safe area, which only this bar pads (the drawer
  * pads its own, being a separate layer), so it is never applied twice.
  * 1099: no box. At rest it sits on the page background (the same colour the status bar is painted, see
- * lib/theme/colors.ts), with no border or shadow; once content scrolls under it a frosted layer and a hairline
- * fade in (.mtop in globals.css). One 44px button size, 20px icons. R1214: the bell and the menu are the shared
- * glass circles (.gbtn-icon, globals.css), the same glass as the tab bar and every phone button.
+ * lib/theme/colors.ts), with no border or shadow; R1284: once content scrolls under it the bar takes the page colour
+ * and a soft fade sits under it (.mtop, R1284 in globals.css). One 44px button size, 20px icons. R1214: the bell and the menu are the shared
+ * .gbtn-icon buttons; R1284 strips their glass inside the bar (bare icons, a tonal fill only while touched). The brand is the
+ * rocket and wordmark, the rocket alone under 360px (.mtop-brand-*).
  * R1216: the bar follows the scroll (lib/client/header-scroll.ts): moving down the page folds it away
  * (data-folded, a 300ms translate in globals.css), moving back brings it in, at the top it always shows. One
  * listener here for every mobile route and for pages that scroll in their own container; nothing else changed.
@@ -321,7 +322,8 @@ export function MobileTopBar() {
     <header ref={bar} data-mtop="" data-lifted={lifted ? "" : undefined} data-folded={hidden ? "" : undefined} className="mtop web-only sticky top-0 z-30 lg:hidden">
       <div className="mtop-row grid h-[52px] grid-cols-[1fr_auto_1fr] items-center gap-2 pl-3 pr-1.5 min-[400px]:pl-4 min-[400px]:pr-2.5">
         <Link href="/home" className="mtop-logo flex h-11 min-w-11 items-center justify-self-start rounded-full px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Outlly dashboard">
-          <OutlyLogo size={22} />
+          <span className="mtop-brand-full inline-flex"><OutlyLogo size={22} /></span>
+          <span className="mtop-brand-mark"><OutlyMark size={22} /></span>
         </Link>
         <span key={title} className="mtop-title max-w-[40vw] truncate text-[16px] font-medium tracking-[-0.01em] text-foreground">
           {title}

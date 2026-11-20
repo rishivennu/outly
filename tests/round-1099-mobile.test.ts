@@ -203,7 +203,8 @@ describe("1099 phone top bar and touch targets", () => {
   test("no box at rest: no border, solid fill or shadow classes on the header", () => {
     expect(bar).toContain('className="mtop web-only sticky top-0 z-30 lg:hidden"');
     expect(bar).not.toMatch(/border-b|bg-background|shadow-\[/);
-    expect(css).toMatch(/\.mtop\[data-lifted\] \{[^}]*backdrop-filter/);
+    // R1284: scrolled, the bar takes the page colour itself (no frost panel); the fade under it lives in the R1284 block
+    expect(css).toContain(".mtop[data-lifted] { background-color: hsl(var(--background)); }");
   });
   test("safe areas on three sides and a shorter row in landscape", () => {
     for (const side of ["top", "left", "right"]) expect(css).toContain(`padding-${side}: var(--sa-${side[0]});`);
