@@ -103,7 +103,7 @@ describe("R1199 wiring", () => {
   test("the Instagram card has the switch, off by default, and the scopes line follows it", () => {
     expect(form).toContain("Ask creators for Instagram insights");
     expect(form).toContain("useState(saved.insights === true)");
-    expect(form).toContain('aria-describedby="instagram-insights-hint"');
+    expect(form).toContain('describedBy="instagram-insights-hint"');
     expect(form).toContain("...(ig ? { insights } : {})");
     expect(form).toContain("`${baseScopes}, instagram_business_manage_insights`");
   });

@@ -83,7 +83,7 @@ export function WhatsAppCard({ initial }: { initial: WhatsAppView }) {
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        <Button type="button" variant="primary" onClick={() => save()} disabled={!!busy}>{busy === "save" ? "Saving…" : "Save"}</Button>
+        <Button type="button" variant="lime" onClick={() => save()} disabled={!!busy}>{busy === "save" ? "Saving…" : "Save"}</Button>
         <Button type="button" variant="outline" onClick={() => test(false)} disabled={!!busy || !saved.token.set || !saved.phoneNumberId}>
           <Wifi className="h-4 w-4" aria-hidden /> {busy === "check" ? "Checking…" : "Check connection"}
         </Button>

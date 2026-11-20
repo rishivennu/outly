@@ -6,6 +6,7 @@ import { adminApi } from "@/lib/client/admin-api";
 import type { DashboardConfig, DashboardStyle } from "@/lib/dashboard-config";
 import { cn } from "@/lib/utils";
 import { Card, CardTitle, Pill } from "./ui";
+import { Switch } from "./Switch";
 
 const STYLES: { id: DashboardStyle; name: string; body: string; points: string[] }[] = [
   {
@@ -110,20 +111,9 @@ export function DashboardStylePicker({ initial }: { initial: DashboardConfig }) 
       </Card>
       <Card>
         <CardTitle hint="On: a small Classic / Analytics switch appears on Home and each browser keeps its own pick. Off: everyone sees the default above.">Let people switch</CardTitle>
-        <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-3 hairline focus-within:ring-2 focus-within:ring-ring">
+        <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-3 hairline">
           <span className="text-[14px] font-medium">Show the dashboard switch on Home</span>
-          <input
-            type="checkbox"
-            role="switch"
-            checked={cfg.userSwitch}
-            disabled={busy}
-            aria-checked={cfg.userSwitch}
-            onChange={(e) => save({ userSwitch: e.target.checked }, (c) => (c.userSwitch ? "People can now switch dashboards from Home." : `Switch hidden. Everyone sees the ${name(c.style)} dashboard.`))}
-            className="peer sr-only"
-          />
-          <span aria-hidden className={cn("relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200", cfg.userSwitch ? "bg-lime" : "bg-foreground/20")}>
-            <span className={cn("absolute top-1 h-5 w-5 rounded-full bg-background shadow transition-transform duration-200 motion-reduce:transition-none", cfg.userSwitch ? "translate-x-6" : "translate-x-1")} />
-          </span>
+          <Switch on={cfg.userSwitch} disabled={busy} label="Show the dashboard switch on Home" onChange={(v) => save({ userSwitch: v }, (c) => (c.userSwitch ? "People can now switch dashboards from Home." : `Switch hidden. Everyone sees the ${name(c.style)} dashboard.`))} />
         </label>
       </Card>
     </div>

@@ -1,4 +1,5 @@
 import { Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin/guard";
 import { formatMoney } from "@/lib/billing/money";
@@ -59,9 +60,11 @@ export default async function Payments(props: { searchParams: Promise<{ status?:
                 <td className="whitespace-nowrap text-muted-foreground">{fmtDate(p.createdAt, true)}</td>
                 <td>
                   {p.invoice ? (
-                    <a href={`/api/billing/invoices/${p.invoice.number}`} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[12px] hairline hover:bg-secondary touch:min-h-11" title={p.invoice.emailedAt ? "Emailed to customer" : "Not emailed"}>
-                      <Download className="h-3.5 w-3.5" aria-hidden />{p.invoice.number}
-                    </a>
+                    <Button asChild variant="outline" size="sm" className="font-mono text-[12px]">
+                      <a href={`/api/billing/invoices/${p.invoice.number}`} title={p.invoice.emailedAt ? "Emailed to customer" : "Not emailed"}>
+                        <Download className="h-3.5 w-3.5" aria-hidden />{p.invoice.number}
+                      </a>
+                    </Button>
                   ) : (
                     <span className="text-muted-foreground">-</span>
                   )}

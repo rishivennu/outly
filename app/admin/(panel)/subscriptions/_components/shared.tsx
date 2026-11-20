@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { formatMoney } from "@/lib/billing/money";
 import { cn } from "@/lib/utils";
 import { Pill } from "@/components/admin/ui";
+import { Switch as AdminSwitch } from "@/components/admin/Switch";
 
 export const pct = (n: number | null | undefined) => (n == null || !Number.isFinite(n) ? "n/a" : `${Math.round(n * 1000) / 10}%`);
 export const inr = (paise: number) => formatMoney(Math.round(paise), "INR");
@@ -16,8 +17,7 @@ export function Switch({ label, hint, checked, onChange, disabled }: { label: st
         <span className="block text-[14px] font-medium">{label}</span>
         {hint && <span className="block text-[12px] text-muted-foreground">{hint}</span>}
       </span>
-      <input type="checkbox" role="switch" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
-      <span aria-hidden className="relative h-7 w-12 shrink-0 rounded-full bg-muted transition-colors peer-checked:bg-lime peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-background after:shadow after:transition-transform after:duration-300 peer-checked:after:translate-x-5 motion-reduce:after:transition-none" />
+      <AdminSwitch on={checked} disabled={disabled} onChange={onChange} label={label} />
     </label>
   );
 }

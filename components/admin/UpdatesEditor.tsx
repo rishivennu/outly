@@ -9,7 +9,8 @@ import { WhatsNewCard } from "@/components/shell/WhatsNew";
 import { adminApi } from "@/lib/client/admin-api";
 import { cleanItems, UPDATE_LIMITS, type UpdateNotice } from "@/lib/updates";
 import { cn } from "@/lib/utils";
-import { Card, CardTitle, Pill } from "./ui";
+import { Card, CardTitle, StatusBadge } from "./ui";
+import { Switch } from "./Switch";
 
 export function UpdatesEditor({ initial }: { initial: UpdateNotice }) {
   const toast = useToast();
@@ -45,7 +46,7 @@ export function UpdatesEditor({ initial }: { initial: UpdateNotice }) {
       <Card>
         <CardTitle
           hint={notice.on ? `Published ${new Date(notice.publishedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" })}` : "Switched off. Nobody sees it."}
-          action={<Pill tone={notice.on ? "ok" : "muted"}>{notice.on ? "Showing" : "Off"}</Pill>}
+          action={<StatusBadge status={notice.on ? "live" : "canceled"} label={notice.on ? "Showing" : "Off"} />}
         >
           What changed
         </CardTitle>
@@ -59,17 +60,7 @@ export function UpdatesEditor({ initial }: { initial: UpdateNotice }) {
               <p className="text-[12.5px] text-muted-foreground">Shown once per member, on the dashboard. New sign-ups skip it.</p>
             </div>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={notice.on}
-            aria-label="Show the update notice"
-            disabled={busy}
-            onClick={() => save({ on: !notice.on })}
-            className={cn("relative inline-flex h-9 w-16 shrink-0 items-center rounded-full transition-colors duration-300 disabled:opacity-60", notice.on ? "bg-success" : "bg-foreground/20")}
-          >
-            <span className={cn("inline-block h-7 w-7 rounded-full bg-white shadow transition-transform duration-300", notice.on ? "translate-x-8" : "translate-x-1")} />
-          </button>
+          <Switch on={notice.on} onChange={() => save({ on: !notice.on })} label="Show the update notice" disabled={busy} />
         </div>
 
         <div className="mt-5 grid gap-4">

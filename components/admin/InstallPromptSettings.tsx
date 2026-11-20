@@ -3,8 +3,8 @@ import { useState } from "react";
 import { useToast } from "@/components/shared/Toast";
 import { adminApi } from "@/lib/client/admin-api";
 import { cooldownFor, type InstallConfig } from "@/lib/pwa-core";
-import { cn } from "@/lib/utils";
 import { Card, CardTitle } from "./ui";
+import { Switch } from "./Switch";
 
 const VISITS = [1, 2, 3, 5];
 const DELAYS = [10, 20, 30, 60];
@@ -63,20 +63,9 @@ export function InstallPromptSettings({ initial }: { initial: InstallConfig }) {
       <CardTitle hint="Phones only, in the browser. Android gets its own install prompt; iPhone and iPad get the three Share steps. Never shown inside the Android app, once Outlly is installed, or in Instagram and other in-app browsers.">
         Home Screen suggestion
       </CardTitle>
-      <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-3 hairline focus-within:ring-2 focus-within:ring-ring">
+      <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-3 hairline">
         <span className="text-[14px] font-medium">Suggest &ldquo;Add Outlly to your Home Screen&rdquo;</span>
-        <input
-          type="checkbox"
-          role="switch"
-          checked={cfg.enabled}
-          disabled={busy}
-          aria-checked={cfg.enabled}
-          onChange={(e) => save({ enabled: e.target.checked }, e.target.checked ? "Home Screen suggestion on." : "Home Screen suggestion off for everyone.")}
-          className="peer sr-only"
-        />
-        <span aria-hidden className={cn("relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200", cfg.enabled ? "bg-lime" : "bg-foreground/20")}>
-          <span className={cn("absolute top-1 h-5 w-5 rounded-full bg-background shadow transition-transform duration-200 motion-reduce:transition-none", cfg.enabled ? "translate-x-6" : "translate-x-1")} />
-        </span>
+        <Switch on={cfg.enabled} disabled={busy} label="Suggest “Add Outlly to your Home Screen”" onChange={(v) => save({ enabled: v }, v ? "Home Screen suggestion on." : "Home Screen suggestion off for everyone.")} />
       </label>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {select("First shown on visit", cfg.minVisits, VISITS, (n) => (n === 1 ? "The first visit" : `Visit ${n}`), "minVisits")}

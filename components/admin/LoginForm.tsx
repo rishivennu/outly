@@ -5,6 +5,7 @@ import { ArrowRight, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { Pip, type PipMood } from "@/components/brand/Pip";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
+import { Tooltip } from "./ui";
 import { adminApi } from "@/lib/client/admin-api";
 import { MOTION_OK, gsap, useGSAP } from "@/lib/motion/gsap";
 import { SHAKE_X, shakeTargets } from "@/lib/client/shake";
@@ -106,14 +107,13 @@ export function AdminLoginForm({ next }: { next: string }) {
               aria-invalid={!!error}
               required
             />
-            <button
-              type="button"
-              onClick={() => setShow((v) => !v)}
-              className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-              aria-label={show ? "Hide password" : "Show password"}
-            >
-              {show ? <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" /> : <Eye className="h-[18px] w-[18px]" aria-hidden="true" />}
-            </button>
+            <span className="absolute right-1 top-1/2 flex -translate-y-1/2">
+              <Tooltip text={show ? "Hide password" : "Show password"}>
+                <Button type="button" variant="ghost" size="icon-sm" onClick={() => setShow((v) => !v)} aria-label={show ? "Hide password" : "Show password"}>
+                  {show ? <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" /> : <Eye className="h-[18px] w-[18px]" aria-hidden="true" />}
+                </Button>
+              </Tooltip>
+            </span>
           </div>
         </div>
 

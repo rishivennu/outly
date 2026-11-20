@@ -2,6 +2,8 @@
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Send } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/field";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/Toast";
 import { adminApi } from "@/lib/client/admin-api";
@@ -37,14 +39,9 @@ export function WinbackButton({ userId, name, email, lastSent }: { userId: strin
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex h-11 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-[12.5px] font-semibold hairline transition-colors hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        aria-label={`Send a win-back email to ${name}`}
-      >
+      <Button type="button" variant="danger" size="sm" onClick={() => setOpen(true)} aria-label={`Send a win-back email to ${name}`}>
         <Send className="h-3.5 w-3.5" aria-hidden /> Win back
-      </button>
+      </Button>
       <ConfirmDialog
         open={open}
         onOpenChange={(o) => !busy && setOpen(o)}
@@ -60,13 +57,13 @@ export function WinbackButton({ userId, name, email, lastSent }: { userId: strin
             <label htmlFor={noteId} className="mb-1.5 block text-[13px] font-semibold">
               Personal line <span className="font-normal text-muted-foreground">(optional)</span>
             </label>
-            <textarea
+            <Textarea
               id={noteId}
               value={note}
               onChange={(e) => setNote(e.target.value.slice(0, 600))}
               rows={3}
               placeholder={`e.g. Saw your last reel did well, ${first}. Want help planning the next one?`}
-              className="w-full resize-none rounded-2xl bg-background px-3.5 py-2.5 text-[14px] hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              className="text-[14px]"
             />
             <p className="mt-1 text-right text-[11.5px] text-muted-foreground tabular">{note.length}/600</p>
           </div>

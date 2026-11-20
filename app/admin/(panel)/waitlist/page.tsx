@@ -2,13 +2,15 @@ import { requireAdmin } from "@/lib/admin/guard";
 import { getConfig } from "@/lib/settings";
 import { istBounds, waitlistCounts, waitlistList } from "@/lib/site";
 import { campaignStatus } from "@/lib/campaigns";
-import { Card, CardTitle, Empty, PageHead, Pill, Table, ago } from "@/components/admin/ui";
+import { Card, CardTitle, Empty, PageHead, StatusBadge, Table, ago } from "@/components/admin/ui";
 import { WaitlistToggle } from "@/components/admin/WaitlistToggle";
 import { WaitlistCampaign } from "@/components/admin/WaitlistCampaign";
 import { AutoRefresh, InviteOne } from "@/components/admin/WaitlistBits";
 import { DateFilter, FilterChips, FilterSelect, MoreFilters, SearchBox } from "@/components/admin/SearchBox";
 import { RefreshButton } from "@/components/admin/RefreshButton";
 import { Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/admin/Pagination";
 
 export const metadata = { title: "Waitlist" };
 export const dynamic = "force-dynamic";
@@ -40,8 +42,6 @@ export default async function WaitlistAdminPage(props: { searchParams: Promise<S
   const f = { q, status: (status || "all") as "all" | "waiting" | "invited", sort: (sort || "new") as "new" | "old", from, to };
   const [c, counts, list, campaign] = await Promise.all([getConfig("site"), waitlistCounts(), waitlistList({ ...f, page, per: PER }), campaignStatus()]);
 
-  const kept = { ...(q ? { q } : {}), ...(status ? { st: status } : {}), ...(sort ? { sort } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) };
-  const link = (p: number) => `?${new URLSearchParams({ ...kept, page: String(p) })}`;
   const csv = `/api/admin/waitlist/export?${new URLSearchParams({ ...(q ? { q } : {}), ...(status ? { status } : {}), ...(sort ? { sort } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) })}`;
   const narrowing = [q, status, from, to].filter(Boolean).length;
   const today = istBounds().day;
@@ -63,9 +63,11 @@ export default async function WaitlistAdminPage(props: { searchParams: Promise<S
         <CardTitle
           hint={narrowing ? `${list.total.toLocaleString("en-IN")} of ${counts.total.toLocaleString("en-IN")} match these filters.` : `${counts.total.toLocaleString("en-IN")} joined in total. Times are India time.`}
           action={
-            <a href={csv} download className="inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold hairline hover:bg-secondary sm:h-9">
-              <Download className="h-4 w-4" aria-hidden /> Export CSV<span className="sr-only"> ({list.total} {list.total === 1 ? "person" : "people"})</span>
-            </a>
+            <Button asChild variant="outline" size="sm">
+              <a href={csv} download>
+                <Download className="h-4 w-4" aria-hidden /> Export CSV<span className="sr-only"> ({list.total} {list.total === 1 ? "person" : "people"})</span>
+              </a>
+            </Button>
           }
         >
           <span id="wl-members">Members</span>
@@ -84,9 +86,9 @@ export default async function WaitlistAdminPage(props: { searchParams: Promise<S
             <DateFilter param="to" label="Joined to" current={to} min={from || undefined} max={todayStr} />
           </MoreFilters>
           {narrowing || sort ? (
-            <a href="?" className="col-span-2 inline-flex h-11 items-center justify-center rounded-full px-4 text-[13px] font-semibold text-muted-foreground hairline hover:bg-secondary hover:text-foreground sm:col-span-1">
-              Clear all
-            </a>
+            <Button asChild variant="outline" className="col-span-2 sm:col-span-1">
+              <a href="?">Clear all</a>
+            </Button>
           ) : null}
         </div>
 
@@ -107,19 +109,13 @@ export default async function WaitlistAdminPage(props: { searchParams: Promise<S
                   <time dateTime={r.createdAt} className="block">{ist(r.createdAt)}</time>
                   <span className="text-[12px] text-muted-foreground">{ago(r.createdAt)}</span>
                 </td>
-                <td>{r.invitedAt ? <Pill tone="ok">Invited {ago(r.invitedAt)}</Pill> : <Pill tone="muted">Waiting</Pill>}</td>
+                <td>{r.invitedAt ? <StatusBadge status="completed" label={`Invited ${ago(r.invitedAt)}`} /> : <StatusBadge status="waiting" />}</td>
                 <td className="text-right">{!r.invitedAt && <InviteOne id={r.id} email={r.email} />}</td>
               </tr>
             ))}
           </Table>
         )}
-        {list.pages > 1 && (
-          <nav aria-label="Pages" className="mt-4 flex items-center justify-between text-[13px]">
-            {list.page > 1 ? <a className="inline-flex h-11 items-center rounded-full px-4 hairline hover:bg-secondary" href={link(list.page - 1)}>Previous</a> : <span />}
-            <span className="text-muted-foreground">Page {list.page} of {list.pages}</span>
-            {list.page < list.pages ? <a className="inline-flex h-11 items-center rounded-full px-4 hairline hover:bg-secondary" href={link(list.page + 1)}>Next</a> : <span />}
-          </nav>
-        )}
+        <Pagination total={list.total} page={list.page} limit={list.per} label="Member list pages" />
       </Card>
     </>
   );

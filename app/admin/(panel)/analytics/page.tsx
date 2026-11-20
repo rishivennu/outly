@@ -1,4 +1,5 @@
 import { ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/lib/admin/guard";
 import { analyticsReport, type Panel } from "@/lib/analytics/posthog-report";
 import { parseRange } from "@/lib/analytics/posthog-query";
@@ -159,9 +160,11 @@ export default async function AnalyticsPage(props: { searchParams: Promise<{ d?:
   const report = await analyticsReport(days);
   const customAsked = !!(sp.from && sp.to);
   const open = (
-    <a href={report.projectUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-4 text-[13px] font-semibold text-background sm:h-9">
-      Open in PostHog <ExternalLink className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">(opens in a new tab)</span>
-    </a>
+    <Button asChild variant="outline" size="sm">
+      <a href={report.projectUrl} target="_blank" rel="noopener noreferrer">
+        Open in PostHog <ExternalLink className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">(opens in a new tab)</span>
+      </a>
+    </Button>
   );
   const bar = (
     <AdminFilterBar label="Analytics filters" meta={report.connected ? <>PostHog · Last {days} days, rolling · UTC days · refreshes every 5 minutes</> : <>PostHog · not connected</>}>

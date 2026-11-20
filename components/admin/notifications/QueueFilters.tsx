@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { AdminFilterBar } from "@/components/admin/FilterBar";
 import { DateFilter, FilterSelect, SearchBox } from "@/components/admin/SearchBox";
 import { filtersOn, type QueueFilters } from "@/lib/admin/notifications";
@@ -28,9 +29,9 @@ export function QueueFilterBar({ f, shown }: { f: QueueFilters; shown: string })
       <DateFilter param="to" label="Created to" current={f.to} min={f.from || undefined} />
       <FilterSelect param="limit" label="Show" current={String(f.limit)} options={LIMIT} />
       {filtersOn(f) && (
-        <Link href="/admin/notifications" scroll={false} className="inline-flex min-h-11 items-center rounded-full px-3.5 text-[13px] font-medium text-muted-foreground hover:text-foreground">
-          Clear filters
-        </Link>
+        <Button asChild variant="ghost">
+          <Link href="/admin/notifications" scroll={false}>Clear filters</Link>
+        </Button>
       )}
     </AdminFilterBar>
   );

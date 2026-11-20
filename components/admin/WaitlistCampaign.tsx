@@ -171,7 +171,7 @@ export function WaitlistCampaign({ initial }: { initial: CampaignStatus }) {
           {showPreview ? "Hide preview" : "Preview email"}
         </Button>
         {!launched ? (
-          <Button type="button" variant="primary" disabled={!!busy || !st.canSend || total === 0} onClick={() => (setAck(false), setAsk(true))}>
+          <Button type="button" variant="lime" disabled={!!busy || !st.canSend || total === 0} onClick={() => (setAck(false), setAsk(true))}>
             <Send className="h-4 w-4" aria-hidden /> Send to {total.toLocaleString("en-IN")} {total === 1 ? "person" : "people"}
           </Button>
         ) : (

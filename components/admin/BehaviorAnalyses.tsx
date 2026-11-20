@@ -112,7 +112,7 @@ export function BehaviorAnalyses({ history, selected, aiReady, range, users, onC
                 const h = HEALTH[i.health] ?? HEALTH.steady;
                 return (
                   <li key={i.id}>
-                    <button type="button" onClick={() => open(i.id)} aria-current={on ? "true" : undefined} aria-label={`Version ${i.version}, ${h.label}, ${fmtDate(i.createdAt, true)}: ${i.headline}`} className={cn("w-full rounded-2xl px-3 py-2.5 text-left transition-colors", on ? "bg-secondary" : "hover:bg-foreground/[0.04]")}>
+                    <button type="button" onClick={() => open(i.id)} aria-current={on ? "true" : undefined} aria-label={`Version ${i.version}, ${h.label}, ${fmtDate(i.createdAt, true)}: ${i.headline}`} className={cn("min-h-11 w-full rounded-2xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-secondary" : "hover:bg-foreground/[0.04]")}>
                       <span className="flex items-center gap-2">
                         <span className={cn("font-display text-[13.5px] font-bold tabular", on && "text-lime-ink")}>v{i.version}</span>
                         <Pill tone={h.tone} className="h-5 px-2 text-[10.5px]">{h.label}</Pill>

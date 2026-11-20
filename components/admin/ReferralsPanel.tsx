@@ -117,7 +117,7 @@ export function ReferralsPanel({ initial, plans }: { initial: { rows: Row[]; tot
           <span className="inline-flex items-center gap-2"><Gift className="h-4 w-4" aria-hidden /> Reward terms</span>
         </CardTitle>
         <div className="grid gap-4">
-          <label className="flex min-h-[44px] items-center justify-between gap-3 rounded-[20px] bg-secondary/40 px-4 hairline">
+          <label className="flex min-h-[44px] cursor-pointer items-center justify-between gap-3 rounded-[20px] bg-secondary/40 px-4 hairline">
             <span className="text-[14px] font-medium">Refer &amp; Earn is on</span>
             <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} className="h-5 w-5 accent-lime" />
           </label>
@@ -139,7 +139,7 @@ export function ReferralsPanel({ initial, plans }: { initial: { rows: Row[]; tot
               {plans.map((p) => {
                 const on = draft.eligiblePlans.includes(p.slug);
                 return (
-                  <button key={p.slug} type="button" role="checkbox" aria-checked={on} onClick={() => toggleEligible(p.slug)} className={cn("h-11 rounded-2xl px-4 text-[13.5px] hairline", on ? "bg-lime/20 font-semibold text-lime-ink" : "bg-secondary/40 text-muted-foreground")}>
+                  <button key={p.slug} type="button" role="checkbox" aria-checked={on} onClick={() => toggleEligible(p.slug)} className={cn("min-h-11 rounded-2xl px-4 text-[13.5px] hairline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-lime/20 font-semibold text-lime-ink" : "bg-secondary/40 text-muted-foreground")}>
                     {p.name}
                   </button>
                 );
@@ -147,7 +147,7 @@ export function ReferralsPanel({ initial, plans }: { initial: { rows: Row[]; tot
             </div>
           </fieldset>
           <div className="flex flex-wrap items-center gap-3">
-            <Button type="button" variant="primary" disabled={!dirty || !!busy || draft.eligiblePlans.length === 0} onClick={save}>{busy === "save" ? "Saving…" : "Save terms"}</Button>
+            <Button type="button" variant="lime" disabled={!dirty || !!busy || draft.eligiblePlans.length === 0} onClick={save}>{busy === "save" ? "Saving…" : "Save terms"}</Button>
             <p className="text-[13px] text-muted-foreground">Now: {cfg.rewardDays} days of {name(cfg.rewardPlan)} after a first payment on {cfg.eligiblePlans.map(name).join(", ") || "nothing"}.</p>
           </div>
         </div>
@@ -171,9 +171,9 @@ export function ReferralsPanel({ initial, plans }: { initial: { rows: Row[]; tot
               <option value="disqualified">Disqualified</option>
             </select>
           </div>
-          <button type="button" aria-pressed={flagged} onClick={() => { setFlagged(!flagged); void load({ flagged: !flagged }); }} className={cn("inline-flex h-11 items-center gap-1.5 rounded-2xl px-4 text-[13.5px] hairline", flagged ? "bg-warning/15 font-semibold" : "bg-secondary/40")}>
+          <Button type="button" variant="outline" aria-pressed={flagged} onClick={() => { setFlagged(!flagged); void load({ flagged: !flagged }); }} className={cn(flagged && "bg-warning/15 font-semibold")}>
             <Flag className="h-4 w-4" aria-hidden /> Flagged only
-          </button>
+          </Button>
           <Button type="submit" variant="subtle" disabled={busy === "load"}><Search className="h-4 w-4" aria-hidden /> Search</Button>
         </form>
         {rows.length === 0 ? (

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Undo2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/Toast";
 import { adminApi } from "@/lib/client/admin-api";
@@ -26,9 +27,9 @@ export function RefundButton({ id, amount, customer }: { id: string; amount: str
   }
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] text-muted-foreground hairline hover:bg-secondary hover:text-foreground" aria-label={`Refund ${amount} to ${customer}`}>
+      <Button type="button" variant="danger" size="sm" onClick={() => setOpen(true)} aria-label={`Refund ${amount} to ${customer}`}>
         <Undo2 className="h-3.5 w-3.5" aria-hidden /> Refund
-      </button>
+      </Button>
       <ConfirmDialog
         open={open}
         onOpenChange={setOpen}

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin/guard";
 import { formatMoney } from "@/lib/billing/money";
-import { Card, CardTitle, Pill, fmtDate } from "@/components/admin/ui";
+import { Card, CardTitle, StatusBadge, fmtDate } from "@/components/admin/ui";
 import { TicketThread } from "@/components/admin/TicketThread";
 
 export const metadata = { title: "Ticket" };
@@ -17,7 +18,7 @@ export default async function TicketPage(props: { params: Promise<{ id: string }
   const sub = t.user?.subscriptions[0];
   return (
     <>
-      <Link href="/admin/tickets" className="mb-4 inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[13px] text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden />All tickets</Link>
+      <Button asChild variant="ghost" size="sm" className="mb-4"><Link href="/admin/tickets"><ArrowLeft className="h-4 w-4" aria-hidden />All tickets</Link></Button>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <TicketThread
           ticket={{ avatar: t.user?.avatar ?? null, id: t.id, ref: t.ref, subject: t.subject, status: t.status, priority: t.priority, email: t.email, name: t.name, source: t.source, createdAt: t.createdAt.toISOString() }}
@@ -32,7 +33,7 @@ export default async function TicketPage(props: { params: Promise<{ id: string }
               <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Joined</dt><dd>{fmtDate(t.user.createdAt)}</dd></div>
               <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Plan</dt><dd>{sub ? `${sub.plan.name} · ${formatMoney(sub.priceMinor, sub.currency)}` : "Free"}</dd></div>
               {t.user.payments.map((p) => (
-                <div key={p.id} className="flex justify-between gap-2"><dt className="text-muted-foreground">{fmtDate(p.createdAt)}</dt><dd className="flex items-center gap-1.5">{formatMoney(p.amountMinor, p.currency)}<Pill tone={p.status === "succeeded" ? "ok" : p.status === "failed" ? "bad" : "warn"}>{p.status === "succeeded" ? "paid" : p.status}</Pill></dd></div>
+                <div key={p.id} className="flex justify-between gap-2"><dt className="text-muted-foreground">{fmtDate(p.createdAt)}</dt><dd className="flex items-center gap-1.5">{formatMoney(p.amountMinor, p.currency)}<StatusBadge status={p.status === "succeeded" ? "paid" : p.status} /></dd></div>
               ))}
             </dl>
           ) : (

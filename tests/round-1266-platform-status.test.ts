@@ -100,8 +100,11 @@ describe("1168 route sweep", () => {
   });
   test("standalone links reach 44px on touch; empty states use the kit", () => {
     expect(P("users")).not.toContain('className="rounded-full px-3 py-1.5 hairline');
-    expect((P("users").match(/inline-flex min-h-11 items-center rounded-full px-4 hairline/g) ?? []).length).toBe(2);
-    expect(P("payments")).toContain("touch:min-h-11");
+    // R1272: Previous/Next are the kit Pagination (shared Button size sm, touch:h-11) and the invoice link is a shared Button.
+    expect(P("users")).toContain('<Pagination total={total} page={page} limit={PER} label="Customer list pages" />');
+    expect(P("users")).not.toMatch(/<a className="inline-flex[^"]*hairline[^"]*" href=\{link\(/);
+    expect(read("components/admin/Pagination.tsx")).toContain('<Button asChild variant="outline" size="sm">');
+    expect(P("payments")).toContain('<Button asChild variant="outline" size="sm" className="font-mono text-[12px]">');
     expect(P("blog")).toContain('href="/admin/blog/library" className="inline-flex min-h-11');
     const b = read("components/admin/BehaviorBreakdown.tsx");
     expect(b).toContain('<Empty title="No platforms connected yet"');

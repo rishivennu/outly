@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from "react";
+import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/admin/ui";
 
 /**
@@ -17,12 +18,14 @@ export default function AdminError({ error, reset }: { error: Error & { digest?:
         title="This page couldn't load"
         body={`${error.message || "Something went wrong on our side."}${error.digest ? ` Reference ${error.digest}.` : ""} Nothing was changed; the numbers that would have appeared here are not shown rather than guessed.`}
         retry={
-          <button type="button" onClick={reset} className="inline-flex min-h-11 items-center rounded-full bg-foreground px-4 text-[13px] font-semibold text-background">
+          <Button type="button" variant="lime" onClick={reset}>
             Try again
-          </button>
+          </Button>
         }
       >
-        <a href="/admin" className="inline-flex min-h-11 items-center rounded-full px-3 text-[13px] font-medium text-muted-foreground underline-offset-4 hover:underline">Back to overview</a>
+        <Button asChild variant="ghost">
+          <a href="/admin">Back to overview</a>
+        </Button>
       </ErrorState>
     </div>
   );

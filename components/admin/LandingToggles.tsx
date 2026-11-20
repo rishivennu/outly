@@ -1,29 +1,15 @@
 "use client";
 import { useState } from "react";
 import { ExternalLink, Eye, EyeOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/Toast";
 import { adminApi } from "@/lib/client/admin-api";
 import { LANDING_COMPETITORS, LANDING_GROUPS, LANDING_SECTIONS, type LandingConfig } from "@/lib/landing";
 import { cn } from "@/lib/utils";
 import { Card, CardTitle, Pill } from "./ui";
+import { Switch } from "./Switch";
 
 type Part = keyof LandingConfig;
-
-function Switch({ on, label, busy, onChange }: { on: boolean; label: string; busy?: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      disabled={busy}
-      onClick={() => onChange(!on)}
-      className={cn("relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors duration-300 disabled:opacity-60", on ? "bg-success" : "bg-foreground/20")}
-    >
-      <span className={cn("inline-block h-6 w-6 rounded-full bg-white shadow transition-transform duration-300", on ? "translate-x-7" : "translate-x-1")} />
-    </button>
-  );
-}
 
 const State = ({ on }: { on: boolean }) => (
   <Pill tone={on ? "ok" : "muted"}>
@@ -69,9 +55,11 @@ export function LandingToggles({ initial }: { initial: LandingConfig }) {
         <CardTitle
           hint={`${shownCount} of ${LANDING_SECTIONS.length} sections shown, top to bottom in page order.`}
           action={
-            <a href="/" target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium hairline hover:bg-secondary">
-              Open the page <ExternalLink className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">(opens in a new tab)</span>
-            </a>
+            <Button asChild variant="outline" size="sm">
+              <a href="/" target="_blank" rel="noopener noreferrer">
+                Open the page <ExternalLink className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">(opens in a new tab)</span>
+              </a>
+            </Button>
           }
         >
           Sections
@@ -101,7 +89,7 @@ export function LandingToggles({ initial }: { initial: LandingConfig }) {
                     <td className="hidden border-b border-border py-3 pr-3 align-middle text-muted-foreground md:table-cell">{s.shows}</td>
                     <td className="hidden border-b border-border py-3 pr-3 align-middle sm:table-cell"><State on={on} /></td>
                     <td className="border-b border-border py-3 text-right align-middle">
-                      <Switch on={on} busy={busy === `sections.${s.id}`} label={`Show ${s.label} on the landing page`} onChange={(v) => flip("sections", s.id, v, s.label)} />
+                      <Switch on={on} disabled={busy === `sections.${s.id}`} label={`Show ${s.label} on the landing page`} onChange={(v) => flip("sections", s.id, v, s.label)} />
                     </td>
                   </tr>
                 );
@@ -135,7 +123,7 @@ export function LandingToggles({ initial }: { initial: LandingConfig }) {
                       <span className="font-medium">{c.label}</span>
                       {last && <span className="block text-[11.5px] text-muted-foreground">Keep at least one to compare against</span>}
                     </span>
-                    <Switch on={on} busy={busy === `competitors.${c.id}` || last} label={`Show the ${c.label} column`} onChange={(v) => flip("competitors", c.id, v, `The ${c.label} column`)} />
+                    <Switch on={on} disabled={busy === `competitors.${c.id}` || last} label={`Show the ${c.label} column`} onChange={(v) => flip("competitors", c.id, v, `The ${c.label} column`)} />
                   </li>
                 );
               })}
@@ -153,7 +141,7 @@ export function LandingToggles({ initial }: { initial: LandingConfig }) {
                       <span className="font-medium">{g}</span>
                       {last && <span className="block text-[11.5px] text-muted-foreground">Hide the whole section instead</span>}
                     </span>
-                    <Switch on={on} busy={busy === `groups.${g}` || last} label={`Show the ${g} rows`} onChange={(v) => flip("groups", g, v, `The ${g} rows`)} />
+                    <Switch on={on} disabled={busy === `groups.${g}` || last} label={`Show the ${g} rows`} onChange={(v) => flip("groups", g, v, `The ${g} rows`)} />
                   </li>
                 );
               })}

@@ -11,7 +11,8 @@ import { CURRENCIES } from "@/lib/billing/money";
 import { ELIGIBILITY, ELIGIBILITY_LABEL, LIMITS, MAX_PCT, endsIn, offerLabel, offerPrice, type LiveState } from "@/lib/campaign-core";
 import type { CampaignRow, CampaignsState } from "@/lib/campaign";
 import { cn } from "@/lib/utils";
-import { Card, CardTitle, Empty, Pill, Table, fmtDate, type Tone } from "./ui";
+import { Card, CardTitle, Empty, Pill, Table, Tooltip, fmtDate, type Tone } from "./ui";
+import { Switch } from "./Switch";
 
 const STATE: Record<LiveState, { tone: Tone; label: string }> = {
   live: { tone: "lime", label: "Live" },
@@ -149,12 +150,9 @@ export function CampaignsPanel({ initial }: { initial: CampaignsState }) {
                 <td className="tabular">{c.funnel.conversions}{c.maxRedemptions > 0 && <span className="text-muted-foreground"> / {c.maxRedemptions}</span>}<span className="block text-[11.5px] text-muted-foreground">{c.funnel.cvr}% of clicks</span></td>
                 <td>
                   <div className="flex items-center justify-end gap-1">
-                    <button type="button" role="switch" aria-checked={c.active} aria-label={`${c.title} on`} disabled={!!busy} onClick={() => run(`t-${c.id}`, { action: "toggle", id: c.id, active: !c.active }, c.active ? "Offer switched off." : "Offer switched on.")}
-                      className={cn("relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-300 disabled:opacity-60", c.active ? "bg-success" : "bg-foreground/20")}>
-                      <span className={cn("inline-block h-5 w-5 rounded-full bg-white shadow transition-transform duration-300", c.active ? "translate-x-6" : "translate-x-1")} />
-                    </button>
-                    <Button type="button" variant="ghost" size="icon" aria-label={`Edit ${c.title}`} onClick={() => setD(fromRow(c))}><Pencil className="h-4 w-4" aria-hidden /></Button>
-                    <Button type="button" variant="ghost" size="icon" aria-label={`Delete ${c.title}`} disabled={c.redemptions > 0} title={c.redemptions > 0 ? "People paid with it: switch it off instead" : undefined} onClick={() => setDel(c)}><Trash2 className="h-4 w-4" aria-hidden /></Button>
+                    <Switch on={c.active} label={`${c.title} on`} disabled={!!busy} onChange={() => run(`t-${c.id}`, { action: "toggle", id: c.id, active: !c.active }, c.active ? "Offer switched off." : "Offer switched on.")} />
+                    <Tooltip text="Edit"><Button type="button" variant="ghost" size="icon-sm" aria-label={`Edit ${c.title}`} onClick={() => setD(fromRow(c))}><Pencil className="h-4 w-4" aria-hidden /></Button></Tooltip>
+                    <Tooltip text={c.redemptions > 0 ? "People paid with it: switch it off instead" : "Delete"}><Button type="button" variant="ghost" size="icon-sm" aria-label={`Delete ${c.title}`} disabled={c.redemptions > 0} title={c.redemptions > 0 ? "People paid with it: switch it off instead" : undefined} onClick={() => setDel(c)}><Trash2 className="h-4 w-4" aria-hidden /></Button></Tooltip>
                   </div>
                 </td>
               </tr>

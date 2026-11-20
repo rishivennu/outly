@@ -7,7 +7,7 @@ import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { adminApi } from "@/lib/client/admin-api";
 import { ADMIN_ROLES, type AdminRole } from "@/lib/admin/perms";
-import { Card, CardTitle, Pill, StatusBadge, Table, ago } from "./ui";
+import { Card, CardTitle, Pill, StatusBadge, Table, Tooltip, ago } from "./ui";
 
 type A = { id: string; name: string; login: string; role: string; active: boolean; lastLoginAt: string | null };
 const ROLES: AdminRole[] = [...ADMIN_ROLES];
@@ -78,12 +78,12 @@ export function TeamView({ initial, me, roles }: { initial: A[]; me: string; rol
                 </select>
               </td>
               <td>
-                <button type="button" onClick={() => patch(a, { active: !a.active })} disabled={a.id === me} className="disabled:opacity-60">
+                <Button type="button" variant="ghost" size="sm" className="px-1 disabled:opacity-60" onClick={() => patch(a, { active: !a.active })} disabled={a.id === me} aria-label={`${a.name}: ${a.active ? "active, press to suspend" : "suspended, press to reactivate"}`}>
                   <StatusBadge status={a.active ? "active" : "suspended"} />
-                </button>
+                </Button>
               </td>
               <td className="text-muted-foreground">{ago(a.lastLoginAt)}</td>
-              <td className="text-right">{a.id !== me && <Button variant="ghost" size="icon-sm" aria-label={`Remove ${a.name}`} onClick={() => setDel(a)}><Trash2 className="h-4 w-4" /></Button>}</td>
+              <td className="text-right">{a.id !== me && <Tooltip text="Remove"><Button variant="danger" size="icon-sm" aria-label={`Remove ${a.name}`} onClick={() => setDel(a)}><Trash2 className="h-4 w-4" aria-hidden /></Button></Tooltip>}</td>
             </tr>
           ))}
         </Table>

@@ -139,7 +139,7 @@ export function NotificationsPanel({ initial, adminLogin, adminName = "", audit 
                 {cfg.cooldown[b.id] === 0 ? "No wait: every one in this group buzzes as it happens." : `Wait ${cfg.cooldown[b.id]} min between buzzes.`}
                 {cfg.cooldown[b.id] !== COOLDOWN_MIN[b.id] && (
                   <> Default {COOLDOWN_MIN[b.id] === 0 ? "no wait" : `${COOLDOWN_MIN[b.id]} min`}.{" "}
-                    <button type="button" className="underline underline-offset-2 min-h-11 -my-3 py-3" disabled={busy === `cd-${b.id}`} onClick={() => save({ cooldown: { [b.id]: COOLDOWN_MIN[b.id] } }, `${b.label} cooldown back to the default.`, `cd-${b.id}`)}>Reset</button>
+                    <Button type="button" variant="ghost" size="sm" className="-my-2 px-2 underline underline-offset-2" disabled={busy === `cd-${b.id}`} onClick={() => save({ cooldown: { [b.id]: COOLDOWN_MIN[b.id] } }, `${b.label} cooldown back to the default.`, `cd-${b.id}`)}>Reset</Button>
                   </>
                 )}
               </p>

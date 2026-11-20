@@ -8,7 +8,8 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { adminApi } from "@/lib/client/admin-api";
 import { Countdown } from "@/components/maintenance/Countdown";
 import { cn } from "@/lib/utils";
-import { Card, CardTitle, Pill } from "./ui";
+import { Card, CardTitle, StatusBadge } from "./ui";
+import { Switch } from "./Switch";
 
 type Site = { maintenance: boolean; message: string; eta: string; since: string; endsAt: string };
 
@@ -61,7 +62,7 @@ export function MaintenanceToggle({ initial, subscribers }: { initial: Site; sub
   return (
     <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
       <Card>
-        <CardTitle hint={on ? `On since ${new Date(site.since).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" })}` : "The site is open to everyone."} action={<Pill tone={on ? "warn" : "ok"}>{on ? "Maintenance ON" : "Live"}</Pill>}>
+        <CardTitle hint={on ? `On since ${new Date(site.since).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" })}` : "The site is open to everyone."} action={<StatusBadge status={on ? "attention" : "live"} label={on ? "Maintenance ON" : undefined} />}>
           Site switch
         </CardTitle>
         <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4 hairline", on ? "bg-warning/10" : "bg-secondary/40")}>
@@ -74,17 +75,7 @@ export function MaintenanceToggle({ initial, subscribers }: { initial: Site; sub
               <p className="text-[12.5px] text-muted-foreground">{on ? "Members who joined before it started keep posting. Sign-ups are closed." : "Turn on before a risky deploy or a database change."}</p>
             </div>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={on}
-            aria-label="Maintenance mode"
-            disabled={busy}
-            onClick={() => (on ? save(false) : setAsk(true))}
-            className={cn("relative inline-flex h-9 w-16 shrink-0 items-center rounded-full transition-colors duration-300 disabled:opacity-60", on ? "bg-warning" : "bg-foreground/20")}
-          >
-            <span className={cn("inline-block h-7 w-7 rounded-full bg-white shadow transition-transform duration-300", on ? "translate-x-8" : "translate-x-1")} />
-          </button>
+          <Switch on={on} onChange={() => (on ? save(false) : setAsk(true))} label="Maintenance mode" disabled={busy} />
         </div>
 
         {on && site.endsAt && (
@@ -104,18 +95,19 @@ export function MaintenanceToggle({ initial, subscribers }: { initial: Site; sub
             {PRESETS.map((p) => {
               const active = !custom && minutes === p.m;
               return (
-                <button
+                <Button
                   key={p.m}
                   type="button"
+                  size="sm"
+                  variant={active ? "primary" : "outline"}
                   aria-pressed={active}
                   onClick={() => pick(p.m)}
-                  className={cn("min-h-[40px] rounded-full px-3.5 text-[13px] font-medium transition-colors", active ? "bg-foreground text-background" : "hairline hover:bg-secondary")}
                 >
                   {p.label}
-                </button>
+                </Button>
               );
             })}
-            <label className="fw-ring flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-[13px] hairline">
+            <label className="fw-ring flex min-h-11 cursor-text items-center gap-1.5 rounded-full px-3 text-[13px] hairline">
               <span className="text-muted-foreground">Custom</span>
               <input
                 type="number"
@@ -134,7 +126,7 @@ export function MaintenanceToggle({ initial, subscribers }: { initial: Site; sub
                 }}
                 aria-label="Custom countdown in minutes"
                 placeholder="45"
-                className="w-14 bg-transparent text-right tabular outline-none"
+                className="h-10 w-14 bg-transparent text-right tabular outline-none"
               />
               <span className="text-muted-foreground">min</span>
             </label>
@@ -152,11 +144,13 @@ export function MaintenanceToggle({ initial, subscribers }: { initial: Site; sub
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button type="button" variant="subtle" disabled={busy || (message === site.message && eta === site.eta && !(on && clock))} onClick={() => save(on)}>{on && clock ? "Save and restart clock" : "Save text"}</Button>
+          <Button type="button" variant="lime" disabled={busy || (message === site.message && eta === site.eta && !(on && clock))} onClick={() => save(on)}>{on && clock ? "Save and restart clock" : "Save text"}</Button>
           {on && (
-            <a href="/maintenance?preview" target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-sm font-medium hairline hover:bg-secondary">
-              Preview the page <ExternalLink className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">(opens in a new tab)</span>
-            </a>
+            <Button asChild variant="outline">
+              <a href="/maintenance?preview" target="_blank" rel="noopener noreferrer">
+                Preview the page <ExternalLink className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">(opens in a new tab)</span>
+              </a>
+            </Button>
           )}
         </div>
       </Card>

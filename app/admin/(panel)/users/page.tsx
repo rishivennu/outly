@@ -10,6 +10,8 @@ import { Users as UsersIcon } from "lucide-react";
 import { DataSwap } from "@/components/shared/DataSwap";
 import { FilterChips, FilterSelect, MoreFilters, SearchBox } from "@/components/admin/SearchBox";
 import { RefreshButton } from "@/components/admin/RefreshButton";
+import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/admin/Pagination";
 import { looksRelayed, placeLabel } from "@/lib/geo";
 import { can } from "@/lib/admin/perms";
 import { aiAccessRows } from "@/lib/ai/entitlements";
@@ -156,9 +158,6 @@ export default async function Users(props: { searchParams: Promise<Params> }) {
   // Phase 3 (A4): AI usage this month, monthly limit and Unlimited AI Access for this page of people.
   const ai = await aiAccessRows(rows.map((r) => r.id)).catch(() => new Map());
   const manageAi = can(admin.role, "plans");
-  const pages = Math.max(1, Math.ceil(total / PER));
-  const kept = { ...(q ? { q } : {}), ...(f ? { f } : {}), ...(plan ? { plan } : {}), ...(joined ? { joined } : {}), ...(platform ? { platform } : {}), ...(tag ? { tag } : {}), ...(sort ? { sort } : {}) };
-  const link = (p: number) => `?${new URLSearchParams({ ...kept, page: String(p) })}`;
   // How many filters are narrowing the list (sort only orders it).
   const narrowing = [q, f, plan, joined, platform, tag].filter(Boolean).length;
   return (
@@ -199,9 +198,9 @@ export default async function Users(props: { searchParams: Promise<Params> }) {
             <FilterSelect fill param="tag" label="Who" current={tag} options={TAGS} />
           </MoreFilters>
           {narrowing + (sort ? 1 : 0) > 0 ? (
-            <Link href="/admin/users" scroll={false} className="inline-flex h-11 items-center justify-center rounded-full px-4 text-[13px] font-medium text-muted-foreground hairline hover:bg-secondary hover:text-foreground">
-              Clear all
-            </Link>
+            <Button asChild variant="outline">
+              <Link href="/admin/users" scroll={false}>Clear all</Link>
+            </Button>
           ) : (
             <span aria-hidden className="sm:hidden" />
           )}
@@ -239,13 +238,7 @@ export default async function Users(props: { searchParams: Promise<Params> }) {
             })}
           </Table>
         )}
-        {pages > 1 && (
-          <nav aria-label="Pages" className="mt-4 flex items-center justify-between text-[13px]">
-            {page > 1 ? <a className="inline-flex min-h-11 items-center rounded-full px-4 hairline hover:bg-secondary" href={link(page - 1)}>Previous</a> : <span />}
-            <span className="text-muted-foreground">Page {page} of {pages}</span>
-            {page < pages ? <a className="inline-flex min-h-11 items-center rounded-full px-4 hairline hover:bg-secondary" href={link(page + 1)}>Next</a> : <span />}
-          </nav>
-        )}
+        <Pagination total={total} page={page} limit={PER} label="Customer list pages" />
         </DataSwap>
       </Panel>
     </>

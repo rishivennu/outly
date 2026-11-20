@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Card, Empty, Pill, STATUS_TONE } from "./ui";
+import { Card, Empty, Pill, StatusBadge } from "./ui";
 
 type R = { id: string; to: string; subject: string; html: string; kind: string; provider: string; status: string; error: string | null; createdAt: string };
 const KIND: Record<string, string> = { invoice: "Invoice", ticket_opened: "Ticket opened", ticket_reply: "Ticket reply", test: "Test" };
@@ -17,12 +17,12 @@ export function OutboxView({ rows }: { rows: R[] }) {
         <ul>
           {rows.map((r) => (
             <li key={r.id}>
-              <button type="button" onClick={() => setSel(r.id)} aria-pressed={sel === r.id} className={cn("flex w-full gap-3 rounded-2xl p-3 text-left transition-colors", sel === r.id ? "bg-secondary" : "hover:bg-foreground/[0.03]")}>
+              <button type="button" onClick={() => setSel(r.id)} aria-pressed={sel === r.id} className={cn("flex min-h-11 w-full gap-3 rounded-2xl p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", sel === r.id ? "bg-secondary" : "hover:bg-foreground/[0.03]")}>
                 <Mail className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13.5px] font-medium">{r.subject}</span>
                   <span className="block truncate text-[12px] text-muted-foreground">{r.to}</span>
-                  <span className="mt-1 flex flex-wrap gap-1.5"><Pill>{KIND[r.kind] ?? r.kind}</Pill><Pill tone={STATUS_TONE[r.status]}>{r.status}</Pill></span>
+                  <span className="mt-1 flex flex-wrap gap-1.5"><Pill>{KIND[r.kind] ?? r.kind}</Pill><StatusBadge status={r.status} /></span>
                 </span>
                 <span className="shrink-0 text-[11px] text-muted-foreground">{new Date(r.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })}</span>
               </button>

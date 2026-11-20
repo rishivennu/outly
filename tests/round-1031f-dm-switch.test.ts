@@ -83,9 +83,9 @@ describe("DM switch", () => {
     expect(r).toContain("dms: z.boolean().optional()");
     expect(r).toContain('b.platform === "instagram" || b.platform === "facebook"');
     const f = src("components/admin/PlatformKeysForm.tsx");
-    expect(f).toContain('role="switch"');
+    expect(f).toContain("<Switch on={dms} onChange={setDms}");
     expect(f).toContain("Ask for the messaging permission");
-    expect(f).toContain("aria-describedby={`${p}-dms-hint`}");
+    expect(f).toContain("describedBy={`${p}-dms-hint`}");
   });
 });
 

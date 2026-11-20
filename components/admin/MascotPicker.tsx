@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { Pip, type PipMood } from "@/components/brand/Pip";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/Toast";
 import { adminApi } from "@/lib/client/admin-api";
 import { MASCOT_DEFAULT, PIP_PALETTES, PIP_SITUATIONS, paletteById, type MascotConfig, type PipSituation } from "@/lib/mascot/palettes";
@@ -51,14 +52,9 @@ export function MascotPicker({ initial }: { initial: MascotConfig }) {
         <CardTitle
           hint="How Pip looks right now in each moment. Pick a colour below to change one."
           action={
-            <button
-              type="button"
-              disabled={isDefault || busy !== null}
-              onClick={() => save(MASCOT_DEFAULT, "all", "Pip is back to the original colours.")}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-4 text-[13px] font-medium hairline hover:bg-secondary disabled:opacity-50"
-            >
+            <Button type="button" variant="outline" size="sm" disabled={isDefault || busy !== null} onClick={() => save(MASCOT_DEFAULT, "all", "Pip is back to the original colours.")}>
               <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Reset to original
-            </button>
+            </Button>
           }
         >
           Lineup

@@ -48,7 +48,7 @@ export function ActivationFunnel({ a, rangeDays }: { a: Activation; rangeDays: n
         action={
           <div role="radiogroup" aria-label="Funnel cohort" className="inline-flex shrink-0 rounded-full bg-secondary/70 p-1 hairline">
             {(["range", "all"] as const).map((k) => (
-              <button key={k} type="button" role="radio" aria-checked={which === k} onClick={() => setWhich(k)} className={cn("h-9 rounded-full px-3 text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", which === k ? "lime-bg" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
+              <button key={k} type="button" role="radio" aria-checked={which === k} onClick={() => setWhich(k)} className={cn("min-h-11 rounded-full px-3 text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", which === k ? "lime-bg" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
                 {k === "range" ? `Joined in ${rangeDays} days` : "All accounts"}
               </button>
             ))}

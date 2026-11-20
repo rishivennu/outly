@@ -1,12 +1,12 @@
 "use client";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input, Textarea } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { adminApi } from "@/lib/client/admin-api";
 import { WELCOME_DEFAULT, WELCOME_LIMITS, type WelcomeConfig } from "@/lib/pwa-welcome";
-import { cn } from "@/lib/utils";
 import { Card, CardTitle } from "./ui";
-
-const input = "h-11 w-full rounded-xl bg-background px-3 text-[14px] hairline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-60";
+import { Switch } from "./Switch";
 
 /**
  * Admin > Dashboard style > Home Screen welcome (1100). The once-per-device screen people see the first time
@@ -46,9 +46,9 @@ export function WelcomeScreenSettings({ initial }: { initial: WelcomeConfig }) {
         <span className="font-normal text-muted-foreground">{draft[k].length}/{max}</span>
       </span>
       {k === "body" ? (
-        <textarea value={draft[k]} maxLength={max} rows={2} disabled={busy} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} className={cn(input, "h-auto py-2.5")} />
+        <Textarea value={draft[k]} maxLength={max} rows={2} disabled={busy} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} className="text-[14px] disabled:opacity-60" />
       ) : (
-        <input value={draft[k]} maxLength={max} disabled={busy} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} className={input} />
+        <Input value={draft[k]} maxLength={max} disabled={busy} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} className="h-11 text-[14px] disabled:opacity-60" />
       )}
       {hint && <span className="font-normal text-muted-foreground">{hint}</span>}
     </label>
@@ -59,19 +59,9 @@ export function WelcomeScreenSettings({ initial }: { initial: WelcomeConfig }) {
       <CardTitle hint="Shown every time someone comes into Outlly: a new browser tab, a launch from the Home Screen or the Android app, or signing in. Once per visit, so moving between pages or reloading does not bring it back. Cookie choice, privacy notice and the tour wait until they press the button. Escape also closes it.">
         Welcome screen
       </CardTitle>
-      <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-3 hairline focus-within:ring-2 focus-within:ring-ring">
+      <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-2xl bg-secondary/40 px-4 py-3 hairline">
         <span className="text-[14px] font-medium">Show a welcome each time someone comes into Outlly</span>
-        <input
-          type="checkbox"
-          role="switch"
-          checked={cfg.enabled}
-          disabled={busy}
-          onChange={(e) => save({ enabled: e.target.checked }, e.target.checked ? "Welcome screen on." : "Welcome screen off for everyone.")}
-          className="peer sr-only"
-        />
-        <span aria-hidden className={cn("relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200", cfg.enabled ? "bg-lime" : "bg-foreground/20")}>
-          <span className={cn("absolute top-1 h-5 w-5 rounded-full bg-background shadow transition-transform duration-200 motion-reduce:transition-none", cfg.enabled ? "translate-x-6" : "translate-x-1")} />
-        </span>
+        <Switch on={cfg.enabled} disabled={busy} label="Show a welcome each time someone comes into Outlly" onChange={(v) => save({ enabled: v }, v ? "Welcome screen on." : "Welcome screen off for everyone.")} />
       </label>
       <form
         className="mt-4 grid gap-3"
@@ -87,12 +77,12 @@ export function WelcomeScreenSettings({ initial }: { initial: WelcomeConfig }) {
         {field("Third button", "tour", WELCOME_LIMITS.tour, "Starts the guided tour.")}
         {field("Text link", "skip", WELCOME_LIMITS.skip, "Goes to the dashboard (Home).")}
         <div className="flex flex-wrap items-center gap-2">
-          <button type="submit" disabled={busy || !dirty || blank} className="h-11 rounded-full bg-foreground px-5 text-[14px] font-semibold text-background disabled:opacity-50">
+          <Button type="submit" variant="lime" disabled={busy || !dirty || blank}>
             Save words
-          </button>
-          <button type="button" disabled={busy} onClick={() => setDraft({ ...WELCOME_DEFAULT, enabled: cfg.enabled })} className="h-11 rounded-full px-4 text-[14px] font-medium text-muted-foreground hover:bg-secondary disabled:opacity-50">
+          </Button>
+          <Button type="button" variant="ghost" disabled={busy} onClick={() => setDraft({ ...WELCOME_DEFAULT, enabled: cfg.enabled })}>
             Use the default words
-          </button>
+          </Button>
         </div>
       </form>
     </Card>

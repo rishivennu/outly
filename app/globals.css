@@ -4424,8 +4424,9 @@ html.theme-anim *::after {
   .atable--cards > table > tbody > tr > [data-cell="lead"] { font-size: 14px; }
   .atable--cards > table > tbody > tr > [data-cell="action"] { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .5rem; }
   .atable--cards > table > tbody > tr > [data-cell="action"]:empty { display: none; }
-  /* Pills (components/admin/ui.tsx Pill) are nowrap for desktop rows; in a half-width card cell they wrap instead of spilling out. */
-  .atable--cards > table > tbody > tr > :is(td, th) .rounded-full.whitespace-nowrap { max-width: 100%; height: auto; min-height: 1.5rem; padding-block: .125rem; white-space: normal; }
+  /* Pills (components/admin/ui.tsx Pill) are nowrap for desktop rows; in a half-width card cell they wrap instead of spilling out.
+     Buttons and links share those classes but must keep their own height (44px touch target). */
+  .atable--cards > table > tbody > tr > :is(td, th) .rounded-full.whitespace-nowrap:not(button, a) { max-width: 100%; height: auto; min-height: 1.5rem; padding-block: .125rem; white-space: normal; }
   .atable--cards > table > tbody > tr > [data-cell="lead"] { order: -1; }
   .atable--cards > table > tbody > tr:has(> [data-cell="select"]) { position: relative; }
   .atable--cards > table > tbody > tr > [data-cell="select"] { position: absolute; top: .375rem; right: .375rem; width: auto; }

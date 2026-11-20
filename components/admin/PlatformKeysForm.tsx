@@ -10,6 +10,7 @@ import { CORE_PLATFORMS, PLATFORM_META, PLATFORMS, type Platform } from "@/lib/d
 import { PLATFORM_SETUP } from "@/lib/social/platform-setup";
 import { platformHint, platformStatus, savedToast, saveLabel } from "@/lib/admin/platform-status";
 import { Card, Pill, StatusBadge, Tooltip } from "./ui";
+import { Switch } from "./Switch";
 import { CopyRow, SecretField, type Secret, type SecretEdit } from "./IntegrationsForm";
 
 type Keys = Record<Platform, { clientId: string; clientSecret: Secret; dms?: boolean; insights?: boolean }>;
@@ -127,8 +128,7 @@ function PlatformCard({ p, saved, ready, base, dm, deletion, clash, onSaved }: {
                     : "Off: login asks only for publishing and comments, so it works while Meta reviews messaging. The Messages tab says DMs are paused."}
                 </span>
               </span>
-              <input type="checkbox" role="switch" checked={dms} onChange={(e) => setDms(e.target.checked)} aria-describedby={`${p}-dms-hint`} className="peer sr-only" />
-              <span aria-hidden="true" className="relative h-7 w-12 shrink-0 rounded-full bg-muted transition-colors peer-checked:bg-lime peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-background after:shadow after:transition-transform after:duration-300 peer-checked:after:translate-x-5" />
+              <Switch on={dms} onChange={setDms} label="Ask for the messaging permission" describedBy={`${p}-dms-hint`} />
             </label>
             {dmsChanged && <p className="text-[12px] text-muted-foreground">Press Save to apply. While this is off, Outlly also pauses syncing and sending direct messages for creators who are already connected.</p>}
             <CopyRow label="Webhook URL" value={dm.webhook} />
@@ -148,8 +148,7 @@ function PlatformCard({ p, saved, ready, base, dm, deletion, clash, onSaved }: {
                     : "Off: creators are not asked, so login keeps working while Meta reviews insights. A super admin signed in here is still asked, for the review recording."}
                 </span>
               </span>
-              <input type="checkbox" role="switch" checked={insights} onChange={(e) => setInsights(e.target.checked)} aria-describedby="instagram-insights-hint" className="peer sr-only" />
-              <span aria-hidden="true" className="relative h-7 w-12 shrink-0 rounded-full bg-muted transition-colors peer-checked:bg-lime peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-background after:shadow after:transition-transform after:duration-300 peer-checked:after:translate-x-5" />
+              <Switch on={insights} onChange={setInsights} label="Ask creators for Instagram insights" describedBy="instagram-insights-hint" />
             </label>
             {insightsChanged && <p className="text-[12px] text-muted-foreground">Press Save to apply. Creators who are already connected see insights after they reconnect Instagram once.</p>}
           </div>
@@ -163,7 +162,7 @@ function PlatformCard({ p, saved, ready, base, dm, deletion, clash, onSaved }: {
         <Button onClick={save} disabled={!dirty || busy} variant="lime">
           {busy ? "Saving…" : dirty ? saveLabel(status, next) : "Save"}
         </Button>
-        <a href={s.console} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+        <a href={s.console} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
           Open {s.consoleName} <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
           <span className="sr-only">(opens in a new tab)</span>
         </a>

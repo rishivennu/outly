@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { Switch } from "./Switch";
 import { adminApi } from "@/lib/client/admin-api";
 import { cn } from "@/lib/utils";
-import { Card, CardTitle, Empty, Pill, Table, ago } from "./ui";
+import { Card, CardTitle, Empty, Pill, StatusBadge, Table, ago } from "./ui";
 import type { FoundingState } from "@/lib/founding";
 
 type R = FoundingState & { claimed?: number; invited?: number };
@@ -48,7 +49,7 @@ export function FoundingPanel({ initial }: { initial: FoundingState }) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
       <Card>
-        <CardTitle hint="Signup page seat counter, the one-time invitation on Home, the badge for paying members." action={<Pill tone={on ? "info" : "muted"}>{on ? "Open" : "Closed"}</Pill>}>
+        <CardTitle hint="Signup page seat counter, the one-time invitation on Home, the badge for paying members." action={<StatusBadge status={on ? "open" : "canceled"} label={on ? undefined : "Closed"} />}>
           Founding seats
         </CardTitle>
         <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4 hairline", on ? "bg-accent/10" : "bg-secondary/40")}>
@@ -59,17 +60,7 @@ export function FoundingPanel({ initial }: { initial: FoundingState }) {
               <p className="text-[12.5px] text-muted-foreground">{on ? "Seats go to confirmed inboxes, in the order they claim." : "Turn on to show the counter on signup and start numbering members."}</p>
             </div>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={on}
-            aria-label="Founding seats open"
-            disabled={!!busy}
-            onClick={() => (on ? setAsk("off") : turn(true))}
-            className={cn("relative inline-flex h-9 w-16 shrink-0 items-center rounded-full transition-colors duration-300 disabled:opacity-60", on ? "bg-success" : "bg-foreground/20")}
-          >
-            <span className={cn("inline-block h-7 w-7 rounded-full bg-white shadow transition-transform duration-300", on ? "translate-x-8" : "translate-x-1")} />
-          </button>
+          <Switch on={on} onChange={() => (on ? setAsk("off") : turn(true))} label="Founding seats open" disabled={!!busy} />
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-[20px] bg-secondary/40 p-4 hairline">
           <div className="flex items-center gap-3">
@@ -79,17 +70,7 @@ export function FoundingPanel({ initial }: { initial: FoundingState }) {
               <p className="text-[12.5px] text-muted-foreground">Dots and +tags in a Gmail address count as the same inbox, so one person gets one seat.</p>
             </div>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={cfg.gmailOnly}
-            aria-label="Gmail addresses only"
-            disabled={!!busy}
-            onClick={() => run("gmail", { method: "PUT", json: { gmailOnly: !cfg.gmailOnly } }, (r) => (r.config.gmailOnly ? "Only Gmail inboxes can claim a seat." : "Any confirmed inbox can claim a seat."))}
-            className={cn("relative inline-flex h-9 w-16 shrink-0 items-center rounded-full transition-colors duration-300 disabled:opacity-60", cfg.gmailOnly ? "bg-success" : "bg-foreground/20")}
-          >
-            <span className={cn("inline-block h-7 w-7 rounded-full bg-white shadow transition-transform duration-300", cfg.gmailOnly ? "translate-x-8" : "translate-x-1")} />
-          </button>
+          <Switch on={cfg.gmailOnly} onChange={() => run("gmail", { method: "PUT", json: { gmailOnly: !cfg.gmailOnly } }, (r) => (r.config.gmailOnly ? "Only Gmail inboxes can claim a seat." : "Any confirmed inbox can claim a seat."))} label="Gmail addresses only" disabled={!!busy} />
         </div>
       </Card>
 
@@ -127,7 +108,7 @@ export function FoundingPanel({ initial }: { initial: FoundingState }) {
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button type="button" variant="primary" disabled={!!busy || !dirty} onClick={() => run("offer", { method: "PUT", json: { limit: n, discountPct: d } }, (r) => `Saved. ${r.config.limit} seats, ${r.config.discountPct}% off for life.`)}>
+          <Button type="button" variant="lime" disabled={!!busy || !dirty} onClick={() => run("offer", { method: "PUT", json: { limit: n, discountPct: d } }, (r) => `Saved. ${r.config.limit} seats, ${r.config.discountPct}% off for life.`)}>
             {busy === "offer" ? "Saving…" : "Save offer"}
           </Button>
           <p className="text-[13px] text-muted-foreground">Now: {cfg.limit} seats at {cfg.discountPct}% off{on ? "" : " (closed)"}.</p>

@@ -53,7 +53,7 @@ function Form({ item, categories, onSaved, onCancel, onDelete }: { item: F; cate
       <div>
         <Label htmlFor={`fq-a-${item.id}`}>
           Answer
-          <button type="button" onClick={() => setPreview((p) => !p)} className="text-[12px] font-semibold text-foreground underline underline-offset-4">{preview ? "Edit" : "Preview"}</button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setPreview((p) => !p)} className="text-foreground underline underline-offset-4">{preview ? "Edit" : "Preview"}</Button>
         </Label>
         {preview ? (
           <div className="min-h-[120px] rounded-2xl bg-secondary/30 px-4 py-3 text-[14.5px] leading-relaxed text-muted-foreground hairline"><Answer text={d.answer || "Nothing yet."} /></div>
@@ -65,7 +65,7 @@ function Form({ item, categories, onSaved, onCancel, onDelete }: { item: F; cate
       {err && <p role="alert" className="rounded-2xl bg-destructive/10 px-4 py-2.5 text-[13px] text-destructive">{err}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" variant="lime" size="sm" disabled={busy || (!dirty && !!item.id)}>{busy ? "Saving…" : item.id ? "Save" : "Add question"}</Button>
-        <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={d.published} onChange={(e) => setD({ ...d, published: e.target.checked })} className="h-4 w-4 accent-[hsl(var(--lime))]" />Published</label>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 text-[13px]"><input type="checkbox" checked={d.published} onChange={(e) => setD({ ...d, published: e.target.checked })} className="h-4 w-4 accent-[hsl(var(--lime))]" />Published</label>
         {onCancel && <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>}
         {onDelete && <Button type="button" variant="danger" size="sm" className="ml-auto" onClick={onDelete}><Trash2 className="h-3.5 w-3.5" aria-hidden />Delete</Button>}
       </div>
@@ -119,7 +119,7 @@ export function FaqEditor({ initial, categories }: { initial: F[]; categories: s
                 const on = open === i.id;
                 return (
                   <li key={i.id} className="border-b border-border/60 last:border-0">
-                    <button type="button" aria-expanded={on} onClick={() => setOpen(on ? null : i.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left hover:bg-foreground/[0.03]">
+                    <button type="button" aria-expanded={on} onClick={() => setOpen(on ? null : i.id)} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-2 py-3 text-left hover:bg-foreground/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                       {i.published ? <Eye className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Published" /> : <EyeOff className="h-4 w-4 shrink-0 text-warning" aria-label="Draft" />}
                       <span className={cn("flex-1 text-[14.5px] font-medium", !i.published && "text-muted-foreground")}>{i.question}</span>
                       {!i.published && <Pill tone="warn">draft</Pill>}

@@ -95,7 +95,7 @@ export function AiEngineCard({ initial, funasrEnv, groqEnv }: { initial: Subtitl
       {provider === "funasr" && !workerReady && <p role="alert" className="mt-3 text-[13px] text-destructive">The worker needs a URL before it can be used.</p>}
       {error && <p role="alert" className="mt-3 text-[13px] text-destructive">{error}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button type="button" variant="primary" disabled={!dirty || blocked || busy} onClick={() => void save()}>
+        <Button type="button" variant="lime" disabled={!dirty || blocked || busy} onClick={() => void save()}>
           {busy ? "Saving" : "Save engine"}
         </Button>
         {provider !== "gemini" && (

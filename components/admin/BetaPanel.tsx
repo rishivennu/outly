@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { Switch } from "./Switch";
 import { adminApi } from "@/lib/client/admin-api";
 import { cn } from "@/lib/utils";
-import { Card, CardTitle, Empty, Pill, Table, ago } from "./ui";
+import { Card, CardTitle, Empty, StatusBadge, Table, ago } from "./ui";
 import type { BetaState } from "@/lib/beta";
 
 type R = BetaState & { made?: string | null; given?: number };
@@ -62,7 +63,7 @@ export function BetaPanel({ initial }: { initial: BetaState }) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
       <Card>
-        <CardTitle hint="Hero stamp, “Free during beta”, footer note, pricing and contact copy." action={<Pill tone={on ? "info" : "muted"}>{on ? "Beta ON" : "Beta OFF"}</Pill>}>
+        <CardTitle hint="Hero stamp, “Free during beta”, footer note, pricing and contact copy." action={<StatusBadge status={on ? "running" : "canceled"} label={on ? "Beta ON" : "Beta OFF"} />}>
           Beta switch
         </CardTitle>
         <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4 hairline", on ? "bg-accent/10" : "bg-secondary/40")}>
@@ -75,17 +76,7 @@ export function BetaPanel({ initial }: { initial: BetaState }) {
               <p className="text-[12.5px] text-muted-foreground">{on ? "New members can still get first-member codes while this is on." : "Turn on to show the beta stamp and hand out first-member codes."}</p>
             </div>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={on}
-            aria-label="Beta mode"
-            disabled={!!busy}
-            onClick={() => (on ? setAsk("off") : turn(true))}
-            className={cn("relative inline-flex h-9 w-16 shrink-0 items-center rounded-full transition-colors duration-300 disabled:opacity-60", on ? "bg-success" : "bg-foreground/20")}
-          >
-            <span className={cn("inline-block h-7 w-7 rounded-full bg-white shadow transition-transform duration-300", on ? "translate-x-8" : "translate-x-1")} />
-          </button>
+          <Switch on={on} onChange={(v) => (v ? turn(true) : setAsk("off"))} label="Beta mode" disabled={!!busy} />
         </div>
       </Card>
 
@@ -131,7 +122,7 @@ export function BetaPanel({ initial }: { initial: BetaState }) {
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button type="button" variant="primary" disabled={!!busy || !dirty} onClick={saveOffer}>
+          <Button type="button" variant="lime" disabled={!!busy || !dirty} onClick={saveOffer}>
             {busy === "offer" ? "Saving…" : "Save offer"}
           </Button>
           <p className="text-[13px] text-muted-foreground">
@@ -169,15 +160,15 @@ export function BetaPanel({ initial }: { initial: BetaState }) {
             {st.codes.map((r) => (
               <tr key={r.id}>
                 <td className="whitespace-nowrap font-mono text-[13px] font-semibold">
-                  <button type="button" onClick={() => copy(r.code)} className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-1 hover:bg-secondary" aria-label={`Copy code ${r.code}`}>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => copy(r.code)} className="font-mono font-semibold text-foreground" aria-label={`Copy code ${r.code}`}>
                     {r.code} <Copy className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                  </button>
+                  </Button>
                 </td>
                 <td className="max-w-[260px] truncate text-muted-foreground">{r.issuedTo ?? (r.note || "Anyone")}</td>
                 <td className="whitespace-nowrap text-muted-foreground">{st.plans.find((p) => p.slug === r.planSlug)?.name ?? r.planSlug} · {r.months} mo</td>
                 <td className="whitespace-nowrap text-muted-foreground">{ago(r.createdAt)}</td>
                 <td>
-                  {r.revokedAt ? <Pill tone="muted">Revoked</Pill> : r.redeemedAt ? <Pill tone="ok">Redeemed {ago(r.redeemedAt)}</Pill> : <Pill tone="info">Unused</Pill>}
+                  {r.revokedAt ? <StatusBadge status="canceled" label="Revoked" /> : r.redeemedAt ? <StatusBadge status="completed" label={`Redeemed ${ago(r.redeemedAt)}`} /> : <StatusBadge status="queued" label="Unused" />}
                 </td>
                 <td className="text-right">
                   {!r.redeemedAt && !r.revokedAt && (

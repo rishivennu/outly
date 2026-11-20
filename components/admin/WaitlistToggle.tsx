@@ -7,7 +7,8 @@ import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { adminApi } from "@/lib/client/admin-api";
 import { cn } from "@/lib/utils";
-import { Card, CardTitle, Pill, ago } from "./ui";
+import { Card, CardTitle, StatusBadge, ago } from "./ui";
+import { Switch } from "./Switch";
 
 export type WaitlistCounts = { total: number; waiting: number; invited: number; today: number; week: number; month: number; last24h: number; latestAt: string | null };
 export type WaitlistState = { waitlist: boolean; since: string; counts: WaitlistCounts };
@@ -69,7 +70,7 @@ export function WaitlistToggle({ initial }: { initial: WaitlistState }) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
       <Card className="lg:col-span-2" aria-labelledby="wl-overview">
-        <CardTitle hint="Straight from the waitlist records. The switch never hides or changes them." action={<Pill tone={on ? "info" : "ok"}>{on ? "Waitlist ON" : "Signups open"}</Pill>}>
+        <CardTitle hint="Straight from the waitlist records. The switch never hides or changes them." action={<StatusBadge status={on ? "waiting" : "live"} label={on ? "Waitlist ON" : "Signups open"} />}>
           <span id="wl-overview">Waitlist overview</span>
         </CardTitle>
         <dl className="mb-4 grid grid-cols-1 gap-2 rounded-[20px] bg-secondary/40 p-3 text-[13.5px] hairline sm:grid-cols-3 sm:gap-4 sm:p-4" aria-label="Waitlist status">
@@ -109,7 +110,7 @@ export function WaitlistToggle({ initial }: { initial: WaitlistState }) {
       </Card>
 
       <Card>
-        <CardTitle hint={on && st.since ? `On since ${ist(st.since)}` : "Anyone can create an account."} action={<Pill tone={on ? "info" : "ok"}>{on ? "Waitlist ON" : "Signups open"}</Pill>}>
+        <CardTitle hint={on && st.since ? `On since ${ist(st.since)}` : "Anyone can create an account."} action={<StatusBadge status={on ? "waiting" : "live"} label={on ? "Waitlist ON" : "Signups open"} />}>
           Waitlist switch
         </CardTitle>
         <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-[20px] p-4 hairline", on ? "bg-accent/10" : "bg-secondary/40")}>
@@ -124,17 +125,7 @@ export function WaitlistToggle({ initial }: { initial: WaitlistState }) {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={on}
-            aria-label="Waitlist mode"
-            disabled={!!busy}
-            onClick={() => setAsk(on ? "off" : "on")}
-            className={cn("relative inline-flex h-9 w-16 shrink-0 items-center rounded-full transition-colors duration-300 disabled:opacity-60", on ? "bg-success" : "bg-foreground/20")}
-          >
-            <span className={cn("inline-block h-7 w-7 rounded-full bg-white shadow transition-transform duration-300", on ? "translate-x-8" : "translate-x-1")} />
-          </button>
+          <Switch on={on} onChange={() => setAsk(on ? "off" : "on")} label="Waitlist mode" disabled={!!busy} />
         </div>
 
         <label className="mt-4 flex min-h-11 cursor-pointer items-start gap-3 rounded-2xl px-1 py-2 text-[13.5px]">
@@ -146,9 +137,11 @@ export function WaitlistToggle({ initial }: { initial: WaitlistState }) {
         </label>
 
         <div className="mt-3 flex flex-wrap gap-2">
-          <a href="/waitlist" target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-sm font-medium hairline hover:bg-secondary">
-            {on ? "Open the waitlist page" : "Waitlist page (shows when on)"} <ExternalLink className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">(opens in a new tab)</span>
-          </a>
+          <Button asChild variant="outline">
+            <a href="/waitlist" target="_blank" rel="noopener noreferrer">
+              {on ? "Open the waitlist page" : "Waitlist page (shows when on)"} <ExternalLink className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">(opens in a new tab)</span>
+            </a>
+          </Button>
         </div>
       </Card>
 
@@ -158,7 +151,7 @@ export function WaitlistToggle({ initial }: { initial: WaitlistState }) {
           <span className="font-display text-[1.9rem] font-bold leading-none tabular">{c.waiting.toLocaleString("en-IN")}</span>{" "}
           <span className="text-muted-foreground">waiting for an invite, {c.invited.toLocaleString("en-IN")} already invited.</span>
         </p>
-        <Button type="button" variant="primary" className="mt-4 w-full" disabled={!!busy || c.waiting === 0} onClick={() => setAsk("all")}>
+        <Button type="button" variant="lime" className="mt-4 w-full" disabled={!!busy || c.waiting === 0} onClick={() => setAsk("all")}>
           <Send className="h-4 w-4" aria-hidden /> Invite everyone waiting ({c.waiting})
         </Button>
         <p className="mt-4 flex items-start gap-2 text-[13px] leading-relaxed text-muted-foreground">
