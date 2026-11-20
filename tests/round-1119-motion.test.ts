@@ -112,7 +112,8 @@ describe("time-based, never scrubbed (1119)", () => {
     // 1181: the panel stack is the second one, and it is also position by definition: a sheet sinks and the next
     // slides over it exactly as far as the page has scrolled past it (lib/motion/panels.ts, the GSAP pinned-panels
     // demo). Nothing readable moves with it; the steps inside a held sheet still play at the token pace.
-    const elsewhere = src.filter((f) => !["components/marketing/ScrollScenes.tsx", "lib/motion/panels.ts"].includes(f.file) && /scrub:\s*[^,}\s]/.test(f.text)).map((f) => f.file);
+    // R1282: /partners hero is the one scrubbed scene the user asked for by name (hands + orb follow the scroll, reduced motion gets the end state).
+    const elsewhere = src.filter((f) => !["components/marketing/ScrollScenes.tsx", "lib/motion/panels.ts", "components/partners/Hero.tsx"].includes(f.file) && /scrub:\s*[^,}\s]/.test(f.text)).map((f) => f.file);
     expect(elsewhere).toEqual([]);
     expect([...read("lib/motion/panels.ts").matchAll(/scrub:\s*([^,}\s]+)/g)].map((m) => m[1])).toEqual(["true"]);
     expect(ss).toMatch(/\[data-parallax\][\s\S]*scrub: 0\.6/);
