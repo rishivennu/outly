@@ -6,6 +6,7 @@ import { buildCsp, CSP_REPORT_PATH, newNonce } from "./lib/csp";
 import { REF_COOKIE, REF_DAYS, REF_VISITOR, isCode } from "./lib/referral-core";
 import { middlewareTiming, type FlagSource } from "./lib/server-timing";
 import { hostOf, routeHost } from "./lib/hosts";
+import { retryAfterSeconds, wantsHtml, wrapHeaders } from "./lib/maintenance/respond";
 
 const AUTH_PAGES = ["/login", "/signup"];
 // Marketing pages anyone can read.
@@ -64,7 +65,7 @@ function syncHints(req: NextRequest, res: NextResponse, authed: boolean, flags: 
 
 // Maintenance and waitlist flags, read through the public status API (edge middleware can't open the
 // database). Cached per instance for a few seconds so a busy site doesn't call it on every page view.
-type Flags = { at: number; maintenance: boolean; waitlist: boolean; hide: string };
+type Flags = { at: number; maintenance: boolean; waitlist: boolean; hide: string; endsAt?: string };
 let status: Flags | null = null;
 let warned = false;
 let refreshing: Promise<Flags> | null = null;
@@ -119,6 +120,7 @@ function refresh(req: NextRequest) {
 export function __resetFlags() {
   status = null;
   refreshing = null;
+  page = null;
 }
 
 /** A brand new instance that could not read the switches in time: maintenance off, waitlist as the hint cookie says. */
@@ -130,14 +132,9 @@ async function readFlags(req: NextRequest): Promise<Flags> {
   let maintenance = status?.maintenance ?? false;
   let waitlist = status?.waitlist ?? false;
   let hide = status?.hide ?? "";
+  let endsAt = status?.endsAt ?? "";
   try {
-    // Never build this URL from the request: the Host header is the visitor's to choose, and the answer
-    // is cached for everyone on this instance. APP_URL is ours; fall back to the request only in dev.
-    const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
-    const base =
-      process.env.APP_URL ||
-      (vercel ? `https://${vercel}` : "") ||
-      (process.env.NODE_ENV === "production" ? "" : req.nextUrl.origin);
+    const base = siteBase(req);
     if (!base) {
       if (!warned) console.error("[middleware] APP_URL is not set: maintenance and waitlist flags cannot be read");
       warned = true;
@@ -150,12 +147,48 @@ async function readFlags(req: NextRequest): Promise<Flags> {
       waitlist = !!j.waitlist;
       // Only plain anchor names get into the cookie.
       hide = Array.isArray(j.hide) ? j.hide.filter((x: unknown) => typeof x === "string" && /^[a-z]{1,20}$/.test(x)).slice(0, 20).join(".") : "";
+      endsAt = typeof j.endsAt === "string" ? j.endsAt : "";
     }
   } catch {
     /* status API unreachable: keep the last known state rather than flapping */
   }
-  status = { at: Date.now(), maintenance, waitlist, hide };
+  status = { at: Date.now(), maintenance, waitlist, hide, endsAt };
   return status;
+}
+
+// Never build this URL from the request: the Host header is the visitor's to choose, and the answer
+// is cached for everyone on this instance. APP_URL is ours; fall back to the request only in dev.
+function siteBase(req: NextRequest) {
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+  return process.env.APP_URL || (vercel ? `https://${vercel}` : "") || (process.env.NODE_ENV === "production" ? "" : req.nextUrl.origin);
+}
+
+/*
+ * R1264: strangers must get the maintenance page with a 503, and a rewrite cannot change the rewritten page's status
+ * (the render's 200 wins), so middleware fetches the page and answers with it. Cached per instance for 30 s so a busy
+ * site does not render it per request. The page's own headers come with it, its CSP included: the HTML carries that
+ * nonce. null: fall back to the plain rewrite (200) rather than ever break the maintenance page.
+ */
+type Page = { at: number; text: string; headers: Headers };
+let page: Page | null = null;
+async function maintenancePage(req: NextRequest): Promise<Page | null> {
+  if (page && Date.now() - page.at < 30_000) return page;
+  try {
+    const base = siteBase(req);
+    if (!base) return null;
+    const fwd = new Headers();
+    for (const h of ["accept-language", "user-agent"]) {
+      const v = req.headers.get(h);
+      if (v) fwd.set(h, v);
+    }
+    // manual: the page redirects to / once maintenance is off, and the home page must never go out as a 503.
+    const r = await fetch(new URL("/maintenance", base), { cache: "no-store", redirect: "manual", headers: fwd, signal: AbortSignal.timeout(3_000) });
+    if (r.status !== 200 || !(r.headers.get("content-type") ?? "").includes("text/html")) return null;
+    page = { at: Date.now(), text: await r.text(), headers: new Headers(r.headers) };
+    return page;
+  } catch {
+    return null;
+  }
 }
 
 /** 1150: paths no Outlly page uses but vulnerability scanners try all day (Outlly has no PHP, WordPress or dotfiles). */
@@ -236,7 +269,8 @@ export async function middleware(req: NextRequest, ev?: NextFetchEvent) {
   const res = await route(req, headers, ev, seen);
   // Perf: measurable live (devtools, curl -I): time spent here and how the site switches were read.
   res.headers.set("Server-Timing", middlewareTiming(Date.now() - t0, seen.flags));
-  res.headers.set("Content-Security-Policy", csp);
+  // R1264: the served maintenance page keeps its own policy, whose nonce its HTML carries.
+  if (!res.headers.has("Content-Security-Policy")) res.headers.set("Content-Security-Policy", csp);
   res.headers.set("Reporting-Endpoints", `csp="${req.nextUrl.origin}${CSP_REPORT_PATH}"`); // must be absolute
   if (noIndex(req.nextUrl.pathname)) res.headers.set("X-Robots-Tag", NOINDEX_HEADER);
   // The old admin-only notice bar is gone; clear its cookie from browsers that still have it.
@@ -300,6 +334,12 @@ async function route(req: NextRequest, headers: Headers, ev: NextFetchEvent | un
   // maintenance page, except sign-in (so a member can get back in) and the legal pages it links to.
   // No account can be created while it is on, and the APIs re-check the member's join date.
   if (flags?.maintenance && !authed && !MAINTENANCE_OPEN.includes(pathname) && !(await isAdmin(req))) {
+    const seconds = retryAfterSeconds(flags.endsAt);
+    if (!wantsHtml(req.method, req.headers.get("accept"))) {
+      return NextResponse.json({ error: "maintenance" }, { status: 503, headers: { "retry-after": String(seconds), "cache-control": "no-store" } });
+    }
+    const p = await maintenancePage(req);
+    if (p) return new NextResponse(req.method === "HEAD" ? null : p.text, { status: 503, headers: wrapHeaders(p.headers, seconds) });
     const res = NextResponse.rewrite(new URL("/maintenance", req.url), { request: { headers } });
     res.headers.set("cache-control", "no-store");
     return res;
