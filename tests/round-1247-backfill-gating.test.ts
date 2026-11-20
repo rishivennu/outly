@@ -68,27 +68,33 @@ describe("R1247 backfillOwner since", () => {
 });
 
 describe("R1247 sweepBackfill", () => {
+  // The sweep reads the whole shared test database, so it runs on a clock far past every other file's posts: its
+  // 180 day window then holds only the posts made here, whatever ran before.
+  const SWEEP_NOW = Date.UTC(2101, 0, 1);
+  const ago = (days: number) => new Date(SWEEP_NOW - days * DAY);
+  const sweep = () => mem.sweepBackfill({ maxOwners: 5, batch: 100, now: SWEEP_NOW });
+
   test("at most 5 owners a run, oldest post first, practice and old posts left alone, idempotent", async () => {
     const owners = await Promise.all(Array.from({ length: 7 }, () => user()));
-    // Created long ago, so this owner holds the oldest pending post in the whole test database.
-    const first = await post(owners[0].id, { createdAt: new Date("2000-01-01T00:00:00Z"), publishedAt: new Date(Date.now() - 20 * DAY) });
-    const mine = [first, ...(await Promise.all(owners.slice(1).map((o) => post(o.id, { publishedAt: new Date(Date.now() - 3 * DAY) }))))];
-    const practice = await post(owners[1].id, { practice: true });
-    const old = await post(owners[2].id, { publishedAt: new Date(Date.now() - 400 * DAY) });
+    // Created long ago, so this owner holds the oldest pending post in the window.
+    const first = await post(owners[0].id, { createdAt: new Date("2000-01-01T00:00:00Z"), publishedAt: ago(20) });
+    const mine = [first, ...(await Promise.all(owners.slice(1).map((o) => post(o.id, { publishedAt: ago(3) }))))];
+    const practice = await post(owners[1].id, { practice: true, publishedAt: ago(1) });
+    const old = await post(owners[2].id, { publishedAt: ago(400) });
 
-    const one = await mem.sweepBackfill({ maxOwners: 5, batch: 100 });
+    const one = await sweep();
     expect(one.owners).toBe(5);
     expect(one.failed).toBe(0);
     expect(await hasItem(first.id)).toBe(true);
 
     let runs = 1;
-    for (let r = one; r.owners > 0 && runs < 100; runs++) r = await mem.sweepBackfill({ maxOwners: 5, batch: 100 });
+    for (let r = one; r.owners > 0 && runs < 100; runs++) r = await sweep();
     for (const p of mine) expect(await hasItem(p.id)).toBe(true);
     expect(await hasItem(practice.id)).toBe(false);
     expect(await hasItem(old.id)).toBe(false);
 
     const items = await db.contentItem.count();
-    expect(await mem.sweepBackfill({ maxOwners: 5, batch: 100 })).toEqual({ owners: 0, items: 0, failed: 0 });
+    expect(await sweep()).toEqual({ owners: 0, items: 0, failed: 0 });
     expect(await db.contentItem.count()).toBe(items);
   });
 

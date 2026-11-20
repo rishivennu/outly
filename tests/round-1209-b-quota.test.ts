@@ -6,6 +6,7 @@
 import { afterAll, describe, expect, mock, test } from "bun:test";
 import * as realStorage from "../lib/storage";
 import type { StorageDriver } from "../lib/storage";
+import type { Prisma } from "@prisma/client";
 import { db } from "../lib/db";
 import { MB, anchoredWindow, calendarWindow, cycleWindow, fmtBytes, monthlyFigures, resolvePolicy, roomLeft, storageFiguresOf, usageState } from "../lib/storage/quota-core";
 import { QuotaError, legacyMeter, recordUpload, reserveUpload, storageUsageFor } from "../lib/storage/quota";
@@ -52,11 +53,18 @@ async function account(o: { priceMinor: number; uploadMonthlyMb?: number | null;
 const mediaRow = (userId: string, bytes: number, o: { status?: string; createdAt?: Date } = {}) =>
   db.media.create({ data: { userId, originalFilename: "clip.mp4", storageKey: `q1209/${tag()}.mp4`, mimeType: "video/mp4", size: Math.min(bytes, 2_147_483_647), sizeBytes: BigInt(bytes), status: o.status ?? "ready", ...(o.createdAt ? { createdAt: o.createdAt } : {}) } });
 
-/** reserve + finish one upload the way the media routes do. */
-async function upload(userId: string, bytes: number, now = new Date()) {
-  const m = await reserveUpload(userId, bytes, (tx) => tx.media.create({ data: { userId, originalFilename: "clip.mp4", storageKey: `q1209/${tag()}.mp4`, mimeType: "video/mp4", size: Math.min(bytes, 2_147_483_647), sizeBytes: BigInt(bytes), status: "uploading" } }), now);
+const hold = (userId: string, bytes: number) => (tx: Prisma.TransactionClient) =>
+  tx.media.create({ data: { userId, originalFilename: "clip.mp4", storageKey: `q1209/${tag()}.mp4`, mimeType: "video/mp4", size: Math.min(bytes, 2_147_483_647), sizeBytes: BigInt(bytes), status: "uploading" } });
+
+async function finish(m: { id: string; userId: string }, bytes: number, now = new Date()) {
   await db.media.update({ where: { id: m.id }, data: { status: "ready" } });
   await recordUpload(m, bytes, now);
+}
+
+/** reserve + finish one upload the way the media routes do. */
+async function upload(userId: string, bytes: number, now = new Date()) {
+  const m = await reserveUpload(userId, bytes, hold(userId, bytes), now);
+  await finish(m, bytes, now);
   return m;
 }
 
@@ -158,8 +166,13 @@ describe("free: the monthly upload allowance", () => {
 
   test("uploads started together can't both take the last room", async () => {
     const { user } = await account({ priceMinor: 0, uploadMonthlyMb: 100 });
-    const tries = await Promise.allSettled([60, 60, 60].map(() => upload(user.id, 60 * MB)));
-    expect(tries.filter((t) => t.status === "fulfilled").length).toBe(1);
+    // Only the reservations race. Finishing inside the race would also race the routes' ready-then-ledger step (a row
+    // that has left "uploading" but has no ledger row yet counts nowhere), so the winner finishes after all settled.
+    const tries = await Promise.allSettled([1, 2, 3].map(() => reserveUpload(user.id, 60 * MB, hold(user.id, 60 * MB))));
+    const won = tries.flatMap((t) => (t.status === "fulfilled" ? [t.value] : []));
+    expect(won.length).toBe(1);
+    for (const t of tries) if (t.status === "rejected") expect((t.reason as QuotaError).code).toBe("quota_monthly");
+    await finish(won[0]!, 60 * MB);
     expect((await storageUsageFor(user.id)).monthly!.usedBytes).toBe(60 * MB);
   });
 

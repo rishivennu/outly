@@ -311,6 +311,8 @@ describe("database", () => {
     expect(none).toEqual({ weekMin: 0, totalMin: 0, posts: 0, weekPosts: 0 });
   });
 
+  // sweepSpikes has no owner filter: each of the three sweeps pages every account in the shared test database and
+  // reads entitlements per owner, so its cost grows with every file that ran before this one.
   test("engagement spike: one alert per account per day, nothing for a normal day", async () => {
     const { sweepSpikes } = await import("../lib/retention/alerts");
     const s = `${Date.now()}`;
@@ -339,7 +341,7 @@ describe("database", () => {
     await db.notice.deleteMany({ where: { userId: user.id } });
     await sweepSpikes(now);
     expect(await db.notice.count({ where: { userId: user.id } })).toBe(0);
-  });
+  }, 30_000);
 
   test("failure alerts respect the owner's switch", async () => {
     const { noticeFailedTarget } = await import("../lib/retention/notices");
