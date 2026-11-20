@@ -25,14 +25,14 @@ describe("R1261 render", () => {
     for (const n of ["Outlly Intelligence", "Content Memory", "Smart Content Adaptation", "Growth Planner"]) expect(text).toContain(n);
     expect((html.match(/<article /g) ?? []).length).toBe(4);
   });
-  test("the loop reads Create, Publish, Learn, Improve in order, with a connector between each pair", () => {
+  test("the loop reads Create, Publish, Learn, Improve in order, on one track (R1263)", () => {
     const labels = GROWTH.loop.map((s) => s.label.toUpperCase());
     expect(labels).toEqual(["CREATE", "PUBLISH", "LEARN", "IMPROVE"]);
     const ol = html.slice(html.indexOf('aria-label="The growth loop"'), html.indexOf("</ol>")).toUpperCase();
     const at = labels.map((l) => ol.indexOf(`>${l}<`));
     at.forEach((i) => expect(i).toBeGreaterThan(-1));
     expect([...at].sort((a, b) => a - b)).toEqual(at);
-    expect((html.match(/class="ge-seg"/g) ?? []).length).toBe(3);
+    expect((html.match(/class="ge-track"/g) ?? []).length).toBe(1);
     expect((html.match(/class="ge-node"/g) ?? []).length).toBe(4);
   });
 });
@@ -86,11 +86,11 @@ describe("R1261 page wiring", () => {
   });
   test("the CSS block is appended and delimited, with a reduced-motion rule", () => {
     const css = read("app/globals.css");
-    const at = css.indexOf("/* R1261 growth engine */");
+    const at = css.indexOf("/* R1263 growth engine */"); // R1263 renamed the R1261 markers
     expect(at).toBeGreaterThan(0);
-    const block = css.slice(at, css.indexOf("/* end R1261 growth engine */"));
-    expect(block).toContain("@media (prefers-reduced-motion: reduce) { .ge-loop[data-shown] .ge-seg { animation: none; } }");
-    expect(block).toContain(".ge-loop[data-shown] .ge-seg { animation: ge-draw-y");
+    const block = css.slice(at, css.indexOf("/* end R1263 growth engine */"));
+    expect(block).toContain("@media (prefers-reduced-motion: reduce) { .ge-loop :is(.ge-node-lit, .ge-label, .ge-hint, .ge-note) { opacity: 1; } .ge-loop .ge-track-fill { clip-path: none; } }");
+    expect(block).toContain('html.js .ge-loop:not([data-ge="live"]) .ge-track-fill { clip-path: inset(0 0 100% 0);'); // R1263: GrowthLoop draws it
     expect(block.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/transform|translate|transition:/); // the 1100 motion sweep reads to the end of the file
   });
 });
