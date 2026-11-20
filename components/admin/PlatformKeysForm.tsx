@@ -33,6 +33,7 @@ export function PlatformKeysForm({ keys: initial, live: initialLive, base, dm }:
           live={live.includes(p)}
           base={base}
           dm={p === "instagram" || p === "facebook" ? dm : undefined}
+          deletion={p === "threads" ? dm?.deletion : undefined}
           clash={p === "instagram" && !!keys.instagram?.clientId && keys.instagram.clientId === keys.facebook?.clientId}
           onSaved={(k, l) => { setKeys(k); setLive(l); }}
         />
@@ -41,7 +42,7 @@ export function PlatformKeysForm({ keys: initial, live: initialLive, base, dm }:
   );
 }
 
-function PlatformCard({ p, saved, live, base, dm, clash, onSaved }: { p: Platform; saved: Keys[Platform]; live: boolean; base: string; dm?: DmSetup; clash?: boolean; onSaved: (k: Keys, l: Platform[]) => void }) {
+function PlatformCard({ p, saved, live, base, dm, deletion, clash, onSaved }: { p: Platform; saved: Keys[Platform]; live: boolean; base: string; dm?: DmSetup; deletion?: string; clash?: boolean; onSaved: (k: Keys, l: Platform[]) => void }) {
   const toast = useToast();
   const meta = PLATFORM_META[p];
   const s = PLATFORM_SETUP[p];
@@ -104,6 +105,7 @@ function PlatformCard({ p, saved, live, base, dm, clash, onSaved }: { p: Platfor
         </div>
         <SecretField id={`${p}-secret`} label={s.secretLabel} saved={saved.clientSecret} value={secret} onChange={setSecret} placeholder={`Paste the ${s.secretLabel.toLowerCase()}`} />
         <CopyRow label="Callback" value={`${base}/api/accounts/${p}/callback`} />
+        {deletion && <CopyRow label="Delete and uninstall callback URL" value={deletion} />}
         {dm && (
           <div className="grid min-w-0 grid-cols-1 gap-2 [&>*]:min-w-0" aria-label="Direct messages setup">
             <p className="text-[12.5px] font-semibold text-foreground">Direct messages</p>
