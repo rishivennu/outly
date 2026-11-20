@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin/guard";
-import { Card, Empty, PageHead, Pill, STATUS_TONE, ago } from "@/components/admin/ui";
+import { Card, Empty, PageHead, StatusBadge, ago } from "@/components/admin/ui";
 import { DataSwap } from "@/components/shared/DataSwap";
 import { FilterChips, SearchBox } from "@/components/admin/SearchBox";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,7 @@ export default async function Tickets(props: { searchParams: Promise<{ s?: strin
                     <span className="mt-0.5 block truncate text-[12.5px] text-muted-foreground">{t.name ?? t.email} · {t.messages[0]?.author === "admin" ? "You: " : ""}{t.messages[0]?.body}</span>
                   </span>
                   <span className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="flex gap-1">{t.priority !== "normal" && <Pill tone={STATUS_TONE[t.priority]}>{t.priority}</Pill>}<Pill tone={STATUS_TONE[t.status]}>{t.status === "pending" ? "waiting" : t.status}</Pill></span>
+                    <span className="flex gap-1">{t.priority !== "normal" && <StatusBadge status={t.priority} />}<StatusBadge status={t.status} /></span>
                     <span className="text-[11.5px] text-muted-foreground">{ago(t.createdAt)}</span>
                   </span>
                 </Link>

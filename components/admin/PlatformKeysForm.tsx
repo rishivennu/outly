@@ -8,7 +8,8 @@ import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { adminApi } from "@/lib/client/admin-api";
 import { CORE_PLATFORMS, PLATFORM_META, PLATFORMS, type Platform } from "@/lib/domain";
 import { PLATFORM_SETUP } from "@/lib/social/platform-setup";
-import { Card, Pill } from "./ui";
+import { platformHint, platformStatus, savedToast, saveLabel } from "@/lib/admin/platform-status";
+import { Card, Pill, StatusBadge, Tooltip } from "./ui";
 import { CopyRow, SecretField, type Secret, type SecretEdit } from "./IntegrationsForm";
 
 type Keys = Record<Platform, { clientId: string; clientSecret: Secret; dms?: boolean; insights?: boolean }>;
@@ -20,9 +21,9 @@ const DM_SCOPES = ["instagram_business_manage_messages", "pages_messaging", "pag
 /** Meta direct-message setup (1031): pasted into the Meta dashboard's Webhooks and App settings. */
 export type DmSetup = { webhook: string; verifyToken: string; deletion: string };
 
-export function PlatformKeysForm({ keys: initial, live: initialLive, base, dm }: { keys: Keys; live: Platform[]; base: string; dm?: DmSetup }) {
+export function PlatformKeysForm({ keys: initial, ready: initialReady, base, dm }: { keys: Keys; ready: Platform[]; base: string; dm?: DmSetup }) {
   const [keys, setKeys] = useState(initial);
-  const [live, setLive] = useState(initialLive);
+  const [ready, setReady] = useState(initialReady);
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       {PLATFORMS.map((p) => (
@@ -30,19 +31,19 @@ export function PlatformKeysForm({ keys: initial, live: initialLive, base, dm }:
           key={p}
           p={p}
           saved={keys[p]}
-          live={live.includes(p)}
+          ready={ready.includes(p)}
           base={base}
           dm={p === "instagram" || p === "facebook" ? dm : undefined}
           deletion={p === "threads" ? dm?.deletion : undefined}
           clash={p === "instagram" && !!keys.instagram?.clientId && keys.instagram.clientId === keys.facebook?.clientId}
-          onSaved={(k, l) => { setKeys(k); setLive(l); }}
+          onSaved={(k, r) => { setKeys(k); setReady(r); }}
         />
       ))}
     </div>
   );
 }
 
-function PlatformCard({ p, saved, live, base, dm, deletion, clash, onSaved }: { p: Platform; saved: Keys[Platform]; live: boolean; base: string; dm?: DmSetup; deletion?: string; clash?: boolean; onSaved: (k: Keys, l: Platform[]) => void }) {
+function PlatformCard({ p, saved, ready, base, dm, deletion, clash, onSaved }: { p: Platform; saved: Keys[Platform]; ready: boolean; base: string; dm?: DmSetup; deletion?: string; clash?: boolean; onSaved: (k: Keys, r: Platform[]) => void }) {
   const toast = useToast();
   const meta = PLATFORM_META[p];
   const s = PLATFORM_SETUP[p];
@@ -59,19 +60,23 @@ function PlatformCard({ p, saved, live, base, dm, deletion, clash, onSaved }: { 
   const dirty = id.trim() !== saved.clientId || (secret !== undefined && secret !== "") || dmsChanged || insightsChanged;
   const baseScopes = dm && !dms ? s.scopes.split(",").map((x) => x.trim()).filter((x) => !DM_SCOPES.includes(x)).join(", ") : s.scopes;
   const scopes = ig && insights ? `${baseScopes}, instagram_business_manage_insights` : baseScopes;
-  const willBeLive = !!id.trim() && (secret === null ? false : saved.clientSecret.set || !!secret);
+  const status = platformStatus({ core, ready, idSet: !!saved.clientId, secretSet: saved.clientSecret.set });
+  const idNext = !!id.trim();
+  const secretNext = secret === null ? false : saved.clientSecret.set || !!secret;
+  // Env keys can fill in for the saved ones, so the prediction only promises "live" when the save itself sets both.
+  const next = platformStatus({ core, ready: idNext && secretNext, idSet: idNext, secretSet: secretNext });
 
   async function save() {
     setBusy(true);
     try {
-      const r = await adminApi<{ platforms: Keys; live: Platform[] }>("/api/admin/platforms", {
+      const r = await adminApi<{ platforms: Keys; ready: Platform[] }>("/api/admin/platforms", {
         method: "PUT",
         json: { platform: p, clientId: id.trim(), clientSecret: secret === undefined || secret === "" ? undefined : secret, ...(dm ? { dms } : {}), ...(ig ? { insights } : {}) },
       });
-      onSaved(r.platforms, r.live);
+      onSaved(r.platforms, r.ready);
       setSecret(undefined);
-      const on = r.live.includes(p);
-      toast(on ? `${meta.name} is live. Creators can connect it now.` : core ? `Saved. ${meta.name} stays in the studio but can't connect until both keys are set.` : `Saved. ${meta.name} stays hidden until both keys are set.`, on ? undefined : "info");
+      const after = platformStatus({ core, ready: r.ready.includes(p), idSet: !!r.platforms[p]?.clientId, secretSet: !!r.platforms[p]?.clientSecret.set });
+      toast(savedToast(meta.name, after, core), after === "live" ? undefined : "info");
     } catch (e: any) {
       toast(e.message ?? "Couldn't save.", "error");
     } finally {
@@ -86,7 +91,11 @@ function PlatformCard({ p, saved, live, base, dm, deletion, clash, onSaved }: { 
         <div className="min-w-0 flex-1">
           <h2 className="flex flex-wrap items-center gap-2 text-[17px] font-semibold">
             {meta.name}
-            {live ? <Pill tone="ok">Live</Pill> : <Pill tone="muted">Not live</Pill>}
+            <Tooltip text={platformHint(status, core)} describe>
+              <span tabIndex={0} className="inline-flex rounded-full">
+                <StatusBadge status={status} />
+              </span>
+            </Tooltip>
             {core && <Pill tone="info">Always shown</Pill>}
           </h2>
           <p className="mt-1 text-[13px] leading-snug text-muted-foreground">{s.note}</p>
@@ -152,7 +161,7 @@ function PlatformCard({ p, saved, live, base, dm, deletion, clash, onSaved }: { 
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <Button onClick={save} disabled={!dirty || busy} variant="lime">
-          {busy ? "Saving…" : dirty && willBeLive && !live ? `Save and go live` : "Save"}
+          {busy ? "Saving…" : dirty ? saveLabel(status, next) : "Save"}
         </Button>
         <a href={s.console} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
           Open {s.consoleName} <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />

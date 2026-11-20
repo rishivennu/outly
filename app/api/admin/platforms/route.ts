@@ -2,8 +2,9 @@ import { z } from "zod";
 import { HttpError, json } from "@/lib/http";
 import { adminRoute, adminEvent } from "@/lib/admin/route";
 import { getConfig, redact, saveConfig, KEYED_PLATFORMS } from "@/lib/settings";
-import { PLATFORM_META } from "@/lib/domain";
-import { livePlatforms, loadKeys } from "@/lib/social/registry";
+import { PLATFORM_META, PLATFORMS, isCorePlatform } from "@/lib/domain";
+import { hasCredentials, livePlatforms, loadKeys } from "@/lib/social/registry";
+import { PLATFORM_STATUS, platformStatus } from "@/lib/admin/platform-status";
 
 const secret = z.union([z.string().trim().max(600), z.null()]).optional();
 const Body = z.object({
@@ -16,9 +17,12 @@ const Body = z.object({
   insights: z.boolean().optional(),
 });
 
+/** `live` is what the studio offers (core platforms always); `ready` is which platforms creators can actually connect. */
+const readyPlatforms = () => PLATFORMS.filter(hasCredentials);
+
 export const GET = adminRoute("platforms", async () => {
   await loadKeys();
-  return json({ platforms: redact("platforms", await getConfig("platforms")), live: livePlatforms() });
+  return json({ platforms: redact("platforms", await getConfig("platforms")), live: livePlatforms(), ready: readyPlatforms() });
 });
 
 export const PUT = adminRoute("platforms", async (req, { admin }) => {
@@ -38,9 +42,12 @@ export const PUT = adminRoute("platforms", async (req, { admin }) => {
   const v = await saveConfig("platforms", { [b.platform]: { clientId: b.clientId, clientSecret: b.clientSecret, ...(dmCapable && b.dms !== undefined ? { dms: b.dms } : {}), ...(storeInsights ? { insights: b.insights } : {}) } });
   await loadKeys();
   const live = livePlatforms();
+  const ready = readyPlatforms();
   const name = PLATFORM_META[b.platform].name;
-  await adminEvent("integration", `${admin.name} updated ${name} keys`, `${live.includes(b.platform) ? `${name} is live` : `${name} is off`}${dmCapable && b.dms !== undefined ? `, direct messages ${b.dms ? "on" : "off"}` : ""}${storeInsights ? `, insights ${b.insights ? "on" : "off"}` : ""}`, "/admin/platforms");
-  return json({ platforms: redact("platforms", v), live });
+  const saved = v[b.platform];
+  const status = platformStatus({ core: isCorePlatform(b.platform), ready: ready.includes(b.platform), idSet: !!saved?.clientId, secretSet: !!saved?.clientSecret });
+  await adminEvent("integration", `${admin.name} updated ${name} keys`, `${name}: ${PLATFORM_STATUS[status].label}${dmCapable && b.dms !== undefined ? `, direct messages ${b.dms ? "on" : "off"}` : ""}${storeInsights ? `, insights ${b.insights ? "on" : "off"}` : ""}`, "/admin/platforms");
+  return json({ platforms: redact("platforms", v), live, ready });
 }, [30, 60_000]);
 
 export const dynamic = "force-dynamic";

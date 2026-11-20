@@ -32,7 +32,7 @@ export default async function GrowthPage(props: { searchParams: Promise<{ r?: st
   return (
     <>
       <PageHead
-        eyebrow="Run"
+        eyebrow="Insights"
         title="Growth"
         body="Where people drop off, and which channels bring creators who stay."
         actions={<FilterChips param="r" current={r === "90" ? "" : r} options={[{ value: "30", label: "30 days" }, { value: "", label: "90 days" }, { value: "all", label: "All time" }]} glide />}

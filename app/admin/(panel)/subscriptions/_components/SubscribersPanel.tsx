@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/client/admin-api";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
-import { Card, CardTitle, Empty, Pill, STATUS_TONE, Table, fmtDate } from "@/components/admin/ui";
+import { Card, CardTitle, Empty, Pill, StatusBadge, Table, fmtDate } from "@/components/admin/ui";
 import { useToast } from "@/components/shared/Toast";
 import { intervalLabel } from "@/lib/billing/money";
 import { chip, inr, MarginBadge, money, TIER_LABEL, useDebounced } from "./shared";
@@ -79,7 +79,7 @@ export function SubscribersPanel({ target }: { target: number }) {
                   <td>{r.plan}</td>
                   <td><Pill tone={r.tier === "intro" ? "lime" : r.tier === "founding" ? "info" : "muted"}>{TIER_LABEL[r.tier] ?? r.tier}</Pill></td>
                   <td className="tabular">{money(r.priceMinor, r.currency)}{intervalLabel(r.interval)}</td>
-                  <td><Pill tone={STATUS_TONE[r.status] ?? "muted"}>{r.pausedUntil && new Date(r.pausedUntil) > new Date() ? "paused" : r.status}</Pill></td>
+                  <td><StatusBadge status={r.pausedUntil && new Date(r.pausedUntil) > new Date() ? "paused" : r.status} /></td>
                   <td>{fmtDate(r.currentPeriodEnd)}</td>
                   <td>
                     <Button type="button" size="sm" variant="ghost" className="rounded-full" aria-expanded={open === r.userId} aria-controls={`hist-${r.userId}`} onClick={() => show(r.userId)}>

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/client/admin-api";
 import { Button } from "@/components/ui/button";
 import { Label, Textarea } from "@/components/ui/field";
-import { Card, CardTitle, Empty, Pill, fmtDate } from "@/components/admin/ui";
+import { Card, CardTitle, Empty, Pill, StatusBadge, fmtDate } from "@/components/admin/ui";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/Toast";
 import { chip } from "./shared";
@@ -66,7 +66,7 @@ export function RiskPanel() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="mr-auto min-w-0 break-words text-[14px] font-semibold">{f.email ?? "Deleted account"}</span>
                 <Pill tone={f.level === "high" ? "bad" : f.level === "medium" ? "warn" : "muted"}>{f.level} risk, score {f.score}</Pill>
-                <Pill tone={f.status === "open" ? "lime" : "muted"}>{f.status}</Pill>
+                <StatusBadge status={f.status} />
               </div>
               <p className="mt-1 text-[12.5px] text-muted-foreground">
                 {ACTION_LABEL[f.action] ?? f.action} · at {f.context} · {fmtDate(f.createdAt, true)}

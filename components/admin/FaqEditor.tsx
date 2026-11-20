@@ -8,7 +8,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Answer } from "@/components/support/Answer";
 import { adminApi } from "@/lib/client/admin-api";
 import { cn } from "@/lib/utils";
-import { Card, Pill } from "./ui";
+import { Card, Empty, Pill } from "./ui";
 import { SearchInput } from "./SearchInput";
 
 type F = { id: string; category: string; question: string; answer: string; published: boolean; sortOrder: number };
@@ -135,7 +135,7 @@ export function FaqEditor({ initial, categories }: { initial: F[]; categories: s
           </Card>
         );
       })}
-      {!shown.length && <p className="py-10 text-center text-muted-foreground">No questions match "{q}".</p>}
+      {!shown.length && <Empty title="No questions match" body={`Nothing matches "${q}". Try another word.`} />}
       <ConfirmDialog open={!!del} onOpenChange={(o) => !o && setDel(null)} title="Delete this question?" body={del?.question ?? ""} confirmLabel="Delete" onConfirm={remove} />
     </div>
   );

@@ -41,7 +41,7 @@ export default async function BlogDashboard() {
         ))}
       </div>
       <Card>
-        <CardTitle hint={stats.lastPublished ? `Last published: ${stats.lastPublished.title}, ${fmtDate(stats.lastPublished.at)}.` : "Nothing published yet."} action={<Link href="/admin/blog/library" className="text-[13px] underline underline-offset-4">Open library</Link>}>Pending approval</CardTitle>
+        <CardTitle hint={stats.lastPublished ? `Last published: ${stats.lastPublished.title}, ${fmtDate(stats.lastPublished.at)}.` : "Nothing published yet."} action={<Link href="/admin/blog/library" className="inline-flex min-h-11 items-center text-[13px] underline underline-offset-4">Open library</Link>}>Pending approval</CardTitle>
         {pending.length === 0 ? (
           <Empty title="The queue is empty" body="Articles land here after a run finishes. Each one waits for a person to approve it." />
         ) : (

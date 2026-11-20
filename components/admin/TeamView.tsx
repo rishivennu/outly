@@ -7,7 +7,7 @@ import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { adminApi } from "@/lib/client/admin-api";
 import { ADMIN_ROLES, type AdminRole } from "@/lib/admin/perms";
-import { Card, CardTitle, Pill, Table, ago } from "./ui";
+import { Card, CardTitle, Pill, StatusBadge, Table, ago } from "./ui";
 
 type A = { id: string; name: string; login: string; role: string; active: boolean; lastLoginAt: string | null };
 const ROLES: AdminRole[] = [...ADMIN_ROLES];
@@ -68,7 +68,7 @@ export function TeamView({ initial, me, roles }: { initial: A[]; me: string; rol
       </div>
       <Card>
         <CardTitle>People</CardTitle>
-        <Table head={["Name", "Role", "Status", "Last sign-in", ""]}>
+        <Table label="Admin team" head={["Name", "Role", "Status", "Last sign-in", ""]}>
           {team.map((a) => (
             <tr key={a.id}>
               <td><span className="block font-medium">{a.name}{a.id === me && <Pill className="ml-2" tone="lime">you</Pill>}</span><span className="font-mono text-[12px] text-muted-foreground">{a.login}</span></td>
@@ -79,7 +79,7 @@ export function TeamView({ initial, me, roles }: { initial: A[]; me: string; rol
               </td>
               <td>
                 <button type="button" onClick={() => patch(a, { active: !a.active })} disabled={a.id === me} className="disabled:opacity-60">
-                  <Pill tone={a.active ? "ok" : "muted"}>{a.active ? "Active" : "Suspended"}</Pill>
+                  <StatusBadge status={a.active ? "active" : "suspended"} />
                 </button>
               </td>
               <td className="text-muted-foreground">{ago(a.lastLoginAt)}</td>

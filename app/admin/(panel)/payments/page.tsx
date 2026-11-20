@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin/guard";
 import { formatMoney } from "@/lib/billing/money";
 import { activeGateway } from "@/lib/billing/service";
-import { Card, Empty, PageHead, Pill, STATUS_TONE, Table, fmtDate } from "@/components/admin/ui";
+import { Card, Empty, PageHead, StatusBadge, Table, fmtDate } from "@/components/admin/ui";
 import { DataSwap } from "@/components/shared/DataSwap";
 import { FilterChips, SearchBox } from "@/components/admin/SearchBox";
 import { RefundButton } from "@/components/admin/RefundButton";
@@ -35,14 +35,14 @@ export default async function Payments(props: { searchParams: Promise<{ status?:
       />
       <Card>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <FilterChips param="status" current={status} options={[{ value: "", label: "All" }, { value: "succeeded", label: `Paid · ${count("succeeded")}` }, { value: "failed", label: `Failed · ${count("failed")}` }, { value: "pending", label: `Pending · ${count("pending")}` }, { value: "refunded", label: `Refunded · ${count("refunded")}` }]} />
+          <FilterChips param="status" current={status} options={[{ value: "", label: "All" }, { value: "succeeded", label: `Paid · ${count("succeeded")}` }, { value: "failed", label: `Failed · ${count("failed")}` }, { value: "pending", label: `Waiting · ${count("pending")}` }, { value: "refunded", label: `Refunded · ${count("refunded")}` }]} />
           <SearchBox placeholder="Customer or invoice number" />
         </div>
         <DataSwap k={`${status}|${q ?? ""}`}>
         {rows.length === 0 ? (
           <Empty title="No payments here" body={status || q ? "Nothing matches these filters." : "Payments show up the moment a customer checks out."} />
         ) : (
-          <Table head={["Customer", "Plan", "Amount", "Status", "Gateway", "Date", "Invoice", ""]}>
+          <Table label="Payments" head={["Customer", "Plan", "Amount", "Status", "Gateway", "Date", "Invoice", ""]}>
             {rows.map((p) => (
               <tr key={p.id}>
                 <td>
@@ -52,14 +52,14 @@ export default async function Payments(props: { searchParams: Promise<{ status?:
                 <td>{plans.get(p.planId ?? "") ?? "Other"}</td>
                 <td className="font-semibold tabular">{formatMoney(p.amountMinor, p.currency)}</td>
                 <td>
-                  <Pill tone={STATUS_TONE[p.status]}>{p.status === "succeeded" ? "Paid" : p.status}</Pill>
+                  <StatusBadge status={p.status} label={p.status === "succeeded" ? "Paid" : undefined} />
                   {p.failureReason && <span className={`mt-1 block max-w-[220px] text-[12px] ${p.status === "refunded" ? "text-muted-foreground" : "text-destructive"}`}>{p.failureReason}</span>}
                 </td>
                 <td className="capitalize text-muted-foreground">{p.provider}{p.sample && " · sample"}</td>
                 <td className="whitespace-nowrap text-muted-foreground">{fmtDate(p.createdAt, true)}</td>
                 <td>
                   {p.invoice ? (
-                    <a href={`/api/billing/invoices/${p.invoice.number}`} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[12px] hairline hover:bg-secondary" title={p.invoice.emailedAt ? "Emailed to customer" : "Not emailed"}>
+                    <a href={`/api/billing/invoices/${p.invoice.number}`} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[12px] hairline hover:bg-secondary touch:min-h-11" title={p.invoice.emailedAt ? "Emailed to customer" : "Not emailed"}>
                       <Download className="h-3.5 w-3.5" aria-hidden />{p.invoice.number}
                     </a>
                   ) : (

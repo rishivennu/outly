@@ -2,6 +2,7 @@ import * as React from "react";
 import { AlertTriangle, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollX } from "@/components/ui/scroll-x";
+import { PLATFORM_STATUS } from "@/lib/admin/platform-status";
 
 /** Server-safe building blocks for admin pages. */
 /** `tight` is for working consoles (1191: Live Assist), where the screen below needs the height more than the title does. */
@@ -63,6 +64,8 @@ export const STATUS_LABEL: Record<string, { label: string; tone: Tone }> = {
   configured: { label: "Configured", tone: "info" },
   connected: { label: "Connected", tone: "ok" },
   live: { label: "Live", tone: "ok" },
+  "keys-missing": PLATFORM_STATUS["keys-missing"],
+  hidden: PLATFORM_STATUS.hidden,
   pending_approval: { label: "Pending approval", tone: "warn" },
   requires_reconnect: { label: "Requires reconnect", tone: "warn" },
   needs_reconnect: { label: "Requires reconnect", tone: "warn" },
@@ -80,6 +83,7 @@ export const STATUS_LABEL: Record<string, { label: string; tone: Tone }> = {
   // money, tickets, accounts
   succeeded: { label: "Succeeded", tone: "ok" },
   active: { label: "Active", tone: "ok" },
+  suspended: { label: "Suspended", tone: "muted" },
   resolved: { label: "Resolved", tone: "ok" },
   past_due: { label: "Past due", tone: "warn" },
   mocked: { label: "Practice", tone: "info" },

@@ -174,7 +174,7 @@ export function BehaviorBreakdown({ s, active = true }: { s: BehaviorStats; acti
         <Card className="gs-in">
           <CardTitle hint={`Accounts linked now. Publishes are per platform in the last ${s.rangeDays} days, practice runs left out.`}>Connected platforms</CardTitle>
           {s.platforms.length ? (
-            <Table head={["Platform", "Connected", "Needs reconnect", "Publishes", "Success"]} minWidth={520}>
+            <Table label="Connected platforms" head={["Platform", "Connected", "Needs reconnect", "Publishes", "Success"]} minWidth={520}>
               {s.platforms.map((p) => (
                 <tr key={p.platform}>
                   <td className="font-medium">{pname(p.platform)}</td>
@@ -186,7 +186,7 @@ export function BehaviorBreakdown({ s, active = true }: { s: BehaviorStats; acti
               ))}
             </Table>
           ) : (
-            <p className="text-[13.5px] text-muted-foreground">No one has connected a platform yet.</p>
+            <Empty title="No platforms connected yet" body="Accounts show up here once a creator links one." />
           )}
         </Card>
         <Card className="gs-in">
@@ -240,7 +240,7 @@ export function BehaviorBreakdown({ s, active = true }: { s: BehaviorStats; acti
           {!people ? (
             <p className="text-[13.5px] text-muted-foreground">Your role can see the totals but not individual people.</p>
           ) : s.topUsers.length ? (
-            <Table head={["Person", "Active days", "Posts", "Published", "Platforms", "Plan", "Last seen"]}>
+            <Table label="Most engaged" head={["Person", "Active days", "Posts", "Published", "Platforms", "Plan", "Last seen"]}>
               {s.topUsers.map((u) => (
                 <tr key={u.id}>
                   <td>
@@ -257,7 +257,7 @@ export function BehaviorBreakdown({ s, active = true }: { s: BehaviorStats; acti
               ))}
             </Table>
           ) : (
-            <p className="text-[13.5px] text-muted-foreground">No activity in this range yet.</p>
+            <Empty title="No activity in this range yet" />
           )}
         </Card>
       </div>

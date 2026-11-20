@@ -145,7 +145,7 @@ export default async function AnalyticsPage(props: { searchParams: Promise<{ d?:
     const r = await outllyAnalytics(win);
     return (
       <>
-        <PageHead title="Analytics" body="Outlly's own records, never added together with PostHog." />
+        <PageHead eyebrow="Insights" title="Analytics" body="Outlly's own records, never added together with PostHog." />
         <AdminFilterBar label="Analytics filters" meta={<ReportMeta source="Outlly data" range={windowLabel(win)} tz={r.timezone} updatedAt={r.generatedAt} />}>
           {source}
           {range}
@@ -174,7 +174,7 @@ export default async function AnalyticsPage(props: { searchParams: Promise<{ d?:
   if (!report.connected) {
     return (
       <>
-        <PageHead title="Analytics" body="Site traffic and the signup funnel, from PostHog." actions={open} />
+        <PageHead eyebrow="Insights" title="Analytics" body="Site traffic and the signup funnel, from PostHog." actions={open} />
         {bar}
         <Card>
           <Empty title="PostHog is not connected" body={`The reports need ${report.missing.join(" and ")} set in the server environment, then a redeploy. No PostHog numbers are shown until then.`}>
@@ -191,7 +191,7 @@ export default async function AnalyticsPage(props: { searchParams: Promise<{ d?:
   const { daily, signups, funnel, pages, referrers, countries } = report;
   return (
     <>
-      <PageHead title="Analytics" body="Site traffic from PostHog: visitors who accepted analytics cookies." actions={open} />
+      <PageHead eyebrow="Insights" title="Analytics" body="Site traffic from PostHog: visitors who accepted analytics cookies." actions={open} />
       {bar}
       {note}
 

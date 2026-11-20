@@ -33,7 +33,7 @@ export default async function RetentionPage(props: { searchParams: Promise<{ f?:
   return (
     <>
       <PageHead
-        eyebrow="Run"
+        eyebrow="Insights"
         title="At risk"
         body="Creators likely to leave, scored from what they actually do."
       />

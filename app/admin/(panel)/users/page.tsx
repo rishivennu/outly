@@ -210,7 +210,7 @@ export default async function Users(props: { searchParams: Promise<Params> }) {
         {rows.length === 0 ? (
           <Empty title={q ? `No one matches "${q}"` : narrowing ? "No one matches these filters" : "No users yet"} body={q || narrowing ? "Loosen a filter or try part of an email or a first name." : "Sign-ups appear here as soon as someone creates an account."} />
         ) : (
-          <Table head={["User", "Plan", "AI this month", "Last seen", "Location", "Joined", "Posts", "Tickets"]}>
+          <Table label="Customers" head={["User", "Plan", "AI this month", "Last seen", "Location", "Joined", "Posts", "Tickets"]}>
             {rows.map((u) => {
               const s = u.subscriptions[0];
               return (
@@ -241,9 +241,9 @@ export default async function Users(props: { searchParams: Promise<Params> }) {
         )}
         {pages > 1 && (
           <nav aria-label="Pages" className="mt-4 flex items-center justify-between text-[13px]">
-            {page > 1 ? <a className="rounded-full px-3 py-1.5 hairline hover:bg-secondary" href={link(page - 1)}>Previous</a> : <span />}
+            {page > 1 ? <a className="inline-flex min-h-11 items-center rounded-full px-4 hairline hover:bg-secondary" href={link(page - 1)}>Previous</a> : <span />}
             <span className="text-muted-foreground">Page {page} of {pages}</span>
-            {page < pages ? <a className="rounded-full px-3 py-1.5 hairline hover:bg-secondary" href={link(page + 1)}>Next</a> : <span />}
+            {page < pages ? <a className="inline-flex min-h-11 items-center rounded-full px-4 hairline hover:bg-secondary" href={link(page + 1)}>Next</a> : <span />}
           </nav>
         )}
         </DataSwap>
