@@ -1,12 +1,15 @@
 import { requireAdmin } from "@/lib/admin/guard";
 import { getAdmin } from "@/lib/admin/auth";
 import { notifyConfig } from "@/lib/notify-config";
-import { deadLetters, failedDeliveries, notifyAudit, notifyOverview, pendingQueue, recentDeliveries } from "@/lib/admin/notifications";
+import { failedDeliveries, filtersOn, notifyAudit, notifyOverview, parseQueueFilters, recentDeliveries, searchDeadLetters, searchQueue } from "@/lib/admin/notifications";
+import { MAX_ATTEMPTS } from "@/lib/notify-engine";
 import { Card, CardTitle, Empty, Hint, PageHead, StatusBadge, Table, ago, fmtDate } from "@/components/admin/ui";
 import { adminEmail, canSeeEmail } from "@/lib/admin/privacy";
 import { EnterRoot } from "@/components/admin/motion/EnterRoot";
 import { RollingNumber } from "@/components/dashboard/RollingNumber";
 import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
+import { QueueFilterBar } from "@/components/admin/notifications/QueueFilters";
+import { RetryButton } from "@/components/admin/notifications/RetryButton";
 
 export const metadata = { title: "Notifications" };
 export const dynamic = "force-dynamic";
@@ -26,11 +29,14 @@ const REASON: Record<string, string> = {
 };
 const reason = (r: string | null) => (r ? REASON[r] ?? r : "");
 
-export default async function AdminNotificationsPage() {
+export default async function AdminNotificationsPage(props: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireAdmin("site");
   const admin = await getAdmin();
   const role = admin?.role ?? "support";
-  const [cfg, over, failed, dead, queue, log, audit] = await Promise.all([notifyConfig(), notifyOverview(), failedDeliveries(), deadLetters(), pendingQueue(), recentDeliveries(40), notifyAudit()]);
+  const f = parseQueueFilters(await props.searchParams);
+  const filtered = filtersOn(f);
+  const [cfg, over, failed, dead, queue, log, audit] = await Promise.all([notifyConfig(), notifyOverview(), failedDeliveries(), searchDeadLetters(f), searchQueue(f), recentDeliveries(40), notifyAudit()]);
+  const who = (email: string | null, id: string | null) => (email ? adminEmail(email, role) : id ? "Account deleted" : "Unknown");
   const sent = over.channels.reduce((s, c) => s + c.sent, 0);
   const held = over.channels.reduce((s, c) => s + c.skipped, 0);
   const broke = over.channels.reduce((s, c) => s + c.failed, 0);
@@ -131,19 +137,32 @@ export default async function AdminNotificationsPage() {
           <NotificationsPanel initial={cfg} adminLogin={admin?.login ?? ""} adminName={admin?.name ?? ""} audit={audit} />
         </div>
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          <Card data-enter>
-            <CardTitle hint="Waiting their turn, urgent first. A retry count above zero means a service turned it away and it will be tried again.">Queue</CardTitle>
-            {queue.length === 0 ? (
-              <Empty title="The queue is empty" body="Events are turned into notifications by the minute sweeper." />
+        <QueueFilterBar f={f} shown={`Up to ${f.limit} rows in each list · dates are UTC days`} />
+
+        <div className="grid gap-3">
+          <Card data-enter id="queue">
+            <CardTitle hint={`Waiting their turn, urgent first. A try count above zero means a service turned it away and it will be tried again, up to ${MAX_ATTEMPTS} tries.`}>Queue</CardTitle>
+            {!queue || queue.length === 0 ? (
+              filtered ? (
+                <Empty title="Nothing matches these filters." body={queue ? "Try a wider date range or a shorter search." : "Dead letters are not in the queue; they are listed in their own card below."} />
+              ) : (
+                <Empty title="The queue is empty" body="Events are turned into notifications by the minute sweeper." />
+              )
             ) : (
-              <Table label="Waiting events" head={["What", "From", "Priority", "Tries", "Due"]}>
+              <Table label="Waiting events" head={["What", "Creator", "Tries", "Last error", "Next run"]}>
                 {queue.map((e) => (
                   <tr key={e.id}>
-                    <td className="font-medium">{e.kind}</td>
-                    <td className="text-[12.5px] text-muted-foreground">{e.source}</td>
-                    <td className="tabular">{e.priority}</td>
-                    <td className="tabular">{e.attempts}</td>
+                    <td>
+                      <span className="block font-medium">{e.kind}</span>
+                      {e.title && <span className="block max-w-[16rem] truncate text-[12.5px]" title={e.title}>{e.title}</span>}
+                      <span className="block text-[12px] text-muted-foreground">Priority {e.priority} · {e.source}{e.email ? " · asks for email" : ""}</span>
+                    </td>
+                    <td>
+                      <span className="block truncate text-[12.5px]">{who(e.userEmail, e.userId)}</span>
+                      <span className="block truncate font-mono text-[11.5px] text-muted-foreground">{e.userId}</span>
+                    </td>
+                    <td className="tabular whitespace-nowrap">{e.attempts} of {MAX_ATTEMPTS}</td>
+                    <td className="max-w-[18rem] truncate text-[12.5px]" title={e.lastError ?? undefined}>{e.lastError ?? <span className="text-muted-foreground">None</span>}</td>
                     <td className="whitespace-nowrap">{fmtDate(e.nextAt, true)}</td>
                   </tr>
                 ))}
@@ -151,18 +170,41 @@ export default async function AdminNotificationsPage() {
             )}
           </Card>
 
-          <Card data-enter>
-            <CardTitle hint="Given up on after four tries. These were never delivered: the payload is kept so the same thing can be sent again once the cause is fixed.">Dead letters</CardTitle>
-            {dead.length === 0 ? (
-              <Empty title="Nothing was given up on" body="An event that fails four times lands here instead of disappearing." />
+          <Card data-enter id="dead-letters">
+            <CardTitle
+              hint={`Given up on after ${MAX_ATTEMPTS} tries. These were never delivered: the payload is kept so the same thing can be sent again once the cause is fixed. Retry puts it back in the queue with ${MAX_ATTEMPTS} fresh tries and runs it straight away. Every retry is written to the admin audit log.`}
+              action={dead && dead.length > 0 ? <RetryButton ids={dead.map((d) => d.id)} /> : undefined}
+            >
+              Dead letters
+            </CardTitle>
+            {!dead || dead.length === 0 ? (
+              filtered ? (
+                <Empty title="Nothing matches these filters." body={dead ? "Try a wider date range or a shorter search." : "Only the Dead letters status lists given-up events; the queue above shows the rest."} />
+              ) : (
+                <Empty title="Nothing was given up on" body={`An event that fails ${MAX_ATTEMPTS} times lands here instead of disappearing.`} />
+              )
             ) : (
-              <Table label="Dead letters" head={["What", "From", "Why", "When"]}>
+              <Table label="Dead letters" head={["What", "Creator", "Tries", "Last error", "Next run", <span key="a" className="sr-only">Action</span>]}>
                 {dead.map((d) => (
                   <tr key={d.id}>
-                    <td className="font-medium">{d.kind}</td>
-                    <td className="text-[12.5px] text-muted-foreground">{d.source}</td>
-                    <td className="max-w-[18rem] truncate text-[12.5px]">{d.error}</td>
-                    <td className="whitespace-nowrap">{ago(d.createdAt)}</td>
+                    <td>
+                      <span className="block font-medium">{d.kind}</span>
+                      {d.title && <span className="block max-w-[16rem] truncate text-[12.5px]" title={d.title}>{d.title}</span>}
+                      <span className="block text-[12px] text-muted-foreground">{d.source}{d.email ? " · asks for email" : ""}</span>
+                    </td>
+                    <td>
+                      <span className="block truncate text-[12.5px]">{who(d.userEmail, d.userId)}</span>
+                      {d.userId && <span className="block truncate font-mono text-[11.5px] text-muted-foreground">{d.userId}</span>}
+                    </td>
+                    <td className="tabular whitespace-nowrap">{d.attempts} of {MAX_ATTEMPTS}</td>
+                    <td className="max-w-[18rem] truncate text-[12.5px]" title={d.error}>{d.error || <span className="text-muted-foreground">None recorded</span>}</td>
+                    <td className="whitespace-nowrap">
+                      <span className="block">Not scheduled</span>
+                      <span className="block text-[12px] text-muted-foreground">given up {ago(d.createdAt)}</span>
+                    </td>
+                    <td>
+                      <RetryButton id={d.id} what={`${d.kind} for ${who(d.userEmail, d.userId)}`} />
+                    </td>
                   </tr>
                 ))}
               </Table>

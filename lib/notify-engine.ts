@@ -126,6 +126,24 @@ export async function processEvent(ev: EventRow, now = new Date()) {
 const SELECT = { id: true, userId: true, kind: true, source: true, idemKey: true, accountId: true, priority: true, payload: true, attempts: true } as const;
 
 /**
+ * R1267: the admin retry. A dead letter goes back in the queue as its own event row with a clean slate (four
+ * new tries, due now) and the dead letter is removed, so the list only shows what is still given up on; if it
+ * fails four more times deadLetter() writes a fresh one. "gone" means the event row no longer exists (its
+ * creator was deleted), so there is nobody left to send it to.
+ */
+export async function requeue(deadLetterId: string, now = new Date()): Promise<{ ok: true; event: EventRow } | { ok: false; reason: "not_found" | "gone" }> {
+  const dl = await db.notifyDeadLetter.findUnique({ where: { id: deadLetterId }, select: { idemKey: true } });
+  if (!dl) return { ok: false, reason: "not_found" };
+  const ev = await db.notifyEvent.findUnique({ where: { idemKey: dl.idemKey }, select: { id: true } });
+  if (!ev) return { ok: false, reason: "gone" };
+  const [event] = await db.$transaction([
+    db.notifyEvent.update({ where: { id: ev.id }, data: { status: "pending", attempts: 0, lastError: null, nextAt: now, processedAt: null }, select: SELECT }),
+    db.notifyDeadLetter.deleteMany({ where: { idemKey: dl.idemKey } }),
+  ]);
+  return { ok: true, event };
+}
+
+/**
  * The sweeper's turn of the handle. Urgent first (priority 1 is a failed post, 4 is an assistant nudge),
  * then oldest due first, so a backlog of nudges can never delay a payment failure.
  */

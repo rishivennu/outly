@@ -1,4 +1,5 @@
 import "server-only";
+import type { Prisma } from "@prisma/client";
 import { db } from "../db";
 import { CENTRE_TABS, type CentreTab } from "../notify-core";
 import { countNotifications, type NotificationCounts } from "./notifications-core";
@@ -112,16 +113,129 @@ export async function recentDeliveries(limit = 50) {
 
 /**
  * 1164: who last touched the brake or sent a test, from the admin audit log. Nothing here is a schema
- * change: the PATCH and POST routes already write these two kinds of AdminEvent.
+ * change: the PATCH and POST routes already write these two kinds of AdminEvent, and the R1267 retry route a third.
  */
-export type NotifyAuditEntry = { id: string; kind: "notify_pause" | "notify_test"; title: string; body: string | null; at: string };
+export type NotifyAuditEntry = { id: string; kind: "notify_pause" | "notify_test" | "notify_retry"; title: string; body: string | null; at: string };
 
 export async function notifyAudit(limit = 8): Promise<NotifyAuditEntry[]> {
-  const rows = await db.adminEvent.findMany({ where: { kind: { in: ["notify_pause", "notify_test"] } }, orderBy: { createdAt: "desc" }, take: limit, select: { id: true, kind: true, title: true, body: true, createdAt: true } });
+  const rows = await db.adminEvent.findMany({ where: { kind: { in: ["notify_pause", "notify_test", "notify_retry"] } }, orderBy: { createdAt: "desc" }, take: limit, select: { id: true, kind: true, title: true, body: true, createdAt: true } });
   return rows.map((r) => ({ id: r.id, kind: r.kind as NotifyAuditEntry["kind"], title: r.title, body: r.body, at: r.createdAt.toISOString() }));
 }
 
 export async function notifyOverview() {
   const [channels, reasons, categories, queue, subs, counts] = await Promise.all([deliverySummary(), skipReasons(), categoryCounts(), queueState(), subscriptionCounts(), notificationCounts()]);
   return { channels, reasons, categories, queue, subs, counts, days: WINDOW_DAYS };
+}
+
+/**
+ * R1267: search and filters for the Queue and Dead letters cards, all read from the URL so a filtered view can be
+ * shared as a link. There is no channel on an event: the bell and push are decided per creator at send time, and
+ * email is the one channel an event asks for itself (payload.email = true). So the channel filter is "asks for
+ * email" or "bell and push only", the only split the stored rows can answer honestly.
+ */
+export const QUEUE_STATUSES = ["waiting", "retrying", "dead", "failed"] as const;
+export const QUEUE_CHANNELS = ["email", "inapp"] as const;
+export const QUEUE_LIMITS = [25, 50, 100] as const;
+export type QueueStatus = (typeof QUEUE_STATUSES)[number];
+export type QueueChannel = (typeof QUEUE_CHANNELS)[number];
+export type QueueFilters = { q: string; status: QueueStatus | ""; channel: QueueChannel | ""; from: string; to: string; limit: (typeof QUEUE_LIMITS)[number] };
+type Params = Record<string, string | string[] | undefined>;
+
+const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
+const day = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) ? v : "");
+const pick = <T extends string>(list: readonly T[], v: string): T | "" => (list.includes(v as T) ? (v as T) : "");
+
+export function parseQueueFilters(sp: Params): QueueFilters {
+  const limit = Number(one(sp.limit));
+  let from = day(one(sp.from));
+  let to = day(one(sp.to));
+  if (from && to && from > to) [from, to] = [to, from];
+  return {
+    q: one(sp.q).trim().slice(0, 100),
+    status: pick(QUEUE_STATUSES, one(sp.status)),
+    channel: pick(QUEUE_CHANNELS, one(sp.channel)),
+    from,
+    to,
+    limit: (QUEUE_LIMITS as readonly number[]).includes(limit) ? (limit as QueueFilters["limit"]) : 25,
+  };
+}
+
+export const filtersOn = (f: QueueFilters) => !!(f.q || f.status || f.channel || f.from || f.to);
+
+/** Inclusive UTC days, the same convention as the analytics date range. */
+function createdIn(f: QueueFilters): { gte?: Date; lt?: Date } | undefined {
+  if (!f.from && !f.to) return undefined;
+  return { ...(f.from ? { gte: new Date(`${f.from}T00:00:00.000Z`) } : {}), ...(f.to ? { lt: new Date(Date.parse(`${f.to}T00:00:00.000Z`) + 864e5) } : {}) };
+}
+
+/**
+ * `contains` without `mode` so SQLite keeps working: its LIKE ignores ASCII case. The lower-case copy covers a
+ * typed capital on providers that compare case-sensitively (kinds and ids are lower case already).
+ */
+function textMatch(q: string) {
+  const terms = [...new Set([q, q.toLowerCase()])];
+  return terms.flatMap((t) => [{ kind: { contains: t } }, { userId: { contains: t } }, { payload: { contains: t } }]);
+}
+
+const EMAIL_ASKED = '"email":true';
+const channelMatch = (c: QueueChannel | "") => (c === "email" ? { payload: { contains: EMAIL_ASKED } } : c === "inapp" ? { NOT: { payload: { contains: EMAIL_ASKED } } } : null);
+
+/** null: the status filter rules this list out entirely (a dead letter is never "waiting"). */
+export function queueWhere(f: QueueFilters): Prisma.NotifyEventWhereInput | null {
+  if (f.status === "dead") return null;
+  const status: Prisma.NotifyEventWhereInput =
+    f.status === "failed" ? { status: "failed" } : f.status === "retrying" ? { status: "pending", attempts: { gt: 0 } } : f.status === "waiting" ? { status: "pending", attempts: 0 } : { status: "pending" };
+  const and: Prisma.NotifyEventWhereInput[] = [];
+  if (f.q) and.push({ OR: textMatch(f.q) });
+  const ch = channelMatch(f.channel);
+  if (ch) and.push(ch);
+  const created = createdIn(f);
+  return { ...status, ...(created ? { createdAt: created } : {}), ...(and.length ? { AND: and } : {}) };
+}
+
+export function deadLetterWhere(f: QueueFilters): Prisma.NotifyDeadLetterWhereInput | null {
+  if (f.status && f.status !== "dead") return null;
+  const and: Prisma.NotifyDeadLetterWhereInput[] = [];
+  if (f.q) and.push({ OR: textMatch(f.q) });
+  const ch = channelMatch(f.channel);
+  if (ch) and.push(ch);
+  const created = createdIn(f);
+  return { ...(created ? { createdAt: created } : {}), ...(and.length ? { AND: and } : {}) };
+}
+
+const titleOf = (payload: string) => {
+  try {
+    const t = (JSON.parse(payload) as { title?: unknown }).title;
+    return typeof t === "string" ? t.slice(0, 140) : null;
+  } catch {
+    return null;
+  }
+};
+const asksEmail = (payload: string) => payload.includes(EMAIL_ASKED);
+
+export type QueueRow = { id: string; kind: string; title: string | null; source: string; priority: number; attempts: number; nextAt: Date; lastError: string | null; email: boolean; userId: string; userEmail: string | null; createdAt: Date };
+export type DeadRow = { id: string; kind: string; title: string | null; source: string; attempts: number; error: string; email: boolean; userId: string | null; userEmail: string | null; createdAt: Date };
+
+/** null when the status filter excludes the queue, so the page can say "nothing matches" rather than "empty". */
+export async function searchQueue(f: QueueFilters): Promise<QueueRow[] | null> {
+  const where = queueWhere(f);
+  if (!where) return null;
+  const rows = await db.notifyEvent.findMany({
+    where,
+    orderBy: [{ priority: "asc" }, { nextAt: "asc" }],
+    take: f.limit,
+    select: { id: true, kind: true, source: true, priority: true, attempts: true, nextAt: true, lastError: true, payload: true, userId: true, createdAt: true, user: { select: { email: true } } },
+  });
+  return rows.map(({ payload, user, ...r }) => ({ ...r, title: titleOf(payload), email: asksEmail(payload), userEmail: user?.email ?? null }));
+}
+
+export async function searchDeadLetters(f: QueueFilters): Promise<DeadRow[] | null> {
+  const where = deadLetterWhere(f);
+  if (!where) return null;
+  const rows = await db.notifyDeadLetter.findMany({ where, orderBy: { createdAt: "desc" }, take: f.limit, select: { id: true, kind: true, source: true, error: true, attempts: true, payload: true, userId: true, createdAt: true } });
+  // A dead letter has no relation to the creator, so their addresses come in one batched read, never one per row.
+  const ids = [...new Set(rows.map((r) => r.userId).filter((v): v is string => !!v))];
+  const users = ids.length ? await db.user.findMany({ where: { id: { in: ids } }, select: { id: true, email: true } }) : [];
+  const email = new Map(users.map((u) => [u.id, u.email]));
+  return rows.map(({ payload, ...r }) => ({ ...r, title: titleOf(payload), email: asksEmail(payload), userEmail: r.userId ? (email.get(r.userId) ?? null) : null }));
 }
