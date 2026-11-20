@@ -54,13 +54,13 @@ function Choice<T extends string>({ value, onChange, options, label }: { value: 
       {options.map((o) => {
         const on = value === o.value;
         return (
-          <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => onChange(o.value)} className={cn("relative min-h-11 rounded-[20px] p-4 text-left transition-[background-color,box-shadow] duration-hover bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-lime/[0.08] ring-2 ring-lime" : "hover:bg-secondary/50")}>
+          <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => onChange(o.value)} className={cn("relative min-h-11 rounded-[20px] p-4 text-left transition-[background-color,box-shadow] duration-hover bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-lime/[0.08] ring-1 ring-inset ring-lime/40" : "hover:bg-secondary/50")}>
             <span className="flex items-center justify-between gap-2">
               <span className="flex min-w-0 items-center gap-2.5">
                 {o.logo && <ServiceLogo service={o.logo} size={34} surface="transparent" />}
                 <span className="font-display text-[15px] font-semibold">{o.title}</span>
               </span>
-              {o.badge && <Pill tone={on ? "lime" : "muted"}>{o.badge}</Pill>}
+              {o.badge ? <Pill tone={on ? "lime" : "muted"}>{o.badge}</Pill> : on && <CheckCircle2 className="h-4 w-4 shrink-0 text-lime-ink" aria-hidden />}
             </span>
             <span className="mt-2 block text-[12.5px] leading-snug text-muted-foreground">{o.body}</span>
           </button>

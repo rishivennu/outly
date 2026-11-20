@@ -53,7 +53,7 @@ export function AiEngineCard({ initial, funasrEnv, groqEnv }: { initial: Subtitl
   }
 
   const option = (value: SubtitleRules["provider"], title: string, body: string, disabled = false) => (
-    <label className={cn("flex min-h-11 cursor-pointer items-start gap-3 rounded-2xl px-3 py-3 transition-colors duration-200", ease, provider === value ? "bg-lime/10 ring-1 ring-[hsl(var(--lime)/0.55)]" : "bg-secondary/30", disabled && "cursor-not-allowed opacity-60")}>
+    <label className={cn("flex min-h-11 cursor-pointer items-start gap-3 rounded-2xl px-3 py-3 transition-colors duration-200", ease, provider === value ? "bg-lime/10 ring-1 ring-[hsl(var(--lime)/0.4)]" : "bg-secondary/30", disabled && "cursor-not-allowed opacity-60")}>
       <input type="radio" name="subtitle-engine" value={value} className="mt-0.5 h-5 w-5 shrink-0 accent-[hsl(var(--lime))]" checked={provider === value} disabled={disabled} onChange={() => setProvider(value)} />
       <span className="min-w-0">
         <span className="block text-[14px] font-medium">{title}</span>

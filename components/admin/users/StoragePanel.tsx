@@ -102,7 +102,7 @@ export function StoragePanel({ userId, email }: { userId?: string; email?: strin
   const m = card?.usage.monthly;
   const s = card?.usage.storage;
   return (
-    <section aria-labelledby={`${id}-h`} className="cx-panel rounded-[28px] p-5 sm:p-6">
+    <section aria-labelledby={`${id}-h`} className="cx-panel rounded-[24px] p-5 sm:p-6">
       <div className="mb-4 flex items-center gap-3">
         <span aria-hidden className="cx-badge grid size-10 shrink-0 place-items-center rounded-full"><HardDrive className="size-[18px]" strokeWidth={1.8} /></span>
         <div className="min-w-0">
@@ -127,7 +127,7 @@ export function StoragePanel({ userId, email }: { userId?: string; email?: strin
       {card && (
         <>
           <p className="mt-4 text-[13px] font-semibold [overflow-wrap:anywhere]">{card.user.name || card.user.email}</p>
-          <dl className="mt-1 divide-y divide-[hsl(var(--cx-line))]">
+          <dl className="mt-1 divide-y divide-[hsl(var(--cx-edge))]">
             <Row label="Plan" value={`${card.plan.name} (${card.plan.source})`} />
             <Row label="Subscription" value={card.plan.status + (card.plan.endsAt ? `, until ${fmtDay(card.plan.endsAt)}` : "")} />
             <Row label="Stored" value={fmtBytes(card.usage.storedBytes)} />
@@ -172,7 +172,7 @@ export function StoragePanel({ userId, email }: { userId?: string; email?: strin
               </div>
             )}
           </div>
-          <fieldset className="mt-5 space-y-3 rounded-[20px] bg-secondary/40 p-4" disabled={busy}>
+          <fieldset className="mt-5 space-y-3 rounded-2xl bg-secondary/40 p-4" disabled={busy}>
             <legend className="px-1 text-[13px] font-semibold">Manual change, this cycle only</legend>
             <div>
               <Label htmlFor={`${id}-note`}>Why (saved in the audit log)</Label>

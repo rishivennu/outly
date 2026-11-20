@@ -89,7 +89,7 @@ export function DashboardStylePicker({ initial }: { initial: DashboardConfig }) 
             {STYLES.map((s) => {
               const on = cfg.style === s.id;
               return (
-                <label key={s.id} className={cn("relative flex cursor-pointer flex-col gap-3 rounded-3xl bg-secondary/40 p-5 transition-shadow focus-within:ring-2 focus-within:ring-ring", on && "ring-2 ring-foreground/70")}>
+                <label key={s.id} className={cn("relative flex cursor-pointer flex-col gap-3 rounded-3xl bg-secondary/40 p-5 transition-shadow focus-within:ring-2 focus-within:ring-ring", on && "ring-1 ring-inset ring-lime/40")}>
                   <input type="radio" name="dash-style" value={s.id} checked={on} onChange={() => save({ style: s.id }, (c) => `Everyone now gets the ${name(c.style)} dashboard${c.userSwitch ? " unless they picked their own" : ""}.`)} className="sr-only" />
                   <span className="flex items-center justify-between gap-2">
                     <span className="flex flex-wrap items-center gap-2">

@@ -100,9 +100,8 @@ describe("kit type scale", () => {
       expect(s).not.toContain("border-white");
     }
   });
-  test("hairline survives in the kit only as the field edge of the filter select", () => {
+  test("no hairline left in the kit (R1280: the filter select edge is the field border-border/60)", () => {
     const hits = KIT.flatMap((f) => read(f).split("\n").filter((l) => l.includes("hairline")).map((l) => `${f}: ${l.trim().slice(0, 40)}`));
-    expect(hits).toHaveLength(1);
-    expect(hits[0]).toContain("SearchBox.tsx");
+    expect(hits).toEqual([]);
   });
 });

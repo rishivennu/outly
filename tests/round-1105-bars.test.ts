@@ -132,7 +132,7 @@ describe("1105 tab bar", () => {
     expect(tabs).toContain("fixed inset-x-0 z-40");
     expect(tabs).not.toContain("max-w-[480px]");
     expect(rule(".mtab")).toContain("height: 60px;");
-    expect(rule(".mtab")).toContain("env(safe-area-inset-right))), 440px);");
+    expect(rule(".mtab")).toContain("var(--sa-r))), 440px);");
     expect(tabs).not.toContain("lg-glass");
     expect(tabs).toContain("min-w-0 flex-1");
     expect(tabs).toContain('strokeWidth={2}');
@@ -149,8 +149,8 @@ describe("1105 tab bar", () => {
     expect(css).toContain(".mtab { animation: mtab-in .4s var(--ease-liquid) backwards; }");
   });
   test("safe area at the bottom, page padding clears it, solid when asked", () => {
-    expect(rule(".mtab")).toContain("bottom: calc(env(safe-area-inset-bottom) + 12px);");
-    expect(src("app/(studio)/layout.tsx")).toContain("pb-[calc(env(safe-area-inset-bottom)+88px)]");
+    expect(rule(".mtab")).toContain("bottom: calc(var(--sa-b) + 12px);");
+    expect(src("app/(studio)/layout.tsx")).toContain("pb-[calc(var(--sa-b)+88px)]");
     expect(css).toContain('html[data-contrast="more"] .mtab { background: hsl(var(--card));');
   });
   test("compacts scrolling down a long page (11-19; it used to hide), back on scroll up, top, end, route change and short pages", () => {
@@ -181,20 +181,20 @@ describe("1105 review fixes", () => {
   test("banners above the top bar clear the notch themselves", () => {
     expect(src("components/shell/WorkspaceBar.tsx")).toContain('className="mtop-pre ');
     expect(src("app/(studio)/layout.tsx")).toContain('className="mtop-pre ');
-    expect(css).toContain(".mtop-pre:first-child { padding-top: calc(env(safe-area-inset-top) + 0.5rem); }");
+    expect(css).toContain(".mtop-pre:first-child { padding-top: calc(var(--sa-t) + 0.5rem); }");
   });
   test("things that float above the tab bar sit 12px over its top edge", () => {
-    const over = "calc(env(safe-area-inset-bottom)+84px)";
+    const over = "var(--sa-float)";
     for (const f of ["components/shared/CookieConsent.tsx", "components/shared/DeviceHint.tsx", "components/support/ChatWidget.tsx", "components/shared/Toast.tsx"]) {
       const s = src(f);
       expect(s).toContain(over);
       expect(s).not.toMatch(/bottom-\[9[26]px\]/);
     }
-    expect(rule(".install-card")).toContain("bottom: calc(env(safe-area-inset-bottom) + 84px);");
-    expect(css).toContain(".install-card { bottom: calc(env(safe-area-inset-bottom) + 74px); }");
+    expect(rule(".install-card")).toContain("bottom: var(--sa-float);");
+    expect(css).toContain(".install-card { bottom: calc(var(--sa-b) + 74px); }");
   });
   test("head script reads the contrast key from its constant", () => {
-    expect(themeScript).toContain("localStorage.getItem('outly-contrast')");
+    expect(themeScript).toContain("localStorage.getItem('outly-contrast-v2')");
     expect(src("lib/theme/script.ts")).toContain("localStorage.getItem('${CONTRAST_KEY}')");
   });
 });

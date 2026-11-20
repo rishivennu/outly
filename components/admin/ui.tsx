@@ -157,7 +157,7 @@ const DOT: Record<Tone, string> = {
 export function StatusBadge({ status, label, className, size = "md" }: { status: string; label?: React.ReactNode; className?: string; size?: "sm" | "md" }) {
   const s = has(STATUS_LABEL, status) ? STATUS_LABEL[status] : undefined;
   return (
-    <Pill tone={s?.tone ?? "muted"} className={cn(size === "sm" && "h-5 gap-1.5 px-2 text-[12px]", size === "md" && "gap-1.5", s?.strong && "ring-1 ring-inset ring-warning/70", className)}>
+    <Pill tone={s?.tone ?? "muted"} className={cn(size === "sm" && "h-5 gap-1.5 px-2 text-[12px]", size === "md" && "gap-1.5", s?.strong && "ring-1 ring-inset ring-warning/40", className)}>
       <span data-dot="" aria-hidden="true" className={cn("h-1.5 w-1.5 shrink-0 rounded-full", DOT[s?.dot ?? s?.tone ?? "muted"])} />
       {label ?? s?.label ?? status}
     </Pill>
@@ -272,7 +272,7 @@ export function ErrorState({ title = "Couldn't load this", body, retry, retryHre
     </Button>
   ) : null);
   return (
-    <div role="alert" className={cn("flex flex-col items-start gap-2 rounded-[20px] bg-destructive/[0.06] px-5 py-5", className)}>
+    <div role="alert" className={cn("flex flex-col items-start gap-2 rounded-2xl bg-destructive/[0.06] px-5 py-5", className)}>
       <p className="flex items-center gap-2 text-[15px] font-semibold">
         <AlertTriangle className="h-4 w-4 text-destructive" aria-hidden /> {title}
       </p>
@@ -301,7 +301,7 @@ export const STATUS_TONE: Record<string, Tone> = {
 /** Nothing to show yet: an optional icon, what is missing, why or what to do, and at most one action. */
 export function Empty({ title, body, children, icon, action, className }: { title: string; body?: string; children?: React.ReactNode; icon?: React.ReactNode; action?: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("flex flex-col items-center gap-2 rounded-[20px] border border-dashed border-border/70 px-6 py-12 text-center", className)}>
+    <div className={cn("flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border/70 px-6 py-12 text-center", className)}>
       {icon && <span aria-hidden="true" className="mb-1 grid h-11 w-11 place-items-center rounded-full bg-secondary text-muted-foreground [&_svg]:h-5 [&_svg]:w-5">{icon}</span>}
       <p className="text-[15px] font-semibold leading-[1.35]">{title}</p>
       {body && <p className="max-w-sm text-[13px] leading-normal text-muted-foreground">{body}</p>}

@@ -59,7 +59,7 @@ export function FontPicker({ initial }: { initial: FontConfig }) {
                 key={f.id}
                 className={cn(
                   "relative flex cursor-pointer flex-col gap-4 rounded-3xl bg-secondary/40 p-5 transition-shadow focus-within:ring-2 focus-within:ring-ring",
-                  on && "ring-2 ring-foreground/70",
+                  on && "ring-1 ring-inset ring-lime/40",
                 )}
               >
                 <input type="radio" name="site-fonts" value={f.id} checked={on} onChange={() => pick(f.id)} className="peer sr-only" />

@@ -99,9 +99,9 @@ function LevelPill({ level, text }: { level: Level; text?: string }) {
 }
 
 function Kpi({ label, value, sub, tone }: { label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: Tone }) {
-  const edge = tone === "bad" ? "border border-destructive/40" : tone === "warn" ? "border border-warning/40" : tone === "ok" ? "border border-success/30" : undefined;
+  const edge = tone === "bad" ? "ring-1 ring-inset ring-destructive/40" : tone === "warn" ? "ring-1 ring-inset ring-warning/40" : tone === "ok" ? "ring-1 ring-inset ring-success/30" : undefined;
   return (
-    <Card as="div" className={cn("rounded-[20px] p-4 sm:p-4", edge)}>
+    <Card as="div" className={cn("p-4 sm:p-4", edge)}>
       <p className="text-[12.5px] font-medium text-muted-foreground">{label}</p>
       <p className="mt-1.5 font-display text-[1.45rem] font-semibold leading-none tabular-nums">{value}</p>
       {sub && <p className="mt-1.5 text-[12.5px] text-muted-foreground">{sub}</p>}
@@ -334,7 +334,7 @@ export function SystemHealth({ me, role }: { me: { id: string; name: string }; r
       ) : (
         <>
           {/* Overall status */}
-          <Card className={cn(overall === "critical" ? "border border-destructive/40" : overall === "warning" ? "border border-warning/40" : overall === "ok" ? "border border-success/30" : "")}>
+          <Card className={cn(overall === "critical" ? "ring-1 ring-inset ring-destructive/40" : overall === "warning" ? "ring-1 ring-inset ring-warning/40" : overall === "ok" ? "ring-1 ring-inset ring-success/30" : "")}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <span aria-hidden className={cn("grid size-11 place-items-center rounded-full", overall === "critical" ? "bg-destructive/15 text-destructive" : overall === "warning" ? "bg-warning/15 pill-ink-warn" : overall === "ok" ? "bg-success/15 pill-ink-ok" : "bg-secondary text-muted-foreground")}>
@@ -686,7 +686,7 @@ function IncidentDrawer({ id, me, onClose, onChanged }: { id: string; me: { id: 
         )}
         {inc && d && (
           <>
-            <dl className="rounded-[18px] bg-secondary/60 px-4 py-1">
+            <dl className="rounded-2xl bg-secondary/60 px-4 py-1">
               <Stat label="First detected" value={fmtDate(inc.firstDetectedAt, true)} />
               <Stat label="Last observed" value={fmtDate(inc.lastObservedAt, true)} />
               <Stat label="Duration" value={dur(inc.durationMs)} />
@@ -700,7 +700,7 @@ function IncidentDrawer({ id, me, onClose, onChanged }: { id: string; me: { id: 
             </dl>
             <h3 className="mt-5 text-[16px] font-semibold">What failed</h3>
             <p className="mt-1 text-[13.5px]">{inc.description || "No description recorded."}</p>
-            {inc.errorDetail && <pre className="mt-2 whitespace-pre-wrap break-words rounded-[14px] bg-secondary/60 p-3 font-mono text-[12px]">{inc.errorDetail}</pre>}
+            {inc.errorDetail && <pre className="mt-2 whitespace-pre-wrap break-words rounded-xl bg-secondary/60 p-3 font-mono text-[12px]">{inc.errorDetail}</pre>}
             <h3 className="mt-4 text-[16px] font-semibold">Likely cause (estimated)</h3>
             <p className="mt-1 text-[13.5px] text-muted-foreground">{inc.likelyCause || "Not enough signal to estimate a cause."}</p>
 
@@ -801,7 +801,7 @@ function SettingsPanel({ data, isSuper, support, pushHere, busy, onClose, onTogg
   const pushWord = support === "unsupported" ? "This browser cannot show Outlly notifications." : support === "ios-needs-install" ? "On iPhone and iPad, add Outlly to the Home Screen first; Safari tabs cannot receive pushes." : pushHere ? "Alert pushes are on for this device." : "Alerts reach this device only after you turn pushes on here.";
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()} title="Alerts & settings" description="Watchdog" className="lg:w-[560px]">
-        <section aria-labelledby="set-push" className="rounded-[18px] bg-secondary/40 p-4">
+        <section aria-labelledby="set-push" className="rounded-2xl bg-secondary/40 p-4">
           <h3 id="set-push" className="flex items-center gap-2 text-[14px] font-semibold">
             <BellRing className="size-4" aria-hidden /> Alert pushes on this device
           </h3>
@@ -837,7 +837,7 @@ function SettingsPanel({ data, isSuper, support, pushHere, busy, onClose, onTogg
 
         {isSuper && cfg ? (
           <form
-            className="mt-4 rounded-[18px] bg-secondary/40 p-4"
+            className="mt-4 rounded-2xl bg-secondary/40 p-4"
             onSubmit={(e) => {
               e.preventDefault();
               void onSave({ enabled, alertEmail: email.trim(), muted, intervals });

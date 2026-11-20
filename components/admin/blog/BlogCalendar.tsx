@@ -156,7 +156,7 @@ export function BlogCalendar({ initial, ready }: { initial: BlogCalendarMonth; r
                   d ? (
                     <div
                       key={d.date}
-                      className={cn("flex min-h-[7.5rem] min-w-0 flex-col gap-1 rounded-2xl border p-1.5", d.date === cal.today ? "border-2 border-foreground" : "border-border/60", d.date === sel && "bg-secondary/60", d.skipped && "bg-secondary/30")}
+                      className={cn("flex min-h-[7.5rem] min-w-0 flex-col gap-1 rounded-2xl border p-1.5", d.date === cal.today ? "border-lime/40 bg-lime/[0.05]" : "border-border/60", d.date === sel && "bg-secondary/60", d.skipped && "bg-secondary/30")}
                     >
                       <DayButton d={d} cal={cal} sel={sel} onPick={setSel} onKey={onKey} />
                       <ul className="grid min-w-0 gap-1">
@@ -185,7 +185,7 @@ export function BlogCalendar({ initial, ready }: { initial: BlogCalendarMonth; r
           {agenda.length ? (
             <ul className="grid gap-2" aria-label={`${monthTitle(cal.month)} agenda`}>
               {agenda.map((d) => (
-                <li key={d.date} className={cn("rounded-2xl border p-3", d.date === cal.today ? "border-2 border-foreground" : "border-border/60", d.date === sel && "bg-secondary/60")}>
+                <li key={d.date} className={cn("rounded-2xl border p-3", d.date === cal.today ? "border-lime/40 bg-lime/[0.05]" : "border-border/60", d.date === sel && "bg-secondary/60")}>
                   <DayButton d={d} cal={cal} sel={sel} onPick={setSel} wide />
                   {d.items.length > 0 && (
                     <ul className="mt-1.5 grid gap-1.5">

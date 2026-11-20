@@ -119,7 +119,7 @@ export function AiAccessPanel({ userId, canManage, onChanged }: { userId: string
           </div>
         </div>
         <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px]">
-          <div className="rounded-[18px] bg-secondary/40 p-3">
+          <div className="rounded-2xl bg-secondary/40 p-3">
             <dt className="text-[12px] text-muted-foreground">AI requests this month</dt>
             <dd className="mt-0.5 font-semibold tabular-nums">{acc.monthLimit > 0 ? `${acc.monthUsed} of ${acc.monthLimit}` : `${acc.monthUsed}, no monthly limit`}</dd>
             {acc.monthLimit > 0 && (
@@ -128,7 +128,7 @@ export function AiAccessPanel({ userId, canManage, onChanged }: { userId: string
               </div>
             )}
           </div>
-          <div className="rounded-[18px] bg-secondary/40 p-3">
+          <div className="rounded-2xl bg-secondary/40 p-3">
             <dt className="text-[12px] text-muted-foreground">Unlimited AI Access</dt>
             <dd className="mt-0.5 font-semibold">{acc.live ? (acc.live.expiresAt ? `Until ${fmtDate(acc.live.expiresAt)}` : "Permanent") : "None"}</dd>
             {acc.live && <p className="mt-1 text-[12px] text-muted-foreground">{featuresText(acc.live.features)}</p>}

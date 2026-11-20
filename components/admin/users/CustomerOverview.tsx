@@ -102,7 +102,7 @@ export function PanelHead({ icon, title, hint, actions, as: H = "h2", id }: { ic
 
 export function Panel({ className, children, label }: { className?: string; children: React.ReactNode; label?: string }) {
   return (
-    <section aria-labelledby={label} className={cn("cx-panel rounded-[28px] p-5 sm:p-6", className)}>
+    <section aria-labelledby={label} className={cn("cx-panel rounded-[24px] p-5 sm:p-6", className)}>
       {children}
     </section>
   );
@@ -200,7 +200,7 @@ export function SummaryPanel({ s }: { s: Summary }) {
       <ul className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
         {tiles.map((t) => (
           <li key={t.label}>
-            <Link href={t.href} scroll={false} aria-label={`${t.label}: ${nf(t.value)}. ${t.go}`} data-tone={t.tone} className="cx-tile group flex h-full flex-col rounded-[22px] p-4">
+            <Link href={t.href} scroll={false} aria-label={`${t.label}: ${nf(t.value)}. ${t.go}`} data-tone={t.tone} className="cx-tile group flex h-full flex-col rounded-2xl p-4">
               <span className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2.5">
                   <span aria-hidden className="cx-tile-chip grid size-8 place-items-center rounded-full"><t.icon className="size-4" strokeWidth={1.9} /></span>
@@ -237,7 +237,7 @@ export function MilestonePanel({ s }: { s: Summary }) {
       <div role="progressbar" aria-label="Customers fully set up" aria-valuemin={0} aria-valuemax={100} aria-valuenow={done} className="cx-track mt-3 h-3 overflow-hidden rounded-full">
         <span className="cx-fill block h-full rounded-full" style={{ width: `${done}%` }} />
       </div>
-      <ul className="mt-5 divide-y divide-[hsl(var(--cx-line))]">
+      <ul className="mt-5 divide-y divide-[hsl(var(--cx-edge))]">
         {steps.map((st) => {
           const p = pct(st.n, s.total);
           const tone = p >= 75 ? "ok" : p >= 40 ? "mid" : "low";
@@ -303,7 +303,7 @@ export function ProfilePanel({ p }: { p: Recent | null }) {
       </Panel>
       <Panel label="cx-details">
         <PanelHead id="cx-details" icon={User} title="Detailed information" as="h3" />
-        <dl className="divide-y divide-[hsl(var(--cx-line))]">
+        <dl className="divide-y divide-[hsl(var(--cx-edge))]">
           {rows.map((r) => (
             <div key={r.label} className="relative min-w-0 py-2.5 pl-12">
               <dt className="text-[11.5px] text-muted-foreground">

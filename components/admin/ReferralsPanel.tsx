@@ -117,7 +117,7 @@ export function ReferralsPanel({ initial, plans }: { initial: { rows: Row[]; tot
           <span className="inline-flex items-center gap-2"><Gift className="h-4 w-4" aria-hidden /> Reward terms</span>
         </CardTitle>
         <div className="grid gap-4">
-          <label className="flex min-h-[44px] cursor-pointer items-center justify-between gap-3 rounded-[20px] bg-secondary/40 px-4">
+          <label className="flex min-h-[44px] cursor-pointer items-center justify-between gap-3 rounded-2xl bg-secondary/40 px-4">
             <span className="text-[14px] font-medium">Refer &amp; Earn is on</span>
             <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} className="h-5 w-5 accent-lime" />
           </label>

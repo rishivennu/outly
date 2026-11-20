@@ -96,6 +96,6 @@ describe("R1276 admin sweep", () => {
 
   test("nested boxes are a soft fill, not a second stroke", () => {
     expect(read("components/admin/blog/TopicBacklog.tsx")).toContain("rounded-2xl bg-secondary/40 p-3");
-    expect(read("components/admin/health/SystemHealth.tsx")).toContain('<section aria-labelledby="set-push" className="rounded-[18px] bg-secondary/40 p-4">');
+    expect(read("components/admin/health/SystemHealth.tsx")).toContain('<section aria-labelledby="set-push" className="rounded-2xl bg-secondary/40 p-4">');
   });
 });

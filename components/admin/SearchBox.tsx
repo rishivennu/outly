@@ -117,9 +117,9 @@ export function FilterSelect({ param, label, options, current, fill = false }: {
           start(() => router.replace(`${path}?${n}`, { scroll: false }));
         }}
         className={cn(
-          "h-11 cursor-pointer appearance-none rounded-2xl pl-3.5 pr-9 text-[13px] text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]",
+          "h-11 cursor-pointer appearance-none rounded-xl border pl-3.5 pr-9 text-[13px] text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]",
           fill ? "w-full min-w-0 sm:w-auto sm:min-w-[9.5rem]" : "min-w-[9.5rem]",
-          on ? "bg-[hsl(var(--lime)/0.16)] font-semibold ring-1 ring-[hsl(var(--lime)/0.55)]" : "bg-secondary/60 font-medium hairline",
+          on ? "border-[hsl(var(--lime)/0.4)] bg-[hsl(var(--lime)/0.16)] font-semibold" : "border-border/60 bg-secondary/60 font-medium",
         )}
       >
         {options.map((o) => (

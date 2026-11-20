@@ -131,7 +131,7 @@ export function PlanGrantsPanel({ plans, initialList, initialEmail }: { plans: P
               <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4" aria-hidden /> {acc.user?.name ?? acc.email}</span>
             </CardTitle>
             <p className="text-[13px] text-muted-foreground">{acc.email}</p>
-            <div className="mt-4 rounded-[20px] bg-secondary/40 p-4">
+            <div className="mt-4 rounded-2xl bg-secondary/40 p-4">
               <p className="text-[12px] font-semibold text-muted-foreground">Access right now</p>
               <p className="mt-1 font-display text-[1.4rem] font-semibold">{acc.current?.planName ?? (acc.user ? "Free" : "None (not registered)")}</p>
               {acc.current && (
@@ -236,7 +236,7 @@ export function PlanGrantsPanel({ plans, initialList, initialEmail }: { plans: P
                       {g.note && <p className="mt-1 text-[12.5px] text-muted-foreground">Note: {g.note}</p>}
                       {g.revokeReason && <p className="mt-1 text-[12.5px] text-muted-foreground">Revoked by {g.revokedBy}: {g.revokeReason}</p>}
                       {edit?.id === g.id && (
-                        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-[20px] bg-secondary/40 p-3">
+                        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-2xl bg-secondary/40 p-3">
                           {edit.kind === "extend" ? (
                             <>
                               <div>
