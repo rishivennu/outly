@@ -18,6 +18,7 @@ import { AnimatePresence, motion, useMotionValue, useReducedMotion, useSpring, u
 import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode, type MouseEvent as ReactMouseEvent } from "react";
 import { cn } from "@/lib/utils";
 import { SPRING_DOCK, T } from "@/lib/motion/tokens";
+import { useMagnet } from "./Magnetic";
 
 const REST = 44;
 
@@ -76,15 +77,18 @@ export type DockItemProps = {
   /** Extra attributes for the link or button (aria-haspopup, aria-expanded, data-*). */
   attrs?: Record<string, string | boolean | undefined>;
   prefetch?: boolean;
+  /** Pulls a little toward the pointer, for the one primary action in the dock. */
+  magnetic?: boolean;
 };
 
 /** One icon in the dock: a link when `href` is given, otherwise a button. */
-export function DockItem({ label, children, href, onClick, active, badge, className, attrs, prefetch }: DockItemProps) {
+export function DockItem({ label, children, href, onClick, active, badge, className, attrs, prefetch, magnetic }: DockItemProps) {
   const { mouseX, magnification, distance, still, fillId } = useDockCtx();
   const ref = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState(false);
   const [focus, setFocus] = useState(false);
   const tipId = useId();
+  const magnet = useMagnet(ref, { off: !magnetic || still });
 
   const fromPointer = useTransform(mouseX, (x) => {
     const r = ref.current?.getBoundingClientRect();
@@ -133,7 +137,7 @@ export function DockItem({ label, children, href, onClick, active, badge, classN
     ...attrs,
   };
   return (
-    <motion.div ref={ref} style={{ width, height: REST }} className="dock-item relative flex shrink-0 items-end justify-center">
+    <motion.div ref={ref} style={{ width, height: REST, x: magnet.x, y: magnet.y }} {...magnet.handlers} className="dock-item relative flex shrink-0 items-end justify-center">
       <AnimatePresence>
         {show && (
           <motion.span

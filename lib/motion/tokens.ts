@@ -177,6 +177,9 @@ export const FX = {
  * the icons grow and shrink with it rather than on a clock; damping ratio 1.55 (overdamped), so nothing overshoots.
  */
 export const SPRING_DOCK = { mass: 0.1, stiffness: 150, damping: 12 } as const;
+/** R1293: Magnetic's pull toward the pointer (components/ui/motion/Magnetic.tsx). Damping ratio 1.67, overdamped:
+ * the pull settles with no bounce. */
+export const SPRING_MAGNET = { mass: 0.2, stiffness: 180, damping: 20 } as const;
 
 export const overshoots = (b: Bezier) => b[1] > 1 || b[1] < 0 || b[3] > 1 || b[3] < 0;
 /** Damping ratio of a mass-spring (>= 1: no overshoot). */

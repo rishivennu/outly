@@ -9,12 +9,13 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Activity, BarChart3, ChevronRight, Contrast, Globe, LayoutDashboard, LifeBuoy, LogOut, Newspaper, PanelLeftOpen, Search, ShieldCheck, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { Dock, DockItem, DockSeparator } from "@/components/ui/motion/Dock";
+import { TransitionPanel, panelDir, type PanelDir } from "@/components/ui/motion/TransitionPanel";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { Button } from "@/components/ui/button";
 import { NEXT_THEME, THEME_OPTIONS, useTheme } from "@/components/shared/ThemeToggle";
 import { CONTRAST_KEY } from "@/lib/theme/script";
 import { can, ROLE_LABEL, type AdminArea, type AdminRole } from "@/lib/admin/perms";
-import { FX } from "@/lib/motion/tokens";
+import { FX, T } from "@/lib/motion/tokens";
 import { cn } from "@/lib/utils";
 import type { NavGroup } from "./AdminShell";
 
@@ -153,6 +154,15 @@ export function AdminDock({ nav, groups, role, admin, path, badges, active, onSi
   const nextTheme = THEME_OPTIONS.find((o) => o.value === NEXT_THEME[theme.choice])!;
   const ThemeIcon = current.Icon;
 
+  // R1293: one popover stays up while you move between groups; its content slides in from the side you came from
+  // (TransitionPanel) and the panel itself glides under the new icon (layout="position").
+  const keys = [...list.map((g) => g.group), ACCOUNT];
+  const idx = menu ? keys.indexOf(menu.key) : -1;
+  const lastIdx = useRef(idx);
+  const dir: PanelDir = idx >= 0 && lastIdx.current >= 0 ? panelDir(lastIdx.current, idx) : 1;
+  useEffect(() => {
+    lastIdx.current = idx;
+  }, [idx]);
   const open = menu ? list.find((g) => g.group === menu.key) : undefined;
   let body: ReactNode = null;
   let title = "";
@@ -240,22 +250,32 @@ export function AdminDock({ nav, groups, role, admin, path, badges, active, onSi
       <AnimatePresence>
         {menu && body && (
           <motion.div
-            key={menu.key}
+            key="menu"
             ref={panel}
             id="admin-dock-menu"
             role="menu"
             aria-label={title}
             onKeyDown={onMenuKey}
+            layout="position"
+            transition={T.nav}
             {...(reduce ? FX.fade : RISE)}
-            className="lg-glass pointer-events-auto fixed z-[var(--admin-z-popover)] flex max-h-[calc(100dvh-8rem)] flex-col gap-0.5 overflow-y-auto overscroll-contain rounded-[24px] p-1.5"
+            className="lg-glass pointer-events-auto fixed z-[var(--admin-z-popover)] flex max-h-[calc(100dvh-8rem)] flex-col overflow-y-auto overscroll-contain rounded-[24px] p-1.5"
             style={{ left: menu.left, bottom: menu.bottom, width: MENU_W, transformOrigin: "50% 100%" }}
           >
-            {open && (
-              <p aria-hidden className="px-3 pb-1 pt-2 text-[12px] font-semibold text-muted-foreground">
-                {title}
-              </p>
-            )}
-            {body}
+            <TransitionPanel activeIndex={idx} dir={dir} panelClassName="flex flex-col gap-0.5">
+              {keys.map((key) =>
+                key === menu.key ? (
+                  <div key={key} className="contents">
+                    {open && (
+                      <p aria-hidden className="px-3 pb-1 pt-2 text-[12px] font-semibold text-muted-foreground">
+                        {title}
+                      </p>
+                    )}
+                    {body}
+                  </div>
+                ) : null,
+              )}
+            </TransitionPanel>
           </motion.div>
         )}
       </AnimatePresence>

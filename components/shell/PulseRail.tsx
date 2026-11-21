@@ -9,6 +9,7 @@ import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { OutllyLogoIcon, OutllyWordmark } from "@/components/brand/OutllyBrand";
 import { AnimIcon, useIconPlay } from "@/components/icons/animated";
 import { HoverLink } from "./HoverLink";
+import { Magnetic } from "@/components/ui/motion/Magnetic";
 import { NoticesBell } from "./NoticesBell";
 import { NavStyleSwitch } from "./NavStyleSwitch";
 import { SignOutButton } from "./SignOutButton";
@@ -163,15 +164,19 @@ export function PulseRail() {
                   <span className="rail-label">Collapse</span>
                 </button>
               </Tip>
-              <Tip label="New post">
-                <HoverLink href="/create" data-tour="new-post" aria-current={isActive(path, "/create") ? "page" : undefined} {...plus.handlers} className="rail-row rail-new">
-                  {isActive(path, "/create") && <motion.span layoutId="rail-pill" className="rail-pill" transition={T.nav} />}
-                  <span className="rail-ic">
-                    <AnimIcon name="plus" size={20} iconRef={plus.ref} />
-                  </span>
-                  <span className="rail-label">New post</span>
-                </HoverLink>
-              </Tip>
+              {/* R1293: a slight pull toward the pointer on the one primary action. Outside Tip, so the tooltip still
+                  clones the link itself (its aria-describedby lands on the focusable element). */}
+              <Magnetic className="block w-full shrink-0">
+                <Tip label="New post">
+                  <HoverLink href="/create" data-tour="new-post" aria-current={isActive(path, "/create") ? "page" : undefined} {...plus.handlers} className="rail-row rail-new">
+                    {isActive(path, "/create") && <motion.span layoutId="rail-pill" className="rail-pill" transition={T.nav} />}
+                    <span className="rail-ic">
+                      <AnimIcon name="plus" size={20} iconRef={plus.ref} />
+                    </span>
+                    <span className="rail-label">New post</span>
+                  </HoverLink>
+                </Tip>
+              </Magnetic>
               <Tip label="Search">
                 <button type="button" onClick={openPalette} aria-label="Search or jump" aria-keyshortcuts="Control+K Meta+K" className="rail-row">
                   <span className="rail-ic">

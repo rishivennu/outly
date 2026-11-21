@@ -47,6 +47,7 @@ export function StudioDock() {
               attrs={{ "data-tour": TOUR[href] }}
               // R1292: outlined like the rail's .rail-new, so the solid lime fill marks only the page you are on.
               className={create ? "dock-new" : undefined}
+              magnetic={create}
             >
               <Icon strokeWidth={1.8} />
             </DockItem>
