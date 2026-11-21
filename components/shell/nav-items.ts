@@ -1,4 +1,4 @@
-import { Activity, BarChart3, CalendarDays, ClipboardCheck, CreditCard, Globe, Home, LayoutGrid, LifeBuoy, Link2, MessagesSquare, Plus, Settings, ShieldCheck, SlidersHorizontal, Sparkles, UserRound, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, CalendarDays, ClipboardCheck, CreditCard, Globe, Handshake, Home, LayoutGrid, LifeBuoy, Link2, MessagesSquare, Plus, Settings, ShieldCheck, SlidersHorizontal, Sparkles, UserRound, type LucideIcon } from "lucide-react";
 
 /**
  * Navigation data shared by the classic sidebar, the pulse rail (1100), the phone tab bar and the account
@@ -26,6 +26,7 @@ export function workspaceItems(teammate: boolean): NavItem[] {
       { href: "/accounts", label: "Connected accounts", icon: Link2 },
       { href: "/billing", label: "Billing", icon: CreditCard },
     ]),
+    { href: "/dashboard/partnerships", label: "My Partnerships", icon: Handshake },
     { href: "/support", label: "Help centre", icon: LifeBuoy },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
@@ -44,6 +45,7 @@ export function accountItems(teammate: boolean): { account: NavItem[]; more: (Na
     ],
     more: [
       ...(teammate ? [] : [{ href: "/billing", label: "Billing & Subscription", icon: CreditCard }]),
+      { href: "/dashboard/partnerships", label: "My Partnerships", icon: Handshake },
       { href: "/support", label: "Help & Support", icon: LifeBuoy },
       { href: "/", label: "Outlly website", icon: Globe, external: true },
     ],
@@ -51,7 +53,7 @@ export function accountItems(teammate: boolean): { account: NavItem[]; more: (Na
 }
 
 /** Animated-icon names for the pulse shell (1080), by route. */
-export const ANIM: Record<string, string> = { "/home": "home", "/create": "plus", "/content": "content", "/calendar": "calendar", "/analytics": "analytics", "/intelligence": "intelligence", "/profile-review": "review", "/inbox": "inbox", "/approvals": "approvals", "/accounts": "accounts", "/billing": "billing", "/support": "help", "/settings": "settings", "/": "website" };
+export const ANIM: Record<string, string> = { "/home": "home", "/create": "plus", "/content": "content", "/calendar": "calendar", "/analytics": "analytics", "/intelligence": "intelligence", "/profile-review": "review", "/inbox": "inbox", "/approvals": "approvals", "/accounts": "accounts", "/billing": "billing", "/dashboard/partnerships": "partnerships", "/support": "help", "/settings": "settings", "/": "website" };
 
 export const TOUR: Record<string, string> = { "/home": "home", "/billing": "billing", "/support": "support", "/settings": "settings", "/create": "new-post", "/content": "content", "/calendar": "calendar", "/analytics": "analytics", "/inbox": "inbox", "/approvals": "approvals", "/accounts": "accounts" };
 
@@ -68,7 +70,7 @@ export function isActive(path: string | null, href: string) {
  */
 const TITLES: [string, string][] = [
   ["/home", "Home"], ["/create", "Create"], ["/content", "Content"], ["/calendar", "Calendar"], ["/analytics", "Analytics"], ["/intelligence", "Intelligence"], ["/profile-review", "Profile Review"],
-  ["/inbox", "Inbox"], ["/approvals", "Approvals"], ["/accounts", "Accounts"], ["/billing", "Billing"], ["/support", "Help"],
+  ["/inbox", "Inbox"], ["/approvals", "Approvals"], ["/accounts", "Accounts"], ["/billing", "Billing"], ["/support", "Help"], ["/dashboard", "Partnerships"],
   ["/settings", "Settings"], ["/mascot", "Pip"],
 ];
 export function pageTitle(path: string | null) {

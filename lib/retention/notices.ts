@@ -35,7 +35,10 @@ export interface NoticeInput {
     | "greet"
     | "inactivity"
     | "growth"
-    | "summary";
+    | "summary"
+    | "partner_update"
+    | "partner_offer"
+    | "partner_deadline";
   tone: "danger" | "warn" | "info";
   title: string;
   body: string;

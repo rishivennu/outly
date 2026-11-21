@@ -1,41 +1,84 @@
 "use client";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Check, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Globe, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Counter } from "@/components/ui/field";
+import { Stepper, StepPanels } from "@/components/ui/easy/Stepper";
+import { MorphingButton } from "@/components/ui/easy/MorphingButton";
+import { PlatformGlyph } from "@/components/shared/PlatformIcon";
 import { api, ApiError } from "@/lib/client/api";
 import { reduced } from "@/lib/motion/prefs";
 import { cn } from "@/lib/utils";
-import { AGE_RANGES, PARTNER_NICHES, PARTNER_NICHE_LABEL, PARTNER_PREFERENCES, PARTNER_PREFERENCE_LABEL, PARTNER_SUBMITTED_MESSAGE, POSTING_FREQUENCIES, POSTING_FREQUENCY_LABEL } from "@/lib/partners/types";
-import { COUNTRIES } from "./form/countries";
+import { EXTRA_MAX } from "@/lib/partners/schema";
+import { PARTNER_PLATFORM_LABEL } from "@/lib/partners/types";
 import { CONTROL, ERROR_INK, Field, FieldError, describe } from "./form/Field";
-import { Stepper } from "./form/Stepper";
-import { SocialRow } from "./form/SocialRow";
+import { CountryCombobox } from "./form/Country";
+import { PlatformRow } from "./form/PlatformRow";
 import { Files } from "./form/Files";
 import { Review } from "./form/Review";
-import { DRAFT_KEY, STEPS, emptyDraft, emptySocial, fieldId, payload, restoreDraft, sourceFrom, stepErrors, type Draft, type SocialDraft, type UploadedFile } from "./form/draft";
+import {
+  CATEGORIES,
+  CHIP_PLATFORMS,
+  DRAFT_KEY,
+  REVIEW,
+  SHORT_PREFERENCES,
+  STEPS,
+  emptyDraft,
+  emptyRow,
+  fieldId,
+  payload,
+  restoreDraft,
+  sourceFrom,
+  stepErrors,
+  toggleChip,
+  trackHref,
+  type Draft,
+  type PlatformDraft,
+  type UploadedFile,
+} from "./form/draft";
 
-const GROUPS = ["personal", "socials", "stats", "proposal", "consent"];
-const stepOf = (key: string) => Math.max(0, GROUPS.findIndex((g) => key === g || key.startsWith(`${g}.`)));
-const HINT_WHY = "Between 40 and 1200 characters.";
-const TEXTAREA = "rounded-xl";
+export type ApplyMe = { name: string; email: string; verified: boolean } | null;
 
-type Group = "personal" | "stats" | "proposal";
+const GROUP_STEP: Record<string, number> = { personal: 0, socials: 1, stats: 2, files: 2, proposal: 3, consent: REVIEW };
+const stepOf = (key: string) => GROUP_STEP[key.split(".")[0]] ?? 0;
+/** Server issues come back as consent.terms / consent.accuracy; the short form shows them on its one checkbox. */
+const fieldKey = (k: string) => (k.startsWith("consent") ? "consent" : k);
 
-export default function ApplyForm() {
+const TITLES = ["Let's get to know you.", "Show us where your audience follows you.", "Give us a quick idea of your reach.", "Choose how you'd like to collaborate.", "Check your application."];
+const LEADS = [
+  "We'll use these details to contact you about your application.",
+  "Add each platform you post on. A link and a rough follower count are enough.",
+  "Self-reported numbers. We may ask for a screenshot later.",
+  "Pick the one that suits you best. Every offer is agreed individually after review.",
+  "Tap Edit to change anything. Your other answers stay as they are.",
+];
+const STEPPER = STEPS.map((label) => ({ label }));
+
+const fmtDay = (d: Date) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(d);
+
+function ChipIcon({ platform }: { platform: (typeof CHIP_PLATFORMS)[number] }) {
+  if (platform === "other") return <Globe className="h-[18px] w-[18px]" aria-hidden="true" />;
+  return <PlatformGlyph platform={platform} className="h-[18px] w-[18px]" />;
+}
+
+export default function ApplyForm({ me = null }: { me?: ApplyMe }) {
   const [d, setD] = useState<Draft>(emptyDraft);
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [summary, setSummary] = useState("");
+  const [announce, setAnnounce] = useState("");
   const [sending, setSending] = useState(false);
-  const [done, setDone] = useState<{ ref: string; email: string } | null>(null);
-  const [serverErr, setServerErr] = useState<string | null>(null);
+  const [done, setDone] = useState<{ ref: string; email: string; at: Date } | null>(null);
+  const [serverErr, setServerErr] = useState<ReactNode>(null);
   const [uploading, setUploading] = useState(0);
   const [website, setWebsite] = useState("");
+  const [editIdentity, setEditIdentity] = useState(false);
+  const [fromReview, setFromReview] = useState(false);
   const source = useRef("");
   const ready = useRef(false);
   const moved = useRef(false);
+  const submitting = useRef(false);
   const lastSubmit = useRef(0);
   const coolUntil = useRef(0);
   const card = useRef<HTMLDivElement>(null);
@@ -43,17 +86,22 @@ export default function ApplyForm() {
 
   useEffect(() => {
     source.current = sourceFrom(window.location.search);
+    let draft = emptyDraft();
+    let at = 0;
     try {
       const saved = restoreDraft(window.sessionStorage.getItem(DRAFT_KEY));
       if (saved) {
-        setD(saved.draft);
-        setStep(saved.step);
+        draft = saved.draft;
+        at = saved.step;
       }
     } catch {
       /* storage blocked: the form still works, it just won't survive a reload */
     }
+    if (me) draft = { ...draft, personal: { ...draft.personal, fullName: draft.personal.fullName || me.name, email: draft.personal.email || me.email } };
+    setD(draft);
+    setStep(at);
     ready.current = true;
-  }, []);
+  }, [me]);
 
   useEffect(() => {
     if (!ready.current) return;
@@ -89,9 +137,12 @@ export default function ApplyForm() {
     if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ block: "start", behavior: reduced() ? "auto" : "smooth" });
   }, [step, done]);
 
-  const set = <G extends Group>(g: G, k: keyof Draft[G], v: Draft[G][keyof Draft[G]]) => setD((x) => ({ ...x, [g]: { ...x[g], [k]: v } }));
-  const setRow = (i: number, row: SocialDraft) => setD((x) => ({ ...x, socials: x.socials.map((r, j) => (j === i ? row : r)) }));
+  const setPersonal = (k: keyof Draft["personal"], v: string) => setD((x) => ({ ...x, personal: { ...x.personal, [k]: v } }));
+  const setStats = (k: keyof Draft["stats"], v: string) => setD((x) => ({ ...x, stats: { ...x.stats, [k]: v } }));
+  const setProposal = (k: keyof Draft["proposal"], v: string) => setD((x) => ({ ...x, proposal: { ...x.proposal, [k]: v } }));
+  const setRows = (fn: (rows: PlatformDraft[]) => PlatformDraft[]) => setD((x) => ({ ...x, socials: fn(x.socials) }));
   const setFiles = useCallback((fn: (prev: UploadedFile[]) => UploadedFile[]) => setD((x) => ({ ...x, files: fn(x.files) })), []);
+  const clearStepErrors = (at: number) => setErrors((e) => Object.fromEntries(Object.entries(e).filter(([k]) => stepOf(k) !== at)));
 
   const blur = (key: string) => {
     const now = stepErrors(stepOf(key), d);
@@ -118,61 +169,78 @@ export default function ApplyForm() {
     focusFirstInvalid();
   };
 
-  const go = (i: number) => {
+  const go = (i: number, opts: { edit?: boolean } = {}) => {
     moved.current = true;
     setSummary("");
     setServerErr(null);
+    setFromReview(!!opts.edit);
     setStep(i);
+    setAnnounce(i === REVIEW ? "Review your application" : `Step ${i + 1} of ${STEPS.length}: ${STEPS[i]}`);
   };
 
   const next = () => {
     if (step === 2 && uploading > 0) return setSummary("Your files are still uploading. Wait for them to finish, then continue.");
     const errs = stepErrors(step, d);
     if (Object.keys(errs).length) return flag(errs, step);
-    go(step + 1);
+    go(fromReview ? REVIEW : step + 1);
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (step < 4) return next();
-    if (sending) return;
+    if (step < REVIEW) return next();
+    // A ref, not state: two taps in the same frame both see sending === false.
+    if (submitting.current) return;
     const now = Date.now();
     if (now < coolUntil.current) return setServerErr("Too many attempts in a short time. Wait a minute, then submit again.");
     if (now - lastSubmit.current < 4000) return;
-    for (let i = 0; i < STEPS.length; i++) {
+    for (let i = 0; i <= REVIEW; i++) {
       const errs = stepErrors(i, d);
       if (Object.keys(errs).length) {
         if (i !== step) go(i);
         return flag(errs, i);
       }
     }
+    submitting.current = true;
     lastSubmit.current = now;
     setSending(true);
     setServerErr(null);
     try {
       const r = await api<{ ok: true; ref: string }>("/api/partners/apply", { method: "POST", json: payload(d, source.current, website) });
       moved.current = true;
-      setDone({ ref: r.ref, email: d.personal.email.trim() });
+      setDone({ ref: r.ref, email: d.personal.email.trim(), at: new Date() });
     } catch (err) {
       if (err instanceof ApiError && err.code === "DUPLICATE") {
         const ref = typeof err.data?.ref === "string" ? err.data.ref : "";
-        setServerErr(`You already have an open application (ID ${ref}). We will get back to you on that one.`);
+        setServerErr(
+          <>
+            {`You already have an open application (ID ${ref}). We will get back to you on that one.`}
+            {me && (
+              <>
+                {" "}
+                <Link href="/dashboard/partnerships" className="font-medium underline underline-offset-2">
+                  Track it in My Partnerships
+                </Link>
+              </>
+            )}
+          </>,
+        );
       } else if (err instanceof ApiError && err.status === 429) {
         coolUntil.current = Date.now() + 60_000;
         setServerErr(err.message || "We have received a lot of attempts. Please wait a while, then try again.");
       } else if (err instanceof ApiError && err.code === "VALIDATION" && Array.isArray(err.data?.issues)) {
         const errs: Record<string, string> = {};
         for (const i of err.data.issues as { path?: unknown[]; message?: string }[]) {
-          const k = (i.path ?? []).map(String).join(".");
+          const k = fieldKey((i.path ?? []).map(String).join("."));
           if (k && !(k in errs)) errs[k] = i.message ?? "Check this answer";
         }
-        const firstStep = Math.min(...Object.keys(errs).map(stepOf), 4);
+        const firstStep = Math.min(...Object.keys(errs).map(stepOf), REVIEW);
         if (firstStep !== step) go(firstStep);
         flag(errs, firstStep);
       } else {
         setServerErr(err instanceof ApiError && err.status ? err.message : "Your application didn't send. Check your connection and try again. Your answers are still here.");
       }
     } finally {
+      submitting.current = false;
       setSending(false);
     }
   };
@@ -183,15 +251,39 @@ export default function ApplyForm() {
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-lime/15">
           <Check className="h-6 w-6 text-lime-ink" aria-hidden="true" />
         </span>
-        <h3 ref={head} tabIndex={-1} className="mt-5 text-[22px] font-semibold tracking-tight focus:outline-none">
-          Application submitted
+        <h3 ref={head} tabIndex={-1} className="mt-5 text-[24px] font-semibold tracking-tight focus:outline-none sm:text-[26px]">
+          {"You're officially in!"}
         </h3>
-        <p className="mt-3 text-[16px] leading-relaxed text-foreground">{PARTNER_SUBMITTED_MESSAGE}</p>
-        <p className="mt-5 inline-flex rounded-xl bg-secondary/60 px-4 py-2.5 text-[15px] font-medium tabular-nums">Application ID: {done.ref}</p>
-        <p className="mt-4 text-[15px] leading-relaxed text-muted-foreground">A confirmation email is on its way to {done.email}.</p>
-        <Button asChild variant="outline" className="mt-7 h-12 px-6">
-          <Link href="/">Back to home</Link>
+        <p className="mt-3 text-[16px] leading-relaxed text-foreground">
+          {"Your creator partnership application has been submitted. We'll review your profile and notify you when there's an update."}
+        </p>
+        <dl className="mt-6 grid gap-3 rounded-2xl bg-secondary/50 p-4 text-[14px] sm:grid-cols-3 sm:p-5">
+          <div className="min-w-0">
+            <dt className="text-[12px] text-muted-foreground">Application ID</dt>
+            <dd className="mt-0.5 font-semibold tabular-nums">{done.ref}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-[12px] text-muted-foreground">Submitted on</dt>
+            <dd className="mt-0.5 tabular-nums">{fmtDay(done.at)}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-[12px] text-muted-foreground">Status</dt>
+            <dd className="mt-1">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-background/70 px-2.5 py-1 text-[12px] font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-lime-ink" aria-hidden="true" />
+                Submitted
+              </span>
+            </dd>
+          </div>
+        </dl>
+        <p className="mt-4 text-[14px] leading-relaxed text-muted-foreground">A confirmation email is on its way to {done.email}.</p>
+        <Button asChild variant="lime" className="mt-7 h-12 px-6 text-[15px]">
+          <Link href={trackHref(done.ref, !!me)}>
+            Track My Application
+            <ArrowRight className="h-[18px] w-[18px]" aria-hidden="true" />
+          </Link>
         </Button>
+        {!me && <p className="mt-3 text-[13px] text-muted-foreground">Sign in with {done.email} to track it.</p>}
       </div>
     );
 
@@ -200,81 +292,104 @@ export default function ApplyForm() {
   const q = d.proposal;
   const err = (k: string) => errors[k];
   const ctl = (k: string, hint?: boolean) => ({ ...describe(fieldId(k), err(k), hint), onBlur: () => blur(k) });
+  const asMe = !!me?.verified && !editIdentity && !!p.fullName.trim() && p.email.trim().toLowerCase() === me.email.toLowerCase();
+  const onChip = (pl: string) => {
+    clearStepErrors(1);
+    setRows((rows) => toggleChip(rows, pl));
+  };
 
   return (
     <div ref={card} className="mx-auto max-w-3xl scroll-mt-24 rounded-[24px] border border-foreground/[0.08] bg-card p-5 sm:p-8">
-      <Stepper step={step} onGo={go} />
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <p className="eyebrow">Your partnership application</p>
+        <p className="text-[13px] tabular-nums text-muted-foreground" aria-hidden="true">
+          {step < REVIEW ? `Step ${step + 1} of ${STEPS.length}` : "Review"}
+        </p>
+      </div>
+      <Stepper steps={STEPPER} current={step} onStepChange={(i) => go(i, { edit: step === REVIEW })} aria-label="Application progress" />
+      <p className="sr-only" aria-live="polite">
+        {announce}
+      </p>
       <form onSubmit={submit} noValidate className="mt-6" aria-labelledby="pa-step-title">
         <h3 id="pa-step-title" ref={head} tabIndex={-1} className="text-[20px] font-semibold tracking-tight focus:outline-none sm:text-[22px]">
-          {["About you", "Your social accounts", "Your performance", "Your proposal", "Review and submit"][step]}
+          {TITLES[step]}
         </h3>
-        <p className="mt-1.5 text-[14px] leading-relaxed text-muted-foreground">
-          {
-            [
-              "We use these details to contact you about your application.",
-              "Add the accounts you would post on. Mark the one you are best known for as primary.",
-              "Creator-provided. We may verify figures before making an offer.",
-              "Tell us how a partnership with Outlly could work for you and your audience.",
-              "Check your answers. Use Edit to change anything before you submit.",
-            ][step]
-          }
-        </p>
+        <p className="mt-1.5 text-[14px] leading-relaxed text-muted-foreground">{LEADS[step]}</p>
 
-        <div className="mt-6">
+        <StepPanels current={step} className="mt-6">
           {step === 0 && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field id={fieldId("personal.fullName")} label="Full name" error={err("personal.fullName")}>
-                <Input {...ctl("personal.fullName")} className="rounded-xl" autoComplete="name" maxLength={80} value={p.fullName} onChange={(e) => set("personal", "fullName", e.target.value)} />
-              </Field>
-              <Field id={fieldId("personal.email")} label="Email" error={err("personal.email")}>
-                <Input {...ctl("personal.email")} className="rounded-xl" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} maxLength={200} value={p.email} onChange={(e) => set("personal", "email", e.target.value)} />
-              </Field>
+              {asMe ? (
+                <div className="flex min-h-12 flex-wrap items-center justify-between gap-2 rounded-2xl bg-secondary/40 px-4 py-2.5 sm:col-span-2">
+                  <p className="min-w-0 break-words text-[15px]">
+                    <span className="text-muted-foreground">Applying as </span>
+                    <span className="font-medium">{p.fullName}</span>, <span className="break-all">{p.email}</span>
+                  </p>
+                  <Button type="button" variant="ghost" className="h-11 px-3" onClick={() => setEditIdentity(true)} aria-label="Change your name or email">
+                    Change
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <Field id={fieldId("personal.fullName")} label="Full name" error={err("personal.fullName")}>
+                    <Input {...ctl("personal.fullName")} className="rounded-xl" autoComplete="name" maxLength={80} value={p.fullName} onChange={(e) => setPersonal("fullName", e.target.value)} />
+                  </Field>
+                  <Field id={fieldId("personal.email")} label="Email" error={err("personal.email")}>
+                    <Input {...ctl("personal.email")} className="rounded-xl" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} maxLength={200} value={p.email} onChange={(e) => setPersonal("email", e.target.value)} />
+                  </Field>
+                </>
+              )}
               <Field id={fieldId("personal.country")} label="Country" error={err("personal.country")}>
-                <select {...ctl("personal.country")} autoComplete="country-name" value={p.country} onChange={(e) => set("personal", "country", e.target.value)} className={CONTROL}>
-                  <option value="">Choose your country</option>
-                  {COUNTRIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field id={fieldId("personal.city")} label="City" optional error={err("personal.city")}>
-                <Input {...ctl("personal.city")} className="rounded-xl" autoComplete="address-level2" maxLength={80} value={p.city} onChange={(e) => set("personal", "city", e.target.value)} />
-              </Field>
-              <Field id={fieldId("personal.phone")} label="Phone" optional hint="Include your country code, for example +91." error={err("personal.phone")}>
-                <Input {...ctl("personal.phone", true)} className="rounded-xl" type="tel" inputMode="tel" autoComplete="tel" maxLength={30} value={p.phone} onChange={(e) => set("personal", "phone", e.target.value)} />
-              </Field>
-              <Field id={fieldId("personal.brandName")} label="Creator or business name" optional error={err("personal.brandName")}>
-                <Input {...ctl("personal.brandName")} className="rounded-xl" autoComplete="organization" maxLength={80} value={p.brandName} onChange={(e) => set("personal", "brandName", e.target.value)} />
+                <CountryCombobox {...describe(fieldId("personal.country"), err("personal.country"))} value={p.country} onChange={(v) => setPersonal("country", v)} onBlur={() => blur("personal.country")} />
               </Field>
             </div>
           )}
 
           {step === 1 && (
             <div className="grid gap-4">
+              <fieldset aria-describedby={err("socials") ? `${fieldId("socials")}-err` : undefined}>
+                <legend className="mb-2.5 text-[15px] font-medium">Where do you share your content?</legend>
+                <div className="flex flex-wrap gap-2">
+                  {CHIP_PLATFORMS.map((pl) => {
+                    const on = d.socials.some((r) => r.platform === pl);
+                    return (
+                      <button
+                        key={pl}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => onChip(pl)}
+                        className={cn(
+                          "inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-[15px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
+                          on ? "bg-foreground font-medium text-background" : "bg-secondary/60 text-foreground hover:bg-secondary",
+                        )}
+                      >
+                        <ChipIcon platform={pl} />
+                        {PARTNER_PLATFORM_LABEL[pl]}
+                        {on && <Check className="h-4 w-4" strokeWidth={2.75} aria-hidden="true" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <FieldError id={fieldId("socials")} error={err("socials")} />
+              </fieldset>
               {d.socials.map((row, i) => (
-                <SocialRow
+                <PlatformRow
                   key={i}
                   i={i}
                   row={row}
-                  primary={d.primary === i}
-                  canRemove={d.socials.length > 1}
                   errors={errors}
-                  onChange={(r) => setRow(i, r)}
-                  onPrimary={() => setD((x) => ({ ...x, primary: i }))}
+                  onChange={(r) => setRows((rows) => rows.map((x, j) => (j === i ? r : x)))}
                   onRemove={() => {
-                    setErrors((e) => Object.fromEntries(Object.entries(e).filter(([k]) => stepOf(k) !== 1)));
-                    setD((x) => ({ ...x, socials: x.socials.filter((_, j) => j !== i), primary: x.primary === i ? 0 : x.primary > i ? x.primary - 1 : x.primary }));
+                    clearStepErrors(1);
+                    setRows((rows) => rows.filter((_, j) => j !== i));
                   }}
                   onBlur={blur}
                 />
               ))}
-              <FieldError id={fieldId("socials")} error={err("socials")} />
-              {d.socials.length < 6 && (
-                <Button type="button" variant="outline" className="h-12 justify-self-start px-5" onClick={() => setD((x) => ({ ...x, socials: [...x.socials, emptySocial()] }))}>
+              {d.socials.length > 0 && d.socials.length < 6 && (
+                <Button type="button" variant="outline" className="h-12 justify-self-start px-5" onClick={() => setRows((rows) => [...rows, emptyRow()])}>
                   <Plus className="h-[18px] w-[18px]" aria-hidden="true" />
-                  Add another account
+                  Add another platform
                 </Button>
               )}
             </div>
@@ -282,177 +397,110 @@ export default function ApplyForm() {
 
           {step === 2 && (
             <div className="grid gap-4 sm:grid-cols-2">
-              {(
-                [
-                  ["avgViews", "Average views per post"],
-                  ["reach", "Average reach per post"],
-                  ["avgLikes", "Average likes"],
-                  ["avgComments", "Average comments"],
-                  ["avgShares", "Average shares"],
-                ] as const
-              ).map(([k, label]) => (
-                <Field key={k} id={fieldId(`stats.${k}`)} label={label} error={err(`stats.${k}`)}>
-                  <Input {...ctl(`stats.${k}`)} className="rounded-xl tabular-nums" inputMode="numeric" autoComplete="off" maxLength={16} value={s[k]} onChange={(e) => set("stats", k, e.target.value)} />
-                </Field>
-              ))}
-              <Field id={fieldId("stats.engagementRate")} label="Engagement rate (%)" optional hint="0 to 100." error={err("stats.engagementRate")}>
-                <Input {...ctl("stats.engagementRate", true)} className="rounded-xl tabular-nums" inputMode="decimal" autoComplete="off" maxLength={8} value={s.engagementRate} onChange={(e) => set("stats", "engagementRate", e.target.value)} />
+              <Field id={fieldId("stats.avgViews")} label="Average views per Reel, video or post" hint="A rough number is fine, for example 12,500." error={err("stats.avgViews")}>
+                <Input {...ctl("stats.avgViews", true)} className="rounded-xl tabular-nums" inputMode="numeric" autoComplete="off" maxLength={16} value={s.avgViews} onChange={(e) => setStats("avgViews", e.target.value)} />
               </Field>
-              <Field id={fieldId("stats.audienceCountries")} label="Top audience countries" optional hint="For example: India 60%, United States 15%." error={err("stats.audienceCountries")} className="sm:col-span-2">
-                <Input {...ctl("stats.audienceCountries", true)} className="rounded-xl" maxLength={200} value={s.audienceCountries} onChange={(e) => set("stats", "audienceCountries", e.target.value)} />
-              </Field>
-              <Field id={fieldId("stats.ageRange")} label="Main audience age" error={err("stats.ageRange")}>
-                <select {...ctl("stats.ageRange")} value={s.ageRange} onChange={(e) => set("stats", "ageRange", e.target.value)} className={CONTROL}>
-                  <option value="">Choose an age range</option>
-                  {AGE_RANGES.map((a) => (
-                    <option key={a} value={a}>
-                      {a === "mixed" ? "Mixed ages" : a}
+              <Field id={fieldId("stats.niche")} label="Primary content category" error={err("stats.niche")}>
+                <select {...ctl("stats.niche")} value={s.niche} onChange={(e) => setStats("niche", e.target.value)} className={CONTROL}>
+                  <option value="">Choose a category</option>
+                  {CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field id={fieldId("stats.frequency")} label="How often you post" error={err("stats.frequency")}>
-                <select {...ctl("stats.frequency")} value={s.frequency} onChange={(e) => set("stats", "frequency", e.target.value)} className={CONTROL}>
-                  <option value="">Choose a frequency</option>
-                  {POSTING_FREQUENCIES.map((f) => (
-                    <option key={f} value={f}>
-                      {POSTING_FREQUENCY_LABEL[f]}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field id={fieldId("stats.niche")} label="Content niche" error={err("stats.niche")} className="sm:col-span-2">
-                <select {...ctl("stats.niche")} value={s.niche} onChange={(e) => set("stats", "niche", e.target.value)} className={CONTROL}>
-                  <option value="">Choose a niche</option>
-                  {PARTNER_NICHES.map((n) => (
-                    <option key={n} value={n}>
-                      {PARTNER_NICHE_LABEL[n]}
-                    </option>
-                  ))}
-                </select>
+              <Field id={fieldId("stats.engagementRate")} label="Engagement rate (%)" optional hint="If you know it. 0 to 100." error={err("stats.engagementRate")}>
+                <Input {...ctl("stats.engagementRate", true)} className="rounded-xl tabular-nums" inputMode="decimal" autoComplete="off" maxLength={8} value={s.engagementRate} onChange={(e) => setStats("engagementRate", e.target.value)} />
               </Field>
               <div className="sm:col-span-2">
-                <p className="mb-2 text-[13px] font-medium text-muted-foreground">Analytics attachments (optional)</p>
-                <p className="mb-3 text-[13px] leading-snug text-muted-foreground">Screenshots of your analytics help us review faster. Never share passwords or login details.</p>
+                <p className="mb-1 flex items-center justify-between text-[13px] font-medium text-muted-foreground">
+                  <span>Analytics screenshot or media kit</span>
+                  <span className="text-[12px] font-normal">Optional</span>
+                </p>
+                <p className="mb-3 text-[13px] leading-snug text-muted-foreground">It helps us review faster. Never share passwords or login details.</p>
                 <Files files={d.files} onChange={setFiles} onBusy={setUploading} />
               </div>
             </div>
           )}
 
           {step === 3 && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Long id="proposal.why" label="Why do you want to partner with Outlly?" hint={HINT_WHY} max={1200} value={q.why} error={err("proposal.why")} ctl={ctl} onChange={(v) => set("proposal", "why", v)} />
-              <Long id="proposal.how" label="How would you introduce Outlly to your audience?" max={1200} value={q.how} error={err("proposal.how")} ctl={ctl} onChange={(v) => set("proposal", "how", v)} />
-              <Field id={fieldId("proposal.contentType")} label="Content type" hint="For example: a tutorial Reel and a story series." error={err("proposal.contentType")}>
-                <Input {...ctl("proposal.contentType", true)} className="rounded-xl" maxLength={120} value={q.contentType} onChange={(e) => set("proposal", "contentType", e.target.value)} />
-              </Field>
-              <Field id={fieldId("proposal.posts")} label="How many posts" hint="1 to 50." error={err("proposal.posts")}>
-                <Input {...ctl("proposal.posts", true)} className="rounded-xl tabular-nums" inputMode="numeric" maxLength={3} value={q.posts} onChange={(e) => set("proposal", "posts", e.target.value)} />
-              </Field>
-              <fieldset className="sm:col-span-2" aria-describedby={err("proposal.preference") ? `${fieldId("proposal.preference")}-err` : undefined}>
-                <legend className="mb-2 text-[13px] font-medium text-muted-foreground">Partnership preference</legend>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {PARTNER_PREFERENCES.map((v, i) => {
-                    const on = q.preference === v;
+            <div className="grid gap-5">
+              <fieldset aria-describedby={err("proposal.preference") ? `${fieldId("proposal.preference")}-err` : undefined}>
+                <legend className="mb-2.5 text-[15px] font-medium">How would you like to partner with Outlly?</legend>
+                <div className="grid gap-2.5 sm:grid-cols-3">
+                  {SHORT_PREFERENCES.map((o, i) => {
+                    const on = q.preference === o.value;
                     return (
                       <label
-                        key={v}
+                        key={o.value}
                         className={cn(
-                          "flex min-h-12 cursor-pointer items-center gap-3 rounded-2xl border border-foreground/[0.08] px-4 py-3 text-[15px] transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2",
-                          on ? "bg-secondary font-medium" : "bg-secondary/30 hover:bg-secondary/60",
+                          "flex min-h-11 cursor-pointer gap-3 rounded-2xl border px-4 py-3.5 transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 sm:flex-col sm:gap-2",
+                          on ? "border-lime-ink bg-lime/10" : "border-foreground/[0.08] bg-secondary/30 hover:bg-secondary/60",
                         )}
                       >
                         <input
                           type="radio"
                           name="pa-preference"
-                          value={v}
+                          value={o.value}
                           checked={on}
-                          onChange={() => set("proposal", "preference", v)}
+                          onChange={() => setProposal("preference", o.value)}
                           onBlur={() => blur("proposal.preference")}
                           id={i === 0 ? fieldId("proposal.preference") : undefined}
                           aria-invalid={err("proposal.preference") ? true : undefined}
                           className="sr-only"
                         />
-                        <span aria-hidden="true" className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2", on ? "border-lime-ink bg-lime-ink" : "border-muted-foreground/60")}>
+                        <span aria-hidden="true" className={cn("mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2", on ? "border-lime-ink bg-lime-ink" : "border-muted-foreground/60")}>
                           {on && <Check className="h-3 w-3 text-background" strokeWidth={3} />}
                         </span>
-                        {PARTNER_PREFERENCE_LABEL[v]}
+                        <span className="min-w-0">
+                          <span className="block text-[15px] font-semibold">{o.title}</span>
+                          <span className="mt-0.5 block text-[14px] leading-snug text-muted-foreground">{o.body}</span>
+                        </span>
                       </label>
                     );
                   })}
                 </div>
                 <FieldError id={fieldId("proposal.preference")} error={err("proposal.preference")} />
               </fieldset>
-              <Field id={fieldId("proposal.compensation")} label="Expected compensation" optional hint="In your own words. This helps us shape an offer, it is not a commitment." error={err("proposal.compensation")} className="sm:col-span-2">
-                <Input {...ctl("proposal.compensation", true)} className="rounded-xl" maxLength={200} value={q.compensation} onChange={(e) => set("proposal", "compensation", e.target.value)} />
-              </Field>
-              <Long id="proposal.pastCollabs" label="Past brand collaborations" optional max={1200} value={q.pastCollabs} error={err("proposal.pastCollabs")} ctl={ctl} onChange={(v) => set("proposal", "pastCollabs", v)} />
-              <div className="sm:col-span-2">
-                <p className="mb-2 flex items-center justify-between text-[13px] font-medium text-muted-foreground">
-                  <span>Portfolio links</span>
-                  <span className="text-[12px] font-normal">Optional</span>
-                </p>
-                <div className="grid gap-2">
-                  {q.portfolio.map((u, i) => {
-                    const k = `proposal.portfolio.${i}`;
-                    return (
-                      <div key={i}>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            {...ctl(k)}
-                            aria-label={`Portfolio link ${i + 1}`}
-                            className="rounded-xl"
-                            type="url"
-                            inputMode="url"
-                            placeholder="https://"
-                            maxLength={300}
-                            value={u}
-                            onChange={(e) => set("proposal", "portfolio", q.portfolio.map((x, j) => (j === i ? e.target.value : x)))}
-                          />
-                          {q.portfolio.length > 1 && (
-                            <Button type="button" variant="ghost" size="icon" aria-label={`Remove portfolio link ${i + 1}`} onClick={() => set("proposal", "portfolio", q.portfolio.filter((_, j) => j !== i))}>
-                              <Trash2 className="h-[18px] w-[18px]" aria-hidden="true" />
-                            </Button>
-                          )}
-                        </div>
-                        <FieldError id={fieldId(k)} error={err(k)} />
-                      </div>
-                    );
-                  })}
+              <Field id={fieldId("proposal.extra")} label="Anything else you'd like us to know?" optional error={err("proposal.extra")}>
+                <Textarea {...ctl("proposal.extra")} className="rounded-xl" rows={3} maxLength={EXTRA_MAX} value={q.extra} onChange={(e) => setProposal("extra", e.target.value)} />
+                <div className="mt-1 flex justify-end">
+                  <Counter value={q.extra.trim().length} max={EXTRA_MAX} />
                 </div>
-                {q.portfolio.length < 5 && (
-                  <Button type="button" variant="ghost" className="mt-2 h-11 px-3" onClick={() => set("proposal", "portfolio", [...q.portfolio, ""])}>
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                    Add a link
-                  </Button>
-                )}
-              </div>
+              </Field>
             </div>
           )}
 
-          {step === 4 && (
+          {step === REVIEW && (
             <div className="grid gap-5">
-              <Review d={d} onEdit={go} />
-              <fieldset className="grid gap-2">
-                <legend className="sr-only">Agreements</legend>
-                <Agree id="consent.terms" checked={d.consent.terms} error={err("consent.terms")} onChange={(v) => setD((x) => ({ ...x, consent: { ...x.consent, terms: v } }))}>
-                  I accept the{" "}
-                  <Link href="/terms" target="_blank" className="font-medium underline underline-offset-2">
-                    Terms
-                  </Link>{" "}
-                  and{" "}
-                  <Link href="/privacy" target="_blank" className="font-medium underline underline-offset-2">
-                    Privacy Policy
-                  </Link>
-                  .
-                </Agree>
-                <Agree id="consent.accuracy" checked={d.consent.accuracy} error={err("consent.accuracy")} onChange={(v) => setD((x) => ({ ...x, consent: { ...x.consent, accuracy: v } }))}>
-                  I confirm the information is accurate and consent to Outlly evaluating my public profiles and the figures I provided.
-                </Agree>
-              </fieldset>
+              <Review d={d} onEdit={(i) => go(i, { edit: true })} />
+              <div>
+                <label htmlFor={fieldId("consent")} className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl py-2 text-[14px] leading-relaxed">
+                  <input
+                    {...describe(fieldId("consent"), err("consent"))}
+                    type="checkbox"
+                    checked={d.consent}
+                    onChange={(e) => setD((x) => ({ ...x, consent: e.target.checked }))}
+                    className="mt-0.5 h-5 w-5 shrink-0 accent-[hsl(var(--lime-ink))]"
+                  />
+                  <span>
+                    I accept the{" "}
+                    <Link href="/terms" target="_blank" className="font-medium underline underline-offset-2">
+                      Terms
+                    </Link>{" "}
+                    and{" "}
+                    <Link href="/privacy" target="_blank" className="font-medium underline underline-offset-2">
+                      Privacy Policy
+                    </Link>
+                    , and confirm my details are accurate so Outlly can review my public profiles.
+                  </span>
+                </label>
+                <FieldError id={fieldId("consent")} error={err("consent")} />
+              </div>
             </div>
           )}
-        </div>
+        </StepPanels>
 
         <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
           <label htmlFor="pa-website">Website</label>
@@ -474,7 +522,7 @@ export default function ApplyForm() {
         )}
 
         <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-          {step > 0 ? (
+          {step > 0 && !fromReview ? (
             <Button type="button" variant="outline" className="h-12 px-5" onClick={() => go(step - 1)} disabled={sending}>
               <ArrowLeft className="h-[18px] w-[18px]" aria-hidden="true" />
               Back
@@ -482,63 +530,23 @@ export default function ApplyForm() {
           ) : (
             <span />
           )}
-          {step < 4 ? (
+          {step < REVIEW ? (
             <Button type="submit" variant="lime" className="h-12 px-6 text-[15px]">
-              Next
+              {fromReview ? "Save and review" : "Next"}
               <ArrowRight className="h-[18px] w-[18px]" aria-hidden="true" />
             </Button>
           ) : (
-            <Button type="submit" variant="lime" className="h-12 px-6 text-[15px]" disabled={sending} aria-busy={sending}>
-              {sending ? "Submitting\u2026" : "Submit Partnership Application"}
-            </Button>
+            <MorphingButton type="submit" variant="lime" className="h-12 px-6 text-[15px]" status={sending ? "loading" : "idle"} loadingText="Submitting" successText="Submitted" disabled={sending}>
+              Submit My Application
+            </MorphingButton>
           )}
         </div>
-        <p className="mt-4 text-[12px] text-muted-foreground">Your answers are kept in this browser tab until you submit.</p>
+        {step === REVIEW ? (
+          <p className="mt-4 text-[13px] text-muted-foreground">Free to apply. Our team will review your profile before making an offer.</p>
+        ) : (
+          <p className="mt-4 text-[12px] text-muted-foreground">Your answers are kept in this browser tab until you submit.</p>
+        )}
       </form>
-    </div>
-  );
-}
-
-function Long({
-  id,
-  label,
-  hint,
-  optional,
-  max,
-  value,
-  error,
-  ctl,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  hint?: string;
-  optional?: boolean;
-  max: number;
-  value: string;
-  error?: string;
-  ctl: (k: string, hint?: boolean) => ReturnType<typeof describe> & { onBlur: () => void };
-  onChange: (v: string) => void;
-}) {
-  return (
-    <Field id={fieldId(id)} label={label} optional={optional} hint={hint} error={error} className="sm:col-span-2">
-      <Textarea {...ctl(id, !!hint)} className={TEXTAREA} rows={4} maxLength={max} value={value} onChange={(e) => onChange(e.target.value)} />
-      <div className="mt-1 flex justify-end">
-        <Counter value={value.trim().length} max={max} />
-      </div>
-    </Field>
-  );
-}
-
-function Agree({ id, checked, error, onChange, children }: { id: string; checked: boolean; error?: string; onChange: (v: boolean) => void; children: ReactNode }) {
-  const fid = fieldId(id);
-  return (
-    <div>
-      <label htmlFor={fid} className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl py-2 text-[14px] leading-relaxed">
-        <input {...describe(fid, error)} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[hsl(var(--lime-ink))]" />
-        <span>{children}</span>
-      </label>
-      <FieldError id={fid} error={error} />
     </div>
   );
 }

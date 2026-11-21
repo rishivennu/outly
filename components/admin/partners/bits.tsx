@@ -65,6 +65,7 @@ export const EVENT_LABEL: Record<string, string> = {
   deliverable: "Deliverable updated",
   code: "Referral code set",
   email: "Email sent",
+  "info.provided": "Creator sent more information",
 };
 export const eventLabel = (action: string) => EVENT_LABEL[action] ?? action.replace(/[_.]+/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 

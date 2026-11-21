@@ -4,6 +4,7 @@ import { db } from "../db";
 import { HttpError } from "../http";
 import { adminEvent } from "../admin/route";
 import { sendPartnerStatusEmail } from "./email";
+import { partnerNotice } from "./notices";
 import {
   PARTNER_NICHES,
   PARTNER_PLATFORMS,
@@ -195,6 +196,7 @@ export async function changeStatus(
   to: string,
   admin: PartnerActor,
   meta: { message?: string; link?: string; notify?: boolean; actor?: "admin" | "creator" | "system"; [k: string]: unknown } = {},
+  hooks: { inTx?: (tx: Prisma.TransactionClient) => Promise<unknown> } = {},
 ) {
   const id = typeof app === "string" ? app : app.id;
   const current = await db.partnerApplication.findUnique({ where: { id } });
@@ -213,7 +215,7 @@ export async function changeStatus(
   const actor = kind === "admin" ? admin.login.slice(0, 120) : kind;
   const { notify: _n, actor: _a, message: _m, ...rest } = meta;
   const eventMeta = { ...rest, ...(message ? { message } : {}), ...(kind === "admin" ? { role: admin.role ?? null } : {}) };
-  const updated = await db.$transaction(async (tx) => {
+  const { updated, eventId } = await db.$transaction(async (tx) => {
     // Only moves when nobody else moved it first (two admins clicking at once).
     const r = await tx.partnerApplication.updateMany({
       where: { id, status: from },
@@ -225,14 +227,16 @@ export async function changeStatus(
       },
     });
     if (r.count !== 1) throw new HttpError(409, "Someone else changed this application. Refresh and try again.", "CONFLICT");
-    await tx.partnerEvent.create({ data: { applicationId: id, actor, action: "status", from, to, meta: JSON.stringify(eventMeta).slice(0, 4000) } });
+    // R1289: work that must land with the move or not at all (the creator's more-information reply).
+    if (hooks.inTx) await hooks.inTx(tx);
+    const ev = await tx.partnerEvent.create({ data: { applicationId: id, actor, action: "status", from, to, meta: JSON.stringify(eventMeta).slice(0, 4000) } });
     await tx.auditLog.create({
       data: {
         actor: admin.login.slice(0, 120), actorRole: admin.role ?? null, action: "partner.status", targetType: "partner", targetId: id,
         email: current.email.toLowerCase(), before: JSON.stringify({ status: from }), after: JSON.stringify({ status: to }), note: message.slice(0, 500),
       },
     });
-    return tx.partnerApplication.findUniqueOrThrow({ where: { id } });
+    return { updated: await tx.partnerApplication.findUniqueOrThrow({ where: { id } }), eventId: ev.id };
   });
   if (meta.notify !== false) {
     // The status change already happened; a mail outage must not undo it or show the admin an error.
@@ -242,6 +246,8 @@ export async function changeStatus(
       console.error("[partners] status email", e);
     }
   }
+  // In-app notice, keyed by this status event. A quiet move (an offer taken back) stays quiet, except going live.
+  if (meta.notify !== false || to === "active") await partnerNotice(updated, to, { stamp: eventId, message });
   if (kind === "admin") {
     await adminEvent("partner", `${updated.fullName}: ${PARTNER_STATUS_LABEL[to as PartnerStatus]}`, `${PARTNER_STATUS_LABEL[from as PartnerStatus] ?? from} to ${PARTNER_STATUS_LABEL[to as PartnerStatus]} by ${admin.login}`, `/admin/partners/${id}`);
   }

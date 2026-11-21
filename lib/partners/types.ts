@@ -109,6 +109,8 @@ export const PARTNER_NICHES = [
   "lifestyle",
   "entertainment",
   "gaming",
+  "food",
+  "travel",
   "other",
 ] as const;
 export type PartnerNiche = (typeof PARTNER_NICHES)[number];
@@ -124,6 +126,8 @@ export const PARTNER_NICHE_LABEL: Record<PartnerNiche, string> = {
   lifestyle: "Lifestyle",
   entertainment: "Entertainment",
   gaming: "Gaming",
+  food: "Food",
+  travel: "Travel",
   other: "Other",
 };
 
@@ -164,33 +168,36 @@ export interface PartnerSocial {
   handle: string; // without the @
   url: string;
   followers: number;
-  niche: PartnerNiche;
-  format: PartnerFormat;
+  niche?: PartnerNiche; // long form only; the short form asks for one category in stats
+  format?: PartnerFormat;
   primary?: boolean;
 }
 
 export interface PartnerStats {
   avgViews: number;
-  avgLikes: number;
-  avgComments: number;
-  avgShares: number;
-  reach: number; // average reach or impressions per post
+  // R1289: the short form asks for avgViews only; these come from long-form applications.
+  avgLikes?: number;
+  avgComments?: number;
+  avgShares?: number;
+  reach?: number; // average reach or impressions per post
   engagementRate: number | null; // percent, creator-provided
   audienceCountries: string; // free text, e.g. "India 60%, US 20%"
-  ageRange: string; // one of AGE_RANGES
-  frequency: PostingFrequency;
-  niche: PartnerNiche;
+  ageRange?: string; // one of AGE_RANGES
+  frequency?: PostingFrequency;
+  niche?: PartnerNiche;
 }
 
 export interface PartnerProposal {
   why: string;
   how: string;
   contentType: string;
-  posts: number;
+  posts?: number;
   preference: PartnerPreference;
   compensation: string; // optional, creator's own words
   pastCollabs: string; // optional
   portfolio: string[]; // optional URLs
+  extra?: string; // short form: anything else, up to 300 characters
+  form?: "short" | "long"; // missing on applications sent before R1289 = long
 }
 
 export const PARTNER_OFFER_STATUSES = ["draft", "sent", "accepted", "declined", "withdrawn", "expired"] as const;

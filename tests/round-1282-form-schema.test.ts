@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import { ApplicationSchema, ConsentSchema, PersonalSchema, SocialsSchema, StatsSchema, issueMap } from "@/lib/partners/schema";
 import { REF_RE, cleanFileName, emailKeyOf, makeFileToken, makeRef, normaliseHandle, normaliseProfileUrl, sniffMime, summarise, FILE_TOKEN_RE } from "@/lib/partners/core";
-import { emptyDraft, payload, restoreDraft, sourceFrom, stepErrors, toNumber, withHandle } from "@/components/partners/form/draft";
+import { emptyDraft, payload, restoreDraft, sourceFrom, stepErrors, toNumber, withUrl } from "@/components/partners/form/draft";
 
 const stats = { avgViews: 800, avgLikes: 60, avgComments: 8, avgShares: 4, reach: 900, engagementRate: 6.5, audienceCountries: "India 70%", ageRange: "18-24", frequency: "weekly", niche: "tech" };
 const proposal = { why: "I make short tutorials on creator tools and my audience keeps asking what I use.", how: "A Reel walking through scheduling one clip to three platforms.", contentType: "Tutorial Reel", posts: 2, preference: "either", compensation: "", pastCollabs: "", portfolio: [] };
@@ -143,16 +143,17 @@ describe("core helpers", () => {
   });
 });
 
+// R1289: the form is the short four-step one now; the long-form draft pins (withHandle, city, 5 steps) went with it.
 describe("form draft", () => {
   test("numbers accept commas, blank is undefined", () => {
     expect(toNumber("12,500")).toBe(12500);
     expect(toNumber("")).toBeUndefined();
     expect(Number.isNaN(toNumber("abc"))).toBe(true);
   });
-  test("handle edits fill the link until the creator types one", () => {
-    const r = withHandle({ platform: "instagram", handle: "", url: "", urlEdited: false, followers: "", niche: "", format: "" }, "@ria.creates");
-    expect(r.url).toBe("https://www.instagram.com/ria.creates/");
-    expect(withHandle({ ...r, url: "https://instagram.com/other", urlEdited: true }, "ria2").url).toBe("https://instagram.com/other");
+  test("a pasted link picks the platform until the creator chooses one", () => {
+    const r = withUrl({ platform: "", url: "", followers: "", locked: false }, "https://www.instagram.com/ria.creates/");
+    expect(r.platform).toBe("instagram");
+    expect(withUrl({ ...r, platform: "other", locked: true }, "https://youtube.com/@ria").platform).toBe("other");
   });
   test("empty step 1 reports field-keyed errors", () => {
     const e = stepErrors(0, emptyDraft());
@@ -162,11 +163,11 @@ describe("form draft", () => {
   });
   test("a filled draft builds a payload the server schema accepts", () => {
     const d = emptyDraft();
-    d.personal = { ...personal };
-    d.socials = [{ platform: "instagram", handle: "ria.creates", url: "", urlEdited: false, followers: "1,000", niche: "tech", format: "reels" }];
-    d.stats = { avgViews: "800", avgLikes: "60", avgComments: "8", avgShares: "4", reach: "900", engagementRate: "", audienceCountries: "", ageRange: "18-24", frequency: "weekly", niche: "tech" };
-    d.proposal = { ...proposal, posts: "2", portfolio: [""] };
-    d.consent = { terms: true, accuracy: true };
+    d.personal = { fullName: personal.fullName, email: personal.email, country: "india" };
+    d.socials = [{ platform: "instagram", url: "instagram.com/ria.creates", followers: "1,000", locked: false }];
+    d.stats = { avgViews: "800", engagementRate: "", niche: "tech" };
+    d.proposal = { preference: "either", extra: "" };
+    d.consent = true;
     for (let i = 0; i < 5; i++) expect(stepErrors(i, d)).toEqual({});
     const r = ApplicationSchema.safeParse(payload(d, "ref:ria", ""));
     expect(r.success).toBe(true);
@@ -177,7 +178,7 @@ describe("form draft", () => {
     const r = restoreDraft(JSON.stringify({ draft: { personal: { fullName: "Ria" } }, step: 9 }));
     expect(r?.step).toBe(4);
     expect(r?.draft.personal.fullName).toBe("Ria");
-    expect(r?.draft.socials.length).toBe(1);
+    expect(r?.draft.socials.length).toBe(0);
   });
   test("sourceFrom reads ref and utm", () => {
     expect(sourceFrom("?ref=ria2026&utm_source=youtube&utm_medium=bio")).toBe("ref:ria2026 utm:youtube/bio");

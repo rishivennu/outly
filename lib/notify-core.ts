@@ -23,10 +23,13 @@ export const EVENTS = [
   "renewal",
   "usage_limit",
   "plan_update",
+  "partner_update",
+  "partner_offer",
+  "partner_deadline",
 ] as const;
 export type EventKey = (typeof EVENTS)[number];
 
-export type CategoryId = "publishing" | "schedule" | "account" | "engagement" | "billing";
+export type CategoryId = "publishing" | "schedule" | "account" | "engagement" | "billing" | "partnerships";
 
 export interface EventInfo {
   label: string;
@@ -56,6 +59,9 @@ export const EVENT_INFO: Record<EventKey, EventInfo> = {
   renewal: { label: "Renewal reminders", hint: "A week and a day before your plan renews or ends." },
   usage_limit: { label: "Usage limit reached", hint: "When you've used this month's AI requests on your plan." },
   plan_update: { label: "Plan updates", hint: "When auto-renew is switched off by your bank or the payment gateway." },
+  partner_update: { label: "Application updates", hint: "When your partnership application is received, reviewed, needs more information or gets a decision." },
+  partner_offer: { label: "Partnership offers", hint: "When an offer is waiting for you, and when your answer or benefit is confirmed." },
+  partner_deadline: { label: "Deliverable deadlines", hint: "A reminder two days before an agreed deliverable is due." },
 };
 
 export interface Category {
@@ -79,6 +85,7 @@ export const CATEGORIES: Category[] = [
     notYet: [{ label: "YouTube comments", why: "YouTube doesn't tell apps about new comments as they happen. They show in Inbox when you open it." }],
   },
   { id: "billing", title: "Billing & subscription", blurb: "Important subscription and payment updates.", events: ["payment_ok", "payment_failed", "renewal", "usage_limit", "plan_update"] },
+  { id: "partnerships", title: "Creator partnerships", blurb: "Updates about your partnership applications and offers.", events: ["partner_update", "partner_offer", "partner_deadline"] },
 ];
 
 export const categoryOf = (e: string): CategoryId | null => CATEGORIES.find((c) => (c.events as string[]).includes(e))?.id ?? null;
@@ -125,6 +132,9 @@ export const PRIORITY: Record<string, 1 | 2 | 3 | 4> = {
   renewal: 2,
   plan_update: 2,
   schedule_change: 2,
+  partner_update: 2,
+  partner_offer: 2,
+  partner_deadline: 2,
   post_live: 3,
   account_connected: 3,
   payment_ok: 3,
@@ -144,7 +154,7 @@ export const priorityOf = (kind: string): 1 | 2 | 3 | 4 => PRIORITY[kind] ?? 3;
  * rule already (a comment's own 2-minute gap per post, a reminder's one-per-scheduled-time key).
  * The admin can raise any of these (lib/notify-config.ts); it can never silence an essential alert.
  */
-export const COOLDOWN_MIN: Record<CategoryId | "assist", number> = { publishing: 0, schedule: 0, account: 30, engagement: 2, billing: 0, assist: 120 };
+export const COOLDOWN_MIN: Record<CategoryId | "assist", number> = { publishing: 0, schedule: 0, account: 30, engagement: 2, billing: 0, partnerships: 0, assist: 120 };
 export const cooldownFor = (kind: string, over: Partial<Record<CategoryId | "assist", number>> = {}) => {
   const bucket = ASSIST_KIND[kind] ? "assist" : categoryOf(KIND_EVENT[kind] ?? kind);
   if (!bucket) return 0;
@@ -171,7 +181,7 @@ export const CENTRE_TABS: { id: CentreTab; title: string; kinds: string[] }[] = 
   { id: "publishing", title: "Publishing", kinds: ["post_live", "post_failed", "remind", "schedule_change"] },
   { id: "performance", title: "Performance", kinds: ["engagement_spike", "milestone"] },
   { id: "growth", title: "Growth", kinds: ["growth", "greet", "inactivity", "summary", "goal_nudge", "recycle"] },
-  { id: "account", title: "Account Alerts", kinds: ["reconnect", "token_expiring", "account_connected", "payment_ok", "payment_failed", "renewal", "usage_limit", "plan_update"] },
+  { id: "account", title: "Account Alerts", kinds: ["reconnect", "token_expiring", "account_connected", "payment_ok", "payment_failed", "renewal", "usage_limit", "plan_update", "partner_update", "partner_offer", "partner_deadline"] },
 ];
 /** Anything new, or a kind from before the centre existed, shows under All only. */
 export const centreTabOf = (kind: string): CentreTab => CENTRE_TABS.find((t) => t.id !== "all" && t.kinds.includes(kind))?.id ?? "all";
@@ -195,6 +205,9 @@ export const KIND_EVENT: Record<string, EventKey> = {
   renewal: "renewal",
   usage_limit: "usage_limit",
   plan_update: "plan_update",
+  partner_update: "partner_update",
+  partner_offer: "partner_offer",
+  partner_deadline: "partner_deadline",
 };
 
 export const LEADS = [5, 15, 30, 60] as const;

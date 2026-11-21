@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
-import { BarChart3, Bell, CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, Home, Inbox, LayoutGrid, LifeBuoy, Link2, Monitor, Moon, Plus, Settings, Sun, X } from "lucide-react";
+import { BarChart3, Bell, CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, Handshake, Home, Inbox, LayoutGrid, LifeBuoy, Link2, Monitor, Moon, Plus, Settings, Sun, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { APP_SELLS_PLANS, appTitle } from "@/lib/app-mode";
 import { APP_MORE_EVENT, haptic, markBack, useAppMode } from "@/lib/client/app-mode";
@@ -270,6 +270,7 @@ export function AppMoreSheet() {
       ...(owner ? [{ href: "/accounts", label: "Connected accounts", icon: Link2, tint: "#0a84ff" }] : []),
     ],
     [
+      { href: "/dashboard/partnerships", label: "My Partnerships", icon: Handshake, tint: "#34c759" },
       { href: "/settings", label: "Settings", icon: Settings, tint: "#8e8e93" },
       { href: "/support", label: "Help centre", icon: LifeBuoy, tint: "#30d158" },
     ],

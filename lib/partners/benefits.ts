@@ -8,6 +8,7 @@ import { ensurePlans } from "../billing/plans";
 import type { PartnerActor } from "./admin";
 import { sendPartnerStatusEmail, type PartnerEmailApp } from "./email";
 import { durationLabel, fmtDay } from "./offer-core";
+import { partnerNotice } from "./notices";
 
 /**
  * Benefit automation (R1282). Only an ACCEPTED offer can grant anything: approving an application never does.
@@ -101,6 +102,7 @@ export async function grantBenefit(offerId: string, actor: PartnerActor, opts: {
   }
   await event(app.id, actor.login, "benefit.grant", { offerId: o.id, grantId: g.id, plan: g.plan.slug, status: g.status, startsAt: g.startsAt.toISOString(), endsAt: g.endsAt.toISOString(), manual: !!opts.force });
   await mailCreator(app, "benefit_activated", { plan: g.plan.name, startsAt: g.startsAt, endsAt: g.status === "pending" ? null : g.endsAt });
+  await partnerNotice(app, "benefit", { stamp: g.id, plan: g.plan.name, endsAt: g.endsAt, pending: g.status === "pending" });
   return { granted: true, grantId: g.id, plan: g.plan.slug, startsAt: g.startsAt, endsAt: g.endsAt, status: g.status };
 }
 

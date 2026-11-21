@@ -23,12 +23,12 @@ export default function HistoryList({ events }: { events: PartnerEventRow[] }) {
                 <span aria-hidden="true" className="mt-[7px] h-2 w-2 rounded-full bg-muted-foreground/60" />
                 <div className="min-w-0">
                   <p className="text-[13.5px] font-medium leading-snug">
-                    {e.action === "status" && e.to ? (e.from ? `${status(e.from)} to ${status(e.to)}` : status(e.to)) : eventLabel(e.action)}
+                    {(e.action === "status" || e.action === "status.change") && e.to ? (e.from ? `${status(e.from)} to ${status(e.to)}` : status(e.to)) : eventLabel(e.action)}
                   </p>
                   <p className="text-[12px] text-muted-foreground">
                     {who(e.actor)} · <time dateTime={e.createdAt}>{fmtDate(e.createdAt, true)}</time>
                   </p>
-                  {message && <p className="mt-1 whitespace-pre-wrap rounded-xl bg-secondary/40 px-3 py-2 text-[12.5px] [overflow-wrap:anywhere]"><span className="font-semibold">Sent to the creator: </span>{message}</p>}
+                  {message && <p className="mt-1 whitespace-pre-wrap rounded-xl bg-secondary/40 px-3 py-2 text-[12.5px] [overflow-wrap:anywhere]"><span className="font-semibold">{e.action === "info.provided" ? "From the creator: " : "Sent to the creator: "}</span>{message}</p>}
                 </div>
               </li>
             );

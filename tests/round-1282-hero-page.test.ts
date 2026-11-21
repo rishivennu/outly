@@ -174,12 +174,13 @@ describe("R1282 page sections", () => {
     expect(s).toContain("Write to partners@outlly.com");
   });
   test("ApplyForm renders inside #apply after the steps", () => {
-    expect(page).toContain('import ApplyForm from "@/components/partners/ApplyForm"');
+    // R1289: the form gets the signed-in applicant and the section has the short-form headline.
+    expect(page).toContain('import ApplyForm, { type ApplyMe } from "@/components/partners/ApplyForm"');
     const apply = page.indexOf('<section id="apply"');
     expect(apply).toBeGreaterThan(page.indexOf("<PartnerSteps />"));
-    expect(page.indexOf("<ApplyForm />")).toBeGreaterThan(apply);
-    expect(page.indexOf("<ApplyForm />")).toBeLessThan(page.indexOf("</section>", apply));
-    expect(page).toContain("Apply for partnership");
+    expect(page.indexOf("<ApplyForm me={me} />")).toBeGreaterThan(apply);
+    expect(page.indexOf("<ApplyForm me={me} />")).toBeLessThan(page.indexOf("</section>", apply));
+    expect(page).toContain("Let's get you rewarded.");
     expect(existsSync("components/partners/ApplyForm.tsx")).toBe(true);
   });
   test("house radii on the cards (R1287: the tiles are flat colour, no stroke)", () => {

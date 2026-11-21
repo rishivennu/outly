@@ -38,19 +38,16 @@ describe("route source pins", () => {
     expect(withdraw).toContain("rateLimit(");
     expect(withdraw).toContain("NOT_FOUND");
   });
-  test("form: exact copy, honeypot, autosave, five steps, consent wording", () => {
-    expect(form).toContain("PARTNER_SUBMITTED_MESSAGE");
-    expect(form).toContain("Submit Partnership Application");
+  // R1289 short form: copy pins moved to tests/round-1289-form.test.ts; the safety pins stay here.
+  test("form: honeypot, autosave, duplicate copy, consent links", () => {
     expect(form).toContain("You already have an open application (ID ${ref}). We will get back to you on that one.");
     expect(form).toContain('id="pa-website"');
     expect(form).toContain("sessionStorage");
-    expect(form).toContain("Screenshots of your analytics help us review faster. Never share passwords or login details.");
-    expect(form).toContain("Creator-provided. We may verify figures before making an offer.");
-    expect(form).toContain("I confirm the information is accurate and consent to Outlly evaluating my public profiles and the figures I provided.");
+    expect(form).toContain("Never share passwords or login details.");
+    expect(form).toContain("Self-reported numbers. We may ask for a screenshot later.");
     expect(form).toContain('href="/terms"');
     expect(form).toContain('href="/privacy"');
-    expect(form).toContain("Back to home");
-    expect(form).toContain("export default function ApplyForm()");
+    expect(form).toContain("export default function ApplyForm({ me = null }: { me?: ApplyMe })");
     expect(form).not.toMatch(/usage rights/i);
     expect(form).not.toContain("\u2014");
   });

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, Bell, BellOff, BellRing, CalendarClock, Check, CircleAlert, CreditCard, Laptop, Mail, MessageCircle, Moon, MonitorSmartphone,
+  ArrowLeft, Bell, BellOff, Handshake, BellRing, CalendarClock, Check, CircleAlert, CreditCard, Laptop, Mail, MessageCircle, Moon, MonitorSmartphone,
   Plus, Send, Share, Smartphone, SquarePlus, Trash2, Rocket, UserRoundCheck, Inbox, Sparkles, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ import { Choice, Expand, Switch, SwitchRow, ago } from "./parts";
 type Initial = { prefs: NotifyPrefs; tz: string; publicKey: string; devices: Device[] };
 type Notice = { id: string; kind: string; tone: "danger" | "warn" | "info"; title: string; body: string; href: string | null; action: string | null; read: boolean; createdAt: string };
 
-const CAT_ICON: Record<CategoryId, typeof Bell> = { publishing: Rocket, schedule: CalendarClock, account: UserRoundCheck, engagement: MessageCircle, billing: CreditCard };
+const CAT_ICON: Record<CategoryId, typeof Bell> = { publishing: Rocket, schedule: CalendarClock, account: UserRoundCheck, engagement: MessageCircle, billing: CreditCard, partnerships: Handshake };
 const SECTIONS = [
   { id: "nf-device", label: "This device", icon: BellRing },
   { id: "nf-types", label: "What to notify", icon: Bell },

@@ -26,6 +26,7 @@ import { GaugeIcon } from "./gauge";
 import { RotateCCWIcon } from "./rotate-ccw";
 import { ShieldCheckIcon } from "./shield-check";
 import { SparklesIcon } from "./sparkles";
+import { HandshakeIcon } from "./handshake";
 
 export type IconHandle = { startAnimation: () => void; stopAnimation: () => void };
 export type AnimatedIcon = ComponentType<HTMLAttributes<HTMLSpanElement> & { size?: number } & RefAttributes<IconHandle>>;
@@ -43,6 +44,8 @@ export const ANIMATED = {
   inbox: MessageCircleIcon,
   approvals: ClipboardCheckIcon,
   accounts: Link2Icon,
+  /** R1289: My Partnerships. */
+  partnerships: HandshakeIcon,
   billing: CreditCardIcon,
   help: CircleHelpIcon,
   settings: SettingsIcon,

@@ -5,6 +5,7 @@ import { ApplicationSchema } from "@/lib/partners/schema";
 import { emailKeyOf, makeRef } from "@/lib/partners/core";
 import { createApplication, findDuplicate } from "@/lib/partners/core-server";
 import { notifyAdminsNewApplication, sendPartnerStatusEmail } from "@/lib/partners/email";
+import { getCurrentUser, realUserId } from "@/lib/auth";
 
 const HOUR = 3_600_000;
 
@@ -24,7 +25,9 @@ export const POST = route(
     const dup = await findDuplicate(emailKey);
     if (dup)
       return json({ error: `You already have an open application (ID ${dup.ref}). We will get back to you on that one.`, code: "DUPLICATE", ref: dup.ref }, { status: 409 });
-    const app = await createApplication(input, { ip });
+    // Signed in: the application belongs to this account from the start (the dashboard lists it right away).
+    const me = await getCurrentUser().catch(() => null);
+    const app = await createApplication(input, { ip, userId: me ? realUserId(me) : undefined });
     await Promise.allSettled([sendPartnerStatusEmail(app, "submitted"), notifyAdminsNewApplication(app)]);
     return json({ ok: true, ref: app.ref });
   },

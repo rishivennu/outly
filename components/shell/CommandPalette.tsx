@@ -102,6 +102,7 @@ export function CommandPalette() {
         { id: "billing", group: "Go to" as const, label: "Billing", keywords: "plan upgrade invoice", href: "/billing" },
       ] : []),
       { id: "settings", group: "Go to", label: "Settings", keywords: "profile timezone email", href: "/settings" },
+      { id: "partnerships", group: "Go to", label: "My Partnerships", keywords: "creator partner application offer collaboration", href: "/dashboard/partnerships" },
       { id: "help", group: "Go to", label: "Help centre", keywords: "support faq", href: "/support" },
       { id: "light", group: "Do", label: "Switch to light theme", keywords: "appearance mode", run: () => setTheme("light") },
       { id: "dark", group: "Do", label: "Switch to dark theme", keywords: "appearance mode night", run: () => setTheme("dark") },

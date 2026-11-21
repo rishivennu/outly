@@ -8,6 +8,7 @@ import { adminEvent } from "../admin/route";
 import { changeStatus, type PartnerActor } from "./admin";
 import { grantBenefit } from "./benefits";
 import { ensurePartnerCode } from "./attribution";
+import { partnerNotice } from "./notices";
 import { OFFER_CURRENCIES, offerTermsOf, type OfferTerms } from "./offer-core";
 import { PARTNER_OFFER_TYPES, PARTNER_PLATFORMS, PARTNER_TERMS_VERSION } from "./types";
 
@@ -211,7 +212,7 @@ async function project(o: NonNullable<Awaited<ReturnType<typeof findByToken>>>):
 }
 
 function findByToken(token: string) {
-  return db.partnerOffer.findUnique({ where: { token }, include: { application: { select: { id: true, ref: true, fullName: true, status: true, email: true } } } });
+  return db.partnerOffer.findUnique({ where: { token }, include: { application: { select: { id: true, ref: true, fullName: true, status: true, email: true, userId: true } } } });
 }
 
 /** A draft was never sent, so its token means nothing yet: the same "not found" as a made-up one. */
@@ -248,6 +249,7 @@ export async function respondToOffer(token: string, decision: "accept" | "declin
     await event(appId, "creator", "offer.decline", { offerId: o.id, ...(reason ? { reason } : {}) });
     await changeStatus(appId, "approved", CREATOR, { actor: "creator", offerId: o.id, notify: false });
     await adminEvent("partner", `${o.application.fullName} declined the offer`, reason || "No reason given", `/admin/partners/${appId}`);
+    await partnerNotice(o.application, "offer_declined", { stamp: o.id });
     return { state: "declined" as const };
   }
 

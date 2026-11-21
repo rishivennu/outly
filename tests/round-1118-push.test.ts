@@ -119,8 +119,8 @@ describe("1118 delivery rules", () => {
 });
 
 describe("1118 preferences", () => {
-  test("five categories cover every event exactly once", () => {
-    expect(CATEGORIES.map((c) => c.id)).toEqual(["publishing", "schedule", "account", "engagement", "billing"]);
+  test("the categories cover every event exactly once", () => {
+    expect(CATEGORIES.map((c) => c.id)).toEqual(["publishing", "schedule", "account", "engagement", "billing", "partnerships"]);
     expect(CATEGORIES.flatMap((c) => c.events).sort()).toEqual([...EVENTS].sort());
   });
   test("Disable all leaves essential alerts on; Enable all turns everything on", () => {

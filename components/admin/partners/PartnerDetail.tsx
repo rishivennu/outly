@@ -20,13 +20,13 @@ export type PartnerDetailData = {
   attribution: { visits: number; signups: number; paid: number };
 };
 
-function Facts({ items }: { items: [string, React.ReactNode][] }) {
+function Facts({ items, missing = "Not given" }: { items: [string, React.ReactNode][]; missing?: string }) {
   return (
     <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
       {items.map(([k, v]) => (
         <div key={k} className="min-w-0">
           <dt className="text-[12px] font-semibold text-muted-foreground">{k}</dt>
-          <dd className="mt-0.5 text-[14px] [overflow-wrap:anywhere]">{v || <span className="text-muted-foreground">Not given</span>}</dd>
+          <dd className="mt-0.5 text-[14px] [overflow-wrap:anywhere]">{v || <span className="text-muted-foreground">{missing}</span>}</dd>
         </div>
       ))}
     </dl>
@@ -43,16 +43,21 @@ const safeHttp = (u: string) => {
   }
 };
 
+/** R1289: a short application leaves most figures out on purpose; absent reads "Not provided", never a zero. */
+const opt = (n: unknown, f: (n: number) => string) => (typeof n === "number" && Number.isFinite(n) ? f(n) : "");
+
 /** Admin detail of one creator application: what they sent on the left, what the team does on the right. */
 export function PartnerDetail({ app }: { app: PartnerDetailData }) {
   const s = app.stats;
   const p = app.proposal;
   const portfolio = (p.portfolio ?? []).map((u) => ({ raw: u, href: safeHttp(u) }));
+  const short = (p as { form?: unknown }).form === "short";
+  const extra = typeof (p as { extra?: unknown }).extra === "string" ? ((p as { extra?: string }).extra ?? "") : "";
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
       <div className="grid min-w-0 content-start gap-4">
         <Card>
-          <CardTitle>Personal</CardTitle>
+          <CardTitle action={short ? <Pill tone="lime">Short application</Pill> : undefined}>Personal</CardTitle>
           <Facts
             items={[
               ["Full name", app.fullName],
@@ -106,13 +111,14 @@ export function PartnerDetail({ app }: { app: PartnerDetailData }) {
         <Card>
           <CardTitle hint="Creator-provided. Not verified by Outlly.">Performance</CardTitle>
           <Facts
+            missing="Not provided"
             items={[
-              ["Average views (creator-provided)", fmtWhole(s.avgViews)],
-              ["Average likes (creator-provided)", fmtWhole(s.avgLikes)],
-              ["Average comments (creator-provided)", fmtWhole(s.avgComments)],
-              ["Average shares (creator-provided)", fmtWhole(s.avgShares)],
-              ["Reach per post (creator-provided)", fmtCount(s.reach)],
-              ["Engagement rate (creator-provided)", fmtRate(s.engagementRate)],
+              ["Average views (creator-provided)", opt(s.avgViews, fmtWhole)],
+              ["Average likes (creator-provided)", opt(s.avgLikes, fmtWhole)],
+              ["Average comments (creator-provided)", opt(s.avgComments, fmtWhole)],
+              ["Average shares (creator-provided)", opt(s.avgShares, fmtWhole)],
+              ["Reach per post (creator-provided)", opt(s.reach, fmtCount)],
+              ["Engagement rate (creator-provided)", opt(s.engagementRate, fmtRate)],
               ["Audience countries (creator-provided)", s.audienceCountries],
               ["Audience age (creator-provided)", s.ageRange],
               ["Posting frequency (creator-provided)", s.frequency ? POSTING_FREQUENCY_LABEL[s.frequency as PostingFrequency] ?? s.frequency : ""],
@@ -149,13 +155,14 @@ export function PartnerDetail({ app }: { app: PartnerDetailData }) {
         <Card>
           <CardTitle>Proposal</CardTitle>
           <div className="grid gap-4">
-            {([["Why Outlly", p.why], ["How they would promote it", p.how], ["Content type", p.contentType]] as const).map(([k, v]) => (
+            {([["Why Outlly", p.why], ["How they would promote it", p.how], ["Content type", p.contentType], ...(extra ? [["Anything else", extra]] : [])] as const).map(([k, v]) => (
               <div key={k}>
                 <h3 className="text-[12px] font-semibold text-muted-foreground">{k}</h3>
-                <p className="mt-0.5 whitespace-pre-wrap text-[14px] leading-relaxed [overflow-wrap:anywhere]">{v || <span className="text-muted-foreground">Not given</span>}</p>
+                <p className="mt-0.5 whitespace-pre-wrap text-[14px] leading-relaxed [overflow-wrap:anywhere]">{v || <span className="text-muted-foreground">{short ? "Not provided" : "Not given"}</span>}</p>
               </div>
             ))}
             <Facts
+              missing={short ? "Not provided" : "Not given"}
               items={[
                 ["Posts offered", typeof p.posts === "number" ? fmtWhole(p.posts) : ""],
                 ["Preference", preferenceLabel(p.preference ?? app.preference)],
