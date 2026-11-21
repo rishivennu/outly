@@ -35,22 +35,30 @@ export function Peep({ name, height = 112, fill = "hsl(var(--card))", className,
   );
 }
 
+/** The studio's ink and paper, fixed: the spot figure is an illustration, the same light sticker on both themes. */
+export const SPOT_INK = "#131315";
+export const SPOT_PAPER = "#f6f4ee";
+
 /**
- * The empty-state and status spot: the figure standing in front of a lime disc, taller than the disc so the head
- * breaks the circle, the bust's flat cut rounded off by the disc's lower edge. The same `bg-lime/15` disc the icon
- * empty states use, grown up. `children` sits in the disc's bottom-right corner (a small badge, optional).
+ * The empty-state and status spot: a solid sticker (dark ink on warm-white paper) standing in a lime disc. The figure
+ * runs on below the box and the clip follows the disc's lower arc, so the bust is cut by the circle the way Open Peeps
+ * presents its own busts; the head and any outstretched hand break the circle freely. `height` is the visible height;
+ * the box is never narrower than the figure. `children` lands in the box's bottom-right corner (a small badge, optional).
  */
-export function PeepSpot({ name, height = 128, fill, className, children }: { name: PeepName; height?: number; fill?: string; className?: string; children?: ReactNode }) {
-  const disc = Math.max(Math.round(height * 0.72), peepWidth(name, height));
+export function PeepSpot({ name, height = 128, ink = SPOT_INK, fill = SPOT_PAPER, className, children }: { name: PeepName; height?: number; ink?: string; fill?: string; className?: string; children?: ReactNode }) {
+  const figure = Math.round(height * 1.16);
+  const sink = figure - height;
+  const disc = Math.round(height * 0.84);
+  const fw = peepWidth(name, figure);
+  const width = Math.max(disc, fw);
+  const r = disc / 2;
+  const cx = width / 2;
+  const cy = height - r;
+  const clip = `path("M0 0H${width}V${height}H${cx + r}V${cy}A${r} ${r} 0 0 1 ${cx - r} ${cy}V${height}H0Z")`;
   return (
-    <span
-      aria-hidden="true"
-      data-peep-spot={name}
-      className={cn("relative inline-grid shrink-0 justify-items-center overflow-hidden", className)}
-      style={{ width: disc, height, alignItems: "end", borderRadius: `0 0 ${disc / 2}px ${disc / 2}px` }}
-    >
-      <span className="absolute bottom-0 left-0 rounded-full bg-lime/15" style={{ width: disc, height: disc }} />
-      <Peep name={name} height={height} fill={fill} className="relative" />
+    <span aria-hidden="true" data-peep-spot={name} className={cn("relative inline-block shrink-0 align-bottom", className)} style={{ width, height, clipPath: clip }}>
+      <span className="absolute bottom-0 rounded-full bg-lime/15 dark:bg-lime/20" style={{ left: cx - r, width: disc, height: disc }} />
+      <Peep name={name} height={figure} fill={fill} className="absolute" style={{ left: cx - fw / 2, bottom: -sink, color: ink }} />
       {children}
     </span>
   );

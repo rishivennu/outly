@@ -17,7 +17,7 @@ const TIERS: {
   range: string;
   body: string;
   tone: Tone;
-  /** R1295: the tier's Open Peep (components/ui/art/peeps), one per tier, standing beside the creator card. */
+  /** R1295: the tier's Open Peep (components/ui/art/peeps), one per tier, standing behind the creator card. */
   peep: PeepName;
   card: { initials: string; handle: string; followers: string; bars: [number, number, number]; tilt: string };
 }[] = [
@@ -81,7 +81,7 @@ function CreatorCard({ card, peep }: { card: (typeof TIERS)[number]["card"]; pee
   const style = { "--tilt": card.tilt } as CSSProperties;
   return (
     <div className={s.stage} aria-hidden="true">
-      <Peep name={peep} height={208} fill="#ffffff" className={s.peep} />
+      <Peep name={peep} height={176} fill="color-mix(in srgb, #ffffff 82%, var(--t-bg))" className={s.peep} />
       <div className={s.creator} style={style}>
         <div className={s.creatorTop}>
           <span className={s.avatar}>{card.initials}</span>

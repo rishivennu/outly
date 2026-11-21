@@ -10,5 +10,5 @@ export const CAST = {
   approved:  { body: "PointingUp",    face: "SmileBig",  hair: "ShortWavy",   accessory: "None",            facialHair: "None" },
   working:   { body: "Geek",          face: "Cute",      hair: "Twists",      accessory: "None",            facialHair: "None" },
   ended:     { body: "Hoodie",        face: "Solemn",    hair: "ShortMessy",  accessory: "None",            facialHair: "None" },
-  numbers:   { body: "PocketShirt",   face: "Awe",       hair: "BantuKnots",  accessory: "None",            facialHair: "None" },
+  numbers:   { body: "ArmsCrossed",   face: "Awe",       hair: "BantuKnots",  accessory: "None",            facialHair: "None" },
 };

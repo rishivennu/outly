@@ -46,23 +46,27 @@
 .tierTile { min-height: 25rem; }
 .stage {
   position: relative;
-  flex: 1 0 11rem;
+  flex: 1 0 12.5rem;
   margin: 1.5rem -1.75rem -1.75rem 0;
 }
 @media (min-width: 640px) {
-  .stage { margin: 1.5rem -2rem -2rem 0; }
+  .stage { flex-basis: 13.5rem; margin: 1.5rem -2rem -2rem 0; }
 }
 
-/* R1295: the tier's figure, ink in the tile's deep tone on white paper, feet on the tile's bottom edge; the card
-   overlaps its shoulder on narrow tiles, which is the intent. */
+/* R1295: the tier's creator stands behind the card, head and shoulders above it, a little left of the card's centre
+   (`right` is measured to the figure's centre through the 50% translate). The card hides the bust's bottom; the paper is
+   a shade off the card's white and the card carries a hairline, so its top edge stays legible across the shirt. */
 .peep {
   position: absolute;
-  left: -0.25rem;
-  bottom: -0.5rem;
+  right: 6.75rem;
+  bottom: 2.25rem;
+  height: 10rem;
+  width: auto;
+  translate: 50% 0;
   color: var(--t-ink);
 }
-@media (max-width: 639px) {
-  .peep { height: 11rem; width: auto; }
+@media (min-width: 640px) {
+  .peep { right: 8.25rem; bottom: 2.5rem; height: 11rem; }
 }
 
 .creator {
@@ -76,7 +80,7 @@
   color: var(--t-ink);
   rotate: var(--tilt, -6deg);
   transform-origin: 100% 100%;
-  box-shadow: 0 20px 50px -20px rgb(0 0 0 / 0.35);
+  box-shadow: 0 20px 50px -20px rgb(0 0 0 / 0.35), 0 0 0 1px color-mix(in srgb, var(--t-ink) 14%, #ffffff);
 }
 @media (max-width: 639px) {
   .creator { scale: 0.85; }

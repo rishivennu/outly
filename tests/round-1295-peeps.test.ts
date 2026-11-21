@@ -54,16 +54,26 @@ describe("R1295 Peep component", () => {
     expect(html).toContain("--peep-fill:#ffffff");
     expect(html).toContain('class="shrink-0 select-none x"');
   });
-  test("PeepSpot: lime disc behind, figure in front, bottom rounded to the disc, never narrower than the figure", () => {
+  test("PeepSpot: a sticker (dark ink, warm-white paper) in a lime disc, bust sunk below the box and clipped to the disc's arc", () => {
     const html = renderToStaticMarkup(createElement(PeepSpot, { name: "question", height: 100 }));
-    const w = peepWidth("question", 100);
-    const disc = Math.max(72, w);
-    expect(disc).toBe(w);
+    const figure = 116;
+    const w = peepWidth("question", figure);
+    const disc = 84;
+    expect(w).toBeGreaterThan(disc);
     expect(html).toContain(`data-peep-spot="question"`);
-    expect(html).toContain(`border-radius:0 0 ${disc / 2}px ${disc / 2}px`);
-    expect(html).toContain('class="absolute bottom-0 left-0 rounded-full bg-lime/15"');
+    expect(html).toContain(`width:${w}px;height:100px;clip-path:path(&quot;M0 0H${w}V100H${w / 2 + 42}V58A42 42 0 0 1 ${w / 2 - 42} 58V100H0Z&quot;)`);
+    expect(html).toContain('class="absolute bottom-0 rounded-full bg-lime/15 dark:bg-lime/20"');
+    expect(html).toContain(`width:${disc}px;height:${disc}px`);
     expect(html.indexOf("bg-lime/15")).toBeLessThan(html.indexOf("<svg"));
+    expect(html).toMatch(/<svg [^>]*height="116"[^>]*data-peep="question"/);
+    expect(html).toContain("--peep-fill:#f6f4ee");
+    expect(html).toContain("bottom:-16px;color:#131315");
     expect(html).toContain('aria-hidden="true"');
+  });
+  test("PeepSpot: the box is never narrower than the disc", () => {
+    const html = renderToStaticMarkup(createElement(PeepSpot, { name: "creator", height: 100 }));
+    expect(peepWidth("creator", 116)).toBeLessThan(84);
+    expect(html).toContain("width:84px;height:100px");
   });
 });
 
@@ -72,10 +82,11 @@ describe("R1295 placements", () => {
     const s = read("components/partners/Sections.tsx");
     const peeps = [...s.matchAll(/^\s+peep: "([a-z]+)",$/gm)].map((m) => m[1]);
     expect(peeps).toEqual(["creator", "growing", "established"]);
-    expect(s).toContain('<Peep name={peep} height={208} fill="#ffffff" className={s.peep} />');
+    expect(s).toContain('<Peep name={peep} height={176} fill="color-mix(in srgb, #ffffff 82%, var(--t-bg))" className={s.peep} />');
     expect(s.indexOf("className={s.peep}")).toBeLessThan(s.indexOf("<div className={s.creator}"));
     const css = read("components/partners/sections.module.css");
-    expect(css).toMatch(/\.peep \{[^}]*position: absolute;[^}]*color: var\(--t-ink\);/s);
+    expect(css).toMatch(/\.peep \{[^}]*position: absolute;[^}]*translate: 50% 0;[^}]*color: var\(--t-ink\);/s);
+    expect(css).toMatch(/\.creator \{[^}]*, 0 0 0 1px color-mix\(in srgb, var\(--t-ink\) 14%, #ffffff\);/s);
   });
   test("client components take the figure as a prop; the pages render it (server-only stays out of client bundles)", () => {
     for (const f of ["components/partners/ApplyForm.tsx", "components/partnerships/PartnershipsList.tsx", "components/dashboard/PulseHome.tsx"]) {
