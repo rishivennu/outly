@@ -46,7 +46,7 @@ describe("R1290 config", () => {
     expect(style).toContain('import "server-only";');
     expect(style).toContain('getConfig("nav")');
     expect(style).toContain("NAV_COOKIE");
-    expect(style).toMatch(/catch \{\s*return \{ style: "sidebar", canSwitch: false, own: false \};/);
+    expect(style).toMatch(/catch \{\s*return \{ style: "sidebar", canSwitch: false, own: false, intro: false \};/);
   });
 });
 
@@ -55,7 +55,8 @@ describe("R1290 API routes", () => {
     expect(meRoute).toContain("export const POST");
     expect(meRoute).toContain("new HttpError(403");
     expect(meRoute).toContain("if (!cfg.userSwitch)");
-    expect(meRoute).toMatch(/cookies\(\)\)\.set\(NAV_COOKIE, style, \{ httpOnly: true[^}]*maxAge: 365 \* 86400/);
+    expect(meRoute).toMatch(/cookies\(\)\)\.set\(NAV_COOKIE, style, cookieOpts\)/);
+    expect(meRoute).toMatch(/const cookieOpts = \{ httpOnly: true[^}]*maxAge: 365 \* 86400/);
     expect(meRoute).toContain("z.enum(NAV_STYLES)");
   });
   test("DELETE /api/me/nav clears the pick", () => {
@@ -80,12 +81,15 @@ describe("R1290 layout: the server picks rail or dock", () => {
     expect(layout).toContain('import { navFor } from "@/lib/nav-style";');
     expect(layout).toMatch(/sid, nav\] = await Promise\.all\(\[/);
     expect(layout).toContain("navFor(),");
-    expect(layout).toContain("<Sidebar style={nav.style} />");
-    expect(layout).toContain("data-nav={nav.style}");
+    // R1291: the frame is client state (NavStyleProvider + NavFrame), seeded by the server, so a switch needs no reload.
+    expect(layout).toContain("<NavStyleProvider initial={nav}>");
+    expect(layout).toContain("<NavFrame>");
+    expect(read("components/shell/NavStyleProvider.tsx")).toContain("<Sidebar style={style} />");
+    expect(read("components/shell/NavStyleProvider.tsx")).toContain('data-nav={style}');
   });
   test("dock pad replaces lg:pb-0 only in dock mode; phone padding untouched", () => {
-    expect(DOCK_MAIN_PAD).toBe("lg:pb-[calc(var(--sa-b)+96px)]");
-    expect(layout).toContain('${nav.style === "dock" ? DOCK_MAIN_PAD : "lg:pb-0"}');
+    expect(DOCK_MAIN_PAD).toBe("lg:pb-0 lg:[[data-nav=dock]_&]:pb-[calc(var(--sa-b)+96px)]");
+    expect(layout).toContain("${DOCK_MAIN_PAD}`}");
     expect(layout).toContain("pb-[calc(var(--sa-b)+88px)] max-lg:[body:has([data-tabbar-off])_&]:pb-[var(--sa-b)]");
     expect(layout).toContain('from "@/lib/nav-config"');
   });
@@ -146,20 +150,20 @@ describe("R1290 Settings and Admin pickers", () => {
     expect(pref).toContain('{ id: "dock", name: "Dock", tag: "New", body: "A floating dock along the bottom, macOS style. Icons grow as you hover." }');
     expect(pref).toContain("Your workspace admin has set the navigation for everyone.");
     expect(pref).toContain("Use the workspace default");
-    expect(pref).toContain('"/api/me/nav", { method: "POST"');
-    expect(pref).toContain('"/api/me/nav", { method: "DELETE" }');
-    expect(pref).toContain("router.refresh()");
+    // R1291: the control writes through the shared NavStyleProvider (one source for Settings, the switcher, the frame).
+    expect(pref).toContain("useNavStyle()");
+    expect(pref).not.toContain("router.refresh()");
     expect(pref).toContain("Dock is on. Your sidebar is one click away here.");
     expect(pref).toContain("Sidebar is back.");
     expect(pref).toContain('type="radio"');
   });
-  test("Settings gets the pick from the server, card sits first in Personalization", () => {
+  test("Settings card sits first in Personalization; the pick comes from the shared provider (R1291)", () => {
     const view = read("components/settings/SettingsView.tsx");
-    expect(view).toContain("<NavStylePref style={navStyle} canSwitch={navCanSwitch} own={navOwn} />");
-    expect(view).toMatch(/<NavStylePref [^\n]*\n\s*<SnippetsCard \/>/);
+    expect(view).toContain("<NavStylePref />");
+    expect(view).toMatch(/<NavStylePref \/>\n\s*<SnippetsCard \/>/);
     const page = read("app/(studio)/settings/page.tsx");
-    expect(page).toContain("navFor()");
-    expect(page).toContain("navStyle={nav.style} navCanSwitch={nav.canSwitch} navOwn={nav.own}");
+    expect(page).not.toContain("navFor()");
+    expect(page).not.toContain("navStyle={");
   });
   test("Admin picker: default tiles + switch, PUT /api/admin/nav, mounted under the dashboard picker", () => {
     expect(picker).toContain('"/api/admin/nav", { method: "PUT"');

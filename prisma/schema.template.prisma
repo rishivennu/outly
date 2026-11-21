@@ -23,6 +23,8 @@ model User {
   timezone     String   @default("Asia/Kolkata")
   /// Phase 2 (1155): guided onboarding progress, JSON {v:1, steps:{welcome|connect|profile|create|schedule|analytics: "done"|"skipped"}, finishedAt?, updatedAt}. Null = never started.
   onboarding   String?
+  /// R1291: this person's UI preferences, JSON {v:1, nav?: "sidebar"|"dock", navTried?: true, navIntro?: {v, state: "dismissed"|"tried", at}}. Null = defaults.
+  uiPrefs      String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

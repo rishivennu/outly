@@ -5,6 +5,7 @@ import { Dock, DockItem, DockSeparator } from "@/components/ui/motion/Dock";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { OutllyLogoIcon } from "@/components/brand/OutllyBrand";
 import { NoticesBell } from "./NoticesBell";
+import { NavStyleSwitch } from "./NavStyleSwitch";
 import { openPalette } from "./CommandPalette";
 import { AccountMenu, useWho } from "./AccountMenu";
 import { MAIN, TOUR, isActive, workspaceItems } from "./nav-items";
@@ -57,6 +58,7 @@ export function StudioDock() {
           </DockItem>
         ))}
         <DockSeparator />
+        <NavStyleSwitch variant="dock" />
         <DockItem label="Search" onClick={() => openPalette()} attrs={{ "aria-haspopup": "dialog", "aria-keyshortcuts": "Control+K Meta+K" }}>
           <Search strokeWidth={1.8} />
         </DockItem>

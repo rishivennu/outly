@@ -9,7 +9,13 @@ export type AnalyticsEvent =
   | "post_scheduled"
   | "post_published"
   | "account_connected"
-  | "library_upload";
+  | "library_upload"
+  // R1291: the navigation style switcher and the "meet your new dock" card. Props: from, to, source; never who.
+  | "nav_switcher_opened"
+  | "nav_intro_shown"
+  | "nav_intro_try"
+  | "nav_intro_later"
+  | "nav_style_changed";
 export type EventProps = Record<string, string | number | boolean | null | undefined>;
 
 /** Same storage key CookieConsent.tsx writes; read here so this module stays free of React. */

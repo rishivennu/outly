@@ -3756,6 +3756,16 @@ html[data-install-card] .pc { opacity: 0; pointer-events: none; transition: opac
 html { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* R1290: Home Screen app and admin console: no pinch zoom either (lib/zoom-lock.ts sets the attribute before paint). */
 html[data-zoom="lock"], html[data-zoom="lock"] body { touch-action: pan-x pan-y; }
+
+/* R1291: switching the desktop navigation in place. The dock rises in, the rail fades in; the page's padding follows.
+   Also runs on a full load, where it reads as the navigation settling. Off under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-nav] .studio-dock > * { animation: nav-dock-in .28s var(--ease-out, ease) both; }
+  [data-nav] .rail-wrap { animation: nav-rail-in .22s var(--ease-out, ease) both; }
+  [data-nav] .mmain { transition: padding-bottom .28s var(--ease-out, ease); }
+}
+@keyframes nav-dock-in { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes nav-rail-in { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
 @media (max-width: 767px) {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
   textarea, select, [contenteditable=""], [contenteditable="true"] { font-size: max(16px, 1em) !important; }

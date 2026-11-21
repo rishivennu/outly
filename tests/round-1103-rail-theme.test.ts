@@ -68,7 +68,9 @@ describe("1103 one sidebar", () => {
     expect(nav).toMatch(/export function Sidebar\(\{ style \}: \{ style: NavStyle \}\)\s*\{\s*if \(style === "dock"\) return <StudioDock \/>;\s*return <PulseRail \/>;\s*\}/);
     expect(existsSync("components/shell/ClassicSidebar.tsx")).toBe(false);
     const layout = src("app/(studio)/layout.tsx");
-    expect(layout).toContain("<Sidebar style={nav.style} />");
+    // R1291: the frame (NavFrame) renders the Sidebar from the shared client state, seeded by navFor.
+    expect(layout).toContain("<NavStyleProvider initial={nav}>");
+    expect(src("components/shell/NavStyleProvider.tsx")).toContain("<Sidebar style={style} />");
     expect(layout).not.toContain("dashboardFor");
   });
   test("rail scroll: slim scrollbar only while open", () => {

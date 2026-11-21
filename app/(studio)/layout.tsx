@@ -6,7 +6,9 @@ import { ACCT_COOKIE } from "@/lib/profiles";
 import { UserProvider } from "@/components/shell/UserContext";
 import { AvatarCursor } from "@/components/shell/AvatarCursor";
 import { ToastProvider } from "@/components/shared/Toast";
-import { MobileNav, MobileTopBar, Sidebar } from "@/components/shell/Nav";
+import { MobileNav, MobileTopBar } from "@/components/shell/Nav";
+import { NavFrame, NavStyleProvider } from "@/components/shell/NavStyleProvider";
+import { NavIntro } from "@/components/shell/NavIntro";
 import { navFor } from "@/lib/nav-style";
 import { DOCK_MAIN_PAD } from "@/lib/nav-config";
 import { Tour } from "@/components/onboarding/Tour";
@@ -50,7 +52,8 @@ export default async function StudioLayout({ children }: { children: React.React
     headers(),
     cookies(),
     currentSessionId().catch(() => null),
-    // R1290: sidebar or dock on desktop (Settings > Personalization, Admin > Dashboard style). Never throws.
+    // R1290: sidebar or dock on desktop (Settings > Personalization, the quick switcher, Admin > Dashboard style).
+    // Never throws; reads the cached user, so it costs no extra query.
     navFor(),
     // Platform app keys (Admin > Social platforms) into this instance's snapshot, so every studio page can read
     // creds() as before; a shared-cache hit above would otherwise skip it. 15 s cached, runs alongside the others.
@@ -74,8 +77,9 @@ export default async function StudioLayout({ children }: { children: React.React
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground">
         Skip to main content
       </a>
-      <div className="flex min-h-dvh" data-nav={nav.style}>
-        <Sidebar style={nav.style} />
+      {/* R1291: the navigation is client state from here down (one source for the frame, Settings and the switcher). */}
+      <NavStyleProvider initial={nav}>
+      <NavFrame>
         {/* A column that is exactly the screen when the page is short: no empty scroll below the content (1053). */}
         <div className="flex min-h-dvh min-w-0 flex-1 flex-col overflow-x-clip">
           <WorkspaceBar />
@@ -88,12 +92,16 @@ export default async function StudioLayout({ children }: { children: React.React
           <AppNavBar />
           {/* Room for the floating tab bar (62px over the home indicator's safe area, 1105) and 26px of air, so the
               last card always scrolls clear of it. It was 11rem plus each page's own. A page that opts out of the
-              tab bar (MobileNav renders data-tabbar-off; none does since 11-16) keeps only the safe area. */}
-          <main id="main" tabIndex={-1} className={`mmain relative flex-1 outline-none pb-[calc(var(--sa-b)+88px)] max-lg:[body:has([data-tabbar-off])_&]:pb-[var(--sa-b)] ${nav.style === "dock" ? DOCK_MAIN_PAD : "lg:pb-0"}`}>
+              tab bar (MobileNav renders data-tabbar-off; none does since 11-16) keeps only the safe area. On desktop
+              the dock's room comes from the frame's data-nav (DOCK_MAIN_PAD), so a switch needs no server render. */}
+          <main id="main" tabIndex={-1} className={`mmain relative flex-1 outline-none pb-[calc(var(--sa-b)+88px)] max-lg:[body:has([data-tabbar-off])_&]:pb-[var(--sa-b)] ${DOCK_MAIN_PAD}`}>
             {children}
           </main>
         </div>
-      </div>
+      </NavFrame>
+      {/* R1291: "meet your new dock", for people on the sidebar who have not met it. Desktop only; once per visit. */}
+      <NavIntro />
+      </NavStyleProvider>
       <MobileNav />
       <AppTabBar />
       <AppMoreSheet />

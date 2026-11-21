@@ -163,7 +163,8 @@ export async function revokeAllSessions(userId: string) {
   await db.userSession.deleteMany({ where: { userId } }).catch(() => {}); // 1080: and the list empties
 }
 
-const USER_SELECT = { id: true, name: true, email: true, avatar: true, timezone: true, createdAt: true } as const;
+// uiPrefs (R1291): the person's own UI picks ride along on the same read, so the layout never pays a second query.
+const USER_SELECT = { id: true, name: true, email: true, avatar: true, timezone: true, createdAt: true, uiPrefs: true } as const;
 
 /**
  * Current user, cached per request. Never returns secrets.
@@ -183,7 +184,8 @@ export const getCurrentUser = cache(async () => {
   if (ws && ws !== id) {
     const seat = await db.teamMember.findFirst({ where: { ownerId: ws, userId: id, status: "active" }, select: { role: true, accountIds: true, owner: { select: USER_SELECT } } });
     if (seat && (TEAM_ROLES as readonly string[]).includes(seat.role))
-      return { ...seat.owner, joinedAt: me.createdAt, actor: { id: me.id, name: me.name, email: me.email } as Actor | null, role: seat.role as WorkspaceRole, scope: parseScope(seat.accountIds) };
+      // uiPrefs stay the real person's (R1291): the dock is their pick, not the workspace owner's.
+      return { ...seat.owner, uiPrefs: me.uiPrefs, joinedAt: me.createdAt, actor: { id: me.id, name: me.name, email: me.email } as Actor | null, role: seat.role as WorkspaceRole, scope: parseScope(seat.accountIds) };
   }
   // scope (1037): the accounts this person may work on in this workspace; null = all of them (always for the owner)
   return { ...me, joinedAt: me.createdAt, actor: null as Actor | null, role: "owner" as WorkspaceRole, scope: null as Scope };

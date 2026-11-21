@@ -10,6 +10,7 @@ import { OutllyLogoIcon, OutllyWordmark } from "@/components/brand/OutllyBrand";
 import { AnimIcon, useIconPlay } from "@/components/icons/animated";
 import { HoverLink } from "./HoverLink";
 import { NoticesBell } from "./NoticesBell";
+import { NavStyleSwitch } from "./NavStyleSwitch";
 import { SignOutButton } from "./SignOutButton";
 import { openPalette } from "./CommandPalette";
 import { AccountMenu, useWho } from "./AccountMenu";
@@ -197,6 +198,8 @@ export function PulseRail() {
             </div>
 
             <div className="rail-bottom">
+              {/* R1291: sidebar or dock in one tap; renders nothing when the admin set it for everyone. */}
+              <NavStyleSwitch variant="rail" wrap={(b) => <Tip label="Change dock style">{b}</Tip>} />
               <RailTheme />
               <NoticesBell placement="side" className="rail-bell" />
               <AccountMenu>
