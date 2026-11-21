@@ -12,8 +12,8 @@ export const ROLE_INFO: Record<TeamRole, { label: string; blurb: string }> = {
 
 /** Paths members never reach in someone else's workspace: money, connected accounts, the owner's profile, the team itself. */
 const OWNER_ONLY = ["/api/billing", "/api/settings", "/api/accounts", "/api/team/members"];
-/** Always open: moving between workspaces and leaving must work from inside one. */
-const ALWAYS = ["/api/team/switch", "/api/team/accept", "/api/team/leave", "/api/auth"];
+/** Always open: moving between workspaces and leaving must work from inside one. Changing your own password too (R1294). */
+const ALWAYS = ["/api/team/switch", "/api/team/accept", "/api/team/leave", "/api/auth", "/api/settings/password"];
 
 /** null = allowed; otherwise the human reason it isn't. */
 export function memberBlock(role: WorkspaceRole, method: string, path: string): string | null {

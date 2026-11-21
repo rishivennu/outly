@@ -183,7 +183,7 @@ export async function completeSignIn(input: string, via: "app" | "whatsapp" = "a
   await createSession(userId, { persist: remember !== false });
   if (remember === true) await rememberDevice(userId);
   else if (remember === false) await forgetThisBrowser();
-  return { used, recoveryLeft: parseHashes((await db.user.findUnique({ where: { id: userId }, select: { recoveryCodes: true } }))?.recoveryCodes).length };
+  return { userId, used, recoveryLeft: parseHashes((await db.user.findUnique({ where: { id: userId }, select: { recoveryCodes: true } }))?.recoveryCodes).length };
 }
 
 // ----------------------------------------------------------------------------------------------- settings

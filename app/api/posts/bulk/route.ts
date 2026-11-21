@@ -4,6 +4,8 @@ import { isPlatform, type Platform } from "@/lib/domain";
 import { bulkScheduleSchema } from "@/lib/validation";
 import { bookBatch, planBatch } from "@/lib/posts/bulk-server";
 import { deletePost } from "@/lib/posts/delete";
+import { realUserId } from "@/lib/auth";
+import { idempotent } from "@/lib/idempotency";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,7 @@ export const POST = route(
   async (req, { user }) => {
     // Booking a batch schedules and publishes, same as /api/posts/[id] launch, so editors are out (1037).
     if (user.role === "editor") throw new HttpError(403, "Editors can't publish. Send a review link, or ask the owner or a manager to launch it.", "ROLE");
-    return json(await bookBatch(user.id, bulkScheduleSchema.parse(await req.json()), user), { status: 201 });
+    return idempotent(req, realUserId(user), "bulk", async () => json(await bookBatch(user.id, bulkScheduleSchema.parse(await req.json()), user), { status: 201 }));
   },
   { limit: [10, 60_000] },
 );

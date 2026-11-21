@@ -3,6 +3,7 @@ import { HttpError, json, route } from "@/lib/http";
 import { isLimited, limitShared } from "@/lib/rate-limit";
 import { loginSchema } from "@/lib/validation";
 import { beginSignIn } from "@/lib/otp/two-factor";
+import { withAppUser } from "@/lib/me";
 
 const LOGIN_FAILS = 20;
 const LOGIN_WINDOW = 60 * 60_000;
@@ -24,7 +25,8 @@ export const POST = route(
       throw e;
     }
     // With an authenticator turned on this sets the halfway cookie, and the form asks for the app code next.
-    return json({ ok: true, ...(await beginSignIn(user.id, "other", { remember: body.remember })) });
+    const step = await beginSignIn(user.id, "other", { remember: body.remember });
+    return json({ ok: true, ...step, ...(await withAppUser(req, step.twoFactor ? null : user.id)) });
   },
   { auth: false, limit: [10, 60_000] },
 );

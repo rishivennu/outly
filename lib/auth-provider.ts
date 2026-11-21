@@ -57,7 +57,7 @@ const useSupabase = () => env.AUTH_PROVIDER === "supabase" && supabaseConfigured
 export async function signUp(name: string, email: string, password: string, timezone?: string | null) {
   email = email.toLowerCase();
   const existing = await db.user.findUnique({ where: { email } });
-  if (existing) throw new HttpError(409, "That email already has a studio. Try signing in.");
+  if (existing) throw new HttpError(409, "That email already has a studio. Try signing in.", "EMAIL_TAKEN");
   if (!useSupabase()) {
     return joined(await db.user.create({ data: { name, email, passwordHash: await hashPassword(password), ...tzData(timezone) }, select: { id: true } }));
   }
@@ -67,7 +67,7 @@ export async function signUp(name: string, email: string, password: string, time
   } catch (e) {
     if (e instanceof SupabaseError && e.status === 422) {
       const msg = String((e.body as { msg?: string; message?: string })?.msg ?? (e.body as { message?: string })?.message ?? "");
-      if (/already|exists|registered/i.test(msg)) throw new HttpError(409, "That email already has a studio. Try signing in.");
+      if (/already|exists|registered/i.test(msg)) throw new HttpError(409, "That email already has a studio. Try signing in.", "EMAIL_TAKEN");
       if (/password/i.test(msg)) throw new HttpError(422, "Pick a stronger password (at least 8 characters).");
     }
     throw e;
@@ -77,7 +77,7 @@ export async function signUp(name: string, email: string, password: string, time
 export async function signIn(email: string, password: string) {
   email = email.toLowerCase();
   const local = await db.user.findUnique({ where: { email } });
-  const wrong = new HttpError(401, "That email and password don't match. If you signed up with Google or WhatsApp, use that, or reset your password.");
+  const wrong = new HttpError(401, "That email and password don't match. If you signed up with Google or WhatsApp, use that, or reset your password.", "BAD_CREDENTIALS");
   if (local && !local.passwordHash && !local.authId) throw wrong; // no password set: the same answer as a wrong one
   if (!useSupabase()) {
     if (!local?.passwordHash || !(await verifyPassword(password, local.passwordHash))) throw wrong;

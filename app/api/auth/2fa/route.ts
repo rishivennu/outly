@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { json, route } from "@/lib/http";
 import { challengeOptions, clearChallenge, completeSignIn } from "@/lib/otp/two-factor";
+import { withAppUser } from "@/lib/me";
 
 const schema = z.object({
   code: z.string().trim().min(1, "Enter the code from your authenticator app.").max(40),
@@ -15,7 +16,8 @@ export const GET = route(async () => json(await challengeOptions()), { auth: fal
 export const POST = route(
   async (req) => {
     const { code, via, remember } = schema.parse(await req.json());
-    return json({ ok: true, ...(await completeSignIn(code, via, remember)) });
+    const { userId, ...done } = await completeSignIn(code, via, remember);
+    return json({ ok: true, ...done, ...(await withAppUser(req, userId)) });
   },
   { auth: false, limit: [20, 10 * 60_000] },
 );

@@ -63,6 +63,13 @@ const nextConfig = {
     staleTimes: { dynamic: 30 },
   },
   images: { formats: ["image/avif", "image/webp"] },
+  // R1294: the bare domain answers /.well-known/* itself (Android App Links verification never follows a redirect)
+  // and sends every other path to www, as the Vercel domain redirect does today. This only takes effect once the
+  // outlly.com domain in Vercel is connected to Production instead of "Redirect to www.outlly.com" (until then the
+  // request never reaches the deployment). Steps: outlly-compose/docs/release.md.
+  redirects: async () => [
+    { source: "/:path((?!\\.well-known(?:/|$)).*)", has: [{ type: "host", value: "outlly\\.com" }], destination: "https://www.outlly.com/:path", permanent: true },
+  ],
   rewrites: async () => [
     { source: "/ingest/static/:path*", destination: `${posthogAssets}/static/:path*` },
     { source: "/ingest/:path*", destination: `${posthogHost}/:path*` },

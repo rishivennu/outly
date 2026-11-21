@@ -6,12 +6,19 @@ import { realUserId } from "@/lib/auth";
 import { getConfig } from "@/lib/settings";
 import { patchUiPrefs } from "@/lib/ui-prefs";
 import { NAV_COOKIE, NAV_STYLES, normalizeNav } from "@/lib/nav-config";
+import { navFor } from "@/lib/nav-style";
 
 export const dynamic = "force-dynamic";
 
 const Body = z.object({ style: z.enum(NAV_STYLES) }).strict();
 
 const cookieOpts = { httpOnly: true, secure: env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 365 * 86400 };
+
+/** R1294: the navigation in force for this person and whether the admin has set it for everyone (what POST answers 403 to). */
+export const GET = route(async () => {
+  const nav = await navFor();
+  return json({ style: nav.style, locked: !nav.canSwitch, own: nav.own }, { headers: { "cache-control": "no-store" } });
+});
 
 /**
  * This person's own navigation (R1290), saved on their account since R1291 so it follows them to every device. The

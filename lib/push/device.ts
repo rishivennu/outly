@@ -8,15 +8,17 @@ export const PUSH_COOKIE = "ol_push";
 /** 1118: which WebPushSub this browser is (Settings > Notifications), for the same reason. */
 export const WEBPUSH_COOKIE = "ol_wp";
 
-export async function forgetThisDevice() {
+/** Returns how many app devices it removed (R1294: DELETE /api/app/push reports it). */
+export async function forgetThisDevice(): Promise<number> {
   const jar = await cookies();
   const id = jar.get(PUSH_COOKIE)?.value;
-  if (id) await db.pushDevice.deleteMany({ where: { id } }).catch(() => {});
+  const removed = id ? ((await db.pushDevice.deleteMany({ where: { id } }).catch(() => null))?.count ?? 0) : 0;
   jar.delete(PUSH_COOKIE);
   // Signed out on this browser: its notifications stop too (they would show someone else's account otherwise).
   const wp = jar.get(WEBPUSH_COOKIE)?.value;
   if (wp) await db.webPushSub.deleteMany({ where: { id: wp } }).catch(() => {});
   jar.delete(WEBPUSH_COOKIE);
+  return removed;
 }
 
 export async function forgetAllDevices(userId: string) {

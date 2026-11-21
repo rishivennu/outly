@@ -5,6 +5,7 @@ import { redeemCode, takeHeld } from "@/lib/app-handoff";
 import { saveConnectedAccount } from "@/lib/accounts";
 import { holdChoice, resolveConnect } from "@/lib/connect-choice";
 import { invalidateDashboards } from "@/lib/live";
+import { withAppUser } from "@/lib/me";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export const POST = route(
       } else next = connectExpired(next);
     }
     if (done.uid) await createSession(done.uid);
-    return json({ next, signedIn: !!done.uid });
+    return json({ next, signedIn: !!done.uid, ...(await withAppUser(req, done.uid)) });
   },
   { auth: false, limit: [20, 60_000] },
 );

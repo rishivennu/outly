@@ -146,6 +146,23 @@ export function accountView(a: SocialAccount) {
 }
 export type AccountView = ReturnType<typeof accountView>;
 
+/**
+ * R1294: token health for the accounts list. `needsReauth`: the platform turned the token down, or it has run out
+ * with nothing to refresh it. `scopes`: what the connector recorded at connect time (metadata.scopes), else [].
+ */
+export function accountAuth(a: Pick<SocialAccount, "status" | "tokenExpiresAt" | "refreshToken" | "metadata">, now = new Date()) {
+  const expired = !!a.tokenExpiresAt && a.tokenExpiresAt.getTime() <= now.getTime() && !a.refreshToken;
+  let scopes: string[] = [];
+  try {
+    const m = a.metadata ? (JSON.parse(a.metadata) as { scopes?: unknown; scope?: unknown }) : null;
+    const s = m?.scopes ?? m?.scope;
+    scopes = Array.isArray(s) ? s.filter((x): x is string => typeof x === "string") : typeof s === "string" ? s.split(/[\s,]+/).filter(Boolean) : [];
+  } catch {
+    /* metadata that isn't JSON records no scopes */
+  }
+  return { expiresAt: a.tokenExpiresAt?.toISOString() ?? null, needsReauth: a.status === "needs_reconnect" || expired, scopes };
+}
+
 /* ---------- ownership-scoped loaders: every lookup filters by userId ---------- */
 
 export async function ownedMedia(userId: string, id: string) {

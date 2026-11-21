@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { json, route } from "@/lib/http";
-import { accountView } from "@/lib/services";
+import { accountAuth, accountView } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const GET = route(async (_req, { user }) => {
   const rows = await db.socialAccount.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } });
   return json({
-    accounts: rows.filter((a) => a.status !== "disconnected").map(accountView),
+    accounts: rows.filter((a) => a.status !== "disconnected").map((a) => ({ ...accountView(a), ...accountAuth(a) })),
     previous: rows.filter((a) => a.status === "disconnected").map((a) => ({ id: a.id, platform: a.platform, username: a.username })),
   });
 });

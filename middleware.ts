@@ -301,7 +301,7 @@ export async function middleware(req: NextRequest, ev?: NextFetchEvent) {
 export function appBounce(req: NextRequest) {
   if (!req.cookies.get("ol_app_ch")?.value) return null;
   const { pathname, searchParams } = req.nextUrl;
-  const stuck = (pathname === "/login" && searchParams.has("google_error")) || (pathname === "/waitlist" && searchParams.get("from") === "google");
+  const stuck = ((pathname === "/login" || pathname === "/signup") && searchParams.has("google_error")) || (pathname === "/waitlist" && searchParams.get("from") === "google");
   if (!stuck) return null;
   const u = new URL("/api/app/return", req.url);
   u.searchParams.set("next", pathname + req.nextUrl.search);

@@ -7,7 +7,7 @@ import { insightsOn, instagramIdLooksLikeMetaAppId } from "@/lib/social/keys";
 import { getAdmin } from "@/lib/admin/auth";
 import { safeReturnTo, saveOAuthState } from "@/lib/oauth-state";
 import { isNativeUA } from "@/lib/app-mode";
-import { APP_AUTH_PAGE } from "@/lib/app-handoff";
+import { APP_AUTH_PAGE, appErrorLink, handoffActive } from "@/lib/app-handoff";
 import { ACCOUNT_ID, parseIntent } from "@/lib/connect-decision";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest, props: { params: Promise<{ platform: string }> }) {
   const params = await props.params;
   const user = await getCurrentUser();
-  if (!user) return NextResponse.redirect(new URL("/login", env.APP_URL));
+  if (!user) return NextResponse.redirect(handoffActive(req) ? appErrorLink("expired", "state") : new URL("/login", env.APP_URL));
   if (!isPlatform(params.platform)) return NextResponse.json({ error: "Unknown platform" }, { status: 404 });
   // Inside a teammate's workspace `user` is the OWNER, so connecting here would replace the owner's
   // channel with the teammate's. Only the owner manages connected accounts.

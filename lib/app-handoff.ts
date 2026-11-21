@@ -182,6 +182,52 @@ export async function takeHeld(id: string, uid: string | null, ch: string): Prom
   }
 }
 
+/*
+ * R1294: a flow that began in the app and ended in an error goes back as outlly://auth?error=<code>&message=…
+ * (plus `reason`, the web's google_error value) instead of leaving the person on a web page in the Custom Tab.
+ */
+export const HANDOFF_ERRORS = ["cancelled", "denied", "expired", "provider_error", "server_error"] as const;
+export type HandoffError = (typeof HANDOFF_ERRORS)[number];
+const HANDOFF_MESSAGE: Record<HandoffError, string> = {
+  cancelled: "Sign-in was cancelled.",
+  denied: "That sign-in isn't allowed for this account.",
+  expired: "That sign-in took too long. Start again from the app.",
+  provider_error: "Google couldn't finish the sign-in. Try again in a moment.",
+  server_error: "Something got in the way. Try again in a moment.",
+};
+
+/** A web google_error reason (or the waitlist) as one of the app's error codes. */
+export function handoffErrorOf(reason: string): HandoffError {
+  if (reason === "access_denied" || reason === "denied" || reason === "cancelled") return "cancelled";
+  if (["unverified", "age", "waitlist", "maintenance", "owner_only"].includes(reason)) return "denied";
+  if (reason === "state" || reason === "expired") return "expired";
+  if (reason === "server") return "server_error";
+  return "provider_error";
+}
+
+export function appErrorLink(error: HandoffError, reason?: string | null) {
+  const q = `error=${error}&message=${encodeURIComponent(HANDOFF_MESSAGE[error])}`;
+  return `${APP_DEEP_LINK}?${q}${reason ? `&reason=${encodeURIComponent(reason)}` : ""}`;
+}
+
+/** The error link for a web error page the browser part ended on (what middleware appBounce sends here), else null. */
+export function handoffErrorFor(next: string | null | undefined): string | null {
+  if (!next || !next.startsWith("/")) return null;
+  let u: URL;
+  try {
+    u = new URL(next, "http://outlly.invalid");
+  } catch {
+    return null;
+  }
+  const g = u.searchParams.get("google_error");
+  if ((u.pathname === "/login" || u.pathname === "/signup") && g) return appErrorLink(handoffErrorOf(g), g.slice(0, 40));
+  if (u.pathname === "/waitlist" && u.searchParams.get("from") === "google") return appErrorLink("denied", "waitlist");
+  return null;
+}
+
+/** The app's challenge cookie is in this browser, i.e. the flow running here began in the app. */
+export const handoffActive = (req: { cookies: { get(name: string): { value: string } | undefined } }) => validChallenge(req.cookies.get(APP_CH_COOKIE)?.value);
+
 export const appCookie = (ch: string) => ({
   name: APP_CH_COOKIE,
   value: ch,

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser, isHandoffSession } from "@/lib/auth";
-import { APP_CH_COOKIE, APP_RETURN_PATH, holdConnect, validChallenge } from "@/lib/app-handoff";
+import { APP_CH_COOKIE, APP_RETURN_PATH, appErrorLink, handoffActive, holdConnect, validChallenge } from "@/lib/app-handoff";
 import { saveConnectedAccount } from "@/lib/accounts";
 import { holdChoice, knownAccounts, resolveConnect } from "@/lib/connect-choice";
 import { googleMayLink } from "@/lib/connect-decision";
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ platform:
   // A Google sign-in whose state cookie is gone (other tab, expired after 10 min, or started on another
   // domain than APP_URL) used to drop the visitor on /login with no word of what happened. Say it.
   if (!user && !pending && p === "youtube") return NextResponse.redirect(new URL(`/login?google_error=${req.nextUrl.searchParams.get("error") === "access_denied" ? "access_denied" : "state"}`, env.APP_URL));
-  if (!user) return NextResponse.redirect(new URL("/login", env.APP_URL));
+  if (!user) return NextResponse.redirect(handoffActive(req) ? appErrorLink("expired", "state") : new URL("/login", env.APP_URL));
   const back = (q: string) => NextResponse.redirect(new URL(`${pending?.returnTo ?? "/accounts"}${(pending?.returnTo ?? "").includes("?") ? "&" : "?"}${q}`, env.APP_URL));
   if (!pending) return back(`connect_error=${p}&reason=state`);
   if (user.role !== "owner") return back(`connect_error=${p}&reason=owner_only`);
