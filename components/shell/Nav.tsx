@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { OutlyLogo, OutlyMark } from "@/components/brand/Logo";
 import { NoticesBell } from "./NoticesBell";
 import { PulseRail } from "./PulseRail";
+import { StudioDock } from "./StudioDock";
+import type { NavStyle } from "@/lib/nav-config";
 import { MobileDrawer } from "./MobileDrawer";
 import { MAIN, TOUR, isActive, pageTitle } from "./nav-items";
 import { TAB_SCROLL_START, hidesTabBar, slideIndex, slideLock, slideStretch, slideTarget, tabScrollStep, type TabScroll } from "@/lib/client/tab-bar";
@@ -12,10 +14,12 @@ import { haptic } from "@/lib/client/app-mode";
 import { useHeaderScroll } from "@/lib/client/header-scroll";
 
 /**
- * Desktop sidebar: the collapsible rail for every dashboard style (1103). Classic and Analytics used to have
- * different sidebars; now only Home differs between them.
+ * Desktop navigation: the collapsible rail for every dashboard style (1103), or since R1290 the dock along the
+ * bottom when the person (or the admin, for everyone) picked it. The server decides which (lib/nav-style.ts), so
+ * the other one is never rendered and nothing swaps after paint.
  */
-export function Sidebar() {
+export function Sidebar({ style }: { style: NavStyle }) {
+  if (style === "dock") return <StudioDock />;
   return <PulseRail />;
 }
 

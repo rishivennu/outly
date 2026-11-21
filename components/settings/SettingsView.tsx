@@ -24,6 +24,8 @@ import { StorageManager } from "./StorageManager";
 import { InstallSettingsCard } from "@/components/pwa/InstallSettingsCard";
 import Link from "next/link";
 import { AlertsCard } from "./AlertsCard";
+import { NavStylePref } from "./NavStylePref";
+import type { NavStyle } from "@/lib/nav-config";
 import { BrandProfileCard } from "./BrandProfileCard";
 import { ALERT_DEFAULTS, type AlertPrefs } from "@/lib/alerts-core";
 import { SettingsShell, Disclosure, useUnsaved, type SettingsCategory } from "./SettingsShell";
@@ -206,7 +208,7 @@ function Note({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, perks = { digest: true, spike: true }, billing = null, identity = null, initialTab }: { weeklyReport?: boolean; alerts?: AlertPrefs; perks?: { digest: boolean; spike: boolean }; billing?: BillingSummary | null; identity?: ProfileIdentity | null; initialTab?: string }) {
+export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, perks = { digest: true, spike: true }, billing = null, identity = null, initialTab, navStyle = "sidebar", navCanSwitch = true, navOwn = false }: { weeklyReport?: boolean; alerts?: AlertPrefs; perks?: { digest: boolean; spike: boolean }; billing?: BillingSummary | null; identity?: ProfileIdentity | null; initialTab?: string; navStyle?: NavStyle; navCanSwitch?: boolean; navOwn?: boolean }) {
   const user = useUser();
   const ws = user.workspace;
   const owner = ws?.ownerName ?? "the owner";
@@ -260,9 +262,10 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, per
       id: "personalization",
       label: "Personalization",
       icon: Sparkles,
-      blurb: "Shortcuts that make writing faster, your writing voice, and the guided tour.",
+      blurb: "Sidebar or dock on desktop, shortcuts that make writing faster, your writing voice, and the guided tour.",
       content: (
         <>
+          <NavStylePref style={navStyle} canSwitch={navCanSwitch} own={navOwn} />
           <SnippetsCard />
           <VoiceMemoryCard />
           <Disclosure title="Guided tour" hint="Replay the one-minute walk, and bring back each page's first-time tips.">

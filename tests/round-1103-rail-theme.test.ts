@@ -64,10 +64,11 @@ describe("1103 theme control", () => {
 
 describe("1103 one sidebar", () => {
   test("Sidebar takes no style; the layout no longer loads the dashboard style for it", () => {
-    expect(nav).toMatch(/export function Sidebar\(\)\s*\{\s*return <PulseRail \/>;\s*\}/);
+    // R1290: Sidebar takes the nav layout (rail or dock), never the dashboard style.
+    expect(nav).toMatch(/export function Sidebar\(\{ style \}: \{ style: NavStyle \}\)\s*\{\s*if \(style === "dock"\) return <StudioDock \/>;\s*return <PulseRail \/>;\s*\}/);
     expect(existsSync("components/shell/ClassicSidebar.tsx")).toBe(false);
     const layout = src("app/(studio)/layout.tsx");
-    expect(layout).toContain("<Sidebar />");
+    expect(layout).toContain("<Sidebar style={nav.style} />");
     expect(layout).not.toContain("dashboardFor");
   });
   test("rail scroll: slim scrollbar only while open", () => {

@@ -7,6 +7,8 @@ import { UserProvider } from "@/components/shell/UserContext";
 import { AvatarCursor } from "@/components/shell/AvatarCursor";
 import { ToastProvider } from "@/components/shared/Toast";
 import { MobileNav, MobileTopBar, Sidebar } from "@/components/shell/Nav";
+import { navFor } from "@/lib/nav-style";
+import { DOCK_MAIN_PAD } from "@/lib/nav-config";
 import { Tour } from "@/components/onboarding/Tour";
 import { PageGuide } from "@/components/onboarding/PageGuide";
 import { CommandPalette } from "@/components/shell/CommandPalette";
@@ -43,11 +45,13 @@ export default async function StudioLayout({ children }: { children: React.React
   if (!user) redirect(`/api/auth/expired?next=${encodeURIComponent((await headers()).get("x-path") ?? "/home")}`);
   // Site-wide admin settings (live platforms, maintenance, the notice, install and welcome cards) come from the shared
   // cache (lib/startup-config.ts), expired the moment an admin saves one, so a cold instance does not wait on them.
-  const [{ live, site, notice, install, welcome }, h, jar, sid] = await Promise.all([
+  const [{ live, site, notice, install, welcome }, h, jar, sid, nav] = await Promise.all([
     studioSettings(),
     headers(),
     cookies(),
     currentSessionId().catch(() => null),
+    // R1290: sidebar or dock on desktop (Settings > Personalization, Admin > Dashboard style). Never throws.
+    navFor(),
     // Platform app keys (Admin > Social platforms) into this instance's snapshot, so every studio page can read
     // creds() as before; a shared-cache hit above would otherwise skip it. 15 s cached, runs alongside the others.
     loadKeys().catch(() => null),
@@ -70,8 +74,8 @@ export default async function StudioLayout({ children }: { children: React.React
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground">
         Skip to main content
       </a>
-      <div className="flex min-h-dvh">
-        <Sidebar />
+      <div className="flex min-h-dvh" data-nav={nav.style}>
+        <Sidebar style={nav.style} />
         {/* A column that is exactly the screen when the page is short: no empty scroll below the content (1053). */}
         <div className="flex min-h-dvh min-w-0 flex-1 flex-col overflow-x-clip">
           <WorkspaceBar />
@@ -85,7 +89,7 @@ export default async function StudioLayout({ children }: { children: React.React
           {/* Room for the floating tab bar (62px over the home indicator's safe area, 1105) and 26px of air, so the
               last card always scrolls clear of it. It was 11rem plus each page's own. A page that opts out of the
               tab bar (MobileNav renders data-tabbar-off; none does since 11-16) keeps only the safe area. */}
-          <main id="main" tabIndex={-1} className="mmain relative flex-1 outline-none pb-[calc(var(--sa-b)+88px)] max-lg:[body:has([data-tabbar-off])_&]:pb-[var(--sa-b)] lg:pb-0">
+          <main id="main" tabIndex={-1} className={`mmain relative flex-1 outline-none pb-[calc(var(--sa-b)+88px)] max-lg:[body:has([data-tabbar-off])_&]:pb-[var(--sa-b)] ${nav.style === "dock" ? DOCK_MAIN_PAD : "lg:pb-0"}`}>
             {children}
           </main>
         </div>

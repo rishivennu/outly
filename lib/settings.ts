@@ -13,6 +13,7 @@ import { YOUPI_DEFAULT, type YoupiConfig } from "./billing/youpi";
 import { BETA_DEFAULT, type BetaConfig } from "./beta-config";
 import { FOUNDING_DEFAULT, type FoundingConfig } from "./founding-config";
 import { DASHBOARD_DEFAULT, type DashboardConfig } from "./dashboard-config";
+import { NAV_DEFAULT, type NavConfig } from "./nav-config";
 import { TOPUP_DEFAULT, type TopUpConfig } from "./billing/topups-core";
 import { EXPERIMENTS_DEFAULT, type ExperimentsConfig } from "./billing/experiments-core";
 import { INSTALL_DEFAULT, type InstallConfig } from "./pwa-core";
@@ -109,6 +110,7 @@ export const DEFAULTS = {
   founding: FOUNDING_DEFAULT as FoundingConfig,
   referral: REFERRAL_DEFAULT as ReferralConfig,
   dashboard: DASHBOARD_DEFAULT as DashboardConfig,
+  nav: NAV_DEFAULT as NavConfig, // R1290 sidebar or dock on desktop
   topups: TOPUP_DEFAULT as TopUpConfig, // 1096
   experiments: EXPERIMENTS_DEFAULT as ExperimentsConfig, // 1096
   install: INSTALL_DEFAULT as InstallConfig, // 1099 Add to Home Screen banner

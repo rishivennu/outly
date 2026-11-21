@@ -3754,6 +3754,8 @@ html[data-install-card] .pc { opacity: 0; pointer-events: none; transition: opac
    which is what stops iOS zooming in when a field takes focus (important: Tailwind's text-sm on a field would
    otherwise win). Checkboxes, radios, ranges, colour and file pickers keep their size. */
 html { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* R1290: Home Screen app and admin console: no pinch zoom either (lib/zoom-lock.ts sets the attribute before paint). */
+html[data-zoom="lock"], html[data-zoom="lock"] body { touch-action: pan-x pan-y; }
 @media (max-width: 767px) {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
   textarea, select, [contenteditable=""], [contenteditable="true"] { font-size: max(16px, 1em) !important; }

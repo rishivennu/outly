@@ -172,6 +172,12 @@ export const FX = {
 } as const;
 
 /** Pure checks used by the tests (and handy in review): a curve or spring that would overshoot. */
+/**
+ * R1290: the dock's magnification (motion-primitives' Dock, components/ui/motion/Dock.tsx). A spring follows the pointer, so
+ * the icons grow and shrink with it rather than on a clock; damping ratio 1.55 (overdamped), so nothing overshoots.
+ */
+export const SPRING_DOCK = { mass: 0.1, stiffness: 150, damping: 12 } as const;
+
 export const overshoots = (b: Bezier) => b[1] > 1 || b[1] < 0 || b[3] > 1 || b[3] < 0;
 /** Damping ratio of a mass-spring (>= 1: no overshoot). */
 export const dampingRatio = (stiffness: number, damping: number, mass = 1) => damping / (2 * Math.sqrt(stiffness * mass));

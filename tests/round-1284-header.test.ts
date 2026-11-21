@@ -101,7 +101,7 @@ describe("R1284 brand placement", () => {
   });
   test("admin: rocket + Admin on the left, bell then menu in the right-hand group", () => {
     const head = shell.slice(shell.indexOf('className="admin-top '), shell.indexOf("</header>"));
-    const left = head.slice(head.indexOf('<div className="flex min-w-0 items-center gap-1.5 lg:hidden">'), head.indexOf('<div className="ml-auto'));
+    const left = head.slice(head.indexOf('<div className={cn("flex min-w-0 items-center gap-1.5", !dock && "lg:hidden")}>'), head.indexOf('<div className="ml-auto'));
     expect(left).toContain("<OutlyMark size={24} />");
     expect(left).toContain(">Admin</span>");
     const right = head.slice(head.indexOf('<div className="ml-auto'));

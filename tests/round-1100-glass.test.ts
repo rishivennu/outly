@@ -16,7 +16,7 @@ describe("1100 glass cards", () => {
   test("scoped to studio cards, never the Android app", () => {
     expect(start).toBeGreaterThan(0);
     expect(glass).toContain(`${S} {`);
-    expect(read("app/(studio)/layout.tsx")).toMatch(/<main id="main" tabIndex=\{-1\} className="mmain /);
+    expect(read("app/(studio)/layout.tsx")).toMatch(/<main id="main" tabIndex=\{-1\} className=\{`mmain /); // R1290: the class list is a template now (dock padding)
     for (const line of glass.split("\n").filter((l) => /\.mmain/.test(l))) expect(line).toMatch(/:not\(\[data-app\]\)/);
   });
   test("painted with backgrounds and inset shadows only: no pseudo-elements, no size change", () => {

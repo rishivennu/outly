@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { db } from "@/lib/db";
@@ -11,12 +11,15 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { ToastProvider } from "@/components/shared/Toast";
 import { adminAppMeta } from "@/lib/admin/app-meta";
 import { THEME_COOKIE } from "@/lib/theme/colors";
+import { ADMIN_VIEWPORT } from "@/lib/zoom-lock";
 import { cookies } from "next/headers";
 import { waitingCount } from "@/lib/support/live";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: { default: "Admin", template: "%s · Outlly admin" }, robots: { index: false, follow: false }, ...adminAppMeta((await cookies()).get(THEME_COOKIE)?.value) };
 }
+/** R1290: the console is an app, not a page: no pinch zoom (the web pages keep it, 1192). */
+export const viewport: Viewport = { ...ADMIN_VIEWPORT };
 export const dynamic = "force-dynamic";
 
 /** What to check when the sweep this deployment relies on has gone quiet. */

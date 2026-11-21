@@ -10,6 +10,7 @@ import { swScript } from "@/lib/sw-script";
 import "./globals.css";
 import "./mobile-app.css";
 import { appScript } from "@/lib/app-mode";
+import { zoomLockScript } from "@/lib/zoom-lock";
 import { railScript } from "@/lib/rail";
 import { welcomeScript } from "@/lib/pwa-welcome";
 import { installCaptureScript } from "@/lib/pwa-core";
@@ -116,6 +117,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: chunkScript }} />
         {/* Inside the Android app: mark <html> before first paint so the app layout (app/mobile-app.css) never flashes the web one. */}
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: appScript }} />
+        {/* R1290: opened from the Home Screen, or in the admin console, pinch zoom is off (lib/zoom-lock.ts). After appScript. */}
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: zoomLockScript }} />
         {/* Pulse rail open or closed (1100), before paint so the page column never jumps. */}
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: railScript }} />
         {/* First launch from the Home Screen (1100): paint the welcome first, never a flash of the dashboard. After appScript. */}

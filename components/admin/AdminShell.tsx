@@ -2,10 +2,10 @@
 import { StarField } from "@/components/marketing/StarField";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Activity, Award, BarChart3, BadgePercent, BellRing, ShieldAlert, CalendarDays, Gift, BadgeCheck, BookOpen, ChevronRight, Construction, FlaskConical, HeartPulse, Headset, Hourglass, Library, Newspaper, Rocket, PanelsTopLeft, PanelLeftClose, PanelLeftOpen, CreditCard, Globe, Handshake, Share2, SlidersHorizontal, Sparkles, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, Repeat, ShieldCheck, Tag, TrendingUp, Type, Users, Wand2, X } from "lucide-react";
+import { Activity, Award, BarChart3, BadgePercent, BellRing, ShieldAlert, CalendarDays, Gift, BadgeCheck, BookOpen, ChevronRight, Construction, FlaskConical, HeartPulse, Headset, Hourglass, Library, Newspaper, Rocket, PanelsTopLeft, PanelBottom, PanelLeftClose, PanelLeftOpen, CreditCard, Globe, Handshake, Share2, SlidersHorizontal, Sparkles, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, Repeat, ShieldCheck, Tag, TrendingUp, Type, Users, Wand2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { OutllyBrand, OutlyMark } from "@/components/brand/Logo";
@@ -20,6 +20,7 @@ import { FX, T } from "@/lib/motion/tokens";
 import { useHeaderScroll } from "@/lib/client/header-scroll";
 import { AdminTabBar } from "./AdminTabBar";
 import { AdminCommand } from "./AdminCommand";
+import { AdminDock } from "./AdminDock";
 
 /** 1163: five groups. Run is the daily console, Insights is read-only analysis, Setup is configuration, Administration is who may do what. */
 export type NavGroup = "Run" | "Insights" | "Content Studio" | "Support" | "Setup" | "Administration";
@@ -69,6 +70,11 @@ export const NAV: { href: string; label: string; icon: typeof Users; area: Admin
 
 /** Remembered per browser: the icon-only sidebar is a preference, not a page state. */
 export const SLIM_KEY = "admin:nav:slim";
+
+/** R1290: the desktop layout, also per browser: the grouped sidebar (default) or the dock along the bottom. */
+export const ADMIN_NAV_KEY = "admin:nav:style";
+export type AdminNavStyle = "sidebar" | "dock";
+export const readNavStyle = (v: string | null): AdminNavStyle => (v === "dock" ? "dock" : "sidebar");
 
 /** Touch screens focus a tapped button, which would leave its focus-within tooltip standing; there the label is aria only. */
 const TOUCH_TIP = "[@media(hover:none)]:[&>.admin-tip]:!hidden";
@@ -162,8 +168,15 @@ function NavList({ role, path, badges, onNavigate, layoutId, slim = false, tip }
 }
 
 /** Account controls, always at the bottom of the sidebar and never inside the scrolling list (1163). */
-function Footer({ admin, path, onNavigate, slim = false }: { admin: { name: string; role: AdminRole }; path: string; onNavigate?: () => void; slim?: boolean }) {
+function Footer({ admin, path, onNavigate, slim = false, onDock }: { admin: { name: string; role: AdminRole }; path: string; onNavigate?: () => void; slim?: boolean; onDock?: () => void }) {
   const mine = path === "/admin/account";
+  const dockBtn = onDock && (
+    <Tooltip text="Switch to the dock" side={slim ? "right" : "top"} className={cn("flex", TOUCH_TIP)}>
+      <Button type="button" variant="ghost" size="icon" onClick={onDock} aria-label="Switch to the dock" data-admin-nav-switch="" className="text-muted-foreground lg:h-10 lg:w-10">
+        <PanelBottom className="h-4 w-4" aria-hidden />
+      </Button>
+    </Tooltip>
+  );
   const signOut = (
     <form action="/api/admin/logout" method="post" className="shrink-0">
       <Button type="submit" variant="ghost" size="icon" className="lg:h-10 lg:w-10" aria-label="Sign out">
@@ -182,6 +195,7 @@ function Footer({ admin, path, onNavigate, slim = false }: { admin: { name: stri
         <Tooltip text="Sign out" side="right" className="flex">
           {signOut}
         </Tooltip>
+        {dockBtn}
       </div>
     );
   }
@@ -189,6 +203,7 @@ function Footer({ admin, path, onNavigate, slim = false }: { admin: { name: stri
     <div className="flex flex-col gap-2 border-t border-border/60 px-3 pb-3 pt-3">
       <div className="flex items-center gap-1">
         <ThemeToggle compact plain />
+        {dockBtn}
         <Tooltip text="View the site" side="top" className="ml-auto flex">
           <Link href="/" aria-label="View the site" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground [@media(hover:hover)]:hover:bg-secondary [@media(hover:hover)]:hover:text-foreground">
             <Globe className="h-4 w-4" aria-hidden />
@@ -247,6 +262,28 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
       setSlim(localStorage.getItem(SLIM_KEY) === "1");
     } catch {}
   }, []);
+  // R1290: read before paint, so a dock user sees the sidebar for one frame at most (the server cannot see localStorage).
+  const [navStyle, setNavStyle] = useState<AdminNavStyle>("sidebar");
+  const dock = navStyle === "dock";
+  const switched = useRef(false);
+  useLayoutEffect(() => {
+    try {
+      setNavStyle(readNavStyle(localStorage.getItem(ADMIN_NAV_KEY)));
+    } catch {}
+  }, []);
+  const chooseNav = (next: AdminNavStyle) => {
+    switched.current = true;
+    setNavStyle(next);
+    try {
+      localStorage.setItem(ADMIN_NAV_KEY, next);
+    } catch {}
+  };
+  // The switch that was pressed unmounts with its layout; focus lands on the one that switches back.
+  useEffect(() => {
+    if (!switched.current) return;
+    switched.current = false;
+    document.querySelector<HTMLElement>("[data-admin-nav-switch]")?.focus({ preventScroll: true });
+  }, [navStyle]);
   const toggleSlim = () => {
     const next = !slim;
     setSlim(next);
@@ -256,31 +293,33 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
   };
 
   return (
-    <div className="admin-root sky-host relative isolate flex min-h-dvh" data-nav={slim ? "slim" : "full"}>
+    <div className="admin-root sky-host relative isolate flex min-h-dvh" data-nav={slim ? "slim" : "full"} data-admin-nav={navStyle}>
       {!quiet && <StarField nebula />}
-      <div className="sticky top-0 z-[var(--admin-z-sidebar)] hidden h-dvh shrink-0 p-3 pt-[max(0.75rem,var(--sa-t))] lg:block">
-        <aside data-route-order="" className={cn("glass flex h-full flex-col overflow-hidden rounded-[28px] transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none", slim ? "w-[72px]" : "w-[248px]")} aria-label="Admin sidebar">
-          <div className={cn("flex items-center gap-2 pb-4 pt-5", slim ? "flex-col px-3" : "justify-between px-5")}>
-            <Link href="/admin" aria-label="Admin overview" className="flex h-10 items-center">
-              <OutllyBrand variant={slim ? "icon" : "full"} size={slim ? 26 : undefined} label={false} />
-            </Link>
-            {!slim && <span className="rounded-full bg-lime/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-lime-ink">Admin</span>}
-            {/* Slim: the rail clips its own overflow, so the toggle uses the same fixed tooltip as the nav items. */}
-            <Tooltip text={slim ? "Expand sidebar" : "Collapse sidebar"} side="bottom" className={cn("flex", slim && "[&>.admin-tip]:!hidden")}>
-              <Button type="button" variant="ghost" size="icon-sm" onClick={toggleSlim} aria-pressed={slim} aria-label={slim ? "Expand sidebar" : "Collapse sidebar"} {...(slim ? { onPointerEnter: (e: React.PointerEvent<HTMLElement>) => slimTip.api.show(e.currentTarget, "Expand sidebar"), onPointerLeave: slimTip.api.hide, onFocus: (e: React.FocusEvent<HTMLElement>) => slimTip.api.show(e.currentTarget, "Expand sidebar"), onBlur: slimTip.api.hide } : {})} className="h-10 w-10">
-                {slim ? <PanelLeftOpen className="h-4 w-4" aria-hidden /> : <PanelLeftClose className="h-4 w-4" aria-hidden />}
-              </Button>
-            </Tooltip>
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col" onScrollCapture={slimTip.api.hide}>
-            <ScrollArea className="px-3 pb-3">
-              <NavList role={admin.role} path={path} badges={badges} layoutId="admin-pill" slim={slim} tip={slim ? slimTip.api : undefined} />
-            </ScrollArea>
-          </div>
-          <Footer admin={admin} path={path} slim={slim} />
-        </aside>
-        {slim && slimTip.node}
-      </div>
+      {!dock && (
+        <div className="sticky top-0 z-[var(--admin-z-sidebar)] hidden h-dvh shrink-0 p-3 pt-[max(0.75rem,var(--sa-t))] lg:block">
+          <aside data-route-order="" className={cn("glass flex h-full flex-col overflow-hidden rounded-[28px] transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none", slim ? "w-[72px]" : "w-[248px]")} aria-label="Admin sidebar">
+            <div className={cn("flex items-center gap-2 pb-4 pt-5", slim ? "flex-col px-3" : "justify-between px-5")}>
+              <Link href="/admin" aria-label="Admin overview" className="flex h-10 items-center">
+                <OutllyBrand variant={slim ? "icon" : "full"} size={slim ? 26 : undefined} label={false} />
+              </Link>
+              {!slim && <span className="rounded-full bg-lime/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-lime-ink">Admin</span>}
+              {/* Slim: the rail clips its own overflow, so the toggle uses the same fixed tooltip as the nav items. */}
+              <Tooltip text={slim ? "Expand sidebar" : "Collapse sidebar"} side="bottom" className={cn("flex", slim && "[&>.admin-tip]:!hidden")}>
+                <Button type="button" variant="ghost" size="icon-sm" onClick={toggleSlim} aria-pressed={slim} aria-label={slim ? "Expand sidebar" : "Collapse sidebar"} {...(slim ? { onPointerEnter: (e: React.PointerEvent<HTMLElement>) => slimTip.api.show(e.currentTarget, "Expand sidebar"), onPointerLeave: slimTip.api.hide, onFocus: (e: React.FocusEvent<HTMLElement>) => slimTip.api.show(e.currentTarget, "Expand sidebar"), onBlur: slimTip.api.hide } : {})} className="h-10 w-10">
+                  {slim ? <PanelLeftOpen className="h-4 w-4" aria-hidden /> : <PanelLeftClose className="h-4 w-4" aria-hidden />}
+                </Button>
+              </Tooltip>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col" onScrollCapture={slimTip.api.hide}>
+              <ScrollArea className="px-3 pb-3">
+                <NavList role={admin.role} path={path} badges={badges} layoutId="admin-pill" slim={slim} tip={slim ? slimTip.api : undefined} />
+              </ScrollArea>
+            </div>
+            <Footer admin={admin} path={path} slim={slim} onDock={() => chooseNav("dock")} />
+          </aside>
+          {slim && slimTip.node}
+        </div>
+      )}
 
       <div className="min-w-0 flex-1">
         {/* 1191: one bar, one height. The phone bar is 52px tall (R1274: the studio bar's height) plus the status-bar inset (box-content, so the inset never eats the row), and
@@ -289,7 +328,7 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
             R1284: no border, fill or blur of its own: under 1024px it is the page (globals.css R1284 block). */}
         <header ref={top} data-lifted={lifted ? "" : undefined} data-folded={hidden ? "" : undefined} className="admin-top sticky top-0 z-[var(--admin-z-header)] box-content flex h-[52px] items-center gap-2 pl-[max(1rem,var(--sa-l))] pr-[max(0.75rem,calc(var(--sa-r)+0.5rem))] pt-[var(--sa-t)] md:h-16 lg:h-auto lg:pl-8 lg:pr-8 lg:pt-[max(1.25rem,var(--sa-t))]">
           {/* R1283: on the phone the menu button sits on the RIGHT, after the bell (user request); the drawer opens from the same edge. */}
-          <div className="flex min-w-0 items-center gap-1.5 lg:hidden">
+          <div className={cn("flex min-w-0 items-center gap-1.5", !dock && "lg:hidden")}>
             <OutlyMark size={24} />
             <span className="truncate font-display text-[16px] font-semibold leading-none tracking-[-0.01em]">Admin</span>
           </div>
@@ -308,10 +347,13 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
             charts side by side) and capped so ultrawide monitors do not stretch tables across the whole desk. */}
         {/* 1191: the console is sized to the window, so the panel's usual deep bottom padding would leave
             a dead strip under it and make the page scroll for nothing. */}
-        <main id="main" className={cn("admin-main mx-auto w-full max-w-[1480px] pb-[calc(var(--sa-float)+1rem)] pl-[max(1rem,var(--sa-l))] pr-[max(1rem,var(--sa-r))] pt-2 sm:pl-[max(1.5rem,var(--sa-l))] sm:pr-[max(1.5rem,var(--sa-r))] lg:px-8", quiet ? "lg:pb-4" : "lg:pb-24")}>
+        <main id="main" className={cn("admin-main mx-auto w-full max-w-[1480px] pb-[calc(var(--sa-float)+1rem)] pl-[max(1rem,var(--sa-l))] pr-[max(1rem,var(--sa-r))] pt-2 sm:pl-[max(1.5rem,var(--sa-l))] sm:pr-[max(1.5rem,var(--sa-r))] lg:px-8", quiet ? "lg:pb-4" : "lg:pb-24", dock && "lg:pb-[calc(6rem+var(--sa-b))]")}>
           {children}
         </main>
       </div>
+
+      {/* R1290: the dock replaces the sidebar from lg up; it renders nothing below lg. */}
+      {dock && <AdminDock nav={NAV} groups={NAV_GROUPS} role={admin.role} admin={admin} path={path} badges={badges} active={active} onSidebar={() => chooseNav("sidebar")} />}
 
       {/* R1274: the phone and tablet tab bar; compact while the header is folded (the same scroll signal, one listener). */}
       <AdminTabBar

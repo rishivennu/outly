@@ -144,7 +144,8 @@ describe("R1279 metadata", () => {
     expect(root).toContain("statusBarStyle: iosStatusBarStyle(theme)");
     expect(src("app/(marketing)/layout.tsx")).toMatch(/generateViewport\(\): Promise<Viewport> \{\n {2}return \{ themeColor: themeColorFor\([^\n]*\) \};/);
     const viewports = walk("app").filter((f) => /export (async function generateViewport|const viewport)/.test(src(f)));
-    expect(viewports.length).toBe(2);
+    // R1290: the admin console (panel layout and sign-in) adds its own viewport to turn pinch zoom off; the merge keeps the root theme colour.
+    expect(viewports.map((f) => f.replace(/\\/g, "/")).sort()).toEqual(["app/(marketing)/layout.tsx", "app/admin/(panel)/layout.tsx", "app/admin/login/page.tsx", "app/layout.tsx"]);
     for (const f of [...walk("app"), ...walk("components")].filter((f) => f.endsWith(".tsx")))
       expect(src(f)).not.toMatch(/<meta name="(viewport|theme-color)"/);
   });

@@ -112,7 +112,7 @@ export function WhoCard({ size = 40, className, href, onPick }: { size?: number;
  * the arrow keys. Opens with a short fade and scale from the circle (CSS .acct-menu), opacity only under
  * reduced motion.
  */
-export function AccountMenu({ children, side = "right" }: { children: React.ReactNode; side?: "right" | "bottom" }) {
+export function AccountMenu({ children, side = "right" }: { children: React.ReactNode; side?: "right" | "bottom" | "top" }) {
   const [open, setOpen] = useState(false);
   const path = usePathname();
   const trigger = useRef<HTMLButtonElement>(null);

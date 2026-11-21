@@ -8,6 +8,7 @@ const read = (f: string) => readFileSync(f, "utf8");
 // Raw <button>s that stay on purpose: each is a selectable tab, radio, chip or list row with aria state.
 const EXCEPTIONS: Record<string, number> = {
   "components/admin/ActivationFunnel.tsx": 1, // range radio
+  "components/admin/AdminDock.tsx": 1, // R1290 dock account menu: the high contrast menuitemcheckbox row
   "components/admin/AiAccessPanel.tsx": 2, // mode radio + length chips
   "components/admin/AdminTabBar.tsx": 1, // R1274 More tab of the phone tab bar (aria-expanded, .mtab-item ink)
   "components/admin/AiEngineCard.tsx": 1, // disclosure row

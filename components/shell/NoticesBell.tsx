@@ -41,7 +41,7 @@ function fetchNotices(fresh = false): Promise<NoticeList> {
   return p;
 }
 
-export function NoticesBell({ placement = "side", className }: { placement?: "side" | "below"; className?: string }) {
+export function NoticesBell({ placement = "side", className }: { placement?: "side" | "below" | "above"; className?: string }) {
   const path = usePathname();
   const id = useId();
   const btn = useRef<HTMLButtonElement>(null);
@@ -51,7 +51,8 @@ export function NoticesBell({ placement = "side", className }: { placement?: "si
   const [unread, setUnread] = useState(0);
   const [pos, setPos] = useState<React.CSSProperties>({});
   // R1255: rises from the rail bell (bottom left) or drops from the top bar bell (top right); leaves in half the time.
-  const shown = usePanelPresence(open, panel, placement === "side" ? PANEL.rise : PANEL.popover, placement === "side" ? "0% 100%" : "100% 0%");
+  // R1290: "above" rises from the desktop dock's bell (bottom centre).
+  const shown = usePanelPresence(open, panel, placement === "below" ? PANEL.popover : PANEL.rise, placement === "side" ? "0% 100%" : placement === "above" ? "50% 100%" : "100% 0%");
 
   const load = useCallback((fresh?: boolean) => {
     fetchNotices(fresh === true)
@@ -86,7 +87,13 @@ export function NoticesBell({ placement = "side", className }: { placement?: "si
     if (!r) return;
     const w = Math.min(360, window.innerWidth - 24);
     if (placement === "side") setPos({ left: Math.min(r.right + 12, window.innerWidth - w - 12), bottom: Math.max(12, window.innerHeight - r.bottom), width: w });
-    else {
+    else if (placement === "above") {
+      // Over the dock, centred on the bell and kept on screen; it never covers the dock itself.
+      const left = Math.max(12, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 12));
+      const dock = btn.current?.closest(".dock")?.getBoundingClientRect();
+      const top = dock && dock.height > 0 ? dock.top : r.top;
+      setPos({ left, bottom: window.innerHeight - top + 12, width: w, maxHeight: Math.max(200, Math.min(520, top - 24)) });
+    } else {
       // Under the phone top bar (1105): stops 8px above the floating tab bar (or the screen edge), so a short phone
       // never stacks the two and the list scrolls inside the panel instead.
       const tabs = document.querySelector("nav.mtab")?.getBoundingClientRect();

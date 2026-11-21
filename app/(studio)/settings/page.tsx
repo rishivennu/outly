@@ -8,6 +8,7 @@ import { accessFor } from "@/lib/billing/access";
 import { isPaidSub } from "@/lib/billing/access-core";
 import { entitlements } from "@/lib/billing/entitlements";
 import { hasPerk } from "@/lib/billing/plan-rules";
+import { navFor } from "@/lib/nav-style";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings" };
@@ -44,6 +45,7 @@ export default async function SettingsPage(props: { searchParams?: Promise<{ tab
   // R1223: the three reads run together (they were one after the other), and the profile card's own words come along,
   // so the card shows its handle and bio in the first paint instead of growing under the stats once /api/profile/card
   // answers (0.2 CLS on a phone, measured). The stats still arrive from that request: they ask the platforms.
+  const navP = navFor();
   const [own, billing, e] = user.actor
     ? [null, null, null]
     : await Promise.all([
@@ -53,6 +55,7 @@ export default async function SettingsPage(props: { searchParams?: Promise<{ tab
         entitlements(user.id).catch(() => null),
       ]);
   const identity = own ? { handle: own.handle, bio: own.bio, niche: own.niche } : null;
+  const nav = await navP;
   const perks = { digest: !e || hasPerk(e, "weekly-digest"), spike: !e || hasPerk(e, "spike-alerts") };
-  return <SettingsView weeklyReport={own?.weeklyReport ?? true} alerts={parseAlertPrefs(own?.alertPrefs)} perks={perks} billing={billing} identity={identity} initialTab={typeof searchParams?.tab === "string" ? searchParams.tab : undefined} />;
+  return <SettingsView weeklyReport={own?.weeklyReport ?? true} alerts={parseAlertPrefs(own?.alertPrefs)} perks={perks} billing={billing} identity={identity} initialTab={typeof searchParams?.tab === "string" ? searchParams.tab : undefined} navStyle={nav.style} navCanSwitch={nav.canSwitch} navOwn={nav.own} />;
 }
