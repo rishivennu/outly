@@ -1,6 +1,7 @@
 import type { MineApplication, MineDeliverable, MineEvent, MineOffer } from "@/lib/partners/mine-types";
 import { PARTNER_NICHE_LABEL, PARTNER_PLATFORM_LABEL, PARTNER_PREFERENCE_LABEL, PARTNER_STATUS_LABEL, PARTNER_STATUS_TONE, type PartnerStatus } from "@/lib/partners/types";
 import { fmtDay } from "@/lib/partners/offer-core";
+import type { PeepName } from "@/components/ui/art/peeps/data";
 
 export const LIST_PATH = "/dashboard/partnerships";
 export const APPLY_HREF = "/partners#partners-apply";
@@ -31,6 +32,20 @@ export const STAGE_COPY: Record<StageKey, string> = {
   completed: "Your partnership has been completed.",
   rejected: "We are not able to offer a partnership this time.",
   withdrawn: "This application was withdrawn.",
+};
+
+/** R1295: the figure that stands beside each status (components/ui/art/peeps). Type only here; the server page renders it. */
+export const STATUS_PEEP: Record<PartnerStatus, PeepName> = {
+  submitted: "relax",
+  under_review: "reviewing",
+  more_info: "question",
+  approved: "cheers",
+  offer_sent: "approved",
+  offer_accepted: "working",
+  active: "working",
+  completed: "cheers",
+  rejected: "ended",
+  withdrawn: "ended",
 };
 
 export type StageState = "done" | "current" | "future" | "ended";

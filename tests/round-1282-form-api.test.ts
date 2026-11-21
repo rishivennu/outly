@@ -47,7 +47,7 @@ describe("route source pins", () => {
     expect(form).toContain("Self-reported numbers. We may ask for a screenshot later.");
     expect(form).toContain('href="/terms"');
     expect(form).toContain('href="/privacy"');
-    expect(form).toContain("export default function ApplyForm({ me = null }: { me?: ApplyMe })");
+    expect(form).toContain("export default function ApplyForm({ me = null, doneArt = null }: { me?: ApplyMe; doneArt?: ReactNode })");
     expect(form).not.toMatch(/usage rights/i);
     expect(form).not.toContain("\u2014");
   });

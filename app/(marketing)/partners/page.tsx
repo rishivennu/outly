@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ApplyForm, { type ApplyMe } from "@/components/partners/ApplyForm";
+import { PeepSpot } from "@/components/ui/art/peeps/Peep";
 import { PartnersBento } from "@/components/partners/Bento";
 import { PartnersHero } from "@/components/partners/Hero";
 import { PartnerSteps, PartnersContactBand, WhatWeLookFor, WhoCanPartner } from "@/components/partners/Sections";
@@ -61,7 +62,7 @@ export default async function PartnersPage() {
             ))}
           </ul>
           <div className="mt-10">
-            <ApplyForm me={me} />
+            <ApplyForm me={me} doneArt={<PeepSpot name="cheers" height={112} />} />
           </div>
         </Shell>
       </section>

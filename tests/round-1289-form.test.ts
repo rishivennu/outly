@@ -213,7 +213,7 @@ describe("form source pins", () => {
   });
   test("route passes the signed-in user, page passes me and the new headline", () => {
     expect(route).toContain("createApplication(input, { ip, userId: me ? realUserId(me) : undefined })");
-    expect(page).toContain("<ApplyForm me={me} />");
+    expect(page).toContain('<ApplyForm me={me} doneArt={<PeepSpot name="cheers" height={112} />} />'); // R1295: the success card's figure comes from the page
     expect(page).toContain("Share a little about your content and audience. If we're a good fit, you could earn through paid collaborations or get access to Outlly Creator for free.");
     for (const b of ["Paid creator collaborations", "Complimentary Creator subscription", "Opportunities to grow with Outlly"]) expect(page).toContain(b);
   });

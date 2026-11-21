@@ -2,7 +2,9 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import type { MineApplication } from "@/lib/partners/mine-types";
 import { fmtDay } from "@/lib/partners/offer-core";
-import { activityTitle, countLabel, dayLabel, handleLabel, LIST_PATH, NOT_PROVIDED, nicheLabel, platformLabel, preferenceLabel } from "./model";
+import type { PartnerStatus } from "@/lib/partners/types";
+import { PeepSpot } from "@/components/ui/art/peeps/Peep";
+import { activityTitle, countLabel, dayLabel, handleLabel, LIST_PATH, NOT_PROVIDED, nicheLabel, platformLabel, preferenceLabel, STATUS_PEEP } from "./model";
 import { StatusPill } from "./StatusPill";
 import { Timeline } from "./Timeline";
 import { MoreInfoPanel } from "./MoreInfoPanel";
@@ -104,7 +106,10 @@ export function PartnershipDetail({ app }: { app: MineApplication }) {
             Submitted {dayLabel(app.createdAt)}. Last update {dayLabel(app.lastStatusAt || app.updatedAt)}.
           </p>
         </div>
-        <StatusPill status={app.status} className="text-[13px]" />
+        <div className="flex items-end gap-3">
+          <PeepSpot name={STATUS_PEEP[app.status as PartnerStatus] ?? "relax"} height={96} />
+          <StatusPill status={app.status} className="mb-2 text-[13px]" />
+        </div>
       </header>
 
       <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-start">

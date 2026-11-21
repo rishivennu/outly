@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { listMine } from "@/lib/partners/mine";
 import { PartnershipsList, SummaryCards } from "@/components/partnerships/PartnershipsList";
+import { PeepSpot } from "@/components/ui/art/peeps/Peep";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "My Partnerships" };
@@ -21,7 +22,7 @@ export default async function PartnershipsPage(props: { searchParams: Promise<{ 
         <SummaryCards summary={summary} />
       </div>
       <div className="mt-6">
-        <PartnershipsList apps={apps} fresh={fresh} />
+        <PartnershipsList apps={apps} fresh={fresh} emptyArt={<PeepSpot name="relax" height={136} />} />
       </div>
     </div>
   );

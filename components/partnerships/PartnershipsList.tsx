@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, Handshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
@@ -88,7 +88,8 @@ function AppCard({ app, fresh }: { app: MineApplication; fresh: boolean }) {
 }
 
 /** `fresh` = the ref from ?new= right after the application form: its card is marked and one toast says so. */
-export function PartnershipsList({ apps, fresh }: { apps: MineApplication[]; fresh: string | null }) {
+/** `emptyArt`: the empty state's figure, rendered by the page (components/ui/art/peeps is server-only); the icon disc otherwise. */
+export function PartnershipsList({ apps, fresh, emptyArt = null }: { apps: MineApplication[]; fresh: string | null; emptyArt?: ReactNode }) {
   const toast = useToast();
   const told = useRef(false);
   const match = fresh ? apps.find((a) => a.ref.toUpperCase() === fresh.toUpperCase()) ?? null : null;
@@ -109,9 +110,11 @@ export function PartnershipsList({ apps, fresh }: { apps: MineApplication[]; fre
   if (!apps.length)
     return (
       <section aria-labelledby="pp-empty" className="flex flex-col items-center rounded-[24px] border border-foreground/[0.08] bg-card px-6 py-12 text-center">
-        <span aria-hidden="true" className="grid h-14 w-14 place-items-center rounded-full bg-lime/15 text-lime-ink">
-          <Handshake className="h-6 w-6" />
-        </span>
+        {emptyArt ?? (
+          <span aria-hidden="true" className="grid h-14 w-14 place-items-center rounded-full bg-lime/15 text-lime-ink">
+            <Handshake className="h-6 w-6" />
+          </span>
+        )}
         <h2 id="pp-empty" className="mt-4 text-[19px] font-semibold">No applications yet</h2>
         <p className="mt-2 max-w-sm text-[14px] leading-relaxed text-muted-foreground">Apply to the Creator Partnership Program and track every step here.</p>
         <Button asChild variant="lime" size="md" className="mt-6">

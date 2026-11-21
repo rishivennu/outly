@@ -1,0 +1,12 @@
+{
+  "name": "outlly-peeps-generator",
+  "private": true,
+  "type": "module",
+  "description": "Builds components/ui/art/peeps/data.ts from Open Peeps parts. Not part of the app's dependency tree.",
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-peeps": "^0.1.10",
+    "svgo": "^4.0.0"
+  }
+}

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Reveal } from "@/components/marketing/Reveal";
 import { Shell } from "@/components/marketing/bits";
 import { PARTNER_TIER_LABEL, type PartnerTier } from "@/lib/partners/types";
+import { Peep, type PeepName } from "@/components/ui/art/peeps/Peep";
 import { cn } from "@/lib/utils";
 import s from "./sections.module.css";
 
@@ -16,6 +17,8 @@ const TIERS: {
   range: string;
   body: string;
   tone: Tone;
+  /** R1295: the tier's Open Peep (components/ui/art/peeps), one per tier, standing beside the creator card. */
+  peep: PeepName;
   card: { initials: string; handle: string; followers: string; bars: [number, number, number]; tilt: string };
 }[] = [
   {
@@ -23,6 +26,7 @@ const TIERS: {
     range: "1K to 5K followers",
     body: "A close audience that trusts your picks. Small and engaged beats big and quiet.",
     tone: "sky",
+    peep: "creator",
     card: { initials: "MK", handle: "@mira.makes", followers: "3.2K followers", bars: [55, 80, 65], tilt: "-6deg" },
   },
   {
@@ -30,6 +34,7 @@ const TIERS: {
     range: "5K to 10K followers",
     body: "A steady audience and a regular posting rhythm, ready for planned campaigns.",
     tone: "butter",
+    peep: "growing",
     card: { initials: "DS", handle: "@dev.ships", followers: "7.8K followers", bars: [45, 70, 90], tilt: "5deg" },
   },
   {
@@ -37,6 +42,7 @@ const TIERS: {
     range: "10K+ followers",
     body: "Wide reach and a track record, suited to longer partnerships and series.",
     tone: "blush",
+    peep: "established",
     card: { initials: "AR", handle: "@ana.reviews", followers: "24K followers", bars: [70, 60, 85], tilt: "-4deg" },
   },
 ];
@@ -71,10 +77,11 @@ function Head({ id, eyebrow, title, body }: { id: string; eyebrow: string; title
   );
 }
 
-function CreatorCard({ card }: { card: (typeof TIERS)[number]["card"] }) {
+function CreatorCard({ card, peep }: { card: (typeof TIERS)[number]["card"]; peep: PeepName }) {
   const style = { "--tilt": card.tilt } as CSSProperties;
   return (
     <div className={s.stage} aria-hidden="true">
+      <Peep name={peep} height={208} fill="#ffffff" className={s.peep} />
       <div className={s.creator} style={style}>
         <div className={s.creatorTop}>
           <span className={s.avatar}>{card.initials}</span>
@@ -108,7 +115,7 @@ export function WhoCanPartner() {
                 <h3 className={cn("play", s.title)}>{PARTNER_TIER_LABEL[t.tier]}</h3>
                 <p className={s.range}>{t.range}</p>
                 <p className={s.body}>{t.body}</p>
-                <CreatorCard card={t.card} />
+                <CreatorCard card={t.card} peep={t.peep} />
               </article>
             </Reveal>
           ))}

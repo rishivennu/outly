@@ -62,7 +62,8 @@ function ChipIcon({ platform }: { platform: (typeof CHIP_PLATFORMS)[number] }) {
   return <PlatformGlyph platform={platform} className="h-[18px] w-[18px]" />;
 }
 
-export default function ApplyForm({ me = null }: { me?: ApplyMe }) {
+/** `doneArt`: the figure on the success card, rendered by the page (components/ui/art/peeps is server-only). */
+export default function ApplyForm({ me = null, doneArt = null }: { me?: ApplyMe; doneArt?: ReactNode }) {
   const [d, setD] = useState<Draft>(emptyDraft);
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -248,9 +249,12 @@ export default function ApplyForm({ me = null }: { me?: ApplyMe }) {
   if (done)
     return (
       <div ref={card} className="mx-auto max-w-2xl scroll-mt-24 rounded-[24px] border border-foreground/[0.08] bg-card p-6 sm:p-10" role="status">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-lime/15">
-          <Check className="h-6 w-6 text-lime-ink" aria-hidden="true" />
-        </span>
+        <div className="flex items-start justify-between gap-4">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-lime/15">
+            <Check className="h-6 w-6 text-lime-ink" aria-hidden="true" />
+          </span>
+          {doneArt}
+        </div>
         <h3 ref={head} tabIndex={-1} className="mt-5 text-[24px] font-semibold tracking-tight focus:outline-none sm:text-[26px]">
           {"You're officially in!"}
         </h3>

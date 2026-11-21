@@ -1,0 +1,7 @@
+node_modules/
+bun.lock
+measure.html
+bbox.json
+peeps.json
+gallery.html
+data.ts

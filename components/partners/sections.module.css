@@ -53,6 +53,18 @@
   .stage { margin: 1.5rem -2rem -2rem 0; }
 }
 
+/* R1295: the tier's figure, ink in the tile's deep tone on white paper, feet on the tile's bottom edge; the card
+   overlaps its shoulder on narrow tiles, which is the intent. */
+.peep {
+  position: absolute;
+  left: -0.25rem;
+  bottom: -0.5rem;
+  color: var(--t-ink);
+}
+@media (max-width: 639px) {
+  .peep { height: 11rem; width: auto; }
+}
+
 .creator {
   position: absolute;
   right: -1.25rem;

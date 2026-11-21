@@ -178,8 +178,8 @@ describe("R1282 page sections", () => {
     expect(page).toContain('import ApplyForm, { type ApplyMe } from "@/components/partners/ApplyForm"');
     const apply = page.indexOf('<section id="apply"');
     expect(apply).toBeGreaterThan(page.indexOf("<PartnerSteps />"));
-    expect(page.indexOf("<ApplyForm me={me} />")).toBeGreaterThan(apply);
-    expect(page.indexOf("<ApplyForm me={me} />")).toBeLessThan(page.indexOf("</section>", apply));
+    expect(page.indexOf("<ApplyForm me={me} ")).toBeGreaterThan(apply);
+    expect(page.indexOf("<ApplyForm me={me} ")).toBeLessThan(page.indexOf("</section>", apply));
     expect(page).toContain("Let's get you rewarded.");
     expect(existsSync("components/partners/ApplyForm.tsx")).toBe(true);
   });

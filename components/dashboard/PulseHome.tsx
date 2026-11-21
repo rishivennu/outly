@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cachedApi, peekCached } from "@/lib/client/api";
 import { useTabMemory } from "@/lib/client/tab-state";
 import { cn } from "@/lib/utils";
@@ -79,7 +79,7 @@ function KpiCard({ k, i }: { k: Kpi; i: number }) {
 
 const rangeUrl = (r: number) => `/api/dashboard?days=${r}`;
 
-export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial: Pulse; firstName: string; canSwitch: boolean; nextPost: { when: string; title: string } | null }) {
+export function PulseHome({ initial, firstName, canSwitch, nextPost, emptyArt = null }: { initial: Pulse; firstName: string; canSwitch: boolean; nextPost: { when: string; title: string } | null; emptyArt?: ReactNode }) {
   // 1114: the range and platform tab you left Home on come back with you from another tab. A kept range shows at
   // once when its numbers are still remembered from this visit's session, else it loads like a click on it.
   const kept = useTabMemory<{ range: PulseRange; tab: string }>("home:pulse", (v) => {
@@ -263,10 +263,13 @@ export function PulseHome({ initial, firstName, canSwitch, nextPost }: { initial
               <ViewsChart cur={c.views} prev={v.views} dates={p.dates} days={range} label={`Views over time, ${scopeLabel}`} />
               {!p.hasData && (
                 <div className="absolute inset-0 grid place-items-center">
-                  <div className="pulse-empty max-w-xs text-center">
-                    <p className="text-[15px] font-semibold">Your numbers land here</p>
-                    <p className="mt-1 text-[13px] text-muted-foreground">Once a post goes live, its views show up within a few hours.</p>
-                    <Link href="/create" className="mt-3 inline-flex h-11 items-center rounded-2xl bg-secondary px-4 text-[14px] font-semibold hairline hover:bg-secondary/70">Create a post</Link>
+                  <div className={`pulse-empty max-w-sm ${emptyArt ? "flex items-center gap-4 text-left" : "max-w-xs text-center"}`}>
+                    {emptyArt}
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-semibold">Your numbers land here</p>
+                      <p className="mt-1 text-[13px] text-muted-foreground">Once a post goes live, its views show up within a few hours.</p>
+                      <Link href="/create" className="mt-3 inline-flex h-11 items-center rounded-2xl bg-secondary px-4 text-[14px] font-semibold hairline hover:bg-secondary/70">Create a post</Link>
+                    </div>
                   </div>
                 </div>
               )}

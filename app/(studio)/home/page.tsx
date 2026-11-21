@@ -52,6 +52,7 @@ import { dashboardFor } from "@/lib/dashboard-style";
 import { getPulse } from "@/lib/dashboard/pulse";
 import { analyticsScope } from "@/lib/profiles";
 import { PulseHome } from "@/components/dashboard/PulseHome";
+import { PeepSpot } from "@/components/ui/art/peeps/Peep";
 import { PulseSkeleton } from "@/components/dashboard/PulseSkeleton";
 import { DashboardSwitch } from "@/components/home/DashboardSwitch";
 import { HomeContentMark } from "@/components/home/HomeContentMark";
@@ -121,7 +122,7 @@ async function PulseBlock(p: { data: Promise<{ d: Pulse | null; ms: number }>; f
   return (
     <>
       <meta name="x-timing" content={timingContent({ pulse: ms })} />
-      <PulseHome initial={d} firstName={p.firstName} canSwitch={p.canSwitch} nextPost={p.nextPost} />
+      <PulseHome initial={d} firstName={p.firstName} canSwitch={p.canSwitch} nextPost={p.nextPost} emptyArt={<PeepSpot name="numbers" height={88} />} />
       <HomeContentMark nonce={p.nonce} />
     </>
   );
