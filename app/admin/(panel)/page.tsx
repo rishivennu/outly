@@ -4,6 +4,7 @@ import { can } from "@/lib/admin/perms";
 import { formatMoney } from "@/lib/billing/money";
 import { Card, PageHead, Unavailable } from "@/components/admin/ui";
 import { OverviewCharts } from "@/components/admin/OverviewCharts";
+import { ActiveDaysCard } from "@/components/admin/ActiveDaysCard";
 import { SampleData } from "@/components/admin/SampleData";
 import { AdminKpi as Kpi } from "@/components/admin/motion/AdminKpi";
 import { EnterRoot } from "@/components/admin/motion/EnterRoot";
@@ -83,6 +84,7 @@ export default async function Overview(props: { searchParams: Promise<{ denied?:
           <Unavailable reason="The live view could not be loaded just now. The numbers above are unaffected; reload to try again." />
         </Card>
       )}
+      <ActiveDaysCard days={o.series.map((r) => ({ date: r.day, value: r.active }))} />
       <OverviewCharts series={o.series} revenueByPlan={money ? o.revenueByPlan : []} currency={o.currency} showMoney={money} />
     </>
   );

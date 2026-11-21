@@ -5,6 +5,7 @@ import type { Activation, Person } from "@/lib/admin/activation";
 import { cn } from "@/lib/utils";
 import { Card, CardTitle, Hint } from "./ui";
 import { pct } from "./behavior-fmt";
+import { FunnelChart } from "@/components/ui/easy/FunnelChart";
 
 const n = (v: number) => v.toLocaleString("en-IN");
 
@@ -61,6 +62,10 @@ export function ActivationFunnel({ a, rangeDays }: { a: Activation; rangeDays: n
       {start === 0 ? (
         <p className="rounded-2xl bg-secondary/50 px-4 py-3 text-[13.5px] text-muted-foreground">Nobody signed up in this range, so there is no cohort to follow. Switch to All accounts to see everyone.</p>
       ) : (
+        <>
+        {/* R1288: the whole cohort at a glance (curved drop-off bridges, a loss chip per step, overall conversion and
+            the biggest drop); the list below keeps each step's rule and the people in it. */}
+        <FunnelChart className="mb-5" stages={f.steps.map((s) => ({ label: s.label, value: s.count }))} formatValue={n} ariaLabel={`Activation funnel, ${f.label}`} />
         <ol className="flex flex-col gap-1.5">
           {f.steps.map((s, i) => (
             <li key={s.key}>
@@ -75,9 +80,6 @@ export function ActivationFunnel({ a, rangeDays }: { a: Activation; rangeDays: n
                       <b className="text-foreground">{n(s.count)}</b> · {pct(s.pctOfStart)} of step 1
                       {s.stepRate !== null && <> · {pct(s.stepRate)} of step {i}</>}
                     </span>
-                  </span>
-                  <span className="block h-2.5 overflow-hidden rounded-full bg-foreground/[0.06]" aria-hidden>
-                    <span className="gs-bar block h-full rounded-full bg-lime" style={{ width: `${Math.max(s.pctOfStart * 100, s.count ? 1.5 : 0)}%` }} />
                   </span>
                   {(s.dropped > 0 || s.skipped > 0) && (
                     <span className="text-[12.5px] text-muted-foreground">
@@ -102,6 +104,7 @@ export function ActivationFunnel({ a, rangeDays }: { a: Activation; rangeDays: n
             </li>
           ))}
         </ol>
+        </>
       )}
 
       <div className="mt-4 rounded-2xl bg-secondary/50 px-4 py-3 text-[13px]">

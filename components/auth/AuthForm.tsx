@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, CircleCheck, Eye, EyeOff, KeyRound, Mail, MessageCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { MorphingButton } from "@/components/ui/easy/MorphingButton";
 import { Input, Label } from "@/components/ui/field";
 import { api, ApiError } from "@/lib/client/api";
 import { GoogleButton } from "./GoogleButton";
@@ -161,11 +161,19 @@ export function AuthForm({ mode, whatsapp = false, apple = false, googleClientId
     });
   });
   const [tries, setTries] = useState(0);
+  // The main button's face: a short error after a failed try, a tick once signed in (while the next page loads).
+  const [ctaErr, setCtaErr] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
-    if (tries) shake();
+    if (!tries) return;
+    shake();
+    setCtaErr(true);
+    const t = setTimeout(() => setCtaErr(false), 2400);
+    return () => clearTimeout(t);
   }, [tries, shake]);
 
   const go = () => {
+    setSignedIn(true);
     router.replace(next ?? "/home");
     router.refresh();
   };
@@ -543,6 +551,7 @@ export function AuthForm({ mode, whatsapp = false, apple = false, googleClientId
                 onComplete={onCodeDone}
                 disabled={busy}
                 invalid={!!error}
+                shake={false}
                 describedBy={[note ? "otp-note" : "", error ? "auth-error" : ""].filter(Boolean).join(" ") || undefined}
               />
             )}
@@ -624,10 +633,19 @@ export function AuthForm({ mode, whatsapp = false, apple = false, googleClientId
           </label>
         )}
         <div className="gs-in">
-          <Button type="submit" variant="lime" className="auth-cta h-12 w-full text-[15px]" disabled={busy} aria-busy={busy}>
+          <MorphingButton
+            type="submit"
+            variant="lime"
+            className="auth-cta h-12 w-full text-[15px]"
+            disabled={busy}
+            status={signedIn ? "success" : busy ? "loading" : ctaErr && error ? "error" : "idle"}
+            loadingText={cta}
+            successText={cta}
+            errorText={error}
+          >
             {cta}
             {!busy && <ArrowRight className="auth-cta-arrow h-[18px] w-[18px]" aria-hidden="true" />}
-          </Button>
+          </MorphingButton>
         </div>
         {mode === "login" && (
           <div className="gs-in -my-1 flex justify-center">

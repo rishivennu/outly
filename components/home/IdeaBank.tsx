@@ -7,6 +7,7 @@ import { Pip } from "@/components/brand/Pip";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/shared/Toast";
 import { api, ApiError } from "@/lib/client/api";
+import { Skeleton, SkeletonReveal } from "@/components/shared/Skeleton";
 
 type Idea = { id: string; text: string; source: string; done: boolean; createdAt: string };
 /** Note tints, cycled. Text on them stays foreground (see .idea-note). */
@@ -91,43 +92,52 @@ export function IdeaBank({ wide = false }: { wide?: boolean }) {
           <Plus className="h-4 w-4" aria-hidden="true" /> <span className="hidden sm:inline">Save</span><span className="sr-only sm:hidden">Save idea</span>
         </Button>
       </form>
-      {ideas === null ? (
-        <div className={cn("mt-4 grid gap-2", wide ? "sm:grid-cols-3" : "sm:grid-cols-2")} aria-hidden="true">
-          <div className="skeleton h-28 rounded-2xl" />
-          <div className="skeleton h-28 rounded-2xl" />
-        </div>
-      ) : list.length === 0 ? (
-        <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border p-5 text-center">
-          <Pip size={56} mood="think" />
-          <p className="max-w-xs text-sm text-muted-foreground">Ideas you jot here, and comments you save from the Inbox, wait for you. Need a nudge?</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {STARTERS.map((t) => (
-              <button key={t} type="button" onClick={() => { setText(t); input.current?.focus(); }} className="inline-flex min-h-[44px] items-center rounded-full bg-secondary/60 px-4 text-sm hairline transition-colors hover:bg-secondary focus-visible:outline-2">
-                {t}
-              </button>
-            ))}
+      {/* R1288: the notes ease in over their placeholder (SkeletonReveal) instead of popping in. */}
+      <SkeletonReveal
+        loading={ideas === null}
+        label="Loading ideas"
+        className="flex flex-1 flex-col"
+        contentClassName="flex flex-1 flex-col"
+        skeleton={
+          <div className={cn("mt-4 grid gap-2", wide ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
           </div>
-        </div>
-      ) : (
-        <ul className={cn("mt-4 grid gap-2", wide ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2")} aria-label="Saved ideas">
-          {shown.map((i, n) => (
-            <li key={i.id} className="idea-note flex min-h-[124px] flex-col rounded-2xl p-3.5" style={{ ["--note" as string]: NOTE[n % NOTE.length] }}>
-              <p className="line-clamp-3 flex-1 text-[15px] leading-snug">{i.text}</p>
-              <div className="mt-3 flex items-center gap-1">
-                <span className="mr-auto inline-flex min-w-0 items-center gap-1 truncate text-[12px] text-muted-foreground">
-                  {i.source === "comment" ? <><MessageCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> From a comment</> : "Your note"}
-                </span>
-                <Button variant="ghost" size="icon" aria-label={`Remove idea: ${i.text.slice(0, 40)}`} onClick={() => remove(i)} className="shrink-0 opacity-70 hover:opacity-100">
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                </Button>
-                <Button variant="subtle" onClick={() => make(i)} disabled={busy === i.id} aria-label={`Make a post from: ${i.text.slice(0, 40)}`} className="shrink-0">
-                  Make it <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+        }
+      >
+        {list.length === 0 ? (
+          <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border p-5 text-center">
+            <Pip size={56} mood="think" />
+            <p className="max-w-xs text-sm text-muted-foreground">Ideas you jot here, and comments you save from the Inbox, wait for you. Need a nudge?</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {STARTERS.map((t) => (
+                <button key={t} type="button" onClick={() => { setText(t); input.current?.focus(); }} className="inline-flex min-h-[44px] items-center rounded-full bg-secondary/60 px-4 text-sm hairline transition-colors hover:bg-secondary focus-visible:outline-2">
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <ul className={cn("mt-4 grid gap-2", wide ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2")} aria-label="Saved ideas">
+            {shown.map((i, n) => (
+              <li key={i.id} className="idea-note flex min-h-[124px] flex-col rounded-2xl p-3.5" style={{ ["--note" as string]: NOTE[n % NOTE.length] }}>
+                <p className="line-clamp-3 flex-1 text-[15px] leading-snug">{i.text}</p>
+                <div className="mt-3 flex items-center gap-1">
+                  <span className="mr-auto inline-flex min-w-0 items-center gap-1 truncate text-[12px] text-muted-foreground">
+                    {i.source === "comment" ? <><MessageCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> From a comment</> : "Your note"}
+                  </span>
+                  <Button variant="ghost" size="icon" aria-label={`Remove idea: ${i.text.slice(0, 40)}`} onClick={() => remove(i)} className="shrink-0 opacity-70 hover:opacity-100">
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                  <Button variant="subtle" onClick={() => make(i)} disabled={busy === i.id} aria-label={`Make a post from: ${i.text.slice(0, 40)}`} className="shrink-0">
+                    Make it <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SkeletonReveal>
       {list.length > limit && (
         <Button variant="ghost" onClick={() => setAll((v) => !v)} aria-expanded={all} className="-ml-3 mt-2 self-start">
           {all ? "Show fewer" : `Show all ${list.length}`}

@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, Check, Loader2, MessageCircle, Search, X } from "lucide-react";
+import { ArrowUpRight, Check, Loader2, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { Pip } from "@/components/brand/Pip";
 import { Answer } from "./Answer";
-import { LiquidAccordion } from "./LiquidAccordion";
+import { FAQ } from "@/components/ui/easy/FAQ";
+import { ExpandableSearch } from "@/components/ui/easy/ExpandableSearch";
 import { HELP_T, readLang, type Lang } from "@/lib/i18n/support";
 import { cn } from "@/lib/utils";
 
@@ -140,28 +141,27 @@ export function HelpCenter({
       )}
       {extra}
 
-      <div className="relative mx-auto mt-8 max-w-2xl">
-        <Label htmlFor="help-q" className="sr-only">{t.search}</Label>
-        <Search className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" aria-hidden />
-        <input
-          ref={inputRef}
-          id="help-q"
-          type="search"
-          role="combobox"
-          aria-expanded={sugOpen && suggestions.length > 0}
-          aria-controls="help-sug"
-          aria-autocomplete="list"
-          aria-activedescendant={active >= 0 ? `sug-${active}` : undefined}
-          autoComplete="off"
-          value={q}
-          placeholder={t.search}
-          onChange={(e) => { setQ(e.target.value); setSugOpen(true); setActive(-1); }}
-          onFocus={() => setSugOpen(true)}
-          onBlur={() => setTimeout(() => setSugOpen(false), 120)}
-          onKeyDown={onKey}
-          className="glass-strong h-16 w-full rounded-full pl-14 pr-14 text-[17px] outline-none transition-shadow focus-visible:ring-4 focus-visible:ring-lime/40 [&::-webkit-search-cancel-button]:hidden"
-        />
-        {q && <button type="button" onClick={() => { setQ(""); inputRef.current?.focus(); }} aria-label="Clear search" className="absolute right-4 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full hover:bg-secondary"><X className="h-4 w-4" /></button>}
+      <Label htmlFor="help-q" className="sr-only">{t.search}</Label>
+      <ExpandableSearch
+        ref={inputRef}
+        className="mt-8"
+        onClear={() => setQ("")}
+        id="help-q"
+        type="search"
+        role="combobox"
+        aria-expanded={sugOpen && suggestions.length > 0}
+        aria-controls="help-sug"
+        aria-autocomplete="list"
+        aria-activedescendant={active >= 0 ? `sug-${active}` : undefined}
+        autoComplete="off"
+        value={q}
+        placeholder={t.search}
+        onChange={(e) => { setQ(e.target.value); setSugOpen(true); setActive(-1); }}
+        onFocus={() => setSugOpen(true)}
+        onBlur={() => setTimeout(() => setSugOpen(false), 120)}
+        onKeyDown={onKey}
+        inputClassName="glass-strong h-16 rounded-full text-[17px] outline-none transition-shadow focus-visible:ring-4 focus-visible:ring-lime/40"
+      >
         {sugOpen && suggestions.length > 0 && (
           <ul id="help-sug" role="listbox" className="glass-strong chat-pop absolute inset-x-0 top-[calc(100%+8px)] z-30 overflow-hidden rounded-[24px] p-2 text-left" style={{ transformOrigin: "top center" }}>
             {suggestions.map((s, i) => (
@@ -172,7 +172,7 @@ export function HelpCenter({
             ))}
           </ul>
         )}
-      </div>
+      </ExpandableSearch>
 
       <div ref={tabsRef} role="tablist" aria-label="Topics" className="relative mx-auto mt-8 flex w-max max-w-full flex-wrap justify-center gap-1 rounded-3xl bg-secondary p-1">
         <span aria-hidden className="blob-tab clip-pill absolute top-0 bg-card shadow-sm" style={{ width: pill.tw, height: pill.th, ["--l" as string]: `${pill.x}px`, ["--r" as string]: `${Math.max(0, pill.tw - pill.x - pill.w)}px`, ["--clip-t" as string]: `${pill.y}px`, ["--clip-b" as string]: `${Math.max(0, pill.th - pill.y - pill.h)}px` }} />
@@ -194,7 +194,7 @@ export function HelpCenter({
           sections.filter((s) => s.list.length).map((s) => (
             <section key={s.c || "r"} className="mb-10" aria-label={s.c || undefined}>
               {s.c && <h2 className="mb-3 font-display text-[19px] font-semibold tracking-[-0.01em]">{s.c}</h2>}
-              <LiquidAccordion key={`${cat}|${openId}`} defaultOpen={openId ? [openId] : []} items={s.list.map((it) => ({ id: it.id, q: it.q, a: <Answer text={it.a} /> }))} />
+              <FAQ key={`${cat}|${openId}`} defaultOpen={openId ? [openId] : []} items={s.list.map((it) => ({ id: it.id, question: it.q, answer: <Answer text={it.a} /> }))} />
             </section>
           ))
         )}

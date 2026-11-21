@@ -55,6 +55,7 @@ import { PulseHome } from "@/components/dashboard/PulseHome";
 import { PulseSkeleton } from "@/components/dashboard/PulseSkeleton";
 import { DashboardSwitch } from "@/components/home/DashboardSwitch";
 import { HomeContentMark } from "@/components/home/HomeContentMark";
+import { HomeRefresh } from "@/components/home/HomeRefresh";
 import { timingContent } from "@/lib/server-timing";
 import type { Pulse } from "@/lib/dashboard/pulse-core";
 
@@ -185,9 +186,10 @@ export default async function HomePage(props: { searchParams?: Promise<{ recapAt
   if (dash.style === "pulse") {
     // Inside the numbers' boundary the first-run pieces are already on the page above, so the fallback leaves them out.
     const view = await pulseView(user, dash.canSwitch, setup, nonce, () => classicView(user, dash.canSwitch, searchParams?.recapAt, setup, nonce, false)).catch(() => null);
-    if (view) return view;
+    // R1288: in the installed app, a pull from the top refreshes Home in place (components/home/HomeRefresh.tsx).
+    if (view) return <HomeRefresh>{view}</HomeRefresh>;
   }
-  return classicView(user, dash.canSwitch, searchParams?.recapAt, setup, nonce, true);
+  return <HomeRefresh>{await classicView(user, dash.canSwitch, searchParams?.recapAt, setup, nonce, true)}</HomeRefresh>;
 }
 
 /** The classic Home. `firstRun` false: drawn inside the pulse view, which already shows the checklist and greetings. */

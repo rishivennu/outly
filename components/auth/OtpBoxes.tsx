@@ -1,5 +1,6 @@
 "use client";
 import { forwardRef, useImperativeHandle, useRef } from "react";
+import { OtpCell, OtpGroup } from "@/components/ui/easy/OtpInput";
 
 /**
  * Six one-digit boxes for a 6-digit code (1060). Typing moves to the next box, Backspace on an empty box
@@ -8,6 +9,8 @@ import { forwardRef, useImperativeHandle, useRef } from "react";
  * Android offer the code. `onComplete` fires once the sixth digit is in.
  *
  * Screen readers hear one group ("6-digit code") with each box labelled "Digit 1 of 6" and so on.
+ * R1288: each digit pops as it lands, and the row shakes once when a code comes back wrong (`invalid` turns on);
+ * `shake={false}` where the page shakes the boxes itself (AuthForm).
  */
 export type OtpBoxesHandle = { focus: () => void };
 
@@ -20,7 +23,8 @@ export const OtpBoxes = forwardRef<OtpBoxesHandle, {
   invalid?: boolean;
   describedBy?: string;
   id?: string;
-}>(function OtpBoxes({ value, onChange, onComplete, label, disabled, invalid, describedBy, id = "otp" }, fwd) {
+  shake?: boolean;
+}>(function OtpBoxes({ value, onChange, onComplete, label, disabled, invalid, describedBy, id = "otp", shake = true }, fwd) {
   const boxes = useRef<(HTMLInputElement | null)[]>([]);
   const digits = value.replace(/\D/g, "").slice(0, 6);
   // The latest digits, ahead of React's re-render: fast typing (or a test robot) lands the next key before
@@ -53,9 +57,9 @@ export const OtpBoxes = forwardRef<OtpBoxesHandle, {
   };
 
   return (
-    <div role="group" aria-label={label} aria-describedby={describedBy} className="flex justify-between gap-2 sm:gap-2.5">
+    <OtpGroup invalid={invalid} shake={shake} aria-label={label} aria-describedby={describedBy} className="flex justify-between gap-2 sm:gap-2.5">
       {Array.from({ length: 6 }, (_, i) => (
-        <input
+        <OtpCell
           key={i}
           ref={(el) => {
             boxes.current[i] = el;
@@ -115,6 +119,6 @@ export const OtpBoxes = forwardRef<OtpBoxesHandle, {
           }
         />
       ))}
-    </div>
+    </OtpGroup>
   );
 });

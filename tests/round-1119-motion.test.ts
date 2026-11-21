@@ -66,7 +66,9 @@ describe("motion tokens (1119)", () => {
 
 describe("nothing bounces (1119)", () => {
   test("no hand-tuned framer springs left: every transition comes from the tokens", () => {
-    const bad = src.filter((f) => f.file !== "lib/motion/tokens.ts" && /stiffness\s*:\s*\d/.test(f.text)).map((f) => f.file);
+    // R1288: components/ui/easy/lib/motion-tokens.ts is the EasyUI ports' own token file (near-critical damping, checked below).
+    const TOKEN_FILES = ["lib/motion/tokens.ts", "components/ui/easy/lib/motion-tokens.ts"];
+    const bad = src.filter((f) => !TOKEN_FILES.includes(f.file) && /stiffness\s*:\s*\d/.test(f.text)).map((f) => f.file);
     expect(bad).toEqual([]);
     const bouncy = src.filter((f) => /bounce\s*:\s*0?\.[1-9]/.test(f.text)).map((f) => f.file);
     expect(bouncy).toEqual([]);

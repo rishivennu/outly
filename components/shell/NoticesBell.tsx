@@ -10,6 +10,7 @@ import { NOTICES_EVENT } from "./PushBridge";
 import { cn } from "@/lib/utils";
 import { PANEL } from "@/lib/motion/fluid";
 import { usePanelPresence } from "@/lib/motion/useFluid";
+import { BadgeCount, BellShake, useArrivalShake } from "@/components/ui/easy/NotificationBell";
 
 type Notice = { id: string; kind: string; tone: "danger" | "warn" | "info"; title: string; body: string; href: string | null; action: string | null; read: boolean; createdAt: string };
 const ICON = { danger: AlertTriangle, warn: CircleAlert, info: Info } as const;
@@ -130,6 +131,8 @@ export function NoticesBell({ placement = "side", className }: { placement?: "si
   }
 
   const label = unread ? `Notices, ${unread} unread` : "Notices";
+  // R1288: a rising count (a push, or a reload that found more) rocks the bell; the first load never does.
+  const shake = useArrivalShake(unread, items !== null);
   return (
     <>
       <button
@@ -142,10 +145,10 @@ export function NoticesBell({ placement = "side", className }: { placement?: "si
         onClick={() => setOpen((v) => !v)}
         className={cn("ripple-host relative grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground", open && "bg-secondary text-foreground", className)}
       >
-        <Bell className="h-[18px] w-[18px]" aria-hidden="true" />
+        <BellShake shake={shake}><Bell className="h-[18px] w-[18px]" aria-hidden="true" /></BellShake>
         {unread > 0 && (
           <span aria-hidden="true" className="absolute right-1.5 top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-destructive px-1 text-[10.5px] font-bold leading-none text-destructive-foreground">
-            {unread > 9 ? "9+" : unread}
+            <BadgeCount value={unread > 9 ? "9+" : unread} />
           </span>
         )}
       </button>

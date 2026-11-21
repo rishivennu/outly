@@ -1,8 +1,11 @@
 import { cn } from "@/lib/utils";
+import styles from "./Skeleton.module.css";
 
-/** Shimmer placeholder. Always inside an aria-busy region so it is not announced. */
+export { SkeletonReveal } from "@/components/ui/easy/Skeleton";
+
+/** Placeholder with a slow light sweep (R1288, EasyUI). Always inside an aria-busy region so it is not announced. */
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("skeleton rounded-2xl", className)} aria-hidden="true" />;
+  return <div className={cn("skeleton rounded-2xl", styles.sweep, className)} aria-hidden="true" />;
 }
 
 /** Page-level placeholder used by route-level loading.tsx files. */

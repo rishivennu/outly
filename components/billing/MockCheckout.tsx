@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { ArrowLeft, CreditCard, Loader2, Lock, ShieldCheck, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { OutlyLogo } from "@/components/brand/Logo";
 import { formatMoney, intervalLabel } from "@/lib/billing/money";
 import { cn } from "@/lib/utils";
 import { tierLabel } from "./offer-core";
+import { PaymentStatus, PaymentStatusIcon } from "@/components/ui/easy/PaymentStatus";
 
 const CARDS = [
   { n: "4242 4242 4242 4242", what: "succeeds" },
@@ -30,6 +32,17 @@ export function MockCheckout({ paymentId, amountMinor, currency, planName, inter
   const [state, setState] = useState<"idle" | "paying" | "failed" | "done">("idle");
   const [error, setError] = useState("");
   const amount = formatMoney(amountMinor, currency);
+  // R1288: the success screen is staged (verifying, then confirmed with the drawn tick) inside the same 1.1 s
+  // before the redirect. Reduced motion lands straight on confirmed.
+  const reduce = useReducedMotion();
+  const [confirmed, setConfirmed] = useState(false);
+  useEffect(() => {
+    if (state !== "done") return setConfirmed(false);
+    if (reduce) return setConfirmed(true);
+    const t = setTimeout(() => setConfirmed(true), 380);
+    return () => clearTimeout(t);
+  }, [state, reduce]);
+  const other = method === "card" ? "upi" : "card";
 
   async function pay(e: React.FormEvent) {
     e.preventDefault();
@@ -72,9 +85,12 @@ export function MockCheckout({ paymentId, amountMinor, currency, planName, inter
           </div>
 
           {state === "done" ? (
-            <div role="status" className="mt-8 text-center">
-              <p className="text-lg font-semibold">Payment successful</p>
-              <p className="mt-1 text-sm text-muted-foreground">Your invoice is on its way to {email}. Taking you back…</p>
+            <div role="status" className="mt-8">
+              <PaymentStatus
+                status={confirmed ? "success" : "verifying"}
+                title={confirmed ? "Payment successful" : "Confirming your payment"}
+                message={confirmed ? <>Your invoice is on its way to {email}. Taking you back…</> : "Checking with the bank. This takes a moment."}
+              />
             </div>
           ) : (
             <form onSubmit={pay} className="mt-7" noValidate>
@@ -106,7 +122,21 @@ export function MockCheckout({ paymentId, amountMinor, currency, planName, inter
               )}
 
               <div id="pay-err" role="alert" className="liquid-panel mt-3 text-sm text-destructive" data-open={state === "failed"}>
-                <div><p className="liquid-inner">{error}{state === "failed" && " Nothing was charged."}</p></div>
+                <div>
+                  {/* R1288: the recovery state: the failure mark, what happened, and a way out besides retrying. */}
+                  <div className="liquid-inner flex items-start gap-3">
+                    {state === "failed" && <PaymentStatusIcon status="failed" size="sm" className="shrink-0" />}
+                    <div className="min-w-0">
+                      <p className="pt-2">{error}{state === "failed" && " Nothing was charged."}</p>
+                      {state === "failed" && (
+                        <Button type="button" variant="ghost" className="-ml-3 mt-1 text-foreground" onClick={() => { setMethod(other); setState("idle"); setError(""); }}>
+                          {other === "upi" ? <Smartphone className="h-4 w-4" aria-hidden /> : <CreditCard className="h-4 w-4" aria-hidden />}
+                          {other === "upi" ? "Pay with UPI instead" : "Pay by card instead"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <Button type="submit" variant="lime" size="lg" className="mt-5 w-full" disabled={state === "paying"}>

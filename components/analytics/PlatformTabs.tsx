@@ -1,14 +1,13 @@
 "use client";
 import { HoverLink as Link } from "@/components/shell/HoverLink";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
 import { LayoutDashboard } from "lucide-react";
 import { PlatformOrb } from "@/components/shared/PlatformIcon";
 import { PLATFORM_META, type Platform } from "@/lib/domain";
 import { useLivePlatforms } from "@/components/shell/LivePlatforms";
 import { useEdgeFade } from "@/lib/client/edge-fade";
 import { cn } from "@/lib/utils";
-import { T } from "@/lib/motion/tokens";
+import { AnimatedTabIndicator } from "@/components/ui/easy/AnimatedTabs";
 
 /**
  * Overview plus one tab per platform. The dot says whether that platform is connected for real.
@@ -30,8 +29,9 @@ export function PlatformTabs({ connected }: { connected: Partial<Record<Platform
           const active = path === t.href;
           return (
             <li key={t.href} className="shrink-0">
-              <Link href={t.href} aria-current={active ? "page" : undefined} className={cn("relative flex h-11 items-center gap-2 whitespace-nowrap rounded-full px-4 text-sm font-medium transition-colors", active ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                {active && <motion.span layoutId="an-tab" className="gseg-pane absolute inset-0 rounded-full bg-background shadow-sm hairline" transition={T.glide} />}
+              <Link href={t.href} aria-current={active ? "page" : undefined} className={cn("relative flex h-11 items-center gap-2 whitespace-nowrap rounded-full px-4 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring", active ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground")}>
+                {/* R1288: EasyUI's shared-layout pill (springMorph), still one layoutId across Overview and every platform. */}
+                {active && <AnimatedTabIndicator layoutId="an-tab" className="gseg-pane hairline" />}
                 <span className="relative flex items-center gap-2">
                   {t.platform ? <PlatformOrb platform={t.platform} size={22} /> : <LayoutDashboard className="h-4 w-4" aria-hidden="true" />}
                   {t.label}

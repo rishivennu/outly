@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { FX, T } from "@/lib/motion/tokens";
 import { useHeaderScroll } from "@/lib/client/header-scroll";
 import { AdminTabBar } from "./AdminTabBar";
+import { AdminCommand } from "./AdminCommand";
 
 /** 1163: five groups. Run is the daily console, Insights is read-only analysis, Setup is configuration, Administration is who may do what. */
 export type NavGroup = "Run" | "Insights" | "Content Studio" | "Support" | "Setup" | "Administration";
@@ -293,6 +294,8 @@ export function AdminShell({ admin, badges, children }: { admin: { name: string;
             <span className="truncate font-display text-[16px] font-semibold leading-none tracking-[-0.01em]">Admin</span>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1">
+            {/* R1288: Ctrl/Cmd+K palette over NAV; its Search pill shows from md up, the shortcut works everywhere. */}
+            <AdminCommand nav={NAV} role={admin.role} />
             <Bell role={admin.role} />
             <Tooltip text="Open menu" side="bottom" className={cn("-mr-2 flex shrink-0 lg:hidden", TOUCH_TIP)}>
               <Button ref={menuBtn} type="button" variant="ghost" size="icon" onPointerDown={() => (byPointer.current = true)} onKeyDown={() => (byPointer.current = false)} onClick={() => { fromTab.current = false; setOpen(true); }} aria-label="Open menu" aria-expanded={open} aria-haspopup="dialog" className="text-foreground">

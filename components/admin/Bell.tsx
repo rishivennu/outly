@@ -13,6 +13,7 @@ import { FX, T } from "@/lib/motion/tokens";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "./ui";
 import { chime, setSound, soundOn, SOUND_EVENT } from "@/lib/client/live-sound";
+import { BadgeCount, BellShake, useArrivalShake } from "@/components/ui/easy/NotificationBell";
 
 type Ev = { id: string; kind: string; title: string; body?: string | null; href?: string | null; createdAt: string };
 const SEEN = "outly-admin-seen";
@@ -55,6 +56,7 @@ export function Bell({ role }: { role: AdminRole }) {
   const [events, setEvents] = useState<Ev[]>([]);
   const [seen, setSeen] = useState<string>("");
   const [open, setOpen] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const since = useRef<string | null>(null);
   const toast = useToast();
   const btn = useRef<HTMLButtonElement>(null);
@@ -81,6 +83,7 @@ export function Bell({ role }: { role: AdminRole }) {
       const j: { events: Ev[]; now: string } = await r.json();
       const first = since.current === null;
       since.current = j.now;
+      if (first) setLoaded(true);
       if (!j.events.length) return;
       setEvents((x) => [...j.events, ...x.filter((e) => !j.events.some((n) => n.id === e.id))].slice(0, 30));
       if (!first) for (const e of j.events.filter((e) => LOUD.has(e.kind)).slice(0, 2)) toast(e.title, BAD.has(e.kind) ? "error" : "info");
@@ -188,6 +191,8 @@ export function Bell({ role }: { role: AdminRole }) {
   useEffect(() => setOpen(false), [path]);
 
   const unread = events.filter((e) => e.createdAt > seen).length;
+  // R1288: the bell rocks when the unread count rises after the first check (never for what was already waiting).
+  const shake = useArrivalShake(unread, loaded);
   const markSeen = () => {
     const top = events[0]?.createdAt ?? new Date().toISOString();
     localStorage.setItem(SEEN, top);
@@ -212,8 +217,8 @@ export function Bell({ role }: { role: AdminRole }) {
           aria-label={unread ? `Notifications, ${unread} new` : "Notifications"}
           className={cn("text-foreground", open && "bg-secondary")}
         >
-          {unread ? <BellRing className="bell-ring h-[19px] w-[19px]" /> : <BellIcon className="h-[19px] w-[19px]" />}
-          {unread > 0 && <span className="absolute right-[5px] top-[5px] grid h-[17px] min-w-[17px] place-items-center rounded-full bg-lime px-[3px] text-[10px] font-bold leading-none text-[hsl(var(--lime-foreground))] ring-2 ring-background">{unread > 9 ? "9+" : unread}</span>}
+          <BellShake shake={shake}>{unread ? <BellRing className="h-[19px] w-[19px]" /> : <BellIcon className="h-[19px] w-[19px]" />}</BellShake>
+          {unread > 0 && <span className="absolute right-[5px] top-[5px] grid h-[17px] min-w-[17px] place-items-center rounded-full bg-lime px-[3px] text-[10px] font-bold leading-none text-[hsl(var(--lime-foreground))] ring-2 ring-background"><BadgeCount value={unread > 9 ? "9+" : unread} /></span>}
         </Button>
       </Tooltip>
       {mounted &&

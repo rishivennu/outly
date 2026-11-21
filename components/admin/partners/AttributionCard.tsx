@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/Toast";
 import { adminApi } from "@/lib/client/admin-api";
 import { Card, CardTitle } from "@/components/admin/ui";
+import { FunnelChart } from "@/components/ui/easy/FunnelChart";
 
 const CODE_STATUSES = ["offer_accepted", "active", "completed"];
 
@@ -40,6 +41,15 @@ export default function AttributionCard({ id, status, code, counts }: { id: stri
           </div>
         ))}
       </dl>
+      {counts.visits > 0 && (
+        <FunnelChart
+          className="mt-4"
+          stages={[{ label: "Visits", value: counts.visits }, { label: "Signups", value: counts.signups }, { label: "Paid", value: counts.paid }]}
+          formatValue={(v) => v.toLocaleString("en-IN")}
+          unit="Count"
+          ariaLabel="Referral funnel from visits to paid"
+        />
+      )}
       <div className="mt-4">
         {code ? (
           <div className="flex items-center gap-2 rounded-2xl bg-secondary/40 py-1 pl-3.5 pr-1">

@@ -1,10 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { DragToConfirm } from "@/components/ui/easy/DragToConfirm";
+import { AvatarStack } from "@/components/ui/easy/AvatarStack";
 import { adminApi } from "@/lib/client/admin-api";
 import { ADMIN_ROLES, type AdminRole } from "@/lib/admin/perms";
 import { Card, CardTitle, Pill, StatusBadge, Table, Tooltip, ago } from "./ui";
@@ -18,6 +20,9 @@ export function TeamView({ initial, me, roles }: { initial: A[]; me: string; rol
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [del, setDel] = useState<A | null>(null);
+  // R1288: removing someone signs them out at once, so Remove stays off until the slider is pulled across.
+  const [armed, setArmed] = useState(false);
+  useEffect(() => setArmed(false), [del]);
   const toast = useToast();
 
   async function add(e: React.FormEvent) {
@@ -67,7 +72,8 @@ export function TeamView({ initial, me, roles }: { initial: A[]; me: string; rol
         ))}
       </div>
       <Card>
-        <CardTitle>People</CardTitle>
+        {/* R1288: the whole team at a glance; active members get the lime tint, the name shows on hover or focus. */}
+        <CardTitle action={<AvatarStack className="shrink-0 pt-1" aria-label={`${team.length} admin${team.length === 1 ? "" : "s"}, ${team.filter((a) => a.active).length} active`} avatars={team.map((a) => ({ id: a.id, name: a.id === me ? `${a.name} (you)` : a.name, highlight: a.active }))} max={5} size="lg" moreLabel="more admins" />}>People</CardTitle>
         <Table label="Admin team" head={["Name", "Role", "Status", "Last sign-in", ""]}>
           {team.map((a) => (
             <tr key={a.id}>
@@ -104,7 +110,7 @@ export function TeamView({ initial, me, roles }: { initial: A[]; me: string; rol
           <div className="sm:col-span-2 lg:col-span-4"><Button type="submit" variant="lime" disabled={busy}><Plus className="h-4 w-4" aria-hidden />{busy ? "Adding…" : "Add admin"}</Button></div>
         </form>
       </Card>
-      <ConfirmDialog open={!!del} onOpenChange={(o) => !o && setDel(null)} title={`Remove ${del?.name}?`} body="They are signed out right away and can't sign in again." confirmLabel="Remove" onConfirm={remove} />
+      <ConfirmDialog open={!!del} onOpenChange={(o) => !o && setDel(null)} title={`Remove ${del?.name}?`} body="They are signed out right away and can't sign in again." confirmLabel="Remove" disabled={!armed} extra={<DragToConfirm className="mt-4 max-w-none" actionType="unlock" variant="danger" label="Slide to unlock" ariaLabel={`Slide to unlock Remove ${del?.name ?? ""}`.trim()} confirmedLabel="Unlocked" autoResetDelay={0} isConfirmed={armed} onConfirm={() => setArmed(true)} />} onConfirm={remove} />
     </div>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Clock, Download, RotateCw, X } from "lucide-react";
+import { Clock, Download, RotateCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/client/api";
 import { formatMoney } from "@/lib/billing/money";
 import { isFinal, receiptKey, type Receipt, type ReceiptState } from "@/lib/billing/receipt-core";
 import { cn } from "@/lib/utils";
+import { DrawnCheck } from "@/components/ui/easy/PaymentStatus";
 
 const GATEWAY: Record<string, string> = { stripe: "Card or wallet (Stripe)", razorpay: "Razorpay", paypal: "PayPal", youpi: "UPI", mock: "Test checkout" };
 const POLL_MS = 4_000;
@@ -133,7 +134,7 @@ export function PaymentReceipt({ initial, onClose, onRetry }: { initial: Receipt
               style={animate ? { animationDelay: `${560 + rows.length * 90}ms` } : undefined}
               aria-hidden="true"
             >
-              {r.state === "paid" ? <Check className="h-6 w-6" strokeWidth={3} /> : r.state === "pending" ? <Clock className={cn("h-6 w-6", checking && "animate-pulse")} /> : <X className="h-6 w-6" strokeWidth={3} />}
+              {r.state === "paid" ? <DrawnCheck animate={animate} delay={(700 + rows.length * 90) / 1000} strokeWidth={3} className="h-6 w-6" /> : r.state === "pending" ? <Clock className={cn("h-6 w-6", checking && "animate-pulse")} /> : <X className="h-6 w-6" strokeWidth={3} />}
             </span>
             <p className="text-[13.5px] leading-snug" role="status" aria-live="polite">
               <b className="block text-[14px]">{c.stamp}</b>

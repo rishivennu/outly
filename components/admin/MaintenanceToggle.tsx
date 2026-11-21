@@ -1,10 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Construction, ExternalLink, Mail, Power, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { DragToConfirm } from "@/components/ui/easy/DragToConfirm";
 import { adminApi } from "@/lib/client/admin-api";
 import { Countdown } from "@/components/maintenance/Countdown";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,11 @@ export function MaintenanceToggle({ initial, subscribers }: { initial: Site; sub
   const [eta, setEta] = useState(initial.eta);
   const [busy, setBusy] = useState(false);
   const [ask, setAsk] = useState(false);
+  // R1288: taking the whole site offline needs a deliberate slide before the confirm button wakes up.
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!ask) setArmed(false);
+  }, [ask]);
   // Picked countdown length. `clock` is true once the admin touches it, so "Save text" never resets a running clock.
   const [minutes, setMinutes] = useState(60);
   const [custom, setCustom] = useState("");
@@ -174,6 +180,8 @@ export function MaintenanceToggle({ initial, subscribers }: { initial: Site; sub
         body={`New visitors see the maintenance page right away and nobody can sign up. Members who already have an account keep working and posting.${minutes ? ` The page counts down ${minutes >= 60 && minutes % 60 === 0 ? `${minutes / 60} hour${minutes === 60 ? "" : "s"}` : `${minutes} minutes`}.` : ""}`}
         confirmLabel="Turn maintenance on"
         busy={busy}
+        disabled={!armed}
+        extra={<DragToConfirm className="mt-4 max-w-none" actionType="unlock" variant="danger" label="Slide to unlock" ariaLabel="Slide to unlock Turn maintenance on" confirmedLabel="Unlocked" autoResetDelay={0} isConfirmed={armed} onConfirm={() => setArmed(true)} />}
         onConfirm={() => save(true)}
       />
     </div>

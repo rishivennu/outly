@@ -19,13 +19,14 @@ import { cn, compact } from "@/lib/utils";
 import type { AnalyticsSummary } from "@/lib/analytics";
 import type { Platform } from "@/lib/domain";
 import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
-import { chartMotion, riseIndex } from "@/lib/motion/numbers";
+import { chartMotion, formatOf, riseIndex } from "@/lib/motion/numbers";
+import { StatCard, StatGrid } from "@/components/ui/easy/StatCard";
 import { LiveStrip } from "./LiveStrip";
 import { AccountDrill, ReportButtons } from "./AccountDrill";
 import { Standouts } from "./Standouts";
 import { Compare } from "./Compare";
 import { combinedNote, DAY_MS, dayKey, headline as buildHeadline, kpiMetrics, METRIC_TITLE, rangeLabel, rangePhrase } from "@/lib/analytics/core";
-import { leadPlatform, trend } from "@/lib/analytics/trend";
+import { leadPlatform, pointsTrend, trend, TREND_SHORT } from "@/lib/analytics/trend";
 import { useEdgeFade } from "@/lib/client/edge-fade";
 
 // 1154: the sentence words come from rangePhrase(window), never from here, so a 30-day range is never called a calendar month.
@@ -262,6 +263,28 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
   const leftOut = [...new Set(cards.flatMap((c) => c.missing))];
   const note = combinedNote(counted.map(nameOf), leftOut.map(nameOf));
 
+  // R1288: the series behind the views and engagement cards. Likes, comments, shares and saves have no daily
+  // series in the summary, so their cards draw no line rather than an invented one.
+  const dayName = (d: string) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const engaged = data.engagementSeries.filter((p): p is { date: string; value: number } => p.value !== null);
+  const engTrend = pointsTrend(data.totals.engagement, data.previous.engagement, data.totals.views, data.previous.views, data.periods, data.coverage);
+  const kpiSeries: Partial<Record<"views" | "engagement", { values: number[]; labels: string[]; delta: number | null; note?: string; unit?: (n: number) => string }>> = {
+    views: {
+      values: data.series.map((row) => PLATFORMS.reduce((n, p) => n + (row[p] ?? 0), 0)),
+      labels: data.series.map((row) => dayName(row.date)),
+      delta: change,
+      note: viewsTrend.kind === "change" ? undefined : TREND_SHORT[viewsTrend.kind],
+    },
+    engagement: {
+      values: engaged.map((p) => p.value),
+      labels: engaged.map((p) => dayName(p.date)),
+      delta: engTrend.kind === "change" ? engTrend.pct : null,
+      note: engTrend.kind === "change" ? undefined : TREND_SHORT[engTrend.kind],
+      unit: (n) => `${n >= 10 ? Math.round(n) : n.toFixed(1)} pts`,
+    },
+  };
+  const spanText = data.window.custom ? rangeLabel(data.window) : `Last ${preset.label}`;
+
   const drilled = drill ? (accounts.find((a) => a.accountId === drill) ?? null) : null;
   // The headline is chosen from the numbers themselves (lib/analytics/core headline), so it never claims
   // growth that the snapshots do not hold.
@@ -341,18 +364,34 @@ export function AnalyticsView({ initial, connected, focusAccount = null, rendere
         {(openCustom || custom) && <CustomRange value={custom} maxDays={maxDays} onApply={applyCustom} onClear={clearCustom} />}
       </header>
 
-      {/* The cards rise in themselves (.kpi-in), so the page entrance moves this row as one block. */}
-      <dl className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {cards.map((c, i, all) => (
-          <div key={c.metric} className={cn("kpi-in glass rounded-[22px] p-5", i === all.length - 1 && all.length % 2 === 1 && "col-span-2 sm:col-span-1")} style={riseIndex(i)}>
-            <dt className="text-sm text-muted-foreground">{METRIC_TITLE[c.metric]}</dt>
-            <dd className="mt-1.5 text-[clamp(1.75rem,2.4vw,2.25rem)] font-semibold leading-none tracking-tight">
-              <AnimatedNumber value={c.metric === "engagement" ? data.totals.engagement : data.totals[c.metric]} format={c.metric === "engagement" ? "pct" : "compact"} id={`analytics:${METRIC_TITLE[c.metric]}`} />
-            </dd>
-            {c.missing.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Not reported by {names(c.missing.map((p) => ({ platform: p as Platform })))}</p>}
-          </div>
-        ))}
-      </dl>
+      {/* The cards rise in themselves (.kpi-in), so the page entrance moves this row as one block. R1288: each is a
+          StatCard; views and engagement draw their daily series (scrub it), the stored-only counts keep the same
+          height with no line, and a comparison only shows when trend() says it is fair. */}
+      <StatGrid min={150} className="mt-10 sm:gap-3">
+        {cards.map((c, i, all) => {
+          const k = kpiSeries[c.metric as "views" | "engagement"];
+          const total = c.metric === "engagement" ? data.totals.engagement : data.totals[c.metric];
+          return (
+            <StatCard
+              key={c.metric}
+              label={METRIC_TITLE[c.metric]}
+              value={total}
+              format={formatOf(c.metric === "engagement" ? "pct" : "compact")}
+              trend={k?.values ?? [total]}
+              trendLabels={k?.labels}
+              sparkline={!!k && k.values.length > 1}
+              delta={k ? k.delta : null}
+              deltaNote={k?.note}
+              deltaFormat={k?.unit}
+              period={k && k.delta !== null ? "vs the period before" : spanText}
+              className={cn("kpi-in glass rounded-[22px]", i === all.length - 1 && all.length % 2 === 1 && "max-sm:col-span-full")}
+              style={riseIndex(i)}
+            >
+              {c.missing.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Not reported by {names(c.missing.map((p) => ({ platform: p as Platform })))}</p>}
+            </StatCard>
+          );
+        })}
+      </StatGrid>
       {/* Says what the combined numbers add up, and what they leave out. */}
       <p className="mt-3 text-sm text-muted-foreground">{note}</p>
 
