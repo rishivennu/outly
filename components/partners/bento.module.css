@@ -1,0 +1,308 @@
+/* R1287 /partners bento. Tiles keep fixed pastel colours in both themes; text is the deep tone of the same hue.
+   Mockups are decorative HTML, tilted with `rotate`, shrunk on phones with `scale` and floated with `translate`,
+   so the three never fight over one transform. */
+
+.grid {
+  --mock-shadow: 0 20px 50px -20px rgb(0 0 0 / 0.35);
+  margin-top: 3rem;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  grid-template-areas: "a" "b" "c" "d" "e" "f";
+  list-style: none;
+  padding: 0;
+}
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "a b"
+      "a c"
+      "d f"
+      "e e";
+  }
+}
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-rows: minmax(302px, auto) minmax(302px, auto) minmax(300px, auto);
+    grid-template-areas:
+      "a a a a a b b b b b b b"
+      "a a a a a c c c c d d d"
+      "e e e e e e e e f f f f";
+  }
+}
+
+.cell { display: flex; min-width: 0; }
+.a { grid-area: a; --min: 540px; }
+.b { grid-area: b; --min: 380px; }
+.c { grid-area: c; --min: 320px; }
+.d { grid-area: d; --min: 360px; }
+.e { grid-area: e; --min: 400px; }
+.f { grid-area: f; --min: 360px; }
+
+.tile {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: max(260px, var(--min));
+  overflow: hidden;
+  border-radius: 24px;
+  padding: 24px;
+  background: var(--tile-bg);
+  color: var(--tile-ink);
+}
+@media (min-width: 1024px) {
+  .tile { min-height: 300px; border-radius: 28px; padding: 32px; }
+  .a .tile { min-height: 620px; }
+}
+
+.lavender { --tile-bg: #DCD2F7; --tile-ink: #3B2A6B; }
+.blush { --tile-bg: #F5B6CC; --tile-ink: #5B1D38; }
+.moss { --tile-bg: #CFE3A8; --tile-ink: #1E3A14; }
+.butter { --tile-bg: #F7E6A3; --tile-ink: #5A4300; }
+.apricot { --tile-bg: #F4B183; --tile-ink: #5A2A0B; }
+.sky { --tile-bg: #BBD6EA; --tile-ink: #1F3A52; }
+
+.copy { position: relative; z-index: 2; max-width: 30rem; }
+.copyTop { margin-bottom: auto; }
+.copyBottom { margin-top: auto; }
+.title { font-size: clamp(1.5rem, 1.2vw + 1rem, 2rem); color: var(--tile-ink); }
+.body { margin-top: 0.625rem; font-size: 15px; line-height: 1.55; color: var(--tile-ink); opacity: 0.8; text-wrap: pretty; }
+/* apricot is 4.26:1 at 80%, under AA, so its body copy runs at full strength (6.47:1) */
+.apricot .body { opacity: 1; }
+@media (min-width: 640px) {
+  .body { font-size: 16px; }
+}
+@media (min-width: 1024px) {
+  .b .copy { max-width: 52%; }
+  .e .copy { max-width: 300px; }
+}
+
+.mock { position: absolute; z-index: 1; pointer-events: none; user-select: none; }
+.card { position: absolute; border-radius: 16px; box-shadow: var(--mock-shadow); }
+
+/* A: offer sheet hanging off the bottom-left, a brief peeking behind it */
+.mockA { left: -26px; bottom: -30px; width: 360px; height: 420px; transform-origin: left bottom; }
+.offer {
+  left: 0;
+  bottom: 56px;
+  width: 300px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #fff;
+  color: #080808;
+  rotate: -5deg;
+}
+.offerHead { font-size: 15px; font-weight: 650; margin-bottom: 8px; }
+.row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid rgb(8 8 8 / 0.08); font-size: 13px; }
+.key { color: rgb(8 8 8 / 0.6); }
+.val { font-weight: 600; text-align: right; }
+.accept {
+  margin-top: 12px;
+  align-self: flex-start;
+  border-radius: 999px;
+  padding: 10px 18px;
+  background: #B5FF00;
+  color: #0B1A00;
+  font-size: 13px;
+  font-weight: 650;
+}
+.brief {
+  left: 120px;
+  top: 0;
+  width: 240px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fff;
+  color: #080808;
+  rotate: 8deg;
+}
+.briefHead { font-size: 13px; font-weight: 650; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 12px; color: rgb(8 8 8 / 0.75); }
+.tick, .tickLime {
+  position: relative;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: #CFE3A8;
+}
+.tick::after, .tickLime::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 5px;
+  height: 9px;
+  border: solid #1E3A14;
+  border-width: 0 2px 2px 0;
+  rotate: 45deg;
+}
+.tickLime { background: #B5FF00; }
+.tickLime::after { border-color: #0B1A00; }
+
+/* B: dark plan card bleeding off the top edge */
+.mockB { right: 36px; top: -34px; width: 270px; height: 230px; transform-origin: right top; }
+.planBack { right: 26px; top: 10px; width: 230px; height: 200px; background: #fff; rotate: -4deg; }
+.plan {
+  right: 0;
+  top: 0;
+  width: 240px;
+  padding: 44px 22px 22px;
+  display: flex;
+  flex-direction: column;
+  background: #080808;
+  color: #fff;
+  rotate: 6deg;
+}
+.planLabel { font-size: 13px; color: rgb(255 255 255 / 0.7); }
+.planBig { margin-top: 6px; font-size: 44px; line-height: 1; }
+.planSub { margin-top: 4px; font-size: 15px; color: rgb(255 255 255 / 0.8); }
+.planCheck { margin-top: 16px; display: flex; align-items: center; gap: 8px; font-size: 12px; }
+
+/* C: wallet card at the top, three mini stats under it */
+.mockC { left: 24px; top: -14px; width: 270px; height: 180px; transform-origin: left top; }
+@media (min-width: 1024px) {
+  .mockC { left: 32px; }
+}
+.walletGroup { position: absolute; inset: 0; rotate: -4deg; }
+.peek { position: absolute; left: 22px; right: 22px; top: 0; height: 40px; border-radius: 14px; background: #F5B6CC; rotate: 4deg; }
+.wallet {
+  left: 0;
+  top: 14px;
+  width: 260px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: #080808;
+  color: #fff;
+}
+.walletLabel { font-size: 12px; color: rgb(255 255 255 / 0.7); }
+.walletFoot { display: flex; align-items: end; justify-content: space-between; gap: 8px; }
+.amount { font-size: 28px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.cur { font-size: 16px; vertical-align: top; }
+.payout { border-radius: 999px; padding: 6px 10px; background: rgb(255 255 255 / 0.12); font-size: 10px; font-weight: 650; }
+.stats {
+  position: absolute;
+  left: 0;
+  top: 126px;
+  width: 260px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  padding: 6px 10px;
+  background: #fff;
+  color: #080808;
+  box-shadow: var(--mock-shadow);
+}
+.statK { font-size: 10px; color: rgb(8 8 8 / 0.6); }
+.statV { font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+/* D: inbox list bleeding off the bottom and right */
+.mockD { left: 20px; right: -48px; top: max(160px, calc(100% - 150px)); height: 180px; transform-origin: left top; }
+.inbox {
+  left: 0;
+  right: 0;
+  top: 0;
+  padding: 6px 14px 30px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #080808;
+  rotate: 4deg;
+}
+.msg { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+.msg + .msg { border-top: 1px solid rgb(8 8 8 / 0.08); }
+.avatar { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.avatarLime { background: #B5FF00; color: #0B1A00; }
+.avatarBlush { background: #F5B6CC; color: #5B1D38; }
+.msgText { display: flex; flex-direction: column; min-width: 0; }
+.msgWho { font-size: 12px; font-weight: 650; }
+.msgLine { font-size: 11px; color: rgb(8 8 8 / 0.65); white-space: nowrap; }
+.msgDate { color: rgb(8 8 8 / 0.5); }
+
+/* E: platform cards fanned off the top and right */
+.mockE { right: -80px; top: -40px; width: 520px; height: 300px; transform-origin: right top; }
+.fan { position: absolute; inset: 0; }
+.pcard {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 150px;
+  height: 92px;
+  border-radius: 14px;
+  box-shadow: var(--mock-shadow);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.pReels { left: 20px; top: 70px; rotate: -12deg; background: #F5B6CC; color: #5B1D38; }
+.pShorts { left: 190px; top: 20px; rotate: 6deg; background: #080808; color: #fff; }
+.pX { left: 360px; top: 40px; rotate: -6deg; background: #fff; color: #080808; font-size: 34px; }
+.pYouTube { left: 60px; top: 190px; rotate: 9deg; background: #DCD2F7; color: #3B2A6B; }
+.pTikTok { left: 220px; top: 150px; rotate: -9deg; background: #173A24; color: #E9FFE0; }
+.pLinkedIn { left: 380px; top: 180px; rotate: 12deg; background: #BBD6EA; color: #1F3A52; }
+
+/* F: phone corner bleeding off the bottom-right */
+.mockF { right: -36px; bottom: -140px; width: 280px; height: 300px; transform-origin: right bottom; }
+.phone {
+  position: absolute;
+  inset: 0;
+  border-radius: 40px;
+  padding: 10px;
+  background: #080808;
+  box-shadow: var(--mock-shadow);
+  rotate: -4deg;
+}
+.screen { position: relative; height: 100%; border-radius: 30px; background: #1F3A52; color: #fff; overflow: hidden; }
+.status { display: flex; align-items: center; justify-content: space-between; padding: 12px 22px 0; font-size: 12px; font-weight: 650; }
+.notch { width: 84px; height: 24px; border-radius: 999px; background: #080808; }
+.bars { width: 22px; height: 10px; border-radius: 3px; border: 1.5px solid rgb(255 255 255 / 0.8); }
+.notif {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 52px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: #fff;
+  color: #080808;
+}
+.appMark { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: #080808; }
+.notifText { display: flex; flex-direction: column; min-width: 0; }
+.notifApp { font-size: 12px; font-weight: 650; }
+.notifBody { font-size: 11px; line-height: 1.35; color: rgb(8 8 8 / 0.75); }
+
+/* phones: mockups shrink and still bleed off the edge */
+@media (max-width: 767px) {
+  .mock { scale: 0.85; }
+}
+
+/* one slow idle float, only for a pointer device that has not asked for less motion */
+@keyframes bentoFloat {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -6px; }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .float { animation: bentoFloat 6s ease-in-out infinite; }
+  .floatSlow { animation-delay: -3s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .float { animation: none; }
+}

@@ -153,9 +153,10 @@ describe("R1282 page sections", () => {
     expect(s).toContain("Tiers are indicative. We review every application on fit, not size.");
     expect(s).toContain("PARTNER_TIER_LABEL[t.tier]");
   });
-  test("options and their footnote", () => {
-    for (const o of ["Paid Collaboration", "Complimentary Creator Subscription", '"Custom"', "Option A", "Option B", "Option C"]) expect(s).toContain(o);
-    expect(s).toContain("Every offer is agreed individually after review. Applying does not guarantee payment or a subscription.");
+  test("options and their footnote (R1287: the bento tiles carry them now)", () => {
+    const bento = flat(readFileSync("components/partners/Bento.tsx", "utf8"));
+    for (const o of ["Paid collaborations", "Complimentary Creator plan", "Track what you earn", "Your portal"]) expect(bento).toContain(o);
+    expect(bento).toContain("Every offer is agreed individually after review. Applying does not guarantee payment or a subscription.");
   });
   test("what we look for closes on follower count", () => {
     for (const c of ["Engagement rate", "Average views", "Audience location and age range", "Past brand collaborations", "Ability to demonstrate Outlly"]) expect(s).toContain(c);
@@ -181,8 +182,8 @@ describe("R1282 page sections", () => {
     expect(page).toContain("Apply for partnership");
     expect(existsSync("components/partners/ApplyForm.tsx")).toBe(true);
   });
-  test("tonal strokes and house radii on the cards", () => {
-    expect(sections).toContain("border-foreground/[0.08]");
+  test("house radii on the cards (R1287: the tiles are flat colour, no stroke)", () => {
+    expect(sections).not.toContain("border-foreground/[0.08]");
     expect(sections).not.toMatch(/border-white|ring-white/);
     const odd = [...sections.matchAll(/rounded-\[(\d+)px\]/g)].map((m) => Number(m[1])).filter((n) => ![24, 16, 12].includes(n));
     expect(odd).toEqual([]);

@@ -1,36 +1,43 @@
-import { BadgeCheck, Gift, Handshake, Sparkles, Sprout, TrendingUp, Wallet } from "lucide-react";
+import type { CSSProperties } from "react";
+import Link from "next/link";
 import { Reveal } from "@/components/marketing/Reveal";
-import { SectionHead, Shell } from "@/components/marketing/bits";
+import { Shell } from "@/components/marketing/bits";
 import { PARTNER_TIER_LABEL, type PartnerTier } from "@/lib/partners/types";
+import { cn } from "@/lib/utils";
+import s from "./sections.module.css";
 
-const CARD = "flex h-full flex-col rounded-[24px] border border-foreground/[0.08] bg-card p-7 sm:p-8";
-const ICON = "grid h-11 w-11 place-items-center rounded-[12px] bg-lime/15 text-lime-ink";
+const SECTION_TITLE = "play text-balance text-[clamp(2rem,2.4vw+1rem,3rem)]";
 const NOTE = "mt-6 max-w-2xl text-pretty text-[14px] leading-relaxed text-muted-foreground";
 
-const TIERS: { tier: PartnerTier; range: string; body: string; icon: typeof Sprout }[] = [
-  { tier: "emerging", range: "1K to 5K followers", body: "A close audience that trusts your picks. Small and engaged beats big and quiet.", icon: Sprout },
-  { tier: "growing", range: "5K to 10K followers", body: "A steady audience and a regular posting rhythm, ready for planned campaigns.", icon: TrendingUp },
-  { tier: "established", range: "10K+ followers", body: "Wide reach and a track record, suited to longer partnerships and series.", icon: BadgeCheck },
-];
+type Tone = "lavender" | "blush" | "moss" | "butter" | "apricot" | "sky";
 
-const OPTIONS = [
+const TIERS: {
+  tier: PartnerTier;
+  range: string;
+  body: string;
+  tone: Tone;
+  card: { initials: string; handle: string; followers: string; bars: [number, number, number]; tilt: string };
+}[] = [
   {
-    tag: "Option A",
-    title: "Paid Collaboration",
-    body: "Compensation agreed per campaign. It depends on your reach, the quality of your content, the format and the scope of the work.",
-    icon: Wallet,
+    tier: "emerging",
+    range: "1K to 5K followers",
+    body: "A close audience that trusts your picks. Small and engaged beats big and quiet.",
+    tone: "sky",
+    card: { initials: "MK", handle: "@mira.makes", followers: "3.2K followers", bars: [55, 80, 65], tilt: "-6deg" },
   },
   {
-    tag: "Option B",
-    title: "Complimentary Creator Subscription",
-    body: "One to two months of the Creator plan to make content with. Ongoing partners can have it extended.",
-    icon: Gift,
+    tier: "growing",
+    range: "5K to 10K followers",
+    body: "A steady audience and a regular posting rhythm, ready for planned campaigns.",
+    tone: "butter",
+    card: { initials: "DS", handle: "@dev.ships", followers: "7.8K followers", bars: [45, 70, 90], tilt: "5deg" },
   },
   {
-    tag: "Option C",
-    title: "Custom",
-    body: "Longer-term partnerships, affiliate arrangements and content we create together.",
-    icon: Handshake,
+    tier: "established",
+    range: "10K+ followers",
+    body: "Wide reach and a track record, suited to longer partnerships and series.",
+    tone: "blush",
+    card: { initials: "AR", handle: "@ana.reviews", followers: "24K followers", bars: [70, 60, 85], tilt: "-4deg" },
   },
 ];
 
@@ -45,28 +52,63 @@ const CRITERIA = [
   "Ability to demonstrate Outlly",
 ];
 
-const STEPS = [
-  { n: "01", title: "Apply", body: "Tell us about you, your channels and the content you would make." },
-  { n: "02", title: "We review", body: "We look at your audience, your content and how well Outlly fits it." },
-  { n: "03", title: "Get your offer", body: "If it is a match, you get an offer with the terms written out in full." },
-  { n: "04", title: "Create and grow", body: "Make the content, share Outlly and track how your posts perform." },
+const STEPS: { n: string; title: string; body: string; tone: Tone }[] = [
+  { n: "01", title: "Apply", body: "Tell us about you, your channels and the content you would make.", tone: "lavender" },
+  { n: "02", title: "We review", body: "We look at your audience, your content and how well Outlly fits it.", tone: "moss" },
+  { n: "03", title: "Get your offer", body: "If it is a match, you get an offer with the terms written out in full.", tone: "apricot" },
+  { n: "04", title: "Create and grow", body: "Make the content, share Outlly and track how your posts perform.", tone: "sky" },
 ];
+
+function Head({ id, eyebrow, title, body }: { id: string; eyebrow: string; title: string; body?: string }) {
+  return (
+    <Reveal y={0} className="max-w-2xl">
+      <p className="eyebrow mb-5">{eyebrow}</p>
+      <h2 id={id} className={SECTION_TITLE}>
+        {title}
+      </h2>
+      {body && <p className="mt-4 text-pretty text-[15px] leading-relaxed text-muted-foreground sm:text-base">{body}</p>}
+    </Reveal>
+  );
+}
+
+function CreatorCard({ card }: { card: (typeof TIERS)[number]["card"] }) {
+  const style = { "--tilt": card.tilt } as CSSProperties;
+  return (
+    <div className={s.stage} aria-hidden="true">
+      <div className={s.creator} style={style}>
+        <div className={s.creatorTop}>
+          <span className={s.avatar}>{card.initials}</span>
+          <div className="min-w-0">
+            <p className={s.handle}>{card.handle}</p>
+            <span className={s.pill}>{card.followers}</span>
+          </div>
+        </div>
+        <div className={s.engage}>
+          <span>Engagement</span>
+          <span className={s.bars}>
+            {card.bars.map((h, i) => (
+              <span key={i} className={s.bar} style={{ height: `${h}%` }} />
+            ))}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function WhoCanPartner() {
   return (
-    <section className="scroll-mt-24 pb-16 pt-20 sm:pb-20 sm:pt-28" aria-labelledby="partners-who">
+    <section id="who" className="scroll-mt-24 py-16 sm:py-20" aria-labelledby="partners-who">
       <Shell>
-        <SectionHead id="partners-who" eyebrow="Who can partner" title="Creators at every stage." />
+        <Head id="partners-who" eyebrow="Who can partner" title="Creators at every stage." />
         <ul className="mt-12 grid gap-4 md:grid-cols-3">
           {TIERS.map((t, i) => (
-            <Reveal as="li" key={t.tier} delay={i * 0.06}>
-              <article className={CARD}>
-                <span className={ICON} aria-hidden="true">
-                  <t.icon className="h-5 w-5" />
-                </span>
-                <h3 className="mt-6 text-xl font-semibold tracking-tight">{PARTNER_TIER_LABEL[t.tier]}</h3>
-                <p className="mt-1 text-[15px] font-medium text-lime-ink">{t.range}</p>
-                <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">{t.body}</p>
+            <Reveal as="li" key={t.tier} delay={i * 0.06} className="min-w-0">
+              <article className={cn(s.tile, s.tierTile, s[t.tone])} style={{ "--float-delay": `${-2 * i}s` } as CSSProperties}>
+                <h3 className={cn("play", s.title)}>{PARTNER_TIER_LABEL[t.tier]}</h3>
+                <p className={s.range}>{t.range}</p>
+                <p className={s.body}>{t.body}</p>
+                <CreatorCard card={t.card} />
               </article>
             </Reveal>
           ))}
@@ -77,47 +119,26 @@ export function WhoCanPartner() {
   );
 }
 
+// The partners bento replaced the three options; kept as a no-op export so older imports still resolve.
 export function WhatYouGet() {
-  return (
-    <section className="scroll-mt-24 py-16 sm:py-20" aria-labelledby="partners-get">
-      <Shell>
-        <SectionHead id="partners-get" eyebrow="What you can get" title="Three ways to work together." />
-        <ul className="mt-12 grid gap-4 md:grid-cols-3">
-          {OPTIONS.map((o, i) => (
-            <Reveal as="li" key={o.tag} delay={i * 0.06}>
-              <article className={CARD}>
-                <span className={ICON} aria-hidden="true">
-                  <o.icon className="h-5 w-5" />
-                </span>
-                <p className="mt-6 text-[13px] font-semibold text-muted-foreground">{o.tag}</p>
-                <h3 className="mt-1 text-xl font-semibold tracking-tight">{o.title}</h3>
-                <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">{o.body}</p>
-              </article>
-            </Reveal>
-          ))}
-        </ul>
-        <p className={NOTE}>Every offer is agreed individually after review. Applying does not guarantee payment or a subscription.</p>
-      </Shell>
-    </section>
-  );
+  return null;
 }
 
 export function WhatWeLookFor() {
   return (
     <section className="scroll-mt-24 py-16 sm:py-20" aria-labelledby="partners-look">
       <Shell>
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-          <SectionHead
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-16">
+          <Head
             id="partners-look"
             eyebrow="What we look for"
             title="Fit, quality and an engaged audience."
             body="Follower count alone never decides it."
           />
-          <Reveal as="ul" stagger className="grid gap-3 sm:grid-cols-2">
+          <Reveal as="ul" stagger className={s.chips}>
             {CRITERIA.map((c) => (
-              <li key={c} className="flex min-h-14 items-start gap-3 rounded-[16px] bg-foreground/[0.03] px-4 py-3.5 text-[15px] leading-snug">
-                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-lime-ink" aria-hidden="true" />
-                <span>{c}</span>
+              <li key={c} className={s.chip}>
+                {c}
               </li>
             ))}
           </Reveal>
@@ -131,19 +152,19 @@ export function PartnerSteps() {
   return (
     <section id="how" className="scroll-mt-24 py-16 sm:py-20" aria-labelledby="partners-how">
       <Shell>
-        <SectionHead id="partners-how" eyebrow="How it works" title="Four steps from hello to live." />
+        <Head id="partners-how" eyebrow="How it works" title="Four steps from hello to live." />
         <ol className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((st, i) => (
-            <Reveal as="li" key={st.n} delay={i * 0.06}>
-              <div className={CARD}>
-                <span className="display block text-[2.4rem] text-lime-ink" aria-hidden="true">
+            <Reveal as="li" key={st.n} delay={i * 0.06} className="min-w-0">
+              <div className={cn(s.tile, s.stepTile, s[st.tone])}>
+                <span className={cn("play", s.numeral)} aria-hidden="true">
                   {st.n}
                 </span>
-                <h3 className="mt-4 text-xl font-semibold tracking-tight">
+                <h3 className={cn("play", s.title)}>
                   <span className="sr-only">Step {Number(st.n)}: </span>
                   {st.title}
                 </h3>
-                <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">{st.body}</p>
+                <p className={s.body}>{st.body}</p>
               </div>
             </Reveal>
           ))}
@@ -155,17 +176,27 @@ export function PartnerSteps() {
 
 export function PartnersContactBand() {
   return (
-    <section className="pb-24 pt-8 sm:pb-32" aria-label="Contact the partnerships team">
+    <section className="pb-24 pt-8 sm:pb-32" aria-labelledby="partners-contact">
       <Shell>
         <Reveal>
-          <div className="flex flex-col items-start justify-between gap-5 rounded-[24px] bg-[#173A24] px-7 py-8 text-white sm:flex-row sm:items-center sm:px-10">
-            <p className="text-pretty text-xl font-semibold tracking-tight">Questions first?</p>
-            <a
-              href="mailto:partners@outlly.com"
-              className="inline-flex min-h-11 items-center rounded-full bg-[#B5FF00] px-5 text-[15px] font-semibold text-[#0b1a00] transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B5FF00]"
-            >
-              Write to partners@outlly.com
-            </a>
+          <div className={cn(s.tile, s.deep, s.band)}>
+            <h2 id="partners-contact" className={cn("play", s.bandTitle)}>
+              Questions first?
+            </h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href="mailto:partners@outlly.com"
+                className="inline-flex min-h-11 items-center rounded-full bg-[#B5FF00] px-5 text-[15px] font-semibold text-[#0b1a00] transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B5FF00]"
+              >
+                Write to partners@outlly.com
+              </a>
+              <Link
+                href="/help"
+                className="inline-flex min-h-11 items-center rounded-full border border-[#E9FFE0]/40 px-5 text-[15px] font-semibold text-[#E9FFE0] transition-colors hover:bg-[#E9FFE0]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E9FFE0]"
+              >
+                Read the FAQ
+              </Link>
+            </div>
           </div>
         </Reveal>
       </Shell>

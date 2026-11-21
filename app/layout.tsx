@@ -51,7 +51,8 @@ const gopher = localFont({
 });
 // Fourth set (Admin > Site fonts > Jakarta + Fraunces). Declared only; downloaded when that set is live.
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", display: "swap", preload: false });
-const fraunces = Fraunces({ subsets: ["latin"], style: ["italic"], variable: "--font-fraunces", display: "swap", preload: false });
+// R1287: upright too, for the Partner With Us "play" titles (components/partners/*): the warm serif of the bento cards.
+const fraunces = Fraunces({ subsets: ["latin"], style: ["normal", "italic"], axes: ["SOFT", "WONK", "opsz"], variable: "--font-fraunces", display: "swap", preload: false });
 // 1063: "Acumin Pro + Times New Roman" and "Magnode + Alpha Lyrae". Open stand-ins for the paid faces (lib/fonts.ts).
 // Declared only, so nobody downloads them unless that set is live.
 const archivo = Archivo({ subsets: ["latin"], variable: "--font-archivo", display: "swap", axes: ["wdth"], preload: false });

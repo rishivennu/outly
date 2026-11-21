@@ -1,0 +1,162 @@
+/* R1287 /partners tiles below the hero. Flat pastel tiles with the deep tone of the same hue, fixed in both themes;
+   shadows only on the mockups. Individual `rotate`/`scale`/`translate` properties so they compose with the
+   transform the reveal engine animates. */
+
+.tile {
+  --t-bg: #dcd2f7;
+  --t-ink: #3b2a6b;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 24px;
+  padding: 1.75rem;
+  background: var(--t-bg);
+  color: var(--t-ink);
+}
+@media (min-width: 640px) {
+  .tile { border-radius: 28px; padding: 2rem; }
+}
+
+.lavender { --t-bg: #dcd2f7; --t-ink: #3b2a6b; }
+.blush { --t-bg: #f5b6cc; --t-ink: #5b1d38; }
+.moss { --t-bg: #cfe3a8; --t-ink: #1e3a14; }
+.butter { --t-bg: #f7e6a3; --t-ink: #5a4300; }
+.apricot { --t-bg: #f4b183; --t-ink: #5a2a0b; }
+.sky { --t-bg: #bbd6ea; --t-ink: #1f3a52; }
+.deep { --t-bg: #173a24; --t-ink: #e9ffe0; }
+
+.title { font-size: clamp(1.5rem, 1.2vw + 1rem, 2rem); color: var(--t-ink); }
+.range { margin-top: 0.5rem; font-size: 15px; font-weight: 700; color: var(--t-ink); }
+.body {
+  margin-top: 0.75rem;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--t-ink);
+  color: color-mix(in srgb, var(--t-ink) 85%, transparent);
+  text-wrap: pretty;
+}
+@media (min-width: 640px) {
+  .body { font-size: 16px; }
+}
+
+/* Tier tiles: the creator card sits in a stage that bleeds to the tile's right and bottom edge. */
+.tierTile { min-height: 25rem; }
+.stage {
+  position: relative;
+  flex: 1 0 11rem;
+  margin: 1.5rem -1.75rem -1.75rem 0;
+}
+@media (min-width: 640px) {
+  .stage { margin: 1.5rem -2rem -2rem 0; }
+}
+
+.creator {
+  position: absolute;
+  right: -1.25rem;
+  bottom: -1.75rem;
+  width: 15rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: #ffffff;
+  color: var(--t-ink);
+  rotate: var(--tilt, -6deg);
+  transform-origin: 100% 100%;
+  box-shadow: 0 20px 50px -20px rgb(0 0 0 / 0.35);
+}
+@media (max-width: 639px) {
+  .creator { scale: 0.85; }
+}
+
+.creatorTop { display: flex; align-items: center; gap: 0.75rem; }
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: none;
+  border-radius: 9999px;
+  background: var(--t-bg);
+  color: var(--t-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+.handle { min-width: 0; font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill {
+  display: inline-flex;
+  margin-top: 0.25rem;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  background: var(--t-bg);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.engage { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.75rem; margin-top: 1rem; font-size: 12px; font-weight: 600; }
+.bars { display: flex; align-items: flex-end; gap: 0.25rem; height: 1.75rem; }
+.bar { width: 0.5rem; border-radius: 3px; background: var(--t-ink); }
+
+/* Criteria stickers */
+.chips { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 0.75rem 0.625rem; padding: 0.25rem; }
+.chip {
+  --t-bg: #dcd2f7;
+  --t-ink: #3b2a6b;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0.625rem 1.125rem;
+  border-radius: 9999px;
+  background: var(--t-bg);
+  color: var(--t-ink);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+.chip:nth-child(6n + 1) { --t-bg: #dcd2f7; --t-ink: #3b2a6b; }
+.chip:nth-child(6n + 2) { --t-bg: #cfe3a8; --t-ink: #1e3a14; }
+.chip:nth-child(6n + 3) { --t-bg: #f7e6a3; --t-ink: #5a4300; }
+.chip:nth-child(6n + 4) { --t-bg: #f4b183; --t-ink: #5a2a0b; }
+.chip:nth-child(6n + 5) { --t-bg: #bbd6ea; --t-ink: #1f3a52; }
+.chip:nth-child(6n + 6) { --t-bg: #f5b6cc; --t-ink: #5b1d38; }
+.chip:nth-child(8n + 1) { rotate: -2deg; }
+.chip:nth-child(8n + 2) { rotate: 1.5deg; }
+.chip:nth-child(8n + 3) { rotate: -1deg; }
+.chip:nth-child(8n + 4) { rotate: 3deg; }
+.chip:nth-child(8n + 5) { rotate: -3deg; }
+.chip:nth-child(8n + 6) { rotate: 2deg; }
+.chip:nth-child(8n + 7) { rotate: -1.5deg; }
+.chip:nth-child(8n + 8) { rotate: 1deg; }
+
+/* Steps */
+.stepTile { min-height: 15rem; justify-content: flex-end; }
+.numeral {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.5rem;
+  font-size: 4rem;
+  color: var(--t-ink);
+  opacity: 0.35;
+}
+
+/* Contact band */
+.band { flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 1.25rem; }
+@media (min-width: 640px) {
+  .band { flex-direction: row; align-items: center; padding: 2.25rem 2.5rem; }
+}
+.bandTitle { font-size: clamp(1.75rem, 1.6vw + 1rem, 2.5rem); color: var(--t-ink); }
+
+/* One slow idle float, only where there is a pointer that hovers and motion is welcome. */
+@keyframes idle-float {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -6px; }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .creator { animation: idle-float 6s ease-in-out var(--float-delay, 0s) infinite; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .creator { animation: none; }
+}

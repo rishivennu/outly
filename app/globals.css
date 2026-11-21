@@ -4885,6 +4885,12 @@ html.dark .admin-root, html.dark .admin-layer { --gb-line: var(--admin-card-line
   .mtop-logo .mtop-brand-mark { display: inline-flex; }
 }
 /* end R1284 */
+/* R1287 Partner With Us "play" type: Fraunces upright (app/layout.tsx loads normal + italic with SOFT/WONK/opsz) for the
+   bento card titles and section titles below the hero. Warm, a little wonky, always on a flat colour tile. */
+.play { font-family: var(--font-fraunces), Georgia, serif; font-weight: 600; letter-spacing: -0.015em; line-height: 1.05; font-variation-settings: "SOFT" 100, "WONK" 1, "opsz" 72; text-wrap: balance; }
+.play-i { font-family: var(--font-fraunces), Georgia, serif; font-style: italic; font-weight: 500; font-variation-settings: "SOFT" 60, "WONK" 1; }
+/* end R1287 */
+
 /* ---------- 1100: Liquid glass on every studio card ----------
    The studio's screen cards wear the same liquid glass as the rail: a cool-to-deep tint, a lit rim on the top-left
    edge with a softer far edge, and a sheen across the top. Cards: .glass panels, the Analytics dashboard's
