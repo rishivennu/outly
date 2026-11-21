@@ -4601,7 +4601,8 @@ html:not(.dark) .la-themed:not(.dark *) .la-thumb { box-shadow: inset 0 0 0 1px 
 @media (max-width: 1023.98px) {
   html:has(.pc-dock[data-lift]:not(.hidden)) .mmain { padding-bottom: calc(var(--sa-b) + 152px); }
   .pc-dock { transition: transform .3s var(--ease-liquid), opacity .3s var(--ease-liquid), visibility 0s; }
-  html[data-tabs-compact] .pc-dock:not([data-open]) {
+  /* R1286: the same slide-away while the public menu sheet is open (html.mnav-lock), so Pip never sits on the sheet's Theme row. */
+  :is(html[data-tabs-compact], html.mnav-lock) .pc-dock:not([data-open]) {
     transform: translateX(calc(100% + 24px)); opacity: 0; pointer-events: none; visibility: hidden;
     transition: transform .3s var(--ease-liquid), opacity .3s var(--ease-liquid), visibility 0s .3s;
   }
@@ -4610,7 +4611,7 @@ html:not(.dark) .la-themed:not(.dark *) .la-thumb { box-shadow: inset 0 0 0 1px 
 }
 /* R1189: the open chat is the whole screen on a phone; the device hint and cookie banner (z-60) step aside until it closes. */
 @media (max-width: 767.98px) { html:has(.pc-dock[data-open]) .consent-in { display: none; } }
-@media (prefers-reduced-motion: reduce) { .pc-dock, html[data-tabs-compact] .pc-dock:not([data-open]) { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .pc-dock, :is(html[data-tabs-compact], html.mnav-lock) .pc-dock:not([data-open]) { transition: none; } }
 
 /* R1179 run card (components/create/captions/RunCard.tsx): the indeterminate fill sweeps while the work size is unknown. */
 @media (prefers-reduced-motion: no-preference) {

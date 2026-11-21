@@ -123,7 +123,7 @@ describe("R1211 floating pill", () => {
       expect(src(f)).toContain("var(--sa-float)");
       expect(src(f)).not.toContain("+74px");
     }
-    expect(css).toContain("html[data-tabs-compact] .pc-dock:not([data-open]) {");
+    expect(css).toContain(":is(html[data-tabs-compact], html.mnav-lock) .pc-dock:not([data-open]) {"); // R1286 widened
     for (const f of ["components/shell/Nav.tsx", "components/shell/NoticesBell.tsx", "components/create/ActionBar.tsx", "app/globals.css"]) {
       expect(src(f)).not.toContain("data-tabs-tucked");
       expect(src(f)).not.toContain("data-hidden");

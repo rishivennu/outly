@@ -54,6 +54,8 @@ type Card =
   | { kind: "expiring"; id: string; platform: Platform; days: number };
 const STORE = "outly-chat-v1";
 const HIDE = ["/admin", "/billing/checkout"];
+// R1286: on a phone the sign-in screens keep their own Pip in the card; the floating dock would sit on the Sign in button.
+const AUTH_SCREEN = /^\/(login|signup|admin\/login|app-auth)(\/|$)/;
 const FAILS_TO_ESCALATE = 2;
 const MAX = 800;
 const SLEEP_MS = 90_000;
@@ -921,7 +923,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   return (
     // 1154 (pc-dock): on a phone Pip steps aside with the tab bar while you scroll down, and the page gets room
     // below its last card so the bubble never sits on top of it (globals.css).
-    <div data-open={open ? "" : undefined} data-lift={lift ? "" : undefined} className={cn(pipFont.variable, "pc pc-dock fixed right-[max(1rem,var(--sa-r))] z-[55] sm:right-[max(1.5rem,var(--sa-r))]", (path.startsWith("/create") || waitTurn) && !open && "hidden", lift ? "bottom-[var(--sa-float)] lg:bottom-6" : "bottom-[max(16px,var(--sa-b))] sm:bottom-6")}>
+    <div data-open={open ? "" : undefined} data-lift={lift ? "" : undefined} className={cn(pipFont.variable, "pc pc-dock fixed right-[max(1rem,var(--sa-r))] z-[55] sm:right-[max(1.5rem,var(--sa-r))]", (path.startsWith("/create") || waitTurn) && !open && "hidden", AUTH_SCREEN.test(path) && !open && "max-sm:hidden", lift ? "bottom-[var(--sa-float)] lg:bottom-6" : "bottom-[max(16px,var(--sa-b))] sm:bottom-6")}>
       {open && <div className="pc-scrim fixed inset-0" aria-hidden onClick={close} />}
       {open && (
         <section
