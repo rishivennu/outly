@@ -118,6 +118,8 @@ function useSlimTip() {
 /** One row of the sidebar. In slim mode the label becomes a tooltip to the right and a badge becomes a lime dot. */
 function NavItem({ href, label, icon: Icon, on, n, slim, onNavigate, layoutId, tip }: { href: string; label: string; icon: typeof Users; on: boolean; n: number; slim: boolean; onNavigate?: () => void; layoutId: string; tip?: SlimTip }) {
   const text = n > 0 ? `${label} (${n} open)` : label;
+  // R1292: reduced motion swaps the colour in place; the lime fill does not travel between rows.
+  const still = useReducedMotion();
   const hover = slim && tip ? { onPointerEnter: (e: React.PointerEvent<HTMLElement>) => tip.show(e.currentTarget, text), onPointerLeave: tip.hide, onFocus: (e: React.FocusEvent<HTMLElement>) => tip.show(e.currentTarget, text), onBlur: tip.hide } : {};
   return (
     <Link
@@ -126,21 +128,19 @@ function NavItem({ href, label, icon: Icon, on, n, slim, onNavigate, layoutId, t
       aria-current={on ? "page" : undefined}
       aria-label={slim && n > 0 ? `${label}, ${n} open` : undefined}
       {...hover}
-      className={cn("group relative flex h-11 items-center rounded-2xl text-[14px] font-medium outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:h-10", slim ? "w-11 justify-center lg:w-10" : "gap-3 px-3", on ? "text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:bg-secondary/60 [@media(hover:hover)]:hover:text-foreground")}
+      className={cn("group relative flex h-11 items-center rounded-2xl text-[14px] font-medium outline-none transition-colors duration-nav ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:h-10", slim ? "w-11 justify-center lg:w-10" : "gap-3 px-3", on ? "text-lime-foreground" : "text-foreground/60 [@media(hover:hover)]:hover:bg-secondary/60 [@media(hover:hover)]:hover:text-foreground")}
     >
       {on && (
-        <motion.span layoutId={layoutId} className="absolute inset-0 rounded-2xl bg-secondary" transition={T.glide}>
-          <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-lime" />
-        </motion.span>
+        <motion.span layoutId={still ? undefined : layoutId} className="absolute inset-0 rounded-2xl bg-lime shadow-[0_6px_18px_-6px_hsl(var(--lime)/.5)]" transition={T.nav} />
       )}
-      <Icon className={cn("relative h-[17px] w-[17px] shrink-0 transition-transform duration-200 motion-reduce:transition-none [@media(hover:hover)]:group-hover:scale-110", on && "text-lime-ink")} strokeWidth={on ? 2.2 : 1.8} aria-hidden />
+      <Icon className={cn("relative h-[17px] w-[17px] shrink-0 transition-transform duration-200 motion-reduce:transition-none [@media(hover:hover)]:group-hover:scale-110")} strokeWidth={on ? 2.2 : 1.8} aria-hidden />
       <span className={cn("relative truncate", slim && "sr-only")}>{label}</span>
       {n > 0 && !slim && (
-        <span className="relative ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-lime px-1.5 text-[11px] font-bold text-[hsl(var(--lime-foreground))]" aria-label={`${n} open`}>
+        <span className={cn("relative ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold", on ? "bg-lime-foreground text-lime" : "bg-lime text-[hsl(var(--lime-foreground))]")} aria-label={`${n} open`}>
           {n > 99 ? "99+" : n}
         </span>
       )}
-      {n > 0 && slim && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-lime ring-2 ring-card" aria-hidden />}
+      {n > 0 && slim && <span className={cn("absolute right-1.5 top-1.5 h-2 w-2 rounded-full ring-2", on ? "bg-lime-foreground ring-lime" : "bg-lime ring-card")} aria-hidden />}
     </Link>
   );
 }
@@ -188,7 +188,7 @@ function Footer({ admin, path, onNavigate, slim = false, onDock }: { admin: { na
     return (
       <div className="flex flex-col items-center gap-1 border-t border-border/60 px-3 pb-3 pt-3">
         <Tooltip text="My account" side="right" className="flex">
-          <Link href="/admin/account" onClick={onNavigate} aria-current={mine ? "page" : undefined} aria-label={`My account, ${admin.name}`} className={cn("grid h-11 w-11 place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring lg:h-10 lg:w-10", mine && "bg-secondary")}>
+          <Link href="/admin/account" onClick={onNavigate} aria-current={mine ? "page" : undefined} aria-label={`My account, ${admin.name}`} className={cn("grid h-11 w-11 place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring lg:h-10 lg:w-10", mine && "bg-lime")}>
             <OrbAvatar seed={admin.name} size={28} />
           </Link>
         </Tooltip>
@@ -212,13 +212,13 @@ function Footer({ admin, path, onNavigate, slim = false, onDock }: { admin: { na
       </div>
       <ContrastToggle className="min-h-11 w-full justify-start" />
       <div className="flex items-center gap-1 rounded-2xl bg-secondary/40 p-1.5">
-        <Link href="/admin/account" onClick={onNavigate} aria-current={mine ? "page" : undefined} className={cn("group flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", mine ? "bg-secondary" : "[@media(hover:hover)]:hover:bg-secondary")}>
+        <Link href="/admin/account" onClick={onNavigate} aria-current={mine ? "page" : undefined} className={cn("group flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", mine ? "bg-lime text-lime-foreground" : "[@media(hover:hover)]:hover:bg-secondary")}>
           <OrbAvatar seed={admin.name} size={34} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[13px] font-semibold">{admin.name}</span>
-            <span className="block truncate text-[11.5px] text-muted-foreground">{ROLE_LABEL[admin.role]} · My account</span>
+            <span className={cn("block truncate text-[11.5px]", mine ? "text-lime-foreground/70" : "text-muted-foreground")}>{ROLE_LABEL[admin.role]} · My account</span>
           </span>
-          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <ChevronRight className={cn("h-3.5 w-3.5 shrink-0", mine ? "text-lime-foreground/70" : "text-muted-foreground")} aria-hidden />
         </Link>
         <Tooltip text="Sign out" side="top" className={cn("flex", TOUCH_TIP)}>
           {signOut}

@@ -10,6 +10,8 @@
  *  - the pointer position is clientX against getBoundingClientRect (the original used pageX, which drifts once the
  *    page scrolls).
  * Positioning (fixed, centred, safe-area) belongs to the caller: see components/shell/StudioDock.tsx and the admin dock.
+ * R1292: the destination you are on sits on a solid lime fill (.nav-fill, dark ink) that glides between items on T.nav;
+ * the dot under the icon is gone and idle icons are quiet grey (text-foreground/60, the one --nav-idle rule).
  */
 import Link from "next/link";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
@@ -19,7 +21,7 @@ import { SPRING_DOCK, T } from "@/lib/motion/tokens";
 
 const REST = 44;
 
-type Ctx = { mouseX: MotionValue<number>; magnification: number; distance: number; still: boolean };
+type Ctx = { mouseX: MotionValue<number>; magnification: number; distance: number; still: boolean; fillId: string };
 const DockContext = createContext<Ctx | null>(null);
 
 function useDockCtx() {
@@ -43,6 +45,8 @@ export type DockProps = {
 export function Dock({ children, label, className, magnification = 64, distance = 140 }: DockProps) {
   const mouseX = useMotionValue(Infinity);
   const still = !!useReducedMotion();
+  // One shared-layout id per dock, so the lime fill glides from the old item to the new one (not between two docks).
+  const fillId = useId();
   const onMove = (e: ReactMouseEvent<HTMLElement>) => mouseX.set(e.clientX);
   const onLeave = () => mouseX.set(Infinity);
   return (
@@ -53,7 +57,7 @@ export function Dock({ children, label, className, magnification = 64, distance 
       className={cn("lg-glass dock flex items-end gap-1 rounded-[24px] px-2 pb-2 pt-2", className)}
       style={{ height: REST + 16 }}
     >
-      <DockContext.Provider value={{ mouseX, magnification: still ? REST : magnification, distance, still }}>{children}</DockContext.Provider>
+      <DockContext.Provider value={{ mouseX, magnification: still ? REST : magnification, distance, still, fillId }}>{children}</DockContext.Provider>
     </nav>
   );
 }
@@ -64,7 +68,7 @@ export type DockItemProps = {
   children: ReactNode;
   href?: string;
   onClick?: (e: ReactMouseEvent<HTMLElement>) => void;
-  /** Lights the dot under the icon. Links also get aria-current="page". */
+  /** The destination you are on: a solid lime fill under a dark icon. Links also get aria-current="page". */
   active?: boolean;
   /** A small count or dot in the corner (unread notices, pending approvals). */
   badge?: ReactNode;
@@ -76,7 +80,7 @@ export type DockItemProps = {
 
 /** One icon in the dock: a link when `href` is given, otherwise a button. */
 export function DockItem({ label, children, href, onClick, active, badge, className, attrs, prefetch }: DockItemProps) {
-  const { mouseX, magnification, distance, still } = useDockCtx();
+  const { mouseX, magnification, distance, still, fillId } = useDockCtx();
   const ref = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState(false);
   const [focus, setFocus] = useState(false);
@@ -102,19 +106,23 @@ export function DockItem({ label, children, href, onClick, active, badge, classN
   const show = hover || focus;
   const inner = (
     <>
-      <motion.span style={{ width: iconSize, height: iconSize }} className="dock-ic grid place-items-center [&>svg]:h-full [&>svg]:w-full" aria-hidden="true">
+      {active && <motion.span layoutId={still ? undefined : fillId} transition={T.nav} aria-hidden="true" className="dock-fill nav-fill absolute inset-0 rounded-[16px]" />}
+      <motion.span style={{ width: iconSize, height: iconSize }} className="dock-ic relative grid place-items-center [&>svg]:h-full [&>svg]:w-full" aria-hidden="true">
         {children}
       </motion.span>
       {badge != null && badge !== false && (
-        <span className="dock-badge absolute -right-0.5 -top-0.5 grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-lime px-1 text-[10.5px] font-semibold leading-none text-lime-foreground ring-2 ring-[hsl(var(--glass-solid))]">
+        <span className={cn("dock-badge absolute -right-0.5 -top-0.5 grid min-h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10.5px] font-semibold leading-none ring-2", active ? "bg-lime-foreground text-lime ring-lime" : "bg-lime text-lime-foreground ring-[hsl(var(--glass-solid))]")}>
           {badge}
         </span>
       )}
-      <span aria-hidden="true" className={cn("dock-dot absolute -bottom-1.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-lime transition-opacity", active ? "opacity-100" : "opacity-0")} />
     </>
   );
   const common = {
-    className: cn("dock-btn relative grid h-full w-full place-items-center rounded-[16px] text-foreground/80 outline-none transition-colors hover:bg-foreground/[0.08] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring", active && "text-foreground", className),
+    className: cn(
+      "dock-btn relative grid h-full w-full place-items-center rounded-[16px] text-foreground/60 outline-none transition-colors duration-nav ease-out motion-reduce:transition-none hover:bg-foreground/[0.08] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+      active && "text-lime-foreground hover:bg-transparent hover:text-lime-foreground",
+      className,
+    ),
     "aria-label": label,
     "aria-describedby": show ? tipId : undefined,
     onMouseEnter: () => setHover(true),

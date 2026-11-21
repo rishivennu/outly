@@ -30,10 +30,11 @@ export function drawerItems(teammate: boolean, tabsHidden = false): NavItem[] {
 
 /** 1154: one row style for every pick in the drawer: 48px tall, a pressed state, hover only where hover exists. */
 const ROW =
-  "group flex h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] font-medium outline-none transition-[background-color,color] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-foreground/[0.09]";
-const IDLE = "text-foreground/85 [@media(hover:hover)]:hover:bg-foreground/[0.06] [@media(hover:hover)]:hover:text-foreground";
-const ON = "bg-secondary font-semibold text-foreground";
-const ICON = "h-[18px] w-[18px] shrink-0 text-muted-foreground transition-colors duration-150 group-aria-[current=page]:text-foreground";
+  "group flex h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] font-medium outline-none transition-[background-color,color] duration-nav ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-foreground/[0.09]";
+// R1292: the page you are on is the shared solid lime fill with dark ink; the rest is quiet grey at 60%.
+const IDLE = "text-foreground/60 [@media(hover:hover)]:hover:bg-foreground/[0.06] [@media(hover:hover)]:hover:text-foreground";
+const ON = "bg-lime font-semibold text-lime-foreground active:bg-lime";
+const ICON = "h-[18px] w-[18px] shrink-0 text-muted-foreground transition-colors duration-nav ease-out motion-reduce:transition-none group-aria-[current=page]:text-lime-foreground";
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (

@@ -45,7 +45,8 @@ export function StudioDock() {
               href={href}
               active={isActive(path, href)}
               attrs={{ "data-tour": TOUR[href] }}
-              className={create ? "bg-lime text-lime-foreground hover:bg-lime hover:text-lime-foreground" : undefined}
+              // R1292: outlined like the rail's .rail-new, so the solid lime fill marks only the page you are on.
+              className={create ? "dock-new" : undefined}
             >
               <Icon strokeWidth={1.8} />
             </DockItem>

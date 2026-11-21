@@ -30,7 +30,7 @@ const TABS = [
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
-const SPRING = T.glide; // 1119: tab and segment pills glide, no overshoot
+const SPRING = T.nav; // R1292: tab and segment pills move on the nav token (300 ms ease-out), no overshoot
 const SHEET = T.card;
 
 const isActive = (path: string, href: string) => (href === "/home" ? path === "/home" : path.startsWith(href));

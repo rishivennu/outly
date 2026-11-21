@@ -144,7 +144,7 @@ describe("1105 tab bar", () => {
     expect(css).not.toContain(".mtab-label");
     expect(tabs).toContain('<span className="sr-only">{label}</span>');
     expect(css).toContain("transition: color .25s var(--ease-liquid); }");
-    expect(rule(".mtab-ind")).toContain("translate .35s var(--ease-liquid)");
+    expect(rule(".mtab-ind")).toContain("translate var(--m-nav) var(--m-ease-out)"); // R1292: nav token
     expect(rule(".mtab-pill")).toContain("transform .15s var(--ease-liquid)");
     expect(css).toContain(".mtab { animation: mtab-in .4s var(--ease-liquid) backwards; }");
   });
@@ -172,7 +172,7 @@ describe("1105 review fixes", () => {
     expect(css).toMatch(/html\.dark \.mtab \{\r?\n  --mtab-bg: 240 5% 11%; --mtab-line: 0 0% 100% \/ \.1;/);
     expect(rule(".mtab")).toContain("--mtab-bg: 0 0% 100%;");
     expect(rule(".mtab")).toContain("hsl(var(--mtab-bg) / .72)");
-    expect(css).toContain(".mtab-item { color: hsl(var(--foreground) / .72);");
+    expect(css).toContain(".mtab-item { color: hsl(var(--foreground) / var(--nav-idle));"); // R1292: shared idle grey
   });
   test("only the latest theme switch clears the transition flag", () => {
     expect(theme).toContain("const n = ++seq;");

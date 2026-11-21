@@ -120,11 +120,12 @@ html[data-app].dark { --ios-fill: 240 3% 52% / .24; --ios-sep: 0 0% 100% / .1; -
   html[data-app] .app-tab {
     position: relative; flex: 1; max-width: 86px; height: 54px; border-radius: 27px;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-    color: hsl(var(--muted-foreground)); transition: color .25s, height .45s var(--ios-ease);
+    color: hsl(var(--foreground) / var(--nav-idle)); transition: color var(--m-nav) var(--m-ease-out), height .45s var(--ios-ease);
   }
-  html[data-app] .app-tab.is-active { color: hsl(var(--foreground)); }
-  html[data-app] .app-tab.is-active svg { color: hsl(var(--lime-ink)); }
-  html[data-app] .app-tab-pill { position: absolute; inset: 0; border-radius: inherit; background: hsl(var(--ios-fill)); box-shadow: inset 0 .5px 0 hsl(0 0% 100% / .25); }
+  /* R1292: the tab you are on sits on the shared solid lime fill with dark ink, like every other navigation. */
+  html[data-app] .app-tab.is-active { color: hsl(var(--lime-foreground)); }
+  html[data-app] .app-tab.is-active svg { color: inherit; }
+  html[data-app] .app-tab-pill { position: absolute; inset: 0; border-radius: inherit; background: hsl(var(--lime)); box-shadow: inset 0 .5px 0 hsl(0 0% 100% / .25), 0 6px 18px -6px hsl(var(--lime) / .5); }
   html[data-app] .app-tab-label { position: relative; font: 600 10.5px/1 var(--font-body), system-ui, sans-serif; letter-spacing: .01em; transition: opacity .25s, max-height .45s var(--ios-ease); max-height: 14px; }
   html[data-app] .app-fab {
     flex: none; width: 64px; height: 64px; border-radius: 32px; display: grid; place-items: center;
@@ -156,7 +157,7 @@ html[data-app].dark { --ios-fill: 240 3% 52% / .24; --ios-sep: 0 0% 100% / .1; -
   html[data-app] .app-group > li + li .app-row::after { content: ""; position: absolute; left: 58px; right: 0; top: 0; height: .5px; background: hsl(var(--ios-sep)); }
   html[data-app] .app-group-label { margin: 22px 16px 8px; font: 500 13px/1 var(--font-body), system-ui, sans-serif; text-transform: uppercase; letter-spacing: .04em; color: hsl(var(--muted-foreground)); }
   html[data-app] .app-row { position: relative; display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 0 14px; font: 400 17px/1.2 var(--font-body), system-ui, sans-serif; }
-  html[data-app] .app-row[aria-current="page"] { background: hsl(var(--ios-fill)); }
+  html[data-app] .app-row[aria-current="page"] { background: hsl(var(--lime)); color: hsl(var(--lime-foreground)); }
   html[data-app] .app-row-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; color: #fff; flex: none; }
   html[data-app] .app-profile { display: flex; align-items: center; gap: 14px; padding: 14px; }
 

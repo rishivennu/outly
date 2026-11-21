@@ -34,7 +34,7 @@ describe("tabs ease in and out (1187)", () => {
 
   test("the layoutId pills glide on it, timed with the page they open", () => {
     expect(T.glide).toEqual({ type: "tween", duration: DUR.page / 1000, ease: smoothInOut });
-    expect(read("components/admin/AdminShell.tsx")).toContain("transition={T.glide}");
+    expect(read("components/admin/AdminShell.tsx")).toContain("transition={T.nav}"); // R1292: the admin pill moved to the nav time
     // No tab pill is left on the default card tween (an ease-out only).
     const dir = "components/analytics";
     for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx"))) {

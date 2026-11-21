@@ -60,7 +60,7 @@ describe("R1269 sidebar", () => {
     expect(shell).toContain("[@media(hover:hover)]:hover:bg-secondary/60");
     expect(shell).toContain("focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:h-10");
     expect(shell).toContain("text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground");
-    expect(shell).toContain("transition={T.glide}");
+    expect(shell).toContain("transition={T.nav}"); // R1292: nav time
   });
 });
 

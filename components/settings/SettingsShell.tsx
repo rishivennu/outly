@@ -112,13 +112,13 @@ export function SettingsShell({ title, intro, categories, initialTab }: { title:
           onClick={() => go(c.id, mobile && !window.matchMedia("(min-width: 1024px)").matches)}
           aria-current={on ? "page" : undefined}
           className={cn(
-            "group relative flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[14px] font-medium transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
-            on ? "text-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground",
+            "group relative flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[14px] font-medium transition-colors duration-nav ease-out motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+            on ? "text-lime-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground",
           )}
         >
-          {/* The selection glides between categories (1065), like the sidebar's pill. */}
-          {on && <motion.span layoutId="settings-pill" className="absolute inset-0 rounded-xl bg-lime/15" transition={T.glide} aria-hidden="true" />}
-          <Ico className={cn("relative h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110", on ? "text-lime-ink" : "opacity-80 group-hover:opacity-100")} aria-hidden="true" />
+          {/* The selection glides between categories (1065); R1292: the shared solid lime fill with dark ink. */}
+          {on && <motion.span layoutId="settings-pill" className="absolute inset-0 rounded-xl bg-lime" transition={T.nav} aria-hidden="true" />}
+          <Ico className={cn("relative h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110", on ? "" : "opacity-80 group-hover:opacity-100")} aria-hidden="true" />
           <span className="relative min-w-0 flex-1 truncate">{c.label}</span>
           {dirty[c.id] && (
             <span className="relative h-2 w-2 shrink-0 rounded-full bg-warning" title="Unsaved changes">

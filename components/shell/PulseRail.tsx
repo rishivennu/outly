@@ -14,7 +14,8 @@ import { NavStyleSwitch } from "./NavStyleSwitch";
 import { SignOutButton } from "./SignOutButton";
 import { openPalette } from "./CommandPalette";
 import { AccountMenu, useWho } from "./AccountMenu";
-import { ANIM, GLIDE, MAIN, RAIL_KEY, TOUR, isActive, workspaceItems } from "./nav-items";
+import { ANIM, MAIN, RAIL_KEY, TOUR, isActive, workspaceItems } from "./nav-items";
+import { T } from "@/lib/motion/tokens";
 import { useHoverPill, usePressFx } from "@/lib/motion/useFluid";
 
 /** R1255: the rows the shared hover pill flows between (the logo, the profile and New post keep their own hover). */
@@ -43,7 +44,7 @@ function Row({ href, label, active }: { href: string; label: string; active: boo
   return (
     <Tip label={label}>
       <HoverLink href={href} data-tour={TOUR[href]} aria-current={active ? "page" : undefined} {...ic.handlers} className="rail-row">
-        {active && <motion.span layoutId="rail-pill" className="rail-pill" transition={GLIDE} />}
+        {active && <motion.span layoutId="rail-pill" className="rail-pill" transition={T.nav} />}
         <span className="rail-ic">
           <AnimIcon name={ANIM[href] ?? "home"} size={20} iconRef={ic.ref} />
         </span>
@@ -164,7 +165,7 @@ export function PulseRail() {
               </Tip>
               <Tip label="New post">
                 <HoverLink href="/create" data-tour="new-post" aria-current={isActive(path, "/create") ? "page" : undefined} {...plus.handlers} className="rail-row rail-new">
-                  {isActive(path, "/create") && <motion.span layoutId="rail-pill" className="rail-pill" transition={GLIDE} />}
+                  {isActive(path, "/create") && <motion.span layoutId="rail-pill" className="rail-pill" transition={T.nav} />}
                   <span className="rail-ic">
                     <AnimIcon name="plus" size={20} iconRef={plus.ref} />
                   </span>

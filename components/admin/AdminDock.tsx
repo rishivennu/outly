@@ -162,11 +162,11 @@ export function AdminDock({ nav, groups, role, admin, path, badges, active, onSi
       const on = active(path, href);
       const n = badges[area] ?? 0;
       return (
-        <Link key={href} href={href} role="menuitem" tabIndex={-1} aria-current={on ? "page" : undefined} onClick={() => setMenu(null)} className={cn(ROW, on ? "bg-secondary text-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:bg-secondary/60 [@media(hover:hover)]:hover:text-foreground")}>
-          <Icon className={cn("h-[17px] w-[17px] shrink-0", on && "text-lime-ink")} strokeWidth={on ? 2.2 : 1.8} aria-hidden />
+        <Link key={href} href={href} role="menuitem" tabIndex={-1} aria-current={on ? "page" : undefined} onClick={() => setMenu(null)} className={cn(ROW, on ? "bg-lime text-lime-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:bg-secondary/60 [@media(hover:hover)]:hover:text-foreground")}>
+          <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={on ? 2.2 : 1.8} aria-hidden />
           <span className="min-w-0 flex-1 truncate">{label}</span>
           {n > 0 && (
-            <span className="grid h-5 min-w-5 place-items-center rounded-full bg-lime px-1.5 text-[11px] font-bold text-lime-foreground" aria-label={`${n} open`}>
+            <span className={cn("grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold", on ? "bg-lime-foreground text-lime" : "bg-lime text-lime-foreground")} aria-label={`${n} open`}>
               {n > 99 ? "99+" : n}
             </span>
           )}
@@ -178,13 +178,13 @@ export function AdminDock({ nav, groups, role, admin, path, badges, active, onSi
     const mine = path === "/admin/account";
     body = (
       <>
-        <Link href="/admin/account" role="menuitem" tabIndex={-1} aria-current={mine ? "page" : undefined} onClick={() => setMenu(null)} className={cn(ROW, "min-h-14", mine ? "bg-secondary" : "[@media(hover:hover)]:hover:bg-secondary/60")}>
+        <Link href="/admin/account" role="menuitem" tabIndex={-1} aria-current={mine ? "page" : undefined} onClick={() => setMenu(null)} className={cn(ROW, "min-h-14", mine ? "bg-lime text-lime-foreground" : "[@media(hover:hover)]:hover:bg-secondary/60")}>
           <OrbAvatar seed={admin.name} size={34} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[13px] font-semibold">{admin.name}</span>
-            <span className="block truncate text-[11.5px] font-normal text-muted-foreground">{ROLE_LABEL[admin.role]} · My account</span>
+            <span className={cn("block truncate text-[11.5px] font-normal", mine ? "text-lime-foreground/70" : "text-muted-foreground")}>{ROLE_LABEL[admin.role]} · My account</span>
           </span>
-          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <ChevronRight className={cn("h-3.5 w-3.5 shrink-0", mine ? "text-lime-foreground/70" : "text-muted-foreground")} aria-hidden />
         </Link>
         <Link href="/" role="menuitem" tabIndex={-1} onClick={() => setMenu(null)} className={cn(ROW, "text-muted-foreground [@media(hover:hover)]:hover:bg-secondary/60 [@media(hover:hover)]:hover:text-foreground")}>
           <Globe className="h-[17px] w-[17px] shrink-0" aria-hidden />

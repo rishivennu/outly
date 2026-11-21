@@ -52,8 +52,8 @@ export function AccountRows({ onPick, onLogout, extra, rowClass }: { onPick: () 
     // Settings links are tabs of one page: none claims it. Others match their children too (/billing/invoices).
     const on = !external && href.split("?")[0] !== "/settings" && isActive(path, href);
     return (
-      <HoverLink key={href} href={href} {...(external ? { target: "_blank", rel: "noopener" } : {})} data-mi="" aria-current={on ? "page" : undefined} onClick={onPick} className={cn(row, on && "bg-secondary text-foreground")}>
-        <Icon className="h-[18px] w-[18px] shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" strokeWidth={1.9} />
+      <HoverLink key={href} href={href} {...(external ? { target: "_blank", rel: "noopener" } : {})} data-mi="" aria-current={on ? "page" : undefined} onClick={onPick} className={cn(row, on && "bg-lime text-lime-foreground hover:bg-lime hover:text-lime-foreground focus-visible:bg-lime focus-visible:text-lime-foreground active:bg-lime")}>
+        <Icon className={cn("h-[18px] w-[18px] shrink-0 transition-colors", on ? "text-lime-foreground" : "text-muted-foreground group-hover:text-foreground")} strokeWidth={1.9} />
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {external && <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />}
         {external && <span className="sr-only">(opens in a new tab)</span>}

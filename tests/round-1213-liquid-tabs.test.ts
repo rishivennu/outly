@@ -88,7 +88,7 @@ describe("R1213 glass pill (globals.css)", () => {
     const ind = rule(".mtab-ind");
     expect(ind).toContain("width: calc((100% - 2 * var(--mtab-px)) / var(--n, 5));");
     expect(ind).toContain("translate: calc(var(--i, 0) * 100%) 0;");
-    expect(ind).toContain("transition: translate .35s var(--ease-liquid), opacity .2s var(--ease-liquid);");
+    expect(ind).toContain("transition: translate var(--m-nav) var(--m-ease-out), opacity .2s var(--ease-liquid);"); // R1292
     expect(rule(".mtab-ind::before")).toContain("width: 56px; height: 32px;");
     expect(rule(".mtab-ind::before")).toContain("scale: var(--sx, 1) 1;");
     expect(css).toContain(".mtab[data-none]:not([data-drag]) .mtab-ind { opacity: 0; }");
@@ -98,7 +98,7 @@ describe("R1213 glass pill (globals.css)", () => {
   });
   test("ink follows the finger while dragging, and the glow under it blooms on release", () => {
     expect(css).toContain(".mtab[data-drag] .mtab-item[data-over] .mtab-pill > svg { color: hsl(var(--lime-foreground)); }");
-    expect(css).toContain(".mtab[data-drag] .mtab-item[aria-current]:not([data-over]) .mtab-pill > svg { color: hsl(var(--foreground) / .72); }");
+    expect(css).toContain(".mtab[data-drag] .mtab-item[aria-current]:not([data-over]) .mtab-pill > svg { color: hsl(var(--foreground) / var(--nav-idle)); }");
     expect(rule(".mtab-ripple")).toContain("translate: var(--fx, 50%) 0;");
     expect(css).toContain(".mtab[data-press] .mtab-ripple { opacity: 1; scale: 1; }");
     expect(css).toContain(".mtab[data-drop] .mtab-ripple { animation: mtab-drop .45s var(--ease-liquid) forwards; }");

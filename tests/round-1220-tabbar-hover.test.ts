@@ -29,7 +29,7 @@ describe("R1220 tab bar pill", () => {
     expect(i).toBeGreaterThan(0);
     const block = css.slice(i, css.indexOf("}\n", css.indexOf(".mtab-item:hover .mtab-pill > svg", i)) + 2);
     for (let k = 1; k <= 5; k++) expect(block).toContain(`.mtab:has(.mtab-item:nth-of-type(${k}):hover) .mtab-ind { translate: ${k === 1 ? "0" : `${(k - 1) * 100}%`} 0; }`);
-    expect(block).toContain(".mtab:has(.mtab-item:hover) .mtab-item[aria-current]:not(:hover) .mtab-pill > svg { color: hsl(var(--foreground) / .72); }");
+    expect(block).toContain(".mtab:has(.mtab-item:hover) .mtab-item[aria-current]:not(:hover) .mtab-pill > svg { color: hsl(var(--foreground) / var(--nav-idle)); }");
     expect(block).toContain(".mtab-item:hover .mtab-pill > svg { color: hsl(var(--lime-foreground)); }");
     expect(block).toContain(".mtab[data-none]:has(.mtab-item:hover) .mtab-ind { opacity: 1; }");
     // the old faint grey hover fill is gone: lime is the hover

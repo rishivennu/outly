@@ -625,6 +625,11 @@ html:not(.dark) .hero-tile { box-shadow: 0 0 0 1px rgba(255, 255, 255, .9), 0 0 
    CSS only holds the hidden state, under html.js so content is never hidden without JS, plus the
    section-head pieces that key off data-shown. No CSS transitions here: they would fight the tweens. */
 :root { --ease-liquid: var(--m-ease-out); }
+/* R1292: one active state for every navigation (dock, rail, phone tab bars, admin, menus): the destination you are on
+   sits on a solid lime fill with dark ink; everything else is quiet grey at --nav-idle. */
+:root { --nav-idle: .6; }
+html[data-contrast="more"] { --nav-idle: .85; }
+.nav-fill { background: hsl(var(--lime)); color: hsl(var(--lime-foreground)); box-shadow: 0 6px 18px -6px hsl(var(--lime) / .5); }
 html.js [data-reveal]:not([data-shown]) { opacity: 0; }
 /* stagger + cards: the wrapper stays put, only its children start hidden */
 html.js [data-reveal][data-stagger]:not([data-shown]) { opacity: 1; }
@@ -3548,10 +3553,9 @@ html[data-contrast="more"] .mtab::before, html[data-contrast="more"] .mtab::afte
    padding steps at once (no transition) so the pill's track (.mtab-ind, measured from --mtab-px) and the icons
    move together. */
 .mtab[data-compact] { height: 56px; padding: 3px 10px; transform: scale(.92); --mtab-px: 10px; }
-/* Tabs: muted until chosen (72% ink: 4.5:1 on the tint over the page, 3:1 over anything). Colour 250ms, a press
+/* Tabs: muted until chosen (R1292: the shared --nav-idle grey, 60%, 85% with more contrast). Colour 250ms, a press
    dips the icon 150ms. */
-.mtab-item { color: hsl(var(--foreground) / .72); -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
-html.dark .mtab-item { color: hsl(var(--foreground) / .78); }
+.mtab-item { color: hsl(var(--foreground) / var(--nav-idle)); -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
 .mtab-item[aria-current] { color: hsl(var(--foreground)); }
 .mtab-pill { border-radius: 9999px; transition: transform .15s var(--ease-liquid), background-color .2s var(--ease-liquid); }
 .mtab-item:not(:disabled):active .mtab-pill { transform: scale(.96); }
@@ -3565,7 +3569,7 @@ html.dark .mtab-item { color: hsl(var(--foreground) / .78); }
   width: calc((100% - 2 * var(--mtab-px)) / var(--n, 5));
   display: grid; place-items: center; pointer-events: none;
   translate: calc(var(--i, 0) * 100%) 0;
-  transition: translate .35s var(--ease-liquid), opacity .2s var(--ease-liquid);
+  transition: translate var(--m-nav) var(--m-ease-out), opacity .2s var(--ease-liquid);
 }
 .mtab-ind::before {
   content: ""; width: 56px; height: 32px; border-radius: 9999px;
@@ -3585,13 +3589,13 @@ html.dark .mtab-item { color: hsl(var(--foreground) / .78); }
   .mtab:has(.mtab-item:nth-of-type(4):hover) .mtab-ind { translate: 300% 0; }
   .mtab:has(.mtab-item:nth-of-type(5):hover) .mtab-ind { translate: 400% 0; }
   .mtab[data-none]:has(.mtab-item:hover) .mtab-ind { opacity: 1; }
-  .mtab:has(.mtab-item:hover) .mtab-item[aria-current]:not(:hover) .mtab-pill > svg { color: hsl(var(--foreground) / .72); }
+  .mtab:has(.mtab-item:hover) .mtab-item[aria-current]:not(:hover) .mtab-pill > svg { color: hsl(var(--foreground) / var(--nav-idle)); }
   .mtab-item:hover .mtab-pill > svg { color: hsl(var(--lime-foreground)); }
 }
 .mtab-item[aria-current] .mtab-pill > svg { color: hsl(var(--lime-foreground)); }
 /* while a finger drags, the tab under it carries the ink and the one you came from lets it go */
 .mtab[data-drag] .mtab-item[data-over] .mtab-pill > svg { color: hsl(var(--lime-foreground)); }
-.mtab[data-drag] .mtab-item[aria-current]:not([data-over]) .mtab-pill > svg { color: hsl(var(--foreground) / .72); }
+.mtab[data-drag] .mtab-item[aria-current]:not([data-over]) .mtab-pill > svg { color: hsl(var(--foreground) / var(--nav-idle)); }
 .mtab-pill > svg { transition: color .25s var(--ease-liquid); }
 .mtab-item { transition: color .25s var(--ease-liquid); }
 /* The liquid highlight: a soft lime glow under the fingertip (--fx in the bar's own pixels), on from the first
@@ -3818,7 +3822,7 @@ html[data-rail="open"] .rail-sec { display: flex; }
   position: relative; display: flex; align-items: center; gap: 8px; flex-shrink: 0;
   height: 44px; width: 100%; min-width: 44px; padding: 0 12px; border-radius: 9999px;
   overflow: hidden; white-space: nowrap; text-align: left;
-  color: hsl(var(--foreground) / .68); font-size: 14px; font-weight: 500;
+  color: hsl(var(--foreground) / var(--nav-idle)); font-size: 14px; font-weight: 500;
   -webkit-tap-highlight-color: transparent; outline: none;
 }
 .rail-row:hover { color: hsl(var(--foreground)); background: hsl(var(--foreground) / .08); }
@@ -3842,6 +3846,12 @@ html:not(.dark) .rail-new:not([aria-current="page"]):hover { color: hsl(var(--li
 /* the outline is a box-shadow too, so keyboard focus adds its ring instead of replacing it */
 .rail-new:not([aria-current="page"]):focus-visible { box-shadow: inset 0 0 0 1.5px hsl(var(--lime) / .7), 0 0 0 2px hsl(var(--ring)); }
 html:not(.dark) .rail-new:not([aria-current="page"]):focus-visible { box-shadow: inset 0 0 0 1.5px hsl(var(--lime-ink) / .6), 0 0 0 2px hsl(var(--ring)); }
+/* R1292: the dock's Create button, outlined like .rail-new so only the destination you are on is solid lime. */
+.dock-new:not([aria-current="page"]) { color: hsl(var(--lime)); box-shadow: inset 0 0 0 1.5px hsl(var(--lime) / .7); }
+.dock-new:not([aria-current="page"]):hover { color: hsl(var(--lime)); background: hsl(var(--lime) / .12); }
+html:not(.dark) .dock-new:not([aria-current="page"]) { color: hsl(var(--lime-ink)); box-shadow: inset 0 0 0 1.5px hsl(var(--lime-ink) / .6); }
+html:not(.dark) .dock-new:not([aria-current="page"]):hover { color: hsl(var(--lime-ink)); background: hsl(var(--lime) / .2); }
+.dock-new:not([aria-current="page"]):focus-visible { box-shadow: inset 0 0 0 1.5px hsl(var(--lime) / .7), 0 0 0 2px hsl(var(--ring)); }
 .rail-logo, .rail-me { padding: 0; gap: 10px; }
 .rail-logo:hover, .rail-me:hover { background: transparent; }
 .rail-logo { height: 44px; margin-bottom: 4px; }
@@ -3854,9 +3864,9 @@ html:not(.dark) .rail-avatar { background: hsl(var(--card)); box-shadow: inset 0
 .rail-me:hover .rail-avatar, .rail-me[data-state="open"] .rail-avatar { box-shadow: 0 0 0 3px hsl(var(--lime) / .45); }
 .rail-me:focus-visible { box-shadow: none; }
 .rail-me:focus-visible .rail-avatar { box-shadow: 0 0 0 2px var(--rail-bg), 0 0 0 4px hsl(var(--ring)); }
-.rail-bell { color: hsl(var(--foreground) / .68); }
+.rail-bell { color: hsl(var(--foreground) / var(--nav-idle)); }
 /* 1103 theme: the cycle circle while collapsed, a "Theme" row with the three-way switch while open */
-.rail-theme { display: none; align-items: center; justify-content: space-between; gap: 4px; height: 44px; flex-shrink: 0; padding-left: 8px; font-size: 13px; font-weight: 500; color: hsl(var(--foreground) / .68); white-space: nowrap; }
+.rail-theme { display: none; align-items: center; justify-content: space-between; gap: 4px; height: 44px; flex-shrink: 0; padding-left: 8px; font-size: 13px; font-weight: 500; color: hsl(var(--foreground) / var(--nav-idle)); white-space: nowrap; }
 html[data-rail="open"] .rail-theme { display: flex; }
 html[data-rail="open"] .rail-theme-cycle { display: none; }
 /* open and taller than the screen (zoom, short windows): the slim neutral scrollbar from 1064 shows. Collapsed it
@@ -3883,7 +3893,7 @@ html[data-rail="open"] .rail-mid.nav-scroll { scrollbar-width: thin; }
 
 @media (prefers-reduced-motion: no-preference) {
   .rail { transition: width .34s var(--ease-liquid), border-radius .34s var(--ease-liquid); }
-  .rail-row { transition: color .2s ease, background-color .2s ease, transform .16s var(--ease-liquid), box-shadow .2s ease; }
+  .rail-row { transition: color var(--m-nav) var(--m-ease-out), background-color .2s ease, transform .16s var(--ease-liquid), box-shadow .2s ease; }
   .rail-row:not(:disabled):active { transform: scale(.96); }
   .rail-label { transition: opacity .16s ease, transform .34s var(--ease-liquid); }
   html[data-rail="open"] .rail-label { transition-delay: .07s; }

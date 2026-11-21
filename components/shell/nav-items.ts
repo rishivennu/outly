@@ -77,7 +77,4 @@ export function pageTitle(path: string | null) {
   return TITLES.find(([h]) => isActive(path, h))?.[1] ?? "";
 }
 
-/** The pulse shell's selection glides on a time-based curve (no spring overshoot). */
-export const GLIDE = { type: "tween", duration: 0.35, ease: [0.16, 1, 0.3, 1] } as const;
-
 export { RAIL_KEY, railScript } from "@/lib/rail";

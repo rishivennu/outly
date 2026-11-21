@@ -125,8 +125,8 @@ describe("R1290 StudioDock", () => {
     expect(dock).toContain('<AccountMenu side="top">');
     expect(dock).toContain('label="Outlly dashboard" href="/home"');
   });
-  test("Create is lime, tour targets kept, the studio press effect still mounts", () => {
-    expect(dock).toContain("bg-lime text-lime-foreground");
+  test("Create is lime (R1292: outlined, solid only on /create), tour targets kept, the studio press effect still mounts", () => {
+    expect(dock).toContain('className={create ? "dock-new" : undefined}');
     expect(dock).toContain('"data-tour": TOUR[href]');
     expect(dock).toContain("usePressFx();");
   });
