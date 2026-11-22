@@ -8,6 +8,7 @@ import { PLATFORM_META, isPlatform, type Platform } from "@/lib/domain";
 import type { SendingItem } from "@/lib/retention/pulse";
 import { fetchSending, liveLabel, liveStep, onSendingWake, realPercent, stepText, updatedLabel, type LivePost } from "@/lib/client/sending";
 import { cn } from "@/lib/utils";
+import { pollable } from "@/lib/client/idle";
 
 /**
  * Home's Live Activity: posts still going out, so a creator who left the posting screen can see them land.
@@ -18,7 +19,13 @@ import { cn } from "@/lib/utils";
  * up here without a reload. Progress is the step a destination is on; a percentage only ever appears if the
  * server really measured one.
  */
-const IDLE_MS = 45_000;
+/**
+ * R1297: the quiet heartbeat is for a send started on another device. 90 s is plenty for that, and it only runs while
+ * someone is actually at the tab (pollable: visible and used in the last five minutes); the shell's SendingPill keeps
+ * its own heartbeat, so a Home tab left open on a desk no longer asks the server every 45 s all day. A send in
+ * progress keeps the fast poll whatever the person is doing: they may be watching it land.
+ */
+const IDLE_MS = 90_000;
 const BUSY_MS = 6000;
 const ACTIVE = ["pending", "queued", "uploading", "processing"];
 
@@ -45,7 +52,7 @@ export function SendingNow({ items }: { items: SendingItem[] }) {
   useEffect(() => {
     const id = setInterval(() => {
       setNow(Date.now());
-      void load();
+      if (busy || pollable()) void load();
     }, busy ? BUSY_MS : IDLE_MS);
     return () => clearInterval(id);
   }, [busy, load]);

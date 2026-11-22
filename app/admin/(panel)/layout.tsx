@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 
 /** What to check when the sweep this deployment relies on has gone quiet. */
 const SWEEP_FIX: Record<SweeperHealth["source"], string> = {
-  cron: "Check the cron-job.org pinger: it should call /api/cron/sweep every minute with the CRON_SECRET bearer token.",
+  cron: "Check the minute cron (Vercel Crons tab, or the external pinger): it should call /api/cron/sweep every minute with the CRON_SECRET bearer token.",
   worker: "Check that the queue worker (npm run worker) is running and can reach Redis.",
   inproc: "The app server runs the sweep itself here, so restart it if this stays.",
 };

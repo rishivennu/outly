@@ -133,7 +133,7 @@ describe("1141 house rules in the new screens", () => {
 
   test("the sweeper calls the engine once and never lets it break the sweep", () => {
     const s = src("app/api/cron/sweep/route.ts");
-    expect(s).toContain("sweepNotify()");
+    expect(s).toContain("sweepNotify(now, plan.housekeeping)"); // R1297: events every minute, the rest on the housekeeping slot
     expect(s).toContain('console.error("[sweep] notify", e)');
   });
 });

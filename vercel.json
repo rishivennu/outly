@@ -1,6 +1,7 @@
 {
   "ignoreCommand": "bash scripts/vercel-ignore.sh",
   "crons": [
+    { "path": "/api/cron/sweep", "schedule": "* * * * *" },
     { "path": "/api/cron/weekly-report", "schedule": "30 3 * * 1" },
     { "path": "/api/cron/retention", "schedule": "30 6 * * *" },
     { "path": "/api/cron/blog", "schedule": "0 1 * * *" }

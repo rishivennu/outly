@@ -20,7 +20,7 @@ import { pollable } from "@/lib/client/idle";
 type Row = LivePost;
 const FAST = 4000;
 const SLOW = 10_000;
-const IDLE_MS = 45_000;
+const IDLE_MS = 90_000; // R1297: 45 s -> 90 s; only for a send started on another device, and only while pollable()
 const SHOW_DONE_MS = 9000;
 
 export function SendingPill() {

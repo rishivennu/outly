@@ -33,8 +33,14 @@ const when = (iso: string) => {
 /* The sidebar and the mobile top bar each mount a bell (one is hidden by CSS). Share one request between them. */
 type NoticeList = { notices: Notice[]; unread: number };
 let inflight: { at: number; p: Promise<NoticeList> } | null = null;
+/**
+ * R1297: the bell loads on every navigation; within SHARE_MS of the last answer it reuses it instead of asking again,
+ * so moving through five studio screens in half a minute costs one request, not five. A push (NOTICES_EVENT), a tab
+ * coming back and a failed mark-read all pass `fresh`, so nothing a person is waiting for is ever served from memory.
+ */
+export const SHARE_MS = 30_000;
 function fetchNotices(fresh = false): Promise<NoticeList> {
-  if (!fresh && inflight && Date.now() - inflight.at < 2000) return inflight.p;
+  if (!fresh && inflight && Date.now() - inflight.at < SHARE_MS) return inflight.p;
   const p = api<NoticeList>("/api/notices");
   inflight = { at: Date.now(), p };
   p.catch(() => (inflight = null));
@@ -67,7 +73,7 @@ export function NoticesBell({ placement = "side", className }: { placement?: "si
     load();
   }, [load, path]);
   useEffect(() => {
-    const onFocus = () => document.visibilityState === "visible" && load();
+    const onFocus = () => document.visibilityState === "visible" && load(true);
     // 1118: a push just arrived (or a notification was tapped and marked read): reload past the shared request.
     const onPush = () => load(true);
     document.addEventListener("visibilitychange", onFocus);
@@ -134,7 +140,7 @@ export function NoticesBell({ placement = "side", className }: { placement?: "si
   async function markRead(ids: string[] | "all") {
     setItems((x) => x?.map((n) => (ids === "all" || ids.includes(n.id) ? { ...n, read: true } : n)) ?? null);
     setUnread((u) => (ids === "all" ? 0 : Math.max(0, u - ids.length)));
-    await api("/api/notices", { method: "PATCH", json: ids === "all" ? { all: true } : { ids } }).catch(() => load());
+    await api("/api/notices", { method: "PATCH", json: ids === "all" ? { all: true } : { ids } }).catch(() => load(true));
   }
 
   const label = unread ? `Notices, ${unread} unread` : "Notices";

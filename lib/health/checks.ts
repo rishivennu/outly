@@ -96,7 +96,7 @@ const checks: Record<CheckKind, (ctx: CheckCtx) => Promise<CheckResult>> = {
         detail: age === null ? `No ${h.source} sweep has ever been recorded` : `Last ${h.source} sweep ${Math.round(age / 60_000)} min ago (limit ${SWEEP_STALE_MS / 60_000} min)${h.latePosts ? `; ${h.latePosts} scheduled posts overdue` : ""}`,
         metrics,
         affected: h.latePosts,
-        cause: h.source === "cron" ? "The external pinger (cron-job.org) stopped calling /api/cron/sweep, or CRON_SECRET changed (estimated)" : h.source === "worker" ? "The BullMQ worker process is down or lost Redis (estimated)" : "No warm instance has run the in-process timer (estimated)",
+        cause: h.source === "cron" ? "The minute cron (Vercel Cron in vercel.json, or the external pinger) stopped calling /api/cron/sweep, or CRON_SECRET changed (estimated)" : h.source === "worker" ? "The BullMQ worker process is down or lost Redis (estimated)" : "No warm instance has run the in-process timer (estimated)",
       };
     }
     return { level: h.latePosts ? "warning" : "ok", detail: `${h.source} sweep ${Math.round((age ?? 0) / 1000)} s ago${h.latePosts ? `, but ${h.latePosts} scheduled posts are overdue` : ""}`, metrics, affected: h.latePosts };

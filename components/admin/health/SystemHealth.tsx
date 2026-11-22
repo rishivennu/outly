@@ -13,6 +13,7 @@ import { ADMIN_DEVICES_URL, adminPushFlag, enableAdminPush, setAdminPushFlag, sy
 import type { AdminRole } from "@/lib/admin/perms";
 import type { healthOverview, incidentRow } from "@/lib/health/overview";
 import type { WatchdogConfig } from "@/lib/health/config";
+import { CYCLE_STALE_SEC } from "@/lib/health/core";
 import { cn } from "@/lib/utils";
 
 /**
@@ -270,7 +271,7 @@ export function SystemHealth({ me, role }: { me: { id: string; name: string }; r
   const summary = data?.summary;
   const overall: Level = summary?.overall ?? "unknown";
   const worker = data?.worker;
-  const workerOk = !!worker && !!worker.lastCycle && worker.lastCycle.ageSec < 180;
+  const workerOk = !!worker && !!worker.lastCycle && worker.lastCycle.ageSec < CYCLE_STALE_SEC; // R1297: cycles every 2 minutes
 
   if (error && !data)
     return (

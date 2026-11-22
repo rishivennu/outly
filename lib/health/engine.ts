@@ -3,7 +3,7 @@ import { db } from "../db";
 import { env } from "../env";
 import { runCheck, type CheckCtx } from "./checks";
 import { watchdogConfig } from "./config";
-import { isDue, RECOVERY_OK_STREAK, RETENTION_DAYS, reminderDue, severityFor, shouldEscalate, type CheckResult, type Severity } from "./core";
+import { CYCLE_STALE_MS, isDue, RECOVERY_OK_STREAK, RETENTION_DAYS, reminderDue, severityFor, shouldEscalate, type CheckResult, type Severity } from "./core";
 import { MONITORED, serviceById, type MonitoredService } from "./registry";
 import { notifyIncident } from "./alerts";
 
@@ -204,14 +204,14 @@ export async function prune(now = new Date(), days = RETENTION_DAYS) {
 export async function heartbeatCheck(origin: string, now = new Date(), opts: { quiet?: boolean } = {}) {
   const cycle = await lastCycle();
   const ageMs = cycle ? now.getTime() - cycle.at : null;
-  const stale = ageMs === null || ageMs > 3 * 60_000;
+  const stale = ageMs === null || ageMs > CYCLE_STALE_MS; // R1297: cycles are 2 minutes apart
   const svc = serviceById("watchdog") as MonitoredService;
   const r: CheckResult = stale
     ? {
         level: "critical",
         detail: ageMs === null ? "The watchdog has never completed a cycle" : `No health cycle for ${Math.round(ageMs / 60_000)} min (the sweep that drives it has stopped)`,
         metrics: { lastCycleAgeSec: ageMs === null ? -1 : Math.round(ageMs / 1000) },
-        cause: "The minute pinger for /api/cron/sweep stopped, CRON_SECRET changed, or every sweep is failing before the health step (estimated)",
+        cause: "The minute cron for /api/cron/sweep (Vercel Cron or the external pinger) stopped, CRON_SECRET changed, or every sweep is failing before the health step (estimated)",
       }
     : { level: "ok", detail: `Last cycle ${Math.round((ageMs ?? 0) / 1000)} s ago (${cycle!.ran} checks, ${cycle!.ms} ms)`, metrics: { lastCycleAgeSec: Math.round((ageMs ?? 0) / 1000), lastCycleMs: cycle!.ms } };
   const sum: CycleSummary = { ran: ["watchdog"], deferred: [], threw: 0, opened: [], updated: [], resolved: [], escalated: [], ms: 0 };

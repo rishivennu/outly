@@ -99,25 +99,21 @@ Self-hosted (`bun run start` / `bun run worker`) has an in-process sweeper every
 
 | Route | Schedule | Does |
 |---|---|---|
-| `/api/cron/sweep` | every minute, from an external pinger | Picks up posts whose time has come and re-queues platform uploads stuck in `queued` for over 2 minutes. Idempotent, safe to call as often as you like |
+| `/api/cron/sweep` | `* * * * *` (Vercel Cron on Pro; or an external pinger on Hobby) | Picks up posts whose time has come and re-queues platform uploads stuck in `queued` for over 2 minutes. Idempotent, safe to call as often as you like. R1297: the creator-facing steps run every minute; housekeeping (health cycle, metric sync, cleanups, greetings, campaigns) runs on minute slots, see `lib/queue/plan.ts`. `?full=1` runs every step at once |
 | `/api/cron/retention` | `30 6 * * *` | Expiring-token warnings, reconnect reminders, the Friday goal nudge, and the data prune (email logs, admin events and behaviour analyses over 90 days, metric samples over 180, sign-in codes over a day) |
 | `/api/cron/weekly-report` | `30 3 * * 1` | Monday summary email |
 
-All three need `Authorization: Bearer $CRON_SECRET`; Vercel Cron sends it automatically once `CRON_SECRET` is set.
+All of them need `Authorization: Bearer $CRON_SECRET`; Vercel Cron sends it automatically once `CRON_SECRET` is set.
 
-**The sweep is not in `vercel.json`, on purpose.** Vercel Hobby only allows daily crons, and a sub-daily entry makes a Hobby deploy *fail*, so the per-minute sweep is driven from outside the app. Point a pinger at it every minute, for example [cron-job.org](https://cron-job.org):
+**The sweep is in `vercel.json` (R1297, Vercel Pro).** Pro allows minute crons, so the deployment drives its own sweep and nothing outside the app needs to call it. If an external pinger (cron-job.org) is still pointed at it, switch that pinger off: two callers a minute double the sweep's compute for no gain (the route is idempotent, so nothing breaks while both run).
+
+**On Vercel Hobby** remove the sweep line from `vercel.json` (Hobby only allows daily crons, and a sub-daily entry makes a Hobby deploy *fail*) and point a pinger at it every minute instead:
 
 ```
 URL:    https://your-domain/api/cron/sweep
 Method: GET          (POST works too, so any pinger will do)
 Every:  1 minute
 Header: Authorization: Bearer <CRON_SECRET>
-```
-
-Only on **Vercel Pro** (which allows minute crons) you may add it to `vercel.json` instead and drop the pinger:
-
-```json
-{ "path": "/api/cron/sweep", "schedule": "* * * * *" }
 ```
 
 Either way something must call it every minute: with nothing calling it, scheduled posts never go out. Maintenance mode does not stop it, because members keep posting while maintenance is on.

@@ -29,6 +29,12 @@ export function redact(input: unknown, max = 300): string {
 }
 
 /** Due when never checked, or when the last check is at least one interval old (with 5 s of slack for a pinger that runs a touch early). */
+/**
+ * R1297: the health cycle runs on even minutes of the sweep (lib/queue/plan.ts), so one missed sweep leaves a 4 minute
+ * gap. "Stalled" / critical only past 5 minutes: two consecutive missed cycles, never a single slow sweep.
+ */
+export const CYCLE_STALE_MS = 5 * 60_000;
+export const CYCLE_STALE_SEC = CYCLE_STALE_MS / 1000;
 export const isDue = (svc: MonitoredService, lastAt: number | null, now: number, intervalSec = svc.intervalSec) => lastAt === null || now - lastAt >= intervalSec * 1000 - 5_000;
 
 /** Severity of a fresh incident for a level, by how important the service is: a warning on a critical service stays a warning; critical is critical. */
