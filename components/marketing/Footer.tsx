@@ -16,6 +16,10 @@ import { Reveal } from "./Reveal";
 import { useBeta } from "./BetaContext";
 import { StoreBadges } from "./StoreBadges";
 
+/**
+ * R1303: four short groups instead of two long columns, so the lists sit side by side at about the same height and
+ * each heading names what is under it. "Legal" also carries the cookie settings button (rendered after its links).
+ */
 const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   {
     title: "Product",
@@ -26,21 +30,31 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
       { href: "/#platforms", label: "Platforms" },
       { href: "/#compare", label: "Compare" },
       { href: "/#pricing", label: "Pricing" },
+    ],
+  },
+  {
+    title: "Support",
+    links: [
+      { href: "/help", label: "Help centre" },
       { href: "/#faq", label: "FAQ" },
+      { href: "/contact", label: "Contact" },
+      { href: "/status", label: "Status" },
     ],
   },
   {
     title: "Company",
     links: [
-      { href: "/help", label: "Help centre" },
-      { href: "/contact", label: "Contact" },
       { href: "/partners", label: "Partner With Us" },
+      { href: "/blog", label: "Blog" },
+      { href: "/changelog", label: "Changelog" },
+    ],
+  },
+  {
+    title: "Legal",
+    links: [
       { href: "/privacy", label: "Privacy" },
       { href: "/terms", label: "Terms" },
       { href: "/security", label: "Security" },
-      { href: "/status", label: "Status" },
-      { href: "/blog", label: "Blog" },
-      { href: "/changelog", label: "Changelog" },
     ],
   },
 ];
@@ -53,7 +67,7 @@ const PLATFORMS = [
 
 /**
  * Footer as one rounded card: a short pitch with the right next step (Dashboard when signed
- * in), two link columns, the three destinations, and the wordmark set huge as a sign-off.
+ * in), four short link groups side by side, the three destinations, and the wordmark set huge as a sign-off.
  * Every item is a real link; nothing points at "#".
  */
 export function MarketingFooter() {
@@ -74,8 +88,10 @@ export function MarketingFooter() {
   return (
     <footer className="px-3 pb-3 pt-6 sm:px-6 sm:pb-6">
       <Reveal fx="footer" y={48} className="footer-card relative mx-auto max-w-[1240px] overflow-clip rounded-[32px] sm:rounded-[40px]">
-        <div className="relative grid gap-10 px-6 pb-8 pt-10 sm:px-10 sm:pt-14 md:grid-cols-[1.5fr_1fr_1fr] md:gap-8">
-          <div>
+        {/* Tablets: the pitch across the top, the four groups in a row under it. From 1024px the pitch takes the first,
+            wider column (room for its button) and the groups share the rest evenly. */}
+        <div className="relative grid gap-10 px-6 pb-8 pt-10 sm:px-10 sm:pt-14 md:grid-cols-4 md:gap-6 lg:grid-cols-[2.4fr_repeat(4,minmax(0,1fr))]">
+          <div className="md:col-span-4 lg:col-span-1">
             <OutlyLogo size={28} className="text-[20px]" />
             <p className="ft-body mt-4 max-w-sm text-base leading-relaxed text-foreground/75">
               Upload once. Publish to Reels, Shorts and X. See exactly what happened to each one.
@@ -107,7 +123,7 @@ export function MarketingFooter() {
             <StoreBadges className="mt-6" />
           </div>
 
-          <div className="grid grid-cols-2 gap-8 md:contents">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-10 md:contents">
             {COLUMNS.map((col) => (
               <nav key={col.title} aria-label={col.title}>
                 <h2 className="ft-head mb-4 font-sans text-xs font-semibold text-foreground/70">{col.title}</h2>
@@ -119,7 +135,7 @@ export function MarketingFooter() {
                       </AnimatedLink>
                     </li>
                   ))}
-                  {col.title === "Company" && (
+                  {col.title === "Legal" && (
                     <li>
                       <CookieSettingsButton animated className="footer-link group/al inline-flex min-h-11 items-center text-[15px] font-medium text-foreground/80 hover:text-foreground" />
                     </li>

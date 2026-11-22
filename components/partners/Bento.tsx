@@ -27,7 +27,7 @@ function Tile({
     <Reveal as="li" delay={delay} className={cx(s.cell, cell)}>
       <article className={cx(s.tile, tone)} data-tile data-tilt>
         <div className={cx(s.copy, copyAt === "top" ? s.copyTop : s.copyBottom)}>
-          <h3 className={cx("play", s.title)}>{title}</h3>
+          <h3 className={cx("display", s.title)}>{title}</h3>
           <p className={s.body}>{body}</p>
         </div>
         {children}
@@ -76,7 +76,7 @@ function PlanMock() {
       <div className={cx(s.card, s.planBack)} data-p="planBack" />
       <div className={cx(s.card, s.plan, s.float)} data-p="plan">
         <span className={s.planLabel}>Creator plan</span>
-        <span className={cx("play", s.planBig)} data-p="planBig">
+        <span className={cx("display", s.planBig)} data-p="planBig">
           2 months
         </span>
         <span className={s.planSub}>on us</span>
@@ -200,8 +200,8 @@ export function PartnersBento() {
       <Shell>
         <Reveal y={0} className="max-w-2xl">
           <p className="eyebrow mb-5">What partnering looks like</p>
-          <h2 id="partners-what" className="play text-balance text-[clamp(2rem,2.4vw+1rem,3rem)]">
-            Six things you get, <span className="play-i">in plain words.</span>
+          <h2 id="partners-what" className="display text-balance text-[clamp(2rem,2.4vw+1rem,3rem)]">
+            Six things you get, <span className="accent-serif">in plain words.</span>
           </h2>
           <p className="mt-4 text-pretty text-base leading-relaxed text-muted-foreground">
             Every partnership comes with the same six things, written out before you post a single frame.

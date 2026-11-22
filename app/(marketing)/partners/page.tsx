@@ -5,6 +5,7 @@ import { PartnersBento } from "@/components/partners/Bento";
 import { PartnersHero } from "@/components/partners/Hero";
 import { PartnerSteps, PartnersContactBand, WhatWeLookFor, WhoCanPartner } from "@/components/partners/Sections";
 import { Shell } from "@/components/marketing/bits";
+import classic from "@/components/partners/classic.module.css";
 import { getCurrentUser, realUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isProven } from "@/lib/founding";
@@ -37,9 +38,10 @@ async function applicant(): Promise<ApplyMe> {
 export default async function PartnersPage() {
   const me = await applicant();
   return (
-    <>
+    <div className={classic.classic}>
       <PartnersHero />
-      {/* R1287: the sections below the hero are flat colour tiles with the "play" serif (components/partners/Bento.tsx, Sections.tsx). */}
+      {/* R1287: the sections below the hero are flat colour tiles; R1303 sets the whole page in the "Outlly classic" pair
+          (components/partners/classic.module.css) with `display` headlines, Apple-HIG clear: one type family per role. */}
       <PartnersBento />
       <WhoCanPartner />
       <WhatWeLookFor />
@@ -47,7 +49,7 @@ export default async function PartnersPage() {
       <section id="apply" className="scroll-mt-24 py-16 sm:py-20" aria-labelledby="partners-apply">
         <Shell>
           <p className="eyebrow mb-5">Apply</p>
-          <h2 id="partners-apply" className="play text-[clamp(2rem,2.4vw+1rem,3rem)]">
+          <h2 id="partners-apply" className="display text-[clamp(2rem,2.4vw+1rem,3rem)]">
             {"Let's get you rewarded."}
           </h2>
           <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-muted-foreground sm:text-[17px]">
@@ -67,6 +69,6 @@ export default async function PartnersPage() {
         </Shell>
       </section>
       <PartnersContactBand />
-    </>
+    </div>
   );
 }

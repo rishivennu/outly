@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { PartnersMotion } from "./Motion";
 import s from "./sections.module.css";
 
-const SECTION_TITLE = "play text-balance text-[clamp(2rem,2.4vw+1rem,3rem)]";
+const SECTION_TITLE = "display text-balance text-[clamp(2rem,2.4vw+1rem,3rem)]";
 const NOTE = "mt-6 max-w-2xl text-pretty text-[14px] leading-relaxed text-muted-foreground";
 
 /** R1302: the four brand tones (sections.module.css), each a soft gradient of one hue. */
@@ -19,7 +19,7 @@ const TIERS: {
   range: string;
   body: string;
   tone: Tone;
-  /** R1295: the tier's Open Peep (components/ui/art/peeps), one per tier, standing behind the creator card. */
+  /** R1295: the tier's Open Peep (components/ui/art/peeps), one per tier; R1303 stands it to the left of the creator card. */
   peep: PeepName;
   card: { initials: string; handle: string; followers: string; bars: [number, number, number]; tilt: string };
 }[] = [
@@ -119,7 +119,7 @@ export function WhoCanPartner() {
                 data-tile
                 data-tilt
               >
-                <h3 className={cn("play", s.title)}>{PARTNER_TIER_LABEL[t.tier]}</h3>
+                <h3 className={cn("display", s.title)}>{PARTNER_TIER_LABEL[t.tier]}</h3>
                 <p className={s.range}>{t.range}</p>
                 <p className={s.body}>{t.body}</p>
                 <CreatorCard card={t.card} peep={t.peep} />
@@ -172,10 +172,10 @@ export function PartnerSteps() {
           {STEPS.map((st, i) => (
             <Reveal as="li" key={st.n} delay={i * 0.06} className="min-w-0">
               <div className={cn(s.tile, s.stepTile, s[st.tone])}>
-                <span className={cn("play", s.numeral)} aria-hidden="true">
+                <span className={cn("display", s.numeral)} aria-hidden="true">
                   {st.n}
                 </span>
-                <h3 className={cn("play", s.title)}>
+                <h3 className={cn("display", s.title)}>
                   <span className="sr-only">Step {Number(st.n)}: </span>
                   {st.title}
                 </h3>
@@ -195,7 +195,7 @@ export function PartnersContactBand() {
       <Shell>
         <Reveal>
           <div className={cn(s.tile, s.deep, s.band)}>
-            <h2 id="partners-contact" className={cn("play", s.bandTitle)}>
+            <h2 id="partners-contact" className={cn("display", s.bandTitle)}>
               Questions first?
             </h2>
             <div className="flex flex-wrap items-center gap-3">

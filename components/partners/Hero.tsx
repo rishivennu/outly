@@ -57,8 +57,8 @@ function pose(stage: HTMLElement, hand: HTMLElement, a: (typeof ANCHOR)[keyof ty
  * R1282 /partners hero, R1302 handshake. The section is taller than the screen and its stage is CSS-sticky (no pin
  * spacer under Lenis, which already drives the window scroll that ScrollTrigger reads). One scrubbed timeline over
  * the section's own scroll: the hands travel in from the edges and meet palm to palm below the copy (CONTACT), the
- * stone shrinks and fades as they close on it, the halo drifts at its own rate (depth parallax), the copy fades
- * early so the clasp becomes the picture. Around CONTACT the open hands cross-fade into the clasped handshake artwork
+ * stone shrinks and fades as they close on it, the halo drifts at its own rate (depth parallax), the copy lifts and
+ * fades right out before the hands meet (R1303: nothing is ever read through the artwork), so the clasp becomes the picture. Around CONTACT the open hands cross-fade into the clasped handshake artwork
  * (public/partners/handshake.svg) and a short time-based beat plays once: a lime burst between the palms and the
  * clasp pumping down and up, damped, like a real shake. Fine pointers also get a light pointer
  * parallax. Reduced motion gets the clasped end state, no tween, no pointer tracking.
@@ -92,8 +92,8 @@ export function PartnersHero() {
         });
         // The approach: both hands ease in and settle into the clasp by CONTACT, each turning upright as it arrives,
         // then cross-fade into the clasped handshake (SWAP) as the burst below covers the join. The stone (far plane)
-        // is overtaken and fades; the halo rises at its own rate; after contact the clasp drifts up a touch while the
-        // copy, already fading, gives it the frame.
+        // is overtaken and fades; the halo rises at its own rate; after contact the clasp drifts up a touch. The copy is
+        // gone by 0.5, before SWAP: the headline, sub-line and CTAs are read in full or not at all, never under the artwork.
         tl.fromTo(left, START.left, { xPercent: () => endL().xPercent, yPercent: () => endL().yPercent, rotation: 0, scale: CLASP.scale, duration: CONTACT, ease: "power2.inOut" }, 0)
           .fromTo(right, START.right, { xPercent: () => endR().xPercent, yPercent: () => endR().yPercent, rotation: 0, scale: CLASP.scale, duration: CONTACT, ease: "power2.inOut" }, 0)
           .fromTo(left, { opacity: 1 }, { opacity: 0, duration: SWAP.duration }, SWAP.at)
@@ -102,7 +102,7 @@ export function PartnersHero() {
           .fromTo(orb, { yPercent: 0, scale: 1, rotation: 0, opacity: 1 }, { yPercent: -10, scale: 0.5, rotation: 26, opacity: 0, duration: CONTACT - 0.08, ease: "power1.in" }, 0.08)
           .fromTo(halo, { yPercent: 0, scale: 1 }, { yPercent: -18, scale: 1.25 }, 0)
           .fromTo(clasp, { yPercent: 0 }, { yPercent: -5, duration: 1 - CONTACT }, CONTACT)
-          .fromTo(copy, { opacity: 1, y: 0 }, { opacity: 0.12, y: -36, duration: 0.4 }, 0.3);
+          .fromTo(copy, { opacity: 1, y: 0 }, { opacity: 0, y: -48, duration: 0.3 }, 0.2);
 
         // The handshake, time-based so it always completes: a lime burst blooms where the palms meet while the
         // whole clasp pumps down and up about that point, each swing smaller than the last. Fired once the scroll

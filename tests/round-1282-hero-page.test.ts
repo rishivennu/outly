@@ -81,7 +81,7 @@ describe("R1282 hero motion contract", () => {
     expect(hero).toContain('rotation: 0, scale: CLASP.scale, duration: CONTACT, ease: "power2.inOut" }, 0)');
     expect(hero).toContain(".fromTo(shake, { opacity: 0, scale: 0.94 }, { opacity: 1, scale: 1, duration: SWAP.duration }, SWAP.at)");
     expect(hero).toContain('{ yPercent: -10, scale: 0.5, rotation: 26, opacity: 0, duration: CONTACT - 0.08, ease: "power1.in" }, 0.08)');
-    expect(hero).toContain("{ opacity: 0.12, y: -36, duration: 0.4 }, 0.3");
+    expect(hero).toContain("{ opacity: 0, y: -48, duration: 0.3 }, 0.2"); // R1303: fully out before SWAP
   });
   test("refresh after fonts settle, no pin (CSS sticky stage instead)", () => {
     expect(hero).toContain("document.fonts?.ready.then(");
@@ -209,8 +209,8 @@ describe("R1282 nav, footer and sitemap", () => {
     expect(item).not.toContain("data-sec");
     expect(row.indexOf("href={PARTNERS.href}")).toBeGreaterThan(row.indexOf("links.map"));
   });
-  test("footer Company column lists it after Contact", () => {
-    expect(footer).toContain('{ href: "/contact", label: "Contact" },\n      { href: "/partners", label: "Partner With Us" },');
+  test("footer Company group leads with it (R1303 regrouped the footer into four short columns)", () => {
+    expect(footer).toContain('title: "Company",\n    links: [\n      { href: "/partners", label: "Partner With Us" },');
   });
   test("sitemap has /partners monthly at 0.7", () => {
     expect(sitemap).toContain('{ url: `${BASE}/partners`, lastModified: now, changeFrequency: "monthly", priority: 0.7 }');

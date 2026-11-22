@@ -1,0 +1,27 @@
+/* R1303: the /partners page is set in the "Outlly classic" pair (lib/fonts.ts): Bricolage Grotesque headlines, a touch
+   condensed, DM Sans body, Instrument Serif italic for the one accent word. The three role variables the site's
+   .display / .accent-serif / h1-h4 rules read are re-pointed here, so the page follows the classic set whatever
+   Admin > Site fonts has picked for the rest of the site; the faces themselves are mounted by app/layout.tsx. */
+.classic {
+  --font-display: var(--font-bricolage), var(--font-dmsans), system-ui, sans-serif;
+  --font-body: var(--font-dmsans), system-ui, sans-serif;
+  --font-serif: var(--font-instrument), Georgia, serif;
+  font-family: var(--font-body);
+}
+.classic :global(.display) {
+  font-weight: 650;
+  font-variation-settings: "wdth" 96, "opsz" 72;
+  letter-spacing: -0.028em;
+  line-height: 1.02;
+}
+.classic :global(h1),
+.classic :global(h2),
+.classic :global(h3),
+.classic :global(h4) {
+  font-variation-settings: "wdth" 96;
+  letter-spacing: -0.02em;
+}
+.classic :global(.accent-serif) {
+  font-weight: 400;
+  letter-spacing: -0.012em;
+}

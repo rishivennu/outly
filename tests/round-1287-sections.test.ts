@@ -60,12 +60,13 @@ describe("R1287 tile style", () => {
     expect(hexes.length).toBeGreaterThan(10);
     for (const h of hexes) expect(PALETTE).toContain(h);
   });
-  test("section titles and tile titles use the play serif", () => {
-    expect(src).toContain('const SECTION_TITLE = "play ');
+  test("section titles and tile titles use the display face (R1303: the classic Bricolage set, not the play serif)", () => {
+    expect(src).toContain('const SECTION_TITLE = "display ');
+    expect(src).not.toContain('"play');
     expect(src.match(/className=\{SECTION_TITLE\}/g)?.length).toBe(1);
     expect(src.match(/<Head\b/g)?.length).toBe(3);
-    expect(flat).toMatch(/<h2 id="partners-contact" className=\{cn\("play"/);
-    expect(src.match(/<h3 className=\{cn\("play", s\.title\)\}>/g)?.length).toBe(2);
+    expect(flat).toMatch(/<h2 id="partners-contact" className=\{cn\("display"/);
+    expect(src.match(/<h3 className=\{cn\("display", s\.title\)\}>/g)?.length).toBe(2);
     expect(src).toContain('<p className="eyebrow mb-5">');
   });
   test("tiles: radius 24 phone / 28 desktop, overflow hidden, one soft brand gradient and a hairline, no border or blur", () => {

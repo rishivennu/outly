@@ -78,14 +78,15 @@ describe("R1295 Peep component", () => {
 });
 
 describe("R1295 placements", () => {
-  test("partners tiers: one figure per tier, all different, standing in the stage before the card, ink in the tile tone", () => {
+  test("partners tiers: one figure per tier, all different, standing at the stage's left before the card (R1303), ink in the tile tone", () => {
     const s = read("components/partners/Sections.tsx");
     const peeps = [...s.matchAll(/^\s+peep: "([a-z]+)",$/gm)].map((m) => m[1]);
     expect(peeps).toEqual(["creator", "growing", "established"]);
     expect(s).toContain('<Peep name={peep} height={176} fill="color-mix(in srgb, #ffffff 82%, var(--t-bg))" className={s.peep} />');
     expect(s.indexOf("className={s.peep}")).toBeLessThan(s.indexOf("<div className={s.creator}"));
     const css = read("components/partners/sections.module.css");
-    expect(css).toMatch(/\.peep \{[^}]*position: absolute;[^}]*translate: 50% 0;[^}]*color: var\(--t-ink\);/s);
+    expect(css).toMatch(/\.peep \{[^}]*position: absolute;[^}]*left: 3\.25rem;[^}]*bottom: 0;[^}]*translate: -50% 0;[^}]*color: var\(--t-ink\);/s);
+    expect(css).not.toMatch(/\.peep \{[^}]*right:/s);
     expect(css).toMatch(/\.creator \{[^}]*, 0 0 0 1px color-mix\(in srgb, var\(--t-ink\) 14%, #ffffff\);/s);
   });
   test("client components take the figure as a prop; the pages render it (server-only stays out of client bundles)", () => {

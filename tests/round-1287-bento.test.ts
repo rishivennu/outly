@@ -1,4 +1,4 @@
-// R1287 /partners bento: copy, tile clipping, palette, play serif, decorative mockups, guarded idle float.
+// R1287 /partners bento: copy, tile clipping, palette, display face (R1303), decorative mockups, guarded idle float.
 // R1302: brand-only gradient tones (mint, moss, lime, deep, night) and the mockup entrances in Motion.tsx.
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
@@ -67,9 +67,11 @@ describe("R1287 bento structure", () => {
     expect(css).toContain(".a .tile { min-height: 620px; }");
     expect(css).toContain("gap: 16px;");
   });
-  test("play serif on h2 and every h3", () => {
-    expect(tsx).toMatch(/<h2 id="partners-what" className="play /);
-    expect(tsx).toContain('<h3 className={cx("play", s.title)}>');
+  test("display face on h2 and every h3, the serif only on the accent word (R1303)", () => {
+    expect(tsx).toMatch(/<h2 id="partners-what" className="display /);
+    expect(tsx).toContain('<h3 className={cx("display", s.title)}>');
+    expect(tsx).toContain('<span className="accent-serif">in plain words.</span>');
+    expect(tsx).not.toContain('"play');
   });
   test("each of the six mockup roots is aria-hidden", () => {
     const roots = tsx.match(/<div aria-hidden="true" className=\{cx\(s\.mock, s\.mock[A-F]\)\} data-anim="\w+">/g) ?? [];

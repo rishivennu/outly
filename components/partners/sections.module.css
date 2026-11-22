@@ -49,7 +49,7 @@
   .body { font-size: 16px; }
 }
 
-/* Tier tiles: the creator card sits in a stage that bleeds to the tile's right and bottom edge. */
+/* Tier tiles: a stage that bleeds to the tile's right and bottom edge; the figure stands at its left, the card at its right. */
 .tierTile { min-height: 25rem; }
 .stage {
   position: relative;
@@ -60,21 +60,27 @@
   .stage { flex-basis: 13.5rem; margin: 1.5rem -2rem -2rem 0; }
 }
 
-/* R1295: the tier's creator stands behind the card, head and shoulders above it, a little left of the card's centre
-   (`right` is measured to the figure's centre through the 50% translate). The card hides the bust's bottom; the paper is
-   a shade off the card's white and the card carries a hairline, so its top edge stays legible across the shirt. */
+/* R1295 the tier's creator; R1303 moved to the left of the card. The figure stands on the tile's left text edge with the
+   bust cut by the tile's bottom (the stage bleeds to it), the card to its right: two clear shapes, nothing hidden behind
+   anything (Apple HIG clarity). `left` is measured to the figure's centre through the -50% translate, so each bust,
+   whatever its width, lines up on the same axis; the paper is a shade off the card's white. */
 .peep {
   position: absolute;
-  right: 6.75rem;
-  bottom: 2.25rem;
+  left: 3.25rem;
+  bottom: 0;
   height: 10rem;
   width: auto;
-  translate: 50% 0;
+  translate: -50% 0;
   color: var(--t-ink);
 }
 .deep .peep { color: var(--t-card); }
 @media (min-width: 640px) {
-  .peep { right: 8.25rem; bottom: 2.5rem; height: 11rem; }
+  .peep { left: 3.75rem; height: 11rem; }
+}
+/* 768-1023: three tiles across a tablet leave each stage about 12rem wide, so the card steps down and the figure with it. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .peep { left: 3rem; height: 9rem; }
+  .creator { scale: 0.8; }
 }
 
 .creator {
