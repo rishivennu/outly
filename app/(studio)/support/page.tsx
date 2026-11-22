@@ -2,7 +2,7 @@ import { listFaq, FAQ_CATEGORIES } from "@/lib/support/faq";
 import { getCurrentUser, realUserId } from "@/lib/auth";
 import { listConversations } from "@/lib/support/conversations";
 import { PipConversations } from "@/components/support/PipConversations";
-import { db } from "@/lib/db";
+import { myTickets } from "@/lib/support/tickets";
 import { HelpCenter } from "@/components/support/HelpCenter";
 import { MyRequests } from "@/components/support/MyRequests";
 import { onboardingFor } from "@/lib/onboarding";
@@ -17,20 +17,8 @@ export default async function StudioHelp(props: { searchParams: Promise<{ topic?
   const email = user.actor?.email ?? user.email;
   const [faq, tickets, chats, onboarding] = await Promise.all([
     listFaq(),
-    db.ticket.findMany({
-      // Only this person's own requests: a teammate inside someone else's workspace sees theirs, not the owner's.
-      where: user.actor ? { email } : { OR: [{ userId: user.id }, { email }] },
-      orderBy: { updatedAt: "desc" },
-      take: 5,
-      select: {
-        id: true,
-        ref: true,
-        subject: true,
-        status: true,
-        updatedAt: true,
-        messages: { where: { author: "admin" }, orderBy: { createdAt: "desc" }, take: 1, select: { body: true, authorName: true, createdAt: true } },
-      },
-    }),
+    // Only this person's own requests: a teammate inside someone else's workspace sees theirs, not the owner's.
+    myTickets(user),
     // 1151: this person's own saved Pip chats (the real signed-in person, never the workspace owner's).
     listConversations(realUserId(user)).catch(() => []),
     // Phase 2: the guided setup, to revisit any step from here.
@@ -50,13 +38,7 @@ export default async function StudioHelp(props: { searchParams: Promise<{ topic?
       extra={
         <>
         <MyRequests
-          tickets={tickets.map((t) => ({
-            ref: t.ref,
-            subject: t.subject,
-            status: t.status,
-            updatedAt: t.updatedAt.toISOString(),
-            reply: t.messages[0] ? { body: t.messages[0].body, by: t.messages[0].authorName ?? "Outlly support" } : null,
-          }))}
+          tickets={tickets}
           onboarding={onboarding}
         />
         <PipConversations items={chats} />

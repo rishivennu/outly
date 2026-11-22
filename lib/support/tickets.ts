@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { db } from "../db";
+import type { SessionUser } from "../auth";
 import { invalidate } from "../cache";
 import { env } from "../env";
 import { sendEmail, templates } from "../email";
@@ -58,4 +59,31 @@ export async function raiseTicket(o: { email: string; name?: string | null; user
   });
   await adminEvent(priority === "urgent" ? "ticket_urgent" : "ticket_new", `${priority === "urgent" ? "Urgent" : "New"} ticket ${ticket.ref}`, subject, `/admin/tickets/${ticket.id}`);
   return { ticket, duplicate: false, emailed: mail.ok };
+}
+
+export type MyTicket = { ref: string; subject: string; status: string; updatedAt: string; reply: { body: string; by: string } | null };
+
+/** The five most recent requests this person has open with us: a teammate sees theirs, never the owner's. */
+export async function myTickets(user: SessionUser): Promise<MyTicket[]> {
+  const email = user.actor?.email ?? user.email;
+  const rows = await db.ticket.findMany({
+    where: user.actor ? { email } : { OR: [{ userId: user.id }, { email }] },
+    orderBy: { updatedAt: "desc" },
+    take: 5,
+    select: {
+      id: true,
+      ref: true,
+      subject: true,
+      status: true,
+      updatedAt: true,
+      messages: { where: { author: "admin" }, orderBy: { createdAt: "desc" }, take: 1, select: { body: true, authorName: true, createdAt: true } },
+    },
+  });
+  return rows.map((t) => ({
+    ref: t.ref,
+    subject: t.subject,
+    status: t.status,
+    updatedAt: t.updatedAt.toISOString(),
+    reply: t.messages[0] ? { body: t.messages[0].body, by: t.messages[0].authorName ?? "Outlly support" } : null,
+  }));
 }
