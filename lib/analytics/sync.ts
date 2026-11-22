@@ -167,6 +167,11 @@ export async function syncMetrics(opts: { budgetMs?: number; now?: Date; account
         // R1219: the platform says it has no such post. Recorded as "needs verification" first; only a second
         // miss, CONFIRM_MS later, marks it deleted there. Never from this one answer.
         if (ins.code === "GONE") await applyVerify(t, "missing", now).catch(() => {});
+        // R1297: a refusal for this one post (MEDIA_REJECTED: a story or a media type with no insights, FORBIDDEN,
+        // UNKNOWN) used to leave it "never checked", so every run asked it again (two Graph calls each, for weeks).
+        // Recorded like a Sync now does (lastSyncError, metricsCheckedAt): it waits its normal cadence like a post
+        // that answered (30 min hot, 6 h after). A blip (NETWORK, PLATFORM_DOWN) is worth asking again next run.
+        else if (ins.code !== "NETWORK" && ins.code !== "PLATFORM_DOWN") await applyVerify(t, { error: ins.code ?? "FETCH_FAILED" }, now).catch(() => {});
         r.failed++;
         bad++;
         continue;

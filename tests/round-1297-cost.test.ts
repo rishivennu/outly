@@ -203,3 +203,82 @@ describe("client heartbeats only while someone is there", () => {
     expect(s).toContain(".catch(() => load(true));");
   });
 });
+
+describe("R1297: a post the platform refuses insights for is not asked again every run", () => {
+  let db: typeof import("../lib/db").db;
+  let sync: typeof import("../lib/analytics/sync");
+  let keys: typeof import("../lib/social/keys");
+  let enc: (s: string) => string;
+  const realFetch = globalThis.fetch;
+  async function fixture(platform = "instagram") {
+    const u = await db.user.create({ data: { name: "R1297", email: `r1297-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x" } });
+    const media = await db.media.create({ data: { userId: u.id, storageKey: `sample/r1297-${Date.now()}.mp4`, originalFilename: "a.mp4", mimeType: "video/mp4", size: 10, status: "ready" } });
+    const acct = await db.socialAccount.create({ data: { userId: u.id, platform, platformUserId: `real-${platform}-${Date.now()}-${Math.random()}`, username: "me", accessToken: enc("tok-secret"), status: "connected" } });
+    const p = await db.post.create({ data: { userId: u.id, mediaId: media.id, status: "published", title: "Clip" } });
+    const t = await db.postTarget.create({ data: { postId: p.id, platform, socialAccountId: acct.id, platformStatus: "published", platformPostId: `pp-r1297-${Date.now()}`, platformUrl: "https://example.com/p/1", practice: false, publishedAt: new Date(Date.now() - 864e5) } });
+    return { acct, t };
+  }
+  const stub = (status: number, body: unknown) => {
+    const urls: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      urls.push(String(input instanceof Request ? input.url : input));
+      return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    return urls;
+  };
+  test("MEDIA_REJECTED: the check is stamped, the next run asks nothing, the account is not cooled", async () => {
+    ({ db } = await import("../lib/db"));
+    sync = await import("../lib/analytics/sync");
+    keys = await import("../lib/social/keys");
+    enc = (await import("../lib/crypto")).encrypt;
+    keys.__setKeys({ instagram: { clientId: "c", clientSecret: "s" } } as never);
+    try {
+      const { acct, t } = await fixture();
+      // Graph answers 400 with a plain error (no throttle code, not transient): the reader maps that to MEDIA_REJECTED.
+      const urls = stub(400, { error: { message: "Unsupported get request.", type: "GraphMethodException", code: 100, fbtrace_id: "x" } });
+      const first = await sync.syncMetrics({ accountIds: [acct.id] });
+      expect(first.targets).toBe(1);
+      expect(first.failed).toBe(1);
+      // The post itself: the Reel metric set, then the plain one, both refused. (Other URLs, if any, are the account's
+      // once-a-day totals snapshot, which is not what this pins.)
+      const asked = () => urls.filter((u) => u.includes(`/${t.platformPostId}/insights?`)).length;
+      expect(asked()).toBe(2);
+      const row = await db.postTarget.findUnique({ where: { id: t.id } });
+      expect(row?.metricsCheckedAt).toBeTruthy();
+      expect(Date.now() - row!.metricsCheckedAt!.getTime()).toBeLessThan(10_000);
+      const state = await db.accountSyncState.findUnique({ where: { accountId: acct.id } });
+      expect(state?.cooldownUntil ?? null).toBeNull();
+      const again = await sync.syncMetrics({ accountIds: [acct.id] });
+      expect(again.targets).toBe(0);
+      expect(asked()).toBe(2);
+      expect(row?.lastSyncError).toBe("MEDIA_REJECTED");
+      // Asked again once its normal cadence passes (force = the 30 minute hot cadence).
+      await db.postTarget.update({ where: { id: t.id }, data: { metricsCheckedAt: new Date(Date.now() - 31 * 60_000) } });
+      const later = await sync.syncMetrics({ accountIds: [acct.id] });
+      expect(later.targets).toBe(1);
+    } finally {
+      globalThis.fetch = realFetch;
+      keys.__setKeys(undefined);
+    }
+  });
+  test("a platform blip (5xx) is not stamped: the post is asked again next run", async () => {
+    keys.__setKeys({ instagram: { clientId: "c", clientSecret: "s" } } as never);
+    try {
+      const { acct, t } = await fixture();
+      stub(503, { error: { message: "Service temporarily unavailable" } });
+      await sync.syncMetrics({ accountIds: [acct.id] });
+      const row = await db.postTarget.findUnique({ where: { id: t.id } });
+      expect(row?.metricsCheckedAt ?? null).toBeNull();
+    } finally {
+      globalThis.fetch = realFetch;
+      keys.__setKeys(undefined);
+    }
+  });
+  test("the sync loop records the refusal through applyVerify (the one place that stamps a check), after GONE", () => {
+    const s = src("lib/analytics/sync.ts");
+    expect(s).toContain('else if (ins.code !== "NETWORK" && ins.code !== "PLATFORM_DOWN") await applyVerify(t, { error: ins.code ?? "FETCH_FAILED" }, now).catch(() => {});');
+    expect(s.indexOf('applyVerify(t, { error: ins.code ?? "FETCH_FAILED" }, now)')).toBeGreaterThan(s.indexOf('if (ins.code === "GONE") await applyVerify(t, "missing", now)'));
+    // R1219's rule still holds: sync.ts never writes metricsCheckedAt itself.
+    expect(s).not.toContain("metricsCheckedAt: now");
+  });
+});
