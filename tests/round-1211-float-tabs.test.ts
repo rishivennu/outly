@@ -75,8 +75,8 @@ describe("R1211 floating pill", () => {
     expect(r).toContain("border: 1px solid hsl(var(--mtab-line));");
     // R1213: liquid glass in place of the solid pill of 11-19 (tests/round-1213-liquid-tabs.test.ts has the recipe)
     expect(r).toContain("var(--mtab-shadow);");
-    expect(r).toContain("background: linear-gradient(180deg, hsl(var(--mtab-bg) / .72), hsl(var(--mtab-bg) / .62));");
-    expect(r).toContain("backdrop-filter: blur(22px) saturate(1.65);");
+    expect(r).toContain("background: linear-gradient(180deg, hsl(var(--mtab-bg) / var(--mtab-fill-a)), hsl(var(--mtab-bg) / var(--mtab-fill-b)));");
+    expect(r).toContain("backdrop-filter: blur(20px) saturate(1.65);"); // R1305: 20px, as on Android
     expect(css).toMatch(/html\.dark \.mtab \{\r?\n  --mtab-bg: 240 5% 11%; --mtab-line: 0 0% 100% \/ \.1;/);
   });
   test("compact: 92% about the bottom centre, 56px, 300ms on the liquid curve, no layout move", () => {

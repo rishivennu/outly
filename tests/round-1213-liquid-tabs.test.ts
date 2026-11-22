@@ -60,13 +60,13 @@ describe("R1213 slide maths (lib/client/tab-bar.ts)", () => {
 });
 
 describe("R1213 glass pill (globals.css)", () => {
-  test("blur, saturation lift, a 62 to 72% tint, inner highlights, a masked gradient rim and a sheen", () => {
+  test("blur, saturation lift, a thin tint (R1305: 22 to 30%), inner highlights, a lens edge, a masked gradient rim and a sheen", () => {
     const r = rule(".mtab");
-    expect(r).toContain("backdrop-filter: blur(22px) saturate(1.65);");
-    expect(r).toContain("-webkit-backdrop-filter: blur(22px) saturate(1.65);");
-    expect(r).toContain("background: linear-gradient(180deg, hsl(var(--mtab-bg) / .72), hsl(var(--mtab-bg) / .62));");
+    expect(r).toContain("backdrop-filter: blur(20px) saturate(1.65);");
+    expect(r).toContain("-webkit-backdrop-filter: blur(20px) saturate(1.65);");
+    expect(r).toContain("background: linear-gradient(180deg, hsl(var(--mtab-bg) / var(--mtab-fill-a)), hsl(var(--mtab-bg) / var(--mtab-fill-b)));");
     expect(r).toContain("isolation: isolate;");
-    expect(r).toContain("box-shadow: inset 0 1px 0 hsl(0 0% 100% / .55), inset 0 -1px 0 hsl(0 0% 100% / .16), var(--mtab-shadow);");
+    expect(r).toContain("box-shadow: inset 0 1px 0 hsl(0 0% 100% / var(--mtab-lip-t)), inset 0 -1px 0 hsl(0 0% 100% / var(--mtab-lip-b)), var(--mtab-lens), var(--mtab-shadow);");
     expect(r).toContain("touch-action: pan-y;");
     expect(rule(".mtab::before")).toContain("background: var(--mtab-rim);");
     expect(rule(".mtab::before")).toContain("mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);");

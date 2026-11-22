@@ -11,7 +11,7 @@ describe("1115 app fill", () => {
     expect(nav).toContain('className="mtab web-only fixed inset-x-0 z-40 flex items-stretch lg:hidden"');
     const rule = css.slice(css.indexOf(".mtab {"), css.indexOf("}", css.indexOf(".mtab {")));
     expect(rule).toContain("border: 1px solid hsl(var(--mtab-line));");
-    expect(rule).toContain("background: linear-gradient(180deg, hsl(var(--mtab-bg) / .72), hsl(var(--mtab-bg) / .62));");
+    expect(rule).toContain("background: linear-gradient(180deg, hsl(var(--mtab-bg) / var(--mtab-fill-a)), hsl(var(--mtab-bg) / var(--mtab-fill-b)));"); // R1305 fill variables
     expect(rule).not.toContain("left:");
     expect(css).not.toContain("transform: translateY(calc(100% + 4px)); opacity: 0;");
   });

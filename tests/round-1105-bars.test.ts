@@ -168,10 +168,11 @@ describe("1105 tab bar", () => {
 });
 
 describe("1105 review fixes", () => {
-  test("tab bar tint (R1213 glass): 62 to 72% of the surface so the 72% ink holds 4.5:1 over the page and 3:1 over anything behind", () => {
+  test("tab bar tint (R1213 glass, R1305 recipe): a thin tint of the surface colour over a 20px blur, the fill per theme in --mtab-fill-a/b", () => {
     expect(css).toMatch(/html\.dark \.mtab \{\r?\n  --mtab-bg: 240 5% 11%; --mtab-line: 0 0% 100% \/ \.1;/);
     expect(rule(".mtab")).toContain("--mtab-bg: 0 0% 100%;");
-    expect(rule(".mtab")).toContain("hsl(var(--mtab-bg) / .72)");
+    expect(rule(".mtab")).toContain("hsl(var(--mtab-bg) / var(--mtab-fill-a))");
+    expect(rule(".mtab")).toContain("--mtab-fill-a: .30; --mtab-fill-b: .22;"); // R1305: the Android AppTabBar fill
     expect(css).toContain(".mtab-item { color: hsl(var(--foreground) / var(--nav-idle));"); // R1292: shared idle grey
   });
   test("only the latest theme switch clears the transition flag", () => {

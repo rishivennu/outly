@@ -3482,11 +3482,14 @@ html[data-contrast="more"] .mtop[data-lifted] { box-shadow: 0 1px 0 hsl(var(--bo
    docked bar of 1115. 60px tall, 12px off the bottom edge plus the safe area (so it clears the home indicator and
    Android's gesture strip), 12px in from the sides (or the notch, on a phone on its side) and never wider than 440px;
    fully rounded, icons only, each tab named for screen readers by hidden text.
-   R1213: liquid glass. The page shows through a 22px blur with a lift in saturation, under a light tint (62 to 72%
-   of the surface colour, so the muted icons hold the 3:1 asked of graphics over whatever scrolls behind, and 4.5:1
-   over the page itself); a gradient rim (::before, a
-   hairline masked to the edge, brightest top-left where light would catch the curve), a specular sheen across the
-   top half (::after) and a soft drop shadow give it depth. One lime pill (.mtab-ind) marks the tab you are on and
+   R1213: liquid glass. R1305 mirrors the Android AppTabBar recipe (Liquid Glass, 11-22): the page shows through a
+   20px blur with a lift in saturation (1.65), under a thin tint (22 to 30% of the surface colour, 38 to 48% in the
+   dark theme; the blur averages whatever scrolls behind into a near-flat field, which is what keeps the muted icons
+   readable at this little fill); a brighter top lip and a softer bottom one (the inset shadows); a lens edge, three
+   1px rings of ink fading inwards from the border (the shade a thick slab gathers at its edge); a gradient rim
+   (::before, a hairline masked to the edge, brightest top-left where light would catch the curve); a specular arc
+   (an ellipse of light at 30% x on the top edge, the ambient source) over a sheen across the top half (::after)
+   and a soft drop shadow give it depth. One lime pill (.mtab-ind) marks the tab you are on and
    glides between tabs on --i (Nav.tsx sets it; fractional while a finger drags it, see useSlideTabs); a liquid
    highlight (.mtab-ripple) rides under the finger at --fx and blooms once where it lets go (data-drop).
    Reading on down a long page compacts the bar (Nav.tsx useCompactOnScroll sets data-compact): the bar drops to 56px
@@ -3498,8 +3501,10 @@ html[data-contrast="more"] .mtop[data-lifted] { box-shadow: 0 1px 0 hsl(var(--bo
 .mtab {
   --mtab-bg: 0 0% 100%; --mtab-line: 222 20% 18% / .1; --mtab-px: 6px;
   --mtab-rim: linear-gradient(120deg, hsl(0 0% 100% / .95), hsl(0 0% 100% / .35) 32%, hsl(0 0% 100% / .12) 58%, hsl(0 0% 100% / .4) 88%, hsl(0 0% 100% / .8));
-  --mtab-sheen: linear-gradient(180deg, hsl(0 0% 100% / .5), hsl(0 0% 100% / 0));
+  --mtab-sheen: radial-gradient(40% 80% at 30% 0%, hsl(0 0% 100% / .30), hsl(0 0% 100% / 0) 70%), linear-gradient(180deg, hsl(0 0% 100% / .24), hsl(0 0% 100% / 0));
   --mtab-shadow: 0 12px 32px -14px rgb(15 20 40 / .35), 0 2px 8px -4px rgb(15 20 40 / .16);
+  --mtab-fill-a: .30; --mtab-fill-b: .22; --mtab-lip-t: .65; --mtab-lip-b: .22;
+  --mtab-lens: inset 0 0 0 1px rgb(15 20 40 / .07), inset 0 0 0 2px rgb(15 20 40 / .04), inset 0 0 0 3px rgb(15 20 40 / .015);
   bottom: calc(var(--sa-b) + 12px);
   width: min(calc(100% - 2 * max(12px, var(--sa-l), var(--sa-r))), 440px);
   margin-inline: auto;
@@ -3507,11 +3512,11 @@ html[data-contrast="more"] .mtop[data-lifted] { box-shadow: 0 1px 0 hsl(var(--bo
   padding: 4px var(--mtab-px);
   border-radius: 9999px;
   isolation: isolate;
-  background: linear-gradient(180deg, hsl(var(--mtab-bg) / .72), hsl(var(--mtab-bg) / .62));
-  -webkit-backdrop-filter: blur(22px) saturate(1.65);
-  backdrop-filter: blur(22px) saturate(1.65);
+  background: linear-gradient(180deg, hsl(var(--mtab-bg) / var(--mtab-fill-a)), hsl(var(--mtab-bg) / var(--mtab-fill-b)));
+  -webkit-backdrop-filter: blur(20px) saturate(1.65);
+  backdrop-filter: blur(20px) saturate(1.65);
   border: 1px solid hsl(var(--mtab-line));
-  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .55), inset 0 -1px 0 hsl(0 0% 100% / .16), var(--mtab-shadow);
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / var(--mtab-lip-t)), inset 0 -1px 0 hsl(0 0% 100% / var(--mtab-lip-b)), var(--mtab-lens), var(--mtab-shadow);
   transform-origin: 50% 100%;
   transition: transform .3s var(--ease-liquid), height .3s var(--ease-liquid);
   touch-action: pan-y;
@@ -3525,7 +3530,7 @@ html[data-contrast="more"] .mtop[data-lifted] { box-shadow: 0 1px 0 hsl(var(--bo
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
-/* the sheen: light across the top half of the glass */
+/* the sheen: light across the top half of the glass, with the specular arc (40% x 40% of the bar, at 30% x) on top */
 .mtab::after {
   content: ""; position: absolute; inset: 1px 1px auto; height: 50%; z-index: -1; pointer-events: none;
   border-radius: inherit; border-bottom-left-radius: 0; border-bottom-right-radius: 0;
@@ -3534,10 +3539,11 @@ html[data-contrast="more"] .mtop[data-lifted] { box-shadow: 0 1px 0 hsl(var(--bo
 html.dark .mtab {
   --mtab-bg: 240 5% 11%; --mtab-line: 0 0% 100% / .1;
   --mtab-rim: linear-gradient(120deg, hsl(0 0% 100% / .4), hsl(0 0% 100% / .12) 32%, hsl(0 0% 100% / .04) 58%, hsl(0 0% 100% / .14) 88%, hsl(0 0% 100% / .32));
-  --mtab-sheen: linear-gradient(180deg, hsl(0 0% 100% / .09), hsl(0 0% 100% / 0));
+  --mtab-sheen: radial-gradient(40% 80% at 30% 0%, hsl(0 0% 100% / .08), hsl(0 0% 100% / 0) 70%), linear-gradient(180deg, hsl(0 0% 100% / .07), hsl(0 0% 100% / 0));
   --mtab-shadow: 0 12px 32px -14px rgb(0 0 0 / .7), 0 2px 8px -4px rgb(0 0 0 / .5);
+  --mtab-fill-a: .48; --mtab-fill-b: .38; --mtab-lip-t: .16; --mtab-lip-b: .06;
+  --mtab-lens: inset 0 0 0 1px rgb(0 0 0 / .18), inset 0 0 0 2px rgb(0 0 0 / .10), inset 0 0 0 3px rgb(0 0 0 / .04);
 }
-html.dark .mtab { box-shadow: inset 0 1px 0 hsl(0 0% 100% / .12), inset 0 -1px 0 hsl(0 0% 100% / .04), var(--mtab-shadow); }
 /* the solid pill of 11-19 wherever glass cannot or should not show: no blur support, less transparency, more contrast */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .mtab { background: hsl(var(--mtab-bg)); }
