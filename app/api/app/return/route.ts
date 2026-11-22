@@ -20,12 +20,25 @@ export async function GET(req: NextRequest) {
   const failed = handoffErrorFor(req.nextUrl.searchParams.get("next"));
   if (failed) return tapped ? NextResponse.redirect(failed) : html(page(failed, "That didn't work", "Head back to the Outlly app to try again."));
   const hold = req.nextUrl.searchParams.get("hold");
-  const code = await signCode({ uid: await readSessionUserId(), ch, next: returnTarget(req.nextUrl.searchParams), hold: hold && HOLD_ID.test(hold) ? hold : null });
+  // R-APP7 8.5: the Accounts callback leaves the platform's own words in a browser cookie (the web page reads it).
+  // The app cannot see Custom Tab cookies, so when this flow ended in connect_error the detail rides inside the
+  // signed code's `next` (still only words we signed: a crafted link can't add any). The cookie is then dropped.
+  const detail = req.cookies.get("outlly-connect-detail")?.value ?? "";
+  let next = returnTarget(req.nextUrl.searchParams);
+  if (detail && /[?&]connect_error=/.test(next)) {
+    let words = "";
+    try {
+      words = decodeURIComponent(detail).slice(0, 240);
+    } catch {}
+    if (words) next += `&detail=${encodeURIComponent(words)}`;
+  }
+  const code = await signCode({ uid: await readSessionUserId(), ch, next, hold: hold && HOLD_ID.test(hold) ? hold : null });
   const link = `${APP_DEEP_LINK}?code=${encodeURIComponent(code)}`;
   // Straight off a consent tap Chrome follows a redirect into the app. After the 2FA step the page got here
   // by script, which Chrome won't let open an app on its own, so show a button to tap.
-  if (tapped) return NextResponse.redirect(link);
-  return html(page(link));
+  const res = tapped ? NextResponse.redirect(link) : html(page(link));
+  if (detail) res.cookies.set("outlly-connect-detail", "", { path: "/", maxAge: 0 });
+  return res;
 }
 
 const html = (body: string) => new NextResponse(body, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
