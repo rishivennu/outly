@@ -51,7 +51,8 @@ export function browserTarget(to: unknown): string | null {
     return null;
   }
   if (u.host !== "outlly.invalid") return null;
-  const google = u.pathname === "/api/auth/google";
+  // R-APP6: Sign in with Apple takes the same road as Google (its start route also reads `next`).
+  const google = u.pathname === "/api/auth/google" || u.pathname === "/api/auth/apple";
   const connect = /^\/api\/accounts\/[a-z]{1,20}\/connect$/.test(u.pathname);
   if (!google && !connect) return null;
   const param = google ? "next" : "returnTo";
@@ -96,7 +97,7 @@ export async function readStart(t: string | null) {
 
 // A signed start link already carries the rewritten target; re-check its shape, not its return param.
 function browserTargetCheck(to: unknown) {
-  return typeof to === "string" && /^\/api\/(auth\/google|accounts\/[a-z]{1,20}\/connect)(\?|$)/.test(to) ? to : null;
+  return typeof to === "string" && /^\/api\/(auth\/(google|apple)|accounts\/[a-z]{1,20}\/connect)(\?|$)/.test(to) ? to : null;
 }
 
 /**
@@ -219,7 +220,7 @@ export function handoffErrorFor(next: string | null | undefined): string | null 
   } catch {
     return null;
   }
-  const g = u.searchParams.get("google_error");
+  const g = u.searchParams.get("google_error") ?? u.searchParams.get("apple_error");
   if ((u.pathname === "/login" || u.pathname === "/signup") && g) return appErrorLink(handoffErrorOf(g), g.slice(0, 40));
   if (u.pathname === "/waitlist" && u.searchParams.get("from") === "google") return appErrorLink("denied", "waitlist");
   return null;

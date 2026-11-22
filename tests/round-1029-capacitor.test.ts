@@ -59,6 +59,12 @@ describe("browserTarget (what the app may open in the browser)", () => {
     expect(back(browserTarget("/api/auth/google"), "next")).toBe(`${APP_RETURN_PATH}?next=${encodeURIComponent("/home")}`);
     expect(back(browserTarget("/api/auth/google?next=https://evil.test/"), "next")).toBe(`${APP_RETURN_PATH}?next=${encodeURIComponent("/home")}`);
   });
+  test("Sign in with Apple takes the same road (R-APP6)", () => {
+    const t = browserTarget("/api/auth/apple?next=%2Fcalendar&from=signup");
+    expect(t?.startsWith("/api/auth/apple?")).toBe(true);
+    expect(back(t, "next")).toBe(`${APP_RETURN_PATH}?next=${encodeURIComponent("/calendar")}`);
+    expect(back(t, "from")).toBe("signup");
+  });
   test("an account connect keeps its other params and returns through the app", () => {
     const t = browserTarget("/api/accounts/instagram/connect?returnTo=%2Faccounts&mode=page");
     const u = new URL(t!, "http://x");
