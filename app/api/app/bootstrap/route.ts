@@ -9,6 +9,7 @@ import { parseUiPrefs } from "@/lib/nav-config";
 import { navFor } from "@/lib/nav-style";
 import { activeProfile, listProfiles } from "@/lib/profiles";
 import { memberships } from "@/lib/team/service";
+import { studioSettings } from "@/lib/startup-config";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
  */
 export const GET = route(async (req, { user }) => {
   const me = realUserId(user);
-  const [limits, usage, files, seats, profiles, nav, dash] = await Promise.all([
+  const [limits, usage, files, seats, profiles, nav, dash, studio] = await Promise.all([
     planLimits(user.id),
     billingUsage(user.id),
     db.media.count({ where: { userId: user.id, deletedAt: null, status: { notIn: ["failed", "uploading"] } } }),
@@ -26,6 +27,8 @@ export const GET = route(async (req, { user }) => {
     listProfiles(user.id, user.scope),
     navFor(),
     dashboardFor(),
+    // R-APP6: the admin "What changed" notice and the welcome card copy, the same shared snapshot the studio layout reads.
+    studioSettings(),
   ]);
   const active = await activeProfile(user, profiles);
   return json(
@@ -43,6 +46,8 @@ export const GET = route(async (req, { user }) => {
       activeProfileId: active?.id ?? null,
       nav: { style: nav.style, locked: !nav.canSwitch, intro: { eligible: nav.intro, saved: parseUiPrefs(user.uiPrefs).navIntro ?? null } },
       dashboard: { style: dash.style, locked: !dash.canSwitch },
+      updates: studio.notice,
+      welcome: studio.welcome,
       serverTime: new Date().toISOString(),
     },
     { headers: { "cache-control": "no-store" } },

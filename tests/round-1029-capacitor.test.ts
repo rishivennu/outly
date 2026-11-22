@@ -243,7 +243,7 @@ describe("FCM push", () => {
   test("with push not configured nothing is sent and nothing throws", async () => {
     const u = await mkUser("push");
     await db.pushDevice.create({ data: { userId: u.id, token: `tok-${Date.now()}-${"x".repeat(30)}` } });
-    expect(await pushToUser(u.id, { title: "Hi", body: "there" })).toEqual({ sent: 0, dropped: 0 });
+    expect(await pushToUser(u.id, { title: "Hi", body: "there" })).toEqual({ sent: 0, dropped: 0, devices: 0 });
   });
   test("a device belongs to one account at a time and goes when the account does", async () => {
     const a = await mkUser("pa");

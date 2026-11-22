@@ -1,4 +1,4 @@
-import { isLibraryStatus, libraryPage } from "@/lib/posts/library";
+import { isLibraryStatus, libraryCounts, libraryPage } from "@/lib/posts/library";
 import { db } from "@/lib/db";
 import { HttpError, json, route } from "@/lib/http";
 import { savePostSchema } from "@/lib/validation";
@@ -31,7 +31,14 @@ export const GET = route(async (req, { user }) => {
   }
   // 1091: the Content library's "Load more" (cursor = id of the last post shown).
   // 1148: `q` searches the whole library (the search box, when not every post is loaded yet).
-  if (req.nextUrl.searchParams.get("library") === "1") return json(await libraryPage(user, req.nextUrl.searchParams.get("cursor"), undefined, undefined, isLibraryStatus(status) ? status : null, req.nextUrl.searchParams.get("q")));
+  if (req.nextUrl.searchParams.get("library") === "1") {
+    const cursor = req.nextUrl.searchParams.get("cursor");
+    const q = req.nextUrl.searchParams.get("q");
+    const page = await libraryPage(user, cursor, undefined, undefined, isLibraryStatus(status) ? status : null, q);
+    // The native app asks for the filter chip counts with the first page (the web gets them from the server component).
+    const counts = cursor == null && !q && req.nextUrl.searchParams.get("counts") === "1" ? await libraryCounts(user) : undefined;
+    return json(counts ? { ...page, counts } : page);
+  }
   const posts = await db.post.findMany({
     where: { userId: user.id, archivedAt: null, ...(await postFilter(user)).where, ...(status && status !== "all" ? { status: status === "failed" ? { in: ["failed", "partial"] } : status } : {}) },
     include: { targets: true, media: true, items: { include: { media: true }, orderBy: { position: "asc" } } },

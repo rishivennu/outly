@@ -45,6 +45,8 @@ export const DELETE = route(
     const b = Del.parse(await req.json());
     const where = "id" in b ? { id: b.id, userId: user.id } : "endpoint" in b ? { endpointHash: endpointHash(b.endpoint), userId: user.id } : { userId: user.id };
     const r = await db.webPushSub.deleteMany({ where });
+    // R-APP6: the list also holds the Android app's phones (PushDevice); "Remove" / "Remove all" cover them too.
+    if (!("endpoint" in b)) r.count += (await db.pushDevice.deleteMany({ where: "id" in b ? { id: b.id, userId: user.id } : { userId: user.id } })).count;
     const jar = await cookies();
     const mine = jar.get(WEBPUSH_COOKIE)?.value;
     if (mine && !(await db.webPushSub.findUnique({ where: { id: mine }, select: { id: true } }))) jar.delete(WEBPUSH_COOKIE);

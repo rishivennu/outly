@@ -83,13 +83,16 @@ export function isDeadToken(status: number, body: string) {
   return status === 404 || /UNREGISTERED/.test(body) || (status === 400 && /registration token/i.test(body));
 }
 
-/** Best effort: never throws, so a push problem can't hide the notice it came with. */
-export async function pushToUser(userId: string, m: PushMessage) {
+/**
+ * Best effort: never throws, so a push problem can't hide the notice it came with. `only` narrows the fan-out to
+ * one phone (Settings > Notifications "Test" on a listed device); `devices` says how many phones were tried.
+ */
+export async function pushToUser(userId: string, m: PushMessage, opts: { only?: string } = {}) {
   const sa = serviceAccount();
-  if (!sa) return { sent: 0, dropped: 0 };
+  if (!sa) return { sent: 0, dropped: 0, devices: 0 };
   try {
-    const devices = await db.pushDevice.findMany({ where: { userId }, select: { id: true, token: true }, take: 10 });
-    if (!devices.length) return { sent: 0, dropped: 0 };
+    const devices = await db.pushDevice.findMany({ where: { userId, ...(opts.only ? { id: opts.only } : {}) }, select: { id: true, token: true }, take: 10 });
+    if (!devices.length) return { sent: 0, dropped: 0, devices: 0 };
     const token = await accessToken(sa);
     let sent = 0;
     const dead: string[] = [];
@@ -107,9 +110,9 @@ export async function pushToUser(userId: string, m: PushMessage) {
       }),
     );
     if (dead.length) await db.pushDevice.deleteMany({ where: { id: { in: dead } } });
-    return { sent, dropped: dead.length };
+    return { sent, dropped: dead.length, devices: devices.length };
   } catch (e) {
     console.error("[push]", e);
-    return { sent: 0, dropped: 0 };
+    return { sent: 0, dropped: 0, devices: 0 };
   }
 }
