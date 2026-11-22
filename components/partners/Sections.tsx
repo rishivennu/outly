@@ -5,12 +5,14 @@ import { Shell } from "@/components/marketing/bits";
 import { PARTNER_TIER_LABEL, type PartnerTier } from "@/lib/partners/types";
 import { Peep, type PeepName } from "@/components/ui/art/peeps/Peep";
 import { cn } from "@/lib/utils";
+import { PartnersMotion } from "./Motion";
 import s from "./sections.module.css";
 
 const SECTION_TITLE = "play text-balance text-[clamp(2rem,2.4vw+1rem,3rem)]";
 const NOTE = "mt-6 max-w-2xl text-pretty text-[14px] leading-relaxed text-muted-foreground";
 
-type Tone = "lavender" | "blush" | "moss" | "butter" | "apricot" | "sky";
+/** R1302: the four brand tones (sections.module.css), each a soft gradient of one hue. */
+type Tone = "mint" | "moss" | "lime" | "deep";
 
 const TIERS: {
   tier: PartnerTier;
@@ -25,7 +27,7 @@ const TIERS: {
     tier: "emerging",
     range: "1K to 5K followers",
     body: "A close audience that trusts your picks. Small and engaged beats big and quiet.",
-    tone: "sky",
+    tone: "mint",
     peep: "creator",
     card: { initials: "MK", handle: "@mira.makes", followers: "3.2K followers", bars: [55, 80, 65], tilt: "-6deg" },
   },
@@ -33,7 +35,7 @@ const TIERS: {
     tier: "growing",
     range: "5K to 10K followers",
     body: "A steady audience and a regular posting rhythm, ready for planned campaigns.",
-    tone: "butter",
+    tone: "moss",
     peep: "growing",
     card: { initials: "DS", handle: "@dev.ships", followers: "7.8K followers", bars: [45, 70, 90], tilt: "5deg" },
   },
@@ -41,7 +43,7 @@ const TIERS: {
     tier: "established",
     range: "10K+ followers",
     body: "Wide reach and a track record, suited to longer partnerships and series.",
-    tone: "blush",
+    tone: "lime",
     peep: "established",
     card: { initials: "AR", handle: "@ana.reviews", followers: "24K followers", bars: [70, 60, 85], tilt: "-4deg" },
   },
@@ -59,10 +61,10 @@ const CRITERIA = [
 ];
 
 const STEPS: { n: string; title: string; body: string; tone: Tone }[] = [
-  { n: "01", title: "Apply", body: "Tell us about you, your channels and the content you would make.", tone: "lavender" },
+  { n: "01", title: "Apply", body: "Tell us about you, your channels and the content you would make.", tone: "mint" },
   { n: "02", title: "We review", body: "We look at your audience, your content and how well Outlly fits it.", tone: "moss" },
-  { n: "03", title: "Get your offer", body: "If it is a match, you get an offer with the terms written out in full.", tone: "apricot" },
-  { n: "04", title: "Create and grow", body: "Make the content, share Outlly and track how your posts perform.", tone: "sky" },
+  { n: "03", title: "Get your offer", body: "If it is a match, you get an offer with the terms written out in full.", tone: "deep" },
+  { n: "04", title: "Create and grow", body: "Make the content, share Outlly and track how your posts perform.", tone: "lime" },
 ];
 
 function Head({ id, eyebrow, title, body }: { id: string; eyebrow: string; title: string; body?: string }) {
@@ -80,9 +82,9 @@ function Head({ id, eyebrow, title, body }: { id: string; eyebrow: string; title
 function CreatorCard({ card, peep }: { card: (typeof TIERS)[number]["card"]; peep: PeepName }) {
   const style = { "--tilt": card.tilt } as CSSProperties;
   return (
-    <div className={s.stage} aria-hidden="true">
+    <div className={s.stage} aria-hidden="true" data-anim="creator">
       <Peep name={peep} height={176} fill="color-mix(in srgb, #ffffff 82%, var(--t-bg))" className={s.peep} />
-      <div className={s.creator} style={style}>
+      <div className={s.creator} style={style} data-p="card">
         <div className={s.creatorTop}>
           <span className={s.avatar}>{card.initials}</span>
           <div className="min-w-0">
@@ -111,7 +113,12 @@ export function WhoCanPartner() {
         <ul className="mt-12 grid gap-4 md:grid-cols-3">
           {TIERS.map((t, i) => (
             <Reveal as="li" key={t.tier} delay={i * 0.06} className="min-w-0">
-              <article className={cn(s.tile, s.tierTile, s[t.tone])} style={{ "--float-delay": `${-2 * i}s` } as CSSProperties}>
+              <article
+                className={cn(s.tile, s.tierTile, s[t.tone])}
+                style={{ "--float-delay": `${-2 * i}s` } as CSSProperties}
+                data-tile
+                data-tilt
+              >
                 <h3 className={cn("play", s.title)}>{PARTNER_TIER_LABEL[t.tier]}</h3>
                 <p className={s.range}>{t.range}</p>
                 <p className={s.body}>{t.body}</p>
@@ -122,6 +129,7 @@ export function WhoCanPartner() {
         </ul>
         <p className={NOTE}>Tiers are indicative. We review every application on fit, not size.</p>
       </Shell>
+      <PartnersMotion root="who" />
     </section>
   );
 }

@@ -1,5 +1,7 @@
-/* R1282 /partners hero. Near-black in both themes by design; the section ends on a rounded edge so the light page
-   below meets it cleanly. Only the four moving layers get will-change. */
+/* R1282 /partners hero, R1302 handshake. Near-black in both themes by design, with a deep-green brand glow rising
+   from the stage floor; the section ends on a rounded edge so the light page below meets it cleanly. Only the moving
+   layers get will-change. `--clasp-y` (a fraction of the stage height) is where the palms meet: under the copy on
+   every width, read by Hero.tsx when it measures the clasped pose. */
 
 .hero {
   --hero-bg: #080808;
@@ -12,7 +14,7 @@
   position: relative;
   height: 160vh;
   margin-top: calc(-1 * var(--hero-nav));
-  background: var(--hero-bg);
+  background: radial-gradient(90% 55% at 50% 100%, rgb(23 58 36 / 0.55), transparent 70%), var(--hero-bg);
   color: var(--hero-ink);
   border-radius: 0 0 2.5rem 2.5rem;
   isolation: isolate;
@@ -26,6 +28,7 @@
 }
 
 .stage {
+  --clasp-y: 0.76;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -129,35 +132,79 @@
 }
 .icons svg { width: 1.25rem; height: 1.25rem; }
 
-/* Art layers: transparent, absolutely placed, animated independently. */
+/* Art layers: transparent, absolutely placed, animated independently. `--hw` is a hand's width; the clasped artwork
+   is sized from it so the open hands and the handshake they become stay the same size on every width. */
 .art {
+  --hw: clamp(13rem, 46vw, 20rem);
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
 }
-.hand {
+/* Both hands in one layer that pivots about the clasp point: the handshake rocks this, the hands never move for it. */
+.clasp {
   position: absolute;
-  width: clamp(13rem, 46vw, 20rem);
-  height: auto;
+  inset: 0;
+  transform-origin: 50% calc(var(--clasp-y) * 100%);
   will-change: transform;
 }
+.hand {
+  position: absolute;
+  width: var(--hw);
+  height: auto;
+  will-change: transform, opacity;
+}
+/* The clasped handshake (both hands, one picture), centred on the clasp point, hidden until the hands reach it. */
+.shake {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--clasp-y) * 100%);
+  width: calc(var(--hw) * 1.55);
+  height: auto;
+  aspect-ratio: 1362 / 894;
+  translate: -50% -50%;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+/* Rest pose before the scroll (matches Hero.tsx START, so hydration changes nothing); origins sit on the anchors
+   that meet, so the hands shrink and turn about their fingertips as they arrive. */
 .handLeft {
   left: 0;
   top: 58%;
   aspect-ratio: 1104 / 936;
-  transform: translate3d(-14%, 0, 0);
-  transform-origin: 88% 52%;
+  transform: translate3d(-14%, 0, 0) rotate(-5deg);
+  transform-origin: 94% 50%;
 }
 .handRight {
   right: 0;
   top: 64%;
   aspect-ratio: 1000 / 776;
-  transform: translate3d(14%, 0, 0);
-  transform-origin: 10% 50%;
+  transform: translate3d(14%, 0, 0) rotate(5deg);
+  transform-origin: 1% 50%;
+}
+/* The lime flash where the palms meet: hidden until the handshake beat scales it up and out. */
+.burst {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--clasp-y) * 100%);
+  width: clamp(11rem, 30vw, 22rem);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(233 255 224 / 0.75), rgb(181 255 0 / 0.5) 22%, rgb(181 255 0 / 0.14) 50%, transparent 74%);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.burst::after {
+  content: "";
+  position: absolute;
+  inset: 24%;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgb(181 255 0 / 0.55), 0 0 40px 6px rgb(181 255 0 / 0.35);
 }
 @media (min-width: 768px) {
-  .hand { width: clamp(18rem, 36vw, 38rem); }
+  .art { --hw: clamp(18rem, 36vw, 38rem); }
+  .shake { width: calc(var(--hw) * 1.4); }
   .handLeft { top: 30%; }
   .handRight { top: 42%; }
 }
@@ -183,9 +230,10 @@
   aspect-ratio: 480 / 576;
   height: auto;
   margin: calc(var(--d) * 1.2 / -2) 0 0 calc(var(--d) / -2);
-  will-change: transform;
+  will-change: transform, opacity;
 }
 @media (min-width: 768px) {
+  .stage { --clasp-y: 0.68; }
   .orb { top: 71%; }
   .halo { top: 66%; }
 }

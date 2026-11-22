@@ -1,10 +1,15 @@
-/* R1287 /partners tiles below the hero. Flat pastel tiles with the deep tone of the same hue, fixed in both themes;
-   shadows only on the mockups. Individual `rotate`/`scale`/`translate` properties so they compose with the
-   transform the reveal engine animates. */
+/* R1287 /partners tiles below the hero, R1302 in the brand palette. Each tile is a soft diagonal gradient of one
+   brand tone (lighter at the top-left, deeper at the bottom-right) with a lime glow in a corner and a hairline edge,
+   fixed in both themes; text is the deep tone of the same hue. Shadows only on the mockups. Individual
+   `rotate`/`scale`/`translate` properties so they compose with the transform the reveal engine animates. */
 
 .tile {
-  --t-bg: #dcd2f7;
-  --t-ink: #3b2a6b;
+  --t-bg: #e9ffe0;
+  --t-ink: #173a24;
+  --t-hi: #f6fff0;
+  --t-lo: #d2f3c2;
+  --t-glow: rgb(181 255 0 / 0.5);
+  --t-line: rgb(255 255 255 / 0.55);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -13,20 +18,22 @@
   overflow: hidden;
   border-radius: 24px;
   padding: 1.75rem;
-  background: var(--t-bg);
+  background:
+    radial-gradient(70% 60% at 100% 0%, var(--t-glow), transparent 70%),
+    linear-gradient(150deg, var(--t-hi) 0%, var(--t-bg) 46%, var(--t-lo) 100%);
   color: var(--t-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t-ink) 10%, transparent), inset 0 1px 0 var(--t-line);
 }
 @media (min-width: 640px) {
   .tile { border-radius: 28px; padding: 2rem; }
 }
 
-.lavender { --t-bg: #dcd2f7; --t-ink: #3b2a6b; }
-.blush { --t-bg: #f5b6cc; --t-ink: #5b1d38; }
-.moss { --t-bg: #cfe3a8; --t-ink: #1e3a14; }
-.butter { --t-bg: #f7e6a3; --t-ink: #5a4300; }
-.apricot { --t-bg: #f4b183; --t-ink: #5a2a0b; }
-.sky { --t-bg: #bbd6ea; --t-ink: #1f3a52; }
-.deep { --t-bg: #173a24; --t-ink: #e9ffe0; }
+/* Brand tones: mint, moss and lime carry deep-green or near-black ink; deep carries mint ink. `--t-card` is the ink
+   inside a white card on the tile (deep stays deep green there); `--t-peep` is the figure's line colour. */
+.mint { --t-bg: #e9ffe0; --t-ink: #173a24; --t-hi: #f6fff0; --t-lo: #d2f3c2; --t-glow: rgb(181 255 0 / 0.5); }
+.moss { --t-bg: #cfe3a8; --t-ink: #1e3a14; --t-hi: #e2f0c4; --t-lo: #b8d48c; --t-glow: rgb(181 255 0 / 0.45); }
+.lime { --t-bg: #b5ff00; --t-ink: #0b1a00; --t-hi: #d4ff66; --t-lo: #9ee000; --t-glow: rgb(255 255 255 / 0.45); }
+.deep { --t-bg: #173a24; --t-ink: #e9ffe0; --t-hi: #22533a; --t-lo: #0f2718; --t-glow: rgb(181 255 0 / 0.3); --t-line: rgb(255 255 255 / 0.12); --t-card: #173a24; }
 
 .title { font-size: clamp(1.5rem, 1.2vw + 1rem, 2rem); color: var(--t-ink); }
 .range { margin-top: 0.5rem; font-size: 15px; font-weight: 700; color: var(--t-ink); }
@@ -65,6 +72,7 @@
   translate: 50% 0;
   color: var(--t-ink);
 }
+.deep .peep { color: var(--t-card); }
 @media (min-width: 640px) {
   .peep { right: 8.25rem; bottom: 2.5rem; height: 11rem; }
 }
@@ -76,8 +84,8 @@
   width: 15rem;
   padding: 1rem;
   border-radius: 18px;
-  background: #ffffff;
-  color: var(--t-ink);
+  background: linear-gradient(160deg, #ffffff, color-mix(in srgb, #ffffff 94%, var(--t-bg)));
+  color: var(--t-card, var(--t-ink));
   rotate: var(--tilt, -6deg);
   transform-origin: 100% 100%;
   box-shadow: 0 20px 50px -20px rgb(0 0 0 / 0.35), 0 0 0 1px color-mix(in srgb, var(--t-ink) 14%, #ffffff);
@@ -106,38 +114,40 @@
   padding: 0.125rem 0.625rem;
   border-radius: 9999px;
   background: var(--t-bg);
+  color: var(--t-ink);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
 .engage { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.75rem; margin-top: 1rem; font-size: 12px; font-weight: 600; }
 .bars { display: flex; align-items: flex-end; gap: 0.25rem; height: 1.75rem; }
-.bar { width: 0.5rem; border-radius: 3px; background: var(--t-ink); }
+.bar { width: 0.5rem; border-radius: 3px; background: var(--t-card, var(--t-ink)); }
 
-/* Criteria stickers */
+/* Criteria stickers, the four brand tones in turn */
 .chips { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 0.75rem 0.625rem; padding: 0.25rem; }
 .chip {
-  --t-bg: #dcd2f7;
-  --t-ink: #3b2a6b;
+  --t-bg: #e9ffe0;
+  --t-ink: #173a24;
+  --t-hi: #f6fff0;
+  --t-lo: #d2f3c2;
   display: inline-flex;
   align-items: center;
   max-width: 100%;
   min-height: 44px;
   padding: 0.625rem 1.125rem;
   border-radius: 9999px;
-  background: var(--t-bg);
+  background: linear-gradient(150deg, var(--t-hi), var(--t-bg) 55%, var(--t-lo));
   color: var(--t-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t-ink) 12%, transparent);
   font-size: 15px;
   font-weight: 600;
   line-height: 1.3;
   text-wrap: balance;
 }
-.chip:nth-child(6n + 1) { --t-bg: #dcd2f7; --t-ink: #3b2a6b; }
-.chip:nth-child(6n + 2) { --t-bg: #cfe3a8; --t-ink: #1e3a14; }
-.chip:nth-child(6n + 3) { --t-bg: #f7e6a3; --t-ink: #5a4300; }
-.chip:nth-child(6n + 4) { --t-bg: #f4b183; --t-ink: #5a2a0b; }
-.chip:nth-child(6n + 5) { --t-bg: #bbd6ea; --t-ink: #1f3a52; }
-.chip:nth-child(6n + 6) { --t-bg: #f5b6cc; --t-ink: #5b1d38; }
+.chip:nth-child(4n + 1) { --t-bg: #e9ffe0; --t-ink: #173a24; --t-hi: #f6fff0; --t-lo: #d2f3c2; }
+.chip:nth-child(4n + 2) { --t-bg: #cfe3a8; --t-ink: #1e3a14; --t-hi: #e2f0c4; --t-lo: #b8d48c; }
+.chip:nth-child(4n + 3) { --t-bg: #b5ff00; --t-ink: #0b1a00; --t-hi: #d4ff66; --t-lo: #9ee000; }
+.chip:nth-child(4n + 4) { --t-bg: #173a24; --t-ink: #e9ffe0; --t-hi: #22533a; --t-lo: #0f2718; }
 .chip:nth-child(8n + 1) { rotate: -2deg; }
 .chip:nth-child(8n + 2) { rotate: 1.5deg; }
 .chip:nth-child(8n + 3) { rotate: -1deg; }
@@ -165,13 +175,16 @@
 }
 .bandTitle { font-size: clamp(1.75rem, 1.6vw + 1rem, 2.5rem); color: var(--t-ink); }
 
-/* One slow idle float, only where there is a pointer that hovers and motion is welcome. */
+/* One slow idle float, only where there is a pointer that hovers and motion is welcome. Tiles lift a touch under
+   the pointer at the same time (the `translate` composes with the reveal's transform). */
 @keyframes idle-float {
   0%, 100% { translate: 0 0; }
   50% { translate: 0 -6px; }
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .creator { animation: idle-float 6s ease-in-out var(--float-delay, 0s) infinite; }
+  .tile { transition: translate 0.45s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s; }
+  .tile:hover { translate: 0 -3px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t-ink) 16%, transparent), inset 0 1px 0 var(--t-line), 0 24px 48px -28px color-mix(in srgb, var(--t-ink) 45%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) {
   .creator { animation: none; }

@@ -1,6 +1,7 @@
 import { OutllyLogoIcon } from "@/components/brand/OutllyBrand";
 import { Reveal } from "@/components/marketing/Reveal";
 import { Shell } from "@/components/marketing/bits";
+import { PartnersMotion } from "./Motion";
 import s from "./bento.module.css";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
@@ -24,7 +25,7 @@ function Tile({
 }) {
   return (
     <Reveal as="li" delay={delay} className={cx(s.cell, cell)}>
-      <article className={cx(s.tile, tone)}>
+      <article className={cx(s.tile, tone)} data-tile data-tilt>
         <div className={cx(s.copy, copyAt === "top" ? s.copyTop : s.copyBottom)}>
           <h3 className={cx("play", s.title)}>{title}</h3>
           <p className={s.body}>{body}</p>
@@ -37,17 +38,17 @@ function Tile({
 
 function OfferMock() {
   return (
-    <div aria-hidden="true" className={cx(s.mock, s.mockA)}>
-      <div className={cx(s.card, s.brief, s.float, s.floatSlow)}>
+    <div aria-hidden="true" className={cx(s.mock, s.mockA)} data-anim="offer">
+      <div className={cx(s.card, s.brief, s.float, s.floatSlow)} data-p="brief">
         <span className={s.briefHead}>Campaign brief</span>
         {["Hook in the first 2 seconds", "Show the caption editor", "Tag @outlly in the post"].map((t) => (
-          <span key={t} className={s.check}>
+          <span key={t} className={s.check} data-p="check">
             <span className={s.tick} />
             {t}
           </span>
         ))}
       </div>
-      <div className={cx(s.card, s.offer, s.float)}>
+      <div className={cx(s.card, s.offer, s.float)} data-p="offer">
         <span className={s.offerHead}>Offer for Maya Rao</span>
         <span className={s.row}>
           <span className={s.key}>Campaign</span>
@@ -61,7 +62,9 @@ function OfferMock() {
           <span className={s.key}>Deadline</span>
           <span className={s.val}>Oct 20</span>
         </span>
-        <span className={s.accept}>Accept offer</span>
+        <span className={s.accept} data-p="accept">
+          Accept offer
+        </span>
       </div>
     </div>
   );
@@ -69,11 +72,13 @@ function OfferMock() {
 
 function PlanMock() {
   return (
-    <div aria-hidden="true" className={cx(s.mock, s.mockB)}>
-      <div className={cx(s.card, s.planBack)} />
-      <div className={cx(s.card, s.plan, s.float)}>
+    <div aria-hidden="true" className={cx(s.mock, s.mockB)} data-anim="plan">
+      <div className={cx(s.card, s.planBack)} data-p="planBack" />
+      <div className={cx(s.card, s.plan, s.float)} data-p="plan">
         <span className={s.planLabel}>Creator plan</span>
-        <span className={cx("play", s.planBig)}>2 months</span>
+        <span className={cx("play", s.planBig)} data-p="planBig">
+          2 months
+        </span>
         <span className={s.planSub}>on us</span>
         <span className={s.planCheck}>
           <span className={s.tickLime} />
@@ -86,10 +91,10 @@ function PlanMock() {
 
 function WalletMock() {
   return (
-    <div aria-hidden="true" className={cx(s.mock, s.mockC)}>
+    <div aria-hidden="true" className={cx(s.mock, s.mockC)} data-anim="wallet">
       <div className={cx(s.walletGroup, s.float)}>
-        <span className={s.peek} />
-        <div className={cx(s.card, s.wallet)}>
+        <span className={s.peek} data-p="peek" />
+        <div className={cx(s.card, s.wallet)} data-p="wallet">
           <span className={s.walletLabel}>Partner balance</span>
           <span className={s.walletFoot}>
             <span className={s.amount}>
@@ -104,7 +109,7 @@ function WalletMock() {
             ["Paid", "31"],
             ["Rate", "24%"],
           ].map(([k, v]) => (
-            <span key={k} className={s.stat}>
+            <span key={k} className={s.stat} data-p="stat">
               <span className={s.statK}>{k}</span>
               <span className={s.statV}>{v}</span>
             </span>
@@ -117,17 +122,17 @@ function WalletMock() {
 
 const INBOX = [
   { who: "Outlly team", initials: "OT", text: "Brief approved", date: "Nov 3", tone: "lime" },
-  { who: "Maya Rao", initials: "MR", text: "Reel 2 uploaded", date: "Nov 5", tone: "blush" },
+  { who: "Maya Rao", initials: "MR", text: "Reel 2 uploaded", date: "Nov 5", tone: "mint" },
   { who: "Outlly team", initials: "OT", text: "Payout sent", date: "Nov 9", tone: "lime" },
 ] as const;
 
 function InboxMock() {
   return (
-    <div aria-hidden="true" className={cx(s.mock, s.mockD)}>
+    <div aria-hidden="true" className={cx(s.mock, s.mockD)} data-anim="inbox">
       <div className={cx(s.card, s.inbox, s.float, s.floatSlow)}>
         {INBOX.map((m) => (
-          <span key={m.text} className={s.msg}>
-            <span className={cx(s.avatar, m.tone === "lime" ? s.avatarLime : s.avatarBlush)}>{m.initials}</span>
+          <span key={m.text} className={s.msg} data-p="msg">
+            <span className={cx(s.avatar, m.tone === "lime" ? s.avatarLime : s.avatarMint)}>{m.initials}</span>
             <span className={s.msgText}>
               <span className={s.msgWho}>{m.who}</span>
               <span className={s.msgLine}>
@@ -152,10 +157,10 @@ const PLATFORMS = [
 
 function FanMock() {
   return (
-    <div aria-hidden="true" className={cx(s.mock, s.mockE)}>
+    <div aria-hidden="true" className={cx(s.mock, s.mockE)} data-anim="fan">
       <div className={cx(s.fan, s.float)}>
         {PLATFORMS.map((p) => (
-          <span key={p.name} className={cx(s.pcard, p.cls)}>
+          <span key={p.name} className={cx(s.pcard, p.cls)} data-p="pcard">
             {p.name}
           </span>
         ))}
@@ -166,15 +171,15 @@ function FanMock() {
 
 function PhoneMock() {
   return (
-    <div aria-hidden="true" className={cx(s.mock, s.mockF)}>
-      <div className={cx(s.phone, s.float, s.floatSlow)}>
+    <div aria-hidden="true" className={cx(s.mock, s.mockF)} data-anim="phone">
+      <div className={cx(s.phone, s.float, s.floatSlow)} data-p="phone">
         <div className={s.screen}>
           <span className={s.status}>
             <span>9:41</span>
             <span className={s.notch} />
             <span className={s.bars} />
           </span>
-          <span className={s.notif}>
+          <span className={s.notif} data-p="notif">
             <span className={s.appMark}>
               <OutllyLogoIcon size={18} tone="dark" />
             </span>
@@ -205,7 +210,7 @@ export function PartnersBento() {
         <ul className={s.grid}>
           <Tile
             cell={s.a}
-            tone={s.lavender}
+            tone={s.mint}
             copyAt="top"
             delay={0}
             title="Paid collaborations"
@@ -215,7 +220,7 @@ export function PartnersBento() {
           </Tile>
           <Tile
             cell={s.b}
-            tone={s.blush}
+            tone={s.deep}
             copyAt="bottom"
             delay={0.06}
             title="Complimentary Creator plan"
@@ -235,7 +240,7 @@ export function PartnersBento() {
           </Tile>
           <Tile
             cell={s.d}
-            tone={s.butter}
+            tone={s.lime}
             copyAt="top"
             delay={0.18}
             title="Your portal"
@@ -245,7 +250,7 @@ export function PartnersBento() {
           </Tile>
           <Tile
             cell={s.e}
-            tone={s.apricot}
+            tone={s.night}
             copyAt="bottom"
             delay={0.06}
             title="Content that fits every platform"
@@ -255,7 +260,7 @@ export function PartnersBento() {
           </Tile>
           <Tile
             cell={s.f}
-            tone={s.sky}
+            tone={s.mint}
             copyAt="top"
             delay={0.12}
             title="We remind, you create"
@@ -268,6 +273,7 @@ export function PartnersBento() {
           Every offer is agreed individually after review. Applying does not guarantee payment or a subscription.
         </p>
       </Shell>
+      <PartnersMotion root="what" />
     </section>
   );
 }

@@ -1,6 +1,7 @@
-/* R1287 /partners bento. Tiles keep fixed pastel colours in both themes; text is the deep tone of the same hue.
-   Mockups are decorative HTML, tilted with `rotate`, shrunk on phones with `scale` and floated with `translate`,
-   so the three never fight over one transform. */
+/* R1287 /partners bento, R1302 in the brand palette. Tiles are soft diagonal gradients of one brand tone (lighter
+   top-left, deeper bottom-right) with a lime glow in a corner and a hairline edge, fixed in both themes; text is the
+   deep tone of the same hue. Mockups are decorative HTML, tilted with `rotate`, shrunk on phones with `scale` and
+   floated with `translate`, so the three never fight over one transform; Motion.tsx adds x/y on top. */
 
 .grid {
   --mock-shadow: 0 20px 50px -20px rgb(0 0 0 / 0.35);
@@ -51,28 +52,28 @@
   overflow: hidden;
   border-radius: 24px;
   padding: 24px;
-  background: var(--tile-bg);
+  background:
+    radial-gradient(70% 60% at 100% 0%, var(--tile-glow), transparent 70%),
+    linear-gradient(150deg, var(--tile-hi) 0%, var(--tile-bg) 46%, var(--tile-lo) 100%);
   color: var(--tile-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tile-ink) 10%, transparent), inset 0 1px 0 var(--tile-line, rgb(255 255 255 / 0.55));
 }
 @media (min-width: 1024px) {
   .tile { min-height: 300px; border-radius: 28px; padding: 32px; }
   .a .tile { min-height: 620px; }
 }
 
-.lavender { --tile-bg: #DCD2F7; --tile-ink: #3B2A6B; }
-.blush { --tile-bg: #F5B6CC; --tile-ink: #5B1D38; }
-.moss { --tile-bg: #CFE3A8; --tile-ink: #1E3A14; }
-.butter { --tile-bg: #F7E6A3; --tile-ink: #5A4300; }
-.apricot { --tile-bg: #F4B183; --tile-ink: #5A2A0B; }
-.sky { --tile-bg: #BBD6EA; --tile-ink: #1F3A52; }
+.mint { --tile-bg: #E9FFE0; --tile-ink: #173A24; --tile-hi: #F6FFF0; --tile-lo: #D2F3C2; --tile-glow: rgb(181 255 0 / 0.5); }
+.moss { --tile-bg: #CFE3A8; --tile-ink: #1E3A14; --tile-hi: #E2F0C4; --tile-lo: #B8D48C; --tile-glow: rgb(181 255 0 / 0.45); }
+.lime { --tile-bg: #B5FF00; --tile-ink: #0B1A00; --tile-hi: #D4FF66; --tile-lo: #9EE000; --tile-glow: rgb(255 255 255 / 0.45); }
+.deep { --tile-bg: #173A24; --tile-ink: #E9FFE0; --tile-hi: #22533A; --tile-lo: #0F2718; --tile-glow: rgb(181 255 0 / 0.3); --tile-line: rgb(255 255 255 / 0.12); }
+.night { --tile-bg: #080808; --tile-ink: #F5F5F5; --tile-hi: #1C211B; --tile-lo: #050505; --tile-glow: rgb(181 255 0 / 0.28); --tile-line: rgb(255 255 255 / 0.1); }
 
 .copy { position: relative; z-index: 2; max-width: 30rem; }
 .copyTop { margin-bottom: auto; }
 .copyBottom { margin-top: auto; }
 .title { font-size: clamp(1.5rem, 1.2vw + 1rem, 2rem); color: var(--tile-ink); }
 .body { margin-top: 0.625rem; font-size: 15px; line-height: 1.55; color: var(--tile-ink); opacity: 0.8; text-wrap: pretty; }
-/* apricot is 4.26:1 at 80%, under AA, so its body copy runs at full strength (6.47:1) */
-.apricot .body { opacity: 1; }
 @media (min-width: 640px) {
   .body { font-size: 16px; }
 }
@@ -173,7 +174,7 @@
   .mockC { left: 32px; }
 }
 .walletGroup { position: absolute; inset: 0; rotate: -4deg; }
-.peek { position: absolute; left: 22px; right: 22px; top: 0; height: 40px; border-radius: 14px; background: #F5B6CC; rotate: 4deg; }
+.peek { position: absolute; left: 22px; right: 22px; top: 0; height: 40px; border-radius: 14px; background: #B5FF00; rotate: 4deg; }
 .wallet {
   left: 0;
   top: 14px;
@@ -228,7 +229,7 @@
 .msg + .msg { border-top: 1px solid rgb(8 8 8 / 0.08); }
 .avatar { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 999px; font-size: 11px; font-weight: 700; }
 .avatarLime { background: #B5FF00; color: #0B1A00; }
-.avatarBlush { background: #F5B6CC; color: #5B1D38; }
+.avatarMint { background: #E9FFE0; color: #173A24; }
 .msgText { display: flex; flex-direction: column; min-width: 0; }
 .msgWho { font-size: 12px; font-weight: 650; }
 .msgLine { font-size: 11px; color: rgb(8 8 8 / 0.65); white-space: nowrap; }
@@ -249,12 +250,12 @@
   font-weight: 700;
   letter-spacing: -0.02em;
 }
-.pReels { left: 20px; top: 70px; rotate: -12deg; background: #F5B6CC; color: #5B1D38; }
-.pShorts { left: 190px; top: 20px; rotate: 6deg; background: #080808; color: #fff; }
+.pReels { left: 20px; top: 70px; rotate: -12deg; background: #E9FFE0; color: #173A24; }
+.pShorts { left: 190px; top: 20px; rotate: 6deg; background: #fff; color: #080808; }
 .pX { left: 360px; top: 40px; rotate: -6deg; background: #fff; color: #080808; font-size: 34px; }
-.pYouTube { left: 60px; top: 190px; rotate: 9deg; background: #DCD2F7; color: #3B2A6B; }
+.pYouTube { left: 60px; top: 190px; rotate: 9deg; background: #B5FF00; color: #0B1A00; }
 .pTikTok { left: 220px; top: 150px; rotate: -9deg; background: #173A24; color: #E9FFE0; }
-.pLinkedIn { left: 380px; top: 180px; rotate: 12deg; background: #BBD6EA; color: #1F3A52; }
+.pLinkedIn { left: 380px; top: 180px; rotate: 12deg; background: #CFE3A8; color: #1E3A14; }
 
 /* F: phone corner bleeding off the bottom-right */
 .mockF { right: -36px; bottom: -140px; width: 280px; height: 300px; transform-origin: right bottom; }
@@ -267,7 +268,7 @@
   box-shadow: var(--mock-shadow);
   rotate: -4deg;
 }
-.screen { position: relative; height: 100%; border-radius: 30px; background: #1F3A52; color: #fff; overflow: hidden; }
+.screen { position: relative; height: 100%; border-radius: 30px; background: #173A24; color: #fff; overflow: hidden; }
 .status { display: flex; align-items: center; justify-content: space-between; padding: 12px 22px 0; font-size: 12px; font-weight: 650; }
 .notch { width: 84px; height: 24px; border-radius: 999px; background: #080808; }
 .bars { width: 22px; height: 10px; border-radius: 3px; border: 1.5px solid rgb(255 255 255 / 0.8); }
@@ -294,7 +295,8 @@
   .mock { scale: 0.85; }
 }
 
-/* one slow idle float, only for a pointer device that has not asked for less motion */
+/* one slow idle float, only for a pointer device that has not asked for less motion; tiles lift a touch under the
+   pointer at the same time (the `translate` composes with the reveal's transform) */
 @keyframes bentoFloat {
   0%, 100% { translate: 0 0; }
   50% { translate: 0 -6px; }
@@ -302,6 +304,8 @@
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .float { animation: bentoFloat 6s ease-in-out infinite; }
   .floatSlow { animation-delay: -3s; }
+  .tile { transition: translate 0.45s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s; }
+  .tile:hover { translate: 0 -3px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tile-ink) 16%, transparent), inset 0 1px 0 var(--tile-line, rgb(255 255 255 / 0.55)), 0 24px 48px -28px color-mix(in srgb, var(--tile-ink) 45%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) {
   .float { animation: none; }

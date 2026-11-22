@@ -1,4 +1,6 @@
 // R1282 public /partners page: copy, metadata, the scrubbed hero contract, art layers and the nav, footer and sitemap links.
+// R1302 moved the hero to the clasped handshake (CONTACT/SWAP, the clasp wrapper, the meet timeline); the motion and art
+// assertions below pin that contract, the copy and page checks are unchanged.
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, statSync } from "node:fs";
 
@@ -68,15 +70,18 @@ describe("R1282 hero motion contract", () => {
     expect(hero).toContain("gsap.matchMedia()");
     expect(hero).toContain("mm.add(MOTION_OK");
     expect(hero).toContain('"(prefers-reduced-motion: reduce)"');
-    expect(hero).toMatch(/mm\.add\(REDUCED[\s\S]*gsap\.set\(left[\s\S]*gsap\.set\(orb/);
+    expect(hero).toMatch(/mm\.add\(REDUCED[\s\S]*gsap\.set\(left[\s\S]*gsap\.set\(right[\s\S]*gsap\.set\(shake, \{ opacity: 1 \}\)[\s\S]*gsap\.set\(orb, \{ opacity: 0 \}\)/);
   });
-  test("tween targets match the brief", () => {
-    expect(hero).toContain("left: { xPercent: 4, yPercent: 6, scale: 0.8 }");
-    expect(hero).toContain("right: { xPercent: -4, yPercent: 6, scale: 0.8 }");
-    expect(hero).toContain("orb: { yPercent: -12, scale: 0.7, rotation: 14 }");
-    expect(hero).toContain("{ xPercent: -14, yPercent: 0, scale: 1 }");
-    expect(hero).toContain("{ xPercent: 14, yPercent: 0, scale: 1 }");
-    expect(hero).toContain("{ opacity: 0.15, y: -24, duration: 0.4 }, 0.6");
+  test("tween targets match the brief (R1302: hands meet at CONTACT and cross-fade into the clasp)", () => {
+    expect(hero).toContain("const CONTACT = 0.55;");
+    expect(hero).toContain("const SWAP = { at: CONTACT - 0.02, duration: 0.06 };");
+    expect(hero).toContain("const CLASP = { scale: 0.88, lap: 0.12 };");
+    expect(hero).toContain("left: { x: 0, y: 0, xPercent: -14, yPercent: 0, rotation: -5, scale: 1 }");
+    expect(hero).toContain("right: { x: 0, y: 0, xPercent: 14, yPercent: 0, rotation: 5, scale: 1 }");
+    expect(hero).toContain('rotation: 0, scale: CLASP.scale, duration: CONTACT, ease: "power2.inOut" }, 0)');
+    expect(hero).toContain(".fromTo(shake, { opacity: 0, scale: 0.94 }, { opacity: 1, scale: 1, duration: SWAP.duration }, SWAP.at)");
+    expect(hero).toContain('{ yPercent: -10, scale: 0.5, rotation: 26, opacity: 0, duration: CONTACT - 0.08, ease: "power1.in" }, 0.08)');
+    expect(hero).toContain("{ opacity: 0.12, y: -36, duration: 0.4 }, 0.3");
   });
   test("refresh after fonts settle, no pin (CSS sticky stage instead)", () => {
     expect(hero).toContain("document.fonts?.ready.then(");
@@ -99,8 +104,8 @@ describe("R1282 hero motion contract", () => {
     expect(hero.split("mm.add(REDUCED")[1]).not.toContain("pointermove");
   });
   test("will-change only on the moving layers", () => {
-    const owners = [...css.matchAll(/\.(\w+) \{[^}]*will-change: transform;/g)].map((m) => m[1]).sort();
-    expect(owners).toEqual(["halo", "hand", "orb"]);
+    const owners = [...css.matchAll(/\.(\w+) \{[^}]*will-change: transform(?:, opacity)?;/g)].map((m) => m[1]).sort();
+    expect(owners).toEqual(["burst", "clasp", "halo", "hand", "orb", "shake"]);
     expect(hero).not.toContain("will-change");
     expect(art).not.toContain("will-change");
   });
@@ -113,8 +118,8 @@ describe("R1282 hero motion contract", () => {
 describe("R1282 hero art", () => {
   test("art is decorative and the layers are separate elements", () => {
     expect(art).toContain('<div className={s.art} aria-hidden="true">');
-    for (const k of ["halo", "left", "right", "orb"]) expect(art).toContain(`data-hero="${k}"`);
-    expect(art.match(/alt=""/g)?.length).toBe(3);
+    for (const k of ["halo", "left", "right", "orb", "clasp", "shake", "burst"]) expect(art).toContain(`data-hero="${k}"`);
+    expect(art.match(/alt=""/g)?.length).toBe(4);
   });
   test.each([
     ["hand-robot.svg", 'viewBox="0 0 1104 936"'],

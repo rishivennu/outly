@@ -1,4 +1,5 @@
 // R1287 /partners bento: copy, tile clipping, palette, play serif, decorative mockups, guarded idle float.
+// R1302: brand-only gradient tones (mint, moss, lime, deep, night) and the mockup entrances in Motion.tsx.
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
@@ -17,8 +18,8 @@ const TILES = [
 ] as const;
 
 const PALETTE = [
-  "#DCD2F7", "#3B2A6B", "#F5B6CC", "#5B1D38", "#CFE3A8", "#1E3A14", "#F7E6A3", "#5A4300",
-  "#F4B183", "#5A2A0B", "#BBD6EA", "#1F3A52", "#B5FF00", "#0B1A00", "#173A24", "#E9FFE0", "#FFF", "#FFFFFF", "#080808",
+  "#E9FFE0", "#173A24", "#F6FFF0", "#D2F3C2", "#CFE3A8", "#1E3A14", "#E2F0C4", "#B8D48C", "#B5FF00", "#0B1A00", "#D4FF66", "#9EE000",
+  "#22533A", "#0F2718", "#080808", "#F5F5F5", "#1C211B", "#050505", "#FFF", "#FFFFFF",
 ];
 
 const rule = (sel: string) => {
@@ -56,7 +57,7 @@ describe("R1287 bento structure", () => {
   test("every tile clips its mockup", () => {
     expect(rule(".tile")).toContain("overflow: hidden");
     expect(tsx.match(/<Tile\b/g)?.length).toBe(6);
-    expect(tsx).toContain("<article className={cx(s.tile, tone)}>");
+    expect(tsx).toContain("<article className={cx(s.tile, tone)} data-tile data-tilt>");
   });
   test("12-column grid with named areas, tall tile A", () => {
     expect(css).toContain("grid-template-columns: repeat(12, minmax(0, 1fr));");
@@ -71,7 +72,7 @@ describe("R1287 bento structure", () => {
     expect(tsx).toContain('<h3 className={cx("play", s.title)}>');
   });
   test("each of the six mockup roots is aria-hidden", () => {
-    const roots = tsx.match(/<div aria-hidden="true" className=\{cx\(s\.mock, s\.mock[A-F]\)\}>/g) ?? [];
+    const roots = tsx.match(/<div aria-hidden="true" className=\{cx\(s\.mock, s\.mock[A-F]\)\} data-anim="\w+">/g) ?? [];
     expect(roots.length).toBe(6);
     for (const k of ["A", "B", "C", "D", "E", "F"]) expect(tsx).toContain(`s.mock${k})`);
   });
@@ -82,7 +83,7 @@ describe("R1287 bento structure", () => {
 });
 
 describe("R1287 bento palette and motion", () => {
-  test("only palette hexes plus #fff and #080808", () => {
+  test("only brand palette hexes plus #fff", () => {
     const hexes = [...(tsx + css).matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((m) => m[0].toUpperCase());
     expect(hexes.length).toBeGreaterThan(0);
     for (const h of hexes) expect(PALETTE).toContain(h);
@@ -96,8 +97,15 @@ describe("R1287 bento palette and motion", () => {
   test("phones shrink the mockups", () => {
     expect(css).toMatch(/@media \(max-width: 767px\) \{\n  \.mock \{ scale: 0\.85; \}/);
   });
-  test("no GSAP and no transition-all", () => {
+  test("no GSAP in the server component (motion lives in Motion.tsx) and no transition-all", () => {
     expect(tsx).not.toMatch(/gsap/i);
+    expect(tsx).toContain('<PartnersMotion root="what" />');
     expect(css).not.toContain("transition: all");
+  });
+  test("tile tones are the brand gradients and the pastels are gone", () => {
+    const tones = [...tsx.matchAll(/tone=\{s\.(\w+)\}/g)].map((m) => m[1]);
+    expect(tones).toEqual(["mint", "deep", "moss", "lime", "night", "mint"]);
+    for (const t of ["lavender", "blush", "butter", "apricot", "sky"]) expect(css).not.toContain(`.${t}`);
+    expect(rule(".tile")).toContain("linear-gradient(150deg, var(--tile-hi) 0%, var(--tile-bg) 46%, var(--tile-lo) 100%)");
   });
 });

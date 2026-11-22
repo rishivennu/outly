@@ -1,4 +1,5 @@
-// R1287 /partners tiers, criteria, steps and contact band in the flat pastel tile style.
+// R1287 /partners tiers, criteria, steps and contact band as soft tiles. R1302 moved them to the brand palette (four
+// gradient tones: mint, moss, lime, deep) and added the section motion (Motion.tsx); the copy checks are unchanged.
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
@@ -7,7 +8,7 @@ const src = read("components/partners/Sections.tsx");
 const css = read("components/partners/sections.module.css");
 const flat = src.replace(/\s+/g, " ");
 
-const PALETTE = ["dcd2f7", "3b2a6b", "f5b6cc", "5b1d38", "cfe3a8", "1e3a14", "f7e6a3", "5a4300", "f4b183", "5a2a0b", "bbd6ea", "1f3a52", "b5ff00", "0b1a00", "173a24", "e9ffe0", "ffffff"];
+const PALETTE = ["e9ffe0", "173a24", "cfe3a8", "1e3a14", "b5ff00", "0b1a00", "f6fff0", "d2f3c2", "e2f0c4", "b8d48c", "d4ff66", "9ee000", "22533a", "0f2718", "080808", "ffffff"];
 
 const lum = (hex: string) => {
   const c = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
@@ -48,9 +49,11 @@ describe("R1287 copy unchanged", () => {
 });
 
 describe("R1287 tile style", () => {
-  test("tier and step tones follow the brief", () => {
+  test("tier and step tones are the four brand tones", () => {
     const tones = [...src.matchAll(/tone: "(\w+)"/g)].map((m) => m[1]);
-    expect(tones).toEqual(["sky", "butter", "blush", "lavender", "moss", "apricot", "sky"]);
+    expect(tones).toEqual(["mint", "moss", "lime", "mint", "moss", "deep", "lime"]);
+    expect(src).toContain('type Tone = "mint" | "moss" | "lime" | "deep";');
+    for (const t of ["lavender", "blush", "butter", "apricot", "sky"]) expect(css).not.toContain(`.${t}`);
   });
   test("only palette hexes in both files", () => {
     const hexes = [...(src + css).matchAll(/#([0-9a-fA-F]{6})\b/g)].map((m) => m[1].toLowerCase());
@@ -65,21 +68,22 @@ describe("R1287 tile style", () => {
     expect(src.match(/<h3 className=\{cn\("play", s\.title\)\}>/g)?.length).toBe(2);
     expect(src).toContain('<p className="eyebrow mb-5">');
   });
-  test("tiles: radius 24 phone / 28 desktop, overflow hidden, no border, gradient or shadow", () => {
+  test("tiles: radius 24 phone / 28 desktop, overflow hidden, one soft brand gradient and a hairline, no border or blur", () => {
     const tile = css.match(/\.tile \{[^}]+\}/)![0];
     expect(tile).toContain("border-radius: 24px");
     expect(tile).toContain("overflow: hidden");
+    expect(tile).toContain("radial-gradient(70% 60% at 100% 0%, var(--t-glow), transparent 70%)");
+    expect(tile).toContain("linear-gradient(150deg, var(--t-hi) 0%, var(--t-bg) 46%, var(--t-lo) 100%)");
     expect(css).toMatch(/@media \(min-width: 640px\) \{\s*\.tile \{ border-radius: 28px;/);
-    expect(css).not.toMatch(/gradient|backdrop-filter|border:/);
-    const shadows = [...css.matchAll(/([.\w\s-]+)\{[^}]*box-shadow/g)].map((m) => m[1].trim());
-    expect(shadows).toEqual([".creator"]);
+    expect(css).not.toMatch(/backdrop-filter|border:/);
     expect(css).toContain("box-shadow: 0 20px 50px -20px rgb(0 0 0 / 0.35)");
   });
   test("deep-tone body copy stays at least 4.5:1 on every tile", () => {
     expect(css).toContain("color-mix(in srgb, var(--t-ink) 85%, transparent)");
-    const tones = [...css.matchAll(/--t-bg: #(\w{6}); --t-ink: #(\w{6});/g)].map((m) => [m[1], m[2]]);
-    expect(tones.length).toBeGreaterThanOrEqual(7);
-    for (const [bg, ink] of tones) expect(ratio(bg, mix(ink, bg, 0.85))).toBeGreaterThanOrEqual(4.5);
+    const tones = [...css.matchAll(/--t-bg: #(\w{6}); --t-ink: #(\w{6});[^}]*--t-hi: #(\w{6}); --t-lo: #(\w{6});/g)].map((m) => [m[1], m[2], m[3], m[4]]);
+    expect(tones.length).toBe(8); // four tile tones and the four chip tones
+    // body copy at 85% ink must hold 4.5:1 against the gradient's lightest and darkest stops as well as its base
+    for (const [bg, ink, hi, lo] of tones) for (const b of [bg, hi, lo]) expect(ratio(b, mix(ink, bg, 0.85))).toBeGreaterThanOrEqual(4.5);
   });
   test("criteria are a semantic list of 44px sticker chips with tilts", () => {
     expect(flat).toContain('<Reveal as="ul" stagger className={s.chips}>');
@@ -102,6 +106,7 @@ describe("R1287 motion", () => {
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.creator \{ animation: none; \}/);
     expect(css).toContain("translate: 0 -6px");
     expect(src).not.toMatch(/gsap|ScrollTrigger|useGSAP/);
+    expect(src).toContain('<PartnersMotion root="who" />');
     expect(src).not.toContain("transition-all");
   });
   test("tiles reveal on enter", () => {
@@ -119,6 +124,6 @@ describe("R1287 contact band", () => {
     expect(flat).toContain("Write to partners@outlly.com");
     expect(flat).toMatch(/<Link href="\/help" className="inline-flex min-h-11 [^"]*border-\[#E9FFE0\]\/40[^"]*text-\[#E9FFE0\][^"]*focus-visible:outline[^"]*" > Read the FAQ <\/Link>/);
     expect(flat).toContain("s.deep");
-    expect(css).toContain(".deep { --t-bg: #173a24; --t-ink: #e9ffe0; }");
+    expect(css).toMatch(/\.deep \{ --t-bg: #173a24; --t-ink: #e9ffe0;[^}]*--t-card: #173a24; \}/);
   });
 });
