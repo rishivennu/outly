@@ -107,6 +107,8 @@ All of them need `Authorization: Bearer $CRON_SECRET`; Vercel Cron sends it auto
 
 **The sweep is in `vercel.json` (R1297, Vercel Pro).** Pro allows minute crons, so the deployment drives its own sweep and nothing outside the app needs to call it. If an external pinger (cron-job.org) is still pointed at it, switch that pinger off: two callers a minute double the sweep's compute for no gain (the route is idempotent, so nothing breaks while both run).
 
+**Watch the watcher (R1298).** The Watchdog runs inside the sweep, so a sweep that has stopped cannot report itself. `GET /api/health?sweeper=1` answers 503 once the sweep this deployment relies on has been quiet for more than `SWEEP_STALE_MS` (3 minutes) or has never run; otherwise 200 with `{ sweeper: { source, ageSec, stale } }`. Point an outside monitor at it (cron-job.org, every 10 minutes, notify on failure) and you hear about a dead sweep before a creator does. The plain `/api/health` is unchanged: it means "app and database up" and is what load balancers and the Watchdog's own app check use.
+
 **On Vercel Hobby** remove the sweep line from `vercel.json` (Hobby only allows daily crons, and a sub-daily entry makes a Hobby deploy *fail*) and point a pinger at it every minute instead:
 
 ```

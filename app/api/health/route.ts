@@ -3,6 +3,7 @@ import { hasAdminCookie } from "@/lib/admin/auth";
 import { safeEqual } from "@/lib/crypto";
 import { paymentsMock } from "@/lib/billing/service";
 import { usingRedis } from "@/lib/queue";
+import { sweeperHealth } from "@/lib/queue/health";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,15 @@ export async function GET(req: Request) {
     const dbMs = Date.now() - t;
     // Operational counters say nothing secret, but they are only useful to whoever runs the deploy.
     const extra = (await trusted(req)) ? await queueInfo().catch(() => ({})) : {};
+    // R1298 dead-man check, for an outside monitor: GET /api/health?sweeper=1. The Watchdog rides the sweep, so when
+    // the sweep stops nothing inside the app can say so. This answers 503 once the sweep this deployment relies on
+    // has been quiet past SWEEP_STALE_MS (or never ran). Only when asked: the plain probe keeps meaning "app and
+    // database up" for load balancers and the Watchdog's own app check. Says how old the last sweep is, nothing else.
+    if (new URL(req.url).searchParams.get("sweeper") === "1") {
+      const s = await sweeperHealth();
+      const sweeper = { source: s.source, ageSec: s.lastAt === null ? null : Math.max(0, Math.round((Date.now() - s.lastAt) / 1000)), stale: s.stale };
+      return Response.json({ ok: !s.stale, dbMs, sweeper, ...extra }, { status: s.stale ? 503 : 200, headers: { "cache-control": "no-store" } });
+    }
     return Response.json({ ok: true, dbMs, ...extra }, { headers: { "cache-control": "no-store" } });
   } catch (e) {
     const err = e as { name?: string; errorCode?: string; code?: string; message?: string };
