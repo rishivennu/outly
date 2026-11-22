@@ -282,3 +282,30 @@ describe("R1297: a post the platform refuses insights for is not asked again eve
     expect(s).not.toContain("metricsCheckedAt: now");
   });
 });
+
+describe("R1297d: a repeated notification event is one read, not a refused insert", () => {
+  test("the second recordEvent with the same idemKey never reaches the database's insert", async () => {
+    const { db } = await import("../lib/db");
+    const { recordEvent } = await import("../lib/notify-engine");
+    const { spyOn } = await import("bun:test");
+    const u = await db.user.create({ data: { name: "R1297d", email: `r1297d-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x" } });
+    const key = `r1297d:${u.id}:${Date.now()}`;
+    const input = { userId: u.id, kind: "new_comment" as const, source: "test:r1297d", idemKey: key, payload: { title: "A", body: "B", key } };
+    const first = await recordEvent(input);
+    expect(first.duplicate).toBe(false);
+    const create = spyOn(db.notifyEvent, "create");
+    try {
+      const again = await recordEvent(input);
+      expect(again).toEqual({ id: first.id, duplicate: true });
+      expect(create).toHaveBeenCalledTimes(0);
+    } finally {
+      create.mockRestore();
+    }
+  });
+  test("the engine looks before it writes", () => {
+    const s = src("lib/notify-engine.ts");
+    expect(s).toContain('const seen = await db.notifyEvent.findUnique({ where: { idemKey: input.idemKey }, select: { id: true } }).catch(() => null);');
+    expect(s).toContain("if (seen) return { id: seen.id, duplicate: true };");
+    expect(s.indexOf("const seen = await db.notifyEvent.findUnique")).toBeLessThan(s.indexOf("await db.notifyEvent.create({ data, select: { id: true } })"));
+  });
+});

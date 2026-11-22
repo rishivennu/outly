@@ -69,6 +69,12 @@ export async function recordEvent(input: NotifyEventInput) {
     payload: JSON.stringify(input.payload),
     nextAt: input.nextAt ?? new Date(),
   };
+  // R1297d: a repeat is the normal case for the sweeps (a digest, a greeting, a partner deadline is re-offered every
+  // housekeeping run until its slot passes), so look first. That is one indexed read instead of an insert the
+  // database refuses (which Prisma logs as an error) followed by the same read. Two sweeps racing on a new key still
+  // meet the unique index, and that is caught below.
+  const seen = await db.notifyEvent.findUnique({ where: { idemKey: input.idemKey }, select: { id: true } }).catch(() => null);
+  if (seen) return { id: seen.id, duplicate: true };
   try {
     const row = await db.notifyEvent.create({ data, select: { id: true } });
     return { id: row.id, duplicate: false };
