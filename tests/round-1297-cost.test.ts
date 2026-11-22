@@ -8,6 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { BLOG_SLOT, HOUSEKEEPING_SLOT, sweepPlan, wantsFull } from "@/lib/queue/plan";
 import { CYCLE_STALE_MS, CYCLE_STALE_SEC } from "@/lib/health/core";
+import { lastSweepAt, recordSweep, SWEEP_DEDUPE_MS } from "@/lib/queue/health";
 
 const src = (p: string) => readFileSync(p, "utf8");
 const at = (min: number) => new Date(2026, 10, 22, 10, min, 0);
@@ -56,7 +57,8 @@ describe("the sweep route follows the plan", () => {
   const s = src("app/api/cron/sweep/route.ts");
   test("one plan per call, from the request clock and ?full", () => {
     expect(s).toContain('import { sweepPlan, wantsFull } from "@/lib/queue/plan";');
-    expect(s).toContain("const plan = sweepPlan(now, wantsFull(req.nextUrl));");
+    expect(s).toContain("const full = wantsFull(req.nextUrl);");
+    expect(s).toContain("const plan = sweepPlan(now, full);");
     expect(s).toContain("const now = new Date(startedAt);");
   });
   test("every minute: due posts, stuck targets, heartbeat, reminders, push outbox, the notification events", () => {
@@ -92,6 +94,30 @@ describe("the sweep route follows the plan", () => {
   });
   test("the answer reports the plan it ran", () => {
     expect(s).toContain("NextResponse.json({ ok: true, plan, requeued,");
+  });
+});
+
+describe("a second caller in the same minute is answered without a sweep", () => {
+  test("the guard: heartbeat under SWEEP_DEDUPE_MS old, not when ?full=1, never on an unreadable heartbeat", () => {
+    const s = src("app/api/cron/sweep/route.ts");
+    expect(SWEEP_DEDUPE_MS).toBe(40_000);
+    expect(s).toContain('import { lastSweepAt, recordSweep, SWEEP_DEDUPE_MS } from "@/lib/queue/health";');
+    expect(s).toContain("if (!full) {\n    const last = await lastSweepAt(\"cron\");\n    if (last !== null && startedAt - last < SWEEP_DEDUPE_MS) return NextResponse.json({ ok: true, skipped: \"recent\", lastAt: last }");
+    // The guard sits after auth and before any work.
+    expect(s.indexOf("lastSweepAt(\"cron\")")).toBeGreaterThan(s.indexOf("safeEqual(req.headers.get(\"authorization\")"));
+    expect(s.indexOf("lastSweepAt(\"cron\")")).toBeLessThan(s.indexOf("await sweepDuePosts();"));
+  });
+  test("lastSweepAt reads the heartbeat recordSweep writes; nothing recorded is null", async () => {
+    expect(await lastSweepAt("cron")).toBeNull();
+    const at = Date.now() - 12_000;
+    await recordSweep("cron", at);
+    expect(await lastSweepAt("cron")).toBe(at);
+    // 12 s old: a second caller would be skipped; 50 s old: it runs.
+    expect(Date.now() - at < SWEEP_DEDUPE_MS).toBe(true);
+    expect(Date.now() - (at - 40_000) < SWEEP_DEDUPE_MS).toBe(false);
+  });
+  test("one caller a minute is never skipped: a 60 s cadence with 15 s of jitter stays past the window", () => {
+    expect(60_000 - 15_000 > SWEEP_DEDUPE_MS).toBe(true);
   });
 });
 

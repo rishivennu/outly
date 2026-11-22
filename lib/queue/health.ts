@@ -13,6 +13,19 @@ const key = (s: SweepSource) => `sweeper:last:${s}`;
 /** No sweep for this long means scheduled posts are going out late (it should run every minute). */
 export const SWEEP_STALE_MS = 3 * 60_000;
 
+/**
+ * R1297: two callers a minute (Vercel Cron plus an external pinger still pointed at the route) would run every step
+ * twice. A sweep that started under this long ago means a second call adds nothing. Under a minute with margin for
+ * the scheduler's jitter, so one caller a minute is never skipped.
+ */
+export const SWEEP_DEDUPE_MS = 40_000;
+
+/** When the last sweep of this source ran (its heartbeat), or null when there is none or it cannot be read. */
+export async function lastSweepAt(source: SweepSource): Promise<number | null> {
+  const row = await db.setting.findUnique({ where: { key: key(source) } }).catch(() => null);
+  return row && /^\d+$/.test(row.value) ? Number(row.value) : null;
+}
+
 export async function recordSweep(source: SweepSource, now = Date.now()) {
   const value = String(now);
   await db.setting.upsert({ where: { key: key(source) }, create: { key: key(source), value }, update: { value } }).catch((e) => console.error("[sweeper-health]", e));

@@ -3,7 +3,7 @@ import { env } from "@/lib/env";
 import { safeEqual } from "@/lib/crypto";
 import { requeueStuckTargets, sweepDirectUploads, sweepDuePosts } from "@/lib/queue/handlers";
 import { settle } from "@/lib/queue";
-import { recordSweep } from "@/lib/queue/health";
+import { lastSweepAt, recordSweep, SWEEP_DEDUPE_MS } from "@/lib/queue/health";
 import { runCleanups } from "@/lib/account-cleanup";
 import { sweepReminders } from "@/lib/retention/reminders";
 import { cleanupSubs, drainOutbox } from "@/lib/push/webpush";
@@ -24,8 +24,16 @@ async function sweep(req: NextRequest) {
   if (!env.CRON_SECRET) return NextResponse.json({ error: "Set CRON_SECRET to enable the sweeper." }, { status: 503 });
   if (!safeEqual(req.headers.get("authorization") ?? "", `Bearer ${env.CRON_SECRET}`)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const now = new Date(startedAt);
-  // R1297: the creator-facing steps run every minute; housekeeping runs on its slot (lib/queue/plan.ts).
-  const plan = sweepPlan(now, wantsFull(req.nextUrl));
+  const full = wantsFull(req.nextUrl);
+  // R1297: a second caller inside the same minute (Vercel Cron and an external pinger both pointed here) would run
+  // every step twice. The heartbeat says when the last sweep started; under SWEEP_DEDUPE_MS ago, this call answers
+  // at once. ?full=1 always runs. An unreadable heartbeat never stops a sweep.
+  if (!full) {
+    const last = await lastSweepAt("cron");
+    if (last !== null && startedAt - last < SWEEP_DEDUPE_MS) return NextResponse.json({ ok: true, skipped: "recent", lastAt: last }, { headers: { "cache-control": "no-store" } });
+  }
+  // The creator-facing steps run every minute; housekeeping runs on its slot (lib/queue/plan.ts).
+  const plan = sweepPlan(now, full);
   // R1297: under Vercel Cron the request's Host is whatever URL the scheduler used (deployment or domain), so the
   // self-requests below (blog kick, watchdog probes) go to the public origin instead. Elsewhere the request origin is it.
   const origin = process.env.VERCEL ? env.APP_URL : req.nextUrl.origin;
