@@ -1,0 +1,464 @@
+/* R1304 Aurora: admin design variant 2.
+   A soft gradient canvas, white 28px cards, a glass header with a pill rail whose active pill is ink.
+   Every rule is scoped to .admin-root.aurora or .admin-layer.aurora so the classic design is untouched.
+   Token values are HSL triplets, read through hsl(var(--x)) like the rest of the repo. */
+
+/* Light tokens */
+.admin-root.aurora,
+.admin-layer.aurora {
+  --background: 150 20% 97%;
+  --foreground: 150 30% 8%;
+  --card: 0 0% 100%;
+  --card-foreground: 150 30% 8%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 150 30% 8%;
+  --muted: 150 14% 94.5%;
+  --muted-foreground: 160 8% 34%;
+  --secondary: 150 16% 93.5%;
+  --secondary-foreground: 150 30% 10%;
+  --accent: 262 72% 56%;
+  --border: 150 12% 88%;
+  --input: 150 10% 80%;
+  --ring: 145 43% 22%;
+  --radius: 1.25rem;
+
+  --au-ink: 95 100% 5%;
+  --au-on-ink: 0 0% 100%;
+  --au-mint: 104 100% 94%;
+  --au-moss: 81 50% 77%;
+  --au-radius-card: 28px;
+  --au-radius-pill: 999px;
+  --au-line: 150 30% 8% / 0.08;
+  --au-glass: 0 0% 100% / 0.66;
+  --au-glass-solid: 0 0% 100%;
+  --au-shadow-card: 0 1px 1px hsl(150 30% 8% / 0.03), 0 2px 6px -2px hsl(150 30% 8% / 0.05), 0 18px 40px -26px hsl(150 30% 12% / 0.2);
+  --au-shadow-float: 0 2px 4px hsl(150 30% 8% / 0.04), 0 10px 24px -10px hsl(150 30% 8% / 0.1), 0 30px 60px -30px hsl(150 30% 12% / 0.28);
+  --au-shadow-hero: 0 1px 2px hsl(150 30% 8% / 0.04), 0 0 0 1px hsl(var(--lime) / 0.22), 0 28px 70px -30px hsl(var(--lime) / 0.6);
+  --au-canvas:
+    radial-gradient(70% 55% at 10% 0%, hsl(104 100% 93% / 0.9), transparent 70%),
+    radial-gradient(60% 50% at 100% 8%, hsl(196 80% 92% / 0.85), transparent 70%),
+    radial-gradient(55% 60% at 85% 100%, hsl(78 100% 60% / 0.14), transparent 70%),
+    linear-gradient(180deg, hsl(150 25% 97.5%), hsl(150 18% 95.5%));
+  --au-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --au-fast: 180ms;
+  --au-mid: 300ms;
+  --au-slow: 450ms;
+
+  --glass-bg: var(--au-glass);
+  --glass-solid: var(--au-glass-solid);
+  --glass-border: var(--au-line);
+  --admin-card-line: var(--au-line);
+  --admin-card-shadow: var(--au-shadow-card);
+  --admin-card-hover-shadow: var(--au-shadow-float);
+}
+
+/* Dark tokens */
+.dark .admin-root.aurora,
+.dark .admin-layer.aurora {
+  --background: 160 10% 5%;
+  --foreground: 150 12% 92%;
+  --card: 160 6% 9%;
+  --card-foreground: 150 12% 92%;
+  --popover: 160 6% 10%;
+  --popover-foreground: 150 12% 92%;
+  --muted: 160 5% 14%;
+  --muted-foreground: 150 6% 66%;
+  --secondary: 160 5% 14%;
+  --secondary-foreground: 150 10% 90%;
+  --accent: 262 85% 74%;
+  --border: 160 5% 18%;
+  --input: 160 5% 24%;
+  --ring: 78 100% 55%;
+
+  --au-ink: 150 12% 94%;
+  --au-on-ink: 95 100% 5%;
+  --au-line: 0 0% 100% / 0.07;
+  --au-glass: 160 8% 7% / 0.62;
+  --au-glass-solid: 160 7% 8%;
+  --au-shadow-card: 0 1px 2px hsl(0 0% 0% / 0.3), 0 16px 36px -24px hsl(0 0% 0% / 0.75);
+  --au-shadow-float: 0 2px 4px hsl(0 0% 0% / 0.34), 0 24px 50px -24px hsl(0 0% 0% / 0.9);
+  --au-shadow-hero: 0 1px 2px hsl(0 0% 0% / 0.3), 0 0 0 1px hsl(var(--lime) / 0.12), 0 30px 80px -36px hsl(var(--lime) / 0.26);
+  --au-canvas:
+    radial-gradient(70% 55% at 10% 0%, hsl(145 45% 16% / 0.55), transparent 70%),
+    radial-gradient(50% 45% at 100% 6%, hsl(170 40% 14% / 0.4), transparent 70%),
+    radial-gradient(55% 60% at 85% 100%, hsl(78 100% 50% / 0.06), transparent 70%),
+    linear-gradient(180deg, hsl(160 10% 5.5%), hsl(160 10% 4%));
+}
+
+/* Canvas */
+.admin-root.aurora { background: transparent; color: hsl(var(--foreground)); }
+.admin-root.aurora::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--au-canvas);
+  background-color: hsl(var(--background));
+}
+
+/* Header */
+.admin-root.aurora .au-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--admin-z-header);
+  min-height: 64px;
+  background: hsl(var(--au-glass));
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  transition: box-shadow var(--au-mid) var(--au-ease), background-color var(--au-mid) var(--au-ease);
+}
+.admin-root.aurora .au-header[data-lifted] { box-shadow: 0 1px 0 hsl(var(--au-line)), 0 10px 30px -22px hsl(150 30% 8% / 0.35); }
+.dark .admin-root.aurora .au-header[data-lifted] { box-shadow: 0 1px 0 hsl(var(--au-line)), 0 10px 30px -18px hsl(0 0% 0% / 0.8); }
+.admin-root.aurora .au-brand { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; color: hsl(var(--foreground)); font-weight: 650; letter-spacing: -0.02em; }
+.admin-root.aurora .au-brand-pill { background: hsl(var(--au-ink)); color: hsl(var(--au-on-ink)); letter-spacing: -0.01em; }
+.admin-layer.aurora .au-sheet-overlay { background: hsl(var(--au-ink) / 0.35); }
+.dark .admin-layer.aurora .au-sheet-overlay { background: hsl(0 0% 0% / 0.6); }
+
+.admin-root.aurora .au-nav {
+  display: none; /* below lg the drawer carries the sections (the markup's `hidden lg:block` loses to this scope) */
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--au-radius-pill);
+  background: hsl(var(--secondary) / 0.7);
+  box-shadow: inset 0 0 0 1px hsl(var(--au-line));
+}
+.admin-root.aurora .au-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--au-radius-pill);
+  color: hsl(var(--muted-foreground));
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color var(--au-fast) var(--au-ease), color var(--au-fast) var(--au-ease), box-shadow var(--au-fast) var(--au-ease);
+}
+@media (hover: hover) {
+  .admin-root.aurora .au-pill:hover { background: hsl(var(--card)); color: hsl(var(--foreground)); }
+}
+.admin-root.aurora .au-pill[aria-current] {
+  background: hsl(var(--au-ink));
+  color: hsl(var(--au-on-ink));
+  box-shadow: 0 6px 16px -8px hsl(150 30% 8% / 0.5);
+}
+.dark .admin-root.aurora .au-pill[aria-current] { box-shadow: 0 6px 18px -10px hsl(0 0% 0% / 0.9); }
+.admin-root.aurora .au-pill-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--au-radius-pill);
+  background: hsl(var(--lime));
+  color: hsl(var(--lime-foreground));
+  font-size: 11px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.admin-root.aurora .au-tools { display: flex; align-items: center; gap: 6px; }
+.admin-root.aurora .au-tools :is(button, a):not(.au-avatar) { min-height: 44px; min-width: 44px; border-radius: var(--au-radius-pill); }
+.admin-root.aurora :is(.au-avatar, .au-menu-btn) {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--au-radius-pill);
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  box-shadow: inset 0 0 0 1px hsl(var(--au-line)), 0 1px 2px hsl(150 30% 8% / 0.06);
+  transition: box-shadow var(--au-fast) var(--au-ease), background-color var(--au-fast) var(--au-ease);
+}
+@media (hover: hover) {
+  .admin-root.aurora .au-avatar:hover { box-shadow: 0 0 0 2px hsl(var(--lime) / 0.7), 0 6px 16px -8px hsl(var(--lime) / 0.8); }
+  .admin-root.aurora .au-menu-btn:hover { background: hsl(var(--secondary)); }
+}
+
+/* Section tabs and the sliding ink */
+.admin-root.aurora .au-tabs {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  padding: 4px 0;
+  overflow: visible;
+}
+.admin-root.aurora .au-tabs > * { min-width: 0; }
+.admin-root.aurora .au-tabs::-webkit-scrollbar { display: none; }
+.admin-root.aurora .au-tab {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--au-radius-pill);
+  color: hsl(var(--muted-foreground));
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color var(--au-fast) var(--au-ease), background-color var(--au-fast) var(--au-ease);
+}
+@media (hover: hover) {
+  .admin-root.aurora .au-tab:hover { color: hsl(var(--foreground)); }
+}
+.admin-root.aurora .au-tab[aria-current="page"] { color: hsl(var(--foreground)); font-weight: 600; }
+/* before JS places the ink (and without JS at all) the active tab carries the tint itself */
+.admin-root.aurora .au-tabs > :not([data-ink-ready]) .au-tab[aria-current="page"] { background: hsl(var(--lime) / 0.22); }
+.admin-root.aurora .au-ink {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 0;
+  border-radius: var(--au-radius-pill);
+  background: hsl(var(--lime) / 0.22);
+  box-shadow: inset 0 0 0 1px hsl(var(--lime) / 0.35);
+  pointer-events: none;
+  will-change: transform;
+}
+.dark .admin-root.aurora .au-ink { background: hsl(var(--lime) / 0.13); box-shadow: inset 0 0 0 1px hsl(var(--lime) / 0.22); }
+.dark .admin-root.aurora .au-tabs > :not([data-ink-ready]) .au-tab[aria-current="page"] { background: hsl(var(--lime) / 0.13); }
+
+/* Cards. Shadows and lines flow through the shared --admin-card-* vars; the radius only replaces Card's own default
+   so a page that passes its own rounded-* utility keeps it. */
+.admin-root.aurora .admin-card {
+  transition: transform var(--au-slow) var(--au-ease), box-shadow var(--au-slow) var(--au-ease), background-color var(--au-fast) var(--au-ease);
+}
+.admin-root.aurora .admin-card:is(.rounded-\[24px\], :not([class*="rounded"])) { border-radius: var(--au-radius-card); }
+.admin-root.aurora .admin-card--flat.rounded-\[24px\] { border-radius: 20px; }
+.dark .admin-root.aurora .admin-card.bg-card:not(.au-hero) { background-image: linear-gradient(180deg, hsl(0 0% 100% / 0.035), transparent 140px); }
+.admin-root.aurora .admin-card--float { box-shadow: inset 0 0 0 1px hsl(var(--au-line)), var(--au-shadow-float); }
+@media (hover: hover) {
+  .admin-root.aurora .kpi-card:hover { box-shadow: inset 0 0 0 1px hsl(var(--au-line)), var(--au-shadow-float); }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .admin-root.aurora :is(.admin-card[data-interactive], a.admin-card):hover { transform: translateY(-2px); }
+  .admin-root.aurora .kpi-card:hover { transform: translateY(-2px); }
+}
+
+/* Overview pieces */
+.admin-root.aurora .au-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--au-radius-card);
+  background:
+    radial-gradient(55% 90% at 100% 0%, hsl(var(--lime) / 0.32), transparent 70%),
+    linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(var(--au-mint)) 70%, hsl(var(--au-moss) / 0.7) 100%);
+  box-shadow: var(--au-shadow-hero);
+}
+.dark .admin-root.aurora .au-hero {
+  background:
+    radial-gradient(55% 90% at 100% 0%, hsl(var(--lime) / 0.12), transparent 70%),
+    linear-gradient(135deg, hsl(160 6% 10%) 0%, hsl(150 30% 11%) 65%, hsl(143 43% 16%) 100%);
+}
+.admin-root.aurora .au-stat { position: relative; overflow: hidden; }
+.admin-root.aurora .au-stat .font-display { letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.admin-root.aurora .au-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: var(--au-radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.admin-root.aurora .au-delta[data-tone="up"] { background: hsl(var(--lime)); color: hsl(var(--lime-foreground)); }
+.admin-root.aurora .au-delta[data-tone="down"] { background: hsl(0 80% 55% / 0.12); color: hsl(0 72% 36%); }
+.admin-root.aurora .au-delta[data-tone="flat"] { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+.dark .admin-root.aurora .au-delta[data-tone="down"] { background: hsl(0 60% 50% / 0.18); color: hsl(0 85% 78%); }
+.admin-root.aurora .au-side { align-self: start; }
+@media (min-width: 1024px) {
+  .admin-root.aurora .au-side { position: sticky; top: 9.5rem; }
+}
+.admin-root.aurora .au-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.admin-root.aurora .au-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  transition: background-color var(--au-fast) var(--au-ease);
+}
+.admin-root.aurora .au-row + .au-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: hsl(var(--au-line));
+  transition: opacity var(--au-fast) var(--au-ease);
+}
+@media (hover: hover) {
+  .admin-root.aurora .au-row:hover { background: hsl(var(--secondary) / 0.75); }
+  .admin-root.aurora .au-row:hover::before,
+  .admin-root.aurora .au-row:hover + .au-row::before { opacity: 0; }
+}
+.admin-root.aurora .au-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--au-radius-pill);
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color var(--au-fast) var(--au-ease), box-shadow var(--au-fast) var(--au-ease);
+}
+@media (hover: hover) {
+  .admin-root.aurora .au-chip:hover { background: hsl(var(--border)); }
+}
+
+/* Existing admin pages: tables, fields, notes, type and shared surfaces */
+.admin-root.aurora .atable > table > thead > tr > th { border-bottom-color: hsl(var(--au-line)); letter-spacing: 0.01em; }
+.admin-root.aurora .atable > table > tbody > tr > td { border-bottom-color: hsl(var(--au-line)); }
+@media (hover: hover) {
+  .admin-root.aurora .atable > table > tbody > tr:hover > td { background-color: hsl(var(--secondary) / 0.55); }
+}
+@media (max-width: 639.98px) {
+  .admin-root.aurora .atable--cards > table > tbody > tr:not([data-selected="true"], [aria-selected="true"]) {
+    border-radius: 20px;
+    background: hsl(var(--secondary) / 0.5);
+    box-shadow: inset 0 0 0 1px hsl(var(--au-line));
+  }
+  .admin-root.aurora .atable--cards > table > tbody > tr > td { background-color: transparent; }
+}
+.admin-root.aurora :is(input:not([type="checkbox"], [type="radio"], [type="range"]), select, textarea).border-input:not(.rounded-full) { border-radius: 14px; }
+.admin-root.aurora [role="status"]:is([class*="bg-secondary"]) { border-radius: 18px; box-shadow: inset 0 0 0 1px hsl(var(--au-line)); }
+.admin-root.aurora .eyebrow { color: hsl(var(--muted-foreground)); font-weight: 600; letter-spacing: 0.14em; }
+.admin-root.aurora :is(h1, h2, h3, h4) { letter-spacing: -0.02em; }
+.admin-root.aurora :is(h1, h2) { font-weight: 650; }
+.admin-root.aurora :is(h3, h4) { font-weight: 600; }
+.admin-root.aurora .font-display { letter-spacing: -0.02em; }
+.admin-root.aurora :is(.glass, .glass-strong),
+.admin-layer.aurora :is(.glass, .glass-strong) { background: hsl(var(--au-glass)); border-color: hsl(var(--au-line)); }
+.admin-root.aurora .hairline,
+.admin-layer.aurora .hairline { box-shadow: inset 0 0 0 1px hsl(var(--au-line)); }
+.admin-root.aurora .lime-glow { box-shadow: 0 0 0 1px hsl(var(--lime) / 0.45), 0 10px 28px -10px hsl(var(--lime) / 0.6); }
+.admin-root.aurora .admin-tip,
+.admin-layer.aurora .admin-tip { border-radius: 12px; background: hsl(var(--au-ink)); color: hsl(var(--au-on-ink)); box-shadow: var(--au-shadow-float); }
+.admin-layer.aurora .admin-card { border-radius: 22px; }
+
+/* Drawer (bottom sheet) */
+.admin-layer.aurora .au-sheet {
+  border-radius: 28px 28px 0 0;
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  box-shadow: 0 -1px 0 hsl(var(--au-line)), 0 -24px 60px -24px hsl(150 30% 8% / 0.35);
+  padding-bottom: max(16px, var(--sa-b));
+  padding-left: max(12px, var(--sa-l));
+  padding-right: max(12px, var(--sa-r));
+}
+.dark .admin-layer.aurora .au-sheet { box-shadow: 0 -1px 0 hsl(var(--au-line)), 0 -24px 60px -20px hsl(0 0% 0% / 0.85); }
+@media (min-width: 768px) {
+  .admin-layer.aurora .au-sheet { border-radius: 28px; box-shadow: inset 0 0 0 1px hsl(var(--au-line)), var(--au-shadow-float); }
+}
+.admin-layer.aurora .au-sheet-handle {
+  display: block;
+  width: 36px;
+  height: 5px;
+  margin: 8px auto 4px;
+  border-radius: var(--au-radius-pill);
+  background: hsl(var(--muted-foreground) / 0.4);
+}
+.admin-layer.aurora .au-sheet-group {
+  margin: 16px 12px 6px;
+  color: hsl(var(--muted-foreground));
+  font-weight: 600;
+}
+.admin-layer.aurora .au-sheet-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 14px;
+  color: hsl(var(--foreground));
+  font-size: 15px;
+  font-weight: 500;
+  transition: background-color var(--au-fast) var(--au-ease), color var(--au-fast) var(--au-ease);
+}
+@media (hover: hover) {
+  .admin-layer.aurora .au-sheet-link:hover { background: hsl(var(--secondary) / 0.7); }
+}
+.admin-layer.aurora .au-sheet-link[aria-current="page"] { background: hsl(var(--secondary)); font-weight: 600; }
+.admin-layer.aurora .au-sheet-link[aria-current="page"]::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-radius: var(--au-radius-pill);
+  background: hsl(var(--lime));
+  box-shadow: 0 0 0 3px hsl(var(--lime) / 0.25);
+}
+
+/* Responsive */
+@media (max-width: 639.98px) {
+  .admin-root.aurora,
+  .admin-layer.aurora { --au-radius-card: 22px; }
+  .admin-root.aurora :is(.au-hero, .au-stat) { padding: 18px; }
+  .admin-root.aurora .au-pill { padding: 0 14px; }
+}
+@media (min-width: 1024px) {
+  .admin-root.aurora .au-header { min-height: 72px; }
+  .admin-root.aurora .au-nav { display: inline-flex; margin-inline: auto; }
+  .admin-root.aurora .au-menu-btn { display: none; } /* the pill rail replaces the drawer button (its inline-grid above beats `lg:hidden`) */
+}
+
+/* More contrast */
+html[data-contrast="more"] .admin-root.aurora,
+html[data-contrast="more"] .admin-layer.aurora {
+  --muted-foreground: 160 10% 20%;
+  --border: 150 8% 45%;
+  --au-line: 150 30% 8% / 0.45;
+  --ring: 145 60% 18%;
+}
+html.dark[data-contrast="more"] .admin-root.aurora,
+html.dark[data-contrast="more"] .admin-layer.aurora {
+  --muted-foreground: 150 8% 84%;
+  --border: 160 4% 55%;
+  --au-line: 0 0% 100% / 0.4;
+  --ring: 78 100% 60%;
+}
+html[data-contrast="more"] .admin-root.aurora .au-header { background: hsl(var(--card)); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: 0 1px 0 hsl(var(--border)); }
+html[data-contrast="more"] .admin-root.aurora .au-nav { background: hsl(var(--card)); box-shadow: inset 0 0 0 1px hsl(var(--border)); }
+
+/* First paint before hydration (and no JS at all): cards rise in via CSS; useAuroraEnter sets data-aurora-js and
+   takes over, so nothing paints solid and then snaps to transparent. */
+@keyframes au-in {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .admin-root.aurora [data-aurora-stage]:not([data-aurora-js]) [data-aurora="card"] { animation: au-in 0.45s var(--au-ease) both; }
+}
+
+/* Reduced motion and reduced transparency */
+@media (prefers-reduced-motion: reduce) {
+  .admin-root.aurora :is(.admin-card, .kpi-card),
+  .admin-root.aurora :is(.admin-card, .kpi-card):hover { transition: none; transform: none; }
+  .admin-root.aurora :is(.au-pill, .au-tab, .au-chip, .au-row),
+  .admin-layer.aurora .au-sheet-link { transition: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .admin-root.aurora .au-header { background: hsl(var(--au-glass-solid)); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .admin-root.aurora :is(.glass, .glass-strong, .admin-card--float),
+  .admin-layer.aurora :is(.glass, .glass-strong, .admin-card--float) { background: hsl(var(--au-glass-solid)); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}

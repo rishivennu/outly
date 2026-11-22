@@ -15,6 +15,9 @@ import { LIVE_DEFAULT_MIN } from "@/lib/live-map-core";
 import { todayBlog } from "@/lib/blog/posts";
 import { blogReady } from "@/lib/blog/llm";
 import { TodayBlogCard } from "@/components/admin/blog/TodayBlogCard";
+import { AuroraOverview } from "@/components/admin/aurora/Overview";
+import { ADMIN_DESIGN_COOKIE, readDesign } from "@/lib/admin/design";
+import { cookies } from "next/headers";
 
 export const metadata = { title: "Overview" };
 
@@ -31,6 +34,11 @@ export default async function Overview(props: { searchParams: Promise<{ denied?:
   // Morning card (1175): "Your Today's Blog Is Ready!" for roles that can open Content Studio.
   const showBlog = can(admin.role, "content");
   const [o, live, blog] = await Promise.all([overview(90), showLive ? liveMap(LIVE_DEFAULT_MIN, Date.now(), admin.role).catch(() => null) : Promise.resolve(null), showBlog ? todayBlog() : Promise.resolve(null)]);
+  // R1304: the Aurora design draws the same numbers as a different composition (components/admin/aurora/Overview).
+  // Same loaders above, same gates below; nothing is fetched twice.
+  if (readDesign((await cookies()).get(ADMIN_DESIGN_COOKIE)?.value) === "aurora") {
+    return <AuroraOverview admin={{ name: admin.name, role: admin.role }} o={o} live={live} blog={blog} denied={searchParams.denied} />;
+  }
   const k = o.kpi;
   const money = can(admin.role, "payments");
   const empty = k.totalUsers < 3 && !o.sample;

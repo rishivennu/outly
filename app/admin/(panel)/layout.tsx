@@ -8,6 +8,9 @@ import { usingDefaultPassword } from "@/lib/admin/auth";
 import { can } from "@/lib/admin/perms";
 import { sweeperHealth, type SweeperHealth } from "@/lib/queue/health";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { AuroraShell } from "@/components/admin/aurora/AuroraShell";
+import { ADMIN_DESIGN_COOKIE, readDesign } from "@/lib/admin/design";
+import "@/components/admin/aurora/aurora.css";
 import { ToastProvider } from "@/components/shared/Toast";
 import { adminAppMeta } from "@/lib/admin/app-meta";
 import { THEME_COOKIE } from "@/lib/theme/colors";
@@ -39,6 +42,10 @@ function ago(ms: number) {
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const admin = await requireAdmin();
+  // R1304: which console design this admin picked (cookie, path /admin). Classic is the default; Aurora is the second
+  // design (components/admin/aurora). Same pages, same loaders, same APIs: only the shell around them changes.
+  const design = readDesign((await cookies()).get(ADMIN_DESIGN_COOKIE)?.value);
+  const Shell = design === "aurora" ? AuroraShell : AdminShell;
   const [weak, openTickets, sweep, liveWaiting] = await Promise.all([
     usingDefaultPassword(admin.id),
     // The sidebar badge can lag a few seconds; it should not cost a database trip on every click.
@@ -54,7 +61,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground">
         Skip to main content
       </a>
-      <AdminShell admin={{ name: admin.name, role: admin.role }} badges={{ tickets: openTickets, live: liveWaiting }}>
+      <Shell admin={{ name: admin.name, role: admin.role }} badges={{ tickets: openTickets, live: liveWaiting }}>
         {weak && (
           <div role="alert" className="mb-6 flex flex-wrap items-center gap-3 rounded-[20px] bg-warning/12 px-4 py-3 text-[13.5px] hairline">
             <AlertTriangle className="h-4 w-4 shrink-0 text-warning" aria-hidden />
@@ -73,7 +80,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
         )}
         {children}
-      </AdminShell>
+      </Shell>
     </ToastProvider>
   );
 }
