@@ -4,7 +4,7 @@ import { cached } from "../cache";
 import { noticeMilestones } from "../notify-events";
 import { isPlatform, PLATFORM_META, type Platform } from "../domain";
 import { liveAccount } from "../live/account";
-import { asPublisherError, httpFailure } from "../social/types";
+import { asPublisherError, httpFailure, PublisherError } from "../social/types";
 import type { AccountContext } from "../social/types";
 import { engagementNote, engagementRate, type MetricKey, type PostInsights, type TargetInsights } from "./post-core";
 
@@ -19,7 +19,7 @@ export const REFRESH_MIN_AGE_MS = 30_000; // a manual refresh younger than this 
 const SNAPSHOT_EVERY_MS = 30 * 60_000;
 const T = () => AbortSignal.timeout(10_000);
 
-const SUPPORTED: Platform[] = ["instagram", "youtube", "facebook", "threads"];
+const SUPPORTED: Platform[] = ["instagram", "youtube", "facebook", "threads", "tiktok"];
 
 /** Per platform, what its API can ever give for a single video. Used to label the rest "not available". */
 export const CAN: Record<string, MetricKey[]> = {
@@ -27,6 +27,7 @@ export const CAN: Record<string, MetricKey[]> = {
   youtube: ["views", "likes", "comments", "shares", "engagementRate", "avgWatchSec", "watchTimeMin"],
   facebook: ["views", "reach", "likes", "comments", "avgWatchSec", "watchTimeMin", "engagementRate"],
   threads: ["views", "likes", "comments", "shares", "engagementRate"],
+  tiktok: ["views", "likes", "comments", "shares", "engagementRate"],
 };
 const ALL: MetricKey[] = ["views", "reach", "impressions", "likes", "comments", "shares", "saves", "engagementRate", "watchTimeMin", "avgWatchSec"];
 
@@ -194,7 +195,41 @@ async function threads(acct: AccountContext, mediaId: string): Promise<Fetched> 
   return { metrics: m, notes: [engagementNote(m, "views"), "Threads counts replies as comments here, and reposts, quotes and shares together as shares.", "Threads does not report reach or saves for a post."].filter((x): x is string => !!x) };
 }
 
-const FETCH: Partial<Record<Platform, (a: AccountContext, id: string) => Promise<Fetched>>> = { instagram, youtube, facebook, threads };
+type TtVideo = { id: string; view_count?: number; like_count?: number; comment_count?: number; share_count?: number };
+/** 1296: one TikTok video's lifetime counts (Display API video.query, scope video.list). TikTok reports no reach, saves or watch time per video. */
+async function tiktok(acct: AccountContext, videoId: string): Promise<Fetched> {
+  const r = await fetch("https://open.tiktokapis.com/v2/video/query/?fields=id,view_count,like_count,comment_count,share_count", {
+    method: "POST",
+    headers: { authorization: `Bearer ${acct.accessToken}`, "content-type": "application/json; charset=UTF-8" },
+    body: JSON.stringify({ filters: { video_ids: [videoId] } }),
+    signal: T(),
+    cache: "no-store",
+  });
+  if (!r.ok) throw await httpFailure(r, "tiktok video query");
+  const j = (await r.json()) as { data?: { videos?: TtVideo[] }; error?: { code?: string; message?: string } };
+  const code = j.error?.code ?? "ok";
+  if (code !== "ok") {
+    const technical = `tiktok video query: ${code} ${j.error?.message ?? ""}`;
+    if (/token|unauthori/i.test(code)) throw new PublisherError("AUTH_EXPIRED", "Authorization expired", technical, false);
+    if (/scope|permission/i.test(`${code} ${j.error?.message ?? ""}`)) throw new PublisherError("FORBIDDEN", "TikTok refused this permission", technical, false);
+    throw new PublisherError("UNKNOWN", "TikTok didn't answer", technical);
+  }
+  const v = j.data?.videos?.find((x) => x.id === videoId) ?? j.data?.videos?.[0];
+  if (!v) throw new PublisherError("MEDIA_REJECTED", "Video not found", `tiktok video query: no video ${videoId} in the answer`, false);
+  const m: Metrics = {};
+  const put = (k: MetricKey, x: number | null) => {
+    if (x !== null) m[k] = x;
+  };
+  put("views", num(v.view_count));
+  put("likes", num(v.like_count));
+  put("comments", num(v.comment_count));
+  put("shares", num(v.share_count));
+  const er = engagementRate(m, "views");
+  if (er !== null) m.engagementRate = er;
+  return { metrics: m, notes: [engagementNote(m, "views"), "TikTok does not report reach, saves or watch time for a video."].filter((x): x is string => !!x) };
+}
+
+const FETCH: Partial<Record<Platform, (a: AccountContext, id: string) => Promise<Fetched>>> = { instagram, youtube, facebook, threads, tiktok };
 
 /* ------------------------------------------------------------ one destination */
 

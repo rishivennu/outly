@@ -22,7 +22,7 @@ import { dayKey } from "./core";
  */
 
 /** Platforms whose per-post numbers Outlly can read (lib/insights/post.ts SUPPORTED). */
-export const SYNCABLE: Platform[] = ["instagram", "youtube", "facebook", "threads"];
+export const SYNCABLE: Platform[] = ["instagram", "youtube", "facebook", "threads", "tiktok"];
 /** A target whose newest stored row is younger than this is already fresh enough. */
 export const TARGET_STALE_MS = 6 * 3600_000;
 /**

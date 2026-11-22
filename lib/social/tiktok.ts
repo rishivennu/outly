@@ -18,7 +18,7 @@ export class TikTokPublisher implements SocialPublisher {
     const u = new URL("https://www.tiktok.com/v2/auth/authorize/");
     u.search = new URLSearchParams({
       client_key: creds("tiktok").clientId,
-      scope: "user.info.basic,user.info.profile,video.publish,video.upload",
+      scope: "user.info.basic,user.info.profile,user.info.stats,video.list,video.publish,video.upload",
       response_type: "code",
       redirect_uri: redirectUri,
       state,

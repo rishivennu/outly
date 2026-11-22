@@ -38,7 +38,7 @@ export interface ReconcileSummary {
   cooldownMs?: number;
 }
 
-const WITH_INSIGHTS: readonly string[] = ["instagram", "youtube", "facebook", "threads"];
+const WITH_INSIGHTS: readonly string[] = ["instagram", "youtube", "facebook", "threads", "tiktok"];
 
 async function ask(t: Row): Promise<VerifyOutcome> {
   if (t.practice) return "unsupported";

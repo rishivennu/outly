@@ -98,20 +98,20 @@ describe("1251 Threads dashboard", () => {
 });
 
 describe("1251 Threads joins the per-post readers", () => {
-  test("the dispatcher routes threads to its own reader and only LinkedIn and TikTok fall back to Outlly's record", () => {
+  test("the dispatcher routes threads to its own reader and only LinkedIn falls back to Outlly's record", () => {
     const live = src("lib/live/index.ts");
     expect(live).toContain('import { threadsDashboard } from "./threads";');
     expect(live).toContain("threadsDashboard(ctx, days)");
-    expect(live).toContain('if (platform === "linkedin" || platform === "tiktok") {');
+    expect(live).toContain('if (platform === "linkedin") {'); // 1296: TikTok has its own reader now
     expect(live).not.toContain('platform === "threads" || platform === "linkedin"');
   });
   test("Content, sync, reconcile and Content Intelligence all know Threads' per-post metrics", () => {
     expect(CAN.threads).toEqual(["views", "likes", "comments", "shares", "engagementRate"]);
     expect(PER_POST_METRICS.threads).toEqual(CAN.threads);
     expect(SYNCABLE).toContain("threads");
-    expect(src("lib/posts/reconcile.ts")).toContain('["instagram", "youtube", "facebook", "threads"]');
+    expect(src("lib/posts/reconcile.ts")).toContain('["instagram", "youtube", "facebook", "threads", "tiktok"]');
     const post = src("lib/insights/post.ts");
-    expect(post).toContain('const SUPPORTED: Platform[] = ["instagram", "youtube", "facebook", "threads"];');
+    expect(post).toContain('const SUPPORTED: Platform[] = ["instagram", "youtube", "facebook", "threads", "tiktok"];');
     expect(post).toContain("metric=views,likes,replies,reposts,quotes,shares");
   });
   test("the OAuth request asks for threads_manage_insights (1252 added the two reply scopes; nothing Outlly does not use)", () => {
