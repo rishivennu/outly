@@ -8,6 +8,8 @@ import { supportsFirstComment } from "@/lib/domain";
 import { pinTargets, postFilter } from "@/lib/profiles";
 import { copyChanged } from "@/lib/collab-core";
 import { recordEdit } from "@/lib/collab";
+import { realUserId } from "@/lib/auth";
+import { track } from "@/lib/analytics/activity";
 import { FORMAT_LABEL, isImageMime, supportsFormat, takesFirstComment, type PostFormat } from "@/lib/formats";
 import { PLATFORM_META } from "@/lib/domain";
 import { DRAFT_CONFLICT_MESSAGE, draftConflict, serverDraft, StaleDraftError } from "@/lib/posts/conflicts";
@@ -109,6 +111,8 @@ export const POST = route(async (req, { user }) => {
     // R1234: only a draft this call created gets its Content Memory item (a clientKey twin or an update already has one).
     if (!existing) await lineageAfterCreate(user.id, id, { adaptedFromPostId: body.adaptedFromPostId, recommendationId: body.recommendationId });
     if (changed) await recordEdit(user, { id });
+    if (!existing) track("content_created", realUserId(user), { format });
+    else if (changed) track("draft_created", realUserId(user), { format });
     return json({ post: await postView(await ownedPost(user.id, id)), ...(deduped ? { deduped: true } : {}) });
   };
   const twin = await twinOf();

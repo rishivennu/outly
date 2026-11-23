@@ -1,5 +1,7 @@
 import { json, route } from "@/lib/http";
 import { inboxStateSchema, setCommentStates } from "@/lib/inbox-state";
+import { track } from "@/lib/analytics/activity";
+import { realUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +10,7 @@ export const PATCH = route(
   async (req, { user }) => {
     const body = inboxStateSchema.parse(await req.json());
     const states = await setCommentStates(user.id, body, user.scope);
+    track("comment_managed", realUserId(user), { kind: "state" });
     return json({ states });
   },
   { limit: [120, 60_000] },

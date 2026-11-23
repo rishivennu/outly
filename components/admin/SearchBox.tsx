@@ -98,15 +98,15 @@ function GlideChips({ options, current, href }: { options: { value: string; labe
  * One URL-driven drop-down filter (1039): picking a value replaces that search param, keeps the others
  * and goes back to page 1. A native <select>, so keyboard, screen readers and phones all just work.
  */
-export function FilterSelect({ param, label, options, current, fill = false }: { param: string; label: string; options: { value: string; label: string }[]; current: string; /** Stretch to its grid cell on phones (the users filter grid). */ fill?: boolean }) {
+export function FilterSelect({ param, label, options, current, fill = false, inline = false }: { param: string; label: string; options: { value: string; label: string }[]; current: string; /** Stretch to its grid cell on phones (the users filter grid). */ fill?: boolean; /** R1308: sit on a toolbar row at chip height (36 px, 44 px touch) with the label read by screen readers only. */ inline?: boolean }) {
   const sp = useSearchParams();
   const router = useRouter();
   const path = usePathname();
   const [pending, start] = useTransition();
   const on = current !== "" && current !== options[0]?.value;
   return (
-    <label className={cn("relative inline-flex min-w-0 flex-col gap-1", fill && "w-full sm:w-auto")}>
-      <span className="text-[12px] font-medium text-muted-foreground">{label}</span>
+    <label className={cn("relative inline-flex min-w-0 flex-col gap-1", fill && "w-full sm:w-auto", inline && "w-full sm:w-auto")}>
+      <span className={cn("text-[12px] font-medium text-muted-foreground", inline && "sr-only")}>{label}</span>
       <select
         value={current}
         aria-busy={pending}
@@ -117,8 +117,9 @@ export function FilterSelect({ param, label, options, current, fill = false }: {
           start(() => router.replace(`${path}?${n}`, { scroll: false }));
         }}
         className={cn(
-          "h-11 cursor-pointer appearance-none rounded-xl border pl-3.5 pr-9 text-[13px] text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]",
-          fill ? "w-full min-w-0 sm:w-auto sm:min-w-[9.5rem]" : "min-w-[9.5rem]",
+          "cursor-pointer appearance-none border pl-3.5 pr-9 text-[13px] text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]",
+          inline ? "h-9 rounded-full touch:h-11" : "h-11 rounded-xl",
+          fill || inline ? "w-full min-w-0 sm:w-auto sm:min-w-[9.5rem]" : "min-w-[9.5rem]",
           on ? "border-[hsl(var(--lime)/0.4)] bg-[hsl(var(--lime)/0.16)] font-semibold" : "border-border/60 bg-secondary/60 font-medium",
         )}
       >
@@ -129,9 +130,9 @@ export function FilterSelect({ param, label, options, current, fill = false }: {
         ))}
       </select>
       {pending ? (
-        <Loader2 className="pointer-events-none absolute bottom-3.5 right-3 h-4 w-4 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden />
+        <Loader2 className={cn("pointer-events-none absolute right-3 h-4 w-4 animate-spin text-muted-foreground motion-reduce:animate-none", inline ? "bottom-2.5 touch:bottom-3.5" : "bottom-3.5")} aria-hidden />
       ) : (
-        <ChevronDown className="pointer-events-none absolute bottom-3.5 right-3 h-4 w-4 text-muted-foreground" aria-hidden />
+        <ChevronDown className={cn("pointer-events-none absolute right-3 h-4 w-4 text-muted-foreground", inline ? "bottom-2.5 touch:bottom-3.5" : "bottom-3.5")} aria-hidden />
       )}
     </label>
   );

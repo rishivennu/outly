@@ -64,7 +64,7 @@ async function openSessionRow(userId: string, ageS: number, sid?: string): Promi
   }
 }
 
-export async function createSession(userId: string, { persist = true, sid, handoff = false }: { persist?: boolean; sid?: string; handoff?: boolean } = {}) {
+export async function createSession(userId: string, { persist = true, sid, handoff = false, silent = false }: { persist?: boolean; sid?: string; handoff?: boolean; silent?: boolean } = {}) {
   const v = (await db.user.findUnique({ where: { id: userId }, select: { tokenVersion: true } }))?.tokenVersion ?? 0;
   // A hand-off session (1086) is never remembered and lives 15 minutes: see /api/app/start.
   const age = handoff ? HANDOFF_AGE : persist ? MAX_AGE : SHORT_AGE;
@@ -85,6 +85,8 @@ export async function createSession(userId: string, { persist = true, sid, hando
     path: "/",
     ...(keep ? { maxAge: MAX_AGE } : {}),
   });
+  // R1308: one "login" event per fresh sign-in. Re-issues and renewals carry a sid, hand-offs finish elsewhere, signup writes "signup".
+  if (!sid && !handoff && !silent) void import("./analytics/activity").then((m) => m.track("login", userId, undefined, { key: id ?? null })).catch(() => {});
 }
 
 export async function destroySession() {

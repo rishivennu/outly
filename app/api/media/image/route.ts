@@ -6,6 +6,8 @@ import { jpegSize } from "@/lib/media/jpeg";
 import { mediaView } from "@/lib/services";
 import { recordUpload, reserveUpload, sizeColumns } from "@/lib/storage/quota";
 import { MAX_IMAGE_BYTES } from "@/lib/formats";
+import { track } from "@/lib/analytics/activity";
+import { realUserId } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,6 +46,7 @@ export const POST = route(
     }
     const media = await db.media.update({ where: { id: held.id }, data: { status: "ready" } });
     await recordUpload(media, bytes.length);
+    track("video_uploaded", realUserId(user), { kind: "image" });
     return json({ media: await mediaView(media) }, { status: 201 });
   },
   { limit: [60, 60_000] },

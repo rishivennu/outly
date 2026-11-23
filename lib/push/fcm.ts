@@ -109,7 +109,12 @@ export async function pushToUser(userId: string, m: PushMessage, opts: { only?: 
         else if (isDeadToken(r.status, await r.text().catch(() => ""))) dead.push(d.id);
       }),
     );
-    if (dead.length) await db.pushDevice.deleteMany({ where: { id: { in: dead } } });
+    if (dead.length) {
+      // R1308: a token FCM no longer knows usually means the app was uninstalled; the install row says so (never fatal).
+      const gone = await db.pushDevice.findMany({ where: { id: { in: dead }, installId: { not: null } }, select: { installId: true } }).catch(() => []);
+      await db.pushDevice.deleteMany({ where: { id: { in: dead } } });
+      if (gone.length) await import("../analytics/activity").then((m) => m.markUninstalled(gone.map((g) => g.installId!))).catch(() => 0);
+    }
     return { sent, dropped: dead.length, devices: devices.length };
   } catch (e) {
     console.error("[push]", e);

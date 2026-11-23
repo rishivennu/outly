@@ -8,6 +8,7 @@ import { HttpError } from "../http";
 import { sendEmail, templates } from "../email";
 import { checkSeats, entitlements } from "../billing/entitlements";
 import { ROLE_INFO, WS_COOKIE, type TeamRole } from "./roles";
+import { track } from "../analytics/activity";
 
 const INVITE_DAYS = 14;
 export const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
@@ -45,6 +46,7 @@ export async function invite(owner: { id: string; name: string; email: string },
     : await db.teamMember.create({ data: { ownerId: owner.id, email, role, tokenHash: hashToken(token) } });
   const url = `${env.APP_URL}/team/accept?token=${token}`;
   await sendEmail({ to: email, kind: "team_invite", subject: `${owner.name} invited you to Outlly`, html: templates.teamInvite({ owner: owner.name, role: ROLE_INFO[role].label, url }) }).catch(() => {});
+  track("team_invited", owner.id);
   return { member: m, url };
 }
 

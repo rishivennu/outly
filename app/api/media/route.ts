@@ -9,6 +9,8 @@ import { enqueue } from "@/lib/queue";
 import { mediaView } from "@/lib/services";
 import { assertUploadSize, uploadLimitBytes } from "@/lib/billing/entitlements";
 import { recordUpload, reserveUpload, sizeColumns } from "@/lib/storage/quota";
+import { track } from "@/lib/analytics/activity";
+import { realUserId } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -90,6 +92,7 @@ export const POST = route(
       throw new HttpError(409, "That upload was cancelled. Try it again.", "UPLOAD_GONE");
     }
     await recordUpload(held, size);
+    track("video_uploaded", realUserId(user), { kind: "video" });
     const media = await db.media.findUniqueOrThrow({ where: { id: held.id } });
     await enqueue("VIDEO_PROCESS", { mediaId: media.id });
     return json({ media: await mediaView(media) }, { status: 201 });

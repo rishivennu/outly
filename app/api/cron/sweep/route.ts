@@ -63,6 +63,8 @@ async function sweep(req: NextRequest) {
   const subs = await sweepSubscriptions(now); // 1147: trials, old signals, offer ledger + month rollover (never fatal)
   if (plan.housekeeping) await import("@/lib/accounts").then((m) => m.resubscribeCommentsOnce()).catch((e) => console.error("[sweep] comment subs", e)); // 1141b, runs once
   if (plan.metrics) await import("@/lib/analytics/sync").then((m) => m.syncMetrics({ budgetMs: 8_000 })).catch((e) => console.error("[sweep] metrics", e)); // 1140 analytics background sync, odd minutes
+  // R1308 App Analytics: the daily rollups (today, yesterday, a few back-filled days) every 10 minutes on the metrics slot; raw rows pruned once a day. Never fatal.
+  const rollup = plan.metrics && now.getMinutes() % 10 === 3 ? await import("@/lib/analytics/rollup").then((m) => m.sweepRollup(now)).catch((e) => (console.error("[sweep] rollup", e), null)) : null;
   if (plan.blog) await import("@/lib/blog/schedule").then((m) => m.kickBlogTick(origin)).catch((e) => console.error("[sweep] blog", e)); // R1178: due blog work runs in its own /api/cron/blog invocation
   // R1195 Watchdog: the health cycle rides the sweep (no always-on worker here). Budgeted, after the creator-facing
   // work, never fatal: monitoring must not delay a scheduled post. Services that do not fit stay due for the next cycle.
@@ -76,7 +78,7 @@ async function sweep(req: NextRequest) {
   // (1027). Budget = what is left of maxDuration minus 10 s of headroom; whatever is still running then is
   // held by waitUntil or picked up by the next sweep.
   const running = await settle(Math.max(0, 50_000 - (Date.now() - startedAt)));
-  return NextResponse.json({ ok: true, plan, requeued, cleaned, files, reminders, push, assist, campaign, outcomes, backfill, subs, health, running }, { headers: { "cache-control": "no-store" } });
+  return NextResponse.json({ ok: true, plan, requeued, cleaned, files, reminders, push, assist, campaign, outcomes, backfill, subs, health, rollup, running }, { headers: { "cache-control": "no-store" } });
 }
 
 /** 1147: trials every 5 minutes (expiry + reminders); signal pruning and the ledger/month sweep once an hour. */

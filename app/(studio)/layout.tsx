@@ -31,6 +31,7 @@ import { NativeBridge } from "@/components/shell/NativeBridge";
 import { PushBridge } from "@/components/shell/PushBridge";
 import { WarmUp } from "@/components/shell/WarmUp";
 import { PerfBeacon } from "@/components/shell/PerfBeacon";
+import { ActivityTracker } from "@/components/shared/ActivityTracker";
 import { InstallPrompt } from "@/components/shell/InstallPrompt";
 import { normalizeInstall } from "@/lib/pwa-core";
 import { PwaWelcome } from "@/components/shell/PwaWelcome";
@@ -126,6 +127,8 @@ export default async function StudioLayout({ children }: { children: React.React
       <WarmUp serverNow={Date.now()} />
       {/* Perf: one startup timing beacon per load (no PII); read-out in Admin > Startup speed. */}
       <PerfBeacon />
+      {/* R1308: page views, heartbeats and the installed-web-app signal for Admin > App Analytics (no PII). */}
+      <ActivityTracker />
       <InstallPrompt config={normalizeInstall(install)} />
       </ToastProvider>
       </LivePlatformsProvider>

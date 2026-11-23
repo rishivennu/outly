@@ -6,6 +6,7 @@ import { launchSchema } from "@/lib/validation";
 import { launchPost, ownedPost, postView } from "@/lib/services";
 import type { SimulationMode } from "@/lib/social/types";
 import { assertPostSchedulable } from "@/lib/posts/guard-server";
+import { track } from "@/lib/analytics/activity";
 
 const SIMS: SimulationMode[] = ["realistic", "smooth", "instagram-reconnect", "youtube-flaky", "x-rejects"];
 
@@ -21,6 +22,7 @@ export const POST = route(
       // A failed or partly-sent post sent again goes through here too: launchPost only resends what isn't live.
       if (body.mode === "schedule" && body.scheduledAt) await assertPostSchedulable(user.id, params.id, new Date(body.scheduledAt));
       await launchPost(user.id, params.id, body.mode, body.scheduledAt ? new Date(body.scheduledAt) : null, simulate);
+      track("post_scheduled", realUserId(user), { kind: body.mode });
       return json({ post: await postView(await ownedPost(user.id, params.id)) }, { status: 202 });
     }),
   { limit: [20, 60_000] },

@@ -12,6 +12,7 @@ import { formatIssues, isPostFormat, type PostFormat } from "../formats";
 import { isApproved } from "../review";
 import { enqueue, usingRedis } from "./index";
 import type { JobName, JobPayloads } from "./jobs";
+import { track } from "../analytics/activity";
 
 /**
  * Waits between automatic retries of a transient failure (1028). It used to be 1.5 / 3 / 6 s, so a platform
@@ -196,9 +197,11 @@ export async function setTarget(id: string, postId: string, status: TargetStatus
     data: { platformStatus: status, ...extra },
   });
   if (!r.count) return false;
-  const t = await db.postTarget.findUnique({ where: { id }, include: { post: { select: { coverKey: true, format: true } } } });
+  const t = await db.postTarget.findUnique({ where: { id }, include: { post: { select: { coverKey: true, format: true, userId: true } } } });
   await syncPost(postId);
   if (!t) return true;
+  // R1308: a live copy is one post_published for its owner (platform = the social network it went out on).
+  if (status === "published" && t.post?.userId) track("post_published", t.post.userId, { platform: t.platform, format: t.post.format ?? "video" });
   // Live with a first comment waiting: post it a few seconds later (a brand-new video can refuse comments for a moment).
   if (status === "published" && t.firstComment?.trim() && !t.firstCommentId && isPlatform(t.platform))
     await enqueue("FIRST_COMMENT", { targetId: id, platform: t.platform }, { delayMs: 5000, jobId: `fc-${id}` });

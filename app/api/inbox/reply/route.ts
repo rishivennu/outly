@@ -5,6 +5,8 @@ import { replyToComment } from "@/lib/inbox";
 import { replyFailure, setCommentStates } from "@/lib/inbox-state";
 import { reserveReply } from "@/lib/billing/entitlements";
 import { PublisherError } from "@/lib/social/types";
+import { track } from "@/lib/analytics/activity";
+import { realUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +32,7 @@ export const POST = route(
     // Practice accounts are for trying things out, so their replies don't use the weekly allowance.
     if (reply.practice) await slot.release();
     const left = slot.replyLimit > 0 ? (reply.practice ? Math.min(slot.replyLimit, slot.left + 1) : slot.left) : null;
+    track("comment_managed", realUserId(user), { kind: "reply" });
     return json({ reply, repliesLeft: left }, { status: 201 });
   },
   { limit: [30, 60_000] },

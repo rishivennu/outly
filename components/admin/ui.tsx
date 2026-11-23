@@ -415,9 +415,10 @@ export const fmtDate = (d: Date | string | null | undefined, withTime = false) =
     ? new Date(d).toLocaleString("en-IN", withTime ? { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" } : { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })
     : "Never";
 
-export function ago(d: Date | string | null | undefined) {
+/** Relative time. Pass `now` when the caller renders on both server and client, so the first paint hydrates cleanly. */
+export function ago(d: Date | string | null | undefined, now: number = Date.now()) {
   if (!d) return "Never";
-  const s = (Date.now() - new Date(d).getTime()) / 1000;
+  const s = (now - new Date(d).getTime()) / 1000;
   if (s < 60) return "just now";
   if (s < 3600) return `${Math.floor(s / 60)} min ago`;
   if (s < 86400) return `${Math.floor(s / 3600)} h ago`;

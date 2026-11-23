@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Activity, Award, BarChart3, BadgePercent, BellRing, ShieldAlert, CalendarDays, Gift, BadgeCheck, BookOpen, ChevronRight, Construction, FlaskConical, HeartPulse, Headset, Hourglass, Library, Newspaper, Rocket, PanelsTopLeft, PanelBottom, PanelLeftClose, PanelLeftOpen, CreditCard, Globe, Handshake, Share2, SlidersHorizontal, Sparkles, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, Repeat, ShieldCheck, Tag, TrendingUp, Type, Users, Wand2, X } from "lucide-react";
+import { Activity, Award, BarChart3, BadgePercent, BellRing, ShieldAlert, CalendarDays, Gift, BadgeCheck, BookOpen, ChevronRight, Construction, FlaskConical, HeartPulse, Headset, Hourglass, Library, Newspaper, Rocket, PanelsTopLeft, PanelBottom, PanelLeftClose, PanelLeftOpen, CreditCard, Globe, Handshake, Share2, SlidersHorizontal, Smartphone, Sparkles, LayoutDashboard, LayoutTemplate, LifeBuoy, LogOut, Mail, Megaphone, Menu, Palette, Plug, Repeat, ShieldCheck, Tag, TrendingUp, Type, Users, Wand2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrbAvatar } from "@/components/brand/OrbAvatar";
 import { OutllyBrand, OutlyMark } from "@/components/brand/Logo";
@@ -42,6 +42,7 @@ export const NAV: { href: string; label: string; icon: typeof Users; area: Admin
   { href: "/admin/retention", label: "At risk", icon: HeartPulse, area: "retention", group: "Insights" },
   { href: "/admin/growth", label: "Growth", icon: Rocket, area: "growth", group: "Insights" },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3, area: "growth", group: "Insights" },
+  { href: "/admin/app-analytics", label: "App Analytics", icon: Smartphone, area: "appAnalytics", group: "Insights" },
   { href: "/admin/blog", label: "Blog dashboard", icon: Newspaper, area: "content", group: "Content Studio" },
   { href: "/admin/blog/generate", label: "Generate blog", icon: Wand2, area: "content", group: "Content Studio" },
   { href: "/admin/blog/library", label: "Blog library", icon: Library, area: "content", group: "Content Studio" },

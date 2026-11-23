@@ -12,6 +12,8 @@ import { noticeScheduleChange } from "@/lib/notify-events";
 import { DRAFT_CONFLICT_MESSAGE, draftConflict, serverDraft, StaleDraftError } from "@/lib/posts/conflicts";
 import { assertPostSchedulable } from "@/lib/posts/guard-server";
 import { deleteDraftWithMedia } from "@/lib/storage/lifecycle";
+import { track } from "@/lib/analytics/activity";
+import { realUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -94,10 +96,16 @@ export const DELETE = route(
     const q = new URL(req.url).searchParams;
     const media = q.get("media") ?? "keep";
     if (media !== "keep" && media !== "delete") throw new HttpError(400, "media must be keep or delete.", "BAD_REQUEST");
-    if (media === "delete") return json(await deleteDraftWithMedia(user, params.id));
+    if (media === "delete") {
+      const out = await deleteDraftWithMedia(user, params.id);
+      track("content_deleted", realUserId(user), { kind: "media" });
+      return json(out);
+    }
     try {
       const appOnly = q.get("appOnly");
-      return json({ ...(await deletePost(user, params.id, { platforms: q.get("platforms") === "1", appOnlyAck: appOnly === "ack" || appOnly === "verify", verify: appOnly === "verify" })), freedBytes: 0, refunded: false });
+      const out = await deletePost(user, params.id, { platforms: q.get("platforms") === "1", appOnlyAck: appOnly === "ack" || appOnly === "verify", verify: appOnly === "verify" });
+      track("content_deleted", realUserId(user));
+      return json({ ...out, freedBytes: 0, refunded: false });
     } catch (e) {
       // The sheet shows what changed (some platforms may have said yes before one said no).
       if (e instanceof HttpError && e.code === "REMOVE_FAILED") {

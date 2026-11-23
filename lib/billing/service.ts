@@ -32,6 +32,7 @@ import { getPolicy } from "../subscriptions/policy";
 import { hashKey } from "../subscriptions/keys";
 import { quoteDetailed, type Quote } from "../subscriptions/eligibility";
 import { onChargeback, onPaymentSucceeded, onRefunded, onSubscriptionCanceled } from "../subscriptions/lifecycle";
+import { track } from "../analytics/activity";
 
 /** Which gateway serves checkout right now. Falls back to mock if the chosen one is missing keys, and says so. */
 export async function activeGateway() {
@@ -334,6 +335,8 @@ export async function completePayment(paymentId: string, providerRef?: string) {
   if (tag) await recordExperiment({ ...tag, userId: p.userId, kind: "paid", amountMinor: p.amountMinor, currency: p.currency });
   await convertCampaign(p); // 1122: an offer that was paid for counts once (never throws)
   await onPaymentSucceeded(fresh); // 1147: offer ledger, trial conversion, month revenue (never throws)
+  track("payment_succeeded", p.userId, { plan: plan.slug });
+  track("subscription_started", p.userId, { plan: plan.slug });
   return { payment: fresh, invoice };
 }
 
@@ -393,6 +396,7 @@ export async function failPayment(paymentId: string, reason: string) {
   await db.payment.update({ where: { id: paymentId }, data: { status: "failed", failureReason: reason.slice(0, 300) } });
   if (!p.sample) await adminEvent("payment_failed", `Payment failed: ${p.user.name}`, `${formatMoney(p.amountMinor, p.currency)} · ${reason.slice(0, 120)}`, "/admin/payments?status=failed");
   if (p.status !== "failed") await noticePaymentFailed(p.id); // 1118: once per payment, never throws
+  track("payment_failed", p.userId, { reason: reason.slice(0, 40) });
 }
 
 /** Cancel at period end: access continues until currentPeriodEnd, nothing is refunded automatically. */
@@ -403,6 +407,7 @@ export async function cancelSubscription(userId: string) {
   await dropMandate(s); // 1098: also stops a replacement still waiting for approval
   await db.subscription.update({ where: { id: s.id }, data: { cancelAtPeriodEnd: true, autoRenew: false, providerSubId: null } });
   await onSubscriptionCanceled(s); // 1147 (never throws)
+  track("subscription_canceled", userId, { plan: s.plan.slug });
   return s;
 }
 export async function resumeSubscription(userId: string) {

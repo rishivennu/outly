@@ -7,6 +7,7 @@ import { attachSource } from "@/lib/growth/source";
 import { assertMayCreateAccount } from "@/lib/site";
 import { captureSignal } from "@/lib/subscriptions/signals";
 import { withAppUser } from "@/lib/me";
+import { track } from "@/lib/analytics/activity";
 
 export const POST = route(
   async (req) => {
@@ -21,7 +22,8 @@ export const POST = route(
     await attachReferral(user.id, clientIp(req)).catch((e) => console.error("[referral] attach", e));
     await attachSource(user.id).catch((e) => console.error("[growth] source", e));
     await captureSignal({ req, userId: user.id, event: "signup" }).catch((e) => console.error("[signals] signup", e)); // 1147 anti-abuse, hashed only
-    await createSession(user.id);
+    await createSession(user.id, { silent: true });
+    track("signup", user.id);
     return json({ ok: true, ...(await withAppUser(req, user.id)) });
   },
   { auth: false, limit: [5, 60_000] },

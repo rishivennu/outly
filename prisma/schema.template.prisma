@@ -1138,6 +1138,7 @@ model PushDevice {
   userId     String
   token      String   @unique
   platform   String   @default("android")
+  installId  String? // R1308: the app installation this token belongs to, so a dead token can mark it uninstalled
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @updatedAt
 
@@ -2282,4 +2283,87 @@ model PartnerAttribution {
   @@unique([applicationId, kind, visitorKey])
   @@index([applicationId, kind, createdAt])
   @@index([userId])
+}
+
+/// R1308 App Analytics: one meaningful thing a person did (the allow-list is in lib/analytics/activity-core.ts).
+/// Server timestamps only; `day` is the UTC calendar day for cheap grouping. No IP and no user agent string are
+/// kept: only coarse buckets (phone/tablet/desktop, OS family, browser family, app version).
+model ActivityEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  name      String
+  at        DateTime @default(now())
+  day       String
+  platform  String // web | pwa | android | ios | server
+  device    String? // phone | tablet | desktop
+  os        String?
+  browser   String?
+  version   String? // native app version, or the web build
+  sessionId String? // UsageSession.id
+  installId String? // AppInstall.id
+  meta      String? // small JSON, never personal data
+
+  @@index([at])
+  @@index([userId, at])
+  @@index([name, at])
+  @@index([day, platform])
+}
+
+/// R1308: one stretch of use. A new row starts after SESSION_GAP_MS of silence (lib/analytics/activity-core.ts);
+/// `key` is the auth session id or install id the events arrived under. Kept apart from UserSession, whose rows are
+/// deleted at sign-out (that is how sign-out works) and so cannot carry history.
+model UsageSession {
+  id         String    @id @default(cuid())
+  userId     String
+  key        String
+  startedAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  endedAt    DateTime? // an explicit sign-out; otherwise the row simply goes quiet
+  platform   String
+  device     String?
+  os         String?
+  browser    String?
+  version    String?
+  events     Int       @default(0)
+
+  @@index([userId, lastSeenAt])
+  @@index([key, lastSeenAt])
+  @@index([startedAt])
+}
+
+/// R1308: an installation of Outlly: the Android app (an install id the app makes on first launch), an installed web
+/// app (the browser's appinstalled event, or running standalone), iOS later. `source` says what the row is based on,
+/// so a download is never counted as an install.
+model AppInstall {
+  id          String   @id
+  userId      String?
+  platform    String // android | ios | pwa
+  version     String?
+  device      String?
+  os          String?
+  source      String // first_launch | appinstalled | standalone | app_signin
+  status      String   @default("active") // active | uninstalled
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  @@index([platform, firstSeenAt])
+  @@index([userId])
+}
+
+/// R1308: one row per UTC day and platform ("all" included), filled by the sweep (lib/analytics/rollup.ts) so the
+/// dashboard reads a year of history from 365 rows instead of scanning events.
+model AnalyticsDaily {
+  day       String
+  platform  String
+  dau       Int      @default(0)
+  newUsers  Int      @default(0)
+  returning Int      @default(0)
+  sessions  Int      @default(0)
+  events    Int      @default(0)
+  installs  Int      @default(0)
+  durationS Int      @default(0)
+  features  String   @default("{}") // JSON { eventName: count }
+  updatedAt DateTime @updatedAt
+
+  @@id([day, platform])
 }
