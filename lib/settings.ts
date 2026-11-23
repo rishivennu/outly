@@ -1,4 +1,5 @@
 import { WELCOME_DEFAULT, type WelcomeConfig } from "./pwa-welcome";
+import { SUPPORT_EMAIL } from "./support";
 import "server-only";
 import { revalidateTag } from "next/cache";
 import { REFERRAL_DEFAULT, type ReferralConfig } from "./referral-core";
@@ -98,7 +99,7 @@ export const DEFAULTS = {
     youpi: { ...YOUPI_DEFAULT },
     business: { name: "Outlly", address: "Gowthami Enclave, G-24, opposite ESI Hospital, Cantonment, Vizianagaram, Andhra Pradesh 535003, India", gstin: "", taxPercent: 0 },
   } as PaymentConfig,
-  email: { provider: "mock", from: "Outlly <hello@mail.outlly.com>", marketingFrom: "", replyTo: "", resend: { apiKey: "", webhookSecret: "" } } as EmailConfig,
+  email: { provider: "mock", from: "Outlly <hello@mail.outlly.com>", marketingFrom: "", replyTo: SUPPORT_EMAIL, resend: { apiKey: "", webhookSecret: "" } } as EmailConfig,
   whatsapp: { enabled: false, phoneNumberId: "", wabaId: "", token: "", template: "outlly_code", lang: "en" } as WhatsAppConfig,
   site: { maintenance: false, message: "", eta: "", since: "", endsAt: "", waitlist: false, waitlistSince: "" } as SiteConfig,
   landing: LANDING_DEFAULT,

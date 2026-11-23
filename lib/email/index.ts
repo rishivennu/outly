@@ -1,4 +1,5 @@
 import "server-only";
+import { SUPPORT_EMAIL } from "@/lib/support";
 import type { IntelBlock, WeeklyStats } from "../reports/weekly-core";
 import { compact } from "../reports/weekly-core";
 import { db } from "../db";
@@ -61,7 +62,7 @@ export async function sendEmail(m: Mail, cfgOverride?: EmailConfig): Promise<{ o
             subject: m.subject,
             html: m.html,
             text: m.text ?? htmlToText(m.html),
-            reply_to: cfg.replyTo || undefined,
+            reply_to: cfg.replyTo.trim() || SUPPORT_EMAIL, // R1306: empty = the support queue, never the sending subdomain
             headers: list ? unsubscribeHeaders(m.to, list) : undefined,
             attachments: m.attachments?.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })),
           }),

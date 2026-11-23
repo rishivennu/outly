@@ -20,7 +20,8 @@ function issuerOf(json: string | null): { name?: string; address?: string; gstin
 }
 
 /** Printed on every invoice and on the verify page. */
-export const SUPPORT_EMAIL = "support@outlly.com";
+import { SUPPORT_EMAIL } from "../support";
+export { SUPPORT_EMAIL };
 
 export const invoiceVerifyCode = (inv: { number: string; amountMinor: number; currency: string; issuedAt: Date; customerEmail: string }) => verifyCode(env.AUTH_SECRET, inv);
 

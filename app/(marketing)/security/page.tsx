@@ -73,7 +73,8 @@ export default function SecurityPage() {
           <p>
             Found a weakness? Email <a href="mailto:support@outlly.com?subject=Security%20report">support@outlly.com</a> with &ldquo;Security report&rdquo; in the subject, or use the{" "}
             <a href="/contact">contact form</a>. Tell us what you found and how to see it, and please give us a chance to fix it before you share it. Only test against your
-            own account, and don&rsquo;t access, change or delete anyone else&rsquo;s data.
+            own account, and don&rsquo;t access, change or delete anyone else&rsquo;s data. The same contact is published for scanners at{" "}
+            <a href="/.well-known/security.txt">/.well-known/security.txt</a>.
           </p>
         </Prose>
       </Shell>
