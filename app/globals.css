@@ -4308,6 +4308,82 @@ html.theme-anim *::after {
 /* Slim sidebar: the nav scroller would clip a tooltip, so AdminShell draws one fixed tooltip outside it. */
 .admin-tip--fixed { display: block; position: fixed; left: auto; bottom: auto; opacity: 1; translate: 0 -50%; white-space: nowrap; }
 
+/* R1307 liquid nav (components/marketing/LiquidNav.tsx + components/ui/liquid-glass-navbar.tsx) ----------
+   Three floating glass pills on one row (brand, the Nimbus water pill, actions), the same 56px height, radius and
+   glass recipe as the phone tab bar (.mtab): a tinted pane with blur, a 1px gradient rim with a lime catch-light at
+   the two points light would strike, a sheen across the top half and a soft shadow. The brand's lime is the only
+   colour accent; the water itself stays the shader's own blue-white. The Nimbus pill's colours are its own CSS
+   custom properties (--n-*), re-pointed here at the site tokens so text holds 4.5:1 over any section in either theme
+   (html .lnav beats the component's inline <style> at equal specificity). lg..xl shows the water pill with icons only
+   (the six labels do not fit a 1024px row beside the two other pills). The split itself is GSAP inline transforms. */
+.lnav { --ln-bg: 0 0% 100%; --ln-line: 222 20% 18% / .10; --ln-fill-a: .62; --ln-fill-b: .50; --ln-lip: .70;
+  --ln-rim: linear-gradient(120deg, hsl(0 0% 100% / .95), hsl(var(--lime) / .5) 26%, hsl(0 0% 100% / .12) 56%, hsl(var(--lime) / .28) 84%, hsl(0 0% 100% / .8));
+  --ln-sheen: radial-gradient(42% 90% at 28% 0%, hsl(var(--lime) / .22), hsl(var(--lime) / 0) 70%), linear-gradient(180deg, hsl(0 0% 100% / .28), hsl(0 0% 100% / 0));
+  --ln-shadow: 0 12px 32px -14px rgb(15 20 40 / .32), 0 2px 8px -4px rgb(15 20 40 / .14); }
+html.dark .lnav { --ln-bg: 240 5% 11%; --ln-line: 0 0% 100% / .12; --ln-fill-a: .58; --ln-fill-b: .46; --ln-lip: .16;
+  --ln-rim: linear-gradient(120deg, hsl(0 0% 100% / .4), hsl(var(--lime) / .38) 26%, hsl(0 0% 100% / .05) 56%, hsl(var(--lime) / .2) 84%, hsl(0 0% 100% / .3));
+  --ln-sheen: radial-gradient(42% 90% at 28% 0%, hsl(var(--lime) / .14), hsl(var(--lime) / 0) 70%), linear-gradient(180deg, hsl(0 0% 100% / .08), hsl(0 0% 100% / 0));
+  --ln-shadow: 0 12px 32px -14px rgb(0 0 0 / .7), 0 2px 8px -4px rgb(0 0 0 / .5); }
+.lnav-pill { position: relative; isolation: isolate; height: 56px; border-radius: 9999px; will-change: transform;
+  background: linear-gradient(180deg, hsl(var(--ln-bg) / var(--ln-fill-a)), hsl(var(--ln-bg) / var(--ln-fill-b)));
+  -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid hsl(var(--ln-line));
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / var(--ln-lip)), var(--ln-shadow); }
+.lnav-pill::before { content: ""; position: absolute; inset: -1px; z-index: -1; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: var(--ln-rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+.lnav-pill::after { content: ""; position: absolute; inset: 1px 1px auto; height: 50%; z-index: -1; pointer-events: none;
+  border-radius: inherit; border-bottom-left-radius: 0; border-bottom-right-radius: 0; background: var(--ln-sheen); }
+/* The lime button sits inside a pill: its glow stays inside the rim instead of spilling past it (as in .mnav-bar). */
+.lnav-pill .lime-glow { box-shadow: inset 0 1px 0 hsl(0 0% 100% / .4), 0 0 0 1px hsl(var(--lime) / .35); }
+.lnav-water { will-change: transform, opacity; }
+/* The row is a transparent strip over the page: only the pills take the pointer, so the content under the gaps (all of
+   it once the row has split) still clicks and scrolls. The drawer is portalled, so it is not under this rule. */
+.lnav { pointer-events: none; }
+.lnav-pill, .lnav-water { pointer-events: auto; }
+/* The water pill: the site font and tokens, 44px items (the component's 42 is under the touch target). */
+html .lnav .nimbus-nav { font-family: inherit; --n-tint: hsl(var(--ln-bg) / .58); --n-fg: hsl(var(--foreground)); --n-fg-soft: hsl(var(--foreground) / .72); --n-rim: hsl(0 0% 100% / .75); }
+html.dark .lnav .nimbus-nav { --n-tint: hsl(var(--ln-bg) / .55); --n-fg: hsl(var(--foreground)); --n-fg-soft: hsl(var(--foreground) / .7); --n-rim: hsl(0 0% 100% / .22); }
+html .lnav .nimbus-nav .nimbus-item { height: 44px; font-weight: 550; white-space: nowrap; }
+html .lnav .nimbus-nav .nimbus-item:focus-visible { outline-color: hsl(var(--lime-ink)); }
+html.dark .lnav .nimbus-nav .nimbus-item:focus-visible { outline-color: hsl(var(--lime)); }
+.lnav-pill :focus-visible { outline: 2px solid hsl(var(--lime-ink)); outline-offset: 2px; }
+html.dark .lnav-pill :focus-visible { outline-color: hsl(var(--lime)); }
+@media (min-width: 1024px) and (max-width: 1279px) {
+  html .lnav .nimbus-nav .nimbus-item { padding: 0 13px; }
+  html .lnav .nimbus-nav .nimbus-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+/* The phone drawer (Radix Dialog): a glass card hanging under the pills over a dimmed page. Radix keeps it mounted
+   while the exit plays (it waits for animationend). */
+.lnav-dim { background: hsl(var(--background) / .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.lnav-dim[data-state="open"] { animation: lnav-fade var(--m-nav) var(--m-ease-out) both; }
+.lnav-dim[data-state="closed"] { animation: lnav-fade var(--m-menu-exit) var(--m-ease-in) both reverse; }
+.lnav-sheet { background: linear-gradient(180deg, hsl(var(--card) / .96), hsl(var(--card) / .92)); color: hsl(var(--foreground));
+  -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5);
+  border: 1px solid hsl(var(--ln-line)); box-shadow: inset 0 1px 0 hsl(0 0% 100% / var(--ln-lip)), 0 24px 60px -24px rgb(0 0 0 / .55); transform-origin: top center; }
+.lnav-sheet[data-state="open"] { animation: lnav-drop var(--m-card) var(--m-ease-out) both; }
+.lnav-sheet[data-state="closed"] { animation: lnav-lift var(--m-menu-exit) var(--m-ease-in) both; }
+@keyframes lnav-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lnav-drop { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes lnav-lift { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-6px) scale(.99); } }
+/* No blur support, less transparency, more contrast, forced colours: solid panes, no rim or sheen. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lnav-pill, .lnav-sheet { background: hsl(var(--ln-bg)); }
+  html .lnav .nimbus-nav { --n-tint: hsl(var(--ln-bg)); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .lnav-pill, .lnav-sheet, .lnav-dim { background: hsl(var(--ln-bg)); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .lnav-pill::before, .lnav-pill::after { display: none; }
+  html .lnav .nimbus-nav { --n-tint: hsl(var(--ln-bg)); }
+}
+html[data-contrast="more"] .lnav-pill { background: hsl(var(--card)); border-color: hsl(var(--border)); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: var(--ln-shadow); }
+html[data-contrast="more"] .lnav-pill::before, html[data-contrast="more"] .lnav-pill::after { display: none; }
+@media (forced-colors: active) { .lnav-pill, .lnav-sheet { border-color: CanvasText; } .lnav-pill::before, .lnav-pill::after { display: none; } }
+@media (prefers-reduced-motion: reduce) { .lnav-dim, .lnav-sheet { animation: none !important; } }
+@media print { .lnav { display: none; } }
+/* end R1307 liquid nav */
+
 /* ---------- 1120: creator profile card (components/profile) ----------
    Light: white surface, grey hairlines, lime accents. Dark: deep teal surface, off-white ink, muted teal lines.
    Hover 200ms, edit actions 180ms, all on the token ease. Transforms and opacity only. */

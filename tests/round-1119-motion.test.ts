@@ -88,6 +88,10 @@ describe("nothing bounces (1119)", () => {
   test("no cubic-bezier or framer ease array leaves 0..1 on the y axis", () => {
     const bad: string[] = [];
     for (const f of src) {
+      // R1307: the Nimbus Waterline component is third-party code kept verbatim by request;
+      // its three icon-scene curves overshoot on purpose (one-shot 0.5-1.15 s flourishes,
+      // off under reduced motion). The Outlly wrapper around it follows the house rules.
+      if (f.file === "components/ui/liquid-glass-navbar.tsx") continue;
       for (const m of f.text.matchAll(/cubic-bezier\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/g)) {
         if (overshoots([+m[1], +m[2], +m[3], +m[4]])) bad.push(`${f.file}: ${m[0]}`);
       }

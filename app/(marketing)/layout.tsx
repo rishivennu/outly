@@ -1,4 +1,4 @@
-import { MarketingNav } from "@/components/marketing/Nav";
+import { LiquidNav } from "@/components/marketing/LiquidNav";
 import { MarketingFooter } from "@/components/marketing/Footer";
 import { MotionFx } from "@/components/marketing/MotionFx";
 import { CursorFx } from "@/components/shared/CursorFx";
@@ -35,7 +35,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
       >
         Skip to content
       </a>
-      <MarketingNav />
+      <LiquidNav />
       {/* R1262: no scroll wrapper; the one Lenis in the root layout scrolls the window, so the sticky nav and sticky bars stick natively. */}
       <main id="main" tabIndex={-1} className="outline-none">{children}</main>
       <MarketingFooter />
