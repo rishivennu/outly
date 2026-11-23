@@ -2,7 +2,7 @@ import { z } from "zod";
 import { json } from "@/lib/http";
 import { adminRoute } from "@/lib/admin/route";
 import { getConfig, saveConfig } from "@/lib/settings";
-import { LANDING_COMPETITORS, LANDING_GROUPS, LANDING_SECTIONS } from "@/lib/landing";
+import { LANDING_COMPETITORS, LANDING_GROUPS, LANDING_SECTIONS, PUBLIC_PAGES } from "@/lib/landing";
 
 export const GET = adminRoute("site", async () => json({ landing: await getConfig("landing") }));
 
@@ -13,6 +13,7 @@ const Body = z
     sections: flags(LANDING_SECTIONS.map((s) => s.id)),
     competitors: flags(LANDING_COMPETITORS.map((c) => c.id)),
     groups: flags(LANDING_GROUPS),
+    pages: flags(PUBLIC_PAGES.map((p) => p.id)),
   })
   .strict();
 

@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { db } from "@/lib/db";
 import { categorySlug } from "@/lib/blog/public";
+import { pageOn } from "@/lib/landing";
+import { getConfig } from "@/lib/settings";
 
 const BASE = process.env.APP_URL ?? "http://localhost:3040";
 
@@ -30,10 +32,14 @@ async function blogEntries(): Promise<MetadataRoute.Sitemap> {
 }
 
 /** Published and completed workshops (completed ones keep their replay page). */
-async function workshopEntries(): Promise<MetadataRoute.Sitemap> {
+async function workshopEntries(now: Date): Promise<MetadataRoute.Sitemap> {
   try {
+    if (!pageOn(await getConfig("landing"), "workshops")) return []; // R1310: page switched off in the admin, nothing to index
     const rows = await db.workshop.findMany({ where: { status: { in: ["published", "completed"] } }, select: { slug: true, updatedAt: true } });
-    return rows.map((w) => ({ url: `${BASE}/workshops/${w.slug}`, lastModified: w.updatedAt, changeFrequency: "weekly" as const, priority: 0.6 }));
+    return [
+      { url: `${BASE}/workshops`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
+      ...rows.map((w) => ({ url: `${BASE}/workshops/${w.slug}`, lastModified: w.updatedAt, changeFrequency: "weekly" as const, priority: 0.6 })),
+    ];
   } catch (e) {
     console.warn("[sitemap] workshop entries skipped:", e instanceof Error ? e.message : e);
     return [];
@@ -53,8 +59,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/security`, lastModified: now, changeFrequency: "monthly", priority: 0.4 },
     { url: `${BASE}/status`, lastModified: now, changeFrequency: "daily", priority: 0.3 },
     { url: `${BASE}/changelog`, lastModified: now, changeFrequency: "weekly", priority: 0.4 },
-    { url: `${BASE}/workshops`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
     ...(await blogEntries()),
-    ...(await workshopEntries()),
+    ...(await workshopEntries(now)),
   ];
 }

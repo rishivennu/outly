@@ -30,17 +30,33 @@ export const LANDING_COMPETITORS = [
 /** Row groups of the comparison table, by their heading. Must match ROW_GROUPS in lib/marketing/comparison.ts. */
 export const LANDING_GROUPS = ["Publishing", "Creating", "Planning and tracking", "Insight and price", "Beyond publishing"] as const;
 
+/**
+ * R1310: public pages and menu entries the admin can switch off. `workshops` takes /workshops and every session page
+ * down (404) and drops the menu link; `resources` only drops the Resources menu link (help, blog and changelog stay
+ * reachable by URL, the help centre is where support links point).
+ */
+export const PUBLIC_PAGES = [
+  { id: "workshops", label: "Workshops page", path: "/workshops", shows: "The Creator Hub: /workshops, every session page and the Workshops link in the menu" },
+  { id: "resources", label: "Resources link", path: "/help", shows: "The Resources link in the menu (help centre, blog, changelog). The pages themselves stay up" },
+] as const;
+export type PublicPage = (typeof PUBLIC_PAGES)[number]["id"];
+
 export interface LandingConfig {
   sections: Record<LandingSection, boolean>;
   competitors: Record<string, boolean>;
   groups: Record<string, boolean>;
+  pages: Record<PublicPage, boolean>;
 }
 
 export const LANDING_DEFAULT: LandingConfig = {
   sections: Object.fromEntries(LANDING_SECTIONS.map((s) => [s.id, true])) as Record<LandingSection, boolean>,
   competitors: Object.fromEntries(LANDING_COMPETITORS.map((c) => [c.id, true])),
   groups: Object.fromEntries(LANDING_GROUPS.map((g) => [g, true])),
+  pages: Object.fromEntries(PUBLIC_PAGES.map((p) => [p.id, true])) as Record<PublicPage, boolean>,
 };
+
+/** Missing keys count as on, like sections. */
+export const pageOn = (cfg: Pick<LandingConfig, "pages"> | null | undefined, id: PublicPage) => cfg?.pages?.[id] !== false;
 
 /** Missing keys count as shown, so a new section appears by default until the admin hides it. */
 export const shown = (cfg: LandingConfig | null | undefined, id: LandingSection) => cfg?.sections?.[id] !== false;
@@ -48,6 +64,7 @@ export const shown = (cfg: LandingConfig | null | undefined, id: LandingSection)
 /** Anchors (#how, #pricing ...) the nav and footer should drop because their section is hidden. */
 export function hiddenAnchors(cfg: LandingConfig | null | undefined): string[] {
   const out: string[] = LANDING_SECTIONS.filter((s) => s.anchor && !shown(cfg, s.id)).map((s) => s.anchor);
+  for (const p of PUBLIC_PAGES) if (!pageOn(cfg, p.id)) out.push(p.id); // R1310: the menu drops the Workshops / Resources link the same way
   return out;
 }
 

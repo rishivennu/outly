@@ -42,7 +42,7 @@ import { useHiddenSections } from "./useHiddenSections";
  * drop out of the pill. Waitlist mode relabels the call to action (useWaitlist, joinHref); a signed-in visitor gets
  * Dashboard instead of Log in + Get started (useSignedIn). components/marketing/Nav.tsx is the bar this replaced.
  */
-type NavEntry = LiquidNavItem & { href: string; sec?: string; routes?: RegExp };
+type NavEntry = LiquidNavItem & { href: string; sec?: string; routes?: RegExp; gate?: string };
 
 const ico = (Icon: typeof Sparkles) => <Icon size={18} strokeWidth={1.8} aria-hidden="true" />;
 
@@ -51,8 +51,8 @@ export const NAV: NavEntry[] = [
   { label: "How it works", href: "/#how", sec: "how", icon: ico(Workflow), fx: "spin" },
   { label: "Features", href: "/#features", sec: "features", icon: ico(Sparkles), fx: "pop" },
   { label: "Pricing", href: "/#pricing", sec: "pricing", icon: ico(Tag), fx: "drop" },
-  { label: "Resources", href: "/help", routes: /^\/(help|blog|changelog)(\/|$)/, icon: ico(BookOpen), fx: "wave" },
-  { label: "Workshops", href: "/workshops", routes: /^\/workshops(\/|$)/, icon: ico(Presentation), fx: "pop" },
+  { label: "Resources", href: "/help", routes: /^\/(help|blog|changelog)(\/|$)/, icon: ico(BookOpen), fx: "wave", gate: "resources" },
+  { label: "Workshops", href: "/workshops", routes: /^\/workshops(\/|$)/, icon: ico(Presentation), fx: "pop", gate: "workshops" },
   { label: "Contact", href: "/contact", routes: /^\/contact(\/|$)/, icon: ico(Send), fx: "plane" },
 ];
 const PARTNERS = { href: "/partners", label: "Partner with us" };
@@ -99,7 +99,7 @@ export function LiquidNav() {
   const hidden = useHiddenSections(pathname);
   const dark = useIsDark();
   const desktop = useDesktop();
-  const items = useMemo(() => NAV.filter((n) => !n.sec || !hidden.has(n.sec)), [hidden]);
+  const items = useMemo(() => NAV.filter((n) => (!n.sec || !hidden.has(n.sec)) && (!n.gate || !hidden.has(n.gate))), [hidden]); // gate: R1310 admin page switches
 
   const [active, setActive] = useState(0);
   const [split, setSplit] = useState(false);

@@ -1,15 +1,121 @@
-/* R1309 Creator Hub: pastel card tints (light pastels, low-alpha washes over the card in dark) and the marquee strip. */
-.tint { background: var(--ws-tint); }
-.sun { --ws-tint: hsl(48 96% 86%); }
-.pink { --ws-tint: hsl(330 90% 92%); }
-.sky { --ws-tint: hsl(200 92% 89%); }
-.lime { --ws-tint: hsl(78 85% 84%); }
-:global(.dark) .sun { --ws-tint: linear-gradient(hsl(45 95% 60% / .14), hsl(45 95% 60% / .14)), hsl(var(--card)); }
-:global(.dark) .pink { --ws-tint: linear-gradient(hsl(var(--pink) / .16), hsl(var(--pink) / .16)), hsl(var(--card)); }
-:global(.dark) .sky { --ws-tint: linear-gradient(hsl(200 95% 60% / .15), hsl(200 95% 60% / .15)), hsl(var(--card)); }
-:global(.dark) .lime { --ws-tint: linear-gradient(hsl(var(--lime) / .13), hsl(var(--lime) / .13)), hsl(var(--card)); }
+/* R1310 Creator Hub, "Round up" scrapbook look: grid-paper page wash, mixed-type headline words,
+   pastel sticker tags, cut-out collage, thin mono marquee strips, pastel card rail, charcoal replay band. */
 
-.marquee { overflow: hidden; }
-.track { display: flex; width: max-content; animation: ws-marquee 38s linear infinite; }
+/* Ink and paper for the mixed-type words. The dark band overrides --ws-ink so the same classes read light-on-dark. */
+.page {
+  --ws-ink: hsl(var(--foreground));
+  --ws-paper: hsl(0 0% 100%);
+  --ws-pink: hsl(338 88% 80%);
+  --ws-blue: hsl(204 92% 84%);
+  --ws-sun: hsl(48 96% 80%);
+  --ws-mint: hsl(158 62% 82%);
+  --ws-line: hsl(172 24% 82% / .6);
+  position: relative;
+  isolation: isolate;
+  color: hsl(var(--foreground));
+  background-color: hsl(168 42% 95%);
+  background-image: linear-gradient(var(--ws-line) 1px, transparent 1px), linear-gradient(90deg, var(--ws-line) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+:global(.dark) .page {
+  --ws-paper: hsl(var(--card));
+  --ws-pink: hsl(338 70% 70%);
+  --ws-blue: hsl(204 80% 74%);
+  --ws-sun: hsl(48 90% 70%);
+  --ws-mint: hsl(158 50% 66%);
+  --ws-line: hsl(0 0% 100% / .045);
+  background-color: hsl(var(--background));
+}
+
+/* Mixed type: one headline, every word its own cut-out. */
+.chunky { font-family: var(--font-rubik), var(--font-display), system-ui, sans-serif; font-weight: 900; letter-spacing: -0.035em; color: var(--ws-ink); }
+.pixel { text-transform: uppercase; letter-spacing: 0.02em; font-size: 0.74em; line-height: 1; color: var(--ws-ink); vertical-align: 0.06em; }
+.outline {
+  position: relative;
+  display: inline-block;
+  isolation: isolate;
+  font-family: var(--font-rubik), var(--font-display), system-ui, sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: transparent;
+  -webkit-text-stroke: 0.04em var(--ws-ink);
+  paint-order: stroke fill;
+}
+.outline::before {
+  content: attr(data-text) / "";
+  position: absolute;
+  left: 0.07em;
+  top: 0.07em;
+  z-index: -1;
+  color: var(--ws-shadow, var(--ws-pink));
+  -webkit-text-stroke: 0;
+}
+.soft {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-weight: 900;
+  font-variation-settings: "SOFT" 100, "WONK" 1, "opsz" 144;
+  letter-spacing: -0.02em;
+  color: var(--ws-fill, var(--ws-pink));
+  -webkit-text-stroke: 0.018em var(--ws-ink);
+  paint-order: stroke fill;
+}
+.serif { font-family: var(--font-fraunces), Georgia, serif; font-weight: 500; font-variation-settings: "SOFT" 60, "WONK" 0, "opsz" 144; letter-spacing: -0.02em; }
+.mono { font-family: var(--font-spacemono), ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* Pastel sticker tag (the little "PLM UPDATES" chip). */
+.tag {
+  display: inline-flex; align-items: center; gap: .5rem; min-height: 1.9rem; padding: 0 .9rem;
+  border-radius: 999px; border: 1.5px solid hsl(var(--foreground) / .18);
+  font-family: var(--font-spacemono), ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; line-height: 1;
+  color: hsl(var(--foreground)); background: var(--ws-tint, var(--ws-paper));
+  box-shadow: 0 2px 0 hsl(var(--foreground) / .12);
+}
+.tint { background: var(--ws-tint); }
+.sun { --ws-tint: hsl(48 96% 84%); }
+.pink { --ws-tint: hsl(338 90% 90%); }
+.sky { --ws-tint: hsl(204 92% 88%); }
+.mint { --ws-tint: hsl(158 60% 86%); }
+.paper { --ws-tint: var(--ws-paper); }
+:global(.dark) .sun { --ws-tint: linear-gradient(hsl(45 95% 60% / .16), hsl(45 95% 60% / .16)), hsl(var(--card)); }
+:global(.dark) .pink { --ws-tint: linear-gradient(hsl(var(--pink) / .18), hsl(var(--pink) / .18)), hsl(var(--card)); }
+:global(.dark) .sky { --ws-tint: linear-gradient(hsl(204 95% 60% / .16), hsl(204 95% 60% / .16)), hsl(var(--card)); }
+:global(.dark) .mint { --ws-tint: linear-gradient(hsl(158 70% 55% / .15), hsl(158 70% 55% / .15)), hsl(var(--card)); }
+
+/* Pink primary pill and white pill. */
+.pinkBtn { background: hsl(var(--pink)); color: hsl(240 10% 6%); }
+.pinkBtn:hover { filter: brightness(1.04); }
+.whiteBtn { background: var(--ws-paper); color: hsl(var(--foreground)); border: 1.5px solid hsl(var(--foreground) / .14); }
+.whiteBtn:hover { border-color: hsl(var(--foreground) / .4); }
+
+/* Doodle stickers around the headline: soft 3D feel from a drop shadow, each with its own tilt. */
+.doodle { position: absolute; pointer-events: none; filter: drop-shadow(0 8px 14px hsl(222 24% 10% / .18)); }
+.cut { transform: rotate(var(--r, 0deg)); filter: drop-shadow(0 12px 18px hsl(222 24% 10% / .22)); transition: transform var(--m-hover, .18s) var(--m-ease-out, ease-out); }
+.collage:hover .cut { transform: translateY(-4px) rotate(var(--r, 0deg)); }
+@media (prefers-reduced-motion: reduce) { .collage:hover .cut { transform: rotate(var(--r, 0deg)); } }
+
+/* Thin marquee strip: mono caps on a light rule. */
+.strip { overflow: hidden; border-top: 1px solid hsl(var(--foreground) / .14); border-bottom: 1px solid hsl(var(--foreground) / .14); background: hsl(0 0% 100% / .55); }
+:global(.dark) .strip { background: hsl(0 0% 100% / .035); }
+.stripDark { border-color: hsl(0 0% 100% / .14); background: hsl(0 0% 100% / .05); }
+.track { display: flex; width: max-content; animation: ws-marquee 42s linear infinite; }
 @keyframes ws-marquee { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
 @media (prefers-reduced-motion: reduce) { .track { animation: none; } }
+
+/* The card rail: scroll-snap, hidden scrollbar, arrows below. */
+.rail { display: flex; gap: 1.1rem; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 1.25rem; padding: .25rem 1.25rem 1.25rem; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.rail::-webkit-scrollbar { display: none; }
+.rail > li { flex: 0 0 min(84vw, 22rem); scroll-snap-align: start; }
+@media (min-width: 640px) { .rail { padding-inline: 2rem; scroll-padding-inline: 2rem; } }
+@media (min-width: 1280px) { .rail { padding-inline: max(2rem, calc((100vw - 1240px) / 2 + 2rem)); scroll-padding-inline: max(2rem, calc((100vw - 1240px) / 2 + 2rem)); } }
+
+/* Charcoal replay band. */
+.band { --ws-ink: hsl(40 33% 95%); --ws-shadow: hsl(338 70% 70%); --ws-fill: hsl(338 70% 70%); background: hsl(240 6% 9%); color: hsl(40 33% 95%); }
+.band .tag { color: hsl(40 33% 95%); border-color: hsl(0 0% 100% / .22); background: hsl(0 0% 100% / .06); box-shadow: none; }
+.band .whiteBtn { background: hsl(0 0% 100% / .08); color: hsl(40 33% 95%); border-color: hsl(0 0% 100% / .2); }
+.band .whiteBtn:hover { border-color: hsl(0 0% 100% / .6); }
+.thumb { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 1rem; background: hsl(0 0% 100% / .06); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform var(--m-hover, .18s) var(--m-ease-out, ease-out); }
+.thumbLink:hover .thumb img { transform: scale(1.03); }
+@media (prefers-reduced-motion: reduce) { .thumbLink:hover .thumb img { transform: none; } }
+.play { position: absolute; inset: 0; display: grid; place-items: center; }
+.play span { display: grid; place-items: center; width: 3.25rem; height: 3.25rem; border-radius: 999px; background: hsl(0 0% 100%); color: hsl(240 6% 9%); box-shadow: 0 10px 24px hsl(0 0% 0% / .35); }

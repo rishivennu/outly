@@ -79,7 +79,7 @@ describe("R1307 LiquidNav wiring", () => {
     expect(nav).toContain("useSignedIn(");
     expect(nav).toContain('<Link href="/home" data-mag=""');
     expect(nav).toContain("useHiddenSections(pathname)");
-    expect(nav).toContain("NAV.filter((n) => !n.sec || !hidden.has(n.sec))");
+    expect(nav).toContain("NAV.filter((n) => (!n.sec || !hidden.has(n.sec)) && (!n.gate || !hidden.has(n.gate)))"); // R1310: admin page switches gate Workshops / Resources
     expect(nav).not.toContain("hairline");
     expect(nav).not.toMatch(/[\u2013\u2014]/);
     // header pads the status bar inset like every pinned top edge (R1283 sweep)

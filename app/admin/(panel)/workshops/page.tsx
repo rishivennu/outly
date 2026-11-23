@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/guard";
+import { can } from "@/lib/admin/perms";
+import { getConfig } from "@/lib/settings";
+import { PublicPageToggles } from "@/components/admin/PublicPageToggles";
 import { PageHead } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
 import { WorkshopsPanel } from "@/components/admin/workshops/WorkshopsPanel";
@@ -11,8 +14,8 @@ export const metadata = { title: "Workshops", robots: { index: false, follow: fa
 export const dynamic = "force-dynamic";
 
 export default async function WorkshopsAdminPage() {
-  await requireAdmin("workshops");
-  const [workshops, calendar] = await Promise.all([listAdminWorkshops(), calendarStatus()]);
+  const admin = await requireAdmin("workshops");
+  const [workshops, calendar, landing] = await Promise.all([listAdminWorkshops(), calendarStatus(), getConfig("landing")]);
   return (
     <>
       <PageHead
@@ -27,6 +30,9 @@ export default async function WorkshopsAdminPage() {
           </Button>
         }
       />
+      <div className="mb-4">
+        <PublicPageToggles initial={{ pages: landing.pages }} canEdit={can(admin.role, "site")} />
+      </div>
       <WorkshopsPanel initial={workshops} calendar={calendar} now={Date.now()} />
     </>
   );

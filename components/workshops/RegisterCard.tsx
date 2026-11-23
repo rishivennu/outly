@@ -6,12 +6,13 @@ import { CalendarPlus, Check, ChevronDown, Copy, PlayCircle, Video } from "lucid
 import { ApiError, api } from "@/lib/client/api";
 import { fmtWhen, googleCalendarUrl, outlookCalendarUrl, seatsLabel, type WorkshopView } from "@/lib/workshops/core";
 import { cn } from "@/lib/utils";
+import s from "./workshops.module.css";
 
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
 const BTN = cn("inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full px-6 font-display text-[15px] font-bold transition disabled:cursor-not-allowed", FOCUS);
-const PRIMARY = cn(BTN, "bg-lime text-lime-foreground lime-glow hover:brightness-105 disabled:opacity-60");
+const PRIMARY = cn(BTN, s.pinkBtn, "disabled:opacity-60");
 const DARK = cn(BTN, "bg-foreground text-background hover:opacity-90");
-const GHOST = cn(BTN, "border-2 border-foreground/15 text-foreground hover:border-foreground/40");
+const GHOST = cn(BTN, s.whiteBtn);
 const QUIET = cn("inline-flex min-h-10 items-center rounded-full px-3 text-[13px] font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline touch:min-h-11", FOCUS);
 
 type Reply = { ok: boolean; workshop: WorkshopView | null };
@@ -58,9 +59,9 @@ export function RegisterCard({ workshop, signedIn, pageUrl }: { workshop: Worksh
   const cal = { title: w.title, summary: w.summary, startsAt: w.startsAt, endsAt: w.endsAt, url: pageUrl, meetUrl: w.meetUrl };
 
   return (
-    <div className="rounded-[1.5rem] border border-border bg-card p-5 text-card-foreground shadow-[0_24px_60px_-40px_rgb(0_0_0/0.45)] sm:p-6">
+    <div className="rounded-[1.6rem] border border-foreground/10 bg-card p-5 text-card-foreground shadow-[0_24px_60px_-40px_rgb(0_0_0/0.45)] sm:p-6">
       <div className="flex items-center justify-between gap-3">
-        <p className="font-display text-sm font-extrabold uppercase tracking-[0.16em]">Free seat</p>
+        <p className={cn(s.tag, s.sun, "-rotate-1")}>Free seat</p>
         {w.live && (
           <span className="inline-flex min-h-7 items-center gap-2 rounded-full bg-foreground px-3 text-xs font-semibold text-background">
             <span className="live-dot" aria-hidden="true" />
@@ -68,8 +69,8 @@ export function RegisterCard({ workshop, signedIn, pageUrl }: { workshop: Worksh
           </span>
         )}
       </div>
-      <p className="mt-3 font-display text-lg font-bold leading-snug">{when.day}</p>
-      <p className="text-[15px] text-muted-foreground">
+      <p className={cn(s.chunky, "mt-4 text-[1.35rem] leading-snug")}>{when.day}</p>
+      <p className={cn(s.mono, "mt-1 text-[12px] uppercase tracking-[0.12em] text-muted-foreground")}>
         {when.time} · {when.dur}
       </p>
 
@@ -109,7 +110,7 @@ export function RegisterCard({ workshop, signedIn, pageUrl }: { workshop: Worksh
                   <Video size={18} aria-hidden="true" />
                   {w.live ? "Join on Google Meet now" : "Google Meet link"}
                 </a>
-                <button type="button" onClick={copyMeet} aria-label={copied ? "Meet link copied" : "Copy Meet link"} className={cn("grid h-12 w-12 shrink-0 place-items-center rounded-full border-2 border-foreground/15 hover:border-foreground/40", FOCUS)}>
+                <button type="button" onClick={copyMeet} aria-label={copied ? "Meet link copied" : "Copy Meet link"} className={cn(s.whiteBtn, "grid h-12 w-12 shrink-0 place-items-center rounded-full", FOCUS)}>
                   {copied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}
                 </button>
               </div>
