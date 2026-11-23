@@ -117,6 +117,7 @@ model User {
 
   @@index([lastSeenAt])
   partnerApplications PartnerApplication[] // R1282
+  workshopRegistrations WorkshopRegistration[] // R1309
 }
 
 /// A browser the person chose to remember at sign-in (1053). The cookie holds `id.secret`; only a hash of
@@ -2307,6 +2308,64 @@ model ActivityEvent {
   @@index([userId, at])
   @@index([name, at])
   @@index([day, platform])
+}
+
+/// R1309 Creator Hub workshops. One row per live session. When the admin has connected Google Calendar (settings key
+/// "calendar"), publishing creates a Google Calendar event with a Meet link and every registered creator as an attendee,
+/// so Google emails the invite, reschedules and cancellations. Status: draft | published | cancelled | completed.
+model Workshop {
+  id             String    @id @default(cuid())
+  slug           String    @unique
+  title          String
+  summary        String    @default("") // one line under the title (cards, email, JSON-LD description)
+  description    String    @default("") // longer text, paragraphs split on blank lines
+  host           String    @default("") // "Rishi, founder of Outlly"
+  level          String    @default("all") // beginner | intermediate | advanced | all
+  tags           String    @default("[]") // JSON string[]
+  startsAt       DateTime
+  endsAt         DateTime
+  timezone       String    @default("Asia/Kolkata") // IANA zone the times are presented in
+  capacity       Int       @default(0) // 0 = unlimited
+  status         String    @default("draft")
+  coverUrl       String    @default("")
+  meetUrl        String    @default("") // Google Meet link (from the calendar event) or a pasted link
+  recordingUrl   String    @default("") // filled after the session
+  googleEventId  String    @default("") // "" = not on Google Calendar yet
+  googleSyncedAt DateTime?
+  googleError    String    @default("") // last sync failure, shown to the admin
+  publishedAt    DateTime?
+  cancelledAt    DateTime?
+  createdBy      String    @default("") // admin login
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  registrations WorkshopRegistration[]
+
+  @@index([status, startsAt])
+  @@index([startsAt])
+}
+
+/// One creator on one workshop. Unique per email, so a double click or a second account with the same inbox can't
+/// register twice. Status: registered | cancelled | attended.
+model WorkshopRegistration {
+  id          String    @id @default(cuid())
+  workshopId  String
+  userId      String?
+  email       String // lowercase
+  name        String    @default("")
+  status      String    @default("registered")
+  source      String    @default("web") // web | app | admin
+  reminderAt  DateTime? // when the 24 h reminder went out
+  cancelledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([workshopId, email])
+  @@index([userId])
+  @@index([workshopId, status])
 }
 
 /// R1308: one stretch of use. A new row starts after SESSION_GAP_MS of silence (lib/analytics/activity-core.ts);

@@ -12,6 +12,7 @@ const EXCEPTIONS: Record<string, number> = {
   "components/admin/AiAccessPanel.tsx": 2, // mode radio + length chips
   "components/admin/AdminTabBar.tsx": 1, // R1274 More tab of the phone tab bar (aria-expanded, .mtab-item ink)
   "components/admin/AiEngineCard.tsx": 1, // disclosure row
+  "components/admin/app-analytics/TabBar.tsx": 1, // R1308 analytics tab bar (role=tab, aria-selected, roving tabIndex)
   "components/admin/BehaviorAnalyses.tsx": 1, // version list row
   "components/admin/BehaviorView.tsx": 2, // tabs + range radio
   "components/admin/FaqEditor.tsx": 1, // accordion row

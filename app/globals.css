@@ -4315,7 +4315,9 @@ html.theme-anim *::after {
    colour accent; the water itself stays the shader's own blue-white. The Nimbus pill's colours are its own CSS
    custom properties (--n-*), re-pointed here at the site tokens so text holds 4.5:1 over any section in either theme
    (html .lnav beats the component's inline <style> at equal specificity). lg..xl shows the water pill with icons only
-   (the six labels do not fit a 1024px row beside the two other pills). The split itself is GSAP inline transforms. */
+   (the six labels do not fit a 1024px row beside the two other pills). The split itself is GSAP inline transforms.
+   R1309: a seventh item (Workshops) made the labelled pill 855px wide, so xl..2xl tightens the items (10px padding,
+   13px type) and the row grows to 1240px; the actions pill no longer runs past the viewport at 1280-1535px. */
 .lnav { --ln-bg: 0 0% 100%; --ln-line: 222 20% 18% / .10; --ln-fill-a: .62; --ln-fill-b: .50; --ln-lip: .70;
   --ln-rim: linear-gradient(120deg, hsl(0 0% 100% / .95), hsl(var(--lime) / .5) 26%, hsl(0 0% 100% / .12) 56%, hsl(var(--lime) / .28) 84%, hsl(0 0% 100% / .8));
   --ln-sheen: radial-gradient(42% 90% at 28% 0%, hsl(var(--lime) / .22), hsl(var(--lime) / 0) 70%), linear-gradient(180deg, hsl(0 0% 100% / .28), hsl(0 0% 100% / 0));
@@ -4353,6 +4355,9 @@ html.dark .lnav-pill :focus-visible { outline-color: hsl(var(--lime)); }
 @media (min-width: 1024px) and (max-width: 1279px) {
   html .lnav .nimbus-nav .nimbus-item { padding: 0 13px; }
   html .lnav .nimbus-nav .nimbus-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+@media (min-width: 1280px) and (max-width: 1535px) {
+  html .lnav .nimbus-nav .nimbus-item { padding: 0 10px; gap: 6px; font-size: 13px; }
 }
 /* The phone drawer (Radix Dialog): a glass card hanging under the pills over a dimmed page. Radix keeps it mounted
    while the exit plays (it waits for animationend). */

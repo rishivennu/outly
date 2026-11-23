@@ -18,7 +18,7 @@ export interface Mail {
   html: string;
   /** Plain-text part. Built from `html` when left out, so no email ever goes out HTML-only. */
   text?: string;
-  kind: "invoice" | "ticket_opened" | "ticket_reply" | "test" | "subscription" | "maintenance" | "weekly_report" | "team_invite" | "referral" | "waitlist" | "notice" | "nudge" | "winback" | "growth" | "otp" | "security" | "beta" | "founding" | "pip_transcript" | "announcement" | "watchdog" | "partner";
+  kind: "invoice" | "ticket_opened" | "ticket_reply" | "test" | "subscription" | "maintenance" | "weekly_report" | "team_invite" | "referral" | "waitlist" | "notice" | "nudge" | "winback" | "growth" | "otp" | "security" | "beta" | "founding" | "pip_transcript" | "announcement" | "watchdog" | "partner" | "workshop";
   attachments?: { filename: string; content: Buffer }[];
   /** Secrets (a sign-in code) masked in the Outbox copy once a real provider has delivered the email. */
   redact?: string[];
@@ -367,6 +367,36 @@ const transcriptText = (text: string) =>
 export type SecurityChange = "on" | "off" | "codes" | "phone" | "phone-off";
 
 export const templates = {
+  /** R1309 workshop seat confirmed: the when, the Meet link (when the calendar is connected) and an Add to calendar button. */
+  workshopConfirmed: (o: { name: string; title: string; day: string; time: string; dur: string; host: string; meetUrl: string; url: string; calendarUrl: string }) =>
+    wrap(
+      "You're in!",
+      `${p(`Hi ${esc(o.name)}, your seat for <b>${esc(o.title)}</b> is saved${o.host ? ` (with ${esc(o.host)})` : ""}. ${o.meetUrl ? "The Google Meet link is below and in the calendar invite." : "The join link lands here and on the workshop page before we start."}`)}${
+        o.meetUrl ? btn(o.meetUrl, "Open the Meet link") : btn(o.url, "Open the workshop page")
+      }${p(`<a href="${esc(o.calendarUrl)}" style="color:${C.ink};font-family:${BODY};text-decoration:underline">Add to Google Calendar</a> &nbsp;&middot;&nbsp; the attached .ics works for Apple Calendar and Outlook.`)}${small("We'll send one reminder 24 hours before. Can't make it? Open the workshop page and give the seat back.")}`,
+      {
+        kicker: "Workshop",
+        tone: "lime",
+        preheader: `${esc(o.day)} · ${esc(o.time)}`,
+        tiles: pair({ tone: "ink", html: stat(esc(o.day), "date", "ink", 24) }, { tone: "forest", html: stat(esc(o.time), `time · ${esc(o.dur)}`, "forest", 22) }),
+      },
+    ),
+  workshopChanged: (o: { name: string; title: string; change: "rescheduled" | "cancelled"; day: string; time: string; url: string; meetUrl: string }) =>
+    wrap(
+      o.change === "cancelled" ? "Workshop cancelled" : "New time",
+      `${p(
+        o.change === "cancelled"
+          ? `Hi ${esc(o.name)}, <b>${esc(o.title)}</b> is cancelled. Sorry about that: if we run it again you'll see it on the workshops page first.`
+          : `Hi ${esc(o.name)}, <b>${esc(o.title)}</b> moved to <b>${esc(o.day)}, ${esc(o.time)}</b>. Your seat is still yours${o.meetUrl ? " and the Meet link is unchanged" : ""}; the attached .ics updates your calendar.`,
+      )}${btn(o.url, o.change === "cancelled" ? "See other workshops" : "Open the workshop page")}`,
+      { kicker: "Workshop", tone: "cream", burst: false, preheader: o.change === "cancelled" ? "Cancelled" : `${esc(o.day)} · ${esc(o.time)}` },
+    ),
+  workshopReminder: (o: { name: string; title: string; day: string; time: string; url: string; meetUrl: string }) =>
+    wrap(
+      "See you tomorrow",
+      `${p(`Hi ${esc(o.name)}, <b>${esc(o.title)}</b> is tomorrow, ${esc(o.day)} at ${esc(o.time)}.`)}${o.meetUrl ? btn(o.meetUrl, "Open the Meet link") : btn(o.url, "Open the workshop page")}${small("Bring a question. The replay goes up on the workshop page afterwards.")}`,
+      { kicker: "Workshop", tone: "lime", preheader: `${esc(o.day)} · ${esc(o.time)}` },
+    ),
   invoice: (o: { name: string; number: string; amount: string; plan: string; url: string }) =>
     wrap(
       "Payment received. Thank you!",

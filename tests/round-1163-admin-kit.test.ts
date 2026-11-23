@@ -33,7 +33,7 @@ describe("1163 sidebar", () => {
     for (const r of ROUTES) expect(hrefs).toContain(r);
     expect(new Set(hrefs).size).toBe(hrefs.length);
     // 30 from 1163, the six Content Studio pages (1175), Live Assist (R1184), System Health (R1195) and Creator Partnerships (R1282) and App Analytics (R1308).
-    expect(hrefs.length).toBe(40);
+    expect(hrefs.length).toBe(41); // R1309 added /admin/workshops
     for (const r of ["/admin/blog", "/admin/blog/generate", "/admin/blog/library", "/admin/blog/calendar", "/admin/blog/seo", "/admin/blog/settings"]) expect(hrefs).toContain(r);
   });
   test("insight pages moved out of Run", () => {

@@ -70,6 +70,15 @@ export interface EmailConfig {
   resend: { apiKey: string; webhookSecret: string };
 }
 
+/**
+ * R1309 Google Calendar for workshops (lib/google/calendar.ts). The organiser (an admin) connects their Google account
+ * once; the refresh token is the secret. Uses the YouTube Google OAuth client (same Google Cloud project) so there is
+ * only one Google app to manage. `email` is the connected account, `calendarId` the calendar events land in.
+ */
+export interface CalendarConfig {
+  google: { refreshToken: string; email: string; calendarId: string; connectedAt: string; scope: string };
+}
+
 /** WhatsApp sign-in codes through Meta's Cloud API (lib/whatsapp.ts). The token is a secret. */
 export interface WhatsAppConfig {
   enabled: boolean;
@@ -87,6 +96,7 @@ const SECRET_PATHS: Record<string, string[]> = {
   platforms: ["instagram", "youtube", "x", "tiktok", "facebook", "threads", "linkedin"].map((p) => `${p}.clientSecret`),
   email: ["resend.apiKey", "resend.webhookSecret"],
   whatsapp: ["token"],
+  calendar: ["google.refreshToken"],
 };
 
 export const DEFAULTS = {
@@ -101,6 +111,7 @@ export const DEFAULTS = {
   } as PaymentConfig,
   email: { provider: "mock", from: "Outlly <hello@mail.outlly.com>", marketingFrom: "", replyTo: SUPPORT_EMAIL, resend: { apiKey: "", webhookSecret: "" } } as EmailConfig,
   whatsapp: { enabled: false, phoneNumberId: "", wabaId: "", token: "", template: "outlly_code", lang: "en" } as WhatsAppConfig,
+  calendar: { google: { refreshToken: "", email: "", calendarId: "primary", connectedAt: "", scope: "" } } as CalendarConfig, // R1309 workshops
   site: { maintenance: false, message: "", eta: "", since: "", endsAt: "", waitlist: false, waitlistSince: "" } as SiteConfig,
   landing: LANDING_DEFAULT,
   pricing: PRICING_DISPLAY_DEFAULT as PricingDisplay,

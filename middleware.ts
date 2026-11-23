@@ -10,10 +10,10 @@ import { retryAfterSeconds, wantsHtml, wrapHeaders } from "./lib/maintenance/res
 
 const AUTH_PAGES = ["/login", "/signup"];
 // Marketing pages anyone can read.
-const OPEN = ["/", "/privacy", "/terms", "/contact", "/help", "/changelog", "/status", "/security", "/waitlist", "/maintenance", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice"];
+const OPEN = ["/", "/privacy", "/terms", "/contact", "/help", "/changelog", "/status", "/security", "/waitlist", "/maintenance", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice", "/workshops"];
 // A review link is its own credential: the reviewer has no account here.
 // A share link (/r/code) and a team invite must work before the visitor has an account.
-const OPEN_PREFIX = ["/review/", "/r/", "/team/accept"];
+const OPEN_PREFIX = ["/review/", "/r/", "/team/accept", "/workshops/"];
 // Pages that need a session. Anything not listed here and not public is either a real public file
 // (og image, icons) or a typo, and a typo deserves the 404 page, not a sign-in wall.
 const STUDIO = ["/home", "/create", "/content", "/calendar", "/analytics", "/intelligence", "/profile-review", "/inbox", "/approvals", "/accounts", "/billing", "/settings", "/support", "/mascot", "/share-target", "/app-share", "/dashboard"];
@@ -36,11 +36,11 @@ const LH_HINT = "outlly_lh";
 // they join; its sign-up buttons scroll to the waitlist form on the page. Open: the landing page, help and contact,
 // the waitlist page itself, the legal pages its form links to, and links that are their own credential
 // (emailed invites, team invites, client review links, share links). Sign-up and the studio stay closed.
-const WAITLIST_OPEN = ["/", "/help", "/contact", "/changelog", "/status", "/security", "/waitlist", "/privacy", "/terms", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice"];
+const WAITLIST_OPEN = ["/", "/help", "/contact", "/changelog", "/status", "/security", "/waitlist", "/privacy", "/terms", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice", "/workshops"];
 // Maintenance on: strangers only reach these. /login lets members back in; nobody can sign up.
 // /unsubscribe: leaving a mailing list must work whatever mode the site is in.
 const MAINTENANCE_OPEN = ["/maintenance", "/status", "/login", "/privacy", "/terms", "/unsubscribe", "/account-deleted", "/app-auth", "/verify-invoice"];
-const WAITLIST_PREFIX = ["/review/", "/r/", "/team/accept"];
+const WAITLIST_PREFIX = ["/review/", "/r/", "/team/accept", "/workshops/"];
 
 function sync(req: NextRequest, res: NextResponse, name: string, on: boolean, maxAge: number) {
   const has = req.cookies.get(name)?.value === "1";

@@ -1,0 +1,15 @@
+/* R1309 Creator Hub: pastel card tints (light pastels, low-alpha washes over the card in dark) and the marquee strip. */
+.tint { background: var(--ws-tint); }
+.sun { --ws-tint: hsl(48 96% 86%); }
+.pink { --ws-tint: hsl(330 90% 92%); }
+.sky { --ws-tint: hsl(200 92% 89%); }
+.lime { --ws-tint: hsl(78 85% 84%); }
+:global(.dark) .sun { --ws-tint: linear-gradient(hsl(45 95% 60% / .14), hsl(45 95% 60% / .14)), hsl(var(--card)); }
+:global(.dark) .pink { --ws-tint: linear-gradient(hsl(var(--pink) / .16), hsl(var(--pink) / .16)), hsl(var(--card)); }
+:global(.dark) .sky { --ws-tint: linear-gradient(hsl(200 95% 60% / .15), hsl(200 95% 60% / .15)), hsl(var(--card)); }
+:global(.dark) .lime { --ws-tint: linear-gradient(hsl(var(--lime) / .13), hsl(var(--lime) / .13)), hsl(var(--card)); }
+
+.marquee { overflow: hidden; }
+.track { display: flex; width: max-content; animation: ws-marquee 38s linear infinite; }
+@keyframes ws-marquee { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
+@media (prefers-reduced-motion: reduce) { .track { animation: none; } }

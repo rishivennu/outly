@@ -1,7 +1,7 @@
 /** Client-safe: shared by the admin sidebar and the server guards. */
 export type AdminRole = "super" | "finance" | "support" | "marketing";
 export const ADMIN_ROLES = ["super", "finance", "support", "marketing"] as const satisfies readonly AdminRole[];
-export type AdminArea = "overview" | "users" | "insights" | "payments" | "pricing" | "tickets" | "faq" | "integrations" | "outbox" | "team" | "site" | "platforms" | "retention" | "growth" | "plans" | "referrals" | "content" | "live" | "health" | "partners" | "appAnalytics";
+export type AdminArea = "overview" | "users" | "insights" | "payments" | "pricing" | "tickets" | "faq" | "integrations" | "outbox" | "team" | "site" | "platforms" | "retention" | "growth" | "plans" | "referrals" | "content" | "live" | "health" | "partners" | "appAnalytics" | "workshops";
 
 export const ROLE_LABEL: Record<AdminRole, string> = { super: "Super admin", finance: "Finance", support: "Support", marketing: "Marketing lead" };
 export const ROLE_BLURB: Record<AdminRole, string> = {
@@ -38,6 +38,8 @@ const ACCESS: Record<AdminArea, AdminRole[]> = {
   health: ["super", "support"],
   // R1308 App Analytics: downloads, active users, engagement and retention. Read-only numbers; every role may look.
   appAnalytics: ["super", "finance", "support", "marketing"],
+  // R1309 Creator Hub workshops: marketing runs them, support answers the "where is my link" tickets.
+  workshops: ["super", "marketing", "support"],
 };
 
 export const can = (role: AdminRole | undefined | null, area: AdminArea) => !!role && ACCESS[area].includes(role);

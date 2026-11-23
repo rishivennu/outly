@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowRight, BookOpen, LayoutDashboard, Send, Sparkles, Tag, Workflow } from "lucide-react";
+import { ArrowRight, BookOpen, LayoutDashboard, Presentation, Send, Sparkles, Tag, Workflow } from "lucide-react";
 import { LiquidNavbar, NimbusIcons, type LiquidNavItem } from "@/components/ui/liquid-glass-navbar";
 import { OutlyLogo } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -52,6 +52,7 @@ export const NAV: NavEntry[] = [
   { label: "Features", href: "/#features", sec: "features", icon: ico(Sparkles), fx: "pop" },
   { label: "Pricing", href: "/#pricing", sec: "pricing", icon: ico(Tag), fx: "drop" },
   { label: "Resources", href: "/help", routes: /^\/(help|blog|changelog)(\/|$)/, icon: ico(BookOpen), fx: "wave" },
+  { label: "Workshops", href: "/workshops", routes: /^\/workshops(\/|$)/, icon: ico(Presentation), fx: "pop" },
   { label: "Contact", href: "/contact", routes: /^\/contact(\/|$)/, icon: ico(Send), fx: "plane" },
 ];
 const PARTNERS = { href: "/partners", label: "Partner with us" };
@@ -292,7 +293,7 @@ export function LiquidNav() {
       className="lnav sticky top-0 z-50 pl-[max(0.75rem,var(--sa-l))] pr-[max(0.75rem,var(--sa-r))] pt-[calc(var(--sa-t)+0.75rem)] sm:pl-[max(1.5rem,var(--sa-l))] sm:pr-[max(1.5rem,var(--sa-r))]"
       data-split={split}
     >
-      <div ref={rowRef} className="relative mx-auto grid max-w-[1180px] grid-cols-[1fr_auto_1fr] items-center gap-3">
+      <div ref={rowRef} className="relative mx-auto grid max-w-[1180px] grid-cols-[1fr_auto_1fr] items-center gap-3 xl:max-w-[1240px]">
         <div ref={brandRef} className="lnav-pill col-start-1 flex items-center justify-self-start px-1.5">
           <Link href="/" data-mag="" className="flex h-11 shrink-0 items-center rounded-full px-2.5" aria-label="Outlly home">
             <OutlyLogo className="text-[17.4px]" compactBelow={360} />

@@ -54,15 +54,16 @@ describe("R1307 LiquidNav wiring", () => {
     expect(read("components/marketing/Nav.tsx")).toContain("export function MarketingNav()");
   });
   test("Outlly items: real sections and routes, one icon and one scene each, Home first", () => {
-    expect(NAV.map((n) => n.label)).toEqual(["Home", "How it works", "Features", "Pricing", "Resources", "Contact"]);
-    expect(NAV.map((n) => n.href)).toEqual(["/", "/#how", "/#features", "/#pricing", "/help", "/contact"]);
+    expect(NAV.map((n) => n.label)).toEqual(["Home", "How it works", "Features", "Pricing", "Resources", "Workshops", "Contact"]);
+    expect(NAV.map((n) => n.href)).toEqual(["/", "/#how", "/#features", "/#pricing", "/help", "/workshops", "/contact"]);
     expect(NAV.filter((n) => n.sec).map((n) => n.sec)).toEqual(["how", "features", "pricing"]);
     for (const n of NAV) {
       expect(n.icon).toBeTruthy();
       expect(["plane", "drop", "spin", "glow", "wave", "pop"]).toContain(n.fx);
     }
     expect(NAV[4].routes?.test("/blog/some-post")).toBe(true);
-    expect(NAV[5].routes?.test("/contact")).toBe(true);
+    expect(NAV[5].routes?.test("/workshops/creator-hooks")).toBe(true); // R1309
+    expect(NAV[6].routes?.test("/contact")).toBe(true);
     expect(NAV[4].routes?.test("/contact")).toBe(false);
     // every section the pill links to exists on the landing page
     for (const id of ["how", "features", "pricing"]) expect(read("app/(marketing)/page.tsx")).toMatch(new RegExp(`on\\("${id}"\\)`));

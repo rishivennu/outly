@@ -60,6 +60,8 @@ async function sweep(req: NextRequest) {
     ? await import("@/lib/intelligence/memory").then((m) => m.sweepBackfill({ maxOwners: 5, batch: 100 })).then((r) => ({ owners: r.owners, items: r.items })).catch((e) => (console.error("[sweep] backfill", e), null))
     : null;
   if (now.getMinutes() === 7) await cleanupSubs().catch(() => 0);
+  // R1309 workshops: the 24 h reminder emails and marking finished sessions completed, on the housekeeping slot (never fatal).
+  if (plan.housekeeping) await import("@/lib/workshops/server").then((m) => m.sweepWorkshops(now)).catch((e) => console.error("[sweep] workshops", e));
   const subs = await sweepSubscriptions(now); // 1147: trials, old signals, offer ledger + month rollover (never fatal)
   if (plan.housekeeping) await import("@/lib/accounts").then((m) => m.resubscribeCommentsOnce()).catch((e) => console.error("[sweep] comment subs", e)); // 1141b, runs once
   if (plan.metrics) await import("@/lib/analytics/sync").then((m) => m.syncMetrics({ budgetMs: 8_000 })).catch((e) => console.error("[sweep] metrics", e)); // 1140 analytics background sync, odd minutes
