@@ -12,7 +12,7 @@ export const POST = route(
     const { story, tone, exclude } = hookRequestSchema.parse(await req.json());
     const uid = realUserId(user);
     await chargeAi(uid, "ai", undefined, undefined, "content");
-    const opts = { cacheKey: uid, signal: req.signal, voice: await voiceFor(uid) };
+    const opts = { cacheKey: uid, signal: req.signal, voice: await voiceFor(uid), meter: { feature: "writing", userId: uid } };
     if (!wantsStream(req)) return json(await generateHooks(story, tone, exclude, opts));
     return ndjson((send) => generateHooks(story, tone, exclude, { ...opts, onPart: (p) => send(p) }));
   },

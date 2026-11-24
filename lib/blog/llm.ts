@@ -31,7 +31,7 @@ export function blogModelLabel(): string {
 /** One JSON answer. Throws BlogLlmError when nothing answered or the JSON did not parse. */
 export async function blogJson<T>(system: string, prompt: string, opts: Pick<LlmOpts, "maxTokens" | "reasoning" | "temperature" | "timeoutMs"> = {}): Promise<{ data: T; model: string }> {
   if (!blogReady()) throw new BlogLlmError(NO_KEY, false);
-  const r = await llmText(system, prompt, { providers: ["nvidia", "kimi"], json: true, timeoutMs: opts.timeoutMs ?? 50_000, temperature: opts.temperature ?? 0.6, maxTokens: opts.maxTokens ?? 4096, reasoning: opts.reasoning === true });
+  const r = await llmText(system, prompt, { providers: ["nvidia", "kimi"], json: true, timeoutMs: opts.timeoutMs ?? 50_000, temperature: opts.temperature ?? 0.6, maxTokens: opts.maxTokens ?? 4096, reasoning: opts.reasoning === true, meter: { feature: "blog" } });
   if (!r) throw new BlogLlmError("The AI did not answer in time.");
   return { data: parseJson<T>(r.text), model: r.model };
 }

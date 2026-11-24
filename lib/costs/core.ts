@@ -24,6 +24,9 @@ export interface ProviderDef { id: string; label: string; category: CostCategory
 /** Only what Outlly uses. Adding a provider here is a code change on purpose: the dashboard never lists what we do not pay for. */
 export const PROVIDERS: readonly ProviderDef[] = [
   { id: "gemini", label: "Google Gemini", category: "ai", currency: "USD", url: "https://aistudio.google.com/usage" },
+  { id: "nvidia", label: "NVIDIA NIM", category: "ai", currency: "USD", url: "https://build.nvidia.com/settings/api-keys" },
+  { id: "openrouter", label: "OpenRouter (Kimi)", category: "ai", currency: "USD", url: "https://openrouter.ai/activity" },
+  { id: "groq", label: "Groq (Whisper)", category: "transcription", currency: "USD", url: "https://console.groq.com/settings/billing" },
   { id: "vercel", label: "Vercel", category: "hosting", currency: "USD", url: "https://vercel.com/dashboard/usage" },
   { id: "render", label: "Render", category: "hosting", currency: "USD", url: "https://dashboard.render.com/billing" },
   { id: "supabase", label: "Supabase", category: "database", currency: "USD", url: "https://supabase.com/dashboard/org/_/usage" },
@@ -40,7 +43,7 @@ export const providerLabel = (id: string) => (PROVIDERS.find((p) => p.id === id)
 
 /** Outlly features a cost can be attributed to (the "what did this buy" axis). */
 export const FEATURE_LABEL: Record<string, string> = {
-  writing: "AI writing", captions: "AI captions", "inbox-reply": "AI inbox replies", assist: "AI assist", "support-chat": "Support chat", blog: "Blog agent", "x-post": "Posts to X", "x-read": "X reads", storage: "Media storage", egress: "Media delivery", email: "Email", platform: "Platform",
+  writing: "AI writing", captions: "AI captions", "inbox-reply": "AI inbox replies", assist: "AI assist", "support-chat": "Support chat", blog: "Blog agent", try: "Try page (signed out)", ai: "AI (unattributed)", "x-post": "Posts to X", "x-read": "X reads", storage: "Media storage", egress: "Media delivery", email: "Email", platform: "Platform",
 };
 export const featureLabel = (id: string) => FEATURE_LABEL[id] ?? (id ? id : "Platform");
 

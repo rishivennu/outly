@@ -71,11 +71,12 @@ function tidy(text: string, platform: Platform) {
   return out.length > LIMIT[platform] ? out.slice(0, LIMIT[platform] - 1) + "…" : out;
 }
 
-export async function suggestReplies(input: { comment: string; author: string; platform: Platform; postTitle?: string | null }): Promise<ReplyResult> {
+export async function suggestReplies(input: { comment: string; author: string; platform: Platform; postTitle?: string | null }, meter?: { feature: string; userId?: string | null }): Promise<ReplyResult> {
   const fallback = offlineReplies(input.comment, input.author, input.platform);
   const g = await gemini<{ intent: ReplyResult["intent"]; suggestions: ReplySuggestion[] }>(
     `You help a short-form video creator reply to comments. Sound like the creator: warm, human, brief. Never corporate, never pushy, no links, no promises you can't keep. At most one emoji per reply. Match the commenter's language.`,
     `Platform: ${input.platform} (max ${LIMIT[input.platform]} chars).\nVideo: """${input.postTitle ?? "unknown"}"""\nCommenter: ${input.author}\nComment: """${input.comment}"""\nReturn JSON {"intent": one of question|praise|critique|request|other, "suggestions": [{"label": 1-3 word label like "Answer", "text": reply under 220 chars}] x3, each a different approach}`,
+    { meter: meter ?? { feature: "inbox-reply" } },
   );
   const list = g?.suggestions?.filter((s) => s?.text?.trim()).slice(0, 3);
   if (!list?.length) return fallback;

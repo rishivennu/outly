@@ -26,11 +26,12 @@ export const POST = route(
     // Highlights are metered as "other", so an Unlimited AI Access grant on "other" (or all) opens them like the
     // plan feature does; the gate and the meter read the same feature.
     if (!(await activeAiGrant(user.id, "other"))) await assertAiCaptions(user.id);
-    await chargeAi(realUserId(user), "ai", undefined, undefined, "other");
+    const uid = realUserId(user);
+    await chargeAi(uid, "ai", undefined, undefined, "other");
     const cues = normalizeCues(raw, duration);
     const rules = await subtitleRules();
     const { system, prompt } = highlightPrompt(cues, rules);
-    const out = await gemini<unknown>(system, prompt, { temperature: 0.4, timeoutMs: 30_000, models: ["gemini-3.6-flash", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"] });
+    const out = await gemini<unknown>(system, prompt, { temperature: 0.4, timeoutMs: 30_000, models: ["gemini-3.6-flash", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"], meter: { feature: "assist", userId: uid } });
     if (!out) throw new HttpError(502, "Gemini didn't answer just now. Try again in a minute.", "AI_FAILED");
     return json({ clips: parseHighlights(out, cues, duration, rules) });
   },

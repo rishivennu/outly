@@ -12,7 +12,7 @@ export const POST = route(
     const uid = realUserId(user);
     const now = new Date();
     const charged = await chargeAi(uid, "ai", now, undefined, intent === "rewrite" || ask ? "rewrite" : "captions");
-    const opts = { cacheKey: uid, signal: req.signal, voice: await voiceFor(uid) };
+    const opts = { cacheKey: uid, signal: req.signal, voice: await voiceFor(uid), meter: { feature: "writing", userId: uid } };
     // R1198: one of Pip's asks, for one place. No template fallback: a suggestion nobody wrote is not a suggestion.
     if (ask) {
       const item = await askPlatformCopy(story, platforms[0], ask, current ?? { title: "", caption: hook, description: "", hashtags: "" }, opts);

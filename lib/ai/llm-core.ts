@@ -82,6 +82,24 @@ export function deltaText(provider: Provider, data: string): string {
   }
 }
 
+/** R1315: token usage reported inside one streamed event (Gemini usageMetadata, OpenAI-shaped `usage`), or null. Gemini repeats cumulative totals in each chunk; the last one is the bill. */
+export type TokenUsage = { input: number; output: number; thoughts: number };
+export function usageOf(provider: Provider, data: string): TokenUsage | null {
+  try {
+    const j = JSON.parse(data);
+    if (provider === "gemini") {
+      const u = j.usageMetadata;
+      if (!u) return null;
+      return { input: Number(u.promptTokenCount ?? 0), output: Number(u.candidatesTokenCount ?? 0), thoughts: Number(u.thoughtsTokenCount ?? 0) };
+    }
+    const u = j.usage;
+    if (!u) return null;
+    return { input: Number(u.prompt_tokens ?? 0), output: Number(u.completion_tokens ?? 0), thoughts: Number(u.completion_tokens_details?.reasoning_tokens ?? 0) };
+  } catch {
+    return null;
+  }
+}
+
 /** The text of a whole, non-streamed answer (a proxy or a mock that ignores ?alt=sse / stream:true). */
 export function wholeText(provider: Provider, body: string): string {
   try {

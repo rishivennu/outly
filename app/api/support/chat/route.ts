@@ -151,5 +151,5 @@ export const POST = route(async (req) => {
       return reply({ answer: r.answer, confident: true, sources: [], wantsHuman: false, data: r.data });
     }
   }
-  return reply(await answer(b.message, b.history, b.lang, { signedIn: !!me, page: b.page, ai: await mayUseAi() }));
+  return reply(await answer(b.message, b.history, b.lang, { signedIn: !!me, userId: me?.id ?? null, page: b.page, ai: await mayUseAi() }));
 }, { auth: false, limit: [30, 60_000] });

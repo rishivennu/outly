@@ -67,7 +67,7 @@ describe("1314 ledger", () => {
     expect(ev).not.toBeNull();
     expect(ev!.currency).toBe("USD");
     expect(ev!.fxToInr).toBeGreaterThan(50);
-    expect(ev!.inrMinor).toBe(Math.round(50 * ev!.fxToInr));
+    expect(ev!.inrMinor).toBeCloseTo(50 * ev!.fxToInr, 6);
     expect(ev!.day).toBe("2026-11-03");
     const dup = await ledger.recordCostEvent({ provider: "gemini", category: "ai", feature: "t1314", amountMinor: 50, currency: "USD", ref: "t1314:a", at });
     expect(dup).toBeNull();
@@ -75,7 +75,7 @@ describe("1314 ledger", () => {
     const daily = await db.costDaily.findUnique({ where: { day_provider_category_feature_source: { day: "2026-11-03", provider: "gemini", category: "ai", feature: "t1314", source: "estimate" } } });
     expect(daily!.count).toBe(2);
     expect(daily!.units).toBe(2000);
-    expect(daily!.inrMinor).toBe(ev!.inrMinor + Math.round(30 * ev!.fxToInr));
+    expect(daily!.inrMinor).toBeCloseTo(ev!.inrMinor + 30 * ev!.fxToInr, 6);
     expect((await ledger.trackingSince())! <= "2026-11-03").toBe(true);
   });
   test("zero amounts are not booked", async () => {
@@ -84,7 +84,7 @@ describe("1314 ledger", () => {
   test("recordUsage prices units at the unit price in force and keeps the price id", async () => {
     const ev = await ledger.recordUsage({ provider: "gemini", sku: "gemini-2.5-flash:output", units: 1_000_000, feature: "captions", at: new Date("2026-11-04T00:00:00Z") });
     expect(ev).not.toBeNull();
-    expect(ev!.amountMinor).toBe(250); // $2.50 per million
+    expect(ev!.amountMinor).toBeCloseTo(250, 6); // $2.50 per million
     expect(ev!.unitPriceId).toBeTruthy();
     expect(ev!.currency).toBe("USD");
     expect(await ledger.recordUsage({ provider: "gemini", sku: "no-such-sku", units: 5 })).toBeNull();

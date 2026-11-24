@@ -162,3 +162,98 @@ export async function exportRows(kind: "events" | "daily", from: string, to: str
 }
 
 export const monthBounds = (now: Date) => ({ from: dayKey(monthStartUtc(now)), to: dayKey(new Date(nextMonthUtc(now).getTime() - 1)) });
+
+/* ---------------------------------------------------------------- R1315 drilldowns ---------------------------------------------------------------- */
+
+export interface AiModelRow { key: string; provider: string; model: string; calls: number; tokensIn: number; tokensOut: number; inrMinor: number; perThousandCallsMinor: number; unpriced: boolean }
+export interface AiFeatureRow { key: string; label: string; calls: number; tokensIn: number; tokensOut: number; inrMinor: number; perThousandCallsMinor: number; pct: number }
+export interface AiBreakdown { range: { from: string; to: string }; totalMinor: number; calls: number; tokensIn: number; tokensOut: number; byModel: AiModelRow[]; byFeature: AiFeatureRow[]; byDay: { day: string; tokens: number; inrMinor: number }[] }
+
+/**
+ * The AI drilldown: token rows (unit token-in / token-out, R1315) grouped by model and by feature. A "call" is one
+ * input row: every model request books its prompt tokens even when the answer was empty, so this counts requests,
+ * not rows. Cost per 1k calls is the plain ratio and is only meaningful once a model has a price on file.
+ */
+export async function aiBreakdown(o: { from?: string; to?: string; now?: Date } = {}): Promise<AiBreakdown> {
+  const now = o.now ?? new Date();
+  const to = o.to && /^\d{4}-\d{2}-\d{2}$/.test(o.to) ? o.to : dayKey(now);
+  const from = o.from && /^\d{4}-\d{2}-\d{2}$/.test(o.from) && o.from <= to ? o.from : addDays(to, -29);
+  const where = { day: { gte: from, lte: to }, category: "ai", unit: { in: ["token-in", "token-out"] } };
+  const [grouped, unpricedRows, dayRows] = await Promise.all([
+    db.costEvent.groupBy({ by: ["provider", "model", "feature", "unit"], where, _sum: { units: true, inrMinor: true }, _count: { _all: true } }),
+    db.costEvent.groupBy({ by: ["provider", "model"], where: { ...where, unitPriceId: null }, _count: { _all: true } }),
+    db.costEvent.groupBy({ by: ["day"], where, _sum: { units: true, inrMinor: true } }),
+  ]);
+  const unpriced = new Set(unpricedRows.map((r) => `${r.provider}/${r.model}`));
+  const models = new Map<string, AiModelRow>();
+  const features = new Map<string, AiFeatureRow>();
+  let totalMinor = 0, calls = 0, tokensIn = 0, tokensOut = 0;
+  for (const g of grouped) {
+    const units = g._sum.units ?? 0, inr = g._sum.inrMinor ?? 0, isIn = g.unit === "token-in";
+    const mk = `${g.provider}/${g.model}`;
+    const m = models.get(mk) ?? { key: mk, provider: g.provider, model: g.model, calls: 0, tokensIn: 0, tokensOut: 0, inrMinor: 0, perThousandCallsMinor: 0, unpriced: unpriced.has(mk) };
+    const f = features.get(g.feature) ?? { key: g.feature, label: featureLabel(g.feature), calls: 0, tokensIn: 0, tokensOut: 0, inrMinor: 0, perThousandCallsMinor: 0, pct: 0 };
+    for (const r of [m, f]) {
+      r.inrMinor += inr;
+      if (isIn) { r.calls += g._count._all; r.tokensIn += units; } else r.tokensOut += units;
+    }
+    models.set(mk, m);
+    features.set(g.feature, f);
+    totalMinor += inr;
+    if (isIn) { calls += g._count._all; tokensIn += units; } else tokensOut += units;
+  }
+  const per1k = (r: { inrMinor: number; calls: number }) => (r.calls ? Math.round((r.inrMinor / r.calls) * 1000) : 0);
+  const byModel = [...models.values()].map((r) => ({ ...r, perThousandCallsMinor: per1k(r) })).sort((a, b) => b.inrMinor - a.inrMinor || b.calls - a.calls);
+  const byFeature = [...features.values()].map((r) => ({ ...r, perThousandCallsMinor: per1k(r), pct: pctOf(r.inrMinor, totalMinor) })).sort((a, b) => b.inrMinor - a.inrMinor || b.calls - a.calls);
+  const byDay = dayRows.map((d) => ({ day: d.day, tokens: d._sum.units ?? 0, inrMinor: d._sum.inrMinor ?? 0 })).sort((a, b) => (a.day < b.day ? -1 : 1));
+  return { range: { from, to }, totalMinor, calls, tokensIn, tokensOut, byModel, byFeature, byDay };
+}
+
+export interface UserCostRow { userId: string; name: string; email: string; tier: string; inrMinor: number; count: number; pct: number; features: { key: string; label: string; inrMinor: number }[] }
+export interface UsersBreakdown { range: { from: string; to: string }; attributedMinor: number; platformMinor: number; users: UserCostRow[]; distinctUsers: number }
+
+/**
+ * Who costs what: ledger rows with a userId, grouped per person with a per-feature split, joined to the account
+ * (name, email) and the paid tier they hold today. Platform-level rows (no user) are reported as one figure so the
+ * two halves add up to the headline. Accounts that were deleted keep their rows under "Deleted account".
+ */
+export async function topUsers(o: { from?: string; to?: string; limit?: number; now?: Date } = {}): Promise<UsersBreakdown> {
+  const now = o.now ?? new Date();
+  const to = o.to && /^\d{4}-\d{2}-\d{2}$/.test(o.to) ? o.to : dayKey(now);
+  const from = o.from && /^\d{4}-\d{2}-\d{2}$/.test(o.from) && o.from <= to ? o.from : addDays(to, -29);
+  const limit = Math.min(200, Math.max(1, o.limit ?? 25));
+  const [grouped, platform] = await Promise.all([
+    db.costEvent.groupBy({ by: ["userId", "feature"], where: { day: { gte: from, lte: to }, userId: { not: null } }, _sum: { inrMinor: true }, _count: { _all: true } }),
+    db.costEvent.aggregate({ where: { day: { gte: from, lte: to }, userId: null }, _sum: { inrMinor: true } }),
+  ]);
+  const per = new Map<string, UserCostRow>();
+  let attributed = 0;
+  for (const g of grouped) {
+    if (!g.userId) continue;
+    const inr = g._sum.inrMinor ?? 0;
+    const u = per.get(g.userId) ?? { userId: g.userId, name: "", email: "", tier: "", inrMinor: 0, count: 0, pct: 0, features: [] };
+    u.inrMinor += inr;
+    u.count += g._count._all;
+    u.features.push({ key: g.feature, label: featureLabel(g.feature), inrMinor: inr });
+    per.set(g.userId, u);
+    attributed += inr;
+  }
+  const top = [...per.values()].sort((a, b) => b.inrMinor - a.inrMinor || b.count - a.count).slice(0, limit);
+  const ids = top.map((u) => u.userId);
+  const [users, subs] = ids.length ? await Promise.all([
+    db.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, email: true } }),
+    db.subscription.findMany({ where: { userId: { in: ids }, status: "active", currentPeriodEnd: { gt: now } }, select: { userId: true, priceTier: true, plan: { select: { slug: true } } }, orderBy: { currentPeriodEnd: "desc" } }),
+  ]) : [[], []];
+  const byId = new Map(users.map((u) => [u.id, u]));
+  const tier = new Map<string, string>();
+  for (const s of subs) if (!tier.has(s.userId)) tier.set(s.userId, `${s.plan.slug}${s.priceTier && s.priceTier !== "legacy" ? ` · ${s.priceTier}` : ""}`);
+  for (const u of top) {
+    const acct = byId.get(u.userId);
+    u.name = acct?.name || (acct ? "" : "Deleted account");
+    u.email = acct?.email ?? "";
+    u.tier = tier.get(u.userId) ?? (acct ? "free" : "");
+    u.pct = pctOf(u.inrMinor, attributed);
+    u.features.sort((a, b) => b.inrMinor - a.inrMinor);
+  }
+  return { range: { from, to }, attributedMinor: attributed, platformMinor: platform._sum.inrMinor ?? 0, users: top, distinctUsers: per.size };
+}

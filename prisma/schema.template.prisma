@@ -2443,10 +2443,10 @@ model CostEvent {
   units       Float    @default(0)
   unit        String   @default("") // tokens | minutes | posts | gb | gb-month | emails | months | ...
   unitPriceId String?
-  amountMinor Int      @default(0)
+  amountMinor Float    @default(0) // minor units, fractions kept: 500 output tokens at $2.50/M is 0.125 cents (R1315)
   currency    String   @default("INR")
   fxToInr     Float    @default(1)
-  inrMinor    Int      @default(0)
+  inrMinor    Float    @default(0)
   source      String   @default("estimate")
   ref         String?  @unique // idempotency key (e.g. "recurring:<id>:2026-11-01")
   note        String   @default("")
@@ -2466,7 +2466,7 @@ model CostDaily {
   feature   String
   source    String
   units     Float    @default(0)
-  inrMinor  Int      @default(0)
+  inrMinor  Float    @default(0) // paise, fractions kept (R1315)
   count     Int      @default(0)
   updatedAt DateTime @updatedAt
 

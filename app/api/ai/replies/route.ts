@@ -12,7 +12,7 @@ export const POST = route(
     await assertPerk(realUserId(user), "ai-replies");
     await chargeAi(realUserId(user), "ai", undefined, undefined, "other");
     track("ai_reply_used", realUserId(user));
-    return json(await suggestReplies(body));
+    return json(await suggestReplies(body, { feature: "inbox-reply", userId: realUserId(user) }));
   },
   { limit: [30, 60_000] },
 );

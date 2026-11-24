@@ -10,6 +10,7 @@ import { Card, CardTitle, Empty, Pill, Table, fmtDate, type Tone } from "@/compo
 import { adminApi } from "@/lib/client/admin-api";
 import { CATEGORY_LABEL, COST_CATEGORIES, CURRENCIES, FEATURE_LABEL, PROVIDERS, fmtInr, fmtMoney, providerLabel, type CostCategoryId } from "@/lib/costs/core";
 import type { AlertView, BillView, BudgetView, PriceView, RecurringView } from "@/lib/costs/overview";
+import type { ImportPreview } from "@/lib/costs/import";
 
 /**
  * R1314 Phase 1, the manual side of Infrastructure & Costs: recurring subscriptions, bills, budgets, unit prices and
@@ -182,6 +183,54 @@ export function BillsCard({ items }: { items: BillView[] }) {
         </Table>
       )}
       <Sheet open={open} onOpenChange={setOpen} title="Record a bill" description="An invoice a provider issued.">{open && <BillForm onClose={() => setOpen(false)} />}</Sheet>
+    </Card>
+  );
+}
+
+/* ---------- CSV import (R1315) ---------- */
+const IMPORT_TONE: Record<ImportPreview["rows"][number]["status"], Tone> = { ok: "ok", duplicate: "muted", error: "bad" };
+const IMPORT_SAMPLE = "provider,invoiceId,periodStart,periodEnd,amount,currency,status,note\nvercel,INV-2026-11,2026-11-01,2026-11-30,20.00,USD,paid,Pro seat";
+
+/** Paste or choose a CSV of invoices; the server parses it and shows every line as ok, duplicate or error before anything is written. */
+export function ImportBillsCard() {
+  const [csv, setCsv] = useState("");
+  const [preview, setPreview] = useState<(ImportPreview & { committed?: number }) | null>(null);
+  const [fileName, setFileName] = useState("");
+  const { busy, error, run } = useSave();
+  const stale = preview != null && preview.committed == null;
+  const post = (commit: boolean) => run(async () => { const r = await adminApi<ImportPreview & { committed: number }>("/api/admin/costs/import", { method: "POST", json: { csv, commit } }); setPreview(commit ? r : { ...r, committed: undefined }); if (commit) setCsv(""); });
+  const onFile = (f: File | undefined) => { if (!f) return; setFileName(f.name); f.text().then((t) => { setCsv(t); setPreview(null); }); };
+  return (
+    <Card>
+      <CardTitle hint={`A header row then one invoice per line, columns ${"provider, invoiceId, periodStart, periodEnd, amount (12.50, major units), currency, status, note"}. Lines already on file (same provider and invoice id) are skipped, never overwritten.`}>Import invoices from CSV</CardTitle>
+      <div className="grid gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="inline-flex h-9 cursor-pointer items-center rounded-full px-3.5 text-[13px] hairline hover:bg-secondary">Choose file<input type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} /></label>
+          {fileName && <span className="text-[12.5px] text-muted-foreground">{fileName}</span>}
+          <Button type="button" variant="ghost" size="sm" onClick={() => { setCsv(IMPORT_SAMPLE); setPreview(null); }}>Paste a sample</Button>
+        </div>
+        <Textarea id="import-csv" aria-label="CSV" rows={5} value={csv} onChange={(e) => { setCsv(e.target.value); setPreview(null); }} placeholder={IMPORT_SAMPLE} className="font-mono text-[12.5px]" />
+        <Err text={error} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" size="sm" disabled={busy || !csv.trim()} onClick={() => post(false)}>Preview</Button>
+          {stale && preview.ok > 0 && <Button type="button" size="sm" variant="lime" disabled={busy} onClick={() => post(true)}>Record {preview.ok} invoice{preview.ok === 1 ? "" : "s"}</Button>}
+          {preview && <span className="text-[12.5px] text-muted-foreground">{preview.committed != null ? `${preview.committed} recorded. ` : ""}{preview.ok} ok · {preview.duplicates} duplicate{preview.duplicates === 1 ? "" : "s"} · {preview.errors} error{preview.errors === 1 ? "" : "s"}</span>}
+        </div>
+        {preview && preview.rows.length > 0 && (
+          <Table label="Import preview" head={["Line", "Provider", "Invoice", "Period", "Amount", "Result"]} lead={2} minWidth={700}>
+            {preview.rows.map((r) => (
+              <tr key={r.line}>
+                <td className="tabular-nums text-muted-foreground">{r.line}</td>
+                <td>{r.raw.provider}</td>
+                <td className="font-mono text-[13px]">{r.raw.invoiceId}</td>
+                <td className="whitespace-nowrap">{r.raw.periodStart} to {r.raw.periodEnd}</td>
+                <td className="tabular-nums">{r.raw.amount} {r.raw.currency || "USD"}</td>
+                <td><Pill tone={IMPORT_TONE[r.status]}>{r.status}</Pill>{r.reason && <span className="ml-2 text-[12.5px] text-muted-foreground">{r.reason}</span>}</td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </div>
     </Card>
   );
 }

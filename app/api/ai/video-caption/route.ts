@@ -51,7 +51,7 @@ export const POST = route(
       throw e;
     }
     const heard = transcript?.trim() ? transcript.trim().slice(0, TRANSCRIPT_MAX) : null;
-    const out = await generateVideoStory(picked, heard, { signal: req.signal, voice: await voiceFor(uid), cacheKey: uid, duration });
+    const out = await generateVideoStory(picked, heard, { signal: req.signal, voice: await voiceFor(uid), cacheKey: uid, duration, meter: { feature: "captions", userId: uid } });
     if (!out) {
       // Each model's refusal is already in the [llm] lines above this one; this says what was asked.
       console.warn(`[video-caption] no model watched the video: ${picked.length} frame(s), ${Math.round(total / 1024)} KB${heard ? ", with transcript" : ""}${auto ? ", auto" : ""}`);

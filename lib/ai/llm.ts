@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { env } from "../env";
-import { HEDGE_MS, deltaText, wholeText, freshStat, isHardFailure, keyOf, rank, recordFail, recordOk, sseEvents, type ModelId, type ModelStat, type Provider } from "./llm-core";
+import { HEDGE_MS, deltaText, wholeText, freshStat, isHardFailure, keyOf, rank, recordFail, recordOk, sseEvents, usageOf, type ModelId, type ModelStat, type Provider, type TokenUsage } from "./llm-core";
 
 /**
  * Every text model call goes through here (1053). Before, one fixed order was tried one after another, and
@@ -89,6 +89,8 @@ export type LlmOpts = {
   web?: boolean;
   /** Only these providers may answer (R1175 blog: Kimi only; R1177: NVIDIA then Kimi, never Gemini). Default: all with a key. */
   providers?: Provider[];
+  /** R1315: who and what this call is for, so its tokens land in the cost ledger under that feature and person. Omitted = feature "ai". */
+  meter?: { feature: string; userId?: string | null };
 };
 
 function candidates(opts: LlmOpts): ModelId[] {
@@ -112,7 +114,7 @@ class CallError extends Error {
   }
 }
 
-async function call(m: ModelId, system: string, prompt: string, opts: LlmOpts, signal: AbortSignal, onDelta: (full: string) => void): Promise<string> {
+async function call(m: ModelId, system: string, prompt: string, opts: LlmOpts, signal: AbortSignal, onDelta: (full: string) => void, onUsage: (u: TokenUsage) => void = () => {}): Promise<string> {
   const req: { url: string; headers: Record<string, string>; body: unknown } =
     m.provider === "gemini"
       ? {
@@ -127,7 +129,7 @@ async function call(m: ModelId, system: string, prompt: string, opts: LlmOpts, s
       : m.provider === "nvidia"
       ? nvidiaRequest(
           env.NVIDIA_API_KEY,
-          { model: m.model, stream: true, messages: [{ role: "system", content: system }, { role: "user", content: kimiUser(prompt, opts.images) }] },
+          { model: m.model, stream: true, stream_options: { include_usage: true }, messages: [{ role: "system", content: system }, { role: "user", content: kimiUser(prompt, opts.images) }] },
           opts,
         )
       : kimiRequest(
@@ -135,6 +137,7 @@ async function call(m: ModelId, system: string, prompt: string, opts: LlmOpts, s
           {
             model: m.model,
             stream: true,
+            stream_options: { include_usage: true }, // R1315: the last chunk carries token usage for the cost ledger
             ...(opts.json !== false ? { response_format: { type: "json_object" } } : {}),
             messages: [{ role: "system", content: system }, { role: "user", content: kimiUser(prompt, opts.images) }],
           },
@@ -159,16 +162,30 @@ async function call(m: ModelId, system: string, prompt: string, opts: LlmOpts, s
     for (const e of events) {
       const d = deltaText(m.provider, e);
       if (d) (text += d), (grew = true);
+      const u = usageOf(m.provider, e);
+      if (u) onUsage(u);
     }
     if (grew) onDelta(text);
   }
-  for (const e of sseEvents(buf + "\n\n").events) text += deltaText(m.provider, e);
+  for (const e of sseEvents(buf + "\n\n").events) {
+    text += deltaText(m.provider, e);
+    const u = usageOf(m.provider, e);
+    if (u) onUsage(u);
+  }
   if (!text.trim() && raw.trimStart().match(/^[[{]/)) {
     text = wholeText(m.provider, raw);
     if (text.trim()) onDelta(text); // so the race sees this model wrote, like a streamed answer
   }
   if (!text.trim()) throw new CallError(204, "empty");
   return text;
+}
+
+/** Gemini reports thinking tokens beside the answer's and bills both at the output rate; OpenAI-shaped APIs already count reasoning inside completion_tokens. */
+export const billableOutput = (provider: ModelId["provider"], u: TokenUsage) => (provider === "gemini" ? u.output + u.thoughts : u.output);
+
+/** R1315: tokens into the cost ledger (lib/costs). Fire-and-forget by design here: the ledger never slows or breaks an answer. */
+function meterTokens(m: ModelId, u: TokenUsage, meter: LlmOpts["meter"]) {
+  import("../costs/tokens").then((t) => t.recordTokens({ provider: m.provider, model: m.model, input: u.input, output: billableOutput(m.provider, u), feature: meter?.feature ?? "ai", userId: meter?.userId ?? null })).catch(() => {});
 }
 
 const cache = new Map<string, { at: number; text: string; model: string }>();
@@ -224,6 +241,9 @@ export async function llmText(system: string, prompt: string, opts: LlmOpts = {}
       running++;
       const t0 = Date.now();
       let wrote = false;
+      let usage: TokenUsage | null = null;
+      // R1315: whatever the provider reported is booked, won or cancelled: a cancelled model still billed the prompt it read.
+      const book = () => usage && meterTokens(m, usage, opts.meter);
       hedge = setTimeout(launch, HEDGE_MS);
       call(m, system, prompt, opts, c.signal, (full) => {
         wrote = true;
@@ -234,14 +254,16 @@ export async function llmText(system: string, prompt: string, opts: LlmOpts = {}
           ctrls.forEach((x, j) => j !== i && x?.abort());
         }
         if (leader === i) opts.onText?.(full);
-      }).then(
+      }, (u) => (usage = u)).then(
         (text) => {
           running--;
+          book();
           stats.set(k, recordOk(stats.get(k) ?? freshStat(m), Date.now() - t0));
           if (leader === -1 || leader === i) finish({ text, model: m.model });
         },
         (e) => {
           running--;
+          book();
           const ours = c.signal.aborted;
           // Cancelled because another model wrote first: only a sign of slowness if this one never wrote.
           if (ours && !wrote) stats.set(k, { ...(stats.get(k) ?? freshStat(m)), ewmaMs: (stats.get(k) ?? freshStat(m)).ewmaMs + 500 });

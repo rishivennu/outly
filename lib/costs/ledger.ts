@@ -3,7 +3,7 @@ import { db } from "../db";
 import { getEconomics } from "../subscriptions/policy";
 import type { CostCategory } from "../subscriptions/economics";
 import { costMinor } from "../subscriptions/economics";
-import { dayKey, providerOf, toInrMinor, type CostCategoryId, type CostSource } from "./core";
+import { dayKey, providerOf, type CostCategoryId, type CostSource } from "./core";
 import { priceFor } from "./prices";
 
 /**
@@ -40,8 +40,8 @@ export async function recordCostEvent(o: CostInput) {
     const at = o.at ?? new Date();
     const currency = o.currency ?? "INR";
     const fx = await fxToInr(currency);
-    const inrMinor = toInrMinor(o.amountMinor, fx);
-    if (o.amountMinor === 0) return null;
+    const inrMinor = Math.round(o.amountMinor * fx * 1e6) / 1e6; // micro-paise kept: token rows are far below one paisa each, and the rounding kills float drift (R1315)
+    if (o.amountMinor === 0 && !(o.units && o.units > 0)) return null;
     const feature = o.feature ?? "";
     const source = o.source ?? "estimate";
     const row = await db.$transaction(async (tx) => {
@@ -70,7 +70,7 @@ export async function recordUsage(o: Omit<CostInput, "amountMinor" | "currency" 
     console.warn("[costs] no unit price for", o.provider, o.sku);
     return null;
   }
-  const amountMinor = Math.round(price.price * o.units * 100);
+  const amountMinor = price.price * o.units * 100;
   return recordCostEvent({ ...o, category: o.category ?? providerOf(o.provider).category, unit: o.unit ?? price.unit, unitPriceId: price.id, amountMinor, currency: price.currency, source: o.source ?? "estimate", meta: { ...(o.meta ?? {}), sku: o.sku, unitPrice: price.price } });
 }
 
@@ -87,8 +87,10 @@ export const ECON_MAP: Record<CostCategory, { provider: string; category: CostCa
 };
 
 /** Books a 1147 metered use at the economics rate (INR) as an estimate. Runs whether or not the 1147 policy is on. */
+const TOKEN_METERED: CostCategory[] = ["ai", "ai_reply", "ai_assist"];
 export async function recordEconomicsUse(o: { userId: string; category: CostCategory; units: number; now?: Date }) {
   try {
+    if (TOKEN_METERED.includes(o.category)) return null; // R1315: text models are booked per token from the provider's own usage report (lib/costs/tokens.ts)
     const econ = await getEconomics();
     const inr = costMinor(o.category, o.units, econ);
     if (inr <= 0) return null;

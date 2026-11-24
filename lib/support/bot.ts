@@ -86,6 +86,7 @@ async function toEnglish(q: string) {
   const r = await gemini<{ en: string }>(
     `Translate the user's support question into plain English. Keep product names. Return JSON {"en": string}.`,
     q,
+    { meter: { feature: "support-chat" } },
   ).catch(() => null);
   return r && typeof r.en === "string" ? r.en.slice(0, 800) : null;
 }
@@ -105,6 +106,7 @@ export async function answerFaq(id: string, lang: Lang = "en", allowAi = true): 
     const ai = await gemini<{ answer: string }>(
       `Translate this support answer from Outlly's help centre into ${COPY[use].name}. Keep product names, **bold** and [link](url) markup exactly. Return JSON {"answer": string}.`,
       f.answer,
+      { meter: { feature: "support-chat" } },
     ).catch(() => null);
     if (ai && typeof ai.answer === "string" && ai.answer.trim()) return { answer: ai.answer, confident: true, sources: others, wantsHuman: false, lang: use };
   }
@@ -138,7 +140,7 @@ async function aiAnswer(q: string, history: { role: "user" | "bot"; text: string
       `CHAT SO FAR:\n${history.slice(-8).map((h) => `${h.role === "user" ? "Person" : "Pip"}: ${h.text.slice(0, 600)}`).join("\n") || "(new chat)"}`,
       `QUESTION: ${q}`,
     ].join("\n\n"),
-    { temperature: 0.3, timeoutMs: 12_000 },
+    { temperature: 0.3, timeoutMs: 12_000, meter: { feature: "support-chat", userId: ctx.userId ?? null } },
   ).catch(() => null);
   if (!ai || typeof ai.answer !== "string" || !ai.answer.trim()) return null;
   const byId = new Map(faq.map((f) => [f.id, f]));
@@ -159,6 +161,8 @@ async function aiAnswer(q: string, history: { role: "user" | "bot"; text: string
 /** FAQ retrieval (keyword + synonyms, BM25-ish), phrased by Gemini when a key is set. */
 export type ChatCtx = {
   signedIn?: boolean;
+  /** R1315: the signed-in person, so the model's tokens are attributed to them in the cost ledger. */
+  userId?: string | null;
   page?: string;
   /** false = answer from the help centre only, no model call (a signed-out visitor over the free budget). */
   ai?: boolean;
@@ -196,6 +200,7 @@ export async function answer(question: string, history: { role: "user" | "bot"; 
   const ai = !useAi ? null : await gemini<{ answer: string; answered: boolean }>(
     `You are Pip, Outlly's friendly support assistant. Answer ONLY from the FAQ entries given. If they don't answer the question, set answered=false. Keep it under 90 words, plain and warm, no markdown headings. Reply in ${L.name}. Return JSON {"answer": string, "answered": boolean}.`,
     `Recent chat:\n${history.slice(-4).map((h) => `${h.role}: ${h.text}`).join("\n")}\n\nQuestion: ${q}\n\nFAQ:\n${top.map((t) => `Q: ${t.f.question}\nA: ${t.f.answer}`).join("\n\n")}`,
+    { meter: { feature: "support-chat", userId: ctx.userId ?? null } },
   ).catch(() => null);
   if (ai && typeof ai.answer === "string") {
     return { answer: ai.answer, confident: !!ai.answered, sources: top.map((t) => ({ id: t.f.id, question: t.f.question })), wantsHuman: false, lang: use };
