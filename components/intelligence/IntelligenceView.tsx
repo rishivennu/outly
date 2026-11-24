@@ -8,6 +8,7 @@ import { ClientSwitcher } from "./ClientSwitcher";
 import { FormatPerformance } from "./FormatPerformance";
 import { GrowthOverview } from "./GrowthOverview";
 import { NextContentRecommendations } from "./NextContentRecommendations";
+import { PersonalBaselines } from "./PersonalBaselines";
 import { PlatformComparison } from "./PlatformComparison";
 import { WhatIsWorking, WhatNeedsAttention } from "./SignalSection";
 import { TopicInsights } from "./TopicInsights";
@@ -167,6 +168,7 @@ export function IntelligenceView({ initial, account, initialOutcomes }: { initia
             </>
           )}
           <TopicInsights topics={data.topics} />
+          <PersonalBaselines client={client || null} />
           <WeeklyReport data={data} savedObjective={savedObjective} client={client || null} />
         </div>
       )}

@@ -424,6 +424,7 @@ model PostTarget {
   post          Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
   socialAccount SocialAccount? @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
   metrics       TargetMetric[]
+  feature       ContentFeature? // R1318: the derived feature row of this destination
 
   @@unique([postId, platform])
   @@index([platformStatus])
@@ -2610,6 +2611,8 @@ model ContentFeature {
   measured    Boolean  @default(false)
   computedAt  DateTime @default(now())
 
+  target PostTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
   @@index([ownerId, platform, publishedAt])
   @@index([ownerId, computedAt])
 }
@@ -2678,4 +2681,62 @@ model ModelVersion {
   notes          String?
   data           String? // JSON: shared baselines, parameters
   createdAt      DateTime @default(now())
+}
+
+/// R1319: one prediction per subject per model per metric. Written before the outcome is known (published posts are
+/// scored from the history before their publish time, never after), then filled with the actual once measured.
+model PredictionRecord {
+  id          String    @id @default(cuid())
+  ownerId     String
+  scopeKey    String    @default("")
+  modelKey    String
+  subjectType String // target | post | draft | clip
+  subjectId   String
+  platform    String
+  format      String
+  metric      String // views
+  level       String // personal | blended | general
+  predicted   Float
+  low         Float
+  high        Float
+  basis       String // JSON PredictionBasis
+  actual      Float?
+  errorPct    Float?
+  evaluatedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([ownerId, modelKey, subjectType, subjectId, metric])
+  @@index([ownerId, platform, createdAt])
+  @@index([ownerId, evaluatedAt])
+}
+
+/// R1319: a creator's calibration of one model on one platform (the cohort medians and lifts the scorer starts from).
+model CreatorModelState {
+  id        String   @id @default(cuid())
+  ownerId   String
+  scopeKey  String   @default("")
+  modelKey  String
+  platform  String
+  state     String // JSON ModelState
+  updatedAt DateTime @updatedAt
+
+  @@unique([ownerId, scopeKey, modelKey, platform])
+}
+
+/// R1319: how a model did for one creator on one platform over its evaluated predictions, one row per ISO week.
+model IntelligenceEvaluation {
+  id        String   @id @default(cuid())
+  ownerId   String
+  modelKey  String
+  platform  String // "" = every platform
+  week      String
+  n         Int
+  medianApe Float? // median absolute percentage error
+  mape      Float?
+  within    Float? // share of actuals inside [low, high], 0..100
+  biasPct   Float? // median signed error: positive = over-predicts
+  data      String? // JSON
+  at        DateTime @default(now())
+
+  @@unique([ownerId, modelKey, platform, week])
 }

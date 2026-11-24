@@ -1,0 +1,52 @@
+import { z } from "zod";
+import { HttpError, json, route } from "@/lib/http";
+import { PLATFORMS } from "@/lib/domain";
+import { POST_FORMATS } from "@/lib/formats";
+import { resolveClient } from "@/lib/intelligence/client-scope";
+import { predictDraft, predictionsOverview } from "@/lib/intelligence/model/predict";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * R1319: GET /api/intelligence/predictions: what a typical post of each format would do per platform (the creator's
+ * calibration of the active model), the model's accuracy so far, and the latest forecasts with their actuals.
+ * ?platform= narrows; ?client= (owner only) computes the same for an agency client's destinations.
+ */
+export const GET = route(
+  async (req, { user }) => {
+    const q = req.nextUrl.searchParams;
+    const platform = q.get("platform");
+    if (platform !== null && !(PLATFORMS as readonly string[]).includes(platform)) throw new HttpError(400, "Unknown platform.", "BAD_PLATFORM");
+    const { scopeKey, targetIds } = await resolveClient(user, q.get("client"));
+    const data = await predictionsOverview(user.id, { scopeKey, targetIds, platform });
+    return json(data, { headers: { "cache-control": "private, no-store" } });
+  },
+  { limit: [60, 60_000] },
+);
+
+const Draft = z.object({
+  platform: z.enum(PLATFORMS),
+  format: z.enum(POST_FORMATS).default("video"),
+  title: z.string().max(500).nullish(),
+  caption: z.string().max(10_000).nullish(),
+  hashtags: z.string().max(2_000).nullish(),
+  hook: z.string().max(500).nullish(),
+  durationSec: z.number().nonnegative().max(8 * 3600).nullish(),
+  width: z.number().int().positive().max(20_000).nullish(),
+  height: z.number().int().positive().max(20_000).nullish(),
+  scheduledAt: z.string().datetime().nullish(),
+  postId: z.string().max(64).nullish(),
+});
+
+/**
+ * POST /api/intelligence/predictions: score a draft. The answer is an estimate from the creator's own past posts (or
+ * null, said plainly, when there is nothing measured to go on). With postId the forecast is stored and judged later.
+ */
+export const POST = route(
+  async (req, { user }) => {
+    const body = Draft.parse(await req.json());
+    const prediction = await predictDraft(user.id, body);
+    return json({ prediction, reason: prediction ? null : "No measured post of yours on this platform yet, so Outlly will not guess a number. Publish a few and the estimate appears." });
+  },
+  { limit: [30, 60_000] },
+);

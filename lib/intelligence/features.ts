@@ -2,7 +2,8 @@ import "server-only";
 import { db } from "../db";
 import { STORED_BY_PLATFORM } from "../analytics/core";
 import type { PostRecord } from "./core";
-import { extractFeatures, extractPerf, FEATURE_VERSION, type FeatureInput } from "./features-core";
+import { extractFeatures, extractPerf, FEATURE_VERSION, parseFeatures, parsePerf, type FeatureInput } from "./features-core";
+import type { FeatureRow } from "./profile-core";
 
 /**
  * R1318: the Prisma half of feature extraction. One published destination becomes one ContentFeature row; the row is
@@ -28,6 +29,8 @@ export interface RefreshResult {
   scanned: number;
   written: number;
   skipped: number;
+  /** Due rows this call did not reach (batch cap). The caller loops or comes back before the profile is final. */
+  remaining: number;
 }
 
 /** The destinations of `ownerId` that need a (re)computed row, oldest publish first, at most `batch`. */
@@ -37,7 +40,8 @@ export async function refreshFeatures(ownerId: string, opts: { batch?: number; n
   const since = new Date(now - FEATURE_WINDOW_DAYS * 864e5);
   const targets = await db.postTarget.findMany({
     where: { post: { userId: ownerId }, ...live(since) },
-    orderBy: [{ publishedAt: "asc" }, { createdAt: "asc" }],
+    // Newest first so the cap keeps the latest posts; the gap walk below sorts by the effective publish time.
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
     take: 2000,
     select: {
       id: true,
@@ -63,7 +67,9 @@ export async function refreshFeatures(ownerId: string, opts: { batch?: number; n
       },
     },
   });
-  if (!targets.length) return { scanned: 0, written: 0, skipped: 0 };
+  if (!targets.length) return { scanned: 0, written: 0, skipped: 0, remaining: 0 };
+  const effective = (t: { publishedAt: Date | null; post: { publishedAt: Date | null } }) => (t.publishedAt ?? t.post.publishedAt)?.getTime() ?? 0;
+  targets.sort((a, b) => effective(a) - effective(b) || (a.id < b.id ? -1 : 1));
   const ids = targets.map((t) => t.id);
   const existing = new Map((await db.contentFeature.findMany({ where: { targetId: { in: ids } }, select: { targetId: true, version: true, computedAt: true, publishedAt: true } })).map((r) => [r.targetId, r]));
   const due = targets.filter((t) => {
@@ -74,7 +80,7 @@ export async function refreshFeatures(ownerId: string, opts: { batch?: number; n
     return age < YOUNG_DAYS * 864e5 && now - row.computedAt.getTime() >= REFRESH_EVERY_MS;
   });
   const work = due.slice(0, batch);
-  if (!work.length) return { scanned: targets.length, written: 0, skipped: targets.length };
+  if (!work.length) return { scanned: targets.length, written: 0, skipped: targets.length, remaining: 0 };
   const sums = await db.targetMetric.groupBy({ by: ["targetId"], where: { targetId: { in: work.map((t) => t.id) } }, _sum: { views: true, likes: true, comments: true, shares: true, saves: true } });
   const byTarget = new Map(sums.map((s) => [s.targetId, s._sum]));
   const user = await db.user.findUnique({ where: { id: ownerId }, select: { timezone: true } });
@@ -140,16 +146,36 @@ export async function refreshFeatures(ownerId: string, opts: { batch?: number; n
     await db.contentFeature.upsert({ where: { targetId: t.id }, create: { targetId: t.id, ...data }, update: data });
     written++;
   }
-  return { scanned: targets.length, written, skipped: targets.length - written };
+  return { scanned: targets.length, written, skipped: targets.length - written, remaining: due.length - work.length };
 }
 
-/** The owner's feature rows of the last `days`, as the profile builder reads them. Scoped by ownerId; optional accounts narrow it. */
-export async function loadFeatureRows(ownerId: string, opts: { days: number; now?: Date | number; postIds?: string[] | null }) {
+/**
+ * The owner's feature rows of the last `days`, as the profile builder reads them. Scoped by ownerId; `targetIds`
+ * narrows to a client's destinations (by target, so a post cross-posted to another account never leaks in). Rows of
+ * removed, practice or unpublished destinations are left out even before the sweep recomputes them.
+ */
+export async function loadFeatureRows(ownerId: string, opts: { days: number; now?: Date | number; targetIds?: string[] | null }) {
   const now = opts.now instanceof Date ? opts.now.getTime() : (opts.now ?? Date.now());
   return db.contentFeature.findMany({
-    where: { ownerId, publishedAt: { gte: new Date(now - opts.days * 864e5), lt: new Date(now) }, ...(opts.postIds ? { postId: { in: opts.postIds } } : {}) },
+    where: {
+      ownerId,
+      publishedAt: { gte: new Date(now - opts.days * 864e5), lt: new Date(now) },
+      target: { removedAt: null, practice: false, platformStatus: "published" },
+      ...(opts.targetIds ? { targetId: { in: opts.targetIds } } : {}),
+    },
     orderBy: { publishedAt: "asc" },
     take: 3000,
     select: { targetId: true, postId: true, platform: true, format: true, publishedAt: true, features: true, perf: true, measured: true },
   });
+}
+
+/** Stored rows -> the pure builders' input. A row whose JSON no longer parses is skipped, never thrown on. */
+export function toFeatureRows(raw: Awaited<ReturnType<typeof loadFeatureRows>>): FeatureRow[] {
+  const out: FeatureRow[] = [];
+  for (const r of raw) {
+    const features = parseFeatures(r.features);
+    if (!features) continue;
+    out.push({ targetId: r.targetId, postId: r.postId, platform: r.platform, format: r.format, publishedAt: r.publishedAt, features, perf: parsePerf(r.perf) });
+  }
+  return out;
 }

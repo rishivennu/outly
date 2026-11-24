@@ -231,13 +231,21 @@ describe("R1318 features + profiles (db)", () => {
     expect(r2.snapshots).toBe(0);
     expect(await db.creatorProfileSnapshot.count({ where: { profile: { ownerId: a.id } } })).toBe(3);
     expect(await db.learningEvent.count({ where: { ownerId: a.id, type: "profile_rebuilt" } })).toBe(1);
-    // The YouTube post leaves the window: its profile row goes.
+    // The YouTube post leaves the window: its profile row stays (weekly history kept) at level none with no posts.
     await db.contentFeature.updateMany({ where: { ownerId: a.id, platform: "youtube" }, data: { publishedAt: new Date(Date.now() - 100 * DAY) } });
     const r3 = await prof.rebuildProfiles(a.id, { now: Date.now() });
     expect(r3.platforms).toEqual(["instagram"]);
-    expect((await prof.getProfiles(a.id)).map((p) => p.platform)).toEqual(["", "instagram"]);
+    const after = await prof.getProfiles(a.id);
+    expect(after.map((p) => p.platform)).toEqual(["", "instagram", "youtube"]);
+    expect(after[2]).toMatchObject({ level: "none", postsTotal: 0 });
+    expect(after[2].data.copy.hookRate).toBeNull();
+    // A removed destination drops out of the rows the profile reads, before any recompute.
+    const gone = await db.postTarget.findFirst({ where: { post: { userId: a.id }, platform: "instagram" } });
+    await db.postTarget.update({ where: { id: gone!.id }, data: { removedAt: new Date() } });
+    expect((await feat.loadFeatureRows(a.id, { days: 90 })).length).toBe(3);
+    await db.postTarget.update({ where: { id: gone!.id }, data: { removedAt: null } });
     const status = await prof.personalStatus(a.id);
-    expect(status.levels.map((l) => l.platform)).toEqual(["", "instagram"]);
+    expect(status.levels.map((l) => l.platform)).toEqual(["", "instagram", "youtube"]);
     expect(status).toMatchObject({ featureRows: 5, measuredRows: 5 });
     expect(status.lastComputedAt).not.toBeNull();
     expect(status.lastLearningAt).not.toBeNull();

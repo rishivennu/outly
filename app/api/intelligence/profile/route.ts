@@ -1,8 +1,7 @@
 import { HttpError, json, route } from "@/lib/http";
-import { getBrandProfile } from "@/lib/intelligence/memory";
+import { resolveClient } from "@/lib/intelligence/client-scope";
 import { getProfiles } from "@/lib/intelligence/profile";
 import { LEVEL_LABEL } from "@/lib/intelligence/profile-core";
-import { CLIENT_KEY_MAX } from "@/components/intelligence/view-core";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +13,7 @@ export const dynamic = "force-dynamic";
 export const GET = route(
   async (req, { user }) => {
     const q = req.nextUrl.searchParams;
-    const client = q.get("client") ?? "";
-    if (client) {
-      if (user.role !== "owner") throw new HttpError(403, "Only the workspace owner can switch clients.", "OWNER_ONLY");
-      if (client.length > CLIENT_KEY_MAX) throw new HttpError(400, "That client key is too long.", "BAD_CLIENT");
-      if (!(await getBrandProfile(user.id, client))) throw new HttpError(404, "That client profile no longer exists.", "NO_CLIENT");
-    }
+    const { scopeKey: client } = await resolveClient(user, q.get("client"));
     const platform = q.get("platform");
     const profiles = await getProfiles(user.id, client);
     const picked = platform === null ? profiles : profiles.filter((p) => p.platform === platform);

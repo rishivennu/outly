@@ -85,7 +85,8 @@ export interface CreatorProfileData {
   formats: Share[];
   topics: Share[];
   categories: Share[];
-  copy: { medianCaptionLen: number | null; medianHashtags: number | null; hookRate: number; questionRate: number; ctaRate: number; emojiRate: number };
+  /** Rates are percentages of the posts in the window, null when there are none (never a made-up 0). */
+  copy: { medianCaptionLen: number | null; medianHashtags: number | null; hookRate: number | null; questionRate: number | null; ctaRate: number | null; emojiRate: number | null };
   video: { medianDurationSec: number | null; verticalShare: number | null };
   timing: { weekdays: Share[]; hours: Share[] };
   performance: MetricProfile[];
@@ -98,6 +99,7 @@ const time = (d: string | Date) => (d instanceof Date ? d.getTime() : Date.parse
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const pct = (n: number, of: number) => (of > 0 ? Math.round((n / of) * 100) : 0);
+const rate = (f: ContentFeatures[], test: (x: ContentFeatures) => boolean) => (f.length ? pct(f.filter(test).length, f.length) : null);
 
 function shares(keys: (string | null | undefined)[], top = TOP_N): Share[] {
   const m = new Map<string, number>();
@@ -221,10 +223,10 @@ export function buildProfile(allRows: FeatureRow[], opts: BuildOpts): CreatorPro
     copy: {
       medianCaptionLen: captionLens.length ? Math.round(median(captionLens)) : null,
       medianHashtags: tagCounts.length ? Math.round(median(tagCounts)) : null,
-      hookRate: pct(f.filter((x) => x.hasHook).length, f.length),
-      questionRate: pct(f.filter((x) => x.hasQuestion).length, f.length),
-      ctaRate: pct(f.filter((x) => x.hasCta).length, f.length),
-      emojiRate: pct(f.filter((x) => x.emojiCount > 0).length, f.length),
+      hookRate: rate(f, (x) => x.hasHook),
+      questionRate: rate(f, (x) => x.hasQuestion),
+      ctaRate: rate(f, (x) => x.hasCta),
+      emojiRate: rate(f, (x) => x.emojiCount > 0),
     },
     video: {
       medianDurationSec: durations.length ? r1(median(durations)) : null,

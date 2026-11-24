@@ -1,8 +1,9 @@
 import "server-only";
 import { db } from "../db";
+import { logLearning } from "./learning";
+import { syncPredictions } from "./model/predict";
 import { accountIdsForClient } from "./memory";
-import { loadFeatureRows, refreshFeatures } from "./features";
-import { parseFeatures, parsePerf } from "./features-core";
+import { loadFeatureRows, refreshFeatures, toFeatureRows } from "./features";
 import { buildProfile, parseProfile, PROFILE_VERSION, PROFILE_WINDOW_DAYS, weekKey, type CreatorProfileData, type FeatureRow, type Level } from "./profile-core";
 
 /**
@@ -13,30 +14,7 @@ import { buildProfile, parseProfile, PROFILE_VERSION, PROFILE_WINDOW_DAYS, weekK
 
 export const BASELINE_MODEL_KEY = "baseline-ts-1";
 
-const isUnique = (e: unknown) => (e as { code?: string })?.code === "P2002";
-
-/** Append to the learning log; the same dedupeKey twice is a no-op (returns false). */
-export async function logLearning(ownerId: string, type: string, opts: { subjectType?: string; subjectId?: string; dedupeKey?: string; data?: unknown; at?: Date } = {}): Promise<boolean> {
-  try {
-    await db.learningEvent.create({
-      data: { ownerId, type, subjectType: opts.subjectType ?? null, subjectId: opts.subjectId ?? null, dedupeKey: opts.dedupeKey ?? null, data: opts.data === undefined ? null : JSON.stringify(opts.data).slice(0, 4000), at: opts.at ?? new Date() },
-    });
-    return true;
-  } catch (e) {
-    if (isUnique(e)) return false;
-    throw e;
-  }
-}
-
-function rowsOf(raw: Awaited<ReturnType<typeof loadFeatureRows>>): FeatureRow[] {
-  const out: FeatureRow[] = [];
-  for (const r of raw) {
-    const features = parseFeatures(r.features);
-    if (!features) continue;
-    out.push({ targetId: r.targetId, postId: r.postId, platform: r.platform, format: r.format, publishedAt: r.publishedAt, features, perf: parsePerf(r.perf) });
-  }
-  return out;
-}
+export { logLearning } from "./learning";
 
 export interface RebuildResult {
   profiles: number;
@@ -52,29 +30,37 @@ export async function rebuildProfiles(ownerId: string, opts: { scopeKey?: string
   const now = opts.now instanceof Date ? opts.now.getTime() : (opts.now ?? Date.now());
   const scopeKey = opts.scopeKey ?? "";
   const days = opts.days ?? PROFILE_WINDOW_DAYS;
-  let postIds: string[] | null = null;
+  let targetIds: string[] | null = null;
   if (scopeKey) {
     const accountIds = await accountIdsForClient(ownerId, scopeKey);
     if (!accountIds) return { profiles: 0, snapshots: 0, platforms: [] };
-    const ts = await db.postTarget.findMany({ where: { post: { userId: ownerId }, socialAccountId: { in: accountIds } }, select: { postId: true }, take: 3000 });
-    postIds = [...new Set(ts.map((t) => t.postId))];
+    const since = new Date(now - days * 864e5);
+    const ts = await db.postTarget.findMany({
+      where: { post: { userId: ownerId }, socialAccountId: { in: accountIds }, platformStatus: "published", OR: [{ publishedAt: { gte: since } }, { publishedAt: null, post: { publishedAt: { gte: since } } }] },
+      select: { id: true },
+      orderBy: { publishedAt: "desc" },
+      take: 3000,
+    });
+    targetIds = ts.map((t) => t.id);
   }
-  const rows = rowsOf(await loadFeatureRows(ownerId, { days, now, postIds }));
+  const rows = toFeatureRows(await loadFeatureRows(ownerId, { days, now, targetIds }));
   const platforms = [...new Set(rows.map((r) => r.platform))].sort();
-  const builds: CreatorProfileData[] = [buildProfile(rows, { platform: "", now, days }), ...platforms.map((p) => buildProfile(rows, { platform: p, now, days }))];
+  // A platform that had a profile but no post in the window keeps its row at level "none", so its weekly history stays.
+  const idle = (await db.creatorProfile.findMany({ where: { ownerId, scopeKey, platform: { notIn: ["", ...platforms] } }, select: { platform: true } })).map((p) => p.platform);
+  const builds: CreatorProfileData[] = [buildProfile(rows, { platform: "", now, days }), ...[...platforms, ...idle].map((p) => buildProfile(rows, { platform: p, now, days }))];
   const week = weekKey(now);
   let snapshots = 0;
   for (const data of builds) {
     const base = { version: PROFILE_VERSION, level: data.level, postsTotal: data.posts.total, postsMeasured: data.posts.measured, data: JSON.stringify(data), computedAt: new Date(now) };
     const row = await db.creatorProfile.upsert({ where: { ownerId_scopeKey_platform: { ownerId, scopeKey, platform: data.platform } }, create: { ownerId, scopeKey, platform: data.platform, ...base }, update: base });
-    try {
+    // One snapshot a week, holding the latest build of that week.
+    const existing = await db.creatorProfileSnapshot.findUnique({ where: { profileId_week: { profileId: row.id, week } }, select: { id: true } });
+    if (existing) await db.creatorProfileSnapshot.update({ where: { id: existing.id }, data: { level: data.level, data: base.data, at: new Date(now) } });
+    else {
       await db.creatorProfileSnapshot.create({ data: { profileId: row.id, week, level: data.level, data: base.data, at: new Date(now) } });
       snapshots++;
-    } catch (e) {
-      if (!isUnique(e)) throw e;
     }
   }
-  await db.creatorProfile.deleteMany({ where: { ownerId, scopeKey, platform: { notIn: ["", ...platforms] } } });
   await logLearning(ownerId, "profile_rebuilt", { subjectType: "profile", subjectId: scopeKey || "workspace", dedupeKey: `profile:${scopeKey}:${week}`, data: { platforms, posts: builds[0].posts, level: builds[0].level }, at: new Date(now) });
   return { profiles: builds.length, snapshots, platforms };
 }
@@ -109,6 +95,7 @@ export interface PersonalStatus {
   snapshots: number;
 }
 
+/** Levels follow the scope; featureRows, measuredRows and lastLearningAt are workspace-wide (features and the log are kept per owner). */
 export async function personalStatus(ownerId: string, scopeKey = ""): Promise<PersonalStatus> {
   const [profiles, featureRows, measuredRows, lastEvent, snapshots] = await Promise.all([
     db.creatorProfile.findMany({ where: { ownerId, scopeKey }, select: { platform: true, level: true, postsTotal: true, postsMeasured: true, computedAt: true }, orderBy: { platform: "asc" } }),
@@ -129,16 +116,28 @@ export async function personalStatus(ownerId: string, scopeKey = ""): Promise<Pe
 }
 
 /** Features then profiles for one owner (what POST /api/intelligence/refresh and the sweep both run). */
-export async function refreshOwner(ownerId: string, opts: { now?: Date | number; batch?: number } = {}) {
-  const features = await refreshFeatures(ownerId, { now: opts.now, batch: opts.batch ?? 200 });
+export async function refreshOwner(ownerId: string, opts: { now?: Date | number; batch?: number; maxBatches?: number } = {}) {
+  // Drain the feature backlog in a few batches (a first run can face hundreds of destinations), so the profile below
+  // is built on every post the owner has, not the oldest hundred.
+  const features = { scanned: 0, written: 0, skipped: 0, remaining: 0 };
+  for (let i = 0; i < Math.max(1, opts.maxBatches ?? 5); i++) {
+    const r = await refreshFeatures(ownerId, { now: opts.now, batch: opts.batch ?? 200 });
+    features.scanned = r.scanned;
+    features.written += r.written;
+    features.skipped = r.skipped;
+    features.remaining = r.remaining;
+    if (!r.remaining) break;
+  }
   const scopes = await db.brandProfile.findMany({ where: { ownerId, NOT: { scopeKey: "" } }, select: { scopeKey: true }, take: 50 });
   const own = await rebuildProfiles(ownerId, { now: opts.now });
+  // R1319: score the newly published destinations from the history before them, fill actuals, roll up accuracy.
+  const predictions = await syncPredictions(ownerId, { now: opts.now }).catch((e) => (console.error("[intel] predictions", ownerId, e), null));
   let clients = 0;
   for (const s of scopes) {
     await rebuildProfiles(ownerId, { scopeKey: s.scopeKey, now: opts.now });
     clients++;
   }
-  return { features, profiles: own.profiles, clients };
+  return { features, profiles: own.profiles, clients, predictions };
 }
 
 /** A profile is stale after this long; the sweep rebuilds the stalest owners first. */
@@ -153,20 +152,20 @@ export async function sweepPersonal(opts: { maxOwners?: number; now?: Date | num
   const maxOwners = Math.max(1, Math.min(20, Math.floor(opts.maxOwners ?? 5) || 5));
   const since = new Date(now - PROFILE_WINDOW_DAYS * 864e5);
   const fresh = new Date(now - PROFILE_STALE_MS);
-  const candidates = await db.post.findMany({
-    where: { publishedAt: { gte: since }, targets: { some: { platformStatus: "published", practice: false } }, ...(opts.ownerIds ? { userId: { in: opts.ownerIds } } : {}) },
-    distinct: ["userId"],
-    select: { userId: true },
+  // Owners whose workspace profile is fresh are excluded in the query, so the group-by only sees owners that may be
+  // due (a distinct over every post would read the whole table every run).
+  const freshOwners = (await db.creatorProfile.findMany({ where: { scopeKey: "", platform: "", computedAt: { gte: fresh }, ...(opts.ownerIds ? { ownerId: { in: opts.ownerIds } } : {}) }, select: { ownerId: true }, take: 5000 })).map((p) => p.ownerId);
+  const grouped = await db.post.groupBy({
+    by: ["userId"],
+    where: { publishedAt: { gte: since }, targets: { some: { platformStatus: "published", practice: false } }, userId: { notIn: freshOwners, ...(opts.ownerIds ? { in: opts.ownerIds } : {}) } },
+    orderBy: { userId: "asc" },
     take: 200,
   });
-  if (!candidates.length) return { owners: 0, features: 0, failed: 0 };
-  const ids = candidates.map((c) => c.userId);
+  if (!grouped.length) return { owners: 0, features: 0, failed: 0 };
+  const ids = grouped.map((c) => c.userId);
   const profiles = await db.creatorProfile.findMany({ where: { ownerId: { in: ids }, scopeKey: "", platform: "" }, select: { ownerId: true, computedAt: true } });
   const at = new Map(profiles.map((p) => [p.ownerId, p.computedAt]));
-  const due = ids
-    .filter((id) => !at.has(id) || at.get(id)! < fresh)
-    .sort((a, b) => (at.get(a)?.getTime() ?? 0) - (at.get(b)?.getTime() ?? 0))
-    .slice(0, maxOwners);
+  const due = ids.sort((a, b) => (at.get(a)?.getTime() ?? 0) - (at.get(b)?.getTime() ?? 0)).slice(0, maxOwners);
   let features = 0;
   let failed = 0;
   for (const ownerId of due) {

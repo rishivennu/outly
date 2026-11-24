@@ -206,6 +206,12 @@ export async function deleteAccount(user: Pick<SessionUser, "id" | "actor">, con
       : []),
     // 1147: anti-abuse signals and the trial go with the account; offer-ledger rows keep only their one-way hash and
     // dates (no owner) so a deleted-and-recreated account cannot take the trial or first-time price again.
+    // R1318/R1319: derived personal intelligence (profiles, learning log, predictions) has no User relation; it goes too.
+    db.creatorProfile.deleteMany({ where: { ownerId: me.id } }),
+    db.learningEvent.deleteMany({ where: { ownerId: me.id } }),
+    db.predictionRecord.deleteMany({ where: { ownerId: me.id } }),
+    db.creatorModelState.deleteMany({ where: { ownerId: me.id } }),
+    db.intelligenceEvaluation.deleteMany({ where: { ownerId: me.id } }),
     db.signupSignal.deleteMany({ where: { userId: me.id } }),
     db.trial.deleteMany({ where: { userId: me.id } }),
     db.offerLedger.updateMany({ where: { userId: me.id }, data: { userId: null } }),
