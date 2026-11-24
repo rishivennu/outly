@@ -62,20 +62,21 @@ describe("1314 core", () => {
 describe("1314 ledger", () => {
   test("records original currency, FX and INR, rolls up per day, and dedupes on ref", async () => {
     const at = new Date("2026-11-03T10:00:00Z");
-    const ev = await ledger.recordCostEvent({ provider: "gemini", category: "ai", feature: "writing", userId: "u1", units: 1200, unit: "token", amountMinor: 50, currency: "USD", source: "estimate", ref: "t1314:a", at });
+    // feature "t1314" keeps these rows apart from what other test files meter through recordCost on the same day (the DB is shared on Windows)
+    const ev = await ledger.recordCostEvent({ provider: "gemini", category: "ai", feature: "t1314", userId: "u1", units: 1200, unit: "token", amountMinor: 50, currency: "USD", source: "estimate", ref: "t1314:a", at });
     expect(ev).not.toBeNull();
     expect(ev!.currency).toBe("USD");
     expect(ev!.fxToInr).toBeGreaterThan(50);
     expect(ev!.inrMinor).toBe(Math.round(50 * ev!.fxToInr));
     expect(ev!.day).toBe("2026-11-03");
-    const dup = await ledger.recordCostEvent({ provider: "gemini", category: "ai", feature: "writing", amountMinor: 50, currency: "USD", ref: "t1314:a", at });
+    const dup = await ledger.recordCostEvent({ provider: "gemini", category: "ai", feature: "t1314", amountMinor: 50, currency: "USD", ref: "t1314:a", at });
     expect(dup).toBeNull();
-    await ledger.recordCostEvent({ provider: "gemini", category: "ai", feature: "writing", userId: "u2", units: 800, unit: "token", amountMinor: 30, currency: "USD", at });
-    const daily = await db.costDaily.findUnique({ where: { day_provider_category_feature_source: { day: "2026-11-03", provider: "gemini", category: "ai", feature: "writing", source: "estimate" } } });
+    await ledger.recordCostEvent({ provider: "gemini", category: "ai", feature: "t1314", userId: "u2", units: 800, unit: "token", amountMinor: 30, currency: "USD", at });
+    const daily = await db.costDaily.findUnique({ where: { day_provider_category_feature_source: { day: "2026-11-03", provider: "gemini", category: "ai", feature: "t1314", source: "estimate" } } });
     expect(daily!.count).toBe(2);
     expect(daily!.units).toBe(2000);
     expect(daily!.inrMinor).toBe(ev!.inrMinor + Math.round(30 * ev!.fxToInr));
-    expect(await ledger.trackingSince()).toBe("2026-11-03");
+    expect((await ledger.trackingSince())! <= "2026-11-03").toBe(true);
   });
   test("zero amounts are not booked", async () => {
     expect(await ledger.recordCostEvent({ provider: "resend", category: "email", amountMinor: 0 })).toBeNull();
@@ -177,7 +178,7 @@ describe("1314 manual entries", () => {
 describe("1314 overview and export", () => {
   test("the overview sums the range, splits by provider/category/feature/source and knows when tracking started", async () => {
     const o = await ov.overview({ from: "2026-11-01", to: "2026-11-30", now: new Date("2026-11-12T00:00:00Z") });
-    expect(o.trackingSince).toBe("2026-01-15"); // the yearly domain booked above is the earliest row
+    expect(o.trackingSince! <= "2026-01-15").toBe(true); // the yearly domain booked above, or anything earlier another test file metered
     expect(o.totalMinor).toBeGreaterThan(0);
     expect(o.byProvider.map((p) => p.key)).toEqual(expect.arrayContaining(["gemini", "render"]));
     expect(o.byFeature.find((f) => f.key === "captions")).toBeTruthy();
@@ -196,8 +197,9 @@ describe("1314 overview and export", () => {
     expect(d.head[0]).toBe("day");
     expect(d.rows.length).toBeGreaterThan(0);
     const e = await ov.exportRows("events", "2026-11-03", "2026-11-03");
-    expect(e.rows.length).toBe(2);
-    expect(e.rows[0][9]).toBe("USD");
+    const mine = e.rows.filter((r) => r[3] === "t1314");
+    expect(mine.length).toBe(2);
+    expect(mine[0][9]).toBe("USD");
   });
 });
 
