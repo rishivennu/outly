@@ -20,9 +20,9 @@ services:
       - key: DATABASE_PROVIDER
         value: postgresql
       - key: PORT
-        value: 10000
+        value: "10000"
       - key: NEXT_TELEMETRY_DISABLED
-        value: 1
+        value: "1"
       - key: FFMPEG_PATH
         value: /usr/bin/ffmpeg
       - key: FFPROBE_PATH
