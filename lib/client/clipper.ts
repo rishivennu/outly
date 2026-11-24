@@ -1,6 +1,6 @@
 "use client";
 import { api, ApiError } from "./api";
-import { audioChunks, drawCue, postChunk, recorderType, type AudioChunk } from "./captions";
+import { audioChunks, drawCue, postChunk, readyFont, recorderType, sampleText, type AudioChunk } from "./captions";
 import { uploadVideo } from "./upload";
 import { runChunks } from "../captions/run";
 import { cueAt, type Cue } from "../captions/cues";
@@ -46,10 +46,18 @@ export function probeVideo(src: string | File): Promise<{ duration: number; widt
 export async function runJob(job: JobView, src: string | Blob, o: { signal: AbortSignal; onProgress: Progress; lang?: string; onJob?: (j: JobView) => void }): Promise<JobDetail> {
   const { job: started } = await stage(job.id, { event: "start", executor: "browser" });
   o.onJob?.(started);
-  let detail: JobDetail | null = null;
   if (started.stage === "transcribe") {
     o.onProgress(0);
-    const all = await audioChunks(src, o.signal);
+    // Decoding a long soundtrack can take a while and reports nothing by itself, so the job keeps its heartbeat
+    // meanwhile (R1322 review #12); otherwise another tab would see it as stalled.
+    const beatNow = (progress: number) => stage(job.id, { event: "heartbeat", progress, executor: "browser" }).catch(() => {});
+    const decodeBeat = setInterval(() => void beatNow(0), HEARTBEAT_MS);
+    let all: AudioChunk[];
+    try {
+      all = await audioChunks(src, o.signal);
+    } finally {
+      clearInterval(decodeBeat);
+    }
     const talking = all.map((c, i) => [c, i] as const).filter(([c]) => !c.silent);
     if (!talking.length) throw new Error("The video has no sound we could hear, so there is nothing to clip by speech.");
     const words: Word[] = [];
@@ -58,7 +66,7 @@ export async function runJob(job: JobView, src: string | Blob, o: { signal: Abor
     const beat = async (done: number) => {
       if (Date.now() - lastBeat < HEARTBEAT_MS) return;
       lastBeat = Date.now();
-      await stage(job.id, { event: "heartbeat", progress: Math.min(0.99, done / talking.length), executor: "browser" }).catch(() => {});
+      await beatNow(Math.min(0.99, done / talking.length));
     };
     const run = `clip-${job.id}-${Date.now().toString(36)}`;
     const out = await runChunks(
@@ -87,8 +95,7 @@ export async function runJob(job: JobView, src: string | Blob, o: { signal: Abor
   o.onProgress(1);
   const d = await api<{ job: JobView }>(`/api/clipper/jobs/${job.id}/detect`, { method: "POST" });
   o.onJob?.(d.job);
-  detail = await api<JobDetail>(`/api/clipper/jobs/${job.id}?transcript=1`);
-  return detail;
+  return api<JobDetail>(`/api/clipper/jobs/${job.id}?transcript=1`);
 }
 
 /** Tell the server the tab gave up, with the reason the creator sees. */
@@ -113,37 +120,46 @@ export interface RenderOpts {
 export async function renderClip(src: string, clip: ClipView, name: string, o: RenderOpts): Promise<File> {
   const type = recorderType();
   if (!type) throw new Error("This browser can't record MP4 video. Use the latest Chrome, Edge or Safari.");
+  if (o.signal?.aborted) throw new DOMException("Cancelled", "AbortError");
   const video = document.createElement("video");
-  video.src = src;
   video.crossOrigin = "anonymous";
   video.playsInline = true;
   video.muted = false;
   video.preload = "auto";
-  await new Promise<void>((res, rej) => {
-    video.onloadedmetadata = () => res();
-    video.onerror = () => rej(new Error("Couldn't open the video to render the clip."));
-  });
+  const releaseVideo = () => {
+    video.pause();
+    video.onended = video.onerror = video.onseeked = video.onstalled = null;
+    video.removeAttribute("src");
+    video.load();
+  };
+  try {
+    await new Promise<void>((res, rej) => {
+      video.onloadedmetadata = () => res();
+      video.onerror = () => rej(new Error("Couldn't open the video to render the clip."));
+      o.signal?.addEventListener("abort", () => rej(new DOMException("Cancelled", "AbortError")), { once: true });
+      video.src = src;
+    });
+  } catch (e) {
+    releaseVideo();
+    throw e;
+  }
   const w = video.videoWidth || 1920;
   const h = video.videoHeight || 1080;
   const d = drawFor(w, h, clip.reframe);
+  const lines = o.cues ? cuesWithin(o.cues, clip) : null;
+  // The first burned frame must not fall back to a system font (R1322 review #13).
+  if (lines?.length) await readyFont(o.font, sampleText(lines));
   const canvas = document.createElement("canvas");
   canvas.width = OUT_W;
   canvas.height = OUT_H;
   const ctx = canvas.getContext("2d")!;
   const stream = canvas.captureStream(30);
   const ac = new AudioContext();
-  const dest = ac.createMediaStreamDestination();
-  try {
-    ac.createMediaElementSource(video).connect(dest);
-    dest.stream.getAudioTracks().forEach((t) => stream.addTrack(t));
-  } catch {
-    /* silent clip */
-  }
-  const rec = new MediaRecorder(stream, { mimeType: type.mime, videoBitsPerSecond: 8_000_000 });
-  const parts: Blob[] = [];
-  rec.ondataavailable = (e) => e.data.size && parts.push(e.data);
-  const stopped = new Promise<void>((res) => (rec.onstop = () => res()));
-  const lines = o.cues ? cuesWithin(o.cues, clip) : null;
+  const cleanup = () => {
+    releaseVideo();
+    stream.getTracks().forEach((t) => t.stop());
+    ac.close().catch(() => {});
+  };
   const aborted = () => !!o.signal?.aborted;
   const paint = () => {
     if (d.backdrop) {
@@ -168,40 +184,72 @@ export async function renderClip(src: string, clip: ClipView, name: string, o: R
       video.onseeked = () => res();
       video.currentTime = t;
     });
-  const cleanup = () => {
-    video.pause();
-    stream.getTracks().forEach((t) => t.stop());
-    ac.close().catch(() => {});
-  };
   const total = clip.end - clip.start;
-  await ac.resume().catch(() => {});
-  let started = false;
+  const parts: Blob[] = [];
+  let rec: MediaRecorder | null = null;
+  let stopped: Promise<void> = Promise.resolve();
+  let failure: Error | null = null;
   try {
+    try {
+      const dest = ac.createMediaStreamDestination();
+      ac.createMediaElementSource(video).connect(dest);
+      dest.stream.getAudioTracks().forEach((t) => stream.addTrack(t));
+    } catch {
+      /* silent clip */
+    }
+    rec = new MediaRecorder(stream, { mimeType: type.mime, videoBitsPerSecond: 8_000_000 });
+    const r = rec;
+    r.ondataavailable = (e) => e.data.size && parts.push(e.data);
+    stopped = new Promise<void>((res) => (r.onstop = () => res()));
+    await ac.resume().catch(() => {});
     await seek(clip.start);
     paint();
-    rec.start(1000);
-    started = true;
+    r.start(1000);
     await video.play();
+    // The frame loop stops on the clip's end, on Stop (even while the video buffers, when no frame callback would
+    // come), on a media error, and when nothing has moved for a long while (R1322 review #14).
     await new Promise<void>((res) => {
-      video.onended = () => {
-        paint();
+      let lastTime = -1;
+      let still = 0;
+      const finish = () => {
+        clearInterval(watch);
         res();
       };
+      const watch = setInterval(() => {
+        if (aborted()) return finish();
+        if (video.currentTime === lastTime) {
+          if (++still >= 20) {
+            failure = new Error("The video stopped loading while it rendered. Check your connection and try again.");
+            return finish();
+          }
+        } else {
+          lastTime = video.currentTime;
+          still = 0;
+        }
+      }, 1000);
+      video.onerror = () => {
+        failure = new Error("The video could not be played to the end.");
+        finish();
+      };
+      video.onended = () => {
+        paint();
+        finish();
+      };
       const step = () => {
+        if (aborted() || video.ended || video.currentTime >= clip.end || failure) return finish();
         paint();
         o.onProgress?.(Math.min(0.99, Math.max(0, video.currentTime - clip.start) / total));
-        if (aborted() || video.ended || video.currentTime >= clip.end) return res();
         "requestVideoFrameCallback" in video ? (video as unknown as { requestVideoFrameCallback: (cb: () => void) => void }).requestVideoFrameCallback(step) : requestAnimationFrame(step);
       };
       step();
     });
-    video.onended = null;
   } finally {
-    if (started && rec.state !== "inactive") rec.stop();
-    if (started) await stopped;
+    if (rec && rec.state !== "inactive") rec.stop();
+    if (rec) await stopped;
     cleanup();
   }
   if (aborted()) throw new DOMException("Cancelled", "AbortError");
+  if (failure) throw failure;
   o.onProgress?.(1);
   return new File(parts, clipFileName(name, clip, type.ext), { type: type.mime.split(";")[0] });
 }
@@ -209,16 +257,25 @@ export async function renderClip(src: string, clip: ClipView, name: string, o: R
 /** Render, upload as Media, report. Returns the clip as the server now has it. */
 export async function exportClip(src: string, clip: ClipView, sourceName: string, o: RenderOpts & { onPhase?: (p: "render" | "upload") => void }): Promise<ClipView> {
   await api(`/api/clipper/clips/${clip.id}/render`, { method: "POST", json: { status: "rendering", executor: "browser" } });
+  const report = (body: unknown) => api<{ clip: ClipView }>(`/api/clipper/clips/${clip.id}/render`, { method: "POST", json: body });
   try {
     o.onPhase?.("render");
     const file = await renderClip(src, clip, sourceName, o);
     o.onPhase?.("upload");
     const up = await uploadVideo<{ id: string }>(file, (p) => o.onProgress?.(p), o.signal, { resumeKey: `clip:${clip.id}:${clip.updatedAt}` });
     await api(`/api/media/${up.media.id}`, { method: "PATCH", json: { duration: Math.round((clip.end - clip.start) * 100) / 100, width: OUT_W, height: OUT_H } }).catch(() => null);
-    const r = await api<{ clip: ClipView }>(`/api/clipper/clips/${clip.id}/render`, { method: "POST", json: { status: "rendered", mediaId: up.media.id, executor: "browser" } });
-    return r.clip;
+    try {
+      return (await report({ status: "rendered", mediaId: up.media.id, executor: "browser" })).clip;
+    } catch (e) {
+      // The clip was edited while it rendered: the file is for an older cut, so it goes to the bin (R1322 review #21).
+      if (e instanceof ApiError && e.status === 409) await api(`/api/media/${up.media.id}`, { method: "DELETE" }).catch(() => null);
+      throw e;
+    }
   } catch (e) {
-    if ((e as Error)?.name !== "AbortError") await api(`/api/clipper/clips/${clip.id}/render`, { method: "POST", json: { status: "failed", error: (e instanceof ApiError ? e.message : (e as Error)?.message) || "The render stopped." } }).catch(() => null);
+    // Stop is reported too, so the clip never stays "Exporting" (R1322 review #4).
+    const stoppedByUser = (e as Error)?.name === "AbortError";
+    const error = stoppedByUser ? "Stopped." : (e instanceof ApiError ? e.message : (e as Error)?.message) || "The render stopped.";
+    await report({ status: "failed", error: error.slice(0, 500), executor: "browser" }).catch(() => null);
     throw e;
   }
 }

@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { api, ApiError } from "@/lib/client/api";
+import { api, ApiError, offerUpgrade } from "@/lib/client/api";
 import { exportClip } from "@/lib/client/clipper";
-import { clampRange, mmss } from "@/lib/clipper/executor-core";
+import { clampRange, mmss, previewStyle, slideAxis } from "@/lib/clipper/executor-core";
 import { drawFor, keptShare, type ReframePlan } from "@/lib/clipper/reframe-core";
 import { OUT_H, OUT_W } from "@/lib/clipper/settings-core";
 import type { Cue } from "@/lib/captions/cues";
@@ -20,21 +20,42 @@ import { DownloadButton } from "./ReviewScreen";
  * change makes the export stale and the screen says so. Export renders in this tab.
  */
 export function ClipEditor({ clip, src, cues, duration, sourceName, onClose, onSaved }: { clip: ClipView; src: string; cues: Cue[]; duration: number; sourceName: string; onClose: () => void; onSaved: () => Promise<unknown> }) {
-  const [draft, setDraft] = useState(() => ({ title: clip.title, hook: clip.hook ?? "", caption: clip.caption ?? "", hashtags: clip.hashtags ?? "", start: clip.start, end: clip.end, reframe: clip.reframe, subtitle: clip.subtitle }));
+  const fromClip = (c: ClipView) => ({ title: c.title, hook: c.hook ?? "", caption: c.caption ?? "", hashtags: c.hashtags ?? "", start: c.start, end: c.end, reframe: c.reframe, subtitle: c.subtitle });
+  const [draft, setDraft] = useState(() => fromClip(clip));
+  /** The range boxes hold text while they are typed in ("12." stays "12."); the numbers land on blur (R1322 review #19). */
+  const [rangeText, setRangeText] = useState<{ start: string; end: string }>({ start: String(clip.start), end: String(clip.end) });
   const [state, setState] = useState<{ kind: "idle" } | { kind: "saving" } | { kind: "exporting"; p: number; phase: "render" | "upload" } | { kind: "error"; message: string }>({ kind: "idle" });
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const video = useRef<HTMLVideoElement>(null);
+  const backdrop = useRef<HTMLVideoElement>(null);
   const abort = useRef<AbortController | null>(null);
+  /** The export reads the source URL at the moment it starts, never one captured by an older render (R1322 review #1). */
+  const srcRef = useRef(src);
+  srcRef.current = src;
+
+  // A refreshed copy of the same clip (an approval elsewhere on the page) keeps the edits; a saved change replaces them.
+  useEffect(() => {
+    setDraft(fromClip(clip));
+    setRangeText({ start: String(clip.start), end: String(clip.end) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clip.id, clip.updatedAt]);
 
   useEffect(() => {
-    setDraft({ title: clip.title, hook: clip.hook ?? "", caption: clip.caption ?? "", hashtags: clip.hashtags ?? "", start: clip.start, end: clip.end, reframe: clip.reframe, subtitle: clip.subtitle });
-  }, [clip]);
-
-  useEffect(() => {
-    const v = video.current;
-    if (!v) return;
-    v.currentTime = draft.start;
+    for (const v of [video.current, backdrop.current]) if (v) v.currentTime = draft.start;
   }, [draft.start]);
+
+  // Leaving the editor stops a render that is still running, and a tab close asks first (R1322 review #5, #6).
+  useEffect(() => () => abort.current?.abort(), []);
+  const exporting = state.kind === "exporting";
+  useEffect(() => {
+    if (!exporting) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [exporting]);
 
   const dirty = useMemo(
     () =>
@@ -50,7 +71,8 @@ export function ClipEditor({ clip, src, cues, duration, sourceName, onClose, onS
   );
   const staleAfterSave = draft.start !== clip.start || draft.end !== clip.end || JSON.stringify(draft.reframe) !== JSON.stringify(clip.reframe) || JSON.stringify(draft.subtitle) !== JSON.stringify(clip.subtitle);
 
-  const save = async () => {
+  /** True when the clip is now saved (or had nothing to save); false stops an export that was about to follow. */
+  const save = async (): Promise<boolean> => {
     setState({ kind: "saving" });
     try {
       const body: Record<string, unknown> = {};
@@ -65,13 +87,17 @@ export function ClipEditor({ clip, src, cues, duration, sourceName, onClose, onS
       if (Object.keys(body).length) await api(`/api/clipper/clips/${clip.id}`, { method: "PATCH", json: body });
       await onSaved();
       setState({ kind: "idle" });
+      return true;
     } catch (e) {
       setState({ kind: "error", message: e instanceof ApiError ? e.message : "Couldn't save the clip." });
+      return false;
     }
   };
 
   const doExport = async () => {
-    if (dirty) await save();
+    // Unsaved edits go first; a save that fails must not export the older server copy (R1322 review #3).
+    if (dirty && !(await save())) return;
+    const src = srcRef.current;
     const ctrl = new AbortController();
     abort.current = ctrl;
     setState({ kind: "exporting", p: 0, phase: "render" });
@@ -88,8 +114,15 @@ export function ClipEditor({ clip, src, cues, duration, sourceName, onClose, onS
       await onSaved();
       setState({ kind: "idle" });
     } catch (e) {
-      if (ctrl.signal.aborted) return setState({ kind: "idle" });
-      setState({ kind: "error", message: e instanceof ApiError ? e.message : (e as Error)?.message || "The export stopped." });
+      if (ctrl.signal.aborted) {
+        setState({ kind: "idle" });
+        await onSaved().catch(() => {});
+        return;
+      }
+      const message = e instanceof ApiError ? e.message : (e as Error)?.message || "The export stopped.";
+      // The rendered file counts as an upload; a full library is a plan question, not a render fault (R1322 review #21).
+      if (e instanceof ApiError && e.status === 402) offerUpgrade(message, (e.data?.feature as string | undefined) ?? "uploads");
+      setState({ kind: "error", message });
       await onSaved().catch(() => {});
     } finally {
       if (abort.current === ctrl) abort.current = null;
@@ -107,15 +140,23 @@ export function ClipEditor({ clip, src, cues, duration, sourceName, onClose, onS
     }
   };
 
-  const setRange = (r: { start: number; end: number }) => setDraft((d) => ({ ...d, ...clampRange(r, duration || Math.max(r.end, d.end)) }));
+  const commitRange = () => {
+    const s = Number(rangeText.start);
+    const e = Number(rangeText.end);
+    const r = clampRange({ start: Number.isFinite(s) ? s : draft.start, end: Number.isFinite(e) ? e : draft.end }, duration || Math.max(e || 0, draft.end));
+    setDraft((d) => ({ ...d, ...r }));
+    setRangeText({ start: String(r.start), end: String(r.end) });
+  };
   const busy = state.kind === "saving" || state.kind === "exporting";
+  // A landscape source slides its window sideways; a tall one (rare) slides it up and down (R1322 review #17).
+  const axis = size ? slideAxis(size.w, size.h) : "x";
 
   return (
     <Card id="clipper-editor" className="relative" title={clip.title} desc={`${mmss(clip.start)} to ${mmss(clip.end)}. ${clip.renderStatus === "rendered" ? (staleAfterSave ? "Saving these changes will need a new export." : "Exported.") : "Not exported yet."}`}>
-      <div className="absolute right-4 top-4"><Button type="button" variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close editor"><X className="h-4 w-4" aria-hidden /></Button></div>
+      <div className="absolute right-4 top-4"><Button type="button" variant="ghost" size="icon-sm" disabled={exporting} onClick={onClose} aria-label={exporting ? "Stop the export before closing" : "Close editor"}><X className="h-4 w-4" aria-hidden /></Button></div>
       <div className="mt-4 grid gap-5 md:grid-cols-[240px_minmax(0,1fr)]">
         <div>
-          <Preview src={src} plan={draft.reframe} videoRef={video} onSize={setSize} />
+          <Preview src={src} plan={draft.reframe} videoRef={video} backdropRef={backdrop} onSize={setSize} />
           {size && <p className="mt-2 text-[12px] text-muted-foreground">{draft.reframe.mode === "crop" ? `Keeps ${Math.round(keptShare(size.w, size.h, draft.reframe) * 100)}% of the picture. Slide to follow the speaker.` : "Whole picture over a blurred copy."}</p>}
           <div className="mt-3 flex gap-2">
             {(["crop", "pillarbox"] as const).map((m) => (
@@ -127,7 +168,7 @@ export function ClipEditor({ clip, src, cues, duration, sourceName, onClose, onS
           {draft.reframe.mode === "crop" && (
             <label className="mt-3 block text-[13px]">
               <span className="font-medium">Window position</span>
-              <input type="range" min={0} max={100} value={Math.round(draft.reframe.x * 100)} onChange={(e) => setDraft((d) => ({ ...d, reframe: { ...d.reframe, x: Number(e.target.value) / 100 } }))} className="mt-1 w-full accent-[hsl(var(--lime))]" aria-label="Horizontal position of the 9:16 window" />
+              <input type="range" min={0} max={100} value={Math.round(draft.reframe[axis] * 100)} onChange={(e) => setDraft((d) => ({ ...d, reframe: { ...d.reframe, [axis]: Number(e.target.value) / 100 } }))} className="mt-1 w-full accent-[hsl(var(--lime))]" aria-label={axis === "x" ? "Horizontal position of the 9:16 window" : "Vertical position of the 9:16 window"} />
             </label>
           )}
         </div>
@@ -136,11 +177,11 @@ export function ClipEditor({ clip, src, cues, duration, sourceName, onClose, onS
           <div className="grid grid-cols-2 gap-3">
             <label className="text-[13px]">
               <span className="font-medium">Start (s)</span>
-              <Input inputMode="decimal" value={String(draft.start)} onChange={(e) => setRange({ start: Number(e.target.value) || 0, end: draft.end })} className="mt-1 h-11 rounded-xl text-[14px]" />
+              <Input inputMode="decimal" value={rangeText.start} onChange={(e) => setRangeText((t) => ({ ...t, start: e.target.value }))} onBlur={commitRange} className="mt-1 h-11 rounded-xl text-[14px]" />
             </label>
             <label className="text-[13px]">
               <span className="font-medium">End (s)</span>
-              <Input inputMode="decimal" value={String(draft.end)} onChange={(e) => setRange({ start: draft.start, end: Number(e.target.value) || 0 })} className="mt-1 h-11 rounded-xl text-[14px]" />
+              <Input inputMode="decimal" value={rangeText.end} onChange={(e) => setRangeText((t) => ({ ...t, end: e.target.value }))} onBlur={commitRange} className="mt-1 h-11 rounded-xl text-[14px]" />
             </label>
           </div>
           <p className="text-[12px] text-muted-foreground">{Math.round((draft.end - draft.start) * 10) / 10} s. Clips run 8 to 90 s.</p>
@@ -182,7 +223,7 @@ export function ClipEditor({ clip, src, cues, duration, sourceName, onClose, onS
           <p className="text-[12px] text-muted-foreground">The words were drafted from what is said in the clip. Redraft puts them back.</p>
 
           {state.kind === "exporting" && <ProgressBar value={state.p} label={state.phase === "render" ? "Rendering" : "Uploading"} />}
-          {state.kind === "exporting" && <p className="text-[12px] text-muted-foreground">{state.phase === "render" ? "Rendering plays the clip once in this tab; keep it open." : "Uploading the rendered clip to your library."}</p>}
+          {state.kind === "exporting" && <p className="text-[12px] text-muted-foreground">{state.phase === "render" ? "Rendering plays the clip once in this tab. Keep this tab in front until it finishes; browsers slow a hidden tab down." : "Uploading the rendered clip to your library."}</p>}
           {state.kind === "error" && <p className="text-[13px] text-destructive" role="alert">{state.message}</p>}
 
           <div className="flex flex-wrap gap-2">
@@ -199,17 +240,18 @@ export function ClipEditor({ clip, src, cues, duration, sourceName, onClose, onS
 }
 
 /** The source through the reframe rectangles, at preview size. The same drawFor the render uses. */
-function Preview({ src, plan, videoRef, onSize }: { src: string; plan: ReframePlan; videoRef: React.RefObject<HTMLVideoElement | null>; onSize: (s: { w: number; h: number }) => void }) {
+function Preview({ src, plan, videoRef, backdropRef, onSize }: { src: string; plan: ReframePlan; videoRef: React.RefObject<HTMLVideoElement | null>; backdropRef: React.RefObject<HTMLVideoElement | null>; onSize: (s: { w: number; h: number }) => void }) {
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const W = 240;
   const H = Math.round((W * OUT_H) / OUT_W);
   const d = size ? drawFor(size.w, size.h, plan) : null;
   const k = W / OUT_W;
-  // The video element is sized so its source rectangle lands on the destination rectangle.
-  const style = d && size ? { width: `${(size.w * d.dw * k) / d.sw}px`, height: `${(size.h * d.dh * k) / d.sh}px`, transform: `translate(${(d.dx - (d.sx * d.dw) / d.sw) * k}px, ${(d.dy - (d.sy * d.dh) / d.sh) * k}px)` } : undefined;
+  // The video element is sized so its source rectangle lands on the destination rectangle (previewStyle is the tested mapping).
+  const style = d && size ? previewStyle(size, d, k) : undefined;
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-black hairline" style={{ width: W, height: H }} aria-label="9:16 preview">
-      {d?.backdrop && <video src={src} muted playsInline aria-hidden className="absolute inset-0 h-full w-full scale-125 object-cover blur-2xl opacity-70" />}
+    <div className="relative overflow-hidden rounded-2xl bg-black hairline" style={{ width: W, height: H }} role="img" aria-label="9:16 preview of the clip">
+      {/* The render blurs a cover-fitted copy by 36 px at 1080 wide: at this width that is 8 px, with the same dark wash over it. */}
+      {d?.backdrop && <video ref={backdropRef} src={src} muted playsInline preload="metadata" aria-hidden className="absolute inset-0 h-full w-full object-cover blur-[8px] brightness-75" />}
       <video
         ref={videoRef}
         src={src}

@@ -4,7 +4,7 @@ import { Scissors } from "lucide-react";
 import { api, ApiError, offerUpgrade } from "@/lib/client/api";
 import { failJob, probeVideo, runJob } from "@/lib/client/clipper";
 import { uploadVideo, useUploadLimits, limitsProblem, upgradeFor } from "@/lib/client/upload";
-import { browserProblem, screenOf, stalledWords, workingWords, type Screen } from "@/lib/clipper/executor-core";
+import { SCREEN_TICK_MS, browserProblem, mmss, screenOf, stalledWords, workingWords, type Screen } from "@/lib/clipper/executor-core";
 import { overallProgress, stageWords } from "@/lib/clipper/settings-core";
 import type { JobDetail, JobView } from "@/lib/clipper/jobs";
 import type { MediaView } from "@/lib/services";
@@ -33,7 +33,26 @@ export function ClipperStudio({ initialJobs, openId }: { initialJobs: JobView[];
   const localSrc = useRef<{ id: string; file: File } | null>(null);
 
   const job = useMemo(() => jobs.find((j) => j.id === current) ?? null, [jobs, current]);
-  const screen: Screen = run.kind === "working" || run.kind === "uploading" ? "processing" : screenOf(job);
+  // The clock the screen is judged by ticks, so a job that stops reporting turns stalled without a reload (R1322 review #8).
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), SCREEN_TICK_MS);
+    return () => clearInterval(t);
+  }, []);
+  const active = run.kind === "working" || run.kind === "uploading";
+  const screen: Screen = active ? "processing" : screenOf(job, now);
+
+  // Leaving the page stops the run (it would keep paying for chunks otherwise), and a tab close asks first (R1322 review #6).
+  useEffect(() => () => abort.current?.abort(), []);
+  useEffect(() => {
+    if (!active) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [active]);
 
   const putJob = useCallback((j: JobView) => setJobs((all) => (all.some((x) => x.id === j.id) ? all.map((x) => (x.id === j.id ? j : x)) : [j, ...all])), []);
 
@@ -49,13 +68,24 @@ export function ClipperStudio({ initialJobs, openId }: { initialJobs: JobView[];
 
   useEffect(() => {
     if (!current) return setDetail(null);
-    load(current).catch((e) => setRun({ kind: "error", message: e instanceof ApiError ? e.message : "Couldn't load that job." }));
-  }, [current, load]);
+    // An older load must not land after a newer one (R1322 review #11).
+    let stale = false;
+    api<JobDetail>(`/api/clipper/jobs/${current}?transcript=1`)
+      .then((d) => {
+        if (stale) return;
+        setDetail(d);
+        putJob(d.job);
+      })
+      .catch((e) => !stale && setRun({ kind: "error", message: e instanceof ApiError ? e.message : "Couldn't load that job." }));
+    return () => {
+      stale = true;
+    };
+  }, [current, putJob]);
 
   /** Transcribe + detect in this tab; `src` is the local file right after an upload, the signed URL on a resume. */
   const work = useCallback(
-    async (j: JobView, src: string | Blob) => {
-      const ctrl = new AbortController();
+    async (j: JobView, src: string | Blob, ctrl = new AbortController()) => {
+      if (ctrl.signal.aborted) return setRun({ kind: "idle" });
       abort.current = ctrl;
       setRun({ kind: "working", p: 0, stage: j.stage });
       try {
@@ -74,7 +104,8 @@ export function ClipperStudio({ initialJobs, openId }: { initialJobs: JobView[];
         if (ctrl.signal.aborted) return setRun({ kind: "idle" });
         const message = e instanceof ApiError ? e.message : (e as Error)?.message || "The tab could not finish this job.";
         if (e instanceof ApiError && e.status === 402) offerUpgrade(message, (e.data?.feature as string | undefined) ?? "ai");
-        await failJob(j.id, message);
+        // A 409 means another tab (or a later stage) owns the job now; this tab must not mark the live job failed (R1322 review #9).
+        if (!(e instanceof ApiError && e.status === 409)) await failJob(j.id, message);
         setRun({ kind: "error", message });
         load(j.id, false).catch(() => {});
       } finally {
@@ -102,7 +133,7 @@ export function ClipperStudio({ initialJobs, openId }: { initialJobs: JobView[];
       } catch (e) {
         return setPickError((e as Error).message);
       }
-      const bp = browserProblem({ duration: meta.duration, mimeType: file.type });
+      const bp = browserProblem({ duration: meta.duration, mimeType: file.type, size: file.size });
       if (bp) return setPickError(bp);
       const ctrl = new AbortController();
       abort.current = ctrl;
@@ -114,7 +145,8 @@ export function ClipperStudio({ initialJobs, openId }: { initialJobs: JobView[];
         localSrc.current = { id: r.job.id, file };
         putJob(r.job);
         setCurrent(r.job.id);
-        await work(r.job, file);
+        // The same controller carries on, so a Cancel pressed during the upload is not lost (R1322 review #7).
+        await work(r.job, file, ctrl);
       } catch (e) {
         if (ctrl.signal.aborted) return setRun({ kind: "idle" });
         const message = e instanceof ApiError ? e.message : (e as Error)?.message || "The upload did not finish.";
@@ -137,10 +169,11 @@ export function ClipperStudio({ initialJobs, openId }: { initialJobs: JobView[];
       j = r.job;
       putJob(j);
     }
-    const src = localSrc.current?.id === j.id ? localSrc.current.file : detail?.media?.url ?? null;
+    // The file is still here right after an upload; otherwise a freshly signed URL, never one from an old load (R1322 review #10).
+    const src = localSrc.current?.id === j.id ? localSrc.current.file : ((await load(j.id).catch(() => null))?.media?.url ?? null);
     if (!src) return setRun({ kind: "error", message: "The source video is gone. Start again from a new upload." });
     await work(j, src);
-  }, [job, detail, putJob, work]);
+  }, [job, load, putJob, work]);
 
   const cancel = useCallback(async () => {
     abort.current?.abort();
@@ -163,8 +196,9 @@ export function ClipperStudio({ initialJobs, openId }: { initialJobs: JobView[];
         )}
 
         {screen === "processing" && (
-          <Card id="clipper-processing" title={run.kind === "uploading" ? "Uploading your video" : workingWords(run.kind === "working" ? run.stage : job?.stage ?? "transcribe", run.kind === "working" ? run.p : 0, run.kind === "working" ? run.parts : undefined)} desc="Keep this tab open. You can keep using Outlly in another tab.">
-            <ProgressBar value={run.kind === "uploading" ? run.p * 0.3 : run.kind === "working" ? 0.3 + 0.7 * overallProgress(run.stage, run.p) : 0} />
+          <Card id="clipper-processing" title={run.kind === "uploading" ? "Uploading your video" : workingWords(run.kind === "working" ? run.stage : job?.stage ?? "transcribe", run.kind === "working" ? run.p : 0, run.kind === "working" ? run.parts : undefined)} desc={active ? "Keep this tab open and in front until it finishes; a hidden tab works slower. You can keep using Outlly in another tab." : "Another tab may be working on this job. If nothing reports for a few minutes it shows here as stalled, and you can resume it."}>
+            <div aria-live="polite" className="sr-only">{run.kind === "uploading" ? "Uploading" : run.kind === "working" ? workingWords(run.stage, run.p, run.parts) : ""}</div>
+            <ProgressBar value={run.kind === "uploading" ? run.p * 0.3 : run.kind === "working" ? 0.3 + 0.7 * overallProgress(run.stage, run.p) : 0} label={run.kind === "uploading" ? "Uploading" : "Working on the video"} />
             <div className="mt-4 flex gap-2">
               <Button type="button" variant="outline" onClick={cancel}>Cancel</Button>
             </div>
@@ -172,7 +206,7 @@ export function ClipperStudio({ initialJobs, openId }: { initialJobs: JobView[];
         )}
 
         {(screen === "stalled" || screen === "failed") && job && (
-          <Card id="clipper-stalled" title={screen === "failed" ? "This job stopped" : "This job lost its tab"} desc={screen === "failed" ? stageWords(job) : stalledWords(job)}>
+          <Card id="clipper-stalled" title={screen === "failed" ? "This job stopped" : job.status === "queued" ? "This job has not started" : "This job lost its tab"} desc={screen === "failed" ? stageWords(job) : stalledWords(job, now)}>
             {run.kind === "error" && <p className="mt-2 text-[13px] text-destructive" role="alert">{run.message}</p>}
             <div className="mt-4 flex flex-wrap gap-2">
               <Button type="button" variant="lime" onClick={resume}>Resume</Button>
@@ -204,20 +238,22 @@ export function ClipperStudio({ initialJobs, openId }: { initialJobs: JobView[];
               <li key={j.id}>
                 <button
                   type="button"
-                  onClick={() => (run.kind === "idle" || run.kind === "error" ? setCurrent(j.id) : undefined)}
+                  disabled={active}
+                  title={active ? "Finishes the current video first" : undefined}
+                  onClick={() => setCurrent(j.id)}
                   aria-current={j.id === current ? "true" : undefined}
-                  className={cn("w-full rounded-2xl p-3 text-left hairline transition", j.id === current ? "bg-secondary/70" : "bg-secondary/30 hover:bg-secondary/50")}
+                  className={cn("w-full rounded-2xl p-3 text-left hairline transition disabled:opacity-60", j.id === current ? "bg-secondary/70" : "bg-secondary/30 hover:bg-secondary/50")}
                 >
                   <div className="flex items-center gap-2 text-[14px] font-medium">
                     <Scissors className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="truncate">{new Date(j.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })} · {j.durationSec ? `${Math.round(j.durationSec / 60)} min` : "video"}</span>
+                    <span className="truncate">{new Date(j.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })} · {j.durationSec ? mmss(j.durationSec) : "video"}</span>
                   </div>
                   <div className="mt-1 text-[12px] text-muted-foreground">{stageWords(j)} · {j.counts.clips} clip{j.counts.clips === 1 ? "" : "s"}</div>
                 </button>
               </li>
             ))}
           </ul>
-          {current && (run.kind === "idle" || run.kind === "error") && (
+          {current && !active && (
             <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setCurrent(null)}>New upload</Button>
           )}
         </Card>

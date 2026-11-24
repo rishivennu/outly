@@ -6,7 +6,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { BROWSER_MAX_SEC, browserProblem, clampRange, clipFileName, cuesWithin, mmss, screenOf, stalledWords, workingWords } from "../lib/clipper/executor-core";
+import { BROWSER_MAX_BYTES, BROWSER_MAX_SEC, browserProblem, clampRange, clipFileName, cuesWithin, mmss, previewStyle, screenOf, slideAxis, stalledWords, workingWords } from "../lib/clipper/executor-core";
 import { drawFor } from "../lib/clipper/reframe-core";
 import { CLIP_MAX_SEC, CLIP_MIN_SEC, STALL_MS } from "../lib/clipper/settings-core";
 import { MAIN, pageTitle } from "../components/shell/nav-items";
@@ -22,13 +22,41 @@ describe("R1322 executor-core", () => {
     expect(browserProblem({ duration: 5, mimeType: "video/mp4" })).toContain("already a short");
     expect(browserProblem({ mimeType: "audio/mp3" })).toContain("needs a video");
     expect(browserProblem({ duration: null, mimeType: "video/quicktime" })).toBeNull();
+    // The whole file is decoded in memory, so bytes are capped too (review #12).
+    expect(browserProblem({ duration: 600, mimeType: "video/mp4", size: BROWSER_MAX_BYTES + 1 })).toContain("1.5 GB");
+    expect(browserProblem({ duration: 600, mimeType: "video/mp4", size: BROWSER_MAX_BYTES })).toBeNull();
+  });
+
+  test("the preview places the video exactly where drawFor puts the source rectangle (crop, pillarbox, tall)", () => {
+    const k = 240 / 1080;
+    // Landscape crop: the window is full height, so the video is scaled so its height is the frame's, then slid by x.
+    const land = drawFor(1920, 1080, { mode: "crop", x: 0.5, y: 0.5 });
+    const st = previewStyle({ w: 1920, h: 1080 }, land, k);
+    expect(st.height).toBe(`${Math.round(1920 * k * 100) / 100}px`);
+    expect(parseFloat(st.width)).toBeCloseTo((1920 * 1080 * k) / land.sw, 1);
+    expect(st.transform).toMatch(/^translate\(-?[\d.]+px, 0px\)$/);
+    // Pillarbox: the whole picture, centred vertically, full width.
+    const fit = drawFor(1920, 1080, { mode: "pillarbox", x: 0.5, y: 0.5 });
+    const sf = previewStyle({ w: 1920, h: 1080 }, fit, k);
+    expect(sf.width).toBe("240px");
+    expect(sf.transform).toBe(`translate(0px, ${Math.round(fit.dy * k * 100) / 100}px)`);
+    // Tall source: the window slides down the picture by y, so the preview translates on y and the slider drives y (review #17).
+    expect(slideAxis(1920, 1080)).toBe("x");
+    expect(slideAxis(1080, 1080)).toBe("x");
+    expect(slideAxis(1080, 2400)).toBe("y");
+    const tall = drawFor(1080, 2400, { mode: "crop", x: 0.5, y: 1 });
+    expect(tall.sy).toBe(2400 - tall.sh);
+    const stall = previewStyle({ w: 1080, h: 2400 }, tall, k);
+    expect(stall.transform).toMatch(/^translate\(0px, -[\d.]+px\)$/);
   });
 
   test("screenOf follows the job, and a running job that stopped reporting is stalled", () => {
     const now = Date.now();
     const j = (status: string, stage: string, beatAgoMs = 0) => ({ status, stage, heartbeatAt: new Date(now - beatAgoMs).toISOString(), updatedAt: new Date(now - beatAgoMs).toISOString() });
     expect(screenOf(null)).toBe("upload");
-    expect(screenOf(j("queued", "transcribe"), now)).toBe("processing");
+    // A queued job with no tab on it can never move by itself, so it is offered Resume straight away (review #8).
+    expect(screenOf(j("queued", "transcribe"), now)).toBe("stalled");
+    expect(stalledWords({ status: "queued", heartbeatAt: null, updatedAt: new Date(now).toISOString() }, now)).toContain("no tab started");
     expect(screenOf(j("running", "transcribe"), now)).toBe("processing");
     expect(screenOf(j("running", "detect", STALL_MS + 1000), now)).toBe("stalled");
     expect(screenOf(j("ready", "review"), now)).toBe("review");
@@ -99,7 +127,8 @@ describe("R1322 wiring", () => {
   test("the executor calls the routes that exist, with the payloads the routes take", () => {
     const ex = read("lib/client/clipper.ts");
     expect(ex).toContain('event: "start", executor: "browser"');
-    expect(ex).toContain('event: "heartbeat", progress: Math.min(0.99'); // a fraction, as the route requires
+    expect(ex).toContain('event: "heartbeat", progress, executor: "browser"');
+    expect(ex).toContain("beatNow(Math.min(0.99, done / talking.length))"); // a fraction, as the route requires
     expect(ex).toContain('event: "transcribed", words: clean');
     expect(ex).toContain("/detect");
     expect(ex).toContain('status: "rendering", executor: "browser"');
@@ -124,5 +153,36 @@ describe("R1322 wiring", () => {
     expect(editor).toContain("will need a new export");
     expect(editor).toContain("The words were drafted from what is said in the clip");
     expect(editor).toContain("keptShare(");
+    // A hidden tab renders slowly: the copy says in front, not merely open (review #15).
+    expect(editor).toContain("Keep this tab in front");
+    expect(studio).toContain("Keep this tab open and in front");
+  });
+
+  test("review fixes: a stopped render is reported, a stale one bins its file, runs end with the page", () => {
+    const client = read("lib/client/clipper.ts");
+    expect(client).toContain('"Stopped."'); // Stop reports failed, so the row never says Exporting for ever (review #4)
+    expect(client).toMatch(/status === 409\) await api\(`\/api\/media\/\$\{up\.media\.id\}`, \{ method: "DELETE" \}\)/); // review #21
+    expect(client).toContain("await readyFont(o.font, sampleText(lines))"); // review #13
+    expect(client).toContain("clearInterval(decodeBeat)"); // heartbeats while the soundtrack decodes (review #12)
+    expect(client).not.toMatch(/let detail/);
+    const editor = read("components/clipper/ClipEditor.tsx");
+    expect(editor).toContain("}, [clip.id, clip.updatedAt]);"); // a refreshed copy keeps the edits (review #2)
+    expect(editor).toContain("if (dirty && !(await save())) return;"); // a failed save stops the export (review #3)
+    expect(editor).toContain("useEffect(() => () => abort.current?.abort(), []);"); // review #5
+    expect(editor).toContain('"beforeunload"');
+    expect(editor).toContain("onBlur={commitRange}"); // decimals can be typed (review #19)
+    expect(editor).toContain("reframe[axis]"); // tall sources slide on y (review #17)
+    expect(editor).toContain('role="img"');
+    const studio = read("components/clipper/ClipperStudio.tsx");
+    expect(studio).toContain("useEffect(() => () => abort.current?.abort(), []);"); // review #6
+    expect(studio).toContain("e.status === 409)) await failJob"); // another tab's job is never marked failed (review #9)
+    expect(studio).toContain("await work(r.job, file, ctrl);"); // Cancel during the upload holds (review #7)
+    expect(studio).toContain("setInterval(() => setNow(Date.now()), SCREEN_TICK_MS)"); // review #8
+    expect(studio).toContain("size: file.size");
+    expect(studio).toContain('aria-live="polite"');
+    expect(studio).not.toContain("Math.round(j.durationSec / 60)");
+    const review = read("components/clipper/ReviewScreen.tsx");
+    expect(review).toContain("}, [sourceFile]);"); // the blob URL outlives a refresh (review #1)
+    expect(review).toContain('window.open("", "_blank")'); // opened in the click, not after the await (review #20)
   });
 });

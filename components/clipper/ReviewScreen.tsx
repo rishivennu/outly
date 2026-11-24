@@ -22,12 +22,18 @@ export function ReviewScreen({ detail, sourceFile, onChange, onNew }: { detail: 
   const [editing, setEditing] = useState<string | null>(null);
   const [src, setSrc] = useState<string | null>(null);
 
+  // The local file gets one blob URL for as long as it is here; it is never revoked under a render because a refresh
+  // signed a new remote URL (R1322 review #1). Without a file, the latest signed URL is used.
+  const remoteUrl = detail.media?.url ?? null;
   useEffect(() => {
-    if (!sourceFile) return setSrc(detail.media?.url ?? null);
+    if (!sourceFile) return;
     const u = URL.createObjectURL(sourceFile);
     setSrc(u);
     return () => URL.revokeObjectURL(u);
-  }, [sourceFile, detail.media?.url]);
+  }, [sourceFile]);
+  useEffect(() => {
+    if (!sourceFile) setSrc(remoteUrl);
+  }, [sourceFile, remoteUrl]);
 
   const refresh = useCallback(async () => onChange(await api<JobDetail>(`/api/clipper/jobs/${detail.job.id}?transcript=1`)), [detail.job.id, onChange]);
 
@@ -177,23 +183,36 @@ function ClipRow({ c, busy, onEdit, onDiscard }: { c: ClipView; busy: boolean; o
 
 export function DownloadButton({ clip }: { clip: ClipView }) {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      disabled={busy}
-      onClick={async () => {
-        setBusy(true);
-        try {
-          const r = await api<{ media: { url: string | null; filename: string } }>(`/api/clipper/clips/${clip.id}/download`);
-          if (r.media.url) window.open(r.media.url, "_blank", "noopener");
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      <Download className="h-4 w-4" aria-hidden /> Download
-    </Button>
+    <span className="inline-flex flex-col items-start gap-1">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          // The window opens in the click itself (after an await a popup blocker eats it, R1322 review #20); the file lands in it.
+          const w = window.open("", "_blank");
+          if (w) w.opener = null;
+          try {
+            const r = await api<{ media: { url: string | null; filename: string } }>(`/api/clipper/clips/${clip.id}/download`);
+            if (!r.media.url) throw new Error("The rendered file is not ready to download yet.");
+            if (w) w.location.href = r.media.url;
+            else window.location.assign(r.media.url);
+          } catch (e) {
+            w?.close();
+            setError(e instanceof ApiError ? e.message : (e as Error)?.message || "Couldn't fetch the file.");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <Download className="h-4 w-4" aria-hidden /> Download
+      </Button>
+      {error && <span className="text-[12px] text-destructive" role="alert">{error}</span>}
+    </span>
   );
 }

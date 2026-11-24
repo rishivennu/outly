@@ -160,7 +160,8 @@ export function drawCue(ctx: CanvasRenderingContext2D, text: string, w: number, 
  * ones the text needs are fetched (without it only the Latin file loads, and an accented or Hindi line would
  * record in the fallback face).
  */
-async function readyFont(family?: string, text?: string) {
+/** Wait for the caption font (with these characters) before the first frame is burned; a miss falls back silently. */
+export async function readyFont(family?: string, text?: string) {
   if (typeof document === "undefined" || !("fonts" in document)) return;
   await document.fonts.load(captionFont(32, family), text || undefined).catch(() => {});
 }
