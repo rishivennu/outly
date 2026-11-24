@@ -1008,23 +1008,14 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
           data-size={big ? "lg" : "md"}
           className="pc-sheet pc-in fixed inset-0 flex flex-col overflow-hidden sm:absolute sm:inset-auto sm:bottom-[80px] sm:right-0"
         >
-          <header className="pc-head flex items-center gap-3 px-3 py-2.5 sm:px-4">
+          <header className="pc-head flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 sm:px-4">
             <span className={cn("pc-pip", hello && "pc-pip-hello", cheer && "pc-pip-cheer", pageHidden && "pc-pip-paused")} aria-hidden><Pip size={40} mood={mood} /></span>
             <div className="min-w-0 flex-1">
               <h2 id="pc-title" className="truncate text-[15px] font-bold leading-tight">{t.title}</h2>
-              <p id="pc-desc" className="pc-muted flex items-center gap-1.5 text-[13px]">
+              {/* R1311: while a specialist has the chat the status takes its own full-width line below (liveStatusLine). */}
+              {liveOn && !resolved ? null : <p id="pc-desc" className="pc-muted flex items-center gap-1.5 text-[13px]">
                 {resolved || live === "resolved" ? (
                   <span className="pc-badge-resolved pc-fade inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"><Check className="h-3 w-3" aria-hidden />{rt.status}</span>
-                ) : liveOn ? (
-                  /* R1311: one line, "Connected to Support · Sam joined · End chat". The dot is green while connected,
-                     breathes in the queue and turns amber when the link drops; the words say the same thing. */
-                  <span className="pc-status flex min-w-0 items-center gap-1.5">
-                    <span className={cn("pc-dot h-1.5 w-1.5 shrink-0 rounded-full", live === "connected" ? "pc-dot-ok" : live === "reconnecting" ? "pc-dot-off" : "pc-pulse")} aria-hidden />
-                    <span className="truncate">{live === "connected" ? lt.connectedTo : live === "reconnecting" ? lt.disconnected : lt.statusWaiting}</span>
-                    {live === "connected" && liveInfo.agent && <><span className="pc-sep" aria-hidden>·</span><span className="truncate">{lt.joined(liveInfo.agent)}</span></>}
-                    <span className="pc-sep" aria-hidden>·</span>
-                    <button type="button" onClick={() => setConfirm("end")} disabled={!!liveBusy || closing.busy} className="pc-status-act shrink-0">{lt.endChat}</button>
-                  </span>
                 ) : signedIn ? (
                   /* R1207: the service, not the shift. Whether a specialist is on duty is internal, and the request
                      is queued either way, so the header never says Online or Away. */
@@ -1032,7 +1023,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                 ) : (
                   <><span className="pc-dot h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden /><span className="truncate">{t.status}</span></>
                 )}
-              </p>
+              </p>}
             </div>
             {msgs.length > 0 && (
               <button type="button" onClick={newChat} aria-label={cx.newChat} title={cx.newChat} className="gbtn-icon ripple-host pc-icon"><SquarePen className="h-[18px] w-[18px]" aria-hidden /></button>
@@ -1041,6 +1032,18 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
               {big ? <Minimize2 className="h-[18px] w-[18px]" aria-hidden /> : <Maximize2 className="h-[18px] w-[18px]" aria-hidden />}
             </button>
             <button type="button" onClick={close} aria-label={t.close} title={t.close} className="gbtn-icon ripple-host pc-icon"><X className="h-5 w-5" aria-hidden /></button>
+            {liveOn && !resolved && (
+              /* R1311 liveStatusLine: ONE line across the sheet, "Connected to Support · Sam Joined · End Chat". Its own row,
+                 so the three header buttons never squeeze it to ellipses. The dot is green while connected, breathes in
+                 the queue and turns amber when the link drops; the words say the same thing. */
+              <p id="pc-desc" className="pc-status pc-muted order-last flex w-full min-w-0 items-center gap-1.5 text-[13px]">
+                <span className={cn("pc-dot h-1.5 w-1.5 shrink-0 rounded-full", live === "connected" ? "pc-dot-ok" : live === "reconnecting" ? "pc-dot-off" : "pc-pulse")} aria-hidden />
+                <span className="truncate">{live === "connected" ? lt.connectedTo : live === "reconnecting" ? lt.disconnected : lt.statusWaiting}</span>
+                {live === "connected" && liveInfo.agent && <><span className="pc-sep" aria-hidden>·</span><span className="truncate">{lt.joined(liveInfo.agent)}</span></>}
+                <span className="pc-sep" aria-hidden>·</span>
+                <button type="button" onClick={() => setConfirm("end")} disabled={!!liveBusy || closing.busy} className="pc-status-act shrink-0">{lt.endChat}</button>
+              </p>
+            )}
           </header>
 
           <div className="relative min-h-0 flex-1">

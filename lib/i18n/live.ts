@@ -69,7 +69,7 @@ export type LiveT = {
   leaveHint: string;
   signedOut: string;
   humanLabel: string;
-  /** R1311: the one-line header status while a specialist has the chat: "Connected to Support · Sam joined · End chat". */
+  /** R1311: the one-line header status while a specialist has the chat: "Connected to Support · Sam Joined · End Chat". */
   connectedTo: string;
   joined: (name: string) => string;
   disconnected: string;
@@ -95,7 +95,7 @@ const en: LiveT = {
   leave: "Leave a message",
   leaving: "Saving your message...",
   left: (ref) => `Got it. Your message is saved as ticket ${ref} and we'll follow up by email.`,
-  endChat: "End chat",
+  endChat: "End Chat",
   pipBack: "Pip is back. Our support team handed this chat back to Pip, so ask away.",
   cancelled: "Request cancelled. Pip is here to help.",
   customerLeft: "You left the chat with our support team. Pip is here to help.",
@@ -131,7 +131,7 @@ const en: LiveT = {
   signedOut: "You're signed out. Sign in again to talk to our support team here.",
   humanLabel: "Human support",
   connectedTo: "Connected to Support",
-  joined: (name) => `${name} joined`,
+  joined: (name) => `${name} Joined`,
   disconnected: "Disconnected",
 };
 

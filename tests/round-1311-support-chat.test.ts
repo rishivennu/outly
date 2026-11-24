@@ -4,7 +4,7 @@
  * - Resolve chat marks the conversation resolved on the server (history kept, no email); End chat ends a live
  *   session first, then resolves; both ask first with the brief's exact words; both are idempotent.
  * - Send Transcript is gone from the widget, the strings and the help centre list.
- * - One-line live status "Connected to Support · Sam joined · End chat"; typing dots follow the server's state.
+ * - One-line live status "Connected to Support · Sam Joined · End Chat" (its own header row); typing dots follow the server's state.
  * - Pip moves: float, hello on open, think while the specialist types, one cheer when resolved; off under reduced motion.
  */
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
@@ -173,12 +173,15 @@ describe("3 Send Transcript is gone", () => {
 });
 
 describe("4 one-line live status and real typing", () => {
-  test("Connected to Support · Sam joined · End chat, with a green dot", () => {
+  test("Connected to Support · Sam Joined · End Chat, with a green dot, on its own full-width header row", () => {
     expect(LIVE_EN.connectedTo).toBe("Connected to Support");
-    expect(LIVE_EN.joined("Sam")).toBe("Sam joined");
-    expect(LIVE_EN.endChat).toBe("End chat");
+    expect(LIVE_EN.joined("Sam")).toBe("Sam Joined");
+    expect(LIVE_EN.endChat).toBe("End Chat");
     expect(liveT("hi").connectedTo).toBe("Connected to Support"); // falls back to English until translated
-    const line = widget.slice(widget.indexOf('className="pc-status'), widget.indexOf("</span>\n                ) : signedIn"));
+    // Its own row (w-full, order-last) under a wrapping header: the three icon buttons can no longer squeeze it to "C… · S…".
+    expect(widget).toContain('<header className="pc-head flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 sm:px-4">');
+    expect(widget).toContain('className="pc-status pc-muted order-last flex w-full min-w-0 items-center gap-1.5 text-[13px]"');
+    const line = widget.slice(widget.indexOf('className="pc-status'), widget.indexOf("</p>\n            )}\n          </header>"));
     expect(line).toContain("lt.connectedTo");
     expect(line).toContain("lt.joined(liveInfo.agent)");
     expect(line).toContain("lt.endChat");
