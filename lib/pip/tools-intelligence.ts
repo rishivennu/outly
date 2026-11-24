@@ -3,9 +3,12 @@ import { OBJECTIVES, type Objective, type Signal } from "../intelligence/core";
 import { objectiveOptions } from "../intelligence/brand-core";
 import { overview, type Overview } from "../intelligence/service";
 import { CONFIDENCE_WORD, attentionEmptyText, emptyStateText, evidenceLine, formatLabel, hasEnoughPosts, platformLabel, statusWord, workingEmptyText } from "../../components/intelligence/view-core";
-import { intelligencePulse } from "../intelligence/pulse";
-import { baselineLine, clipperLine, platformName as pulsePlatformName, type IntelligencePulse } from "../intelligence/pulse-core";
+import { clipperPulse, intelligencePulse } from "../intelligence/pulse";
+import { baselineLine, clipperLine, platformName as pulsePlatformName, sampleWords, type ClipperPulse, type IntelligencePulse } from "../intelligence/pulse-core";
 import { LEVEL_LABEL } from "../intelligence/profile-core";
+import { HISTORY_DAYS } from "../intelligence/model/predict";
+import { targetIdsForAccounts } from "../intelligence/client-scope";
+import { isPlatform } from "../domain";
 import { base, type PipArgs, type PipCtx } from "./tools-core";
 import { windowFor } from "./tools-analytics";
 import type { DateRange } from "./range";
@@ -99,7 +102,7 @@ export function predictionsSummary(p: IntelligencePulse | null, platform: string
   }
   const measured = platforms.reduce((s, x) => s + x.measured, 0);
   const cards: PipCard[] = [
-    { label: "Measured posts", value: measured.toLocaleString("en"), hint: "Your own published posts with numbers, last 180 days." },
+    { label: "Measured posts", value: measured.toLocaleString("en"), hint: `Your own published posts with numbers, last ${HISTORY_DAYS} days.` },
     { label: "Platforms", value: String(platforms.length) },
   ];
   const own = platforms.filter((x) => x.level === "personal").length;
@@ -111,7 +114,7 @@ export function predictionsSummary(p: IntelligencePulse | null, platform: string
       format: x.top?.format ?? "—",
       typical: x.top ? `~${fmtViews(x.top.predicted)}` : null,
       range: x.top ? `${fmtViews(x.top.low)} to ${fmtViews(x.top.high)}` : null,
-      sample: x.top ? (x.top.n ? `${x.top.n} of yours` : x.top.shared ? `${x.top.shared.n} cohort posts` : "—") : "—",
+      sample: x.top ? (sampleWords(x.top) ?? "—") : "—",
       level: LEVEL_LABEL[x.level],
     },
     links: [{ label: "Open", href: `/intelligence#intel-baselines` }],
@@ -122,7 +125,6 @@ export function predictionsSummary(p: IntelligencePulse | null, platform: string
 
 /** `predictions`: the creator's own baselines (R1319/R1324), read-only. A platform named in the message narrows it. */
 export async function predictions(ctx: PipCtx, a: PipArgs, range: DateRange | null, period: string | null): Promise<PipResult> {
-  const w = await windowFor(ctx, range, 28);
   const r = base(
     "predictions",
     "Your baselines",
@@ -138,31 +140,30 @@ export async function predictions(ctx: PipCtx, a: PipArgs, range: DateRange | nu
     "",
     period,
   );
-  const scopeKey = ctx.scope ? ctx.scope.slice().sort().join(",") : "";
-  const p = await intelligencePulse(ctx.ownerId, { now: ctx.now.getTime(), scopeKey, targetIds: ctx.scope ? await targetIdsFor(ctx.ownerId, ctx.scope) : null });
-  const s = predictionsSummary(p, a.platform ?? null);
+  // A scoped teammate reads only their accounts' destinations (the same subset a client scope gets); no accounts = nothing,
+  // never the workspace. The scope key is non-empty so stored workspace states are never served for it (R1326 review).
+  const scopeKey = ctx.scope ? `pip:${ctx.scope.slice().sort().join(",")}` : "";
+  const p = await intelligencePulse(ctx.ownerId, { now: ctx.now.getTime(), scopeKey, targetIds: ctx.scope ? await targetIdsForAccounts(ctx.ownerId, ctx.scope) : null });
+  // The model may hand back "Instagram" or "reels": only a real platform id narrows, anything else means all (never a false "nothing on X").
+  const platform = a.platform && isPlatform(a.platform) ? a.platform : null;
+  const s = predictionsSummary(p, platform);
   r.cards = s.cards;
   r.rows = s.rows;
   r.facts = s.facts;
   r.empty = s.empty;
   r.found = r.returned = r.rows.length;
   r.estimate = true;
-  if (range) r.notes.push({ level: "info", text: `Baselines are read over the last 180 days of measured posts, not the period asked (${w.label}).` });
+  if (range) {
+    const w = await windowFor(ctx, range, 28);
+    r.notes.push({ level: "info", text: `Baselines are read over the last ${HISTORY_DAYS} days of measured posts, not the period asked (${w.label}).` });
+  }
   r.notes.push({ level: "info", text: "An estimate from your past posts (or, with few of your own, from an anonymised cohort scaled to your size), shown with its sample. Never a promise." });
   r.downloads = [{ label: "Open your baselines", href: "/intelligence#intel-baselines" }];
   return r;
 }
 
-/** Destination ids a scoped teammate may read (their accounts' PostTargets). */
-async function targetIdsFor(ownerId: string, accountIds: string[]): Promise<string[]> {
-  const { db } = await import("../db");
-  const rows = await db.postTarget.findMany({ where: { post: { userId: ownerId }, socialAccountId: { in: accountIds } }, select: { id: true }, take: 5000 });
-  return rows.map((t) => t.id);
-}
-
 /** The deterministic summary behind `clipper_status`. */
-export function clipperSummary(p: IntelligencePulse | null): { cards: PipCard[]; rows: PipRow[]; facts: string[]; empty: string } {
-  const c = p?.clipper ?? null;
+export function clipperSummary(c: ClipperPulse | null): { cards: PipCard[]; rows: PipRow[]; facts: string[]; empty: string } {
   if (!c) {
     const empty = "No clipper job yet. Upload a long video on the Clipper page and it finds the moments worth a short.";
     return { cards: [], rows: [], facts: [empty], empty };
@@ -175,10 +176,11 @@ export function clipperSummary(p: IntelligencePulse | null): { cards: PipCard[];
   ];
   const rows: PipRow[] = [
     { id: "running", cells: { state: "Running", count: c.running, meaning: "Transcribing or finding moments" } },
+    ...(c.queued ? [{ id: "queued", cells: { state: "Waiting to start", count: c.queued, meaning: "Open the Clipper in a tab to drive it" } }] : []),
     { id: "review", cells: { state: "Waiting for review", count: c.review, meaning: "Candidates ready for you to approve" } },
     { id: "ready", cells: { state: "Ready to post", count: c.readyToPost, meaning: "Rendered clips with no post yet" } },
     { id: "published", cells: { state: "Published", count: c.published, meaning: "Clips that became a post" } },
-    ...(c.failed ? [{ id: "failed", cells: { state: "Failed", count: c.failed, meaning: "Open the job to retry" } }] : []),
+    ...(c.failed ? [{ id: "failed", cells: { state: "Failed", count: c.failed, meaning: "Failed in the last 30 days; open the job to retry" } }] : []),
   ];
   return { cards, rows, facts: [clipperLine(c) ?? "Nothing in the clipper queue."], empty: "" };
 }
@@ -197,8 +199,8 @@ export async function clipperStatus(ctx: PipCtx, _a: PipArgs, _range: DateRange 
     "",
     period,
   );
-  const p = await intelligencePulse(ctx.ownerId, { now: ctx.now.getTime() });
-  const s = clipperSummary(p);
+  // Only the queue counts (R1326 review): the model is not read for this answer, so a model problem never hides the queue.
+  const s = clipperSummary(await clipperPulse(ctx.ownerId, ctx.now.getTime()));
   r.cards = s.cards;
   r.rows = s.rows;
   r.facts = s.facts;

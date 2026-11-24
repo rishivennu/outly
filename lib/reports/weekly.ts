@@ -86,11 +86,15 @@ async function ownerPulse(userId: string): Promise<IntelligencePulse | null> {
  * R1325: "Your baselines" appended to the block (at most three platforms, each with its sample), plus the same lines
  * in the plain text. A pulse that fails or has nothing measured leaves the block as it was.
  */
+export const BASELINES_LABEL = "Your baselines";
+const BASELINES_PATH = "/intelligence#intel-baselines";
+
 export function withBaselines(block: IntelBlock, pulse: IntelligencePulse | null, appUrl: string): IntelBlock {
   const items = baselineItems(pulse);
   if (!items.length) return block;
-  const href = `${appUrl.replace(/\/+$/, "")}/intelligence#intel-baselines`;
-  const section = { label: "Your baselines", items: items.map((i) => ({ ...i, href: null })) };
+  const href = `${appUrl.replace(/\/+$/, "")}${BASELINES_PATH}`;
+  // Item hrefs are paths; the template makes them absolute (weekly-core `absolute`). R1326 review: the HTML links too.
+  const section = { label: BASELINES_LABEL, items: items.map((i) => ({ ...i, href: BASELINES_PATH })) };
   const text = [block.text, "", `${section.label}:`, ...items.map((i) => `- ${i.title}: ${i.detail}`), `Open your baselines: ${href}`].join("\n");
   return { ...block, sections: [...block.sections, section], text };
 }
@@ -102,10 +106,9 @@ export async function intelligenceFor(
   pulse: (userId: string) => Promise<IntelligencePulse | null> = ownerPulse,
 ): Promise<IntelBlock | null> {
   try {
-    const block = intelligenceBlock(await load(userId), env.APP_URL);
-    // R1325: baselines are a bonus; their failure never costs the block.
-    const p = await pulse(userId).catch((e) => (console.warn("[weekly] baselines_skipped", userId, e instanceof Error ? e.message : String(e)), null));
-    return withBaselines(block, p, env.APP_URL);
+    // R1325: baselines are a bonus; their failure never costs the block. Both reads run side by side.
+    const [intel, p] = await Promise.all([load(userId), pulse(userId).catch((e) => (console.warn("[weekly] baselines_skipped", userId, e instanceof Error ? e.message : String(e)), null))]);
+    return withBaselines(intelligenceBlock(intel, env.APP_URL), p, env.APP_URL);
   } catch (e) {
     console.warn("[weekly] intelligence_skipped", userId, e instanceof Error ? e.message : String(e));
     return null;
@@ -118,6 +121,14 @@ export function weeklyHtml(o: { name: string; stats: WeeklyStats; intel: IntelBl
   if (!o.intel) return templates.weeklyReport(base);
   const html = templates.weeklyReport({ ...base, intel: o.intel });
   if (withinEmailBudget(html)) return html;
+  // R1326 review: the bonus baselines go first; the block itself is dropped only when it is over budget on its own.
+  if (o.intel.sections.some((s) => s.label === BASELINES_LABEL)) {
+    const lean = templates.weeklyReport({ ...base, intel: { ...o.intel, sections: o.intel.sections.filter((s) => s.label !== BASELINES_LABEL) } });
+    if (withinEmailBudget(lean)) {
+      console.warn("[weekly] baselines_dropped_over_budget");
+      return lean;
+    }
+  }
   console.warn("[weekly] intelligence_dropped_over_budget");
   return templates.weeklyReport(base);
 }

@@ -66,6 +66,9 @@ async function sweep(req: NextRequest) {
   // R1324 shared learning: the anonymised cohort baselines, rebuilt once the stored document is an hour old (one cheap
   // read on every tick, so the refresh does not depend on the pinger landing on one minute), never fatal.
   const shared = await import("@/lib/intelligence/shared").then((m) => m.sweepShared(now)).catch((e) => (console.error("[sweep] shared", e), null));
+  // R1326 clipper housekeeping on the housekeeping slot: abandoned running jobs closed after 7 days, transcripts pruned
+  // 90 days and spare candidates 30 days after a job closes, 500 rows per table a run (never fatal).
+  const clipper = plan.housekeeping ? await import("@/lib/clipper/retention").then((m) => m.sweepClipper(now)).catch((e) => (console.error("[sweep] clipper", e), null)) : null;
   // R1309 workshops: the 24 h reminder emails and marking finished sessions completed, on the housekeeping slot (never fatal).
   if (plan.housekeeping) await import("@/lib/workshops/server").then((m) => m.sweepWorkshops(now)).catch((e) => console.error("[sweep] workshops", e));
   // R1314 Infrastructure & Costs: book due renewals, warn a week ahead, raise budget steps once a month (never fatal).
@@ -88,7 +91,7 @@ async function sweep(req: NextRequest) {
   // (1027). Budget = what is left of maxDuration minus 10 s of headroom; whatever is still running then is
   // held by waitUntil or picked up by the next sweep.
   const running = await settle(Math.max(0, 50_000 - (Date.now() - startedAt)));
-  return NextResponse.json({ ok: true, plan, requeued, cleaned, files, reminders, push, assist, campaign, outcomes, backfill, subs, health, rollup, personal, running, shared }, { headers: { "cache-control": "no-store" } });
+  return NextResponse.json({ ok: true, plan, requeued, cleaned, files, reminders, push, assist, campaign, outcomes, backfill, subs, health, rollup, personal, running, shared, clipper }, { headers: { "cache-control": "no-store" } });
 }
 
 /** 1147: trials every 5 minutes (expiry + reminders); signal pruning and the ledger/month sweep once an hour. */

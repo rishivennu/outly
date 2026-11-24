@@ -369,7 +369,7 @@ export interface DetectResult {
 }
 
 /** Runs detection over the stored transcript, replaces the job's suggested AI candidates, moves the job to review. */
-export async function detect(ownerId: string, id: string, opts: { ask: AskJson | null; actor: Actor | null }): Promise<DetectResult> {
+export async function detect(ownerId: string, id: string, opts: { ask: AskJson | null; actor: Actor | null; note?: Record<string, unknown> | null }): Promise<DetectResult> {
   const j = await ownedJob(ownerId, id);
   if (j.status !== "running" || j.stage !== "detect") throw new HttpError(409, `This job is ${j.status} at the ${j.stage} stage; it is not waiting for detection.`, "BAD_TRANSITION");
   const settings = parseSettings(j.settings);
@@ -401,7 +401,7 @@ export async function detect(ownerId: string, id: string, opts: { ask: AskJson |
     await tx.clipCandidate.deleteMany({ where: { jobId: j.id, ownerId, source: "ai", status: "suggested" } });
     for (const c of ranked) await tx.clipCandidate.create({ data: { jobId: j.id, ownerId, start: c.start, end: c.end, kind: c.kind, title: c.title, reason: c.reason, scores: json(c.scores), score: c.score, rank: c.rank, source: "ai" } });
   });
-  await event(j.id, ownerId, "detected", { detector, candidates: ranked.length, hints, from: { status: j.status, stage: j.stage }, to: next }, null, opts.actor?.id ?? null);
+  await event(j.id, ownerId, "detected", { detector, candidates: ranked.length, hints, from: { status: j.status, stage: j.stage }, to: next, ...(opts.note ?? {}) }, null, opts.actor?.id ?? null);
   const job = jobView(await ownedJob(ownerId, id));
   const rows = await db.clipCandidate.findMany({ where: { jobId: j.id, ownerId }, orderBy: [{ rank: "asc" }, { start: "asc" }], take: 50, include: { clip: { select: { id: true } } } });
   return { job, candidates: rows.map(candidateView), detector };

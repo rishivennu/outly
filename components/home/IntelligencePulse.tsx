@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, BrainCircuit, Scissors } from "lucide-react";
 import { LEVEL_LABEL } from "@/lib/intelligence/profile-core";
-import { clipperLine, platformName, type IntelligencePulse as Pulse } from "@/lib/intelligence/pulse-core";
+import { clipperLine, platformName, sampleWords, type IntelligencePulse as Pulse } from "@/lib/intelligence/pulse-core";
 
 /**
  * R1325 (Phase 7): Home "Intelligence pulse". Per platform the baseline the engine stands behind (the number, its
@@ -12,6 +12,7 @@ const num = (n: number) => Math.round(n).toLocaleString("en");
 
 export function IntelligencePulseCard({ p }: { p: Pulse }) {
   const platforms = p.platforms.slice(0, 4);
+  const more = p.platforms.length - platforms.length;
   const clipper = clipperLine(p.clipper);
   return (
     <section aria-labelledby="intel-pulse-h" className="glass min-w-0 rounded-[32px] p-5 sm:p-6">
@@ -29,26 +30,30 @@ export function IntelligencePulseCard({ p }: { p: Pulse }) {
             <li key={x.platform} className="rounded-2xl bg-secondary/60 p-4">
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-sm font-medium">{platformName(x.platform)}{x.top ? <span className="text-muted-foreground"> · {x.top.format}</span> : null}</p>
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{x.level === "none" ? "No data" : x.level}</span>
+                <span className="text-xs font-medium text-muted-foreground">{LEVEL_LABEL[x.level]}</span>
               </div>
               {x.top ? (
                 <>
                   <p className="display mt-1.5 text-3xl leading-none tabular-nums">~{num(x.top.predicted)} <span className="text-sm font-medium text-muted-foreground">views</span></p>
                   <p className="mt-1.5 text-[13px] text-muted-foreground tabular-nums">
                     usually {num(x.top.low)} to {num(x.top.high)} ·{" "}
-                    {x.top.n > 0 ? `from ${x.top.n} measured post${x.top.n === 1 ? "" : "s"} of yours` : x.top.shared ? `from ${x.top.shared.n} cohort posts scaled to your size` : "no sample"}
+                    {sampleWords(x.top) ?? "sample unknown"}
                   </p>
                 </>
               ) : (
                 <p className="mt-1.5 text-sm text-muted-foreground">No measured post yet, so no number.</p>
               )}
-              <p className="sr-only">{LEVEL_LABEL[x.level]}</p>
             </li>
           ))}
         </ul>
       )}
+      {more > 0 && (
+        <p className="mt-2 text-[13px] text-muted-foreground">
+          And {more} more platform{more === 1 ? "" : "s"} <Link href="/intelligence#intel-baselines" className="underline underline-offset-2 hover:text-foreground">on your baselines page</Link>.
+        </p>
+      )}
       {p.recommendation && (
-        <Link href="/intelligence#intel-personal" className="mt-3 block rounded-2xl bg-[hsl(var(--lime)/0.16)] p-4 transition-colors hover:bg-[hsl(var(--lime)/0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <Link href="/intelligence#intel-personal" aria-label={`Made for you: ${p.recommendation.title}. Open your recommendations`} className="mt-3 block rounded-2xl bg-[hsl(var(--lime)/0.16)] p-4 transition-colors hover:bg-[hsl(var(--lime)/0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <p className="text-xs font-medium text-foreground/70">Made for you · {platformName(p.recommendation.platform)} · {p.recommendation.confidence} confidence</p>
           <p className="mt-1 text-sm font-medium">{p.recommendation.title}</p>
           <p className="mt-1 text-[13px] leading-relaxed text-foreground/75">{p.recommendation.why}</p>

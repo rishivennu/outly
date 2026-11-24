@@ -140,12 +140,14 @@ async function pulseView(user: HomeUser, canSwitch: boolean, setup: Setup, nonce
   const t0 = performance.now();
   const [scope, accountIds] = await Promise.all([postFilter(user), analyticsScope(user)]);
   const data = soft(getPulse(user.id, 7, accountIds), PULSE_MS, null, "home analytics").then((d) => ({ d, ms: performance.now() - t0 }));
-  const [, next, welcome, founding, onboarding] = await Promise.all([
+  const [, next, welcome, founding, onboarding, intel] = await Promise.all([
     loadKeys(),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() }, ...scope.where }, select: { title: true, scheduledAt: true }, orderBy: { scheduledAt: "asc" } }),
     soft(welcomeOffer(user), CARD_MS, null, "home welcome"),
     user.actor ? null : soft(myFounding(user.id), CARD_MS, null, "home founding"),
     soft(onboardingFor(user), CARD_MS, null, "home onboarding"),
+    // R1326 review: the Intelligence pulse on the pulse-style Home as well (owners only, never fatal).
+    user.actor ? null : soft(intelligencePulse(user.id), CARD_MS, null, "home intelligence"),
   ]);
   const tCards = performance.now();
   const promo: FoundingPromo | null =
@@ -171,6 +173,7 @@ async function pulseView(user: HomeUser, canSwitch: boolean, setup: Setup, nonce
       <Suspense fallback={<PulseSkeleton firstName={firstName} nextPost={nextPost} />}>
         <PulseBlock data={data} firstName={firstName} canSwitch={canSwitch} nextPost={nextPost} nonce={nonce} fallback={classic} />
       </Suspense>
+      {intel && <div className="mt-4"><IntelligencePulseCard p={intel} /></div>}
       {/* 1114: may open from the background preload; brings itself up to date when that copy is 90 s old. */}
       <PageFresh renderedAt={Date.now()} maxAge={90_000} />
     </div>

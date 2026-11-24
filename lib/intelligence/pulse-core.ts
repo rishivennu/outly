@@ -37,6 +37,8 @@ export interface PulseRecommendation {
 }
 
 export interface ClipperPulse {
+  /** Jobs created but with no executor driving them yet (a browser job whose tab is not open). */
+  queued: number;
   /** Jobs transcribing or detecting right now. */
   running: number;
   /** Jobs whose candidates wait for a human. */
@@ -45,9 +47,14 @@ export interface ClipperPulse {
   readyToPost: number;
   /** Clips that became a post. */
   published: number;
-  /** Jobs that failed and want a retry. */
+  /** Jobs that failed in the last FAILED_WINDOW_DAYS and want a retry (older ones are not nagged about). */
   failed: number;
 }
+
+/** Failed jobs older than this stop counting in the pulse (R1326 review). */
+export const FAILED_WINDOW_DAYS = 30;
+/** Accuracy words come only from an evaluation younger than this (R1326 review). */
+export const ACCURACY_MAX_AGE_DAYS = 90;
 
 export interface IntelligencePulse {
   platforms: PulsePlatform[];
@@ -67,15 +74,26 @@ export function pickTop(byFormat: readonly PulseBaseline[]): PulseBaseline | nul
   return [...byFormat].sort((a, b) => b.n - a.n || (b.shared?.n ?? 0) - (a.shared?.n ?? 0) || a.format.localeCompare(b.format))[0];
 }
 
+/**
+ * Where a baseline's number came from, with every sample it leans on (R1326 review: a blended number names the cohort
+ * sample too). Null when there is no sample to name; `pulse.ts` drops such formats before they reach anyone.
+ */
+export function sampleWords(t: PulseBaseline): string | null {
+  const cohort = t.shared ? `${plural(t.shared.n, "cohort post")}${t.shared.owners ? ` by ${t.shared.owners} creators` : ""}` : null;
+  if (t.n > 0 && cohort) return `from ${plural(t.n, "measured post")} of yours, blended with ${cohort}`;
+  if (t.n > 0) return `from ${plural(t.n, "measured post")} of yours`;
+  if (cohort) return `from ${cohort} scaled to your size; none of your own measured yet`;
+  return null;
+}
+
 /** One honest sentence per platform baseline. */
 export function baselineLine(p: PulsePlatform): string {
   const name = platformName(p.platform);
   if (!p.top) return `${name}: no measured post yet, so no number.`;
   const t = p.top;
   const range = `usually ${num(t.low)} to ${num(t.high)}`;
-  if (t.n === 0 && t.shared) return `${name} ${t.format}: ~${num(t.predicted)} views (${range}), from ${plural(t.shared.n, "cohort post")}${t.shared.owners ? ` by ${t.shared.owners} creators` : ""} scaled to your size; none of your own measured yet.`;
-  const own = `from ${plural(t.n, "measured post")} of yours`;
-  return `${name} ${t.format}: ~${num(t.predicted)} views (${range}), ${own}${t.shared ? ", blended with the cohort" : ""}${p.accuracyWords ? `. ${p.accuracyWords}` : "."}`;
+  const sample = sampleWords(t) ?? "sample unknown";
+  return `${name} ${t.format}: ~${num(t.predicted)} views (${range}), ${sample}${p.accuracyWords && t.n > 0 ? `. ${p.accuracyWords}` : "."}`;
 }
 
 /** The clipper queue in one line, or null when there is nothing to say. */
@@ -83,6 +101,7 @@ export function clipperLine(c: ClipperPulse | null): string | null {
   if (!c) return null;
   const parts: string[] = [];
   if (c.running) parts.push(`${plural(c.running, "job")} running`);
+  if (c.queued) parts.push(`${plural(c.queued, "job")} waiting for a tab to drive it`);
   if (c.review) parts.push(`${plural(c.review, "job")} waiting for your review`);
   if (c.readyToPost) parts.push(`${plural(c.readyToPost, "clip")} rendered and ready to post`);
   if (c.failed) parts.push(`${plural(c.failed, "job")} failed`);
@@ -110,7 +129,6 @@ export function baselineItems(p: IntelligencePulse | null, max = 3): { title: st
     .slice(0, max)
     .map((x) => {
       const t = x.top!;
-      const sample = t.n > 0 ? `from ${plural(t.n, "measured post")} of yours` : t.shared ? `from ${plural(t.shared.n, "cohort post")} scaled to your size` : "";
-      return { title: `${platformName(x.platform)} ${t.format}: ~${num(t.predicted)} views`, detail: `usually ${num(t.low)} to ${num(t.high)}, ${sample}${x.accuracyWords && t.n > 0 ? `. ${x.accuracyWords}` : "."}` };
+      return { title: `${platformName(x.platform)} ${t.format}: ~${num(t.predicted)} views`, detail: `usually ${num(t.low)} to ${num(t.high)}, ${sampleWords(t) ?? "sample unknown"}${x.accuracyWords && t.n > 0 ? `. ${x.accuracyWords}` : "."}` };
     });
 }

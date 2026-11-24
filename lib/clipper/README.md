@@ -13,6 +13,7 @@ ranked moments come out; the creator approves, trims, reframes and renders 9:16 
 | R1322 review | A queued job with no tab is `stalled` (Resume) and the studio re-judges the screen every 30 s; Stop reports `failed: "Stopped."` so a clip never stays `rendering`; a `STALE_RENDER` 409 after the upload bins the file; the render waits for the caption font, ends on abort/error/20 s without a frame, and releases the `<video>`; files capped at 1.5 GB and the soundtrack decode keeps the heartbeat; the editor keeps edits across refreshes (reset on `id+updatedAt`), stops an export on unmount, warns on tab close, slides tall sources on `y`, takes decimals in the range boxes (`previewStyle` is the tested mapping); the studio never marks another tab's job failed on 409, carries Cancel through the upload, and reads a fresh URL on Resume. |
 | R1323 | Publish through Create: `GET clips/:id/publish` hands the composer the rendered Media and the words (`publish-core.ts clipPrefill`), `/create?clip=<id>` sets it as the video and fills the caption/hook when the boxes are empty; the first save carries `clipId` (savePostSchema), `/api/posts` links `GeneratedClip.postId` (`attachClipToPost`, idempotent, quiet) and files the post in Content Memory with origin `clipper`. Reading clips (`clipsWithPosts`) is when a clip learns its post went out: status `published`, ClipEvent `published`, LearningEvent `clip_published` (deduped, dated at publish). `GET clips/:id/performance` reads the post's destinations from the latest TargetMetric rows (`platformPerformance`: unavailable is null, never 0; `performanceLine` is the one row sentence). Clip rows: Post this clip / Open post + the line. |
 | R1323 review | Numbers are the **sum** of a destination's TargetMetric deltas (`groupBy`, like the feature store), destinations taken down through Outlly are left out, and a summed 0 for a metric the platform reports late (`LAGGING`: YouTube shares) is unavailable, not zero. A `partial` post promotes the clip too and `performanceLine` names the failed destinations. A clip with a post keeps its cut (`updateClip` 409 `HAS_POST` for range/reframe/subtitle; words still editable) and cannot be discarded (`HAS_POST`; Discard hidden). `attachClipToPost` also refuses discarded/unrendered clips and a post whose video is not the clip's render (`media_mismatch`); `/api/posts` runs the attach first and files origin `clipper` only on a real link; Create drops `clipId` when a new file is chosen, keeps a `?rec=` origin alongside, and a clip that already has a post (409 `ALREADY_POSTED` + postId) opens that post; a clip whose post was deleted is unlinked and can be posted again. PerformanceLine has an error state and refetches on `updatedAt`. |
+| R1326 | Hardening: `retention-core.ts` + `retention.ts` (`sweepClipper` on the housekeeping slot: running jobs with no report for 7 days are cancelled as `abandoned`, transcripts go 90 days and suggested/rejected candidates 30 days after a job closes, 500 rows per table a run); `budget-core.ts` + `budget.ts` (per-user daily AI cap from the cost ledger, 30 calls / ₹40 by default, `CLIPPER_DAILY_CALLS` / `CLIPPER_DAILY_INR`; over it `POST jobs/:id/detect` runs the rule detector and answers `budget`); the review notes and sweep bounds below. |
 
 ## Files
 
@@ -46,7 +47,7 @@ ranked moments come out; the creator approves, trims, reframes and renders 9:16 
 | `GET/POST jobs` | List; create (201, or 200 for the same `clientKey`). 400 bad source, 409 too many active. |
 | `GET jobs/:id` | Detail: job, source media, cues, candidates, clips. |
 | `POST jobs/:id/stage` | Executor reports: `start`, `heartbeat`, `transcribed`, `fail`, `retry`, `reviewed`. |
-| `POST jobs/:id/detect` | Rank moments. Gemini when the key, the entitlement (or an AI grant on "other") allow. |
+| `POST jobs/:id/detect` | Rank moments. Gemini when the key, the entitlement (or an AI grant on "other") allow. R1326: `detector` names what ran and `budget` (`{ allowed, reason: ok | calls | money, line, spend, cap }`, null without a key or entitlement) says when the daily cap made it the rules. |
 | `POST jobs/:id/candidates` | Cut by text `{ query }`. |
 | `GET/POST jobs/:id/clips` | Clips of a job; manual clip `{ start, end, title }`. |
 | `POST jobs/:id/cancel` | Cancel. |
@@ -65,6 +66,61 @@ The job table knows an `executor` (`browser` in v1, `worker` later). Hosting has
 v1 transcribes (`lib/client/captions.ts`) and renders (canvas + MediaRecorder) in the creator's tab and reports
 through `/stage` and `/render`. A job whose executor has not reported for 5 minutes is **stalled** and the screen
 offers to resume. Nothing in the data model changes when a worker takes over.
+
+## Hardening (R1326)
+
+### Retention
+
+Rules in `retention-core.ts`, applied by `retention.ts sweepClipper(now)` every 5 minutes (housekeeping slot):
+
+| What | When | Why |
+| --- | --- | --- |
+| Running job, no heartbeat for `ABANDON_DAYS` (7) | cancelled, `error` = the reason, ClipEvent `abandoned` | frees one of the owner's `ACTIVE_JOBS_MAX` slots; a stall under 7 days is the creator's to resume |
+| `ClipTranscript` | `TRANSCRIPT_RETENTION_DAYS` (90) after the job **closed** (failed, cancelled, or ready/done; `completedAt`, else `updatedAt`) | the heaviest rows (up to 40k words); clips keep title, copy and plans; afterwards Regenerate copy and Find in words answer `NO_TRANSCRIPT`, and a failed job that old is started again from the video |
+| `ClipCandidate` suggested / rejected | `CANDIDATE_RETENTION_DAYS` (30) after close | approved candidates stay: a clip's candidate holds the reason and scores feedback learns from |
+
+A job at `ready/review` is the creator's desk and is never pruned. Every step reads at most `RETENTION_BATCH` (500)
+ids and deletes by id; the abandon update repeats its condition so a heartbeat landing mid-sweep keeps the job.
+
+### Daily AI budget
+
+`budget-core.ts budgetVerdict(spend, cap)`; `budget.ts clipperSpend(userId, now)` counts today's `token-in` rows
+and sums `inrMinor` for feature `clipper` in the cost ledger (R1315). Two caps, first hit wins: **calls** (safety
+net while a model has no unit price and books at ₹0) and **money**. Defaults 30 calls / ₹40 a UTC day, overridable
+with `CLIPPER_DAILY_CALLS` and `CLIPPER_DAILY_INR` (rupees). The cap never blocks a job: detection falls back to the
+rules and the response and the `detected` event carry the reason. The check precedes the call and the booking
+follows it, so a day can overshoot by one call. Keyed by the user the ledger books (the person detecting).
+
+### Review notes (ownership, RLS)
+
+- Every clipper table carries `ownerId`, and every read and write in `jobs.ts` filters by it (`ownedJob`,
+  `ownedClip`, `updateMany({ where: { id, ownerId, ... } })`); routes pass `user.id` (the workspace owner) and
+  `realUserId(user)` only for the actor on events. There is no path from a clip id alone to a row.
+- Children (`ClipTranscript`, `ClipCandidate`, `GeneratedClip`, `ClipEvent`) repeat `ownerId` instead of trusting the
+  join, so a wrong join can only narrow a result, never widen it.
+- The database is reached through one Prisma role; Postgres row-level security is not on. If direct access (Supabase
+  client, SQL console for staff) is ever added, enable RLS on these five tables with `owner_id = auth.uid()` policies
+  and keep the service role for the sweep only; the schema needs no change for that.
+- Media: `ClipJob.mediaId` and `GeneratedClip.mediaId` are `SetNull`, so purging a source or a render (account cleanup,
+  trash) never orphans a job; `sourceProblem` refuses trashed or already-used media before a job starts.
+- Idempotency: `(ownerId, clientKey)` on jobs, `candidateId` and `postId` unique on clips, `updatedAt` compare on
+  edits (409 `CONFLICT`), stage flips inside the writing transaction.
+
+### Sweep bounds
+
+Steps of `/api/cron/sweep` this plan added, what bounds each one, and the slot it runs on:
+
+| Step | Slot | Bound |
+| --- | --- | --- |
+| `sweepPersonal` (features, profiles) | minute % 10 == 2 | 5 owners a run, young posts only between FEATURE_VERSION bumps |
+| `sweepOutcomes` | minute % 10 == 4 | 10 owners a run |
+| `sweepBackfill` | minute % 10 == 7 | 5 owners x 100 posts |
+| `sweepShared` | every tick | one `findFirst` read; rebuild only when the document is 55 min old; 50k rows, 180 days |
+| `sweepClipper` | housekeeping (every 5 min) | 3 reads x 500 ids, deletes by id |
+| `syncPredictions` | inside `sweepPersonal` per owner | bounded by the owner's measured destinations |
+
+`tests/round-1326-hardening.test.ts` seeds 300 closed jobs and times one `sweepClipper` pass under 3 s on SQLite as
+the regression line; the abandon step is the only per-row loop and is capped by the same batch.
 
 ## Honesty
 

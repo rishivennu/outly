@@ -5,7 +5,7 @@
  * and the Android contract doc.
  */
 import { beforeAll, describe, expect, mock, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { baselineItems, baselineLine, clipperLine, pickTop, pulseLines, type IntelligencePulse } from "../lib/intelligence/pulse-core";
 import { clipperSummary, predictionsSummary } from "../lib/pip/tools-intelligence";
 import { ANALYTIC_TOOLS, PIP_TOOLS } from "../lib/pip/types";
@@ -43,7 +43,7 @@ const sample: IntelligencePulse = {
     { platform: "threads", level: "none", measured: 0, accuracyWords: null, top: null },
   ],
   recommendation: { id: "personal:format:video:instagram", title: "Lead with video on Instagram", why: "Your 12 videos beat your 4 photos by 60%.", platform: "instagram", confidence: "medium" },
-  clipper: { running: 1, review: 2, readyToPost: 3, published: 4, failed: 0 },
+  clipper: { queued: 0, running: 1, review: 2, readyToPost: 3, published: 4, failed: 0 },
   computedAt: "2026-11-24T12:00:00.000Z",
 };
 
@@ -74,7 +74,7 @@ describe("R1325 pulse-core", () => {
     const items = baselineItems(sample);
     expect(items).toHaveLength(2);
     expect(items[0]).toEqual({ title: "Instagram video: ~1,200 views", detail: "usually 800 to 1,900, from 12 measured posts of yours. Typically within 20% so far." });
-    expect(items[1].detail).toContain("from 40 cohort posts scaled to your size.");
+    expect(items[1].detail).toContain("from 40 cohort posts by 6 creators scaled to your size; none of your own measured yet.");
     expect(baselineItems(null)).toEqual([]);
     expect(baselineItems({ ...sample, platforms: [sample.platforms[2]] })).toEqual([]);
   });
@@ -87,8 +87,8 @@ describe("R1325 Pip summaries (pure)", () => {
     expect(s.cards[0].value).toBe("14");
     expect(s.cards[2].value).toBe("1 of 3");
     expect(s.rows.map((r) => r.cells.platform)).toEqual(["Instagram", "YouTube", "Threads"]);
-    expect(s.rows[0].cells).toMatchObject({ typical: "~1,200", range: "800 to 1,900", sample: "12 of yours" });
-    expect(s.rows[1].cells.sample).toBe("40 cohort posts");
+    expect(s.rows[0].cells).toMatchObject({ typical: "~1,200", range: "800 to 1,900", sample: "from 12 measured posts of yours" });
+    expect(s.rows[1].cells.sample).toBe("from 40 cohort posts by 6 creators scaled to your size; none of your own measured yet");
     expect(s.rows[2].cells).toMatchObject({ format: "—", typical: null, range: null });
     expect(s.facts).toEqual(sample.platforms.map(baselineLine));
     expect(predictionsSummary(sample, "youtube").rows).toHaveLength(1);
@@ -98,12 +98,13 @@ describe("R1325 Pip summaries (pure)", () => {
   });
 
   test("clipper_status: counts as cards and rows, the failed row only when there is one", () => {
-    const s = clipperSummary(sample);
+    const s = clipperSummary(sample.clipper);
     expect(s.cards.map((c) => [c.label, c.value])).toEqual([["Running", "1"], ["Waiting for review", "2"], ["Ready to post", "3"], ["Published", "4"]]);
     expect(s.rows.map((r) => r.id)).toEqual(["running", "review", "ready", "published"]);
-    expect(clipperSummary({ ...sample, clipper: { ...sample.clipper!, failed: 2 } }).rows.map((r) => r.id)).toContain("failed");
+    expect(clipperSummary({ ...sample.clipper!, failed: 2 }).rows.map((r) => r.id)).toContain("failed");
+    expect(clipperSummary({ ...sample.clipper!, queued: 1 }).rows.map((r) => r.id)).toContain("queued");
     expect(clipperSummary(null).empty).toContain("No clipper job yet");
-    expect(clipperSummary({ ...sample, clipper: null }).rows).toEqual([]);
+    expect(clipperSummary(null).rows).toEqual([]);
   });
 
   test("routing and registry", () => {
@@ -123,6 +124,11 @@ describe("R1325 Pip summaries (pure)", () => {
     expect(plan.keywordPlan("forecast my views for next month")?.tool).toBe("forecast");
     expect(plan.keywordPlan("what is working in my content?")?.tool).toBe("intelligence_overview");
     expect(plan.keywordPlan("show my invoices")?.tool).toBe("invoices");
+    // R1326 review: how-to questions about the product nouns stay with the help bot; metric questions keep their tools.
+    for (const q of ["how do I use the clipper", "how does the clipper work?", "can the clipper do 16:9?", "what is a baseline?", "explain baselines", "download my clips"]) expect(plan.keywordPlan(q)).toBeNull();
+    expect(plan.keywordPlan("how many views did my clips get this week")?.tool).not.toBe("clipper_status");
+    expect(plan.keywordPlan("what's my typical reel reach")?.tool).not.toBe("predictions");
+    expect(plan.keywordPlan("baseline engagement rate")?.tool).not.toBe("predictions");
     expect(plan.readPlan({ tool: "clipper_status" })?.tool).toBe("clipper_status");
     expect(plan.PLAN_SYSTEM).toContain("predictions = their own baselines");
     expect(plan.PLAN_SYSTEM).toContain("clipper_status = the Shorts clipper queue");
@@ -187,14 +193,19 @@ describe("R1325 stored pulse + tools (db)", () => {
     const sh = p!.platforms[0].top!.shared;
     expect(sh === null || (typeof sh.n === "number" && typeof sh.owners === "number")).toBe(true);
     expect(p!.platforms[0].top!.predicted).toBeGreaterThan(0);
-    expect(p!.clipper).toEqual({ running: 1, review: 1, readyToPost: 1, published: 1, failed: 0 });
+    expect(p!.clipper).toEqual({ queued: 0, running: 1, review: 1, readyToPost: 1, published: 1, failed: 0 });
     expect(await counts(u.id)).toEqual(before);
 
     const ctx = { ownerId: u.id, actorId: null, scope: null, tz: "UTC", now: new Date(), message: "what are my baselines" };
     const r = await tools.runTool("predictions", ctx, {});
     expect(r.tool).toBe("predictions");
     expect(r.rows).toHaveLength(1);
-    expect(r.rows[0].cells).toMatchObject({ platform: "Instagram", format: "video", sample: "5 of yours" });
+    expect(r.rows[0].cells.sample).toStartWith("from 5 measured posts of yours");
+    expect(r.rows[0].cells).toMatchObject({ platform: "Instagram", format: "video" });
+    // R1326 review: a platform word the model made up never produces a false "nothing on X"; a scoped teammate with no accounts sees nothing of the workspace.
+    expect((await tools.runTool("predictions", ctx, { platform: "Instagram" })).rows).toHaveLength(1);
+    expect((await tools.runTool("predictions", { ...ctx, scope: [] }, {})).rows).toEqual([]);
+    expect((await tools.runTool("predictions", { ...ctx, scope: [] }, {})).empty).toContain("Nothing measured yet");
     expect(r.facts[0]).toContain("from 5 measured posts of yours");
     expect(r.downloads[0].href).toBe("/intelligence#intel-baselines");
     const c = await tools.runTool("clipper_status", ctx, {});
@@ -228,10 +239,14 @@ describe("R1325 wiring", () => {
     expect(read("lib/pip/tools.ts")).toContain("clipper_status: clipperStatus");
     expect(read("lib/intelligence/pulse-core.ts")).not.toContain("prisma");
     expect(read("lib/intelligence/pulse.ts")).toContain('import "server-only"');
-    const doc = read("../../outlly-compose/docs/api-intelligence-clipper.md");
-    expect(doc).toContain("GET predictions");
-    expect(doc).toContain("`/clipper` is NOT registered in the manifest on purpose");
-    expect(read("../../outlly-compose/app/src/main/AndroidManifest.xml")).not.toContain('android:path="/clipper"');
+    // The Android repo sits beside this one in the working tree only; a clean clone of the web repo skips these two lines.
+    if (existsSync(new URL("../../../outlly-compose/docs/api-intelligence-clipper.md", import.meta.url))) {
+      const doc = read("../../outlly-compose/docs/api-intelligence-clipper.md");
+      expect(doc).toContain("GET predictions");
+      expect(doc).toContain("`/clipper` is NOT registered in the manifest on purpose");
+      expect(doc).toContain("GET pulse");
+      expect(read("../../outlly-compose/app/src/main/AndroidManifest.xml")).not.toContain('android:path="/clipper"');
+    }
     expect(read("docs/intelligence-clipper-plan.md")).toContain("R1325");
   });
 });

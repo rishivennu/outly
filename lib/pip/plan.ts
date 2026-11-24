@@ -20,7 +20,11 @@ const HOW_TO = /^\s*(how (do|can|should|would|does) (i|you|we|it|one)\b|how to\b
  * these wants their own data, so they count as data requests.
  */
 const STRONG =
-  /\b(best (time|times|day|days) to post|when should i post|which platform|platforms? (with|has|have|gets?|got) (the )?most|am i (consistent|growing|posting enough)|full report|performance report|forecast|predict|why (did|was|is|has|have|are) (my|that|this|it|the post|these)|what made (it|that|this|my)|what (works|performs) best|(which|what) (post|video|reel|short|tweet|content)s? (got|had|has|have|did|was|were|performed|gets?)|most (shares|shared|comments|commented|likes|liked|views|viewed))\b|^\s*(compare|forecast|predict|analy[sz]e)\b|^\s*(views|likes|comments|shares|engagement|followers|reach|posts?|best|top|worst|platforms?|upcoming|scheduled)\b|\b(clipper|shorts? queue|clips? (ready|rendered|waiting|in review|to post|to approve)|baselines?)\b/i;
+  /\b(best (time|times|day|days) to post|when should i post|which platform|platforms? (with|has|have|gets?|got) (the )?most|am i (consistent|growing|posting enough)|full report|performance report|forecast|predict|why (did|was|is|has|have|are) (my|that|this|it|the post|these)|what made (it|that|this|my)|what (works|performs) best|(which|what) (post|video|reel|short|tweet|content)s? (got|had|has|have|did|was|were|performed|gets?)|most (shares|shared|comments|commented|likes|liked|views|viewed))\b|^\s*(compare|forecast|predict|analy[sz]e)\b|^\s*(views|likes|comments|shares|engagement|followers|reach|posts?|best|top|worst|platforms?|upcoming|scheduled)\b/i;
+/** R1325 product nouns that mean "show me" on their own, unless the sentence is a how-to ("how does the clipper work?" is for the help bot). */
+const STRONG_NOUN = /\b(clipper|clip jobs?|shorts? queue|clips? (ready|rendered|waiting|in review|to post|to approve)|baselines?)\b/i;
+/** "Can the clipper do 16:9?" / "how does the clipper work?" ask what the product does, not for the queue ("how is the clipper doing?" does). */
+const CAPABILITY = /^\s*(can|could|does|do|will|would|should|how (does|do|can|could|would|should)) (the|a|an|it|this|outlly)\b/i;
 /** "Instagram vs YouTube this month": a comparison with no "my". A how-to ("how do I post to Instagram and YouTube?") still isn't. */
 const PAIR = /\b(instagram|youtube|tiktok|facebook|linkedin|threads|twitter)\b.*\b(vs\.?|versus|and|or|with)\b.*\b(instagram|youtube|tiktok|facebook|linkedin|threads|twitter)\b/i;
 /** "Why did my post fail?" / "why was I charged twice?" are help questions, not performance analysis. */
@@ -70,8 +74,10 @@ export const platformsNamed = (t: string) => PLATFORM_WORDS.filter(([re]) => re.
 function analyticOf(t: string): PipTool | null {
   // R1244: Content Intelligence (what is working, what needs attention, what to make next).
   // R1325: the Shorts clipper's queue, and the creator's own baselines (checked before "forecast", which is the analytics projection).
-  if (/\bclipper\b|\bclip jobs?\b|\bshorts? (clipper|jobs?|queue)\b|\b(my|the|any|new) clips\b|\bclips? (ready|rendered|waiting|in review|to post|to approve)\b/i.test(t)) return "clipper_status";
-  if (/\b(baselines?|how many views (will|would|should) (my|a|this|the)|what (will|would|should) (my|a|this|the) (next |new )?(post|video|reel|short|carousel|photo) (get|do|make)|expect(ed)? views|typical (post|video|reel|short)|my (own )?(predictions?|model))\b/i.test(t)) return "predictions";
+  // Queue and state words only: "how many views did my clips get" is analytics and "the clips I uploaded" is uploads (R1326 review).
+  if (/\bclipper\b|\bclip jobs?\b|\bshorts? (clipper|jobs?|queue)\b|\bclips? (ready|rendered|waiting|in review|to post|to approve)\b/i.test(t) && !/\b(views|likes|comments|shares|reach|engagement|uploaded|download)\b/i.test(t)) return "clipper_status";
+  // Baselines answer in views; a reach/engagement/likes question keeps its own tool (R1326 review).
+  if (/\b(baselines?|how many views (will|would|should) (my|a|this|the)|what (will|would|should) (my|a|this|the) (next |new )?(post|video|reel|short|carousel|photo) (get|do|make)|expect(ed)? views|typical (post|video|reel|short)|my (own )?(predictions?|model))\b/i.test(t) && !/\b(reach|engagement|likes?|comments?|shares?|followers?|rate)\b/i.test(t)) return "predictions";
   if (/\b(content )?intelligence\b|\bwhat('s| is) (working|not working)\b|\bneeds? attention\b|\b(content )?recommendations?\b|\bwhat (should|do) i (make|create) next\b/i.test(t)) return "intelligence_overview";
   if (/\bwhy (did|was|is|has) (my |that |this |the )?(post|video|reel|short|tweet|it|one)\b|\bwhat made (it|that|this|my)\b/i.test(t) && !TROUBLE.test(t)) return "post_insight";
   if (/\b(full|complete|whole|detailed|cross[- ]platform|performance|monthly|weekly|quarterly)\s+(report|analysis|review|breakdown|summary)\b|\b(analy[sz]e|analysis|deep dive|audit)\b|\bstrateg(y|ies)\b|\bwhat should i (do|post|focus on|change|improve)\b|\bgame ?plan\b|\bhow (can|do|should) i (grow|improve|do better)\b/i.test(t)) return "report";
@@ -132,7 +138,7 @@ function statusOf(tool: PipTool, t: string): string | null {
 /** Is this a "show me my stuff" message rather than a how-to or a change request? */
 export function wantsData(text: string) {
   if (ACTION.test(text.replace(CHANGE_Q, " "))) return false;
-  return ((PERSONAL.test(text) || RETRIEVE.test(text)) && !HOW_TO.test(text)) || (STRONG.test(text) && !(HOW_TO.test(text) && TROUBLE.test(text))) || (PAIR.test(text) && !HOW_TO.test(text));
+  return ((PERSONAL.test(text) || RETRIEVE.test(text)) && !HOW_TO.test(text)) || (STRONG.test(text) && !(HOW_TO.test(text) && TROUBLE.test(text))) || (PAIR.test(text) && !HOW_TO.test(text)) || (STRONG_NOUN.test(text) && !HOW_TO.test(text) && !CAPABILITY.test(text));
 }
 
 export function keywordPlan(message: string): PipPlan | null {

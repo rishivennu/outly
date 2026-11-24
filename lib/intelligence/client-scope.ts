@@ -15,7 +15,15 @@ export async function resolveClient(user: Pick<SessionUser, "id" | "role">, clie
   if (client.length > CLIENT_KEY_MAX) throw new HttpError(400, "That client key is too long.", "BAD_CLIENT");
   if (!(await getBrandProfile(user.id, client))) throw new HttpError(404, "That client profile no longer exists.", "NO_CLIENT");
   const accountIds = (await accountIdsForClient(user.id, client)) ?? [];
-  if (!accountIds.length) return { scopeKey: client, targetIds: [] };
-  const ts = await db.postTarget.findMany({ where: { post: { userId: user.id }, socialAccountId: { in: accountIds }, platformStatus: "published" }, select: { id: true }, orderBy: { publishedAt: "desc" }, take: 3000 });
-  return { scopeKey: client, targetIds: ts.map((t) => t.id) };
+  return { scopeKey: client, targetIds: await targetIdsForAccounts(user.id, accountIds) };
+}
+
+/**
+ * The published destinations on a set of the owner's accounts, newest first, at most 3000: the one way a client or a
+ * scoped teammate (R1325 Pip) is narrowed, so both read the same subset. Empty accounts give [] (nothing), never null (everything).
+ */
+export async function targetIdsForAccounts(ownerId: string, accountIds: readonly string[]): Promise<string[]> {
+  if (!accountIds.length) return [];
+  const ts = await db.postTarget.findMany({ where: { post: { userId: ownerId }, socialAccountId: { in: [...accountIds] }, platformStatus: "published" }, select: { id: true }, orderBy: { publishedAt: "desc" }, take: 3000 });
+  return ts.map((t) => t.id);
 }

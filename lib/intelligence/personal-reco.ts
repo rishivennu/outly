@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "../db";
 import { periodOf } from "./core";
-import { HISTORY_DAYS, modelStates } from "./model/predict";
+import { HISTORY_DAYS, modelStates, type ModelState } from "./model/predict";
 import { persistRecommendations, storedFor, type StoredRecommendation } from "./reco";
 import { ACTIVE_STATUSES, ruleKeyOf } from "./reco-core";
 import { PERSONAL_ID_PREFIX, personalRecommendations, type PersonalDrafts } from "./personal-reco-core";
@@ -17,13 +17,14 @@ export interface PersonalRead extends Omit<PersonalDrafts, "recommendations"> {
   window: { from: string; to: string; label: string };
 }
 
-export async function personalRead(ownerId: string, opts: { scopeKey?: string; targetIds?: string[] | null; now?: number; readOnly?: boolean } = {}): Promise<PersonalRead> {
+export async function personalRead(ownerId: string, opts: { scopeKey?: string; targetIds?: string[] | null; now?: number; readOnly?: boolean; states?: ModelState[] } = {}): Promise<PersonalRead> {
   const now = opts.now ?? Date.now();
   const scopeKey = opts.scopeKey ?? "";
   // The states are computed over the model's HISTORY_DAYS, so the window the cards name is that one.
   const period = periodOf(now, HISTORY_DAYS);
   const window = { from: period.from, to: period.to, label: period.label };
-  const states = await modelStates(ownerId, { scopeKey, targetIds: opts.targetIds, now });
+  // R1326 review: a caller that already has the states (the pulse) passes them, so the model is read once.
+  const states = opts.states ?? (await modelStates(ownerId, { scopeKey, targetIds: opts.targetIds, now }));
   const drafts = personalRecommendations({ states, window });
   const stored = opts.readOnly
     ? await storedFor(ownerId, scopeKey, drafts.recommendations, period, now)
