@@ -1,4 +1,4 @@
-import { Activity, BarChart3, CalendarDays, ClipboardCheck, CreditCard, Globe, Handshake, Home, LayoutGrid, LifeBuoy, Link2, MessagesSquare, Plus, Settings, ShieldCheck, SlidersHorizontal, Sparkles, UserRound, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, CalendarDays, ClipboardCheck, CreditCard, Globe, Handshake, Home, LayoutGrid, LifeBuoy, Link2, MessagesSquare, Plus, Scissors, Settings, ShieldCheck, SlidersHorizontal, Sparkles, UserRound, type LucideIcon } from "lucide-react";
 
 /**
  * Navigation data shared by the classic sidebar, the pulse rail (1100), the phone tab bar and the account
@@ -9,6 +9,8 @@ export type NavItem = { href: string; label: string; icon: LucideIcon };
 export const MAIN: NavItem[] = [
   { href: "/home", label: "Home", icon: Home },
   { href: "/create", label: "Create", icon: Plus },
+  // R1322: the Shorts Clipper makes the posts Create publishes, so it sits right after it.
+  { href: "/clipper", label: "Clipper", icon: Scissors },
   { href: "/content", label: "Content", icon: LayoutGrid },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
@@ -53,7 +55,7 @@ export function accountItems(teammate: boolean): { account: NavItem[]; more: (Na
 }
 
 /** Animated-icon names for the pulse shell (1080), by route. */
-export const ANIM: Record<string, string> = { "/home": "home", "/create": "plus", "/content": "content", "/calendar": "calendar", "/analytics": "analytics", "/intelligence": "intelligence", "/profile-review": "review", "/inbox": "inbox", "/approvals": "approvals", "/accounts": "accounts", "/billing": "billing", "/dashboard/partnerships": "partnerships", "/support": "help", "/settings": "settings", "/": "website" };
+export const ANIM: Record<string, string> = { "/home": "home", "/create": "plus", "/content": "content", "/calendar": "calendar", "/analytics": "analytics", "/intelligence": "intelligence", "/clipper": "content", "/profile-review": "review", "/inbox": "inbox", "/approvals": "approvals", "/accounts": "accounts", "/billing": "billing", "/dashboard/partnerships": "partnerships", "/support": "help", "/settings": "settings", "/": "website" };
 
 export const TOUR: Record<string, string> = { "/home": "home", "/billing": "billing", "/support": "support", "/settings": "settings", "/create": "new-post", "/content": "content", "/calendar": "calendar", "/analytics": "analytics", "/inbox": "inbox", "/approvals": "approvals", "/accounts": "accounts" };
 
@@ -69,7 +71,7 @@ export function isActive(path: string | null, href: string) {
  * two buttons on a 320px phone. Children use their section's ("/analytics/instagram" is Analytics).
  */
 const TITLES: [string, string][] = [
-  ["/home", "Home"], ["/create", "Create"], ["/content", "Content"], ["/calendar", "Calendar"], ["/analytics", "Analytics"], ["/intelligence", "Intelligence"], ["/profile-review", "Profile Review"],
+  ["/home", "Home"], ["/create", "Create"], ["/content", "Content"], ["/calendar", "Calendar"], ["/analytics", "Analytics"], ["/intelligence", "Intelligence"], ["/clipper", "Clipper"], ["/profile-review", "Profile Review"],
   ["/inbox", "Inbox"], ["/approvals", "Approvals"], ["/accounts", "Accounts"], ["/billing", "Billing"], ["/support", "Help"], ["/dashboard", "Partnerships"],
   ["/settings", "Settings"], ["/mascot", "Pip"],
 ];

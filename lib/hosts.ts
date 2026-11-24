@@ -8,7 +8,7 @@
 export const CANONICAL_ORIGIN = "https://www.outlly.com";
 
 /** The studio pages that need a session (middleware's sign-in wall uses this same list). */
-export const STUDIO_PATHS = ["/home", "/create", "/content", "/calendar", "/analytics", "/intelligence", "/profile-review", "/inbox", "/approvals", "/accounts", "/billing", "/settings", "/support", "/mascot", "/share-target", "/app-share", "/dashboard"];
+export const STUDIO_PATHS = ["/home", "/create", "/content", "/calendar", "/analytics", "/intelligence", "/clipper", "/profile-review", "/inbox", "/approvals", "/accounts", "/billing", "/settings", "/support", "/mascot", "/share-target", "/app-share", "/dashboard"];
 
 export const ADMIN_SUBDOMAIN = "admin.outlly.com";
 

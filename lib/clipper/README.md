@@ -9,7 +9,7 @@ ranked moments come out; the creator approves, trims, reframes and renders 9:16 
 | --- | --- |
 | R1321 | Schema (`ClipJob`, `ClipTranscript`, `ClipCandidate`, `GeneratedClip`, `ClipEvent`), pure cores, service, API. |
 | R1321 review | Transcript save and detection flip the stage inside their transaction; a `rendered` report is accepted only while the clip is `rendering` (edits make it `pending`, so stale renders are refused with `STALE_RENDER`); source, trashed and already-used media are not renders; `ruleWindows` covers the whole source; candidates per job capped at 60; `ClipJob.media` is `SetNull` so purging the source keeps the clips; heartbeat progress is a fraction 0..1; `?transcript=1` on the detail. |
-| R1322 | Browser executor + `/clipper` studio screens (planned). |
+| R1322 | Browser executor (`lib/client/clipper.ts`: probe, transcribe through the Caption Studio chunks, detect, render 1080x1920 through `drawFor`, upload, report) + `executor-core.ts` (tab limit 40 min, screens, words) + `/clipper` studio (`components/clipper/*`: upload, processing with resume, review with reasons, editor with live reframe preview, export, download). Nav entry after Create. |
 | R1323 | Publish through the Create flow, performance feedback into Intelligence (planned). |
 
 ## Files
@@ -28,6 +28,9 @@ ranked moments come out; the creator approves, trims, reframes and renders 9:16 
   Every candidate carries a `reason` that reads its own numbers back.
 - `copy-core.ts`: `draftCopy(text, title, platforms)` drafts title, hook, caption and hashtags from the clip's own
   sentences. No model: it rewords, never invents. `#shorts` only when YouTube is a target.
+- `executor-core.ts`: the pure side of the tab executor. `BROWSER_MAX_SEC` (40 min: the browser decodes the whole
+  soundtrack in memory), `browserProblem`, `screenOf(job)` (upload / processing / stalled / failed / review / done),
+  `workingWords`, `stalledWords`, `clampRange`, `cuesWithin`, `clipFileName`.
 - `jobs.ts` (server-only): the service. Owner-scoped reads, idempotent `createJob` by `clientKey`, `moveJob` through
   the state machine with a conditional update, `saveTranscript` (words in either `{w,s,e}` or `{text,start,end}`
   shape), `detect` (Gemini through `AskJson` when allowed, else `ruleWindows`, said plainly in `detector`),
