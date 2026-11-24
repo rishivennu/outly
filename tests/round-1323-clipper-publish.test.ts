@@ -247,7 +247,7 @@ describe("R1323 wiring", () => {
     const page = read("app/(studio)/create/page.tsx");
     expect(page).toContain("clipId={post || searchParams.post || searchParams.local ? null : (searchParams.clip?.slice(0, 40) ?? null)}");
     // ?clip= wins over ?rec=, so the two never fight over the first save's origin.
-    expect(page).toContain("recId={post || searchParams.post || searchParams.local || searchParams.clip ? null :");
+    expect(page).toContain("recId={post || searchParams.post || searchParams.local ? null : searchParams.clip ? null :");
     const ws = read("components/create/CreateWorkspace.tsx");
     expect(ws).toContain("/api/clipper/clips/${encodeURIComponent(clipId)}/publish");
     expect(ws).toContain("setMedia(r.media);");

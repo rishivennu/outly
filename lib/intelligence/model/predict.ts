@@ -3,9 +3,11 @@ import { db } from "../../db";
 import { loadFeatureRows, toFeatureRows } from "../features";
 import { extractFeatures, type ContentFeatures } from "../features-core";
 import { logLearning } from "../learning";
-import { PROFILE_WINDOW_DAYS, traitLifts, levelOf, weekKey, type FeatureRow, type Level, type Lift } from "../profile-core";
+import { PERSONAL_MIN, PROFILE_WINDOW_DAYS, traitLifts, levelOf, weekKey, type FeatureRow, type Level, type Lift } from "../profile-core";
 import type { PostRecord } from "../core";
-import { accuracyWords, apeOf, baselineScorer, BASELINE_KEY, EVAL_MIN_AGE_DAYS, evaluate, parseBasis, type Evaluation, type Prediction, type Scorer } from "./scorer-core";
+import { followersOn, loadShared } from "../shared";
+import { sharedFor } from "../shared-core";
+import { accuracyWords, apeOf, baselineScorer, BASELINE_KEY, cohortSize, EVAL_MIN_AGE_DAYS, evaluate, parseBasis, type Evaluation, type Prediction, type Scorer, type SharedBaseline } from "./scorer-core";
 
 /**
  * R1319: predictions, the stored side. Every published destination is scored once from the creator's history before
@@ -21,6 +23,22 @@ const METRIC = "views" as const;
 
 async function history(ownerId: string, now: number, targetIds?: string[] | null): Promise<FeatureRow[]> {
   return toFeatureRows(await loadFeatureRows(ownerId, { days: HISTORY_DAYS, now, targetIds }));
+}
+
+/** A shared prior for one question, or null. */
+export type SharedLookup = (q: { platform: string; format: string; categories?: readonly string[]; n: number }) => SharedBaseline | null;
+
+/**
+ * R1324: the shared prior, offered only below the personal level (PERSONAL_MIN own posts), scaled to the creator's
+ * follower count on each platform. Live estimates only: backfilled forecasts (syncPredictions) stay own-data, so an
+ * evaluation never benefits from a cohort document built after the post went out.
+ */
+export async function sharedLookupFor(ownerId: string, platforms: readonly string[]): Promise<SharedLookup> {
+  const b = await loadShared().catch(() => null);
+  if (!b || !b.buckets.length) return () => null;
+  const wanted = [...new Set(platforms)];
+  const followers = new Map(await Promise.all(wanted.map(async (p) => [p, await followersOn(ownerId, p).catch(() => null)] as const)));
+  return (q) => (q.n >= PERSONAL_MIN ? null : sharedFor(b, { platform: q.platform, format: q.format, categories: q.categories, followers: followers.get(q.platform) ?? null }));
 }
 
 export interface DraftInput {
@@ -53,7 +71,9 @@ export async function predictDraft(ownerId: string, draft: DraftInput, opts: { n
   delete known.gapDays;
   delete known.crossPosted;
   const rows = await history(ownerId, now);
-  const prediction = SCORERS[ACTIVE_MODEL].score({ platform: draft.platform, format: draft.format, features: known, history: rows, asOf: now });
+  const shared = await sharedLookupFor(ownerId, [draft.platform]);
+  const n = cohortSize(rows, draft.platform, draft.format, now);
+  const prediction = SCORERS[ACTIVE_MODEL].score({ platform: draft.platform, format: draft.format, features: known, history: rows, asOf: now, shared: shared({ platform: draft.platform, format: draft.format, categories: known.categories, n }) });
   if (prediction && draft.postId) {
     const post = await db.post.findFirst({ where: { id: draft.postId, userId: ownerId }, select: { id: true } });
     if (post) await storePrediction(ownerId, opts.scopeKey ?? "", "post", post.id, prediction, now);
@@ -166,7 +186,7 @@ export interface ModelState {
 }
 
 /** What a typical post of each format would do today, per platform, from the rows given. Pure apart from the clock. */
-export function statesFrom(rows: FeatureRow[], now: number): ModelState[] {
+export function statesFrom(rows: FeatureRow[], now: number, shared: SharedLookup = () => null): ModelState[] {
   const scorer = SCORERS[ACTIVE_MODEL];
   const platforms = [...new Set(rows.map((r) => r.platform))].sort();
   return platforms.map((platform) => {
@@ -175,7 +195,7 @@ export function statesFrom(rows: FeatureRow[], now: number): ModelState[] {
     const formats = [...new Set(mine.map((r) => r.format))].sort();
     const byFormat: FormatBaseline[] = [];
     for (const format of formats) {
-      const p = scorer.score({ platform, format, features: {}, history: rows, asOf: now, metric: METRIC });
+      const p = scorer.score({ platform, format, features: {}, history: rows, asOf: now, metric: METRIC, shared: shared({ platform, format, n: cohortSize(rows, platform, format, now, METRIC) }) });
       if (p) byFormat.push({ format, n: p.n, level: p.level, predicted: p.predicted, low: p.low, high: p.high, confidence: p.confidence, explanation: p.explanation });
     }
     return { modelKey: scorer.key, platform, level: levelOf(measured), measured, byFormat, lifts: traitLifts(mine, METRIC), computedAt: new Date(now).toISOString() };
@@ -183,7 +203,7 @@ export function statesFrom(rows: FeatureRow[], now: number): ModelState[] {
 }
 
 async function calibrate(ownerId: string, scopeKey: string, rows: FeatureRow[], now: number) {
-  const states = statesFrom(rows, now);
+  const states = statesFrom(rows, now, await sharedLookupFor(ownerId, rows.map((r) => r.platform)));
   for (const s of states) {
     await db.creatorModelState.upsert({ where: { ownerId_scopeKey_modelKey_platform: { ownerId, scopeKey, modelKey: s.modelKey, platform: s.platform } }, create: { ownerId, scopeKey, modelKey: s.modelKey, platform: s.platform, state: JSON.stringify(s) }, update: { state: JSON.stringify(s) } });
   }
@@ -197,10 +217,11 @@ async function calibrate(ownerId: string, scopeKey: string, rows: FeatureRow[], 
  */
 export async function modelStates(ownerId: string, opts: { scopeKey?: string; targetIds?: string[] | null; now?: number } = {}): Promise<ModelState[]> {
   const now = opts.now ?? Date.now();
-  if (opts.scopeKey) return statesFrom(await history(ownerId, now, opts.targetIds ?? []), now);
+  const live = async (rows: FeatureRow[]) => statesFrom(rows, now, await sharedLookupFor(ownerId, rows.map((r) => r.platform)));
+  if (opts.scopeKey) return live(await history(ownerId, now, opts.targetIds ?? []));
   const stored = await db.creatorModelState.findMany({ where: { ownerId, scopeKey: "", modelKey: ACTIVE_MODEL }, orderBy: { platform: "asc" }, take: 20 });
   // Before the first calibration (the sweep has not reached this owner yet) the states are computed on the spot.
-  if (!stored.length) return statesFrom(await history(ownerId, now), now);
+  if (!stored.length) return live(await history(ownerId, now));
   return stored.map((s) => JSON.parse(s.state) as ModelState);
 }
 

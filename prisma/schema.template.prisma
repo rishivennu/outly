@@ -37,6 +37,7 @@ model User {
   referralCode String?   @unique // share link /signup?ref={code} (old /r/{code} still works)
   referredById String? // who invited this user (1052: the friend, not the sharer, earns a Creator month on their first payment)
   weeklyReport Boolean   @default(true) // Monday summary email
+  shareLearning Boolean  @default(true) // R1324: this creator's measured posts may join the anonymised cohort baselines (aggregates only; opt out any time)
   lastReportAt DateTime?
   postingGoal  Int       @default(3) // posts per week the creator aims for (0 = no goal)
   nudgeAt      DateTime? // last "you're behind this week" nudge

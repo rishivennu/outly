@@ -92,6 +92,64 @@ export function PersonalBaselines({ client }: { client: string | null }) {
         </ul>
       )}
       {data && data.platforms.length > 0 && <p className="mt-3 text-[13px] text-muted-foreground">{data.overall.words}</p>}
+      {!client && <SharingRow />}
     </Card>
+  );
+}
+
+/**
+ * R1324: the one switch for shared learning. On, this workspace's measured posts join anonymised cohort medians
+ * (never fewer than 5 creators and 20 posts per bucket, no single creator above half); off, they stay home. Either
+ * way the creator's own estimates still read the shared baseline when they have little history of their own.
+ */
+function SharingRow() {
+  const [share, setShare] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    api<{ share: boolean }>("/api/intelligence/sharing")
+      .then((r) => live && setShare(r.share))
+      .catch(() => live && setShare(null));
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (share === null) return null;
+  const flip = async () => {
+    setBusy(true);
+    setNote(null);
+    try {
+      const r = await api<{ share: boolean }>("/api/intelligence/sharing", { method: "PATCH", json: { share: !share } });
+      setShare(r.share);
+      setNote(r.share ? "Your posts join the next hourly rebuild." : "Your posts leave the shared baselines at the next hourly rebuild.");
+    } catch (e) {
+      setNote(e instanceof ApiError ? e.message : "That didn't save. Try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mt-4 flex flex-wrap items-start justify-between gap-3 rounded-2xl bg-secondary/40 p-4 hairline">
+      <div className="min-w-0 flex-1">
+        <p id="intel-sharing-label" className="text-sm font-medium">Help the shared baselines</p>
+        <p id="intel-sharing-hint" className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
+          Your measured posts join anonymised medians (never fewer than 5 creators and 20 posts in a group, no one creator more than half of it). Nothing of yours is shown to anyone; new creators get a fairer starting estimate. You keep reading them either way.
+        </p>
+        {note && <p className="mt-1.5 text-[13px] text-muted-foreground" aria-live="polite">{note}</p>}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={share}
+        aria-labelledby="intel-sharing-label"
+        aria-describedby="intel-sharing-hint"
+        disabled={busy}
+        onClick={flip}
+        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 ${share ? "bg-lime" : "bg-muted"}`}
+      >
+        <span className={`inline-block h-5 w-5 rounded-full bg-background shadow transition-transform ${share ? "translate-x-6" : "translate-x-1"}`} aria-hidden />
+      </button>
+    </div>
   );
 }

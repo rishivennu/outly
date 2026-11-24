@@ -94,6 +94,12 @@ export interface Scorer {
 const time = (d: string | Date | number) => (d instanceof Date ? d.getTime() : typeof d === "number" ? d : Date.parse(d));
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+/** How many measured posts of this platform + format the creator has before `asOf` (the scorer's own cohort size). */
+export function cohortSize(history: readonly FeatureRow[], platform: string, format: string, asOf: Date | number, metric: MetricKey = "views"): number {
+  const at = time(asOf);
+  return history.filter((r) => r.platform === platform && r.format === format && time(r.publishedAt) <= at - COHORT_LAG_MS && valueOf(r, metric) !== null).length;
+}
+
 function valueOf(row: FeatureRow, metric: MetricKey): number | null {
   if (!row.perf?.measured) return null;
   if (metric === "engagementRate") return row.perf.engagementRate;

@@ -1,7 +1,7 @@
 /** Client-safe: shared by the admin sidebar and the server guards. */
 export type AdminRole = "super" | "finance" | "support" | "marketing";
 export const ADMIN_ROLES = ["super", "finance", "support", "marketing"] as const satisfies readonly AdminRole[];
-export type AdminArea = "overview" | "users" | "insights" | "payments" | "pricing" | "tickets" | "faq" | "integrations" | "outbox" | "team" | "site" | "platforms" | "retention" | "growth" | "plans" | "referrals" | "content" | "live" | "health" | "partners" | "appAnalytics" | "workshops" | "costs";
+export type AdminArea = "overview" | "users" | "insights" | "payments" | "pricing" | "tickets" | "faq" | "integrations" | "outbox" | "team" | "site" | "platforms" | "retention" | "growth" | "plans" | "referrals" | "content" | "live" | "health" | "partners" | "appAnalytics" | "workshops" | "costs" | "intelligence";
 
 export const ROLE_LABEL: Record<AdminRole, string> = { super: "Super admin", finance: "Finance", support: "Support", marketing: "Marketing lead" };
 export const ROLE_BLURB: Record<AdminRole, string> = {
@@ -42,6 +42,9 @@ const ACCESS: Record<AdminArea, AdminRole[]> = {
   workshops: ["super", "marketing", "support"],
   // R1314 Infrastructure & Costs: what Outlly pays its providers. Money and secrets: super and finance only.
   costs: ["super", "finance"],
+  // R1324 Intelligence governance: model versions, accuracy, drift and the anonymised shared baselines. Aggregates
+  // only, but it is where a model gets retired or the cohort rebuilt: super admins.
+  intelligence: ["super"],
 };
 
 export const can = (role: AdminRole | undefined | null, area: AdminArea) => !!role && ACCESS[area].includes(role);
