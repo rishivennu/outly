@@ -8,6 +8,7 @@ ranked moments come out; the creator approves, trims, reframes and renders 9:16 
 | Round | What |
 | --- | --- |
 | R1321 | Schema (`ClipJob`, `ClipTranscript`, `ClipCandidate`, `GeneratedClip`, `ClipEvent`), pure cores, service, API. |
+| R1321 review | Transcript save and detection flip the stage inside their transaction; a `rendered` report is accepted only while the clip is `rendering` (edits make it `pending`, so stale renders are refused with `STALE_RENDER`); source, trashed and already-used media are not renders; `ruleWindows` covers the whole source; candidates per job capped at 60; `ClipJob.media` is `SetNull` so purging the source keeps the clips; heartbeat progress is a fraction 0..1; `?transcript=1` on the detail. |
 | R1322 | Browser executor + `/clipper` studio screens (planned). |
 | R1323 | Publish through the Create flow, performance feedback into Intelligence (planned). |
 

@@ -241,6 +241,21 @@ describe("R1321 candidates-core", () => {
   });
 });
 
+describe("R1321 rule detector", () => {
+  test("ruleWindows covers the whole video and samples down to the cap", () => {
+    const cues: Cue[] = Array.from({ length: 1800 }, (_, i) => ({ start: i * 4, end: i * 4 + 3.8, text: `line ${i} of a two hour talk about planning` }));
+    const settings = settingsOf({ minSec: 10, maxSec: 45 });
+    const w = jobs.ruleWindows(cues, settings);
+    expect(w.length).toBe(jobs.RULE_WINDOWS_MAX);
+    expect(w[0].start).toBe(0);
+    expect(w[w.length - 1].end).toBeGreaterThan(7000); // the last window sits near the end of the 2 h source
+    for (const h of w) expect(h.end - h.start).toBeLessThanOrEqual(45);
+    const few = jobs.ruleWindows(cues.slice(0, 30), settings);
+    expect(few.length).toBeGreaterThan(3);
+    expect(few.length).toBeLessThanOrEqual(jobs.RULE_WINDOWS_MAX);
+  });
+});
+
 describe("R1321 copy-core", () => {
   test("draftCopy rewords the clip's own sentences, never invents; #shorts only for YouTube", () => {
     const c = draftCopy("Why nobody tells you this is the biggest mistake I see. Everyone plans tasks but nobody plans energy. You have maybe four good hours a day.", null, ["youtube"]);
@@ -268,6 +283,8 @@ describe("R1321 clipper service", () => {
     const b = await jobs.createJob(user.id, { mediaId: media.id, clientKey: "k1" }, actor);
     expect(b.created).toBe(false);
     expect(b.job.id).toBe(a.job.id);
+    const another = await db.media.create({ data: { userId: user.id, originalFilename: "b.mp4", storageKey: `r1321/b-${a.job.id}.mp4`, mimeType: "video/mp4", size: 10, duration: 60, status: "ready" } });
+    await expect(jobs.createJob(user.id, { mediaId: another.id, clientKey: "k1" }, actor)).rejects.toMatchObject({ status: 409, code: "KEY_IN_USE" });
     const short = await db.media.create({ data: { userId: user.id, originalFilename: "s.mp4", storageKey: `r1321/short-${a.job.id}.mp4`, mimeType: "video/mp4", size: 10, duration: 10, status: "ready" } });
     await expect(jobs.createJob(user.id, { mediaId: short.id }, actor)).rejects.toMatchObject({ status: 400, code: "BAD_SOURCE" });
     const c = await jobs.createJob(user.id, { mediaId: media.id, clientKey: "k2" }, actor);
@@ -293,6 +310,8 @@ describe("R1321 clipper service", () => {
     expect(started.status).toBe("running");
     const hb = await jobs.heartbeat(user.id, job.id, 0.4);
     expect(hb.progress).toBe(0.4);
+    // A second "start" from another tab is a no-op that keeps the progress.
+    expect((await jobs.moveJob(user.id, job.id, "start", actor)).progress).toBe(0.4);
     await expect(jobs.saveTranscript(user.id, job.id, { words: [] }, actor)).rejects.toMatchObject({ status: 400, code: "EMPTY_TRANSCRIPT" });
     const t = await jobs.saveTranscript(user.id, job.id, { words, cues, language: "en", engine: "browser-whisper" }, actor);
     expect(t.wordCount).toBe(words.length);
@@ -301,7 +320,9 @@ describe("R1321 clipper service", () => {
     expect(t.job.language).toBe("en");
     // Detect with no model: the rule detector, said plainly.
     await expect(jobs.detect(user.id, job.id, { ask: null, actor })).resolves.toMatchObject({ detector: "rules" });
-    const detail = await jobs.jobDetail(user.id, job.id);
+    const detail = await jobs.jobDetail(user.id, job.id, { transcript: true });
+    expect(detail.transcript?.cues.length).toBeGreaterThan(0);
+    expect((await jobs.jobDetail(user.id, job.id)).transcript?.cues).toEqual([]); // polling view: no lines
     expect(detail.job.status).toBe("ready");
     expect(detail.job.stage).toBe("review");
     expect(detail.candidates.length).toBeGreaterThanOrEqual(3);
@@ -322,6 +343,7 @@ describe("R1321 clipper service", () => {
     expect(byText.added.length).toBe(1);
     expect(byText.added[0].source).toBe("text");
     expect(byText.added[0].kind).toBe("text");
+    expect((await jobs.addTextCandidates(user.id, job.id, "paper notebook", actor)).added).toEqual([]); // same place: not twice
     const none = await jobs.addTextCandidates(user.id, job.id, "quantum physics", actor);
     expect(none.added).toEqual([]);
     expect(none.missing).toEqual(["quantum physics"]);
@@ -358,9 +380,23 @@ describe("R1321 clipper service", () => {
     expect(moved.mediaId).toBeNull();
     expect(moved.reframe).toEqual({ mode: "crop", x: 0.2, y: 0.5 });
     await expect(jobs.clipDownload(user.id, ap.clip.id)).rejects.toMatchObject({ status: 409, code: "NOT_RENDERED" });
+    // A "rendered" report for a render that started before the edit is stale: refused, the clip stays pending.
+    await expect(jobs.reportRender(user.id, ap.clip.id, { status: "rendered", mediaId: rendered.id }, actor)).rejects.toMatchObject({ status: 409, code: "STALE_RENDER" });
+    expect((await jobs.ownedClip(user.id, ap.clip.id)).renderStatus).toBe("pending");
+    await jobs.reportRender(user.id, ap.clip.id, { status: "rendering" }, actor);
+    // The source video and a trashed file are not renders.
+    await expect(jobs.reportRender(user.id, ap.clip.id, { status: "rendered", mediaId: media.id }, actor)).rejects.toMatchObject({ status: 400, code: "BAD_RENDER" });
+    const binned = await db.media.create({ data: { userId: user.id, originalFilename: "t.webm", storageKey: `r1321/bin-${ap.clip.id}.webm`, mimeType: "video/webm", size: 10, status: "ready", deletedAt: new Date() } });
+    await expect(jobs.reportRender(user.id, ap.clip.id, { status: "rendered", mediaId: binned.id }, actor)).rejects.toMatchObject({ status: 400, code: "BAD_RENDER" });
     // A photo is not a render.
     const photo = await db.media.create({ data: { userId: user.id, originalFilename: "p.jpg", storageKey: `r1321/photo-${ap.clip.id}.jpg`, mimeType: "image/jpeg", size: 10, status: "ready" } });
     await expect(jobs.reportRender(user.id, ap.clip.id, { status: "rendered", mediaId: photo.id }, actor)).rejects.toMatchObject({ status: 400, code: "BAD_RENDER" });
+    // The same file cannot be two clips' render.
+    const fresh = await db.media.create({ data: { userId: user.id, originalFilename: "c2.webm", storageKey: `r1321/render2-${ap.clip.id}.webm`, mimeType: "video/webm", size: 10, status: "ready" } });
+    const second = await jobs.reportRender(user.id, ap.clip.id, { status: "rendered", mediaId: fresh.id }, actor);
+    expect(second.renderStatus).toBe("rendered");
+    await jobs.reportRender(user.id, manual.id, { status: "rendering" }, actor);
+    await expect(jobs.reportRender(user.id, manual.id, { status: "rendered", mediaId: fresh.id }, actor)).rejects.toMatchObject({ status: 409, code: "MEDIA_IN_USE" });
     // Regenerate copy after a hand edit, then discard; the review closes the job.
     const regen = await jobs.regenerateCopy(user.id, ap.clip.id, actor);
     expect(regen.title).not.toBe("A better title");
@@ -423,6 +459,7 @@ describe("R1321 wiring", () => {
     expect(schema).toContain("@@unique([ownerId, clientKey])");
     expect(schema).toMatch(/model ClipTranscript[\s\S]*?onDelete: Cascade/);
     expect(schema).toMatch(/model GeneratedClip[\s\S]*?postId\s+String\?\s+@unique/);
+    expect(schema).toMatch(/model ClipJob[\s\S]*?media\s+Media\?\s+@relation\(fields: \[mediaId\], references: \[id\], onDelete: SetNull\)/); // purging the source keeps the clips
     expect(read("prisma/schema.prisma")).toContain("model GeneratedClip {");
   });
   test("routes exist and go through route(); pure cores never touch the database", () => {
@@ -454,7 +491,11 @@ describe("R1321 wiring", () => {
       expect(src).not.toContain("prisma");
     }
     expect(read("lib/clipper/jobs.ts")).toContain('import "server-only"');
-    expect(read("app/api/clipper/jobs/[id]/detect/route.ts")).toContain("activeAiGrant");
+    const detectSrc = read("app/api/clipper/jobs/[id]/detect/route.ts");
+    expect(detectSrc).toContain("activeAiGrant");
+    expect(detectSrc.indexOf("ownedJob(")).toBeLessThan(detectSrc.indexOf("chargeAi(")); // the stage check comes before any charge
+    expect(read("app/api/clipper/jobs/[id]/stage/route.ts")).toContain("max(1)"); // heartbeat progress is a fraction
+    expect(read("app/api/clipper/jobs/[id]/clips/route.ts")).toContain("ownerId: user.id");
   });
   test("account deletion clears clipper rows; docs name the round", () => {
     const acc = read("lib/account.ts");

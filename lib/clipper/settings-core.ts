@@ -73,7 +73,7 @@ const POSITIONS: readonly CaptionPos[] = ["bottom", "middle", "top"];
 export function settingsOf(input: unknown): ClipSettings {
   const o = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const sub = (o.subtitle && typeof o.subtitle === "object" ? o.subtitle : {}) as Record<string, unknown>;
-  const minSec = num(o.minSec, CLIP_MIN_SEC, CLIP_MAX_SEC, DEFAULT_SETTINGS.minSec);
+  const minSec = num(o.minSec, CLIP_MIN_SEC, CLIP_MAX_SEC - 2, DEFAULT_SETTINGS.minSec);
   const maxSec = Math.max(minSec + 2, num(o.maxSec, CLIP_MIN_SEC, CLIP_MAX_SEC, DEFAULT_SETTINGS.maxSec));
   const platforms = Array.isArray(o.platforms) ? (o.platforms.filter((p): p is Platform => typeof p === "string" && (PLATFORMS as readonly string[]).includes(p)) as Platform[]) : [];
   return {
@@ -123,6 +123,7 @@ export function nextState(cur: { status: string; stage: string }, event: JobEven
   if (status === "cancelled") return null;
   switch (event) {
     case "start":
+      // A second "start" on a running job is a no-op (same state); moveJob leaves progress and error alone for it.
       return status === "queued" || (status === "failed" && stage !== "done") ? { status: "running", stage: stage === "done" ? "review" : stage } : status === "running" ? { status, stage } : null;
     case "transcribed":
       return status === "running" && stage === "transcribe" ? { status: "running", stage: "detect" } : null;

@@ -80,5 +80,5 @@ export function drawFor(w: number, h: number, plan: ReframePlan): Draw {
 /** How much of the source width the crop keeps (1 = all), for the editor's note. */
 export const keptShare = (w: number, h: number, plan: ReframePlan): number => {
   const d = drawFor(w, h, plan);
-  return Math.round(((d.sw * d.sh) / (Math.max(1, w) * Math.max(1, h))) * 100) / 100;
+  return Math.round(((d.sw * d.sh) / (Math.max(1, Math.floor(w)) * Math.max(1, Math.floor(h)))) * 100) / 100;
 };

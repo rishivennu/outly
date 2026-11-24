@@ -1,11 +1,11 @@
 import { realUserId } from "@/lib/auth";
-import { json, route } from "@/lib/http";
+import { HttpError, json, route } from "@/lib/http";
 import { assertAiCaptions } from "@/lib/billing/entitlements";
 import { chargeAi } from "@/lib/ai-quota";
 import { activeAiGrant } from "@/lib/ai/entitlements";
 import { gemini } from "@/lib/ai/creative";
 import { env } from "@/lib/env";
-import { detect, type AskJson } from "@/lib/clipper/jobs";
+import { detect, ownedJob, type AskJson } from "@/lib/clipper/jobs";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,6 +18,9 @@ export const maxDuration = 60;
 export const POST = route(
   async (_req, { user, params }) => {
     const uid = realUserId(user);
+    // Check the stage before any charge: a double click, a cancelled job or a repeat costs nothing.
+    const j = await ownedJob(user.id, params.id);
+    if (j.status !== "running" || j.stage !== "detect") throw new HttpError(409, `This job is ${j.status} at the ${j.stage} stage; it is not waiting for detection.`, "BAD_TRANSITION");
     let ask: AskJson | null = null;
     if (env.GEMINI_API_KEY) {
       const allowed = (await activeAiGrant(user.id, "other")) || (await assertAiCaptions(user.id).then(() => true, () => false));

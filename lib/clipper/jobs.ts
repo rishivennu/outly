@@ -9,7 +9,7 @@ import { modelStates } from "../intelligence/model/predict";
 import { fromHighlights, rankCandidates, textOf, widen, type PersonalHints, type ScoredCandidate } from "./candidates-core";
 import { draftCopy } from "./copy-core";
 import { DEFAULT_REFRAME, parseReframe, reframeOf, type ReframePlan } from "./reframe-core";
-import { ACTIVE_JOBS_MAX, CLIP_MAX_SEC, CLIP_MIN_SEC, isActive, nextState, parseSettings, settingsOf, sourceProblem, type ClipSettings, type Executor, type JobEvent } from "./settings-core";
+import { ACTIVE_JOBS_MAX, CANDIDATES_MAX, CLIP_MAX_SEC, CLIP_MIN_SEC, MAX_SOURCE_SEC, isActive, nextState, parseSettings, settingsOf, sourceProblem, type ClipSettings, type Executor, type JobEvent } from "./settings-core";
 
 /**
  * R1321: the Shorts Clipper's stored side. A job is created from an owned Media, moves through the state machine in
@@ -38,7 +38,7 @@ async function event(jobId: string, ownerId: string, type: string, data?: unknow
 
 export interface JobView {
   id: string;
-  mediaId: string;
+  mediaId: string | null;
   status: string;
   stage: string;
   progress: number;
@@ -153,6 +153,7 @@ export async function createJob(ownerId: string, input: { mediaId: string; clien
   const clientKey = input.clientKey?.trim() || null;
   if (clientKey) {
     const same = await db.clipJob.findUnique({ where: { ownerId_clientKey: { ownerId, clientKey } }, include: COUNT });
+    if (same && same.mediaId !== input.mediaId) throw new HttpError(409, "That client key already names a job for another video.", "KEY_IN_USE");
     if (same) return { job: jobView(same), created: false };
   }
   const media = await ownedMedia(ownerId, input.mediaId);
@@ -188,10 +189,11 @@ export interface JobDetail {
   clips: ClipView[];
 }
 
-export async function jobDetail(ownerId: string, id: string): Promise<JobDetail> {
+/** One job with everything the screen needs. Cues (up to 6000 lines) come only with `transcript: true`; polling goes without. */
+export async function jobDetail(ownerId: string, id: string, opts: { transcript?: boolean } = {}): Promise<JobDetail> {
   const j = await ownedJob(ownerId, id);
   const [media, transcript, candidates, clips] = await Promise.all([
-    db.media.findFirst({ where: { id: j.mediaId, userId: ownerId } }).then((m) => (m ? mediaView(m) : null)),
+    j.mediaId ? db.media.findFirst({ where: { id: j.mediaId, userId: ownerId } }).then((m) => (m ? mediaView(m) : null)) : null,
     db.clipTranscript.findUnique({ where: { jobId: j.id } }),
     db.clipCandidate.findMany({ where: { jobId: j.id, ownerId }, orderBy: [{ rank: "asc" }, { start: "asc" }], take: 50, include: { clip: { select: { id: true } } } }),
     db.generatedClip.findMany({ where: { jobId: j.id, ownerId, status: { not: "discarded" } }, orderBy: [{ start: "asc" }, { id: "asc" }], take: 50 }),
@@ -199,7 +201,7 @@ export async function jobDetail(ownerId: string, id: string): Promise<JobDetail>
   return {
     job: jobView(j),
     media,
-    transcript: transcript ? { engine: transcript.engine, language: transcript.language, wordCount: transcript.wordCount, cues: parse<Cue[]>(transcript.cues, []) } : null,
+    transcript: transcript ? { engine: transcript.engine, language: transcript.language, wordCount: transcript.wordCount, cues: opts.transcript ? parse<Cue[]>(transcript.cues, []) : [] } : null,
     candidates: candidates.map(candidateView),
     clips: clips.map(clipView),
   };
@@ -211,6 +213,11 @@ export async function moveJob(ownerId: string, id: string, ev: JobEvent, actor: 
   const next = nextState(j, ev);
   if (!next) throw new HttpError(409, `This job is ${j.status} at the ${j.stage} stage; "${ev}" does not apply here.`, "BAD_TRANSITION");
   const now = new Date();
+  if (ev === "start" && j.status === "running") {
+    // Already running (a second tab, a retry of the same call): only the heartbeat and the executor move.
+    await db.clipJob.updateMany({ where: { id: j.id, ownerId, status: "running" }, data: { heartbeatAt: now, ...extra } });
+    return jobView(await ownedJob(ownerId, id));
+  }
   const n = await db.clipJob.updateMany({
     where: { id: j.id, ownerId, status: j.status, stage: j.stage },
     data: { status: next.status, stage: next.stage, heartbeatAt: now, ...(ev === "start" || ev === "retry" ? { error: null, progress: 0 } : {}), ...(next.stage === "done" || next.status === "cancelled" ? { completedAt: now } : {}), ...extra },
@@ -240,19 +247,30 @@ export const TRANSCRIPT_MAX = { words: 40_000, cues: 6_000 } as const;
 export async function saveTranscript(ownerId: string, id: string, input: { words: unknown; cues?: unknown; language?: string; engine?: string; durationSec?: number | null }, actor: Actor | null): Promise<{ job: JobView; wordCount: number; cues: number }> {
   const j = await ownedJob(ownerId, id);
   if (j.status !== "running" || j.stage !== "transcribe") throw new HttpError(409, `This job is ${j.status} at the ${j.stage} stage; it is not waiting for a transcript.`, "BAD_TRANSITION");
-  const duration = input.durationSec && input.durationSec > 0 ? input.durationSec : (j.durationSec ?? Infinity);
+  const reported = input.durationSec && input.durationSec > 0 ? Math.min(input.durationSec, MAX_SOURCE_SEC) : null;
+  const duration = reported ?? j.durationSec ?? MAX_SOURCE_SEC;
   const words = cleanWords(input.words, 0, duration).slice(0, TRANSCRIPT_MAX.words);
   if (words.length < 3) throw new HttpError(400, "The transcript is empty. The video may have no speech, or the audio did not come through.", "EMPTY_TRANSCRIPT");
   const cues = (Array.isArray(input.cues) && input.cues.length ? normalizeCues(input.cues as { start: unknown; end: unknown; text: unknown }[], duration) : cuesFromWords(words, DEFAULT_SUBTITLE_RULES)).slice(0, TRANSCRIPT_MAX.cues);
   const language = (input.language ?? "").trim().slice(0, 12);
   const engine = (input.engine ?? "unknown").trim().slice(0, 24) || "unknown";
-  await db.clipTranscript.upsert({
-    where: { jobId: j.id },
-    create: { jobId: j.id, ownerId, engine, language, words: json(words), cues: json(cues), wordCount: words.length },
-    update: { engine, language, words: json(words), cues: json(cues), wordCount: words.length },
+  // The transcript and the stage move land together, guarded by the stage: a second "transcribed" racing the first
+  // cannot overwrite a transcript detection is already reading.
+  const next = nextState(j, "transcribed")!;
+  await db.$transaction(async (tx) => {
+    const n = await tx.clipJob.updateMany({
+      where: { id: j.id, ownerId, status: "running", stage: "transcribe" },
+      data: { status: next.status, stage: next.stage, heartbeatAt: new Date(), progress: 0, language: language || j.language, ...(reported ? { durationSec: reported } : {}) },
+    });
+    if (!n.count) throw new HttpError(409, "The job just changed under you. Refresh to see where it is.", "CONFLICT");
+    await tx.clipTranscript.upsert({
+      where: { jobId: j.id },
+      create: { jobId: j.id, ownerId, engine, language, words: json(words), cues: json(cues), wordCount: words.length },
+      update: { engine, language, words: json(words), cues: json(cues), wordCount: words.length },
+    });
   });
-  const job = await moveJob(ownerId, id, "transcribed", actor, { progress: 0, language: language || j.language, ...(input.durationSec && input.durationSec > 0 ? { durationSec: input.durationSec } : {}) });
-  return { job, wordCount: words.length, cues: cues.length };
+  await event(j.id, ownerId, "transcribed", { from: { status: j.status, stage: j.stage }, to: next, words: words.length, cues: cues.length, engine }, null, actor?.id ?? null);
+  return { job: jobView(await ownedJob(ownerId, id)), wordCount: words.length, cues: cues.length };
 }
 
 async function transcriptOf(ownerId: string, jobId: string): Promise<{ words: Word[]; cues: Cue[] }> {
@@ -281,8 +299,14 @@ export type AskJson = (system: string, prompt: string) => Promise<unknown>;
  * Without a model: windows that start at a line start and run to the last line end inside the sweet spot, every
  * few lines, so the creator always gets ranked moments to pick from. Scored exactly like the model's picks.
  */
+export const RULE_WINDOWS_MAX = 60;
+/**
+ * The fallback detector: sweet-spot windows over the whole transcript, each starting at a line, neighbours
+ * half-overlapping so the overlap rule in rankCandidates keeps the better one. A long source gives many windows;
+ * they are sampled evenly down to RULE_WINDOWS_MAX so every part of the video stays in the running.
+ */
 export function ruleWindows(cues: Cue[], settings: ClipSettings): Highlight[] {
-  const out: Highlight[] = [];
+  const all: Highlight[] = [];
   const sweet = Math.min(settings.maxSec, Math.max(settings.minSec, Math.round((settings.minSec + settings.maxSec) / 2)));
   let i = 0;
   while (i < cues.length) {
@@ -290,12 +314,12 @@ export function ruleWindows(cues: Cue[], settings: ClipSettings): Highlight[] {
     let j = i;
     while (j + 1 < cues.length && cues[j + 1].end - start <= sweet) j++;
     const end = cues[j].end;
-    if (end - start >= settings.minSec) out.push({ start, end, title: cues[i].text.split(/\s+/).slice(0, 8).join(" "), why: "" });
-    // Step a few lines forward so neighbours overlap and the overlap rule keeps the better one.
+    if (end - start >= settings.minSec) all.push({ start, end, title: cues[i].text.split(/\s+/).slice(0, 8).join(" "), why: "" });
     i = Math.max(i + 1, Math.floor((i + j) / 2) + 1);
-    if (out.length >= 40) break;
   }
-  return out;
+  if (all.length <= RULE_WINDOWS_MAX) return all;
+  const step = all.length / RULE_WINDOWS_MAX;
+  return Array.from({ length: RULE_WINDOWS_MAX }, (_, k) => all[Math.min(all.length - 1, Math.floor(k * step))]);
 }
 
 export interface DetectResult {
@@ -328,27 +352,42 @@ export async function detect(ownerId: string, id: string, opts: { ask: AskJson |
   }
   const hints = await hintsFor(ownerId, settings.platforms);
   const ranked = rankCandidates(fromHighlights(highlights), { cues, words, settings, hints });
+  // The stage flips inside the same transaction as the candidate writes: a cancel or a second detect that landed
+  // while the model was thinking makes the whole write roll back (409), never half a candidate set.
+  const next = nextState(j, "detected")!;
   await db.$transaction(async (tx) => {
+    const n = await tx.clipJob.updateMany({ where: { id: j.id, ownerId, status: "running", stage: "detect" }, data: { status: next.status, stage: next.stage, progress: 1, heartbeatAt: new Date() } });
+    if (!n.count) throw new HttpError(409, "The job just changed under you. Refresh to see where it is.", "CONFLICT");
     await tx.clipCandidate.deleteMany({ where: { jobId: j.id, ownerId, source: "ai", status: "suggested" } });
     for (const c of ranked) await tx.clipCandidate.create({ data: { jobId: j.id, ownerId, start: c.start, end: c.end, kind: c.kind, title: c.title, reason: c.reason, scores: json(c.scores), score: c.score, rank: c.rank, source: "ai" } });
   });
-  await event(j.id, ownerId, "detected", { detector, candidates: ranked.length, hints }, null, opts.actor?.id ?? null);
-  const job = await moveJob(ownerId, id, "detected", opts.actor, { progress: 1 });
+  await event(j.id, ownerId, "detected", { detector, candidates: ranked.length, hints, from: { status: j.status, stage: j.stage }, to: next }, null, opts.actor?.id ?? null);
+  const job = jobView(await ownedJob(ownerId, id));
   const rows = await db.clipCandidate.findMany({ where: { jobId: j.id, ownerId }, orderBy: [{ rank: "asc" }, { start: "asc" }], take: 50, include: { clip: { select: { id: true } } } });
   return { job, candidates: rows.map(candidateView), detector };
 }
 
 /** The creator's own words -> ranges from the transcript, scored and added as "text" candidates. */
+/** Candidates a job may hold in all (AI, text and manual together). */
+export const CANDIDATES_PER_JOB_MAX = CANDIDATES_MAX * 5;
+
 export async function addTextCandidates(ownerId: string, id: string, query: string, actor: Actor): Promise<{ added: CandidateView[]; missing: string[] }> {
   const j = await ownedJob(ownerId, id);
   if (j.status !== "ready") throw new HttpError(409, "Finish detection first, then cut by text.", "BAD_TRANSITION");
   const settings = parseSettings(j.settings);
   const { words, cues } = await transcriptOf(ownerId, j.id);
   const { ranges, missing } = findText(words, query.slice(0, 500), DEFAULT_SUBTITLE_RULES, j.durationSec ?? Infinity);
-  const existing = await db.clipCandidate.count({ where: { jobId: j.id, ownerId } });
+  const have = await db.clipCandidate.findMany({ where: { jobId: j.id, ownerId }, select: { start: true, end: true, source: true }, take: CANDIDATES_PER_JOB_MAX });
+  const existing = have.length;
+  if (existing >= CANDIDATES_PER_JOB_MAX) throw new HttpError(409, `This job already has ${existing} moments. Reject some before adding more.`, "TOO_MANY_CANDIDATES");
   // A phrase is a second or two wide; grow each hit to whole lines and at least the shortest clip, phrase first.
   const widened = ranges.map((r) => ({ ...widen(r, cues, Math.min(settings.minSec, CLIP_MIN_SEC), settings.maxSec, j.durationSec ?? Infinity), source: "text" as const }));
-  const ranked = rankCandidates(widened, { cues, words, settings: { ...settings, minSec: Math.min(settings.minSec, CLIP_MIN_SEC) }, hints: await hintsFor(ownerId, settings.platforms) });
+  // The same phrase searched twice adds nothing; a moment the AI also picked is still added (the creator asked for
+  // it by name), unless the ranges are all but identical.
+  const share = (a: { start: number; end: number }, b: { start: number; end: number }) => (Math.min(a.end, b.end) - Math.max(a.start, b.start)) / Math.max(0.01, Math.min(a.end - a.start, b.end - b.start));
+  const same = (a: { start: number; end: number }, b: { start: number; end: number }) => (Math.min(a.end, b.end) - Math.max(a.start, b.start)) / Math.max(0.01, Math.max(a.end, b.end) - Math.min(a.start, b.start));
+  const fresh = widened.filter((r) => !have.some((h) => (h.source === "text" ? share(h, r) > 0.5 : same(h, r) > 0.9)));
+  const ranked = rankCandidates(fresh, { cues, words, settings: { ...settings, minSec: Math.min(settings.minSec, CLIP_MIN_SEC) }, hints: await hintsFor(ownerId, settings.platforms) }).slice(0, CANDIDATES_PER_JOB_MAX - existing);
   const added: CandidateView[] = [];
   for (const [i, c] of ranked.entries()) {
     const row = await db.clipCandidate.create({ data: { jobId: j.id, ownerId, start: c.start, end: c.end, kind: "text", title: c.title, reason: c.reason, scores: json(c.scores), score: c.score, rank: existing + i + 1, source: "text" } });
@@ -485,7 +524,8 @@ export async function regenerateCopy(ownerId: string, clipId: string, actor: Act
   const j = await ownedJob(ownerId, c.jobId);
   const { words } = await transcriptOf(ownerId, c.jobId);
   const copy = draftCopy(textOf(words, c), null, parseSettings(j.settings).platforms);
-  await db.generatedClip.updateMany({ where: { id: c.id, ownerId }, data: { title: copy.title, hook: copy.hook, caption: copy.caption, hashtags: copy.hashtags } });
+  const n = await db.generatedClip.updateMany({ where: { id: c.id, ownerId, updatedAt: c.updatedAt }, data: { title: copy.title, hook: copy.hook, caption: copy.caption, hashtags: copy.hashtags } });
+  if (!n.count) throw new HttpError(409, "The clip just changed under you. Refresh and try again.", "CONFLICT");
   await event(c.jobId, ownerId, "copy_regenerated", null, c.id, actor.id);
   return clipView(await ownedClip(ownerId, clipId));
 }
@@ -494,7 +534,8 @@ export async function discardClip(ownerId: string, clipId: string, actor: Actor)
   const c = await ownedClip(ownerId, clipId);
   if (c.status === "published") throw new HttpError(409, "This clip is published; archive the post instead.", "PUBLISHED");
   if (c.status !== "discarded") {
-    await db.generatedClip.updateMany({ where: { id: c.id, ownerId }, data: { status: "discarded" } });
+    const n = await db.generatedClip.updateMany({ where: { id: c.id, ownerId, status: { notIn: ["published", "discarded"] } }, data: { status: "discarded" } });
+    if (!n.count) throw new HttpError(409, "The clip just changed under you. Refresh and try again.", "CONFLICT");
     if (c.candidateId) await db.clipCandidate.updateMany({ where: { id: c.candidateId, ownerId }, data: { status: "rejected" } });
     await event(c.jobId, ownerId, "discarded", null, c.id, actor.id);
   }
@@ -514,8 +555,17 @@ export async function reportRender(ownerId: string, clipId: string, r: RenderRep
   } else if (r.status === "rendered") {
     const m = await ownedMedia(ownerId, r.mediaId);
     if (!m.mimeType.startsWith("video/")) throw new HttpError(400, "The rendered clip must be a video.", "BAD_RENDER");
+    if (m.deletedAt) throw new HttpError(400, "That rendered file is in the Trash.", "BAD_RENDER");
     if (m.id === c.mediaId && c.renderStatus === "rendered") return clipView(c);
-    await db.generatedClip.updateMany({ where: { id: c.id, ownerId }, data: { renderStatus: "rendered", renderError: null, renderedAt: new Date(), mediaId: m.id } });
+    const j = await ownedJob(ownerId, c.jobId);
+    if (m.id === j.mediaId) throw new HttpError(400, "That is the source video, not a rendered clip.", "BAD_RENDER");
+    // Only a render this clip is waiting on counts: after an edit the status is "pending" again, so a report from
+    // the render that started before the edit is stale and refused rather than marking old content as current.
+    if (c.renderStatus !== "rendering") throw new HttpError(409, "This clip changed since that render started. Render it again.", "STALE_RENDER");
+    const other = await db.generatedClip.findFirst({ where: { mediaId: m.id, ownerId, NOT: { id: c.id } }, select: { id: true } });
+    if (other) throw new HttpError(409, "That file already belongs to another clip.", "MEDIA_IN_USE");
+    const n = await db.generatedClip.updateMany({ where: { id: c.id, ownerId, renderStatus: "rendering", updatedAt: c.updatedAt }, data: { renderStatus: "rendered", renderError: null, renderedAt: new Date(), mediaId: m.id } });
+    if (!n.count) throw new HttpError(409, "This clip changed since that render started. Render it again.", "STALE_RENDER");
   } else {
     await db.generatedClip.updateMany({ where: { id: c.id, ownerId }, data: { renderStatus: "failed", renderError: r.error.slice(0, 300) } });
   }

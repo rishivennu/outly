@@ -12,7 +12,7 @@ const body = z.object({ start: z.number().min(0), end: z.number().min(0), title:
 export const GET = route(
   async (_req, { user, params }) => {
     const job = await ownedJob(user.id, params.id);
-    const rows = await db.generatedClip.findMany({ where: { jobId: job.id, status: { not: "discarded" } }, orderBy: [{ start: "asc" }, { id: "asc" }] });
+    const rows = await db.generatedClip.findMany({ where: { jobId: job.id, ownerId: user.id, status: { not: "discarded" } }, orderBy: [{ start: "asc" }, { id: "asc" }], take: 100 });
     return json({ clips: rows.map(clipView) });
   },
   { limit: [120, 60_000] },

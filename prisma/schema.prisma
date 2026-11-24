@@ -2750,7 +2750,7 @@ model IntelligenceEvaluation {
 model ClipJob {
   id          String    @id @default(cuid())
   ownerId     String
-  mediaId     String
+  mediaId     String?
   /// Idempotent create: the same (ownerId, clientKey) returns the same job.
   clientKey   String?
   status      String    @default("queued") // queued | running | ready | failed | cancelled
@@ -2766,7 +2766,7 @@ model ClipJob {
   updatedAt   DateTime  @updatedAt
   completedAt DateTime?
 
-  media      Media           @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  media      Media?          @relation(fields: [mediaId], references: [id], onDelete: SetNull)
   transcript ClipTranscript?
   candidates ClipCandidate[]
   clips      GeneratedClip[]

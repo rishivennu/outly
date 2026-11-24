@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 const body = z.discriminatedUnion("status", [
   z.object({ status: z.literal("rendering"), executor: z.enum(EXECUTORS).optional() }),
-  z.object({ status: z.literal("rendered"), mediaId: z.string().min(1), executor: z.enum(EXECUTORS).optional() }),
+  z.object({ status: z.literal("rendered"), mediaId: z.string().min(1).max(64), executor: z.enum(EXECUTORS).optional() }),
   z.object({ status: z.literal("failed"), error: z.string().max(500), executor: z.enum(EXECUTORS).optional() }),
 ]);
 
