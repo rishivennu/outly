@@ -98,7 +98,7 @@ async function rowFor(payerId: string, now: Date, known: { sub: PaidSub | null; 
 export async function recordCost(o: { userId: string; category: CostCategory; units: number; now?: Date }): Promise<{ costMinor: number; payerId: string } | null> {
   try {
     // R1314: the cost ledger (Admin > Infrastructure & Costs) sees every metered use, whether or not the 1147 budget policy is on.
-    void recordEconomicsUse(o);
+    await recordEconomicsUse(o); // awaited: a serverless function may freeze before a dangling write lands
     if (!(await getPolicy()).enabled) return null; // policy off: nothing is metered, exactly as before 1147
     const now = o.now ?? new Date();
     const c = costMinor(o.category, o.units, await getEconomics());

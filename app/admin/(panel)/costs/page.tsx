@@ -67,6 +67,7 @@ export default async function Costs(props: { searchParams: Promise<Params> }) {
             ))}
           </ul>
         )}
+        {o.supersededMinor > 0 && <p className="mt-3 text-[12.5px] text-muted-foreground">{fmtInr(o.supersededMinor)} of estimates in this range is set aside from the totals because the provider's invoice for that month is on file. The invoice counts; the estimates stay in the ledger for comparison.</p>}
       </Card>
 
       <div className="mb-4 grid gap-4 lg:grid-cols-2">

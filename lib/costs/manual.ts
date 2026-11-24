@@ -52,11 +52,8 @@ export async function updateBill(id: string, input: unknown, by: Actor) {
   const b = BillBody.partial().parse(input);
   const cur = await db.billingRecord.findUnique({ where: { id } });
   if (!cur) throw new HttpError(404, "That bill is gone.", "NOT_FOUND");
-  if (b.periodStart || b.periodEnd) periodOk(b.periodStart ?? cur.periodStart, b.periodEnd ?? cur.periodEnd);
-  // Money fields are fixed once booked: delete and re-enter instead, so the ledger never drifts from the bill.
-  const { amountMinor: _a, currency: _c, provider: _p, invoiceId: _i, ...rest } = b;
-  void _a; void _c; void _p; void _i;
-  const row = await db.billingRecord.update({ where: { id }, data: rest });
+  // Only status and note can change: money, provider, period and category are what the ledger row was booked with. Delete and re-enter to correct those.
+  const row = await db.billingRecord.update({ where: { id }, data: { ...(b.status ? { status: b.status } : {}), ...(b.note !== undefined ? { note: b.note } : {}) } });
   await adminEvent("costs", `Bill updated: ${cur.provider} ${cur.invoiceId}`, by.login, "/admin/costs");
   return row;
 }

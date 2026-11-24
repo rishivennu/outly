@@ -73,6 +73,8 @@ export async function sendEmail(m: Mail, cfgOverride?: EmailConfig): Promise<{ o
           status = "sent";
           // Resend's id for this email: delivery webhooks (bounced, delivered) refer to it.
           providerId = ((await r.json().catch(() => ({}))) as { id?: string }).id || undefined;
+          // R1314: one sent email into the cost ledger at the Resend unit price on file (estimate; never blocks the send).
+          await import("../costs/ledger").then((l) => l.recordUsage({ provider: "resend", sku: "resend:email", units: 1, category: "email", feature: "email", ref: providerId ? `resend:${providerId}` : undefined, meta: { kind: m.kind } })).catch(() => {});
         } else {
           status = "failed";
           const j = await r.json().catch(() => ({}));

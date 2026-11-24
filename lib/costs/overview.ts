@@ -12,6 +12,8 @@ export interface Overview {
   totalMinor: number;
   previousMinor: number | null;
   bySource: Record<CostSource, number>;
+  /** Estimate/reported INR in the range set aside because the provider's invoice for that month is on file. */
+  supersededMinor: number;
   byProvider: Slice[];
   byCategory: Slice[];
   byFeature: Slice[];
@@ -44,10 +46,30 @@ function slices(rows: { key: string; inrMinor: number; units: number; count: num
   return [...m.values()].map((s) => ({ ...s, pct: pctOf(s.inrMinor, total) })).sort((a, b) => b.inrMinor - a.inrMinor);
 }
 
+type DailyRow = { day: string; provider: string; category: string; feature: string; source: string; units: number; inrMinor: number; count: number };
+
+/**
+ * A provider's invoice for a month supersedes Outlly's own estimates (and provider-reported usage) for that provider
+ * in that month: the invoice is the truth, the estimates were the forecast of it. Both stay in the ledger; the totals
+ * count the billed row only. Returns the rows that count and how much estimate was set aside.
+ */
+export function supersedeEstimates<T extends Pick<DailyRow, "day" | "provider" | "source" | "inrMinor">>(rows: T[]) {
+  const billed = new Set(rows.filter((r) => r.source === "billed").map((r) => `${r.provider}/${r.day.slice(0, 7)}`));
+  let supersededMinor = 0;
+  const kept = rows.filter((r) => {
+    const drop = (r.source === "estimate" || r.source === "reported") && billed.has(`${r.provider}/${r.day.slice(0, 7)}`);
+    if (drop) supersededMinor += r.inrMinor;
+    return !drop;
+  });
+  return { kept, supersededMinor };
+}
+
 export async function spentInScope(scope: string, key: string, from: string, to: string) {
-  const where = { day: { gte: from, lte: to }, ...(scope === "provider" ? { provider: key } : scope === "category" ? { category: key } : scope === "feature" ? { feature: key } : {}) };
-  const agg = await db.costDaily.aggregate({ where, _sum: { inrMinor: true } });
-  return agg._sum.inrMinor ?? 0;
+  // Month-wide rows for the providers involved, so an invoice booked on the last day still supersedes the whole month's estimates.
+  const monthFrom = `${from.slice(0, 7)}-01`;
+  const where = { day: { gte: monthFrom, lte: to }, ...(scope === "provider" ? { provider: key } : scope === "category" ? { category: key } : scope === "feature" ? { feature: key } : {}) };
+  const { kept } = supersedeEstimates(await db.costDaily.findMany({ where, select: { day: true, provider: true, source: true, inrMinor: true } }));
+  return kept.filter((r) => r.day >= from).reduce((s, r) => s + r.inrMinor, 0);
 }
 
 export async function budgetViews(now = new Date()): Promise<BudgetView[]> {
@@ -68,10 +90,10 @@ export async function overview(o: { from?: string; to?: string; now?: Date } = {
   const prevFrom = addDays(from, -span), prevTo = addDays(from, -1);
   const mFrom = dayKey(monthStartUtc(now)), mTo = dayKey(now);
 
-  const [rows, prev, monthRows, since, recurringRows, billRows, budgets, alertRows, priceRows] = await Promise.all([
+  const [allRows, prevRows, monthRowsAll, since, recurringRows, billRows, budgets, alertRows, priceRows] = await Promise.all([
     db.costDaily.findMany({ where: { day: { gte: from, lte: to } } }),
-    db.costDaily.aggregate({ where: { day: { gte: prevFrom, lte: prevTo } }, _sum: { inrMinor: true }, _count: true }),
-    db.costDaily.findMany({ where: { day: { gte: mFrom, lte: mTo } }, select: { inrMinor: true, source: true, category: true } }),
+    db.costDaily.findMany({ where: { day: { gte: prevFrom, lte: prevTo } }, select: { day: true, provider: true, source: true, inrMinor: true } }),
+    db.costDaily.findMany({ where: { day: { gte: mFrom, lte: mTo } }, select: { day: true, provider: true, inrMinor: true, source: true, category: true } }),
     trackingSince(),
     db.recurringExpense.findMany({ orderBy: [{ active: "desc" }, { nextRenewal: "asc" }] }),
     db.billingRecord.findMany({ orderBy: { periodStart: "desc" }, take: 100 }),
@@ -80,9 +102,13 @@ export async function overview(o: { from?: string; to?: string; now?: Date } = {
     import("./prices").then((m) => m.listPrices()),
   ]);
 
-  const total = rows.reduce((s, r) => s + r.inrMinor, 0);
+  // Estimates are shown by source in full; the headline, breakdowns and series count a month's invoice instead of its estimates.
   const bySource = Object.fromEntries(COST_SOURCES.map((s) => [s, 0])) as Record<CostSource, number>;
-  for (const r of rows) bySource[(r.source as CostSource) in bySource ? (r.source as CostSource) : "estimate"] += r.inrMinor;
+  for (const r of allRows) bySource[(r.source as CostSource) in bySource ? (r.source as CostSource) : "estimate"] += r.inrMinor;
+  const { kept: rows, supersededMinor } = supersedeEstimates(allRows);
+  const total = rows.reduce((s, r) => s + r.inrMinor, 0);
+  const prev = supersedeEstimates(prevRows).kept.reduce((s, r) => s + r.inrMinor, 0);
+  const monthRows = supersedeEstimates(monthRowsAll).kept;
   const seriesMap = new Map<string, number>();
   for (let d = from; d <= to; d = addDays(d, 1)) seriesMap.set(d, 0);
   for (const r of rows) seriesMap.set(r.day, (seriesMap.get(r.day) ?? 0) + r.inrMinor);
@@ -109,8 +135,9 @@ export async function overview(o: { from?: string; to?: string; now?: Date } = {
     range: { from, to },
     trackingSince: since,
     totalMinor: total,
-    previousMinor: since && prevTo >= since ? prev._sum.inrMinor ?? 0 : null,
+    previousMinor: since && prevTo >= since ? prev : null,
     bySource,
+    supersededMinor,
     byProvider: slices(rows.map((r) => ({ key: r.provider, inrMinor: r.inrMinor, units: r.units, count: r.count })), providerLabel, total),
     byCategory: slices(rows.map((r) => ({ key: r.category, inrMinor: r.inrMinor, units: r.units, count: r.count })), (k) => CATEGORY_LABEL[k as CostCategoryId] ?? k, total),
     byFeature: slices(rows.map((r) => ({ key: r.feature, inrMinor: r.inrMinor, units: r.units, count: r.count })), featureLabel, total),

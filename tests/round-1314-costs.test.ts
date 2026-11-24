@@ -176,6 +176,24 @@ describe("1314 manual entries", () => {
 });
 
 describe("1314 overview and export", () => {
+  test("an invoice for a provider-month supersedes that month's estimates in the totals, both stay in the ledger", async () => {
+    const rows = [
+      { day: "2026-08-02", provider: "vercel", source: "estimate", inrMinor: 100 },
+      { day: "2026-08-20", provider: "vercel", source: "reported", inrMinor: 50 },
+      { day: "2026-08-31", provider: "vercel", source: "billed", inrMinor: 900 },
+      { day: "2026-09-02", provider: "vercel", source: "estimate", inrMinor: 70 },
+      { day: "2026-08-10", provider: "gemini", source: "estimate", inrMinor: 40 },
+    ];
+    const r = ov.supersedeEstimates(rows);
+    expect(r.supersededMinor).toBe(150);
+    expect(r.kept.reduce((s, x) => s + x.inrMinor, 0)).toBe(900 + 70 + 40);
+    await manual.createBill({ provider: "x", invoiceId: "X-AUG", category: "x", periodStart: "2026-08-01", periodEnd: "2026-08-31", amountMinor: 10000, currency: "USD" }, by);
+    await ledger.recordCostEvent({ provider: "x", category: "x", feature: "x-post", amountMinor: 500, currency: "INR", source: "estimate", at: new Date("2026-08-05T00:00:00Z") });
+    expect(await ov.spentInScope("provider", "x", "2026-08-01", "2026-08-31")).toBe((await db.billingRecord.findFirstOrThrow({ where: { invoiceId: "X-AUG" } })).inrMinor);
+    const o = await ov.overview({ from: "2026-08-01", to: "2026-08-31", now: new Date("2026-09-01T00:00:00Z") });
+    expect(o.supersededMinor).toBeGreaterThanOrEqual(500);
+    expect(o.bySource.estimate).toBeGreaterThanOrEqual(500); // still shown by source
+  });
   test("the overview sums the range, splits by provider/category/feature/source and knows when tracking started", async () => {
     const o = await ov.overview({ from: "2026-11-01", to: "2026-11-30", now: new Date("2026-11-12T00:00:00Z") });
     expect(o.trackingSince! <= "2026-01-15").toBe(true); // the yearly domain booked above, or anything earlier another test file metered
@@ -217,8 +235,13 @@ describe("1314 wiring", () => {
   });
   test("the ledger hook in recordCost runs before the 1147 policy check", () => {
     const s = read("lib/subscriptions/costs.ts");
-    expect(s.indexOf("void recordEconomicsUse(o);")).toBeGreaterThan(0);
-    expect(s.indexOf("void recordEconomicsUse(o);")).toBeLessThan(s.indexOf("if (!(await getPolicy()).enabled) return null;"));
+    expect(s.indexOf("await recordEconomicsUse(o);")).toBeGreaterThan(0);
+    expect(s.indexOf("await recordEconomicsUse(o);")).toBeLessThan(s.indexOf("if (!(await getPolicy()).enabled) return null;"));
+  });
+  test("every sent Resend email is booked at the resend:email unit price", () => {
+    const s = read("lib/email/index.ts");
+    expect(s).toContain('l.recordUsage({ provider: "resend", sku: "resend:email", units: 1');
+    expect(s.indexOf('status = "sent";')).toBeLessThan(s.indexOf('l.recordUsage({ provider: "resend"'));
   });
   test("schema has the six R1314 models in the template and the generated file", () => {
     for (const f of ["prisma/schema.template.prisma", "prisma/schema.prisma"]) {
