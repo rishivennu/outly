@@ -87,11 +87,15 @@ export async function syncPredictions(ownerId: string, opts: { now?: Date | numb
   const batch = Math.max(1, Math.min(200, opts.batch ?? 50));
   const rows = await history(ownerId, now);
   const scorer = SCORERS[ACTIVE_MODEL];
-  const have = new Set((await db.predictionRecord.findMany({ where: { ownerId, modelKey: scorer.key, subjectType: "target", metric: METRIC }, select: { subjectId: true } })).map((r) => r.subjectId));
-  const pending = rows.filter((r) => !have.has(r.targetId)).sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()).slice(0, batch);
+  const targetIds = rows.map((r) => r.targetId);
+  const have = new Set((await db.predictionRecord.findMany({ where: { ownerId, modelKey: scorer.key, subjectType: "target", metric: METRIC, subjectId: { in: targetIds } }, select: { subjectId: true } })).map((r) => r.subjectId));
+  // Newest first; a row that scores null (a platform never measured, the first post somewhere) is skipped every time,
+  // so the walk goes past it instead of stopping at `batch` rows looked at. Attempts are bounded all the same.
+  const pending = rows.filter((r) => !have.has(r.targetId)).sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
   let scored = 0;
   let skipped = 0;
   for (const row of pending) {
+    if (scored >= batch || scored + skipped >= batch * 4) break;
     const p = scorer.score({ platform: row.platform, format: row.format, features: row.features, history: rows, asOf: new Date(row.publishedAt), metric: METRIC });
     if (!p) {
       skipped++;
@@ -100,18 +104,23 @@ export async function syncPredictions(ownerId: string, opts: { now?: Date | numb
     await storePrediction(ownerId, "", "target", row.targetId, p, now);
     scored++;
   }
-  // Actuals: forecasts without one whose destination is measured and past its first week.
-  const open = await db.predictionRecord.findMany({ where: { ownerId, modelKey: scorer.key, subjectType: "target", actual: null }, select: { id: true, subjectId: true, predicted: true } });
+  // Actuals: forecasts without one whose destination is measured and past its first week. Bounded to the targets in
+  // the history: one whose target left it (removed, or older than HISTORY_DAYS) is never judged, and never re-read.
   const byTarget = new Map(rows.map((r) => [r.targetId, r]));
+  const open = await db.predictionRecord.findMany({ where: { ownerId, modelKey: scorer.key, subjectType: "target", actual: null, subjectId: { in: targetIds } }, select: { id: true, subjectId: true, predicted: true } });
+  // Draft forecasts (predictDraft with a postId) are judged from the post's destination on the same platform.
+  const byPost = new Map(rows.map((r) => [`${r.postId}|${r.platform}`, r]));
+  const openDrafts = await db.predictionRecord.findMany({ where: { ownerId, modelKey: scorer.key, subjectType: "post", actual: null, subjectId: { in: [...new Set(rows.map((r) => r.postId))] } }, select: { id: true, subjectId: true, predicted: true, platform: true } });
   let evaluated = 0;
-  for (const rec of open) {
-    const row = byTarget.get(rec.subjectId);
+  const judge = async (rec: { id: string; subjectId: string; predicted: number }, subjectType: string, row: FeatureRow | undefined) => {
     const actual = row?.perf?.measured && row.perf.ageDays >= EVAL_MIN_AGE_DAYS ? row.perf.totals[METRIC] : undefined;
-    if (typeof actual !== "number") continue;
+    if (typeof actual !== "number") return;
     await db.predictionRecord.update({ where: { id: rec.id }, data: { actual, errorPct: Math.round(apeOf(rec.predicted, actual) * 100) / 100, evaluatedAt: new Date(now) } });
-    await logLearning(ownerId, "prediction_evaluated", { subjectType: "target", subjectId: rec.subjectId, dedupeKey: `eval:${rec.id}`, data: { predicted: rec.predicted, actual }, at: new Date(now) });
+    await logLearning(ownerId, "prediction_evaluated", { subjectType, subjectId: rec.subjectId, dedupeKey: `eval:${rec.id}`, data: { predicted: rec.predicted, actual }, at: new Date(now) });
     evaluated++;
-  }
+  };
+  for (const rec of open) await judge(rec, "target", byTarget.get(rec.subjectId));
+  for (const rec of openDrafts) await judge(rec, "post", byPost.get(`${rec.subjectId}|${rec.platform}`));
   const platforms = await rollup(ownerId, scorer.key, now);
   await calibrate(ownerId, "", rows, now);
   return { scored, skipped, evaluated, platforms };
@@ -181,6 +190,17 @@ async function calibrate(ownerId: string, scopeKey: string, rows: FeatureRow[], 
   return states;
 }
 
+/**
+ * The creator's per-platform states: the stored calibration for the workspace scope, or computed on the spot over a
+ * client's destinations (a client scope has no stored state of its own).
+ */
+export async function modelStates(ownerId: string, opts: { scopeKey?: string; targetIds?: string[] | null; now?: number } = {}): Promise<ModelState[]> {
+  const now = opts.now ?? Date.now();
+  if (opts.scopeKey) return statesFrom(await history(ownerId, now, opts.targetIds ?? []), now);
+  const stored = await db.creatorModelState.findMany({ where: { ownerId, scopeKey: "", modelKey: ACTIVE_MODEL }, orderBy: { platform: "asc" }, take: 20 });
+  return stored.map((s) => JSON.parse(s.state) as ModelState);
+}
+
 export interface PlatformPredictions extends ModelState {
   accuracy: Evaluation | null;
   accuracyWords: string;
@@ -203,17 +223,14 @@ export async function predictionsOverview(ownerId: string, opts: { scopeKey?: st
   const [model, evals, recentRows] = await Promise.all([
     db.modelVersion.findUnique({ where: { key: ACTIVE_MODEL }, select: { key: true, kind: true, status: true } }),
     db.intelligenceEvaluation.findMany({ where: { ownerId, modelKey: ACTIVE_MODEL }, orderBy: { at: "desc" }, take: 40 }),
-    db.predictionRecord.findMany({ where: { ownerId, modelKey: ACTIVE_MODEL, subjectType: "target", ...(opts.platform ? { platform: opts.platform } : {}) }, orderBy: { createdAt: "desc" }, take: 10 }),
+    // A client scope only sees forecasts for its own destinations.
+    db.predictionRecord.findMany({ where: { ownerId, modelKey: ACTIVE_MODEL, subjectType: "target", ...(opts.platform ? { platform: opts.platform } : {}), ...(scopeKey ? { subjectId: { in: opts.targetIds ?? [] } } : {}) }, orderBy: { createdAt: "desc" }, take: 10 }),
   ]);
-  let states: ModelState[];
-  if (scopeKey) states = statesFrom(await history(ownerId, now, opts.targetIds ?? []), now);
-  else {
-    const stored = await db.creatorModelState.findMany({ where: { ownerId, scopeKey: "", modelKey: ACTIVE_MODEL }, orderBy: { platform: "asc" } });
-    states = stored.map((s) => JSON.parse(s.state) as ModelState);
-  }
+  let states = await modelStates(ownerId, { scopeKey, targetIds: opts.targetIds, now });
   if (opts.platform) states = states.filter((s) => s.platform === opts.platform);
+  // Accuracy is measured over the whole workspace; inside a client scope it is not shown rather than shown wrong.
   const latest = new Map<string, Evaluation>();
-  for (const e of evals) if (!latest.has(e.platform)) latest.set(e.platform, { n: e.n, medianApe: e.medianApe, mape: e.mape, within: e.within, biasPct: e.biasPct });
+  if (!scopeKey) for (const e of evals) if (!latest.has(e.platform)) latest.set(e.platform, { n: e.n, medianApe: e.medianApe, mape: e.mape, within: e.within, biasPct: e.biasPct });
   const overall = latest.get("") ?? null;
   return {
     model,

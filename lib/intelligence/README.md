@@ -17,6 +17,7 @@ Pure (no I/O, no Prisma, safe in tests and on the client):
 - `features-core.ts` (R1318): one published destination -> a versioned ContentFeatures row (counts and flags, never the copy) and PerfFeatures (derived totals; `measured` needs views and a day of age).
 - `model/scorer-core.ts` (R1319): the `Scorer` interface and `baseline-ts-1` (cohort median shrunk toward a prior with n/(n+6), capped trait adjustments, cohort-spread range, no cohort row at or after asOf), plus `evaluate` / `accuracyWords`.
 - `profile-core.ts` (R1318): ContentFeature rows -> CreatorProfileData (cadence, shares, medians, trait lifts) and the personalization ladder personal / blended / general / none.
+- `personal-reco-core.ts` (R1320): the creator's ModelStates -> personal recommendation drafts (a trait lift with both sides and samples, the format whose baseline beats the next by 25%), at most 2 per platform and 5 in all, only on platforms at level blended or personal; ids `personal:<rule>:<subject>:<platform>` so one live row per advice.
 
 Server (touch Prisma, `import "server-only"`):
 
@@ -28,6 +29,7 @@ Server (touch Prisma, `import "server-only"`):
 - `lineage.ts`, `categories.ts`: content identity and categories.
 - `learning.ts` (R1318): `logLearning` with dedupeKey. `client-scope.ts` (R1319): the ?client= rule (owner only, stored profile, the client's target ids).
 - `model/predict.ts` (R1319): `syncPredictions` (forecast every destination from the history before it, actuals after 7 days, weekly IntelligenceEvaluation per platform, CreatorModelState calibration), `predictDraft` (POST /api/intelligence/predictions, stored only for the owner's own post), `predictionsOverview` (GET; `components/intelligence/PersonalBaselines.tsx`). GET /api/intelligence/platforms/:platform joins profile + baselines.
+- `personal-reco.ts` (R1320): `personalRead` stores the personal drafts through `reco.ts` (same ids, statuses, planner actions and expiry as the workspace engine's) under the scope they belong to; `readOnly` matches stored rows and writes nothing. Routes: GET /api/intelligence/recommendations (stores), /insights (status + profiles + baselines + personal, read-only), /history (LearningEvents, or one recommendation's trail with ?recommendation=), POST /feedback (the planner's act). `planner.act` also logs a LearningEvent `recommendation_<event>` per real action. UI: `components/intelligence/PersonalRecommendations.tsx` ("Made for you").
 - `features.ts`, `profile.ts` (R1318): ContentFeature refresh (young posts daily, all on a FEATURE_VERSION bump), CreatorProfile rebuild per scope and platform with one CreatorProfileSnapshot a week, the LearningEvent log (`logLearning`, dedupeKey), ModelVersion baseline row, and `sweepPersonal` (sweep slot minute % 10 === 2, stalest owners first). Routes: GET /api/intelligence/profile, /status, POST /refresh. Plan: `docs/intelligence-clipper-plan.md`.
 
 Elsewhere:

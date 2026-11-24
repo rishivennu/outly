@@ -4,6 +4,7 @@ import { db } from "../db";
 import { HttpError } from "../http";
 import { DEDUPE_MS, NOTHING_TO_CHANGE, applyAction, eventTypeOf, ideaTextOf, isPlannerAction, isPlannerError, prefillOf, type Prefill } from "./planner-core";
 import { isExpired } from "./reco-core";
+import { logLearning } from "./learning";
 
 /**
  * R1240: the Growth Planner's actions on a recommendation, each one a single transaction that writes the change and
@@ -65,6 +66,18 @@ export async function act(ownerId: string, recId: string, action: string, payloa
     return withPrefill(after, false, ideaId);
   });
   if (out === "expired") throw new HttpError(400, EXPIRED_MESSAGE, "EXPIRED");
+  // R1320: every real action is also a learning event, so the personal engine can weigh what was accepted, rejected
+  // or done. Outside the transaction, deduped on the row and the action; a failure to log never fails the action.
+  if (!out.deduped) {
+    const rec = out.recommendation;
+    await logLearning(ownerId, `recommendation_${type}`, {
+      subjectType: "recommendation",
+      subjectId: rec.id,
+      dedupeKey: `rec:${rec.id}:${type}:${Math.floor(now / DEDUPE_MS)}`,
+      data: { platform: rec.platform, format: rec.format, status: rec.status, role: actor.role, personal: rec.evidence.includes('"rule":"personal:') },
+      at: new Date(now),
+    }).catch((e) => console.error("[intel] learning", rec.id, e));
+  }
   return out;
 }
 

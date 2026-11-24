@@ -30,14 +30,16 @@ beforeAll(async () => {
 
 const DAY = 864e5;
 const NOW = Date.UTC(2026, 10, 20, 12);
+/** Fixture ages are counted from a week before NOW: a neighbour counts only once its first week is over (COHORT_LAG_MS). */
+const LAG = 7;
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 
 const row = (i: number, views: number, ageDays: number, over: { platform?: string; format?: string; hasHook?: boolean } = {}): FeatureRow => {
   const platform = over.platform ?? "instagram";
   const format = over.format ?? "video";
-  const rec: PostRecord = { id: `t${i}`, platform, format, publishedAt: new Date(NOW - ageDays * DAY).toISOString(), metrics: { views, likes: 1 } };
+  const rec: PostRecord = { id: `t${i}`, platform, format, publishedAt: new Date(NOW - (ageDays + LAG) * DAY).toISOString(), metrics: { views, likes: 1 } };
   const features = { ...extractFeatures({ record: rec, caption: "x", hook: over.hasHook ? "Why?" : undefined }), hasHook: over.hasHook ?? false };
-  return { targetId: `t${i}`, postId: `p${i}`, platform, format, publishedAt: new Date(NOW - ageDays * DAY), features, perf: extractPerf(rec, NOW) };
+  return { targetId: `t${i}`, postId: `p${i}`, platform, format, publishedAt: new Date(NOW - (ageDays + LAG) * DAY), features, perf: extractPerf(rec, NOW) };
 };
 
 describe("R1319 scorer-core", () => {
@@ -180,7 +182,8 @@ describe("R1319 stored loop (db)", () => {
     expect(states).toHaveLength(1);
     const st = JSON.parse(states[0].state);
     expect(st).toMatchObject({ platform: "instagram", level: "blended", measured: 6 });
-    expect(st.byFormat[0]).toMatchObject({ format: "video", n: 6 });
+    // The baseline as of now leaves out the 2-day-old post: its first week is not over (COHORT_LAG_MS).
+    expect(st.byFormat[0]).toMatchObject({ format: "video", n: 5 });
     // Idempotent: a second run scores nothing new and keeps the counts.
     const again = await pred.syncPredictions(a.id);
     expect(again).toMatchObject({ scored: 0, evaluated: 0 });
@@ -222,7 +225,7 @@ describe("R1319 stored loop (db)", () => {
   test("refreshOwner runs the prediction loop and reports it", async () => {
     const a = await user();
     const s = await seed(a.id);
-    for (const v of [100, 120, 140]) await s.post(v, 20 * DAY);
+    for (const [i, v] of [100, 120, 140].entries()) await s.post(v, (34 - i * 7) * DAY);
     const r = await prof.refreshOwner(a.id);
     expect(r.predictions).not.toBeNull();
     expect(r.predictions!.scored).toBe(2);

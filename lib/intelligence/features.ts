@@ -163,10 +163,11 @@ export async function loadFeatureRows(ownerId: string, opts: { days: number; now
       target: { removedAt: null, practice: false, platformStatus: "published" },
       ...(opts.targetIds ? { targetId: { in: opts.targetIds } } : {}),
     },
-    orderBy: { publishedAt: "asc" },
+    // Newest first so a long history keeps its latest posts, then back in time order for the builders.
+    orderBy: { publishedAt: "desc" },
     take: 3000,
     select: { targetId: true, postId: true, platform: true, format: true, publishedAt: true, features: true, perf: true, measured: true },
-  });
+  }).then((rows) => rows.reverse());
 }
 
 /** Stored rows -> the pure builders' input. A row whose JSON no longer parses is skipped, never thrown on. */

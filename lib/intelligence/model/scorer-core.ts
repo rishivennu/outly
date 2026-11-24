@@ -27,6 +27,8 @@ export const MIN_ADJ = 0.5;
 export const MAX_ADJ = 1.5;
 /** A prediction is evaluated once the post is at least this old (its first week is in). */
 export const EVAL_MIN_AGE_DAYS = 7;
+/** A neighbour only counts once its own first week is over: what it did before that is not known as of `asOf`. */
+export const COHORT_LAG_MS = EVAL_MIN_AGE_DAYS * 864e5;
 
 export interface SharedBaseline {
   /** Where the prior came from, for the explanation. */
@@ -150,7 +152,8 @@ export const baselineScorer: Scorer = {
   score(input) {
     const metric = input.metric ?? "views";
     const asOf = time(input.asOf);
-    const before = input.history.filter((r) => time(r.publishedAt) < asOf && r.platform === input.platform);
+    // No leakage: a post published after asOf, or so close before it that its numbers were not in yet, is not a neighbour.
+    const before = input.history.filter((r) => time(r.publishedAt) <= asOf - COHORT_LAG_MS && r.platform === input.platform);
     const platformVals = before.map((r) => valueOf(r, metric)).filter((v): v is number => typeof v === "number");
     const cohortRows = before.filter((r) => r.format === input.format && valueOf(r, metric) !== null);
     const cohortVals = cohortRows.map((r) => valueOf(r, metric) as number).sort((a, b) => a - b);

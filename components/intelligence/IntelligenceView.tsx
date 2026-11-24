@@ -9,6 +9,7 @@ import { FormatPerformance } from "./FormatPerformance";
 import { GrowthOverview } from "./GrowthOverview";
 import { NextContentRecommendations } from "./NextContentRecommendations";
 import { PersonalBaselines } from "./PersonalBaselines";
+import { PersonalRecommendations } from "./PersonalRecommendations";
 import { PlatformComparison } from "./PlatformComparison";
 import { WhatIsWorking, WhatNeedsAttention } from "./SignalSection";
 import { TopicInsights } from "./TopicInsights";
@@ -169,6 +170,7 @@ export function IntelligenceView({ initial, account, initialOutcomes }: { initia
           )}
           <TopicInsights topics={data.topics} />
           <PersonalBaselines client={client || null} />
+          <PersonalRecommendations client={client || null} />
           <WeeklyReport data={data} savedObjective={savedObjective} client={client || null} />
         </div>
       )}
