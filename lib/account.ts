@@ -212,6 +212,9 @@ export async function deleteAccount(user: Pick<SessionUser, "id" | "actor">, con
     db.predictionRecord.deleteMany({ where: { ownerId: me.id } }),
     db.creatorModelState.deleteMany({ where: { ownerId: me.id } }),
     db.intelligenceEvaluation.deleteMany({ where: { ownerId: me.id } }),
+    // R1321: clipper jobs cascade to their transcript, candidates and clips; events have no relation to the owner.
+    db.clipEvent.deleteMany({ where: { ownerId: me.id } }),
+    db.clipJob.deleteMany({ where: { ownerId: me.id } }),
     db.signupSignal.deleteMany({ where: { userId: me.id } }),
     db.trial.deleteMany({ where: { userId: me.id } }),
     db.offerLedger.updateMany({ where: { userId: me.id }, data: { userId: null } }),

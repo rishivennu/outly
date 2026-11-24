@@ -219,6 +219,8 @@ model Media {
   posts     Post[]
   postItems PostMedia[] // 1131: slides of photo / carousel / story posts
   upload    UploadSession? // R1193: the multipart session while it uploads
+  clipJobs    ClipJob[]       // R1321: Shorts Clipper jobs cut from this long-form file
+  clipRenders GeneratedClip[] // R1321: rendered 9:16 clips stored as media
 
   @@index([userId])
   @@index([deletedAt])
@@ -356,6 +358,7 @@ model Post {
   notes   PostNote[]
   items   PostMedia[]
   variation ContentVariation? // R1233: this post as a variation of a ContentItem (relation only, no column)
+  clip      GeneratedClip? // R1321: the Shorts Clipper clip this post was made from
 
   @@index([userId, status])
   @@index([userId, scheduledAt])
@@ -2739,4 +2742,132 @@ model IntelligenceEvaluation {
   at        DateTime @default(now())
 
   @@unique([ownerId, modelKey, platform, week])
+}
+
+/// R1321: Shorts Clipper. One long-form Media -> a job that moves through resumable stages (transcribe, detect,
+/// review), run by an executor (v1 the browser tab, v2 a worker). Every row is scoped by ownerId; the source Media
+/// going away takes the job with it. Settings and progress are small JSON strings.
+model ClipJob {
+  id          String    @id @default(cuid())
+  ownerId     String
+  mediaId     String
+  /// Idempotent create: the same (ownerId, clientKey) returns the same job.
+  clientKey   String?
+  status      String    @default("queued") // queued | running | ready | failed | cancelled
+  stage       String    @default("transcribe") // transcribe | detect | review | done
+  progress    Float     @default(0) // 0..1 within the current stage
+  executor    String    @default("browser") // browser | worker
+  settings    String    @default("{}") // JSON ClipSettings (lib/clipper/settings-core.ts)
+  error       String?
+  durationSec Float?
+  language    String?
+  heartbeatAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  media      Media           @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  transcript ClipTranscript?
+  candidates ClipCandidate[]
+  clips      GeneratedClip[]
+  events     ClipEvent[]
+
+  @@unique([ownerId, clientKey])
+  @@index([ownerId, createdAt])
+  @@index([status, heartbeatAt])
+}
+
+/// R1321: the job's transcript, words and cues as JSON (the same shapes Caption Studio uses).
+model ClipTranscript {
+  id        String   @id @default(cuid())
+  jobId     String   @unique
+  ownerId   String
+  engine    String
+  language  String
+  words     String // JSON Word[]
+  cues      String // JSON Cue[]
+  wordCount Int
+  createdAt DateTime @default(now())
+
+  job ClipJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+}
+
+/// R1321: a moment the detector proposed, with every score it was ranked on. Suggested until the creator approves
+/// (-> GeneratedClip) or rejects it.
+model ClipCandidate {
+  id        String   @id @default(cuid())
+  jobId     String
+  ownerId   String
+  start     Float
+  end       Float
+  kind      String // hook | insight | story | punchline | takeaway | text | manual
+  title     String
+  reason    String
+  scores    String // JSON CandidateScores
+  score     Float
+  rank      Int
+  source    String   @default("ai") // ai | text | manual
+  status    String   @default("suggested") // suggested | approved | rejected
+  createdAt DateTime @default(now())
+
+  job  ClipJob        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  clip GeneratedClip?
+
+  @@index([jobId, rank])
+  @@index([ownerId])
+}
+
+/// R1321: an approved candidate turned into a clip: its copy, reframe and subtitle plan, the rendered 9:16 Media
+/// once the executor has made it, and the Post it was published as.
+model GeneratedClip {
+  id           String    @id @default(cuid())
+  jobId        String
+  ownerId      String
+  candidateId  String?   @unique
+  start        Float
+  end          Float
+  title        String
+  hook         String?
+  caption      String?
+  hashtags     String?
+  reframe      String    @default("{}") // JSON ReframePlan
+  subtitle     String    @default("{}") // JSON SubtitlePlan
+  renderStatus String    @default("pending") // pending | rendering | rendered | failed
+  renderError  String?
+  renderedAt   DateTime?
+  mediaId      String?
+  postId       String?   @unique
+  features     String? // JSON, the clip's own features once rendered
+  status       String    @default("draft") // draft | approved | published | discarded
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  job       ClipJob        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate ClipCandidate? @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+  media     Media?         @relation(fields: [mediaId], references: [id], onDelete: SetNull)
+  post      Post?          @relation(fields: [postId], references: [id], onDelete: SetNull)
+  events    ClipEvent[]
+
+  @@index([ownerId, createdAt])
+  @@index([jobId])
+}
+
+/// R1321: the audit trail of a job and its clips (stages, edits, approvals, renders, publishes).
+model ClipEvent {
+  id      String   @id @default(cuid())
+  jobId   String
+  clipId  String?
+  ownerId String
+  actorId String?
+  type    String
+  data    String? // JSON
+  at      DateTime @default(now())
+
+  job  ClipJob        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  clip GeneratedClip? @relation(fields: [clipId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, at])
+  @@index([clipId, at])
 }
