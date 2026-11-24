@@ -4,8 +4,8 @@
  */
 import { beforeAll, describe, expect, mock, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { ABANDON_DAYS, ABANDONED_ERROR, CANDIDATE_RETENTION_DAYS, DAY_MS, RETENTION_BATCH, TRANSCRIPT_RETENTION_DAYS, candidatesExpired, closedAt, isAbandoned, isClosed, retentionCutoffs, retentionLine, transcriptExpired } from "../lib/clipper/retention-core";
-import { DEFAULT_CLIPPER_CAP, budgetVerdict, capFrom, rupees } from "../lib/clipper/budget-core";
+import { ABANDON_BATCH, ABANDON_DAYS, ABANDONED_ERROR, CANDIDATE_RETENTION_DAYS, DAY_MS, RETENTION_BATCH, TRANSCRIPT_RETENTION_DAYS, candidatesExpired, closedAt, isAbandoned, isClosed, isTerminal, retentionCutoffs, retentionLine, transcriptExpired } from "../lib/clipper/retention-core";
+import { DEFAULT_CLIPPER_CAP, budgetVerdict, capFrom, rupees, unavailableVerdict } from "../lib/clipper/budget-core";
 
 mock.module("next/headers", () => ({
   cookies: () => ({ get: () => undefined, getAll: () => [], has: () => false, set: () => {}, delete: () => {} }),
@@ -35,6 +35,11 @@ describe("R1326 retention rules (pure)", () => {
     expect(isClosed({ status: "ready", stage: "review" })).toBe(false);
     expect(isClosed({ status: "running", stage: "detect" })).toBe(false);
     expect(isClosed({ status: "queued", stage: "transcribe" })).toBe(false);
+    // R1328 review: a failed job is closed for the clock but not terminal; it can be retried at its stage, so its transcript stays.
+    expect(isTerminal({ status: "failed", stage: "detect" })).toBe(false);
+    expect(isTerminal({ status: "cancelled", stage: "detect" })).toBe(true);
+    expect(isTerminal({ status: "ready", stage: "done" })).toBe(true);
+    expect(isTerminal({ status: "ready", stage: "review" })).toBe(false);
   });
 
   test("the clock starts when the job closed: completedAt first, updatedAt for a failed job, null while open", () => {
@@ -48,6 +53,8 @@ describe("R1326 retention rules (pure)", () => {
     expect(CANDIDATE_RETENTION_DAYS).toBe(30);
     expect(transcriptExpired(job({ completedAt: ago(91) }), now)).toBe(true);
     expect(transcriptExpired(job({ completedAt: ago(89) }), now)).toBe(false);
+    expect(transcriptExpired(job({ status: "failed", stage: "detect", updatedAt: ago(400) }), now)).toBe(false); // kept for a retry
+    expect(candidatesExpired(job({ status: "failed", stage: "detect", updatedAt: ago(40) }), now)).toBe(true); // a retry detects afresh
     expect(candidatesExpired(job({ completedAt: ago(31) }), now)).toBe(true);
     expect(candidatesExpired(job({ completedAt: ago(29) }), now)).toBe(false);
     // Open for 200 days, closed yesterday: nothing expires.
@@ -59,13 +66,17 @@ describe("R1326 retention rules (pure)", () => {
     expect(c.abandoned).toEqual(ago(ABANDON_DAYS));
   });
 
-  test("abandoned = running with no report for 7 days (heartbeat, else last update); a stall under that is not", () => {
+  test("abandoned = running with no report for 7 days (heartbeat, else last update), or queued and untouched as long; a stall under that is not", () => {
     expect(isAbandoned(job({ status: "running", stage: "transcribe", heartbeatAt: ago(8) }), now)).toBe(true);
     expect(isAbandoned(job({ status: "running", stage: "transcribe", heartbeatAt: null, updatedAt: ago(8) }), now)).toBe(true);
     expect(isAbandoned(job({ status: "running", stage: "transcribe", heartbeatAt: ago(6) }), now)).toBe(false);
-    expect(isAbandoned(job({ status: "queued", stage: "transcribe", heartbeatAt: null, updatedAt: ago(30) }), now)).toBe(false);
+    // R1328 review: a queued job holds an ACTIVE_JOBS_MAX slot too, so one nobody started for 7 days is abandoned as well.
+    expect(isAbandoned(job({ status: "queued", stage: "transcribe", heartbeatAt: null, updatedAt: ago(30) }), now)).toBe(true);
+    expect(isAbandoned(job({ status: "queued", stage: "transcribe", heartbeatAt: null, updatedAt: ago(6) }), now)).toBe(false);
+    expect(isAbandoned(job({ status: "ready", stage: "review", updatedAt: ago(30) }), now)).toBe(false);
     expect(ABANDONED_ERROR).toContain("7 days");
     expect(RETENTION_BATCH).toBe(500);
+    expect(ABANDON_BATCH).toBe(100);
   });
 
   test("the sweep line reads its own numbers back", () => {
@@ -98,6 +109,12 @@ describe("R1326 daily budget (pure)", () => {
     expect(money.line).toContain("₹5 of ₹5");
     // Both over: calls wins, so the message does not blame money when prices are missing.
     expect(budgetVerdict({ calls: 9, inrMinor: 9999 }, cap).reason).toBe("calls");
+    // Days are UTC: the reset time is named, never a bare "tomorrow" (05:30 IST).
+    expect(calls.line).toContain("00:00 UTC (05:30 IST)");
+    // R1328 review: a budget that cannot be read fails closed to the rules, with a line that says so.
+    const u = unavailableVerdict(cap);
+    expect(u).toMatchObject({ allowed: false, reason: "unavailable", cap, spend: { calls: 0, inrMinor: 0 } });
+    expect(u.line).toContain("could not be checked");
   });
 });
 
@@ -112,12 +129,15 @@ describe("R1326 sweepClipper (db)", () => {
   test("abandons quiet running jobs, prunes transcripts at 90 d and spare candidates at 30 d after close, keeps the desk and approved candidates; a second pass is a no-op", async () => {
     const u = await mk();
     const stale = await seedJob(u.id, { status: "running", stage: "transcribe", heartbeatAt: ago(8) });
+    const never = await seedJob(u.id, { status: "queued", stage: "transcribe", updatedAt: ago(9) });
+    const justQueued = await seedJob(u.id, { status: "queued", stage: "transcribe", updatedAt: ago(2) });
     const live = await seedJob(u.id, { status: "running", stage: "detect", heartbeatAt: ago(6) });
     const old = await seedJob(u.id, { status: "ready", stage: "done", completedAt: ago(100) });
     const desk = await seedJob(u.id, { status: "ready", stage: "review", updatedAt: ago(200) });
     const failed = await seedJob(u.id, { status: "failed", stage: "detect", updatedAt: ago(40) });
+    const oldFailed = await seedJob(u.id, { status: "failed", stage: "detect", updatedAt: ago(400) });
     const fresh = await seedJob(u.id, { status: "cancelled", stage: "transcribe", completedAt: ago(10) });
-    for (const j of [stale, live, old, desk, failed, fresh]) await seedTranscript(u.id, j.id);
+    for (const j of [stale, live, old, desk, failed, oldFailed, fresh]) await seedTranscript(u.id, j.id);
     for (const j of [old, desk, failed, fresh]) {
       await seedCandidate(u.id, j.id, "suggested", 1);
       await seedCandidate(u.id, j.id, "rejected", 2);
@@ -125,8 +145,15 @@ describe("R1326 sweepClipper (db)", () => {
     }
 
     const r = await ret.sweepClipper(now);
-    expect(r).toMatchObject({ abandoned: 1, transcripts: 1, candidates: 4 });
+    expect(r).toMatchObject({ abandoned: 2, transcripts: 1, candidates: 4 });
     expect(r.ms).toBeGreaterThanOrEqual(0);
+
+    // The queued job nobody started for 9 days is closed with the same reason; the one from two days ago waits.
+    const q = await db.clipJob.findUniqueOrThrow({ where: { id: never.id } });
+    expect(q).toMatchObject({ status: "cancelled", error: ABANDONED_ERROR });
+    const qe = await db.clipEvent.findFirstOrThrow({ where: { jobId: never.id, type: "abandoned" } });
+    expect(JSON.parse(qe.data ?? "{}")).toMatchObject({ from: { status: "queued", stage: "transcribe" }, afterDays: ABANDON_DAYS });
+    expect((await db.clipJob.findUniqueOrThrow({ where: { id: justQueued.id } })).status).toBe("queued");
 
     const s = await db.clipJob.findUniqueOrThrow({ where: { id: stale.id } });
     expect(s).toMatchObject({ status: "cancelled", stage: "transcribe", error: ABANDONED_ERROR });
@@ -135,7 +162,8 @@ describe("R1326 sweepClipper (db)", () => {
     expect((await db.clipJob.findUniqueOrThrow({ where: { id: live.id } })).status).toBe("running");
 
     const transcripts = await db.clipTranscript.findMany({ where: { ownerId: u.id }, select: { jobId: true } });
-    expect(transcripts.map((t) => t.jobId).sort()).toEqual([stale.id, live.id, desk.id, failed.id, fresh.id].sort());
+    // The 400-day-old FAILED job keeps its transcript: a retry runs detect at its stage and needs the words (R1328 review).
+    expect(transcripts.map((t) => t.jobId).sort()).toEqual([stale.id, live.id, desk.id, failed.id, oldFailed.id, fresh.id].sort());
     const left = await db.clipCandidate.findMany({ where: { ownerId: u.id }, select: { jobId: true, status: true } });
     expect(left.filter((c) => c.jobId === old.id).map((c) => c.status)).toEqual(["approved"]);
     expect(left.filter((c) => c.jobId === failed.id).map((c) => c.status)).toEqual(["approved"]);
@@ -150,24 +178,34 @@ describe("R1326 sweepClipper (db)", () => {
   test("load line: 300 closed jobs with transcripts and two spare candidates each, one pass under 3 s and bounded by the batch", async () => {
     const u = await mk();
     const ids: string[] = [];
-    for (let i = 0; i < 300; i++) ids.push((await seedJob(u.id, { status: i % 2 ? "failed" : "ready", stage: i % 2 ? "detect" : "done", completedAt: ago(120 + i), updatedAt: ago(120 + i) })).id);
+    // Half cancelled (terminal: transcript goes), half failed (transcript stays for a retry; spare candidates still go).
+    for (let i = 0; i < 300; i++) ids.push((await seedJob(u.id, { status: i % 2 ? "failed" : "cancelled", stage: "detect", completedAt: ago(120 + i), updatedAt: ago(120 + i) })).id);
     await db.clipTranscript.createMany({ data: ids.map((jobId) => ({ jobId, ownerId: u.id, engine: "test", language: "en", words: "[]", cues: "[]", wordCount: 0 })) });
     await db.clipCandidate.createMany({ data: ids.flatMap((jobId) => [1, 2].map((rank) => ({ jobId, ownerId: u.id, start: 0, end: 10, kind: "hook", title: "t", reason: "r", scores: "{}", score: 0.5, rank, status: rank === 1 ? "suggested" : "rejected", source: "ai" }))) });
+    // A batch smaller than the seed exercises the bound (R1328 review: 300 rows never reached RETENTION_BATCH); counts are
+    // scoped to this owner because the shared test database may hold other suites' closed jobs.
+    const batch = 100;
+    const mine = async () => ({ transcripts: await db.clipTranscript.count({ where: { ownerId: u.id } }), candidates: await db.clipCandidate.count({ where: { ownerId: u.id } }) });
+    const before = await mine();
+    expect(before).toEqual({ transcripts: 300, candidates: 600 });
     const t0 = Date.now();
-    const first = await ret.sweepClipper(now);
+    const first = await ret.sweepClipper(now, { batch });
     const ms = Date.now() - t0;
-    expect(first.transcripts).toBe(300);
-    expect(first.candidates).toBe(RETENTION_BATCH);
+    expect(first.transcripts).toBe(batch);
+    expect(first.candidates).toBe(batch);
     expect(ms).toBeLessThan(3000);
-    const second = await ret.sweepClipper(now);
-    expect(second.candidates).toBe(600 - RETENTION_BATCH);
-    expect(await db.clipTranscript.count({ where: { ownerId: u.id } })).toBe(0);
-    expect(await db.clipCandidate.count({ where: { ownerId: u.id } })).toBe(0);
+    const after = await mine();
+    expect(before.transcripts - after.transcripts).toBeLessThanOrEqual(batch);
+    expect(before.candidates - after.candidates).toBeLessThanOrEqual(batch);
+    // Drain with the default batch: the 150 cancelled transcripts go in total, the 150 failed ones stay; all 600 spare candidates go.
+    for (let i = 0; i < 8; i++) await ret.sweepClipper(now);
+    expect(await mine()).toEqual({ transcripts: 150, candidates: 0 });
+    expect(await db.clipTranscript.count({ where: { ownerId: u.id, job: { status: "failed" } } })).toBe(150);
   });
 });
 
 describe("R1326 daily budget (db)", () => {
-  test("spend = today's token-in rows and their rupees for feature clipper and this user only; the verdict follows the env cap", async () => {
+  test("spend = today's AI detection runs (detected events by this actor) and the clipper rupees for this user only; the verdict follows the env cap", async () => {
     const u = await mk();
     const other = await mk();
     const day = now.toISOString().slice(0, 10);
@@ -175,10 +213,22 @@ describe("R1326 daily budget (db)", () => {
     await db.costEvent.createMany({
       data: [
         row(u.id, "token-in", 50), row(u.id, "token-out", 150),
-        row(u.id, "token-in", 0), row(u.id, "token-out", 0), // unpriced call still counts as a call
+        row(u.id, "token-in", 0), row(u.id, "token-out", 0), // an unpriced call: ₹0, and no longer a "run" by itself
         row(u.id, "token-in", 999, "captions"), // another feature
         row(u.id, "token-in", 999, "clipper", "2026-11-24"), // yesterday
         row(other.id, "token-in", 999), // someone else
+      ],
+    });
+    // Runs come from the job log, not the ledger (R1328 review: one run can book 2-3 hedged model calls, or none on a timeout).
+    const j = await seedJob(u.id, { status: "ready", stage: "review" });
+    const ev = (actorId: string, detector: string, at: Date) => ({ jobId: j.id, ownerId: u.id, actorId, type: "detected", at, data: JSON.stringify({ detector, candidates: 3 }) });
+    await db.clipEvent.createMany({
+      data: [
+        ev(u.id, "ai", now), ev(u.id, "ai", new Date(`${day}T00:00:01Z`)), // two AI runs today
+        ev(u.id, "rules", now), // a rules run is free
+        ev(u.id, "ai", new Date("2026-11-24T23:59:59Z")), // yesterday (UTC)
+        ev(other.id, "ai", now), // another actor on this owner's job
+        { jobId: j.id, ownerId: u.id, actorId: u.id, type: "approved", at: now, data: JSON.stringify({ detector: "ai" }) }, // not a detection
       ],
     });
     expect(await budget.clipperSpend(u.id, now)).toEqual({ calls: 2, inrMinor: 200 });
@@ -206,8 +256,8 @@ describe("R1326 wiring", () => {
     expect(sweep).toContain("plan.housekeeping ? await import(\"@/lib/clipper/retention\").then((m) => m.sweepClipper(now))");
     expect(sweep).toContain("rollup, personal, running, shared, clipper }");
     const detect = read("app/api/clipper/jobs/[id]/detect/route.ts");
-    expect(detect).toContain("budget = await clipperBudget(uid).catch(() => null);");
-    expect(detect).toContain("if (!budget || budget.allowed) {"); // a ledger read failure never blocks AI; the cap only ever downgrades to rules
+    expect(detect).toContain("budget = await clipperBudget(uid).catch(() => unavailableVerdict(clipperCap()));"); // R1328: a read failure fails closed to the rules
+    expect(detect).toContain("if (budget.allowed) {");
     expect(detect).toContain("note: budget && !budget.allowed ? { budget: budget.reason } : null");
     expect(detect).toContain("budget: budget ? { allowed: budget.allowed, reason: budget.reason, line: budget.line, spend: budget.spend, cap: budget.cap } : null");
     for (const f of ["lib/clipper/retention-core.ts", "lib/clipper/budget-core.ts"]) expect(read(f)).not.toContain("@prisma/client\"");
@@ -218,7 +268,18 @@ describe("R1326 wiring", () => {
     expect(studio).toContain('<p role="status" className="rounded-2xl bg-secondary/60 px-4 py-3 text-[13px] text-muted-foreground">{detectNote}</p>');
     for (const f of ["lib/clipper/retention.ts", "lib/clipper/budget.ts"]) expect(read(f)).toContain('import "server-only"');
     const readme = read("lib/clipper/README.md");
-    for (const s of ["## Hardening (R1326)", "### Retention", "### Daily AI budget", "### Review notes (ownership, RLS)", "### Sweep bounds", "CLIPPER_DAILY_CALLS", "`sweepClipper` | housekeeping"]) expect(readme).toContain(s);
+    for (const s of ["## Hardening (R1326)", "### Retention", "### Daily AI budget", "### Review notes (ownership, RLS)", "### Sweep bounds", "CLIPPER_DAILY_CALLS", "`sweepClipper` | housekeeping", "R1328"]) expect(readme).toContain(s);
+    // R1328 review: the retention sweep never deletes by id alone.
+    const retention = read("lib/clipper/retention.ts");
+    expect(retention).toContain("where: { id: { in: tIds }, job: terminalBefore(cut.transcripts) }");
+    expect(retention).toContain("where: { id: { in: cIds }, status: { in: SPARE }, job: closedBefore(cut.candidates) }");
+    expect(retention).toContain("db.clipEvent.createMany(");
+    // The Monday email's baseline links are absolute (the template writes hrefs as they are).
+    expect(read("lib/reports/weekly.ts")).toContain("items: items.map((i) => ({ ...i, href }))");
+    // The pulse-style Home renders the Intelligence card once: classicView skips it when drawn as the fallback.
+    expect(read("app/(studio)/home/page.tsx")).toContain('user.actor || !firstRun ? null : soft(intelligencePulse(user.id), CARD_MS, null, "home intelligence")');
+    // The app's pulse route narrows a scoped teammate like Pip does.
+    expect(read("app/api/intelligence/pulse/route.ts")).toContain("targetIds: await targetIdsForAccounts(user.id, user.scope)");
     expect(read("docs/intelligence-clipper-plan.md")).toContain("| 8 Hardening | R1326 DONE |");
   });
 });

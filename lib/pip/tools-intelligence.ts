@@ -4,7 +4,7 @@ import { objectiveOptions } from "../intelligence/brand-core";
 import { overview, type Overview } from "../intelligence/service";
 import { CONFIDENCE_WORD, attentionEmptyText, emptyStateText, evidenceLine, formatLabel, hasEnoughPosts, platformLabel, statusWord, workingEmptyText } from "../../components/intelligence/view-core";
 import { clipperPulse, intelligencePulse } from "../intelligence/pulse";
-import { baselineLine, clipperLine, platformName as pulsePlatformName, sampleWords, type ClipperPulse, type IntelligencePulse } from "../intelligence/pulse-core";
+import { FAILED_WINDOW_DAYS, baselineLine, clipperLine, platformName as pulsePlatformName, sampleWords, type ClipperPulse, type IntelligencePulse } from "../intelligence/pulse-core";
 import { LEVEL_LABEL } from "../intelligence/profile-core";
 import { HISTORY_DAYS } from "../intelligence/model/predict";
 import { targetIdsForAccounts } from "../intelligence/client-scope";
@@ -168,19 +168,22 @@ export function clipperSummary(c: ClipperPulse | null): { cards: PipCard[]; rows
     const empty = "No clipper job yet. Upload a long video on the Clipper page and it finds the moments worth a short.";
     return { cards: [], rows: [], facts: [empty], empty };
   }
+  // Queued and failed jobs get a card only when there are any, so "0 running" never hides a stuck queue (R1328 review).
   const cards: PipCard[] = [
     { label: "Running", value: String(c.running) },
+    ...(c.queued ? [{ label: "Waiting to start", value: String(c.queued) }] : []),
+    ...(c.failed ? [{ label: "Failed", value: String(c.failed), hint: `In the last ${FAILED_WINDOW_DAYS} days.` }] : []),
     { label: "Waiting for review", value: String(c.review) },
     { label: "Ready to post", value: String(c.readyToPost), hint: "Approved and rendered clips not yet made into a post." },
     { label: "Published", value: String(c.published) },
   ];
   const rows: PipRow[] = [
     { id: "running", cells: { state: "Running", count: c.running, meaning: "Transcribing or finding moments" } },
-    ...(c.queued ? [{ id: "queued", cells: { state: "Waiting to start", count: c.queued, meaning: "Open the Clipper in a tab to drive it" } }] : []),
+    ...(c.queued ? [{ id: "queued", cells: { state: "Waiting to start", count: c.queued, meaning: "Created or retried, not started yet" } }] : []),
     { id: "review", cells: { state: "Waiting for review", count: c.review, meaning: "Candidates ready for you to approve" } },
     { id: "ready", cells: { state: "Ready to post", count: c.readyToPost, meaning: "Rendered clips with no post yet" } },
     { id: "published", cells: { state: "Published", count: c.published, meaning: "Clips that became a post" } },
-    ...(c.failed ? [{ id: "failed", cells: { state: "Failed", count: c.failed, meaning: "Failed in the last 30 days; open the job to retry" } }] : []),
+    ...(c.failed ? [{ id: "failed", cells: { state: "Failed", count: c.failed, meaning: `Failed in the last ${FAILED_WINDOW_DAYS} days; open the job to retry` } }] : []),
   ];
   return { cards, rows, facts: [clipperLine(c) ?? "Nothing in the clipper queue."], empty: "" };
 }

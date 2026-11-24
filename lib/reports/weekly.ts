@@ -77,9 +77,9 @@ async function ownerIntelligence(userId: string): Promise<WeeklyIntelligence> {
   return weeklyIntelligence(await overview({ id: userId, scope: null }, { days: 28, accountIds: null }));
 }
 
-/** R1325: the owner's Intelligence pulse, for the "Your baselines" section. */
+/** R1325: the owner's Intelligence pulse, for the "Your baselines" section; the email never shows the clipper queue, so it is not read. */
 async function ownerPulse(userId: string): Promise<IntelligencePulse | null> {
-  return import("../intelligence/pulse").then((m) => m.intelligencePulse(userId));
+  return import("../intelligence/pulse").then((m) => m.intelligencePulse(userId, { clipper: false }));
 }
 
 /**
@@ -93,8 +93,8 @@ export function withBaselines(block: IntelBlock, pulse: IntelligencePulse | null
   const items = baselineItems(pulse);
   if (!items.length) return block;
   const href = `${appUrl.replace(/\/+$/, "")}${BASELINES_PATH}`;
-  // Item hrefs are paths; the template makes them absolute (weekly-core `absolute`). R1326 review: the HTML links too.
-  const section = { label: BASELINES_LABEL, items: items.map((i) => ({ ...i, href: BASELINES_PATH })) };
+  // The template writes item hrefs as they are (lib/email/index.ts), so they are absolute here, like weekly-core's own sections (R1328 review).
+  const section = { label: BASELINES_LABEL, items: items.map((i) => ({ ...i, href })) };
   const text = [block.text, "", `${section.label}:`, ...items.map((i) => `- ${i.title}: ${i.detail}`), `Open your baselines: ${href}`].join("\n");
   return { ...block, sections: [...block.sections, section], text };
 }

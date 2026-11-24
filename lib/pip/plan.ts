@@ -22,7 +22,7 @@ const HOW_TO = /^\s*(how (do|can|should|would|does) (i|you|we|it|one)\b|how to\b
 const STRONG =
   /\b(best (time|times|day|days) to post|when should i post|which platform|platforms? (with|has|have|gets?|got) (the )?most|am i (consistent|growing|posting enough)|full report|performance report|forecast|predict|why (did|was|is|has|have|are) (my|that|this|it|the post|these)|what made (it|that|this|my)|what (works|performs) best|(which|what) (post|video|reel|short|tweet|content)s? (got|had|has|have|did|was|were|performed|gets?)|most (shares|shared|comments|commented|likes|liked|views|viewed))\b|^\s*(compare|forecast|predict|analy[sz]e)\b|^\s*(views|likes|comments|shares|engagement|followers|reach|posts?|best|top|worst|platforms?|upcoming|scheduled)\b/i;
 /** R1325 product nouns that mean "show me" on their own, unless the sentence is a how-to ("how does the clipper work?" is for the help bot). */
-const STRONG_NOUN = /\b(clipper|clip jobs?|shorts? queue|clips? (ready|rendered|waiting|in review|to post|to approve)|baselines?)\b/i;
+const STRONG_NOUN = /\b(clipper|clip jobs?|shorts? (clipper|jobs?|queue)|clips? ((are|that are|which are) )?(ready|rendered|waiting|in review|to post|to approve)|baselines?|expect(ed)? views)\b/i;
 /** "Can the clipper do 16:9?" / "how does the clipper work?" ask what the product does, not for the queue ("how is the clipper doing?" does). */
 const CAPABILITY = /^\s*(can|could|does|do|will|would|should|how (does|do|can|could|would|should)) (the|a|an|it|this|outlly)\b/i;
 /** "Instagram vs YouTube this month": a comparison with no "my". A how-to ("how do I post to Instagram and YouTube?") still isn't. */
@@ -75,7 +75,8 @@ function analyticOf(t: string): PipTool | null {
   // R1244: Content Intelligence (what is working, what needs attention, what to make next).
   // R1325: the Shorts clipper's queue, and the creator's own baselines (checked before "forecast", which is the analytics projection).
   // Queue and state words only: "how many views did my clips get" is analytics and "the clips I uploaded" is uploads (R1326 review).
-  if (/\bclipper\b|\bclip jobs?\b|\bshorts? (clipper|jobs?|queue)\b|\bclips? (ready|rendered|waiting|in review|to post|to approve)\b/i.test(t) && !/\b(views|likes|comments|shares|reach|engagement|uploaded|download)\b/i.test(t)) return "clipper_status";
+  // "The clipper is broken / stuck" is a trouble report for the help bot, not a queue count (R1328 review).
+  if (/\bclipper\b|\bclip jobs?\b|\bshorts? (clipper|jobs?|queue)\b|\bclips? ((are|that are|which are) )?(ready|rendered|waiting|in review|to post|to approve)\b/i.test(t) && !/\b(views|likes|comments|shares|reach|engagement|uploaded|download|broken)\b/i.test(t) && !TROUBLE.test(t)) return "clipper_status";
   // Baselines answer in views; a reach/engagement/likes question keeps its own tool (R1326 review).
   if (/\b(baselines?|how many views (will|would|should) (my|a|this|the)|what (will|would|should) (my|a|this|the) (next |new )?(post|video|reel|short|carousel|photo) (get|do|make)|expect(ed)? views|typical (post|video|reel|short)|my (own )?(predictions?|model))\b/i.test(t) && !/\b(reach|engagement|likes?|comments?|shares?|followers?|rate)\b/i.test(t)) return "predictions";
   if (/\b(content )?intelligence\b|\bwhat('s| is) (working|not working)\b|\bneeds? attention\b|\b(content )?recommendations?\b|\bwhat (should|do) i (make|create) next\b/i.test(t)) return "intelligence_overview";

@@ -7,23 +7,34 @@ import { ACCURACY_MAX_AGE_DAYS, FAILED_WINDOW_DAYS, pickTop, sampleWords, type C
 
 const DAY_MS = 86_400_000;
 
+/** A short stable key for a set of destination ids (sorted, djb2), so two subsets never share a stored state. */
+function idsKey(ids: readonly string[]): string {
+  let h = 5381;
+  for (const id of [...ids].sort()) for (let i = 0; i < id.length; i++) h = ((h * 33) ^ id.charCodeAt(i)) >>> 0;
+  return `${ids.length}:${h.toString(36)}`;
+}
+
 /**
  * R1325: the stored side of the Intelligence pulse. Reads what the engine already keeps (CreatorModelState, the
  * personal recommendations in readOnly mode, clipper counts) and writes nothing of its own (`modelStates` may
  * recalibrate a state that leaned on a retired cohort document; it is read ONCE here and handed to personalRead, so
  * two reads never race). Null when the workspace has nothing measured and no clipper job: the card is simply not shown.
- * A scoped teammate with no accounts (`targetIds: []`) gets the honest empty pulse, never the workspace's.
+ *
+ * Scope (R1328 review): `targetIds` narrows to a client or a scoped teammate's destinations. It ALWAYS comes with a
+ * non-empty scope key (a caller that forgets one gets a key derived from the ids), so stored workspace states are
+ * never served for a subset; `[]` gives the honest empty pulse. The clipper queue is workspace-wide and has no per-
+ * account view, so a scoped pulse carries `clipper: null` rather than counts that do not belong to the scope; the
+ * email passes `clipper: false` because it never shows the queue.
  */
-export async function intelligencePulse(ownerId: string, opts: { now?: number; scopeKey?: string; targetIds?: string[] | null } = {}): Promise<IntelligencePulse | null> {
+export async function intelligencePulse(ownerId: string, opts: { now?: number; scopeKey?: string; targetIds?: string[] | null; clipper?: boolean } = {}): Promise<IntelligencePulse | null> {
   const now = opts.now ?? Date.now();
-  const scopeKey = opts.scopeKey ?? "";
-  if (opts.targetIds && !opts.targetIds.length) {
-    const clipper = await clipperPulse(ownerId, now);
-    return clipper ? { platforms: [], recommendation: null, clipper, computedAt: new Date(now).toISOString() } : null;
-  }
+  const scoped = opts.targetIds !== null && opts.targetIds !== undefined;
+  const scopeKey = opts.scopeKey || (scoped ? `ids:${idsKey(opts.targetIds!)}` : "");
+  const wantClipper = opts.clipper !== false && !scoped;
+  if (scoped && !opts.targetIds!.length) return null;
   const [states, evals, clipper] = await Promise.all([
     modelStates(ownerId, { scopeKey, targetIds: opts.targetIds, now }),
-    scopeKey
+    scopeKey || scoped
       ? []
       : db.intelligenceEvaluation.findMany({
           where: { ownerId, modelKey: ACTIVE_MODEL, platform: { not: "" }, at: { gte: new Date(now - ACCURACY_MAX_AGE_DAYS * DAY_MS) } },
@@ -31,7 +42,7 @@ export async function intelligencePulse(ownerId: string, opts: { now?: number; s
           take: 20,
           select: { platform: true, n: true, medianApe: true, mape: true, within: true, biasPct: true },
         }),
-    clipperPulse(ownerId, now),
+    wantClipper ? clipperPulse(ownerId, now) : null,
   ]);
   const personal = await personalRead(ownerId, { scopeKey, targetIds: opts.targetIds, now, readOnly: true, states }).catch(() => null);
   const latest = new Map<string, (typeof evals)[number]>();

@@ -242,7 +242,8 @@ async function classicView(user: HomeUser, canSwitch: boolean, recapAtParam: str
     // Phase 2: the guided setup, saved on the account and merged with the studio's own data (lib/onboarding.ts)
     firstRun ? soft(onboardingFor(user), CARD_MS, null, "home onboarding") : null,
     // R1325: the Intelligence pulse (baselines, one personal recommendation, the clipper queue); owners only, never fatal.
-    user.actor ? null : soft(intelligencePulse(user.id), CARD_MS, null, "home intelligence"),
+    // Inside the pulse view (firstRun false) the page already renders the card once (R1328 review).
+    user.actor || !firstRun ? null : soft(intelligencePulse(user.id), CARD_MS, null, "home intelligence"),
   ]);
   const started = Object.values(live).some(Boolean) || published > 0;
   const steps = ret?.steps ?? [];

@@ -61,8 +61,9 @@ describe("R1325 pulse-core", () => {
     expect(baselineLine(th)).toBe("Threads: no measured post yet, so no number.");
     expect(clipperLine(null)).toBeNull();
     expect(clipperLine(sample.clipper)).toBe("1 job running, 2 jobs waiting for your review, 3 clips rendered and ready to post; 4 clips published so far.");
-    expect(clipperLine({ running: 0, review: 0, readyToPost: 0, published: 0, failed: 0 })).toBe("Nothing in the clipper queue.");
-    expect(clipperLine({ running: 0, review: 0, readyToPost: 0, published: 2, failed: 1 })).toBe("1 job failed; 2 clips published so far.");
+    expect(clipperLine({ queued: 0, running: 0, review: 0, readyToPost: 0, published: 0, failed: 0 })).toBe("Nothing in the clipper queue.");
+    expect(clipperLine({ queued: 2, running: 0, review: 0, readyToPost: 0, published: 0, failed: 0 })).toBe("2 jobs waiting to start.");
+    expect(clipperLine({ queued: 0, running: 0, review: 0, readyToPost: 0, published: 2, failed: 1 })).toBe("1 job failed; 2 clips published so far.");
     const lines = pulseLines(sample);
     expect(lines).toHaveLength(5);
     expect(lines[3]).toContain("Made for you: Lead with video on Instagram (Instagram, medium).");
@@ -120,6 +121,12 @@ describe("R1325 Pip summaries (pure)", () => {
     expect(plan.keywordPlan("how is the clipper doing?")?.tool).toBe("clipper_status");
     expect(plan.keywordPlan("any clips ready to post?")?.tool).toBe("clipper_status");
     expect(plan.keywordPlan("shorts queue")?.tool).toBe("clipper_status");
+    // R1328 review: a trouble report goes to help, and "clips are waiting" counts with the verb between.
+    expect(plan.keywordPlan("the clipper is broken")?.tool).not.toBe("clipper_status");
+    expect(plan.keywordPlan("my clipper job is stuck")?.tool).not.toBe("clipper_status");
+    expect(plan.keywordPlan("how many clips are waiting for review")?.tool).toBe("clipper_status");
+    expect(plan.keywordPlan("show my shorts jobs")?.tool).toBe("clipper_status");
+    expect(plan.keywordPlan("expected views for a reel")?.tool).toBe("predictions");
     // The analytics projection keeps its own tool; Content Intelligence keeps its words.
     expect(plan.keywordPlan("forecast my views for next month")?.tool).toBe("forecast");
     expect(plan.keywordPlan("what is working in my content?")?.tool).toBe("intelligence_overview");
@@ -221,6 +228,10 @@ describe("R1325 stored pulse + tools (db)", () => {
     expect(block?.sections[0].items[0].detail).toContain("from 5 measured posts of yours");
     expect(block?.text).toContain("Your baselines:");
     expect(block?.text).toContain("/intelligence#intel-baselines");
+    // R1328 review: the HTML item links are absolute too (the email template writes hrefs verbatim).
+    expect(block?.sections[0].items[0].href).toMatch(/^https?:\/\/.+\/intelligence#intel-baselines$/);
+    // A scoped pulse carries no clipper counts (the queue has no per-account view); an empty scope is the honest null.
+    expect(await pulse.intelligencePulse(u.id, { scopeKey: "", targetIds: [] })).toBeNull();
     const plain = await weekly.intelligenceFor(u.id, async () => wi(), async () => { throw new Error("pulse down"); });
     expect(plain?.sections).toEqual([]);
     expect(await weekly.intelligenceFor(u.id, async () => wi(), async () => null)).toMatchObject({ sections: [] });

@@ -101,7 +101,7 @@ export function clipperLine(c: ClipperPulse | null): string | null {
   if (!c) return null;
   const parts: string[] = [];
   if (c.running) parts.push(`${plural(c.running, "job")} running`);
-  if (c.queued) parts.push(`${plural(c.queued, "job")} waiting for a tab to drive it`);
+  if (c.queued) parts.push(`${plural(c.queued, "job")} waiting to start`);
   if (c.review) parts.push(`${plural(c.review, "job")} waiting for your review`);
   if (c.readyToPost) parts.push(`${plural(c.readyToPost, "clip")} rendered and ready to post`);
   if (c.failed) parts.push(`${plural(c.failed, "job")} failed`);
@@ -109,7 +109,7 @@ export function clipperLine(c: ClipperPulse | null): string | null {
   return `${parts.join(", ")}${c.published ? `; ${plural(c.published, "clip")} published so far` : ""}.`;
 }
 
-/** Plain lines for a chat answer or an email paragraph; the same facts the Home card shows. */
+/** Plain lines for a chat answer or an email paragraph; the Home card's facts plus the accuracy words it leaves out. */
 export function pulseLines(p: IntelligencePulse): string[] {
   const lines = p.platforms.map(baselineLine);
   if (p.recommendation) lines.push(`Made for you: ${p.recommendation.title} (${platformName(p.recommendation.platform)}, ${p.recommendation.confidence}). ${p.recommendation.why}`);

@@ -6,8 +6,8 @@ import { activeAiGrant } from "@/lib/ai/entitlements";
 import { gemini } from "@/lib/ai/creative";
 import { env } from "@/lib/env";
 import { detect, ownedJob, type AskJson } from "@/lib/clipper/jobs";
-import { clipperBudget } from "@/lib/clipper/budget";
-import type { BudgetVerdict } from "@/lib/clipper/budget-core";
+import { clipperBudget, clipperCap } from "@/lib/clipper/budget";
+import { unavailableVerdict, type BudgetVerdict } from "@/lib/clipper/budget-core";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,7 +17,8 @@ export const maxDuration = 60;
  * "other") the model reads the transcript; without one the rule detector runs, and the response says so in
  * `detector`. Either way the ranking is deterministic (candidates-core) and every candidate carries its reason.
  * R1326: the caller's daily clipper budget (lib/clipper/budget-core.ts) is checked before the charge; over it, the
- * rule detector runs and `budget` says why, so the fallback is never silent.
+ * rule detector runs and `budget` says why, so the fallback is never silent. A budget that cannot be read fails
+ * closed to the rules as well (R1328 review), never to unlimited AI.
  */
 export const POST = route(
   async (_req, { user, params }) => {
@@ -30,8 +31,8 @@ export const POST = route(
     if (env.GEMINI_API_KEY) {
       const allowed = (await activeAiGrant(user.id, "other")) || (await assertAiCaptions(user.id).then(() => true, () => false));
       if (allowed) {
-        budget = await clipperBudget(uid).catch(() => null);
-        if (!budget || budget.allowed) {
+        budget = await clipperBudget(uid).catch(() => unavailableVerdict(clipperCap()));
+        if (budget.allowed) {
           await chargeAi(uid, "ai", undefined, undefined, "other");
           ask = (system, prompt) => gemini<unknown>(system, prompt, { temperature: 0.4, timeoutMs: 30_000, models: ["gemini-3.6-flash", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"], meter: { feature: "clipper", userId: uid } });
         }
