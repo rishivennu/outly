@@ -14,6 +14,8 @@ Pure (no I/O, no Prisma, safe in tests and on the client):
 - `categories-core.ts`: category and topic validation.
 - `prefill-core.ts`: a recommendation turned into a Content Studio draft (`/create?rec=`).
 - `report-core.ts`: the Weekly Intelligence Report block (email and dashboard).
+- `features-core.ts` (R1318): one published destination -> a versioned ContentFeatures row (counts and flags, never the copy) and PerfFeatures (derived totals; `measured` needs views and a day of age).
+- `profile-core.ts` (R1318): ContentFeature rows -> CreatorProfileData (cadence, shares, medians, trait lifts) and the personalization ladder personal / blended / general / none.
 
 Server (touch Prisma, `import "server-only"`):
 
@@ -23,6 +25,7 @@ Server (touch Prisma, `import "server-only"`):
 - `planner.ts`: act() and the audit trail.
 - `outcome.ts`: outcome links, measurement, the sweep step.
 - `lineage.ts`, `categories.ts`: content identity and categories.
+- `features.ts`, `profile.ts` (R1318): ContentFeature refresh (young posts daily, all on a FEATURE_VERSION bump), CreatorProfile rebuild per scope and platform with one CreatorProfileSnapshot a week, the LearningEvent log (`logLearning`, dedupeKey), ModelVersion baseline row, and `sweepPersonal` (sweep slot minute % 10 === 2, stalest owners first). Routes: GET /api/intelligence/profile, /status, POST /refresh. Plan: `docs/intelligence-clipper-plan.md`.
 
 Elsewhere:
 

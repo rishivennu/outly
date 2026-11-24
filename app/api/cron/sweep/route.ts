@@ -61,6 +61,8 @@ async function sweep(req: NextRequest) {
     ? await import("@/lib/intelligence/memory").then((m) => m.sweepBackfill({ maxOwners: 5, batch: 100 })).then((r) => ({ owners: r.owners, items: r.items })).catch((e) => (console.error("[sweep] backfill", e), null))
     : null;
   if (now.getMinutes() === 7) await cleanupSubs().catch(() => 0);
+  // R1318 Personal Intelligence: features and creator profiles, every 10 minutes (slot 2), at most 5 owners a run (never fatal).
+  const personal = new Date().getMinutes() % 10 === 2 ? await import("@/lib/intelligence/profile").then((m) => m.sweepPersonal({ maxOwners: 5 })).catch((e) => (console.error("[sweep] personal", e), null)) : null;
   // R1309 workshops: the 24 h reminder emails and marking finished sessions completed, on the housekeeping slot (never fatal).
   if (plan.housekeeping) await import("@/lib/workshops/server").then((m) => m.sweepWorkshops(now)).catch((e) => console.error("[sweep] workshops", e));
   // R1314 Infrastructure & Costs: book due renewals, warn a week ahead, raise budget steps once a month (never fatal).
@@ -83,7 +85,7 @@ async function sweep(req: NextRequest) {
   // (1027). Budget = what is left of maxDuration minus 10 s of headroom; whatever is still running then is
   // held by waitUntil or picked up by the next sweep.
   const running = await settle(Math.max(0, 50_000 - (Date.now() - startedAt)));
-  return NextResponse.json({ ok: true, plan, requeued, cleaned, files, reminders, push, assist, campaign, outcomes, backfill, subs, health, rollup, running }, { headers: { "cache-control": "no-store" } });
+  return NextResponse.json({ ok: true, plan, requeued, cleaned, files, reminders, push, assist, campaign, outcomes, backfill, subs, health, rollup, personal, running }, { headers: { "cache-control": "no-store" } });
 }
 
 /** 1147: trials every 5 minutes (expiry + reminders); signal pruning and the ledger/month sweep once an hour. */

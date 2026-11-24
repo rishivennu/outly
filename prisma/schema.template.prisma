@@ -2592,3 +2592,90 @@ model CostAlert {
 
   @@index([status, createdAt])
 }
+
+/// R1318 Personal Intelligence: a derived, versioned feature row per published destination (PostTarget). Raw numbers stay
+/// in TargetMetric; `features` holds counts and flags of the copy and media (never the text), `perf` the derived totals.
+/// Recomputed by the sweep while the post is young and whenever FEATURE_VERSION moves (lib/intelligence/features-core.ts).
+model ContentFeature {
+  id          String   @id @default(cuid())
+  ownerId     String
+  targetId    String   @unique
+  postId      String
+  platform    String
+  format      String
+  publishedAt DateTime
+  version     Int
+  features    String // JSON ContentFeatures
+  perf        String? // JSON PerfFeatures
+  measured    Boolean  @default(false)
+  computedAt  DateTime @default(now())
+
+  @@index([ownerId, platform, publishedAt])
+  @@index([ownerId, computedAt])
+}
+
+/// R1318: the derived creator profile; platform "" = the whole workspace, else one platform. Rebuilt by the sweep from
+/// ContentFeature rows, never hand edited (explicit preferences live in BrandProfile). scopeKey mirrors BrandProfile.
+model CreatorProfile {
+  id            String   @id @default(cuid())
+  ownerId       String
+  scopeKey      String   @default("")
+  platform      String   @default("")
+  version       Int
+  level         String // personal | blended | general | none (lib/intelligence/profile-core.ts)
+  postsTotal    Int      @default(0)
+  postsMeasured Int      @default(0)
+  data          String // JSON CreatorProfileData
+  computedAt    DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  snapshots CreatorProfileSnapshot[]
+
+  @@unique([ownerId, scopeKey, platform])
+  @@index([computedAt])
+}
+
+/// R1318: one copy of a profile per ISO week, so a creator's behaviour can be read over time.
+model CreatorProfileSnapshot {
+  id        String   @id @default(cuid())
+  profileId String
+  week      String // yyyy-Www
+  level     String
+  data      String
+  at        DateTime @default(now())
+
+  profile CreatorProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, week])
+}
+
+/// R1318: the learning log. Recommendation feedback stays in RecommendationEvent; this holds everything else the
+/// engine learns from (publish, measurement, profile rebuilds, predictions evaluated, clip decisions). dedupeKey makes
+/// a repeated write a no-op. No FK to the subject on purpose: an event outlives a deleted post or clip.
+model LearningEvent {
+  id          String   @id @default(cuid())
+  ownerId     String
+  type        String
+  subjectType String?
+  subjectId   String?
+  dedupeKey   String?
+  data        String? // small JSON
+  at          DateTime @default(now())
+
+  @@unique([ownerId, dedupeKey])
+  @@index([ownerId, at])
+  @@index([ownerId, type, at])
+}
+
+/// R1318: every scorer that ever produced a prediction, including the deterministic TypeScript baseline. A prediction
+/// always names its version, so an evaluation compares like with like.
+model ModelVersion {
+  id             String   @id @default(cuid())
+  key            String   @unique // e.g. baseline-ts-1
+  kind           String // baseline | gbm | llm
+  featureVersion Int
+  status         String   @default("active") // candidate | active | retired
+  notes          String?
+  data           String? // JSON: shared baselines, parameters
+  createdAt      DateTime @default(now())
+}
