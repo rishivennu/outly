@@ -9,7 +9,7 @@ services:
     repo: https://github.com/rishivennu/outly
     branch: main
     region: singapore
-    plan: free
+    plan: starter
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /api/health
