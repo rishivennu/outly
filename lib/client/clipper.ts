@@ -43,7 +43,10 @@ export function probeVideo(src: string | File): Promise<{ duration: number; widt
  * Transcribe + detect for a job, from the top: start, chunks in parallel (3 at a time, retries inside runChunks),
  * one transcript post, one detect call. Throws ApiError or Error; the caller reports `fail` with the message.
  */
-export async function runJob(job: JobView, src: string | Blob, o: { signal: AbortSignal; onProgress: Progress; lang?: string; onJob?: (j: JobView) => void }): Promise<JobDetail> {
+/** R1326: what the detect call said about how the moments were found, for the studio's notice. */
+export interface DetectOutcome { detector: "ai" | "rules"; budget: { allowed: boolean; reason: "ok" | "calls" | "money"; line: string } | null }
+
+export async function runJob(job: JobView, src: string | Blob, o: { signal: AbortSignal; onProgress: Progress; lang?: string; onJob?: (j: JobView) => void; onDetect?: (d: DetectOutcome) => void }): Promise<JobDetail> {
   const { job: started } = await stage(job.id, { event: "start", executor: "browser" });
   o.onJob?.(started);
   if (started.stage === "transcribe") {
@@ -93,8 +96,9 @@ export async function runJob(job: JobView, src: string | Blob, o: { signal: Abor
   }
   if (o.signal.aborted) throw new DOMException("Cancelled", "AbortError");
   o.onProgress(1);
-  const d = await api<{ job: JobView }>(`/api/clipper/jobs/${job.id}/detect`, { method: "POST" });
+  const d = await api<{ job: JobView } & DetectOutcome>(`/api/clipper/jobs/${job.id}/detect`, { method: "POST" });
   o.onJob?.(d.job);
+  o.onDetect?.({ detector: d.detector, budget: d.budget ?? null });
   return api<JobDetail>(`/api/clipper/jobs/${job.id}?transcript=1`);
 }
 

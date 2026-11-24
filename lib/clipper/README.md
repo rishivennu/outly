@@ -88,7 +88,7 @@ ids and deletes by id; the abandon update repeats its condition so a heartbeat l
 and sums `inrMinor` for feature `clipper` in the cost ledger (R1315). Two caps, first hit wins: **calls** (safety
 net while a model has no unit price and books at ₹0) and **money**. Defaults 30 calls / ₹40 a UTC day, overridable
 with `CLIPPER_DAILY_CALLS` and `CLIPPER_DAILY_INR` (rupees). The cap never blocks a job: detection falls back to the
-rules and the response and the `detected` event carry the reason. The check precedes the call and the booking
+rules and the response and the `detected` event carry the reason; the studio shows `budget.line` once over the candidates (`detectNote`). The check precedes the call and the booking
 follows it, so a day can overshoot by one call. Keyed by the user the ledger books (the person detecting).
 
 ### Review notes (ownership, RLS)

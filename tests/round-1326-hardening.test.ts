@@ -211,6 +211,11 @@ describe("R1326 wiring", () => {
     expect(detect).toContain("note: budget && !budget.allowed ? { budget: budget.reason } : null");
     expect(detect).toContain("budget: budget ? { allowed: budget.allowed, reason: budget.reason, line: budget.line, spend: budget.spend, cap: budget.cap } : null");
     for (const f of ["lib/clipper/retention-core.ts", "lib/clipper/budget-core.ts"]) expect(read(f)).not.toContain("@prisma/client\"");
+    // The studio tells the creator when the rules ran because of the budget (plan "Later" row closed).
+    expect(read("lib/client/clipper.ts")).toContain("o.onDetect?.({ detector: d.detector, budget: d.budget ?? null });");
+    const studio = read("components/clipper/ClipperStudio.tsx");
+    expect(studio).toContain("o.detector === \"rules\" && o.budget && !o.budget.allowed");
+    expect(studio).toContain('<p role="status" className="rounded-2xl bg-secondary/60 px-4 py-3 text-[13px] text-muted-foreground">{detectNote}</p>');
     for (const f of ["lib/clipper/retention.ts", "lib/clipper/budget.ts"]) expect(read(f)).toContain('import "server-only"');
     const readme = read("lib/clipper/README.md");
     for (const s of ["## Hardening (R1326)", "### Retention", "### Daily AI budget", "### Review notes (ownership, RLS)", "### Sweep bounds", "CLIPPER_DAILY_CALLS", "`sweepClipper` | housekeeping"]) expect(readme).toContain(s);

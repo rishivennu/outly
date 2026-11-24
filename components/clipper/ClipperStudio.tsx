@@ -28,6 +28,8 @@ export function ClipperStudio({ initialJobs, openId }: { initialJobs: JobView[];
   const [detail, setDetail] = useState<JobDetail | null>(null);
   const [run, setRun] = useState<Run>({ kind: "idle" });
   const [pickError, setPickError] = useState<string | null>(null);
+  // R1326: when the daily AI budget made the rule detector run, the creator is told so, once, over the candidates.
+  const [detectNote, setDetectNote] = useState<string | null>(null);
   const limits = useUploadLimits();
   const abort = useRef<AbortController | null>(null);
   const localSrc = useRef<{ id: string; file: File } | null>(null);
@@ -88,9 +90,11 @@ export function ClipperStudio({ initialJobs, openId }: { initialJobs: JobView[];
       if (ctrl.signal.aborted) return setRun({ kind: "idle" });
       abort.current = ctrl;
       setRun({ kind: "working", p: 0, stage: j.stage });
+      setDetectNote(null);
       try {
         const d = await runJob(j, src, {
           signal: ctrl.signal,
+          onDetect: (o) => setDetectNote(o.detector === "rules" && o.budget && !o.budget.allowed ? `Moments were found by the rule detector this time. ${o.budget.line}` : null),
           onJob: (nj) => {
             putJob(nj);
             setRun((r) => (r.kind === "working" ? { ...r, stage: nj.stage } : r));
@@ -222,6 +226,9 @@ export function ClipperStudio({ initialJobs, openId }: { initialJobs: JobView[];
           </Card>
         )}
 
+        {detectNote && screen === "review" && detail && detail.job.id === job?.id && (
+          <p role="status" className="rounded-2xl bg-secondary/60 px-4 py-3 text-[13px] text-muted-foreground">{detectNote}</p>
+        )}
         {(screen === "review" || screen === "done" || screen === "cancelled") && detail && detail.job.id === job?.id && (
           <ReviewScreen detail={detail} sourceFile={localSrc.current?.id === detail.job.id ? localSrc.current.file : null} onChange={(d) => { setDetail(d); putJob(d.job); }} onNew={() => setCurrent(null)} />
         )}
