@@ -76,7 +76,7 @@ describe("R1319 scorer-core", () => {
     expect(none.explanation).toContain("no measured carousel post");
     // A shared baseline wins over the platform prior when given.
     const shared = baselineScorer.score({ platform: "instagram", format: "video", features: {}, history: hist, asOf: NOW, shared: { source: "creators like you", median: 1000, n: 50 } })!;
-    expect(shared.basis.prior).toEqual({ source: "creators like you", value: 1000 });
+    expect(shared.basis.prior).toMatchObject({ source: "creators like you", value: 1000, n: 50, shared: true });
     expect(shared.predicted).toBeGreaterThan(300);
   });
 
@@ -211,15 +211,24 @@ describe("R1319 stored loop (db)", () => {
     const mine = [];
     for (const v of [300, 300, 300, 300]) mine.push(await s.post(v, 10 * DAY));
     await feat.refreshFeatures(a.id);
-    const p = await pred.predictDraft(a.id, { platform: "instagram", format: "video", caption: "A new one", hook: "Ready?", postId: mine[0].post.id });
+    // A draft of the owner's own: the forecast is stored against it.
+    const draft = await db.post.create({ data: { userId: a.id, mediaId: mine[0].post.mediaId, status: "draft" } });
+    const p = await pred.predictDraft(a.id, { platform: "instagram", format: "video", caption: "A new one", hook: "Ready?", postId: draft.id });
     expect(p).toMatchObject({ n: 4, level: "blended", predicted: 300 });
-    expect(await db.predictionRecord.count({ where: { ownerId: a.id, subjectType: "post", subjectId: mine[0].post.id } })).toBe(1);
+    expect(await db.predictionRecord.count({ where: { ownerId: a.id, subjectType: "post", subjectId: draft.id } })).toBe(1);
     // Another owner naming this post: scored from their (empty) history, nothing stored.
-    expect(await pred.predictDraft(b.id, { platform: "instagram", format: "video", postId: mine[0].post.id })).toBeNull();
-    expect(await db.predictionRecord.count({ where: { subjectId: mine[0].post.id } })).toBe(1);
+    expect(await pred.predictDraft(b.id, { platform: "instagram", format: "video", postId: draft.id })).toBeNull();
+    expect(await db.predictionRecord.count({ where: { subjectId: draft.id } })).toBe(1);
     // Same draft again: the stored forecast is updated, not duplicated.
-    await pred.predictDraft(a.id, { platform: "instagram", format: "video", caption: "Edited", postId: mine[0].post.id });
+    await pred.predictDraft(a.id, { platform: "instagram", format: "video", caption: "Edited", postId: draft.id });
     expect(await db.predictionRecord.count({ where: { ownerId: a.id, subjectType: "post" } })).toBe(1);
+    // R1324 review: a post already published is past its outcome; naming it scores but stores nothing (no hindsight).
+    expect(await pred.predictDraft(a.id, { platform: "instagram", format: "video", caption: "Late", postId: mine[0].post.id })).not.toBeNull();
+    expect(await db.predictionRecord.count({ where: { subjectId: mine[0].post.id } })).toBe(0);
+    // And a judged forecast is never overwritten.
+    await db.predictionRecord.updateMany({ where: { subjectId: draft.id }, data: { actual: 500, errorPct: 40, evaluatedAt: new Date() } });
+    await pred.predictDraft(a.id, { platform: "instagram", format: "video", caption: "Edited again", postId: draft.id });
+    expect((await db.predictionRecord.findFirst({ where: { subjectId: draft.id } }))?.actual).toBe(500);
   });
 
   test("refreshOwner runs the prediction loop and reports it", async () => {

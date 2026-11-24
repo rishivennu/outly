@@ -19,15 +19,17 @@ const action = z.discriminatedUnion("action", [
 ]);
 
 /**
- * POST { action: "rebuild" } rebuilds the shared baselines now; { action: "status", key, status } moves a model
- * version (retiring the shared document stops every creator reading it at the next cache turn). Both are logged.
+ * POST { action: "rebuild" } rebuilds the shared baselines now (a retired document is refreshed but stays retired);
+ * { action: "status", key, status } moves a model version. Retiring the shared document stops every creator reading
+ * it at the next cache turn (5 minutes): live estimates read the document, and a stored calibration that leaned on it
+ * is recomputed on its next read. Both are logged.
  */
 export const POST = adminRoute("intelligence", async (req, { admin }) => {
   const body = action.parse(await req.json());
   if (body.action === "rebuild") {
     const r = await rebuildShared();
-    await adminEvent("intelligence", `Shared baselines rebuilt: ${r.baselines.buckets.length} buckets from ${r.baselines.owners} creators`, admin.login, "/admin/intelligence");
-    return json({ ok: true, buckets: r.baselines.buckets.length, rows: r.baselines.rows, owners: r.baselines.owners, dropped: r.baselines.dropped, optedOut: r.optedOut });
+    await adminEvent("intelligence", `Shared baselines rebuilt: ${r.baselines.buckets.length} buckets from ${r.baselines.owners} creators${r.status === "active" ? "" : ` (document ${r.status}: stored, served to nobody)`}`, admin.login, "/admin/intelligence");
+    return json({ ok: true, buckets: r.baselines.buckets.length, rows: r.baselines.rows, owners: r.baselines.owners, dropped: r.baselines.dropped, optedOut: r.optedOut, status: r.status });
   }
   const v = await db.modelVersion.findUnique({ where: { key: body.key }, select: { key: true, status: true } });
   if (!v) throw new HttpError(404, "No model version with that key.", "NOT_FOUND");

@@ -63,8 +63,9 @@ async function sweep(req: NextRequest) {
   if (now.getMinutes() === 7) await cleanupSubs().catch(() => 0);
   // R1318 Personal Intelligence: features and creator profiles, every 10 minutes (slot 2), at most 5 owners a run (never fatal).
   const personal = new Date().getMinutes() % 10 === 2 ? await import("@/lib/intelligence/profile").then((m) => m.sweepPersonal({ maxOwners: 5 })).catch((e) => (console.error("[sweep] personal", e), null)) : null;
-  // R1324 shared learning: the anonymised cohort baselines, rebuilt once an hour (minute 12), never fatal.
-  const shared = new Date().getMinutes() === 12 ? await import("@/lib/intelligence/shared").then((m) => m.sweepShared(now)).catch((e) => (console.error("[sweep] shared", e), null)) : null;
+  // R1324 shared learning: the anonymised cohort baselines, rebuilt once the stored document is an hour old (one cheap
+  // read on every tick, so the refresh does not depend on the pinger landing on one minute), never fatal.
+  const shared = await import("@/lib/intelligence/shared").then((m) => m.sweepShared(now)).catch((e) => (console.error("[sweep] shared", e), null));
   // R1309 workshops: the 24 h reminder emails and marking finished sessions completed, on the housekeeping slot (never fatal).
   if (plan.housekeeping) await import("@/lib/workshops/server").then((m) => m.sweepWorkshops(now)).catch((e) => console.error("[sweep] workshops", e));
   // R1314 Infrastructure & Costs: book due renewals, warn a week ahead, raise budget steps once a month (never fatal).

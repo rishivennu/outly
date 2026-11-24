@@ -29,14 +29,14 @@ export default async function Intelligence() {
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AdminKpi i={0} label="Active model" value={g.modelKey} sub={`${num(g.predictions.total)} forecasts · ${num(g.predictions.evaluated)} evaluated`} hint="Every forecast is written before the outcome is known and filled with the actual after the post's first week." />
-        <AdminKpi i={1} label="Accuracy, latest week" value={latest ? pct(latest.mape) : "—"} sub={latest ? `MAPE across ${latest.owners} creator${latest.owners === 1 ? "" : "s"}, ${latest.n} posts` : "No evaluated week yet"} hint="Mean absolute percentage error, weighted by each creator's evaluated posts. Lower is better." />
+        <AdminKpi i={1} label={latest ? `Accuracy, week ${latest.week}` : "Accuracy, latest week"} value={latest ? pct(latest.mape) : "—"} sub={latest ? `MAPE across ${latest.owners} creator${latest.owners === 1 ? "" : "s"}, ${latest.n} posts` : "No evaluated week yet"} hint="Mean absolute percentage error over the forecasts judged that week. Lower is better." />
         <AdminKpi i={2} label="Drift" value={g.drift.deltaPts === null ? "—" : `${g.drift.deltaPts > 0 ? "+" : ""}${g.drift.deltaPts} pts`} sub={g.drift.verdict} hint="The last 4 evaluated weeks against the 4 before them. More than 10 points worse is drifting." />
         <AdminKpi i={3} label="Sharing" value={g.participation.creators ? `${Math.round((participating / g.participation.creators) * 100)}%` : "—"} sub={`${num(participating)} of ${num(g.participation.creators)} creators · ${num(g.participation.optedOut)} opted out`} hint="Creators whose measured posts may join the anonymised buckets. Opting out keeps their rows home; it never changes their own predictions." />
       </div>
 
       <div className="mb-4 grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardTitle hint="One line per ISO week: the n-weighted MAPE, the share of actuals inside the predicted band, and the signed bias (positive = over-predicts).">Accuracy by week</CardTitle>
+          <CardTitle hint="One line per ISO week, each forecast filed under the week its outcome became known: the mean absolute percentage error, the share of actuals inside the predicted band, and the mean signed bias (positive = over-predicts).">Accuracy by week</CardTitle>
           {g.accuracy.length === 0 ? <Empty title="No evaluated forecasts yet" body="A forecast is evaluated once its post is a week old and measured. The first evaluated week starts this table." /> : (
             <Table label="Accuracy by week" head={["Week", "Creators", "Posts", "MAPE", "In band", "Bias"]} lead={1} align={[undefined, "right", "right", "right", "right", "right"]} minWidth={520}>
               {[...g.accuracy].reverse().map((w) => (
@@ -71,13 +71,17 @@ export default async function Intelligence() {
       </div>
 
       <Card className="mb-4">
-        <CardTitle hint={`Built from measured posts of the last ${g.shared?.windowDays ?? 180} days. A bucket is published only with at least ${g.shared?.minOwners ?? 5} creators and ${g.shared?.minPosts ?? 20} posts and no creator above half of it. The number carried is views per follower, so it scales to any account size.`}>Shared baselines</CardTitle>
+        <CardTitle hint={`Built from measured posts of the last ${g.shared?.windowDays ?? 180} days, each past its first week. A bucket, and each statistic in it, is published only with at least ${g.shared?.minOwners ?? 5} creators and ${g.shared?.minPosts ?? 20} posts and no creator above half of it. The number carried is views per follower, so it scales to any account size.`}>Shared baselines</CardTitle>
         {!g.shared ? (
-          <Empty title="Not built yet" body="Rebuild now, or wait for the hourly sweep. Until then every creator's estimate is their own numbers only." />
+          g.sharedStatus && g.sharedStatus !== "active" ? (
+            <Empty title={`Document ${g.sharedStatus}`} body="Stored but served to nobody: every creator's estimate is their own numbers only. Activate it below to serve it again." />
+          ) : (
+            <Empty title="Not built yet" body="Rebuild now, or wait for the hourly sweep. Until then every creator's estimate is their own numbers only." />
+          )
         ) : (
           <>
             <p className="mb-3 text-[12.5px] text-muted-foreground">
-              Built <time dateTime={g.shared.builtAt ?? undefined}>{fmtDate(g.shared.builtAt)}</time> from {num(g.shared.rows)} posts by {num(g.shared.owners)} creators. {num(g.shared.buckets.length)} bucket{g.shared.buckets.length === 1 ? "" : "s"} published, {num(g.shared.dropped)} too thin or too concentrated to publish.
+              Built <time dateTime={g.shared.builtAt ?? undefined}>{fmtDate(g.shared.builtAt)}</time> from {num(g.shared.rows)} posts by {num(g.shared.owners)} creators. {num(g.shared.buckets.length)} bucket{g.shared.buckets.length === 1 ? "" : "s"} published, {num(g.shared.dropped)} too thin or too concentrated to publish.{g.shared.truncated ? " The row cap was hit, so the window was not read in full." : ""}
             </p>
             {g.shared.buckets.length === 0 ? <Empty title="No bucket clears the threshold yet" body="Buckets appear as more creators have measured posts of the same format on the same platform." /> : (
               <Table label="Shared baselines" head={["Bucket", "Creators", "Posts", "Top creator share", "Views / follower (median)", "Views (median)", "Engagement (median)"]} lead={1} align={[undefined, "right", "right", "right", "right", "right", "right"]} minWidth={820}>
@@ -99,7 +103,7 @@ export default async function Intelligence() {
       </Card>
 
       <Card>
-        <CardTitle hint="Every scorer and shared document the engine has used. Retiring the shared document stops every creator reading it within a few minutes; the active scorer stays until a replacement is shipped.">Model versions</CardTitle>
+        <CardTitle hint="Every scorer and shared document the engine has used, newest first. Retiring the shared document stops every creator reading it within a few minutes (live estimates at the next cache turn; a stored calibration that leaned on it is recomputed on its next read); the active scorer stays until a replacement is shipped.">Model versions</CardTitle>
         {g.versions.length === 0 ? <Empty title="No versions recorded yet" body="The first personal-intelligence sweep registers the baseline scorer." /> : (
           <Table label="Model versions" head={["Key", "Kind", "Features v", "Status", "Notes", "Since"]} lead={1} minWidth={760}>
             {g.versions.map((v) => (

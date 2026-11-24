@@ -7,7 +7,7 @@ import { PERSONAL_MIN, PROFILE_WINDOW_DAYS, traitLifts, levelOf, weekKey, type F
 import type { PostRecord } from "../core";
 import { followersOn, loadShared } from "../shared";
 import { sharedFor } from "../shared-core";
-import { accuracyWords, apeOf, baselineScorer, BASELINE_KEY, cohortSize, EVAL_MIN_AGE_DAYS, evaluate, parseBasis, type Evaluation, type Prediction, type Scorer, type SharedBaseline } from "./scorer-core";
+import { accuracyWords, apeOf, baselineScorer, BASELINE_KEY, EVAL_MIN_AGE_DAYS, evaluate, parseBasis, type Evaluation, type Prediction, type Scorer, type SharedBaseline } from "./scorer-core";
 
 /**
  * R1319: predictions, the stored side. Every published destination is scored once from the creator's history before
@@ -25,12 +25,16 @@ async function history(ownerId: string, now: number, targetIds?: string[] | null
   return toFeatureRows(await loadFeatureRows(ownerId, { days: HISTORY_DAYS, now, targetIds }));
 }
 
-/** A shared prior for one question, or null. */
-export type SharedLookup = (q: { platform: string; format: string; categories?: readonly string[]; n: number }) => SharedBaseline | null;
+/** A shared prior for one question, or null. `measured` is the creator's measured posts on that platform (every format). */
+export type SharedLookup = (q: { platform: string; format: string; categories?: readonly string[]; measured: number }) => SharedBaseline | null;
+
+/** The creator's measured posts on a platform, the count the personal level is read from. */
+export const measuredOn = (rows: readonly FeatureRow[], platform: string) => rows.filter((r) => r.platform === platform && r.perf?.measured).length;
 
 /**
- * R1324: the shared prior, offered only below the personal level (PERSONAL_MIN own posts), scaled to the creator's
- * follower count on each platform. Live estimates only: backfilled forecasts (syncPredictions) stay own-data, so an
+ * R1324: the shared prior, offered only below the personal level on that platform (PERSONAL_MIN measured posts across
+ * its formats: a creator with a deep platform history keeps their own platform-wide prior for a new format), scaled to
+ * the creator's follower count. Live estimates only: backfilled forecasts (syncPredictions) stay own-data, so an
  * evaluation never benefits from a cohort document built after the post went out.
  */
 export async function sharedLookupFor(ownerId: string, platforms: readonly string[]): Promise<SharedLookup> {
@@ -38,7 +42,7 @@ export async function sharedLookupFor(ownerId: string, platforms: readonly strin
   if (!b || !b.buckets.length) return () => null;
   const wanted = [...new Set(platforms)];
   const followers = new Map(await Promise.all(wanted.map(async (p) => [p, await followersOn(ownerId, p).catch(() => null)] as const)));
-  return (q) => (q.n >= PERSONAL_MIN ? null : sharedFor(b, { platform: q.platform, format: q.format, categories: q.categories, followers: followers.get(q.platform) ?? null }));
+  return (q) => (q.measured >= PERSONAL_MIN ? null : sharedFor(b, { platform: q.platform, format: q.format, categories: q.categories, followers: followers.get(q.platform) ?? null }));
 }
 
 export interface DraftInput {
@@ -72,10 +76,11 @@ export async function predictDraft(ownerId: string, draft: DraftInput, opts: { n
   delete known.crossPosted;
   const rows = await history(ownerId, now);
   const shared = await sharedLookupFor(ownerId, [draft.platform]);
-  const n = cohortSize(rows, draft.platform, draft.format, now);
-  const prediction = SCORERS[ACTIVE_MODEL].score({ platform: draft.platform, format: draft.format, features: known, history: rows, asOf: now, shared: shared({ platform: draft.platform, format: draft.format, categories: known.categories, n }) });
+  const prediction = SCORERS[ACTIVE_MODEL].score({ platform: draft.platform, format: draft.format, features: known, history: rows, asOf: now, shared: shared({ platform: draft.platform, format: draft.format, categories: known.categories, measured: measuredOn(rows, draft.platform) }) });
   if (prediction && draft.postId) {
-    const post = await db.post.findFirst({ where: { id: draft.postId, userId: ownerId }, select: { id: true } });
+    // Stored only while the post is still ahead of its outcome (a draft or a scheduled post), and never over a
+    // forecast that has already been judged: a number written after the fact would be hindsight, not a forecast.
+    const post = await db.post.findFirst({ where: { id: draft.postId, userId: ownerId, status: { in: ["draft", "scheduled"] } }, select: { id: true } });
     if (post) await storePrediction(ownerId, opts.scopeKey ?? "", "post", post.id, prediction, now);
   }
   return prediction;
@@ -83,6 +88,10 @@ export async function predictDraft(ownerId: string, draft: DraftInput, opts: { n
 
 async function storePrediction(ownerId: string, scopeKey: string, subjectType: string, subjectId: string, p: Prediction, now: number) {
   const data = { platform: p.platform, format: p.format, level: p.level, predicted: p.predicted, low: p.low, high: p.high, basis: JSON.stringify(p.basis) };
+  if (subjectType === "post") {
+    const judged = await db.predictionRecord.findFirst({ where: { ownerId, modelKey: p.modelKey, subjectType, subjectId, metric: p.metric, actual: { not: null } }, select: { id: true } });
+    if (judged) return null;
+  }
   return db.predictionRecord.upsert({
     where: { ownerId_modelKey_subjectType_subjectId_metric: { ownerId, modelKey: p.modelKey, subjectType, subjectId, metric: p.metric } },
     create: { ownerId, scopeKey, modelKey: p.modelKey, subjectType, subjectId, metric: p.metric, ...data, createdAt: new Date(now) },
@@ -173,6 +182,8 @@ export interface FormatBaseline {
   high: number;
   confidence: Prediction["confidence"];
   explanation: string;
+  /** When the number leans on the shared cohort: how many posts and creators it came from. */
+  prior?: { shared: boolean; n: number; owners: number | null } | null;
 }
 
 export interface ModelState {
@@ -183,6 +194,8 @@ export interface ModelState {
   byFormat: FormatBaseline[];
   lifts: Lift[];
   computedAt: string;
+  /** True when any format here leaned on the shared cohort document at the time it was computed. */
+  shared?: boolean;
 }
 
 /** What a typical post of each format would do today, per platform, from the rows given. Pure apart from the clock. */
@@ -195,10 +208,11 @@ export function statesFrom(rows: FeatureRow[], now: number, shared: SharedLookup
     const formats = [...new Set(mine.map((r) => r.format))].sort();
     const byFormat: FormatBaseline[] = [];
     for (const format of formats) {
-      const p = scorer.score({ platform, format, features: {}, history: rows, asOf: now, metric: METRIC, shared: shared({ platform, format, n: cohortSize(rows, platform, format, now, METRIC) }) });
-      if (p) byFormat.push({ format, n: p.n, level: p.level, predicted: p.predicted, low: p.low, high: p.high, confidence: p.confidence, explanation: p.explanation });
+      const p = scorer.score({ platform, format, features: {}, history: rows, asOf: now, metric: METRIC, shared: shared({ platform, format, measured }) });
+      if (p) byFormat.push({ format, n: p.n, level: p.level, predicted: p.predicted, low: p.low, high: p.high, confidence: p.confidence, explanation: p.explanation, prior: p.basis.prior?.shared ? { shared: true, n: p.basis.prior.n ?? 0, owners: p.basis.prior.owners ?? null } : null });
     }
-    return { modelKey: scorer.key, platform, level: levelOf(measured), measured, byFormat, lifts: traitLifts(mine, METRIC), computedAt: new Date(now).toISOString() };
+    const usedShared = byFormat.some((f) => f.prior?.shared);
+    return { modelKey: scorer.key, platform, level: levelOf(measured), measured, byFormat, lifts: traitLifts(mine, METRIC), computedAt: new Date(now).toISOString(), ...(usedShared ? { shared: true } : {}) };
   });
 }
 
@@ -222,7 +236,11 @@ export async function modelStates(ownerId: string, opts: { scopeKey?: string; ta
   const stored = await db.creatorModelState.findMany({ where: { ownerId, scopeKey: "", modelKey: ACTIVE_MODEL }, orderBy: { platform: "asc" }, take: 20 });
   // Before the first calibration (the sweep has not reached this owner yet) the states are computed on the spot.
   if (!stored.length) return live(await history(ownerId, now));
-  return stored.map((s) => JSON.parse(s.state) as ModelState);
+  const states = stored.map((s) => JSON.parse(s.state) as ModelState);
+  // A stored state that leaned on the shared document is served only while that document is still active; once an
+  // admin retires it the state is recomputed from the creator's own rows (and the stored copy refreshed).
+  if (states.some((s) => s.shared) && !(await loadShared().catch(() => null))) return calibrate(ownerId, "", await history(ownerId, now), now);
+  return states;
 }
 
 export interface PlatformPredictions extends ModelState {

@@ -34,7 +34,12 @@ export interface SharedBaseline {
   /** Where the prior came from, for the explanation. */
   source: string;
   median: number;
+  /** Posts behind the prior and the distinct creators they came from. */
   n: number;
+  owners?: number;
+  /** The cohort's spread, scaled the same way as the median; the band when the creator has under 3 posts of their own. */
+  p25?: number;
+  p75?: number;
 }
 
 export interface ScoreInput {
@@ -65,7 +70,8 @@ export interface PredictionBasis {
   cohortP75: number | null;
   platformN: number;
   platformMedian: number | null;
-  prior: { source: string; value: number } | null;
+  /** `n` and `owners` are set for a shared (cohort) prior; a platform-wide prior names the creator's own posts in `n`. */
+  prior: { source: string; value: number; n?: number; owners?: number; shared?: boolean } | null;
   shrinkWeight: number;
   adjustments: Adjustment[];
   adjustment: number;
@@ -167,7 +173,11 @@ export const baselineScorer: Scorer = {
     const level = levelOf(n);
     const cohortMedian = n ? median(cohortVals) : null;
     const platformMedian = platformVals.length ? median(platformVals) : null;
-    const prior = input.shared ? { source: input.shared.source, value: input.shared.median } : platformMedian !== null && platformVals.length > n ? { source: "your other formats on this platform", value: platformMedian } : null;
+    const prior: PredictionBasis["prior"] = input.shared
+      ? { source: input.shared.source, value: input.shared.median, n: input.shared.n, owners: input.shared.owners, shared: true }
+      : platformMedian !== null && platformVals.length > n
+        ? { source: "your other formats on this platform", value: platformMedian, n: platformVals.length }
+        : null;
     // Nothing measured at all for this creator here, and no shared prior: no number.
     if (level === "none" && !prior) return null;
     const weight = r2(n / (n + SHRINK_K));
@@ -178,9 +188,13 @@ export const baselineScorer: Scorer = {
     const predicted = centre * adjustment;
     const p25 = n >= 3 ? quantile(cohortVals, 0.25) : null;
     const p75 = n >= 3 ? quantile(cohortVals, 0.75) : null;
-    // The spread of the cohort around its median, applied to the estimate; with under 3 posts a wide default band.
-    const lowRatio = cohortMedian && p25 !== null && cohortMedian > 0 ? Math.min(1, p25 / cohortMedian) : 0.5;
-    const highRatio = cohortMedian && p75 !== null && cohortMedian > 0 ? Math.max(1, p75 / cohortMedian) : 1.8;
+    // The spread of the cohort around its median, applied to the estimate; with under 3 posts of the creator's own the
+    // shared cohort's spread stands in when there is one, else a wide default band.
+    const sh = input.shared;
+    const sharedLow = sh && sh.median > 0 && typeof sh.p25 === "number" ? Math.min(1, sh.p25 / sh.median) : null;
+    const sharedHigh = sh && sh.median > 0 && typeof sh.p75 === "number" ? Math.max(1, sh.p75 / sh.median) : null;
+    const lowRatio = cohortMedian && p25 !== null && cohortMedian > 0 ? Math.min(1, p25 / cohortMedian) : (sharedLow ?? 0.5);
+    const highRatio = cohortMedian && p75 !== null && cohortMedian > 0 ? Math.max(1, p75 / cohortMedian) : (sharedHigh ?? 1.8);
     const round = (v: number) => (metric === "engagementRate" ? r2(v) : Math.round(v));
     const lvl: Exclude<Level, "none"> = level === "none" ? "general" : level;
     const basis: PredictionBasis = { cohortN: n, cohortMedian: cohortMedian === null ? null : r2(cohortMedian), cohortP25: p25 === null ? null : r2(p25), cohortP75: p75 === null ? null : r2(p75), platformN: platformVals.length, platformMedian: platformMedian === null ? null : r2(platformMedian), prior, shrinkWeight: weight, adjustments, adjustment };

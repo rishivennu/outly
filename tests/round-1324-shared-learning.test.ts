@@ -7,8 +7,8 @@
  */
 import { beforeAll, describe, expect, mock, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { accuracyByWeek, buildShared, driftOf, parseShared, pickBucket, quantile, SHARED_MAX_OWNER_SHARE, SHARED_MIN_OWNERS, SHARED_MIN_POSTS, SHARED_OWNER_CAP, sharedFor, type SharedRow } from "../lib/intelligence/shared-core";
-import { cohortSize } from "../lib/intelligence/model/scorer-core";
+import { accuracyByWeek, buildShared, driftOf, parseShared, pickBucket, quantile, SHARED_MAX_OWNER_SHARE, SHARED_MIN_OWNERS, SHARED_MIN_POSTS, SHARED_OWNER_CAP, sharedFor, weeklyAccuracy, type SharedRow } from "../lib/intelligence/shared-core";
+import { baselineScorer, cohortSize, EVAL_MIN_AGE_DAYS } from "../lib/intelligence/model/scorer-core";
 import { can } from "../lib/admin/perms";
 
 mock.module("next/headers", () => ({
@@ -29,7 +29,8 @@ beforeAll(async () => {
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 const DAY = 864e5;
 const NOW = Date.UTC(2026, 10, 24, 12);
-const row = (owner: string, i: number, o: Partial<SharedRow> = {}): SharedRow => ({ owner, platform: "instagram", format: "video", publishedAt: new Date(NOW - (i + 1) * DAY), categories: ["finance"], views: 100 + i, viewsPerFollower: 0.1 + i / 100, engagementRate: 2, ...o });
+// Rows start a week + 1 day back: a post joins the cohort only once its first week is over.
+const row = (owner: string, i: number, o: Partial<SharedRow> = {}): SharedRow => ({ owner, platform: "instagram", format: "video", publishedAt: new Date(NOW - (i + EVAL_MIN_AGE_DAYS + 1) * DAY), categories: ["finance"], views: 100 + i, viewsPerFollower: 0.1 + i / 100, engagementRate: 2, ...o });
 
 /* ------------------------------------------------------------------ core */
 
@@ -69,6 +70,40 @@ describe("R1324 shared-core", () => {
     expect(buildShared(stale, NOW).rows).toBe(0);
     const empty = Array.from({ length: 5 }, (_, o) => Array.from({ length: 5 }, (_, i) => row(`o${o}`, i, { views: null, viewsPerFollower: null, engagementRate: null }))).flat();
     expect(buildShared(empty, NOW).rows).toBe(0);
+  });
+
+  test("review fixes: each statistic clears the gates on its own rows, and a post younger than a week stays out", () => {
+    // 5 creators x 4 posts clear the bucket gates, but only one creator has a follower count: no views-per-follower
+    // median is published (it would be that creator's numbers), while views and engagement (every row) are.
+    const rows = Array.from({ length: 5 }, (_, o) => Array.from({ length: 4 }, (_, i) => row(`o${o}`, i, { viewsPerFollower: o === 0 ? 0.5 : null }))).flat();
+    const b = buildShared(rows, NOW);
+    const all = b.buckets.find((x) => x.category === null)!;
+    expect(all).toMatchObject({ n: 20, owners: 5 });
+    expect(all.viewsPerFollower).toBeNull();
+    expect(all.views).toMatchObject({ n: 20, owners: 5 });
+    expect(all.engagementRate).toMatchObject({ n: 20, owners: 5 });
+    // One creator is the only one with an engagement rate (12 of 32 rows, so the bucket itself stands): that statistic
+    // is dropped, the others stand.
+    const skewed = [...Array.from({ length: 5 }, (_, o) => Array.from({ length: 4 }, (_, i) => row(`o${o}`, i, { engagementRate: null }))).flat(), ...Array.from({ length: 12 }, (_, i) => row("big", i, { engagementRate: 9 }))];
+    const sk = buildShared(skewed, NOW).buckets.find((x) => x.category === null)!;
+    expect(sk.engagementRate).toBeNull();
+    expect(sk.views).not.toBeNull();
+    // A bucket whose every statistic fails on its own is dropped, not published empty.
+    const thin = Array.from({ length: 5 }, (_, o) => Array.from({ length: 4 }, (_, i) => row(`o${o}`, i, { views: null, engagementRate: null, viewsPerFollower: o < 2 ? 0.3 : null }))).flat();
+    expect(buildShared(thin, NOW)).toMatchObject({ buckets: [], dropped: 2 });
+    // Posts 1..6 days old carry partial first-week numbers: not in the cohort (the scorer's own lag rule).
+    const young = Array.from({ length: 5 }, (_, o) => Array.from({ length: 4 }, (_, i) => row(`o${o}`, i, { publishedAt: new Date(NOW - (i + 1) * DAY) }))).flat();
+    expect(buildShared(young, NOW).rows).toBe(0);
+    expect(buildShared(young, NOW + 7 * DAY).rows).toBe(20);
+    // sharedFor carries the cohort's spread and owner count with the median.
+    const prior = sharedFor(b, { platform: "instagram", format: "video", followers: null })!;
+    expect(prior).toMatchObject({ n: 20, owners: 5 });
+    expect(prior.p25!).toBeLessThanOrEqual(prior.median);
+    expect(prior.p75!).toBeGreaterThanOrEqual(prior.median);
+    // The scorer uses that spread for the band when the creator has under 3 posts, and records the prior's sample.
+    const p = baselineScorer.score({ platform: "instagram", format: "video", features: {}, history: [], asOf: NOW, shared: { source: "cohort", median: 1000, n: 20, owners: 5, p25: 600, p75: 1900 } })!;
+    expect(p).toMatchObject({ predicted: 1000, low: 600, high: 1900, n: 0 });
+    expect(p.basis.prior).toMatchObject({ shared: true, n: 20, owners: 5, value: 1000 });
   });
 
   test("the stored document carries no identity: counts and quantiles only", () => {
@@ -130,6 +165,22 @@ describe("R1324 shared-core", () => {
     expect(driftOf([w(0, 45), w(1, 45), w(2, 45), w(3, 45), w(4, 30), w(5, 30), w(6, 30), w(7, 30)]).verdict).toBe("improving");
     expect(driftOf([w(0, 30), w(1, 32), w(2, 30), w(3, 30), w(4, 35), w(5, 35), w(6, 35), w(7, 35)]).verdict).toBe("steady");
     expect(driftOf([w(0, 30)])).toMatchObject({ verdict: "unknown", deltaPts: null });
+  });
+
+  test("weeklyAccuracy files each evaluated forecast under the week its outcome was known, so weeks do not overlap", () => {
+    const at = (d: number) => new Date(Date.UTC(2026, 9, d, 12));
+    const rows = [
+      { owner: "a", platform: "instagram", predicted: 100, low: 80, high: 120, actual: 100, evaluatedAt: at(5) }, // W41, ape 0, in band
+      { owner: "b", platform: "instagram", predicted: 150, low: 100, high: 200, actual: 100, evaluatedAt: at(6) }, // W41, ape 50, in band
+      { owner: "b", platform: "youtube", predicted: 50, low: 40, high: 60, actual: 100, evaluatedAt: at(7) }, // W41, ape 50, out of band
+      { owner: "a", platform: "instagram", predicted: 100, low: 80, high: 120, actual: 200, evaluatedAt: at(12) }, // W42
+    ];
+    const weeks = weeklyAccuracy(rows);
+    expect(weeks.map((w) => w.week)).toEqual(["2026-W41", "2026-W42"]);
+    expect(weeks[0]).toEqual({ week: "2026-W41", owners: 2, n: 3, mape: 33.3, within: 66.7, biasPct: 0 });
+    expect(weeks[1]).toMatchObject({ owners: 1, n: 1, mape: 50, within: 0, biasPct: -50 });
+    expect(weeklyAccuracy(rows, { platform: "youtube" })).toEqual([{ week: "2026-W41", owners: 1, n: 1, mape: 50, within: 0, biasPct: -50 }]);
+    expect(JSON.stringify(weeks)).not.toContain('"owner"');
   });
 
   test("cohortSize counts the creator's own measured posts of that platform + format before asOf, less the lag", () => {
@@ -256,13 +307,22 @@ describe("R1324 wiring", () => {
   test("the sweep rebuilds hourly, the scorer is wired for live estimates only, and the sharing switch is owner-only", () => {
     expect(read("app/api/cron/sweep/route.ts")).toContain("m.sweepShared(now)");
     const p = read("lib/intelligence/model/predict.ts");
-    expect(p).toContain("shared: shared({ platform: draft.platform, format: draft.format, categories: known.categories, n })");
-    expect(p).toContain("q.n >= PERSONAL_MIN ? null :");
+    expect(p).toContain("shared: shared({ platform: draft.platform, format: draft.format, categories: known.categories, measured: measuredOn(rows, draft.platform) })");
+    expect(p).toContain("q.measured >= PERSONAL_MIN ? null :");
+    // A draft forecast is stored only for a post still ahead of its outcome, never over a judged one (no hindsight).
+    expect(p).toContain('status: { in: ["draft", "scheduled"] }');
+    expect(p).toContain("actual: { not: null } }, select: { id: true } });\n    if (judged) return null;");
+    // The sweep slot runs every tick and gates on the document's age, not on one minute of the hour.
+    expect(read("app/api/cron/sweep/route.ts")).not.toContain("getMinutes() === 12");
+    expect(read("lib/intelligence/shared.ts")).toContain("SHARED_REBUILD_MS");
     // syncPredictions (backfilled forecasts) never takes a shared prior: no hindsight in the evaluation.
     const sync = p.slice(p.indexOf("export async function syncPredictions"), p.indexOf("export interface FormatBaseline"));
     expect(sync).not.toContain("shared");
     const r = read("app/api/intelligence/sharing/route.ts");
     expect(r).toContain('if (user.role !== "owner") throw new HttpError(403');
+    expect(r).toContain('canChange');
+    expect(read("components/intelligence/PersonalBaselines.tsx")).toContain("disabled={busy || !canChange}");
+    expect(read("components/intelligence/PersonalBaselines.tsx")).toContain('role="status" aria-live="polite"');
     expect(r).toContain("export const PATCH = route(");
     expect(read("components/intelligence/PersonalBaselines.tsx")).toContain('role="switch"');
     expect(read("components/intelligence/PersonalBaselines.tsx")).toContain("/api/intelligence/sharing");

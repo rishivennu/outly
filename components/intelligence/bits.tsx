@@ -26,13 +26,13 @@ const CONF_STYLE: Record<Confidence, string> = {
 const CONF_ICON: Record<Confidence, typeof CircleCheck> = { high: CircleCheck, medium: CircleDot, low: CircleAlert };
 
 /** The word first, the colour and the glyph only as a second signal. */
-export function ConfidenceBadge({ level, n }: { level: Confidence; n?: number }) {
+export function ConfidenceBadge({ level, n, of }: { level: Confidence; n?: number; of?: string }) {
   const Icon = CONF_ICON[level];
   return (
     <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold hairline", CONF_STYLE[level])}>
       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
       {CONFIDENCE_WORD[level]}
-      {n !== undefined && <span className="font-medium tabular">from {n.toLocaleString("en")}</span>}
+      {n !== undefined && <span className="font-medium tabular">from {n.toLocaleString("en")}{of ? ` ${of}` : ""}</span>}
     </span>
   );
 }

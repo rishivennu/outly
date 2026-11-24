@@ -11,7 +11,7 @@ import type { Confidence } from "./types";
  * sample and its level on the honesty ladder; a platform with nothing measured says so instead of guessing.
  */
 
-type FormatBaseline = { format: string; n: number; level: Exclude<Level, "none">; predicted: number; low: number; high: number; confidence: Confidence; explanation: string };
+type FormatBaseline = { format: string; n: number; level: Exclude<Level, "none">; predicted: number; low: number; high: number; confidence: Confidence; explanation: string; prior?: { shared: boolean; n: number; owners: number | null } | null };
 type PlatformPredictions = { platform: string; level: Level; measured: number; byFormat: FormatBaseline[]; lifts: Lift[]; accuracy: { n: number; medianApe: number | null; within: number | null } | null; accuracyWords: string };
 type Overview = { model: { key: string } | null; platforms: PlatformPredictions[]; overall: { words: string }; recent: unknown[] };
 
@@ -36,7 +36,7 @@ export function PersonalBaselines({ client }: { client: string | null }) {
     <Card
       id="intel-baselines"
       title="Your baselines"
-      desc="What a typical post of yours does on each platform, worked out from your own measured posts. An estimate from the past, shown with its sample size, never a promise."
+      desc="What a typical post of yours does on each platform, worked out from your own measured posts; where you have few of those, from an anonymised cohort of creators your size, and the card says so. An estimate from the past, shown with its sample size, never a promise."
     >
       {error && <p className="rounded-2xl bg-destructive/10 p-4 text-sm font-medium text-destructive hairline">{error}</p>}
       {!data && !error && <p className="text-sm text-muted-foreground">Reading your measured posts...</p>}
@@ -60,7 +60,7 @@ export function PersonalBaselines({ client }: { client: string | null }) {
                     <li key={f.format} className="rounded-xl bg-background/70 p-3 hairline">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <p className="text-sm font-medium capitalize">{f.format}</p>
-                        <ConfidenceBadge level={f.confidence} n={f.n} />
+                        {f.n === 0 && f.prior?.shared ? <ConfidenceBadge level={f.confidence} n={f.prior.n} of={`cohort post${f.prior.n === 1 ? "" : "s"}`} /> : <ConfidenceBadge level={f.confidence} n={f.n} />}
                       </div>
                       <p className="mt-1 text-2xl font-semibold tabular tracking-tight">
                         ~{num(f.predicted)} <span className="text-sm font-medium text-muted-foreground">views</span>
@@ -102,29 +102,33 @@ export function PersonalBaselines({ client }: { client: string | null }) {
  * (never fewer than 5 creators and 20 posts per bucket, no single creator above half); off, they stay home. Either
  * way the creator's own estimates still read the shared baseline when they have little history of their own.
  */
+type Sharing = { share: boolean; canChange: boolean; rules: { minOwners: number; minPosts: number; windowDays: number } };
+
 function SharingRow() {
-  const [share, setShare] = useState<boolean | null>(null);
+  const [state, setState] = useState<Sharing | null>(null);
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
+  const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
   useEffect(() => {
     let live = true;
-    api<{ share: boolean }>("/api/intelligence/sharing")
-      .then((r) => live && setShare(r.share))
-      .catch(() => live && setShare(null));
+    api<Sharing>("/api/intelligence/sharing")
+      .then((r) => live && setState(r))
+      .catch(() => live && setState(null));
     return () => {
       live = false;
     };
   }, []);
-  if (share === null) return null;
+  if (!state) return null;
+  const { share, canChange, rules } = state;
   const flip = async () => {
+    if (!canChange) return;
     setBusy(true);
     setNote(null);
     try {
-      const r = await api<{ share: boolean }>("/api/intelligence/sharing", { method: "PATCH", json: { share: !share } });
-      setShare(r.share);
-      setNote(r.share ? "Your posts join the next hourly rebuild." : "Your posts leave the shared baselines at the next hourly rebuild.");
+      const r = await api<Sharing>("/api/intelligence/sharing", { method: "PATCH", json: { share: !share } });
+      setState(r);
+      setNote({ text: r.share ? "Your posts join the next hourly rebuild." : "Your posts leave the shared baselines at the next hourly rebuild.", error: false });
     } catch (e) {
-      setNote(e instanceof ApiError ? e.message : "That didn't save. Try again in a moment.");
+      setNote({ text: e instanceof ApiError ? e.message : "That didn't save. Try again in a moment.", error: true });
     } finally {
       setBusy(false);
     }
@@ -134,9 +138,12 @@ function SharingRow() {
       <div className="min-w-0 flex-1">
         <p id="intel-sharing-label" className="text-sm font-medium">Help the shared baselines</p>
         <p id="intel-sharing-hint" className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
-          Your measured posts join anonymised medians (never fewer than 5 creators and 20 posts in a group, no one creator more than half of it). Nothing of yours is shown to anyone; new creators get a fairer starting estimate. You keep reading them either way.
+          Your measured posts join anonymised medians (never fewer than {rules.minOwners} creators and {rules.minPosts} posts in a group, no one creator more than half of it). Nothing of yours is shown to anyone; new creators get a fairer starting estimate. You keep reading them either way.
+          {!canChange && " Only the workspace owner can change this."}
         </p>
-        {note && <p className="mt-1.5 text-[13px] text-muted-foreground" aria-live="polite">{note}</p>}
+        {/* Both regions stay mounted so a screen reader announces the text when it arrives. */}
+        <p className="mt-1.5 text-[13px] text-muted-foreground empty:hidden" role="status" aria-live="polite">{note && !note.error ? note.text : ""}</p>
+        <p className="mt-1.5 text-[13px] text-destructive empty:hidden" role="alert">{note?.error ? note.text : ""}</p>
       </div>
       <button
         type="button"
@@ -144,7 +151,7 @@ function SharingRow() {
         aria-checked={share}
         aria-labelledby="intel-sharing-label"
         aria-describedby="intel-sharing-hint"
-        disabled={busy}
+        disabled={busy || !canChange}
         onClick={flip}
         className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 ${share ? "bg-lime" : "bg-muted"}`}
       >

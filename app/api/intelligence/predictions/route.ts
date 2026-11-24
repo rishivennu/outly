@@ -39,8 +39,10 @@ const Draft = z.object({
 });
 
 /**
- * POST /api/intelligence/predictions: score a draft. The answer is an estimate from the creator's own past posts (or
- * null, said plainly, when there is nothing measured to go on). With postId the forecast is stored and judged later.
+ * POST /api/intelligence/predictions: score a draft. The answer is an estimate from the creator's own past posts, or,
+ * below the personal level on that platform, from the anonymised cohort baseline scaled to their size (the basis names
+ * the source and its sample), or null, said plainly, when there is nothing to go on. With postId the forecast is
+ * stored (only while the post is a draft or scheduled, never over a judged forecast) and judged later.
  */
 export const POST = route(
   async (req, { user }) => {
