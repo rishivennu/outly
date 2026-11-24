@@ -166,7 +166,7 @@ export async function clipsWithPosts(ownerId: string, clips: GeneratedClip[]): P
   const out: ClipView[] = [];
   for (let c of clips) {
     const post = c.postId ? byId.get(c.postId) ?? null : null;
-    if (post && post.status === "published" && c.status !== "published" && c.status !== "discarded") {
+    if (post && (post.status === "published" || post.status === "partial") && c.status !== "published" && c.status !== "discarded") {
       const n = await db.generatedClip.updateMany({ where: { id: c.id, ownerId, status: c.status }, data: { status: "published" } });
       if (n.count) {
         await event(c.jobId, ownerId, "published", { postId: post.id, publishedAt: post.publishedAt }, c.id, null);
@@ -528,6 +528,9 @@ export async function updateClip(ownerId: string, clipId: string, patch: ClipPat
   if (c.status === "discarded") throw new HttpError(409, "This clip was discarded.", "DISCARDED");
   const j = await ownedJob(ownerId, c.jobId);
   const data: Prisma.GeneratedClipUpdateManyMutationInput = {};
+  // R1323 review: a clip with a post keeps its render; cut, frame and subtitles are what the post carries.
+  const cut = (patch.start !== undefined && patch.start !== c.start) || (patch.end !== undefined && patch.end !== c.end) || patch.reframe !== undefined || patch.subtitle !== undefined;
+  if (c.postId && cut) throw new HttpError(409, "This clip has a post. Its cut, frame and subtitles stay as posted; edit the words here or the post in Create.", "HAS_POST");
   const changed: string[] = [];
   if (patch.title !== undefined && patch.title.trim() && patch.title.trim() !== c.title) (data.title = patch.title.trim().slice(0, 80)), changed.push("title");
   for (const k of ["hook", "caption", "hashtags"] as const) {
@@ -573,6 +576,7 @@ export async function regenerateCopy(ownerId: string, clipId: string, actor: Act
 export async function discardClip(ownerId: string, clipId: string, actor: Actor): Promise<ClipView> {
   const c = await ownedClip(ownerId, clipId);
   if (c.status === "published") throw new HttpError(409, "This clip is published; archive the post instead.", "PUBLISHED");
+  if (c.postId && c.status !== "discarded") throw new HttpError(409, "This clip has a post. Delete or archive the post first.", "HAS_POST");
   if (c.status !== "discarded") {
     const n = await db.generatedClip.updateMany({ where: { id: c.id, ownerId, status: { notIn: ["published", "discarded"] } }, data: { status: "discarded" } });
     if (!n.count) throw new HttpError(409, "The clip just changed under you. Refresh and try again.", "CONFLICT");

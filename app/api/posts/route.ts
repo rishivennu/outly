@@ -109,10 +109,11 @@ export const POST = route(async (req, { user }) => {
       if (e instanceof StaleDraftError) throw new HttpError(409, DRAFT_CONFLICT_MESSAGE, "draft_conflict", { server: serverDraft(await ownedPost(user.id, id)) });
       throw e;
     }
+    // R1323: a post started from a Shorts Clipper clip is linked back to it first (quiet: a bad, foreign, unrendered or
+    // swapped-video clip is a no-op), and only a real link makes the item's origin "clipper".
+    const fromClip = !existing && !!body.clipId && (await attachClipToPost(user.id, body.clipId, id).then((r) => r.ok).catch((e) => (console.warn("[clipper] attach_failed", e instanceof Error ? e.message : e), false)));
     // R1234: only a draft this call created gets its Content Memory item (a clientKey twin or an update already has one).
-    if (!existing) await lineageAfterCreate(user.id, id, { adaptedFromPostId: body.adaptedFromPostId, recommendationId: body.recommendationId }, body.clipId ? { origin: "clipper" } : {});
-    // R1323: a post started from a Shorts Clipper clip is linked back to it (quiet: a bad or foreign id is a no-op).
-    if (!existing && body.clipId) await attachClipToPost(user.id, body.clipId, id).catch((e) => console.warn("[clipper] attach_failed", e instanceof Error ? e.message : e));
+    if (!existing) await lineageAfterCreate(user.id, id, { adaptedFromPostId: body.adaptedFromPostId, recommendationId: body.recommendationId }, fromClip ? { origin: "clipper" } : {});
     if (changed) await recordEdit(user, { id });
     if (!existing) track("content_created", realUserId(user), { format });
     else if (changed) track("draft_created", realUserId(user), { format });

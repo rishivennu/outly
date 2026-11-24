@@ -1,4 +1,4 @@
-import type { Platform } from "../domain";
+import { PLATFORM_META, type Platform } from "../domain";
 import type { MetricKey } from "../insights/post-core";
 import { availabilityOf, type Availability } from "../intelligence/core";
 
@@ -44,12 +44,19 @@ export interface ClipPlatformPerformance {
   metrics: ClipMetric[];
 }
 
-/** One destination's numbers. `raw` is the latest TargetMetric row, or null when none was ever read. */
+/**
+ * Metrics a platform reports late or through a second API, so a summed 0 can mean "not read yet" rather than zero.
+ * TargetMetric columns default to 0, so these are shown as unavailable until they are above 0.
+ */
+export const LAGGING: Record<string, readonly MetricKey[]> = { youtube: ["shares"] };
+
+/** One destination's numbers. `raw` is the destination's summed TargetMetric deltas, or null when none was ever read. */
 export function platformPerformance(t: { platform: string; platformStatus: string; publishedAt: Date | string | null; metricsCheckedAt: Date | string | null }, format: string, raw: Partial<Record<MetricKey, number | null>> | null): ClipPlatformPerformance {
   const iso = (d: Date | string | null) => (d ? new Date(d).toISOString() : null);
+  const lagging = LAGGING[t.platform] ?? [];
   const metrics = CLIP_METRICS.map((key) => {
     const v = raw ? raw[key] : null;
-    const availability = availabilityOf(t.platform, format, key, raw ? v : null);
+    const availability = raw && v === 0 && lagging.includes(key) ? "unavailable" : availabilityOf(t.platform, format, key, raw ? v : null);
     return { key, value: availability === "available" || availability === "zero" ? (v as number) : null, availability };
   });
   return { platform: t.platform, status: t.platformStatus, publishedAt: iso(t.publishedAt), checkedAt: iso(t.metricsCheckedAt), metrics };
@@ -63,10 +70,12 @@ export function performanceLine(post: { status: string; scheduledAt: string | nu
   if (post.status === "failed") return "The post failed. Open it in Create to see why.";
   if (post.status !== "published" && post.status !== "partial") return "Draft in Create";
   const live = platforms.filter((p) => p.status === "published");
-  if (!live.length) return "Published";
+  const failed = platforms.filter((p) => p.status === "failed").map((p) => PLATFORM_META[p.platform as Platform]?.name ?? p.platform);
+  const tail = post.status === "partial" && failed.length ? ` ${failed.join(", ")} failed; open the post in Create to retry.` : "";
+  if (!live.length) return tail ? `Published.${tail}` : "Published";
   const views = live.map((p) => p.metrics.find((m) => m.key === "views")).filter((m): m is ClipMetric => !!m && m.value !== null);
-  if (!views.length) return live.some((p) => p.checkedAt) ? "Published. Views are not reported for this destination yet." : "Published. Numbers arrive after the first sync.";
+  if (!views.length) return (live.some((p) => p.checkedAt) ? "Published. Views are not reported for this destination yet." : "Published. Numbers arrive after the first sync.") + tail;
   const total = views.reduce((s, m) => s + (m.value ?? 0), 0);
   const where = views.length < live.length ? ` on ${views.length} of ${live.length} destinations` : "";
-  return `Published. ${total.toLocaleString()} view${total === 1 ? "" : "s"}${where}.`;
+  return `Published. ${total.toLocaleString()} view${total === 1 ? "" : "s"}${where}.${tail}`;
 }

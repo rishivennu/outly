@@ -183,7 +183,7 @@ function ClipRow({ c, busy, onEdit, onDiscard }: { c: ClipView; busy: boolean; o
           {c.post && (
             <Button asChild variant="outline" size="sm"><Link href={`/create?post=${encodeURIComponent(c.post.id)}`}>Open post</Link></Button>
           )}
-          {c.status !== "published" && <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onDiscard} aria-label={`Discard ${c.title}`}><X className="h-4 w-4" aria-hidden /></Button>}
+          {c.status !== "published" && !c.post && <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onDiscard} aria-label={`Discard ${c.title}`}><X className="h-4 w-4" aria-hidden /></Button>}
         </div>
       </div>
     </li>
@@ -197,17 +197,19 @@ function ClipRow({ c, busy, onEdit, onDiscard }: { c: ClipView; busy: boolean; o
 function PerformanceLine({ clip }: { clip: ClipView }) {
   const live = clip.post?.status === "published" || clip.post?.status === "partial";
   const [perf, setPerf] = useState<{ platforms: ClipPlatformPerformance[]; line: string } | null>(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     if (!live) return;
     let alive = true;
+    setFailed(false);
     api<{ platforms: ClipPlatformPerformance[]; line: string }>(`/api/clipper/clips/${clip.id}/performance`)
       .then((r) => alive && setPerf(r))
-      .catch(() => alive && setPerf(null));
+      .catch(() => alive && (setPerf(null), setFailed(true)));
     return () => {
       alive = false;
     };
-  }, [clip.id, clip.post?.status, live]);
-  const line = perf?.line ?? (live ? "Published. Reading the numbers…" : performanceLine(clip.post, []));
+  }, [clip.id, clip.post?.status, clip.updatedAt, live]);
+  const line = perf?.line ?? (live ? (failed ? "Published. The numbers didn't load; they'll show on the next refresh." : "Published. Reading the numbers…") : performanceLine(clip.post, []));
   const given = perf?.platforms.flatMap((p) => p.metrics.filter((m) => m.value !== null).map((m) => `${p.platform}: ${m.value!.toLocaleString()} ${m.key}`)) ?? [];
   return (
     <p className="mt-1 text-[12px] text-muted-foreground" title={given.length ? given.join(" · ") : undefined}>

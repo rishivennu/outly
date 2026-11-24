@@ -100,6 +100,9 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
 
   /* ---------------- video ---------------- */
   const [media, setMedia] = useState<MediaView | null>(initialPost?.media ?? null);
+  /** The current media for effects with empty deps (R1323 clip arrival checks it). */
+  const mediaRef = useRef(media);
+  mediaRef.current = media;
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   const [localPoster, setLocalPoster] = useState<string | null>(null);
   const [localMeta, setLocalMeta] = useState<Meta | null>(null);
@@ -474,6 +477,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       pausedRef.current = false;
       synced.current = null;
       setMedia(null);
+      // R1323 review: a new file means the post is no longer the clip's render, so the first save must not link it.
+      if (recOrigin.current?.clipId) recOrigin.current = recOrigin.current.recommendationId || recOrigin.current.adaptedFromPostId ? { ...recOrigin.current, clipId: undefined } : null;
       const url = objectUrl ?? URL.createObjectURL(file);
       setLocalUrl((old) => (old && old !== url && URL.revokeObjectURL(old), url));
       setUpload({ kind: "uploading", progress: resume?.progress ?? 0 });
@@ -796,13 +801,17 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       const r = await api<{ clip: { id: string; status: string }; media: MediaView; prefill: ClipPrefill }>(`/api/clipper/clips/${encodeURIComponent(clipId)}/publish`).catch((e: unknown) => (e instanceof ApiError ? e : null));
       window.history.replaceState(null, "", "/create");
       if (!alive) return;
+      if (r instanceof ApiError && r.code === "ALREADY_POSTED" && typeof r.data?.postId === "string") {
+        toast("This clip already has a post. Here it is.", "info");
+        return router.replace(`/create?post=${encodeURIComponent(r.data.postId)}`);
+      }
       if (!r || r instanceof ApiError) return toast(r instanceof ApiError ? r.message : "We couldn't open that clip. You can still start your post here.", "info");
-      if (fileRef.current || media) return toast("You already have a video here, so the clip was not swapped in. Open it from the Clipper when this one is done.", "info");
+      if (fileRef.current || mediaRef.current) return toast("You already have a video here, so the clip was not swapped in. Open it from the Clipper when this one is done.", "info");
       uploadAbort.current?.abort();
       synced.current = r.media.id;
       setMedia(r.media);
       setUpload({ kind: "done" });
-      recOrigin.current = { clipId: r.clip.id };
+      recOrigin.current = { ...(recOrigin.current ?? {}), clipId: r.clip.id };
       if (emptyRef.current) {
         setStory(r.prefill.story);
         setCaptionProposal(null);
