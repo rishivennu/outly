@@ -46,24 +46,26 @@ export const render: Adapter = {
         if (ev) booked++;
       }
     }
-    // Bandwidth: one query per service for the whole range, bucketed by day in UTC.
+    // Bandwidth: one query per service for the whole range, bucketed by UTC day and booked per service, so a
+    // service whose metrics call failed is simply missing (and picked up by the next run), never booked too low.
     const live = services.filter((s) => !s.suspended);
-    const perDay = new Map<string, number>();
     for (const s of live) {
       const start = Math.floor(new Date(`${range.from}T00:00:00Z`).getTime() / 1000), end = Math.floor(Math.min(range.now.getTime(), new Date(`${range.to}T23:59:59Z`).getTime()) / 1000);
-      const m = await getJson<Metric[]>(`https://api.render.com/v1/metrics/bandwidth?resource=${encodeURIComponent(s.id)}&startTime=${start}&endTime=${end}`, token).catch((e) => { notes.push(`${s.name}: bandwidth not read (${(e as Error).message}).`); return [] as Metric[]; });
+      const m = await getJson<Metric[]>(`https://api.render.com/v1/metrics/bandwidth?resource=${encodeURIComponent(s.id)}&startTime=${start}&endTime=${end}`, token).catch((e) => { notes.push(`${s.name}: bandwidth not read (${(e as Error).message}).`); return null; });
+      if (!m) continue;
+      const perDay = new Map<string, number>();
       for (const series of m) for (const v of series.values) {
         const day = v.timestamp.slice(0, 10);
         const bytes = series.unit === "GB" ? v.value * 1e9 : series.unit === "MB" ? v.value * 1e6 : series.unit === "KB" ? v.value * 1e3 : v.value;
         perDay.set(day, (perDay.get(day) ?? 0) + bytes);
       }
-    }
-    for (const [day, bytes] of perDay) {
-      if (day < range.from || day > range.to || day >= range.now.toISOString().slice(0, 10)) continue; // today is still growing: book it tomorrow
-      const gb = bytes / 1e9;
-      if (gb <= 0) continue;
-      const ev = await recordUsage({ provider: "render", sku: "render:bandwidth-gb", units: Math.round(gb * 1e4) / 1e4, unit: "gb", category: "egress", feature: "platform", source: "reported", ref: `render:bandwidth:${day}`, note: "Bandwidth reported by Render, gross of the included allowance", at: new Date(`${day}T12:00:00Z`) });
-      if (ev) booked++;
+      for (const [day, bytes] of perDay) {
+        if (day < range.from || day > range.to || day >= range.now.toISOString().slice(0, 10)) continue; // today is still growing: book it tomorrow
+        const gb = bytes / 1e9;
+        if (gb <= 0) continue;
+        const ev = await recordUsage({ provider: "render", sku: "render:bandwidth-gb", units: Math.round(gb * 1e4) / 1e4, unit: "gb", category: "egress", feature: "platform", source: "reported", ref: `render:bandwidth:${s.id}:${day}`, note: `${s.name} bandwidth reported by Render, gross of the included allowance`, at: new Date(`${day}T12:00:00Z`), meta: { serviceId: s.id } });
+        if (ev) booked++;
+      }
     }
     if (!live.length) notes.push("No running services found.");
     return { booked, facts: t.facts, notes };

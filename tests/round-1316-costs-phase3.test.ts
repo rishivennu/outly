@@ -106,7 +106,7 @@ describe("1316 connections", () => {
     expect(await db.costEvent.count({ where: { ref: { startsWith: "render:plan:srv-old:" } } })).toBe(0);
     expect(await db.costEvent.count({ where: { ref: { startsWith: "render:plan:srv-cron:" } } })).toBe(0);
     const bw = await db.costEvent.findMany({ where: { ref: { startsWith: "render:bandwidth:" } }, orderBy: { day: "asc" } });
-    expect(bw.map((b) => [b.day, b.units])).toEqual([["2026-10-20", 4], ["2026-10-21", 1]]);
+    expect(bw.map((b) => [b.day, b.units, b.ref])).toEqual([["2026-10-20", 4, "render:bandwidth:srv-web:2026-10-20"], ["2026-10-21", 1, "render:bandwidth:srv-web:2026-10-21"]]); // per service, so one failed metrics call never undercounts a day for good
     expect(bw[0].source).toBe("reported");
     expect(bw[0].amountMinor).toBeCloseTo(4 * 0.15 * 100, 6);
     const again = await conn.syncProvider("render", range);
