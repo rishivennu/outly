@@ -2,7 +2,7 @@
  * Round 1126: Resolve Conversation in Pip.
  * - Resolution intent: clear "I'm done" phrases offer to resolve; a bare "thanks", or thanks plus a new question, never does.
  * - The chat route records a signed-in person's conversation and offers the resolve (visitors never are).
- * - Resolve & Send Transcript: verified email only, owner only, one email per resolve, honest failure, retry works.
+ * - Resolve (R1311: legacy spelling of close): owner only, idempotent, nothing emailed; the transcript mailer is gone.
  * - A resolved conversation refuses new messages until it is reopened.
  */
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
@@ -145,42 +145,28 @@ describe("chat route", () => {
   });
 });
 
-describe("resolve & send transcript", () => {
-  test("sends to the verified account email, marks resolved, and formats the transcript", async () => {
+describe("resolve (legacy spelling of close): nothing is emailed", () => {
+  test("marks resolved, keeps the history, sends no transcript", async () => {
     const u = await mkUser("send");
     const id = await seed(u.id, [["How do I add <script>alert(1)</script> captions?", "Open **Create** and tap Captions."], ["This solved my problem", "Glad I could help!"]]);
     await signIn(u.id);
     const r = await act("resolve", id);
     expect(r.status).toBe(200);
     const j = await r.json();
-    expect(j).toMatchObject({ ok: true, status: "resolved", to: u.email, already: false });
+    expect(j).toMatchObject({ ok: true, status: "resolved", already: false });
+    expect(j.to).toBeUndefined();
     const c = await db.pipConversation.findUnique({ where: { id } });
     expect(c?.status).toBe("resolved");
-    expect(c?.sentTo).toBe(u.email);
     expect(c?.sendingAt).toBeNull();
-    const logs = await db.emailLog.findMany({ where: { to: u.email, kind: "pip_transcript" } });
-    expect(logs.length).toBe(1);
-    expect(logs[0].subject).toBe("Your Outlly Support Conversation \u2013 Transcript");
-    const html = logs[0].html; // the mock outbox keeps the body outside production
-    expect(html).toContain(c!.ref);
-    expect(html).toContain("Conversation ID");
-    expect(html).toContain("How do I add");
-    expect(html).toMatch(/>You</);
-    expect(html).toMatch(/>Pip</);
-    expect(html).toMatch(/\d{1,2}:\d{2}/); // timestamps
-    expect(html).toContain("<b>Create</b>");
-    expect(html.indexOf("How do I add")).toBeLessThan(html.indexOf("Open <b>Create</b>"));
-    expect(html).not.toContain("<script>alert(1)</script>");
-    expect(html).toContain("&lt;script&gt;");
+    expect(await db.pipMessage.count({ where: { conversationId: id } })).toBe(4);
+    expect(await db.emailLog.count({ where: { to: u.email } })).toBe(0);
   });
-  test("an unverified address gets nothing, and the chat stays open", async () => {
+  test("an unverified address resolves too (no email, so nothing to verify)", async () => {
     const u = await mkUser("unverified", false);
     const id = await seed(u.id);
     await signIn(u.id);
-    const r = await act("resolve", id);
-    expect(r.status).toBe(403);
-    expect((await r.json()).code).toBe("UNVERIFIED");
-    expect((await db.pipConversation.findUnique({ where: { id } }))?.status).toBe("open");
+    expect((await act("resolve", id)).status).toBe(200);
+    expect((await db.pipConversation.findUnique({ where: { id } }))?.status).toBe("resolved");
     expect(await db.emailLog.count({ where: { to: u.email } })).toBe(0);
   });
   test("signed out and other people's conversations are refused", async () => {
@@ -192,61 +178,20 @@ describe("resolve & send transcript", () => {
     expect((await act("reopen", id)).status).toBe(404);
     expect(await db.emailLog.count({ where: { to: a.email } })).toBe(0);
   });
-  test("double taps send one email", async () => {
+  test("double taps are idempotent", async () => {
     const u = await mkUser("dupe");
     const id = await seed(u.id);
     await signIn(u.id);
     const rs = await Promise.all([act("resolve", id), act("resolve", id), act("resolve", id)]);
-    for (const r of rs) expect([200, 409]).toContain(r.status);
-    expect(rs.filter((r) => r.status === 200).length).toBeGreaterThanOrEqual(1);
-    expect(await db.emailLog.count({ where: { to: u.email, kind: "pip_transcript" } })).toBe(1);
+    for (const r of rs) expect(r.status).toBe(200);
     const again = await (await act("resolve", id)).json();
     expect(again).toMatchObject({ ok: true, already: true });
-    expect(await db.emailLog.count({ where: { to: u.email, kind: "pip_transcript" } })).toBe(1);
+    expect(await db.emailLog.count({ where: { to: u.email } })).toBe(0);
   });
-  test("a failed email is reported as a failure; nothing is lost and a retry works", async () => {
-    const u = await mkUser("fail");
-    const id = await seed(u.id);
-    await signIn(u.id);
-    const cache = (globalThis as unknown as { __cfg: Map<string, { at: number; v: unknown }> }).__cfg;
-    const base = await getConfig("email");
-    cache.set("email", { at: Date.now() + 3600_000, v: { ...base, provider: "resend", resend: { ...(base as { resend: object }).resend, apiKey: "" } } });
-    try {
-      const r = await act("resolve", id);
-      expect(r.status).toBe(502);
-      const j = await r.json();
-      expect(j.code).toBe("SEND_FAILED");
-      expect(j.error).toContain("still open");
-    } finally {
-      cache.delete("email");
-    }
-    const c = await db.pipConversation.findUnique({ where: { id } });
-    expect(c?.status).toBe("open");
-    expect(c?.sentAt).toBeNull();
-    expect(c?.sendingAt).toBeNull();
-    expect(await db.pipMessage.count({ where: { conversationId: id } })).toBe(4);
-    expect(await db.emailLog.count({ where: { to: u.email, status: "failed" } })).toBe(1);
-    const retry = await act("resolve", id);
-    expect(retry.status).toBe(200);
-    expect((await db.pipConversation.findUnique({ where: { id } }))?.status).toBe("resolved");
-  });
-  test("sent but not saved: reported as sent, and a retry never sends a second copy", async () => {
-    const u = await mkUser("blip");
-    const id = await seed(u.id);
-    await signIn(u.id);
-    const delegate = db.pipConversation as unknown as { update: (...a: unknown[]) => Promise<unknown> };
-    const real = delegate.update;
-    delegate.update = () => Promise.reject(new Error("db blip"));
-    try {
-      const r = await act("resolve", id);
-      expect(r.status).toBe(200);
-      expect((await r.json()).ok).toBe(true);
-      const retry = await act("resolve", id);
-      expect(retry.status).toBe(409); // the claim is kept, so the retry waits
-    } finally {
-      delegate.update = real;
-    }
-    expect(await db.emailLog.count({ where: { to: u.email, kind: "pip_transcript" } })).toBe(1);
+  test("resolveAndSend (the transcript mailer) is gone from the server", () => {
+    const src = readFileSync("lib/support/conversations.ts", "utf8");
+    expect(src).not.toContain("export async function resolveAndSend");
+    expect(readFileSync("app/api/support/conversation/route.ts", "utf8")).not.toContain("resolveAndSend");
   });
 });
 
@@ -270,9 +215,9 @@ describe("locked while resolved, reopen", () => {
     const j = await (await chat("All sorted now, thanks", { conversationId: id })).json();
     expect(j.conversationId).toBe(id);
     expect(await db.pipMessage.count({ where: { conversationId: id } })).toBe(6);
-    // Resolving again sends a fresh transcript.
+    // Resolving again just closes it again; still no email.
     expect((await (await act("resolve", id)).json()).already).toBe(false);
-    expect(await db.emailLog.count({ where: { to: u.email, kind: "pip_transcript" } })).toBe(2);
+    expect(await db.emailLog.count({ where: { to: u.email } })).toBe(0);
   });
   test("teammates can resolve their own chats", () => {
     for (const role of ["viewer", "editor", "manager"] as const) expect(memberBlock(role, "POST", "/api/support/conversation")).toBeNull();
@@ -289,15 +234,16 @@ describe("retention and privacy", () => {
     expect(await db.pipConversation.count({ where: { id } })).toBe(0);
     expect(await db.pipMessage.count({ where: { conversationId: id } })).toBe(0);
   });
-  test("a sent transcript keeps no copy of the chat in the email log in production", () => {
-    const src = readFileSync("lib/email/index.ts", "utf8");
-    expect(src).toContain('m.private ? ""');
-    expect(readFileSync("lib/support/conversations.ts", "utf8")).toContain("private: true");
+  test("R1311: the server no longer emails chats at all (no sendEmail import in conversations.ts)", () => {
+    const src = readFileSync("lib/support/conversations.ts", "utf8");
+    expect(src).not.toContain("sendEmail");
+    expect(src).not.toContain("pipTranscript");
   });
   test("the privacy page mentions Pip conversations and their 90 days", () => {
     const p = readFileSync("app/(marketing)/privacy/page.tsx", "utf8");
     expect(p).toContain("Pip conversations are deleted after 90 days");
-    expect(p).toContain("verified email address only");
+    expect(p).toContain("is never emailed");
+    expect(p).not.toContain("email its transcript");
     expect(p).not.toContain("kept in this browser tab only");
   });
 });
@@ -305,8 +251,10 @@ describe("retention and privacy", () => {
 describe("chat widget", () => {
   const src = readFileSync("components/support/ChatWidget.tsx", "utf8");
   test("labels match the brief", () => {
-    expect(PIP_RESOLVE.en).toMatchObject({ reply: "Glad I could help!", resolve: "Resolve & Send Transcript", keep: "Continue Chat", doneTitle: "Conversation resolved!", reopen: "Reopen Conversation" });
-    expect(PIP_RESOLVE.en.doneBody("")).toContain("your registered email address");
+    // R1311: Resolve Chat marks the conversation resolved and keeps its history; no transcript is emailed or mentioned.
+    expect(PIP_RESOLVE.en).toMatchObject({ reply: "Glad I could help!", resolve: "Resolve Chat", keep: "Continue Chat", doneTitle: "Conversation resolved!", reopen: "Reopen Conversation" });
+    expect(PIP_RESOLVE.en.doneBody("")).toContain("history stays saved");
+    expect(PIP_RESOLVE.en.doneBody("")).not.toMatch(/transcript|email/i);
   });
   test("resolved locks the composer and shows the resolved panel", () => {
     expect(src).toContain("disabled={!!resolved}");
@@ -321,7 +269,8 @@ describe("chat widget", () => {
     expect(src).toContain("disabled={closing.busy}");
     expect(src).toMatch(/role="alert" className="pc-error mt-2 text-\[13px\]">\{closing\.error\}/);
     // Success is only shown after the server says so.
-    expect(src.indexOf("if (!r.ok || !j.ok) throw")).toBeLessThan(src.indexOf("setResolved({ to: typeof j.to"));
+    const at = src.indexOf("async function resolveNow");
+    expect(src.indexOf("if (!r.ok || !j.ok) throw", at)).toBeLessThan(src.indexOf("setResolved({ to: \"\" });", at));
     // A conversation that is gone is not offered as an endless retry.
     expect(src).toMatch(/if \(r\.status === 404\) \{\s+setConv\(null\);/);
   });
@@ -335,7 +284,7 @@ describe("chat widget", () => {
     // "Did that help? Yes" offers to resolve in a saved chat, instead of a dead-end line. 1151: only while not
     // resolved (the early return) and only when the transcript can really be emailed.
     expect(src).toContain("if (good && resolved) return;");
-    expect(src).toMatch(/if \(good && signedIn && conv && transcriptOk\) \{[\s\S]{0,200}kind: "resolve", offer: true/);
+    expect(src).toMatch(/if \(good && signedIn && conv\) \{[\s\S]{0,200}kind: "resolve", offer: true/);
     expect(src).toContain("ref={reopenRef}");
   });
 });

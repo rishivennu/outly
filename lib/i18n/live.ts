@@ -69,6 +69,10 @@ export type LiveT = {
   leaveHint: string;
   signedOut: string;
   humanLabel: string;
+  /** R1311: the one-line header status while a specialist has the chat: "Connected to Support · Sam joined · End chat". */
+  connectedTo: string;
+  joined: (name: string) => string;
+  disconnected: string;
 };
 
 const en: LiveT = {
@@ -126,6 +130,9 @@ const en: LiveT = {
   leaveHint: "Write your message below and send it. A specialist will reply in this chat.",
   signedOut: "You're signed out. Sign in again to talk to our support team here.",
   humanLabel: "Human support",
+  connectedTo: "Connected to Support",
+  joined: (name) => `${name} joined`,
+  disconnected: "Disconnected",
 };
 
 const hi: Partial<LiveT> = {

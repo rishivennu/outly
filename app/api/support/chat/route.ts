@@ -10,7 +10,7 @@ import { env } from "@/lib/env";
 import { planFor, runPip } from "@/lib/pip/run";
 import { PIP_TOOLS } from "@/lib/pip/types";
 import { asksForPastChats, asksForTranscript, wantsToResolve } from "@/lib/support/resolve";
-import { openConversation, PAST_CHATS_TEXT, PAST_CHATS_VISITOR, recordTurn, transcriptAvailable, transcriptUnavailableText } from "@/lib/support/conversations";
+import { openConversation, PAST_CHATS_TEXT, PAST_CHATS_VISITOR, recordTurn, TRANSCRIPTS_RETIRED_TEXT } from "@/lib/support/conversations";
 import { customerSend, handoffLog, requestHuman } from "@/lib/support/live";
 import { routeIntent } from "@/lib/support/intent";
 import { conversationState } from "@/lib/support/live-core";
@@ -110,21 +110,16 @@ export const POST = route(async (req) => {
   // 1151: "where are my old chats?" gets the real place in the studio, never a made-up "Chat History".
   if (!b.faqId && asksForPastChats(b.message))
     return reply({ answer: me ? PAST_CHATS_TEXT : PAST_CHATS_VISITOR, confident: true, sources: [], wantsHuman: false, smalltalk: true });
-  // 1151: the offer only appears when the transcript can really be emailed (email provider on, address
-  // verified). Otherwise one plain reply says why, and never offers what it would then refuse.
+  // R1311: Resolve chat marks the conversation resolved on the server and keeps its history; no email is involved,
+  // so the offer appears for anyone signed in. Asking for a transcript gets the one honest line (they are retired).
   const done = !b.faqId && wantsToResolve(b.message, b.history);
   const wantsCopy = !b.faqId && !done && asksForTranscript(b.message);
   if (done || wantsCopy) {
     const rt = resolveT(b.lang);
     const base = { confident: true, sources: [], wantsHuman: false, smalltalk: true };
-    if (!who) return reply({ ...base, answer: wantsCopy ? "Transcripts go to the email address on your account, so sign in first and I can offer one." : rt.visitor, resolve: false });
-    const t = await transcriptAvailable(who);
-    if (t.available) {
-      const head = wantsCopy ? "Sure, I can email you this conversation." : rt.reply;
-      return reply({ ...base, answer: head, resolve: true }, `${head}\n\n${rt.ask}`);
-    }
-    const why = transcriptUnavailableText(t.reason);
-    return reply({ ...base, answer: done ? `${rt.reply} ${why}` : why, resolve: false });
+    if (wantsCopy) return reply({ ...base, answer: TRANSCRIPTS_RETIRED_TEXT, resolve: false });
+    if (!who) return reply({ ...base, answer: rt.visitor, resolve: false });
+    return reply({ ...base, answer: rt.reply, resolve: true }, `${rt.reply}\n\n${rt.ask}`);
   }
   // Charged only when a model call is about to happen (an English help-question tap never calls it).
   // Signed in: the per-person daily counter (throws 429 past it). Visitor: the free pool above.

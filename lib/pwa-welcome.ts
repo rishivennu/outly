@@ -144,6 +144,20 @@ const WELCOME_PRELOAD = `try{var w=window.innerWidth,p=(w>=1024?340:w*.56)*(wind
  */
 export const welcomeScript = `try{var d=document.documentElement,r=document.referrer,o=location.origin,i=false;try{i=!!r&&r.indexOf(o+"/")===0&&${STUDIO_RE}.test(new URL(r).pathname)}catch(e){}if(!i&&${STUDIO_RE}.test(location.pathname)&&!sessionStorage.getItem("${WELCOME_SESSION_KEY}")){d.setAttribute("data-welcome","");window.__owT=setTimeout(function(){d.removeAttribute("data-welcome")},${WELCOME_WATCHDOG_MS});${WELCOME_PRELOAD}}}catch(e){}`;
 
+/**
+ * R1311: where the greeting's primary action lands. Home is the default screen after the welcome: an entry that
+ * opened on the posting screen with nothing asked for (a bare /create or /create/bulk) goes to the dashboard. Any
+ * query (?post=, ?idea=, ?format=) is an intentional deep link and stays; every other page stays where it opened.
+ * `?local=` is the posting screen's own bookkeeping (its autosave puts the draft id in the address while the welcome is
+ * still up, CreateWorkspace), not something the person asked for, so it counts as bare.
+ */
+export function welcomeLandsHome(pathname: string, search = "") {
+  const q = new URLSearchParams(search);
+  q.delete("local");
+  if (q.toString()) return false;
+  return pathname === "/create" || pathname === "/create/" || pathname === "/create/bulk";
+}
+
 /** The welcome is on screen (or about to be): the flag is set and the studio rendered it. */
 export function welcomePending() {
   if (typeof document === "undefined") return false;

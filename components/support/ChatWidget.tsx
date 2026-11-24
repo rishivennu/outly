@@ -146,12 +146,26 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     };
   }, []);
   const [announce, setAnnounce] = useState("");
-  // 1126: the saved conversation (signed in), and whether it has been resolved (its transcript emailed).
+  // 1126/R1311: the saved conversation (signed in), and whether it has been resolved (closed on the server, nothing emailed).
   const [conv, setConv] = useState<string | null>(null);
   const [resolved, setResolved] = useState<{ to: string } | null>(null);
   const [closing, setClosing] = useState<{ busy: boolean; error: string }>({ busy: false, error: "" });
-  // 1151: can a transcript really be emailed right now (email on, address verified)? Unknown = don't offer.
-  const [transcriptOk, setTranscriptOk] = useState(false);
+  // R1311: the confirmation up ("Resolve this conversation?" / "End this conversation?"), and Pip's hello on open.
+  const [confirm, setConfirm] = useState<"resolve" | "end" | null>(null);
+  const [hello, setHello] = useState(false);
+  const [cheer, setCheer] = useState(false);
+  // R1311: Pip's float stops while the tab is in the background (no animation work for a page nobody sees).
+  const [pageHidden, setPageHidden] = useState(false);
+  useEffect(() => {
+    const sync = () => setPageHidden(document.visibilityState === "hidden");
+    sync();
+    document.addEventListener("visibilitychange", sync);
+    return () => document.removeEventListener("visibilitychange", sync);
+  }, []);
+  const confirmRef = useRef<"resolve" | "end" | null>(null);
+  const cfBoxRef = useRef<HTMLDivElement>(null);
+  const cfKeepRef = useRef<HTMLButtonElement>(null);
+  confirmRef.current = confirm;
   // R1184 Live Assist: where a request for a person stands (always the server's answer), what we know about it,
   // and the last message number seen. hasLive: this conversation has had a live chat, so a reopen still arrives.
   const [live, setLive] = useState<WidgetState>("none");
@@ -254,8 +268,27 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     loadedCtx.current = true;
     fetch("/api/support/context").then((r) => (r.ok ? r.json() : { items: [] })).then((j) => setCards(j.items ?? [])).catch(() => {});
     fetch("/api/pip/insights").then((r) => (r.ok ? r.json() : { items: [] })).then((j) => setInsights((j.items ?? []).slice(0, 3))).catch(() => {});
-    fetch("/api/support/conversation").then((r) => (r.ok ? r.json() : null)).then((j) => setTranscriptOk(!!j?.transcript?.available)).catch(() => {});
   }, [open, inStudio]);
+
+  // R1311 Pip says hello as the chat opens (a wave for a moment), and cheers once when a conversation is resolved.
+  useEffect(() => {
+    if (!open) { setHello(false); return; }
+    setHello(true);
+    const id = setTimeout(() => setHello(false), 1800);
+    return () => clearTimeout(id);
+  }, [open]);
+  const isResolved = !!resolved || live === "resolved";
+  useEffect(() => {
+    if (!isResolved) { setCheer(false); return; }
+    setCheer(true);
+    const id = setTimeout(() => setCheer(false), 1400);
+    return () => clearTimeout(id);
+  }, [isResolved]);
+  // The confirmation takes focus on its safe action and gives it back to the composer when it goes.
+  useEffect(() => {
+    if (confirm) { const id = setTimeout(() => cfKeepRef.current?.focus(), 30); return () => clearTimeout(id); }
+    requestAnimationFrame(() => { if (openRef.current && !document.activeElement?.closest(".pc-sheet")) inputRef.current?.focus(); });
+  }, [confirm]);
 
   // Pip dozes off when nobody has typed for a while; any activity wakes it.
   useEffect(() => {
@@ -322,7 +355,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
         }
         return;
       }
-      // "My issue is resolved": a compact offer to close and email the transcript. Nothing closes until they confirm.
+      // "My issue is resolved": a compact offer to close the conversation. Nothing closes until they confirm.
       if (j.resolve && typeof j.conversationId === "string") {
         setMsgs((x) => x.map((m) => (m.offer ? { ...m, offer: false } : m)));
         return push({ role: "bot", text: `**${j.answer}**\n\n${resolveT(lang).ask}`, kind: "resolve", offer: true });
@@ -413,7 +446,10 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     if (j.conversationId !== convRef.current) { convRef.current = j.conversationId; setConv(j.conversationId); }
     if (j.session) setHasLive(true);
     setLiveInfo({
-      agent: j.session?.agent ?? null, position: j.position ?? null, canRate: !!j.session?.canRate, rated: !!j.session?.rated, typing: typeof j.typing === "string" ? j.typing : null, receipts: j.receipts ?? NO_LIVE.receipts,
+      agent: j.session?.agent ?? null, position: j.position ?? null, canRate: !!j.session?.canRate, rated: !!j.session?.rated,
+      // R1311: the dots follow the server's typing state, and go the moment the specialist's words arrive with this answer.
+      typing: incoming.some((m) => m.role === "agent" && !known.has(m.id)) ? null : typeof j.typing === "string" ? j.typing : null,
+      receipts: j.receipts ?? NO_LIVE.receipts,
       eta: j.eta === "1min" ? "1min" : null, late: typeof j.waitedMs === "number" && j.waitedMs >= ETA_MS,
     });
     etaEndRef.current = j.eta === "1min" && typeof j.waitedMs === "number" ? Date.now() + ETA_MS - j.waitedMs : 0;
@@ -654,9 +690,11 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     if (!open) return;
     const id = setTimeout(() => inputRef.current?.focus(), 120);
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { e.preventDefault(); close(); return; }
+      // R1311: Escape closes an open confirmation first, the chat only when none is up.
+      if (e.key === "Escape") { e.preventDefault(); if (confirmRef.current) { if (!closingRef.current) setConfirm(null); return; } close(); return; }
       if (e.key !== "Tab" || !sheetRef.current) return;
-      const f = [...sheetRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.offsetParent !== null || el === document.activeElement);
+      const root = cfBoxRef.current ?? sheetRef.current;
+      const f = [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.offsetParent !== null || el === document.activeElement);
       if (!f.length) return;
       const first = f[0], last = f[f.length - 1];
       const inside = sheetRef.current.contains(document.activeElement);
@@ -691,7 +729,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     setMsgs((x) => x.map((y) => (y.id === m.id ? { ...y, ask: false } : y)));
     // 1126: "Yes, that helped" is the clearest "resolved" there is. Signed in with a saved chat: offer to close it.
     if (good && resolved) return;
-    if (good && signedIn && conv && transcriptOk) {
+    if (good && signedIn && conv) {
       setMsgs((x) => x.map((y) => (y.offer ? { ...y, offer: false } : y)));
       return push({ role: "bot", text: `**${rt.reply}**\n\n${rt.ask}`, kind: "resolve", offer: true });
     }
@@ -746,18 +784,19 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
     } catch {}
   }
 
-  // 1126: close the conversation and email the transcript. One request at a time (the ref guards a double tap
-  // before React re-renders); success is only shown once the server says the email went out.
+  // R1311 Resolve chat: the server marks the conversation resolved (history kept, nothing emailed); only then does
+  // the widget show it as resolved. One request at a time (the ref guards a double tap before React re-renders).
   async function resolveNow() {
     if (closingRef.current || !conv) return;
     closingRef.current = true;
     setClosing({ busy: true, error: "" });
     try {
-      const r = await fetch("/api/support/conversation", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "resolve", conversationId: conv }) });
+      const r = await fetch("/api/support/conversation", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "close", conversationId: conv }) });
       const j = await r.json().catch(() => ({}));
       // Gone (kept 90 days) or not theirs: a retry can never work, so say so and let the chat carry on as a new one.
       if (r.status === 404) {
         setConv(null);
+        setConfirm(null);
         setMsgs((x) => x.map((m) => (m.offer ? { ...m, offer: false } : m)));
         setClosing({ busy: false, error: "" });
         push({ role: "bot", text: typeof j.error === "string" ? j.error : rt.failed, kind: "error" });
@@ -766,11 +805,38 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
       }
       if (!r.ok || !j.ok) throw new Error(typeof j.error === "string" ? j.error : rt.failed);
       setMsgs((x) => x.map((m) => (m.offer ? { ...m, offer: false } : m)));
-      setResolved({ to: typeof j.to === "string" ? j.to : "" });
+      setResolved({ to: "" });
+      setConfirm(null);
       setClosing({ busy: false, error: "" });
       setAnnounce(rt.announce);
       // The offer buttons unmount; keep keyboard focus in the panel that replaces the composer.
       requestAnimationFrame(() => reopenRef.current?.focus());
+    } catch (e) {
+      setClosing({ busy: false, error: e instanceof Error && e.message ? e.message : rt.failed });
+    } finally {
+      closingRef.current = false;
+    }
+  }
+  // R1311 End chat: a live session is ended on the server first (the specialist is told), then the conversation is
+  // marked resolved there too; its history stays. The widget goes back to the welcome, and no new conversation is
+  // opened until this person writes again.
+  async function endNow() {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setClosing({ busy: true, error: "" });
+    const id = convRef.current;
+    try {
+      if (id && inLive(liveRef.current)) {
+        const r = await fetch("/api/support/live", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "cancel", conversationId: id }) });
+        if (!r.ok && r.status !== 404 && r.status !== 409) { const j = await r.json().catch(() => ({})); throw new Error(typeof j.error === "string" ? j.error : lt.error); }
+      }
+      if (id) {
+        const r = await fetch("/api/support/conversation", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "close", conversationId: id }) });
+        if (!r.ok && r.status !== 404) { const j = await r.json().catch(() => ({})); throw new Error(typeof j.error === "string" ? j.error : rt.failed); }
+      }
+      setConfirm(null);
+      resetChat();
+      setAnnounce(rt.ended);
     } catch (e) {
       setClosing({ busy: false, error: e instanceof Error && e.message ? e.message : rt.failed });
     } finally {
@@ -839,7 +905,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
         liveRef.current = was;
         setLive(was); setLiveInfo(NO_LIVE); setUnread(0); setLiveErr("");
         setHasLive(was !== "none" || list.some((m) => m.kind === "sys"));
-        // Resolved by the support team: their panel. Pip's own resolve (transcript emailed) keeps its own.
+        // Resolved by the support team: their panel. Pip's own resolve (closed by its owner) keeps its own.
         setResolved(j.status === "resolved" && was !== "resolved" ? { to: typeof j.sentTo === "string" ? j.sentTo : "" } : null);
         setAnnounce(`${cx.conversation}: ${typeof j.subject === "string" ? j.subject : ""}`);
       } catch (err) {
@@ -882,6 +948,10 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   function newChat() {
     // An open request is ended first, so nobody on the support team waits for a chat that has moved on.
     if (conv && inLive(live)) fetch("/api/support/live", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "cancel", conversationId: conv }) }).catch(() => {});
+    resetChat();
+  }
+  /** Back to the welcome: nothing on screen, no conversation attached. The next message opens a new one. */
+  function resetChat() {
     cursorRef.current = null;
     liveRef.current = "none";
     setLive("none"); setLiveInfo(NO_LIVE); setHasLive(false); setUnread(0); setLiveErr(""); alreadyRef.current = false;
@@ -897,7 +967,8 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
   const lastBot = [...msgs].reverse().find((m) => m.role === "bot");
   const liveOn = inLive(live);
   // Pip steps back while a person helps: a calm face, never thinking or sad.
-  const mood: PipMood = resolved || live === "resolved" ? "happy" : liveOn ? (live === "connected" ? "happy" : "wait") : busy ? "think"
+  // R1311: a wave as the chat opens; while the specialist types Pip thinks along; a resolved chat gets its hop.
+  const mood: PipMood = hello ? "wave" : resolved || live === "resolved" ? "happy" : liveOn ? (live === "connected" ? (liveInfo.typing ? "think" : "happy") : "wait") : busy ? "think"
     : lastBot?.kind === "error" ? "dizzy"
     : lastBot?.kind === "ticket" || lastBot?.text === t.glad ? "happy"
     : lastBot?.kind === "escalate" ? "sad"
@@ -938,14 +1009,22 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
           className="pc-sheet pc-in fixed inset-0 flex flex-col overflow-hidden sm:absolute sm:inset-auto sm:bottom-[80px] sm:right-0"
         >
           <header className="pc-head flex items-center gap-3 px-3 py-2.5 sm:px-4">
-            <Pip size={40} mood={mood} />
+            <span className={cn("pc-pip", hello && "pc-pip-hello", cheer && "pc-pip-cheer", pageHidden && "pc-pip-paused")} aria-hidden><Pip size={40} mood={mood} /></span>
             <div className="min-w-0 flex-1">
               <h2 id="pc-title" className="truncate text-[15px] font-bold leading-tight">{t.title}</h2>
               <p id="pc-desc" className="pc-muted flex items-center gap-1.5 text-[13px]">
                 {resolved || live === "resolved" ? (
                   <span className="pc-badge-resolved pc-fade inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"><Check className="h-3 w-3" aria-hidden />{rt.status}</span>
                 ) : liveOn ? (
-                  <><Headset className={cn("h-3.5 w-3.5 shrink-0", live === "connected" && "pc-live-ok")} aria-hidden /><span className="truncate">{live === "connected" ? (liveInfo.agent ? lt.agentLabel(liveInfo.agent) : lt.statusConnected) : live === "reconnecting" ? lt.statusReconnecting : lt.statusWaiting}</span></>
+                  /* R1311: one line, "Connected to Support · Sam joined · End chat". The dot is green while connected,
+                     breathes in the queue and turns amber when the link drops; the words say the same thing. */
+                  <span className="pc-status flex min-w-0 items-center gap-1.5">
+                    <span className={cn("pc-dot h-1.5 w-1.5 shrink-0 rounded-full", live === "connected" ? "pc-dot-ok" : live === "reconnecting" ? "pc-dot-off" : "pc-pulse")} aria-hidden />
+                    <span className="truncate">{live === "connected" ? lt.connectedTo : live === "reconnecting" ? lt.disconnected : lt.statusWaiting}</span>
+                    {live === "connected" && liveInfo.agent && <><span className="pc-sep" aria-hidden>·</span><span className="truncate">{lt.joined(liveInfo.agent)}</span></>}
+                    <span className="pc-sep" aria-hidden>·</span>
+                    <button type="button" onClick={() => setConfirm("end")} disabled={!!liveBusy || closing.busy} className="pc-status-act shrink-0">{lt.endChat}</button>
+                  </span>
                 ) : signedIn ? (
                   /* R1207: the service, not the shift. Whether a specialist is on duty is internal, and the request
                      is queued either way, so the header never says Online or Away. */
@@ -1114,7 +1193,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                     {m.kind === "resolve" && m.offer && !resolved && !liveOn && (
                       <div className="pc-offer mt-1.5 ps-1">
                         <div role="group" aria-label={rt.reply} className="flex flex-wrap items-center gap-2">
-                          <button type="button" onClick={resolveNow} disabled={closing.busy} aria-busy={closing.busy} className="gbtn gbtn-lime pc-btn pc-btn-primary">
+                          <button type="button" onClick={() => setConfirm("resolve")} disabled={closing.busy} aria-busy={closing.busy} className="gbtn gbtn-lime pc-btn pc-btn-primary">
                             {closing.busy && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{closing.busy ? rt.sending : rt.resolve}
                           </button>
                           <button type="button" onClick={() => keepChatting(m)} disabled={closing.busy} className="gbtn pc-btn">{rt.keep}</button>
@@ -1218,16 +1297,16 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                 {liveErr && <p role="alert" className="pc-error mt-2 text-[13px]">{liveErr}</p>}
               </div>
             ) : (<>
-            {liveOn && (
-              <div className={cn("pc-live pc-in mb-2 p-3", live === "connected" && "pc-live-on", live === "reconnecting" && "pc-live-warn")}>
-                {/* R1207: the card leads with its own line ("You're in the support queue!", "You're connected!"), then
-                    what happens next. It never mentions whether anyone is on shift. */}
+            {liveOn && live !== "connected" && (
+              /* R1311: while connected the header line carries the status and End chat, so there is no card here. */
+              <div className={cn("pc-live pc-in mb-2 p-3", live === "reconnecting" && "pc-live-warn")}>
+                {/* R1207: the card leads with its own line ("You're in the support queue!"), then what happens next.
+                    It never mentions whether anyone is on shift. */}
                 <p className="flex items-start gap-2 text-[14px] font-medium leading-snug">
                   {live === "connecting" || live === "reconnecting" ? <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden /> : <Headset className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />}
                   <span>
                     {live === "waiting" && <strong className="block font-bold">{lt.queueTitle}</strong>}
-                    {live === "connected" && <strong className="block font-bold">{lt.connectedTitle}</strong>}
-                    {live === "connecting" ? lt.connecting : live === "waiting" ? (liveInfo.late ? lt.waitingLong : liveInfo.eta === "1min" ? lt.waitingEta : lt.waiting) : live === "reconnecting" ? lt.reconnecting : liveInfo.agent ? lt.connectedWith(liveInfo.agent) : lt.connected}
+                    {live === "connecting" ? lt.connecting : live === "waiting" ? (liveInfo.late ? lt.waitingLong : liveInfo.eta === "1min" ? lt.waitingEta : lt.waiting) : lt.reconnecting}
                   </span>
                 </p>
                 {/* R1205: the queue status comes from the backend. The one-minute estimate shows only while a specialist is online,
@@ -1244,14 +1323,10 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                 )}
                 {live !== "connecting" && (
                   <div className="mt-2 flex flex-wrap gap-2 ps-6">
-                    {live === "connected" ? (
-                      <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="gbtn pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{lt.endChat}</button>
-                    ) : (<>
-                      {/* R1207: both actions the brief asks for, from the first moment in the queue: leave a message
-                          (it stays in this chat) or cancel the request (back to Pip). The request itself is untouched. */}
-                      <button type="button" onClick={leaveHere} disabled={!!liveBusy} className="gbtn pc-btn">{liveBusy === "leave" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{liveBusy === "leave" ? lt.leaving : lt.leave}</button>
-                      <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="gbtn pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{lt.cancel}</button>
-                    </>)}
+                    {/* R1207: both actions the brief asks for, from the first moment in the queue: leave a message
+                        (it stays in this chat) or cancel the request (back to Pip). The request itself is untouched. */}
+                    <button type="button" onClick={leaveHere} disabled={!!liveBusy} className="gbtn pc-btn">{liveBusy === "leave" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{liveBusy === "leave" ? lt.leaving : lt.leave}</button>
+                    <button type="button" onClick={() => liveAction("cancel")} disabled={!!liveBusy} className="gbtn pc-btn">{liveBusy === "cancel" && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}{lt.cancel}</button>
                   </div>
                 )}
                 {/* R1205: no email, no ticket. A message left here stays in this chat and the request stays in the queue. */}
@@ -1259,7 +1334,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
                 {liveErr && <p role="alert" className="pc-error mt-2 ps-6 text-[13px]">{liveErr}</p>}
               </div>
             )}
-            {!liveOn && liveErr && <p role="alert" className="pc-error mb-1.5 px-2 text-[13px]">{liveErr}</p>}
+            {(!liveOn || live === "connected") && liveErr && <p role="alert" className="pc-error mb-1.5 px-2 text-[13px]">{liveErr}</p>}
             {!liveOn && !waitingEmail && fails > 0 && !ticket.ref && (
               <button type="button" onClick={() => escalate()} className="pc-link mb-1.5 min-h-11 text-[14px] font-medium">{t.human}</button>
             )}
@@ -1298,6 +1373,23 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
             </div>
           </footer>
           <p className="sr-only" role="status" aria-live="polite">{announce}</p>
+          {confirm && (
+            /* R1311: Resolve chat / End chat ask first. Inside the sheet, so the focus trap and Escape cover it. */
+            <div className="pc-confirm-scrim absolute inset-0 z-10 grid place-items-center p-4" onClick={() => { if (!closing.busy) setConfirm(null); }}>
+              <div ref={cfBoxRef} role="alertdialog" aria-modal="true" aria-labelledby="pc-cf-title" aria-describedby="pc-cf-body" className="pc-confirm pc-in w-full max-w-[340px] p-4" onClick={(e) => e.stopPropagation()}>
+                <h3 id="pc-cf-title" className="text-[16px] font-bold leading-snug">{confirm === "resolve" ? rt.confirmTitle : rt.endTitle}</h3>
+                <p id="pc-cf-body" className="pc-muted mt-1 text-[14px] leading-snug">{confirm === "resolve" ? rt.confirmBody : rt.endBody}</p>
+                {closing.error && <p role="alert" className="pc-error mt-2 text-[13px]">{closing.error}</p>}
+                <div className="mt-3 flex flex-wrap justify-end gap-2">
+                  <button ref={cfKeepRef} type="button" onClick={() => setConfirm(null)} disabled={closing.busy} className="gbtn pc-btn">{rt.keep}</button>
+                  <button type="button" onClick={confirm === "resolve" ? resolveNow : endNow} disabled={closing.busy} aria-busy={closing.busy} className="gbtn gbtn-lime pc-btn pc-btn-primary">
+                    {closing.busy && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}
+                    {confirm === "resolve" ? (closing.busy ? rt.sending : rt.resolve) : closing.busy ? rt.ending : rt.end}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -1315,7 +1407,7 @@ export function ChatWidget({ pending }: { pending?: { q?: string } | null } = {}
         aria-label={open ? t.close : unread ? `${t.open}. ${lt.unread(unread)}` : t.open}
         className={cn("pc-launch relative grid h-[60px] w-[60px] place-items-center rounded-full", open && "max-sm:hidden")}
       >
-        {open ? <X className="h-6 w-6" aria-hidden /> : <Pip size={46} mood={nudge ? "wave" : "idle"} />}
+        {open ? <X className="h-6 w-6" aria-hidden /> : <span className={cn("pc-pip pc-pip-idle", pageHidden && "pc-pip-paused")} aria-hidden><Pip size={46} mood={nudge ? "wave" : "idle"} /></span>}
         {!open && unread > 0 && <span className="pc-unread" aria-hidden>{unread > 9 ? "9+" : unread}</span>}
       </button>
     </div>

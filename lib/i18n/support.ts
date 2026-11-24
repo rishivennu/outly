@@ -431,48 +431,67 @@ export function pipHome(l: Lang): PipHome {
   };
 }
 
-/** Resolve Conversation (1126). Languages without an entry use English. */
+/**
+ * Resolve Conversation (1126; R1311 without the transcript email). Languages without an entry use English.
+ * R1311: confirmTitle/confirmBody back the "Resolve this conversation?" dialog, endTitle/endBody/end/ended the
+ * "End this conversation?" dialog. doneBody keeps its argument for older saved strings; the address is never shown.
+ */
 export type ResolveT = {
   reply: string; ask: string; resolve: string; sending: string; keep: string; kept: string; visitor: string;
   doneTitle: string; doneBody: (to: string) => string; reopen: string; reopening: string; reopened: string;
   status: string; retry: string; failed: string; announce: string;
+  confirmTitle: string; confirmBody: string; endTitle: string; endBody: string; end: string; ending: string; ended: string;
 };
 export const PIP_RESOLVE: Partial<Record<Lang, ResolveT>> & { en: ResolveT } = {
   en: {
     reply: "Glad I could help!",
-    ask: "Would you like to close this conversation and receive a copy of the chat transcript by email?",
-    resolve: "Resolve & Send Transcript",
-    sending: "Sending transcript",
+    ask: "Has your issue been resolved? You can mark this conversation as resolved; it stays saved under Help centre.",
+    resolve: "Resolve Chat",
+    sending: "Resolving",
     keep: "Continue Chat",
     kept: "Sure. What else can I help with?",
     visitor: "Glad I could help! If anything else comes up, just ask.",
     doneTitle: "Conversation resolved!",
-    doneBody: (to) => `Your support conversation has been closed, and a copy of the transcript has been sent to ${to || "your registered email address"}.`,
+    doneBody: () => "Your support conversation has been marked as resolved. Its history stays saved under Help centre, Your Pip conversations.",
     reopen: "Reopen Conversation",
     reopening: "Reopening",
     reopened: "Conversation reopened. What else can I help with?",
     status: "Resolved",
     retry: "Try again",
-    failed: "We couldn't send the email just now. Your conversation is still open and nothing was lost. Try again in a moment.",
-    announce: "Conversation resolved. The transcript was sent to your email.",
+    failed: "We couldn't resolve the conversation just now. It is still open and nothing was lost. Try again in a moment.",
+    announce: "Conversation resolved. Its history is saved.",
+    confirmTitle: "Resolve this conversation?",
+    confirmBody: "Are you sure your issue has been resolved?",
+    endTitle: "End this conversation?",
+    endBody: "Are you sure you want to end your current support conversation?",
+    end: "End Chat",
+    ending: "Ending",
+    ended: "Your conversation has ended. Its history is saved under Help centre.",
   },
   hi: {
     reply: "खुशी हुई कि मैं मदद कर सका!",
-    ask: "क्या आप यह बातचीत बंद करके चैट की एक कॉपी ईमेल पर पाना चाहेंगे?",
-    resolve: "हल करें और ट्रांसक्रिप्ट भेजें",
-    sending: "ट्रांसक्रिप्ट भेजी जा रही है",
+    ask: "क्या आपकी समस्या हल हो गई? आप इस बातचीत को हल के रूप में चिह्नित कर सकते हैं; यह हेल्प सेंटर में सेव रहेगी।",
+    resolve: "चैट हल करें",
+    sending: "हल कर रहे हैं",
     keep: "चैट जारी रखें",
     kept: "ज़रूर। और किसमें मदद करूँ?",
     visitor: "खुशी हुई कि मैं मदद कर सका! कुछ और हो तो बस पूछिए।",
     doneTitle: "बातचीत हल हो गई!",
-    doneBody: (to) => `आपकी सपोर्ट बातचीत बंद कर दी गई है, और इसकी कॉपी ${to || "आपके रजिस्टर्ड ईमेल"} पर भेज दी गई है।`,
+    doneBody: () => "आपकी सपोर्ट बातचीत हल के रूप में चिह्नित कर दी गई है। इसका इतिहास हेल्प सेंटर, आपकी Pip बातचीतें में सेव रहेगा।",
     reopen: "बातचीत फिर से खोलें",
     reopening: "खोल रहे हैं",
     reopened: "बातचीत फिर से खुल गई। और किसमें मदद करूँ?",
     status: "हल हो गई",
     retry: "फिर से कोशिश करें",
-    failed: "अभी ईमेल नहीं भेजा जा सका। आपकी बातचीत खुली है और कुछ भी नहीं खोया। थोड़ी देर में फिर कोशिश करें।",
-    announce: "बातचीत हल हो गई। ट्रांसक्रिप्ट आपके ईमेल पर भेज दी गई।",
+    failed: "अभी बातचीत हल नहीं की जा सकी। यह अभी भी खुली है और कुछ भी नहीं खोया। थोड़ी देर में फिर कोशिश करें।",
+    announce: "बातचीत हल हो गई। इसका इतिहास सेव है।",
+    confirmTitle: "इस बातचीत को हल करें?",
+    confirmBody: "क्या आप सुनिश्चित हैं कि आपकी समस्या हल हो गई है?",
+    endTitle: "इस बातचीत को खत्म करें?",
+    endBody: "क्या आप सुनिश्चित हैं कि आप अपनी वर्तमान सपोर्ट बातचीत खत्म करना चाहते हैं?",
+    end: "चैट खत्म करें",
+    ending: "खत्म कर रहे हैं",
+    ended: "आपकी बातचीत खत्म हो गई। इसका इतिहास हेल्प सेंटर में सेव है।",
   },
 };
 export const resolveT = (l: Lang): ResolveT => PIP_RESOLVE[l] ?? PIP_RESOLVE.en;

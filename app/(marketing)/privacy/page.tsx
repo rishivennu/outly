@@ -91,7 +91,7 @@ export default function PrivacyPage() {
             <li><strong>Numbers and comments from your accounts:</strong> views, likes, comments, followers and similar figures for your posts, and the comments in your Inbox. Live figures are cached for about a minute and a half; per-post history is kept so your analytics can show trends.</li>
             <li><strong>Billing:</strong> your plan, payment amounts, status and the gateway reference, and invoices with your name and email. Card and bank details go straight to the payment provider. We never see or store them. If you pay by UPI through YOUPI, we send it only the amount and an order number, never your name, email or phone.</li>
             <li><strong>Teams:</strong> if you invite people to your studio, their email address, name and role.</li>
-            <li><strong>Support:</strong> what you write to Pip, our support assistant, and Pip’s replies, when you are signed in, and any ticket you open, including the conversation that led to it, so a person can pick it up. When you resolve a Pip conversation, we email its transcript to your account’s verified email address only.</li>
+            <li><strong>Support:</strong> what you write to Pip, our support assistant, and Pip’s replies, when you are signed in, and any ticket you open, including the conversation that led to it, so a person can pick it up. Resolving or ending a Pip conversation closes it; the conversation stays readable under Help centre for 90 days and is never emailed.</li>
             <li><strong>Operational logs:</strong> publish attempts, errors, timings and the emails we sent you, so a failed post or a missing email can be explained.</li>
           </ul>
 
@@ -236,7 +236,7 @@ export default function PrivacyPage() {
           </ul>
           <p>
             Invoices stay on your Billing page for as long as you have an account. If you delete it, each invoice is kept until 8 years after the date it was issued, because Indian tax law requires it, and is then deleted automatically. A kept invoice holds only what was printed on it: the invoice number, date, plan, amount, tax and the name and email it was made out to. It is no longer linked to any account. Saved drafts stay until you delete them. An upload no draft or post uses moves to Trash after 3 days and is
-            deleted for good 30 days later. Email logs and Pip conversations are deleted after 90 days (a Pip conversation counts from its last message; a transcript email stores no copy of the chat in our logs), post metric history after 2 years and sign-in codes after one day. Source files your drafts and posts use stay downloadable from the library for as long as your account exists.
+            deleted for good 30 days later. Email logs and Pip conversations are deleted after 90 days (a Pip conversation counts from its last message), post metric history after 2 years and sign-in codes after one day. Source files your drafts and posts use stay downloadable from the library for as long as your account exists.
           </p>
 
           <h2>Your rights</h2>

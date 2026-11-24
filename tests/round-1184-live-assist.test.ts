@@ -44,7 +44,7 @@ const liveRoute = await import("../app/api/support/live/route");
 const queueRoute = await import("../app/api/admin/live-assist/route");
 const chatRoute = await import("../app/api/admin/live-assist/[id]/route");
 const { pruneOldData } = await import("../lib/retention/prune");
-const { startConversation, resolveAndSend, recordTurn } = await import("../lib/support/conversations");
+const { startConversation, closeConversation, recordTurn } = await import("../lib/support/conversations");
 type AdminSession = import("../lib/admin/auth").AdminSession;
 
 const users: string[] = [];
@@ -477,11 +477,11 @@ describe("cancel, leave a message, back to Pip", () => {
 });
 
 describe("review fixes: a live chat can't be stranded", () => {
-  test("Resolve & Send Transcript is refused while a person is waiting or talking; Pip's late answer is dropped", async () => {
+  test("Resolve chat (close) is refused while a person is waiting or talking; Pip's late answer is dropped", async () => {
     const u = await mkUser("strand");
     const r = await live.requestHuman(u.id, {});
     expect(r.mode).toBe("waiting");
-    expect(await err(resolveAndSend(u.id, r.conversationId))).toEqual({ status: 409, code: "LIVE_OPEN" });
+    expect(await err(closeConversation(u.id, r.conversationId))).toEqual({ status: 409, code: "LIVE_OPEN" });
     const conv = await db.pipConversation.findUniqueOrThrow({ where: { id: r.conversationId } });
     expect({ status: conv.status, mode: conv.mode, sendingAt: conv.sendingAt }).toEqual({ status: "open", mode: "waiting", sendingAt: null });
     // Pip was still answering when the customer tapped Connect: their words are kept for the team, Pip's reply is not.
@@ -624,7 +624,8 @@ describe("retention and the rest of the product", () => {
   test("the widget speaks through /api/support/live, uses the shared words and keeps the old email ticket path", () => {
     const w = readFileSync("components/support/ChatWidget.tsx", "utf8");
     expect(w).toContain("/api/support/live");
-    for (const k of ["connecting", "queueTitle", "waiting", "connectedTitle", "connected", "reconnecting", "resolved", "keepPip"]) expect({ k, used: w.includes(`lt.${k}`) }).toEqual({ k, used: true });
+    // R1311: the connected card is gone; the header's one line (connectedTo, joined, endChat) carries that state.
+    for (const k of ["connecting", "queueTitle", "waiting", "connectedTo", "joined", "endChat", "reconnecting", "resolved", "keepPip"]) expect({ k, used: w.includes(`lt.${k}`) }).toEqual({ k, used: true });
     // R1207: the customer is never shown the unavailable line.
     expect(w).not.toContain("lt.unavailable");
     expect(w).toContain("liveT(lang).offer");

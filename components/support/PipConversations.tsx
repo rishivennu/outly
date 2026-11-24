@@ -7,7 +7,7 @@ export type PipConvItem = { id: string; ref: string; subject: string; status: "o
 
 const STATUS: Record<PipConvItem["status"], { label: string; cls: string }> = {
   open: { label: "Open", cls: "bg-warning/15 pill-ink-warn" },
-  pending: { label: "Sending transcript", cls: "bg-accent/15 pill-ink-info" },
+  pending: { label: "Resolving", cls: "bg-accent/15 pill-ink-info" },
   resolved: { label: "Resolved", cls: "bg-success/15 pill-ink-ok" },
 };
 
@@ -35,7 +35,6 @@ export function PipConversations({ items }: { items: PipConvItem[] }) {
                   <p className="truncate text-[15px] font-semibold">{c.subject}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     <span className="tabular">{c.ref}</span> · {c.messages} {c.messages === 1 ? "message" : "messages"} · updated {day(c.updatedAt)}
-                    {c.sentTo ? ` · transcript sent to ${c.sentTo}` : ""}
                   </p>
                 </div>
                 <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold", s.cls)}>{s.label}</span>

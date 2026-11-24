@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useUser } from "./UserContext";
 import { WelcomeArt } from "./WelcomeArt";
 import { welcomeFont } from "./welcome-font";
-import { HEADLINE_NOWRAP, WELCOMED_EVENT, WELCOME_DEFAULT, WELCOME_KEY, WELCOME_SESSION_KEY, fillGreeting, fillName, headlineParts, shouldWelcome, type WelcomeConfig } from "@/lib/pwa-welcome";
+import { HEADLINE_NOWRAP, WELCOMED_EVENT, WELCOME_DEFAULT, WELCOME_KEY, WELCOME_SESSION_KEY, fillGreeting, fillName, headlineParts, shouldWelcome, welcomeLandsHome, type WelcomeConfig } from "@/lib/pwa-welcome";
 
 /** What the person picked on the way out (1101). Every one of them counts as seen. */
 type Exit = "start" | "connect" | "tour" | "skip";
@@ -122,6 +122,9 @@ export function PwaWelcome({ config }: { config: WelcomeConfig }) {
     // Navigate under the exit, so the new page is already there when the screen has faded.
     if (how === "connect") router.push("/accounts");
     if (how === "skip" && location.pathname !== "/home") router.push("/home");
+    // R1311: after the greeting the app lands on Home. A bare /create entry (no post, idea or format asked for) is
+    // not a deep link, so Let's go takes it to the dashboard; /create?post=… and other pages stay where they opened.
+    if (how === "start" && welcomeLandsHome(location.pathname, location.search)) router.push("/home");
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     exit.current = window.setTimeout(() => {
       document.documentElement.removeAttribute("data-welcome");

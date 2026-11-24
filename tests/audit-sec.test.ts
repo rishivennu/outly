@@ -53,6 +53,14 @@ describe("sec: admin surface is guarded server-side", () => {
     test(`${apiPath(f)} uses adminRoute or its own origin + rate limit`, () => {
       const s = src(f);
       if (/\badminRoute[(<]/.test(s)) return;
+      // R1309 Google Calendar OAuth callback: Google lands here cross-origin, so adminRoute's same-origin check would
+      // refuse it. It guards itself: admin session + permission, and the state cookie (CSRF) compared in constant time.
+      if (f === "app/api/admin/integrations/google/callback/route.ts") {
+        expect(s).toContain("await getAdmin()");
+        expect(s).toMatch(/can\(admin\.role, "integrations"\)/);
+        expect(s).toContain("safeEqual(expected, state)");
+        return;
+      }
       expect(f).toMatch(/app\/api\/admin\/(login|logout)\/route\.ts/);
       expect(s).toContain("assertSameOrigin");
       // Signing in is brute-forceable, so it also carries a limit; signing out only needs the origin check.

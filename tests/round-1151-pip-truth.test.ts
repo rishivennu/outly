@@ -230,46 +230,47 @@ describe("7-8 Refresh data", () => {
   });
 });
 
-describe("9-11 transcript email", () => {
-  test("9 enabled: a verified person is offered Resolve & Send Transcript, also when they ask for the transcript", async () => {
+describe("9-11 transcript email (R1311: retired; Resolve chat needs no email)", () => {
+  test("9 a verified person is offered Resolve chat; asking for a transcript gets the one honest line, no offer", async () => {
     const u = await mkUser("tok");
     await signIn(u.id);
-    expect(await conv.transcriptAvailable(u.id)).toEqual({ available: true, reason: "OK" });
     const j = await (await chat("My issue is resolved")).json();
     expect(j.resolve).toBe(true);
     const k = await (await chat("can you email me the transcript?", { conversationId: j.conversationId })).json();
-    expect(k.resolve).toBe(true);
-    expect(k.answer).not.toMatch(/can'?t|unable|not available/i);
+    expect(k.resolve).toBe(false);
+    expect(k.answer).toBe(conv.TRANSCRIPTS_RETIRED_TEXT);
+    expect(k.answer).toContain("Your Pip conversations");
   });
-  test("10 a failed send leaves it open (covered end to end in round-1126), and the offer text never contradicts itself", () => {
-    expect(conv.transcriptUnavailableText("UNVERIFIED")).toContain("isn't verified");
-    expect(conv.transcriptUnavailableText("EMAIL_OFF")).toContain("isn't available right now");
+  test("10 R1311: the transcript mailer and its availability check are gone from the server", () => {
+    expect("transcriptAvailable" in conv).toBe(false);
+    expect("resolveAndSend" in conv).toBe(false);
+    expect(readFileSync("lib/support/conversations.ts", "utf8")).not.toContain("pipTranscript");
   });
-  test("11 disabled: no offer, one plain reason, for an unverified address and for email switched off", async () => {
+  test("11 R1311: the offer no longer depends on email: an unverified address and email switched off still get Resolve chat", async () => {
     const un = await mkUser("unv", false);
     await signIn(un.id);
     const j = await (await chat("My issue is resolved")).json();
-    expect(j.resolve).toBe(false);
-    expect(j.answer).toContain("isn't verified");
+    expect(j.resolve).toBe(true);
+    expect(j.answer).toBe("Glad I could help!");
     const u = await mkUser("off");
     await signIn(u.id);
     const base0 = await getConfig("email");
     cfgCache().set("email", { at: Date.now() + 3600_000, v: { ...base0, provider: "resend", resend: { ...(base0 as { resend: object }).resend, apiKey: "" } } });
     try {
-      expect((await conv.transcriptAvailable(u.id)).reason).toBe("EMAIL_OFF");
       const k = await (await chat("please send me a transcript of this chat")).json();
       expect(k.resolve).toBe(false);
-      expect(k.answer).toContain("Emailing transcripts isn't available right now");
+      expect(k.answer).toBe(conv.TRANSCRIPTS_RETIRED_TEXT);
       const g = await (await get("/api/support/conversation")).json();
-      expect(g.transcript).toEqual({ available: false, reason: "EMAIL_OFF" });
+      expect(g.transcript).toBeUndefined();
+      expect(Array.isArray(g.items)).toBe(true);
     } finally {
       cfgCache().delete("email");
     }
   });
-  test("the widget asks the server before offering it from Did that help? Yes", () => {
+  test("R1311: the widget offers Resolve chat from Did that help? Yes to anyone signed in with a saved chat", () => {
     const src = readFileSync("components/support/ChatWidget.tsx", "utf8");
-    expect(src).toContain("setTranscriptOk(!!j?.transcript?.available)");
-    expect(src).toContain("if (good && signedIn && conv && transcriptOk) {");
+    expect(src).not.toContain("transcriptOk");
+    expect(src).toContain("if (good && signedIn && conv) {");
   });
   test("transcript intent", () => {
     for (const s of ["email me the transcript", "can I get a transcript?", "send me a copy of this chat", "mail this conversation to me"]) expect({ s, y: asksForTranscript(s) }).toEqual({ s, y: true });
