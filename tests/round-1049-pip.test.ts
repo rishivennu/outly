@@ -133,7 +133,7 @@ describe("1049 routing", () => {
     expect(readPlan({ tool: "delete_account" })).toBeNull();
     expect(readPlan({ tool: null })).toBeNull();
     expect(readPlan({ tool: "payments", period: "last week", minAmount: 10 })!.args).toMatchObject({ period: "last week", minAmount: 10 });
-    expect(PIP_TOOLS.length).toBe(26); // R1244 added intelligence_overview
+    expect(PIP_TOOLS.length).toBe(28); // R1244 added intelligence_overview; R1325 predictions + clipper_status
   });
 });
 

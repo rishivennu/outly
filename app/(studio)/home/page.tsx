@@ -47,6 +47,8 @@ import { ProfileSwitcher } from "@/components/home/ProfileSwitcher";
 import { TrustBadges } from "@/components/shared/TrustBadges";
 import { savedTime } from "@/lib/retention/time-saved";
 import { TimeSavedCard } from "@/components/home/TimeSavedCard";
+import { IntelligencePulseCard } from "@/components/home/IntelligencePulse";
+import { intelligencePulse } from "@/lib/intelligence/pulse";
 import { soft } from "@/lib/budget";
 import { dashboardFor } from "@/lib/dashboard-style";
 import { getPulse } from "@/lib/dashboard/pulse";
@@ -207,7 +209,7 @@ async function classicView(user: HomeUser, canSwitch: boolean, recapAtParam: str
   const recapAt = process.env.NODE_ENV !== "production" && recapAtParam ? new Date(recapAtParam) : new Date();
   // 1037: the picked profile (or a member's accounts) narrows the drafts and the next post too.
   const [profiles, scope, badges] = await Promise.all([listProfiles(user.id, user.scope), postFilter(user), trustBadges(user.id)]);
-  const [, drafts, next, live, welcome, published, ret, pulse, recap, founding, saved, storage, onboarding] = await Promise.all([
+  const [, drafts, next, live, welcome, published, ret, pulse, recap, founding, saved, storage, onboarding, intel] = await Promise.all([
     loadKeys(),
     db.post.findMany({ where: { userId: user.id, status: "draft", archivedAt: null, ...scope.where }, include: { targets: true, media: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.post.findFirst({ where: { userId: user.id, status: "scheduled", scheduledAt: { gte: new Date() }, ...scope.where }, include: { targets: true, media: true }, orderBy: { scheduledAt: "asc" } }),
@@ -236,6 +238,8 @@ async function classicView(user: HomeUser, canSwitch: boolean, recapAtParam: str
     soft(storageUsage(user.id), CARD_MS, null, "home storage"),
     // Phase 2: the guided setup, saved on the account and merged with the studio's own data (lib/onboarding.ts)
     firstRun ? soft(onboardingFor(user), CARD_MS, null, "home onboarding") : null,
+    // R1325: the Intelligence pulse (baselines, one personal recommendation, the clipper queue); owners only, never fatal.
+    user.actor ? null : soft(intelligencePulse(user.id), CARD_MS, null, "home intelligence"),
   ]);
   const started = Object.values(live).some(Boolean) || published > 0;
   const steps = ret?.steps ?? [];
@@ -274,11 +278,12 @@ async function classicView(user: HomeUser, canSwitch: boolean, recapAtParam: str
       ) : (
         welcome && <WelcomeSubscribe firstName={user.name.split(" ")[0]} offer={welcome.offer} freeLimit={welcome.freeLimit} freePeriod={welcome.freePeriod} foundingFull={founding?.kind === "full" ? founding.limit : null} trial={welcome.trial} />
       )}
-      {(pulse || recap || (saved && saved.posts > 0)) && (
+      {(pulse || recap || (saved && saved.posts > 0) || intel) && (
         <div className="page-frame grid grid-cols-[minmax(0,1fr)] gap-4 pb-4">
           {recap && <WeekRecap r={recap} canEmail={!user.actor && (await digestP)} />}
           {pulse && <SendingNow items={pulse.sending} />}
           {pulse && <WeekPulse p={pulse} />}
+          {intel && <IntelligencePulseCard p={intel} />}
           {saved && <TimeSavedCard t={saved} />}
         </div>
       )}

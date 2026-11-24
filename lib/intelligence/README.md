@@ -36,7 +36,9 @@ Server (touch Prisma, `import "server-only"`):
 
 Elsewhere:
 
-- `lib/pip/tools-intelligence.ts`: Pip's read-only `intelligence_overview` tool (workspace scope, overview in readOnly mode).
+- `pulse-core.ts` (R1325, pure): the app-facing digest. `IntelligencePulse` = per platform {level, measured, top baseline {predicted, low, high, n, shared}, accuracyWords}, the first open recommendation, clipper queue counts, computedAt; `pickTop` (most measured format), `baselineLine` / `clipperLine` / `pulseLines` (one sentence each, every number with its sample, "no measured post yet" instead of a zero), `baselineItems` for the weekly report. `pulse.ts` (server): `intelligencePulse(ownerId)` reads `modelStates`, the latest IntelligenceEvaluation per platform, `personalRead(readOnly)` and `clipperPulse` (ClipJob / GeneratedClip counts); writes nothing.
+- `lib/pip/tools-intelligence.ts`: Pip's read-only tools: `intelligence_overview` (workspace scope, overview in readOnly mode), `predictions` (R1325: the owner's own baselines from the pulse, flagged estimate, link to /intelligence#intel-baselines) and `clipper_status` (R1325: queue counts, link to /clipper). `lib/pip/plan.ts` routes "baselines", "how many views will my next reel get", "clipper", "clips ready to post" to them before the analytics `forecast`.
+- `components/home/IntelligencePulse.tsx` (R1325): the Home card for owners (not actors), fed by `intelligencePulse` behind the same soft timeout as the other Home cards; `lib/reports/weekly.ts` `withBaselines` adds the "Your baselines" section to the weekly email when the pulse is available.
 - `components/intelligence/*`: the dashboard. `view-core.ts` holds every gap, confidence and outcome word; `TopicInsights.tsx` (Topics section), `RecActions.tsx` (planner buttons on a card), `ClientSwitcher.tsx` (agency client picker, `?client=`).
 
 ## Invariants

@@ -28,6 +28,9 @@ export const PIP_TOOLS = [
   "report",
   // R1244: Content Intelligence, read-only (lib/pip/tools-intelligence.ts).
   "intelligence_overview",
+  // R1325: Personal Intelligence baselines and the Shorts clipper queue, read-only (lib/pip/tools-intelligence.ts).
+  "predictions",
+  "clipper_status",
 ] as const;
 export type PipTool = (typeof PIP_TOOLS)[number];
 
@@ -38,7 +41,7 @@ export type PipRow = { id: string; cells: Record<string, PipCell>; links?: PipLi
 /** A headline number (1123). kind "estimate" = a projection, shown with an Estimate badge, never as an actual. */
 export type PipCard = { label: string; value: string; delta?: string | null; hint?: string; kind?: "actual" | "estimate" };
 /** The analysis tools: their summaries may run longer than a plain lookup's. */
-export const ANALYTIC_TOOLS: readonly PipTool[] = ["overview", "compare_platforms", "trend", "consistency", "best_times", "formats", "segments", "schedule", "account", "post_insight", "forecast", "report", "intelligence_overview"];
+export const ANALYTIC_TOOLS: readonly PipTool[] = ["overview", "compare_platforms", "trend", "consistency", "best_times", "formats", "segments", "schedule", "account", "post_insight", "forecast", "report", "intelligence_overview", "predictions"];
 
 export interface PipResult {
   tool: PipTool;

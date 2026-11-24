@@ -9,6 +9,7 @@ import { hasPerk } from "../billing/plan-rules";
 import { intelligenceBlock, recapCopy, recapVisible, recapWindow, reportDue, summarize, withinEmailBudget, type IntelBlock, type RecapCopy, type WeeklyStats } from "./weekly-core";
 import { overview } from "../intelligence/service";
 import { weeklyIntelligence, type WeeklyIntelligence } from "../intelligence/report-core";
+import { baselineItems, type IntelligencePulse } from "../intelligence/pulse-core";
 
 /** Posts that went out in [since, until), with their latest numbers. `names` swaps platform ids for display names (email). */
 async function statsBetween(userId: string, since: Date, until: Date, upcomingWhere: { gt: Date; lt?: Date }, names: boolean): Promise<WeeklyStats> {
@@ -76,10 +77,35 @@ async function ownerIntelligence(userId: string): Promise<WeeklyIntelligence> {
   return weeklyIntelligence(await overview({ id: userId, scope: null }, { days: 28, accountIds: null }));
 }
 
+/** R1325: the owner's Intelligence pulse, for the "Your baselines" section. */
+async function ownerPulse(userId: string): Promise<IntelligencePulse | null> {
+  return import("../intelligence/pulse").then((m) => m.intelligencePulse(userId));
+}
+
+/**
+ * R1325: "Your baselines" appended to the block (at most three platforms, each with its sample), plus the same lines
+ * in the plain text. A pulse that fails or has nothing measured leaves the block as it was.
+ */
+export function withBaselines(block: IntelBlock, pulse: IntelligencePulse | null, appUrl: string): IntelBlock {
+  const items = baselineItems(pulse);
+  if (!items.length) return block;
+  const href = `${appUrl.replace(/\/+$/, "")}/intelligence#intel-baselines`;
+  const section = { label: "Your baselines", items: items.map((i) => ({ ...i, href: null })) };
+  const text = [block.text, "", `${section.label}:`, ...items.map((i) => `- ${i.title}: ${i.detail}`), `Open your baselines: ${href}`].join("\n");
+  return { ...block, sections: [...block.sections, section], text };
+}
+
 /** R1243: never lets the intelligence block stop the weekly email: any failure is logged and the block is left out. */
-export async function intelligenceFor(userId: string, load: (userId: string) => Promise<WeeklyIntelligence> = ownerIntelligence): Promise<IntelBlock | null> {
+export async function intelligenceFor(
+  userId: string,
+  load: (userId: string) => Promise<WeeklyIntelligence> = ownerIntelligence,
+  pulse: (userId: string) => Promise<IntelligencePulse | null> = ownerPulse,
+): Promise<IntelBlock | null> {
   try {
-    return intelligenceBlock(await load(userId), env.APP_URL);
+    const block = intelligenceBlock(await load(userId), env.APP_URL);
+    // R1325: baselines are a bonus; their failure never costs the block.
+    const p = await pulse(userId).catch((e) => (console.warn("[weekly] baselines_skipped", userId, e instanceof Error ? e.message : String(e)), null));
+    return withBaselines(block, p, env.APP_URL);
   } catch (e) {
     console.warn("[weekly] intelligence_skipped", userId, e instanceof Error ? e.message : String(e));
     return null;
@@ -97,7 +123,7 @@ export function weeklyHtml(o: { name: string; stats: WeeklyStats; intel: IntelBl
 }
 
 /** Sends to everyone whose Monday report is due. Skips people who never posted (nothing to say). */
-export async function sendWeeklyReports(now = new Date(), opts: { force?: boolean; limit?: number; only?: string[]; intel?: (userId: string) => Promise<WeeklyIntelligence> } = {}) {
+export async function sendWeeklyReports(now = new Date(), opts: { force?: boolean; limit?: number; only?: string[]; intel?: (userId: string) => Promise<WeeklyIntelligence>; pulse?: (userId: string) => Promise<IntelligencePulse | null> } = {}) {
   // R1245: `only` narrows a forced run to given users; tests on a shared database use it so they do not send to everyone.
   const users = await db.user.findMany({
     where: { ...(opts.only ? { id: { in: opts.only } } : {}), weeklyReport: true, OR: [{ lastReportAt: null }, { lastReportAt: { lt: new Date(now.getTime() - 6 * 864e5) } }], posts: { some: { status: { not: "draft" } } } },
@@ -112,7 +138,7 @@ export async function sendWeeklyReports(now = new Date(), opts: { force?: boolea
     if (!claimed.count) return;
     // Plans without the digest perk (1096) still get claimed above, so they don't sit "due" and crowd every batch.
     if (!hasPerk(await entitlements(u.id), "weekly-digest")) return;
-    const [stats, intel] = await Promise.all([weeklyStats(u.id, now), intelligenceFor(u.id, opts.intel)]);
+    const [stats, intel] = await Promise.all([weeklyStats(u.id, now), intelligenceFor(u.id, opts.intel, opts.pulse)]);
     await sendEmail({ to: u.email, kind: "weekly_report", subject: stats.published ? `Your week: ${stats.published} post${stats.published === 1 ? "" : "s"} out` : "Your week on Outlly", html: weeklyHtml({ name: u.name, stats, intel }) }).catch(() => {});
     sent++;
   };

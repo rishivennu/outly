@@ -3,7 +3,7 @@ import { parseRange, type DateRange } from "./range";
 import { creditNotes, invoices, payments, refundsMissingCreditNote, spending, subscription } from "./tools-billing";
 import { activity, engagement, notices, posts, tickets, topPosts, uploads } from "./tools-content";
 import { addFreshness, ANALYTICS } from "./tools-analytics";
-import { intelligenceOverview } from "./tools-intelligence";
+import { clipperStatus, intelligenceOverview, predictions } from "./tools-intelligence";
 import { isPlatform } from "../domain";
 import { ANALYTIC_TOOLS } from "./types";
 import { base, mergeRelink, type PipArgs, type PipCtx } from "./tools-core";
@@ -29,6 +29,8 @@ const TOOLS: Record<PipTool, Tool> = {
   activity,
   ...ANALYTICS,
   intelligence_overview: intelligenceOverview,
+  predictions,
+  clipper_status: clipperStatus,
 };
 
 /** Money belongs to the workspace owner: a teammate gets a plain no, not a partial view. */
