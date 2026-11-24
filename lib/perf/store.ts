@@ -8,7 +8,7 @@ const PRUNE_ONE_IN = 50;
 const DAY = 86_400_000;
 
 /** A beacon that ran without a build id still lands under the version this server was built from. */
-const serverVersion = () => (process.env.NEXT_PUBLIC_BUILD_ID || process.env.VERCEL_GIT_COMMIT_SHA || "dev").slice(0, 12);
+const serverVersion = () => (process.env.NEXT_PUBLIC_BUILD_ID || process.env.VERCEL_GIT_COMMIT_SHA || process.env.RENDER_GIT_COMMIT || "dev").slice(0, 12);
 
 /**
  * One row per page load. The client's load id is the primary key, so a beacon the browser retries (or a page that

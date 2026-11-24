@@ -95,7 +95,13 @@ export async function healthOverview(now = new Date(), range = "24h") {
   const hbAt = hbRow && /^\d+$/.test(hbRow.value) ? Number(hbRow.value) : null;
 
   const worker = {
-    model: process.env.VERCEL ? "cron-driven (serverless, no always-on worker)" : env.REDIS_URL ? "Redis worker + in-process timers" : "in-process timers (dev) + cron route",
+    model: process.env.VERCEL
+      ? "cron-driven (serverless, no always-on worker)"
+      : process.env.RENDER
+        ? "cron-driven (always-on container, scripts/cron-scheduler.mjs replays vercel.json)"
+        : env.REDIS_URL
+          ? "Redis worker + in-process timers"
+          : "in-process timers (dev) + cron route",
     sweep: { source: expectedSource(), lastAt: sweep.lastAt ? new Date(sweep.lastAt).toISOString() : null, stale: sweep.stale },
     lastCycle: cycle ? { at: new Date(cycle.at).toISOString(), ms: cycle.ms, ran: cycle.ran, threw: cycle.threw, source: cycle.source, ageSec: Math.round((now.getTime() - cycle.at) / 1000) } : null,
     heartbeat: { configured: hbAt !== null, lastAt: hbAt ? new Date(hbAt).toISOString() : null, stale: hbAt === null || now.getTime() - hbAt > 3 * 60_000 },

@@ -81,7 +81,7 @@ describe("the sweep route follows the plan", () => {
     expect(s).toContain('if (plan.metrics) await import("@/lib/analytics/sync").then((m) => m.syncMetrics({ budgetMs: 8_000 })).catch(');
     expect(s).toContain('if (plan.blog) await import("@/lib/blog/schedule").then((m) => m.kickBlogTick(origin)).catch(');
     // Vercel Cron's Host header is the scheduler's choice, so self-requests use the public origin there.
-    expect(s).toContain("const origin = process.env.VERCEL ? env.APP_URL : req.nextUrl.origin;");
+    expect(s).toContain("const origin = process.env.VERCEL || process.env.RENDER ? env.APP_URL : req.nextUrl.origin;"); // R1312: Render too
     expect(s).toContain("m.runHealthCycle({ origin: m.originOf(origin),");
     expect(s).toMatch(/const health = plan\.health\s+\? await import\("@\/lib\/health\/engine"\)/);
     expect(s).toContain('.catch((e) => (console.error("[sweep] health", e), null))\n    : null;');

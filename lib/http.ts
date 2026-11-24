@@ -95,7 +95,13 @@ export function assertSameOrigin(req: NextRequest) {
  */
 export function clientIp(req: NextRequest) {
   const hops = req.headers.get("x-forwarded-for")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
-  const platform = process.env.VERCEL ? req.headers.get("x-real-ip")?.trim() : undefined;
+  // R1312 Render sits behind Cloudflare: the edge sets cf-connecting-ip to the real visitor (a client cannot override it
+  // through the proxy) and appends itself to XFF, so the last hop there would be a Cloudflare address shared by thousands.
+  const platform = process.env.VERCEL
+    ? req.headers.get("x-real-ip")?.trim()
+    : process.env.RENDER
+      ? req.headers.get("cf-connecting-ip")?.trim() || req.headers.get("true-client-ip")?.trim()
+      : undefined;
   return platform || hops[hops.length - 1] || "local";
 }
 const clientKey = clientIp;

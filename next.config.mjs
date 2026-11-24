@@ -13,7 +13,7 @@ const nextConfig = {
   poweredByHeader: false,
   // R1283: the build a page was served with, inlined into server and client code. components/pwa/FreshOnResume.tsx
   // compares it with /api/build when an installed app comes back, so a page kept alive for days learns it is old.
-  env: { NEXT_PUBLIC_BUILD: process.env.VERCEL_GIT_COMMIT_SHA || process.env.NEXT_PUBLIC_BUILD || "dev" },
+  env: { NEXT_PUBLIC_BUILD: process.env.VERCEL_GIT_COMMIT_SHA || process.env.RENDER_GIT_COMMIT || process.env.NEXT_PUBLIC_BUILD || "dev" },
   // Production only: in dev, gzipping ~10 MB of unminified JS per page load on one thread made localhost take 10 s+.
   compress: process.env.NODE_ENV === "production",
   // Lets parallel dev servers run from one checkout without clobbering each other's build output.

@@ -1,0 +1,41 @@
+# R1312: Outlly on Render, as a Blueprint (https://render.com/docs/blueprint-spec). One always-on Docker web service in
+# Singapore. Behaviour matches the Vercel deploy: same build, same Postgres, same env names; the four vercel.json crons are
+# replayed in-process by scripts/cron-scheduler.mjs. `sync: false` values are the ones copied from Vercel's environment
+# (set in the Render dashboard or through the API; never in git). Health: /api/health answers 200 when app + DB are up.
+services:
+  - type: web
+    name: outly
+    runtime: docker
+    repo: https://github.com/rishivennu/outly
+    branch: main
+    region: singapore
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: APP_URL
+        value: https://www.outlly.com
+      - key: DATABASE_PROVIDER
+        value: postgresql
+      - key: PORT
+        value: 10000
+      - key: NEXT_TELEMETRY_DISABLED
+        value: 1
+      - key: FFMPEG_PATH
+        value: /usr/bin/ffmpeg
+      - key: FFPROBE_PATH
+        value: /usr/bin/ffprobe
+      - key: AUTH_SECRET
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      # The rest of the Vercel environment (storage, social app keys, AI keys, PostHog, push, admin) is copied 1:1 by
+      # scripts/render-env.mjs from a `vercel env pull` file; the names are the ones lib/env.ts reads.

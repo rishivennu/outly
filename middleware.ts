@@ -160,7 +160,7 @@ async function readFlags(req: NextRequest): Promise<Flags> {
 // is cached for everyone on this instance. APP_URL is ours; fall back to the request only in dev.
 function siteBase(req: NextRequest) {
   const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
-  return process.env.APP_URL || (vercel ? `https://${vercel}` : "") || (process.env.NODE_ENV === "production" ? "" : req.nextUrl.origin);
+  return process.env.APP_URL || (vercel ? `https://${vercel}` : "") || process.env.RENDER_EXTERNAL_URL || (process.env.NODE_ENV === "production" ? "" : req.nextUrl.origin);
 }
 
 /*

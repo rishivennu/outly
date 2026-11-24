@@ -22,7 +22,9 @@ if (!tagged.__outllyErrHooks) {
 // Never on Vercel (1040): every instance ran its own 15 s sweep (posts, reports, retention) on boot and
 // shared its database connection with visitors, so a request landing there waited 10-20 s. There the
 // external pinger (/api/cron/sweep, every minute) and the vercel.json crons already do this work.
-if (!process.env.REDIS_URL && !process.env.VERCEL) {
+// R1312: on Render the same crons run through scripts/cron-scheduler.mjs (the sidecar started by
+// scripts/render-start.sh), so the timer stays off there too and nothing runs twice.
+if (!process.env.REDIS_URL && !process.env.VERCEL && !process.env.RENDER) {
   startSweeper();
   console.log("[studio] in-process queue + scheduler running (set REDIS_URL to use BullMQ workers)");
 }

@@ -17,7 +17,7 @@ describe("R1283 /api/build", () => {
     expect(await res.json()).toEqual({ build: process.env.NEXT_PUBLIC_BUILD || "dev" });
   });
   test("next.config inlines the build id from the commit", () => {
-    expect(src("next.config.mjs")).toContain('env: { NEXT_PUBLIC_BUILD: process.env.VERCEL_GIT_COMMIT_SHA || process.env.NEXT_PUBLIC_BUILD || "dev" },');
+    expect(src("next.config.mjs")).toContain('env: { NEXT_PUBLIC_BUILD: process.env.VERCEL_GIT_COMMIT_SHA || process.env.RENDER_GIT_COMMIT || process.env.NEXT_PUBLIC_BUILD || "dev" },'); // R1312: Render's commit too
   });
   test("the service worker never answers /api, so the check always reaches the server", () => {
     expect(src("public/sw.js")).toContain('if (p.startsWith("/api/")) return null;');

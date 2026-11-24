@@ -58,7 +58,7 @@ export function readUnsubToken(token: string | null | undefined): { email: strin
 /** Email links must be absolute (a relative List-Unsubscribe is invalid and mail clients can't open it). */
 const base = () => {
   const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
-  return (process.env.APP_URL || (vercel ? `https://${vercel}` : "") || "http://localhost:3040").replace(/\/$/, "");
+  return (process.env.APP_URL || (vercel ? `https://${vercel}` : "") || process.env.RENDER_EXTERNAL_URL || "http://localhost:3040").replace(/\/$/, "");
 };
 /** The page a person lands on from the footer link (asks before doing anything, so link scanners can't unsubscribe). */
 export const unsubPageUrl = (email: string, list: List) => `${base()}/unsubscribe?t=${unsubToken(email, list)}`;

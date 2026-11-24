@@ -36,7 +36,8 @@ async function sweep(req: NextRequest) {
   const plan = sweepPlan(now, full);
   // R1297: under Vercel Cron the request's Host is whatever URL the scheduler used (deployment or domain), so the
   // self-requests below (blog kick, watchdog probes) go to the public origin instead. Elsewhere the request origin is it.
-  const origin = process.env.VERCEL ? env.APP_URL : req.nextUrl.origin;
+  // R1312: on Render the scheduler calls 127.0.0.1, so the public origin is APP_URL there as well.
+  const origin = process.env.VERCEL || process.env.RENDER ? env.APP_URL : req.nextUrl.origin;
   // No maintenance skip: members keep posting while maintenance is on, so their schedule must still run.
   await sweepDuePosts();
   const requeued = await requeueStuckTargets();

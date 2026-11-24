@@ -3,7 +3,7 @@ import { unstable_cache } from "next/cache";
 import { settingTag } from "./settings";
 
 // A deploy can add default fields to a setting; an entry built by an older build must not stand in for them.
-const BUILD = process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID || "local";
+const BUILD = process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID || process.env.RENDER_GIT_COMMIT || "local";
 
 /** Next throws these when there is no request around (tests, workers, scripts): there is no shared cache to use. */
 export const outsideNext = (e: unknown) => /incrementalCache missing|static generation store missing/.test(String((e as Error)?.message ?? e));

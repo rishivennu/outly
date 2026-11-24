@@ -9,7 +9,8 @@ const g = globalThis as unknown as { __prisma?: PrismaClient };
  * (Supabase's pooler takes hundreds of clients) and wait up to 20 s. Only raises values, never lowers them.
  */
 function poolUrl(raw = process.env.DATABASE_URL ?? "") {
-  if (!process.env.VERCEL || !/^postgres(ql)?:/.test(raw)) return undefined;
+  // R1312: the same floor on Render (one always-on process shares one client; Supabase's pooler is still in front).
+  if (!(process.env.VERCEL || process.env.RENDER) || !/^postgres(ql)?:/.test(raw)) return undefined;
   try {
     const u = new URL(raw);
     const at = (k: string, min: number) => {
