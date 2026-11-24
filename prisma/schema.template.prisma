@@ -2426,3 +2426,150 @@ model AnalyticsDaily {
 
   @@id([day, platform])
 }
+
+/// R1314 Infrastructure & Costs: one row per costed event (an AI call, a transcribed minute, a bill, a renewal).
+/// amountMinor is in `currency` minor units; inrMinor is the INR value at the FX recorded when the row was written
+/// (fxToInr) and is never repriced later. source: estimate (internal calculation from usage x unit price) | reported
+/// (a provider's usage API) | billed (an invoice) | manual (typed in by an admin) | forecast (never written here).
+model CostEvent {
+  id          String   @id @default(cuid())
+  at          DateTime @default(now())
+  day         String // YYYY-MM-DD (UTC)
+  provider    String // gemini | vercel | render | supabase | resend | x | cloudflare | ... (lib/costs/core.ts)
+  category    String // ai | transcription | x | storage | egress | email | hosting | database | domain | tooling | other
+  feature     String   @default("") // Outlly feature: writing | captions | inbox-reply | assist | support-chat | x-post | ...
+  userId      String? // whose usage caused it (null for platform-level costs); no relation so the ledger outlives the account
+  model       String   @default("") // AI model id when relevant
+  units       Float    @default(0)
+  unit        String   @default("") // tokens | minutes | posts | gb | gb-month | emails | months | ...
+  unitPriceId String?
+  amountMinor Int      @default(0)
+  currency    String   @default("INR")
+  fxToInr     Float    @default(1)
+  inrMinor    Int      @default(0)
+  source      String   @default("estimate")
+  ref         String?  @unique // idempotency key (e.g. "recurring:<id>:2026-11-01")
+  note        String   @default("")
+  meta        String   @default("{}") // JSON: tokens in/out, invoice line, anything the source knew
+
+  @@index([day])
+  @@index([provider, day])
+  @@index([feature, day])
+  @@index([userId, day])
+}
+
+/// R1314: the ledger rolled up per UTC day so the dashboard reads hundreds of rows, not millions.
+model CostDaily {
+  day       String
+  provider  String
+  category  String
+  feature   String
+  source    String
+  units     Float    @default(0)
+  inrMinor  Int      @default(0)
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([day, provider, category, feature, source])
+  @@index([day])
+}
+
+/// R1314: what one unit of a provider SKU costs, with history. A new price is a new row with its own effectiveFrom;
+/// the ledger keeps the unitPriceId it was priced with. source: seed (shipped defaults, verify) | official | manual.
+model UnitPrice {
+  id            String    @id @default(cuid())
+  provider      String
+  sku           String // "gemini-2.5-flash:input" | "resend:email" | "vercel:bandwidth-gb" | ...
+  unit          String
+  price         Float // in `currency` per unit (fractions allowed: tokens are priced per token)
+  currency      String    @default("USD")
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  source        String    @default("manual")
+  sourceUrl     String    @default("")
+  note          String    @default("")
+  createdBy     String    @default("")
+  createdAt     DateTime  @default(now())
+
+  @@index([provider, sku, effectiveFrom])
+}
+
+/// R1314: an actual bill (invoice) from a provider, typed in or imported. (provider, invoiceId) dedupes imports.
+model BillingRecord {
+  id          String   @id @default(cuid())
+  provider    String
+  invoiceId   String
+  category    String   @default("hosting")
+  periodStart DateTime
+  periodEnd   DateTime
+  amountMinor Int
+  currency    String   @default("USD")
+  fxToInr     Float    @default(1)
+  inrMinor    Int      @default(0)
+  status      String   @default("paid") // paid | due | disputed
+  source      String   @default("manual") // manual | api
+  note        String   @default("")
+  createdBy   String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([provider, invoiceId])
+  @@index([periodStart])
+}
+
+/// R1314: a subscription Outlly pays for (hosting plan, domains, a tool). The sweep books it into the ledger on each
+/// renewal (ref "recurring:<id>:<day>") and warns a week before.
+model RecurringExpense {
+  id          String    @id @default(cuid())
+  name        String
+  provider    String
+  category    String    @default("tooling")
+  amountMinor Int
+  currency    String    @default("USD")
+  cadence     String    @default("monthly") // monthly | yearly
+  startsAt    DateTime
+  endsAt      DateTime?
+  nextRenewal DateTime
+  autoRenew   Boolean   @default(true)
+  active      Boolean   @default(true)
+  note        String    @default("")
+  createdBy   String    @default("")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([active, nextRenewal])
+}
+
+/// R1314: a monthly spending limit in INR for everything (scope "total", key "") or one provider / category / feature.
+model CostBudget {
+  id         String   @id @default(cuid())
+  name       String
+  scope      String   @default("total") // total | provider | category | feature
+  key        String   @default("")
+  inrMinor   Int
+  thresholds String   @default("50,75,90,100") // percent steps that raise an alert, once each per month
+  active     Boolean  @default(true)
+  createdBy  String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([scope, key])
+}
+
+/// R1314: one alert per `key` (budget:<id>:<month>:<pct>, renewal:<id>:<day>, spike:<provider>:<day>), so the same
+/// condition never pages twice.
+model CostAlert {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  kind      String // budget | renewal | spike | sync
+  severity  String    @default("warn") // info | warn | critical
+  title     String
+  body      String    @default("")
+  href      String    @default("")
+  status    String    @default("open") // open | acked
+  createdAt DateTime  @default(now())
+  ackedAt   DateTime?
+  ackedBy   String?
+
+  @@index([status, createdAt])
+}

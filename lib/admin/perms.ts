@@ -1,7 +1,7 @@
 /** Client-safe: shared by the admin sidebar and the server guards. */
 export type AdminRole = "super" | "finance" | "support" | "marketing";
 export const ADMIN_ROLES = ["super", "finance", "support", "marketing"] as const satisfies readonly AdminRole[];
-export type AdminArea = "overview" | "users" | "insights" | "payments" | "pricing" | "tickets" | "faq" | "integrations" | "outbox" | "team" | "site" | "platforms" | "retention" | "growth" | "plans" | "referrals" | "content" | "live" | "health" | "partners" | "appAnalytics" | "workshops";
+export type AdminArea = "overview" | "users" | "insights" | "payments" | "pricing" | "tickets" | "faq" | "integrations" | "outbox" | "team" | "site" | "platforms" | "retention" | "growth" | "plans" | "referrals" | "content" | "live" | "health" | "partners" | "appAnalytics" | "workshops" | "costs";
 
 export const ROLE_LABEL: Record<AdminRole, string> = { super: "Super admin", finance: "Finance", support: "Support", marketing: "Marketing lead" };
 export const ROLE_BLURB: Record<AdminRole, string> = {
@@ -40,6 +40,8 @@ const ACCESS: Record<AdminArea, AdminRole[]> = {
   appAnalytics: ["super", "finance", "support", "marketing"],
   // R1309 Creator Hub workshops: marketing runs them, support answers the "where is my link" tickets.
   workshops: ["super", "marketing", "support"],
+  // R1314 Infrastructure & Costs: what Outlly pays its providers. Money and secrets: super and finance only.
+  costs: ["super", "finance"],
 };
 
 export const can = (role: AdminRole | undefined | null, area: AdminArea) => !!role && ACCESS[area].includes(role);

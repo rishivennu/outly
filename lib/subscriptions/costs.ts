@@ -4,6 +4,7 @@ import { HttpError } from "../http";
 import { GIFT_PROVIDERS } from "../billing/access-core";
 import { getEconomics, getPolicy, type BudgetMode } from "./policy";
 import { bucketOf, budgetMinor, costMinor, feeInrMinor, netRevenueInrMinor, COST_BUCKETS, type CostBucket, type CostCategory, type Economics } from "./economics";
+import { recordEconomicsUse } from "../costs/ledger";
 
 /**
  * 1147 metering. Every costly call adds its cost (INR paise, from the economics rates) to the paying
@@ -96,6 +97,8 @@ async function rowFor(payerId: string, now: Date, known: { sub: PaidSub | null; 
 /** Adds the cost of `units` to the payer's month. Never throws: metering must not break the feature. */
 export async function recordCost(o: { userId: string; category: CostCategory; units: number; now?: Date }): Promise<{ costMinor: number; payerId: string } | null> {
   try {
+    // R1314: the cost ledger (Admin > Infrastructure & Costs) sees every metered use, whether or not the 1147 budget policy is on.
+    void recordEconomicsUse(o);
     if (!(await getPolicy()).enabled) return null; // policy off: nothing is metered, exactly as before 1147
     const now = o.now ?? new Date();
     const c = costMinor(o.category, o.units, await getEconomics());
