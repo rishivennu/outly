@@ -53,6 +53,7 @@ export default async function CreatePage(props: { searchParams: Promise<Record<s
       restoreLocal={post ? null : (searchParams.local ?? null)}
       missingPostId={!post && searchParams.post ? searchParams.post : null}
       recId={post || searchParams.post || searchParams.local ? null : (searchParams.rec?.slice(0, 40) ?? null)}
+      clipId={post || searchParams.post || searchParams.local ? null : (searchParams.clip?.slice(0, 40) ?? null)}
     />
   );
 }

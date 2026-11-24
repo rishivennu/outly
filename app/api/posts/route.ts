@@ -14,6 +14,7 @@ import { FORMAT_LABEL, isImageMime, supportsFormat, takesFirstComment, type Post
 import { PLATFORM_META } from "@/lib/domain";
 import { DRAFT_CONFLICT_MESSAGE, draftConflict, serverDraft, StaleDraftError } from "@/lib/posts/conflicts";
 import { lineageAfterCreate } from "@/lib/intelligence/lineage";
+import { attachClipToPost } from "@/lib/clipper/publish";
 
 export const dynamic = "force-dynamic";
 
@@ -109,7 +110,9 @@ export const POST = route(async (req, { user }) => {
       throw e;
     }
     // R1234: only a draft this call created gets its Content Memory item (a clientKey twin or an update already has one).
-    if (!existing) await lineageAfterCreate(user.id, id, { adaptedFromPostId: body.adaptedFromPostId, recommendationId: body.recommendationId });
+    if (!existing) await lineageAfterCreate(user.id, id, { adaptedFromPostId: body.adaptedFromPostId, recommendationId: body.recommendationId }, body.clipId ? { origin: "clipper" } : {});
+    // R1323: a post started from a Shorts Clipper clip is linked back to it (quiet: a bad or foreign id is a no-op).
+    if (!existing && body.clipId) await attachClipToPost(user.id, body.clipId, id).catch((e) => console.warn("[clipper] attach_failed", e instanceof Error ? e.message : e));
     if (changed) await recordEdit(user, { id });
     if (!existing) track("content_created", realUserId(user), { format });
     else if (changed) track("draft_created", realUserId(user), { format });

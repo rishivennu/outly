@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { realUserId } from "@/lib/auth";
 import { json, route } from "@/lib/http";
-import { clipView, discardClip, ownedClip, updateClip } from "@/lib/clipper/jobs";
+import { clipsWithPosts, discardClip, ownedClip, updateClip } from "@/lib/clipper/jobs";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ const patch = z.object({
   subtitle: z.unknown().optional(),
 });
 
-export const GET = route(async (_req, { user, params }) => json({ clip: clipView(await ownedClip(user.id, params.id)) }, { headers: { "cache-control": "private, no-store" } }));
+export const GET = route(async (_req, { user, params }) => json({ clip: (await clipsWithPosts(user.id, [await ownedClip(user.id, params.id)]))[0] }, { headers: { "cache-control": "private, no-store" } }));
 
 /** R1321: edit a clip's copy, timing, reframe or subtitles. Timing, reframe and subtitle changes make the render stale. */
 export const PATCH = route(

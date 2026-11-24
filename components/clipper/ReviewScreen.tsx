@@ -1,8 +1,10 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Download, Pencil, Search, X } from "lucide-react";
+import Link from "next/link";
+import { Check, Download, Pencil, Search, Send, X } from "lucide-react";
 import { api, ApiError } from "@/lib/client/api";
 import { mmss } from "@/lib/clipper/executor-core";
+import { performanceLine, type ClipPlatformPerformance } from "@/lib/clipper/publish-core";
 import type { CandidateView, ClipView, JobDetail } from "@/lib/clipper/jobs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
@@ -170,14 +172,47 @@ function ClipRow({ c, busy, onEdit, onDiscard }: { c: ClipView; busy: boolean; o
           </div>
           <h3 className="mt-1 text-[15px] font-semibold leading-snug">{c.title}</h3>
           {c.hook && <p className="mt-1 text-[13px] text-muted-foreground">{c.hook}</p>}
+          {c.post && <PerformanceLine clip={c} />}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" onClick={onEdit}><Pencil className="h-4 w-4" aria-hidden /> {c.renderStatus === "rendered" ? "Edit" : "Edit & export"}</Button>
           {c.renderStatus === "rendered" && <DownloadButton clip={c} />}
+          {c.renderStatus === "rendered" && !c.post && (
+            <Button asChild variant="lime" size="sm"><Link href={`/create?clip=${encodeURIComponent(c.id)}`}><Send className="h-4 w-4" aria-hidden /> Post this clip</Link></Button>
+          )}
+          {c.post && (
+            <Button asChild variant="outline" size="sm"><Link href={`/create?post=${encodeURIComponent(c.post.id)}`}>Open post</Link></Button>
+          )}
           {c.status !== "published" && <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onDiscard} aria-label={`Discard ${c.title}`}><X className="h-4 w-4" aria-hidden /></Button>}
         </div>
       </div>
     </li>
+  );
+}
+
+/**
+ * R1323: the one line about the clip's post. Drafts and scheduled posts need no fetch; a published one reads its
+ * numbers (from the same rows Insights uses) and says so only for what the platform actually gave.
+ */
+function PerformanceLine({ clip }: { clip: ClipView }) {
+  const live = clip.post?.status === "published" || clip.post?.status === "partial";
+  const [perf, setPerf] = useState<{ platforms: ClipPlatformPerformance[]; line: string } | null>(null);
+  useEffect(() => {
+    if (!live) return;
+    let alive = true;
+    api<{ platforms: ClipPlatformPerformance[]; line: string }>(`/api/clipper/clips/${clip.id}/performance`)
+      .then((r) => alive && setPerf(r))
+      .catch(() => alive && setPerf(null));
+    return () => {
+      alive = false;
+    };
+  }, [clip.id, clip.post?.status, live]);
+  const line = perf?.line ?? (live ? "Published. Reading the numbers…" : performanceLine(clip.post, []));
+  const given = perf?.platforms.flatMap((p) => p.metrics.filter((m) => m.value !== null).map((m) => `${p.platform}: ${m.value!.toLocaleString()} ${m.key}`)) ?? [];
+  return (
+    <p className="mt-1 text-[12px] text-muted-foreground" title={given.length ? given.join(" · ") : undefined}>
+      {line}
+    </p>
   );
 }
 

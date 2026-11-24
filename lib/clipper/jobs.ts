@@ -5,6 +5,7 @@ import { HttpError } from "../http";
 import { mediaView, ownedMedia } from "../services";
 import { normalizeCues, type Cue } from "../captions/cues";
 import { cleanWords, cuesFromWords, DEFAULT_SUBTITLE_RULES, findText, highlightPrompt, parseHighlights, type Highlight, type Word } from "../captions/subtitle-engine";
+import { logLearning } from "../intelligence/learning";
 import { modelStates } from "../intelligence/model/predict";
 import { fromHighlights, rankCandidates, textOf, widen, type PersonalHints, type ScoredCandidate } from "./candidates-core";
 import { draftCopy } from "./copy-core";
@@ -79,9 +80,19 @@ export interface ClipView {
   renderedAt: string | null;
   mediaId: string | null;
   postId: string | null;
+  /** R1323: the post made from this clip, when the detail was read with its posts (null = none, or not looked up). */
+  post: ClipPostView | null;
   status: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** R1323: what the clip screen needs to know about the post a clip became. */
+export interface ClipPostView {
+  id: string;
+  status: string;
+  scheduledAt: string | null;
+  publishedAt: string | null;
 }
 
 const jobView = (j: ClipJob & { _count?: { candidates: number; clips: number } }): JobView => ({
@@ -117,7 +128,7 @@ const candidateView = (c: ClipCandidate & { clip?: { id: string } | null }): Can
   clipId: c.clip?.id ?? null,
 });
 
-export const clipView = (c: GeneratedClip): ClipView => ({
+export const clipView = (c: GeneratedClip, post: ClipPostView | null = null): ClipView => ({
   id: c.id,
   jobId: c.jobId,
   candidateId: c.candidateId,
@@ -134,10 +145,39 @@ export const clipView = (c: GeneratedClip): ClipView => ({
   renderedAt: c.renderedAt?.toISOString() ?? null,
   mediaId: c.mediaId,
   postId: c.postId,
+  post,
   status: c.status,
   createdAt: c.createdAt.toISOString(),
   updatedAt: c.updatedAt.toISOString(),
 });
+
+const postSummary = (p: { id: string; status: string; scheduledAt: Date | null; publishedAt: Date | null }): ClipPostView => ({ id: p.id, status: p.status, scheduledAt: p.scheduledAt?.toISOString() ?? null, publishedAt: p.publishedAt?.toISOString() ?? null });
+
+/**
+ * R1323: clips with the posts they became. Reading is also when a clip learns its post went out: the clip turns
+ * `published`, gets a ClipEvent and one LearningEvent (`clip_published`, deduped), so the loop closes without a hook
+ * in the publishing path. A post that was deleted leaves `post` null and the clip as it was.
+ */
+export async function clipsWithPosts(ownerId: string, clips: GeneratedClip[]): Promise<ClipView[]> {
+  const ids = clips.map((c) => c.postId).filter((id): id is string => !!id);
+  if (!ids.length) return clips.map((c) => clipView(c));
+  const posts = await db.post.findMany({ where: { id: { in: ids }, userId: ownerId }, select: { id: true, status: true, scheduledAt: true, publishedAt: true } });
+  const byId = new Map(posts.map((p) => [p.id, postSummary(p)]));
+  const out: ClipView[] = [];
+  for (let c of clips) {
+    const post = c.postId ? byId.get(c.postId) ?? null : null;
+    if (post && post.status === "published" && c.status !== "published" && c.status !== "discarded") {
+      const n = await db.generatedClip.updateMany({ where: { id: c.id, ownerId, status: c.status }, data: { status: "published" } });
+      if (n.count) {
+        await event(c.jobId, ownerId, "published", { postId: post.id, publishedAt: post.publishedAt }, c.id, null);
+        await logLearning(ownerId, "clip_published", { subjectType: "clip", subjectId: c.id, dedupeKey: `clip_published:${c.id}`, data: { jobId: c.jobId, postId: post.id, start: c.start, end: c.end, candidateId: c.candidateId, length: Math.round((c.end - c.start) * 10) / 10 }, at: post.publishedAt ? new Date(post.publishedAt) : undefined }).catch(() => false);
+        c = { ...c, status: "published" };
+      }
+    }
+    out.push(clipView(c, post));
+  }
+  return out;
+}
 
 /* ------------------------------------------------------------------ jobs */
 
@@ -203,7 +243,7 @@ export async function jobDetail(ownerId: string, id: string, opts: { transcript?
     media,
     transcript: transcript ? { engine: transcript.engine, language: transcript.language, wordCount: transcript.wordCount, cues: opts.transcript ? parse<Cue[]>(transcript.cues, []) : [] } : null,
     candidates: candidates.map(candidateView),
-    clips: clips.map(clipView),
+    clips: await clipsWithPosts(ownerId, clips),
   };
 }
 

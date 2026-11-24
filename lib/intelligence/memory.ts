@@ -12,8 +12,8 @@ import { CLIENTS_MAX, CLIENT_ACCOUNTS_MAX, isScopeKey, slugOf } from "./brand-co
  * (the workspace, Post.userId): a post id from another workspace is treated as not found, never linked.
  */
 
-export type ContentOrigin = "manual" | "adapt" | "recommendation" | "backfill";
-const ORIGINS: readonly ContentOrigin[] = ["manual", "adapt", "recommendation", "backfill"];
+export type ContentOrigin = "manual" | "adapt" | "recommendation" | "backfill" | "clipper";
+const ORIGINS: readonly ContentOrigin[] = ["manual", "adapt", "recommendation", "backfill", "clipper"];
 const originOf = (o: unknown): ContentOrigin => (ORIGINS.includes(o as ContentOrigin) ? (o as ContentOrigin) : "manual");
 
 const isUnique = (e: unknown) => (e as { code?: string })?.code === "P2002";

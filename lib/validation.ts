@@ -63,6 +63,8 @@ export const savePostSchema = z.object({
   /** R1241: the recommendation this new draft was started from (/create?rec=). Only read when a post is created;
    *  a malformed one becomes null, so it can never fail the save. */
   recommendationId: z.string().regex(/^[A-Za-z0-9]{1,40}$/).max(40).nullish().catch(null),
+  /** R1323: the Shorts Clipper clip this draft posts (/create?clip=). Only read when a post is created; never fails the save. */
+  clipId: z.string().regex(/^[A-Za-z0-9]{1,40}$/).max(40).nullish().catch(null),
   /** 1131: video (the default, one clip) | photo | carousel | story. Not sent = keep what the post is. */
   format: z.enum(POST_FORMATS).optional(),
   /** 1131: the slides in order, for every format but video. The first one is also mediaId. */

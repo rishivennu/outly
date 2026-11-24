@@ -11,7 +11,7 @@ ranked moments come out; the creator approves, trims, reframes and renders 9:16 
 | R1321 review | Transcript save and detection flip the stage inside their transaction; a `rendered` report is accepted only while the clip is `rendering` (edits make it `pending`, so stale renders are refused with `STALE_RENDER`); source, trashed and already-used media are not renders; `ruleWindows` covers the whole source; candidates per job capped at 60; `ClipJob.media` is `SetNull` so purging the source keeps the clips; heartbeat progress is a fraction 0..1; `?transcript=1` on the detail. |
 | R1322 | Browser executor (`lib/client/clipper.ts`: probe, transcribe through the Caption Studio chunks, detect, render 1080x1920 through `drawFor`, upload, report) + `executor-core.ts` (tab limit 40 min, screens, words) + `/clipper` studio (`components/clipper/*`: upload, processing with resume, review with reasons, editor with live reframe preview, export, download). Nav entry after Create. |
 | R1322 review | A queued job with no tab is `stalled` (Resume) and the studio re-judges the screen every 30 s; Stop reports `failed: "Stopped."` so a clip never stays `rendering`; a `STALE_RENDER` 409 after the upload bins the file; the render waits for the caption font, ends on abort/error/20 s without a frame, and releases the `<video>`; files capped at 1.5 GB and the soundtrack decode keeps the heartbeat; the editor keeps edits across refreshes (reset on `id+updatedAt`), stops an export on unmount, warns on tab close, slides tall sources on `y`, takes decimals in the range boxes (`previewStyle` is the tested mapping); the studio never marks another tab's job failed on 409, carries Cancel through the upload, and reads a fresh URL on Resume. |
-| R1323 | Publish through the Create flow, performance feedback into Intelligence (planned). |
+| R1323 | Publish through Create: `GET clips/:id/publish` hands the composer the rendered Media and the words (`publish-core.ts clipPrefill`), `/create?clip=<id>` sets it as the video and fills the caption/hook when the boxes are empty; the first save carries `clipId` (savePostSchema), `/api/posts` links `GeneratedClip.postId` (`attachClipToPost`, idempotent, quiet) and files the post in Content Memory with origin `clipper`. Reading clips (`clipsWithPosts`) is when a clip learns its post went out: status `published`, ClipEvent `published`, LearningEvent `clip_published` (deduped, dated at publish). `GET clips/:id/performance` reads the post's destinations from the latest TargetMetric rows (`platformPerformance`: unavailable is null, never 0; `performanceLine` is the one row sentence). Clip rows: Post this clip / Open post + the line. |
 
 ## Files
 
@@ -55,6 +55,8 @@ ranked moments come out; the creator approves, trims, reframes and renders 9:16 
 | `POST clips/:id/regenerate` | Redraft copy from the clip's words. |
 | `GET clips/:id/download` | The rendered Media view (409 until rendered). |
 | `GET clips/:id/events` | Audit trail. |
+| `GET clips/:id/publish` | R1323: `{ clip, media, prefill }` for Create (409 `NOT_RENDERED`, 404 `NO_MEDIA`). |
+| `GET clips/:id/performance` | R1323: `{ clip, post, platforms[], line }`; a metric the platform never gave is `null`. |
 
 ## Executor model
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { realUserId } from "@/lib/auth";
 import { json, route } from "@/lib/http";
-import { clipView, createManualClip, ownedJob } from "@/lib/clipper/jobs";
+import { clipsWithPosts, createManualClip, ownedJob } from "@/lib/clipper/jobs";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export const GET = route(
   async (_req, { user, params }) => {
     const job = await ownedJob(user.id, params.id);
     const rows = await db.generatedClip.findMany({ where: { jobId: job.id, ownerId: user.id, status: { not: "discarded" } }, orderBy: [{ start: "asc" }, { id: "asc" }], take: 100 });
-    return json({ clips: rows.map(clipView) });
+    return json({ clips: await clipsWithPosts(user.id, rows) });
   },
   { limit: [120, 60_000] },
 );

@@ -54,6 +54,7 @@ import { ASK_KEYS, CAPTION_ASK_LABEL, type CaptionAsk, type PipAsk } from "@/lib
 import { acceptRewrite, parseMeta, serializeMeta, startMeta, staleFor, switchMode, takeGenerated, captionKey, type CaptionMode, type StoryMeta } from "./story-meta";
 import type { Prefill } from "@/lib/intelligence/planner-core";
 import { acceptsOnOpen, editorEmpty, prefillToDraft, type PrefillDraft } from "@/lib/intelligence/prefill-core";
+import type { ClipPrefill } from "@/lib/clipper/publish-core";
 import { ADAPT_MAX, copyKey, firstSentence, isLongForm, LONG_FORM_SEC, timedTranscript, type AdaptTone } from "@/lib/ai/adapt-core";
 import { T } from "@/lib/motion/tokens";
 
@@ -75,6 +76,8 @@ interface Props {
   missingPostId?: string | null;
   /** R1241: `?rec=` : a recommendation to start from (lib/intelligence/prefill-core). */
   recId?: string | null;
+  /** R1323: `?clip=` : a rendered Shorts Clipper clip to post (its 9:16 file is already in the library). */
+  clipId?: string | null;
 }
 
 type Meta = { duration: number; width: number; height: number };
@@ -83,7 +86,7 @@ const LIVE = ["publishing", "published", "partial", "failed"];
 /** The older version's drafts are offered once per tab, not on every visit to Create. */
 let legacyOffered = false;
 
-export function CreateWorkspace({ accounts: accountList, choices: choiceList, initialPost, tz, connected, connectError, initialStory, shared, restoreLocal, missingPostId, recId }: Props) {
+export function CreateWorkspace({ accounts: accountList, choices: choiceList, initialPost, tz, connected, connectError, initialStory, shared, restoreLocal, missingPostId, recId, clipId }: Props) {
   const toast = useToast();
   // R1209 B: what Start over did (saved or deleted), said on the fresh Create it opened.
   useEffect(() => {
@@ -737,7 +740,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
 
   /* ---------------- R1241: started from a recommendation (/create?rec=<id>) ---------------- */
   /** Sent with the first save only: the new post joins its source's item and the recommendation is linked to it. */
-  const recOrigin = useRef<Pick<PrefillDraft, "adaptedFromPostId" | "recommendationId"> | null>(null);
+  const recOrigin = useRef<(Partial<Pick<PrefillDraft, "adaptedFromPostId" | "recommendationId">> & { clipId?: string }) | null>(null);
   const recFields = () => (postIdRef.current || !recOrigin.current ? {} : recOrigin.current);
   const [fromRec, setFromRec] = useState<PrefillDraft | null>(null);
   /** Words were already here when the recommendation arrived: the creator picks, nothing is overwritten. */
@@ -775,6 +778,51 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
       const d = prefillToDraft(r.prefill, { recommendationId: r.recommendation.id });
       if (emptyRef.current) applyRec(d);
       else setRecOffer(d);
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ---------------- R1323: posting a Shorts Clipper clip (/create?clip=<id>) ---------------- */
+  // The rendered 9:16 file is already an owned Media, so Step 1 is done on arrival; the clip's words fill the caption
+  // and hook when the boxes are empty (words already here are kept, the creator is told). The first save carries the
+  // clip id so the post is linked back to it.
+  useEffect(() => {
+    if (!clipId || initialPost) return;
+    let alive = true;
+    (async () => {
+      const r = await api<{ clip: { id: string; status: string }; media: MediaView; prefill: ClipPrefill }>(`/api/clipper/clips/${encodeURIComponent(clipId)}/publish`).catch((e: unknown) => (e instanceof ApiError ? e : null));
+      window.history.replaceState(null, "", "/create");
+      if (!alive) return;
+      if (!r || r instanceof ApiError) return toast(r instanceof ApiError ? r.message : "We couldn't open that clip. You can still start your post here.", "info");
+      if (fileRef.current || media) return toast("You already have a video here, so the clip was not swapped in. Open it from the Clipper when this one is done.", "info");
+      uploadAbort.current?.abort();
+      synced.current = r.media.id;
+      setMedia(r.media);
+      setUpload({ kind: "done" });
+      recOrigin.current = { clipId: r.clip.id };
+      if (emptyRef.current) {
+        setStory(r.prefill.story);
+        setCaptionProposal(null);
+        const sm = startMeta(null, r.prefill.story);
+        metaRef.current = sm;
+        setStoryMeta(sm);
+        setSubmittedStory(r.prefill.story);
+        if (r.prefill.hook) setHook(r.prefill.hook);
+        const on = r.prefill.platforms.filter((p) => live.includes(p));
+        if (on.length)
+          setDrafts((cur) => {
+            const out = { ...cur };
+            for (const p of PLATFORMS) out[p] = { ...cur[p], enabled: on.includes(p) };
+            return out;
+          });
+        setStep("everywhere");
+      } else {
+        toast("Your words were kept; the clip's caption was not applied.", "info");
+        setStep("story");
+      }
     })();
     return () => {
       alive = false;
