@@ -215,6 +215,7 @@ export async function presetBackup() {
  * when nobody has paid for it, else hidden, so no record ever points at a missing plan.
  */
 export async function undoPricingPreset(actor: Actor) {
+  if (await revision3Backup()) throw new HttpError(409, "Undo the international pricing first, then this one.", "REVISION3_APPLIED");
   if (await revisionBackup()) throw new HttpError(409, "Undo the revised pricing first, then this one.", "REVISION_APPLIED");
   const b = await presetBackup();
   if (!b) return { restored: [] as string[] };
@@ -320,6 +321,7 @@ const pickFields = (r: Record<string, unknown>) => Object.fromEntries(FIELDS.map
 
 export async function applyPricingRevision(actor: Actor) {
   if (!(await presetBackup())) throw new HttpError(409, "Apply the November 2026 pricing first; this revision updates those plans.", "PRESET_MISSING");
+  if (await revision3Backup()) throw new HttpError(409, "The international pricing is applied on top; undo it first.", "REVISION3_APPLIED");
   if (await revisionBackup()) throw new HttpError(409, "The revised pricing is already applied. Undo it first to apply it again.", "PRESET_APPLIED");
   const slugs = PRICING_2026_11_R2.map((p) => p.slug);
   const current = await db.plan.findMany({ where: { slug: { in: slugs } } });
@@ -341,6 +343,7 @@ export async function applyPricingRevision(actor: Actor) {
 }
 
 export async function undoPricingRevision(actor: Actor) {
+  if (await revision3Backup()) throw new HttpError(409, "Undo the international pricing first, then this one.", "REVISION3_APPLIED");
   const b = await revisionBackup();
   if (!b) return { restored: [] as string[] };
   const restored: string[] = [];
@@ -354,5 +357,90 @@ export async function undoPricingRevision(actor: Actor) {
   await db.setting.delete({ where: { key: REV_KEY } }).catch(() => {});
   revalidatePricing();
   await audit({ actor, action: "pricing.preset.undo", targetType: "config", targetId: REVISION_NAME, after: { restored } });
+  return { restored };
+}
+
+// ------------------------------------------------------------------ 1313: revision 3 (international first, 24 Nov 2026)
+
+/**
+ * Foreign buyers are the primary customers, so every one of the eight currencies the site prices in gets an
+ * explicit, market-rounded price instead of an INR conversion at a fixed rate (Starter $9 / Creator $19 /
+ * Agency $49; EUR at parity, GBP x0.85, CAD x1.37, AUD x1.52, SGD x1.35, AED x3.67; yearly = 10 months).
+ * INR stays at the revision-2 figures (Rs379 / 979 / 3,479), which already clear the cost floors. Limits and
+ * caps are revision 2's. Unit economics (~/.aki/tmp/ue model, Razorpay international 3.54% + 1.5% FX + 2%
+ * reserve, exports zero-rated): contribution margin at typical use 90 / 86 / 81%, at every cap 73 / 66 / 59%.
+ * Packs get the same eight currencies. Applies on top of the first preset (revision 2 need not be applied:
+ * the full rows are written), keeps its own backup, and Undo puts back exactly what it replaced.
+ */
+export const REVISION3_NAME = "pricing-2026-11-r3-intl";
+const R3_KEY = `preset-backup:${REVISION3_NAME}`;
+
+/** Minor units: whole-currency prices, the convention the first two presets set. */
+export const world = (usd: number, eur: number, gbp: number, cad: number, aud: number, sgd: number, aed: number) =>
+  ({ USD: usd * 100, EUR: eur * 100, GBP: gbp * 100, CAD: cad * 100, AUD: aud * 100, SGD: sgd * 100, AED: aed * 100 });
+
+export const STARTER_R3 = world(9, 9, 8, 12, 14, 12, 33);
+export const CREATOR_R3 = world(19, 19, 16, 26, 29, 26, 70);
+export const AGENCY_R3 = world(49, 49, 42, 66, 75, 66, 180);
+const R3_PRICES: Record<string, Record<string, number>> = { starter: STARTER_R3, creator: CREATOR_R3, "pro-manager": AGENCY_R3 };
+
+export const PRICING_2026_11_R3: PresetPlan[] = PRICING_2026_11_R2.map((p) => {
+  const prices = R3_PRICES[p.slug];
+  if (!prices) return p;
+  const note = p.slug === "starter" ? "For one creator posting every day" : p.slug === "creator" ? "For creators who post everywhere, every day" : p.data.note;
+  return { ...p, data: { ...p.data, note, prices, yearlyPrices: x10(prices) } };
+});
+
+/** Same packs as revision 2, priced in every currency (small = $3 pack, large = $6 pack). */
+const PACK_SMALL = world(3, 3, 3, 4, 5, 4, 11);
+const PACK_LARGE = world(6, 6, 5, 8, 9, 8, 22);
+export const REVISION3_PACKS: TopUpPack[] = REVISION_PACKS.map((x) => ({ ...x, prices: x.id === "ai-20" || x.id === "seat-1" ? PACK_SMALL : PACK_LARGE }));
+
+export async function revision3Backup() {
+  const row = await db.setting.findUnique({ where: { key: R3_KEY } });
+  if (!row) return null;
+  try {
+    return JSON.parse(row.value) as RevBackup;
+  } catch {
+    return null;
+  }
+}
+
+export async function applyPricingRevision3(actor: Actor) {
+  if (!(await presetBackup())) throw new HttpError(409, "Apply the November 2026 pricing first; the international pricing updates those plans.", "PRESET_MISSING");
+  if (await revision3Backup()) throw new HttpError(409, "The international pricing is already applied. Undo it first to apply it again.", "PRESET_APPLIED");
+  const slugs = PRICING_2026_11_R3.map((p) => p.slug);
+  const current = await db.plan.findMany({ where: { slug: { in: slugs } } });
+  const missing = slugs.filter((s) => !current.some((c) => c.slug === s));
+  if (missing.length) throw new HttpError(409, `Plan ${missing.join(", ")} is missing. Apply the November 2026 pricing first.`, "PRESET_MISSING");
+  const topups = normalizeTopups(await getConfig("topups"));
+  const backup: RevBackup = { at: new Date().toISOString(), by: actor.login, rows: current.map((r) => ({ slug: r.slug, before: pickFields(r as unknown as Record<string, unknown>) })), topups };
+  await db.setting.upsert({ where: { key: R3_KEY }, create: { key: R3_KEY, value: JSON.stringify(backup) }, update: { value: JSON.stringify(backup) } });
+  await db.$transaction(async (tx) => {
+    for (const p of PRICING_2026_11_R3) await tx.plan.update({ where: { id: current.find((c) => c.slug === p.slug)!.id }, data: toRow(p.data) });
+    await tx.plan.updateMany({ where: { slug: { not: "creator" }, highlight: true }, data: { highlight: false } });
+  });
+  await saveConfig("topups", { ...topups, packs: REVISION3_PACKS } as never);
+  revalidatePricing();
+  await audit({ actor, action: "pricing.preset", targetType: "config", targetId: REVISION3_NAME, before: backup.rows.map((r) => ({ slug: r.slug, prices: r.before.prices })), after: { changed: slugs } });
+  const { adminEvent } = await import("../admin/route");
+  await adminEvent("plan_changed", `${actor.login} applied the international pricing`, "Starter $9, Creator $19, Agency $49 with EUR, GBP, CAD, AUD, SGD and AED set; INR unchanged; packs in every currency. Existing subscribers keep their price until renewal.", "/admin/pricing");
+  return { changed: slugs };
+}
+
+export async function undoPricingRevision3(actor: Actor) {
+  const b = await revision3Backup();
+  if (!b) return { restored: [] as string[] };
+  const restored: string[] = [];
+  for (const r of b.rows) {
+    const plan = await db.plan.findUnique({ where: { slug: r.slug }, select: { id: true } });
+    if (!plan) continue;
+    await db.plan.update({ where: { id: plan.id }, data: r.before as never });
+    restored.push(r.slug);
+  }
+  if (b.topups) await saveConfig("topups", b.topups as never);
+  await db.setting.delete({ where: { key: R3_KEY } }).catch(() => {});
+  revalidatePricing();
+  await audit({ actor, action: "pricing.preset.undo", targetType: "config", targetId: REVISION3_NAME, after: { restored } });
   return { restored };
 }

@@ -34,7 +34,7 @@ function Switch({ label, hint, checked, onChange, disabled }: { label: string; h
 
 // ------------------------------------------------------------------ preset (shown inside the plan editor)
 
-type PresetState = { preset: string; plans: string[]; applied: boolean; appliedAt: string | null; appliedBy: string | null; stale?: { plans: string[]; packs: number }; revision?: { name: string; applied: boolean; appliedAt: string | null; appliedBy: string | null } };
+type PresetState = { preset: string; plans: string[]; applied: boolean; appliedAt: string | null; appliedBy: string | null; stale?: { plans: string[]; packs: number }; revision?: { name: string; applied: boolean; appliedAt: string | null; appliedBy: string | null }; revision3?: { name: string; applied: boolean; appliedAt: string | null; appliedBy: string | null } };
 
 /**
  * The November 2026 pricing, applied only when an admin presses the button. A backup of every touched row
@@ -43,21 +43,21 @@ type PresetState = { preset: string; plans: string[]; applied: boolean; appliedA
 export function PresetPanel({ onChanged }: { onChanged: () => Promise<void> | void }) {
   const toast = useToast();
   const [s, setS] = useState<PresetState | null>(null);
-  const [ask, setAsk] = useState<"apply" | "undo" | "rev" | "rev-undo" | null>(null);
+  const [ask, setAsk] = useState<"apply" | "undo" | "rev" | "rev-undo" | "r3" | "r3-undo" | null>(null);
   const [endBeta, setEndBeta] = useState(false);
   const [founding, setFounding] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     adminApi<PresetState>("/api/admin/plans/preset").then(setS).catch(() => {});
   }, []);
-  async function run(undo: boolean | "copy" | "rev" | "rev-undo") {
+  async function run(undo: boolean | "copy" | "rev" | "rev-undo" | "r3" | "r3-undo") {
     setBusy(true);
     try {
-      const body = undo === "rev" ? { revision: "apply" } : undo === "rev-undo" ? { revision: "undo" } : undo === "copy" ? { fixCopy: true } : undo ? { undo: true } : { endBeta, enableFounding: founding };
+      const body = undo === "r3" ? { revision3: "apply" } : undo === "r3-undo" ? { revision3: "undo" } : undo === "rev" ? { revision: "apply" } : undo === "rev-undo" ? { revision: "undo" } : undo === "copy" ? { fixCopy: true } : undo ? { undo: true } : { endBeta, enableFounding: founding };
       const r = await adminApi<PresetState>("/api/admin/plans/preset", { method: "POST", json: body });
       setS(r);
       await onChanged();
-      toast(undo === "rev" ? "Revised pricing is live" : undo === "rev-undo" ? "The previous November plans are back" : undo === "copy" ? "Plan wording fixed" : undo ? "The previous plans are back" : "November 2026 pricing is live");
+      toast(undo === "r3" ? "International pricing is live" : undo === "r3-undo" ? "The pricing before the international revision is back" : undo === "rev" ? "Revised pricing is live" : undo === "rev-undo" ? "The previous November plans are back" : undo === "copy" ? "Plan wording fixed" : undo ? "The previous plans are back" : "November 2026 pricing is live");
     } catch (e: any) {
       toast(e.message, "error");
     } finally {
@@ -103,12 +103,49 @@ export function PresetPanel({ onChanged }: { onChanged: () => Promise<void> | vo
             </p>
           </div>
           {s.revision.applied ? (
-            <Button type="button" variant="ghost" className="rounded-full" disabled={busy} onClick={() => setAsk("rev-undo")}>Undo revision</Button>
+            <Button type="button" variant="ghost" className="rounded-full" disabled={busy || !!s.revision3?.applied} title={s.revision3?.applied ? "Undo the international pricing first" : undefined} onClick={() => setAsk("rev-undo")}>Undo revision</Button>
           ) : (
             <Button type="button" variant="lime" className="rounded-full" disabled={busy} onClick={() => setAsk("rev")}>Apply revised pricing</Button>
           )}
         </div>
       )}
+      {s.applied && s.revision3 && (
+        <div className="relative mt-4 flex flex-wrap items-center gap-3 border-t border-border/60 pt-4">
+          <div className="mr-auto min-w-0">
+            <h3 className="text-[14px] font-semibold">International pricing (foreign buyers first)</h3>
+            <p className="mt-0.5 text-[12.5px] la-mute">
+              {s.revision3.applied
+                ? `Applied ${fmtDate(s.revision3.appliedAt, true)} by ${s.revision3.appliedBy}. Undo puts back the plans and packs it replaced.`
+                : "Starter $9 / €9 / £8, Creator $19 / €19 / £16, Agency $49 / €49 / £42, with CAD, AUD, SGD and AED set as well; yearly is 10 months. INR stays ₹379 / ₹979 / ₹3,479 and the limits are the revised ones. Packs get every currency."}
+            </p>
+          </div>
+          {s.revision3.applied ? (
+            <Button type="button" variant="ghost" className="rounded-full" disabled={busy} onClick={() => setAsk("r3-undo")}>Undo international pricing</Button>
+          ) : (
+            <Button type="button" variant="lime" className="rounded-full" disabled={busy} onClick={() => setAsk("r3")}>Apply international pricing</Button>
+          )}
+        </div>
+      )}
+      <ConfirmDialog
+        open={ask === "r3"}
+        onOpenChange={(o) => !o && setAsk(null)}
+        tone="primary"
+        title="Apply the international pricing?"
+        body="Starter, Creator and Agency get explicit prices in USD, EUR, GBP, CAD, AUD, SGD and AED (yearly = 10 months), INR is unchanged, and the top-up packs are priced in every currency. People already subscribed keep what they pay until they renew or change plan. You can undo this."
+        confirmLabel="Apply international pricing"
+        cancelLabel="Not yet"
+        busy={busy}
+        onConfirm={() => run("r3")}
+      />
+      <ConfirmDialog
+        open={ask === "r3-undo"}
+        onOpenChange={(o) => !o && setAsk(null)}
+        title="Undo the international pricing?"
+        body="The four plans and the packs go back to the rows saved when the international pricing was applied, including any edits since."
+        confirmLabel="Undo international pricing"
+        busy={busy}
+        onConfirm={() => run("r3-undo")}
+      />
       <ConfirmDialog
         open={ask === "rev"}
         onOpenChange={(o) => !o && setAsk(null)}
