@@ -36,6 +36,7 @@ import { autosaveLine, draftTitle, enabledPlatforms, launchGate, launchPlan, pic
 import { CaptionBurner } from "./CaptionBurner";
 import { CaptionRunProvider, TranscribeRun, useCaptionBurning, useCaptionRunLine, useCaptionTranscribing, useCaptionWorkspace } from "./captions/CaptionRun";
 import { PendingBurnNotice } from "./captions/PendingBurnNotice";
+import { DraftForecast } from "./DraftForecast";
 import { readFrames, readVideo } from "./frame";
 import { primeGroove } from "./Groove";
 import { ActionBar, barState, BURN_SEND, PreviewSheet, type BarId } from "./ActionBar";
@@ -1926,6 +1927,8 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
                 {pipButton}
                 {/* R1265: a burn that finished off Step 2 is offered here too, so the clean video is never sent by accident. */}
                 <PendingBurnNotice store={capStore} onBurned={onCapBurned} className="mb-4" />
+                {/* R1327: what the creator's own history says this draft will do, per destination (plan Phase 3 panel). */}
+                <DraftForecast platforms={enabledPlatforms(drafts)} drafts={drafts} hook={hook ?? ""} media={meta} when={mode === "schedule" ? when : null} postId={postId} online={online} className="mb-4" />
                 {/* Held places are listed with their reason and never sent; the bar's Publish waits until none are left. */}
                 <LaunchPanel drafts={drafts} accounts={accounts} media={meta} poster={poster} hook={hook ?? ""} title={draftTitle({ drafts, hook, filename: media?.filename ?? fileRef.current?.name })} status={autosaveLine(saved, savedAt)} tz={tz} when={when} onWhen={setWhen} mode={mode} onMode={setMode} busy={launching} error={launchError} online={online}
                   onEdit={() => goTo("everywhere")}
