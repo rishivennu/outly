@@ -108,7 +108,8 @@ export async function syncPredictions(ownerId: string, opts: { now?: Date | numb
   // the history: one whose target left it (removed, or older than HISTORY_DAYS) is never judged, and never re-read.
   const byTarget = new Map(rows.map((r) => [r.targetId, r]));
   const open = await db.predictionRecord.findMany({ where: { ownerId, modelKey: scorer.key, subjectType: "target", actual: null, subjectId: { in: targetIds } }, select: { id: true, subjectId: true, predicted: true } });
-  // Draft forecasts (predictDraft with a postId) are judged from the post's destination on the same platform.
+  // Draft forecasts (predictDraft with a postId) are judged from the post's destination on the same platform. A post
+  // with two destinations on one platform (two accounts) is judged by the later row; rows are in time order.
   const byPost = new Map(rows.map((r) => [`${r.postId}|${r.platform}`, r]));
   const openDrafts = await db.predictionRecord.findMany({ where: { ownerId, modelKey: scorer.key, subjectType: "post", actual: null, subjectId: { in: [...new Set(rows.map((r) => r.postId))] } }, select: { id: true, subjectId: true, predicted: true, platform: true } });
   let evaluated = 0;
@@ -198,6 +199,8 @@ export async function modelStates(ownerId: string, opts: { scopeKey?: string; ta
   const now = opts.now ?? Date.now();
   if (opts.scopeKey) return statesFrom(await history(ownerId, now, opts.targetIds ?? []), now);
   const stored = await db.creatorModelState.findMany({ where: { ownerId, scopeKey: "", modelKey: ACTIVE_MODEL }, orderBy: { platform: "asc" }, take: 20 });
+  // Before the first calibration (the sweep has not reached this owner yet) the states are computed on the spot.
+  if (!stored.length) return statesFrom(await history(ownerId, now), now);
   return stored.map((s) => JSON.parse(s.state) as ModelState);
 }
 

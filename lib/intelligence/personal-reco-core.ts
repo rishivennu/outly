@@ -49,6 +49,8 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 /** The stable id of a personal draft: rule, subject and platform. Never the period, so one live row per advice. */
 export const personalId = (rule: PersonalRule, subject: string, platform: string) => `${PERSONAL_ID_PREFIX}${rule}:${subject}:${platform}`;
+/** The id of a trait draft carries its direction: when a lift flips sign the advice is new, not a reworded old row. */
+export const traitSubject = (trait: string, up: boolean) => `${trait}${up ? "+" : "-"}`;
 export const isPersonalId = (id: string) => id.startsWith(PERSONAL_ID_PREFIX);
 
 /** How a trait is asked for in the composer; the label is the lift's own words. */
@@ -82,7 +84,7 @@ function traitDraft(platform: string, l: Lift, window: PersonalInput["window"], 
   const why = `This is your own pattern, not a general rule: ${plural(nBetter, "post")} on one side against ${plural(nWorse, "post")} on the other, ${gap}% apart on ${metric}, ${window.label}.`;
   const evidence: Evidence = { metric: l.metric, value: better, baseline: worse, unit: unitOf(l.metric), lift: gap, n: nBetter, baselineN: nWorse, period: window.label };
   return {
-    id: personalId("trait", l.trait, platform),
+    id: personalId("trait", traitSubject(l.trait, up), platform),
     title,
     format: "",
     platform,

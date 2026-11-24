@@ -7,7 +7,7 @@
 import { beforeAll, describe, expect, mock, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import type { ModelState } from "../lib/intelligence/model/predict";
-import { FORMAT_GAP_PCT, NO_PERSONAL_REASON, PER_PLATFORM_MAX, PERSONAL_MAX, isPersonalId, personalEvidenceLine, personalId, personalRecommendations } from "../lib/intelligence/personal-reco-core";
+import { FORMAT_GAP_PCT, NO_PERSONAL_REASON, PER_PLATFORM_MAX, PERSONAL_MAX, isPersonalId, personalEvidenceLine, personalId, personalRecommendations, traitSubject } from "../lib/intelligence/personal-reco-core";
 import { ruleKeyOf } from "../lib/intelligence/reco-core";
 
 mock.module("next/headers", () => ({
@@ -63,7 +63,8 @@ describe("R1320 personal-reco-core", () => {
     const up = personalRecommendations({ states: [state("instagram", { lifts: [lift("hasHook", "a written hook", 420, 150, 5, 6)] })], window: WINDOW });
     expect(up.recommendations).toHaveLength(1);
     const r = up.recommendations[0];
-    expect(r.id).toBe(personalId("trait", "hasHook", "instagram"));
+    expect(r.id).toBe(personalId("trait", traitSubject("hasHook", true), "instagram"));
+    expect(r.id).toBe("personal:trait:hasHook+:instagram");
     expect(isPersonalId(r.id)).toBe(true);
     expect(r.title).toBe("Open with a written hook on Instagram");
     expect(r.platform).toBe("instagram");
@@ -80,6 +81,7 @@ describe("R1320 personal-reco-core", () => {
     // The other direction: without the trait does better, so the advice is to drop it; the better side is the value.
     const down = personalRecommendations({ states: [state("youtube", { lifts: [lift("manyTags", "five or more hashtags", 100, 200, 3, 3)] })], window: WINDOW }).recommendations[0];
     expect(down.title).toBe("Use fewer than five hashtags on YouTube");
+    expect(down.id).toBe("personal:trait:manyTags-:youtube");
     expect(down.evidence).toMatchObject({ value: 200, baseline: 100, lift: 50, n: 3, baselineN: 3 });
     expect(down.confidence).toBe("medium"); // 3*2 = 6
     expect(down.concept).toContain("without five or more hashtags");
@@ -115,13 +117,13 @@ describe("R1320 personal-reco-core", () => {
     for (const r of a.recommendations) perPlatform.set(r.platform, (perPlatform.get(r.platform) ?? 0) + 1);
     for (const n of perPlatform.values()) expect(n).toBeLessThanOrEqual(PER_PLATFORM_MAX);
     // Largest gaps first: YouTube's short video (900%), then Instagram's hook (300%) and the weekend/format pair.
-    expect(a.recommendations[0].id).toBe(personalId("trait", "shortVideo", "youtube"));
-    expect(a.recommendations[1].id).toBe(personalId("trait", "hasHook", "instagram"));
+    expect(a.recommendations[0].id).toBe(personalId("trait", "shortVideo+", "youtube"));
+    expect(a.recommendations[1].id).toBe(personalId("trait", "hasHook+", "instagram"));
     const lifts = a.recommendations.map((r) => r.evidence.lift);
     expect([...lifts].sort((x, y) => y - x)).toEqual(lifts);
     expect(a.reason).toBeNull();
     // Rule keys never include the period: the same advice is one live row whatever the window.
-    expect(ruleKeyOf(a.recommendations[0])).toBe("personal:trait:shortVideo:youtube|youtube||");
+    expect(ruleKeyOf(a.recommendations[0])).toBe("personal:trait:shortVideo+:youtube|youtube||");
   });
 });
 
@@ -153,7 +155,8 @@ describe("R1320 stored read (db)", () => {
     const first = await personal.personalRead(a.id);
     expect(first.levels).toEqual([{ platform: "instagram", level: "blended", measured: 10 }]);
     expect(first.recommendations.length).toBeGreaterThanOrEqual(1);
-    const hook = first.recommendations.find((r) => r.rule.startsWith("personal:trait:hasHook:instagram"))!;
+    const hook = first.recommendations.find((r) => r.rule.startsWith("personal:trait:hasHook+:instagram"))!;
+    expect(first.window.label).toBe(first.recommendations[0].period);
     expect(hook).toBeDefined();
     expect(hook.status).toBe("open");
     expect(hook.ownerId).toBe(a.id);
@@ -192,10 +195,15 @@ describe("R1320 stored read (db)", () => {
     expect(empty.recommendations).toEqual([]);
     expect(empty.reason).toContain("Nothing measured yet");
     expect(await db.recommendation.count({ where: { ownerId: b.id } })).toBe(0);
+    // A row whose rule the numbers no longer support is retired: an open personal row from a rule not drafted now.
+    const stale = await db.recommendation.create({ data: { ownerId: a.id, scopeKey: "", dedupeKey: `stale-${Date.now()}`, title: "Old", concept: "Old advice", why: "Old numbers", evidence: JSON.stringify({ metric: "views", value: 1, baseline: 2, unit: "count", lift: 50, n: 3, baselineN: 3, period: "x", rule: "personal:trait:hasHook-:instagram|instagram||" }), postsAnalyzed: 6, periodFrom: "2026-01-01", periodTo: "2026-06-30", confidence: "low", nextAction: "{}" } });
+    await personal.personalRead(a.id);
+    expect((await db.recommendation.findUnique({ where: { id: stale.id } }))!.status).toBe("expired");
+    expect(await db.recommendationEvent.count({ where: { recommendationId: stale.id, type: "expired" } })).toBe(1);
     // Read-only for the owner: the stored rows come back, nothing new is written.
     const ro = await personal.personalRead(a.id, { readOnly: true });
     expect(ro.recommendations.map((r) => r.id)).toEqual(after.recommendations.map((r) => r.id));
-    expect(await db.recommendation.count({ where: { ownerId: a.id } })).toBe(rows);
+    expect(await db.recommendation.count({ where: { ownerId: a.id } })).toBe(rows + 1);
   });
 });
 
