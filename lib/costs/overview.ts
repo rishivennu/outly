@@ -24,6 +24,8 @@ export interface Overview {
   budgets: BudgetView[];
   alerts: AlertView[];
   prices: PriceView[];
+  /** R1316 */
+  connections: import("./connections").ConnectionView[];
 }
 export interface RecurringView { id: string; name: string; provider: string; category: string; amountMinor: number; currency: string; cadence: string; startsAt: string; endsAt: string | null; nextRenewal: string; autoRenew: boolean; active: boolean; note: string; monthlyInrMinor: number }
 export interface BillView { id: string; provider: string; invoiceId: string; category: string; periodStart: string; periodEnd: string; amountMinor: number; currency: string; fxToInr: number; inrMinor: number; status: string; source: string; note: string; createdAt: string }
@@ -90,7 +92,7 @@ export async function overview(o: { from?: string; to?: string; now?: Date } = {
   const prevFrom = addDays(from, -span), prevTo = addDays(from, -1);
   const mFrom = dayKey(monthStartUtc(now)), mTo = dayKey(now);
 
-  const [allRows, prevRows, monthRowsAll, since, recurringRows, billRows, budgets, alertRows, priceRows] = await Promise.all([
+  const [allRows, prevRows, monthRowsAll, since, recurringRows, billRows, budgets, alertRows, priceRows, connections] = await Promise.all([
     db.costDaily.findMany({ where: { day: { gte: from, lte: to } } }),
     db.costDaily.findMany({ where: { day: { gte: prevFrom, lte: prevTo } }, select: { day: true, provider: true, source: true, inrMinor: true } }),
     db.costDaily.findMany({ where: { day: { gte: mFrom, lte: mTo } }, select: { day: true, provider: true, inrMinor: true, source: true, category: true } }),
@@ -100,6 +102,7 @@ export async function overview(o: { from?: string; to?: string; now?: Date } = {
     budgetViews(now),
     db.costAlert.findMany({ orderBy: [{ status: "asc" }, { createdAt: "desc" }], take: 50 }),
     import("./prices").then((m) => m.listPrices()),
+    import("./connections").then((m) => m.listConnections()),
   ]);
 
   // Estimates are shown by source in full; the headline, breakdowns and series count a month's invoice instead of its estimates.
@@ -148,6 +151,7 @@ export async function overview(o: { from?: string; to?: string; now?: Date } = {
     budgets,
     alerts: alertRows.map((a) => ({ id: a.id, key: a.key, kind: a.kind, severity: a.severity, title: a.title, body: a.body, href: a.href, status: a.status, createdAt: a.createdAt.toISOString(), ackedAt: iso(a.ackedAt), ackedBy: a.ackedBy })),
     prices,
+    connections,
   };
 }
 

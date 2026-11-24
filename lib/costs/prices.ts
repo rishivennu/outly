@@ -30,6 +30,15 @@ export const SEED_PRICES: readonly SeedPrice[] = [
   { provider: "vercel", sku: "vercel:bandwidth-gb", unit: "gb", price: 0.15, currency: "USD", effectiveFrom: "2025-01-01", sourceUrl: "https://vercel.com/pricing", note: "Fast Data Transfer beyond the plan's included 1 TB." },
   { provider: "render", sku: "render:bandwidth-gb", unit: "gb", price: 0.15, currency: "USD", effectiveFrom: "2025-01-01", sourceUrl: "https://render.com/pricing", note: "Beyond 5 GB included on Hobby." },
   { provider: "render", sku: "render:custom-domain", unit: "domain-month", price: 0.25, currency: "USD", effectiveFrom: "2025-01-01", sourceUrl: "https://render.com/pricing", note: "Beyond 2 included custom domains." },
+  // R1316: provider plans at list price, booked per day by the connection sync until the invoice supersedes them.
+  { provider: "render", sku: "render:plan-starter-month", unit: "month", price: 7, currency: "USD", effectiveFrom: "2025-01-01", sourceUrl: "https://render.com/pricing", note: "Starter instance, 512 MB." },
+  { provider: "render", sku: "render:plan-standard-month", unit: "month", price: 25, currency: "USD", effectiveFrom: "2025-01-01", sourceUrl: "https://render.com/pricing", note: "Standard instance, 2 GB." },
+  { provider: "render", sku: "render:plan-pro-month", unit: "month", price: 85, currency: "USD", effectiveFrom: "2025-01-01", sourceUrl: "https://render.com/pricing", note: "Pro instance, 4 GB." },
+  { provider: "render", sku: "render:plan-pro_plus-month", unit: "month", price: 175, currency: "USD", effectiveFrom: "2025-01-01", sourceUrl: "https://render.com/pricing", note: "Pro Plus instance, 8 GB." },
+  { provider: "render", sku: "render:plan-pro_max-month", unit: "month", price: 225, currency: "USD", effectiveFrom: "2025-01-01", sourceUrl: "https://render.com/pricing", note: "Pro Max instance, 16 GB." },
+  { provider: "render", sku: "render:plan-pro_ultra-month", unit: "month", price: 450, currency: "USD", effectiveFrom: "2025-01-01", sourceUrl: "https://render.com/pricing", note: "Pro Ultra instance, 32 GB." },
+  { provider: "supabase", sku: "supabase:plan-pro-month", unit: "month", price: 25, currency: "USD", effectiveFrom: "2025-01-01", sourceUrl: "https://supabase.com/pricing", note: "Pro organisation, includes $10 compute credit." },
+  { provider: "supabase", sku: "supabase:plan-team-month", unit: "month", price: 599, currency: "USD", effectiveFrom: "2025-01-01", sourceUrl: "https://supabase.com/pricing", note: "Team organisation." },
   { provider: "supabase", sku: "supabase:storage-gb-month", unit: "gb-month", price: 0.021, currency: "USD", effectiveFrom: "2025-01-01", sourceUrl: "https://supabase.com/pricing", note: "File storage beyond the plan's included GB." },
   { provider: "supabase", sku: "supabase:egress-gb", unit: "gb", price: 0.09, currency: "USD", effectiveFrom: "2025-01-01", sourceUrl: "https://supabase.com/pricing", note: "Egress beyond included." },
 ];

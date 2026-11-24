@@ -2556,6 +2556,25 @@ model CostBudget {
   @@unique([scope, key])
 }
 
+/// R1316: a read-only API token per provider so the sweep can pull what each public API exposes (plans, services,
+/// bandwidth). The token is AES-GCM encrypted at rest (lib/crypto) and never leaves the server; the UI sees last4.
+model CostProviderConnection {
+  id         String    @id @default(cuid())
+  provider   String    @unique // vercel | render | supabase (lib/costs/providers)
+  label      String    @default("") // account/team/org name the test call found
+  tokenEnc   String // encrypted token
+  last4      String    @default("")
+  scope      String    @default("") // vercel teamId, supabase org slug, render owner id; adapter-specific, optional
+  status     String    @default("untested") // untested | ok | error
+  lastError  String    @default("")
+  lastTestAt DateTime?
+  lastSyncAt DateTime?
+  facts      String    @default("{}") // JSON the last test/sync learned (plan, services, projects)
+  createdBy  String    @default("")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
 /// R1314: one alert per `key` (budget:<id>:<month>:<pct>, renewal:<id>:<day>, spike:<provider>:<day>), so the same
 /// condition never pages twice.
 model CostAlert {

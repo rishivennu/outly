@@ -4,7 +4,7 @@ import { COST_SOURCES, SOURCE_BLURB, SOURCE_LABEL, fmtInr, pctOf, providerLabel,
 import { Card, CardTitle, Empty, PageHead, Pill, Table, fmtDate } from "@/components/admin/ui";
 import { AdminKpi } from "@/components/admin/motion/AdminKpi";
 import { DateFilter, FilterChips } from "@/components/admin/SearchBox";
-import { AlertsCard, BillsCard, BudgetsCard, ImportBillsCard, PricesCard, RecurringCard, SweepNowButton } from "@/components/admin/costs/CostsPanel";
+import { AlertsCard, BillsCard, BudgetsCard, ConnectionsCard, ImportBillsCard, PricesCard, RecurringCard, SweepNowButton } from "@/components/admin/costs/CostsPanel";
 
 export const metadata = { title: "Infrastructure & Costs" };
 export const dynamic = "force-dynamic";
@@ -84,6 +84,7 @@ export default async function Costs(props: { searchParams: Promise<Params> }) {
         <BudgetsCard items={o.budgets} />
       </div>
       <div className="mb-4 grid gap-4">
+        <ConnectionsCard items={o.connections} />
         <RecurringCard items={o.recurring} />
         <BillsCard items={o.bills} />
         <ImportBillsCard />

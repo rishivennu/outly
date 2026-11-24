@@ -11,6 +11,7 @@ import { adminApi } from "@/lib/client/admin-api";
 import { CATEGORY_LABEL, COST_CATEGORIES, CURRENCIES, FEATURE_LABEL, PROVIDERS, fmtInr, fmtMoney, providerLabel, type CostCategoryId } from "@/lib/costs/core";
 import type { AlertView, BillView, BudgetView, PriceView, RecurringView } from "@/lib/costs/overview";
 import type { ImportPreview } from "@/lib/costs/import";
+import type { ConnectionView } from "@/lib/costs/connections";
 
 /**
  * R1314 Phase 1, the manual side of Infrastructure & Costs: recurring subscriptions, bills, budgets, unit prices and
@@ -231,6 +232,71 @@ export function ImportBillsCard() {
           </Table>
         )}
       </div>
+    </Card>
+  );
+}
+
+/* ---------- Provider connections (R1316) ---------- */
+const CONN_TONE: Record<string, Tone> = { ok: "ok", error: "bad", untested: "warn", none: "muted" };
+const CONN_LABEL: Record<string, string> = { ok: "Connected", error: "Error", untested: "Untested", none: "Not connected" };
+
+function factsLine(c: ConnectionView) {
+  const f = c.facts as { plan?: string; projectCount?: number; services?: { name: string; plan: string }[]; orgs?: { name: string; plan: string }[]; projects?: unknown[] };
+  const bits: string[] = [];
+  if (f.plan) bits.push(`plan ${f.plan}`);
+  if (f.projectCount != null) bits.push(`${f.projectCount} project${f.projectCount === 1 ? "" : "s"}`);
+  if (f.services) bits.push(`${f.services.length} service${f.services.length === 1 ? "" : "s"}${f.services.length ? ` (${f.services.map((s) => `${s.name}${s.plan ? ` ${s.plan}` : ""}`).slice(0, 4).join(", ")}${f.services.length > 4 ? ", …" : ""})` : ""}`);
+  if (f.orgs) bits.push(f.orgs.map((o) => `${o.name}${o.plan ? ` on ${o.plan}` : ""}`).join(", "));
+  if (f.projects && !f.projectCount) bits.push(`${f.projects.length} project${f.projects.length === 1 ? "" : "s"}`);
+  return bits.join(" · ");
+}
+
+function ConnectForm({ c, onClose }: { c: ConnectionView; onClose: () => void }) {
+  const [token, setToken] = useState("");
+  const [scope, setScope] = useState(c.scope);
+  const { busy, error, run } = useSave();
+  return (
+    <form className="grid gap-4 pt-2" noValidate onSubmit={(e) => { e.preventDefault(); run(() => adminApi("/api/admin/costs/connections", { method: "POST", json: { provider: c.provider, token, scope } }), onClose); }}>
+      <p className="text-[13px] text-muted-foreground">{c.capability}</p>
+      <Field id={`cn-token-${c.provider}`} label="API token" hint={c.tokenHelp}><Input id={`cn-token-${c.provider}`} type="password" autoComplete="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} placeholder={c.last4 ? `Replace the token ending …${c.last4}` : "Paste the token"} /></Field>
+      {c.scopeLabel && <Field id={`cn-scope-${c.provider}`} label={c.scopeLabel} hint={c.scopeHelp}><Input id={`cn-scope-${c.provider}`} value={scope} onChange={(e) => setScope(e.target.value)} /></Field>}
+      <p className="text-[12.5px] text-muted-foreground">The token is checked against {c.providerLabel} before it is saved, stored encrypted, and only its last four characters are ever shown again.</p>
+      <Err text={error} />
+      <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onClose}>Cancel</Button><Button type="submit" variant="lime" disabled={busy || token.trim().length < 8}>{busy ? "Checking…" : c.id ? "Replace token" : "Connect"}</Button></div>
+    </form>
+  );
+}
+
+/** One row per provider adapter: status, what the last test learned, and connect / re-test / sync / remove. */
+export function ConnectionsCard({ items }: { items: ConnectionView[] }) {
+  const [open, setOpen] = useState<ConnectionView | null>(null);
+  const { busy, error, run } = useSave();
+  const act = (c: ConnectionView, what: "test" | "sync") => run(() => what === "test" ? adminApi(`/api/admin/costs/connections/${c.provider}`, { method: "PATCH", json: {} }) : adminApi("/api/admin/costs/sync", { method: "POST", json: { provider: c.provider } }));
+  return (
+    <Card>
+      <CardTitle hint="Read-only tokens, encrypted at rest. The nightly sweep pulls what each provider's public API exposes and books it with a reference, so a re-run never double counts. Each row says plainly what its API cannot show.">Provider connections</CardTitle>
+      <Err text={error} />
+      <ul className="grid gap-3">
+        {items.map((c) => (
+          <li key={c.provider} className="rounded-2xl bg-secondary/40 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2"><span className="font-medium">{c.providerLabel}</span><Pill tone={CONN_TONE[c.status] ?? "muted"}>{CONN_LABEL[c.status] ?? c.status}</Pill>{c.label && <span className="text-[12.5px] text-muted-foreground">{c.label}</span>}</div>
+                <p className="mt-1 text-[12.5px] text-muted-foreground">{c.capability}</p>
+                {c.id && <p className="mt-1 text-[12.5px] text-muted-foreground">{factsLine(c) || "Nothing learned yet."}{c.lastSyncAt ? ` · synced ${fmtDate(c.lastSyncAt)}` : c.lastTestAt ? ` · tested ${fmtDate(c.lastTestAt)}` : ""}{c.last4 ? ` · token …${c.last4}` : ""}</p>}
+                {c.lastError && <p role="alert" className="mt-1 text-[12.5px] text-[hsl(0_72%_38%)] dark:text-destructive">{c.lastError}</p>}
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-1.5">
+                {c.id && <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => act(c, "test")}>Re-test</Button>}
+                {c.id && <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => act(c, "sync")}>Sync now</Button>}
+                <Button type="button" size="sm" variant={c.id ? "ghost" : "lime"} onClick={() => setOpen(c)}>{c.id ? "Replace token" : "Connect"}</Button>
+                {c.id && <Remove kind="connections" id={c.provider} name={`the ${c.providerLabel} connection`} />}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <Sheet open={!!open} onOpenChange={(o) => !o && setOpen(null)} title={open ? `Connect ${open.providerLabel}` : ""} description="A read-only token so the sweep can pull plans and usage.">{open && <ConnectForm c={open} onClose={() => setOpen(null)} />}</Sheet>
     </Card>
   );
 }

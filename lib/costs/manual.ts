@@ -189,5 +189,8 @@ export async function sweepCosts(now = new Date()) {
       if (await raiseAlert({ key: `budget:${b.id}:${month}:${t}`, kind: "budget", severity: t >= 100 ? "critical" : t >= 90 ? "warn" : "info", title: `${b.name}: ${b.pct}% of this month's budget used`, body: `Spent ₹${(b.spentMinor / 100).toFixed(0)} of ₹${(b.inrMinor / 100).toFixed(0)} (${t}% step).` })) alerts++;
     }
   }
-  return { booked, alerts, due: due.length };
+  // R1316: pull every connected provider (plans, bandwidth) for the last three days; refs make a re-run free.
+  const synced = await import("./connections").then((m) => m.syncAll(now)).catch((e) => { console.error("[costs] sync", e); return []; });
+  for (const s of synced) if (s.ok && s.result) booked += s.result.booked; else alerts++;
+  return { booked, alerts, due: due.length, synced: synced.map((s) => ({ provider: s.provider, ok: s.ok })) };
 }
