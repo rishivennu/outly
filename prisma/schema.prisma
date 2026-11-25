@@ -2801,6 +2801,25 @@ model SharedContribution {
   @@index([lastBuildId])
 }
 
+/// R1337: one row per run of an Intelligence job (the personal sweep step, a shared-model rebuild, an on-demand draft
+/// forecast), so Admin > AI Management shows measured success rates and latency instead of a guess. No owner id on
+/// purpose: a run is about the engine, not about a creator. Rows older than INTELLIGENCE_JOB_RETENTION_DAYS
+/// (lib/intelligence/jobs-core.ts) are pruned by the sweep.
+model IntelligenceJobRun {
+  id         String   @id @default(cuid())
+  job        String // personal | shared | predict
+  trigger    String   @default("sweep") // sweep | admin | api
+  ok         Boolean
+  durationMs Int
+  result     String? // small JSON: the counts the job returned
+  error      String? // first 500 characters of the failure, no ids
+  startedAt  DateTime
+  finishedAt DateTime @default(now())
+
+  @@index([job, startedAt])
+  @@index([startedAt])
+}
+
 /// R1319: one prediction per subject per model per metric. Written before the outcome is known (published posts are
 /// scored from the history before their publish time, never after), then filled with the actual once measured.
 model PredictionRecord {

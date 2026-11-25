@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { adminEvent, adminRoute } from "@/lib/admin/route";
 import { ACTIVE_MODEL } from "@/lib/intelligence/model/predict";
 import { intelligenceGovernance, rebuildShared, resetSharedCache, SHARED_MODEL_KEY } from "@/lib/intelligence/shared";
+import { runJob } from "@/lib/intelligence/jobs";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,8 @@ const action = z.discriminatedUnion("action", [
 export const POST = adminRoute("intelligence", async (req, { admin }) => {
   const body = action.parse(await req.json());
   if (body.action === "rebuild") {
-    const r = await rebuildShared({ trigger: "admin" });
+    // R1337: logged as IntelligenceJobRun `shared` (trigger admin), success or failure, like the sweep's rebuilds.
+    const r = await runJob("shared", "admin", () => rebuildShared({ trigger: "admin" }), { summary: (x) => ({ buckets: x.baselines.buckets.length, rows: x.baselines.rows, status: x.status, build: x.build.datasetVersion }) });
     await adminEvent("intelligence", `Shared baselines rebuilt (${r.build.datasetVersion}): ${r.baselines.buckets.length} buckets from ${r.baselines.owners} creators${r.status === "active" ? "" : ` (document ${r.status}: stored, served to nobody)`}${r.build.served ? "" : "; validation failed, empty document served"}`, admin.login, "/admin/intelligence");
     return json({ ok: true, buckets: r.baselines.buckets.length, rows: r.baselines.rows, owners: r.baselines.owners, dropped: r.baselines.dropped, consented: r.consented, status: r.status, build: r.build });
   }

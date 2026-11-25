@@ -5,6 +5,7 @@ import { POST_FORMATS } from "@/lib/formats";
 import { resolveClient } from "@/lib/intelligence/client-scope";
 import { predictDraft, predictionsOverview } from "@/lib/intelligence/model/predict";
 import { requireIntelligence } from "@/lib/intelligence/entitlements";
+import { recordJobRun } from "@/lib/intelligence/jobs";
 
 export const dynamic = "force-dynamic";
 
@@ -45,12 +46,22 @@ const Draft = z.object({
  * below the personal level on that platform, from the anonymised cohort baseline scaled to their size (the basis names
  * the source and its sample), or null, said plainly, when there is nothing to go on. With postId the forecast is
  * stored (only while the post is a draft or scheduled, never over a judged forecast) and judged later.
+ * R1337: each call is timed and logged as IntelligenceJobRun `predict` (duration, level, no owner), the measured latency
+ * Admin > AI Management shows; the log never delays or fails the answer.
  */
 export const POST = route(
   async (req, { user }) => {
     await requireIntelligence(user.id, "personalized_predictions_enabled");
     const body = Draft.parse(await req.json());
-    const prediction = await predictDraft(user.id, body);
+    const startedAt = Date.now();
+    let prediction: Awaited<ReturnType<typeof predictDraft>>;
+    try {
+      prediction = await predictDraft(user.id, body);
+    } catch (e) {
+      void recordJobRun("predict", { trigger: "api", startedAt, ok: false, error: e });
+      throw e;
+    }
+    void recordJobRun("predict", { trigger: "api", startedAt, ok: true, result: { platform: body.platform, level: prediction?.level ?? null, stored: !!body.postId && !!prediction } });
     return json({ prediction, reason: prediction ? null : "No measured post of yours on this platform yet, so Outlly will not guess a number. Publish a few and the estimate appears." });
   },
   { limit: [30, 60_000] },

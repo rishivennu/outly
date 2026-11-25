@@ -62,10 +62,14 @@ async function sweep(req: NextRequest) {
     : null;
   if (now.getMinutes() === 7) await cleanupSubs().catch(() => 0);
   // R1318 Personal Intelligence: features and creator profiles, every 10 minutes (slot 2), at most 5 owners a run (never fatal).
-  const personal = new Date().getMinutes() % 10 === 2 ? await import("@/lib/intelligence/profile").then((m) => m.sweepPersonal({ maxOwners: 5 })).catch((e) => (console.error("[sweep] personal", e), null)) : null;
+  // R1337: every run (and every failure) is logged as IntelligenceJobRun `personal`, so Admin > AI Management shows measured rates.
+  const jobs = await import("@/lib/intelligence/jobs");
+  const personal = new Date().getMinutes() % 10 === 2 ? await jobs.runJob("personal", "sweep", () => import("@/lib/intelligence/profile").then((m) => m.sweepPersonal({ maxOwners: 5 }))).catch((e) => (console.error("[sweep] personal", e), null)) : null;
   // R1324 shared learning: the anonymised cohort baselines, rebuilt once the stored document is an hour old (one cheap
   // read on every tick, so the refresh does not depend on the pinger landing on one minute), never fatal.
-  const shared = await import("@/lib/intelligence/shared").then((m) => m.sweepShared(now)).catch((e) => (console.error("[sweep] shared", e), null));
+  // R1337: a tick that rebuilt (or failed) is logged as IntelligenceJobRun `shared`; a tick with nothing due leaves no row.
+  const shared = await jobs.runJob("shared", "sweep", () => import("@/lib/intelligence/shared").then((m) => m.sweepShared(now)), { skip: (r) => r === null }).catch((e) => (console.error("[sweep] shared", e), null));
+  if (plan.housekeeping) await jobs.pruneJobRuns(now).catch((e) => console.error("[sweep] job log", e));
   // R1326 clipper housekeeping on the housekeeping slot: abandoned running jobs closed after 7 days, transcripts pruned
   // 90 days and spare candidates 30 days after a job closes, 500 rows per table a run (never fatal).
   const clipper = plan.housekeeping ? await import("@/lib/clipper/retention").then((m) => m.sweepClipper(now)).catch((e) => (console.error("[sweep] clipper", e), null)) : null;

@@ -3,6 +3,7 @@ import { ACTIVE_MODEL } from "@/lib/intelligence/model/predict";
 import { intelligenceGovernance } from "@/lib/intelligence/shared";
 import { Card, CardTitle, Empty, PageHead, Pill, Table, fmtDate } from "@/components/admin/ui";
 import { AdminKpi } from "@/components/admin/motion/AdminKpi";
+import Link from "next/link";
 import { RebuildButton, VersionActions } from "@/components/admin/intelligence/IntelligencePanel";
 
 export const metadata = { title: "Intelligence" };
@@ -25,7 +26,7 @@ export default async function Intelligence() {
 
   return (
     <>
-      <PageHead eyebrow="Insights" title="Intelligence" body="The forecasting model, its accuracy, and the anonymised cohort baselines it leans on. Aggregates only." actions={<RebuildButton />} />
+      <PageHead eyebrow="Insights" title="Intelligence" body="The forecasting model, its accuracy, and the anonymised cohort baselines it leans on. Aggregates only." actions={<div className="flex flex-wrap items-center gap-2"><Link href="/admin/intelligence/management" className="inline-flex min-h-11 items-center rounded-full border border-border px-5 text-sm font-medium hover:bg-secondary">AI Management</Link><RebuildButton /></div>} />
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AdminKpi i={0} label="Active model" value={g.modelKey} sub={`${num(g.predictions.total)} forecasts · ${num(g.predictions.evaluated)} evaluated`} hint="Every forecast is written before the outcome is known and filled with the actual after the post's first week." />
