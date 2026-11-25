@@ -16,15 +16,21 @@ const read = (p: string) => readFileSync(join(import.meta.dir, "..", p), "utf8")
 const U = "u-1331-payer";
 const PAY = "pay_T1331aaaaaaaaaa";
 const PAY2 = "pay_T1331bbbbbbbbbb";
+const AT = new Date("2026-01-15T10:00:00Z"); // a fixed past day so the rollup rows can be removed without touching today's
+const DAY = "2026-01-15";
+const clean = async () => {
+  await db.costEvent.deleteMany({ where: { OR: [{ ref: { startsWith: "razorpay:fee:pay_T1331" } }, { userId: U }] } });
+  await db.costDaily.deleteMany({ where: { day: DAY, OR: [{ provider: "razorpay", feature: { in: ["checkout", "renewal"] } }, { provider: "x", feature: "x-read" }] } });
+};
 
 beforeAll(async () => {
   db = (await import("../lib/db")).db;
   fees = await import("../lib/costs/fees");
   xreads = await import("../lib/costs/x-reads");
-  await db.costEvent.deleteMany({ where: { OR: [{ ref: { startsWith: "razorpay:fee:pay_T1331" } }, { userId: U }] } });
+  await clean();
 });
 afterAll(async () => {
-  await db.costEvent.deleteMany({ where: { OR: [{ ref: { startsWith: "razorpay:fee:pay_T1331" } }, { userId: U }] } });
+  await clean();
   await db.$disconnect();
 });
 
@@ -79,13 +85,14 @@ describe("1331 razorpay fee input (pure)", () => {
 describe("1331 razorpay fee ledger", () => {
   test("a captured payment's fee is booked once; a webhook retry is a no-op", async () => {
     const pay = { id: PAY, amount: 49900, currency: "INR", fee: 1178, tax: 180, method: "card" };
-    const ev = await fees.bookRazorpayFee(pay, U, "checkout");
+    const ev = await fees.bookRazorpayFee(pay, U, "checkout", AT);
     expect(ev).not.toBeNull();
+    expect(ev!.day).toBe(DAY);
     expect(ev!.amountMinor).toBe(1178);
     expect(ev!.inrMinor).toBe(1178); // INR at FX 1
     expect(ev!.fxToInr).toBe(1);
     expect(ev!.source).toBe("reported");
-    expect(await fees.bookRazorpayFee(pay, U, "checkout")).toBeNull();
+    expect(await fees.bookRazorpayFee(pay, U, "checkout", AT)).toBeNull();
     expect(await db.costEvent.count({ where: { ref: `razorpay:fee:${PAY}` } })).toBe(1);
     const row = await db.costEvent.findUnique({ where: { ref: `razorpay:fee:${PAY}` } });
     expect(row!.provider).toBe("razorpay");
@@ -96,7 +103,7 @@ describe("1331 razorpay fee ledger", () => {
   });
 
   test("an authorised-only payment books nothing", async () => {
-    expect(await fees.bookRazorpayFee({ id: PAY2, amount: 100, currency: "INR" }, U, "renewal")).toBeNull();
+    expect(await fees.bookRazorpayFee({ id: PAY2, amount: 100, currency: "INR" }, U, "renewal", AT)).toBeNull();
     expect(await db.costEvent.count({ where: { ref: `razorpay:fee:${PAY2}` } })).toBe(0);
   });
 });
@@ -109,10 +116,11 @@ describe("1331 x reads", () => {
     expect(await xreads.meterXReads(U, "x", -3)).toBeNull();
   });
 
-  test("posts an X read endpoint returned are booked at the x_read rate against the user", async () => {
-    await xreads.meterXReads(U, "x", 7.9);
+  test("posts an X read endpoint returned are booked at the x_read rate against the user, in the ledger only", async () => {
+    await xreads.meterXReads(U, "x", 7.9, false, AT);
     const row = await db.costEvent.findFirst({ where: { userId: U, feature: "x-read" }, orderBy: { at: "desc" } });
     expect(row).not.toBeNull();
+    expect(row!.day).toBe(DAY);
     expect(row!.provider).toBe("x");
     expect(row!.category).toBe("x");
     expect(row!.units).toBe(7); // whole posts
@@ -123,10 +131,11 @@ describe("1331 x reads", () => {
 });
 
 describe("1331 wiring (source)", () => {
-  test("the Razorpay webhook books the fee after order.paid settles the payment, from the same payload", () => {
+  test("the Razorpay webhook books the fee after order.paid settles the payment, fetching the payment only when the payload has no fee yet", () => {
     const s = read("app/api/billing/webhooks/razorpay/route.ts");
     expect(s).toContain('import { bookRazorpayFee } from "@/lib/costs/fees";');
-    expect(s).toContain('if (p && ev.event === "order.paid") await bookRazorpayFee(ev?.payload?.payment?.entity, p.userId, "checkout");');
+    expect(s).toContain('const src = Number(ent?.fee) > 0 || typeof ent?.id !== "string" ? ent : ((await razorpay.paymentFor(cfg, ent.id).catch(() => null)) ?? ent);');
+    expect(s).toContain('await bookRazorpayFee(src, p.userId, "checkout");');
     expect(s.indexOf("await completePayment(p.id, orderId)")).toBeLessThan(s.indexOf("await bookRazorpayFee("));
   });
 
@@ -149,10 +158,13 @@ describe("1331 wiring (source)", () => {
     expect(live.indexOf("await xDashboard(ctx, days);")).toBeLessThan(live.indexOf("await meterXReads("));
   });
 
-  test("x_read is a metered 1147 category with a rate and a ledger mapping, but never a blocking one", () => {
+  test("x_read is a metered 1147 category with a rate and a ledger mapping; reads go to the ledger, never the user's budget", () => {
     const econ = read("lib/subscriptions/economics.ts");
     expect(econ).toMatch(/x_read: 0\.\d+/);
     expect(read("lib/costs/ledger.ts")).toContain('x_read: { provider: "x", category: "x", feature: "x-read", unit: "read" }');
     expect(read("lib/subscriptions/costs.ts")).not.toMatch(/BLOCKING[^\n]*x_read/);
+    const x = read("lib/costs/x-reads.ts");
+    expect(x).toContain('import { recordEconomicsUse } from "./ledger";');
+    expect(x).not.toMatch(/import[^\n]*subscriptions\/costs/); // the comment may name it; the code must not call recordCost
   });
 });

@@ -60,8 +60,13 @@ export async function POST(req: NextRequest) {
     if (p && ev.event === "order.paid") await completePayment(p.id, orderId);
     // 1147: the card / UPI behind the payment joins the offer ledger as a one-way hash (never throws).
     if (p && ev.event === "order.paid") await notePaymentKey(p.userId, paymentKeyFromRazorpay(ev?.payload?.payment?.entity));
-    // R1331: Razorpay's fee on this payment into the cost ledger (idempotent on the payment id, never throws).
-    if (p && ev.event === "order.paid") await bookRazorpayFee(ev?.payload?.payment?.entity, p.userId, "checkout");
+    // R1331: Razorpay's fee on this payment into the cost ledger (idempotent on the payment id, never throws). The
+    // fee rides on the captured payment; a payload that arrived without it gets one fetch of the payment instead.
+    if (p && ev.event === "order.paid") {
+      const ent = ev?.payload?.payment?.entity;
+      const src = Number(ent?.fee) > 0 || typeof ent?.id !== "string" ? ent : ((await razorpay.paymentFor(cfg, ent.id).catch(() => null)) ?? ent);
+      await bookRazorpayFee(src, p.userId, "checkout");
+    }
     if (p && ev.event === "payment.failed") await failPayment(p.id, ev?.payload?.payment?.entity?.error_description ?? "Payment failed");
     if (p && ev.event === "refund.processed") {
       const pay = ev?.payload?.payment?.entity ?? {};

@@ -39,7 +39,7 @@ export default async function Costs(props: { searchParams: Promise<Params> }) {
   return (
     <>
       <PageHead eyebrow="Run" title="Infrastructure & Costs" body="What Outlly pays its providers, by provider, category and feature, with bills, budgets and alerts."
-        actions={<div className="flex flex-wrap gap-2"><a className="inline-flex h-9 items-center rounded-full px-3.5 text-[13px] hairline hover:bg-secondary" href={`/api/admin/costs/export?kind=daily&${exportQs}`}>Export daily CSV</a><a className="inline-flex h-9 items-center rounded-full px-3.5 text-[13px] hairline hover:bg-secondary" href={`/api/admin/costs/export?kind=events&${exportQs}`}>Export ledger CSV</a><SweepNowButton /></div>} />
+        actions={<div className="flex flex-wrap gap-2"><a className="inline-flex h-9 items-center rounded-full px-3.5 text-[13px] hairline hover:bg-secondary" href={`/api/admin/costs/export?format=pdf&${exportQs}`}>PDF report</a><a className="inline-flex h-9 items-center rounded-full px-3.5 text-[13px] hairline hover:bg-secondary" href={`/api/admin/costs/export?format=xlsx&${exportQs}`}>Excel workbook</a><a className="inline-flex h-9 items-center rounded-full px-3.5 text-[13px] hairline hover:bg-secondary" href={`/api/admin/costs/export?kind=daily&${exportQs}`}>Daily CSV</a><a className="inline-flex h-9 items-center rounded-full px-3.5 text-[13px] hairline hover:bg-secondary" href={`/api/admin/costs/export?kind=events&${exportQs}`}>Ledger CSV</a><SweepNowButton /></div>} />
 
       <Card className="mb-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
