@@ -3,6 +3,7 @@ import { json, route, HttpError } from "@/lib/http";
 import { SHARED_MIN_OWNERS, SHARED_MIN_POSTS, SHARED_WINDOW_DAYS } from "@/lib/intelligence/shared-core";
 import { CONSENT_SOURCES, consentView, type ConsentSource, type ConsentState } from "@/lib/intelligence/consent-core";
 import { consentHistory, currentConsent, grantConsent, requestDeletion, withdrawConsent } from "@/lib/intelligence/consent";
+import { myContribution } from "@/lib/intelligence/shared-lineage";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +33,9 @@ async function view(userId: string, state: ConsentState, canChange: boolean) {
     at: new Date(h.createdAt).toISOString(),
     deletion: h.deletionStatus ? { status: h.deletionStatus, requestedAt: h.deletionRequestedAt ? new Date(h.deletionRequestedAt).toISOString() : null, doneAt: h.deletionDoneAt ? new Date(h.deletionDoneAt).toISOString() : null } : null,
   }));
-  // `share` kept for anything still reading the R1324 shape.
-  return { ...consentView(state), share: state.granted, canChange, rules, history };
+  // R1336: the creator's own lineage (counts and dates only). `share` kept for anything still reading the R1324 shape.
+  const contribution = await myContribution(userId);
+  return { ...consentView(state), share: state.granted, canChange, rules, history, contribution };
 }
 
 export const GET = route(

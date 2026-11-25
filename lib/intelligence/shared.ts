@@ -1,9 +1,12 @@
 import "server-only";
 import { db } from "../db";
 import { closeDeletions, consentSummary, consentedOwnerIds, pendingDeletions } from "./consent";
+import { CONSENT_CATEGORIES, CONSENT_POLICY_VERSION } from "./consent-core";
+import { buildsSummary, pruneBuilds, purgeContributions, recordBuild, syncContributions, type BuildsSummary, type ContributorRows } from "./shared-lineage";
+import { compareShared, validateShared, type SharedRejections } from "./shared-lineage-core";
 import { FEATURE_VERSION, parseFeatures, parsePerf } from "./features-core";
 import type { SharedBaseline } from "./model/scorer-core";
-import { buildShared, driftOf, parseShared, SHARED_WINDOW_DAYS, sharedCutoff, sharedFor, weeklyAccuracy, type Drift, type SharedBaselines, type SharedBucket, type SharedQuery, type SharedRow, type WeekAccuracy } from "./shared-core";
+import { buildShared, driftOf, parseShared, SHARED_VERSION, SHARED_WINDOW_DAYS, sharedCutoff, sharedFor, weeklyAccuracy, type Drift, type SharedBaselines, type SharedBucket, type SharedQuery, type SharedRow, type WeekAccuracy } from "./shared-core";
 
 /**
  * R1324 (Phase 6): shared learning, the stored side. One sweep reads the measured ContentFeature rows of creators who
@@ -35,8 +38,21 @@ async function contributorIds(): Promise<string[]> {
  * Rebuild the shared baselines from scratch and store them. Idempotent; safe to run from the sweep or the admin page.
  * The document's status is left as the admin set it: a retired document is refreshed in the row but served to nobody
  * (the cache only takes an active one), so retiring sticks until an admin brings it back.
+ *
+ * R1336: every rebuild is a versioned build (SharedDatasetBuild: what was read, rejected and published, validated
+ * against the floors and for leaked ids, compared with the build before) and refreshes the lineage (SharedContribution,
+ * one pseudonymous row per contributor). A document that fails validation is never served: an empty one takes its place
+ * and the admins are told. An odd-looking one is served and flagged (the consent promise outranks a manual gate).
  */
-export async function rebuildShared(opts: { now?: Date | number } = {}): Promise<{ baselines: SharedBaselines; consented: number; status: string }> {
+export interface RebuildResult {
+  baselines: SharedBaselines;
+  consented: number;
+  status: string;
+  build: { seq: number; datasetVersion: string; served: boolean; validation: string; anomaly: string | null; rejected: SharedRejections; lineage: { active: number; inactive: number } };
+}
+
+export async function rebuildShared(opts: { now?: Date | number; trigger?: "sweep" | "deletion" | "admin" } = {}): Promise<RebuildResult> {
+  const started = Date.now();
   const now = opts.now instanceof Date ? opts.now.getTime() : (opts.now ?? Date.now());
   const contributors = await contributorIds();
   const since = new Date(now - SHARED_WINDOW_DAYS * 864e5);
@@ -44,21 +60,38 @@ export async function rebuildShared(opts: { now?: Date | number } = {}): Promise
   const raw = contributors.length
     ? await db.contentFeature.findMany({
         where: { measured: true, ownerId: { in: contributors }, publishedAt: { gte: since, lte: new Date(sharedCutoff(now)) } },
-        select: { ownerId: true, platform: true, format: true, publishedAt: true, features: true, perf: true },
+        select: { id: true, ownerId: true, platform: true, format: true, publishedAt: true, features: true, perf: true },
         orderBy: { publishedAt: "desc" },
         take: SHARED_MAX_ROWS,
       })
     : [];
   const rows: SharedRow[] = [];
+  const perOwner = new Map<string, string[]>();
+  let unmeasured = 0;
   for (const r of raw) {
     const perf = parsePerf(r.perf);
-    if (!perf?.measured) continue;
+    if (!perf?.measured) {
+      unmeasured++;
+      continue;
+    }
     const f = parseFeatures(r.features);
     rows.push({ owner: r.ownerId, platform: r.platform, format: r.format, publishedAt: r.publishedAt, categories: f?.categories ?? [], views: typeof perf.totals.views === "number" ? perf.totals.views : null, viewsPerFollower: perf.viewsPerFollower, engagementRate: perf.engagementRate });
+    (perOwner.get(r.ownerId) ?? perOwner.set(r.ownerId, []).get(r.ownerId)!).push(r.id);
   }
   const truncated = raw.length >= SHARED_MAX_ROWS;
-  const baselines = buildShared(rows, now, { truncated });
-  const notes = `Anonymised cohort baselines: ${baselines.buckets.length} buckets from ${baselines.owners} creators' ${baselines.rows} measured posts (last ${baselines.windowDays} days, each past its first week; >= ${baselines.minOwners} creators and ${baselines.minPosts} posts per bucket and per statistic, no creator above half). Opt-in: ${contributors.length} creators consented.${truncated ? ` Row cap of ${SHARED_MAX_ROWS} hit: the window was not read in full.` : ""}`;
+  const built = buildShared(rows, now, { truncated });
+  const rejected: SharedRejections = { unmeasured, noMetric: rows.length - built.rows, thinBuckets: built.dropped, truncated };
+
+  // Validate before anything is served; compare with the document being replaced.
+  const validation = validateShared(built, contributors);
+  const prevRow = await db.modelVersion.findUnique({ where: { key: SHARED_MODEL_KEY }, select: { status: true, data: true } });
+  const prevBuild = await db.sharedDatasetBuild.findFirst({ where: { served: true }, orderBy: { seq: "desc" }, select: { seq: true } });
+  const evaluation = compareShared(prevRow ? parseShared(prevRow.data) : null, built, prevBuild?.seq ?? null);
+  const baselines = validation.ok ? built : buildShared([], now);
+
+  const notes = validation.ok
+    ? `Anonymised cohort baselines: ${baselines.buckets.length} buckets from ${baselines.owners} creators' ${baselines.rows} measured posts (last ${baselines.windowDays} days, each past its first week; >= ${baselines.minOwners} creators and ${baselines.minPosts} posts per bucket and per statistic, no creator above half). Opt-in: ${contributors.length} creators consented.${truncated ? ` Row cap of ${SHARED_MAX_ROWS} hit: the window was not read in full.` : ""}`
+    : `Empty: the build failed validation (${validation.notes.join("; ")}) and was not served.`;
   const data = { featureVersion: FEATURE_VERSION, notes, data: JSON.stringify(baselines) };
   let stored: { status: string };
   try {
@@ -68,7 +101,36 @@ export async function rebuildShared(opts: { now?: Date | number } = {}): Promise
     stored = await db.modelVersion.update({ where: { key: SHARED_MODEL_KEY }, data, select: { status: true } });
   }
   cache = { at: Date.now(), value: stored.status === "active" ? baselines : null };
-  return { baselines, consented: contributors.length, status: stored.status };
+
+  // The record of this build and the lineage behind it. Bookkeeping never breaks the rebuild itself.
+  const builtAt = new Date(now);
+  let lineage = { active: 0, inactive: 0 };
+  let build = { seq: 0, datasetVersion: "", served: validation.ok, validation: validation.ok ? "passed" : "failed", anomaly: validation.ok ? evaluation.anomaly : `validation failed: ${validation.notes.join("; ")}` };
+  try {
+    const b = await recordBuild({
+      trigger: opts.trigger ?? "sweep",
+      featureVersion: FEATURE_VERSION,
+      sharedVersion: SHARED_VERSION,
+      policyVersion: CONSENT_POLICY_VERSION,
+      sourceCategories: CONSENT_CATEGORIES,
+      contributors: contributors.length,
+      rowsRead: raw.length,
+      rowsKept: built.rows,
+      rejected,
+      buckets: built.buckets.length,
+      validation,
+      evaluation,
+      served: validation.ok,
+      durationMs: Date.now() - started,
+      builtAt,
+    });
+    build = { seq: b.seq, datasetVersion: b.datasetVersion, served: b.served, validation: b.validation, anomaly: b.anomaly };
+    const read: ContributorRows[] = [...perOwner.entries()].map(([ownerId, refs]) => ({ ownerId, refs }));
+    lineage = await syncContributions({ id: b.id, builtAt }, validation.ok ? read : [], CONSENT_POLICY_VERSION, CONSENT_CATEGORIES);
+  } catch (e) {
+    console.error("[shared] build bookkeeping failed", e instanceof Error ? e.message : e);
+  }
+  return { baselines, consented: contributors.length, status: stored.status, build: { ...build, rejected, lineage } };
 }
 
 /** The stored shared baselines, cached for a few minutes per instance. Null until the first rebuild. */
@@ -111,6 +173,8 @@ export interface IntelligenceGovernance {
   sharedStatus: string | null;
   /** R1335: consented = newest decision granted; withdrawn = newest decision withdrawn; the rest never answered. */
   participation: { creators: number; consented: number; withdrawn: number; deletionsOpen: number; withMeasuredPosts: number };
+  /** R1336: the build log and the lineage counts. */
+  builds: BuildsSummary;
   versions: { key: string; kind: string; featureVersion: number; status: string; notes: string | null; createdAt: string }[];
   predictions: { total: number; evaluated: number; byPlatform: { platform: string; total: number; evaluated: number }[] };
   accuracy: WeekAccuracy[];
@@ -124,7 +188,7 @@ export async function intelligenceGovernance(opts: { modelKey: string; weeks?: n
   const now = Date.now();
   // One week more than shown, so the oldest week kept is complete (the first partial week is sliced off).
   const since = new Date(now - (weeks + 1) * 7 * 864e5);
-  const [shared, sharedRow, versions, creators, consent, measuredOwners, predAll, predEval, evals] = await Promise.all([
+  const [shared, sharedRow, versions, creators, consent, measuredOwners, predAll, predEval, evals, builds] = await Promise.all([
     loadShared({ fresh: true }),
     db.modelVersion.findUnique({ where: { key: SHARED_MODEL_KEY }, select: { status: true } }),
     db.modelVersion.findMany({ orderBy: { createdAt: "desc" }, take: 20, select: { key: true, kind: true, featureVersion: true, status: true, notes: true, createdAt: true } }),
@@ -135,6 +199,7 @@ export async function intelligenceGovernance(opts: { modelKey: string; weeks?: n
     db.predictionRecord.groupBy({ by: ["platform"], where: { modelKey: opts.modelKey, evaluatedAt: { not: null } }, _count: { _all: true } }),
     // Evaluated forecasts of the window, filed by the week their outcome was known (not the trailing rollups).
     db.predictionRecord.findMany({ where: { modelKey: opts.modelKey, subjectType: "target", evaluatedAt: { gte: since }, actual: { not: null } }, select: { ownerId: true, platform: true, predicted: true, low: true, high: true, actual: true, evaluatedAt: true }, take: 50_000 }),
+    buildsSummary(new Date(now)),
   ]);
   const evalBy = new Map(predEval.map((p) => [p.platform, p._count._all]));
   const byPlatform = predAll.map((p) => ({ platform: p.platform, total: p._count._all, evaluated: evalBy.get(p.platform) ?? 0 })).sort((a, b) => b.total - a.total);
@@ -143,6 +208,7 @@ export async function intelligenceGovernance(opts: { modelKey: string; weeks?: n
     shared: shared ? { stored: true, builtAt: shared.builtAt, rows: shared.rows, owners: shared.owners, buckets: shared.buckets, dropped: shared.dropped, windowDays: shared.windowDays, minOwners: shared.minOwners, minPosts: shared.minPosts, truncated: !!shared.truncated } : null,
     sharedStatus: sharedRow?.status ?? null,
     participation: { creators, consented: consent.granted, withdrawn: consent.withdrawn, deletionsOpen: consent.deletionsOpen, withMeasuredPosts: measuredOwners },
+    builds,
     versions: versions.map((v) => ({ ...v, createdAt: v.createdAt.toISOString() })),
     predictions: { total: byPlatform.reduce((s, p) => s + p.total, 0), evaluated: byPlatform.reduce((s, p) => s + p.evaluated, 0), byPlatform },
     accuracy,
@@ -157,12 +223,15 @@ export async function intelligenceGovernance(opts: { modelKey: string; weeks?: n
  * R1335: an open deletion request rebuilds at once (this tick, not the hourly timer) so the creator's rows are out of the
  * served document within minutes; the request is then marked done.
  */
-export async function sweepShared(now: Date = new Date()): Promise<{ buckets: number; rows: number; status: string; deletions: number } | null> {
+export async function sweepShared(now: Date = new Date()): Promise<{ buckets: number; rows: number; status: string; deletions: number; purged: number; pruned: number; build: string } | null> {
   const deletions = await pendingDeletions();
   const row = await db.modelVersion.findUnique({ where: { key: SHARED_MODEL_KEY }, select: { data: true } });
   const builtAt = row ? parseShared(row.data)?.builtAt : null;
   if (!deletions.length && builtAt && now.getTime() - new Date(builtAt).getTime() < SHARED_REBUILD_MS) return null;
-  const { baselines, status } = await rebuildShared({ now });
+  const { baselines, status, build } = await rebuildShared({ now, trigger: deletions.length ? "deletion" : "sweep" });
+  // R1336: the document no longer holds their rows; now clear the lineage references and close the requests.
+  const purged = await purgeContributions([...new Set(deletions.map((d) => d.userId))], now);
   const closed = await closeDeletions(deletions.map((d) => d.id), now);
-  return { buckets: baselines.buckets.length, rows: baselines.rows, status, deletions: closed };
+  const pruned = await pruneBuilds(now).catch(() => 0);
+  return { buckets: baselines.buckets.length, rows: baselines.rows, status, deletions: closed, purged, pruned, build: build.datasetVersion };
 }

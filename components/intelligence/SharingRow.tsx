@@ -11,7 +11,7 @@ import { consentStatusLine, type ConsentSource, type ConsentView } from "@/lib/i
  * included, when they said yes and under which policy version, and a way to withdraw or to ask for contributed data to
  * be removed. Shown under Your baselines (paid), on the upgrade card (free) and in Settings > Data & Privacy.
  */
-type Sharing = ConsentView & { share: boolean; canChange: boolean; rules: { minOwners: number; minPosts: number; windowDays: number } };
+type Sharing = ConsentView & { share: boolean; canChange: boolean; rules: { minOwners: number; minPosts: number; windowDays: number }; contribution: { status: string; records: number; builds: number; since: string; last: string; deleted: boolean } | null };
 
 export function SharingRow({ source = "intelligence" }: { source?: ConsentSource }) {
   const [state, setState] = useState<Sharing | null>(null);
@@ -28,7 +28,7 @@ export function SharingRow({ source = "intelligence" }: { source?: ConsentSource
     };
   }, []);
   if (!state) return null;
-  const { canChange, rules, copy, categories, never } = state;
+  const { canChange, rules, copy, categories, never, contribution } = state;
   const s = state.state;
   const granted = s.granted;
 
@@ -63,6 +63,10 @@ export function SharingRow({ source = "intelligence" }: { source?: ConsentSource
         <p className="mt-1.5 text-[13px] text-muted-foreground">
           {consentStatusLine(s)}
           {s.policyVersion && <span className="text-muted-foreground/70"> Policy {s.granted ? s.policyVersion : state.policyVersion}.</span>}
+          {contribution && !contribution.deleted && contribution.status === "active" && (
+            <span> {contribution.records} of your measured posts went into the latest build; part of {contribution.builds} build{contribution.builds === 1 ? "" : "s"} since {new Date(contribution.since).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}.</span>
+          )}
+          {contribution?.deleted && <span> The record of which of your posts were used has been cleared.</span>}
         </p>
         <details className="mt-2 text-[13px] text-muted-foreground">
           <summary className="cursor-pointer select-none font-medium text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">What this covers</summary>

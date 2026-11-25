@@ -27,9 +27,9 @@ const action = z.discriminatedUnion("action", [
 export const POST = adminRoute("intelligence", async (req, { admin }) => {
   const body = action.parse(await req.json());
   if (body.action === "rebuild") {
-    const r = await rebuildShared();
-    await adminEvent("intelligence", `Shared baselines rebuilt: ${r.baselines.buckets.length} buckets from ${r.baselines.owners} creators${r.status === "active" ? "" : ` (document ${r.status}: stored, served to nobody)`}`, admin.login, "/admin/intelligence");
-    return json({ ok: true, buckets: r.baselines.buckets.length, rows: r.baselines.rows, owners: r.baselines.owners, dropped: r.baselines.dropped, consented: r.consented, status: r.status });
+    const r = await rebuildShared({ trigger: "admin" });
+    await adminEvent("intelligence", `Shared baselines rebuilt (${r.build.datasetVersion}): ${r.baselines.buckets.length} buckets from ${r.baselines.owners} creators${r.status === "active" ? "" : ` (document ${r.status}: stored, served to nobody)`}${r.build.served ? "" : "; validation failed, empty document served"}`, admin.login, "/admin/intelligence");
+    return json({ ok: true, buckets: r.baselines.buckets.length, rows: r.baselines.rows, owners: r.baselines.owners, dropped: r.baselines.dropped, consented: r.consented, status: r.status, build: r.build });
   }
   const v = await db.modelVersion.findUnique({ where: { key: body.key }, select: { key: true, status: true } });
   if (!v) throw new HttpError(404, "No model version with that key.", "NOT_FOUND");

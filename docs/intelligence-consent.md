@@ -108,10 +108,40 @@ Returns the same view. Rate limit 20 a minute.
 - Nothing reads a client flag; the route reads no entitlement; `shared.ts` and `entitlements.ts` do not touch
   `shareLearning` directly.
 
+## Builds and lineage (R1336)
+
+Every shared rebuild is a versioned build:
+
+- `SharedDatasetBuild`: `seq` / `datasetVersion` (`sd-<seq>`), feature and document schema versions, the consent policy
+  version and categories in force, trigger (`sweep`, `deletion`, `admin`), contributors, rows read and kept, rejections
+  (`unmeasured`, `noMetric`, `thinBuckets`, `truncated`), buckets, `validation` (passed / failed + notes), `evaluation`
+  (against the build before: common buckets, largest median move, anomaly), `anomaly`, `served`, duration. Kept 90 days
+  (`pruneBuilds`, every sweep tick).
+- Validation before serving (`validateShared`): no contributor id anywhere in the document, every bucket and statistic
+  past the publishing floors, a real `builtAt`. A failed document is never served: an empty one is stored in its place,
+  the build row says `failed`, and an AdminEvent `intelligence_build` is raised.
+- Evaluation (`compareShared`): a build with fewer than half the buckets or rows of the one before, or a common bucket
+  whose views-per-follower median moved more than 50%, is served and flagged (AdminEvent + `anomaly`). It is served
+  because the consent promise (posts leave at the next rebuild) outranks a manual gate; the admin's approval control is
+  retire / restore on the document (`/admin/intelligence`).
+- `SharedContribution`: one row per contributor, keyed by `contributorKey` = HMAC-SHA256(AUTH_SECRET, "shared-contributor:" + ownerId)
+  truncated to 32 characters. No user id, email or handle on the row; the key is the only way back and it lives in the
+  environment, not the table. Columns: consent row id and policy version in force at the last build, categories,
+  ContentFeature ids read (newest 60), count, first and last build, number of builds, `status` (active = in the last
+  build; inactive = withdrew or had no usable rows), `deletionStatus` (`deleted` once a deletion request cleared the
+  references). The table stays the size of the consented cohort: a build upserts, never appends.
+- Deletion: the sweep rebuilds without the requester, then `purgeContributions` clears their references and marks the
+  row `deleted`, then the consent request is closed. Order is pinned by `round-1336`.
+- The creator sees their own line in the consent row ("N of your measured posts went into the latest build; part of M
+  builds since <date>"), from `GET /api/intelligence/sharing` `contribution`. Nobody sees anyone else's.
+- Honesty: the stored data is pseudonymised, not anonymous; the served document (bucket medians) is what other
+  creators read. The copy says both.
+
 ## Admin
 
 `/admin/intelligence` shows opted-in count and share, withdrawals and pending deletions (`intelligenceGovernance().participation`,
-counts only). `consentSummary()` also gives never-asked, deletions done, by policy version, by category, stale mirrors
+counts only), and the "Builds and lineage" card (`intelligenceGovernance().builds`: latest build with rejections, recent
+builds, flagged and failed in 30 days, lineage counts). `consentSummary()` also gives never-asked, deletions done, by policy version, by category, stale mirrors
 and 30-day decisions for the R1337 "AI Intelligence Management" section.
 
 ## Tests

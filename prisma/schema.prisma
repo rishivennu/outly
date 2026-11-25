@@ -2744,6 +2744,63 @@ model AiDataConsent {
   @@index([deletionStatus, deletionRequestedAt])
 }
 
+/// R1336: one record per shared-model build (the hourly anonymised baselines rebuild, lib/intelligence/shared.ts): what
+/// was read, what was rejected and why, what came out, how it compared with the build before, whether it passed
+/// validation and became the served document. Counts only; no creator named. The document itself lives in ModelVersion
+/// `shared-baselines-1`. Rows older than SHARED_BUILD_RETENTION_DAYS (90) are pruned by the sweep.
+model SharedDatasetBuild {
+  id               String   @id @default(cuid())
+  seq              Int      @unique // dataset version number, +1 per build
+  datasetVersion   String   @unique // "sd-<seq>"
+  featureVersion   Int // ContentFeature schema version read
+  sharedVersion    Int // document schema version written (shared-core SHARED_VERSION)
+  policyVersion    String // consent policy version in force
+  sourceCategories String // JSON string[] consent categories read
+  trigger          String // sweep | deletion | admin
+  contributors     Int // consented creators whose rows were read
+  rowsRead         Int
+  rowsKept         Int // usable rows that entered buckets
+  rejected         String // JSON { unmeasured, noMetric, thinBuckets, truncated }
+  buckets          Int
+  validation       String // passed | failed
+  validationNotes  String? // JSON string[] of failed checks
+  evaluation       String? // JSON SharedEvaluation (against the build before)
+  anomaly          String? // why an admin should look; the build is served unless validation failed
+  served           Boolean  @default(false) // this build's document is what ModelVersion holds
+  durationMs       Int
+  builtAt          DateTime
+  createdAt        DateTime @default(now())
+
+  @@index([builtAt])
+  @@index([served, builtAt])
+}
+
+/// R1336: lineage. Which pseudonymous contributor's rows are in the shared model, under which consent, since and until
+/// which build. One row per contributor, kept current by every build (never one per build, so the table stays the size
+/// of the consented cohort). No userId: `contributorKey` is an HMAC of the owner id under AUTH_SECRET, so the
+/// identity mapping is the key, held apart from these rows. A deletion request clears the record references.
+model SharedContribution {
+  id                String    @id @default(cuid())
+  contributorKey    String    @unique // pseudonymous, lib/intelligence/shared-lineage.ts
+  consentId         String // AiDataConsent row of the grant in force at the last build
+  policyVersion     String
+  categories        String // JSON string[] consent categories
+  recordRefs        String // JSON string[] ContentFeature ids read at the last build (capped)
+  records           Int // usable rows read at the last build
+  firstBuildId      String
+  lastBuildId       String
+  builds            Int       @default(1)
+  status            String    @default("active") // active (in the last build) | inactive (withdrew, or no usable rows)
+  deletionStatus    String? // deleted (references cleared on the creator's request)
+  contributedAt     DateTime
+  lastContributedAt DateTime
+  inactiveAt        DateTime?
+  deletedAt         DateTime?
+
+  @@index([status, lastContributedAt])
+  @@index([lastBuildId])
+}
+
 /// R1319: one prediction per subject per model per metric. Written before the outcome is known (published posts are
 /// scored from the history before their publish time, never after), then filled with the actual once measured.
 model PredictionRecord {

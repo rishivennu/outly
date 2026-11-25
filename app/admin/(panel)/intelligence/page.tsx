@@ -102,6 +102,31 @@ export default async function Intelligence() {
         )}
       </Card>
 
+      <Card className="mb-4">
+        <CardTitle hint={`One row per shared-model build (hourly, or at once for a deletion request). Each build reads consented creators' measured posts only, is validated before it is served (no creator id inside the document, every bucket past the floors) and compared with the build before. A failed validation serves an empty document and raises an admin event; an odd-looking build is served and flagged. Records are kept ${g.builds.retentionDays} days. Lineage: one pseudonymous row per contributor (an HMAC of the owner id, no user id stored), updated by every build; a deletion request clears its references.`}>Builds and lineage</CardTitle>
+        <p className="mb-3 text-[12.5px] text-muted-foreground">
+          {num(g.builds.total)} build{g.builds.total === 1 ? "" : "s"} on record · {num(g.builds.flagged30d)} flagged and {num(g.builds.failed30d)} failed validation in 30 days · lineage {num(g.builds.lineage.active)} active contributor{g.builds.lineage.active === 1 ? "" : "s"} ({num(g.builds.lineage.recordsActive)} posts referenced), {num(g.builds.lineage.inactive)} inactive, {num(g.builds.lineage.deleted)} deleted on request.
+          {g.builds.latest && ` Latest ${g.builds.latest.datasetVersion}: read ${num(g.builds.latest.rowsRead)} rows, kept ${num(g.builds.latest.rowsKept)}; rejected ${num(g.builds.latest.rejected.unmeasured)} unmeasured, ${num(g.builds.latest.rejected.noMetric)} without a metric, ${num(g.builds.latest.rejected.thinBuckets)} thin bucket${g.builds.latest.rejected.thinBuckets === 1 ? "" : "s"}${g.builds.latest.rejected.truncated ? ", row cap hit" : ""}; ${num(g.builds.latest.durationMs)} ms.`}
+        </p>
+        {g.builds.recent.length === 0 ? <Empty title="No build recorded yet" body="The next hourly sweep, or Rebuild now, writes the first record." /> : (
+          <Table label="Shared model builds" head={["Version", "Built", "Trigger", "Creators", "Posts", "Buckets", "Validation", "Served", "Flag"]} lead={1} align={[undefined, undefined, undefined, "right", "right", "right"]} minWidth={860}>
+            {g.builds.recent.map((b) => (
+              <tr key={b.seq}>
+                <td className="font-medium">{b.datasetVersion}</td>
+                <td className="whitespace-nowrap text-[12.5px] text-muted-foreground"><time dateTime={b.builtAt}>{fmtDate(b.builtAt)}</time></td>
+                <td className="capitalize">{b.trigger}</td>
+                <td className="text-right tabular-nums">{num(b.contributors)}</td>
+                <td className="text-right tabular-nums">{num(b.rowsKept)}</td>
+                <td className="text-right tabular-nums">{num(b.buckets)}</td>
+                <td><Pill tone={b.validation === "passed" ? "ok" : "warn"}>{b.validation}</Pill></td>
+                <td>{b.served ? "Yes" : "No"}</td>
+                <td className="max-w-[24rem] text-[12.5px] text-muted-foreground">{b.anomaly ?? "—"}</td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </Card>
+
       <Card>
         <CardTitle hint="Every scorer and shared document the engine has used, newest first. Retiring the shared document stops every creator reading it within a few minutes (live estimates at the next cache turn; a stored calibration that leaned on it is recomputed on its next read); the active scorer stays until a replacement is shipped.">Model versions</CardTitle>
         {g.versions.length === 0 ? <Empty title="No versions recorded yet" body="The first personal-intelligence sweep registers the baseline scorer." /> : (

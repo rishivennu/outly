@@ -17,8 +17,8 @@ import { weekKey } from "./profile-core";
  *    creator whose follower count is unknown.
  *  - a shared prior is a prior, never a verdict: the scorer shrinks the creator's own median toward it with their own
  *    sample size as the weight (SHRINK_K), and it is offered only below the personal level.
- * Opting out (User.shareLearning = false) keeps a creator's posts out of every bucket; it never removes their own
- * predictions. Everything here is deterministic.
+ * Sharing is opt-in (R1335, AiDataConsent): only creators who said yes have rows in any bucket, and consent never
+ * changes their own predictions. Everything here is deterministic.
  */
 
 export const SHARED_VERSION = 1;
