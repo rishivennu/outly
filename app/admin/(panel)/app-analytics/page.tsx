@@ -14,6 +14,7 @@ import { TabBar } from "@/components/admin/app-analytics/TabBar";
 import { BreakdownCard, CohortGrid, ExportLinks, KpiGrid, RetentionCards, StatusPill, fmtDur, n, pct } from "@/components/admin/app-analytics/parts";
 import { DEFINITIONS, PLATFORM_LABEL, parseRange } from "@/lib/analytics/activity-core";
 import { USER_JOINED, USER_PLATFORMS, USER_SORTS, USER_STATUS, activeSeries, engagement, live, overview, parseQuery, parseUserFilters, platforms, retention, usersPage } from "@/lib/admin/app-analytics";
+import { crashGroups } from "@/lib/crash/server";
 
 export const metadata = { title: "App Analytics" };
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ const TABS = [
   { key: "retention", label: "Retention" },
   { key: "platforms", label: "Platforms & devices", short: "Platforms" },
   { key: "users", label: "User activity", short: "Users" },
+  { key: "crashes", label: "Crashes" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 const tabOf = (v: string | undefined): TabKey => (TABS.some((t) => t.key === v) ? (v as TabKey) : "overview");
@@ -47,7 +49,7 @@ export default async function AppAnalyticsPage(props: { searchParams: Promise<Pa
   const tab = tabOf(str(sp.tab));
   const on = (...keys: TabKey[]) => keys.includes(tab);
   // One group at a time: only its queries run (overview always, for the header meta and the tracking start).
-  const [ov, series, eng, ret, plat, users, lv, cmp] = await Promise.all([
+  const [ov, series, eng, ret, plat, users, lv, cmp, crashes] = await Promise.all([
     overview(q, now),
     on("active") ? activeSeries(q) : null,
     on("engagement") ? engagement(q) : null,
@@ -56,6 +58,7 @@ export default async function AppAnalyticsPage(props: { searchParams: Promise<Pa
     on("users") ? usersPage(uf, admin.role, now) : null,
     on("overview") ? live(admin.role, now) : null,
     on("overview") && cmpRange ? overview({ ...q, range: cmpRange }, now) : null,
+    on("crashes") ? crashGroups({ from: range.from, to: range.to, platform: q.platform }) : null,
   ]);
   const compareText = range.days === 1 ? "the day before" : `the previous ${range.days} days`;
   const since = ov.trackingSince ? new Date(ov.trackingSince) : null;
@@ -341,6 +344,40 @@ export default async function AppAnalyticsPage(props: { searchParams: Promise<Pa
               </DataSwap>
               <Pagination total={users.total} page={uf.page} limit={uf.limit} className="mt-4" />
               <p className="mt-3 text-[12px] text-muted-foreground">Sessions and platform come from the usage sessions recorded since this release; &quot;Last active&quot; uses the older daily activity log too. {admin.role !== "super" && <Pill tone="muted">emails masked for your role</Pill>}</p>
+            </Card>
+          </Section>
+          </div>
+        )}
+
+        {/* 8. Crashes (R1329): what the Android app reported after it fell over, one row per distinct crash */}
+        {tab === "crashes" && crashes && (
+          <div {...panel("crashes")}>
+          <Section id="crashes" className="mt-0" title="Crashes" hint="One row per distinct crash (same exception and top frames), counted by the time it happened on the phone. Stack traces are as the app sent them; R8 names resolve with that release's mapping file.">
+            <Card data-enter>
+              {crashes.length === 0 ? (
+                <Empty title="No crashes reported" body={`Nothing from the app in this range${q.platform === "all" ? "" : ` on ${PLATFORM_LABEL[q.platform]}`}. The app posts a crash on its next launch, so a day's crashes can land a day late.`} />
+              ) : (
+                <Table label="Crashes" head={["Crash", "Where", "Times", "People", "Versions", "Last seen"]} align={[undefined, undefined, "right", "right", undefined, undefined]} stickyFirst>
+                  {crashes.map((g) => (
+                    <tr key={g.fingerprint}>
+                      <td>
+                        <span className="font-medium">{g.exception}</span>
+                        {g.message && <span className="block max-w-[40ch] truncate text-[12px] text-muted-foreground" title={g.message}>{g.message}</span>}
+                        <details className="mt-1 text-[12px]">
+                          <summary className="cursor-pointer text-muted-foreground underline-offset-2 hover:underline">Stack ({g.sample.device ?? "device unknown"}{g.sample.sdk ? `, API ${g.sample.sdk}` : ""}{g.sample.screen ? `, on ${g.sample.screen}` : ""})</summary>
+                          <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-muted/60 p-3 text-[11px] leading-snug">{g.sample.stack}</pre>
+                        </details>
+                      </td>
+                      <td className="font-mono text-[12px]">{g.where || <span className="text-muted-foreground">outside the app&apos;s code</span>}</td>
+                      <td>{n(g.count)}</td>
+                      <td>{n(g.people)}</td>
+                      <td className="tabular-nums text-[12.5px]">{g.versions.map((v) => `${v.version} (${n(v.count)})`).join(", ")}</td>
+                      <td title={fmtDate(g.lastAt, true)}>{ago(g.lastAt)}{g.count > 1 && <span className="block text-[12px] text-muted-foreground">first {ago(g.firstAt)}</span>}</td>
+                    </tr>
+                  ))}
+                </Table>
+              )}
+              <p className="mt-3 text-[12px] text-muted-foreground">Reports come from the Android app's own crash hook (Settings &gt; Send crash reports), kept 90 days. A new crash raises one admin event a day.</p>
             </Card>
           </Section>
           </div>

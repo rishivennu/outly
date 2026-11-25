@@ -96,6 +96,7 @@ model User {
   ideas          Idea[]
   featureUses FeatureUse[]
   pushDevices PushDevice[]
+  appCrashes  AppCrash[]
   webPushSubs WebPushSub[]
   dmThreads   DmThread[]
   betaIssued  BetaCode?  @relation("BetaIssued")
@@ -1151,6 +1152,35 @@ model PushDevice {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/// R1329: one crash the native app reported on its next launch (outlly-compose CrashReportWorker). Grouped by fingerprint
+/// in Admin > App Analytics > Crashes; rows older than 90 days are pruned by the housekeeping sweep. The person is kept
+/// only to count how many people a crash hit; deleting the account keeps the row without them.
+model AppCrash {
+  id          String   @id @default(cuid())
+  userId      String?
+  installId   String?
+  platform    String // android | ios
+  version     String // 3.6.2
+  build       Int? // versionCode
+  sdk         Int? // Android API level
+  device      String? // "samsung SM-N981B"
+  fingerprint String // exception + top in-app frames, lib/crash/core.ts
+  exception   String // kotlin.KotlinNullPointerException
+  message     String?
+  stack       String // capped at MAX_STACK characters
+  thread      String?
+  screen      String? // the route on screen when it happened
+  crashedAt   DateTime
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([fingerprint, createdAt])
+  @@index([crashedAt])
+  @@index([createdAt])
+  @@index([userId, createdAt])
 }
 
 /// 1118: a browser or installed web app (iPhone/iPad Home Screen, Android, desktop) that gets Web Push (VAPID).
