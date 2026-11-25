@@ -43,7 +43,7 @@ export const providerLabel = (id: string) => (PROVIDERS.find((p) => p.id === id)
 
 /** Outlly features a cost can be attributed to (the "what did this buy" axis). */
 export const FEATURE_LABEL: Record<string, string> = {
-  writing: "AI writing", captions: "AI captions", "inbox-reply": "AI inbox replies", assist: "AI assist", "support-chat": "Support chat", blog: "Blog agent", try: "Try page (signed out)", ai: "AI (unattributed)", "x-post": "Posts to X", "x-read": "X reads", storage: "Media storage", egress: "Media delivery", email: "Email", platform: "Platform",
+  writing: "AI writing", captions: "AI captions", "inbox-reply": "AI inbox replies", assist: "AI assist", "support-chat": "Support chat", blog: "Blog agent", try: "Try page (signed out)", ai: "AI (unattributed)", "x-post": "Posts to X", "x-read": "X reads", storage: "Media storage", egress: "Media delivery", email: "Email", platform: "Platform", checkout: "Checkout payments", renewal: "Auto-renew charges",
 };
 export const featureLabel = (id: string) => FEATURE_LABEL[id] ?? (id ? id : "Platform");
 

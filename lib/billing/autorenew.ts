@@ -14,6 +14,7 @@ import { GIFT_PROVIDERS } from "./access-core";
 import { reminderDue, reminderKey, renewedEnd } from "./renewal-core";
 import { onPaymentSucceeded } from "../subscriptions/lifecycle";
 import { paymentKeyFromRazorpay } from "../subscriptions/keys";
+import { bookRazorpayFee } from "../costs/fees";
 
 /**
  * 1096 auto-renew. Off by default for everyone; the customer turns it on in Billing.
@@ -208,7 +209,12 @@ export async function onRazorpaySubscription(ev: { event?: string; payload?: any
     await db.subscription.updateMany({ where: { providerSubId: sub.id, status: "active" }, data: { autoRenew: true, cancelAtPeriodEnd: false } });
   else if (kind === "subscription.charged") {
     const pay = ev.payload?.payment?.entity;
-    if (pay?.id) await renewFromCharge(sub.id, { id: pay.id, amount: Number(pay.amount), currency: String(pay.currency ?? "INR"), paymentKey: paymentKeyFromRazorpay(pay) }, new Date(), typeof sub.notes?.subscriptionId === "string" ? sub.notes.subscriptionId : null);
+    if (pay?.id) {
+      await renewFromCharge(sub.id, { id: pay.id, amount: Number(pay.amount), currency: String(pay.currency ?? "INR"), paymentKey: paymentKeyFromRazorpay(pay) }, new Date(), typeof sub.notes?.subscriptionId === "string" ? sub.notes.subscriptionId : null);
+      // R1331: Razorpay charged its fee whether or not the mandate was ours to honour; book it once against the payer.
+      const payer = await db.payment.findFirst({ where: { provider: "razorpay", providerRef: pay.id }, select: { userId: true } });
+      await bookRazorpayFee(pay, payer?.userId ?? null, "renewal");
+    }
   } else if (["subscription.cancelled", "subscription.halted", "subscription.completed", "subscription.paused"].includes(kind)) {
     await db.setting.deleteMany({ where: { key: replaceKey(sub.id) } }); // a replacement that never got approved
     // 1118: tell the owner, but only when the bank or gateway stopped it. A mandate Outlly itself stopped (cancel,

@@ -13,6 +13,7 @@ import { mediaView } from "./services";
 import { youtubeEmbed, type CommentMedia } from "./inbox-media";
 import { commentCapable, loadCommentStates, NO_STATE, stateKey, type ReadMark } from "./inbox-state";
 import type { Media } from "@prisma/client";
+import { meterXReads } from "./costs/x-reads";
 
 /** Inbox ids for comments on the creator's own account (not published through Outlly): a:<accountId>:<mediaId>. */
 export const accountTargetId = (accountId: string, mediaId: string) => `a:${accountId}:${mediaId}`;
@@ -181,7 +182,12 @@ export async function inbox(userId: string, platform?: Platform, scope: Scope = 
   const results = await Promise.allSettled(
     targets.map((l) =>
       l.publisher.listComments
-        ? cachedComments(l.target.id, () => l.publisher.listComments!({ platformPostId: l.target.platformPostId, practice: l.target.practice }, l.account))
+        ? cachedComments(l.target.id, () =>
+            l.publisher.listComments!({ platformPostId: l.target.platformPostId, practice: l.target.practice }, l.account).then(async (c) => {
+              await meterXReads(userId, l.target.platform, c.length, l.target.practice); // R1331: only on a cache miss, so a real X read
+              return c;
+            }),
+          )
         : Promise.resolve(null),
     ),
   );

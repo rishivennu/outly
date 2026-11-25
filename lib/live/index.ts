@@ -18,6 +18,7 @@ import { outllyDashboard } from "./outlly";
 import { suggest } from "./suggest";
 import type { PlatformDashboard, Suggestion } from "./types";
 import { DEFAULT_RANGE_DAYS, pickRangeDays } from "./ranges";
+import { meterXReads } from "../costs/x-reads";
 
 export type { PlatformDashboard } from "./types";
 
@@ -105,6 +106,7 @@ export async function platformDashboard(userId: string, platform: Platform, opts
               : platform === "tiktok"
                 ? await tiktokDashboard(ctx, days)
                 : await xDashboard(ctx, days);
+    if (platform === "x") await meterXReads(userId, platform, base.posts.length); // R1331: X bills the posts it returned
     // Rule-based coaching only: the Gemini ideas are fetched separately (platformIdeas) so a slow model
     // never holds the numbers back. Throwing here keeps a failure out of every cache.
     return { ...base, suggestions: suggest({ platform, posts: base.posts, series: base.series, hours: base.hours, timezone: tz }) };
