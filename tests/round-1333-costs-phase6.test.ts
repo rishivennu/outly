@@ -173,11 +173,21 @@ describe("1333 real exports", () => {
     expect(doc.getAuthor()).toBe("Outlly");
   });
 
-  test("parseRange defaults to the last 30 days and refuses junk", () => {
-    const r = report.parseRange(new URLSearchParams("from=2026-03-01&to=2026-03-10"));
-    expect(r).toEqual({ from: "2026-03-01", to: "2026-03-10" });
-    const d = report.parseRange(new URLSearchParams("from=junk&to=2026-03-30"));
-    expect(d).toEqual({ from: "2026-03-01", to: "2026-03-30" });
+  test("parseRange defaults to the last 30 days and refuses junk, impossible dates, inverted and oversized ranges", () => {
+    const NOW = new Date("2026-03-30T12:00:00Z");
+    expect(report.parseRange(new URLSearchParams("from=2026-03-01&to=2026-03-10"), NOW)).toEqual({ ok: true, from: "2026-03-01", to: "2026-03-10" });
+    expect(report.parseRange(new URLSearchParams(""), NOW)).toEqual({ ok: true, from: "2026-03-01", to: "2026-03-30" });
+    expect(report.parseRange(new URLSearchParams("from=&to="), NOW)).toEqual({ ok: true, from: "2026-03-01", to: "2026-03-30" });
+    expect(report.parseRange(new URLSearchParams("to=2026-03-30"), NOW)).toEqual({ ok: true, from: "2026-03-01", to: "2026-03-30" });
+    expect(report.parseRange(new URLSearchParams("from=2025-03-31&to=2026-03-31"), NOW)).toEqual({ ok: true, from: "2025-03-31", to: "2026-03-31" });
+    for (const qs of ["from=junk&to=2026-03-30", "from=2026-13-45&to=2026-03-30", "from=2026-02-30&to=2026-03-01", "from=2026-03-01&to=2026-3-1", "to=../../etc"]) {
+      const r = report.parseRange(new URLSearchParams(qs), NOW);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error).toMatch(/real date/);
+    }
+    expect(report.parseRange(new URLSearchParams("from=2026-03-10&to=2026-03-01"), NOW)).toEqual({ ok: false, error: "from must not be after to" });
+    expect(report.parseRange(new URLSearchParams("from=2025-03-30&to=2026-03-31"), NOW)).toEqual({ ok: false, error: `range is capped at ${report.MAX_RANGE_DAYS} days` });
+    expect(report.MAX_RANGE_DAYS).toBe(366);
     expect(report.exportName("report", "2026-03-01", "2026-03-30", "pdf")).toBe("outlly-costs-report-2026-03-01-to-2026-03-30.pdf");
   });
 });
@@ -187,6 +197,9 @@ describe("1333 wiring (source)", () => {
     const s = read("app/api/admin/costs/export/route.ts");
     expect(s).toContain('import { costsPdf, costsWorkbook, exportName, parseRange } from "@/lib/costs/report";');
     expect(s).toContain('const format = sp.get("format") === "xlsx" ? "xlsx" : sp.get("format") === "pdf" ? "pdf" : "csv";');
+    expect(s).toContain("const range = parseRange(sp);");
+    expect(s).toContain("if (!range.ok) return Response.json({ error: range.error }, { status: 400 });");
+    expect(s.indexOf("if (!range.ok)")).toBeLessThan(s.indexOf("await costsWorkbook("));
     expect(s).toContain('headers("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", exportName("workbook", range.from, range.to, "xlsx"))');
     expect(s).toContain('headers("application/pdf", exportName("report", range.from, range.to, "pdf"))');
     expect(s).toContain('headers("text/csv; charset=utf-8", exportName(kind, from, to, "csv"))');

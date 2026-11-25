@@ -12,7 +12,9 @@ export const dynamic = "force-dynamic";
  */
 export const GET = adminRoute("costs", async (req) => {
   const sp = req.nextUrl.searchParams;
-  const { from, to } = parseRange(sp);
+  const range = parseRange(sp);
+  if (!range.ok) return Response.json({ error: range.error }, { status: 400 });
+  const { from, to } = range;
   const format = sp.get("format") === "xlsx" ? "xlsx" : sp.get("format") === "pdf" ? "pdf" : "csv";
   const headers = (type: string, name: string) => ({ "content-type": type, "content-disposition": `attachment; filename="${name}"`, "cache-control": "no-store" });
   if (format === "xlsx") {

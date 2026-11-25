@@ -95,8 +95,30 @@ export async function costsPdf(from: string, to: string, now = new Date()) {
 }
 
 export const exportName = (kind: string, from: string, to: string, ext: string) => `outlly-costs-${kind}-${from}-to-${to}.${ext}`;
-export const parseRange = (sp: URLSearchParams) => {
-  const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.get("to") ?? "") ? sp.get("to")! : dayKey(new Date());
-  const from = /^\d{4}-\d{2}-\d{2}$/.test(sp.get("from") ?? "") ? sp.get("from")! : dayKey(new Date(new Date(`${to}T00:00:00Z`).getTime() - 29 * 86400_000));
-  return { from, to };
+/** Longest export range; overview() walks the range day by day, so this also bounds the work one request can ask for. */
+export const MAX_RANGE_DAYS = 366;
+const DAY_MS = 86400_000;
+/** A real calendar day in YYYY-MM-DD (2026-02-30 and 2026-13-01 fail: the round trip through Date changes them). */
+const validDay = (s: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const ms = Date.parse(`${s}T00:00:00Z`);
+  return Number.isFinite(ms) && dayKey(new Date(ms)) === s;
+};
+export type ExportRange = { ok: true; from: string; to: string } | { ok: false; error: string };
+
+/**
+ * Inclusive UTC day range for an export. Absent params default to the last 30 days ending today; a present but
+ * malformed or impossible date, from after to, or a span over MAX_RANGE_DAYS is refused (the route answers 400).
+ */
+export const parseRange = (sp: URLSearchParams, now = new Date()): ExportRange => {
+  const rawTo = sp.get("to") ?? "";
+  const rawFrom = sp.get("from") ?? "";
+  if (rawTo && !validDay(rawTo)) return { ok: false, error: "to must be a real date in YYYY-MM-DD" };
+  if (rawFrom && !validDay(rawFrom)) return { ok: false, error: "from must be a real date in YYYY-MM-DD" };
+  const to = rawTo || dayKey(now);
+  const from = rawFrom || dayKey(new Date(Date.parse(`${to}T00:00:00Z`) - 29 * DAY_MS));
+  if (from > to) return { ok: false, error: "from must not be after to" };
+  const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS) + 1;
+  if (days > MAX_RANGE_DAYS) return { ok: false, error: `range is capped at ${MAX_RANGE_DAYS} days` };
+  return { ok: true, from, to };
 };
