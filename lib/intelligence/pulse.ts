@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "../db";
+import { hasIntelligence } from "./entitlements";
 import { ACTIVE_MODEL, modelStates } from "./model/predict";
 import { accuracyWords } from "./model/scorer-core";
 import { personalRead } from "./personal-reco";
@@ -27,6 +28,9 @@ function idsKey(ids: readonly string[]): string {
  * email passes `clipper: false` because it never shows the queue.
  */
 export async function intelligencePulse(ownerId: string, opts: { now?: number; scopeKey?: string; targetIds?: string[] | null; clipper?: boolean } = {}): Promise<IntelligencePulse | null> {
+  // R1334: the pulse is the personal engine's digest; without the perk there is nothing honest to say, so null (Home,
+  // the Monday email, Pip and the app all read null as "no card"). The route adds the `entitled` flag for clients.
+  if (!(await hasIntelligence(ownerId))) return null;
   const now = opts.now ?? Date.now();
   const scoped = opts.targetIds !== null && opts.targetIds !== undefined;
   const scopeKey = opts.scopeKey || (scoped ? `ids:${idsKey(opts.targetIds!)}` : "");

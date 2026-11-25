@@ -2,6 +2,7 @@ import { HttpError, json, route } from "@/lib/http";
 import { resolveClient } from "@/lib/intelligence/client-scope";
 import { getProfiles } from "@/lib/intelligence/profile";
 import { LEVEL_LABEL } from "@/lib/intelligence/profile-core";
+import { requireIntelligence } from "@/lib/intelligence/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
  */
 export const GET = route(
   async (req, { user }) => {
+    await requireIntelligence(user.id, "personal_intelligence_enabled");
     const q = req.nextUrl.searchParams;
     const { scopeKey: client } = await resolveClient(user, q.get("client"));
     const platform = q.get("platform");

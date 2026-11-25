@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { accuracyByWeek, buildShared, driftOf, parseShared, pickBucket, quantile, SHARED_MAX_OWNER_SHARE, SHARED_MIN_OWNERS, SHARED_MIN_POSTS, SHARED_OWNER_CAP, sharedFor, weeklyAccuracy, type SharedRow } from "../lib/intelligence/shared-core";
 import { baselineScorer, cohortSize, EVAL_MIN_AGE_DAYS } from "../lib/intelligence/model/scorer-core";
 import { can } from "../lib/admin/perms";
+import { withIntelligence } from "./helpers/intelligence-plan";
 
 mock.module("next/headers", () => ({
   cookies: () => ({ get: () => undefined, getAll: () => [], has: () => false, set: () => {}, delete: () => {} }),
@@ -195,7 +196,7 @@ describe("R1324 shared-core", () => {
 /* ------------------------------------------------------------------ stored */
 
 let n = 0;
-const mk = async (extra: { shareLearning?: boolean } = {}) => db.user.create({ data: { name: `S ${++n}`, email: `r1324-${n}-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x", ...extra } });
+const mk = async (extra: { shareLearning?: boolean } = {}) => withIntelligence(await db.user.create({ data: { name: `S ${++n}`, email: `r1324-${n}-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x", ...extra } }));
 
 /** Measured ContentFeature rows for one owner, written the way the feature store writes them. */
 async function featureRows(ownerId: string, posts: { views: number; vpf: number; ageDays: number; categories?: string[] }[], platform = "instagram") {
@@ -321,11 +322,11 @@ describe("R1324 wiring", () => {
     const r = read("app/api/intelligence/sharing/route.ts");
     expect(r).toContain('if (user.role !== "owner") throw new HttpError(403');
     expect(r).toContain('canChange');
-    expect(read("components/intelligence/PersonalBaselines.tsx")).toContain("disabled={busy || !canChange}");
-    expect(read("components/intelligence/PersonalBaselines.tsx")).toContain('role="status" aria-live="polite"');
+    expect(read("components/intelligence/SharingRow.tsx")).toContain("disabled={busy || !canChange}");
+    expect(read("components/intelligence/SharingRow.tsx")).toContain('role="status" aria-live="polite"');
     expect(r).toContain("export const PATCH = route(");
-    expect(read("components/intelligence/PersonalBaselines.tsx")).toContain('role="switch"');
-    expect(read("components/intelligence/PersonalBaselines.tsx")).toContain("/api/intelligence/sharing");
+    expect(read("components/intelligence/SharingRow.tsx")).toContain('role="switch"');
+    expect(read("components/intelligence/SharingRow.tsx")).toContain("/api/intelligence/sharing");
     expect(read("prisma/schema.template.prisma")).toContain("shareLearning Boolean  @default(true)");
     expect(read("lib/intelligence/shared-core.ts")).not.toContain("prisma");
     expect(read("lib/intelligence/shared.ts")).toContain('import "server-only"');

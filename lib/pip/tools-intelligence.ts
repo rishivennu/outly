@@ -4,6 +4,8 @@ import { objectiveOptions } from "../intelligence/brand-core";
 import { overview, type Overview } from "../intelligence/service";
 import { CONFIDENCE_WORD, attentionEmptyText, emptyStateText, evidenceLine, formatLabel, hasEnoughPosts, platformLabel, statusWord, workingEmptyText } from "../../components/intelligence/view-core";
 import { clipperPulse, intelligencePulse } from "../intelligence/pulse";
+import { intelligenceAccess } from "../intelligence/entitlements";
+import { accessBlock } from "../intelligence/entitlements-core";
 import { FAILED_WINDOW_DAYS, baselineLine, clipperLine, platformName as pulsePlatformName, sampleWords, type ClipperPulse, type IntelligencePulse } from "../intelligence/pulse-core";
 import { LEVEL_LABEL } from "../intelligence/profile-core";
 import { HISTORY_DAYS } from "../intelligence/model/predict";
@@ -143,6 +145,15 @@ export async function predictions(ctx: PipCtx, a: PipArgs, range: DateRange | nu
   // A scoped teammate reads only their accounts' destinations (the same subset a client scope gets); no accounts = nothing,
   // never the workspace. The scope key is non-empty so stored workspace states are never served for it (R1326 review).
   const scopeKey = ctx.scope ? `pip:${ctx.scope.slice().sort().join(",")}` : "";
+  // R1334: without the Personal Intelligence perk the honest answer is the door, not "nothing measured yet".
+  const access = await intelligenceAccess(ctx.ownerId);
+  if (!access.enabled) {
+    r.empty = accessBlock(access.planName);
+    r.facts = [r.empty];
+    r.found = r.returned = 0;
+    r.downloads = [{ label: "See plans", href: access.upgrade ?? "/billing" }];
+    return r;
+  }
   const p = await intelligencePulse(ctx.ownerId, { now: ctx.now.getTime(), scopeKey, targetIds: ctx.scope ? await targetIdsForAccounts(ctx.ownerId, ctx.scope) : null });
   // The model may hand back "Instagram" or "reels": only a real platform id narrows, anything else means all (never a false "nothing on X").
   const platform = a.platform && isPlatform(a.platform) ? a.platform : null;

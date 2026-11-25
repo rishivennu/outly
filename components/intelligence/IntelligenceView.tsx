@@ -8,6 +8,7 @@ import { ClientSwitcher } from "./ClientSwitcher";
 import { FormatPerformance } from "./FormatPerformance";
 import { GrowthOverview } from "./GrowthOverview";
 import { NextContentRecommendations } from "./NextContentRecommendations";
+import { IntelligenceUpgrade } from "./IntelligenceUpgrade";
 import { PersonalBaselines } from "./PersonalBaselines";
 import { PersonalRecommendations } from "./PersonalRecommendations";
 import { PlatformComparison } from "./PlatformComparison";
@@ -29,7 +30,8 @@ const pill =
 
 type Listed = { recommendations: { id: string; outcome?: StoredOutcome | null }[] };
 
-export function IntelligenceView({ initial, account, initialOutcomes }: { initial: Overview | null; account?: string | null; initialOutcomes?: Record<string, StoredOutcome> }) {
+/** `personal` (R1334): the server-checked Personal Intelligence access; the client never decides it. */
+export function IntelligenceView({ initial, account, initialOutcomes, personal }: { initial: Overview | null; account?: string | null; initialOutcomes?: Record<string, StoredOutcome>; personal: { enabled: boolean; planName: string } }) {
   const [data, setData] = useState<Overview | null>(initial);
   const [days, setDays] = useState<number>(initial?.period.days ?? 28);
   const [objective, setObjective] = useState<Objective | null>(initial?.objective ?? null);
@@ -169,8 +171,14 @@ export function IntelligenceView({ initial, account, initialOutcomes }: { initia
             </>
           )}
           <TopicInsights topics={data.topics} />
-          <PersonalBaselines client={client || null} />
-          <PersonalRecommendations client={client || null} />
+          {personal.enabled ? (
+            <>
+              <PersonalBaselines client={client || null} />
+              <PersonalRecommendations client={client || null} />
+            </>
+          ) : (
+            <IntelligenceUpgrade planName={personal.planName} client={client || null} />
+          )}
           <WeeklyReport data={data} savedObjective={savedObjective} client={client || null} />
         </div>
       )}

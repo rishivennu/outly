@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth";
 import { analyticsScope } from "@/lib/profiles";
+import { intelligenceAccess } from "@/lib/intelligence/entitlements";
 import { overview } from "@/lib/intelligence/service";
 import { outcomesFor } from "@/lib/intelligence/outcome";
 import { hasOutcomeLine } from "@/components/intelligence/view-core";
@@ -26,5 +27,7 @@ export default async function IntelligencePage(props: { searchParams: Promise<{ 
   // R1248: the accepted cards' outcomes come with the first paint (one server read, no client round trip).
   const accepted = initial?.recommendations.filter((r) => hasOutcomeLine(r.status)).map((r) => r.id) ?? [];
   const initialOutcomes = accepted.length ? await outcomesFor(user.id, accepted).catch(() => undefined) : {};
-  return <IntelligenceView initial={initial} account={account} initialOutcomes={initialOutcomes} />;
+  // R1334: the personal layer is a plan perk, decided here on the server; the view only renders what it is told.
+  const access = await intelligenceAccess(user.id);
+  return <IntelligenceView initial={initial} account={account} initialOutcomes={initialOutcomes} personal={{ enabled: access.enabled, planName: access.planName }} />;
 }

@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import type { PostRecord } from "../lib/intelligence/core";
 import { aspectOf, extractFeatures, extractPerf, FEATURE_VERSION, hookTypeOf, localWeekdayHour, MEASURE_MIN_AGE_MS, parseFeatures, parsePerf, type ContentFeatures } from "../lib/intelligence/features-core";
 import { BLENDED_MIN, buildProfile, levelOf, PERSONAL_MIN, traitLifts, weekKey, type FeatureRow } from "../lib/intelligence/profile-core";
+import { withIntelligence } from "./helpers/intelligence-plan";
 
 mock.module("next/headers", () => ({
   cookies: () => ({ get: () => undefined, getAll: () => [], has: () => false, set: () => {}, delete: () => {} }),
@@ -160,7 +161,7 @@ describe("R1318 profile-core", () => {
 });
 
 let n = 0;
-const user = async () => db.user.create({ data: { name: `O ${++n}`, email: `r1318-${n}-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x", timezone: "Asia/Kolkata" } });
+const user = async () => withIntelligence(await db.user.create({ data: { name: `O ${++n}`, email: `r1318-${n}-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x", timezone: "Asia/Kolkata" } }));
 
 async function seed(ownerId: string, platform = "instagram") {
   const account = await db.socialAccount.create({ data: { userId: ownerId, platform, platformUserId: `${platform}-r1318-${Date.now()}-${Math.random()}`, username: "@o", accessToken: "x", status: "connected" } });
@@ -281,7 +282,7 @@ describe("R1318 features + profiles (db)", () => {
     // ownerIds narrows the candidates so other tenants in this database never change the ordering under test.
     const ids = [a.id, b.id, c.id];
     const r = await prof.sweepPersonal({ maxOwners: 20, ownerIds: ids });
-    expect(r).toEqual({ owners: 2, features: 2, failed: 0 });
+    expect(r).toEqual({ owners: 2, features: 2, failed: 0, skipped: 0 }); // R1334: skipped = owners with neither the perk nor consent
     expect(await db.creatorProfile.count({ where: { ownerId: a.id, platform: "" } })).toBe(1);
     expect(await db.creatorProfile.count({ where: { ownerId: b.id, platform: "" } })).toBe(1);
     // Everyone fresh now: nothing due.

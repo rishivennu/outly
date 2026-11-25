@@ -1,6 +1,7 @@
 import "server-only";
 import type { ClipCandidate, ClipJob, GeneratedClip, Prisma } from "@prisma/client";
 import { db } from "../db";
+import { hasIntelligence } from "../intelligence/entitlements";
 import { HttpError } from "../http";
 import { mediaView, ownedMedia } from "../services";
 import { normalizeCues, type Cue } from "../captions/cues";
@@ -323,6 +324,9 @@ async function transcriptOf(ownerId: string, jobId: string): Promise<{ words: Wo
 
 /** What the creator's own history says about hooks and short videos, on the platforms this job is for. */
 export async function hintsFor(ownerId: string, platforms: readonly string[]): Promise<PersonalHints> {
+  // R1334: the personal part of the score is a paid capability; without it every candidate scores neutral (0.5), which
+  // is what `personalScore` does with null hints, and the reason line never says "what works for you".
+  if (!(await hasIntelligence(ownerId, "personalized_clip_ranking_enabled").catch(() => false))) return { hookLiftPct: null, shortVideoLiftPct: null };
   const states = await modelStates(ownerId).catch(() => []);
   const pick = (trait: string) => {
     const mine = states.filter((s) => platforms.includes(s.platform) && (s.level === "personal" || s.level === "blended"));

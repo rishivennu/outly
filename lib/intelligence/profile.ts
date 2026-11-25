@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "../db";
+import { contributesShared, hasIntelligence } from "./entitlements";
 import { logLearning } from "./learning";
 import { syncPredictions } from "./model/predict";
 import { accountIdsForClient } from "./memory";
@@ -115,11 +116,25 @@ export async function personalStatus(ownerId: string, scopeKey = ""): Promise<Pe
   };
 }
 
-/** Features then profiles for one owner (what POST /api/intelligence/refresh and the sweep both run). */
-export async function refreshOwner(ownerId: string, opts: { now?: Date | number; batch?: number; maxBatches?: number } = {}) {
+/** What one owner is allowed to have built: features (their plan, or their consent to the shared baselines) and the personal layer (their plan). */
+export async function refreshScope(ownerId: string): Promise<{ features: boolean; personal: boolean }> {
+  const [personal, consented] = await Promise.all([hasIntelligence(ownerId, "personal_learning_enabled").catch(() => false), contributesShared(ownerId).catch(() => false)]);
+  return { features: personal || consented, personal };
+}
+
+/**
+ * Features then profiles for one owner (what POST /api/intelligence/refresh and the sweep both run).
+ * R1334: ContentFeature rows (counts and flags, never copy) are refreshed for an owner whose plan has the engine OR
+ * who consented to the shared baselines: they are the lightweight signal the shared model learns from. Profiles,
+ * forecasts, model states and the learning log are built only with the plan; an owner with neither is skipped whole
+ * (`skipped: "not-entitled"`), so a downgrade stops personal learning at the next tick and never deletes a row.
+ */
+export async function refreshOwner(ownerId: string, opts: { now?: Date | number; batch?: number; maxBatches?: number; scope?: { features: boolean; personal: boolean } } = {}) {
+  const scope = opts.scope ?? (await refreshScope(ownerId));
+  const features = { scanned: 0, written: 0, skipped: 0, remaining: 0 };
+  if (!scope.features) return { features, profiles: [], clients: 0, predictions: null, skipped: "not-entitled" as const };
   // Drain the feature backlog in a few batches (a first run can face hundreds of destinations), so the profile below
   // is built on every post the owner has, not the oldest hundred.
-  const features = { scanned: 0, written: 0, skipped: 0, remaining: 0 };
   for (let i = 0; i < Math.max(1, opts.maxBatches ?? 5); i++) {
     const r = await refreshFeatures(ownerId, { now: opts.now, batch: opts.batch ?? 200 });
     features.scanned = r.scanned;
@@ -128,6 +143,7 @@ export async function refreshOwner(ownerId: string, opts: { now?: Date | number;
     features.remaining = r.remaining;
     if (!r.remaining) break;
   }
+  if (!scope.personal) return { features, profiles: [], clients: 0, predictions: null, skipped: "features-only" as const };
   const scopes = await db.brandProfile.findMany({ where: { ownerId, NOT: { scopeKey: "" } }, select: { scopeKey: true }, take: 50 });
   const own = await rebuildProfiles(ownerId, { now: opts.now });
   // R1319: score the newly published destinations from the history before them, fill actuals, roll up accuracy.
@@ -137,7 +153,7 @@ export async function refreshOwner(ownerId: string, opts: { now?: Date | number;
     await rebuildProfiles(ownerId, { scopeKey: s.scopeKey, now: opts.now });
     clients++;
   }
-  return { features, profiles: own.profiles, clients, predictions };
+  return { features, profiles: own.profiles, clients, predictions, skipped: null };
 }
 
 /** A profile is stale after this long; the sweep rebuilds the stalest owners first. */
@@ -147,7 +163,7 @@ export const PROFILE_STALE_MS = 6 * 36e5;
  * The sweep step: owners with a live post in the window whose workspace profile is missing or older than
  * PROFILE_STALE_MS, at most `maxOwners` a run. One failing owner never stops the others.
  */
-export async function sweepPersonal(opts: { maxOwners?: number; now?: Date | number; ownerIds?: string[] } = {}): Promise<{ owners: number; features: number; failed: number }> {
+export async function sweepPersonal(opts: { maxOwners?: number; now?: Date | number; ownerIds?: string[] } = {}): Promise<{ owners: number; features: number; failed: number; skipped: number }> {
   const now = opts.now instanceof Date ? opts.now.getTime() : (opts.now ?? Date.now());
   const maxOwners = Math.max(1, Math.min(20, Math.floor(opts.maxOwners ?? 5) || 5));
   const since = new Date(now - PROFILE_WINDOW_DAYS * 864e5);
@@ -161,23 +177,33 @@ export async function sweepPersonal(opts: { maxOwners?: number; now?: Date | num
     orderBy: { userId: "asc" },
     take: 200,
   });
-  if (!grouped.length) return { owners: 0, features: 0, failed: 0 };
+  if (!grouped.length) return { owners: 0, features: 0, failed: 0, skipped: 0 };
   const ids = grouped.map((c) => c.userId);
   const profiles = await db.creatorProfile.findMany({ where: { ownerId: { in: ids }, scopeKey: "", platform: "" }, select: { ownerId: true, computedAt: true } });
   const at = new Map(profiles.map((p) => [p.ownerId, p.computedAt]));
-  const due = ids.sort((a, b) => (at.get(a)?.getTime() ?? 0) - (at.get(b)?.getTime() ?? 0)).slice(0, maxOwners);
+  const ordered = ids.sort((a, b) => (at.get(a)?.getTime() ?? 0) - (at.get(b)?.getTime() ?? 0));
+  // R1334: the plan (or consent) is checked here, per owner, before any work; an owner with neither is skipped and
+  // counted, never built. The check walks the stalest first and stops once `maxOwners` eligible owners are found.
+  const due: { ownerId: string; scope: { features: boolean; personal: boolean } }[] = [];
+  let skipped = 0;
+  for (const ownerId of ordered) {
+    if (due.length >= maxOwners) break;
+    const scope = await refreshScope(ownerId);
+    if (scope.features) due.push({ ownerId, scope });
+    else skipped++;
+  }
   let features = 0;
   let failed = 0;
-  for (const ownerId of due) {
+  for (const { ownerId, scope } of due) {
     try {
-      const r = await refreshOwner(ownerId, { now, batch: 100 });
+      const r = await refreshOwner(ownerId, { now, batch: 100, scope });
       features += r.features.written;
     } catch (e) {
       failed++;
       console.error("[sweep] personal", ownerId, e);
     }
   }
-  return { owners: due.length, features, failed };
+  return { owners: due.length, features, failed, skipped };
 }
 
 /** The deterministic baseline is a model version like any other; created once, idempotent. */

@@ -1,6 +1,7 @@
 import { json, route } from "@/lib/http";
 import { resolveClient } from "@/lib/intelligence/client-scope";
 import { personalRead } from "@/lib/intelligence/personal-reco";
+import { requireIntelligence } from "@/lib/intelligence/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
  */
 export const GET = route(
   async (req, { user }) => {
+    await requireIntelligence(user.id, "personalized_recommendations_enabled");
     const { scopeKey, targetIds } = await resolveClient(user, req.nextUrl.searchParams.get("client"));
     const data = await personalRead(user.id, { scopeKey, targetIds });
     return json(data, { headers: { "cache-control": "private, no-store" } });

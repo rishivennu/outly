@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "../db";
+import { requireIntelligence } from "./entitlements";
 import { periodOf } from "./core";
 import { HISTORY_DAYS, modelStates, type ModelState } from "./model/predict";
 import { persistRecommendations, storedFor, type StoredRecommendation } from "./reco";
@@ -18,6 +19,7 @@ export interface PersonalRead extends Omit<PersonalDrafts, "recommendations"> {
 }
 
 export async function personalRead(ownerId: string, opts: { scopeKey?: string; targetIds?: string[] | null; now?: number; readOnly?: boolean; states?: ModelState[] } = {}): Promise<PersonalRead> {
+  await requireIntelligence(ownerId, "personalized_recommendations_enabled"); // R1334: inference and storage are paid
   const now = opts.now ?? Date.now();
   const scopeKey = opts.scopeKey ?? "";
   // The states are computed over the model's HISTORY_DAYS, so the window the cards name is that one.

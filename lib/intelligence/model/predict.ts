@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "../../db";
+import { requireIntelligence } from "../entitlements";
 import { loadFeatureRows, toFeatureRows } from "../features";
 import { extractFeatures, type ContentFeatures } from "../features-core";
 import { logLearning } from "../learning";
@@ -63,6 +64,7 @@ export interface DraftInput {
 
 /** Score a draft from the creator's history. Returns null when there is nothing honest to say (level none, no prior). */
 export async function predictDraft(ownerId: string, draft: DraftInput, opts: { now?: Date | number; scopeKey?: string } = {}): Promise<Prediction | null> {
+  await requireIntelligence(ownerId, "personalized_predictions_enabled"); // R1334: a forecast is paid inference
   const now = opts.now instanceof Date ? opts.now.getTime() : (opts.now ?? Date.now());
   const at = draft.scheduledAt ? new Date(draft.scheduledAt) : new Date(now);
   const user = draft.timezone === undefined ? await db.user.findUnique({ where: { id: ownerId }, select: { timezone: true } }) : null;

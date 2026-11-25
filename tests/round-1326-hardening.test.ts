@@ -6,6 +6,7 @@ import { beforeAll, describe, expect, mock, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { ABANDON_BATCH, ABANDON_DAYS, ABANDONED_ERROR, CANDIDATE_RETENTION_DAYS, DAY_MS, RETENTION_BATCH, TRANSCRIPT_RETENTION_DAYS, candidatesExpired, closedAt, isAbandoned, isClosed, isTerminal, retentionCutoffs, retentionLine, transcriptExpired } from "../lib/clipper/retention-core";
 import { DEFAULT_CLIPPER_CAP, budgetVerdict, capFrom, rupees, unavailableVerdict } from "../lib/clipper/budget-core";
+import { withIntelligence } from "./helpers/intelligence-plan";
 
 mock.module("next/headers", () => ({
   cookies: () => ({ get: () => undefined, getAll: () => [], has: () => false, set: () => {}, delete: () => {} }),
@@ -118,7 +119,7 @@ describe("R1326 daily budget (pure)", () => {
   });
 });
 
-const mk = async () => db.user.create({ data: { email: `r1326-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test.local`, name: "R1326", passwordHash: "x" } });
+const mk = async () => withIntelligence(await db.user.create({ data: { email: `r1326-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test.local`, name: "R1326", passwordHash: "x" } }));
 const seedJob = (ownerId: string, o: { status: string; stage: string; heartbeatAt?: Date | null; updatedAt?: Date; completedAt?: Date | null }) =>
   db.clipJob.create({ data: { ownerId, status: o.status, stage: o.stage, heartbeatAt: o.heartbeatAt ?? null, updatedAt: o.updatedAt ?? ago(1), completedAt: o.completedAt ?? null, settings: "{}", executor: "browser" } });
 const seedTranscript = (ownerId: string, jobId: string) => db.clipTranscript.create({ data: { jobId, ownerId, engine: "test", language: "en", words: "[]", cues: "[]", wordCount: 0 } });
@@ -254,7 +255,7 @@ describe("R1326 wiring", () => {
   test("sweep slot, detect fallback, docs", () => {
     const sweep = read("app/api/cron/sweep/route.ts");
     expect(sweep).toContain("plan.housekeeping ? await import(\"@/lib/clipper/retention\").then((m) => m.sweepClipper(now))");
-    expect(sweep).toContain("rollup, personal, running, shared, clipper }");
+    expect(sweep).toContain("rollup, personal, running, shared, clipper, crashes }"); // R1329 added crashes
     const detect = read("app/api/clipper/jobs/[id]/detect/route.ts");
     expect(detect).toContain("budget = await clipperBudget(uid).catch(() => unavailableVerdict(clipperCap()));"); // R1328: a read failure fails closed to the rules
     expect(detect).toContain("if (budget.allowed) {");

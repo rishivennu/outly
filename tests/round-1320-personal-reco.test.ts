@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import type { ModelState } from "../lib/intelligence/model/predict";
 import { FORMAT_GAP_PCT, NO_PERSONAL_REASON, PER_PLATFORM_MAX, PERSONAL_MAX, isPersonalId, personalEvidenceLine, personalId, personalRecommendations, traitSubject } from "../lib/intelligence/personal-reco-core";
 import { ruleKeyOf } from "../lib/intelligence/reco-core";
+import { withIntelligence } from "./helpers/intelligence-plan";
 
 mock.module("next/headers", () => ({
   cookies: () => ({ get: () => undefined, getAll: () => [], has: () => false, set: () => {}, delete: () => {} }),
@@ -128,7 +129,7 @@ describe("R1320 personal-reco-core", () => {
 });
 
 let n = 0;
-const user = async () => db.user.create({ data: { name: `O ${++n}`, email: `r1320-${n}-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x" } });
+const user = async () => withIntelligence(await db.user.create({ data: { name: `O ${++n}`, email: `r1320-${n}-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x" } }));
 
 async function seed(ownerId: string, platform = "instagram") {
   const account = await db.socialAccount.create({ data: { userId: ownerId, platform, platformUserId: `${platform}-r1320-${Date.now()}-${Math.random()}`, username: "@o", accessToken: "x", status: "connected" } });

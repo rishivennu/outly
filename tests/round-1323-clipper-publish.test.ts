@@ -9,6 +9,7 @@ import { beforeAll, describe, expect, mock, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { CLIP_METRICS, clipPrefill, performanceLine, platformPerformance } from "../lib/clipper/publish-core";
 import { savePostSchema } from "../lib/validation";
+import { withIntelligence } from "./helpers/intelligence-plan";
 
 mock.module("next/headers", () => ({
   cookies: () => ({ get: () => undefined, getAll: () => [], has: () => false, set: () => {}, delete: () => {} }),
@@ -30,7 +31,7 @@ const tag = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(
 
 async function seed(o: { rendered?: boolean } = {}) {
   const t = tag();
-  const user = await db.user.create({ data: { email: `r1323-${t}@test.dev`, name: "Clip Poster", passwordHash: "x" } });
+  const user = await withIntelligence(await db.user.create({ data: { email: `r1323-${t}@test.dev`, name: "Clip Poster", passwordHash: "x" } }));
   const source = await db.media.create({ data: { userId: user.id, originalFilename: "talk.mp4", storageKey: `r1323/${t}.mp4`, mimeType: "video/mp4", size: 1000, duration: 120, width: 1920, height: 1080, status: "ready" } });
   const job = await db.clipJob.create({ data: { ownerId: user.id, mediaId: source.id, status: "ready", stage: "review", settings: JSON.stringify({ platforms: ["instagram", "youtube"] }), durationSec: 120, executor: "browser" } });
   const rendered = o.rendered === false ? null : await db.media.create({ data: { userId: user.id, originalFilename: "clip.mp4", storageKey: `r1323/${t}-clip.mp4`, mimeType: "video/mp4", size: 500, duration: 30, width: 1080, height: 1920, status: "ready" } });

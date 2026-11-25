@@ -10,6 +10,7 @@ import type { PostRecord } from "../lib/intelligence/core";
 import { extractFeatures, extractPerf } from "../lib/intelligence/features-core";
 import type { FeatureRow } from "../lib/intelligence/profile-core";
 import { accuracyWords, adjustmentsFor, apeOf, baselineScorer, BASELINE_KEY, evaluate, MAX_ADJ, MIN_ADJ, SHRINK_K, traitOf } from "../lib/intelligence/model/scorer-core";
+import { withIntelligence } from "./helpers/intelligence-plan";
 
 mock.module("next/headers", () => ({
   cookies: () => ({ get: () => undefined, getAll: () => [], has: () => false, set: () => {}, delete: () => {} }),
@@ -134,7 +135,7 @@ describe("R1319 scorer-core", () => {
 });
 
 let n = 0;
-const user = async () => db.user.create({ data: { name: `O ${++n}`, email: `r1319-${n}-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x" } });
+const user = async () => withIntelligence(await db.user.create({ data: { name: `O ${++n}`, email: `r1319-${n}-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x" } }));
 
 async function seed(ownerId: string, platform = "instagram") {
   const account = await db.socialAccount.create({ data: { userId: ownerId, platform, platformUserId: `${platform}-r1319-${Date.now()}-${Math.random()}`, username: "@o", accessToken: "x", status: "connected" } });

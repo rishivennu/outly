@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { baselineItems, baselineLine, clipperLine, pickTop, pulseLines, type IntelligencePulse } from "../lib/intelligence/pulse-core";
 import { clipperSummary, predictionsSummary } from "../lib/pip/tools-intelligence";
 import { ANALYTIC_TOOLS, PIP_TOOLS } from "../lib/pip/types";
+import { withIntelligence } from "./helpers/intelligence-plan";
 
 mock.module("next/headers", () => ({
   cookies: () => ({ get: () => undefined, getAll: () => [], has: () => false, set: () => {}, delete: () => {} }),
@@ -145,7 +146,7 @@ describe("R1325 Pip summaries (pure)", () => {
 /* ------------------------------------------------------------------ stored */
 
 let n = 0;
-const mk = async () => db.user.create({ data: { name: `P ${++n}`, email: `r1325-${n}-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x" } });
+const mk = async () => withIntelligence(await db.user.create({ data: { name: `P ${++n}`, email: `r1325-${n}-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x" } }));
 
 async function seed(ownerId: string, views: number[], platform = "instagram") {
   const account = await db.socialAccount.create({ data: { userId: ownerId, platform, platformUserId: `${platform}-r1325-${Date.now()}-${Math.random()}`, username: "@p", accessToken: "x", status: "connected" } });

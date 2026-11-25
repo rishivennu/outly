@@ -4,6 +4,7 @@ import { PLATFORMS } from "@/lib/domain";
 import { POST_FORMATS } from "@/lib/formats";
 import { resolveClient } from "@/lib/intelligence/client-scope";
 import { predictDraft, predictionsOverview } from "@/lib/intelligence/model/predict";
+import { requireIntelligence } from "@/lib/intelligence/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic";
  */
 export const GET = route(
   async (req, { user }) => {
+    await requireIntelligence(user.id, "personalized_predictions_enabled");
     const q = req.nextUrl.searchParams;
     const platform = q.get("platform");
     if (platform !== null && !(PLATFORMS as readonly string[]).includes(platform)) throw new HttpError(400, "Unknown platform.", "BAD_PLATFORM");
@@ -46,6 +48,7 @@ const Draft = z.object({
  */
 export const POST = route(
   async (req, { user }) => {
+    await requireIntelligence(user.id, "personalized_predictions_enabled");
     const body = Draft.parse(await req.json());
     const prediction = await predictDraft(user.id, body);
     return json({ prediction, reason: prediction ? null : "No measured post of yours on this platform yet, so Outlly will not guess a number. Publish a few and the estimate appears." });

@@ -48,7 +48,7 @@ export interface Entitlements {
 }
 
 /** Which limit a 402 is about, so the upgrade popup can say the right thing. */
-export type LimitFeature = "posts" | "upload" | "replies" | "captions" | "burn" | "ai" | "seats" | "accounts" | "storage" | "platforms" | "brands" | "x" | "perk";
+export type LimitFeature = "posts" | "upload" | "replies" | "captions" | "burn" | "ai" | "seats" | "accounts" | "storage" | "platforms" | "brands" | "x" | "perk" | "intelligence";
 
 const limit = (message: string, feature: LimitFeature) => new HttpError(402, message, "PLAN_LIMIT", { feature, upgrade: "/billing" });
 

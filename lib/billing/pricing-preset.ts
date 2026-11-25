@@ -63,7 +63,7 @@ export const PRICING_2026_11: PresetPlan[] = [
       name: "Creator", note: "For creators who post everywhere, every day", priceMinor: 79900, yearlyMinor: 799000, prices: CREATOR, yearlyPrices: x10(CREATOR), highlight: true, sortOrder: 2, state: "available",
       postLimit: 0, postPeriod: "month", fairUsePosts: 300, xPostLimit: 100, captionVideos: 150, aiCaptions: true, analyticsDays: 365, replyLimit: 0,
       seats: 1, accountLimit: 0, brandLimit: 2, platformLimit: 0, storageMb: 25 * 1024, maxUploadMb: 1024, burnCaptions: true,
-      perks: ["weekly-digest", "voice-memory", "csv-export", "ai-replies", "review-links", "ai-insights"], // R1247: AI wording of recommendations
+      perks: ["weekly-digest", "voice-memory", "csv-export", "ai-replies", "review-links", "ai-insights", "personal-intelligence"], // R1247: AI wording of recommendations; R1334: the personal engine
       features: ["2 brands on every platform", "Unlimited posts, 100 to X a month", "AI captions on 150 videos, in your voice", "1 year of analytics and CSV export", "1 helper, review links, AI replies"],
     },
   },
@@ -282,7 +282,7 @@ export const PRICING_2026_11_R2: PresetPlan[] = [
       name: "Creator", note: "For creators who post everywhere, every day", priceMinor: 97900, yearlyMinor: 979000, prices: CREATOR_R2, yearlyPrices: x10(CREATOR_R2), highlight: true, sortOrder: 2, state: "available",
       postLimit: 150, postPeriod: "month", fairUsePosts: 0, xPostLimit: 40, captionVideos: 60, aiCaptions: true, analyticsDays: 365, replyLimit: 35,
       seats: 1, accountLimit: 0, brandLimit: 2, platformLimit: 0, storageMb: 25 * 1024, maxUploadMb: 1024, burnCaptions: true,
-      perks: ["weekly-digest", "voice-memory", "csv-export", "ai-replies", "review-links", "ai-insights"], aiMonthly: 200, aiDaily: 25, // R1247: ai-insights = AI wording of recommendations
+      perks: ["weekly-digest", "voice-memory", "csv-export", "ai-replies", "review-links", "ai-insights", "personal-intelligence"], aiMonthly: 200, aiDaily: 25, // R1247: ai-insights = AI wording of recommendations; R1334: personal-intelligence
       features: ["2 brands on every platform", "150 posts a month, 40 to X", "AI captions on 60 videos, in your voice", "200 AI requests a month, 25 GB of storage", "1 year of analytics, CSV export, 1 helper"],
     },
   },

@@ -1,5 +1,6 @@
 import { json, route } from "@/lib/http";
 import { refreshOwner } from "@/lib/intelligence/profile";
+import { requireIntelligence } from "@/lib/intelligence/entitlements";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -11,6 +12,7 @@ export const maxDuration = 60;
  */
 export const POST = route(
   async (_req, { user }) => {
+    await requireIntelligence(user.id, "personal_learning_enabled");
     // user.id is the workspace owner for members too (lib/auth.ts seats a member on the owner's row).
     const r = await refreshOwner(user.id, { batch: 200 });
     return json({ ok: true, features: r.features, profiles: r.profiles, clients: r.clients });
