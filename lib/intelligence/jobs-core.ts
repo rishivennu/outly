@@ -96,10 +96,21 @@ export function predictLatency(rows: readonly JobRunRow[]): { n: number; p50: nu
   return { n: mine.length, p50: percentile(d, 50), p95: percentile(d, 95), failed: mine.filter((r) => !r.ok).length };
 }
 
-/** The failure text kept on a row: the message only, cut short, never a stack (which could carry a path or an id). */
+/** Values a database error message can carry that must not reach the admin log: addresses, Prisma cuids, UUIDs. */
+const REDACTIONS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "[email]"],
+  [/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "[id]"],
+  [/\bc[a-z0-9]{24}\b/g, "[id]"],
+];
+
+/**
+ * The failure text kept on a row: the message only, one line, cut short, never a stack (which could carry a path),
+ * with addresses and record ids redacted (a constraint error can quote the offending value).
+ */
 export function errorText(e: unknown): string {
   const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
-  return msg.replace(/\s+/g, " ").trim().slice(0, 500) || "Unknown error";
+  const flat = REDACTIONS.reduce((t, [re, to]) => t.replace(re, to), msg.replace(/\s+/g, " ").trim());
+  return flat.slice(0, 500) || "Unknown error";
 }
 
 export function parseResult(raw: string | null | undefined): Record<string, unknown> {

@@ -122,6 +122,12 @@ describe("R1337 job statistics, pure", () => {
     expect(errorText(undefined)).toBe("Unknown error");
     expect(errorText(new Error(""))).toBe("Unknown error");
   });
+
+  test("errorText redacts addresses and record ids a database error may quote", () => {
+    expect(errorText(new Error("Unique constraint failed on email a.b+c@example.co.uk for cm3x9k2l0000a1b2c3d4e5f6g"))).toBe("Unique constraint failed on email [email] for [id]");
+    expect(errorText("row 3f2504e0-4f89-11d3-9a0c-0305e82c3301 missing")).toBe("row [id] missing");
+    expect(errorText("plain words and a cuid-length c123 token stay")).toBe("plain words and a cuid-length c123 token stay");
+  });
 });
 
 describe("R1337 privacy rules, pure", () => {

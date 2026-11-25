@@ -63,7 +63,11 @@ async function sweep(req: NextRequest) {
   if (now.getMinutes() === 7) await cleanupSubs().catch(() => 0);
   // R1318 Personal Intelligence: features and creator profiles, every 10 minutes (slot 2), at most 5 owners a run (never fatal).
   // R1337: every run (and every failure) is logged as IntelligenceJobRun `personal`, so Admin > AI Management shows measured rates.
-  const jobs = await import("@/lib/intelligence/jobs");
+  // The job log is bookkeeping: if its module cannot load, the sweeps still run, just unlogged (never fatal).
+  const jobs = await import("@/lib/intelligence/jobs").catch((e) => (console.error("[sweep] jobs", e), null)) ?? {
+    runJob: <T,>(_job: unknown, _trigger: unknown, fn: () => Promise<T>) => fn(),
+    pruneJobRuns: async () => 0,
+  };
   const personal = new Date().getMinutes() % 10 === 2 ? await jobs.runJob("personal", "sweep", () => import("@/lib/intelligence/profile").then((m) => m.sweepPersonal({ maxOwners: 5 }))).catch((e) => (console.error("[sweep] personal", e), null)) : null;
   // R1324 shared learning: the anonymised cohort baselines, rebuilt once the stored document is an hour old (one cheap
   // read on every tick, so the refresh does not depend on the pinger landing on one minute), never fatal.
