@@ -63,6 +63,13 @@ export interface DeviceDraft {
   captions?: unknown;
   /** 1190: what Pip wrote for each place, so "Restore Pip's version" survives a reload. */
   adapted?: unknown;
+  /**
+   * R1330: the video is already on Outlly (a Clipper render, or an upload that finished), so a reload adopts that Media
+   * instead of asking for the file again. Null once a different file takes over.
+   */
+  mediaId?: string | null;
+  /** R1330: the Clipper clip this draft came from; the first server save still links the post to it after a reload. */
+  clipId?: string | null;
 }
 
 export type DeviceDraftInput = Omit<DeviceDraft, "updatedAt" | "videoKey" | "videoType" | "syncState" | "clientKey"> & Partial<Pick<DeviceDraft, "syncState" | "clientKey">>;
@@ -315,6 +322,8 @@ export function openDrafts(userId: string) {
       ...("schedule" in d ? { schedule: d.schedule } : prev?.schedule !== undefined ? { schedule: prev.schedule } : {}),
       ...("captions" in d ? { captions: d.captions } : prev?.captions !== undefined ? { captions: prev.captions } : {}),
       ...("adapted" in d ? { adapted: d.adapted } : prev?.adapted !== undefined ? { adapted: prev.adapted } : {}),
+      ...("mediaId" in d ? { mediaId: typeof d.mediaId === "string" ? d.mediaId : null } : prev?.mediaId !== undefined ? { mediaId: prev.mediaId } : {}),
+      ...("clipId" in d ? { clipId: typeof d.clipId === "string" ? d.clipId : null } : prev?.clipId !== undefined ? { clipId: prev.clipId } : {}),
       ...(typeof d.storyMeta === "string" ? { storyMeta: d.storyMeta.slice(0, 20_000) } : typeof prev?.storyMeta === "string" ? { storyMeta: prev.storyMeta } : {}),
     };
     const ok = await run([META, VIDEO], "readwrite", (tx) => {

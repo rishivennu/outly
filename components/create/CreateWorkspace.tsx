@@ -705,7 +705,19 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
             }
             return out;
           });
-          if (found.video) {
+          // R1330: the video may already be on Outlly (a Clipper render never had a file in this tab; a finished upload
+          // has one but needs no second trip). Adopt it when the server still has it; otherwise fall back to the file.
+          const onOutlly = d.mediaId ? await api<{ media: MediaView }>(`/api/media/${encodeURIComponent(d.mediaId)}`).then((r) => r.media, () => null) : null;
+          if (!alive) return;
+          if (onOutlly) {
+            uploadAbort.current?.abort();
+            synced.current = onOutlly.id;
+            setMedia(onOutlly);
+            setUpload({ kind: "done" });
+            if (d.clipId) recOrigin.current = { ...(recOrigin.current ?? {}), clipId: d.clipId };
+            setStep(d.hook || d.story?.trim() ? "everywhere" : "story");
+            toast(missingPostId ? "That draft was no longer on Outlly, so we brought it back from this device." : "Picked up where you left off.", "info");
+          } else if (found.video) {
             // R1209 A1: Outlly already wrote (or the creator wrote) this caption: the video is not read again.
             void startUpload(found.video, undefined, undefined, { watch: !d.story?.trim() && !sm.original });
             setStep(d.hook || d.story?.trim() ? "everywhere" : "story");
@@ -917,8 +929,12 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
         targets[p] = { enabled: x.enabled, title: x.title, caption: x.caption, description: x.description, hashtags: x.hashtags, firstComment: x.firstComment, accountId: x.accountId ?? null };
       }
       const schedule = { at: mode === "schedule" ? when.toISOString() : null, tz };
+      // R1330: a video Outlly already holds (a Clipper render has no file in this tab at all) is remembered by id, with the
+      // clip it came from, so a reload adopts it instead of asking for the file and the first save still links the clip.
+      const mediaId = media && upload.kind === "done" ? media.id : null;
+      const clipId = recOrigin.current?.clipId ?? null;
       const written = store
-        .save({ id, postId, title: draftTitle({ drafts, hook, filename }), story, storyMeta: metaJson, hook, targets, filename, poster: posterBlob.current, captions: captionsRef.current ?? undefined, adapted: adaptedRef.current, baseUpdatedAt: baseRef.current ?? undefined, schedule }, fileRef.current)
+        .save({ id, postId, title: draftTitle({ drafts, hook, filename }), story, storyMeta: metaJson, hook, targets, filename, poster: posterBlob.current, captions: captionsRef.current ?? undefined, adapted: adaptedRef.current, baseUpdatedAt: baseRef.current ?? undefined, schedule, mediaId, clipId }, fileRef.current)
         .then((ok) => {
           // Not on Outlly yet: put this copy in the address, so a reload picks it straight back up.
           if (ok && !postIdRef.current && window.location.pathname === "/create" && !window.location.search) window.history.replaceState(null, "", `/create?local=${encodeURIComponent(id)}`);
@@ -930,7 +946,7 @@ export function CreateWorkspace({ accounts: accountList, choices: choiceList, in
   useEffect(() => {
     const t = setTimeout(() => writeLocal.current(), 700);
     return () => clearTimeout(t);
-  }, [deviceReady, phase, hasMedia, postId, drafts, hook, story, metaJson, media, localPoster, mode, when]);
+  }, [deviceReady, phase, hasMedia, postId, drafts, hook, story, metaJson, media, upload.kind, localPoster, mode, when]);
   const capTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const onTrackChange = useCallback((t: CaptionTrack | null) => {
     captionsRef.current = t;
