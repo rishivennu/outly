@@ -32,8 +32,10 @@ describe("1163 sidebar", () => {
     const hrefs = [...shell.matchAll(/href: "(\/admin[^"]*)"/g)].map((m) => m[1]);
     for (const r of ROUTES) expect(hrefs).toContain(r);
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    // 30 from 1163, the six Content Studio pages (1175), Live Assist (R1184), System Health (R1195) and Creator Partnerships (R1282) and App Analytics (R1308).
-    expect(hrefs.length).toBe(42); // R1309 added /admin/workshops, R1314 /admin/costs
+    // 30 from 1163, the six Content Studio pages (1175), Live Assist (R1184), System Health (R1195), Creator Partnerships (R1282),
+    // App Analytics (R1308), Workshops (R1309), Costs (R1314) and Intelligence (R1324).
+    expect(hrefs.length).toBe(43);
+    expect(hrefs).toContain("/admin/intelligence");
     for (const r of ["/admin/blog", "/admin/blog/generate", "/admin/blog/library", "/admin/blog/calendar", "/admin/blog/seo", "/admin/blog/settings"]) expect(hrefs).toContain(r);
   });
   test("insight pages moved out of Run", () => {

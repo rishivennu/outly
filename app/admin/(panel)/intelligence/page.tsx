@@ -25,7 +25,7 @@ export default async function Intelligence() {
 
   return (
     <>
-      <PageHead eyebrow="Insights" title="Intelligence" body="The forecasting model, its accuracy across creators, and the anonymised cohort baselines it leans on. Aggregates only." actions={<RebuildButton />} />
+      <PageHead eyebrow="Insights" title="Intelligence" body="The forecasting model, its accuracy, and the anonymised cohort baselines it leans on. Aggregates only." actions={<RebuildButton />} />
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AdminKpi i={0} label="Active model" value={g.modelKey} sub={`${num(g.predictions.total)} forecasts · ${num(g.predictions.evaluated)} evaluated`} hint="Every forecast is written before the outcome is known and filled with the actual after the post's first week." />
