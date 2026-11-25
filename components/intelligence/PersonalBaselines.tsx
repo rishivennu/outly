@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/client/api";
 import { LEVEL_LABEL, type Level, type Lift } from "@/lib/intelligence/profile-core";
+import { COLD_START_COPY } from "@/lib/intelligence/entitlements-core";
 import { Card, Chips, ConfidenceBadge } from "./bits";
 import { SharingRow } from "./SharingRow";
 import type { Confidence } from "./types";
@@ -14,7 +15,7 @@ import type { Confidence } from "./types";
 
 type FormatBaseline = { format: string; n: number; level: Exclude<Level, "none">; predicted: number; low: number; high: number; confidence: Confidence; explanation: string; prior?: { shared: boolean; n: number; owners: number | null } | null };
 type PlatformPredictions = { platform: string; level: Level; measured: number; byFormat: FormatBaseline[]; lifts: Lift[]; accuracy: { n: number; medianApe: number | null; within: number | null } | null; accuracyWords: string };
-type Overview = { model: { key: string } | null; platforms: PlatformPredictions[]; overall: { words: string }; recent: unknown[] };
+type Overview = { model: { key: string } | null; platforms: PlatformPredictions[]; overall: { words: string }; recent: unknown[]; coldStart?: boolean | null; backfill?: string | null };
 
 const num = (n: number) => n.toLocaleString("en");
 
@@ -41,6 +42,12 @@ export function PersonalBaselines({ client }: { client: string | null }) {
     >
       {error && <p className="rounded-2xl bg-destructive/10 p-4 text-sm font-medium text-destructive hairline">{error}</p>}
       {!data && !error && <p className="text-sm text-muted-foreground">Reading your measured posts...</p>}
+      {data && data.coldStart && (
+        <p className="rounded-2xl bg-secondary/50 p-4 text-sm text-muted-foreground hairline" role="status">
+          {COLD_START_COPY}
+          {data.backfill === "kicked" || data.backfill === "locked" ? " Your first profile is being built now; this card fills in on your next visit." : ""}
+        </p>
+      )}
       {data && !data.platforms.length && (
         <p className="rounded-2xl bg-secondary/50 p-4 text-sm text-muted-foreground hairline">
           Nothing measured yet. Baselines appear once a published post is a day old and has numbers (Instagram, YouTube or Facebook report them; the other platforms give none per post).

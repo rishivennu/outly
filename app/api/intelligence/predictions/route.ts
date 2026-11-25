@@ -6,6 +6,7 @@ import { resolveClient } from "@/lib/intelligence/client-scope";
 import { predictDraft, predictionsOverview } from "@/lib/intelligence/model/predict";
 import { requireIntelligence } from "@/lib/intelligence/entitlements";
 import { recordJobRun } from "@/lib/intelligence/jobs";
+import { kickBackfill } from "@/lib/intelligence/backfill";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,8 @@ export const dynamic = "force-dynamic";
  * R1319: GET /api/intelligence/predictions: what a typical post of each format would do per platform (the creator's
  * calibration of the active model), the model's accuracy so far, and the latest forecasts with their actuals.
  * ?platform= narrows; ?client= (owner only) computes the same for an agency client's destinations.
+ * R1338: on the workspace scope the answer carries `coldStart` (no workspace profile yet) and `backfill` (the kick this
+ * read gave a missing or stale profile), so "Your baselines" can show the cold-start line while the first build runs.
  */
 export const GET = route(
   async (req, { user }) => {
@@ -21,8 +24,8 @@ export const GET = route(
     const platform = q.get("platform");
     if (platform !== null && !(PLATFORMS as readonly string[]).includes(platform)) throw new HttpError(400, "Unknown platform.", "BAD_PLATFORM");
     const { scopeKey, targetIds } = await resolveClient(user, q.get("client"));
-    const data = await predictionsOverview(user.id, { scopeKey, targetIds, platform });
-    return json(data, { headers: { "cache-control": "private, no-store" } });
+    const [data, kick] = await Promise.all([predictionsOverview(user.id, { scopeKey, targetIds, platform }), scopeKey ? null : kickBackfill(user.id).catch(() => null)]);
+    return json({ ...data, coldStart: kick ? kick.coldStart : null, backfill: kick?.verdict ?? null }, { headers: { "cache-control": "private, no-store" } });
   },
   { limit: [60, 60_000] },
 );
