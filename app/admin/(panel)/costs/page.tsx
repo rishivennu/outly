@@ -1,5 +1,7 @@
 import { requireAdmin } from "@/lib/admin/guard";
 import { aiBreakdown, overview, topUsers, type AiBreakdown, type UsersBreakdown } from "@/lib/costs/overview";
+import { recommendationsFor } from "@/lib/costs/insights";
+import type { Recommendation } from "@/lib/costs/insights-core";
 import { COST_SOURCES, SOURCE_BLURB, SOURCE_LABEL, fmtInr, pctOf, providerLabel, type CostSource } from "@/lib/costs/core";
 import { Card, CardTitle, Empty, PageHead, Pill, Table, fmtDate } from "@/components/admin/ui";
 import { AdminKpi } from "@/components/admin/motion/AdminKpi";
@@ -23,7 +25,11 @@ export default async function Costs(props: { searchParams: Promise<Params> }) {
   await requireAdmin("costs");
   const view = sp.view === "ai" || sp.view === "users" ? sp.view : "";
   const o = await overview({ from: sp.from, to: sp.to });
-  const [ai, people] = await Promise.all([view === "ai" ? aiBreakdown({ from: o.range.from, to: o.range.to }) : null, view === "users" ? topUsers({ from: o.range.from, to: o.range.to, limit: 50 }) : null]);
+  const [ai, people, recs] = await Promise.all([
+    view === "ai" ? aiBreakdown({ from: o.range.from, to: o.range.to }) : null,
+    view === "users" ? topUsers({ from: o.range.from, to: o.range.to, limit: 50 }) : null,
+    view === "" ? recommendationsFor(o).catch(() => [] as Recommendation[]) : ([] as Recommendation[]),
+  ]);
   const change = o.previousMinor != null && o.previousMinor > 0 ? Math.round(((o.totalMinor - o.previousMinor) / o.previousMinor) * 100) : null;
   const open = o.alerts.filter((a) => a.status === "open");
   const spark = o.series.map((p) => p.inrMinor / 100);
@@ -79,6 +85,7 @@ export default async function Costs(props: { searchParams: Promise<Params> }) {
         {o.supersededMinor > 0 && <p className="mt-3 text-[12.5px] text-muted-foreground">{fmtInr(o.supersededMinor)} of estimates in this range is set aside from the totals because the provider's invoice for that month is on file. The invoice counts; the estimates stay in the ledger for comparison.</p>}
       </Card>
 
+      <InsightsCard items={recs} />
       <div className="mb-4 grid gap-4 lg:grid-cols-2">
         <AlertsCard items={o.alerts} />
         <BudgetsCard items={o.budgets} />
@@ -92,6 +99,31 @@ export default async function Costs(props: { searchParams: Promise<Params> }) {
       </div>
       </>)}
     </>
+  );
+}
+
+/** R1332: plain rules over this range's numbers. Each line says what it saw and what to do; a saving is an estimate for the same period. */
+function InsightsCard({ items }: { items: Recommendation[] }) {
+  return (
+    <Card className="mb-4">
+      <CardTitle hint="Rules, not a model: a budget on course to be exceeded, a plan with no usage, two hosts at once, an expensive AI model mix, card fees against UPI, estimates where provider data could replace them. Recomputed on every load.">Recommendations{items.length ? ` (${items.length})` : ""}</CardTitle>
+      {items.length === 0 ? <Empty title="Nothing to recommend in this range" body="Budgets are on pace, every active plan shows usage and the mix looks fine. Spikes are raised as alerts by the daily sweep." /> : (
+        <ul className="grid gap-2">
+          {items.map((r) => (
+            <li key={r.id} className="flex flex-col gap-1 rounded-2xl bg-secondary/40 p-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2"><Pill tone={r.severity === "warn" ? "warn" : "info"}>{r.severity === "warn" ? "Act" : "Consider"}</Pill><span className="text-[14px] font-medium">{r.title}</span></div>
+                <p className="mt-1 text-[12.5px] text-muted-foreground">{r.body}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-end">
+                {r.saveMinor != null && r.saveMinor > 0 && <span className="text-[13px] tabular-nums text-muted-foreground">about {fmtInr(r.saveMinor)}</span>}
+                <a className="text-[13px] underline-offset-4 hover:underline" href={r.href}>Open</a>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }
 

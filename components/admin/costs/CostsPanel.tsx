@@ -364,7 +364,7 @@ export function AlertsCard({ items }: { items: AlertView[] }) {
   const open = items.filter((a) => a.status === "open");
   return (
     <Card>
-      <CardTitle hint="One alert per condition: a budget step, a renewal within a week. Acknowledging hides it; it will not come back for the same step.">Alerts{open.length ? ` (${open.length})` : ""}</CardTitle>
+      <CardTitle hint="One alert per condition: a budget step, a renewal within a week, a provider whose day was several times its usual. Warn and critical ones also go to the System Health alert email. Acknowledging hides it; it will not come back for the same step.">Alerts{open.length ? ` (${open.length})` : ""}</CardTitle>
       {items.length === 0 ? <Empty title="Nothing to flag" body="Budget steps and upcoming renewals show up here." /> : (
         <ul className="divide-y divide-border/60">
           {items.slice(0, 12).map((a) => (

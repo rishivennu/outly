@@ -18,7 +18,7 @@ export interface Mail {
   html: string;
   /** Plain-text part. Built from `html` when left out, so no email ever goes out HTML-only. */
   text?: string;
-  kind: "invoice" | "ticket_opened" | "ticket_reply" | "test" | "subscription" | "maintenance" | "weekly_report" | "team_invite" | "referral" | "waitlist" | "notice" | "nudge" | "winback" | "growth" | "otp" | "security" | "beta" | "founding" | "pip_transcript" | "announcement" | "watchdog" | "partner" | "workshop";
+  kind: "invoice" | "ticket_opened" | "ticket_reply" | "test" | "subscription" | "maintenance" | "weekly_report" | "team_invite" | "referral" | "waitlist" | "notice" | "nudge" | "winback" | "growth" | "otp" | "security" | "beta" | "founding" | "pip_transcript" | "announcement" | "watchdog" | "partner" | "workshop" | "costs";
   attachments?: { filename: string; content: Buffer }[];
   /** Secrets (a sign-in code) masked in the Outbox copy once a real provider has delivered the email. */
   redact?: string[];

@@ -144,6 +144,8 @@ export async function raiseAlert(a: { key: string; kind: string; severity?: "inf
   try {
     await db.costAlert.create({ data: { key: a.key, kind: a.kind, severity: a.severity ?? "warn", title: a.title, body: a.body ?? "", href: a.href ?? "/admin/costs" } });
     await adminEvent("costs", a.title, a.body, a.href ?? "/admin/costs");
+    // R1332: warn and critical alerts (a budget at 90%+, a spike) also go to the alert email; info stays in the bell.
+    if ((a.severity ?? "warn") !== "info") await import("./insights").then((m) => m.emailCostAlert(a)).catch(() => {});
     return true;
   } catch {
     return false; // raced with another sweep
@@ -159,7 +161,8 @@ const addCadence = (d: Date, cadence: string) => {
 
 /**
  * Housekeeping, from the sweep: books due renewals into the ledger (idempotent on recurring:<id>:<day>), moves
- * nextRenewal forward, warns 7 days before a renewal, and raises each budget threshold once per month.
+ * nextRenewal forward, warns 7 days before a renewal, raises each budget threshold once per month and (R1332) flags a
+ * provider whose day was several times its usual.
  */
 export async function sweepCosts(now = new Date()) {
   let booked = 0, alerts = 0;
@@ -189,6 +192,8 @@ export async function sweepCosts(now = new Date()) {
       if (await raiseAlert({ key: `budget:${b.id}:${month}:${t}`, kind: "budget", severity: t >= 100 ? "critical" : t >= 90 ? "warn" : "info", title: `${b.name}: ${b.pct}% of this month's budget used`, body: `Spent ₹${(b.spentMinor / 100).toFixed(0)} of ₹${(b.inrMinor / 100).toFixed(0)} (${t}% step).` })) alerts++;
     }
   }
+  // R1332: yesterday's variable spend per provider against the week before it, one alert per provider per day.
+  alerts += await import("./insights").then((m) => m.sweepSpikes(now)).catch((e) => { console.error("[costs] spikes", e); return 0; });
   // R1316: pull every connected provider (plans, bandwidth) for the last three days; refs make a re-run free.
   const synced = await import("./connections").then((m) => m.syncAll(now)).catch((e) => { console.error("[costs] sync", e); return []; });
   for (const s of synced) if (s.ok && s.result) booked += s.result.booked; else alerts++;
