@@ -19,6 +19,7 @@ import { personalRead } from "../lib/intelligence/personal-reco";
 import { intelligencePulse } from "../lib/intelligence/pulse";
 import { hintsFor } from "../lib/clipper/jobs";
 import { downgrade, withIntelligence, withoutIntelligence } from "./helpers/intelligence-plan";
+import { grantConsent } from "../lib/intelligence/consent";
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 const DAY = 864e5;
@@ -117,7 +118,8 @@ describe("1334 the gate (db)", () => {
 
   test("refreshOwner and the sweep: nothing for a free owner, features only for a consented free owner, everything for an entitled one", async () => {
     const free = await plain();
-    const consented = await db.user.create({ data: { name: "C", email: `r1334-c-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x", shareLearning: true } });
+    const consented = await db.user.create({ data: { name: "C", email: `r1334-c-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x" } });
+    await grantConsent(consented.id, { source: "settings" }); // R1335: consent is a record, not a column
     const paid = await withIntelligence(await plain());
     for (const u of [free, consented, paid]) await seed(u.id, 6);
 
@@ -231,6 +233,6 @@ describe("1334 wiring (source)", () => {
     expect(up).toContain("{!client && <SharingRow />}");
     expect(up.slice(up.indexOf("return ("))).not.toMatch(/locked|blur|opacity-50/i);
     expect(read("components/intelligence/PersonalBaselines.tsx")).toContain("{!client && <SharingRow />}");
-    expect(read("components/intelligence/SharingRow.tsx")).toContain("export function SharingRow()");
+    expect(read("components/intelligence/SharingRow.tsx")).toContain("export function SharingRow(");
   });
 });

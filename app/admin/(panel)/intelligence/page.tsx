@@ -21,7 +21,7 @@ export default async function Intelligence() {
   const g = await intelligenceGovernance({ modelKey: ACTIVE_MODEL, weeks: 12 });
   const driftTone = g.drift.verdict === "drifting" ? "warn" : g.drift.verdict === "improving" ? "ok" : g.drift.verdict === "steady" ? "info" : "muted";
   const latest = g.accuracy[g.accuracy.length - 1];
-  const participating = g.participation.creators - g.participation.optedOut;
+  const participating = g.participation.consented;
 
   return (
     <>
@@ -31,7 +31,7 @@ export default async function Intelligence() {
         <AdminKpi i={0} label="Active model" value={g.modelKey} sub={`${num(g.predictions.total)} forecasts · ${num(g.predictions.evaluated)} evaluated`} hint="Every forecast is written before the outcome is known and filled with the actual after the post's first week." />
         <AdminKpi i={1} label={latest ? `Accuracy, week ${latest.week}` : "Accuracy, latest week"} value={latest ? pct(latest.mape) : "—"} sub={latest ? `MAPE across ${latest.owners} creator${latest.owners === 1 ? "" : "s"}, ${latest.n} posts` : "No evaluated week yet"} hint="Mean absolute percentage error over the forecasts judged that week. Lower is better." />
         <AdminKpi i={2} label="Drift" value={g.drift.deltaPts === null ? "—" : `${g.drift.deltaPts > 0 ? "+" : ""}${g.drift.deltaPts} pts`} sub={g.drift.verdict} hint="The last 4 evaluated weeks against the 4 before them. More than 10 points worse is drifting." />
-        <AdminKpi i={3} label="Sharing" value={g.participation.creators ? `${Math.round((participating / g.participation.creators) * 100)}%` : "—"} sub={`${num(participating)} of ${num(g.participation.creators)} creators · ${num(g.participation.optedOut)} opted out`} hint="Creators whose measured posts may join the anonymised buckets. Opting out keeps their rows home; it never changes their own predictions." />
+        <AdminKpi i={3} label="Help improve Outlly AI" value={g.participation.creators ? `${Math.round((participating / g.participation.creators) * 100)}%` : "—"} sub={`${num(participating)} of ${num(g.participation.creators)} creators opted in · ${num(g.participation.withdrawn)} withdrew${g.participation.deletionsOpen ? ` · ${num(g.participation.deletionsOpen)} deletion${g.participation.deletionsOpen === 1 ? "" : "s"} pending` : ""}`} hint="Creators who explicitly said yes (never preselected). Only their measured posts may join the anonymised buckets; everyone else's stay home. Consent never changes anyone's own predictions." />
       </div>
 
       <div className="mb-4 grid gap-4 lg:grid-cols-2">

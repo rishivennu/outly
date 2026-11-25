@@ -20,6 +20,7 @@ import { VoiceMemoryCard } from "@/components/billing/PlanExtras";
 import { TwoStepCard } from "./TwoStepCard";
 import { PhoneCard } from "./PhoneCard";
 import { YourDataCard } from "./YourDataCard";
+import { AiConsentCard } from "./AiConsentCard";
 import { StorageManager } from "./StorageManager";
 import { InstallSettingsCard } from "@/components/pwa/InstallSettingsCard";
 import Link from "next/link";
@@ -335,10 +336,11 @@ export function SettingsView({ weeklyReport = true, alerts = ALERT_DEFAULTS, per
       id: "privacy",
       label: "Data & Privacy",
       icon: Lock,
-      blurb: "Your data, the accounts Outlly can post to, and what we know about where you are.",
+      blurb: "Your data, whether you help improve Outlly AI, the accounts Outlly can post to, and what we know about where you are.",
       content: (
         <>
           {!ws && <YourDataCard email={user.email} />}
+          <AiConsentCard />
           <ConnectedAccountsCard />
           <LocationCard />
         </>

@@ -10,6 +10,8 @@ import { resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
 export const LOCK_SQL = "supabase/migrations/0002_lock_all_tables.sql";
+/** Idempotent data fixes run after every push, before the lock. Each must be safe to run twice. */
+export const DATA_SQL = ["supabase/migrations/0003_r1335_consent_mirror_reset.sql"];
 
 function push(env, extra = []) {
   const r = spawnSync("prisma", ["db", "push", "--skip-generate", ...extra], { cwd: ROOT, env, shell: true, encoding: "utf8" });
@@ -50,6 +52,23 @@ if (import.meta.main ?? true) {
     r = push(env, ["--accept-data-loss"]);
   }
   if (r.status !== 0) process.exit(r.status);
+
+  // R1335: idempotent data fixes (consent mirror reset). A failure stops the build: a user contributing to the shared
+  // model without a recorded yes is the one thing this round must not ship.
+  for (const file of DATA_SQL) {
+    console.log(`db-sync: running ${file}...`);
+    const fix = spawnSync("prisma", ["db", "execute", "--schema", "prisma/schema.prisma", "--file", file], {
+      cwd: ROOT,
+      env: { ...env, DATABASE_URL: env.DIRECT_URL },
+      shell: true,
+      encoding: "utf8",
+    });
+    process.stdout.write((fix.stdout ?? "") + (fix.stderr ?? ""));
+    if (fix.status !== 0) {
+      console.error(`db-sync: ${file} failed. Run it by hand against DIRECT_URL, then redeploy.`);
+      process.exit(fix.status ?? 1);
+    }
+  }
 
   // 1053: lock every table (new ones included) out of the public Data API, on every deploy. A failure
   // stops the build: shipping a table the anon key can read is worse than a delayed deploy.

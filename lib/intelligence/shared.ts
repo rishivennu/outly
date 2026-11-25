@@ -1,12 +1,14 @@
 import "server-only";
 import { db } from "../db";
+import { closeDeletions, consentSummary, consentedOwnerIds, pendingDeletions } from "./consent";
 import { FEATURE_VERSION, parseFeatures, parsePerf } from "./features-core";
 import type { SharedBaseline } from "./model/scorer-core";
 import { buildShared, driftOf, parseShared, SHARED_WINDOW_DAYS, sharedCutoff, sharedFor, weeklyAccuracy, type Drift, type SharedBaselines, type SharedBucket, type SharedQuery, type SharedRow, type WeekAccuracy } from "./shared-core";
 
 /**
  * R1324 (Phase 6): shared learning, the stored side. One sweep reads the measured ContentFeature rows of creators who
- * have not opted out, builds the anonymised buckets (shared-core.ts) and stores them as one ModelVersion row
+ * said yes to "Help improve Outlly AI" (R1335: AiDataConsent, never preselected; nobody is in by default), builds the
+ * anonymised buckets (shared-core.ts) and stores them as one ModelVersion row
  * (SHARED_MODEL_KEY, data = JSON). Readers take that document, never the rows, so a creator's numbers leave their
  * workspace only as part of a median over many. The admin governance view is built from the same document plus
  * per-week accuracy rollups: counts and percentages, no creator named.
@@ -21,10 +23,12 @@ export const SHARED_REBUILD_MS = 55 * 60_000;
 
 let cache: { at: number; value: SharedBaselines | null } | null = null;
 
-/** Creators who opted out of contributing. Their predictions still read the shared priors; only their rows stay home. */
-async function optedOutIds(): Promise<string[]> {
-  const rows = await db.user.findMany({ where: { shareLearning: false }, select: { id: true } });
-  return rows.map((r) => r.id);
+/**
+ * R1335: the shared pipeline is opt-in. Only creators whose newest consent decision says granted are read; everyone
+ * else's rows stay home, whatever their plan. Their own predictions still read the shared priors.
+ */
+async function contributorIds(): Promise<string[]> {
+  return (await consentedOwnerIds()).ids;
 }
 
 /**
@@ -32,16 +36,19 @@ async function optedOutIds(): Promise<string[]> {
  * The document's status is left as the admin set it: a retired document is refreshed in the row but served to nobody
  * (the cache only takes an active one), so retiring sticks until an admin brings it back.
  */
-export async function rebuildShared(opts: { now?: Date | number } = {}): Promise<{ baselines: SharedBaselines; optedOut: number; status: string }> {
+export async function rebuildShared(opts: { now?: Date | number } = {}): Promise<{ baselines: SharedBaselines; consented: number; status: string }> {
   const now = opts.now instanceof Date ? opts.now.getTime() : (opts.now ?? Date.now());
-  const out = await optedOutIds();
+  const contributors = await contributorIds();
   const since = new Date(now - SHARED_WINDOW_DAYS * 864e5);
-  const raw = await db.contentFeature.findMany({
-    where: { measured: true, publishedAt: { gte: since, lte: new Date(sharedCutoff(now)) }, ...(out.length ? { ownerId: { notIn: out } } : {}) },
-    select: { ownerId: true, platform: true, format: true, publishedAt: true, features: true, perf: true },
-    orderBy: { publishedAt: "desc" },
-    take: SHARED_MAX_ROWS,
-  });
+  // No consent on file anywhere: an empty document, never "everyone".
+  const raw = contributors.length
+    ? await db.contentFeature.findMany({
+        where: { measured: true, ownerId: { in: contributors }, publishedAt: { gte: since, lte: new Date(sharedCutoff(now)) } },
+        select: { ownerId: true, platform: true, format: true, publishedAt: true, features: true, perf: true },
+        orderBy: { publishedAt: "desc" },
+        take: SHARED_MAX_ROWS,
+      })
+    : [];
   const rows: SharedRow[] = [];
   for (const r of raw) {
     const perf = parsePerf(r.perf);
@@ -51,7 +58,7 @@ export async function rebuildShared(opts: { now?: Date | number } = {}): Promise
   }
   const truncated = raw.length >= SHARED_MAX_ROWS;
   const baselines = buildShared(rows, now, { truncated });
-  const notes = `Anonymised cohort baselines: ${baselines.buckets.length} buckets from ${baselines.owners} creators' ${baselines.rows} measured posts (last ${baselines.windowDays} days, each past its first week; >= ${baselines.minOwners} creators and ${baselines.minPosts} posts per bucket and per statistic, no creator above half). ${out.length} opted out.${truncated ? ` Row cap of ${SHARED_MAX_ROWS} hit: the window was not read in full.` : ""}`;
+  const notes = `Anonymised cohort baselines: ${baselines.buckets.length} buckets from ${baselines.owners} creators' ${baselines.rows} measured posts (last ${baselines.windowDays} days, each past its first week; >= ${baselines.minOwners} creators and ${baselines.minPosts} posts per bucket and per statistic, no creator above half). Opt-in: ${contributors.length} creators consented.${truncated ? ` Row cap of ${SHARED_MAX_ROWS} hit: the window was not read in full.` : ""}`;
   const data = { featureVersion: FEATURE_VERSION, notes, data: JSON.stringify(baselines) };
   let stored: { status: string };
   try {
@@ -61,7 +68,7 @@ export async function rebuildShared(opts: { now?: Date | number } = {}): Promise
     stored = await db.modelVersion.update({ where: { key: SHARED_MODEL_KEY }, data, select: { status: true } });
   }
   cache = { at: Date.now(), value: stored.status === "active" ? baselines : null };
-  return { baselines, optedOut: out.length, status: stored.status };
+  return { baselines, consented: contributors.length, status: stored.status };
 }
 
 /** The stored shared baselines, cached for a few minutes per instance. Null until the first rebuild. */
@@ -102,7 +109,8 @@ export interface IntelligenceGovernance {
   shared: { stored: boolean; builtAt: string | null; rows: number; owners: number; buckets: SharedBucket[]; dropped: number; windowDays: number; minOwners: number; minPosts: number; truncated: boolean } | null;
   /** The stored document's status even when it is not served (retired), or null when none is stored. */
   sharedStatus: string | null;
-  participation: { creators: number; optedOut: number; withMeasuredPosts: number };
+  /** R1335: consented = newest decision granted; withdrawn = newest decision withdrawn; the rest never answered. */
+  participation: { creators: number; consented: number; withdrawn: number; deletionsOpen: number; withMeasuredPosts: number };
   versions: { key: string; kind: string; featureVersion: number; status: string; notes: string | null; createdAt: string }[];
   predictions: { total: number; evaluated: number; byPlatform: { platform: string; total: number; evaluated: number }[] };
   accuracy: WeekAccuracy[];
@@ -116,12 +124,12 @@ export async function intelligenceGovernance(opts: { modelKey: string; weeks?: n
   const now = Date.now();
   // One week more than shown, so the oldest week kept is complete (the first partial week is sliced off).
   const since = new Date(now - (weeks + 1) * 7 * 864e5);
-  const [shared, sharedRow, versions, creators, optedOut, measuredOwners, predAll, predEval, evals] = await Promise.all([
+  const [shared, sharedRow, versions, creators, consent, measuredOwners, predAll, predEval, evals] = await Promise.all([
     loadShared({ fresh: true }),
     db.modelVersion.findUnique({ where: { key: SHARED_MODEL_KEY }, select: { status: true } }),
     db.modelVersion.findMany({ orderBy: { createdAt: "desc" }, take: 20, select: { key: true, kind: true, featureVersion: true, status: true, notes: true, createdAt: true } }),
     db.user.count(),
-    db.user.count({ where: { shareLearning: false } }),
+    consentSummary(new Date(now)),
     db.contentFeature.findMany({ where: { measured: true }, distinct: ["ownerId"], select: { ownerId: true } }).then((g) => g.length),
     db.predictionRecord.groupBy({ by: ["platform"], where: { modelKey: opts.modelKey }, _count: { _all: true } }),
     db.predictionRecord.groupBy({ by: ["platform"], where: { modelKey: opts.modelKey, evaluatedAt: { not: null } }, _count: { _all: true } }),
@@ -134,7 +142,7 @@ export async function intelligenceGovernance(opts: { modelKey: string; weeks?: n
   return {
     shared: shared ? { stored: true, builtAt: shared.builtAt, rows: shared.rows, owners: shared.owners, buckets: shared.buckets, dropped: shared.dropped, windowDays: shared.windowDays, minOwners: shared.minOwners, minPosts: shared.minPosts, truncated: !!shared.truncated } : null,
     sharedStatus: sharedRow?.status ?? null,
-    participation: { creators, optedOut, withMeasuredPosts: measuredOwners },
+    participation: { creators, consented: consent.granted, withdrawn: consent.withdrawn, deletionsOpen: consent.deletionsOpen, withMeasuredPosts: measuredOwners },
     versions: versions.map((v) => ({ ...v, createdAt: v.createdAt.toISOString() })),
     predictions: { total: byPlatform.reduce((s, p) => s + p.total, 0), evaluated: byPlatform.reduce((s, p) => s + p.evaluated, 0), byPlatform },
     accuracy,
@@ -146,11 +154,15 @@ export async function intelligenceGovernance(opts: { modelKey: string; weeks?: n
 /**
  * The sweep's slot, every tick: rebuild when the stored document is older than SHARED_REBUILD_MS (or missing), so an
  * hourly refresh happens whichever minutes the pinger lands on. One clock, one cheap read otherwise. Never fatal.
+ * R1335: an open deletion request rebuilds at once (this tick, not the hourly timer) so the creator's rows are out of the
+ * served document within minutes; the request is then marked done.
  */
-export async function sweepShared(now: Date = new Date()): Promise<{ buckets: number; rows: number; status: string } | null> {
+export async function sweepShared(now: Date = new Date()): Promise<{ buckets: number; rows: number; status: string; deletions: number } | null> {
+  const deletions = await pendingDeletions();
   const row = await db.modelVersion.findUnique({ where: { key: SHARED_MODEL_KEY }, select: { data: true } });
   const builtAt = row ? parseShared(row.data)?.builtAt : null;
-  if (builtAt && now.getTime() - new Date(builtAt).getTime() < SHARED_REBUILD_MS) return null;
+  if (!deletions.length && builtAt && now.getTime() - new Date(builtAt).getTime() < SHARED_REBUILD_MS) return null;
   const { baselines, status } = await rebuildShared({ now });
-  return { buckets: baselines.buckets.length, rows: baselines.rows, status };
+  const closed = await closeDeletions(deletions.map((d) => d.id), now);
+  return { buckets: baselines.buckets.length, rows: baselines.rows, status, deletions: closed };
 }

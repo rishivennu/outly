@@ -37,7 +37,7 @@ model User {
   referralCode String?   @unique // share link /signup?ref={code} (old /r/{code} still works)
   referredById String? // who invited this user (1052: the friend, not the sharer, earns a Creator month on their first payment)
   weeklyReport Boolean   @default(true) // Monday summary email
-  shareLearning Boolean  @default(true) // R1324: this creator's measured posts may join the anonymised cohort baselines (aggregates only; opt out any time)
+  shareLearning Boolean  @default(false) // R1335: mirror of the current "Help improve Outlly AI" consent (AiDataConsent); written only by lib/intelligence/consent.ts, never preselected
   lastReportAt DateTime?
   postingGoal  Int       @default(3) // posts per week the creator aims for (0 = no goal)
   nudgeAt      DateTime? // last "you're behind this week" nudge
@@ -97,6 +97,7 @@ model User {
   featureUses FeatureUse[]
   pushDevices PushDevice[]
   appCrashes  AppCrash[]
+  aiConsents  AiDataConsent[]
   webPushSubs WebPushSub[]
   dmThreads   DmThread[]
   betaIssued  BetaCode?  @relation("BetaIssued")
@@ -2715,6 +2716,32 @@ model ModelVersion {
   notes          String?
   data           String? // JSON: shared baselines, parameters
   createdAt      DateTime @default(now())
+}
+
+/// R1335: explicit consent to contribute de-identified content and performance signals to the shared Outlly model
+/// ("Help improve Outlly AI"). Append-only: one row per decision, the newest row per (userId, consentType) is the current
+/// state, so the history is the audit trail. Never preselected: a user with no row has not consented. `User.shareLearning`
+/// mirrors the current state for the bulk reads (rebuild, counts) and is written only through lib/intelligence/consent.ts.
+model AiDataConsent {
+  id                  String    @id @default(cuid())
+  userId              String
+  consentType         String    @default("shared-model") // shared-model (one type today; a new data category gets its own)
+  status              String // granted | withdrawn
+  policyVersion       String // lib/intelligence/consent-core.ts CONSENT_POLICY_VERSION when the decision was made
+  categories          String // JSON string[] of the data categories covered (consent-core CONSENT_CATEGORIES)
+  source              String // settings | intelligence | onboarding | api
+  consentedAt         DateTime? // when the grant this row records (or continues) was given
+  withdrawnAt         DateTime?
+  deletionRequestedAt DateTime? // the user asked for contributed data to be removed
+  deletionStatus      String? // requested | done (done = shared model rebuilt without them; contribution rows purged, R1336)
+  deletionDoneAt      DateTime?
+  createdAt           DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, consentType, createdAt])
+  @@index([consentType, status, createdAt])
+  @@index([deletionStatus, deletionRequestedAt])
 }
 
 /// R1319: one prediction per subject per model per metric. Written before the outcome is known (published posts are

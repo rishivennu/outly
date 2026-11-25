@@ -1,6 +1,7 @@
 import "server-only";
 import { entitlements } from "../billing/entitlements";
 import { db } from "../db";
+import { hasSharedConsent } from "./consent";
 import { HttpError } from "../http";
 import { accessBlock, intelligenceAccessOf, type Capability, type IntelligenceAccess } from "./entitlements-core";
 import { logLearning } from "./learning";
@@ -40,10 +41,9 @@ export async function entitledOwners(ownerIds: readonly string[], capability: Ca
   return out;
 }
 
-/** Does this owner contribute to the shared baselines (consent, independent of the plan)? Phase 2 moves this onto the consent table. */
+/** Does this owner contribute to the shared baselines? R1335: the consent record decides (AiDataConsent), never the plan. */
 export async function contributesShared(userId: string): Promise<boolean> {
-  const u = await db.user.findUnique({ where: { id: userId }, select: { shareLearning: true } });
-  return !!u?.shareLearning;
+  return hasSharedConsent(userId);
 }
 
 async function noteDenied(userId: string, capability: Capability, a: IntelligenceAccess) {

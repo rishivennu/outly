@@ -11,6 +11,7 @@ import { accuracyByWeek, buildShared, driftOf, parseShared, pickBucket, quantile
 import { baselineScorer, cohortSize, EVAL_MIN_AGE_DAYS } from "../lib/intelligence/model/scorer-core";
 import { can } from "../lib/admin/perms";
 import { withIntelligence } from "./helpers/intelligence-plan";
+import { grantConsent } from "../lib/intelligence/consent";
 
 mock.module("next/headers", () => ({
   cookies: () => ({ get: () => undefined, getAll: () => [], has: () => false, set: () => {}, delete: () => {} }),
@@ -196,7 +197,12 @@ describe("R1324 shared-core", () => {
 /* ------------------------------------------------------------------ stored */
 
 let n = 0;
-const mk = async (extra: { shareLearning?: boolean } = {}) => withIntelligence(await db.user.create({ data: { name: `S ${++n}`, email: `r1324-${n}-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x", ...extra } }));
+/** R1335: sharing is opt-in. `mk()` says yes through the consent record (the only way in); `mk({ shareLearning: false })` never answers. */
+const mk = async (extra: { shareLearning?: boolean } = {}) => {
+  const u = await withIntelligence(await db.user.create({ data: { name: `S ${++n}`, email: `r1324-${n}-${Date.now()}-${Math.random()}@test.dev`, passwordHash: "x" } }));
+  if (extra.shareLearning !== false) await grantConsent(u.id, { source: "settings" });
+  return u;
+};
 
 /** Measured ContentFeature rows for one owner, written the way the feature store writes them. */
 async function featureRows(ownerId: string, posts: { views: number; vpf: number; ageDays: number; categories?: string[] }[], platform = "instagram") {
@@ -227,7 +233,7 @@ describe("R1324 stored shared learning (db)", () => {
     const out = await mk({ shareLearning: false });
     await featureRows(out.id, Array.from({ length: 10 }, (_, k) => ({ views: 9_000_000, vpf: 900, ageDays: 10 + k })));
     const r = await shared.rebuildShared();
-    expect(r.optedOut).toBeGreaterThanOrEqual(1);
+    expect(r.consented).toBeGreaterThanOrEqual(6);
     const all = r.baselines.buckets.find((b) => b.platform === "instagram" && b.format === "video" && b.category === null)!;
     expect(all).toBeDefined();
     expect(all.owners).toBeGreaterThanOrEqual(6);
@@ -273,8 +279,10 @@ describe("R1324 stored shared learning (db)", () => {
     expect(p!.predicted).toBe(50);
     const g = await shared.intelligenceGovernance({ modelKey: pred.ACTIVE_MODEL });
     expect(g.shared?.stored).toBe(true);
-    expect(g.participation.optedOut).toBeGreaterThanOrEqual(1);
-    expect(g.participation.creators).toBeGreaterThan(g.participation.optedOut);
+    expect(g.participation.consented).toBeGreaterThanOrEqual(1); // R1335: explicit yeses only
+    expect(g.participation.creators).toBeGreaterThan(g.participation.consented);
+    expect(typeof g.participation.withdrawn).toBe("number");
+    expect(typeof g.participation.deletionsOpen).toBe("number");
     expect(g.versions.some((v) => v.key === shared.SHARED_MODEL_KEY)).toBe(true);
     expect(Array.isArray(g.accuracy)).toBe(true);
     expect(["steady", "improving", "drifting", "unknown"]).toContain(g.drift.verdict);
@@ -327,7 +335,7 @@ describe("R1324 wiring", () => {
     expect(r).toContain("export const PATCH = route(");
     expect(read("components/intelligence/SharingRow.tsx")).toContain('role="switch"');
     expect(read("components/intelligence/SharingRow.tsx")).toContain("/api/intelligence/sharing");
-    expect(read("prisma/schema.template.prisma")).toContain("shareLearning Boolean  @default(true)");
+    expect(read("prisma/schema.template.prisma")).toContain("shareLearning Boolean  @default(false)"); // R1335: opt-in
     expect(read("lib/intelligence/shared-core.ts")).not.toContain("prisma");
     expect(read("lib/intelligence/shared.ts")).toContain('import "server-only"');
   });
