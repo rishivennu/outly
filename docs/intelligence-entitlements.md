@@ -109,7 +109,9 @@ cold-start rule.
   is missing or older than 6 hours and the creator has a published post in the 90-day window, `refreshOwner` runs in the
   background (held open on Vercel through the request context), once per owner per 30 minutes (a LearningEvent
   `backfill_kicked` dedupe key is the lock). The read never waits for it and never fails because of it. Until the profile
-  exists "Your baselines" shows the spec's cold-start line (`COLD_START_COPY`), never a made-up number.
+  exists "Your baselines" shows the spec's cold-start line (`COLD_START_COPY`), never a made-up number. A read with a
+  client scope selected does not kick anything (client profiles come from the sweep), and `coldStart` only describes
+  whether the workspace profile exists; the plan gate runs before `kickBackfill`, so a free creator never sees either field.
 - Downgrade: 402 at once on the gated routes, `intelligencePulse` null, the clipper falls back to neutral hints, the
   sweep and the backfill skip the owner (`not-entitled`). Every row (profiles, forecasts, model states, features,
   learning log) is kept and never updated; a re-upgrade resumes from them on the next read.
