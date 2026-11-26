@@ -29,3 +29,45 @@ export interface ColdStart {
   /** What this read did about it. */
   backfill: BackfillVerdict | null;
 }
+
+/**
+ * R1339: what the baselines card does while a backfill runs. The first profile is usually written within seconds of the
+ * kick, so the card re-reads once early and once patiently, then stops and says so; no polling loop.
+ */
+export const BACKFILL_REFETCH_MS: readonly number[] = [20_000, 60_000];
+
+/** A refresh is in flight for this owner: this read kicked it, or an earlier read's lock is still held. */
+export function backfillRunning(backfill: BackfillVerdict | null | undefined): boolean {
+  return backfill === "kicked" || backfill === "locked";
+}
+
+/** Whether the card should re-read after `attempt` re-reads so far (0 = none yet) and how long to wait first. */
+export function baselinesRefetchDelay(input: { coldStart?: boolean | null; backfill?: BackfillVerdict | null } | null, attempt: number): number | null {
+  if (!input || !input.coldStart || !backfillRunning(input.backfill)) return null;
+  return attempt < BACKFILL_REFETCH_MS.length ? BACKFILL_REFETCH_MS[attempt] : null;
+}
+
+/**
+ * The one notice the baselines card shows above its numbers, never two at once (R1339: the cold-start line used to
+ * sit next to "Nothing measured yet", two explanations of the same empty card). Platform cards, when there are any,
+ * render under the notice regardless.
+ */
+export type BaselinesNotice = "loading" | "error" | "cold-start" | "empty" | null;
+export function baselinesNotice(input: { data: { coldStart?: boolean | null; platforms: readonly unknown[] } | null; error: string | null }): BaselinesNotice {
+  if (input.data) {
+    if (input.data.coldStart) return "cold-start";
+    return input.data.platforms.length ? null : "empty";
+  }
+  return input.error ? "error" : "loading";
+}
+
+/** The sentence after the cold-start line: what is happening and whether the card will look again by itself. */
+export function coldStartDetail(backfill: BackfillVerdict | null | undefined, attempt: number): string {
+  if (backfillRunning(backfill)) {
+    if (attempt === 0) return "Your first profile is being built now; this card checks again in a moment.";
+    if (attempt < BACKFILL_REFETCH_MS.length) return "Still building; this card checks again shortly.";
+    return "Still building. Come back in a few minutes and this card will have filled in.";
+  }
+  if (backfill === "no-posts") return "It starts with your first published post that has a day of numbers.";
+  return "";
+}

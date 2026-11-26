@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/client/api";
 import { LEVEL_LABEL, type Level, type Lift } from "@/lib/intelligence/profile-core";
 import { COLD_START_COPY } from "@/lib/intelligence/entitlements-core";
+import { baselinesNotice, baselinesRefetchDelay, coldStartDetail, type BackfillVerdict } from "@/lib/intelligence/backfill-core";
 import { Card, Chips, ConfidenceBadge } from "./bits";
 import { SharingRow } from "./SharingRow";
 import type { Confidence } from "./types";
@@ -15,24 +16,46 @@ import type { Confidence } from "./types";
 
 type FormatBaseline = { format: string; n: number; level: Exclude<Level, "none">; predicted: number; low: number; high: number; confidence: Confidence; explanation: string; prior?: { shared: boolean; n: number; owners: number | null } | null };
 type PlatformPredictions = { platform: string; level: Level; measured: number; byFormat: FormatBaseline[]; lifts: Lift[]; accuracy: { n: number; medianApe: number | null; within: number | null } | null; accuracyWords: string };
-type Overview = { model: { key: string } | null; platforms: PlatformPredictions[]; overall: { words: string }; recent: unknown[]; coldStart?: boolean | null; backfill?: string | null };
+type Overview = { model: { key: string } | null; platforms: PlatformPredictions[]; overall: { words: string }; recent: unknown[]; coldStart?: boolean | null; backfill?: BackfillVerdict | null };
 
 const num = (n: number) => n.toLocaleString("en");
 
 export function PersonalBaselines({ client }: { client: string | null }) {
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // R1339: how many times this card has re-read on its own while the first profile was being built.
+  const [attempt, setAttempt] = useState(0);
+  const url = `/api/intelligence/predictions${client ? `?client=${encodeURIComponent(client)}` : ""}`;
   useEffect(() => {
     let live = true;
     setData(null);
     setError(null);
-    api<Overview>(`/api/intelligence/predictions${client ? `?client=${encodeURIComponent(client)}` : ""}`)
+    setAttempt(0);
+    api<Overview>(url)
       .then((d) => live && setData(d))
       .catch((e) => live && setError(e instanceof ApiError ? e.message : "Could not read your baselines just now."));
     return () => {
       live = false;
     };
-  }, [client]);
+  }, [url]);
+  // R1339: a cold start with a backfill running re-reads once early and once patiently (BACKFILL_REFETCH_MS), so the
+  // card fills in without a reload. A failed re-read keeps what is shown and just counts the attempt.
+  const delay = baselinesRefetchDelay(data, attempt);
+  useEffect(() => {
+    if (delay === null) return;
+    let live = true;
+    const t = setTimeout(() => {
+      api<Overview>(url)
+        .then((d) => live && setData(d))
+        .catch(() => undefined)
+        .finally(() => live && setAttempt((a) => a + 1));
+    }, delay);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [delay, attempt, url]);
+  const notice = baselinesNotice({ data, error });
 
   return (
     <Card
@@ -40,21 +63,20 @@ export function PersonalBaselines({ client }: { client: string | null }) {
       title="Your baselines"
       desc="What a typical post of yours does on each platform, worked out from your own measured posts; where you have few of those, from an anonymised cohort of creators your size, and the card says so. An estimate from the past, shown with its sample size, never a promise."
     >
-      {error && <p className="rounded-2xl bg-destructive/10 p-4 text-sm font-medium text-destructive hairline">{error}</p>}
-      {!data && !error && <p className="text-sm text-muted-foreground">Reading your measured posts...</p>}
-      {data && data.coldStart && (
+      {notice === "error" && <p className="rounded-2xl bg-destructive/10 p-4 text-sm font-medium text-destructive hairline" role="alert">{error}</p>}
+      {notice === "loading" && <p className="text-sm text-muted-foreground" role="status">Reading your measured posts...</p>}
+      {notice === "cold-start" && data && (
         <p className="rounded-2xl bg-secondary/50 p-4 text-sm text-muted-foreground hairline" role="status">
-          {COLD_START_COPY}
-          {data.backfill === "kicked" || data.backfill === "locked" ? " Your first profile is being built now; this card fills in on your next visit." : ""}
+          {COLD_START_COPY} {coldStartDetail(data.backfill, attempt)}
         </p>
       )}
-      {data && !data.platforms.length && (
+      {notice === "empty" && (
         <p className="rounded-2xl bg-secondary/50 p-4 text-sm text-muted-foreground hairline">
           Nothing measured yet. Baselines appear once a published post is a day old and has numbers (Instagram, YouTube or Facebook report them; the other platforms give none per post).
         </p>
       )}
       {data && data.platforms.length > 0 && (
-        <ul className="grid gap-3 md:grid-cols-2">
+        <ul className={`grid gap-3 md:grid-cols-2${notice === "cold-start" ? " mt-3" : ""}`}>
           {data.platforms.map((p) => (
             <li key={p.platform} className="rounded-2xl bg-secondary/40 p-4 hairline">
               <div className="flex flex-wrap items-center justify-between gap-2">

@@ -18,7 +18,7 @@ export function IntelligenceUpgrade({ planName, client }: { planName: string; cl
         ))}
       </ul>
       <p className="mt-3 text-[13px] text-muted-foreground">{UPGRADE_COPY.note}</p>
-      <Link href="/billing" className="mt-4 inline-flex h-10 items-center rounded-full bg-foreground px-4 text-sm font-medium text-background hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">See plans</Link>
+      <Link href="/billing" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-foreground px-4 text-sm font-medium text-background hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">See plans</Link>
       {!client && <SharingRow />}
     </Card>
   );

@@ -144,7 +144,8 @@ describe("R1338 source pins", () => {
   test("the baselines card shows the spec's cold-start line, verbatim, from one constant", () => {
     const card = read("components/intelligence/PersonalBaselines.tsx");
     expect(card).toContain('import { COLD_START_COPY } from "@/lib/intelligence/entitlements-core"');
-    expect(card).toContain("{data && data.coldStart && (");
+    // R1339: the card picks one notice (baselinesNotice), so the cold-start line renders under that guard.
+    expect(card).toContain('{notice === "cold-start" && data && (');
     expect(card).toContain("{COLD_START_COPY}");
     expect(COLD_START_COPY).toBe("Your Intelligence Engine is getting to know your content. As more performance data becomes available, your insights will become more personalized.");
   });

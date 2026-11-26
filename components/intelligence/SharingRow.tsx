@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { api, ApiError } from "@/lib/client/api";
 import { consentStatusLine, type ConsentSource, type ConsentView } from "@/lib/intelligence/consent-core";
 
@@ -10,24 +10,57 @@ import { consentStatusLine, type ConsentSource, type ConsentView } from "@/lib/i
  * who has not decided sees it off. Under it: the exact explanation they agree to, what it covers, what is never
  * included, when they said yes and under which policy version, and a way to withdraw or to ask for contributed data to
  * be removed. Shown under Your baselines (paid), on the upgrade card (free) and in Settings > Data & Privacy.
+ * R1339: the row is never blank. While the record loads it says so; if the read fails it says that and offers to try
+ * again (Settings > Data & Privacy is where the spec says this setting must always be reachable).
  */
 type Sharing = ConsentView & { share: boolean; canChange: boolean; rules: { minOwners: number; minPosts: number; windowDays: number }; contribution: { status: string; records: number; builds: number; since: string; last: string; deleted: boolean } | null };
 
 export function SharingRow({ source = "intelligence" }: { source?: ConsentSource }) {
+  const uid = useId();
+  const labelId = `${uid}-label`;
+  const hintId = `${uid}-hint`;
   const [state, setState] = useState<Sharing | null>(null);
+  const [load, setLoad] = useState<"loading" | "failed" | "ready">("loading");
+  const [tries, setTries] = useState(0);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const retry = useCallback(() => setTries((t) => t + 1), []);
   useEffect(() => {
     let live = true;
+    setLoad("loading");
     api<Sharing>("/api/intelligence/sharing")
-      .then((r) => live && setState(r))
-      .catch(() => live && setState(null));
+      .then((r) => {
+        if (!live) return;
+        setState(r);
+        setLoad("ready");
+      })
+      .catch(() => live && setLoad("failed"));
     return () => {
       live = false;
     };
-  }, []);
-  if (!state) return null;
+  }, [tries]);
+  if (load === "loading" && !state) {
+    return (
+      <div className="mt-4 rounded-2xl bg-secondary/40 p-4 hairline" role="status" aria-live="polite" aria-busy="true">
+        <span className="sr-only">Loading your sharing setting</span>
+        <span aria-hidden className="block space-y-2">
+          <span className="skeleton block h-3.5 w-44 rounded-lg" />
+          <span className="skeleton block h-3 w-3/4 rounded-lg" />
+        </span>
+      </div>
+    );
+  }
+  if (!state) {
+    return (
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-secondary/40 p-4 hairline">
+        <p className="text-[13px] text-muted-foreground" role="alert">Your "Help improve Outlly AI" setting could not be read just now. Nothing has changed.</p>
+        <button type="button" onClick={retry} className="inline-flex min-h-11 items-center rounded-full px-4 text-sm font-medium hairline hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          Try again
+        </button>
+      </div>
+    );
+  }
   const { canChange, rules, copy, categories, never, contribution } = state;
   const s = state.state;
   const granted = s.granted;
@@ -55,8 +88,8 @@ export function SharingRow({ source = "intelligence" }: { source?: ConsentSource
   return (
     <div className="mt-4 flex flex-wrap items-start justify-between gap-3 rounded-2xl bg-secondary/40 p-4 hairline" data-consent={granted ? "granted" : "off"}>
       <div className="min-w-0 flex-1">
-        <p id="intel-sharing-label" className="text-sm font-medium">{copy.title}</p>
-        <p id="intel-sharing-hint" className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
+        <p id={labelId} className="text-sm font-medium">{copy.title}</p>
+        <p id={hintId} className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
           {copy.explanation}
           {!canChange && " Only the workspace owner can change this."}
         </p>
@@ -69,7 +102,7 @@ export function SharingRow({ source = "intelligence" }: { source?: ConsentSource
           {contribution?.deleted && <span> The record of which of your posts were used has been cleared.</span>}
         </p>
         <details className="mt-2 text-[13px] text-muted-foreground">
-          <summary className="cursor-pointer select-none font-medium text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">What this covers</summary>
+          <summary className="cursor-pointer select-none py-2 font-medium text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">What this covers</summary>
           <ul className="mt-1.5 space-y-1">
             {categories.map((c) => (
               <li key={c.key}>
@@ -90,21 +123,21 @@ export function SharingRow({ source = "intelligence" }: { source?: ConsentSource
         {canChange && s.decisions > 0 && s.deletion?.status !== "requested" && (
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px]">
             {granted && !s.current && (
-              <button type="button" disabled={busy} onClick={() => act("grant")} className="rounded-full bg-foreground px-3 py-1 font-medium text-background disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <button type="button" disabled={busy} onClick={() => act("grant")} className="inline-flex min-h-11 items-center rounded-full bg-foreground px-3.5 font-medium text-background disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 I've read it, keep helping
               </button>
             )}
             {!confirmDelete ? (
-              <button type="button" disabled={busy} onClick={() => setConfirmDelete(true)} className="text-muted-foreground underline-offset-2 hover:underline disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
+              <button type="button" disabled={busy} onClick={() => setConfirmDelete(true)} className="inline-flex min-h-11 items-center text-muted-foreground underline-offset-2 hover:underline disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
                 Remove my contributed data
               </button>
             ) : (
               <span className="flex flex-wrap items-center gap-2" role="group" aria-label="Confirm removing your contributed data">
                 <span>Remove your posts from the shared model and the record of which were used?</span>
-                <button type="button" disabled={busy} onClick={() => act("request-deletion")} className="rounded-full bg-destructive/90 px-3 py-1 font-medium text-destructive-foreground disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <button type="button" disabled={busy} onClick={() => act("request-deletion")} className="inline-flex min-h-11 items-center rounded-full bg-destructive/90 px-3.5 font-medium text-destructive-foreground disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   Yes, remove it
                 </button>
-                <button type="button" disabled={busy} onClick={() => setConfirmDelete(false)} className="rounded-full px-3 py-1 font-medium hairline disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <button type="button" disabled={busy} onClick={() => setConfirmDelete(false)} className="inline-flex min-h-11 items-center rounded-full px-3.5 font-medium hairline disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   Keep it
                 </button>
               </span>
@@ -119,11 +152,11 @@ export function SharingRow({ source = "intelligence" }: { source?: ConsentSource
         type="button"
         role="switch"
         aria-checked={granted}
-        aria-labelledby="intel-sharing-label"
-        aria-describedby="intel-sharing-hint"
+        aria-labelledby={labelId}
+        aria-describedby={hintId}
         disabled={busy || !canChange}
         onClick={flip}
-        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 ${granted ? "bg-lime" : "bg-muted"}`}
+        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors before:absolute before:-inset-x-1 before:-inset-y-2 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 ${granted ? "bg-lime" : "bg-muted"}`}
       >
         <span className={`inline-block h-5 w-5 rounded-full bg-background shadow transition-transform ${granted ? "translate-x-6" : "translate-x-1"}`} aria-hidden />
       </button>

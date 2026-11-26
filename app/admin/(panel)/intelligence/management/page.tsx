@@ -3,8 +3,9 @@ import { requireAdmin } from "@/lib/admin/guard";
 import { intelligenceManagement } from "@/lib/intelligence/management";
 import { CAPABILITY_LABEL, type Capability } from "@/lib/intelligence/entitlements-core";
 import { CATEGORY_LABEL, type ConsentCategory } from "@/lib/intelligence/consent-core";
-import { Card, CardTitle, Empty, PageHead, Pill, Table, fmtDate } from "@/components/admin/ui";
+import { Card, CardTitle, Empty, PageHead, Pill, Section, Table, fmtDate } from "@/components/admin/ui";
 import { AdminKpi } from "@/components/admin/motion/AdminKpi";
+import { RefreshButton } from "@/components/admin/RefreshButton";
 
 export const metadata = { title: "AI Management" };
 export const dynamic = "force-dynamic";
@@ -16,11 +17,31 @@ const capLabel = (c: string) => (c in CAPABILITY_LABEL ? CAPABILITY_LABEL[c as C
 const catLabel = (c: string) => (c in CATEGORY_LABEL ? CATEGORY_LABEL[c as ConsentCategory].label : c);
 const sorted = (r: Record<string, number>) => Object.entries(r).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
+/** R1339: the five areas of the page, in order; the jump links under the title and the section anchors share this list. */
+const SECTIONS = [
+  { id: "access", title: "Subscription distribution", hint: "Who has the engine, by plan, and the server-side checks that refused a client." },
+  { id: "consent", title: "Data consent", hint: "The shared-model opt-in: never preselected, every decision on record with its policy version and categories." },
+  { id: "shared", title: "Shared model training", hint: "What the anonymised cohort pipeline read, kept, rejected and served." },
+  { id: "personal", title: "Personal Intelligence", hint: "How the per-creator engine is keeping up: profiles, jobs, latency and how much it knows." },
+  { id: "privacy", title: "Privacy and security", hint: "The consent ledger, deletion requests, retention against the oldest row, and isolation checks run on this load." },
+] as const;
+
+/** A section anchor that clears the sticky admin header (jump links land on the heading, not under it). */
+function Area({ id, children }: { id: (typeof SECTIONS)[number]["id"]; children: React.ReactNode }) {
+  const def = SECTIONS.find((x) => x.id === id)!;
+  return (
+    <div id={id} className="mt-8 scroll-mt-24 first:mt-0">
+      <Section id={`${id}-section`} className="mt-0" title={def.title} hint={def.hint}>{children}</Section>
+    </div>
+  );
+}
+
 /**
  * R1337 (Phase 4): AI Intelligence Management. Five sections, every figure counted from rows at request time: who has
  * the engine by plan, who consented to the shared model, what the shared training pipeline did, how the personal engine
  * is keeping up, and the privacy ledger. A figure that has not been measured yet says so; nothing here is a placeholder,
- * and nothing names a creator.
+ * and nothing names a creator. R1339: each area has a heading and a jump link, the refresh button says when the figures
+ * were read, and the 402 denials are shown once (Subscription distribution) and referenced from the privacy ledger.
  */
 export default async function Management() {
   await requireAdmin("intelligence");
@@ -35,6 +56,9 @@ export default async function Management() {
   const sharedJob = j.jobs.find((x) => x.job === "shared");
   const fresh = p.profiles.freshness;
   const verdictTone = m.privacy.isolation.verdict === "verified" ? "ok" : m.privacy.isolation.verdict === "attention" ? "bad" : "muted";
+  const retentionOverdue = m.privacy.retention.filter((r) => r.status === "overdue").length;
+  const retentionTracked = m.privacy.retention.filter((r) => r.status !== "empty").length;
+  const oldestRetention = m.privacy.retention.reduce<number | null>((acc, r) => (r.oldestAgeDays !== null && (acc === null || r.oldestAgeDays > acc) ? r.oldestAgeDays : acc), null);
 
   return (
     <>
@@ -42,18 +66,30 @@ export default async function Management() {
         eyebrow="Insights"
         title="AI Intelligence Management"
         body="Plan-based access, consent, shared-model training, the personal engine and the privacy ledger: live counts from the database, read when this page loads."
-        actions={<Link href="/admin/intelligence" className="inline-flex min-h-11 items-center rounded-full border border-border px-5 text-sm font-medium hover:bg-secondary">Model governance</Link>}
+        actions={
+          <>
+            <RefreshButton total={a.users} noun="accounts" loadedAt={new Date().toISOString()} />
+            <Link href="/admin/intelligence" className="inline-flex min-h-11 items-center rounded-full border border-border px-5 text-sm font-medium hover:bg-secondary">Model governance</Link>
+          </>
+        }
       />
+      <nav aria-label="Sections of this page" className="mb-6 flex flex-wrap gap-2">
+        {SECTIONS.map((x) => (
+          <a key={x.id} href={`#${x.id}`} className="inline-flex min-h-10 items-center rounded-full border border-border px-3.5 text-[13px] font-medium hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {x.title}
+          </a>
+        ))}
+      </nav>
 
-      {/* 1. Subscription distribution */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <Area id="access">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AdminKpi i={0} label="Free accounts" value={num(a.free)} sub={`${pct(a.free, a.users)} of ${num(a.users)} accounts${a.freePlanGrantsAccess ? " · the Free plan lists the perk" : " · no Personal Intelligence"}`} hint="Accounts with no live paid subscription, gift, admin grant or referral reward right now. They see the honest upgrade explanation, never locked cards." />
         <AdminKpi i={1} label="Paid with access" value={num(a.perk + a.legacyPaid)} sub={`${num(a.perk)} by the perk · ${num(a.legacyPaid)} on a pre-perk plan`} hint="Live accounts whose winning plan lists the personal-intelligence perk, plus plans made before perks existed (every perk). Same rule the routes use (intelligenceAccessOf)." />
         <AdminKpi i={2} label="Paid without access" value={num(a.planWithoutPerk)} sub={paid ? `${pct(a.planWithoutPerk, paid)} of ${num(paid)} paying or granted accounts` : "No paying account yet"} hint="A live plan that lists its perks without personal-intelligence. Turn it on per plan in Admin > Pricing." />
-        <AdminKpi i={3} label="Entitlement checks failed" value={num(m.denials.total)} sub={m.denials.total ? `${num(m.denials.owners)} account${m.denials.owners === 1 ? "" : "s"} · ${num(m.denials.last7d)} in 7 days` : "None in 30 days"} hint="Server-side denials (402 PLAN_LIMIT) in 30 days, one per account, capability and UTC day. Each one is a client that asked for a paid capability without the plan: the normal upgrade path, or a tampered client." />
+        <AdminKpi i={3} label="Entitlement checks failed" value={num(m.denials.total)} sub={m.denials.total ? `${num(m.denials.owners)} account${m.denials.owners === 1 ? "" : "s"} · ${num(m.denials.last7d)} in 7 days` : "None in 30 days"} hint="Server-side denials (402 PLAN_LIMIT) in 30 days, one per account, capability and UTC day. Each one is a client that asked for a paid capability without the plan: the normal upgrade path, or a tampered client. These are the unauthorized attempts of the privacy ledger; they are counted once, here." />
       </div>
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardTitle hint="Each live account counted once under the plan that wins for it (highest tier, then paid before admin, referral, gift). Accounts with nothing live are on Free.">Access by plan</CardTitle>
           {a.byPlan.length === 0 ? <Empty title="No account yet" /> : (
@@ -92,16 +128,17 @@ export default async function Management() {
           )}
         </Card>
       </div>
+      </Area>
 
-      {/* 2. Data consent */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <Area id="consent">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AdminKpi i={0} label="Opted in" value={num(c.granted)} sub={`${pct(c.granted, a.users)} of ${num(a.users)} accounts · policy ${c.policyVersion}`} hint="Accounts whose newest consent decision is granted. Never preselected: an account with no decision has not consented." />
         <AdminKpi i={1} label="Opted out" value={num(c.withdrawn)} sub={`${num(c.neverAsked)} never answered`} hint="Accounts whose newest decision is withdrawn. Withdrawal stops new contributions at once and takes their rows out of the shared document at the next rebuild." />
         <AdminKpi i={2} label="Withdrawals, 30 days" value={num(c.decisions30d.withdrawn)} sub={`${num(c.decisions30d.granted)} grants in the same 30 days`} hint="Decisions recorded in the last 30 days, by kind." />
         <AdminKpi i={3} label="Deletion requests" value={num(c.deletionsOpen)} sub={`${num(c.deletionsDone)} completed`} hint="Open requests to remove an account's contributions. An open request rebuilds the shared document on the next sweep tick and clears the account's lineage references." />
       </div>
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardTitle hint="Among accounts currently opted in: how many agreed to each data category (every grant lists them explicitly).">Consent by category</CardTitle>
           {c.granted === 0 ? <Empty title="Nobody has opted in yet" /> : (
@@ -131,16 +168,17 @@ export default async function Management() {
           {c.staleMirrors > 0 && <p className="mt-3 text-[12.5px] text-warning-foreground">{num(c.staleMirrors)} consent mirror{c.staleMirrors === 1 ? "" : "s"} out of step with the record; the next shared rebuild rewrites them.</p>}
         </Card>
       </div>
+      </Area>
 
-      {/* 3. Shared model training */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <Area id="shared">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AdminKpi i={0} label="Contributions" value={num(b.lineage.active)} sub={`${num(b.lineage.recordsActive)} posts referenced · ${num(b.lineage.inactive)} inactive · ${num(b.lineage.deleted)} deleted`} hint="Contributors in the latest served build (pseudonymous lineage rows), and how many of their measured posts the document rests on." />
         <AdminKpi i={1} label="Rejected in last build" value={b.latest ? num(b.latest.rejected.unmeasured + b.latest.rejected.noMetric + b.latest.rejected.thinBuckets) : "—"} sub={b.latest ? `${num(b.latest.rejected.unmeasured)} unmeasured · ${num(b.latest.rejected.noMetric)} no metric · ${num(b.latest.rejected.thinBuckets)} thin bucket${b.latest.rejected.thinBuckets === 1 ? "" : "s"}` : "No build yet"} hint="Rows read from consented creators that did not make it into the document, and why." />
         <AdminKpi i={2} label="Excluded (no consent)" value={num(m.shared.eligible.excludedWithData)} sub={`${num(m.shared.eligible.withMeasuredPosts)} creators have measured posts · ${num(m.shared.eligible.consented)} consented`} hint="Creators whose measured posts exist but who have not opted in: their rows never enter the shared document." />
         <AdminKpi i={3} label="Dataset versions" value={num(b.total)} sub={b.latest ? `latest ${b.latest.datasetVersion} · ${fmtDate(b.latest.builtAt)}` : "No build yet"} hint={`One version per rebuild (hourly, on a deletion request, or by hand). Records kept ${b.retentionDays} days.`} />
       </div>
 
-      <Card className="mb-4">
+      <Card>
         <CardTitle hint="The production shared document, the last training run, its evaluation against the build before, and what the builds cost. Builds run inside the minute sweep on the web host, so cost is measured as compute time; there is no separate training bill to show.">Training pipeline</CardTitle>
         <dl className="grid gap-3 text-[13px] sm:grid-cols-2 xl:grid-cols-4">
           <div><dt className="text-muted-foreground">Production model</dt><dd className="font-medium">{m.shared.production ? <>{m.shared.production.key} <Pill tone={m.shared.production.status === "active" ? "ok" : "warn"}>{m.shared.production.status}</Pill></> : "Not built yet"}</dd>{m.shared.production && <dd className="text-[12px] text-muted-foreground">features v{m.shared.production.featureVersion} · updated {fmtDate(m.shared.production.updatedAt)}</dd>}</div>
@@ -149,16 +187,17 @@ export default async function Management() {
           <div><dt className="text-muted-foreground">Training cost, 30 days</dt><dd className="font-medium">{m.shared.compute30d.builds ? ms(m.shared.compute30d.totalMs) : "—"}</dd><dd className="text-[12px] text-muted-foreground">{m.shared.compute30d.builds ? `${num(m.shared.compute30d.builds)} builds · ${ms(m.shared.compute30d.meanMs ?? 0)} each on average · compute time inside the sweep, no separate bill` : "No build in 30 days."}</dd></div>
         </dl>
       </Card>
+      </Area>
 
-      {/* 4. Personal Intelligence */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <Area id="personal">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AdminKpi i={0} label="Active personal profiles" value={num(p.profiles.owners)} sub={`${num(p.retainedWithoutAccess)} kept after a downgrade · ${num(p.entitledWithoutProfile)} entitled, not built yet`} hint="Creators with a workspace profile on record. A downgraded creator's profile stays as data and is never rebuilt; an entitled creator without one is the cold start (or has no published post in the 90-day window)." />
         <AdminKpi i={1} label="Profile freshness" value={fresh.total ? pct(fresh.fresh, fresh.total) : "—"} sub={fresh.total ? `${num(fresh.fresh)} fresh · ${num(fresh.stale)} older than ${fresh.staleHours} h · oldest ${fresh.oldestAgeHours ?? 0} h` : "No profile yet"} hint="Share of workspace profiles rebuilt within the sweep's staleness rule. Downgraded creators' profiles age on purpose." />
         <AdminKpi i={2} label="Learning jobs, 30 days" value={personalJob?.successRate === null || personalJob?.successRate === undefined ? "—" : `${personalJob.successRate}%`} sub={personalJob?.runs ? `${num(personalJob.runs)} runs · ${num(personalJob.failed)} failed · ${num(j.personal.failedOwners)} owner failures inside runs` : "No run logged yet"} hint="The personal sweep step (every 10 minutes): a run fails when the step throws; an owner failure inside a run is counted separately and never stops the others." />
         <AdminKpi i={3} label="Forecast latency" value={j.predict ? ms(j.predict.p50) : "Not measured yet"} sub={j.predict ? `p95 ${ms(j.predict.p95)} · ${num(j.predict.n)} on-demand forecasts in ${j.latencyWindowDays} days · ${num(j.predict.failed)} failed` : `No on-demand forecast in ${j.latencyWindowDays} days`} hint="Measured on POST /api/intelligence/predictions: time from the request reaching the scorer to its answer. Backfilled forecasts inside the sweep are not counted here." />
       </div>
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardTitle hint="How much the engine knows each creator: personal (own history carries), blended (own plus cohort), general (cohort only), none (nothing measured). Workspace profiles only.">Data sufficiency</CardTitle>
           {p.profiles.rows === 0 ? <Empty title="No profile yet" body="The first personal sweep after an entitled creator has a measured post writes the first profile." /> : (
@@ -194,12 +233,13 @@ export default async function Management() {
           </p>
         </Card>
       </div>
+      </Area>
 
-      {/* 5. Privacy & security */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <Area id="privacy">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AdminKpi i={0} label="Consent audit trail" value={num(m.privacy.decisions.total)} sub={`${num(m.privacy.decisions.last30d.granted + m.privacy.decisions.last30d.withdrawn)} decisions in 30 days · last ${m.privacy.decisions.lastAt ? fmtDate(m.privacy.decisions.lastAt) : "—"}`} hint="Every consent decision ever recorded (append-only; a row is never edited). Each carries its timestamp, policy version, categories and source." />
         <AdminKpi i={1} label="Deletion requests" value={`${num(m.privacy.deletions.open)} open`} sub={`${num(m.privacy.deletions.done)} completed${m.privacy.deletions.oldestOpenAt ? ` · oldest open ${fmtDate(m.privacy.deletions.oldestOpenAt)}` : ""}`} hint="A request is completed when the shared document has been rebuilt without the account's rows and its lineage references cleared, usually within the next sweep tick." />
-        <AdminKpi i={2} label="Unauthorized attempts" value={num(m.denials.total)} sub={m.denials.total ? `${num(m.denials.owners)} accounts in 30 days · ${num(m.denials.last7d)} in 7 days` : "None in 30 days"} hint="Requests for a paid Intelligence capability that the server refused (402). Counted once per account, capability and UTC day." />
+        <AdminKpi i={2} label="Retention" value={retentionTracked ? (retentionOverdue ? `${num(retentionOverdue)} overdue` : "Within policy") : "No rows yet"} sub={retentionTracked ? `${num(retentionTracked)} of ${num(m.privacy.retention.length)} data kinds have rows · oldest ${num(oldestRetention ?? 0)} d` : `${num(m.privacy.retention.length)} data kinds, nothing stored yet`} hint="Each kind of engine data against its keep rule, from the oldest row actually on record (the table below). 'Overdue' means the sweep has rows older than the rule and should have pruned them. Unauthorized attempts (402 denials) are counted once, under Subscription distribution." />
         <AdminKpi i={3} label="Data isolation" value={m.privacy.isolation.verdict} sub={`${m.privacy.isolation.checks.filter((x) => x.ok === true).length} of ${m.privacy.isolation.checks.length} checks passed`} hint="Checks this page can run against the live data right now; see the list below. 'attention' means a check failed." />
       </div>
 
@@ -227,8 +267,12 @@ export default async function Management() {
               </li>
             ))}
           </ul>
+          <p className="mt-3 text-[12.5px] text-muted-foreground">
+            Unauthorized attempts: {num(m.denials.total)} refused request{m.denials.total === 1 ? "" : "s"} in 30 days, counted under <a href="#access" className="underline underline-offset-2">Subscription distribution</a>.
+          </p>
         </Card>
       </div>
+      </Area>
     </>
   );
 }

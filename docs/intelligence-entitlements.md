@@ -112,6 +112,9 @@ cold-start rule.
   exists "Your baselines" shows the spec's cold-start line (`COLD_START_COPY`), never a made-up number. A read with a
   client scope selected does not kick anything (client profiles come from the sweep), and `coldStart` only describes
   whether the workspace profile exists; the plan gate runs before `kickBackfill`, so a free creator never sees either field.
+  While the kick runs the card re-reads on its own, 20 s and then 60 s later (`BACKFILL_REFETCH_MS`), and says so; after
+  that it tells the creator to come back in a few minutes. It shows one notice at a time: the cold-start line outranks
+  "Nothing measured yet" (R1339).
 - Downgrade: 402 at once on the gated routes, `intelligencePulse` null, the clipper falls back to neutral hints, the
   sweep and the backfill skip the owner (`not-entitled`). Every row (profiles, forecasts, model states, features,
   learning log) is kept and never updated; a re-upgrade resumes from them on the next read.
