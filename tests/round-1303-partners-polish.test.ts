@@ -90,10 +90,10 @@ describe("R1303 footer: four short groups side by side", () => {
     expect(groups.map((g) => g.title)).toEqual(["Product", "Support", "Company", "Legal"]);
     for (const g of groups) expect(g.n).toBeLessThanOrEqual(6);
     expect(Math.max(...groups.map((g) => g.n)) - Math.min(...groups.map((g) => g.n))).toBeLessThanOrEqual(3);
-    for (const href of ["/#why-outlly", "/#how", "/#features", "/#platforms", "/#compare", "/#pricing", "/#faq", "/help", "/contact", "/partners", "/privacy", "/terms", "/security", "/status", "/blog", "/changelog"]) {
+    for (const href of ["/#why-outlly", "/#how", "/#features", "/#platforms", "/#compare", "/#pricing", "/#faq", "/help", "/contact", "/partners", "/privacy", "/terms", "/security", "/delete-account", "/status", "/blog", "/changelog"]) {
       expect(cols).toContain(`{ href: "${href}",`);
     }
-    expect((cols.match(/\{ href: "/g) ?? []).length).toBe(16);
+    expect((cols.match(/\{ href: "/g) ?? []).length).toBe(17); // R1340: Legal gained "Delete account" (Google Play's public deletion URL)
   });
   test("cookie settings sits under Legal; the groups stay 2x2 on phones, a row on tablets, beside the pitch from 1024px", () => {
     expect(footer).toContain('{col.title === "Legal" && (');

@@ -55,6 +55,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
       { href: "/privacy", label: "Privacy" },
       { href: "/terms", label: "Terms" },
       { href: "/security", label: "Security" },
+      { href: "/delete-account", label: "Delete account" },
     ],
   },
 ];

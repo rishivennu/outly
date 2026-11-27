@@ -231,7 +231,7 @@ export default function PrivacyPage() {
           <ul>
             <li><strong>Disconnect a platform:</strong> open Accounts and choose Disconnect. The stored tokens for that platform, and any direct messages from it, are deleted straight away. You can also remove Outlly from the platform’s own settings (connected apps or business integrations), which stops access from their side too.</li>
             <li><strong>Delete media or posts:</strong> from the content library, at any time.</li>
-            <li><strong>Delete your account:</strong> open Settings, then Your data, and choose Delete account. Your account, media, posts, connected accounts, comments, analytics and payment records are deleted straight away. Invoices are the one exception (see below). You can also ask from the Pip chat or the <a href="/contact">contact page</a> using your account email.</li>
+            <li><strong>Delete your account:</strong> open Settings, then Your data, and choose Delete account. Your account, media, posts, connected accounts, comments, analytics and payment records are deleted straight away. Invoices are the one exception (see below). Without the app, or after uninstalling it, use <a href="/delete-account">outlly.com/delete-account</a>: sign in there and confirm. You can also ask from the Pip chat or the <a href="/contact">contact page</a> using your account email.</li>
             <li><strong>Take a copy:</strong> Settings, Your data, Download my data gives you a readable PDF with your profile, posts, schedule, library details, direct messages and invoices, or the same data as a JSON file to move to another service. Passwords and access tokens are never included.</li>
           </ul>
           <p>
