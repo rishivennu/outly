@@ -61,8 +61,10 @@ describe("R1280 no hard strokes in the Run and Insights files", () => {
     expect(s).toContain('<Card as="div" className={cn("p-4 sm:p-4", edge)}>');
   });
   test("the filter select is a field: border-border/60 at rest, 12px radius", () => {
+    // R1342: R1308 split the class list so the toolbar variant (inline) can be a 36px pill; the field look is the default.
     const s = read("components/admin/SearchBox.tsx");
-    expect(s).toContain("appearance-none rounded-xl border pl-3.5");
+    expect(s).toContain('"cursor-pointer appearance-none border pl-3.5');
+    expect(s).toContain('inline ? "h-9 rounded-full touch:h-11" : "h-11 rounded-xl"');
     expect(s).toContain('"border-border/60 bg-secondary/60 font-medium"');
   });
   test("Empty and ErrorState are nested surfaces (16px)", () => {
