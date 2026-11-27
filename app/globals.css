@@ -5251,3 +5251,34 @@ html[data-contrast="more"]:not([data-app]) .mmain :is(.glass, .pulse-card, .card
   .ge-track { background: GrayText; }
 }
 /* end R1263 growth engine */
+
+/* R1341 intelligence kiln */
+/* The Intelligence Engine section (IntelligenceEngine.tsx): a dark stage, always dark in both themes, whose top is a
+   canvas of 10 px cells (HeatField.tsx) that glow hotter where the pointer moves and spell the headline's last word.
+   The stage, the window and the card are glass over the field. Motion is GSAP (EngineStage.tsx, HeatField.tsx,
+   EngineCard.tsx): the .ek-rise pieces are hidden here only under html.js until the stage arms (data-ek="live"), with
+   a 3 s failsafe. The 1100 motion sweep reads to the end of this file: no transforms here (GSAP sets them inline). */
+.ek-stage { --ek-ink: #0b0d14; background: var(--ek-ink); color: #fff; min-height: 30rem; }
+.ek-field { position: absolute; inset: 0 0 auto 0; pointer-events: none; }
+.ek-field canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.ek-glass { background: hsl(0 0% 100% / .07); box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .12), 0 10px 30px -18px hsl(0 0% 0% / .6); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.ek-pixel { color: hsl(var(--lime)); font-weight: 700; letter-spacing: .02em; }
+.ek-ctl { color: #fff; background: hsl(0 0% 100% / .08); transition: background-color .15s ease; }
+.ek-ctl:hover:not(:disabled) { background: hsl(0 0% 100% / .18); }
+.ek-ctl:disabled { color: hsl(0 0% 100% / .35); }
+.ek-ctl[aria-pressed="true"] { background: hsl(var(--lime)); color: var(--ek-ink); }
+.ek-stage :is(.ek-ctl, .ek-part):focus-visible { outline: 2px solid hsl(var(--lime)); outline-offset: 2px; border-radius: 9999px; }
+.ek-part[aria-expanded="true"] .ek-num { color: hsl(var(--lime)); }
+@keyframes ek-failsafe { to { opacity: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  html.js .ek-stage:not([data-ek="live"]) .ek-rise { opacity: 0; animation: ek-failsafe 0s linear 3s forwards; }
+}
+/* Reduced motion: everything is simply there; HeatField draws one still frame and the intensity controls are not offered. */
+@media (prefers-reduced-motion: reduce) { .ek-stage .ek-rise { opacity: 1; } }
+@media (forced-colors: active) {
+  .ek-field { display: none; }
+  .ek-stage { border: 1px solid CanvasText; }
+  .ek-glass { background: Canvas; box-shadow: 0 0 0 1px CanvasText; }
+  .ek-pixel, .ek-part[aria-expanded="true"] .ek-num { color: Highlight; }
+}
+/* end R1341 intelligence kiln */

@@ -4,6 +4,7 @@ import { Hero } from "@/components/marketing/Hero";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { Features } from "@/components/marketing/Features";
 import { GrowthEngine } from "@/components/marketing/GrowthEngine";
+import { IntelligenceEngine } from "@/components/marketing/IntelligenceEngine";
 import { WhyOutlly } from "@/components/marketing/WhyOutlly";
 import { Difference } from "@/components/marketing/Difference";
 import { Platforms } from "@/components/marketing/Platforms";
@@ -132,6 +133,8 @@ export default async function LandingPage() {
       )}
       {!on("hero") && <div className="h-6" aria-hidden="true" />}
       {on("how") && <Panel><HowItWorks /></Panel>}
+      {/* R1341: the Intelligence Engine kiln, its own switch in Admin > Landing page; its second button points at the growth loop when that is shown. */}
+      {on("engine") && <Panel><IntelligenceEngine showGrowth={on("features")} /></Panel>}
       {on("features") && <Panel><Features /></Panel>}
       {/* R1261: rides the Features switch (Admin > Landing page has no switch of its own for it yet). */}
       {on("features") && <Panel><GrowthEngine /></Panel>}

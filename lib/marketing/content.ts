@@ -123,6 +123,38 @@ export const GROWTH = {
   loopNote: "Each recommendation opens in Content Studio, so the next loop starts from what the last one taught.",
 } as const;
 
+/**
+ * R1341: the Intelligence Engine section (IntelligenceEngine.tsx), the kiln. Every claim here is one the engine
+ * makes about itself: `parts` are UPGRADE_COPY.points (lib/intelligence/entitlements-core.ts) reworded for a visitor,
+ * `plans` is the perk `personal-intelligence` (Creator and Agency) plus the growth loop on every plan (R1334), and
+ * `sharing` is the R1335 consent (off by default, CONSENT_CATEGORIES only, NEVER_INCLUDED). Keep them in step.
+ */
+export const ENGINE = {
+  eyebrow: "Outlly Intelligence Engine",
+  /** Two lines. The last word of the second line is set in the pixel face, the same word the field spells. */
+  title: ["It learns what works for you.", "Then tells you what to make next."],
+  /** The word the heat field spells in its pixels. Short and upper case: it is read in 10 px cells. */
+  spell: "NEXT",
+  body: "A model of your own channel, built only from your published posts and their measured results. Every number shows the sample it rests on, and every forecast is checked against the real result a week later.",
+  learns: {
+    title: "What it learns from",
+    body: "Your published posts and the results the platforms report. Never anyone else's content, never your drafts.",
+  },
+  parts: [
+    { n: "01", name: "Baselines", line: "What a post of each format usually does for you, per platform, with the sample it rests on." },
+    { n: "02", name: "Forecasts", line: "A range for a draft before it goes out, judged against the real number a week later." },
+    { n: "03", name: "Made for you", line: "Recommendations from your own lifts, with both sides of the evidence." },
+    { n: "04", name: "Clip ranking", line: "Clips ranked by what has worked for you, not only by general rules." },
+  ],
+  accuracy: "A weekly accuracy line shows when the model knows you and when it is still guessing.",
+  plans: "The personal layer is part of Creator and Agency. The growth loop (overview, recommendations, topics and history) is on every plan.",
+  sharing: "Helping the shared model is opt-in and off by default. It uses de-identified performance signals, never your videos, captions or drafts.",
+  primary: { label: "Start creating" },
+  secondary: { label: "See the growth loop", href: "#growth" },
+  /** What a screen reader gets instead of the canvas. */
+  alt: "A field of glowing pixels, warm where the pointer moves, spelling the word NEXT.",
+} as const;
+
 export const GROWTH_BLOCKS: GrowthBlock[] = [
   {
     id: "intelligence",

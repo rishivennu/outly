@@ -6,6 +6,7 @@ export const LANDING_SECTIONS = [
   { id: "try", anchor: "try", label: "Try it", shows: "The live AI box: one idea in, a caption, a Shorts title and a post out" },
   { id: "usp", anchor: "why-outlly", label: "Why Outlly", shows: "The six strengths: captions, publishing, calendar, analytics, inbox and Pip, with the with and without comparison" },
   { id: "how", anchor: "how", label: "How it works", shows: "Three steps from one upload to every platform" },
+  { id: "engine", anchor: "intelligence", label: "Intelligence Engine", shows: "The kiln: a live pixel heat field spelling the engine, its four parts and what it learns from" },
   { id: "features", anchor: "features", label: "Features", shows: "The feature bento: AI captions, scheduling, tracking" },
   { id: "time", anchor: "time-saved", label: "Time saved", shows: "The time-saved calculator, the visitor's own numbers" },
   { id: "demo", anchor: "demo", label: "Live demo", shows: "The animated upload, tailor and publish flow" },
